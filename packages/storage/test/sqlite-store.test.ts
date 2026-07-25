@@ -211,13 +211,15 @@ test("SQLite migration preserves legacy settings while adding current safety and
     assert.deepEqual(store.getSettings(), {
       sync: { iCloudEnabled: false },
       notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "19:00" } },
-      moveFeedback: { soundEnabled: true, hapticsEnabled: true }
+      moveFeedback: { soundEnabled: true, hapticsEnabled: true },
+      sprintGuides: { rulesSeen: false, activeSessionSeen: false, arrowDuelSeen: false }
     });
 
     store.saveSettings({
       sync: { iCloudEnabled: true },
       notifications: { reviewReminder: { mode: "off" } },
-      moveFeedback: { soundEnabled: false, hapticsEnabled: true }
+      moveFeedback: { soundEnabled: false, hapticsEnabled: true },
+      sprintGuides: { rulesSeen: true, activeSessionSeen: true, arrowDuelSeen: false }
     });
     store.migrate();
     store.close();
@@ -232,6 +234,9 @@ test("SQLite migration preserves legacy settings while adding current safety and
       review_reminder_fixed_local_time: string | null;
       move_feedback_sound_enabled: number;
       move_feedback_haptics_enabled: number;
+      sprint_rules_guide_seen: number;
+      sprint_active_session_guide_seen: number;
+      sprint_arrow_duel_guide_seen: number;
     };
     const integrity = migratedDb.prepare("PRAGMA integrity_check").get() as { integrity_check: string };
     migratedDb.close();
@@ -246,7 +251,10 @@ test("SQLite migration preserves legacy settings while adding current safety and
       review_reminder_mode: "off",
       review_reminder_fixed_local_time: null,
       move_feedback_sound_enabled: 0,
-      move_feedback_haptics_enabled: 1
+      move_feedback_haptics_enabled: 1,
+      sprint_rules_guide_seen: 1,
+      sprint_active_session_guide_seen: 1,
+      sprint_arrow_duel_guide_seen: 0
     });
     assert.equal(integrity.integrity_check, "ok");
   } finally {
@@ -842,6 +850,11 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
           moveFeedback: {
             soundEnabled: true,
             hapticsEnabled: true
+          },
+          sprintGuides: {
+            rulesSeen: false,
+            activeSessionSeen: false,
+            arrowDuelSeen: false
           }
         });
 
@@ -858,6 +871,11 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
           moveFeedback: {
             soundEnabled: false,
             hapticsEnabled: true
+          },
+          sprintGuides: {
+            rulesSeen: true,
+            activeSessionSeen: true,
+            arrowDuelSeen: false
           }
         });
 
@@ -889,6 +907,11 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
           moveFeedback: {
             soundEnabled: false,
             hapticsEnabled: true
+          },
+          sprintGuides: {
+            rulesSeen: true,
+            activeSessionSeen: true,
+            arrowDuelSeen: false
           }
         });
         assert.deepEqual(service.getReviewReminderPreference(), { mode: "fixed", fixedLocalTime: "08:15" });

@@ -200,6 +200,7 @@ export const navigationCoverage = {
     "review-filters": coveredBy("review-filters"),
     "settings-advanced-ratings": notCataloged("Issue 253 moves name and current rating editing into each Run editor."),
     "custom-rating-editor": coveredBy("practice-custom-rating-editor"),
+    "sprint-session-guide": coveredBy("practice-active-session-guide"),
     "starting-practice": coveredBy("practice-preparing")
   } satisfies Record<MobileBackTransient, CatalogCoverage>,
   details: {

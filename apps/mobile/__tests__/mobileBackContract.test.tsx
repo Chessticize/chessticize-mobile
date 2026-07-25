@@ -30,6 +30,14 @@ describe("mobile Back contract", () => {
       kind: "dismiss-transient",
       transient: "starting-practice"
     });
+
+    expect(resolveMobileBackIntent({
+      ...rootState,
+      topTransient: "sprint-session-guide"
+    }, "button")).toEqual({
+      kind: "dismiss-transient",
+      transient: "sprint-session-guide"
+    });
   });
 
   it("returns analysis and review detail to their owning surface", () => {

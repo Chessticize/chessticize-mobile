@@ -69,14 +69,16 @@ for (const label of STORE_LABELS) {
       const updated = service.saveSettings({
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "09:45" } },
-        moveFeedback: { soundEnabled: false, hapticsEnabled: true }
+        moveFeedback: { soundEnabled: false, hapticsEnabled: true },
+        sprintGuides: { rulesSeen: true, activeSessionSeen: true, arrowDuelSeen: false }
       });
 
       assert.deepEqual(updated, service.getSettings());
       assert.deepEqual(service.getSettings(), {
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "09:45" } },
-        moveFeedback: { soundEnabled: false, hapticsEnabled: true }
+        moveFeedback: { soundEnabled: false, hapticsEnabled: true },
+        sprintGuides: { rulesSeen: true, activeSessionSeen: true, arrowDuelSeen: false }
       });
     } finally {
       await cleanup();

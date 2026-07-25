@@ -106,6 +106,11 @@ function sampleSnapshot(): ProgressSyncSnapshot {
         moveFeedback: {
           soundEnabled: true,
           hapticsEnabled: true
+        },
+        sprintGuides: {
+          rulesSeen: false,
+          activeSessionSeen: false,
+          arrowDuelSeen: false
         }
       },
       ratings: [],

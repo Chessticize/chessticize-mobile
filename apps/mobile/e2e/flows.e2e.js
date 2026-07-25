@@ -1,4 +1,5 @@
 const {
+  completeFirstUseSessionGuides,
   openTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
@@ -301,6 +302,7 @@ describe('Key user flows', () => {
     await element(by.text('Flow Focus')).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await element(by.id('practice-run-start')).tap();
+    await completeFirstUseSessionGuides();
     await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
 
     await element(by.id('session-abandon')).tap();
@@ -321,6 +323,7 @@ describe('Key user flows', () => {
     await element(by.text('Persistent Focus')).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await element(by.id('practice-run-start')).tap();
+    await completeFirstUseSessionGuides();
     await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);

@@ -6,6 +6,7 @@ import {
   assertValidManualRating,
   assertValidPracticeRunRating,
   buildSprintConfig,
+  buildSprintResultSummary,
   clonePracticeRun,
   createCustomPracticeRun,
   createDefaultRating,
@@ -44,6 +45,7 @@ import type {
   SessionMistakeReviewItem,
   SprintConfig,
   SprintMode,
+  SprintResultSummary,
   SprintState
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter } from "./query-types.ts";
@@ -310,6 +312,15 @@ export class PracticeService {
 
   countHistory(filter: HistoryFilter = {}): number {
     return this.store.countAttempts(filter);
+  }
+
+  getSprintResultSummary(
+    state: Pick<SprintState, "id" | "correctCount" | "mistakeCount">
+  ): SprintResultSummary {
+    return buildSprintResultSummary(
+      state,
+      this.store.listAttempts({ sessionId: state.id })
+    );
   }
 
   getPracticeProgressSummary(nowMs: number, ratingKey: string) {

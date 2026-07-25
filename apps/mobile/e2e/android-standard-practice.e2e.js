@@ -55,7 +55,7 @@ describe(`Android Standard Practice offline persistence (${standardFixture.puzzl
     await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
     await waitForElementTextContaining(
       'sprint-result-solved',
-      `${standardFixture.targetCorrect} / ${standardFixture.targetCorrect}`,
+      `Solved ${standardFixture.targetCorrect}`,
       10000
     );
     await waitForElementTextContaining(

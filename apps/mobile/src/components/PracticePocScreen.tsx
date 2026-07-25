@@ -42,9 +42,11 @@ import {
   historyAttemptSpeedSeconds,
   isUnclearAttemptEligible,
   isReviewOverdue,
+  markSprintGuideSeen,
   normalizeHistoryAttemptDetail,
   PRACTICE_RUN_NAME_MAX_LENGTH,
   RATING_FLOOR,
+  resetSprintGuideProgress,
   resolvePuzzleTimingPolicy,
   reviewAnalysisStartingFen,
   reviewDueState,
@@ -54,6 +56,7 @@ import {
   submitLineMove,
   SERVER_CURATED_THEME_PRESENTATION,
   SERVER_CURATED_THEMES,
+  sprintSessionGuidesFor,
   stepManualRating
 } from "../../../../packages/core/src/index.ts";
 import type {
@@ -81,7 +84,9 @@ import type {
   ReviewContext,
   SessionMistakeReviewItem,
   SprintConfig,
+  SprintGuideKey,
   SprintMode,
+  SprintResultSummary,
   ThemeChoiceIntent,
   SprintState,
   UciEngineTransport
@@ -193,6 +198,7 @@ interface Props {
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   feedbackIssuesOpener?: (url: string) => Promise<void>;
   currentTimeMs?: () => number;
+  sprintGuidanceEnabled?: boolean;
   moveFeedbackSettings?: {
     preview?: MoveFeedbackPreviewer;
   };
@@ -220,6 +226,7 @@ export type SprintSessionGuidePresentation = SprintRulesGuidePresentation & {
 
 export type SprintResultUnclearSummaryPresentation = {
   slowMarkedCount: number;
+  timedOutMarkedCount?: number;
   userMarkedCount: number;
 };
 
@@ -328,6 +335,12 @@ type UnclearPromptState = {
   marked: boolean;
   puzzleId: string;
   question: string;
+};
+
+type PendingGuidedStart = {
+  nextMode: SprintMode;
+  practiceRunId?: string;
+  useCustomTiming: boolean;
 };
 
 const SPRINT_RULES_PREVIEW_UNCLEAR_ATTEMPT_ID = "sprint-rules-preview-final-attempt";
@@ -447,6 +460,7 @@ export function PracticePocScreen({
   debugTrace,
   feedbackIssuesOpener = openFeedbackIssuesInBrowser,
   currentTimeMs = Date.now,
+  sprintGuidanceEnabled = false,
   moveFeedbackSettings,
   puzzleSelectionId,
   puzzleSelectionSeed,
@@ -492,6 +506,7 @@ export function PracticePocScreen({
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const puzzleTimeoutInFlightRef = useRef<string | null>(null);
   const sprintStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingGuidedStartRef = useRef<PendingGuidedStart | null>(null);
   const startingModeRef = useRef<SprintMode | null>(null);
   const startingPracticeRunIdRef = useRef<string | null>(null);
   const deferredBackTransitionsRef = useRef(new Map<string, () => void>());
@@ -573,7 +588,11 @@ export function PracticePocScreen({
   const [practiceExitConfirmationVisible, setPracticeExitConfirmationVisible] = useState(false);
   const [sprintRulesGuideVisible, setSprintRulesGuideVisible] = useState(
     () => sprintRulesDesignPreview?.firstRunGuideInitiallyVisible === true
+      || (sprintGuidanceEnabled && !service.getSettings().sprintGuides.rulesSeen)
   );
+  const [sessionGuidePresentations, setSessionGuidePresentations] = useState<
+    readonly SprintSessionGuidePresentation[]
+  >(() => sprintRulesDesignPreview?.initialSessionGuides ?? []);
   const [sessionGuideIndex, setSessionGuideIndex] = useState<number | null>(
     () => sprintRulesDesignPreview?.initialSessionGuides?.length ? 0 : null
   );
@@ -614,9 +633,15 @@ export function PracticePocScreen({
   const isPaused = state?.status === "paused";
   const isOpenSession = isActive || isPaused;
   const isFinished = state !== null && !isOpenSession;
+  const storedSprintResultSummary = useMemo<SprintResultSummary | undefined>(() => {
+    void aggregateRevision;
+    if (!sprintGuidanceEnabled || !isFinished || !state) {
+      return undefined;
+    }
+    return service.getSprintResultSummary(state);
+  }, [aggregateRevision, sprintGuidanceEnabled, isFinished, service, state]);
   const isShowingFeedbackSnapshot = feedbackSnapshot !== null;
   const shouldShowSessionBoard = isActive || isShowingFeedbackSnapshot;
-  const sessionGuidePresentations = sprintRulesDesignPreview?.initialSessionGuides ?? [];
   const sessionGuidePresentation = sessionGuideIndex === null
     ? undefined
     : sessionGuidePresentations[sessionGuideIndex];
@@ -1235,12 +1260,85 @@ export function PracticePocScreen({
     startSprint(run.mode, run.kind === "custom", run.id);
   }
 
+  function sprintGuidePresentationFor(
+    nextMode: SprintMode,
+    useCustomTiming: boolean,
+    practiceRunId?: string
+  ): SprintRulesGuidePresentation {
+    const config = practiceRunId === undefined
+      ? sprintConfigFor(
+          nextMode,
+          customDurationSeconds,
+          customPerPuzzleSeconds,
+          useCustomTiming,
+          useCustomTiming ? selectedSprintThemes : []
+        )
+      : service.getActivePracticeRun(practiceRunId);
+    const targetOverride = useCustomTiming
+      ? customTargetCorrect
+      : nextMode === "standard"
+        ? standardTargetCorrect
+        : arrowDuelTargetCorrect;
+    return {
+      durationLabel: formatSprintDurationLabel(config.durationSeconds),
+      maxMistakes: config.maxMistakes,
+      targetCorrect: targetOverride ?? config.targetCorrect
+    };
+  }
+
+  function saveSprintGuideSeen(guide: SprintGuideKey): void {
+    const settings = service.getSettings();
+    service.saveSettings({
+      ...settings,
+      sprintGuides: markSprintGuideSeen(settings.sprintGuides, guide)
+    });
+    setSettingsRevision((current) => current + 1);
+  }
+
+  function beginFirstUseSessionGuides(
+    nextMode: SprintMode,
+    useCustomTiming: boolean,
+    practiceRunId?: string
+  ): boolean {
+    if (!sprintGuidanceEnabled || pendingGuidedStartRef.current) {
+      return false;
+    }
+    const guideKeys = sprintSessionGuidesFor(
+      service.getSettings().sprintGuides,
+      nextMode
+    );
+    if (guideKeys.length === 0) {
+      return false;
+    }
+    const presentation = sprintGuidePresentationFor(
+      nextMode,
+      useCustomTiming,
+      practiceRunId
+    );
+    pendingGuidedStartRef.current = {
+      nextMode,
+      useCustomTiming,
+      ...(practiceRunId === undefined ? {} : { practiceRunId })
+    };
+    setSessionGuidePresentations(guideKeys.map((guide) => ({
+      ...presentation,
+      mode: guide === "arrow_duel" ? "arrow_duel" : "standard"
+    })));
+    setSessionGuideCoachStep(0);
+    setSessionGuideIndex(0);
+    navigateToTab("practice");
+    return true;
+  }
+
   function startSprint(
     nextMode: SprintMode = mode,
     useCustomTiming = nextMode === "custom",
     practiceRunId?: string
   ): void {
     if (startingModeRef.current !== null) {
+      return;
+    }
+    if (beginFirstUseSessionGuides(nextMode, useCustomTiming, practiceRunId)) {
       return;
     }
     if (nextMode === "arrow_duel") {
@@ -1598,8 +1696,10 @@ export function PracticePocScreen({
       if (next.attempt) {
         const isSlowAutoMarked = next.attempt.timingStatus === "slow" &&
           next.attempt.unclear === true;
-        setUnclearPrompt(isUnclearAttemptEligible(next.attempt) &&
-          (!next.attempt.unclear || isSlowAutoMarked)
+        setUnclearPrompt(
+          isUnclearAttemptEligible(next.attempt)
+            && next.attempt.result !== "timed_out"
+            && (!next.attempt.unclear || isSlowAutoMarked || next.attempt.result === "wrong")
           ? {
               attemptId: next.attempt.id,
               ...(isSlowAutoMarked ? { autoMarkedReason: "slow" as const } : {}),
@@ -1607,9 +1707,12 @@ export function PracticePocScreen({
               puzzleId: next.attempt.puzzleId,
               question: isSlowAutoMarked
                 ? "Marked unclear because the last puzzle was slow."
+                : next.attempt.result === "wrong"
+                  ? "Was it clear why your last move was wrong?"
                 : "Was it clear why the last correct move worked?"
             }
-          : null);
+          : null
+        );
       }
       commitState(next.state);
       setFeedback(nextFeedback);
@@ -2390,8 +2493,10 @@ export function PracticePocScreen({
   const visibleHistoryPage = historyView?.page;
   const contentOwnsHeader = tab === "review" || tab === "history";
   const reviewSurfaceOpen = reviewSessionSource !== null || historyReviewEntries.length > 0 || historyUnavailableAttempt !== null;
-  const topBackTransient: MobileBackTransient | null = startingMode
-    ? "starting-practice"
+  const topBackTransient: MobileBackTransient | null = isSessionGuideVisible
+    ? "sprint-session-guide"
+    : startingMode
+      ? "starting-practice"
     : practiceExitConfirmationVisible
       ? "practice-exit-confirmation"
       : reviewReminderPermissionPromptVisible
@@ -2454,6 +2559,11 @@ export function PracticePocScreen({
           setCustomRatingEditorOpen(false);
         } else if (intent.transient === "starting-practice") {
           cancelStartingSprint();
+        } else if (intent.transient === "sprint-session-guide") {
+          pendingGuidedStartRef.current = null;
+          setSessionGuidePresentations([]);
+          setSessionGuideIndex(null);
+          setSessionGuideCoachStep(0);
         }
         return true;
       case "close-analysis":
@@ -2603,6 +2713,21 @@ export function PracticePocScreen({
   const selectedManagedRun = activeRunManagementPresentation?.runs.find(
     (run) => run.id === activeRunManagementPresentation.selectedRunId
   );
+  const selectedHomeConfig = selectedManagedRun
+    ? buildSprintConfig({
+        durationSeconds: selectedManagedRun.durationSeconds,
+        mode: selectedManagedRun.mode,
+        perPuzzleSeconds: selectedManagedRun.perPuzzleSeconds
+      })
+    : selectedConfig;
+  const sprintRulesGuidePresentation = sprintRulesDesignPreview?.firstRunGuide
+    ?? (sprintGuidanceEnabled
+      ? {
+          durationLabel: formatSprintDurationLabel(selectedHomeConfig.durationSeconds),
+          maxMistakes: selectedHomeConfig.maxMistakes,
+          targetCorrect: selectedHomeConfig.targetCorrect
+        }
+      : undefined);
   const practiceProgressRatingKey = selectedManagedRun?.ratingKey ?? selectedConfig.ratingKey;
   const practiceProgress = useMemo(() => {
     void aggregateRevision;
@@ -2754,9 +2879,9 @@ export function PracticePocScreen({
             testID="session-puzzle-timeout-overlay"
           >
             <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
-            {sprintRulesDesignPreview?.timeoutCountsAsMistake === true ? (
+            {sprintGuidanceEnabled || sprintRulesDesignPreview?.timeoutCountsAsMistake === true ? (
               <Text style={styles.puzzleTimeoutOverlayDetail}>
-                Mistake · Marked Unclear · Moving on
+                Mistake · Marked Unclear · Added to Review · Moving on
               </Text>
             ) : null}
           </View>
@@ -2836,7 +2961,9 @@ export function PracticePocScreen({
         marked={unclearPrompt.marked}
         question={unclearPrompt.autoMarkedReason === "slow"
           ? "Marked unclear because the previous puzzle was slow."
-          : "Was the previous puzzle clear?"}
+          : unclearPrompt.question.includes("wrong")
+            ? unclearPrompt.question
+            : "Was the previous puzzle clear?"}
         onToggle={toggleUnclearPrompt}
       />
     </View>
@@ -2992,13 +3119,37 @@ export function PracticePocScreen({
                       }
                       const nextIndex = sessionGuideIndex + 1;
                       if (sessionGuidePresentations[nextIndex]) {
+                        if (sprintGuidanceEnabled) {
+                          saveSprintGuideSeen(
+                            sessionGuidePresentation.mode === "arrow_duel"
+                              ? "arrow_duel"
+                              : "active_session"
+                          );
+                        }
                         setSessionGuideIndex(nextIndex);
                         setSessionGuideCoachStep(0);
                         return;
                       }
 
+                      if (sprintGuidanceEnabled) {
+                        saveSprintGuideSeen(
+                          sessionGuidePresentation.mode === "arrow_duel"
+                            ? "arrow_duel"
+                            : "active_session"
+                        );
+                      }
                       setSessionGuideIndex(null);
                       setSessionGuideCoachStep(0);
+                      const pendingStart = pendingGuidedStartRef.current;
+                      pendingGuidedStartRef.current = null;
+                      if (pendingStart) {
+                        startSprint(
+                          pendingStart.nextMode,
+                          pendingStart.useCustomTiming,
+                          pendingStart.practiceRunId
+                        );
+                        return;
+                      }
                       startSprint(sessionGuidePresentation.mode);
                     }}
                   />
@@ -3090,10 +3241,15 @@ export function PracticePocScreen({
                     overdueReviewCount={overdueCount}
                     progress={practiceProgress}
                     runManagement={activeRunManagementPresentation}
-                    sprintRulesGuide={sprintRulesDesignPreview?.firstRunGuide}
+                    sprintRulesGuide={sprintRulesGuidePresentation}
                     sprintRulesGuideVisible={sprintRulesGuideVisible}
                     resumableSprint={resumableSprint}
-                    onDismissSprintRulesGuide={() => setSprintRulesGuideVisible(false)}
+                    onDismissSprintRulesGuide={() => {
+                      setSprintRulesGuideVisible(false);
+                      if (sprintGuidanceEnabled) {
+                        saveSprintGuideSeen("rules");
+                      }
+                    }}
                     onOpenSprintRulesGuide={() => setSprintRulesGuideVisible(true)}
                     onSelectMode={setMode}
                     onStartMode={(nextMode) => startSprint(nextMode)}
@@ -3105,9 +3261,15 @@ export function PracticePocScreen({
                 {!isSessionGuideVisible && !isOpenSession && state === null && activeRunManagementPresentation && activeRunManagementPresentation.screen !== "home" ? (
                   <PracticeRunEditor
                     presentation={activeRunManagementPresentation}
-                    showSprintRulesSummary={sprintRulesDesignPreview?.showRunEditorSummary === true}
+                    showSprintRulesSummary={
+                      sprintGuidanceEnabled
+                      || sprintRulesDesignPreview?.showRunEditorSummary === true
+                    }
                     themeCatalogPresentation={themeCatalogPresentation}
-                    timeoutCountsAsMistake={sprintRulesDesignPreview?.timeoutCountsAsMistake === true}
+                    timeoutCountsAsMistake={
+                      sprintGuidanceEnabled
+                      || sprintRulesDesignPreview?.timeoutCountsAsMistake === true
+                    }
                   />
                 ) : null}
 
@@ -3154,10 +3316,16 @@ export function PracticePocScreen({
                   <>
                     <SprintSummary
                       state={state}
-                      clarifyGoal={sprintRulesDesignPreview?.initialResultState !== undefined}
+                      resultSummary={storedSprintResultSummary}
+                      clarifyGoal={
+                        sprintGuidanceEnabled
+                        || sprintRulesDesignPreview?.initialResultState !== undefined
+                      }
                       elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
                       unclearPrompt={unclearPrompt}
-                      unclearSummary={sprintRulesDesignPreview?.resultUnclearSummary}
+                      unclearSummary={
+                        sprintRulesDesignPreview?.resultUnclearSummary
+                      }
                       includePromptInUnclearSummary={
                         sprintRulesDesignPreview?.initialResultUnclearPrompt !== undefined
                       }
@@ -3362,7 +3530,10 @@ export function PracticePocScreen({
                 iCloudSyncStatus={iCloudSyncStatus}
                 moveFeedbackPreferences={moveFeedbackPreferences}
                 moveFeedbackPreviewer={moveFeedbackSettings?.preview}
-                showSprintGuideReset={sprintRulesDesignPreview?.showSettingsReset === true}
+                showSprintGuideReset={
+                  sprintGuidanceEnabled
+                  || sprintRulesDesignPreview?.showSettingsReset === true
+                }
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
                 onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
                 onMoveFeedbackPreferencesChange={saveMoveFeedbackPreferences}
@@ -3370,6 +3541,15 @@ export function PracticePocScreen({
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
                 onSaveReviewReminderPreference={saveReviewReminderPreference}
                 onSaveICloudSyncEnabled={saveICloudSyncEnabled}
+                onResetSprintGuides={() => {
+                  const settings = service.getSettings();
+                  service.saveSettings({
+                    ...settings,
+                    sprintGuides: resetSprintGuideProgress()
+                  });
+                  setSprintRulesGuideVisible(true);
+                  setSettingsRevision((current) => current + 1);
+                }}
                 onSyncICloudNow={() => runICloudProgressSync("manual")}
               />
             ) : null}
@@ -4122,19 +4302,42 @@ function ActiveSessionGuide({
         timerCopy={timerCopy}
       />
 
-      <View style={styles.sessionGuideCoachNavigation}>
+      <View
+        style={[
+          styles.sessionGuideCoachNavigation,
+          adaptiveLayout.usesSessionRail
+            ? [
+                styles.sessionGuideCoachNavigationRail,
+                { width: adaptiveLayout.sessionRailWidth }
+              ]
+            : null
+        ]}
+        testID="practice-session-guide-navigation"
+      >
         {hasPreviousCoachStep ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Previous guide step"
-            style={styles.sessionGuideCoachBackButton}
+            style={[
+              styles.sessionGuideCoachBackButton,
+              adaptiveLayout.usesSessionRail
+                ? styles.sessionGuideCoachBackButtonRail
+                : null
+            ]}
             testID="practice-session-guide-back"
             onPress={onBack}
           >
             <Text style={styles.sessionGuideCoachBackText}>Back</Text>
           </Pressable>
         ) : (
-          <View style={styles.sessionGuideCoachBackSpacer} />
+          <View
+            style={[
+              styles.sessionGuideCoachBackSpacer,
+              adaptiveLayout.usesSessionRail
+                ? styles.sessionGuideCoachBackSpacerRail
+                : null
+            ]}
+          />
         )}
         <Text
           accessibilityLabel={`Step ${unifiedCoachStep} of ${unifiedCoachTotal}`}
@@ -4146,7 +4349,12 @@ function ActiveSessionGuide({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={continueLabel}
-          style={styles.sessionGuideCoachNextButton}
+          style={[
+            styles.sessionGuideCoachNextButton,
+            adaptiveLayout.usesSessionRail
+              ? styles.sessionGuideCoachNextButtonRail
+              : null
+          ]}
           testID="practice-session-guide-start"
           onPress={onContinue}
         >
@@ -4537,7 +4745,7 @@ function SessionCoachmarkDemo({
               >
                 <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
                 <Text style={styles.puzzleTimeoutOverlayDetail}>
-                  Mistake · Marked Unclear · Moving on
+                  Mistake · Marked Unclear · Added to Review · Moving on
                 </Text>
               </View>
             ) : null}
@@ -4677,6 +4885,7 @@ function SessionCoachmarkDemo({
                   style={[
                     styles.activeSessionBottomFeedback,
                     styles.activeSessionRailBottomFeedback,
+                    styles.sessionGuideRailBottomFeedback,
                     styles.sessionGuideCoachLayer,
                     { width: adaptiveLayout.sessionRailWidth }
                   ]}
@@ -6865,6 +7074,7 @@ function SprintSummary({
   includePromptInUnclearSummary,
   unclearPrompt,
   unclearSummary,
+  resultSummary,
   onToggleUnclear,
   onReplay,
   onBack,
@@ -6877,6 +7087,7 @@ function SprintSummary({
   includePromptInUnclearSummary: boolean;
   unclearPrompt: UnclearPromptState | null;
   unclearSummary?: SprintResultUnclearSummaryPresentation;
+  resultSummary?: SprintResultSummary;
   onToggleUnclear: () => void;
   onReplay: () => void;
   onBack: () => void;
@@ -6886,24 +7097,39 @@ function SprintSummary({
   const delta = (state.ratingAfter ?? state.ratingBefore) - state.ratingBefore;
   const reason = formatEndReason(state.endReason);
   const shouldPrioritizeReview = Boolean(onReview);
-  const attemptCount = state.correctCount + state.mistakeCount;
-  const accuracy = Math.round((state.correctCount / Math.max(1, attemptCount)) * 100);
+  const attemptCount = resultSummary?.attemptCount
+    ?? state.correctCount + state.mistakeCount;
+  const accuracy = resultSummary?.accuracyPercent
+    ?? Math.round((state.correctCount / Math.max(1, attemptCount)) * 100);
   const ratingAfter = state.ratingAfter ?? state.ratingBefore;
-  const reviewImpact = state.mistakeCount > 0
-    ? `${state.mistakeCount} ${state.mistakeCount === 1 ? "mistake" : "mistakes"} queued`
-    : "No new review items";
+  const reviewMistakeCount = resultSummary?.review.mistakeCount ?? state.mistakeCount;
+  const timedOutReviewCount = resultSummary?.review.timedOutCount ?? 0;
+  const wrongMoveReviewCount = Math.max(0, reviewMistakeCount - timedOutReviewCount);
+  const reviewImpact = wrongMoveReviewCount > 0 && timedOutReviewCount > 0
+    ? `${wrongMoveReviewCount} wrong + ${timedOutReviewCount} timed out added to Review`
+    : timedOutReviewCount > 0
+      ? `${timedOutReviewCount} timed out added to Review`
+      : reviewMistakeCount > 0
+        ? `${reviewMistakeCount} ${reviewMistakeCount === 1 ? "mistake" : "mistakes"} queued`
+        : "No new review items";
+  const resolvedUnclearSummary = resultSummary?.unclear ?? unclearSummary;
   const promptMarkedCount = includePromptInUnclearSummary && unclearPrompt?.marked ? 1 : 0;
-  const userMarkedCount = (unclearSummary?.userMarkedCount ?? 0) + promptMarkedCount;
-  const unclearCount = unclearSummary
-    ? userMarkedCount + unclearSummary.slowMarkedCount
+  const userMarkedCount = (resolvedUnclearSummary?.userMarkedCount ?? 0) + promptMarkedCount;
+  const unclearCount = resolvedUnclearSummary
+    ? userMarkedCount
+      + resolvedUnclearSummary.slowMarkedCount
+      + (resolvedUnclearSummary.timedOutMarkedCount ?? 0)
     : 0;
-  const unclearSources = unclearSummary
+  const unclearSources = resolvedUnclearSummary
     ? [
         userMarkedCount > 0
           ? `${userMarkedCount} marked by you`
           : null,
-        unclearSummary.slowMarkedCount > 0
-          ? `${unclearSummary.slowMarkedCount} marked after Slow`
+        resolvedUnclearSummary.slowMarkedCount > 0
+          ? `${resolvedUnclearSummary.slowMarkedCount} marked after Slow`
+          : null,
+        (resolvedUnclearSummary.timedOutMarkedCount ?? 0) > 0
+          ? `${resolvedUnclearSummary.timedOutMarkedCount} marked after Timed out`
           : null
       ].filter((source): source is string => source !== null).join(" · ")
     : "";
@@ -7020,7 +7246,7 @@ function SprintSummary({
         </View>
       </View>
 
-      {unclearSummary && unclearCount > 0 ? (
+      {resolvedUnclearSummary && unclearCount > 0 ? (
         <View
           accessibilityLabel={`Unclear ${unclearCount}. ${unclearSources}. Saved in History. Does not affect your Sprint result.`}
           style={styles.resultUnclearRow}
@@ -7044,7 +7270,7 @@ function SprintSummary({
         <View style={styles.resultReviewCopy}>
           <Text style={styles.listText}>Mistakes</Text>
           <Text style={styles.helperText}>
-            {state.mistakeCount > 0 ? `Review your mistakes · ${reviewImpact}` : reviewImpact}
+            {reviewMistakeCount > 0 ? `Review your mistakes · ${reviewImpact}` : reviewImpact}
           </Text>
         </View>
         <View
@@ -7053,9 +7279,9 @@ function SprintSummary({
         >
           <Text
             testID="sprint-result-mistakes"
-            style={[styles.resultReviewCount, state.mistakeCount > 0 ? styles.errorText : styles.positive]}
+            style={[styles.resultReviewCount, reviewMistakeCount > 0 ? styles.errorText : styles.positive]}
           >
-            {state.mistakeCount}
+            {reviewMistakeCount}
           </Text>
         </View>
       </View>
@@ -11281,6 +11507,7 @@ function SettingsPanel({
   onAdjustRating,
   onAdvancedRatingsOpenChange,
   onRequestReviewReminderPermission,
+  onResetSprintGuides,
   onSaveICloudSyncEnabled,
   onSaveReviewReminderPreference,
   onSyncICloudNow,
@@ -11308,6 +11535,7 @@ function SettingsPanel({
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
   onAdvancedRatingsOpenChange: (open: boolean) => void;
   onRequestReviewReminderPermission: () => Promise<ReviewReminderPermissionStatus>;
+  onResetSprintGuides: () => void;
   onSaveICloudSyncEnabled: (enabled: boolean) => void;
   onSaveReviewReminderPreference: (preference: ReviewReminderPreference) => void;
   onSyncICloudNow: () => Promise<string>;
@@ -11351,7 +11579,10 @@ function SettingsPanel({
                 sprintGuideReady ? styles.settingsGuidanceResetButtonComplete : null
               ]}
               testID="settings-show-sprint-guide"
-              onPress={() => setSprintGuideReady(true)}
+              onPress={() => {
+                onResetSprintGuides();
+                setSprintGuideReady(true);
+              }}
             >
               <Text
                 style={[
@@ -13621,6 +13852,7 @@ const styles = StyleSheet.create({
   sessionGuideCalibrated: {
     alignSelf: "center",
     gap: 12,
+    position: "relative",
     width: "100%"
   },
   sessionGuideCoachFrame: {
@@ -13738,6 +13970,14 @@ const styles = StyleSheet.create({
     padding: 8,
     width: "100%"
   },
+  sessionGuideCoachNavigationRail: {
+    bottom: 0,
+    gap: 6,
+    padding: 4,
+    position: "absolute",
+    right: 0,
+    zIndex: 6
+  },
   sessionGuideCoachBackButton: {
     alignItems: "center",
     borderColor: "#CBD5E1",
@@ -13748,8 +13988,16 @@ const styles = StyleSheet.create({
     minWidth: 76,
     paddingHorizontal: 10
   },
+  sessionGuideCoachBackButtonRail: {
+    minHeight: 44,
+    minWidth: 64,
+    paddingHorizontal: 8
+  },
   sessionGuideCoachBackSpacer: {
     minWidth: 76
+  },
+  sessionGuideCoachBackSpacerRail: {
+    minWidth: 64
   },
   sessionGuideCoachBackText: {
     color: "#334155",
@@ -13772,6 +14020,11 @@ const styles = StyleSheet.create({
     minHeight: 44,
     minWidth: 96,
     paddingHorizontal: 12
+  },
+  sessionGuideCoachNextButtonRail: {
+    minHeight: 44,
+    minWidth: 92,
+    paddingHorizontal: 8
   },
   sessionGuideInfoTitle: {
     color: "#111827",
@@ -14713,6 +14966,9 @@ const styles = StyleSheet.create({
   },
   activeSessionRailBottomFeedback: {
     marginTop: "auto"
+  },
+  sessionGuideRailBottomFeedback: {
+    marginBottom: 64
   },
   activeSessionShell: {
     gap: 8
@@ -16784,7 +17040,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
-    minHeight: 42,
+    minHeight: 44,
     paddingHorizontal: 16
   },
   settingsGuidanceResetButtonComplete: {
