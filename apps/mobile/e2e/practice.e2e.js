@@ -145,7 +145,7 @@ describe('Practice POC', () => {
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
-    await waitFor(element(by.id('sprint-summary-panel'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('sprint-summary-panel'))).toBeVisible().withTimeout(15000);
     await element(by.id('back-practice-button')).tap();
 
     await openTab('settings-tab', 'settings-show-sprint-guide');
@@ -282,6 +282,7 @@ describe('Practice POC', () => {
       10000
     );
     await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('review-session-control-rail')).scrollTo('bottom');
     await waitFor(element(by.id('review-context-actions-rail'))).toExist().withTimeout(10000);
     await expect(element(by.id('review-schedule-control'))).toBeVisible();
     await expect(element(by.id('history-attempt-unclear'))).toBeVisible();

@@ -95,6 +95,15 @@ do not invent interaction tests for them.
 Choose simulator scenes, device profiles, orientations, and supporting test
 scope from the union of changes since the release, not only the newest PR.
 
+- Treat the changed-surface matrix as the primary visual scope. For every
+  changed screen, state, or interaction, drive the real public UI on the
+  simulator and inspect the resulting presentation. The maintained baseline is
+  a regression safety net; it does not replace deeper checks of the release
+  delta.
+- Exercise both portrait and landscape for every changed state that uses
+  adaptive layout, Safe Area geometry, board/control rails, wrapping, scrolling,
+  fixed navigation, or screen-size branches. A portrait pass is not evidence
+  for the corresponding landscape state.
 - Always capture and inspect the maintained fifteen Release scenes plus the
   eleven layout-sensitive landscape scenes on a dedicated iPhone simulator.
 - Add another device family when the delta touches adaptive layout, Safe Area,
@@ -153,6 +162,11 @@ command exiting zero. Inspect:
 - Portrait and landscape clipping, scrolling, and whitespace.
 - Bottom-tab or overlay obstruction.
 - Release-only presentation and absence of developer controls.
+
+For changed interactions, also play the transition before and after the
+captured state through public controls. Confirm that the visible target remains
+reachable and that rotation does not hide, overlap, reset, or replace the state.
+Static screenshots alone do not prove an interaction regression.
 
 Compare against the current Storybook scenario when one exists. Storybook is
 the design contract; the Release simulator is native acceptance evidence.

@@ -929,6 +929,31 @@ describe('Detox suite configuration', () => {
     expect(tapGuideAction).toBeGreaterThan(scrollDown);
   });
 
+  it('scrolls responsive Review actions inside the independent control rail', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const caseStart = practiceSpec.indexOf(
+      "it('persists Unclear, places its History actions responsively"
+    );
+    const caseEnd = practiceSpec.indexOf(
+      "it('opens last sprint mistake review",
+      caseStart
+    );
+    const responsiveHistoryCase = practiceSpec.slice(caseStart, caseEnd);
+    const normalizeOuterScroll = responsiveHistoryCase.indexOf(
+      "element(by.id('practice-main-scroll')).scrollTo('top')"
+    );
+    const scrollControlRail = responsiveHistoryCase.indexOf(
+      "element(by.id('review-session-control-rail')).scrollTo('bottom')"
+    );
+    const requireUnclearVisible = responsiveHistoryCase.indexOf(
+      "expect(element(by.id('history-attempt-unclear'))).toBeVisible()"
+    );
+
+    expect(normalizeOuterScroll).toBeGreaterThan(0);
+    expect(scrollControlRail).toBeGreaterThan(normalizeOuterScroll);
+    expect(requireUnclearVisible).toBeGreaterThan(scrollControlRail);
+  });
+
   it('pins the Arrow Duel screenshot to the exact runtime-selected long-arrow fixture', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const renderCaseStart = practiceSpec.indexOf("it('renders Arrow Duel candidate arrows on the board'");
