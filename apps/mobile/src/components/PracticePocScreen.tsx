@@ -4607,16 +4607,31 @@ function SessionCoachmarkDemo({
             + measuredLayouts["unclear-control"].y
         }
       : undefined;
+  const measuredConnectorRouteY = callout.id === "unclear"
+    && measuredLayouts["unclear-prompt"]
+    ? measuredLayouts["unclear-prompt"].y - 8
+    : measuredRailTarget
+      ? measuredRailTarget.y + measuredRailTarget.height / 2
+      : undefined;
+  const measuredConnectorTargetDrop = callout.id === "unclear"
+    && measuredLayouts["unclear-prompt"]
+    && measuredLayouts["unclear-control"]
+    && measuredConnectorRouteY !== undefined
+    ? Math.max(
+        0,
+        measuredLayouts["unclear-prompt"].y
+          + measuredLayouts["unclear-control"].y
+          - measuredConnectorRouteY
+      )
+    : 0;
   const measuredBoardCalloutTop = calloutUsesBoard
     && measuredCallout
-    && measuredRailTarget
+    && measuredConnectorRouteY !== undefined
     ? Math.round(Math.min(
         Math.max(12, boardSize - measuredCallout.height - 12),
         Math.max(
           12,
-          measuredRailTarget.y
-            + measuredRailTarget.height / 2
-            - measuredCallout.height / 2
+          measuredConnectorRouteY - measuredCallout.height / 2
         )
       ))
     : undefined;
@@ -4689,15 +4704,39 @@ function SessionCoachmarkDemo({
       ]}
       testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
     >
-      <Text
-        style={[
-          styles.sessionGuideCoachTargetConnectorHead,
-          callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
-          callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
-        ]}
-      >
-        ▶
-      </Text>
+      {measuredConnectorTargetDrop > 0 ? (
+        <>
+          <View
+            style={[
+              styles.sessionGuideCoachTargetConnectorDrop,
+              { height: measuredConnectorTargetDrop },
+              callout.tone === "warning" ? styles.sessionGuideCoachTargetConnectorWarning : null,
+              callout.tone === "danger" ? styles.sessionGuideCoachTargetConnectorDanger : null
+            ]}
+            testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}-target-drop`}
+          />
+          <Text
+            style={[
+              styles.sessionGuideCoachTargetConnectorDropHead,
+              { top: measuredConnectorTargetDrop - 2 },
+              callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
+              callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
+            ]}
+          >
+            ▼
+          </Text>
+        </>
+      ) : (
+        <Text
+          style={[
+            styles.sessionGuideCoachTargetConnectorHead,
+            callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
+            callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
+          ]}
+        >
+          ▶
+        </Text>
+      )}
     </View>
   ) : (
     <Text
@@ -14250,6 +14289,20 @@ const styles = StyleSheet.create({
   },
   sessionGuideCoachTargetConnectorDanger: {
     backgroundColor: "#DC2626"
+  },
+  sessionGuideCoachTargetConnectorDrop: {
+    backgroundColor: "#2563EB",
+    position: "absolute",
+    right: 0,
+    top: 0,
+    width: 2
+  },
+  sessionGuideCoachTargetConnectorDropHead: {
+    color: "#2563EB",
+    fontSize: 14,
+    lineHeight: 14,
+    position: "absolute",
+    right: -6
   },
   sessionGuideCoachTargetConnectorHead: {
     color: "#2563EB",

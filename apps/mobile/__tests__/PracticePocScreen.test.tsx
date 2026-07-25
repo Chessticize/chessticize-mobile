@@ -1850,7 +1850,7 @@ describe("PracticePocScreen", () => {
       flattenTestStyle(
         findByTestId(renderer, "practice-session-guide-coach-unclear").props.style
       ).top
-    ).toBe(252);
+    ).toBe(222);
     expect(
       flattenTestStyle(
         findByTestId(
@@ -1859,6 +1859,14 @@ describe("PracticePocScreen", () => {
         ).props.style
       ).width
     ).toBe(adaptiveLayout.sessionRailGap + 222);
+    expect(
+      flattenTestStyle(
+        findByTestId(
+          renderer,
+          "practice-session-guide-coach-pointer-unclear-right-target-drop"
+        ).props.style
+      ).height
+    ).toBe(15);
     expect(
       flattenTestStyle(
         findByTestId(renderer, "practice-session-guide-demo-unclear").props.style
