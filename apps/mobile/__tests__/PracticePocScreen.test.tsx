@@ -1603,6 +1603,15 @@ describe("PracticePocScreen", () => {
     expect(
       flattenTestStyle(findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-coach").props.style).top
     ).toBe(portraitBoardSize / 8 * 3.15 + 4);
+    const portraitArrowCalloutZIndex = Number(flattenTestStyle(
+      findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-coach").props.style
+    ).zIndex);
+    expect(portraitArrowCalloutZIndex).toBeGreaterThan(Number(flattenTestStyle(
+      findByTestId(portraitArrowDuel, "board-coordinate-overlay").props.style
+    ).zIndex));
+    expect(portraitArrowCalloutZIndex).toBeGreaterThan(Number(flattenTestStyle(
+      findByTestId(portraitArrowDuel, "board-input-blocker").props.style
+    ).zIndex));
 
     act(() => {
       windowDimensions.__setWindowDimensions?.({

@@ -14084,7 +14084,7 @@ const styles = StyleSheet.create({
     padding: 11,
     paddingTop: 5,
     position: "absolute",
-    zIndex: 4
+    zIndex: 60
   },
   sessionGuideCoachCopy: {
     gap: 3
