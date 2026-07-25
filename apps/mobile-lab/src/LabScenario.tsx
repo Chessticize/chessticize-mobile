@@ -124,14 +124,22 @@ function sprintRulesDesignPreviewFor(
   if (
     scenarioId === "practice-active-session-guide"
     || scenarioId === "practice-arrow-duel-guide"
+    || scenarioId === "practice-arrow-duel-guide-only"
   ) {
+    const sharedGuide = {
+      durationLabel: "5:00",
+      maxMistakes: 3,
+      mode: "standard" as const,
+      targetCorrect: 15
+    };
+    const arrowDuelGuide = {
+      ...sharedGuide,
+      mode: "arrow_duel" as const
+    };
     return {
-      initialSessionGuide: {
-        durationLabel: "5:00",
-        maxMistakes: 3,
-        mode: scenarioId === "practice-arrow-duel-guide" ? "arrow_duel" : "standard",
-        targetCorrect: 15
-      },
+      initialSessionGuides: scenarioId === "practice-arrow-duel-guide"
+        ? [sharedGuide, arrowDuelGuide]
+        : [scenarioId === "practice-arrow-duel-guide-only" ? arrowDuelGuide : sharedGuide],
       timeoutAddsToReview: true
     };
   }
@@ -287,10 +295,14 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       break;
     case "practice-active-session-guide":
     case "practice-arrow-duel-guide":
+    case "practice-arrow-duel-guide-only":
       service = createSessionGuideService();
       configurePuzzleSource = false;
       screenProps.standardTargetCorrect = 15;
       screenProps.arrowDuelTargetCorrect = 15;
+      break;
+    case "settings-sprint-guidance":
+      screenProps.initialTab = "settings";
       break;
     case "practice-unclear-follow-up":
       screenProps.arrowDuelTargetCorrect = 2;

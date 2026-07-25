@@ -170,7 +170,7 @@ export const ActiveSession: Story = {
 };
 
 export const ActiveSessionGuide: Story = {
-  name: "First active-session guide",
+  name: "Active session · first-use guide",
   args: { scenarioId: "practice-active-session-guide" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "practice-active-session-guide");
@@ -180,11 +180,23 @@ export const ActiveSessionGuide: Story = {
 };
 
 export const ArrowDuelGuide: Story = {
-  name: "First Arrow Duel guide",
+  name: "Arrow Duel · first-ever entry (both guides)",
   args: { scenarioId: "practice-arrow-duel-guide" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-active-session-guide");
+    await waitForText(canvasElement, "GUIDE 1 OF 2 · YOUR FIRST ACTIVE SPRINT");
+    expectTestIdAbsent(canvasElement, "practice-arrow-duel-guide");
+    expectTestIdAbsent(canvasElement, "session-board");
+  }
+};
+
+export const ArrowDuelGuideOnly: Story = {
+  name: "Arrow Duel · guide only (Sprint guide seen)",
+  args: { scenarioId: "practice-arrow-duel-guide-only" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "practice-arrow-duel-guide");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
+    expectTestIdAbsent(canvasElement, "practice-active-session-guide");
     expectTestIdAbsent(canvasElement, "session-board");
   }
 };

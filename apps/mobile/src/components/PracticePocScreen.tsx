@@ -139,6 +139,7 @@ import {
   type MobileBackDestination,
   type MobileBackDetail,
   type MobileBackIntent,
+  type MobileBackPrimaryTab,
   type MobileBackState,
   type MobileBackTab,
   type MobileBackTransient
@@ -200,6 +201,7 @@ interface Props {
   runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
   runEloEditingMovedToHome?: boolean;
+  initialTab?: MobileBackPrimaryTab;
   sprintRulesDesignPreview?: SprintRulesDesignPreview;
   sprintStartDelayMs?: number;
   standardTargetCorrect?: number;
@@ -229,7 +231,7 @@ export type SprintResultUnclearPromptPresentation = {
 export type SprintRulesDesignPreview = {
   firstRunGuide?: SprintRulesGuidePresentation;
   firstRunGuideInitiallyVisible?: boolean;
-  initialSessionGuide?: SprintSessionGuidePresentation;
+  initialSessionGuides?: readonly SprintSessionGuidePresentation[];
   initialResultUnclearPrompt?: SprintResultUnclearPromptPresentation;
   initialResultState?: SprintState;
   resultUnclearSummary?: SprintResultUnclearSummaryPresentation;
@@ -450,6 +452,7 @@ export function PracticePocScreen({
   runManagementEnabled = false,
   runManagementPresentation,
   runEloEditingMovedToHome = false,
+  initialTab = "practice",
   sprintRulesDesignPreview,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
@@ -514,7 +517,7 @@ export function PracticePocScreen({
 
   const [mode, setMode] = useState<SprintMode>("standard");
   const [startingMode, setStartingMode] = useState<SprintMode | null>(null);
-  const [tab, setTab] = useState<Tab>("practice");
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [state, setState] = useState<SprintState | null>(
     () => sprintRulesDesignPreview?.initialResultState ?? null
   );
@@ -570,8 +573,8 @@ export function PracticePocScreen({
   const [sprintRulesGuideVisible, setSprintRulesGuideVisible] = useState(
     () => sprintRulesDesignPreview?.firstRunGuideInitiallyVisible === true
   );
-  const [sessionGuideMode, setSessionGuideMode] = useState<"standard" | "arrow_duel" | null>(
-    () => sprintRulesDesignPreview?.initialSessionGuide?.mode ?? null
+  const [sessionGuideIndex, setSessionGuideIndex] = useState<number | null>(
+    () => sprintRulesDesignPreview?.initialSessionGuides?.length ? 0 : null
   );
   const [historyFiltersExpanded, setHistoryFiltersExpanded] = useState(false);
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
@@ -611,11 +614,12 @@ export function PracticePocScreen({
   const isFinished = state !== null && !isOpenSession;
   const isShowingFeedbackSnapshot = feedbackSnapshot !== null;
   const shouldShowSessionBoard = isActive || isShowingFeedbackSnapshot;
-  const sessionGuidePresentation = sessionGuideMode
-    ? sprintRulesDesignPreview?.initialSessionGuide
-    : undefined;
+  const sessionGuidePresentations = sprintRulesDesignPreview?.initialSessionGuides ?? [];
+  const sessionGuidePresentation = sessionGuideIndex === null
+    ? undefined
+    : sessionGuidePresentations[sessionGuideIndex];
   const isSessionGuideVisible = state === null
-    && sessionGuideMode !== null
+    && sessionGuideIndex !== null
     && sessionGuidePresentation !== undefined;
 
   useEffect(() => {
@@ -2836,7 +2840,7 @@ export function PracticePocScreen({
   const practiceAnnouncement = error
     ? `Error. ${error}`
     : isSessionGuideVisible
-      ? `${sessionGuideMode === "arrow_duel" ? "Arrow Duel" : "Sprint"} first-session guide. The timer has not started.`
+      ? `${sessionGuidePresentation?.mode === "arrow_duel" ? "Arrow Duel" : "Sprint"} first-session guide. The timer has not started.`
     : boardFeedback
       ? `${boardFeedback.result === "correct" ? "Correct move" : "Wrong move"}. ${boardFeedback.puzzleSolved ? "Puzzle complete." : "Continue the puzzle."}`
       : isActive && displayedSideToMove
@@ -2950,12 +2954,17 @@ export function PracticePocScreen({
                 {isSessionGuideVisible && sessionGuidePresentation ? (
                   <ActiveSessionGuide
                     presentation={sessionGuidePresentation}
-                    onStart={() => {
-                      const nextMode = sessionGuideMode;
-                      setSessionGuideMode(null);
-                      if (nextMode) {
-                        startSprint(nextMode);
+                    stepNumber={sessionGuideIndex + 1}
+                    totalSteps={sessionGuidePresentations.length}
+                    onContinue={() => {
+                      const nextIndex = sessionGuideIndex + 1;
+                      if (sessionGuidePresentations[nextIndex]) {
+                        setSessionGuideIndex(nextIndex);
+                        return;
                       }
+
+                      setSessionGuideIndex(null);
+                      startSprint(sessionGuidePresentation.mode);
                     }}
                   />
                 ) : null}
@@ -4016,30 +4025,44 @@ function SprintRuleRow({
 }
 
 function ActiveSessionGuide({
-  onStart,
-  presentation
+  onContinue,
+  presentation,
+  stepNumber,
+  totalSteps
 }: {
-  onStart: () => void;
+  onContinue: () => void;
   presentation: SprintSessionGuidePresentation;
+  stepNumber: number;
+  totalSteps: number;
 }): React.JSX.Element {
   const isArrowDuel = presentation.mode === "arrow_duel";
+  const hasNextGuide = stepNumber < totalSteps;
   const title = isArrowDuel ? "How Arrow Duel works" : "Know what happens while you solve";
-  const startLabel = isArrowDuel ? "Start Arrow Duel" : "Start Sprint";
+  const startLabel = hasNextGuide
+    ? "Next: Arrow Duel"
+    : isArrowDuel
+      ? "Start Arrow Duel"
+      : "Start Sprint";
+  const timerCopy = totalSteps > 1 && stepNumber === 1
+    ? "Your timer starts after both guides."
+    : "Your timer starts after this guide.";
+  const stepCopy = totalSteps > 1 ? `GUIDE ${stepNumber} OF ${totalSteps} · ` : "";
+  const accessibilityStepCopy = totalSteps > 1 ? `Guide ${stepNumber} of ${totalSteps}. ` : "";
 
   return (
     <View
       accessibilityLabel={isArrowDuel
-        ? "Your first Arrow Duel. Compare the two candidate arrows, then play the stronger move. Only the shown candidates count. The timer starts after this guide."
-        : `Your first active Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. A Slow warning automatically marks the puzzle as Unclear without adding a mistake. A timeout marks the puzzle Timed out and Unclear, adds it to Review, then moves on. After a correct puzzle, use Mark as unclear when the solution still did not make sense. The timer starts after this guide.`}
+        ? `${accessibilityStepCopy}Your first Arrow Duel. Compare the two candidate arrows, then play the stronger move. Only the shown candidates count. ${timerCopy}`
+        : `${accessibilityStepCopy}Your first active Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. A Slow warning automatically marks the puzzle as Unclear without adding a mistake. A timeout marks the puzzle Timed out and Unclear, adds it to Review, then moves on. After a correct puzzle, use Mark as unclear when the solution still did not make sense. ${timerCopy}`}
       style={styles.sessionGuide}
       testID={isArrowDuel ? "practice-arrow-duel-guide" : "practice-active-session-guide"}
     >
       <View style={styles.sessionGuideHeader}>
-        <Text style={styles.sessionGuideEyebrow}>
-          {isArrowDuel ? "YOUR FIRST ARROW DUEL" : "YOUR FIRST ACTIVE SPRINT"}
+        <Text style={styles.sessionGuideEyebrow} testID="practice-session-guide-progress">
+          {stepCopy}{isArrowDuel ? "YOUR FIRST ARROW DUEL" : "YOUR FIRST ACTIVE SPRINT"}
         </Text>
         <Text style={styles.sessionGuideTitle}>{title}</Text>
-        <Text style={styles.sessionGuideIntro}>Your timer starts after this guide.</Text>
+        <Text style={styles.sessionGuideIntro}>{timerCopy}</Text>
       </View>
 
       {isArrowDuel ? (
@@ -4118,7 +4141,7 @@ function ActiveSessionGuide({
         accessibilityLabel={startLabel}
         style={styles.sessionGuideStartButton}
         testID={isArrowDuel ? "practice-arrow-duel-guide-start" : "practice-session-guide-start"}
-        onPress={onStart}
+        onPress={onContinue}
       >
         <Text style={styles.sessionGuideStartButtonText}>{startLabel}</Text>
       </Pressable>
@@ -10774,6 +10797,28 @@ function SettingsPanel({
 
   return (
     <View style={[styles.settingsPanel, adaptiveLayout.usesWideContent ? styles.settingsPanelWide : null]} testID="settings-panel">
+      {showSprintGuideReset ? (
+        <SettingsSection title="Guidance" testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
+          <SettingsActionRow
+            label="Show Sprint guides again"
+            detail="Replay the rules, active-session, and Arrow Duel guides. Runs, ratings, and History stay unchanged."
+            testID="settings-show-sprint-guide"
+            onPress={() => setSprintGuideReady(true)}
+          />
+          {sprintGuideReady ? (
+            <View
+              accessibilityLiveRegion="polite"
+              style={styles.sprintGuideReadyStatus}
+              testID="settings-sprint-guide-ready"
+            >
+              <Text style={styles.sprintGuideReadyStatusText}>
+                Sprint rules, active-session, and Arrow Duel guides will replay in their next matching session
+              </Text>
+            </View>
+          ) : null}
+        </SettingsSection>
+      ) : null}
+
       {progressProtection.kind === "icloud_sync" ? (
         <SettingsSection title="iCloud Sync" testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
           <SettingsRow
@@ -10930,26 +10975,6 @@ function SettingsPanel({
                 setStatusMessage(`${ratingLabelFromKey(ratingKey)} rating set to ${next.rating}`);
               }}
             />
-          ) : null}
-        </SettingsSection>
-      ) : null}
-
-      {showSprintGuideReset ? (
-        <SettingsSection title="Guidance" testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
-          <SettingsActionRow
-            label="Show Sprint guides again"
-            detail="Replay the rules, active-session, and Arrow Duel guides. Runs, ratings, and History stay unchanged."
-            testID="settings-show-sprint-guide"
-            onPress={() => setSprintGuideReady(true)}
-          />
-          {sprintGuideReady ? (
-            <View
-              accessibilityLiveRegion="polite"
-              style={styles.sprintGuideReadyStatus}
-              testID="settings-sprint-guide-ready"
-            >
-              <Text style={styles.sprintGuideReadyStatusText}>Guides ready for your next Sprint</Text>
-            </View>
           ) : null}
         </SettingsSection>
       ) : null}

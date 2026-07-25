@@ -40,14 +40,10 @@ export const IosSync: Story = {
 };
 
 export const SprintGuideReset: Story = {
-  name: "Sprint guides reset",
+  name: "Guidance · replay Sprint and Arrow Duel guides",
   args: { scenarioId: "settings-sprint-guidance" },
   play: async ({ canvasElement }) => {
-    await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-guidance-section");
-    await clickTestId(canvasElement, "settings-show-sprint-guide");
-    await waitForTestId(canvasElement, "settings-sprint-guide-ready");
-    (canvasElement.querySelector('[data-testid="settings-show-sprint-guide"]') as HTMLElement | null)?.blur();
   }
 };
 

@@ -1091,14 +1091,43 @@ describe("PracticePocScreen", () => {
     press(activeSession, "practice-session-guide-start");
     expect(findByTestId(activeSession, "session-board")).toBeTruthy();
 
-    const arrowDuel = renderLabScenario("practice-arrow-duel-guide");
+    const firstEverArrowDuel = renderLabScenario("practice-arrow-duel-guide");
 
-    expect(findByTestId(arrowDuel, "practice-arrow-duel-guide")).toBeTruthy();
-    expect(findByTestId(arrowDuel, "practice-arrow-duel-guide-candidates")).toBeTruthy();
-    expect(() => findByTestId(arrowDuel, "session-board")).toThrow();
-    expect(collectText(findByTestId(arrowDuel, "practice-arrow-duel-guide"))).toContain(
+    expect(findByTestId(firstEverArrowDuel, "practice-active-session-guide")).toBeTruthy();
+    expect(() => findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide")).toThrow();
+    expect(() => findByTestId(firstEverArrowDuel, "session-board")).toThrow();
+    expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-progress"))).toBe(
+      "GUIDE 1 OF 2 · YOUR FIRST ACTIVE SPRINT"
+    );
+    expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-start"))).toBe(
+      "Next: Arrow Duel"
+    );
+
+    press(firstEverArrowDuel, "practice-session-guide-start");
+    expect(() => findByTestId(firstEverArrowDuel, "practice-active-session-guide")).toThrow();
+    expect(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide")).toBeTruthy();
+    expect(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-candidates")).toBeTruthy();
+    expect(() => findByTestId(firstEverArrowDuel, "session-board")).toThrow();
+    expect(collectText(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide"))).toContain(
       "Only the two shown candidates count; other moves are ignored."
     );
+    expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-progress"))).toBe(
+      "GUIDE 2 OF 2 · YOUR FIRST ARROW DUEL"
+    );
+
+    press(firstEverArrowDuel, "practice-arrow-duel-guide-start");
+    expect(findByTestId(firstEverArrowDuel, "sprint-loading-overlay")).toBeTruthy();
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+    expect(findByTestId(firstEverArrowDuel, "session-board")).toBeTruthy();
+
+    const returningArrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
+
+    expect(findByTestId(returningArrowDuel, "practice-arrow-duel-guide")).toBeTruthy();
+    expect(() => findByTestId(returningArrowDuel, "practice-active-session-guide")).toThrow();
+    expect(findByTestId(returningArrowDuel, "practice-arrow-duel-guide-candidates")).toBeTruthy();
+    expect(() => findByTestId(returningArrowDuel, "session-board")).toThrow();
   });
 
   it("summarizes dynamic pass rules in New Run and keeps the preview out of product defaults", () => {
@@ -1142,10 +1171,10 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("lets Settings make the Sprint guide available again without a confirmation step", () => {
+  it("opens the Settings guidance story directly and resets both Sprint guides without confirmation", () => {
     const renderer = renderLabScenario("settings-sprint-guidance");
 
-    press(renderer, "settings-tab");
+    expect(findByTestId(renderer, "settings-panel")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-show-sprint-guide"))).toContain(
       "Runs, ratings, and History stay unchanged."
     );
@@ -1156,7 +1185,7 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "settings-show-sprint-guide");
     expect(collectText(findByTestId(renderer, "settings-sprint-guide-ready"))).toBe(
-      "Guides ready for your next Sprint"
+      "Sprint rules, active-session, and Arrow Duel guides will replay in their next matching session"
     );
   });
 
