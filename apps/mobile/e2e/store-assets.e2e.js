@@ -1,6 +1,7 @@
 const { execFileSync } = require('node:child_process');
 const { resolve } = require('node:path');
 const {
+  frameFor,
   launchWithDisabledSynchronization,
   openTab,
   playBoardMove,
@@ -9,6 +10,7 @@ const {
   textFromAttributes,
   waitForVisibleInPracticeScroll
 } = require('./helpers');
+const { expectFrameContained } = require('./screenshotAssertions');
 
 const describeStoreAssets = process.env.CHESSTICIZE_CAPTURE_STORE_ASSETS === '1' ? describe : describe.skip;
 const captureLandscapeAssets = process.env.CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS === '1';
@@ -106,7 +108,10 @@ async function completeOneWrongReview() {
     'review-current-puzzle-id'
   );
   await takePortraitScreenshotAtTop('app-store-08-review-session');
-  await takeLandscapeScreenshot('app-store-08-review-session');
+  await takeLandscapeScreenshot(
+    'app-store-08-review-session',
+    assertReviewLandscapeLayout
+  );
   await playBoardMove('review-board', fixture.wrongMove, fixture.flipped);
   await waitFor(element(by.id('review-reminder-permission-prompt'))).toExist().withTimeout(10000);
   await element(by.id('review-reminder-permission-dismiss')).tap();
@@ -188,7 +193,7 @@ async function takePortraitScreenshotAtTop(name) {
   await device.takeScreenshot(name);
 }
 
-async function takeLandscapeScreenshot(name) {
+async function takeLandscapeScreenshot(name, assertLayout) {
   if (!captureLandscapeAssets) {
     return;
   }
@@ -196,10 +201,37 @@ async function takeLandscapeScreenshot(name) {
   await device.setOrientation('landscape');
   try {
     await sleep(500);
+    await assertLayout?.();
     await device.takeScreenshot(`${name}-landscape`);
   } finally {
     await device.setOrientation('portrait');
     await sleep(500);
+  }
+}
+
+async function assertReviewLandscapeLayout() {
+  const screenFrame = await frameFor(element(by.id('adaptive-layout')));
+  const layoutFrame = await frameFor(element(by.id('review-session-adaptive-layout')));
+  const boardFrame = await frameFor(element(by.id('review-board')));
+  const controlRailFrame = await frameFor(element(by.id('review-session-control-rail')));
+  const headerFrame = await frameFor(element(by.id('review-header')));
+  const promptFrame = await frameFor(element(by.id('practice-prompt')));
+
+  expectFrameContained(layoutFrame, screenFrame, 'Review landscape layout');
+  expectFrameContained(boardFrame, layoutFrame, 'Review landscape board');
+  expectFrameContained(controlRailFrame, layoutFrame, 'Review landscape control rail');
+  expectFrameContained(headerFrame, controlRailFrame, 'Review landscape header');
+  expectFrameContained(promptFrame, controlRailFrame, 'Review landscape instruction');
+
+  if (Math.abs(boardFrame.width - boardFrame.height) > 1) {
+    throw new Error(`Review landscape board must stay square: ${JSON.stringify(boardFrame)}`);
+  }
+  const boardRight = boardFrame.x + boardFrame.width;
+  if (boardFrame.x >= controlRailFrame.x || boardRight > controlRailFrame.x + 1) {
+    throw new Error(
+      'Review landscape board must stay left of and separate from the control rail: '
+      + `board=${JSON.stringify(boardFrame)}, rail=${JSON.stringify(controlRailFrame)}`
+    );
   }
 }
 

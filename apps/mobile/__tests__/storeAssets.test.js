@@ -91,7 +91,12 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-01-practice-tab')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-05-standard-sprint')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-06-arrow-duel')");
-    expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-08-review-session')");
+    expect(storeAssetsE2e).toContain(
+      "'app-store-08-review-session',\n    assertReviewLandscapeLayout"
+    );
+    expect(storeAssetsE2e).toContain("frameFor(element(by.id('review-session-adaptive-layout')))");
+    expect(storeAssetsE2e).toContain("expectFrameContained(boardFrame, layoutFrame");
+    expect(storeAssetsE2e).toContain("boardRight > controlRailFrame.x + 1");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-05-standard-sprint')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-06-arrow-duel')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-08-review-session')");

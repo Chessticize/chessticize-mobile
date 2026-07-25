@@ -10,6 +10,11 @@ import {
   type PracticeDebugTraceEvent,
   type PracticeRunManagementPresentation
 } from "../src/components/PracticePocScreen";
+import {
+  buildPracticeAdaptiveLayout,
+  PRACTICE_UI_PADDING,
+  type PracticeSafeAreaInsets
+} from "../src/components/adaptivePracticeLayout";
 import { LabScenario } from "../../mobile-lab/src/LabScenario";
 import {
   createMobilePracticeService,
@@ -3146,6 +3151,159 @@ describe("PracticePocScreen", () => {
       .toBe("Mistakes 0");
     expect(controlRail.findByProps({ testID: "session-score-left" }).props.accessibilityLabel)
       .toBe("Left 15");
+  });
+
+  it.each([
+    {
+      height: 402,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 },
+      label: "iPhone 17 landscape",
+      scale: 3,
+      width: 874
+    },
+    {
+      height: 834,
+      insets: { top: 0, right: 0, bottom: 20, left: 0 },
+      label: "11-inch iPad landscape",
+      scale: 2,
+      width: 1210
+    }
+  ])("keeps active Review in the Sprint board-left layout on $label", ({
+    height,
+    insets,
+    scale,
+    width
+  }: {
+    height: number;
+    insets: PracticeSafeAreaInsets;
+    label: string;
+    scale: number;
+    width: number;
+  }) => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: {
+        fontScale: number;
+        height: number;
+        scale: number;
+        width: number;
+      }) => void;
+    }).__setWindowDimensions?.({ width, height, scale, fontScale: 1 });
+    (SafeAreaContext as unknown as {
+      __setSafeAreaInsets?: (nextInsets: PracticeSafeAreaInsets) => void;
+    }).__setSafeAreaInsets?.(insets);
+
+    const expectedLayout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height,
+      insets,
+      width
+    });
+    const sprintRenderer = renderScreen({
+      practiceService: createMobilePracticeService("familiar15")
+    });
+    startStandardSprint(sprintRenderer);
+    const sprintBoardSize = Number(
+      flattenTestStyle(findByTestId(sprintRenderer, "session-board").props.style).width
+    );
+
+    const reviewRenderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
+      practiceService: createDueReviewService(1)
+    });
+    press(reviewRenderer, "review-tab");
+    press(reviewRenderer, "review-start-due");
+
+    const reviewLayout = findByTestId(reviewRenderer, "review-session-adaptive-layout");
+    const boardLane = findByTestId(reviewRenderer, "review-session-board-lane");
+    const controlRail = findByTestId(reviewRenderer, "review-session-control-rail");
+    const boardStyle = flattenTestStyle(findByTestId(reviewRenderer, "review-board").props.style);
+    const layoutStyle = flattenTestStyle(reviewLayout.props.style);
+    const boardLaneStyle = flattenTestStyle(boardLane.props.style);
+    const controlRailStyle = flattenTestStyle(controlRail.props.style);
+
+    expect(boardStyle.width).toBe(sprintBoardSize);
+    expect(boardStyle.height).toBe(sprintBoardSize);
+    expect(layoutStyle.width).toBe(expectedLayout.sessionPackedRowWidth);
+    expect(layoutStyle.gap).toBe(expectedLayout.sessionRailGap);
+    expect(boardLaneStyle.width).toBe(sprintBoardSize);
+    expect(controlRailStyle.width).toBe(expectedLayout.sessionRailWidth);
+    expect(controlRailStyle.height).toBe(sprintBoardSize);
+    expect(sprintBoardSize + 2 * PRACTICE_UI_PADDING)
+      .toBeLessThanOrEqual(expectedLayout.contentHeight);
+    expect(controlRail.findByProps({ testID: "review-header" })).toBeTruthy();
+    expect(controlRail.findByProps({ testID: "review-context-strip" })).toBeTruthy();
+    expect(controlRail.findByProps({ testID: "practice-prompt" })).toBeTruthy();
+    expect(() => boardLane.findByProps({ testID: "review-header" })).toThrow();
+    expect(() => boardLane.findByProps({ testID: "review-context-strip" })).toThrow();
+    expect(() => boardLane.findByProps({ testID: "practice-prompt" })).toThrow();
+    expect(boardLane.findByProps({ testID: "review-board" })).toBeTruthy();
+  });
+
+  it("keeps the native Review board mounted while rotating into its unobstructed landscape lane", () => {
+    const windowDimensions = ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: {
+        fontScale: number;
+        height: number;
+        scale: number;
+        width: number;
+      }) => void;
+    };
+    const safeArea = SafeAreaContext as unknown as {
+      __setSafeAreaInsets?: (insets: PracticeSafeAreaInsets) => void;
+    };
+    windowDimensions.__setWindowDimensions?.({
+      width: 402,
+      height: 874,
+      scale: 3,
+      fontScale: 1
+    });
+    safeArea.__setSafeAreaInsets?.({ top: 62, right: 0, bottom: 34, left: 0 });
+
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
+      practiceService: createDueReviewService(1)
+    });
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+
+    const portraitReviewBoard = findByTestId(renderer, "review-board");
+    const portraitChessboard = findByTestId(renderer, "mock-chessboard");
+    const portraitCoordinateOverlay = findByTestId(renderer, "board-coordinate-overlay");
+    const portraitHandlers = {
+      mockResetBoard: portraitChessboard.props.mockResetBoard
+    };
+
+    expect(findByTestId(renderer, "review-session-stacked-layout")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-session-control-rail")).toThrow();
+    expect(testIdOrder(renderer, "review-header", "review-board")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "practice-prompt", "review-board")).toBeLessThan(0);
+
+    act(() => {
+      windowDimensions.__setWindowDimensions?.({
+        width: 874,
+        height: 402,
+        scale: 3,
+        fontScale: 1
+      });
+      safeArea.__setSafeAreaInsets?.({ top: 0, right: 62, bottom: 21, left: 62 });
+    });
+
+    const landscapeReviewBoard = findByTestId(renderer, "review-board");
+    const landscapeChessboard = findByTestId(renderer, "mock-chessboard");
+    const landscapeCoordinateOverlay = findByTestId(renderer, "board-coordinate-overlay");
+    expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
+      .toBe("Layout compactLandscape");
+    expect(findByTestId(renderer, "review-session-adaptive-layout")).toBeTruthy();
+    expect(landscapeReviewBoard).toBe(portraitReviewBoard);
+    expect(landscapeChessboard).toBe(portraitChessboard);
+    expect(landscapeCoordinateOverlay).toBe(portraitCoordinateOverlay);
+    expect(landscapeChessboard.props.mockResetBoard).toBe(portraitHandlers.mockResetBoard);
+    expect(findByTestId(renderer, "review-session-board-lane").findByProps({
+      testID: "review-board"
+    })).toBeTruthy();
+    expect(findByTestId(renderer, "review-session-control-rail").findByProps({
+      testID: "review-header"
+    })).toBeTruthy();
   });
 
   it.each([

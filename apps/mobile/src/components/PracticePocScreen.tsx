@@ -10622,7 +10622,17 @@ function ReviewSession({
     || currentEntry.source !== "due"
     || reviewResultRecorded;
   const reviewPromptNode = (
-    <View style={[styles.practicePromptStack, { width: boardSize }]}>
+    <View
+      key="review-prompt"
+      style={[
+        styles.practicePromptStack,
+        {
+          width: adaptiveLayout.usesSessionRail
+            ? adaptiveLayout.sessionRailWidth
+            : boardSize
+        }
+      ]}
+    >
       <PracticePrompt
         currentPuzzle={currentPuzzle}
         kingPieceSize={kingGlyphSizeForBoard(boardSize)}
@@ -10642,60 +10652,47 @@ function ReviewSession({
       />
     </View>
   );
-
-  return (
-    <View style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]} testID="review-session">
-      <View
-        accessible
-        accessibilityLabel={feedback
-          ? `${feedback.result === "correct" ? "Correct move" : "Wrong move"}. ${feedback.puzzleSolved ? "Puzzle complete." : "Continue the review."}`
-          : analysisEnabled
-            ? `Analysis ${analysisEngineLabel || "ready"}. ${sideToMoveAccessibilityLabel(reviewSideToMove)}.${lastMove ? ` Last move ${lastMove.from} to ${lastMove.to}.` : ""}`
-            : `Review puzzle ${reviewProgressPosition} of ${reviewProgressTotal}. ${sideToMoveAccessibilityLabel(reviewSideToMove)}.`}
-        accessibilityLiveRegion="polite"
-        style={styles.accessibilityAnnouncement}
-        testID="review-announcement"
-      />
-      <View style={styles.reviewHeaderRow}>
-        <View style={styles.reviewTopNav}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Exit review"
-            testID="review-exit"
-            style={styles.iconButton}
-            onPress={() => onReturnToOwner(currentEntry.source)}
-          >
-            <CloseGlyph />
-          </Pressable>
-          <View style={styles.reviewTitleBlock}>
-            <Text style={styles.panelTitle}>Review</Text>
-            <Text testID="review-progress" style={styles.helperText}>
-              {reviewProgressPosition} / {reviewProgressTotal} · {modeLabel(currentEntry.mode)}
-            </Text>
-            {arePracticeTestControlsEnabled() || isStoreAssetCaptureEnabled() ? (
-              <>
-                <Text testID="review-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
-                  {currentEntry.puzzle.id}
-                </Text>
-                <Text testID="review-current-expected-move" style={styles.reviewDueHiddenMetric}>
-                  {expectedReviewMove(currentPuzzle)}
-                </Text>
-                <Text testID="review-board-flipped" style={styles.reviewDueHiddenMetric}>
-                  {boardFlipped ? "flipped" : "normal"}
-                </Text>
-                <Text testID="review-board-state" style={styles.reviewDueHiddenMetric}>
-                  {reviewBoardLocked ? "locked" : "ready"}
-                </Text>
-              </>
-            ) : null}
-          </View>
-          <View
-            style={[
-              styles.iconButtonRow,
-              currentEntry.source === "due" ? styles.reviewHeaderDueActionsPlaceholder : null
-            ]}
-            testID="review-header-actions"
-          >
+  const reviewHeaderNode = (
+    <View key="review-header" style={styles.reviewHeaderRow} testID="review-header">
+      <View style={styles.reviewTopNav}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Exit review"
+          testID="review-exit"
+          style={styles.iconButton}
+          onPress={() => onReturnToOwner(currentEntry.source)}
+        >
+          <CloseGlyph />
+        </Pressable>
+        <View style={styles.reviewTitleBlock}>
+          <Text style={styles.panelTitle}>Review</Text>
+          <Text testID="review-progress" style={styles.helperText}>
+            {reviewProgressPosition} / {reviewProgressTotal} · {modeLabel(currentEntry.mode)}
+          </Text>
+          {arePracticeTestControlsEnabled() || isStoreAssetCaptureEnabled() ? (
+            <>
+              <Text testID="review-current-puzzle-id" style={styles.reviewDueHiddenMetric}>
+                {currentEntry.puzzle.id}
+              </Text>
+              <Text testID="review-current-expected-move" style={styles.reviewDueHiddenMetric}>
+                {expectedReviewMove(currentPuzzle)}
+              </Text>
+              <Text testID="review-board-flipped" style={styles.reviewDueHiddenMetric}>
+                {boardFlipped ? "flipped" : "normal"}
+              </Text>
+              <Text testID="review-board-state" style={styles.reviewDueHiddenMetric}>
+                {reviewBoardLocked ? "locked" : "ready"}
+              </Text>
+            </>
+          ) : null}
+        </View>
+        <View
+          style={[
+            styles.iconButtonRow,
+            currentEntry.source === "due" ? styles.reviewHeaderDueActionsPlaceholder : null
+          ]}
+          testID="review-header-actions"
+        >
           {currentEntry.source === "session" || currentEntry.source === "history" ? (
             <>
               <Pressable
@@ -10735,34 +10732,203 @@ function ReviewSession({
               <Text style={styles.iconButtonText}>↺</Text>
             </Pressable>
           ) : null}
-          </View>
-        </View>
-        <View style={styles.reviewContextStrip} testID="review-context-strip">
-          {currentEntry.source === "session" ? (
-            <View style={styles.reviewContextPill} testID="review-source-pill">
-              <Text style={styles.reviewContextPillText}>Sprint review</Text>
-            </View>
-          ) : null}
-          {reviewRemainingSeconds !== null ? (
-            <View style={[styles.reviewContextPill, styles.reviewTimerPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}>
-              <Text
-                numberOfLines={1}
-                testID="review-timer"
-                style={reviewRemainingSeconds === 0
-                  ? [styles.reviewContextPillText, styles.errorText]
-                  : styles.reviewTimerText}
-              >
-                {reviewRemainingSeconds === 0 ? "Time expired" : formatDuration(reviewRemainingSeconds)}
-              </Text>
-            </View>
-          ) : null}
         </View>
       </View>
+      <View style={styles.reviewContextStrip} testID="review-context-strip">
+        {currentEntry.source === "session" ? (
+          <View style={styles.reviewContextPill} testID="review-source-pill">
+            <Text style={styles.reviewContextPillText}>Sprint review</Text>
+          </View>
+        ) : null}
+        {reviewRemainingSeconds !== null ? (
+          <View style={[styles.reviewContextPill, styles.reviewTimerPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}>
+            <Text
+              numberOfLines={1}
+              testID="review-timer"
+              style={reviewRemainingSeconds === 0
+                ? [styles.reviewContextPillText, styles.errorText]
+                : styles.reviewTimerText}
+            >
+              {reviewRemainingSeconds === 0 ? "Time expired" : formatDuration(reviewRemainingSeconds)}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+  const reviewAnalysisColumnNode = hasAnalysisPanelContent
+    || (adaptiveLayout.usesSessionRail && hasReviewContextActions) ? (
+      <View
+        key="review-analysis-column"
+        style={[
+          styles.reviewAnalysisColumn,
+          adaptiveLayout.usesSessionRail ? styles.reviewAnalysisPanelWide : null,
+          adaptiveLayout.usesSessionRail ? { width: adaptiveLayout.sessionRailWidth } : null
+        ]}
+        testID="review-analysis-column"
+      >
+        {hasAnalysisPanelContent ? (
+          <View style={styles.analysisPanel} testID="review-analysis-panel">
+            {!analysisEnabled && guidedEvalLines.length > 0 ? (
+              <View testID="review-guided-eval-list">
+                {guidedEvalLines.map((line, index) => (
+                  <View
+                    key={`${line.move}-${index}`}
+                    style={styles.analysisLineRow}
+                    testID={`review-guided-eval-line-${index}`}
+                  >
+                    <Text style={styles.analysisEvalText}>{line.score}</Text>
+                    <Text style={styles.analysisMoveText} numberOfLines={1}>
+                      {line.label === "Current position" ? line.san : `${index + 1}. ${line.san}`}
+                    </Text>
+                    <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {analysisEnabled || currentEntry.source !== "due" || reviewResultRecorded ? (
+              <View style={styles.analysisToolbar} testID="review-analysis-toolbar">
+                {analysisEnabled ? (
+                  <>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Close analysis" testID="review-close-analysis" style={styles.iconButton} onPress={closeAnalysis}>
+                      <CloseGlyph />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Analysis back"
+                      accessibilityState={{ disabled: !canAnalysisBack }}
+                      disabled={!canAnalysisBack}
+                      testID="review-analysis-back"
+                      style={[styles.iconButton, !canAnalysisBack ? styles.disabledButton : null]}
+                      onPress={stepAnalysisBack}
+                    >
+                      <ChevronGlyph direction="left" />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Analysis forward"
+                      accessibilityState={{ disabled: !canAnalysisForward }}
+                      disabled={!canAnalysisForward}
+                      testID="review-analysis-forward"
+                      style={[styles.iconButton, !canAnalysisForward ? styles.disabledButton : null]}
+                      onPress={stepAnalysisForward}
+                    >
+                      <ChevronGlyph direction="right" />
+                    </Pressable>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Reset analysis" testID="review-analysis-reset" style={styles.iconButton} onPress={resetAnalysisPosition}>
+                      <Text style={styles.iconButtonText}>↺</Text>
+                    </Pressable>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Flip board" testID="review-analysis-flip" style={styles.iconButton} onPress={() => setManualBoardFlip((current) => !current)}>
+                      <FlipGlyph />
+                    </Pressable>
+                    <Text testID="review-analysis-engine-status" style={styles.analysisEngineStatus} numberOfLines={1}>
+                      {analysisEngineLabel}
+                    </Text>
+                  </>
+                ) : (
+                  <Pressable accessibilityRole="button" accessibilityLabel="Analyze position" testID="review-analysis-button" style={styles.analysisPrimaryButton} onPress={openAnalysis}>
+                    <SearchGlyph />
+                    <Text style={styles.analysisPrimaryButtonText}>Analysis</Text>
+                  </Pressable>
+                )}
+              </View>
+            ) : null}
+            {analysisEnabled ? (
+              <>
+                {analysisEngineStatus === "error" ? (
+                  <View style={styles.analysisError} testID="review-analysis-error">
+                    <Text style={styles.errorText}>Stockfish couldn't start. Check the bundled engine and try again.</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Retry Stockfish analysis"
+                      testID="review-analysis-retry"
+                      style={styles.secondaryButton}
+                      onPress={() => {
+                        setAnalysisEngineStatus("thinking");
+                        setAnalysisRetryCount((count) => count + 1);
+                      }}
+                    >
+                      <Text style={styles.secondaryButtonText}>Retry analysis</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+                {analysisLines.map((line, index) => (
+                  <Pressable
+                    key={`${line.move}-${index}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${line.score} ${formatAnalysisLineMoveLabel(line, index)} ${line.label}`}
+                    accessibilityState={{ disabled: !line.move }}
+                    disabled={!line.move}
+                    style={styles.analysisLineRow}
+                    testID={`review-analysis-line-${index}`}
+                    onPress={() => {
+                      if (line.move) {
+                        void playAnalysisCandidateMove(line.move);
+                      }
+                    }}
+                  >
+                    <Text style={styles.analysisEvalText}>{line.score}</Text>
+                    <Text style={styles.analysisMoveText} numberOfLines={1}>
+                      {formatAnalysisLineMoveLabel(line, index)}
+                    </Text>
+                    <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
+                  </Pressable>
+                ))}
+              </>
+            ) : null}
+          </View>
+        ) : null}
+        {adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
+          <View style={styles.reviewContextActions} testID="review-context-actions-rail">
+            {reviewScheduleControlNode}
+            {historyUnclearActionNode}
+          </View>
+        ) : null}
+      </View>
+    ) : null;
 
-      <View style={[styles.reviewBoardLayout, adaptiveLayout.usesSessionRail ? styles.reviewBoardLayoutWide : null]}>
-        <View style={styles.reviewBoardLane} testID="review-board-lane">
-          {reviewPromptNode}
+  return (
+    <View style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]} testID="review-session">
+      <View
+        accessible
+        accessibilityLabel={feedback
+          ? `${feedback.result === "correct" ? "Correct move" : "Wrong move"}. ${feedback.puzzleSolved ? "Puzzle complete." : "Continue the review."}`
+          : analysisEnabled
+            ? `Analysis ${analysisEngineLabel || "ready"}. ${sideToMoveAccessibilityLabel(reviewSideToMove)}.${lastMove ? ` Last move ${lastMove.from} to ${lastMove.to}.` : ""}`
+            : `Review puzzle ${reviewProgressPosition} of ${reviewProgressTotal}. ${sideToMoveAccessibilityLabel(reviewSideToMove)}.`}
+        accessibilityLiveRegion="polite"
+        style={styles.accessibilityAnnouncement}
+        testID="review-announcement"
+      />
+      {!adaptiveLayout.usesSessionRail ? reviewHeaderNode : null}
+
+      <View
+        key="review-session-layout"
+        style={adaptiveLayout.usesSessionRail
+          ? [
+              styles.activeSessionAdaptiveLayout,
+              {
+                gap: adaptiveLayout.sessionRailGap,
+                width: adaptiveLayout.sessionPackedRowWidth
+              }
+            ]
+          : styles.reviewBoardLayout}
+        testID={adaptiveLayout.usesSessionRail
+          ? "review-session-adaptive-layout"
+          : "review-session-stacked-layout"}
+      >
+        <View
+          key="review-session-board-lane"
+          style={adaptiveLayout.usesSessionRail
+            ? [styles.activeSessionBoardLane, { width: boardSize }]
+            : styles.reviewBoardLane}
+          testID={adaptiveLayout.usesSessionRail
+            ? "review-session-board-lane"
+            : "review-board-lane"}
+        >
+          {!adaptiveLayout.usesSessionRail ? reviewPromptNode : null}
           <View
+            key="review-board"
             accessible
             accessibilityLabel={sessionBoardAccessibilityLabel(reviewSideToMove, lastMove)}
             accessibilityRole="image"
@@ -10842,8 +11008,11 @@ function ReviewSession({
               />
             ) : null}
           </View>
-          {analysisEnabled && reviewCuratedThemes.length > 0 ? (
+          {!adaptiveLayout.usesSessionRail
+            && analysisEnabled
+            && reviewCuratedThemes.length > 0 ? (
             <View
+              key="review-theme-catalog"
               style={[styles.reviewThemeCatalogRail, { width: boardSize }]}
               testID="review-theme-catalog"
             >
@@ -10852,136 +11021,52 @@ function ReviewSession({
           ) : null}
         </View>
 
-        {hasAnalysisPanelContent || (adaptiveLayout.usesSessionRail && hasReviewContextActions) ? (
-          <View
+        {adaptiveLayout.usesSessionRail ? (
+          <ScrollView
             style={[
-              styles.reviewAnalysisColumn,
-              adaptiveLayout.usesSessionRail ? styles.reviewAnalysisPanelWide : null,
-              adaptiveLayout.usesSessionRail ? { width: adaptiveLayout.sessionRailWidth } : null
+              styles.activeSessionControlRailScroll,
+              {
+                height: boardSize,
+                width: adaptiveLayout.sessionRailWidth
+              }
             ]}
-            testID="review-analysis-column"
+            contentContainerStyle={[
+              styles.activeSessionControlRailScrollContent,
+              {
+                minHeight: boardSize,
+                width: adaptiveLayout.sessionRailWidth
+              }
+            ]}
+            testID="review-session-control-rail"
           >
-          {hasAnalysisPanelContent ? (
-            <View style={styles.analysisPanel} testID="review-analysis-panel">
-          {!analysisEnabled && guidedEvalLines.length > 0 ? (
-            <View testID="review-guided-eval-list">
-              {guidedEvalLines.map((line, index) => (
+            <View
+              style={[
+                styles.activeSessionControlRail,
+                {
+                  minHeight: boardSize,
+                  width: adaptiveLayout.sessionRailWidth
+                }
+              ]}
+              testID="review-session-control-rail-content"
+            >
+              {reviewHeaderNode}
+              {reviewPromptNode}
+              {analysisEnabled && reviewCuratedThemes.length > 0 ? (
                 <View
-                  key={`${line.move}-${index}`}
-                  style={styles.analysisLineRow}
-                  testID={`review-guided-eval-line-${index}`}
+                  key="review-theme-catalog"
+                  style={[
+                    styles.reviewThemeCatalogRail,
+                    { width: adaptiveLayout.sessionRailWidth }
+                  ]}
+                  testID="review-theme-catalog"
                 >
-                  <Text style={styles.analysisEvalText}>{line.score}</Text>
-                  <Text style={styles.analysisMoveText} numberOfLines={1}>
-                    {line.label === "Current position" ? line.san : `${index + 1}. ${line.san}`}
-                  </Text>
-                  <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-          {analysisEnabled || currentEntry.source !== "due" || reviewResultRecorded ? (
-          <View style={styles.analysisToolbar} testID="review-analysis-toolbar">
-            {analysisEnabled ? (
-              <>
-                <Pressable accessibilityRole="button" accessibilityLabel="Close analysis" testID="review-close-analysis" style={styles.iconButton} onPress={closeAnalysis}>
-                  <CloseGlyph />
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Analysis back"
-                  accessibilityState={{ disabled: !canAnalysisBack }}
-                  disabled={!canAnalysisBack}
-                  testID="review-analysis-back"
-                  style={[styles.iconButton, !canAnalysisBack ? styles.disabledButton : null]}
-                  onPress={stepAnalysisBack}
-                >
-                  <ChevronGlyph direction="left" />
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Analysis forward"
-                  accessibilityState={{ disabled: !canAnalysisForward }}
-                  disabled={!canAnalysisForward}
-                  testID="review-analysis-forward"
-                  style={[styles.iconButton, !canAnalysisForward ? styles.disabledButton : null]}
-                  onPress={stepAnalysisForward}
-                >
-                  <ChevronGlyph direction="right" />
-                </Pressable>
-                <Pressable accessibilityRole="button" accessibilityLabel="Reset analysis" testID="review-analysis-reset" style={styles.iconButton} onPress={resetAnalysisPosition}>
-                  <Text style={styles.iconButtonText}>↺</Text>
-                </Pressable>
-                <Pressable accessibilityRole="button" accessibilityLabel="Flip board" testID="review-analysis-flip" style={styles.iconButton} onPress={() => setManualBoardFlip((current) => !current)}>
-                  <FlipGlyph />
-                </Pressable>
-                <Text testID="review-analysis-engine-status" style={styles.analysisEngineStatus} numberOfLines={1}>
-                  {analysisEngineLabel}
-                </Text>
-              </>
-            ) : (
-              <>
-                <Pressable accessibilityRole="button" accessibilityLabel="Analyze position" testID="review-analysis-button" style={styles.analysisPrimaryButton} onPress={openAnalysis}>
-                  <SearchGlyph />
-                  <Text style={styles.analysisPrimaryButtonText}>Analysis</Text>
-                </Pressable>
-              </>
-            )}
-          </View>
-          ) : null}
-          {analysisEnabled ? (
-            <>
-              {analysisEngineStatus === "error" ? (
-                <View style={styles.analysisError} testID="review-analysis-error">
-                  <Text style={styles.errorText}>Stockfish couldn't start. Check the bundled engine and try again.</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Retry Stockfish analysis"
-                    testID="review-analysis-retry"
-                    style={styles.secondaryButton}
-                    onPress={() => {
-                      setAnalysisEngineStatus("thinking");
-                      setAnalysisRetryCount((count) => count + 1);
-                    }}
-                  >
-                    <Text style={styles.secondaryButtonText}>Retry analysis</Text>
-                  </Pressable>
+                  <ThemeTagRail centered testID="review-theme-rail" themes={reviewCuratedThemes} />
                 </View>
               ) : null}
-              {analysisLines.map((line, index) => (
-                <Pressable
-                  key={`${line.move}-${index}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${line.score} ${formatAnalysisLineMoveLabel(line, index)} ${line.label}`}
-                  accessibilityState={{ disabled: !line.move }}
-                  disabled={!line.move}
-                  style={styles.analysisLineRow}
-                  testID={`review-analysis-line-${index}`}
-                  onPress={() => {
-                    if (line.move) {
-                      void playAnalysisCandidateMove(line.move);
-                    }
-                  }}
-                >
-                  <Text style={styles.analysisEvalText}>{line.score}</Text>
-                  <Text style={styles.analysisMoveText} numberOfLines={1}>
-                    {formatAnalysisLineMoveLabel(line, index)}
-                  </Text>
-                  <Text style={styles.analysisLineLabel} numberOfLines={1}>{line.label}</Text>
-                </Pressable>
-              ))}
-            </>
-          ) : null}
+              {reviewAnalysisColumnNode}
             </View>
-          ) : null}
-          {adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
-            <View style={styles.reviewContextActions} testID="review-context-actions-rail">
-              {reviewScheduleControlNode}
-              {historyUnclearActionNode}
-            </View>
-          ) : null}
-          </View>
-        ) : null}
+          </ScrollView>
+        ) : reviewAnalysisColumnNode}
       </View>
       {!adaptiveLayout.usesSessionRail && hasReviewContextActions ? (
         <View style={styles.reviewContextActions} testID="review-context-actions-bottom">
@@ -16216,11 +16301,6 @@ const styles = StyleSheet.create({
   },
   reviewBoardLayout: {
     gap: 12
-  },
-  reviewBoardLayoutWide: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    justifyContent: "center"
   },
   reviewBoardLane: {
     alignItems: "center",
