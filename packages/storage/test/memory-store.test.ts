@@ -294,6 +294,11 @@ test("PracticeService persists settings through the store boundary", () => {
     moveFeedback: {
       soundEnabled: true,
       hapticsEnabled: true
+    },
+    sprintGuides: {
+      rulesSeen: false,
+      activeSessionSeen: false,
+      arrowDuelSeen: false
     }
   });
 
@@ -310,6 +315,11 @@ test("PracticeService persists settings through the store boundary", () => {
     moveFeedback: {
       soundEnabled: false,
       hapticsEnabled: true
+    },
+    sprintGuides: {
+      rulesSeen: true,
+      activeSessionSeen: true,
+      arrowDuelSeen: false
     }
   });
 
@@ -331,6 +341,11 @@ test("PracticeService persists settings through the store boundary", () => {
     moveFeedback: {
       soundEnabled: false,
       hapticsEnabled: true
+    },
+    sprintGuides: {
+      rulesSeen: true,
+      activeSessionSeen: true,
+      arrowDuelSeen: false
     }
   });
 });

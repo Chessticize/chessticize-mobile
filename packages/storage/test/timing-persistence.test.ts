@@ -16,7 +16,7 @@ import {
 process.env.TZ = "UTC";
 const PUZZLE_FIXTURE = resolve("fixtures/puzzles/presolved-sample.json");
 
-test("SQLite v10 preserves v9 settings while backfilling Run timing and rebuilding attempts", async () => {
+test("SQLite v11 preserves v9 settings while backfilling Run timing, rebuilding attempts, and adding guides", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-v10-timing-"));
   const databasePath = join(directory, "practice.sqlite");
   try {
@@ -137,9 +137,14 @@ test("SQLite v10 preserves v9 settings while backfilling Run timing and rebuildi
     try {
       assert.equal(
         (store.db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
-        10
+        11
       );
-      assert.equal(CURRENT_SCHEMA_VERSION, 10);
+      assert.equal(CURRENT_SCHEMA_VERSION, 11);
+      assert.deepEqual(store.getSettings().sprintGuides, {
+        rulesSeen: false,
+        activeSessionSeen: false,
+        arrowDuelSeen: false
+      });
       assert.deepEqual(
         store.listPracticeRuns().map((run) => ({
           id: run.id,
@@ -283,7 +288,11 @@ test("pausing at the puzzle deadline records one timeout and pauses the next puz
     service.listHistory().map((attempt) => attempt.result),
     ["timed_out"]
   );
-  assert.equal(service.listReviewQueue().length, 0);
+  assert.equal(service.listReviewQueue().length, 1);
+  assert.equal(
+    service.listReviewQueue()[0]?.puzzleId,
+    service.listHistory()[0]?.puzzleId
+  );
 });
 
 for (const backend of ["memory", "sqlite"] as const) {
@@ -347,7 +356,19 @@ for (const backend of ["memory", "sqlite"] as const) {
       assert.notEqual(timedOut.state.currentPuzzle?.puzzle.id, timedOutPuzzleId);
       assert.equal(timedOut.state.correctCount, 0);
       assert.equal(timedOut.state.mistakeCount, 0);
-      assert.equal(service.listReviewQueue().length, 0);
+      assert.equal(service.listReviewQueue().length, 1);
+      assert.deepEqual(service.listReviewQueue()[0], {
+        puzzleId: timedOutPuzzleId,
+        mode: "standard",
+        ratingKey: started.config.ratingKey,
+        intervalDays: 1,
+        dueDay: "2026-07-24",
+        reviewCount: 0,
+        successStreak: 0,
+        lapseCount: 0,
+        lastResult: "wrong",
+        lastReviewedAt: "2026-07-24T01:01:00.000Z"
+      });
       assert.deepEqual(service.listHistory(), [{
         ...timedOut.attempt,
         runId: "standard",
@@ -378,7 +399,7 @@ for (const backend of ["memory", "sqlite"] as const) {
         now: "2026-07-24T01:01:02.000Z",
         timeRange: "max",
         attentionOnly: true
-      }).attempts, []);
+      }).attempts.map((attempt) => attempt.id), [timedOutAttemptId]);
       assert.equal(
         service.advanceSprintTime("2026-07-24T01:01:00.000Z").attempt,
         undefined

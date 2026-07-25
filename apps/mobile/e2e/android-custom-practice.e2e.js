@@ -1,4 +1,5 @@
 const {
+  completeFirstUseSessionGuides,
   launchWithDisabledSynchronization,
   openTab,
   playBoardMove,
@@ -72,6 +73,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await element(by.id('practice-main-scroll')).scrollTo('top');
       await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
       await element(by.id('practice-run-start')).tap();
+      await completeFirstUseSessionGuides();
       await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 1').withTimeout(10000);
 

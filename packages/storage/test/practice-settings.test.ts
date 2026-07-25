@@ -13,6 +13,43 @@ test("move feedback settings default to sound and haptics enabled", () => {
   });
 });
 
+test("Sprint guide progress defaults unseen and legacy settings normalize safely", () => {
+  assert.deepEqual(defaultPracticeSettings().sprintGuides, {
+    rulesSeen: false,
+    activeSessionSeen: false,
+    arrowDuelSeen: false
+  });
+
+  const legacySettings = {
+    sync: { iCloudEnabled: true },
+    notifications: { reviewReminder: { mode: "smart" as const } },
+    moveFeedback: {
+      soundEnabled: true,
+      hapticsEnabled: true
+    }
+  } as PracticeSettings;
+
+  assert.deepEqual(clonePracticeSettings(legacySettings).sprintGuides, {
+    rulesSeen: false,
+    activeSessionSeen: false,
+    arrowDuelSeen: false
+  });
+});
+
+test("Sprint guide progress is cloned independently", () => {
+  const settings = defaultPracticeSettings();
+  settings.sprintGuides.rulesSeen = true;
+
+  const cloned = clonePracticeSettings(settings);
+  settings.sprintGuides.activeSessionSeen = true;
+
+  assert.deepEqual(cloned.sprintGuides, {
+    rulesSeen: true,
+    activeSessionSeen: false,
+    arrowDuelSeen: false
+  });
+});
+
 test("legacy settings without move feedback normalize to enabled defaults", () => {
   const legacySettings = {
     sync: { iCloudEnabled: true },

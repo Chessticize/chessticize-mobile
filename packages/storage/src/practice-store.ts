@@ -17,6 +17,7 @@ import type {
 } from "../../core/src/index.ts";
 import { isReviewDay, reviewDayFor } from "../../core/src/index.ts";
 import type { HistoryQuery, HistoryView, ReviewReminderSettings } from "../../core/src/index.ts";
+import type { SprintGuideProgress } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type { PracticeProgressSummary } from "./rating-history.ts";
 
@@ -88,6 +89,7 @@ export interface PracticeSettings {
     soundEnabled: boolean;
     hapticsEnabled: boolean;
   };
+  sprintGuides: SprintGuideProgress;
 }
 
 export type ReviewReminderPreference =

@@ -225,6 +225,9 @@ interface AppSettingsRow {
   review_reminder_fixed_local_time: string | null;
   move_feedback_sound_enabled: number;
   move_feedback_haptics_enabled: number;
+  sprint_rules_guide_seen: number;
+  sprint_active_session_guide_seen: number;
+  sprint_arrow_duel_guide_seen: number;
 }
 
 interface SprintSessionExportRow {
@@ -262,7 +265,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 10;
+export const CURRENT_SCHEMA_VERSION = 11;
 
 interface SQLiteMigration {
   from: number;
@@ -280,7 +283,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 6, to: 7, apply: migrateV6ToV7 },
   { from: 7, to: 8, apply: migrateV7ToV8 },
   { from: 8, to: 9, apply: migrateV8ToV9 },
-  { from: 9, to: 10, apply: migrateV9ToV10 }
+  { from: 9, to: 10, apply: migrateV9ToV10 },
+  { from: 10, to: 11, apply: migrateV10ToV11 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -302,7 +306,7 @@ export class SyncSQLiteStore implements PracticeStore {
     }
     if (
       startingVersion === CURRENT_SCHEMA_VERSION &&
-      hasMoveFeedbackColumns(this.db)
+      hasCurrentSettingsColumns(this.db)
     ) {
       return;
     }
@@ -591,8 +595,11 @@ export class SyncSQLiteStore implements PracticeStore {
           review_reminder_mode,
           review_reminder_fixed_local_time,
           move_feedback_sound_enabled,
-          move_feedback_haptics_enabled
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?)`
+          move_feedback_haptics_enabled,
+          sprint_rules_guide_seen,
+          sprint_active_session_guide_seen,
+          sprint_arrow_duel_guide_seen
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         boolToInt(cloned.sync.iCloudEnabled),
@@ -602,7 +609,10 @@ export class SyncSQLiteStore implements PracticeStore {
           ? cloned.notifications.reviewReminder.fixedLocalTime
           : null,
         boolToInt(cloned.moveFeedback.soundEnabled),
-        boolToInt(cloned.moveFeedback.hapticsEnabled)
+        boolToInt(cloned.moveFeedback.hapticsEnabled),
+        boolToInt(cloned.sprintGuides.rulesSeen),
+        boolToInt(cloned.sprintGuides.activeSessionSeen),
+        boolToInt(cloned.sprintGuides.arrowDuelSeen)
       );
   }
 
@@ -2178,11 +2188,15 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   // merged. Devices that ran the timing build can therefore report the current
   // version while still lacking these columns.
   ensureMoveFeedbackColumns(db);
+  migrateV10ToV11(db);
 }
 
-function hasMoveFeedbackColumns(db: SyncSqliteDatabase): boolean {
+function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
   return hasColumn(db, "app_settings", "move_feedback_sound_enabled") &&
-    hasColumn(db, "app_settings", "move_feedback_haptics_enabled");
+    hasColumn(db, "app_settings", "move_feedback_haptics_enabled") &&
+    hasColumn(db, "app_settings", "sprint_rules_guide_seen") &&
+    hasColumn(db, "app_settings", "sprint_active_session_guide_seen") &&
+    hasColumn(db, "app_settings", "sprint_arrow_duel_guide_seen");
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -2335,6 +2349,27 @@ function migrateV9ToV10(db: SyncSqliteDatabase): void {
   `);
 }
 
+function migrateV10ToV11(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "sprint_rules_guide_seen",
+    "ALTER TABLE app_settings ADD COLUMN sprint_rules_guide_seen INTEGER NOT NULL DEFAULT 0 CHECK (sprint_rules_guide_seen IN (0, 1))"
+  );
+  ensureColumn(
+    db,
+    "app_settings",
+    "sprint_active_session_guide_seen",
+    "ALTER TABLE app_settings ADD COLUMN sprint_active_session_guide_seen INTEGER NOT NULL DEFAULT 0 CHECK (sprint_active_session_guide_seen IN (0, 1))"
+  );
+  ensureColumn(
+    db,
+    "app_settings",
+    "sprint_arrow_duel_guide_seen",
+    "ALTER TABLE app_settings ADD COLUMN sprint_arrow_duel_guide_seen INTEGER NOT NULL DEFAULT 0 CHECK (sprint_arrow_duel_guide_seen IN (0, 1))"
+  );
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -2475,6 +2510,11 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
     moveFeedback: {
       soundEnabled: intToBool(row.move_feedback_sound_enabled),
       hapticsEnabled: intToBool(row.move_feedback_haptics_enabled)
+    },
+    sprintGuides: {
+      rulesSeen: intToBool(row.sprint_rules_guide_seen),
+      activeSessionSeen: intToBool(row.sprint_active_session_guide_seen),
+      arrowDuelSeen: intToBool(row.sprint_arrow_duel_guide_seen)
     }
   };
 }

@@ -192,7 +192,7 @@ export class PracticeService {
     this.store.transaction(() => {
       if (attemptToReturn) {
         this.store.recordAttempt(attemptToReturn);
-        if (attemptToReturn.result === "wrong") {
+        if (attemptAddsToReview(attemptToReturn)) {
           this.store.scheduleMistakeReview(reviewContextFromAttempt(attemptToReturn), attemptToReturn.completedAt);
         }
       }
@@ -237,6 +237,12 @@ export class PracticeService {
     this.store.transaction(() => {
       if (result.attempt) {
         this.store.recordAttempt(result.attempt);
+        if (attemptAddsToReview(result.attempt)) {
+          this.store.scheduleMistakeReview(
+            reviewContextFromAttempt(result.attempt),
+            result.attempt.completedAt
+          );
+        }
       }
       if (isOpenSprint(result.state)) {
         if (result.attempt) {
@@ -273,6 +279,12 @@ export class PracticeService {
     this.store.transaction(() => {
       if (result.attempt) {
         this.store.recordAttempt(result.attempt);
+        if (attemptAddsToReview(result.attempt)) {
+          this.store.scheduleMistakeReview(
+            reviewContextFromAttempt(result.attempt),
+            result.attempt.completedAt
+          );
+        }
       }
       if (isOpenSprint(result.state)) {
         this.store.updateSprintSession(result.state);
@@ -871,6 +883,10 @@ function reviewContextFromAttempt(attempt: AttemptEvent): ReviewContext {
     mode: attempt.mode,
     ratingKey: attempt.ratingKey
   };
+}
+
+function attemptAddsToReview(attempt: AttemptEvent): boolean {
+  return attempt.result === "wrong" || attempt.result === "timed_out";
 }
 
 function generateReviewAttemptId(puzzleId: string, completedAt: string): string {

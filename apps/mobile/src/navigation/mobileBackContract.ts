@@ -8,6 +8,7 @@ export type MobileBackTransient =
   | "review-filters"
   | "settings-advanced-ratings"
   | "custom-rating-editor"
+  | "sprint-session-guide"
   | "starting-practice";
 
 export type MobileBackOwner = MobileBackPrimaryTab;
@@ -85,6 +86,9 @@ export function mobileBackDestination(
         return { label: "Active sprint", testID: "active-practice" };
       }
       if (intent.transient === "starting-practice") {
+        return { label: "Practice setup", testID: "practice-setup" };
+      }
+      if (intent.transient === "sprint-session-guide") {
         return { label: "Practice setup", testID: "practice-setup" };
       }
       if (intent.transient === "custom-rating-editor") {
