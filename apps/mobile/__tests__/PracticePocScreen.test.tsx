@@ -1535,6 +1535,12 @@ describe("PracticePocScreen", () => {
       scale: 3,
       fontScale: 1
     });
+    const portraitAdaptiveLayout = buildPracticeAdaptiveLayout({
+      width: 390,
+      height: 844,
+      fontScale: 1,
+      insets: { top: 0, right: 0, bottom: 0, left: 0 }
+    });
 
     const portrait = renderLabScenario("practice-active-session-guide");
     const portraitBoardSize = Number(
@@ -1608,18 +1614,60 @@ describe("PracticePocScreen", () => {
         findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-demo-board").props.style
       ).borderColor
     ).not.toBe("#60A5FA");
+    const portraitArrowBoardSize = Number(
+      flattenTestStyle(
+        findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-demo-board").props.style
+      ).width
+    );
     expect(
-      flattenTestStyle(findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-coach").props.style).top
-    ).toBe(portraitBoardSize / 8 * 3.15 + 4);
-    const portraitArrowCalloutZIndex = Number(flattenTestStyle(
-      findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-coach").props.style
-    ).zIndex);
-    expect(portraitArrowCalloutZIndex).toBeGreaterThan(Number(flattenTestStyle(
-      findByTestId(portraitArrowDuel, "board-coordinate-overlay").props.style
-    ).zIndex));
-    expect(portraitArrowCalloutZIndex).toBeGreaterThan(Number(flattenTestStyle(
-      findByTestId(portraitArrowDuel, "board-input-blocker").props.style
-    ).zIndex));
+      flattenTestStyle(
+        findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-coach").props.style
+      )
+    ).toMatchObject({
+      alignSelf: "center",
+      marginTop: 18,
+      position: "relative",
+      width: portraitAdaptiveLayout.boardSize
+    });
+    expect(
+      flattenTestStyle(
+        findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-coach").props.style
+      ).top
+    ).toBeUndefined();
+    expect(
+      findByTestId(portraitArrowDuel, "practice-arrow-duel-guide-demo-board")
+        .findAllByProps({ testID: "practice-arrow-duel-guide-coach" })
+    ).toHaveLength(0);
+    expect(testIdOrder(
+      portraitArrowDuel,
+      "practice-arrow-duel-guide-demo-board",
+      "practice-arrow-duel-guide-coach"
+    )).toBeLessThan(0);
+    expect(testIdOrder(
+      portraitArrowDuel,
+      "practice-arrow-duel-guide-coach",
+      "practice-arrow-duel-guide-demo-timer"
+    )).toBeLessThan(0);
+    expect(testIdOrder(
+      portraitArrowDuel,
+      "practice-arrow-duel-guide-coach",
+      "practice-session-guide-navigation"
+    )).toBeLessThan(0);
+    expect(
+      flattenTestStyle(
+        findByTestId(
+          portraitArrowDuel,
+          "practice-session-guide-coach-pointer-arrow-duel-top"
+        ).props.style
+      )
+    ).toMatchObject({
+      left: Math.round(
+        (portraitAdaptiveLayout.boardSize - portraitArrowBoardSize) / 2
+          + portraitArrowBoardSize * 0.79
+      ),
+      top: -22,
+      width: 24
+    });
 
     act(() => {
       windowDimensions.__setWindowDimensions?.({

@@ -122,6 +122,7 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.match(activeSessionGuide.description, /terminate at the amber timer and Mark as unclear control/);
   assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
   assert.ok(arrowDuelGuide.scope.includes.includes("The arrows show your two choices"));
+  assert.ok(arrowDuelGuide.scope.includes.includes("Portrait callout below the board"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Landscape callout in the empty board lane"));
   assert.match(arrowDuelGuide.description, /two arrows are the user's two choices/);
   assert.doesNotMatch(

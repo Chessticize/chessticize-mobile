@@ -4689,17 +4689,24 @@ function SessionCoachmarkDemo({
         width: adaptiveLayout.sessionRailWidth
       }
     : {
-        left: 0,
-        right: 0,
-        top: isArrowDuel
-          ? boardSquareSize * 3.15 + 4
-          : coachStep === 0
+        ...(isArrowDuel
+          ? {
+              alignSelf: "center" as const,
+              marginTop: 18,
+              position: "relative" as const,
+              width: adaptiveLayout.boardSize
+            }
+          : {
+              left: 0,
+              right: 0,
+              top: coachStep === 0
             ? 113
             : coachStep === 1
               ? boardSize + 71
               : coachStep === 2
                 ? 92
                 : boardSize + 150
+            })
       };
   const measuredConnectorWidth = calloutUsesBoard && measuredRailTarget
     ? Math.max(
@@ -4780,9 +4787,14 @@ function SessionCoachmarkDemo({
         pointerPlacement === "bottom" ? styles.sessionGuideCoachPointerBottom : null,
         pointerPlacement === "left" ? styles.sessionGuideCoachPointerLeft : null,
         pointerPlacement === "right" ? styles.sessionGuideCoachPointerRight : null,
-        isArrowDuel && adaptiveLayout.usesSessionRail && pointerPlacement === "top"
+        isArrowDuel && pointerPlacement === "top"
           ? {
-              left: Math.round(boardSize * 0.79),
+              left: Math.round(
+                (adaptiveLayout.usesSessionRail
+                  ? 0
+                  : (adaptiveLayout.boardSize - boardSize) / 2)
+                  + boardSize * 0.79
+              ),
               right: undefined,
               width: 24
             }
@@ -4980,7 +4992,6 @@ function SessionCoachmarkDemo({
                 testID="practice-arrow-duel-guide-candidates"
               />
             ) : null}
-            {isArrowDuel && !adaptiveLayout.usesSessionRail ? calloutNode : null}
             {!isArrowDuel && coachStep === 2 ? (
               <View
                 accessibilityRole="alert"
@@ -4994,6 +5005,7 @@ function SessionCoachmarkDemo({
               </View>
             ) : null}
           </View>
+          {isArrowDuel && !adaptiveLayout.usesSessionRail ? calloutNode : null}
           {!adaptiveLayout.usesSessionRail ? (
             <View
               style={[styles.sessionBoardDetails, { width: boardSize }]}
