@@ -12,8 +12,10 @@ import {
 import {
   assertCalibrationArtifactMatchesReport,
   buildArtifact,
+  buildDecisionEvidenceTemplate,
   calibrationContentHash,
   evaluateCalibrationReadiness,
+  parseCalibrationArguments,
   posteriorApproximationReport,
   reliabilityBins,
   runCalibration,
@@ -157,6 +159,74 @@ test("authenticated reports bind every generated artifact parameter", () => {
         manifest
       ),
     /does not exactly match/
+  );
+});
+
+test("decision evidence templates bind review to the exact calibration inputs", () => {
+  const report = {
+    input: {
+      corpusHash: `sha256:${"b".repeat(64)}`,
+      policyHash: `sha256:${"c".repeat(64)}`
+    }
+  };
+  const manifest = {
+    packFileHash: `sha256:${"a".repeat(64)}`
+  };
+
+  assert.deepEqual(buildDecisionEvidenceTemplate(report, manifest), {
+    schemaVersion: 1,
+    decisionId: "",
+    packFileHash: manifest.packFileHash,
+    corpusHash: report.input.corpusHash,
+    policyHash: report.input.policyHash,
+    families: {
+      line: emptyDecisionEvidence(),
+      arrow_duel: emptyDecisionEvidence()
+    }
+  });
+});
+
+test("calibration CLI parses the two-pass review and activation controls", () => {
+  const options = parseCalibrationArguments([
+    "--progress",
+    "progress-1.json",
+    "--progress",
+    "progress-2.json",
+    "--pack",
+    "pack.sqlite",
+    "--manifest",
+    "manifest.json",
+    "--decision-template",
+    "decision.json",
+    "--representative-owner-approved",
+    "--require-all-families-ready"
+  ]);
+
+  assert.deepEqual(
+    options.progressPaths.map((path) => path.slice(path.lastIndexOf("/") + 1)),
+    ["progress-1.json", "progress-2.json"]
+  );
+  assert.equal(
+    options.decisionTemplatePath.slice(
+      options.decisionTemplatePath.lastIndexOf("/") + 1
+    ),
+    "decision.json"
+  );
+  assert.equal(options.ownerApproved, true);
+  assert.equal(options.requireAllFamiliesReady, true);
+});
+
+test("calibration content hashes ignore JSON object key order", () => {
+  assert.equal(
+    calibrationContentHash({ b: 2, a: { d: 4, c: 3 } }),
+    calibrationContentHash({ a: { c: 3, d: 4 }, b: 2 })
+  );
+});
+
+test("activation readiness cannot be asserted without an artifact output", async () => {
+  await assert.rejects(
+    runCalibration({ requireAllFamiliesReady: true }),
+    /requires --artifact/
   );
 });
 
@@ -376,6 +446,7 @@ test("calibration joins canonical exports and emits cohort reports without activ
   const policyPath = join(directory, "policy.json");
   const progressPath = join(directory, "progress.json");
   const decisionEvidencePath = join(directory, "decision-evidence.json");
+  const decisionTemplatePath = join(directory, "decision-template.json");
   const reportPath = join(directory, "report.json");
   const artifactPath = join(directory, "artifact.json");
   try {
@@ -409,9 +480,7 @@ test("calibration joins canonical exports and emits cohort reports without activ
     const policyHash = calibrationContentHash(policy);
     await writeFile(policyPath, JSON.stringify(policy));
     const progress = calibrationProgress();
-    const corpusHash = `sha256:${createHash("sha256")
-      .update(JSON.stringify([progress]))
-      .digest("hex")}`;
+    const corpusHash = calibrationContentHash([progress]);
     await writeFile(progressPath, JSON.stringify(progress));
 
     const report = await runCalibration({
@@ -421,9 +490,13 @@ test("calibration joins canonical exports and emits cohort reports without activ
       policyPath,
       reportPath,
       artifactPath,
-      ownerApproved: true
+      decisionTemplatePath,
+      ownerApproved: false
     });
     const artifact = JSON.parse(await readFile(artifactPath, "utf8"));
+    const decisionTemplate = JSON.parse(
+      await readFile(decisionTemplatePath, "utf8")
+    );
 
     assert.equal(report.input.joinedObservationCount, 4);
     assert.equal(artifact.provenance.inputSchemaVersion, 1);
@@ -436,8 +509,19 @@ test("calibration joins canonical exports and emits cohort reports without activ
     );
     assert.equal(
       artifact.provenance.representativeOwnerApproved,
-      true
+      false
     );
+    assert.deepEqual(decisionTemplate, {
+      schemaVersion: 1,
+      decisionId: "",
+      packFileHash,
+      corpusHash,
+      policyHash,
+      families: {
+        line: emptyDecisionEvidence(),
+        arrow_duel: emptyDecisionEvidence()
+      }
+    });
     assert.deepEqual(
       artifact.provenance.familyReadiness.line,
       report.families.line.readiness
@@ -473,17 +557,42 @@ test("calibration joins canonical exports and emits cohort reports without activ
       /required calibration decisions are incomplete/
     );
 
-    await writeFile(decisionEvidencePath, JSON.stringify({
-      schemaVersion: 1,
-      decisionId: "owner-reviewed-test-decisions",
-      packFileHash,
-      corpusHash,
-      policyHash,
-      families: {
-        line: completeDecisionEvidence(),
-        arrow_duel: completeDecisionEvidence()
-      }
-    }));
+    await assert.rejects(
+      runCalibration({
+        progressPaths: [progressPath],
+        packPath,
+        manifestPath,
+        policyPath,
+        reportPath,
+        artifactPath,
+        decisionTemplatePath
+      }),
+      /Decision evidence template already exists/
+    );
+
+    decisionTemplate.decisionId = "owner-reviewed-test-decisions";
+    decisionTemplate.families = {
+      line: completeDecisionEvidence(),
+      arrow_duel: completeDecisionEvidence()
+    };
+    await writeFile(
+      decisionEvidencePath,
+      JSON.stringify(decisionTemplate)
+    );
+    await assert.rejects(
+      runCalibration({
+        progressPaths: [progressPath],
+        packPath,
+        manifestPath,
+        policyPath,
+        reportPath,
+        artifactPath,
+        decisionEvidencePath,
+        decisionTemplatePath,
+        ownerApproved: true
+      }),
+      /cannot be used together/
+    );
     const reviewed = await runCalibration({
       progressPaths: [progressPath],
       packPath,
@@ -507,6 +616,20 @@ test("calibration joins canonical exports and emits cohort reports without activ
         reason.includes("required calibration decisions are incomplete")
       ),
       false
+    );
+    await assert.rejects(
+      runCalibration({
+        progressPaths: [progressPath],
+        packPath,
+        manifestPath,
+        policyPath,
+        reportPath,
+        artifactPath,
+        decisionEvidencePath,
+        ownerApproved: true,
+        requireAllFamiliesReady: true
+      }),
+      /both task families must pass/
     );
 
     await writeFile(decisionEvidencePath, JSON.stringify({
@@ -590,6 +713,15 @@ function completeDecisionEvidence() {
     focusedRunPolicyCalibration: true,
     homeLeadCalibration: true
   };
+}
+
+function emptyDecisionEvidence() {
+  return Object.fromEntries(
+    Object.keys(completeDecisionEvidence()).map((decision) => [
+      decision,
+      null
+    ])
+  );
 }
 
 function calibrationPolicy() {

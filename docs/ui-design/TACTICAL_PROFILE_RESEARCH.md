@@ -847,6 +847,9 @@ decision-evidence identity, explicit owner approval, and a passing family
 readiness result. The checked-in artifact keeps both task families unavailable
 until representative holdout evidence passes those gates. An invalid artifact,
 missing pack identity, policy mismatch, or pack mismatch also fails closed.
+The repeatable two-pass operator workflow, authenticated decision template, and
+activation checks are documented in
+[`docs/agents/tactical-profile-calibration.md`](../agents/tactical-profile-calibration.md).
 
 After an owner-approved representative corpus passes calibration, the local
 harness writes the reviewed aggregate report and replacement artifact with

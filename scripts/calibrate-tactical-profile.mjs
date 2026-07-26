@@ -106,6 +106,24 @@ export function calibrationContentHash(value) {
     .digest("hex")}`;
 }
 
+export function buildDecisionEvidenceTemplate(report, manifest) {
+  return {
+    schemaVersion: 1,
+    decisionId: "",
+    packFileHash: manifest.packFileHash,
+    corpusHash: report.input.corpusHash,
+    policyHash: report.input.policyHash,
+    families: Object.fromEntries(
+      ["line", "arrow_duel"].map((taskFamily) => [
+        taskFamily,
+        Object.fromEntries(
+          REQUIRED_DECISION_EVIDENCE.map((decision) => [decision, null])
+        )
+      ])
+    )
+  };
+}
+
 export function evaluateCalibrationReadiness(report, policy, ownerApproved) {
   const reasons = [];
   if (!ownerApproved) {
@@ -228,6 +246,14 @@ export function evaluateCalibrationReadiness(report, policy, ownerApproved) {
 }
 
 export async function runCalibration(options) {
+  if (options.decisionEvidencePath && options.decisionTemplatePath) {
+    throw new Error(
+      "--decision-evidence and --decision-template cannot be used together"
+    );
+  }
+  if (options.requireAllFamiliesReady === true && !options.artifactPath) {
+    throw new Error("--require-all-families-ready requires --artifact");
+  }
   const policy = JSON.parse(await readFile(options.policyPath, "utf8"));
   const policyHash = calibrationContentHash(policy);
   const manifest = JSON.parse(await readFile(options.manifestPath, "utf8"));
@@ -275,9 +301,7 @@ export async function runCalibration(options) {
     throw new Error("Puzzle pack manifest has no Tactical Profile feature identity");
   }
   const exports = await loadProgressExports(options.progressPaths);
-  const corpusHash = `sha256:${createHash("sha256")
-    .update(JSON.stringify(exports))
-    .digest("hex")}`;
+  const corpusHash = calibrationContentHash(exports);
   const decisionEvidence = await loadDecisionEvidence(
     options.decisionEvidencePath,
     manifest,
@@ -319,10 +343,37 @@ export async function runCalibration(options) {
         .filter(([, family]) => family.readiness.ready)
         .map(([family]) => family)
     };
+    if (options.decisionTemplatePath) {
+      const template = buildDecisionEvidenceTemplate(report, manifest);
+      try {
+        await writeFile(
+          options.decisionTemplatePath,
+          `${JSON.stringify(template, null, 2)}\n`,
+          { flag: "wx" }
+        );
+      } catch (error) {
+        if (error?.code === "EEXIST") {
+          throw new Error(
+            `Decision evidence template already exists: ${options.decisionTemplatePath}`
+          );
+        }
+        throw error;
+      }
+    }
     if (options.reportPath) {
       await writeFile(options.reportPath, `${JSON.stringify(report, null, 2)}\n`);
     }
     if (options.artifactPath) {
+      if (
+        options.requireAllFamiliesReady === true &&
+        !["line", "arrow_duel"].every((family) =>
+          report.readyFamilies.includes(family)
+        )
+      ) {
+        throw new Error(
+          "Calibration is not ready for activation; both task families must pass"
+        );
+      }
       const artifact = buildArtifact(report, familyReports, policy, manifest);
       await writeFile(options.artifactPath, `${JSON.stringify(artifact, null, 2)}\n`);
     }
@@ -1091,12 +1142,15 @@ async function loadProgressExports(paths) {
   return exports;
 }
 
-function parseArguments(argv) {
+export function parseCalibrationArguments(argv) {
   const values = new Map();
   const flags = new Set();
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
-    if (argument === "--representative-owner-approved") {
+    if (
+      argument === "--representative-owner-approved" ||
+      argument === "--require-all-families-ready"
+    ) {
       flags.add(argument);
       continue;
     }
@@ -1118,7 +1172,7 @@ function parseArguments(argv) {
     return resolve(value);
   };
   return {
-    progressPaths: (values.get("--progress") ?? []).map(resolve),
+    progressPaths: (values.get("--progress") ?? []).map((path) => resolve(path)),
     packPath: required("--pack"),
     manifestPath: required("--manifest"),
     policyPath: resolve(
@@ -1132,12 +1186,16 @@ function parseArguments(argv) {
     decisionEvidencePath: values.get("--decision-evidence")?.[0]
       ? resolve(values.get("--decision-evidence")[0])
       : undefined,
-    ownerApproved: flags.has("--representative-owner-approved")
+    decisionTemplatePath: values.get("--decision-template")?.[0]
+      ? resolve(values.get("--decision-template")[0])
+      : undefined,
+    ownerApproved: flags.has("--representative-owner-approved"),
+    requireAllFamiliesReady: flags.has("--require-all-families-ready")
   };
 }
 
 async function main() {
-  const options = parseArguments(process.argv.slice(2));
+  const options = parseCalibrationArguments(process.argv.slice(2));
   if (options.progressPaths.length === 0) {
     throw new Error("At least one --progress export is required");
   }
@@ -1154,6 +1212,7 @@ async function main() {
   process.stdout.write(`${JSON.stringify({
     reportPath: options.reportPath,
     artifactPath: options.artifactPath ?? null,
+    decisionTemplatePath: options.decisionTemplatePath ?? null,
     readyFamilies: report.readyFamilies,
     missingness: report.missingness
   }, null, 2)}\n`);
