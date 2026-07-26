@@ -103,10 +103,11 @@ make a failed result pass.
 When both families pass:
 
 1. Review the report's missingness and family readiness reasons one final time.
-2. Replace
-   `config/tactical-profile-calibration-report-v1.json` and
+2. Add the reviewed report at
+   `config/tactical-profile-calibration-report-v1.json` and replace
    `config/tactical-profile-calibration-artifact-v1.json` with the reviewed
-   outputs.
+   artifact. The report is intentionally absent before activation so an
+   unrepresentative or synthetic report cannot look canonical.
 3. Run the root tests, typecheck, process validation, and the focused
    calibration test before publishing the activation commit.
 4. Record the corpus scope, owner approval, decision ID, exact pack hash,
