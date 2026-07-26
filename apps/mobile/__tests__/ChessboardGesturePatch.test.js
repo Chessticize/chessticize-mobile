@@ -250,7 +250,49 @@ describe("react-native-chessboard gesture patch", () => {
     expect(patch).toContain("Migrate the piece to its destination slot immediately");
     expect(patch).toContain("toState.piece.set(finalPieceCode);");
   });
+
+  it("keeps Skia atlas sprite and transform arrays at one fixed length", () => {
+    const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
+    const sources = [
+      resolve(packageRoot, "src/components/skia/skia-pieces-atlas.tsx"),
+      resolve(packageRoot, "lib/module/components/skia/skia-pieces-atlas.js"),
+      resolve(packageRoot, "lib/commonjs/components/skia/skia-pieces-atlas.js")
+    ];
+
+    for (const sourcePath of sources) {
+      expectAtlasSourcePadsParallelArrays(readFileSync(sourcePath, "utf8"), sourcePath);
+    }
+  });
+
+  it("keeps fixed-length Skia atlas slots in the durable package patch", () => {
+    const patch = readFileSync(
+      resolve(__dirname, "../../../patches/react-native-chessboard@0.2.0.patch"),
+      "utf8"
+    );
+
+    expect(patch).toContain("const MAX_PIECE_SLOTS = 32;");
+    expect(patch).toContain("while (sprites.length < MAX_PIECE_SLOTS)");
+    expect(patch).toContain("RSXform(0, 0, -pieceSize, -pieceSize)");
+  });
 });
+
+function expectAtlasSourcePadsParallelArrays(source, sourcePath) {
+  const maxSlotsIndex = source.indexOf("const MAX_PIECE_SLOTS = 32;");
+  const padIndex = source.indexOf("while (sprites.length < MAX_PIECE_SLOTS)");
+  const spritePushIndex = source.indexOf("sprites.push(SPRITE_RECTS.wp);", padIndex);
+  const transformPushIndex = source.indexOf(
+    "RSXform(0, 0, -pieceSize, -pieceSize)",
+    spritePushIndex
+  );
+  const returnIndex = source.indexOf("return {", transformPushIndex);
+
+  expect(maxSlotsIndex).toBeGreaterThanOrEqual(0);
+  expect(padIndex).toBeGreaterThan(maxSlotsIndex);
+  expect(spritePushIndex).toBeGreaterThan(padIndex);
+  expect(transformPushIndex).toBeGreaterThan(spritePushIndex);
+  expect(returnIndex).toBeGreaterThan(transformPushIndex);
+  expect(sourcePath).toContain("skia-pieces-atlas");
+}
 
 function expectGestureSourceRejectsOpponentPiecesBeforeRaise(source, sourcePath) {
   const beginIndex = source.indexOf(".onBegin");

@@ -131,7 +131,7 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..0bccb0fcd4305c749f11e01b738087a4
    }))));
  });
 diff --git a/lib/commonjs/components/skia/gesture-board.js b/lib/commonjs/components/skia/gesture-board.js
-index 7ddc0516545a4e1e16774f520123aaa883c235c0..641120fe24f153f4638cab2579ee0fd54e31ad5c 100644
+index 7ddc0516545a4e1e16774f520123aaa883c235c0..62d6ce8f22d199c860824eb7221bb8722b32e607 100644
 --- a/lib/commonjs/components/skia/gesture-board.js
 +++ b/lib/commonjs/components/skia/gesture-board.js
 @@ -20,13 +20,16 @@ var _promotionDialog = require("../promotion-dialog");
@@ -253,6 +253,33 @@ index 99152d0e193c3ff32b49cb57c78a5b09799a8617..27bd528cb50e65fefa778afe525945ca
  SkiaDots.displayName = 'SkiaDots';
  //# sourceMappingURL=skia-dots.js.map
 \ No newline at end of file
+diff --git a/lib/commonjs/components/skia/skia-pieces-atlas.js b/lib/commonjs/components/skia/skia-pieces-atlas.js
+index d4a7146591891ed0ac8381633f06b668cb1b7ad0..19fac16cdbf5ccc017eadf4aa769d4fabf098dca 100644
+--- a/lib/commonjs/components/skia/skia-pieces-atlas.js
++++ b/lib/commonjs/components/skia/skia-pieces-atlas.js
+@@ -12,6 +12,7 @@ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e
+ // Sprite sheet layout: 6x2 grid (p, n, b, r, q, k for each color)
+ // Row 0: white pieces, Row 1: black pieces
+ const SPRITE_CELL_SIZE = 128;
++const MAX_PIECE_SLOTS = 32;
+ 
+ // Pre-computed sprite rects for all piece types
+ const SPRITE_RECTS = {
+@@ -82,6 +83,14 @@ const SkiaPiecesAtlas = exports.SkiaPiecesAtlas = /*#__PURE__*/_react.default.me
+       const scaledHalf = SPRITE_CELL_SIZE / 2 * pieceScale;
+       transforms.push(_reactNativeSkia.Skia.RSXform(pieceScale, 0, centerX - scaledHalf, centerY - scaledHalf));
+     }
++
++    // Atlas observes sprites and transforms through separate derived-value
++    // subscriptions. Keep both arrays at the board's fixed maximum piece
++    // count so an update cannot expose different lengths and crash Skia.
++    while (sprites.length < MAX_PIECE_SLOTS) {
++      sprites.push(SPRITE_RECTS.wp);
++      transforms.push(_reactNativeSkia.Skia.RSXform(0, 0, -pieceSize, -pieceSize));
++    }
+     return {
+       sprites,
+       transforms
 diff --git a/lib/commonjs/hooks/use-board-gesture.js b/lib/commonjs/hooks/use-board-gesture.js
 index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a297f4ce985 100644
 --- a/lib/commonjs/hooks/use-board-gesture.js
@@ -514,7 +541,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a29
  };
  exports.useBoardGesture = useBoardGesture;
 diff --git a/lib/commonjs/index.js b/lib/commonjs/index.js
-index 360d75d327324795ca72a43b37965b1ea2bc19d9..a474d52e74f449471c429a653e7dc17e7de39302 100644
+index 360d75d327324795ca72a43b37965b1ea2bc19d9..f7a5a82061069d45db82d72ac05ecec7561dcd78 100644
 --- a/lib/commonjs/index.js
 +++ b/lib/commonjs/index.js
 @@ -12,6 +12,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
@@ -889,7 +916,7 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..6313910ecd52f23830722b3bd69ceb29
    }))));
  });
 diff --git a/lib/module/components/skia/gesture-board.js b/lib/module/components/skia/gesture-board.js
-index 79598f3cce08d079d2a004ed0563f1194fd7d31c..a77c63b2988f8d72851af87b8be00622c08c1f59 100644
+index 79598f3cce08d079d2a004ed0563f1194fd7d31c..01aeda5e79f1d30b95eb3dcfff4ba8c402080ffd 100644
 --- a/lib/module/components/skia/gesture-board.js
 +++ b/lib/module/components/skia/gesture-board.js
 @@ -1,4 +1,4 @@
@@ -1017,6 +1044,33 @@ index 120f116f938d6bf19ed350321959c9c5a860b48a..863f4f5380a90afb2c2f1ed1508efe19
  SkiaDots.displayName = 'SkiaDots';
  //# sourceMappingURL=skia-dots.js.map
 \ No newline at end of file
+diff --git a/lib/module/components/skia/skia-pieces-atlas.js b/lib/module/components/skia/skia-pieces-atlas.js
+index efa0ca0d342d28c1d44eed586d831d294159c2d9..e37e77f10f1168a0709903b1d44092701868e675 100644
+--- a/lib/module/components/skia/skia-pieces-atlas.js
++++ b/lib/module/components/skia/skia-pieces-atlas.js
+@@ -6,6 +6,7 @@ import { SQUARES } from '../../state/types';
+ // Sprite sheet layout: 6x2 grid (p, n, b, r, q, k for each color)
+ // Row 0: white pieces, Row 1: black pieces
+ const SPRITE_CELL_SIZE = 128;
++const MAX_PIECE_SLOTS = 32;
+ 
+ // Pre-computed sprite rects for all piece types
+ const SPRITE_RECTS = {
+@@ -76,6 +77,14 @@ export const SkiaPiecesAtlas = /*#__PURE__*/React.memo(({
+       const scaledHalf = SPRITE_CELL_SIZE / 2 * pieceScale;
+       transforms.push(Skia.RSXform(pieceScale, 0, centerX - scaledHalf, centerY - scaledHalf));
+     }
++
++    // Atlas observes sprites and transforms through separate derived-value
++    // subscriptions. Keep both arrays at the board's fixed maximum piece
++    // count so an update cannot expose different lengths and crash Skia.
++    while (sprites.length < MAX_PIECE_SLOTS) {
++      sprites.push(SPRITE_RECTS.wp);
++      transforms.push(Skia.RSXform(0, 0, -pieceSize, -pieceSize));
++    }
+     return {
+       sprites,
+       transforms
 diff --git a/lib/module/hooks/use-board-gesture.js b/lib/module/hooks/use-board-gesture.js
 index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacccee94e68 100644
 --- a/lib/module/hooks/use-board-gesture.js
@@ -1279,7 +1333,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacc
  //# sourceMappingURL=use-board-gesture.js.map
 \ No newline at end of file
 diff --git a/lib/module/index.js b/lib/module/index.js
-index 7cee33e75529b83bea5c7216e4b89be54c9fb520..a3ecb923b546782d8fb7952825f7e2969a9e50f2 100644
+index 7cee33e75529b83bea5c7216e4b89be54c9fb520..c7046d081e266d2ba4bdee6fc4874027989fc037 100644
 --- a/lib/module/index.js
 +++ b/lib/module/index.js
 @@ -5,6 +5,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
@@ -2047,6 +2101,33 @@ index 5032bfe81a485ff85d710e7d6e4c0a2e8d78347e..041ff73a79b81185b4719c5e53c6e56e
 +    );
    }
  );
+ 
+diff --git a/src/components/skia/skia-pieces-atlas.tsx b/src/components/skia/skia-pieces-atlas.tsx
+index 4cc6f383a6d248943def00bc914cbe572f991f36..95b14879b7ed4f3375aacde96b06a472e59df891 100644
+--- a/src/components/skia/skia-pieces-atlas.tsx
++++ b/src/components/skia/skia-pieces-atlas.tsx
+@@ -8,6 +8,7 @@ import { SQUARES, BoardState, PieceCode } from '../../state/types';
+ // Sprite sheet layout: 6x2 grid (p, n, b, r, q, k for each color)
+ // Row 0: white pieces, Row 1: black pieces
+ const SPRITE_CELL_SIZE = 128;
++const MAX_PIECE_SLOTS = 32;
+ 
+ // Pre-computed sprite rects for all piece types
+ const SPRITE_RECTS: Record<NonNullable<PieceCode>, SkRect> = {
+@@ -119,6 +120,14 @@ export const SkiaPiecesAtlas: React.FC<SkiaPiecesAtlasProps> = React.memo(
+         );
+       }
+ 
++      // Atlas observes sprites and transforms through separate derived-value
++      // subscriptions. Keep both arrays at the board's fixed maximum piece
++      // count so an update cannot expose different lengths and crash Skia.
++      while (sprites.length < MAX_PIECE_SLOTS) {
++        sprites.push(SPRITE_RECTS.wp);
++        transforms.push(Skia.RSXform(0, 0, -pieceSize, -pieceSize));
++      }
++
+       return { sprites, transforms };
+     });
  
 diff --git a/src/hooks/use-board-gesture.ts b/src/hooks/use-board-gesture.ts
 index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee697673b44c194 100644
