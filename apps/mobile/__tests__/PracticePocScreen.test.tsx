@@ -1100,6 +1100,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("uses the only recommended Arrow Duel family and shows returning users the dedicated Focused Run guide", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
     const service = createArrowFocusedPracticeService();
     service.saveSettings({
       ...service.getSettings(),
