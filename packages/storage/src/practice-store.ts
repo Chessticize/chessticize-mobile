@@ -151,6 +151,7 @@ export interface PracticeStore {
   getSprintSessions(ids: readonly string[]): ExportedSprintSession[];
   listSprintAttemptUtcDays(sessionIds: readonly string[]): string[];
   listSprintSessions(): ExportedSprintSession[];
+  getTacticalProfileSourceRevision(): number;
   exportLocalData(): LocalDataExport;
   importLocalData(
     data: LocalDataImport,

@@ -33,6 +33,18 @@ export type TacticalProfileNaturalFrequency = Readonly<Record<
   Readonly<Record<string, number>>
 >>;
 
+export type TacticalProfileNaturalFrequencyForRating = (
+  taskFamily: TacticalProfileTaskFamily,
+  rating: number
+) => Readonly<Record<string, number>>;
+
+export type TacticalProfileInventoryUpperBound = (
+  taskFamily: TacticalProfileTaskFamily,
+  minRating: number,
+  maxRating: number,
+  themes: readonly string[]
+) => Readonly<Record<string, number>> | undefined;
+
 export type TacticalProfileFocusedRunPolicy = NonNullable<
   TacticalProfileCalibrationArtifact["focusedRun"]
 >;
@@ -70,6 +82,8 @@ export type TacticalProfileServiceOptions = {
   repository: TacticalProfileRepository;
   calibration: TacticalProfileCalibrationArtifact;
   naturalFrequency: TacticalProfileNaturalFrequency;
+  naturalFrequencyForRating?: TacticalProfileNaturalFrequencyForRating;
+  inventoryUpperBound?: TacticalProfileInventoryUpperBound;
   focusedRunPolicy?: TacticalProfileFocusedRunPolicy;
   maxDirtyDaysPerRefresh?: number;
 };
@@ -80,6 +94,12 @@ export class TacticalProfileService {
   private readonly repository: TacticalProfileRepository;
   private readonly calibration: TacticalProfileCalibrationArtifact;
   private readonly naturalFrequency: TacticalProfileNaturalFrequency;
+  private readonly naturalFrequencyForRating:
+    | TacticalProfileNaturalFrequencyForRating
+    | undefined;
+  private readonly inventoryUpperBound:
+    | TacticalProfileInventoryUpperBound
+    | undefined;
   private readonly focusedRunPolicy: TacticalProfileFocusedRunPolicy | undefined;
   private readonly maxDirtyDaysPerRefresh: number;
   private repositoryReady = false;
@@ -92,6 +112,8 @@ export class TacticalProfileService {
     this.repository = options.repository;
     this.calibration = options.calibration;
     this.naturalFrequency = options.naturalFrequency;
+    this.naturalFrequencyForRating = options.naturalFrequencyForRating;
+    this.inventoryUpperBound = options.inventoryUpperBound;
     this.focusedRunPolicy = options.focusedRunPolicy;
     this.maxDirtyDaysPerRefresh = options.maxDirtyDaysPerRefresh ?? 30;
     try {
@@ -122,7 +144,7 @@ export class TacticalProfileService {
     const evaluation = evaluateTacticalProfile({
       cells: this.repository.listDailyCells(this.identity),
       calibration: this.calibration,
-      naturalFrequency: this.naturalFrequency,
+      naturalFrequency: this.currentNaturalFrequency(),
       now: evaluatedAt,
       ...(buildState.recommendedSignalIds === undefined
         ? {}
@@ -154,8 +176,7 @@ export class TacticalProfileService {
     if (day) {
       try {
         this.ensureRepositoryReady();
-        this.ensureIdentity();
-        this.repository.markDirtyDays(this.identity, [day]);
+        this.markDirtyDaysAtCurrentRevision([day]);
       } catch (error) {
         this.recordCacheFailure(error);
       }
@@ -166,7 +187,11 @@ export class TacticalProfileService {
     this.requiresCanonicalRebuild = true;
     try {
       this.ensureRepositoryReady();
-      this.repository.reset(this.identity, this.canonicalCompletedDays());
+      this.repository.reset(
+        this.identity,
+        this.canonicalCompletedDays(),
+        this.sourceRevision
+      );
       this.requiresCanonicalRebuild = false;
       this.lastCacheError = undefined;
     } catch (error) {
@@ -220,8 +245,7 @@ export class TacticalProfileService {
     }
     try {
       this.ensureRepositoryReady();
-      this.ensureIdentity();
-      this.repository.markDirtyDays(this.identity, completedDays);
+      this.markDirtyDaysAtCurrentRevision(completedDays);
     } catch (error) {
       this.recordCacheFailure(error);
     }
@@ -276,9 +300,39 @@ export class TacticalProfileService {
       this.focusedRunPolicy.recentPuzzleDays
     );
     const runFocuses = distinctRunFocuses(rankedFocuses);
-    const inventoryBands = this.focusedRunPolicy.ratingBandHalfWidths.map((halfWidth) => {
+    const inventoryBands = this.focusedRunPolicy.ratingBandHalfWidths.flatMap((halfWidth) => {
       const minRating = Math.max(0, anchor.rating - halfWidth);
       const maxRating = anchor.rating + halfWidth;
+      const upperBound = this.inventoryUpperBound?.(
+        taskFamily,
+        minRating,
+        maxRating,
+        runFocuses.map((focus) => focus.theme)
+      );
+      if (upperBound) {
+        const preflight = buildFocusedRunPlan({
+          taskFamily,
+          ratingAnchor: anchor,
+          rankedFocuses: runFocuses,
+          runSize: this.focusedRunPolicy!.runSize,
+          inventoryBands: [{
+            minRating,
+            maxRating,
+            availableByTheme: upperBound,
+            mixedAvailableCount: this.focusedRunPolicy!.runSize
+          }],
+          excludePuzzleIds: exclusions,
+          ...(this.focusedRunPolicy!.themeShortfallBackfill === undefined
+            ? {}
+            : {
+                themeShortfallBackfill:
+                  this.focusedRunPolicy!.themeShortfallBackfill
+              })
+        });
+        if (preflight.status !== "ready") {
+          return [];
+        }
+      }
       const commonFilter = {
         mode: taskFamily === "arrow_duel" ? "arrow_duel" as const : "standard" as const,
         minRating,
@@ -287,7 +341,7 @@ export class TacticalProfileService {
         randomSeed,
         limit: this.focusedRunPolicy!.runSize
       };
-      return {
+      return [{
         minRating,
         maxRating,
         availableByTheme: Object.fromEntries(
@@ -303,28 +357,36 @@ export class TacticalProfileService {
           commonFilter,
           runFocuses.map((focus) => focus.theme)
         ).length
-      };
+      }];
     });
-    const planResult = buildFocusedRunPlan({
-      taskFamily,
-      ratingAnchor: anchor,
-      rankedFocuses: runFocuses,
-      runSize: this.focusedRunPolicy.runSize,
-      inventoryBands,
-      excludePuzzleIds: exclusions
-    });
-    if (planResult.status !== "ready") {
-      return { status: "unavailable", reason: "insufficient_inventory" };
+    for (const inventoryBand of inventoryBands) {
+      const planResult = buildFocusedRunPlan({
+        taskFamily,
+        ratingAnchor: anchor,
+        rankedFocuses: runFocuses,
+        runSize: this.focusedRunPolicy.runSize,
+        inventoryBands: [inventoryBand],
+        excludePuzzleIds: exclusions,
+        ...(this.focusedRunPolicy.themeShortfallBackfill === undefined
+          ? {}
+          : {
+              themeShortfallBackfill:
+                this.focusedRunPolicy.themeShortfallBackfill
+            })
+      });
+      if (planResult.status !== "ready") {
+        continue;
+      }
+      const prepared = this.selectPlanPuzzles(
+        planResult.plan,
+        latestMixed.config,
+        randomSeed
+      );
+      if (prepared) {
+        return { status: "ready", prepared };
+      }
     }
-
-    const prepared = this.selectPlanPuzzles(
-      planResult.plan,
-      latestMixed.config,
-      randomSeed
-    );
-    return prepared
-      ? { status: "ready", prepared }
-      : { status: "unavailable", reason: "insufficient_inventory" };
+    return { status: "unavailable", reason: "insufficient_inventory" };
   }
 
   private refreshDirtyDays(): TacticalProfileBuildState {
@@ -338,6 +400,7 @@ export class TacticalProfileService {
         ...this.identity,
         status: "ready" as const,
         dirtyDayCount: 0,
+        sourceRevision: previousState?.sourceRevision ?? this.sourceRevision,
         ...(previousState?.watermarkDay === undefined
           ? {}
           : { watermarkDay: previousState.watermarkDay }),
@@ -402,6 +465,7 @@ export class TacticalProfileService {
         ...this.identity,
         status: remaining.length > 0 ? "building" : "ready",
         dirtyDayCount: remaining.length,
+        sourceRevision: previousState?.sourceRevision ?? this.sourceRevision,
         watermarkDay: dirtyDays[0] as string,
         ...(previousState?.evaluatedAt === undefined
           ? {}
@@ -417,6 +481,7 @@ export class TacticalProfileService {
         ...this.identity,
         status: "failed",
         dirtyDayCount: this.repository.listDirtyDays(this.identity).length,
+        sourceRevision: previousState?.sourceRevision ?? this.sourceRevision,
         lastError: error instanceof Error ? error.message : String(error)
       };
       this.repository.saveBuildState(state);
@@ -426,17 +491,52 @@ export class TacticalProfileService {
 
   private ensureIdentity(): void {
     this.ensureRepositoryReady();
+    const sourceRevision = this.sourceRevision;
     if (this.requiresCanonicalRebuild) {
-      this.repository.reset(this.identity, this.canonicalCompletedDays());
+      this.repository.reset(
+        this.identity,
+        this.canonicalCompletedDays(),
+        sourceRevision
+      );
       this.requiresCanonicalRebuild = false;
       this.lastCacheError = undefined;
       return;
     }
     const state = this.repository.getBuildState();
-    if (!state || !sameIdentity(state, this.identity)) {
-      this.repository.reset(this.identity, this.canonicalCompletedDays());
+    if (
+      !state ||
+      !sameIdentity(state, this.identity) ||
+      state.sourceRevision !== sourceRevision
+    ) {
+      this.repository.reset(
+        this.identity,
+        this.canonicalCompletedDays(),
+        sourceRevision
+      );
       this.lastCacheError = undefined;
     }
+  }
+
+  private markDirtyDaysAtCurrentRevision(completedDays: readonly string[]): void {
+    const sourceRevision = this.sourceRevision;
+    const state = this.repository.getBuildState();
+    if (!state || !sameIdentity(state, this.identity)) {
+      this.repository.reset(
+        this.identity,
+        this.canonicalCompletedDays(),
+        sourceRevision
+      );
+      return;
+    }
+    this.repository.markDirtyDays(
+      this.identity,
+      completedDays,
+      sourceRevision
+    );
+  }
+
+  private get sourceRevision(): number {
+    return this.progressStore.getTacticalProfileSourceRevision();
   }
 
   private ensureRepositoryReady(): void {
@@ -469,6 +569,7 @@ export class TacticalProfileService {
         ...this.identity,
         status: "failed",
         dirtyDayCount: 0,
+        sourceRevision: this.sourceRevision,
         lastError: this.lastCacheError ?? reason
       },
       unavailableFamilies: {
@@ -476,6 +577,35 @@ export class TacticalProfileService {
         arrow_duel: reason
       }
     };
+  }
+
+  private currentNaturalFrequency(): TacticalProfileNaturalFrequency {
+    if (!this.naturalFrequencyForRating) {
+      return this.naturalFrequency;
+    }
+    const sessions = this.progressStore.listSprintSessions();
+    const frequencies: Record<
+      TacticalProfileTaskFamily,
+      Readonly<Record<string, number>>
+    > = {
+      line: this.naturalFrequency.line,
+      arrow_duel: this.naturalFrequency.arrow_duel
+    };
+    for (const taskFamily of ["line", "arrow_duel"] as const) {
+      const latest = latestOrdinaryMixedSessionByConfiguration(
+        sessions,
+        taskFamily
+      );
+      if (!latest?.config) {
+        continue;
+      }
+      const rating = this.progressStore.getRating(latest.config.ratingKey).rating;
+      frequencies[taskFamily] = this.naturalFrequencyForRating(
+        taskFamily,
+        rating
+      );
+    }
+    return frequencies;
   }
 
   private canonicalCompletedDays(): string[] {
@@ -657,6 +787,23 @@ function latestOrdinaryMixedSession(
   taskFamily: TacticalProfileTaskFamily,
   hasCanonicalAttempt: (sessionId: string) => boolean
 ): ExportedSprintSession | undefined {
+  return ordinaryMixedSessions(sessions, taskFamily)
+    .sort((left, right) => compareCompletedSessions(right, left))
+    .find((session) => hasCanonicalAttempt(session.id));
+}
+
+function latestOrdinaryMixedSessionByConfiguration(
+  sessions: readonly ExportedSprintSession[],
+  taskFamily: TacticalProfileTaskFamily
+): ExportedSprintSession | undefined {
+  return ordinaryMixedSessions(sessions, taskFamily)
+    .sort((left, right) => compareCompletedSessions(right, left))[0];
+}
+
+function ordinaryMixedSessions(
+  sessions: readonly ExportedSprintSession[],
+  taskFamily: TacticalProfileTaskFamily
+): ExportedSprintSession[] {
   return sessions
     .filter((session) => session.completedAt !== undefined)
     .filter((session) => {
@@ -664,10 +811,9 @@ function latestOrdinaryMixedSession(
         return false;
       }
       const family = session.config.mode === "arrow_duel" ? "arrow_duel" : "line";
-      return family === taskFamily && namedThemesForSelection(session.config.themes).length === 0;
-    })
-    .sort((left, right) => compareCompletedSessions(right, left))
-    .find((session) => hasCanonicalAttempt(session.id));
+      return family === taskFamily &&
+        namedThemesForSelection(session.config.themes).length === 0;
+    });
 }
 
 function latestFocusedSession(

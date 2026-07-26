@@ -4,7 +4,11 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { buildPuzzlePackManifest } from "../src/index.ts";
+import {
+  buildPuzzlePackManifest,
+  tacticalThemeFrequencyAtRating,
+  tacticalThemeInventoryUpperBound
+} from "../src/index.ts";
 import type { Puzzle, PuzzlePackManifest } from "../src/index.ts";
 
 test("bundled core puzzle pack manifest matches the shipped puzzle artifact", (t) => {
@@ -54,6 +58,60 @@ test("bundled core puzzle pack manifest matches the shipped puzzle artifact", (t
   assert.deepEqual(manifest, rebuilt);
 });
 
+test("Tactical Profile frequencies follow the nearest current-Rating bucket", () => {
+  const manifest = analysisManifest();
+
+  assert.deepEqual(
+    tacticalThemeFrequencyAtRating(manifest, "line", 950),
+    { fork: 0.2, pin: 0.05 }
+  );
+  assert.deepEqual(
+    tacticalThemeFrequencyAtRating(manifest, "line", 1_075),
+    { fork: 0.05, pin: 0.25 }
+  );
+  assert.deepEqual(
+    tacticalThemeFrequencyAtRating(manifest, "arrow_duel", 1_075),
+    { fork: 0.05, pin: 0.25 }
+  );
+  assert.deepEqual(
+    tacticalThemeFrequencyAtRating(
+      { ...manifest, arrowDuelCount: manifest.puzzleCount - 1 },
+      "arrow_duel",
+      1_075
+    ),
+    {},
+    "a partial Arrow Duel inventory needs explicit task-family bucket counts"
+  );
+});
+
+test("Tactical Profile inventory preflight is a conservative bucket upper bound", () => {
+  const manifest = analysisManifest();
+
+  assert.deepEqual(
+    tacticalThemeInventoryUpperBound(
+      manifest,
+      "line",
+      975,
+      1_025,
+      ["fork", "pin", "fork"]
+    ),
+    {
+      availableByTheme: { fork: 25, pin: 30 },
+      puzzleCount: 200
+    }
+  );
+  assert.equal(
+    tacticalThemeInventoryUpperBound(
+      { ...manifest, arrowDuelCount: 50 },
+      "arrow_duel",
+      900,
+      1_099,
+      ["fork"]
+    ),
+    undefined
+  );
+});
+
 function readBundledPuzzles(): Puzzle[] {
   return JSON.parse(readFileSync(resolve("fixtures/puzzles/bundled-core-pack.json"), "utf8")) as Puzzle[];
 }
@@ -95,4 +153,38 @@ function readSqlitePackSummary(): {
   } finally {
     db.close();
   }
+}
+
+function analysisManifest(): PuzzlePackManifest {
+  return {
+    id: "analysis-pack",
+    title: "Analysis pack",
+    buildDate: "2026-07-26",
+    source: "test",
+    sourceLicense: "test",
+    presolve: "test",
+    licenseNote: "test",
+    manifestHash: "sha256:test",
+    puzzleCount: 200,
+    rating: { min: 900, max: 1_099 },
+    themes: ["fork", "pin"],
+    themeCounts: { fork: 25, pin: 30 },
+    ratingBuckets: [
+      {
+        minRating: 900,
+        maxRating: 999,
+        puzzleCount: 100,
+        themeCounts: { fork: 20, pin: 5 },
+        matePatternCounts: {}
+      },
+      {
+        minRating: 1_000,
+        maxRating: 1_099,
+        puzzleCount: 100,
+        themeCounts: { fork: 5, pin: 25 },
+        matePatternCounts: {}
+      }
+    ],
+    arrowDuelCount: 200
+  };
 }

@@ -34,7 +34,11 @@ export function productionTacticalProfileCalibration(
     focusedRun: {
       runSize: 15,
       recentPuzzleDays: 30,
-      ratingBandHalfWidths: [100, 200]
+      ratingBandHalfWidths: [100, 200],
+      themeShortfallBackfill: {
+        destination: "mixed_control",
+        minimumPuzzlesPerTheme: 1
+      }
     },
     families: {
       line: {

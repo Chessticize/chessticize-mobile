@@ -5,7 +5,7 @@ import type {
 } from "../../core/src/index.ts";
 import type { SyncSqliteDatabase } from "./sync-sqlite-store.ts";
 
-export const TACTICAL_PROFILE_CACHE_SCHEMA_VERSION = 2;
+export const TACTICAL_PROFILE_CACHE_SCHEMA_VERSION = 3;
 
 export type TacticalProfileCacheIdentity = Pick<
   TacticalProfileCalibrationArtifact,
@@ -17,6 +17,7 @@ export type TacticalProfileBuildStatus = "empty" | "building" | "ready" | "faile
 export type TacticalProfileBuildState = TacticalProfileCacheIdentity & {
   status: TacticalProfileBuildStatus;
   dirtyDayCount: number;
+  sourceRevision: number;
   watermarkDay?: string;
   lastError?: string;
   evaluatedAt?: string;
@@ -26,8 +27,16 @@ export type TacticalProfileBuildState = TacticalProfileCacheIdentity & {
 export interface TacticalProfileRepository {
   migrate(): void;
   getBuildState(): TacticalProfileBuildState | undefined;
-  reset(identity: TacticalProfileCacheIdentity, completedDays: readonly string[]): void;
-  markDirtyDays(identity: TacticalProfileCacheIdentity, completedDays: readonly string[]): void;
+  reset(
+    identity: TacticalProfileCacheIdentity,
+    completedDays: readonly string[],
+    sourceRevision: number
+  ): void;
+  markDirtyDays(
+    identity: TacticalProfileCacheIdentity,
+    completedDays: readonly string[],
+    sourceRevision: number
+  ): void;
   listDirtyDays(identity: TacticalProfileCacheIdentity): string[];
   replaceDay(
     identity: TacticalProfileCacheIdentity,
@@ -50,23 +59,33 @@ export class MemoryTacticalProfileRepository implements TacticalProfileRepositor
     return this.buildState ? cloneBuildState(this.buildState) : undefined;
   }
 
-  reset(identity: TacticalProfileCacheIdentity, completedDays: readonly string[]): void {
+  reset(
+    identity: TacticalProfileCacheIdentity,
+    completedDays: readonly string[],
+    sourceRevision: number
+  ): void {
     this.cells.clear();
     this.dirtyDays = new Set(uniqueDays(completedDays));
     this.buildState = {
       ...identity,
       status: this.dirtyDays.size > 0 ? "building" : "ready",
-      dirtyDayCount: this.dirtyDays.size
+      dirtyDayCount: this.dirtyDays.size,
+      sourceRevision
     };
   }
 
-  markDirtyDays(identity: TacticalProfileCacheIdentity, completedDays: readonly string[]): void {
+  markDirtyDays(
+    identity: TacticalProfileCacheIdentity,
+    completedDays: readonly string[],
+    sourceRevision: number
+  ): void {
     this.assertIdentity(identity);
     uniqueDays(completedDays).forEach((day) => this.dirtyDays.add(day));
     this.buildState = {
       ...identity,
       status: this.dirtyDays.size > 0 ? "building" : this.buildState?.status ?? "empty",
       dirtyDayCount: this.dirtyDays.size,
+      sourceRevision,
       ...(this.buildState?.watermarkDay === undefined
         ? {}
         : { watermarkDay: this.buildState.watermarkDay }),
@@ -211,17 +230,26 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           calibration_id TEXT NOT NULL,
           status TEXT NOT NULL,
           dirty_day_count INTEGER NOT NULL,
+          source_revision INTEGER NOT NULL,
           watermark_day TEXT,
           last_error TEXT,
           evaluated_at TEXT,
           recommended_signal_ids_json TEXT
         );
       `);
-      } else if (current === 1) {
-        this.db.exec(`
-          ALTER TABLE weakness_build_state ADD COLUMN evaluated_at TEXT;
-          ALTER TABLE weakness_build_state ADD COLUMN recommended_signal_ids_json TEXT;
-        `);
+      } else {
+        if (current === 1) {
+          this.db.exec(`
+            ALTER TABLE weakness_build_state ADD COLUMN evaluated_at TEXT;
+            ALTER TABLE weakness_build_state ADD COLUMN recommended_signal_ids_json TEXT;
+          `);
+        }
+        if (current <= 2) {
+          this.db.exec(`
+            ALTER TABLE weakness_build_state
+            ADD COLUMN source_revision INTEGER NOT NULL DEFAULT -1;
+          `);
+        }
       }
       this.db.exec(`PRAGMA user_version = ${TACTICAL_PROFILE_CACHE_SCHEMA_VERSION}`);
     });
@@ -235,6 +263,7 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         calibration_id AS calibrationId,
         status,
         dirty_day_count AS dirtyDayCount,
+        source_revision AS sourceRevision,
         watermark_day AS watermarkDay,
         last_error AS lastError,
         evaluated_at AS evaluatedAt,
@@ -245,7 +274,11 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
     return row ? buildStateFromRow(row) : undefined;
   }
 
-  reset(identity: TacticalProfileCacheIdentity, completedDays: readonly string[]): void {
+  reset(
+    identity: TacticalProfileCacheIdentity,
+    completedDays: readonly string[],
+    sourceRevision: number
+  ): void {
     const days = uniqueDays(completedDays);
     this.transaction(() => {
       this.db.prepare("DELETE FROM weakness_daily_stats").run();
@@ -256,12 +289,17 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
       this.saveBuildState({
         ...identity,
         status: days.length > 0 ? "building" : "ready",
-        dirtyDayCount: days.length
+        dirtyDayCount: days.length,
+        sourceRevision
       });
     });
   }
 
-  markDirtyDays(identity: TacticalProfileCacheIdentity, completedDays: readonly string[]): void {
+  markDirtyDays(
+    identity: TacticalProfileCacheIdentity,
+    completedDays: readonly string[],
+    sourceRevision: number
+  ): void {
     this.requireIdentity(identity);
     this.transaction(() => {
       for (const day of uniqueDays(completedDays)) {
@@ -273,6 +311,7 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         ...identity,
         status: dirtyDayCount > 0 ? "building" : current?.status ?? "empty",
         dirtyDayCount,
+        sourceRevision,
         ...(current?.watermarkDay === undefined ? {} : { watermarkDay: current.watermarkDay }),
         ...(current?.evaluatedAt === undefined ? {} : { evaluatedAt: current.evaluatedAt }),
         ...(current?.recommendedSignalIds === undefined
@@ -404,17 +443,19 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         calibration_id,
         status,
         dirty_day_count,
+        source_revision,
         watermark_day,
         last_error,
         evaluated_at,
         recommended_signal_ids_json
-      ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(singleton_id) DO UPDATE SET
         model_version = excluded.model_version,
         pack_feature_hash = excluded.pack_feature_hash,
         calibration_id = excluded.calibration_id,
         status = excluded.status,
         dirty_day_count = excluded.dirty_day_count,
+        source_revision = excluded.source_revision,
         watermark_day = excluded.watermark_day,
         last_error = excluded.last_error,
         evaluated_at = excluded.evaluated_at,
@@ -425,6 +466,7 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
       state.calibrationId,
       state.status,
       state.dirtyDayCount,
+      state.sourceRevision,
       state.watermarkDay ?? null,
       state.lastError ?? null,
       state.evaluatedAt ?? null,
@@ -482,6 +524,7 @@ interface BuildStateRow {
   calibrationId: string;
   status: TacticalProfileBuildStatus;
   dirtyDayCount: number;
+  sourceRevision: number;
   watermarkDay: string | null;
   lastError: string | null;
   evaluatedAt: string | null;
@@ -504,6 +547,7 @@ function buildStateFromRow(row: BuildStateRow): TacticalProfileBuildState {
     calibrationId: row.calibrationId,
     status: row.status,
     dirtyDayCount: row.dirtyDayCount,
+    sourceRevision: row.sourceRevision,
     ...(row.watermarkDay === null ? {} : { watermarkDay: row.watermarkDay }),
     ...(row.lastError === null ? {} : { lastError: row.lastError }),
     ...(row.evaluatedAt === null ? {} : { evaluatedAt: row.evaluatedAt }),

@@ -1,5 +1,10 @@
 // Mobile platform storage composition belongs outside the backend/domain seam.
-import type { Puzzle, PuzzlePackManifest } from "../../../../packages/core/src/index.ts";
+import {
+  tacticalThemeFrequencyAtRating,
+  tacticalThemeInventoryUpperBound,
+  type Puzzle,
+  type PuzzlePackManifest
+} from "../../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
 import { PackBackedPracticeStore } from "../../../../packages/storage/src/pack-backed-practice-store.ts";
 import { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
@@ -185,6 +190,20 @@ function createTacticalProfileService(
     repository,
     calibration,
     naturalFrequency: bundledNaturalFrequency(),
+    naturalFrequencyForRating: (taskFamily, rating) =>
+      tacticalThemeFrequencyAtRating(
+        bundledCoreManifest,
+        taskFamily,
+        rating
+      ),
+    inventoryUpperBound: (taskFamily, minRating, maxRating, themes) =>
+      tacticalThemeInventoryUpperBound(
+        bundledCoreManifest,
+        taskFamily,
+        minRating,
+        maxRating,
+        themes
+      )?.availableByTheme,
     ...(calibration.focusedRun === undefined
       ? {}
       : { focusedRunPolicy: calibration.focusedRun })

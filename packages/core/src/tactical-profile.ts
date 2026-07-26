@@ -52,6 +52,11 @@ export type FocusedRunInventoryBand = {
   mixedAvailableCount: number;
 };
 
+export type FocusedRunThemeShortfallBackfill = {
+  destination: "mixed_control";
+  minimumPuzzlesPerTheme: number;
+};
+
 export type FocusedRunPlan = {
   taskFamily: TacticalProfileTaskFamily;
   ratingAnchor: FocusedRunRatingAnchor;
@@ -129,8 +134,14 @@ export function buildFocusedRunPlan(input: {
   runSize: number;
   inventoryBands: readonly FocusedRunInventoryBand[];
   excludePuzzleIds?: readonly string[];
+  themeShortfallBackfill?: FocusedRunThemeShortfallBackfill;
 }): FocusedRunPlanResult {
-  if (!validRatingAnchor(input.ratingAnchor) || !Number.isInteger(input.runSize) || input.runSize < 1) {
+  if (
+    !validRatingAnchor(input.ratingAnchor) ||
+    !Number.isInteger(input.runSize) ||
+    input.runSize < 1 ||
+    !validThemeShortfallBackfill(input.themeShortfallBackfill)
+  ) {
     return unavailable("invalid_input");
   }
 
@@ -149,9 +160,15 @@ export function buildFocusedRunPlan(input: {
     if (!validInventoryBand(inventory, input.ratingAnchor.rating)) {
       continue;
     }
-    const shortages = inventoryShortages(focuses, allocation.themeCounts, allocation.mixedCount, inventory);
-    if (shortages.length > 0) {
-      lastShortages = shortages;
+    const availableAllocation = inventoryAllocation(
+      focuses,
+      allocation.themeCounts,
+      allocation.mixedCount,
+      inventory,
+      input.themeShortfallBackfill
+    );
+    if ("shortages" in availableAllocation) {
+      lastShortages = availableAllocation.shortages;
       continue;
     }
     return {
@@ -161,9 +178,9 @@ export function buildFocusedRunPlan(input: {
         ratingAnchor: { ...input.ratingAnchor },
         reasons: focuses.map((focus, index) => ({
           ...focus,
-          count: allocation.themeCounts[index] as number
+          count: availableAllocation.themeCounts[index] as number
         })),
-        mixedControlCount: allocation.mixedCount,
+        mixedControlCount: availableAllocation.mixedCount,
         minRating: inventory.minRating,
         maxRating: inventory.maxRating,
         excludePuzzleIds: uniquePuzzleIds(input.excludePuzzleIds)
@@ -263,29 +280,49 @@ function largestRemainder(
   return new Map(allocations.map((allocation) => [allocation.id, allocation.count]));
 }
 
-function inventoryShortages(
+function inventoryAllocation(
   focuses: readonly TacticalFocus[],
   themeCounts: readonly number[],
   mixedCount: number,
-  inventory: FocusedRunInventoryBand
-): FocusedRunInventoryShortage[] {
+  inventory: FocusedRunInventoryBand,
+  backfill: FocusedRunThemeShortfallBackfill | undefined
+):
+  | { themeCounts: readonly number[]; mixedCount: number }
+  | { shortages: readonly FocusedRunInventoryShortage[] } {
   const shortages: FocusedRunInventoryShortage[] = [];
+  const availableThemeCounts = [...themeCounts];
+  let availableMixedCount = mixedCount;
   for (const [index, focus] of focuses.entries()) {
     const required = themeCounts[index] as number;
     const available = normalizedAvailability(inventory.availableByTheme[focus.theme]);
-    if (available < required) {
-      shortages.push({ bucket: "theme", theme: focus.theme, required, available });
+    if (available >= required) {
+      continue;
     }
+    const assigned = backfill ? Math.min(required, available) : required;
+    if (
+      !backfill ||
+      assigned < backfill.minimumPuzzlesPerTheme
+    ) {
+      shortages.push({ bucket: "theme", theme: focus.theme, required, available });
+      continue;
+    }
+    availableThemeCounts[index] = assigned;
+    availableMixedCount += required - assigned;
   }
   const mixedAvailable = normalizedAvailability(inventory.mixedAvailableCount);
-  if (mixedAvailable < mixedCount) {
+  if (mixedAvailable < availableMixedCount) {
     shortages.push({
       bucket: "mixed",
-      required: mixedCount,
+      required: availableMixedCount,
       available: mixedAvailable
     });
   }
-  return shortages;
+  return shortages.length > 0
+    ? { shortages }
+    : {
+        themeCounts: availableThemeCounts,
+        mixedCount: availableMixedCount
+      };
 }
 
 function validRatingAnchor(anchor: FocusedRunRatingAnchor): boolean {
@@ -297,6 +334,17 @@ function validInventoryBand(inventory: FocusedRunInventoryBand, rating: number):
     && Number.isFinite(inventory.maxRating)
     && inventory.minRating <= rating
     && rating <= inventory.maxRating;
+}
+
+function validThemeShortfallBackfill(
+  backfill: FocusedRunThemeShortfallBackfill | undefined
+): boolean {
+  return backfill === undefined ||
+    (
+      backfill.destination === "mixed_control" &&
+      Number.isInteger(backfill.minimumPuzzlesPerTheme) &&
+      backfill.minimumPuzzlesPerTheme > 0
+    );
 }
 
 function normalizedAvailability(value: number | undefined): number {
@@ -334,6 +382,7 @@ export type TacticalProfileCalibrationArtifact = {
     runSize: number;
     recentPuzzleDays: number;
     ratingBandHalfWidths: readonly number[];
+    themeShortfallBackfill?: FocusedRunThemeShortfallBackfill;
   };
   families: Record<TacticalProfileTaskFamily, TacticalProfileFamilyCalibration>;
 };
@@ -1216,6 +1265,9 @@ function assertValidCalibration(calibration: TacticalProfileCalibrationArtifact)
       ) ||
       calibration.focusedRun.ratingBandHalfWidths.some(
         (halfWidth, index, widths) => index > 0 && halfWidth <= (widths[index - 1] as number)
+      ) ||
+      !validThemeShortfallBackfill(
+        calibration.focusedRun.themeShortfallBackfill
       )
     ) {
       throw new Error("Tactical Profile Focused Run policy is invalid");

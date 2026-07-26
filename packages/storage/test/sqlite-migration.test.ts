@@ -37,7 +37,8 @@ const SNAPSHOT_TABLES = [
   "practice_runs",
   "review_queue",
   "review_schedule_removals",
-  "review_events"
+  "review_events",
+  "tactical_profile_source_state"
 ] as const;
 
 test("SQLite migrates an empty database to the current schema version", async () => {

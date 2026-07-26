@@ -20,7 +20,11 @@ for (const fixture of repositoryFixtures()) {
   test(`${fixture.name} Tactical Profile cache replaces dirty days deterministically`, () => {
     const repository = fixture.create();
     repository.migrate();
-    repository.reset(IDENTITY, ["2026-07-02", "2026-07-01", "2026-07-02"]);
+    repository.reset(
+      IDENTITY,
+      ["2026-07-02", "2026-07-01", "2026-07-02"],
+      7
+    );
 
     assert.deepEqual(repository.listDirtyDays(IDENTITY), ["2026-07-02", "2026-07-01"]);
     repository.replaceDay(IDENTITY, "2026-07-02", [cell("2026-07-02", "pin", 2)]);
@@ -29,6 +33,7 @@ for (const fixture of repositoryFixtures()) {
       ...IDENTITY,
       status: "ready",
       dirtyDayCount: 0,
+      sourceRevision: 7,
       watermarkDay: "2026-07-02",
       evaluatedAt: "2026-07-03T00:00:00.000Z",
       recommendedSignalIds: ["line:pin", "line:fork", "line:pin"]
@@ -56,7 +61,7 @@ for (const fixture of repositoryFixtures()) {
       ]
     );
 
-    repository.markDirtyDays(IDENTITY, ["2026-07-01", "bad-day"]);
+    repository.markDirtyDays(IDENTITY, ["2026-07-01", "bad-day"], 8);
     repository.replaceDay(IDENTITY, "2026-07-01", [cell("2026-07-01", "fork", 4)]);
     assert.equal(repository.listDailyCells(IDENTITY)[0]?.solveScore, 4);
   });
@@ -64,9 +69,9 @@ for (const fixture of repositoryFixtures()) {
   test(`${fixture.name} Tactical Profile day replacement rolls back atomically`, () => {
     const repository = fixture.create();
     repository.migrate();
-    repository.reset(IDENTITY, ["2026-07-01"]);
+    repository.reset(IDENTITY, ["2026-07-01"], 7);
     repository.replaceDay(IDENTITY, "2026-07-01", [cell("2026-07-01", "fork", 1)]);
-    repository.markDirtyDays(IDENTITY, ["2026-07-01"]);
+    repository.markDirtyDays(IDENTITY, ["2026-07-01"], 8);
 
     assert.throws(
       () => repository.replaceDay(IDENTITY, "2026-07-01", [
@@ -149,12 +154,13 @@ test("SQLite Tactical Profile cache migrates schema v1 build state", () => {
 
   assert.equal(
     (native.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
-    2
+    3
   );
   assert.deepEqual(repository.getBuildState(), {
     ...IDENTITY,
     status: "ready",
     dirtyDayCount: 0,
+    sourceRevision: -1,
     watermarkDay: "2026-07-01"
   });
 });

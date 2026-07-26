@@ -1,11 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import {
   evaluateCalibrationReadiness,
   posteriorApproximationReport,
   reliabilityBins,
+  runCalibration,
   scoreBinaryPredictions,
-  splitWholeSessions
+  splitWholeSessions,
+  verifyPackIdentity
 } from "./calibrate-tactical-profile.mjs";
 
 test("calibration holdout keeps every session wholly on one side", () => {
@@ -55,6 +62,7 @@ test("artifact readiness fails closed without explicit representative-corpus app
     holdoutSessionCount: 40,
     trainAttemptCount: 1000,
     holdoutAttemptCount: 400,
+    decisionEvidence: completeDecisionEvidence(),
     solve: {
       coefficients: {
         intercept: 0,
@@ -129,6 +137,137 @@ test("artifact readiness fails closed without explicit representative-corpus app
   );
 });
 
+test("calibration authenticates the exact SQLite pack before fitting", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "tactical-pack-identity-"));
+  const packPath = join(directory, "pack.sqlite");
+  try {
+    const writer = new DatabaseSync(packPath);
+    writer.exec(`
+      CREATE TABLE puzzles (
+        id TEXT PRIMARY KEY,
+        rating INTEGER NOT NULL,
+        rating_deviation INTEGER,
+        solution_moves TEXT NOT NULL
+      );
+      INSERT INTO puzzles (id, rating, rating_deviation, solution_moves)
+      VALUES ('p1', 900, 80, 'e2e4');
+    `);
+    writer.close();
+    const bytes = await readFile(packPath);
+    const manifest = {
+      format: "sqlite",
+      packFileBytes: (await stat(packPath)).size,
+      packFileHash: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+      puzzleCount: 1,
+      rating: { min: 900, max: 900 }
+    };
+    const reader = new DatabaseSync(packPath, { readOnly: true });
+    try {
+      await verifyPackIdentity(manifest, packPath, reader);
+      await assert.rejects(
+        verifyPackIdentity(
+          { ...manifest, packFileHash: `sha256:${"0".repeat(64)}` },
+          packPath,
+          reader
+        ),
+        /hash does not match/
+      );
+      await assert.rejects(
+        verifyPackIdentity(
+          { ...manifest, puzzleCount: 2 },
+          packPath,
+          reader
+        ),
+        /features do not match/
+      );
+    } finally {
+      reader.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("calibration joins canonical exports and emits cohort reports without activating provisional decisions", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "tactical-calibration-e2e-"));
+  const packPath = join(directory, "pack.sqlite");
+  const manifestPath = join(directory, "manifest.json");
+  const policyPath = join(directory, "policy.json");
+  const progressPath = join(directory, "progress.json");
+  const reportPath = join(directory, "report.json");
+  const artifactPath = join(directory, "artifact.json");
+  try {
+    const writer = new DatabaseSync(packPath);
+    writer.exec(`
+      CREATE TABLE puzzles (
+        id TEXT PRIMARY KEY,
+        rating INTEGER NOT NULL,
+        rating_deviation INTEGER,
+        solution_moves TEXT NOT NULL
+      );
+      INSERT INTO puzzles (id, rating, rating_deviation, solution_moves)
+      VALUES ('p1', 900, 80, 'e2e4 e7e5');
+    `);
+    writer.close();
+    const bytes = await readFile(packPath);
+    await writeFile(manifestPath, JSON.stringify({
+      format: "sqlite",
+      packFileBytes: bytes.length,
+      packFileHash: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+      puzzleCount: 1,
+      rating: { min: 900, max: 900 },
+      tacticalAnalysis: {
+        puzzleRatingDeviation: true,
+        featureHash: `sha256:${"1".repeat(64)}`
+      }
+    }));
+    await writeFile(policyPath, JSON.stringify(calibrationPolicy()));
+    await writeFile(progressPath, JSON.stringify(calibrationProgress()));
+
+    const report = await runCalibration({
+      progressPaths: [progressPath],
+      packPath,
+      manifestPath,
+      policyPath,
+      reportPath,
+      artifactPath,
+      ownerApproved: true
+    });
+    const artifact = JSON.parse(await readFile(artifactPath, "utf8"));
+
+    assert.equal(report.input.joinedObservationCount, 4);
+    assert.deepEqual(
+      report.missingnessCohorts.map((cohort) => [
+        cohort.taskFamily,
+        cohort.timeoutPolicySeconds,
+        cohort.joinedObservationCount
+      ]),
+      [["line", 30, 2], ["line", 60, 2]]
+    );
+    assert.deepEqual(
+      report.families.line.solve.timeoutPolicyHoldout.map(
+        (cohort) => cohort.timeoutPolicySeconds
+      ),
+      [60]
+    );
+    assert.equal(
+      report.families.line.decisionEvidence.timeoutPolicyStratification,
+      true
+    );
+    assert.equal(
+      report.families.line.decisionEvidence.actionUtilityCalibration,
+      false
+    );
+    assert.equal(artifact.families.line.status, "unavailable");
+    assert.match(
+      artifact.families.line.reason,
+      /required calibration decisions are incomplete/
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("predeclared one-step posterior fixtures stay within the policy tolerance", () => {
   const report = posteriorApproximationReport(100);
   assert.deepEqual(
@@ -141,4 +280,104 @@ test("predeclared one-step posterior fixtures stay within the policy tolerance",
 
 function observation(sessionId, completedAt) {
   return { sessionId, completedAt };
+}
+
+function completeDecisionEvidence() {
+  return {
+    candidateModelComparison: true,
+    timeoutPolicyStratification: true,
+    residualInfluencePolicy: true,
+    heteroscedasticityPolicy: true,
+    priorCalibration: true,
+    practicalThresholdCalibration: true,
+    opportunityTransformCalibration: true,
+    actionUtilityCalibration: true,
+    focusedRunPolicyCalibration: true,
+    homeLeadCalibration: true
+  };
+}
+
+function calibrationPolicy() {
+  return {
+    schemaVersion: 1,
+    policyId: "test-policy",
+    holdoutFraction: 0.5,
+    minimums: {
+      trainSessionsPerFamily: 1,
+      holdoutSessionsPerFamily: 1,
+      trainAttemptsPerFamily: 1,
+      holdoutAttemptsPerFamily: 1,
+      reliableSpeedHoldoutAttemptsPerFamily: 1
+    },
+    holdoutGates: {
+      maximumBrierScore: 1,
+      maximumLogLoss: 10,
+      maximumCalibrationInterceptMagnitude: 10,
+      minimumCalibrationSlope: -10,
+      maximumCalibrationSlope: 10,
+      maximumSpeedMeanLogResidualMagnitude: 10,
+      maximumSpeedRootMeanSquareLogResidual: 10,
+      maximumOneStepPosteriorMeanErrorRating: 100,
+      maximumOneStepPosteriorSdErrorRating: 100
+    },
+    focusedRun: {
+      runSize: 15,
+      recentPuzzleDays: 30,
+      ratingBandHalfWidths: [100, 200],
+      themeShortfallBackfill: {
+        destination: "mixed_control",
+        minimumPuzzlesPerTheme: 1
+      }
+    },
+    artifactParameters: {
+      recencyHalfLifeDays: 90,
+      watchProbability: 0.75,
+      recommendationExitProbability: 0.85,
+      recommendationProbability: 0.9,
+      strongProbability: 0.97,
+      minDistinctPuzzles: 4,
+      minDistinctSessions: 2,
+      minimumOpportunityWeight: 0.25,
+      opportunityExponent: 0.5,
+      solveThemePriorSdRating: 100,
+      solvePracticalDeficitRating: 20,
+      minimumExpectedFailuresPer100: 2,
+      speedThemePriorSdLogSeconds: 0.5,
+      practicalTimeMultiplier: 1.2
+    }
+  };
+}
+
+function calibrationProgress() {
+  const sprintSessions = [];
+  const attempts = [];
+  for (let index = 0; index < 4; index += 1) {
+    const sessionId = `s${index + 1}`;
+    const timeoutAfterSeconds = index < 2 ? 30 : 60;
+    const completedAt = `2026-01-0${index + 1}T00:00:10.000Z`;
+    sprintSessions.push({
+      id: sessionId,
+      completedAt,
+      config: {
+        mode: "standard",
+        themes: ["mixed"],
+        perPuzzleSeconds: 20,
+        puzzleTiming: {
+          slowAfterSeconds: 40,
+          timeoutAfterSeconds
+        }
+      }
+    });
+    attempts.push({
+      id: `a${index + 1}`,
+      source: "sprint",
+      sessionId,
+      puzzleId: "p1",
+      result: index % 2 === 0 ? "correct" : "wrong",
+      ratingBefore: 900 + index * 10,
+      elapsedMs: 10_000 + index * 1_000,
+      completedAt
+    });
+  }
+  return { sprintSessions, attempts };
 }

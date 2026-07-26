@@ -176,6 +176,10 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.listSprintAttemptUtcDays(sessionIds);
   }
 
+  getTacticalProfileSourceRevision(): number {
+    return this.userStore.getTacticalProfileSourceRevision();
+  }
+
   exportLocalData(): LocalDataExport {
     return this.userStore.exportLocalData();
   }

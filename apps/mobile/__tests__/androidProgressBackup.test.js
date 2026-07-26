@@ -81,6 +81,7 @@ describe('Android Progress Backup', () => {
       'chessticize-tactical-profile-cache.sqlite',
     );
     expect(deviceStore).toContain('return new DeviceSQLiteStore(open({ name }))');
+    expect(deviceStore).toContain('`${libraryPath}/Caches`');
     expect(mobilePractice).toContain(
       'DeviceSQLiteStore.open(MOBILE_DATABASE_LAYOUT.progressDatabaseName)',
     );

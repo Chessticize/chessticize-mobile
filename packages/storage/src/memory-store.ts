@@ -80,6 +80,7 @@ export class MemoryStore implements PracticeStore {
   private readonly reviewQueue = new Map<string, ReviewQueueState>();
   private readonly reviewRemovals = new Map<string, ReviewScheduleRemoval>();
   private settings = defaultPracticeSettings();
+  private tacticalProfileSourceRevision = 0;
 
   seedPuzzles(puzzles: Puzzle[]): void {
     for (const puzzle of puzzles) {
@@ -206,14 +207,19 @@ export class MemoryStore implements PracticeStore {
 
   createSprintSession(state: SprintState): void {
     this.sessions.set(state.id, state);
+    this.tacticalProfileSourceRevision += 1;
   }
 
   updateSprintSession(state: SprintState): void {
     this.sessions.set(state.id, state);
+    this.tacticalProfileSourceRevision += 1;
   }
 
   recordAttempt(attempt: AttemptEvent): void {
     this.attempts.push(cloneAttemptHistoryRow(attempt));
+    if (attempt.source === "sprint") {
+      this.tacticalProfileSourceRevision += 1;
+    }
   }
 
   setAttemptUnclear(attemptId: string, unclear: boolean, updatedAt: string): AttemptHistoryRow {
@@ -323,6 +329,10 @@ export class MemoryStore implements PracticeStore {
         .map((attempt) => utcDay(attempt.completedAt))
         .filter((day): day is string => day !== undefined)
     )].sort();
+  }
+
+  getTacticalProfileSourceRevision(): number {
+    return this.tacticalProfileSourceRevision;
   }
 
   importLocalData(
@@ -441,6 +451,9 @@ export class MemoryStore implements PracticeStore {
         result.reviewQueue += 1;
       }
     }
+    if (result.sprintSessions > 0 || result.attempts > 0) {
+      this.tacticalProfileSourceRevision += 1;
+    }
     return result;
   }
 
@@ -458,6 +471,9 @@ export class MemoryStore implements PracticeStore {
       if (!isOpenSprint(session)) {
         this.sessions.delete(id);
       }
+    }
+    if (result.attempts > 0 || result.sprintSessions > 0) {
+      this.tacticalProfileSourceRevision += 1;
     }
     return result;
   }

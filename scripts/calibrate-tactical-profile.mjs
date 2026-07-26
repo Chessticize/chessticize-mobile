@@ -1,5 +1,7 @@
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
@@ -11,6 +13,18 @@ import {
 } from "../packages/core/src/index.ts";
 
 const EPSILON = 1e-9;
+const REQUIRED_DECISION_EVIDENCE = [
+  "candidateModelComparison",
+  "timeoutPolicyStratification",
+  "residualInfluencePolicy",
+  "heteroscedasticityPolicy",
+  "priorCalibration",
+  "practicalThresholdCalibration",
+  "opportunityTransformCalibration",
+  "actionUtilityCalibration",
+  "focusedRunPolicyCalibration",
+  "homeLeadCalibration"
+];
 
 export function splitWholeSessions(observations, holdoutFraction) {
   if (!(holdoutFraction > 0 && holdoutFraction < 1)) {
@@ -91,6 +105,14 @@ export function evaluateCalibrationReadiness(report, policy, ownerApproved) {
   const reasons = [];
   if (!ownerApproved) {
     reasons.push("representative corpus has not been explicitly owner-approved");
+  }
+  const incompleteDecisions = REQUIRED_DECISION_EVIDENCE.filter(
+    (decision) => report.decisionEvidence?.[decision] !== true
+  );
+  if (incompleteDecisions.length > 0) {
+    reasons.push(
+      `required calibration decisions are incomplete: ${incompleteDecisions.join(", ")}`
+    );
   }
   const minimums = policy.minimums;
   const gates = policy.holdoutGates;
@@ -190,7 +212,12 @@ export async function runCalibration(options) {
     !Number.isInteger(policy.focusedRun.recentPuzzleDays) ||
     policy.focusedRun.recentPuzzleDays < 0 ||
     !Array.isArray(policy.focusedRun.ratingBandHalfWidths) ||
-    policy.focusedRun.ratingBandHalfWidths.length < 1
+    policy.focusedRun.ratingBandHalfWidths.length < 1 ||
+    policy.focusedRun.themeShortfallBackfill?.destination !== "mixed_control" ||
+    !Number.isInteger(
+      policy.focusedRun.themeShortfallBackfill?.minimumPuzzlesPerTheme
+    ) ||
+    policy.focusedRun.themeShortfallBackfill.minimumPuzzlesPerTheme < 1
   ) {
     throw new Error("Calibration policy has no valid Focused Run policy");
   }
@@ -200,6 +227,7 @@ export async function runCalibration(options) {
   const exports = await loadProgressExports(options.progressPaths);
   const database = new DatabaseSync(options.packPath, { readOnly: true });
   try {
+    await verifyPackIdentity(manifest, options.packPath, database);
     const joined = joinCanonicalObservations(exports, database);
     const familyReports = {};
     for (const taskFamily of ["line", "arrow_duel"]) {
@@ -220,6 +248,7 @@ export async function runCalibration(options) {
         joinedObservationCount: joined.observations.length
       },
       missingness: joined.missingness,
+      missingnessCohorts: joined.missingnessCohorts,
       families: familyReports,
       readyFamilies: Object.entries(familyReports)
         .filter(([, family]) => family.readiness.ready)
@@ -235,6 +264,45 @@ export async function runCalibration(options) {
     return report;
   } finally {
     database.close();
+  }
+}
+
+export async function verifyPackIdentity(manifest, packPath, database) {
+  if (
+    manifest.format !== "sqlite" ||
+    !Number.isSafeInteger(manifest.packFileBytes) ||
+    !/^sha256:[a-f0-9]{64}$/.test(manifest.packFileHash ?? "")
+  ) {
+    throw new Error(
+      "Puzzle pack manifest has no authenticated SQLite file identity"
+    );
+  }
+  const file = await stat(packPath);
+  if (file.size !== manifest.packFileBytes) {
+    throw new Error(
+      `Puzzle pack size does not match manifest: ${file.size}/${manifest.packFileBytes}`
+    );
+  }
+  const actualHash = `sha256:${await sha256File(packPath)}`;
+  if (actualHash !== manifest.packFileHash) {
+    throw new Error("Puzzle pack hash does not match manifest");
+  }
+  const row = database.prepare(`
+    SELECT
+      COUNT(*) AS puzzleCount,
+      MIN(rating) AS minRating,
+      MAX(rating) AS maxRating,
+      SUM(CASE WHEN rating_deviation IS NULL THEN 1 ELSE 0 END)
+        AS missingRatingDeviationCount
+    FROM puzzles
+  `).get();
+  if (
+    row?.puzzleCount !== manifest.puzzleCount ||
+    row?.minRating !== manifest.rating?.min ||
+    row?.maxRating !== manifest.rating?.max ||
+    row?.missingRatingDeviationCount !== 0
+  ) {
+    throw new Error("Puzzle pack schema or Tactical Profile features do not match manifest");
   }
 }
 
@@ -262,11 +330,21 @@ function calibrateFamily(observations, policy, ownerApproved) {
     Math.log(observation.elapsedMs / 1000) -
     dot(speedFit.coefficients, speedFeatures(observation))
   );
+  const speedResidualRows = speedHoldout.map((observation, index) => ({
+    relativeDifficulty: speedFeatures(observation)[1],
+    residual: speedResiduals[index]
+  }));
   const report = {
     trainSessionCount: split.trainSessionCount,
     holdoutSessionCount: split.holdoutSessionCount,
     trainAttemptCount: split.train.length,
     holdoutAttemptCount: split.holdout.length,
+    decisionEvidence: Object.fromEntries(
+      REQUIRED_DECISION_EVIDENCE.map((decision) => [
+        decision,
+        decision === "timeoutPolicyStratification"
+      ])
+    ),
     solve: {
       coefficients: {
         intercept: solveFit.coefficients[0],
@@ -280,6 +358,14 @@ function calibrateFamily(observations, policy, ownerApproved) {
       calibrationIntercept: calibration.coefficients[0] ?? null,
       calibrationSlope: calibration.coefficients[1] ?? null,
       reliability: reliabilityBins(scoredHoldout),
+      timeoutPolicyHoldout: timeoutPolicyHoldoutReport(
+        split.holdout,
+        solveFit.coefficients
+      ),
+      trainingInformationDiagonal: logisticInformationDiagonal(
+        split.train,
+        solveFit.coefficients
+      ),
       posteriorApproximation: posteriorApproximationReport(
         policy.artifactParameters.solveThemePriorSdRating
       )
@@ -297,17 +383,29 @@ function calibrateFamily(observations, policy, ownerApproved) {
       holdoutCount: speedHoldout.length,
       meanLogResidual: meanOrNull(speedResiduals),
       rootMeanSquareLogResidual: rootMeanSquareOrNull(speedResiduals),
+      trainingInformationDiagonal: linearInformationDiagonal(speedTrain),
       residualQuantiles: {
         p05: quantileOrNull(speedResiduals, 0.05),
         p50: quantileOrNull(speedResiduals, 0.5),
         p95: quantileOrNull(speedResiduals, 0.95)
-      }
+      },
+      tailInfluence: residualTailInfluence(speedResiduals),
+      residualByRelativeDifficultyQuartile:
+        residualQuartiles(speedResidualRows)
     }
   };
   return {
     ...report,
     readiness: evaluateCalibrationReadiness(report, policy, ownerApproved)
   };
+}
+
+async function sha256File(path) {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(path)) {
+    hash.update(chunk);
+  }
+  return hash.digest("hex");
 }
 
 export function posteriorApproximationReport(priorSd) {
@@ -374,6 +472,7 @@ function joinCanonicalObservations(exports, database) {
     missingTimeoutPolicy: 0,
     unreliableElapsedTime: 0
   };
+  const missingnessCohorts = new Map();
   const observations = [];
   for (const attempt of deduplicateById(attempts)) {
     if (attempt.source !== "sprint") {
@@ -385,38 +484,63 @@ function joinCanonicalObservations(exports, database) {
       missingness.missingSessionConfig += 1;
       continue;
     }
+    const taskFamily = config.mode === "arrow_duel" ? "arrow_duel" : "line";
+    const timeout = config.puzzleTiming?.timeoutAfterSeconds;
+    const cohortKey = `${taskFamily}|${
+      timeout > 0 ? `timeout:${timeout}` : "timeout:missing"
+    }`;
+    const cohort = missingnessCohorts.get(cohortKey) ?? {
+      taskFamily,
+      timeoutPolicySeconds: timeout > 0 ? timeout : null,
+      inputAttemptCount: 0,
+      joinedObservationCount: 0,
+      focusedIntervention: 0,
+      missingPuzzle: 0,
+      missingPuzzleRatingDeviation: 0,
+      missingRatingBefore: 0,
+      missingTimeoutPolicy: 0,
+      unreliableElapsedTime: 0
+    };
+    cohort.inputAttemptCount += 1;
+    missingnessCohorts.set(cohortKey, cohort);
     if (
       config.tacticalFocus ||
       (config.themes ?? []).some((theme) => theme !== "mixed")
     ) {
       missingness.focusedIntervention += 1;
+      cohort.focusedIntervention += 1;
       continue;
     }
     const puzzle = getPuzzle.get(attempt.puzzleId);
     if (!puzzle) {
       missingness.missingPuzzle += 1;
+      cohort.missingPuzzle += 1;
       continue;
     }
     if (!(puzzle.ratingDeviation > 0)) {
       missingness.missingPuzzleRatingDeviation += 1;
+      cohort.missingPuzzleRatingDeviation += 1;
       continue;
     }
     if (!Number.isFinite(attempt.ratingBefore)) {
       missingness.missingRatingBefore += 1;
+      cohort.missingRatingBefore += 1;
       continue;
     }
-    const timeout = config.puzzleTiming?.timeoutAfterSeconds;
     if (!(timeout > 0)) {
       missingness.missingTimeoutPolicy += 1;
+      cohort.missingTimeoutPolicy += 1;
       continue;
     }
     if (!(attempt.elapsedMs > 0)) {
       missingness.unreliableElapsedTime += 1;
+      cohort.unreliableElapsedTime += 1;
     }
+    cohort.joinedObservationCount += 1;
     observations.push({
       sessionId: attempt.sessionId,
       completedAt: attempt.completedAt,
-      taskFamily: config.mode === "arrow_duel" ? "arrow_duel" : "line",
+      taskFamily,
       success: attempt.result === "correct" ? 1 : 0,
       ratingBefore: attempt.ratingBefore,
       puzzleRating: puzzle.rating,
@@ -433,6 +557,10 @@ function joinCanonicalObservations(exports, database) {
   return {
     observations,
     missingness,
+    missingnessCohorts: [...missingnessCohorts.values()].sort((left, right) =>
+      left.taskFamily.localeCompare(right.taskFamily) ||
+      (left.timeoutPolicySeconds ?? -1) - (right.timeoutPolicySeconds ?? -1)
+    ),
     inputAttemptCount: attempts.length
   };
 }
@@ -486,7 +614,10 @@ function buildArtifact(report, familyReports, policy, manifest) {
     focusedRun: {
       runSize: policy.focusedRun.runSize,
       recentPuzzleDays: policy.focusedRun.recentPuzzleDays,
-      ratingBandHalfWidths: [...policy.focusedRun.ratingBandHalfWidths]
+      ratingBandHalfWidths: [...policy.focusedRun.ratingBandHalfWidths],
+      themeShortfallBackfill: {
+        ...policy.focusedRun.themeShortfallBackfill
+      }
     },
     families
   };
@@ -533,6 +664,106 @@ function reliableSpeedObservation(observation) {
     Number.isFinite(observation.elapsedMs) &&
     observation.elapsedMs > 0 &&
     observation.elapsedMs < observation.timeoutAfterSeconds * 1000;
+}
+
+function timeoutPolicyHoldoutReport(observations, coefficients) {
+  const groups = new Map();
+  for (const observation of observations) {
+    const rows = groups.get(observation.timeoutAfterSeconds) ?? [];
+    rows.push({
+      outcome: observation.success,
+      probability: logistic(dot(coefficients, solveFeatures(observation)))
+    });
+    groups.set(observation.timeoutAfterSeconds, rows);
+  }
+  return [...groups.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([timeoutPolicySeconds, rows]) => ({
+      timeoutPolicySeconds,
+      ...scoreBinaryPredictions(rows),
+      reliability: reliabilityBins(rows)
+    }));
+}
+
+function logisticInformationDiagonal(observations, coefficients) {
+  const totals = Array(coefficients.length).fill(0);
+  for (const observation of observations) {
+    const features = solveFeatures(observation);
+    const probability = logistic(dot(coefficients, features));
+    const variance = probability * (1 - probability);
+    for (let index = 0; index < totals.length; index += 1) {
+      totals[index] += variance * features[index] ** 2;
+    }
+  }
+  return totals;
+}
+
+function linearInformationDiagonal(observations) {
+  const featureCount = observations[0] ? speedFeatures(observations[0]).length : 0;
+  const totals = Array(featureCount).fill(0);
+  for (const observation of observations) {
+    const features = speedFeatures(observation);
+    for (let index = 0; index < totals.length; index += 1) {
+      totals[index] += features[index] ** 2;
+    }
+  }
+  return totals;
+}
+
+function residualTailInfluence(residuals) {
+  const finite = residuals.filter(Number.isFinite);
+  if (finite.length === 0) {
+    return {
+      count: 0,
+      lowerWinsorLimit: null,
+      upperWinsorLimit: null,
+      rawMean: null,
+      winsorizedMean: null,
+      rawRootMeanSquare: null,
+      winsorizedRootMeanSquare: null
+    };
+  }
+  const lower = quantileOrNull(finite, 0.05);
+  const upper = quantileOrNull(finite, 0.95);
+  const winsorized = finite.map((value) =>
+    Math.min(upper, Math.max(lower, value))
+  );
+  return {
+    count: finite.length,
+    lowerWinsorLimit: lower,
+    upperWinsorLimit: upper,
+    rawMean: meanOrNull(finite),
+    winsorizedMean: meanOrNull(winsorized),
+    rawRootMeanSquare: rootMeanSquareOrNull(finite),
+    winsorizedRootMeanSquare: rootMeanSquareOrNull(winsorized)
+  };
+}
+
+function residualQuartiles(rows) {
+  const sorted = rows
+    .filter((row) =>
+      Number.isFinite(row.relativeDifficulty) &&
+      Number.isFinite(row.residual)
+    )
+    .sort((left, right) =>
+      left.relativeDifficulty - right.relativeDifficulty
+    );
+  return Array.from({ length: 4 }, (_, quartile) => {
+    const start = Math.floor(sorted.length * quartile / 4);
+    const end = Math.floor(sorted.length * (quartile + 1) / 4);
+    const group = sorted.slice(start, end);
+    const residuals = group.map((row) => row.residual);
+    return {
+      quartile: quartile + 1,
+      count: group.length,
+      minimumRelativeDifficulty:
+        group[0]?.relativeDifficulty ?? null,
+      maximumRelativeDifficulty:
+        group.at(-1)?.relativeDifficulty ?? null,
+      meanLogResidual: meanOrNull(residuals),
+      rootMeanSquareLogResidual: rootMeanSquareOrNull(residuals)
+    };
+  });
 }
 
 function fitLogistic(rows) {

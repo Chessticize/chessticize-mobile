@@ -1,5 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import {
   buildSprintConfig,
   startSprint,
@@ -10,8 +14,9 @@ import {
 import { MemoryStore } from "../src/memory-store.ts";
 import { PracticeService } from "../src/practice-service.ts";
 import { MemoryTacticalProfileRepository } from "../src/tactical-profile-repository.ts";
-import { SQLiteStore } from "../src/sqlite-store.ts";
+import { NodeSqliteDatabase, SQLiteStore } from "../src/sqlite-store.ts";
 import { TacticalProfileService } from "../src/tactical-profile-service.ts";
+import { SQLiteTacticalProfileRepository } from "../src/tactical-profile-repository.ts";
 
 test("TacticalProfileService rebuilds dirty days and converges after duplicate import", () => {
   const store = seededStore();
@@ -166,6 +171,101 @@ test("large SQLite rebuilds and imports keep canonical reads bounded", () => {
     );
   } finally {
     store.close();
+  }
+});
+
+test("a source-revision mismatch rebuilds a stale cache across SQLite lifetimes", () => {
+  const directory = mkdtempSync(join(tmpdir(), "tactical-profile-revision-"));
+  const progressPath = join(directory, "progress.sqlite");
+  const cachePath = join(directory, "profile-cache.sqlite");
+  try {
+    const initialStore = new SQLiteStore(progressPath);
+    initialStore.migrate();
+    seedStore(initialStore);
+    seedWeaknessHistory(initialStore);
+    const initialCacheDb = new DatabaseSync(cachePath);
+    const initialRepository = new SQLiteTacticalProfileRepository(
+      new NodeSqliteDatabase(initialCacheDb)
+    );
+    const initialProfile = new TacticalProfileService({
+      progressStore: initialStore,
+      puzzleSource: initialStore,
+      repository: initialRepository,
+      calibration: CALIBRATION,
+      naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} }
+    });
+    const initial = initialProfile.getSnapshot("2026-07-25T00:00:00.000Z");
+    const consumedRevision = initial.buildState.sourceRevision;
+    initialCacheDb.close();
+    initialStore.close();
+
+    const changedStore = new SQLiteStore(progressPath);
+    changedStore.migrate();
+    const completedAt = "2026-07-24T00:04:00.000Z";
+    const config = buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20
+    });
+    const session = startSprint({
+      id: "crash-window-session",
+      config,
+      puzzles: [changedStore.getPuzzle("evidence-0")!],
+      ratingBefore: 925,
+      now: "2026-07-24T00:00:00.000Z"
+    });
+    changedStore.transaction(() => {
+      changedStore.createSprintSession({
+        ...session,
+        status: "failed",
+        completedAt,
+        endReason: "max_mistakes",
+        correctCount: 0,
+        mistakeCount: 1,
+        ratingAfter: 900
+      });
+      changedStore.recordAttempt(attempt({
+        id: "crash-window-attempt",
+        sessionId: session.id,
+        puzzleId: "evidence-0",
+        completedAt
+      }));
+    });
+    const changedRevision = changedStore.getTacticalProfileSourceRevision();
+    assert.ok(changedRevision > consumedRevision);
+    changedStore.close();
+
+    const recoveredStore = new SQLiteStore(progressPath);
+    recoveredStore.migrate();
+    const recoveredCacheDb = new DatabaseSync(cachePath);
+    const recoveredRepository = new SQLiteTacticalProfileRepository(
+      new NodeSqliteDatabase(recoveredCacheDb)
+    );
+    const recoveredProfile = new TacticalProfileService({
+      progressStore: recoveredStore,
+      puzzleSource: recoveredStore,
+      repository: recoveredRepository,
+      calibration: CALIBRATION,
+      naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} }
+    });
+
+    const recovered = recoveredProfile.getSnapshot(
+      "2026-07-25T00:00:00.000Z"
+    );
+
+    assert.equal(recovered.buildState.sourceRevision, changedRevision);
+    assert.ok(
+      recoveredRepository
+        .listDailyCells(identity())
+        .some((cell) =>
+          cell.completedDay === "2026-07-24" &&
+          cell.distinctSessionIds.includes("crash-window-session")
+        )
+    );
+    recoveredCacheDb.close();
+    recoveredStore.close();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
@@ -476,6 +576,124 @@ test("TacticalProfileService preserves 10 / 5 quotas, exact deduplication, and a
   );
 });
 
+test("TacticalProfileService backfills a sparse theme only with mixed control", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  for (let index = 0; index < 8; index += 1) {
+    store.recordAttempt({
+      ...attempt({
+        id: `recent-review-${index}`,
+        sessionId: `review-session-${index}`,
+        puzzleId: `fresh-fork-${index}`,
+        completedAt: "2026-07-24T00:00:00.000Z"
+      }),
+      source: "scheduled_review"
+    });
+  }
+  const profile = new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository: new MemoryTacticalProfileRepository(),
+    calibration: CALIBRATION,
+    naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} },
+    focusedRunPolicy: {
+      runSize: 15,
+      recentPuzzleDays: 30,
+      ratingBandHalfWidths: [100, 200],
+      themeShortfallBackfill: {
+        destination: "mixed_control",
+        minimumPuzzlesPerTheme: 1
+      }
+    }
+  });
+
+  const result = profile.prepareFocusedRun(
+    "line",
+    "2026-07-25T00:00:00.000Z",
+    "sparse-backfill"
+  );
+
+  assert.equal(result.status, "ready", JSON.stringify(result));
+  if (result.status !== "ready") return;
+  assert.deepEqual(
+    result.prepared.plan.reasons.map((reason) => [reason.theme, reason.count]),
+    [["fork", 4]]
+  );
+  assert.equal(result.prepared.plan.mixedControlCount, 11);
+  assert.equal(
+    result.prepared.puzzles.filter((puzzle) => puzzle.themes.includes("fork")).length,
+    4
+  );
+  assert.equal(result.prepared.puzzles.length, 15);
+});
+
+test("overlapping focus inventory widens before giving up on an exact two-theme Run", () => {
+  const store = new MemoryStore();
+  const evidence = Array.from({ length: 12 }, (_, index) =>
+    puzzle(`dual-evidence-${index}`, ["fork", "pin"])
+  );
+  const narrowOverlap = Array.from({ length: 9 }, (_, index) =>
+    puzzle(`narrow-overlap-${index}`, ["fork", "pin"])
+  );
+  const widerForks = Array.from({ length: 9 }, (_, index) =>
+    puzzle(`wider-fork-${index}`, ["fork"], 1_100)
+  );
+  const widerPins = Array.from({ length: 3 }, (_, index) =>
+    puzzle(`wider-pin-${index}`, ["pin"], 1_100)
+  );
+  const mixed = Array.from({ length: 3 }, (_, index) =>
+    puzzle(`dual-mixed-${index}`, ["sacrifice"])
+  );
+  store.seedPuzzles([
+    ...evidence,
+    ...narrowOverlap,
+    ...widerForks,
+    ...widerPins,
+    ...mixed
+  ]);
+  store.saveRating({
+    key: "standard 5/20",
+    generation: 0,
+    rating: 925,
+    ratingDeviation: 80,
+    volatility: 0.06,
+    games: 12
+  });
+  seedDualWeaknessHistory(store);
+  const profile = new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository: new MemoryTacticalProfileRepository(),
+    calibration: CALIBRATION,
+    naturalFrequency: {
+      line: { fork: 0.12, pin: 0.12 },
+      arrow_duel: {}
+    },
+    focusedRunPolicy: {
+      runSize: 15,
+      recentPuzzleDays: 30,
+      ratingBandHalfWidths: [100, 200]
+    }
+  });
+
+  const result = profile.prepareFocusedRun(
+    "line",
+    "2026-07-25T00:00:00.000Z",
+    "overlap-widening"
+  );
+
+  assert.equal(result.status, "ready", JSON.stringify(result));
+  if (result.status !== "ready") return;
+  assert.equal(result.prepared.plan.minRating, 725);
+  assert.equal(result.prepared.plan.maxRating, 1_125);
+  assert.deepEqual(
+    result.prepared.plan.reasons.map((reason) => [reason.theme, reason.count]),
+    [["fork", 9], ["pin", 3]]
+  );
+  assert.equal(result.prepared.plan.mixedControlCount, 3);
+  assert.equal(new Set(result.prepared.puzzles.map((puzzle) => puzzle.id)).size, 15);
+});
+
 test("a new Focused Run uses the current family Rating without rewriting old evidence", () => {
   const store = seededStore();
   seedWeaknessHistory(store);
@@ -500,6 +718,80 @@ test("a new Focused Run uses the current family Rating without rewriting old evi
   assert.equal(prepared.prepared.plan.minRating, 900);
   assert.equal(prepared.prepared.plan.maxRating, 1100);
   assert.deepEqual(repository.listDailyCells(identity()), oldEvidence);
+});
+
+test("Rating growth re-evaluates opportunity frequency without rewriting evidence", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new MemoryTacticalProfileRepository();
+  const observedRatings: number[] = [];
+  const profile = new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository,
+    calibration: CALIBRATION,
+    naturalFrequency: { line: { fork: 0.01 }, arrow_duel: {} },
+    naturalFrequencyForRating: (taskFamily, rating) => {
+      observedRatings.push(rating);
+      return taskFamily === "line"
+        ? { fork: rating < 1_000 ? 0.01 : 0.25 }
+        : {};
+    }
+  });
+
+  const before = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const oldEvidence = repository.listDailyCells(identity());
+  const beforeFork = before.evaluation.signals.find(
+    (signal) => signal.id === "line:fork"
+  );
+  const current = store.getRating("standard 5/20");
+  store.saveRating({
+    ...current,
+    generation: current.generation + 1,
+    rating: 1_025
+  });
+
+  const after = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const afterFork = after.evaluation.signals.find(
+    (signal) => signal.id === "line:fork"
+  );
+
+  assert.deepEqual(observedRatings, [925, 1_025]);
+  assert.equal(afterFork?.solveConfidence, beforeFork?.solveConfidence);
+  assert.ok(
+    (afterFork?.actionPriority ?? 0) > (beforeFork?.actionPriority ?? 0)
+  );
+  assert.deepEqual(repository.listDailyCells(identity()), oldEvidence);
+});
+
+test("manifest inventory preflight skips exact queries for an impossible theme", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const originalSelectPuzzles = store.selectPuzzles.bind(store);
+  let exactQueries = 0;
+  store.selectPuzzles = (filter) => {
+    exactQueries += 1;
+    return originalSelectPuzzles(filter);
+  };
+  const profile = new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository: new MemoryTacticalProfileRepository(),
+    calibration: CALIBRATION,
+    naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} },
+    inventoryUpperBound: () => ({ fork: 0 }),
+    focusedRunPolicy: {
+      runSize: 15,
+      recentPuzzleDays: 30,
+      ratingBandHalfWidths: [100, 200]
+    }
+  });
+
+  assert.deepEqual(
+    profile.prepareFocusedRun("line", "2026-07-25T00:00:00.000Z"),
+    { status: "unavailable", reason: "insufficient_inventory" }
+  );
+  assert.equal(exactQueries, 0);
 });
 
 test("TacticalProfileService does not re-offer a Focused Run before fresh mixed evidence", () => {
@@ -575,6 +867,43 @@ test("PracticeService starts the prepared Focused Run through the normal session
   assert.equal(
     practice.listSprintSessions().find((session) => session.id === started.id)?.config?.maxAttempts,
     15
+  );
+});
+
+test("an active Focused Run keeps its frozen puzzle IDs, Rating band, and quotas", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const profile = service(store, new MemoryTacticalProfileRepository());
+  const practice = new PracticeService(store, profile);
+  const started = practice.startFocusedRun(
+    "line",
+    "2026-07-25T00:00:00.000Z",
+    "frozen-run"
+  );
+  const frozen = {
+    puzzleIds: started.puzzles.map((puzzle) => puzzle.id),
+    tacticalFocus: structuredClone(started.config.tacticalFocus),
+    maxAttempts: started.config.maxAttempts
+  };
+  const rating = store.getRating(started.config.ratingKey);
+  store.saveRating({
+    ...rating,
+    generation: rating.generation + 1,
+    rating: rating.rating + 300
+  });
+
+  const active = practice.getActiveSprint();
+
+  assert.deepEqual(active?.puzzles.map((puzzle) => puzzle.id), frozen.puzzleIds);
+  assert.deepEqual(active?.config.tacticalFocus, frozen.tacticalFocus);
+  assert.equal(active?.config.maxAttempts, frozen.maxAttempts);
+  assert.throws(
+    () => practice.startFocusedRun(
+      "line",
+      "2026-07-25T00:01:00.000Z",
+      "replacement-run"
+    ),
+    /while another sprint is active/
   );
 });
 
@@ -699,6 +1028,11 @@ function service(
 
 function seededStore(): MemoryStore {
   const store = new MemoryStore();
+  seedStore(store);
+  return store;
+}
+
+function seedStore(store: MemoryStore | SQLiteStore): void {
   const evidence = Array.from({ length: 12 }, (_, index) =>
     puzzle(`evidence-${index}`, ["fork"])
   );
@@ -717,10 +1051,9 @@ function seededStore(): MemoryStore {
     volatility: 0.06,
     games: 12
   });
-  return store;
 }
 
-function seedWeaknessHistory(store: MemoryStore): void {
+function seedWeaknessHistory(store: MemoryStore | SQLiteStore): void {
   const config = buildSprintConfig({
     mode: "standard",
     durationSeconds: 300,
@@ -758,6 +1091,44 @@ function seedWeaknessHistory(store: MemoryStore): void {
   }
 }
 
+function seedDualWeaknessHistory(store: MemoryStore): void {
+  const config = buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20
+  });
+  for (let sessionIndex = 0; sessionIndex < 3; sessionIndex += 1) {
+    const day = 10 + sessionIndex * 4;
+    const startedAt = `2026-07-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+    const completedAt = `2026-07-${String(day).padStart(2, "0")}T00:04:00.000Z`;
+    const session = startSprint({
+      id: `dual-session-${sessionIndex}`,
+      config,
+      puzzles: [store.getPuzzle(`dual-evidence-${sessionIndex * 4}`)!],
+      ratingBefore: 925,
+      now: startedAt
+    });
+    store.createSprintSession({
+      ...session,
+      status: "failed",
+      completedAt,
+      endReason: "max_mistakes",
+      correctCount: 0,
+      mistakeCount: 4,
+      ratingAfter: 900
+    });
+    for (let offset = 0; offset < 4; offset += 1) {
+      const index = sessionIndex * 4 + offset;
+      store.recordAttempt(attempt({
+        id: `dual-attempt-${index}`,
+        sessionId: session.id,
+        puzzleId: `dual-evidence-${index}`,
+        completedAt
+      }));
+    }
+  }
+}
+
 function attempt(input: {
   id: string;
   sessionId: string;
@@ -781,12 +1152,12 @@ function attempt(input: {
   };
 }
 
-function puzzle(id: string, themes: string[]): Puzzle {
+function puzzle(id: string, themes: string[], rating = 925): Puzzle {
   return {
     id,
     initialFen: "8/8/4P3/8/8/8/8/4K2k w - - 0 1",
     solutionMoves: ["e6e7"],
-    rating: 925,
+    rating,
     ratingDeviation: 80,
     themes,
     source: "lichess",

@@ -269,7 +269,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 12;
+export const CURRENT_SCHEMA_VERSION = 13;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -290,7 +290,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 8, to: 9, apply: migrateV8ToV9 },
   { from: 9, to: 10, apply: migrateV9ToV10 },
   { from: 10, to: 11, apply: migrateV10ToV11 },
-  { from: 11, to: 12, apply: migrateV11ToV12 }
+  { from: 11, to: 12, apply: migrateV11ToV12 },
+  { from: 12, to: 13, apply: migrateV12ToV13 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -680,6 +681,7 @@ export class SyncSQLiteStore implements PracticeStore {
         state.mistakeCount,
         state.ratingBefore
       );
+    this.bumpTacticalProfileSourceRevision();
   }
 
   updateSprintSession(state: SprintState): void {
@@ -705,6 +707,7 @@ export class SyncSQLiteStore implements PracticeStore {
         state.ratingAfter ?? null,
         state.id
       );
+    this.bumpTacticalProfileSourceRevision();
   }
 
   recordAttempt(attempt: AttemptEvent): void {
@@ -755,6 +758,9 @@ export class SyncSQLiteStore implements PracticeStore {
         storedAttempt.unclear ? 1 : 0,
         storedAttempt.unclearUpdatedAt ?? null
       );
+    if (storedAttempt.source === "sprint") {
+      this.bumpTacticalProfileSourceRevision();
+    }
   }
 
   setAttemptUnclear(attemptId: string, unclear: boolean, updatedAt: string): AttemptHistoryRow {
@@ -1084,6 +1090,9 @@ export class SyncSQLiteStore implements PracticeStore {
           result.reviewQueue += 1;
         }
       }
+      if (result.sprintSessions > 0 || result.attempts > 0) {
+        this.bumpTacticalProfileSourceRevision();
+      }
     });
     return result;
   }
@@ -1100,6 +1109,9 @@ export class SyncSQLiteStore implements PracticeStore {
     this.db.prepare("DELETE FROM review_queue").run();
     this.db.prepare("DELETE FROM review_schedule_removals").run();
     this.db.prepare("DELETE FROM sprint_sessions WHERE status NOT IN ('active', 'paused')").run();
+    if (result.attempts > 0 || result.sprintSessions > 0) {
+      this.bumpTacticalProfileSourceRevision();
+    }
     return result;
   }
 
@@ -1640,6 +1652,19 @@ export class SyncSQLiteStore implements PracticeStore {
     return [...days].sort();
   }
 
+  getTacticalProfileSourceRevision(): number {
+    const row = this.db.prepare(`
+      SELECT revision
+      FROM tactical_profile_source_state
+      WHERE singleton_id = 1
+    `).get() as { revision?: unknown } | undefined;
+    return typeof row?.revision === "number" &&
+        Number.isSafeInteger(row.revision) &&
+        row.revision >= 0
+      ? row.revision
+      : 0;
+  }
+
   private importSprintSession(
     session: ExportedSprintSession,
     observer?: LocalDataImportObserver
@@ -1896,6 +1921,14 @@ export class SyncSQLiteStore implements PracticeStore {
         attempt.ratingBefore,
         null
       );
+  }
+
+  private bumpTacticalProfileSourceRevision(): void {
+    this.db.prepare(`
+      UPDATE tactical_profile_source_state
+      SET revision = revision + 1
+      WHERE singleton_id = 1
+    `).run();
   }
 
 }
@@ -2477,6 +2510,17 @@ function migrateV11ToV12(db: SyncSqliteDatabase): void {
     "sprint_focused_run_guide_seen",
     "ALTER TABLE app_settings ADD COLUMN sprint_focused_run_guide_seen INTEGER NOT NULL DEFAULT 0 CHECK (sprint_focused_run_guide_seen IN (0, 1))"
   );
+}
+
+function migrateV12ToV13(db: SyncSqliteDatabase): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tactical_profile_source_state (
+      singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+      revision INTEGER NOT NULL CHECK (revision >= 0)
+    );
+    INSERT OR IGNORE INTO tactical_profile_source_state (singleton_id, revision)
+    VALUES (1, 0);
+  `);
 }
 
 function readSchemaVersion(db: SyncSqliteDatabase): number {

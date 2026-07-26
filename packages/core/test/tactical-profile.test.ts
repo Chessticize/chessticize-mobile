@@ -147,6 +147,98 @@ test("planner reports sparse-theme shortages without changing the approved mix",
   });
 });
 
+test("policy-governed backfill moves sparse primary quota only into mixed control", () => {
+  const result = buildFocusedRunPlan({
+    taskFamily: "line",
+    ratingAnchor: { ratingKey: "standard 5/20", rating: 1500 },
+    rankedFocuses,
+    runSize: 15,
+    inventoryBands: [
+      inventoryBand(1400, 1600, { fork: 4, pin: 3 }, 8)
+    ],
+    themeShortfallBackfill: {
+      destination: "mixed_control",
+      minimumPuzzlesPerTheme: 1
+    }
+  });
+
+  assert.equal(result.status, "ready");
+  if (result.status !== "ready") return;
+  assert.deepEqual(
+    result.plan.reasons.map((reason) => [reason.theme, reason.count]),
+    [["fork", 4], ["pin", 3]]
+  );
+  assert.equal(result.plan.mixedControlCount, 8);
+});
+
+test("policy-governed backfill preserves the primary cap when secondary inventory is sparse", () => {
+  const result = buildFocusedRunPlan({
+    taskFamily: "line",
+    ratingAnchor: { ratingKey: "standard 5/20", rating: 1500 },
+    rankedFocuses,
+    runSize: 15,
+    inventoryBands: [
+      inventoryBand(1400, 1600, { fork: 9, pin: 1 }, 5)
+    ],
+    themeShortfallBackfill: {
+      destination: "mixed_control",
+      minimumPuzzlesPerTheme: 1
+    }
+  });
+
+  assert.equal(result.status, "ready");
+  if (result.status !== "ready") return;
+  assert.deepEqual(
+    result.plan.reasons.map((reason) => [reason.theme, reason.count]),
+    [["fork", 9], ["pin", 1]]
+  );
+  assert.equal(result.plan.mixedControlCount, 5);
+});
+
+test("backfill declines when a focus minimum or expanded mixed quota cannot be filled", () => {
+  const missingFocus = buildFocusedRunPlan({
+    taskFamily: "line",
+    ratingAnchor: { ratingKey: "standard 5/20", rating: 1500 },
+    rankedFocuses,
+    runSize: 15,
+    inventoryBands: [
+      inventoryBand(1400, 1600, { fork: 9, pin: 0 }, 20)
+    ],
+    themeShortfallBackfill: {
+      destination: "mixed_control",
+      minimumPuzzlesPerTheme: 1
+    }
+  });
+  const missingMixed = buildFocusedRunPlan({
+    taskFamily: "line",
+    ratingAnchor: { ratingKey: "standard 5/20", rating: 1500 },
+    rankedFocuses,
+    runSize: 15,
+    inventoryBands: [
+      inventoryBand(1400, 1600, { fork: 4, pin: 3 }, 7)
+    ],
+    themeShortfallBackfill: {
+      destination: "mixed_control",
+      minimumPuzzlesPerTheme: 1
+    }
+  });
+
+  assert.deepEqual(missingFocus, {
+    status: "unavailable",
+    reason: "insufficient_inventory",
+    shortages: [
+      { bucket: "theme", theme: "pin", required: 3, available: 0 }
+    ]
+  });
+  assert.deepEqual(missingMixed, {
+    status: "unavailable",
+    reason: "insufficient_inventory",
+    shortages: [
+      { bucket: "mixed", required: 8, available: 7 }
+    ]
+  });
+});
+
 test("planner rejects a band that cannot preserve the mixed allocation", () => {
   const result = buildFocusedRunPlan({
     taskFamily: "arrow_duel",

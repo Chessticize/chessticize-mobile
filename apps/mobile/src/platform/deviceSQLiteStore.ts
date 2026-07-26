@@ -29,8 +29,12 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
   static openTacticalProfileRepository(
     name = MOBILE_DATABASE_LAYOUT.tacticalProfileCacheDatabaseName
   ): SQLiteTacticalProfileRepository {
+    const location = tacticalProfileCacheLocation();
     return new SQLiteTacticalProfileRepository(
-      new OPSqliteDatabase(open({ name }))
+      new OPSqliteDatabase(open({
+        name,
+        ...(location === undefined ? {} : { location })
+      }))
     );
   }
 
@@ -89,6 +93,17 @@ function bundledJsDirectory(): string | undefined {
   const scriptPath = decodeURIComponent(scriptUrl.slice("file://".length));
   const lastSlash = scriptPath.lastIndexOf("/");
   return lastSlash === -1 ? undefined : scriptPath.slice(0, lastSlash);
+}
+
+function tacticalProfileCacheLocation(): string | undefined {
+  if (Platform.OS !== "ios") {
+    return undefined;
+  }
+  const module = NativeModules.OPSQLite as
+    | { IOS_LIBRARY_PATH?: string }
+    | undefined;
+  const libraryPath = module?.IOS_LIBRARY_PATH?.replace(/\/+$/, "");
+  return libraryPath ? `${libraryPath}/Caches` : undefined;
 }
 
 function moveBundledDatabaseAsset(args: { filename: string; path: string }): Promise<boolean> {

@@ -16,7 +16,7 @@ import {
 process.env.TZ = "UTC";
 const PUZZLE_FIXTURE = resolve("fixtures/puzzles/presolved-sample.json");
 
-test("SQLite v12 preserves v9 settings while backfilling Run timing, rebuilding attempts, and adding guides", async () => {
+test("SQLite v13 preserves v9 settings while backfilling Run timing, rebuilding attempts, and adding guides", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-v10-timing-"));
   const databasePath = join(directory, "practice.sqlite");
   try {
@@ -137,9 +137,9 @@ test("SQLite v12 preserves v9 settings while backfilling Run timing, rebuilding 
     try {
       assert.equal(
         (store.db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
-        12
+        13
       );
-      assert.equal(CURRENT_SCHEMA_VERSION, 12);
+      assert.equal(CURRENT_SCHEMA_VERSION, 13);
       assert.deepEqual(store.getSettings().sprintGuides, {
         rulesSeen: false,
         activeSessionSeen: false,
