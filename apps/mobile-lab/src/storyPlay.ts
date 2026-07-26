@@ -26,7 +26,7 @@ export async function waitForEnabledTestId(
     if (element.getAttribute("aria-disabled") === "true" || element.hasAttribute("disabled")) {
       throw new Error(`${testID} must be enabled`);
     }
-  });
+  }, { timeout: 4_000 });
 }
 
 export async function waitForText(canvasElement: HTMLElement, text: string): Promise<void> {

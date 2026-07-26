@@ -19,6 +19,8 @@ export type LabScenarioId =
   | "practice-timing-warning"
   | "practice-timing-timeout"
   | "practice-timeout-review-notice"
+  | "practice-wrong-review-notice"
+  | "practice-slow-unclear-notice"
   | "practice-preparing"
   | "practice-active"
   | "practice-active-session-guide"
@@ -119,9 +121,31 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "Practice",
     "Active session · after timeout",
     "practice--timeout-review-notice",
-    "The next puzzle replaces the Unclear question with the production read-only notice explaining that the previous puzzle timed out, counted as a mistake, and was added to Review.",
+    "The next puzzle replaces the Unclear question with the concise production notice explaining that the previous puzzle timed out, counted as a mistake, and was added to Review.",
     "practice",
     ["Existing active session", "Next puzzle in progress", "Read-only In Review notice", "Timeout counted as a mistake", "No Unclear question", "Portrait below-board placement", "Landscape right rail"],
+    ["Production sprint rule", "History persistence"],
+    "contained"
+  ),
+  "practice-wrong-review-notice": defineScenario(
+    "practice-wrong-review-notice",
+    "Practice",
+    "Active session · after wrong answer",
+    "practice--wrong-review-notice",
+    "The next puzzle shows the production read-only notice explaining that the previous answer was incorrect, counted as a mistake, and was added to Review.",
+    "practice",
+    ["Existing active session", "Next puzzle in progress", "Read-only In Review notice", "Wrong counted as a mistake", "No Unclear question", "Portrait below-board placement", "Landscape right rail"],
+    ["Production sprint rule", "History persistence"],
+    "contained"
+  ),
+  "practice-slow-unclear-notice": defineScenario(
+    "practice-slow-unclear-notice",
+    "Practice",
+    "Active session · after Slow correct answer",
+    "practice--slow-unclear-notice",
+    "The next puzzle shows the production read-only notice explaining that the previous puzzle took too long and was automatically marked Unclear and added to Review.",
+    "practice",
+    ["Existing active session", "Next puzzle in progress", "Read-only Marked Unclear notice", "Slow correct auto-marked Unclear", "Added to Review", "No manual Unclear action", "Portrait below-board placement", "Landscape right rail"],
     ["Production sprint rule", "History persistence"],
     "contained"
   ),

@@ -137,9 +137,11 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   ));
 });
 
-test("Timed out handoff explains its mistake and Review result on the next puzzle", () => {
+test("post-attempt handoffs explain Timeout, Wrong, and Slow-correct results", () => {
   const timedOut = scenarioRegistry["practice-timing-timeout"];
   const afterTimeout = scenarioRegistry["practice-timeout-review-notice"];
+  const afterWrong = scenarioRegistry["practice-wrong-review-notice"];
+  const afterSlow = scenarioRegistry["practice-slow-unclear-notice"];
 
   assert.ok(timedOut.scope.includes.includes("Post-timeout mistake, Review, and no-Unclear notice"));
   assert.match(timedOut.description, /explains that the mistake entered Review instead of Unclear/);
@@ -147,4 +149,12 @@ test("Timed out handoff explains its mistake and Review result on the next puzzl
   assert.ok(afterTimeout.scope.includes.includes("Read-only In Review notice"));
   assert.ok(afterTimeout.scope.includes.includes("No Unclear question"));
   assert.match(afterTimeout.description, /replaces the Unclear question/);
+  assert.equal(afterWrong.storyId, "practice--wrong-review-notice");
+  assert.ok(afterWrong.scope.includes.includes("Wrong counted as a mistake"));
+  assert.ok(afterWrong.scope.includes.includes("No Unclear question"));
+  assert.match(afterWrong.description, /previous answer was incorrect/);
+  assert.equal(afterSlow.storyId, "practice--slow-unclear-notice");
+  assert.ok(afterSlow.scope.includes.includes("Slow correct auto-marked Unclear"));
+  assert.ok(afterSlow.scope.includes.includes("No manual Unclear action"));
+  assert.match(afterSlow.description, /automatically marked Unclear/);
 });
