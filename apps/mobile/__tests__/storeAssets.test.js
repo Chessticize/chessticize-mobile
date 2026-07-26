@@ -149,6 +149,31 @@ describe("App Store assets document", () => {
     expect(storeAssetsDoc).toContain("physical-device build");
   });
 
+  it("verifies portrait orientation before every portrait store-asset screenshot", () => {
+    const portraitHelperStart = storeAssetsE2e.indexOf(
+      "async function takePortraitScreenshotAtTop(name)"
+    );
+    const portraitHelperEnd = storeAssetsE2e.indexOf(
+      "\n}\n\nasync function takeLandscapeScreenshot",
+      portraitHelperStart
+    );
+    const portraitHelper = storeAssetsE2e.slice(portraitHelperStart, portraitHelperEnd);
+    const setPortrait = "await device.setOrientation('portrait')";
+    const waitForPortrait = "await waitForScreenOrientation('portrait')";
+    const takeScreenshot = "await device.takeScreenshot(name)";
+
+    expect(storeAssetsE2e.match(/takePortraitScreenshotAtTop\('app-store-/g)).toHaveLength(11);
+    expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop(scene)");
+    expect(storeAssetsE2e).not.toMatch(/device\.takeScreenshot\('app-store-/);
+    expect(portraitHelper.indexOf(setPortrait)).toBeGreaterThan(-1);
+    expect(portraitHelper.indexOf(waitForPortrait)).toBeGreaterThan(
+      portraitHelper.indexOf(setPortrait)
+    );
+    expect(portraitHelper.indexOf(takeScreenshot)).toBeGreaterThan(
+      portraitHelper.indexOf(waitForPortrait)
+    );
+  });
+
   it("marks the App Store plan store-assets item implementation complete", () => {
     expect(appStorePlan).toContain("`docs/STORE_ASSETS.md` now records");
     expect(appStorePlan).toMatch(

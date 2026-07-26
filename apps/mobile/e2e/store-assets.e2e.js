@@ -163,8 +163,7 @@ async function captureMainTabScenes() {
   if (ratingText === 'Rating 600') {
     throw new Error('Expected the Practice screenshot to show a populated Arrow Duel rating');
   }
-  await sleep(1200);
-  await device.takeScreenshot('app-store-01-practice-tab');
+  await takePortraitScreenshotAtTop('app-store-01-practice-tab');
   await takeLandscapeScreenshot('app-store-01-practice-tab');
 
   await waitForVisibleInPracticeScroll('practice-add-run');
@@ -174,8 +173,7 @@ async function captureMainTabScenes() {
   await waitFor(element(by.id('custom-mode-regular'))).toBeVisible().withTimeout(10000);
   await waitFor(element(by.id('practice-run-theme-row'))).toExist().withTimeout(10000);
   await expect(element(by.text('Themes'))).toExist();
-  await sleep(1200);
-  await device.takeScreenshot('app-store-07-custom-setup');
+  await takePortraitScreenshotAtTop('app-store-07-custom-setup');
   await element(by.id('practice-run-editor-close')).tap();
   await waitFor(element(by.id('practice-run-arrow-duel'))).toBeVisible().withTimeout(10000);
 
@@ -183,19 +181,16 @@ async function captureMainTabScenes() {
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id('review-due-count'))).toHaveText('1 / 3').withTimeout(10000);
   await waitFor(element(by.id('review-today-history'))).toExist().withTimeout(10000);
-  await sleep(1200);
-  await device.takeScreenshot('app-store-02-review-tab');
+  await takePortraitScreenshotAtTop('app-store-02-review-tab');
 
   await openTab('history-tab', 'history-action-header');
   await waitFor(element(by.text('1-4 of 4'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
-  await sleep(1200);
-  await device.takeScreenshot('app-store-03-history-tab');
+  await takePortraitScreenshotAtTop('app-store-03-history-tab');
 
   await openTab('settings-tab', 'settings-app-version');
   await element(by.id('practice-main-scroll')).scrollTo('top');
-  await sleep(1200);
-  await device.takeScreenshot('app-store-04-settings-tab');
+  await takePortraitScreenshotAtTop('app-store-04-settings-tab');
 }
 
 async function captureSprintScenes() {
@@ -220,6 +215,8 @@ async function captureSprintScenes() {
 }
 
 async function takePortraitScreenshotAtTop(name) {
+  await device.setOrientation('portrait');
+  await waitForScreenOrientation('portrait');
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await sleep(500);
   await device.takeScreenshot(name);
