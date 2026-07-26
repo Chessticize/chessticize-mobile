@@ -193,6 +193,10 @@ import {
   TacticalProfileHomeCard
 } from "./TacticalProfileSection.tsx";
 import type { TacticalProfilePresentation } from "./tacticalProfilePresentation.ts";
+import {
+  ICloudSyncErrorDetails,
+  type ICloudSyncErrorDetailsPresentation
+} from "./ICloudSyncErrorDetails.tsx";
 
 export type {
   PracticeRunDraft,
@@ -216,6 +220,7 @@ interface Props {
   customTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   feedbackIssuesOpener?: (url: string) => Promise<void>;
+  iCloudSyncErrorDetails?: ICloudSyncErrorDetailsPresentation;
   currentTimeMs?: () => number;
   sprintGuidanceEnabled?: boolean;
   moveFeedbackSettings?: {
@@ -512,6 +517,7 @@ export function PracticePocScreen({
   customTargetCorrect,
   debugTrace,
   feedbackIssuesOpener = openFeedbackIssuesInBrowser,
+  iCloudSyncErrorDetails,
   currentTimeMs = Date.now,
   sprintGuidanceEnabled = false,
   moveFeedbackSettings,
@@ -3611,7 +3617,8 @@ export function PracticePocScreen({
                 reviewReminderPreference={reviewReminderPreference}
                 showRatingControls={!ratingEditingMovedToHome}
                 iCloudSyncEnabled={iCloudSyncEnabled}
-                iCloudSyncStatus={iCloudSyncStatus}
+                iCloudSyncErrorDetails={iCloudSyncErrorDetails}
+                iCloudSyncStatus={iCloudSyncErrorDetails ? "iCloud sync failed" : iCloudSyncStatus}
                 moveFeedbackPreferences={moveFeedbackPreferences}
                 moveFeedbackPreviewer={moveFeedbackSettings?.preview}
                 showSprintGuideReset={
@@ -12225,6 +12232,7 @@ function SettingsPanel({
   onSaveReviewReminderPreference,
   onSyncICloudNow,
   iCloudSyncEnabled,
+  iCloudSyncErrorDetails,
   iCloudSyncStatus,
   moveFeedbackPreferences,
   moveFeedbackPreviewer,
@@ -12253,6 +12261,7 @@ function SettingsPanel({
   onSaveReviewReminderPreference: (preference: ReviewReminderPreference) => void;
   onSyncICloudNow: () => Promise<string>;
   iCloudSyncEnabled: boolean;
+  iCloudSyncErrorDetails?: ICloudSyncErrorDetailsPresentation;
   iCloudSyncStatus: string;
   moveFeedbackPreferences: MoveFeedbackPreferences;
   moveFeedbackPreviewer?: MoveFeedbackPreviewer;
@@ -12302,16 +12311,21 @@ function SettingsPanel({
             />
           </View>
           {iCloudSyncEnabled ? (
-            <SettingsActionRow
-              label="Sync Now"
-              detail="Merge ratings, history, and review queue with your private iCloud."
-              testID="settings-sync-now"
-              onPress={() => {
-                void onSyncICloudNow().then((message) => {
-                  setStatusMessage(message);
-                });
-              }}
-            />
+            <>
+              <SettingsActionRow
+                label="Sync Now"
+                detail="Merge ratings, history, and review queue with your private iCloud."
+                testID="settings-sync-now"
+                onPress={() => {
+                  void onSyncICloudNow().then((message) => {
+                    setStatusMessage(message);
+                  });
+                }}
+              />
+              {iCloudSyncErrorDetails ? (
+                <ICloudSyncErrorDetails presentation={iCloudSyncErrorDetails} />
+              ) : null}
+            </>
           ) : null}
         </SettingsSection>
       ) : (

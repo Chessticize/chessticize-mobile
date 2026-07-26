@@ -331,6 +331,22 @@
       }
     ]
   },
+  "settings-ios-sync-error-details": {
+    "issues": [
+      {
+        "issueNumber": 353,
+        "changeNote": "Show a local iCloud sync diagnostic that users can inspect and copy, then explicitly confirm before exporting a complete reproduction bundle."
+      }
+    ]
+  },
+  "settings-ios-sync-support-bundle-partial": {
+    "issues": [
+      {
+        "issueNumber": 353,
+        "changeNote": "Clearly mark the support bundle as partial when CloudKit cannot supply its JSON progress snapshot."
+      }
+    ]
+  },
   "settings-sprint-guidance": {
     "issues": [
       {

@@ -60,6 +60,8 @@ export type LabScenarioId =
   | "history-attempt-detail"
   | "history-replay-unavailable"
   | "settings-ios-sync"
+  | "settings-ios-sync-error-details"
+  | "settings-ios-sync-support-bundle-partial"
   | "settings-sprint-guidance"
   | "settings-android-backup"
   | "settings-notifications-denied"
@@ -217,6 +219,28 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "settings",
     ["iCloud Sync", "Notifications", "Sound and haptic toggles", "Move and capture audio previews", "About"],
     ["Run editor", "Native audio and haptic validation", "Stockfish diagnostics"]
+  ),
+  "settings-ios-sync-error-details": defineScenario(
+    "settings-ios-sync-error-details",
+    "Settings",
+    "iCloud sync error details",
+    "settings--i-cloud-sync-error-details",
+    "The iOS Settings sync failure branch with a local, privacy-bounded diagnostic that the user can inspect, select, and copy for support.",
+    "settings",
+    ["Failed iCloud Sync status", "View Error Details entry", "Local diagnostic modal", "Selectable technical details", "Copy success feedback", "Sensitive-data confirmation", "Complete support bundle", "iOS Share Sheet handoff"],
+    ["Settings", "User-controlled support message", "Native database snapshot and Share Sheet"],
+    "contained"
+  ),
+  "settings-ios-sync-support-bundle-partial": defineScenario(
+    "settings-ios-sync-support-bundle-partial",
+    "Settings",
+    "iCloud support bundle · partial",
+    "settings--i-cloud-sync-support-bundle-partial",
+    "The support-bundle recovery branch when the local SQLite snapshot is available but CloudKit cannot return its JSON progress snapshot.",
+    "settings",
+    ["Sensitive-data confirmation", "CloudKit snapshot unavailable", "Explicit partial-bundle warning", "Included-file inventory", "iOS Share Sheet handoff"],
+    ["iCloud sync error details", "Native database snapshot and Share Sheet"],
+    "contained"
   ),
   "settings-sprint-guidance": defineScenario("settings-sprint-guidance", "Settings", "Guidance · replay Sprint and Arrow Duel guides", "settings--sprint-guide-reset", "Settings guidance action that makes the rules, active-session, and Arrow Duel guides available again without changing Runs, ratings, or History.", "settings", ["Direct Settings entry", "Guidance focused in the phone viewport", "Explicit Reset guides button", "Reset the full guidance set", "No confirmation for a reversible action", "Inline completed state", "Progress safety copy"], ["Production onboarding persistence", "Practice"], "contained"),
   "settings-android-backup": defineScenario("settings-android-backup", "Settings", "Android backup", "settings--android-backup", "Android managed-backup variant with iCloud controls omitted.", "settings", ["Android Progress Backup", "Notifications", "About"], ["Stockfish diagnostics"]),
