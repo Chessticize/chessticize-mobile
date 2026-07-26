@@ -256,6 +256,7 @@ export type SprintRulesDesignPreview = {
   firstRunGuide?: SprintRulesGuidePresentation;
   firstRunGuideInitiallyVisible?: boolean;
   initialSessionGuides?: readonly SprintSessionGuidePresentation[];
+  initialPreviousAttemptNotice?: "slow" | "timed_out" | "wrong";
   initialResultUnclearPrompt?: SprintResultUnclearPromptPresentation;
   initialResultState?: SprintState;
   resultUnclearSummary?: SprintResultUnclearSummaryPresentation;
@@ -348,27 +349,40 @@ type FeedbackBoardSnapshot = {
 
 type UnclearPromptState = {
   attemptId: string;
-  autoMarkedReason?: "slow";
   marked: boolean;
   puzzleId: string;
   question: string;
 };
 
+type PreviousAttemptNoticeReason = "slow" | "timed_out" | "wrong";
+
 type PreviousAttemptNoticeState = {
   attemptId: string;
   puzzleId: string;
-  reason: "timed_out";
+  reason: PreviousAttemptNoticeReason;
 };
 
 function previousAttemptNoticeFor(
   attempt: AttemptEvent | null | undefined,
   sprintStatus: SprintState["status"]
 ): PreviousAttemptNoticeState | null {
-  return attempt?.result === "timed_out" && sprintStatus === "active"
+  if (!attempt || sprintStatus !== "active") {
+    return null;
+  }
+  if (attempt.result === "timed_out" || attempt.result === "wrong") {
+    return {
+      attemptId: attempt.id,
+      puzzleId: attempt.puzzleId,
+      reason: attempt.result
+    };
+  }
+  return attempt.result === "correct"
+    && attempt.timingStatus === "slow"
+    && attempt.unclear === true
     ? {
         attemptId: attempt.id,
         puzzleId: attempt.puzzleId,
-        reason: "timed_out"
+        reason: "slow"
       }
     : null;
 }
@@ -597,7 +611,15 @@ export function PracticePocScreen({
       : null
   ));
   const [previousAttemptNotice, setPreviousAttemptNotice] =
-    useState<PreviousAttemptNoticeState | null>(null);
+    useState<PreviousAttemptNoticeState | null>(() => (
+      sprintRulesDesignPreview?.initialPreviousAttemptNotice
+        ? {
+            attemptId: "sprint-rules-preview-previous-attempt",
+            puzzleId: "sprint-rules-preview-previous-puzzle",
+            reason: sprintRulesDesignPreview.initialPreviousAttemptNotice
+          }
+        : null
+    ));
   const [boardInputLocked, setBoardInputLocked] = useState(false);
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
   const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
@@ -1737,24 +1759,21 @@ export function PracticePocScreen({
       const next = service.submitMove(move, captureLiveNowIso());
       playCommittedMoveFeedback("user", move, submittedFen);
       const nextFeedback = (next.feedback as SessionFeedback) ?? null;
-      setPreviousAttemptNotice(previousAttemptNoticeFor(
+      const nextPreviousAttemptNotice = previousAttemptNoticeFor(
         next.attempt,
         next.state.status
-      ));
+      );
+      setPreviousAttemptNotice(nextPreviousAttemptNotice);
       if (next.attempt) {
-        const isSlowAutoMarked = next.attempt.timingStatus === "slow" &&
-          next.attempt.unclear === true;
         setUnclearPrompt(
-          isUnclearAttemptEligible(next.attempt)
-            && (!next.attempt.unclear || isSlowAutoMarked)
+          !nextPreviousAttemptNotice
+            && isUnclearAttemptEligible(next.attempt)
+            && !next.attempt.unclear
           ? {
               attemptId: next.attempt.id,
-              ...(isSlowAutoMarked ? { autoMarkedReason: "slow" as const } : {}),
               marked: Boolean(next.attempt.unclear),
               puzzleId: next.attempt.puzzleId,
-              question: isSlowAutoMarked
-                ? "Marked unclear because the last puzzle was slow."
-                : "Was it clear why the last correct move worked?"
+              question: "Was it clear why the last correct move worked?"
             }
           : null
         );
@@ -2927,9 +2946,7 @@ export function PracticePocScreen({
           >
             <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
             {sprintGuidanceEnabled || sprintRulesDesignPreview?.timeoutCountsAsMistake === true ? (
-              <Text style={styles.puzzleTimeoutOverlayDetail}>
-                Mistake · Added to Review · Moving on
-              </Text>
+              <Text style={styles.puzzleTimeoutOverlayDetail}>Added to Review</Text>
             ) : null}
           </View>
         ) : null}
@@ -3006,15 +3023,13 @@ export function PracticePocScreen({
       ]}
     >
       {previousAttemptNotice ? (
-        <PreviousAttemptNotice />
+        <PreviousAttemptNotice reason={previousAttemptNotice.reason} />
       ) : unclearPrompt ? (
         <UnclearAttemptPrompt
           marked={unclearPrompt.marked}
-          question={unclearPrompt.autoMarkedReason === "slow"
-            ? "Marked unclear because the previous puzzle was slow."
-            : unclearPrompt.question.includes("wrong")
-              ? unclearPrompt.question
-              : "Was the previous puzzle clear?"}
+          question={unclearPrompt.question.includes("wrong")
+            ? unclearPrompt.question
+            : "Was the previous puzzle clear?"}
           onToggle={toggleUnclearPrompt}
         />
       ) : null}
@@ -5058,9 +5073,7 @@ function SessionCoachmarkDemo({
                 testID="practice-session-guide-timeout-overlay"
               >
                 <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
-                <Text style={styles.puzzleTimeoutOverlayDetail}>
-                  Mistake · Added to Review · Moving on
-                </Text>
+                <Text style={styles.puzzleTimeoutOverlayDetail}>Added to Review</Text>
               </View>
             ) : null}
           </View>
@@ -7359,22 +7372,56 @@ function ActiveMistakeIndicator({
   );
 }
 
-function PreviousAttemptNotice(): React.JSX.Element {
+function PreviousAttemptNotice({
+  reason
+}: {
+  reason: PreviousAttemptNoticeReason;
+}): React.JSX.Element {
+  const presentation = reason === "slow"
+    ? {
+        detail: "It was automatically marked Unclear and added to Review.",
+        status: "Marked Unclear",
+        title: "Previous puzzle took too long"
+      }
+    : reason === "wrong"
+      ? {
+          detail: "It counted as a mistake and was added to Review.",
+          status: "In Review",
+          title: "Previous answer was incorrect"
+        }
+      : {
+          detail: "It counted as a mistake and was added to Review.",
+          status: "In Review",
+          title: "Previous puzzle timed out"
+        };
   return (
     <View
-      accessibilityLabel="Previous puzzle timed out. It counted as a mistake and was added to Review. Mistakes are not marked Unclear. In Review."
+      accessibilityLabel={`${presentation.title}. ${presentation.detail} ${presentation.status}.`}
       accessibilityLiveRegion="polite"
       style={styles.unclearPrompt}
       testID="sprint-previous-attempt-notice"
     >
       <View style={styles.previousAttemptNoticeCopy}>
-        <Text style={styles.previousAttemptNoticeTitle}>Previous puzzle timed out</Text>
+        <Text style={styles.previousAttemptNoticeTitle}>{presentation.title}</Text>
         <Text style={styles.previousAttemptNoticeDetail}>
-          It counted as a mistake and was added to Review. Mistakes are not marked Unclear.
+          {presentation.detail}
         </Text>
       </View>
-      <View style={styles.previousAttemptNoticeStatus}>
-        <Text style={styles.previousAttemptNoticeStatusText}>In Review</Text>
+      <View
+        style={[
+          styles.previousAttemptNoticeStatus,
+          reason === "slow" ? styles.previousAttemptNoticeStatusUnclear : null
+        ]}
+        testID="sprint-previous-attempt-notice-status"
+      >
+        <Text
+          style={[
+            styles.previousAttemptNoticeStatusText,
+            reason === "slow" ? styles.previousAttemptNoticeStatusTextUnclear : null
+          ]}
+        >
+          {presentation.status}
+        </Text>
       </View>
     </View>
   );
@@ -15820,10 +15867,17 @@ const styles = StyleSheet.create({
     minHeight: 30,
     paddingHorizontal: 8
   },
+  previousAttemptNoticeStatusUnclear: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#F59E0B"
+  },
   previousAttemptNoticeStatusText: {
     color: "#1D4ED8",
     fontSize: 11,
     fontWeight: "900"
+  },
+  previousAttemptNoticeStatusTextUnclear: {
+    color: "#B45309"
   },
   promptCopy: {
     flex: 1,

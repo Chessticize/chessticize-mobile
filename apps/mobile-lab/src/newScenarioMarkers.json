@@ -228,6 +228,26 @@
       {
         "issueNumber": 337,
         "changeNote": "Show the read-only In Review notice that replaces the Unclear question after a timeout."
+      },
+      {
+        "issueNumber": 342,
+        "changeNote": "Keep the timeout handoff concise while preserving its mistake and Review explanation."
+      }
+    ]
+  },
+  "practice-wrong-review-notice": {
+    "issues": [
+      {
+        "issueNumber": 342,
+        "changeNote": "Explain that the previous wrong answer counted as a mistake and was added to Review."
+      }
+    ]
+  },
+  "practice-slow-unclear-notice": {
+    "issues": [
+      {
+        "issueNumber": 342,
+        "changeNote": "Explain that the previous Slow correct answer was automatically marked Unclear and added to Review."
       }
     ]
   },

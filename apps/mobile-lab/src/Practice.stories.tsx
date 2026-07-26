@@ -385,9 +385,43 @@ export const TimeoutReviewNotice: Story = {
     await waitForText(canvasElement, "Previous puzzle timed out");
     await waitForText(
       canvasElement,
-      "It counted as a mistake and was added to Review. Mistakes are not marked Unclear."
+      "It counted as a mistake and was added to Review."
     );
     await waitForText(canvasElement, "In Review");
+    expectTestIdAbsent(canvasElement, "sprint-unclear-prompt");
+  }
+};
+
+export const WrongReviewNotice: Story = {
+  name: "Active session · after wrong answer",
+  args: { scenarioId: "practice-wrong-review-notice" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "active-session-shell");
+    await waitForTestId(canvasElement, "sprint-previous-attempt-notice");
+    await waitForText(canvasElement, "Previous answer was incorrect");
+    await waitForText(
+      canvasElement,
+      "It counted as a mistake and was added to Review."
+    );
+    await waitForText(canvasElement, "In Review");
+    expectTestIdAbsent(canvasElement, "sprint-unclear-prompt");
+  }
+};
+
+export const SlowUnclearNotice: Story = {
+  name: "Active session · after Slow correct answer",
+  args: { scenarioId: "practice-slow-unclear-notice" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "active-session-shell");
+    await waitForTestId(canvasElement, "sprint-previous-attempt-notice");
+    await waitForText(canvasElement, "Previous puzzle took too long");
+    await waitForText(
+      canvasElement,
+      "It was automatically marked Unclear and added to Review."
+    );
+    await waitForText(canvasElement, "Marked Unclear");
     expectTestIdAbsent(canvasElement, "sprint-unclear-prompt");
   }
 };

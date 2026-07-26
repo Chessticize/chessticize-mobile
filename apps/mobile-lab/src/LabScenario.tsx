@@ -393,6 +393,26 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       break;
   }
 
+  if (
+    scenarioId === "practice-wrong-review-notice"
+    || scenarioId === "practice-slow-unclear-notice"
+  ) {
+    const active = service.startSprint({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 60,
+      targetCorrect: 2
+    }, new Date(LAB_NOW_MS).toISOString());
+    screenProps.sprintRulesDesignPreview = {
+      ...(screenProps.sprintRulesDesignPreview ?? {}),
+      initialPreviousAttemptNotice: scenarioId === "practice-wrong-review-notice"
+        ? "wrong"
+        : "slow",
+      initialResultState: active
+    };
+    screenProps.standardTargetCorrect = 2;
+  }
+
   const initialPuzzleElapsedSeconds = timingScenarioInitialElapsedSeconds(scenarioId);
   if (initialPuzzleElapsedSeconds !== null) {
     screenProps.currentTimeMs = createLivePuzzleClock(
@@ -438,6 +458,9 @@ function timingScenarioInitialElapsedSeconds(scenarioId: LabScenarioId): number 
   }
   if (scenarioId === "practice-timeout-review-notice") {
     return 59;
+  }
+  if (scenarioId === "practice-slow-unclear-notice") {
+    return 41;
   }
   return null;
 }
