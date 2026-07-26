@@ -22,6 +22,10 @@ import {
 import { previewBrowserMoveFeedback } from "./browserMoveFeedbackPreview.ts";
 import { clearLabPracticeService, setLabPracticeService } from "./boardController.ts";
 import { ISSUE_272_LAB_PUZZLE, LAB_PUZZLES, PRIMARY_LAB_PUZZLE } from "./labPuzzles.ts";
+import {
+  createLabICloudSyncDiagnosticsClient,
+  labMobilePlatformForScenario
+} from "./labICloudSyncDiagnostics.ts";
 import { scenarioRegistry, type LabScenarioId } from "./scenarioRegistry.ts";
 import {
   SERVER_CURATED_THEME_PRESENTATION,
@@ -345,8 +349,11 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
   let service = createSeededService();
   let configurePuzzleSource = true;
   let notificationStatus: ReviewReminderPermissionStatus = "authorized";
-  let reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"] = "ios";
-  let progressProtection: MobilePlatformCapabilities["progressProtection"] = { kind: "icloud_sync" };
+  const reminderPlatform = labMobilePlatformForScenario(scenarioId);
+  const progressProtection: MobilePlatformCapabilities["progressProtection"] =
+    reminderPlatform === "ios"
+      ? { kind: "icloud_sync" }
+      : { kind: "android_managed_backup" };
   const screenProps: ScreenProps = {
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
@@ -412,10 +419,6 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       break;
     case "history-replay-unavailable":
       service = createHistoryService(true);
-      break;
-    case "settings-android-backup":
-      reminderPlatform = "android";
-      progressProtection = { kind: "android_managed_backup" };
       break;
     case "settings-ios-sync":
       notificationStatus = "not_determined";
@@ -486,7 +489,8 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     progressProtection,
     iCloudProgressSyncClient: reminderPlatform === "ios"
       ? new FakeICloudProgressSyncClient(undefined, "no_account")
-      : null
+      : null,
+    iCloudSyncDiagnosticsClient: createLabICloudSyncDiagnosticsClient(reminderPlatform)
   };
   if (
     scenarioId === "settings-ios-sync-error-details"

@@ -12738,6 +12738,9 @@ function FeedbackSupportCard({
           You will review and submit your issue on GitHub.
         </Text>
       </View>
+      {supportBundle ? (
+        <ICloudSyncSupportDiagnosticsEntry presentation={supportBundle} />
+      ) : null}
       <SettingsExternalLinkRow
         label="Email Support"
         value="Email"
@@ -12748,9 +12751,6 @@ function FeedbackSupportCard({
           void Linking.openURL(supportEmailUrl);
         }}
       />
-      {supportBundle ? (
-        <ICloudSyncSupportDiagnosticsEntry presentation={supportBundle} />
-      ) : null}
       {confirmationVisible ? (
         <Modal
           animationType="fade"

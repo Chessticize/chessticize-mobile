@@ -239,7 +239,7 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "settings--i-cloud-sync-support-bundle",
     "The always-available iOS Settings entry under Help & Feedback for preparing support diagnostics even when no sync failure was captured.",
     "settings",
-    ["Help & Feedback placement", "Email Support neighbor", "Persistent Settings entry", "Sensitive-data confirmation", "Consistent local SQLite snapshot", "CloudKit JSON snapshot", "Diagnostic manifest", "iOS Share Sheet handoff"],
+    ["Help & Feedback placement", "Email Support final row", "Persistent Settings entry", "Sensitive-data confirmation", "Consistent local SQLite snapshot", "CloudKit JSON snapshot", "Diagnostic manifest", "iOS Share Sheet handoff"],
     ["User-controlled support handoff", "Native database snapshot and Share Sheet"],
     "contained"
   ),
