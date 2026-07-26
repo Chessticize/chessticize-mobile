@@ -26,6 +26,7 @@ describe('Android support diagnostics native boundary', () => {
 
   it('packages only the consistent local snapshot and privacy-bounded metadata', () => {
     const adapter = read('src/platform/androidSupportDiagnostics.ts');
+    const manifest = read('android/app/src/main/AndroidManifest.xml');
     const nativeModule = read(
       'android/app/src/main/java/com/chessticize/mobile/AndroidSupportDiagnosticsModule.kt'
     );
@@ -40,6 +41,14 @@ describe('Android support diagnostics native boundary', () => {
     expect(nativeModule).toContain('.put("credentialsIncluded", false)');
     expect(nativeModule).toContain('.put("hardwareIdentifiersIncluded", false)');
     expect(nativeModule).toContain('worker.shutdownNow()');
+    expect(nativeModule).toContain('SupportDiagnosticsCleanupReceiver');
+    expect(nativeModule).toContain('setAndAllowWhileIdle');
+    expect(nativeModule).toContain('scheduleNextCleanup');
+    expect(nativeModule).not.toContain('worker.schedule(');
+    expect(manifest).toContain(
+      'android:name=".SupportDiagnosticsCleanupReceiver"'
+    );
+    expect(manifest).not.toContain('android.permission.SCHEDULE_EXACT_ALARM');
     expect(nativeModule).not.toContain('ANDROID_ID');
     expect(nativeModule).not.toContain('Build.SERIAL');
   });

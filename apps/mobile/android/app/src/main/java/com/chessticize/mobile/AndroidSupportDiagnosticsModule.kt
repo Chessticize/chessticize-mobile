@@ -1,5 +1,8 @@
 package com.chessticize.mobile
 
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -43,7 +46,9 @@ class AndroidSupportDiagnosticsModule(
   init {
     worker.execute {
       workRoot().deleteRecursively()
-      removeExpiredArchives()
+      SupportDiagnosticsArchiveLifecycle.removeExpiredAndScheduleNext(
+        reactApplicationContext,
+      )
     }
   }
 
@@ -71,7 +76,9 @@ class AndroidSupportDiagnosticsModule(
             "The support diagnostic is unexpectedly large.",
           )
         }
-        removeExpiredArchives()
+        SupportDiagnosticsArchiveLifecycle.removeExpiredAndScheduleNext(
+          reactApplicationContext,
+        )
         val directory = File(workRoot(), "$WORK_PREFIX${UUID.randomUUID()}")
         if (!directory.mkdirs()) {
           throw SupportBundleException(
@@ -144,7 +151,9 @@ class AndroidSupportDiagnosticsModule(
         )
         writeZip(archive, includedFiles)
         directory.deleteRecursively()
-        worker.schedule({ archive.delete() }, ARCHIVE_LIFETIME_HOURS, TimeUnit.HOURS)
+        SupportDiagnosticsArchiveLifecycle.scheduleNextCleanup(
+          reactApplicationContext,
+        )
 
         val files = Arguments.createArray().apply {
           includedFiles.forEach { pushString(it.name) }
@@ -164,7 +173,12 @@ class AndroidSupportDiagnosticsModule(
   @ReactMethod
   fun shareSupportBundle(bundleUrl: String, promise: Promise) {
     val archive = managedFileFromUrl(bundleUrl, archiveRoot(), ARCHIVE_PREFIX)
-    if (archive == null || !archive.isFile || archive.extension.lowercase() != "zip") {
+    if (
+      archive == null
+      || !archive.isFile
+      || archive.extension.lowercase() != "zip"
+      || SupportDiagnosticsArchiveLifecycle.deleteIfExpired(archive)
+    ) {
       promise.reject(
         "support_bundle_missing",
         "The prepared support bundle is no longer available.",
@@ -226,6 +240,9 @@ class AndroidSupportDiagnosticsModule(
         )
         return@execute
       }
+      SupportDiagnosticsArchiveLifecycle.scheduleNextCleanup(
+        reactApplicationContext,
+      )
       promise.resolve(true)
     }
   }
@@ -396,15 +413,6 @@ class AndroidSupportDiagnosticsModule(
     }
   }
 
-  private fun removeExpiredArchives() {
-    val cutoff = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(ARCHIVE_LIFETIME_HOURS)
-    archiveRoot().listFiles()?.forEach { file ->
-      if (file.name.startsWith(ARCHIVE_PREFIX) && file.lastModified() < cutoff) {
-        file.delete()
-      }
-    }
-  }
-
   private fun supportRoot(): File =
     File(reactApplicationContext.cacheDir, SUPPORT_ROOT_DIRECTORY)
 
@@ -412,7 +420,7 @@ class AndroidSupportDiagnosticsModule(
     File(supportRoot(), WORK_DIRECTORY)
 
   private fun archiveRoot(): File =
-    File(supportRoot(), ARCHIVE_DIRECTORY)
+    SupportDiagnosticsArchiveLifecycle.archiveRoot(reactApplicationContext)
 
   private fun readableString(metadata: ReadableMap, key: String): String =
     if (metadata.hasKey(key) && !metadata.isNull(key)) {
@@ -442,16 +450,109 @@ class AndroidSupportDiagnosticsModule(
 
   companion object {
     private const val NAME = "AndroidSupportDiagnostics"
-    private const val SUPPORT_ROOT_DIRECTORY = "support-diagnostics"
     private const val WORK_DIRECTORY = "work"
-    private const val ARCHIVE_DIRECTORY = "archives"
     private const val WORK_PREFIX = "chessticize-support-work-"
-    private const val ARCHIVE_PREFIX = "Chessticize-Support-"
     private const val DATABASE_FILENAME = "local-progress.sqlite"
     private const val DIAGNOSTIC_FILENAME = "diagnostic.txt"
     private const val MANIFEST_FILENAME = "manifest.json"
-    private const val ARCHIVE_LIFETIME_HOURS = 1L
     private const val MAX_DIAGNOSTIC_BYTES = 64 * 1024
+  }
+}
+
+private const val SUPPORT_ROOT_DIRECTORY = "support-diagnostics"
+private const val ARCHIVE_DIRECTORY = "archives"
+private const val ARCHIVE_PREFIX = "Chessticize-Support-"
+private const val ARCHIVE_LIFETIME_HOURS = 1L
+
+private object SupportDiagnosticsArchiveLifecycle {
+  const val ACTION_CLEANUP =
+    "com.chessticize.mobile.action.CLEAN_SUPPORT_DIAGNOSTICS"
+  private const val ALARM_REQUEST_CODE = 194
+
+  @Synchronized
+  fun removeExpiredAndScheduleNext(context: Context) {
+    removeExpiredArchives(context)
+    scheduleNextCleanup(context)
+  }
+
+  @Synchronized
+  fun scheduleNextCleanup(context: Context) {
+    val applicationContext = context.applicationContext
+    val pendingIntent = cleanupPendingIntent(applicationContext)
+    val alarmManager = applicationContext.getSystemService(AlarmManager::class.java)
+      ?: return
+    val nextExpiry = managedArchives(applicationContext)
+      .minOfOrNull { archive -> archive.lastModified() + archiveLifetimeMillis() }
+
+    alarmManager.cancel(pendingIntent)
+    if (nextExpiry == null) {
+      pendingIntent.cancel()
+      return
+    }
+
+    alarmManager.setAndAllowWhileIdle(
+      AlarmManager.RTC_WAKEUP,
+      nextExpiry.coerceAtLeast(System.currentTimeMillis()),
+      pendingIntent,
+    )
+  }
+
+  fun deleteIfExpired(archive: File): Boolean {
+    if (!isExpired(archive)) {
+      return false
+    }
+    archive.delete()
+    return true
+  }
+
+  fun archiveRoot(context: Context): File =
+    File(
+      File(context.cacheDir, SUPPORT_ROOT_DIRECTORY),
+      ARCHIVE_DIRECTORY,
+    )
+
+  private fun removeExpiredArchives(context: Context) {
+    managedArchives(context).forEach { archive ->
+      if (isExpired(archive)) {
+        archive.delete()
+      }
+    }
+  }
+
+  private fun managedArchives(context: Context): List<File> =
+    archiveRoot(context).listFiles()
+      ?.filter { file -> file.isFile && file.name.startsWith(ARCHIVE_PREFIX) }
+      .orEmpty()
+
+  private fun isExpired(
+    archive: File,
+    now: Long = System.currentTimeMillis(),
+  ): Boolean = archive.lastModified() <= now - archiveLifetimeMillis()
+
+  private fun archiveLifetimeMillis(): Long =
+    TimeUnit.HOURS.toMillis(ARCHIVE_LIFETIME_HOURS)
+
+  private fun cleanupPendingIntent(context: Context): PendingIntent =
+    PendingIntent.getBroadcast(
+      context,
+      ALARM_REQUEST_CODE,
+      Intent(context, SupportDiagnosticsCleanupReceiver::class.java).apply {
+        action = ACTION_CLEANUP
+      },
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+}
+
+class SupportDiagnosticsCleanupReceiver : BroadcastReceiver() {
+  override fun onReceive(context: Context, intent: Intent) {
+    when (intent.action) {
+      SupportDiagnosticsArchiveLifecycle.ACTION_CLEANUP,
+      Intent.ACTION_BOOT_COMPLETED,
+      Intent.ACTION_MY_PACKAGE_REPLACED,
+      Intent.ACTION_TIME_CHANGED,
+      Intent.ACTION_TIMEZONE_CHANGED ->
+        SupportDiagnosticsArchiveLifecycle.removeExpiredAndScheduleNext(context)
+    }
   }
 }
 
