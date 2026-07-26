@@ -120,8 +120,9 @@ describe('Practice POC', () => {
 
     await device.terminateApp();
     await launchWithDisabledSynchronization({ newInstance: true, delete: false });
-    await waitFor(element(by.text('Calculation Focus'))).toExist().withTimeout(180000);
-    await waitFor(element(by.text('1000'))).toExist().withTimeout(10000);
+    await waitFor(
+      element(by.label('Select Calculation Focus, rating 1000, All · 5 min · 20s pace'))
+    ).toExist().withTimeout(180000);
   });
 
   it('persists first-use Sprint guidance and replays it after Settings reset', async () => {
@@ -264,6 +265,8 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
+    // Needs Attention starts with both reasons selected. Remove In review so
+    // this journey proves the persisted Unclear marker specifically.
     await waitForVisibleInPracticeScroll('history-attention-flag-in-review');
     await element(by.id('history-attention-flag-in-review')).tap();
     await element(by.id('history-filter-toggle')).tap();
@@ -345,6 +348,8 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
+    // Isolate Unclear again after relaunch; the empty state proves enrollment
+    // cleared that marker and later Review removal did not restore it.
     await waitForVisibleInPracticeScroll('history-attention-flag-in-review');
     await element(by.id('history-attention-flag-in-review')).tap();
     await waitFor(element(by.id('history-empty-state'))).toExist().withTimeout(10000);
