@@ -530,7 +530,7 @@ export const TacticalFocusActive: Story = {
   }
 };
 
-export const TacticalFocusFirstUseGuide: Story = {
+export const TacticalFocusGuide: Story = {
   name: "Tactical Focus · first-use guide",
   args: { scenarioId: "practice-tactical-focus-guide" },
   tags: ["new"],

@@ -3045,7 +3045,7 @@ export function PracticePocScreen({
     />
   ) : null;
   const sessionScoreNode = state?.status === "active" ? (
-    <SessionScoreStrip state={state} />
+    <SessionScoreStrip compact={sessionUsesRail} state={state} />
   ) : null;
   const pausedSessionNode = isPaused && state ? (
     <PausedSessionPanel
@@ -5434,7 +5434,10 @@ function SessionCoachmarkDemo({
                 style={styles.sessionGuideCoachDimmed}
                 testID="practice-session-guide-score"
               >
-                <SessionScoreStrip state={guideState} />
+                <SessionScoreStrip
+                  compact={adaptiveLayout.usesSessionRail}
+                  state={guideState}
+                />
               </View>
             </View>
           ) : null}
@@ -5547,7 +5550,7 @@ function SessionCoachmarkDemo({
                 style={styles.sessionGuideCoachDimmed}
                 testID="practice-session-guide-score"
               >
-                <SessionScoreStrip state={guideState} />
+                <SessionScoreStrip compact state={guideState} />
               </View>
               {!isArrowDuel && coachStep === 3 ? (
                 <View
@@ -7624,7 +7627,13 @@ function SessionStatusBar({
           style={styles.sessionMetricBlock}
           testID="session-progress-block"
         >
-          <Text numberOfLines={1} testID="session-progress" style={styles.sessionProgressValue}>
+          <Text
+            adjustsFontSizeToFit={compactMetrics}
+            minimumFontScale={0.75}
+            numberOfLines={1}
+            testID="session-progress"
+            style={styles.sessionProgressValue}
+          >
             {isTacticalFocus
               ? `${completedAttempts} / ${plannedAttempts}`
               : `${state.correctCount} / ${state.config.targetCorrect}`}
@@ -7635,7 +7644,15 @@ function SessionStatusBar({
           style={styles.sessionMetricBlock}
           testID="session-timer-block"
         >
-          <Text numberOfLines={1} testID="session-timer" style={styles.timerText}>{timerText}</Text>
+          <Text
+            adjustsFontSizeToFit={compactMetrics}
+            minimumFontScale={0.75}
+            numberOfLines={1}
+            testID="session-timer"
+            style={styles.timerText}
+          >
+            {timerText}
+          </Text>
         </View>
         {isTacticalFocus ? (
           <View
@@ -7643,7 +7660,14 @@ function SessionStatusBar({
             style={styles.sessionMetricBlock}
             testID="session-rating-policy"
           >
-            <Text numberOfLines={1} style={styles.timerText}>Unrated</Text>
+            <Text
+              adjustsFontSizeToFit={compactMetrics}
+              minimumFontScale={0.75}
+              numberOfLines={1}
+              style={styles.timerText}
+            >
+              Unrated
+            </Text>
           </View>
         ) : (
           <View
@@ -8320,7 +8344,13 @@ function PracticeModeGlyph({
   );
 }
 
-function SessionScoreStrip({ state }: { state: SprintState }): React.JSX.Element {
+function SessionScoreStrip({
+  compact = false,
+  state
+}: {
+  compact?: boolean;
+  state: SprintState;
+}): React.JSX.Element {
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
   const completedCount = state.correctCount + state.mistakeCount;
   const leftCount = Math.max(
@@ -8335,12 +8365,16 @@ function SessionScoreStrip({ state }: { state: SprintState }): React.JSX.Element
       accessibilityLabel={isTacticalFocus
         ? `Focused Run: completed ${completedCount}, correct ${state.correctCount}, left ${leftCount}`
         : `Session score: solved ${state.correctCount}, mistakes ${state.mistakeCount}, left ${leftCount}`}
-      style={styles.sessionScoreStrip}
+      style={[
+        styles.sessionScoreStrip,
+        compact ? styles.sessionScoreStripCompact : null
+      ]}
       testID="session-score-strip"
     >
       <SessionScoreMetric
         label={isTacticalFocus ? "Completed" : "Solved"}
         metricTestID={isTacticalFocus ? "session-score-completed" : "session-score-solved"}
+        compact={compact}
         showLabel={isTacticalFocus}
         tone="positive"
         value={isTacticalFocus ? completedCount : state.correctCount}
@@ -8348,6 +8382,7 @@ function SessionScoreStrip({ state }: { state: SprintState }): React.JSX.Element
       <SessionScoreMetric
         label={isTacticalFocus ? "Correct" : "Mistakes"}
         metricTestID={isTacticalFocus ? "session-score-correct" : "session-score-mistakes"}
+        compact={compact}
         showLabel={isTacticalFocus}
         tone={isTacticalFocus ? "positive" : "negative"}
         value={isTacticalFocus ? state.correctCount : state.mistakeCount}
@@ -8355,6 +8390,7 @@ function SessionScoreStrip({ state }: { state: SprintState }): React.JSX.Element
       <SessionScoreMetric
         label="Left"
         metricTestID="session-score-left"
+        compact={compact}
         showLabel={isTacticalFocus}
         tone="neutral"
         value={leftCount}
@@ -8364,12 +8400,14 @@ function SessionScoreStrip({ state }: { state: SprintState }): React.JSX.Element
 }
 
 function SessionScoreMetric({
+  compact = false,
   label,
   metricTestID,
   showLabel = false,
   tone,
   value
 }: {
+  compact?: boolean;
   label: string;
   metricTestID: string;
   showLabel?: boolean;
@@ -8382,12 +8420,23 @@ function SessionScoreMetric({
       accessibilityLabel={`${label} ${value}`}
       style={[
         styles.sessionScoreMetric,
-        showLabel ? styles.sessionScoreMetricLabeled : null
+        showLabel ? styles.sessionScoreMetricLabeled : null,
+        compact ? styles.sessionScoreMetricCompact : null
       ]}
       testID={metricTestID}
     >
       {showLabel ? (
-        <Text numberOfLines={1} style={styles.sessionScoreLabel}>{label}</Text>
+        <Text
+          adjustsFontSizeToFit={compact}
+          minimumFontScale={0.75}
+          numberOfLines={1}
+          style={[
+            styles.sessionScoreLabel,
+            compact ? styles.sessionScoreLabelCompact : null
+          ]}
+        >
+          {label}
+        </Text>
       ) : (
         <SessionScoreGlyph tone={tone} />
       )}
@@ -16400,6 +16449,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7
   },
+  sessionScoreStripCompact: {
+    paddingHorizontal: 4
+  },
   sessionScoreMetric: {
     alignItems: "center",
     flex: 1,
@@ -16411,6 +16463,10 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     gap: 1
   },
+  sessionScoreMetricCompact: {
+    gap: 2,
+    minWidth: 0
+  },
   sessionScoreLabel: {
     color: "#64748B",
     fontSize: 10,
@@ -16418,6 +16474,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.25,
     lineHeight: 12,
     textTransform: "uppercase"
+  },
+  sessionScoreLabelCompact: {
+    fontSize: 9,
+    letterSpacing: 0
   },
   sessionScoreIcon: {
     alignItems: "center",

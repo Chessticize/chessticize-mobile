@@ -1253,6 +1253,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
       "Mixed Arrow Duel"
     );
+
+    press(renderer, "focused-run-start");
+    expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+    expect(findByTestId(renderer, "session-rating-policy")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain(
+      "Choose the best move"
+    );
   });
 
   it("uses an explicit cross-mode Home lead and blocks mismatched Focused Runs", () => {
@@ -4781,6 +4788,25 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-score-left").props.accessibilityLabel)
       .toBe("Left 5");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("10 / 15");
+  });
+
+  it("keeps Focused Run metric labels readable in the maintained landscape rail", () => {
+    setPracticeViewport({
+      width: 874,
+      height: 402,
+      scale: 3,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 }
+    });
+    const renderer = renderLabScenario("practice-tactical-focus-active");
+    const unratedText = findByTestId(renderer, "session-rating-policy")
+      .findAllByType(ReactNative.Text)
+      .find((node) => collectText(node) === "Unrated");
+    const completedText = findByTestId(renderer, "session-score-completed")
+      .findAllByType(ReactNative.Text)
+      .find((node) => collectText(node) === "Completed");
+
+    expect(unratedText?.props.adjustsFontSizeToFit).toBe(true);
+    expect(completedText?.props.adjustsFontSizeToFit).toBe(true);
   });
 
   it("explains fixed and unrated semantics before a first Focused Run", () => {

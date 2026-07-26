@@ -1,6 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
-import type { AttemptEvent, SprintMode, SprintState } from "../../../packages/core/src/index.ts";
-import { defaultSprintConfig } from "../../../packages/core/src/index.ts";
+import type {
+  AttemptEvent,
+  SprintMode,
+  SprintState,
+  TacticalProfileTaskFamily
+} from "../../../packages/core/src/index.ts";
+import {
+  beginArrowDuelPuzzle,
+  defaultSprintConfig
+} from "../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../packages/storage/src/memory-store.ts";
 import { PracticeService } from "../../../packages/storage/src/practice-service.ts";
 import { PracticePocScreen } from "../../mobile/src/components/PracticePocScreen.tsx";
@@ -83,7 +91,9 @@ function LabScenarioContent({
     }
   }, [scenarioId]);
 
+  const startedTaskFamily = tacticalProfileState.startedTaskFamily;
   const tacticalProfilePresentation = isTacticalProfileScenario(scenarioId)
+    && startedTaskFamily === undefined
     ? tacticalProfilePresentationFor(
         scenarioId,
         tacticalProfileState,
@@ -92,10 +102,21 @@ function LabScenarioContent({
         )
       )
     : undefined;
+  const screenProps = startedTaskFamily === undefined
+    ? runtime.screenProps
+    : {
+        ...runtime.screenProps,
+        sprintRulesDesignPreview: {
+          initialActiveState: tacticalFocusActiveState(startedTaskFamily)
+        }
+      };
 
   return (
     <LabScenarioShell scenarioId={scenarioId}>
       <PracticePocScreen
+        key={startedTaskFamily === undefined
+          ? `scenario-${scenarioId}`
+          : `tactical-focus-active-${startedTaskFamily}`}
         customThemeSelection={{
           selectedThemes: selectedCustomThemes,
           onChange: setSelectedCustomThemes
@@ -106,7 +127,7 @@ function LabScenarioContent({
           : undefined}
         runEloEditingMovedToHome
         tacticalProfilePresentation={tacticalProfilePresentation}
-        {...runtime.screenProps}
+        {...screenProps}
       />
     </LabScenarioShell>
   );
@@ -269,7 +290,9 @@ function sprintRulesDesignPreviewFor(
   return undefined;
 }
 
-function tacticalFocusActiveState(): SprintState {
+function tacticalFocusActiveState(
+  taskFamily: TacticalProfileTaskFamily = "line"
+): SprintState {
   const startedAt = new Date(LAB_NOW_MS - 2 * 60 * 1000).toISOString();
   const deadlineAt = new Date(LAB_NOW_MS + 3 * 60 * 1000).toISOString();
   const puzzles = Array.from({ length: 15 }, (_, index) => {
@@ -280,29 +303,33 @@ function tacticalFocusActiveState(): SprintState {
     };
   });
   const activePuzzle = puzzles[10]!;
-  const currentPuzzle = {
-    autoPlayedMoves: [activePuzzle.solutionMoves[0]!],
-    currentFen: "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2",
-    cursor: 1,
-    kind: "line" as const,
-    playedMoves: [],
-    puzzle: activePuzzle,
-    solved: false
-  };
+  const isArrowDuel = taskFamily === "arrow_duel";
+  const currentPuzzle = isArrowDuel
+    ? beginArrowDuelPuzzle(activePuzzle, "tactical-focus-active")
+    : {
+        autoPlayedMoves: [activePuzzle.solutionMoves[0]!],
+        currentFen: "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2",
+        cursor: 1,
+        kind: "line" as const,
+        playedMoves: [],
+        puzzle: activePuzzle,
+        solved: false
+      };
+  const ratingAnchor = isArrowDuel ? 875 : 1087;
   return {
     bestStreak: 4,
     config: {
-      ...defaultSprintConfig("standard"),
+      ...defaultSprintConfig(isArrowDuel ? "arrow_duel" : "standard"),
       maxAttempts: 15,
       maxMistakes: 15,
       ratingPolicy: "unrated",
       tacticalFocus: {
-        taskFamily: "line",
-        themes: ["fork"],
+        taskFamily,
+        themes: [isArrowDuel ? "pin" : "fork"],
         mixedControlCount: 5,
-        ratingAnchor: 1087,
-        minRating: 987,
-        maxRating: 1187
+        ratingAnchor,
+        minRating: ratingAnchor - 100,
+        maxRating: ratingAnchor + 100
       },
       targetCorrect: 15
     },
@@ -315,7 +342,7 @@ function tacticalFocusActiveState(): SprintState {
     id: "tactical-focus-active",
     mistakeCount: 2,
     puzzles,
-    ratingBefore: 1087,
+    ratingBefore: ratingAnchor,
     startedAt,
     status: "active"
   };

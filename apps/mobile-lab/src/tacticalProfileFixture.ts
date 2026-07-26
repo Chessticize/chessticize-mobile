@@ -26,6 +26,7 @@ export type TacticalProfileFixtureState = {
   screen: TacticalProfileScreen;
   selectedSignalId?: string;
   selectedTaskFamily: TacticalProfileTaskFamily;
+  startedTaskFamily?: TacticalProfileTaskFamily;
 };
 
 const FORK_SIGNAL: TacticalProfileSignal = {
@@ -201,8 +202,15 @@ export function reduceTacticalProfileFixtureState(
   if (intent.type === "explain-signal") {
     return { ...current, screen: "explanation", selectedSignalId: intent.signalId };
   }
-  if (intent.type === "preview-focused-run" || intent.type === "start-focused-run") {
+  if (intent.type === "preview-focused-run") {
     return { ...current, screen: "focused_run" };
+  }
+  if (intent.type === "start-focused-run") {
+    return {
+      ...current,
+      screen: "focused_run",
+      startedTaskFamily: current.selectedTaskFamily
+    };
   }
   return { ...current, screen: "suppressed" };
 }
