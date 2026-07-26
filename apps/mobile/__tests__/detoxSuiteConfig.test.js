@@ -1321,6 +1321,23 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).not.toContain('toHaveToggleValue');
   });
 
+  it('targets current public controls in the practice suite', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+
+    expect(practiceSpec).toContain("openTab('settings-tab', 'settings-show-sprint-guide')");
+    expect(practiceSpec).toContain("waitForVisibleInPracticeScroll('history-attention-flag-in-review')");
+    expect(practiceSpec).toContain("by.text('Attention: Unclear')");
+    expect(practiceSpec).toContain("expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible()");
+    expect(practiceSpec).toContain("tapVisibleHistoryResult('Correct')");
+    expect(practiceSpec).toContain("tapVisibleHistoryResult('Wrong move')");
+    expect(practiceSpec).toContain("element(by.traits(['button'])).getAttributes()");
+    expect(practiceSpec).toContain("attributes.identifier.startsWith('history-attempt-')");
+    expect(practiceSpec).toContain('waitForVisibleInPracticeScroll(resultRow.identifier)');
+    expect(practiceSpec).toContain('element(by.id(resultRow.identifier)).tap()');
+    expect(practiceSpec).not.toContain('history-filter-unclear');
+    expect(practiceSpec).not.toContain("endsWith('-result')");
+  });
+
   it('partitions every active spec exactly once across the two CI suites', () => {
     expect(resolveDetoxTestMatch({ DETOX_ACTIVE_SUITE: 'all' }))
       .toEqual(ACTIVE_E2E_TEST_MATCH);

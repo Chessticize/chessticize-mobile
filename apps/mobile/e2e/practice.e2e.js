@@ -148,7 +148,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('sprint-summary-panel'))).toBeVisible().withTimeout(10000);
     await element(by.id('back-practice-button')).tap();
 
-    await openTab('settings-tab', 'settings-guidance-section');
+    await openTab('settings-tab', 'settings-show-sprint-guide');
     await element(by.id('settings-show-sprint-guide')).tap();
     await waitFor(element(by.id('settings-sprint-guide-ready'))).toExist().withTimeout(10000);
 
@@ -264,19 +264,12 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitForElementAccessibilityLabelContaining(
-      'history-filter-unclear',
-      'Unclear attempts',
-      10000
-    );
-    await element(by.id('history-filter-unclear')).tap();
-    await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
-    const resultAttributes = await element(by.text('Correct')).atIndex(0).getAttributes();
-    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-      throw new Error(`Could not resolve unclear History row from ${String(resultIdentifier)}`);
-    }
-    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    await waitForVisibleInPracticeScroll('history-attention-flag-in-review');
+    await element(by.id('history-attention-flag-in-review')).tap();
+    await waitFor(element(
+      by.text('Attention: Unclear').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
+    await tapVisibleHistoryResult('Correct');
     await waitForVisibleInPracticeScroll('review-schedule-add');
     await waitForVisibleInPracticeScroll('history-attempt-unclear');
     await expect(element(by.id('history-attempt-detail'))).not.toExist();
@@ -293,7 +286,7 @@ describe('Practice POC', () => {
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('review-context-actions-rail'))).toExist().withTimeout(10000);
     await expect(element(by.id('review-schedule-control'))).toBeVisible();
-    await expect(element(by.id('history-attempt-unclear'))).toBeVisible();
+    await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
     const screenFrame = await frameFor(element(by.id('safe-area-shell')));
     const boardFrame = await frameFor(element(by.id('review-board')));
     const actionRailFrame = await frameFor(element(by.id('review-context-actions-rail')));
@@ -348,12 +341,11 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitForElementAccessibilityLabelContaining(
-      'history-filter-unclear',
-      'Unclear attempts',
-      10000
-    );
-    await element(by.id('history-filter-unclear')).tap();
+    await waitForVisibleInPracticeScroll('history-attention-flag-in-review');
+    await element(by.id('history-attention-flag-in-review')).tap();
+    await waitFor(element(
+      by.text('Attention: Unclear').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
     await waitFor(element(by.id('history-empty-state'))).toExist().withTimeout(10000);
   });
 
@@ -430,13 +422,7 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
-    const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
-    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-      throw new Error(`Could not resolve persisted history attempt row from ${String(resultIdentifier)}`);
-    }
-    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    await tapVisibleHistoryResult('Wrong move');
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
     await waitForVisibleInPracticeScroll('review-analysis-button');
     await element(by.id('review-analysis-button')).tap();
@@ -445,6 +431,26 @@ describe('Practice POC', () => {
     await waitForElementTextContaining('review-analysis-line-0', 'Top move', 90000);
   });
 });
+
+async function tapVisibleHistoryResult(label) {
+  const buttonAttributes = await element(by.traits(['button'])).getAttributes();
+  const buttons = Array.isArray(buttonAttributes)
+    ? buttonAttributes
+    : Array.isArray(buttonAttributes.elements)
+      ? buttonAttributes.elements
+      : [buttonAttributes];
+  const resultRow = buttons.find((attributes) => (
+    typeof attributes.identifier === 'string'
+    && attributes.identifier.startsWith('history-attempt-')
+    && typeof attributes.label === 'string'
+    && attributes.label.includes(`, ${label},`)
+  ));
+  if (!resultRow) {
+    throw new Error(`Could not resolve a public History row for result "${label}"`);
+  }
+  await waitForVisibleInPracticeScroll(resultRow.identifier);
+  await element(by.id(resultRow.identifier)).tap();
+}
 
 function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame) {
   const png = readRgbaPng(screenshotPath);
