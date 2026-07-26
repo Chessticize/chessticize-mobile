@@ -4831,13 +4831,28 @@ function SessionCoachmarkDemo({
         {
           height: arrowDuelLandscapeGeometry.connectorHeight,
           left: arrowDuelLandscapeGeometry.connectorLeft,
-          top: -arrowDuelLandscapeGeometry.connectorHeight
+          top: -arrowDuelLandscapeGeometry.connectorHeight,
+          width: arrowDuelLandscapeGeometry.connectorArmWidth + 1
         }
       ]}
       testID={pointerTestId}
     >
       <View
-        style={styles.sessionGuideArrowDuelTargetConnectorEndpoint}
+        style={styles.sessionGuideArrowDuelTargetConnectorVertical}
+        testID={`${pointerTestId}-vertical`}
+      />
+      <View
+        style={[
+          styles.sessionGuideArrowDuelTargetConnectorArm,
+          { width: arrowDuelLandscapeGeometry.connectorArmWidth }
+        ]}
+        testID={`${pointerTestId}-horizontal`}
+      />
+      <View
+        style={[
+          styles.sessionGuideArrowDuelTargetConnectorEndpoint,
+          { left: arrowDuelLandscapeGeometry.connectorArmWidth - 4 }
+        ]}
         testID={`${pointerTestId}-endpoint`}
       />
     </View>
@@ -14652,15 +14667,29 @@ const styles = StyleSheet.create({
     right: -8
   },
   sessionGuideArrowDuelTargetConnector: {
-    backgroundColor: "#2563EB",
+    position: "absolute"
+  },
+  sessionGuideArrowDuelTargetConnectorVertical: {
+    backgroundColor: "#64748B",
+    bottom: 0,
+    left: 0,
     position: "absolute",
+    top: 0,
     width: 2
   },
+  sessionGuideArrowDuelTargetConnectorArm: {
+    backgroundColor: "#64748B",
+    height: 2,
+    left: 0,
+    position: "absolute",
+    top: 0
+  },
   sessionGuideArrowDuelTargetConnectorEndpoint: {
-    backgroundColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+    borderColor: "#2563EB",
     borderRadius: 4,
+    borderWidth: 2,
     height: 8,
-    left: -3,
     position: "absolute",
     top: -4,
     width: 8

@@ -1857,6 +1857,14 @@ describe("PracticePocScreen", () => {
     )).toBeTruthy();
     expect(findByTestId(
       arrowDuel,
+      "practice-session-guide-coach-pointer-arrow-duel-top-vertical"
+    )).toBeTruthy();
+    expect(findByTestId(
+      arrowDuel,
+      "practice-session-guide-coach-pointer-arrow-duel-top-horizontal"
+    )).toBeTruthy();
+    expect(findByTestId(
+      arrowDuel,
       "practice-session-guide-coach-pointer-arrow-duel-top-endpoint"
     )).toBeTruthy();
   });

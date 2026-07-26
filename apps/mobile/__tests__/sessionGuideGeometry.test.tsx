@@ -36,9 +36,9 @@ describe("session guide geometry", () => {
         y: 326
       }
     })).toEqual({
-      calloutTop: 250,
-      connectorTop: 48,
-      connectorDrop: 43,
+      calloutTop: 252,
+      connectorTop: 68,
+      connectorDrop: 21,
       connectorWidth: 158
     });
   });
@@ -46,8 +46,9 @@ describe("session guide geometry", () => {
   it("points toward the Arrow Duel candidate origin without joining its move arrows", () => {
     expect(buildArrowDuelLandscapeGuideGeometry(360)).toEqual({
       calloutTop: 209,
+      connectorArmWidth: 24,
       connectorHeight: 68,
-      connectorLeft: 281
+      connectorLeft: 257
     });
   });
 
