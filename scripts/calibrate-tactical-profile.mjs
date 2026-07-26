@@ -106,13 +106,42 @@ export function calibrationContentHash(value) {
     .digest("hex")}`;
 }
 
+export function calibrationDecisionAnalysisHash(report) {
+  const {
+    analysisHash: _analysisHash,
+    decisionEvidenceId: _decisionEvidenceId,
+    representativeOwnerApproved: _representativeOwnerApproved,
+    ...analysisInput
+  } = report.input ?? {};
+  const families = Object.fromEntries(
+    Object.entries(report.families ?? {}).map(([taskFamily, family]) => {
+      const {
+        decisionEvidence: _decisionEvidence,
+        readiness: _readiness,
+        ...analysis
+      } = family;
+      return [taskFamily, analysis];
+    })
+  );
+  return calibrationContentHash({
+    schemaVersion: report.schemaVersion,
+    policyId: report.policyId,
+    packFeatureHash: report.packFeatureHash,
+    input: analysisInput,
+    missingness: report.missingness,
+    missingnessCohorts: report.missingnessCohorts,
+    families
+  });
+}
+
 export function buildDecisionEvidenceTemplate(report, manifest) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     decisionId: "",
     packFileHash: manifest.packFileHash,
     corpusHash: report.input.corpusHash,
     policyHash: report.input.policyHash,
+    analysisHash: calibrationDecisionAnalysisHash(report),
     families: Object.fromEntries(
       ["line", "arrow_duel"].map((taskFamily) => [
         taskFamily,
@@ -130,11 +159,19 @@ export function evaluateCalibrationReadiness(report, policy, ownerApproved) {
     reasons.push("representative corpus has not been explicitly owner-approved");
   }
   const incompleteDecisions = REQUIRED_DECISION_EVIDENCE.filter(
-    (decision) => report.decisionEvidence?.[decision] !== true
+    (decision) => report.decisionEvidence?.[decision] == null
   );
   if (incompleteDecisions.length > 0) {
     reasons.push(
       `required calibration decisions are incomplete: ${incompleteDecisions.join(", ")}`
+    );
+  }
+  const rejectedDecisions = REQUIRED_DECISION_EVIDENCE.filter(
+    (decision) => report.decisionEvidence?.[decision] === false
+  );
+  if (rejectedDecisions.length > 0) {
+    reasons.push(
+      `required calibration decisions were rejected: ${rejectedDecisions.join(", ")}`
     );
   }
   const minimums = policy.minimums;
@@ -343,6 +380,8 @@ export async function runCalibration(options) {
         .filter(([, family]) => family.readiness.ready)
         .map(([family]) => family)
     };
+    report.input.analysisHash = calibrationDecisionAnalysisHash(report);
+    assertDecisionEvidenceMatchesAnalysis(decisionEvidence, report);
     if (options.decisionTemplatePath) {
       const template = buildDecisionEvidenceTemplate(report, manifest);
       try {
@@ -390,19 +429,20 @@ async function loadDecisionEvidence(
   policyHash
 ) {
   if (!path) {
-    return { decisionId: null, families: {} };
+    return { decisionId: null, analysisHash: null, families: {} };
   }
   const evidence = JSON.parse(await readFile(path, "utf8"));
   if (
-    evidence.schemaVersion !== 1 ||
+    evidence.schemaVersion !== 2 ||
     typeof evidence.decisionId !== "string" ||
     evidence.decisionId.trim().length === 0 ||
     evidence.packFileHash !== manifest.packFileHash ||
     evidence.corpusHash !== corpusHash ||
-    evidence.policyHash !== policyHash
+    evidence.policyHash !== policyHash ||
+    !/^sha256:[a-f0-9]{64}$/.test(evidence.analysisHash ?? "")
   ) {
     throw new Error(
-      "Calibration decision evidence does not match the authenticated pack, corpus, and policy"
+      "Calibration decision evidence does not match the authenticated inputs"
     );
   }
   for (const taskFamily of ["line", "arrow_duel"]) {
@@ -420,8 +460,20 @@ async function loadDecisionEvidence(
   }
   return {
     decisionId: evidence.decisionId.trim(),
+    analysisHash: evidence.analysisHash,
     families: evidence.families
   };
+}
+
+export function assertDecisionEvidenceMatchesAnalysis(evidence, report) {
+  if (
+    evidence.analysisHash !== null &&
+    evidence.analysisHash !== report.input.analysisHash
+  ) {
+    throw new Error(
+      "Calibration decision evidence does not match the reviewed analysis"
+    );
+  }
 }
 
 export async function verifyPackIdentity(manifest, packPath, database) {
@@ -504,7 +556,7 @@ function calibrateFamily(
     decisionEvidence: Object.fromEntries(
       REQUIRED_DECISION_EVIDENCE.map((decision) => [
         decision,
-        suppliedDecisionEvidence?.[decision] === true
+        suppliedDecisionEvidence?.[decision] ?? null
       ])
     ),
     solve: {

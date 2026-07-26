@@ -42,9 +42,11 @@ pnpm calibrate:tactical-profile \
 ```
 
 The generated decision template is authenticated to the exact pack file,
-canonical corpus, and policy hashes. The harness creates it once and refuses to
-overwrite it. Every decision starts as `null`, so the template cannot be reused
-as completed evidence without explicit review.
+canonical corpus, policy, and decision-relevant analysis output hashes. The
+harness creates it once and refuses to overwrite it. Every decision starts as
+`null`, so the template cannot be reused as completed evidence without explicit
+review. Do not edit any hash. If calibration code or its analysis output changes
+between passes, generate a new first-pass template and review the new report.
 
 Review the report separately for `line` and `arrow_duel`. The owner must decide
 whether the corpus is representative, and the reviewer must replace every
@@ -72,7 +74,7 @@ whether the corpus is representative, and the reviewer must replace every
 
 Set a unique, non-empty `decisionId` that identifies the reviewed decision
 record. A `false` decision is valid evidence of review, but it keeps that family
-unavailable.
+unavailable and is reported as explicitly rejected rather than incomplete.
 
 ## Second pass: activation candidate
 

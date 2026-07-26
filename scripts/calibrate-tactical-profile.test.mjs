@@ -10,10 +10,12 @@ import {
   assertValidTacticalProfileCalibrationArtifact
 } from "../packages/core/src/index.ts";
 import {
+  assertDecisionEvidenceMatchesAnalysis,
   assertCalibrationArtifactMatchesReport,
   buildArtifact,
   buildDecisionEvidenceTemplate,
   calibrationContentHash,
+  calibrationDecisionAnalysisHash,
   evaluateCalibrationReadiness,
   parseCalibrationArguments,
   posteriorApproximationReport,
@@ -174,16 +176,71 @@ test("decision evidence templates bind review to the exact calibration inputs", 
   };
 
   assert.deepEqual(buildDecisionEvidenceTemplate(report, manifest), {
-    schemaVersion: 1,
+    schemaVersion: 2,
     decisionId: "",
     packFileHash: manifest.packFileHash,
     corpusHash: report.input.corpusHash,
     policyHash: report.input.policyHash,
+    analysisHash: calibrationDecisionAnalysisHash(report),
     families: {
       line: emptyDecisionEvidence(),
       arrow_duel: emptyDecisionEvidence()
     }
   });
+});
+
+test("decision evidence follows the reviewed analysis rather than only its inputs", () => {
+  const report = {
+    schemaVersion: 1,
+    createdAt: "2026-07-26T00:00:00.000Z",
+    policyId: "test-policy",
+    packFeatureHash: `sha256:${"a".repeat(64)}`,
+    input: {
+      schemaVersion: 1,
+      corpusHash: `sha256:${"b".repeat(64)}`,
+      policyHash: `sha256:${"c".repeat(64)}`,
+      decisionEvidenceId: null,
+      representativeOwnerApproved: false
+    },
+    missingness: { missingPuzzle: 0 },
+    missingnessCohorts: [],
+    families: {
+      line: {
+        decisionEvidence: emptyDecisionEvidence(),
+        readiness: { ready: false, reasons: ["review required"] },
+        solve: { coefficients: { intercept: 0.25 } }
+      }
+    }
+  };
+  const analysisHash = calibrationDecisionAnalysisHash(report);
+  const reviewOnlyChange = structuredClone(report);
+  reviewOnlyChange.createdAt = "2026-07-27T00:00:00.000Z";
+  reviewOnlyChange.input.decisionEvidenceId = "reviewed";
+  reviewOnlyChange.input.representativeOwnerApproved = true;
+  reviewOnlyChange.families.line.decisionEvidence =
+    completeDecisionEvidence();
+  reviewOnlyChange.families.line.readiness = { ready: true, reasons: [] };
+  assert.equal(
+    calibrationDecisionAnalysisHash(reviewOnlyChange),
+    analysisHash
+  );
+
+  const changedAnalysis = structuredClone(reviewOnlyChange);
+  changedAnalysis.families.line.solve.coefficients.intercept = 0.5;
+  assert.notEqual(
+    calibrationDecisionAnalysisHash(changedAnalysis),
+    analysisHash
+  );
+  changedAnalysis.input.analysisHash =
+    calibrationDecisionAnalysisHash(changedAnalysis);
+  assert.throws(
+    () =>
+      assertDecisionEvidenceMatchesAnalysis(
+        { analysisHash },
+        changedAnalysis
+      ),
+    /does not match the reviewed analysis/
+  );
 });
 
 test("calibration CLI parses the two-pass review and activation controls", () => {
@@ -349,6 +406,18 @@ test("artifact readiness fails closed without explicit representative-corpus app
     ready: false,
     reasons: ["representative corpus has not been explicitly owner-approved"]
   });
+  const incompleteDecision = structuredClone(report);
+  incompleteDecision.decisionEvidence.actionUtilityCalibration = null;
+  assert.deepEqual(
+    evaluateCalibrationReadiness(incompleteDecision, policy, true).reasons,
+    ["required calibration decisions are incomplete: actionUtilityCalibration"]
+  );
+  const rejectedDecision = structuredClone(report);
+  rejectedDecision.decisionEvidence.actionUtilityCalibration = false;
+  assert.deepEqual(
+    evaluateCalibrationReadiness(rejectedDecision, policy, true).reasons,
+    ["required calibration decisions were rejected: actionUtilityCalibration"]
+  );
   const oneTimeoutPolicy = structuredClone(report);
   oneTimeoutPolicy.solve.timeoutPolicyHoldout = [
     { timeoutPolicySeconds: 30, count: 100 }
@@ -512,11 +581,12 @@ test("calibration joins canonical exports and emits cohort reports without activ
       false
     );
     assert.deepEqual(decisionTemplate, {
-      schemaVersion: 1,
+      schemaVersion: 2,
       decisionId: "",
       packFileHash,
       corpusHash,
       policyHash,
+      analysisHash: report.input.analysisHash,
       families: {
         line: emptyDecisionEvidence(),
         arrow_duel: emptyDecisionEvidence()
@@ -545,11 +615,11 @@ test("calibration joins canonical exports and emits cohort reports without activ
     );
     assert.equal(
       report.families.line.decisionEvidence.timeoutPolicyStratification,
-      false
+      null
     );
     assert.equal(
       report.families.line.decisionEvidence.actionUtilityCalibration,
-      false
+      null
     );
     assert.equal(artifact.families.line.status, "unavailable");
     assert.match(
@@ -575,6 +645,26 @@ test("calibration joins canonical exports and emits cohort reports without activ
       line: completeDecisionEvidence(),
       arrow_duel: completeDecisionEvidence()
     };
+    const reviewedAnalysisHash = decisionTemplate.analysisHash;
+    decisionTemplate.analysisHash = `sha256:${"f".repeat(64)}`;
+    await writeFile(
+      decisionEvidencePath,
+      JSON.stringify(decisionTemplate)
+    );
+    await assert.rejects(
+      runCalibration({
+        progressPaths: [progressPath],
+        packPath,
+        manifestPath,
+        policyPath,
+        reportPath,
+        artifactPath,
+        decisionEvidencePath,
+        ownerApproved: true
+      }),
+      /does not match the reviewed analysis/
+    );
+    decisionTemplate.analysisHash = reviewedAnalysisHash;
     await writeFile(
       decisionEvidencePath,
       JSON.stringify(decisionTemplate)
@@ -633,11 +723,12 @@ test("calibration joins canonical exports and emits cohort reports without activ
     );
 
     await writeFile(decisionEvidencePath, JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       decisionId: "wrong-pack",
       packFileHash: `sha256:${"0".repeat(64)}`,
       corpusHash,
       policyHash,
+      analysisHash: reviewedAnalysisHash,
       families: {
         line: completeDecisionEvidence(),
         arrow_duel: completeDecisionEvidence()
@@ -654,15 +745,16 @@ test("calibration joins canonical exports and emits cohort reports without activ
         decisionEvidencePath,
         ownerApproved: true
       }),
-      /does not match the authenticated pack, corpus, and policy/
+      /does not match the authenticated inputs/
     );
 
     await writeFile(decisionEvidencePath, JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       decisionId: "wrong-policy",
       packFileHash,
       corpusHash,
       policyHash: `sha256:${"0".repeat(64)}`,
+      analysisHash: reviewedAnalysisHash,
       families: {
         line: completeDecisionEvidence(),
         arrow_duel: completeDecisionEvidence()
@@ -679,7 +771,7 @@ test("calibration joins canonical exports and emits cohort reports without activ
         decisionEvidencePath,
         ownerApproved: true
       }),
-      /does not match the authenticated pack, corpus, and policy/
+      /does not match the authenticated inputs/
     );
   } finally {
     await rm(directory, { recursive: true, force: true });
