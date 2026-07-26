@@ -2985,7 +2985,12 @@ describe("PracticePocScreen", () => {
     });
     expect(service.getRating("standard 5/20")).toMatchObject({ generation: 1, rating: 1375 });
     expect(collectText(findByTestId(renderer, "practice-run-standard"))).toContain("Morning Warm-up");
-    expect(collectText(findByTestId(renderer, "practice-run-standard"))).toContain("Rating 1375");
+    expect(collectText(findByTestId(renderer, "practice-run-standard"))).toContain("1375");
+    expect(collectText(findByTestId(renderer, "practice-run-standard"))).not.toContain("Rating");
+    press(renderer, "practice-run-home-done");
+    expect(findByTestId(renderer, "practice-run-select-standard").props.accessibilityLabel).toContain(
+      "rating 1375"
+    );
   });
 
   it("blocks duplicate Run names and out-of-range direct rating without changing saved data", () => {
@@ -3188,8 +3193,11 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-review-strip"))).not.toContain("Scheduled mistake reviews");
     expect(findByTestId(renderer, "practice-review-strip").props.accessibilityLabel).toContain("scheduled mistake reviews");
     expect(flattenTestStyle(findByTestId(renderer, "practice-review-due-count").props.style).alignItems).toBe("center");
-    expect(collectText(findByTestId(renderer, "practice-review-due-count"))).toContain("0");
-    expect(collectText(findByTestId(renderer, "practice-review-due-count"))).toContain("Due today");
+    expect(collectText(findByTestId(renderer, "practice-review-due-count"))).toBe("0");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-action-area").props.style).width).toBe("50%");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-counts").props.style).justifyContent).toBe("center");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-chevron").props.style).position).toBe("absolute");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-chevron").props.style).right).toBe(0);
     expect(() => findByTestId(renderer, "practice-review-overdue-count")).toThrow();
     expect(findByTestId(renderer, "practice-review-strip").props.accessibilityLabel).not.toContain("overdue");
     press(renderer, "review-tab");
@@ -3233,6 +3241,22 @@ describe("PracticePocScreen", () => {
 
     expect(() => findByTestId(renderer, "sprint-loading-overlay")).toThrow();
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
+  });
+
+  it("shows the Review status once and centers its count in the right half", () => {
+    const service = createDueReviewService(1);
+    const dueDay = service.listReviewQueue()[0]!.dueDay;
+    jest.setSystemTime(new Date(`${dueDay}T12:00:00.000Z`));
+    const renderer = renderScreen({ practiceService: service });
+    const reviewStripText = collectText(findByTestId(renderer, "practice-review-strip"));
+
+    expect(reviewStripText.match(/Due today/g)).toHaveLength(1);
+    expect(collectText(findByTestId(renderer, "practice-review-due-count"))).toBe("1");
+    expect(findByTestId(renderer, "practice-review-strip").props.accessibilityLabel).toContain(
+      "1 due today"
+    );
+    expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-action-area").props.style).width).toBe("50%");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-counts").props.style).justifyContent).toBe("center");
   });
 
   it("keeps the preparing state available for deterministic interaction-lab review", () => {
@@ -3431,8 +3455,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "app-shell-header")).toBeTruthy();
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
     expect(styleEntryMatches(findByTestId(renderer, "practice-home-layout").props.style, "flexDirection", "row")).toBe(homeColumns);
-    expect(styleEntryMatches(findByTestId(renderer, "practice-review-strip-action-area").props.style, "width", "50%")).toBe(homeColumns);
-    expect(styleEntryMatches(findByTestId(renderer, "practice-review-strip-counts").props.style, "justifyContent", "center")).toBe(homeColumns);
+    expect(styleEntryMatches(findByTestId(renderer, "practice-review-strip-action-area").props.style, "width", "50%")).toBe(true);
+    expect(styleEntryMatches(findByTestId(renderer, "practice-review-strip-counts").props.style, "justifyContent", "center")).toBe(true);
     expect(findByTestId(renderer, "practice-tab")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
     if (sideRail) {

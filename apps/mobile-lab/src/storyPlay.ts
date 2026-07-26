@@ -34,6 +34,20 @@ export async function waitForText(canvasElement: HTMLElement, text: string): Pro
   await page.findByText(text, {}, { timeout: 4_000 });
 }
 
+export async function expectTestIdText(
+  canvasElement: HTMLElement,
+  testID: string,
+  expectedText: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    if (element.textContent?.trim() !== expectedText) {
+      throw new Error(`Expected ${testID} to render "${expectedText}"`);
+    }
+  });
+}
+
 export async function replaceTextTestId(
   canvasElement: HTMLElement,
   testID: string,

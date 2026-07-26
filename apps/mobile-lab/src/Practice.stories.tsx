@@ -6,6 +6,7 @@ import {
   dragTestId,
   expectReorderAnimation,
   expectRunCardInsets,
+  expectTestIdText,
   expectTestIdAbsent,
   expectTestIdsInOrder,
   expectUniformRunDropTarget,
@@ -25,7 +26,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Home: Story = {
-  args: { scenarioId: "practice-home" }
+  args: { scenarioId: "practice-home" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await expectTestIdText(canvasElement, "practice-mode-standard-rating", "1054");
+    await expectTestIdText(canvasElement, "practice-mode-arrow-duel-rating", "966");
+    await expectTestIdText(canvasElement, "practice-review-due-count", "28");
+  }
 };
 
 export const TacticalProfileBuilding: Story = {
