@@ -39,6 +39,27 @@ describe('Key user flows', () => {
     );
   });
 
+  it('prepares support diagnostics from Settings without requiring a sync error', async () => {
+    if (device.getPlatform() !== 'ios') {
+      return;
+    }
+
+    await openTab('settings-tab', 'settings-app-version');
+    await waitForVisibleInPracticeScroll('settings-sync-support-bundle-entry');
+    await element(by.id('settings-sync-support-bundle-entry')).tap();
+    await waitFor(element(by.id('settings-sync-support-bundle-modal')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await element(by.id('settings-sync-support-bundle-prepare')).tap();
+    await waitFor(element(by.id('settings-sync-support-bundle-share')))
+      .toBeVisible()
+      .withTimeout(60000);
+    await element(by.id('settings-sync-support-bundle-details')).tap();
+    await waitFor(element(by.id('settings-sync-support-bundle-modal')))
+      .not.toExist()
+      .withTimeout(10000);
+  });
+
   it('fails a standard sprint and shows actionable results', async () => {
     const runWithDiagnostics = device.getPlatform() === 'android'
       ? withAndroidUiDiagnostics

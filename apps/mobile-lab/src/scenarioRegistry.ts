@@ -61,6 +61,7 @@ export type LabScenarioId =
   | "history-replay-unavailable"
   | "settings-ios-sync"
   | "settings-ios-sync-error-details"
+  | "settings-ios-sync-support-bundle"
   | "settings-ios-sync-support-bundle-partial"
   | "settings-sprint-guidance"
   | "settings-android-backup"
@@ -229,6 +230,17 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "settings",
     ["Failed iCloud Sync status", "View Error Details entry", "Local diagnostic modal", "Selectable technical details", "Copy success feedback", "Sensitive-data confirmation", "Complete support bundle", "iOS Share Sheet handoff"],
     ["Settings", "User-controlled support message", "Native database snapshot and Share Sheet"],
+    "contained"
+  ),
+  "settings-ios-sync-support-bundle": defineScenario(
+    "settings-ios-sync-support-bundle",
+    "Settings",
+    "iCloud support diagnostics",
+    "settings--i-cloud-sync-support-bundle",
+    "The always-available iOS Settings entry for preparing support diagnostics even when no sync failure was captured.",
+    "settings",
+    ["Persistent Settings entry", "Sensitive-data confirmation", "Consistent local SQLite snapshot", "CloudKit JSON snapshot", "Diagnostic manifest", "iOS Share Sheet handoff"],
+    ["User-controlled support handoff", "Native database snapshot and Share Sheet"],
     "contained"
   ),
   "settings-ios-sync-support-bundle-partial": defineScenario(

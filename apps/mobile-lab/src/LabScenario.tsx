@@ -426,6 +426,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "settings-ios-sync-error-details":
       screenProps.iCloudSyncErrorDetails = iCloudSyncErrorDetailsPresentation("complete");
       break;
+    case "settings-ios-sync-support-bundle":
+      screenProps.iCloudSyncSupportBundle =
+        iCloudSyncErrorDetailsPresentation("complete").supportBundle;
+      break;
     case "settings-ios-sync-support-bundle-partial":
       screenProps.iCloudSyncErrorDetails = iCloudSyncErrorDetailsPresentation("partial");
       break;
@@ -486,6 +490,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
   };
   if (
     scenarioId === "settings-ios-sync-error-details"
+    || scenarioId === "settings-ios-sync-support-bundle"
     || scenarioId === "settings-ios-sync-support-bundle-partial"
   ) {
     capabilityOverrides.applicationMetadata = {

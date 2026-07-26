@@ -56,6 +56,8 @@ describe("iOS App Store privacy artifacts", () => {
     expect(policy).toContain("Chessticize Mobile does not collect data from the app.");
     expect(policy).toContain("private iCloud account");
     expect(policy).toContain("Chessticize does not operate a sync server");
+    expect(policy).toContain("support diagnostics package");
+    expect(policy).toContain("Chessticize does not upload or receive this package");
     expect(policy).toContain("does not track you across apps or websites");
     expect(readme).toContain("[Privacy Policy](docs/PRIVACY_POLICY.md)");
   });
@@ -71,5 +73,21 @@ describe("iOS App Store privacy artifacts", () => {
     expect(pbxproj).toContain("CODE_SIGN_ENTITLEMENTS = ChessticizeMobile/ChessticizeMobile.entitlements;");
     expect(pbxproj).toContain("ICloudProgressSync.m in Sources");
     expect(pbxproj).toContain("CloudKit.framework in Frameworks");
+  });
+
+  it("wires the user-controlled iCloud support bundle through native boundaries", () => {
+    const implementation = readText(join(iosRoot, "ICloudSyncDiagnostics.m"));
+    const pbxproj = readText(join(appRoot, "ios", "ChessticizeMobile.xcodeproj", "project.pbxproj"));
+
+    expect(implementation).toContain("sqlite3_backup_init");
+    expect(implementation).toContain("icloud-progress-snapshot.json");
+    expect(implementation).toContain("UIPasteboard");
+    expect(implementation).toContain("UIActivityViewController");
+    expect(implementation).toContain("sha256");
+    expect(implementation).toContain("PRAGMA quick_check");
+    expect(implementation).toContain("operatingSystemVersion");
+    expect(implementation).toContain("appleIdIncluded");
+    expect(pbxproj).toContain("ICloudSyncDiagnostics.m in Sources");
+    expect(pbxproj).toContain("libsqlite3.tbd in Frameworks");
   });
 });

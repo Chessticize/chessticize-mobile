@@ -1,6 +1,6 @@
 # Chessticize Mobile Privacy Policy
 
-Effective date: 2026-07-14
+Effective date: 2026-07-26
 
 Chessticize Mobile is an offline-first chess training app. The current app does not
 create Chessticize accounts, does not show ads, does not use analytics SDKs, and
@@ -22,6 +22,19 @@ using Apple's CloudKit service so your Apple devices can merge ratings, history,
 and review queue state. Chessticize does not operate a sync server and does not
 have a Chessticize account system for this data.
 
+On iOS, Settings can prepare a support diagnostics package when you explicitly
+request it. The package can contain a consistent snapshot of the app's local
+progress database, the latest progress snapshot fetched from your private
+CloudKit database when available, and diagnostic metadata such as app and iOS
+versions, database health, sync status, timestamps, and file checksums. It does
+not contain your Apple ID, iCloud credentials, hardware identifiers, or the
+bundled puzzle pack. Progress data can contain the app-generated sync ID needed
+to reproduce merge behavior.
+
+Chessticize does not upload or receive this package. After it is prepared, you
+choose whether and where to send it through the iOS Share Sheet. The temporary
+package is removed when you close the diagnostics window.
+
 On Android, Android Progress Backup can copy the local progress database for
 encrypted cloud restore or supported device-to-device transfer when those
 features are available and enabled in Android settings. This operating-system
@@ -41,6 +54,10 @@ and Stockfish analysis run on device. iCloud Sync uses Apple's iCloud and
 CloudKit network services only while it is enabled. Development builds can
 connect to local developer tooling, but release builds do not require Metro or a
 Chessticize server to practice.
+
+Preparing support diagnostics can contact Apple's CloudKit service to download
+the latest private progress snapshot. The package is not sent to Chessticize
+unless you separately choose a destination that sends it to Chessticize.
 
 Android Progress Backup may use Android or Google backup network services when
 enabled in the device's system settings. The app does not operate that service

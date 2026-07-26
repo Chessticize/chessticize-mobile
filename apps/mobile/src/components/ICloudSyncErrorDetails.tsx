@@ -11,14 +11,16 @@ import {
 } from "react-native";
 
 export type ICloudSyncSupportBundleResult = {
+  bundleUrl?: string;
   files: readonly string[];
   kind: "complete" | "partial";
   unavailableReason?: string;
 };
 
 export type ICloudSyncSupportBundlePresentation = {
+  onDiscard?: (result: ICloudSyncSupportBundleResult) => Promise<void> | void;
   onPrepare: () => Promise<ICloudSyncSupportBundleResult>;
-  onShare: () => Promise<void> | void;
+  onShare: (result: ICloudSyncSupportBundleResult) => Promise<void> | void;
 };
 
 export type ICloudSyncErrorDetailsPresentation = {
@@ -29,26 +31,52 @@ export type ICloudSyncErrorDetailsPresentation = {
   supportBundle?: ICloudSyncSupportBundlePresentation;
 };
 
+export function ICloudSyncSupportDiagnosticsEntry({
+  presentation
+}: {
+  presentation: ICloudSyncSupportBundlePresentation;
+}): React.JSX.Element {
+  return (
+    <ICloudSyncErrorDetails
+      entryVariant="support"
+      presentation={{
+        copyText: "",
+        message: "",
+        occurredAtLabel: "",
+        onCopy: async () => {},
+        supportBundle: presentation
+      }}
+    />
+  );
+}
+
 type CopyState = "idle" | "copying" | "copied" | "failed";
 type Panel = "details" | "export-confirmation" | "preparing" | "ready";
 type ShareState = "idle" | "sharing" | "shared" | "failed";
 
 export function ICloudSyncErrorDetails({
+  entryVariant = "error",
   presentation
 }: {
+  entryVariant?: "error" | "support";
   presentation: ICloudSyncErrorDetailsPresentation;
 }): React.JSX.Element {
   const [visible, setVisible] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>("idle");
-  const [panel, setPanel] = useState<Panel>("details");
+  const [panel, setPanel] = useState<Panel>(
+    entryVariant === "support" ? "export-confirmation" : "details"
+  );
   const [bundleResult, setBundleResult] = useState<ICloudSyncSupportBundleResult | null>(null);
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [shareState, setShareState] = useState<ShareState>("idle");
 
   function close(): void {
+    if (bundleResult) {
+      void presentation.supportBundle?.onDiscard?.(bundleResult);
+    }
     setVisible(false);
     setCopyState("idle");
-    setPanel("details");
+    setPanel(entryVariant === "support" ? "export-confirmation" : "details");
     setBundleResult(null);
     setPrepareError(null);
     setShareState("idle");
@@ -81,12 +109,12 @@ export function ICloudSyncErrorDetails({
   }
 
   async function shareSupportBundle(): Promise<void> {
-    if (!presentation.supportBundle) {
+    if (!presentation.supportBundle || !bundleResult) {
       return;
     }
     setShareState("sharing");
     try {
-      await presentation.supportBundle.onShare();
+      await presentation.supportBundle.onShare(bundleResult);
       setShareState("shared");
     } catch {
       setShareState("failed");
@@ -96,7 +124,7 @@ export function ICloudSyncErrorDetails({
   const modalTitle = panel === "details"
     ? "iCloud Sync Error"
     : panel === "export-confirmation"
-      ? "Export Progress for Support?"
+      ? "Export Support Diagnostics?"
       : panel === "preparing"
         ? "Preparing Support Bundle"
         : bundleResult?.kind === "partial"
@@ -113,29 +141,44 @@ export function ICloudSyncErrorDetails({
   return (
     <>
       <Pressable
-        accessibilityLabel={`View iCloud sync error details. Last failed ${presentation.occurredAtLabel}.`}
+        accessibilityLabel={entryVariant === "support"
+          ? "Export iCloud sync diagnostics and progress for support"
+          : `View iCloud sync error details. Last failed ${presentation.occurredAtLabel}.`}
         accessibilityRole="button"
         onPress={() => {
           setCopyState("idle");
-          setPanel("details");
+          setPanel(entryVariant === "support" ? "export-confirmation" : "details");
           setBundleResult(null);
           setPrepareError(null);
           setShareState("idle");
           setVisible(true);
         }}
-        style={styles.entry}
-        testID="settings-sync-error-details"
+        style={entryVariant === "support" ? styles.supportEntry : styles.entry}
+        testID={entryVariant === "support"
+          ? "settings-sync-support-bundle-entry"
+          : "settings-sync-error-details"}
       >
-        <View style={styles.entryIndicator}>
-          <Text style={styles.entryIndicatorText}>!</Text>
-        </View>
-        <View style={styles.entryCopy}>
-          <Text style={styles.entryTitle}>View Error Details</Text>
-          <Text style={styles.entryDetail}>
-            Last failed {presentation.occurredAtLabel}. Copy technical information for support.
+        <View style={entryVariant === "support" ? styles.supportEntryIndicator : styles.entryIndicator}>
+          <Text style={entryVariant === "support"
+            ? styles.supportEntryIndicatorText
+            : styles.entryIndicatorText}
+          >
+            {entryVariant === "support" ? "↥" : "!"}
           </Text>
         </View>
-        <Text style={styles.entryChevron}>›</Text>
+        <View style={styles.entryCopy}>
+          <Text style={entryVariant === "support" ? styles.supportEntryTitle : styles.entryTitle}>
+            {entryVariant === "support" ? "Export Support Diagnostics" : "View Error Details"}
+          </Text>
+          <Text style={entryVariant === "support" ? styles.supportEntryDetail : styles.entryDetail}>
+            {entryVariant === "support"
+              ? "Share a local database snapshot, iCloud snapshot, and diagnostic details."
+              : `Last failed ${presentation.occurredAtLabel}. Copy technical information for support.`}
+          </Text>
+        </View>
+        <Text style={entryVariant === "support" ? styles.supportEntryChevron : styles.entryChevron}>
+          ›
+        </Text>
       </Pressable>
 
       <Modal
@@ -149,7 +192,9 @@ export function ICloudSyncErrorDetails({
           <View
             accessibilityViewIsModal
             style={styles.modal}
-            testID="settings-sync-error-details-modal"
+            testID={entryVariant === "support"
+              ? "settings-sync-support-bundle-modal"
+              : "settings-sync-error-details-modal"}
           >
             <ScrollView
               contentContainerStyle={styles.modalContent}
@@ -165,14 +210,16 @@ export function ICloudSyncErrorDetails({
                     {panel === "details"
                       ? "These details can help support understand why the last sync failed."
                       : panel === "export-confirmation"
-                        ? "Create a file you can send to support so the sync state can be reproduced."
+                        ? "Create a file you can send to support so the app and sync state can be diagnosed."
                         : panel === "preparing"
                           ? "Creating a consistent local database snapshot and fetching the latest iCloud progress snapshot."
                           : "Review what was included before opening the iOS Share Sheet."}
                   </Text>
                 </View>
                 <Pressable
-                  accessibilityLabel="Close iCloud sync error details"
+                  accessibilityLabel={entryVariant === "support"
+                    ? "Close support diagnostics"
+                    : "Close iCloud sync error details"}
                   accessibilityRole="button"
                   hitSlop={8}
                   onPress={close}
@@ -314,11 +361,13 @@ export function ICloudSyncErrorDetails({
                       name="icloud-progress-snapshot.json"
                     />
                     <BundleFile
-                      description="The copyable sync failure details shown above."
+                      description={entryVariant === "support"
+                        ? "App, database, and sync environment details, plus the latest failure captured in this session."
+                        : "The copyable sync failure details shown above, plus app and sync environment details."}
                       name="diagnostic.txt"
                     />
                     <BundleFile
-                      description="App version, timestamps, checksums, and file availability."
+                      description="App and iOS versions, database health, timestamps, checksums, and file availability."
                       name="manifest.json"
                     />
                   </View>
@@ -326,8 +375,9 @@ export function ICloudSyncErrorDetails({
                   <View style={styles.excludedCard}>
                     <Text style={styles.excludedTitle}>Not included</Text>
                     <Text style={styles.excludedCopy}>
-                      Your Apple ID, iCloud credentials, device identifiers, and the bundled puzzle
-                      pack are not included.
+                      Your Apple ID, iCloud credentials, hardware identifiers, and the bundled
+                      puzzle pack are not included. The progress data does contain the app-generated
+                      sync ID needed to reproduce merge behavior.
                     </Text>
                   </View>
 
@@ -348,13 +398,23 @@ export function ICloudSyncErrorDetails({
 
                   <View style={styles.actions}>
                     <Pressable
-                      accessibilityLabel="Back to iCloud sync error details"
+                      accessibilityLabel={entryVariant === "support"
+                        ? "Cancel support diagnostics export"
+                        : "Back to iCloud sync error details"}
                       accessibilityRole="button"
-                      onPress={() => setPanel("details")}
+                      onPress={() => {
+                        if (entryVariant === "support") {
+                          close();
+                          return;
+                        }
+                        setPanel("details");
+                      }}
                       style={styles.secondaryButton}
                       testID="settings-sync-support-bundle-back"
                     >
-                      <Text style={styles.secondaryButtonText}>Back</Text>
+                      <Text style={styles.secondaryButtonText}>
+                        {entryVariant === "support" ? "Cancel" : "Back"}
+                      </Text>
                     </Pressable>
                     <Pressable
                       accessibilityLabel="Prepare iCloud sync support bundle"
@@ -456,13 +516,23 @@ export function ICloudSyncErrorDetails({
 
                   <View style={styles.actions}>
                     <Pressable
-                      accessibilityLabel="Back to iCloud sync error details"
+                      accessibilityLabel={entryVariant === "support"
+                        ? "Close support diagnostics"
+                        : "Back to iCloud sync error details"}
                       accessibilityRole="button"
-                      onPress={() => setPanel("details")}
+                      onPress={() => {
+                        if (entryVariant === "support") {
+                          close();
+                          return;
+                        }
+                        setPanel("details");
+                      }}
                       style={styles.secondaryButton}
                       testID="settings-sync-support-bundle-details"
                     >
-                      <Text style={styles.secondaryButtonText}>Back to Details</Text>
+                      <Text style={styles.secondaryButtonText}>
+                        {entryVariant === "support" ? "Close" : "Back to Details"}
+                      </Text>
                     </Pressable>
                     <Pressable
                       accessibilityLabel="Share iCloud sync support bundle"
@@ -556,6 +626,46 @@ const styles = StyleSheet.create({
   },
   entryChevron: {
     color: "#C2410C",
+    fontSize: 26,
+    fontWeight: "500"
+  },
+  supportEntry: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderBottomColor: "#CBD5E1",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 10,
+    minHeight: 68,
+    paddingHorizontal: 12,
+    paddingVertical: 11
+  },
+  supportEntryIndicator: {
+    alignItems: "center",
+    backgroundColor: "#DBEAFE",
+    borderRadius: 999,
+    height: 30,
+    justifyContent: "center",
+    width: 30
+  },
+  supportEntryIndicatorText: {
+    color: "#1D4ED8",
+    fontSize: 17,
+    fontWeight: "900"
+  },
+  supportEntryTitle: {
+    color: "#1E3A8A",
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  supportEntryDetail: {
+    color: "#334155",
+    fontSize: 11,
+    fontWeight: "600",
+    lineHeight: 16
+  },
+  supportEntryChevron: {
+    color: "#2563EB",
     fontSize: 26,
     fontWeight: "500"
   },

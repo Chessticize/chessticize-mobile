@@ -20,6 +20,7 @@ const BUNDLED_CORE_PACK_OPTIONS = {
 } as const;
 
 let persistentPracticeService: PracticeService | undefined;
+let persistentProgressDatabasePath: string | undefined;
 const seededPuzzleSources = new WeakMap<PracticeService, Set<MobilePuzzleSource>>();
 const packBackedServices = new WeakSet<PracticeService>();
 let persistentPracticeServicePromise: Promise<PracticeService> | undefined;
@@ -98,10 +99,15 @@ async function createPersistentMobilePracticeServiceImpl(): Promise<PracticeServ
 function createPersistentService(userStore: InstanceType<typeof import("./deviceSQLiteStore.ts").DeviceSQLiteStore>, packSource: PuzzleSource): PracticeService {
   const store = new PackBackedPracticeStore(userStore, packSource);
   const service = new PracticeService(store);
+  persistentProgressDatabasePath = userStore.databasePath();
   packBackedServices.add(service);
   configureMobilePracticePuzzleSource(service, DEFAULT_PUZZLE_SOURCE);
   persistentPracticeService = service;
   return service;
+}
+
+export function getPersistentMobileProgressDatabasePath(): string | undefined {
+  return persistentProgressDatabasePath;
 }
 
 class LazyPuzzleSource implements PuzzleSource {

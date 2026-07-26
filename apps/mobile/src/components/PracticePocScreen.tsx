@@ -120,6 +120,13 @@ import {
   type ReviewReminderScheduleResult
 } from "../platform/reviewReminderScheduler.ts";
 import type { ICloudAccountStatus } from "../platform/iCloudProgressSync.ts";
+import {
+  captureICloudSyncFailure,
+  formatICloudSyncFailureDiagnostic,
+  formatICloudSyncOverviewDiagnostic,
+  iCloudSyncAttemptLabel,
+  type ICloudSyncFailureDiagnostic
+} from "../platform/iCloudSyncDiagnostics.ts";
 import type {
   MobileApplicationMetadata,
   MobilePlatformCapabilities,
@@ -195,7 +202,9 @@ import {
 import type { TacticalProfilePresentation } from "./tacticalProfilePresentation.ts";
 import {
   ICloudSyncErrorDetails,
-  type ICloudSyncErrorDetailsPresentation
+  ICloudSyncSupportDiagnosticsEntry,
+  type ICloudSyncErrorDetailsPresentation,
+  type ICloudSyncSupportBundlePresentation
 } from "./ICloudSyncErrorDetails.tsx";
 
 export type {
@@ -221,6 +230,7 @@ interface Props {
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   feedbackIssuesOpener?: (url: string) => Promise<void>;
   iCloudSyncErrorDetails?: ICloudSyncErrorDetailsPresentation;
+  iCloudSyncSupportBundle?: ICloudSyncSupportBundlePresentation;
   currentTimeMs?: () => number;
   sprintGuidanceEnabled?: boolean;
   moveFeedbackSettings?: {
@@ -518,6 +528,7 @@ export function PracticePocScreen({
   debugTrace,
   feedbackIssuesOpener = openFeedbackIssuesInBrowser,
   iCloudSyncErrorDetails,
+  iCloudSyncSupportBundle,
   currentTimeMs = Date.now,
   sprintGuidanceEnabled = false,
   moveFeedbackSettings,
@@ -543,6 +554,7 @@ export function PracticePocScreen({
   const moveFeedbackClient = platformCapabilities.moveFeedback.client;
   const progressProtection = platformCapabilities.progressProtection;
   const iCloudSyncClient = platformCapabilities.progressSync.client;
+  const iCloudSyncDiagnosticsClient = platformCapabilities.progressSync.diagnostics;
   const boardRef = useRef<ChessboardRef | null>(null);
   const sessionBoardHandlersRef = useRef<{
     onIllegalMove: (from: Square, to: Square) => void;
@@ -676,6 +688,10 @@ export function PracticePocScreen({
   const [mobileBackPreview, setMobileBackPreview] = useState<MobileBackPreview | null>(null);
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
+  const iCloudAccountStatusRef =
+    useRef<ICloudAccountStatus | "not_checked">("not_checked");
+  const [lastICloudSyncFailure, setLastICloudSyncFailure] =
+    useState<ICloudSyncFailureDiagnostic | undefined>();
   const [moveFeedbackPreferences, setMoveFeedbackPreferences] = useState<MoveFeedbackPreferences>(
     () => service.getSettings().moveFeedback
   );
@@ -698,6 +714,60 @@ export function PracticePocScreen({
     [fontScale, height, insets, width]
   );
   const boardSize = adaptiveLayout.boardSize;
+  const syncDiagnosticMetadata = {
+    appVersion: platformCapabilities.applicationMetadata.versionName,
+    ...(platformCapabilities.applicationMetadata.buildNumber
+      ? { buildNumber: platformCapabilities.applicationMetadata.buildNumber }
+      : {}),
+    iCloudAccountStatus: iCloudAccountStatusRef.current,
+    iCloudSyncEnabled,
+    latestSyncStatus: iCloudSyncStatus
+  };
+  const generatedSupportBundle = iCloudSyncDiagnosticsClient
+    ? {
+        onDiscard: async (result) => {
+          if (result.bundleUrl) {
+            await iCloudSyncDiagnosticsClient.discardSupportBundle(result.bundleUrl);
+          }
+        },
+        onPrepare: async () => {
+          const prepared = await iCloudSyncDiagnosticsClient.prepareSupportBundle({
+            diagnosticText: formatICloudSyncOverviewDiagnostic(
+              syncDiagnosticMetadata,
+              new Date(currentTimeMs()).toISOString(),
+              lastICloudSyncFailure
+            ),
+            metadata: syncDiagnosticMetadata
+          });
+          return prepared;
+        },
+        onShare: async (result) => {
+          if (!result.bundleUrl) {
+            throw new Error("The prepared support bundle is unavailable.");
+          }
+          await iCloudSyncDiagnosticsClient.shareSupportBundle(result.bundleUrl);
+        }
+      } satisfies ICloudSyncSupportBundlePresentation
+    : undefined;
+  const effectiveSupportBundle = iCloudSyncSupportBundle ?? generatedSupportBundle;
+  const generatedErrorDetails = lastICloudSyncFailure && iCloudSyncStatus === "iCloud sync failed"
+    ? {
+        copyText: formatICloudSyncFailureDiagnostic(
+          lastICloudSyncFailure,
+          syncDiagnosticMetadata
+        ),
+        message: lastICloudSyncFailure.message,
+        occurredAtLabel: new Date(lastICloudSyncFailure.occurredAt).toLocaleString(),
+        onCopy: async (text: string) => {
+          if (!iCloudSyncDiagnosticsClient) {
+            throw new Error("Clipboard access is unavailable.");
+          }
+          await iCloudSyncDiagnosticsClient.copyText(text);
+        },
+        supportBundle: effectiveSupportBundle
+      } satisfies ICloudSyncErrorDetailsPresentation
+    : undefined;
+  const effectiveErrorDetails = iCloudSyncErrorDetails ?? generatedErrorDetails;
 
   const isActive = state?.status === "active";
   const isPaused = state?.status === "paused";
@@ -1138,6 +1208,7 @@ export function PracticePocScreen({
       setICloudSyncStatus("Syncing");
       try {
         const accountStatus = await iCloudSyncClient.getAccountStatus();
+        iCloudAccountStatusRef.current = accountStatus;
         if (accountStatus !== "available") {
           const message = iCloudAccountStatusMessage(accountStatus);
           setICloudSyncStatus(message);
@@ -1155,6 +1226,10 @@ export function PracticePocScreen({
         return message;
       } catch (caught) {
         const message = "iCloud sync failed";
+        setLastICloudSyncFailure(captureICloudSyncFailure(caught, {
+          attempt: iCloudSyncAttemptLabel(reason),
+          occurredAt: new Date(currentTimeMs()).toISOString()
+        }));
         setICloudSyncStatus(message);
         emitTrace({
           type: "move-ignored",
@@ -3617,8 +3692,9 @@ export function PracticePocScreen({
                 reviewReminderPreference={reviewReminderPreference}
                 showRatingControls={!ratingEditingMovedToHome}
                 iCloudSyncEnabled={iCloudSyncEnabled}
-                iCloudSyncErrorDetails={iCloudSyncErrorDetails}
+                iCloudSyncErrorDetails={effectiveErrorDetails}
                 iCloudSyncStatus={iCloudSyncErrorDetails ? "iCloud sync failed" : iCloudSyncStatus}
+                iCloudSyncSupportBundle={effectiveSupportBundle}
                 moveFeedbackPreferences={moveFeedbackPreferences}
                 moveFeedbackPreviewer={moveFeedbackSettings?.preview}
                 showSprintGuideReset={
@@ -12234,6 +12310,7 @@ function SettingsPanel({
   iCloudSyncEnabled,
   iCloudSyncErrorDetails,
   iCloudSyncStatus,
+  iCloudSyncSupportBundle,
   moveFeedbackPreferences,
   moveFeedbackPreviewer,
   notificationPermissionStatus,
@@ -12263,6 +12340,7 @@ function SettingsPanel({
   iCloudSyncEnabled: boolean;
   iCloudSyncErrorDetails?: ICloudSyncErrorDetailsPresentation;
   iCloudSyncStatus: string;
+  iCloudSyncSupportBundle?: ICloudSyncSupportBundlePresentation;
   moveFeedbackPreferences: MoveFeedbackPreferences;
   moveFeedbackPreviewer?: MoveFeedbackPreviewer;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
@@ -12326,6 +12404,9 @@ function SettingsPanel({
                 <ICloudSyncErrorDetails presentation={iCloudSyncErrorDetails} />
               ) : null}
             </>
+          ) : null}
+          {iCloudSyncSupportBundle ? (
+            <ICloudSyncSupportDiagnosticsEntry presentation={iCloudSyncSupportBundle} />
           ) : null}
         </SettingsSection>
       ) : (

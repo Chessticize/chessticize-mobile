@@ -24,6 +24,12 @@ Rationale:
   stores a progress snapshot in the user's private iCloud account through
   Apple's CloudKit service. Chessticize does not operate a sync server, does not
   receive this data, and does not use it for tracking or analytics.
+- The user can explicitly prepare a local support diagnostics package containing
+  a consistent local progress database snapshot, a private CloudKit progress
+  snapshot when available, and bounded diagnostic metadata. Chessticize does not
+  upload or receive this package automatically; the user controls any handoff
+  through the iOS Share Sheet. This user-controlled on-device processing does not
+  change the `Data Not Collected` answer.
 - Stockfish analysis runs on device.
 - Review reminders are local notifications and do not use a push notification
   server.
@@ -69,7 +75,10 @@ Before submission:
    cloud sync, crash reporting, or permission prompts.
 5. Confirm iCloud Sync still uses only the app's private CloudKit container and
    does not introduce a Chessticize-operated data collection path.
-6. Re-run the privacy regression test:
+6. Confirm support diagnostics are prepared only after explicit user action,
+   exclude account credentials and hardware identifiers, and are handed off only
+   through the user-controlled iOS Share Sheet.
+7. Re-run the privacy regression test:
 
    ```sh
    pnpm --filter ChessticizeMobile test -- iosPrivacy.test.js
