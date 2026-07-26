@@ -21,6 +21,10 @@ const RELEASED_V0_FIXTURE = resolve(
   "packages/storage/test/fixtures/migrations/schema-v0-ios-1.0.0.sqlite"
 );
 const RELEASED_V0_SHA256 = "f9746607dcd98c642a1b111be348dd7476ee12a239c10346b64abe069e6cad5f";
+const RELEASED_IOS_121_FIXTURE = resolve(
+  "packages/storage/test/fixtures/migrations/schema-v8-ios-1.2.1.sqlite"
+);
+const RELEASED_IOS_121_SHA256 = "09ab34a656b6315189a4bc8e75baa64f1226492dce1cf5bb192d444822ee442b";
 const GOLDEN_SCHEMA_SNAPSHOTS_DIR = resolve("packages/storage/test/fixtures/schema-snapshots");
 const PUZZLE_FIXTURE = resolve("fixtures/puzzles/presolved-sample.json");
 const SNAPSHOT_TABLES = [
@@ -442,6 +446,294 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
     const reopened = new SQLiteStore(databasePath);
     reopened.migrate();
     reopened.migrate();
+    reopened.close();
+    assert.deepEqual(databaseSnapshot(databasePath), afterWrite);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("SQLite migrates the released iOS 1.2.1 database without losing user semantics", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-ios-121-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  let postMigrationAttemptId: string | undefined;
+  try {
+    assert.equal(
+      sha256(await readFile(RELEASED_IOS_121_FIXTURE)),
+      RELEASED_IOS_121_SHA256
+    );
+    await copyFile(RELEASED_IOS_121_FIXTURE, databasePath);
+
+    const before = new DatabaseSync(databasePath);
+    try {
+      assert.equal(schemaVersion(before), 8);
+      assert.equal(integrityResult(before), "ok");
+      assert.deepEqual(before.prepare("PRAGMA foreign_key_check").all(), []);
+      assert.deepEqual(
+        computeSchemaSnapshot(new NodeSqliteDatabase(before)),
+        await goldenSchemaSnapshot(8)
+      );
+      assert.equal(rowCount(before, "ratings"), 4);
+      assert.equal(rowCount(before, "attempts"), 5);
+      assert.equal(rowCount(before, "sprint_sessions"), 7);
+      assert.equal(rowCount(before, "practice_runs"), 3);
+      assert.equal(rowCount(before, "review_queue"), 2);
+    } finally {
+      before.close();
+    }
+
+    const store = new SQLiteStore(databasePath);
+    store.migrate();
+    const service = new PracticeService(store);
+    try {
+      assert.equal(schemaVersionForStore(store), CURRENT_SCHEMA_VERSION);
+      assert.equal(integrityResultForStore(store), "ok");
+      assert.deepEqual(store.db.prepare("PRAGMA foreign_key_check").all(), []);
+      assert.deepEqual(
+        computeSchemaSnapshot(store.db),
+        await goldenSchemaSnapshot(CURRENT_SCHEMA_VERSION)
+      );
+
+      assert.deepEqual(service.getSettings(), {
+        sync: { iCloudEnabled: false },
+        notifications: {
+          reviewReminder: { mode: "fixed", fixedLocalTime: "07:35" }
+        },
+        moveFeedback: { soundEnabled: true, hapticsEnabled: true },
+        sprintGuides: {
+          rulesSeen: false,
+          activeSessionSeen: false,
+          arrowDuelSeen: false
+        }
+      });
+      assert.deepEqual(service.getRating("standard 5/20"), {
+        key: "standard 5/20",
+        generation: 1,
+        rating: 708,
+        ratingDeviation: 84,
+        volatility: 0.055,
+        games: 2
+      });
+      assert.deepEqual(service.listCustomSprintConfigs(), [
+        {
+          id: "ios-121-custom-config",
+          mode: "custom",
+          ratingKey: "fork custom 7/25",
+          durationSeconds: 420,
+          perPuzzleSeconds: 25,
+          targetCorrect: 7,
+          maxMistakes: 2,
+          themes: ["fork"],
+          lastStartedAt: "2026-07-19T10:00:00.000Z",
+          playCount: 3
+        }
+      ]);
+      assert.deepEqual(
+        service.listPracticeRuns().map((run) => ({
+          id: run.id,
+          name: run.name,
+          ratingKey: run.ratingKey,
+          perPuzzleSeconds: run.perPuzzleSeconds,
+          puzzleTiming: run.puzzleTiming
+        })),
+        [
+          {
+            id: "standard",
+            name: "Standard",
+            ratingKey: "standard 5/20",
+            perPuzzleSeconds: 20,
+            puzzleTiming: { slowAfterSeconds: 40, timeoutAfterSeconds: 60 }
+          },
+          {
+            id: "arrow-duel",
+            name: "Arrow Duel",
+            ratingKey: "arrow_duel 5/30",
+            perPuzzleSeconds: 30,
+            puzzleTiming: { slowAfterSeconds: 60, timeoutAfterSeconds: 90 }
+          },
+          {
+            id: "ios-121-custom-run",
+            name: "Fork Trainer",
+            ratingKey: "fork custom 7/25",
+            perPuzzleSeconds: 25,
+            puzzleTiming: { slowAfterSeconds: 50, timeoutAfterSeconds: 75 }
+          }
+        ]
+      );
+
+      const standardHistory = service.getHistoryView({
+        now: "2026-07-24T12:00:00.000Z",
+        timeRange: "max",
+        ratingKey: "standard 5/20"
+      }).attempts;
+      assert.deepEqual(
+        standardHistory.map((attempt) => ({
+          id: attempt.id,
+          result: attempt.result,
+          source: attempt.source,
+          perPuzzleSeconds: attempt.perPuzzleSeconds,
+          runId: attempt.runId,
+          runName: attempt.runName,
+          unclear: attempt.unclear
+        })),
+        [
+          {
+            id: "ios-121-review-correct",
+            result: "correct",
+            source: "scheduled_review",
+            perPuzzleSeconds: undefined,
+            runId: undefined,
+            runName: undefined,
+            unclear: undefined
+          },
+          {
+            id: "ios-121-standard-wrong",
+            result: "wrong",
+            source: "sprint",
+            perPuzzleSeconds: 20,
+            runId: "standard",
+            runName: "Standard",
+            unclear: undefined
+          },
+          {
+            id: "ios-121-standard-correct",
+            result: "correct",
+            source: "sprint",
+            perPuzzleSeconds: 20,
+            runId: "standard",
+            runName: "Standard",
+            unclear: true
+          }
+        ]
+      );
+      assert.deepEqual(
+        service.listHistory({ mode: "arrow_duel" })[0]?.arrowDuelCandidateOrder,
+        ["b2b1", "f2g3", "h6c1"]
+      );
+      assert.deepEqual(
+        service.getDueReviews("2026-07-24T12:00:00.000Z").map((review) => ({
+          puzzleId: review.puzzleId,
+          mode: review.mode,
+          ratingKey: review.ratingKey,
+          dueDay: review.dueDay,
+          enrolledAt: review.enrolledAt
+        })),
+        [
+          {
+            puzzleId: "ios-121-standard-puzzle",
+            mode: "standard",
+            ratingKey: "standard 5/20",
+            dueDay: "2026-07-21",
+            enrolledAt: undefined
+          },
+          {
+            puzzleId: "ios-121-arrow-puzzle",
+            mode: "arrow_duel",
+            ratingKey: "arrow_duel 5/30",
+            dueDay: "2026-07-22",
+            enrolledAt: "2026-07-21T09:00:00.000Z"
+          }
+        ]
+      );
+      assert.deepEqual(
+        service.listSprintSessions()
+          .filter((session) => session.status === "active" || session.status === "paused")
+          .map((session) => ({ id: session.id, status: session.status, run: session.run })),
+        [
+          {
+            id: "ios-121-custom-paused",
+            status: "paused",
+            run: {
+              id: "ios-121-custom-run",
+              kind: "custom",
+              name: "Fork Trainer"
+            }
+          },
+          {
+            id: "ios-121-standard-active",
+            status: "active",
+            run: { id: "standard", kind: "standard", name: "Standard" }
+          }
+        ]
+      );
+      assert.deepEqual(
+        service.getPracticeProgressSummary(
+          Date.parse("2026-07-24T12:00:00.000Z"),
+          "standard 5/20"
+        ),
+        {
+          correctThisWeek: 2,
+          accuracyThisWeek: 67,
+          ratingDeltaThisWeek: 8,
+          wrongThisWeek: 1,
+          netThisWeek: 1
+        }
+      );
+      assert.deepEqual(
+        service.getSprintResultSummary({
+          id: "ios-121-standard-failed",
+          correctCount: 0,
+          mistakeCount: 1
+        }),
+        {
+          accuracyPercent: 0,
+          attemptCount: 1,
+          unclear: {
+            slowMarkedCount: 0,
+            timedOutMarkedCount: 0,
+            userMarkedCount: 0
+          },
+          review: {
+            addedCount: 1,
+            mistakeCount: 1,
+            timedOutCount: 0
+          }
+        }
+      );
+
+      const postMigrationAttempt = service.recordReviewAttempt(
+        {
+          puzzleId: "ios-121-custom-puzzle",
+          mode: "custom",
+          ratingKey: "fork custom 7/25",
+          result: "wrong",
+          submittedMove: "c2c4",
+          expectedMove: "c2c3",
+          startedAt: "2026-07-24T12:10:00.000Z"
+        },
+        "2026-07-24T12:10:05.000Z"
+      );
+      postMigrationAttemptId = postMigrationAttempt.attempt.id;
+      service.saveSettings({
+        ...service.getSettings(),
+        moveFeedback: { soundEnabled: false, hapticsEnabled: true },
+        sprintGuides: {
+          rulesSeen: true,
+          activeSessionSeen: true,
+          arrowDuelSeen: false
+        }
+      });
+      assert.equal(service.listHistory().length, 6);
+      assert.equal(service.getSettings().moveFeedback.soundEnabled, false);
+    } finally {
+      store.close();
+    }
+
+    const afterWrite = databaseSnapshot(databasePath);
+    const reopened = new SQLiteStore(databasePath);
+    reopened.migrate();
+    reopened.migrate();
+    const reopenedService = new PracticeService(reopened);
+    assert.equal(reopenedService.listHistory().length, 6);
+    assert.equal(
+      reopenedService.getHistoryAttempt(postMigrationAttemptId ?? assert.fail("expected a post-migration write"))?.result,
+      "wrong"
+    );
+    assert.deepEqual(reopenedService.getSettings().sprintGuides, {
+      rulesSeen: true,
+      activeSessionSeen: true,
+      arrowDuelSeen: false
+    });
     reopened.close();
     assert.deepEqual(databaseSnapshot(databasePath), afterWrite);
   } finally {
