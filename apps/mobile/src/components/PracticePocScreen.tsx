@@ -27,6 +27,7 @@ import {
   buildArrowDuelLandscapeGuideGeometry,
   buildPortraitGuideCalloutTop,
   buildPortraitGuidePointerLeft,
+  buildSessionGuideLandscapeAlignment,
   buildSessionGuideRailConnectorGeometry
 } from "./sessionGuideGeometry.ts";
 import {
@@ -4071,6 +4072,10 @@ function PracticeHome({
               <Text style={styles.listText}>{reviewStatusLabel}</Text>
             </View>
             <View
+              style={styles.practiceSummaryColumnGap}
+              testID="practice-review-strip-column-gap"
+            />
+            <View
               style={styles.reviewStripActionArea}
               testID="practice-review-strip-action-area"
             >
@@ -4638,6 +4643,13 @@ function ActiveSessionGuide({
       ? 1
       : coachStep + 1;
   const hasPreviousCoachStep = coachStep > 0 || stepNumber > 1;
+  const landscapeAlignment = adaptiveLayout.usesSessionRail
+    ? buildSessionGuideLandscapeAlignment({
+        boardSize: guideBoardSize,
+        sessionRailGap: adaptiveLayout.sessionRailGap,
+        sessionRailWidth: adaptiveLayout.sessionRailWidth
+      })
+    : undefined;
   const continueLabel = !isArrowDuel && (coachStep < 3 || hasNextGuide)
     ? "Next"
     : isFocusedRun
@@ -4680,26 +4692,46 @@ function ActiveSessionGuide({
           adaptiveLayout.usesSessionRail
             ? [
                 styles.sessionGuideCoachNavigationRail,
-                { width: adaptiveLayout.sessionRailWidth }
+                {
+                  left: "50%",
+                  transform: [{
+                    translateX: landscapeAlignment?.railTranslateX ?? 0
+                  }],
+                  width: adaptiveLayout.sessionRailWidth
+                }
               ]
             : null
         ]}
         testID="practice-session-guide-navigation"
       >
-        {hasPreviousCoachStep ? (
+        {hasPreviousCoachStep || adaptiveLayout.usesSessionRail ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Previous guide"
+            accessibilityState={{ disabled: !hasPreviousCoachStep }}
+            disabled={!hasPreviousCoachStep}
             style={[
               styles.sessionGuideCoachBackButton,
               adaptiveLayout.usesSessionRail
                 ? styles.sessionGuideCoachBackButtonRail
+                : null,
+              !hasPreviousCoachStep
+                ? styles.sessionGuideCoachBackButtonDisabled
                 : null
             ]}
             testID="practice-session-guide-back"
             onPress={onBack}
           >
-            <Text style={styles.sessionGuideCoachBackText}>Back</Text>
+            <Text
+              style={[
+                styles.sessionGuideCoachBackText,
+                !hasPreviousCoachStep
+                  ? styles.sessionGuideCoachBackTextDisabled
+                  : null
+              ]}
+            >
+              Back
+            </Text>
           </Pressable>
         ) : (
           <View
@@ -4815,6 +4847,7 @@ function SessionCoachmarkDemo({
     Partial<Record<SessionGuideMeasuredLayoutKey, SessionGuideMeasuredLayout>>
   >({});
   const guideFrameRef = useRef<View>(null);
+  const guideRowRef = useRef<View>(null);
   const slowTargetRef = useRef<View>(null);
   const unclearTargetRef = useRef<View>(null);
   const rememberMeasuredLayout = useCallback((
@@ -4836,12 +4869,14 @@ function SessionCoachmarkDemo({
     key: "slow-target" | "unclear-target",
     target: View | null
   ) => {
-    const guideFrame = guideFrameRef.current;
-    if (!guideFrame || !target) {
+    const measurementFrame = adaptiveLayout.usesSessionRail
+      ? guideRowRef.current
+      : guideFrameRef.current;
+    if (!measurementFrame || !target) {
       return;
     }
     target.measure((_x, _y, width, height, pageX, pageY) => {
-      guideFrame.measure((
+      measurementFrame.measure((
         _frameX,
         _frameY,
         _frameWidth,
@@ -4857,7 +4892,7 @@ function SessionCoachmarkDemo({
         });
       });
     });
-  }, [rememberMeasuredLayout]);
+  }, [adaptiveLayout.usesSessionRail, rememberMeasuredLayout]);
   const boardSquareSize = boardSize / 8;
   const currentPuzzle = isArrowDuel
     ? ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE
@@ -4934,11 +4969,9 @@ function SessionCoachmarkDemo({
       }
     : callout.id === "unclear"
       ? {
-          height: 0,
-          width: 0,
-          x: boardSize
-            + adaptiveLayout.sessionRailGap
-            + adaptiveLayout.sessionRailWidth * 0.72,
+          height: 72,
+          width: adaptiveLayout.sessionRailWidth,
+          x: boardSize + adaptiveLayout.sessionRailGap,
           y: boardSize - 82
         }
       : undefined;
@@ -4955,7 +4988,6 @@ function SessionCoachmarkDemo({
     ? buildSessionGuideRailConnectorGeometry({
         boardSize,
         calloutHeight: effectiveCalloutHeight,
-        routeAboveTarget: callout.id === "unclear",
         target: measuredRailTarget
       })
     : undefined;
@@ -4971,22 +5003,35 @@ function SessionCoachmarkDemo({
   const arrowDuelLandscapeGeometry = isArrowDuel && adaptiveLayout.usesSessionRail
     ? buildArrowDuelLandscapeGuideGeometry(boardSize)
     : undefined;
+  const landscapeAlignment = adaptiveLayout.usesSessionRail
+    ? buildSessionGuideLandscapeAlignment({
+        boardSize,
+        sessionRailGap: adaptiveLayout.sessionRailGap,
+        sessionRailWidth: adaptiveLayout.sessionRailWidth
+      })
+    : undefined;
   const calloutPlacement = adaptiveLayout.usesSessionRail
     ? calloutUsesBoard
       ? {
-          left: 12,
+          left: "50%" as const,
           top: measuredConnectorGeometry?.calloutTop ?? (coachStep === 1 ? 108 : 146),
+          transform: [{
+            translateX: landscapeAlignment?.boardCalloutTranslateX ?? 0
+          }],
           width: Math.max(0, boardSize - 24)
         }
       : isArrowDuel
         ? {
-            left: 12,
+            left: "50%" as const,
             top: arrowDuelLandscapeGeometry?.calloutTop
               ?? Math.round(boardSize * 0.58),
+            transform: [{
+              translateX: landscapeAlignment?.boardCalloutTranslateX ?? 0
+            }],
             width: Math.max(0, boardSize - 24)
           }
       : {
-        left: boardSize + adaptiveLayout.sessionRailGap,
+        left: "50%" as const,
         top: coachStep === 0
           ? 112
           : coachStep === 1
@@ -4994,6 +5039,9 @@ function SessionCoachmarkDemo({
             : coachStep === 2
               ? 122
               : 156,
+        transform: [{
+          translateX: landscapeAlignment?.railTranslateX ?? 0
+        }],
         width: adaptiveLayout.sessionRailWidth
       }
     : {
@@ -5058,7 +5106,7 @@ function SessionCoachmarkDemo({
           height: arrowDuelLandscapeGeometry.connectorHeight,
           left: arrowDuelLandscapeGeometry.connectorLeft,
           top: -arrowDuelLandscapeGeometry.connectorHeight,
-          width: arrowDuelLandscapeGeometry.connectorArmWidth + 1
+          width: 10
         }
       ]}
       testID={pointerTestId}
@@ -5068,18 +5116,8 @@ function SessionCoachmarkDemo({
         testID={`${pointerTestId}-vertical`}
       />
       <View
-        style={[
-          styles.sessionGuideArrowDuelTargetConnectorArm,
-          { width: arrowDuelLandscapeGeometry.connectorArmWidth }
-        ]}
-        testID={`${pointerTestId}-horizontal`}
-      />
-      <View
-        style={[
-          styles.sessionGuideArrowDuelTargetConnectorEndpoint,
-          { left: arrowDuelLandscapeGeometry.connectorArmWidth - 4 }
-        ]}
-        testID={`${pointerTestId}-endpoint`}
+        style={styles.sessionGuideArrowDuelTargetConnectorHead}
+        testID={`${pointerTestId}-head`}
       />
     </View>
   ) : pointerPlacement === "right" && measuredConnectorWidth && measuredConnectorDrop > 0 ? (
@@ -5295,6 +5333,7 @@ function SessionCoachmarkDemo({
       ) : null}
 
       <View
+        ref={guideRowRef}
         style={adaptiveLayout.usesSessionRail
           ? [
               styles.activeSessionAdaptiveLayout,
@@ -5575,6 +5614,7 @@ function SessionCoachmarkDemo({
                       "unclear-target",
                       unclearTargetRef.current
                     )}
+                    targetArea="prompt"
                     targetRef={unclearTargetRef}
                   />
                 </View>
@@ -6691,7 +6731,10 @@ function PracticeProgressCard({
           <Text style={styles.progressValue}>{currentRating}</Text>
           <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
         </View>
-        <View style={styles.progressDivider} />
+        <View
+          style={[styles.practiceSummaryColumnGap, styles.progressDivider]}
+          testID="practice-progress-divider"
+        />
         <View style={styles.progressMetric} testID="practice-progress-weekly-metric">
           <Text style={styles.progressMetricLabel}>This Week</Text>
           <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
@@ -7826,19 +7869,25 @@ function UnclearAttemptPrompt({
   onToggle,
   onTargetLayout,
   question,
+  targetArea = "action",
   targetRef
 }: {
   marked: boolean;
   onToggle: () => void;
   onTargetLayout?: (event: LayoutChangeEvent) => void;
   question: string;
+  targetArea?: "action" | "prompt";
   targetRef?: React.RefObject<View | null>;
 }): React.JSX.Element {
+  const targetsPrompt = targetArea === "prompt";
+
   return (
     <View
       accessibilityLabel={`${question} ${marked ? "Marked as unclear." : "Mark as unclear. Activate to mark unclear."}`}
+      ref={targetsPrompt ? targetRef : undefined}
       style={styles.unclearPrompt}
       testID="sprint-unclear-prompt"
+      onLayout={targetsPrompt ? onTargetLayout : undefined}
     >
       <View style={styles.unclearPromptCopy}>
         <Text style={styles.unclearPromptQuestion} testID="sprint-unclear-question">{question}</Text>
@@ -7851,11 +7900,11 @@ function UnclearAttemptPrompt({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Mark this attempt as unclear"
-          ref={targetRef}
+          ref={targetsPrompt ? undefined : targetRef}
           style={styles.unclearPromptButton}
           testID="sprint-unclear-toggle"
           onPress={onToggle}
-          onLayout={onTargetLayout}
+          onLayout={targetsPrompt ? undefined : onTargetLayout}
         >
           <Text style={styles.unclearPromptButtonText}>Mark as unclear</Text>
         </Pressable>
@@ -15041,29 +15090,25 @@ const styles = StyleSheet.create({
     position: "absolute"
   },
   sessionGuideArrowDuelTargetConnectorVertical: {
-    backgroundColor: "#64748B",
+    backgroundColor: "#2563EB",
     bottom: 0,
+    left: 4,
+    position: "absolute",
+    top: 7,
+    width: 2
+  },
+  sessionGuideArrowDuelTargetConnectorHead: {
+    borderBottomColor: "#2563EB",
+    borderBottomWidth: 7,
+    borderLeftColor: "transparent",
+    borderLeftWidth: 5,
+    borderRightColor: "transparent",
+    borderRightWidth: 5,
+    height: 0,
     left: 0,
     position: "absolute",
     top: 0,
-    width: 2
-  },
-  sessionGuideArrowDuelTargetConnectorArm: {
-    backgroundColor: "#64748B",
-    height: 2,
-    left: 0,
-    position: "absolute",
-    top: 0
-  },
-  sessionGuideArrowDuelTargetConnectorEndpoint: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#2563EB",
-    borderRadius: 4,
-    borderWidth: 2,
-    height: 8,
-    position: "absolute",
-    top: -4,
-    width: 8
+    width: 0
   },
   sessionGuideCoachBadge: {
     color: "#1D4ED8",
@@ -15096,7 +15141,6 @@ const styles = StyleSheet.create({
     gap: 6,
     padding: 4,
     position: "absolute",
-    right: 0,
     zIndex: 6
   },
   sessionGuideCoachBackButton: {
@@ -15114,6 +15158,10 @@ const styles = StyleSheet.create({
     minWidth: 64,
     paddingHorizontal: 8
   },
+  sessionGuideCoachBackButtonDisabled: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#E2E8F0"
+  },
   sessionGuideCoachBackSpacer: {
     minWidth: 76
   },
@@ -15124,6 +15172,9 @@ const styles = StyleSheet.create({
     color: "#334155",
     fontSize: 12,
     fontWeight: "900"
+  },
+  sessionGuideCoachBackTextDisabled: {
+    color: "#94A3B8"
   },
   sessionGuideCoachProgress: {
     color: "#64748B",
@@ -15723,6 +15774,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14
   },
+  practiceSummaryColumnGap: {
+    marginHorizontal: 12,
+    width: 1
+  },
   progressMetric: {
     alignItems: "center",
     flex: 1,
@@ -15739,9 +15794,7 @@ const styles = StyleSheet.create({
   },
   progressDivider: {
     alignSelf: "stretch",
-    backgroundColor: "#E2E8F0",
-    marginHorizontal: 12,
-    width: 1
+    backgroundColor: "#E2E8F0"
   },
   progressValue: {
     color: "#111827",
@@ -15781,16 +15834,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 58,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10
   },
   reviewStripActionArea: {
     alignItems: "center",
     alignSelf: "stretch",
+    flex: 1,
     flexDirection: "row",
     justifyContent: "center",
-    position: "relative",
-    width: "50%"
+    position: "relative"
   },
   reviewStripStatusCopy: {
     flex: 1,

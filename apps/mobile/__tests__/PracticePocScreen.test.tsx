@@ -1913,6 +1913,10 @@ describe("PracticePocScreen", () => {
     });
 
     const portrait = renderLabScenario("practice-active-session-guide");
+    expect(() => findByTestId(
+      portrait,
+      "practice-session-guide-back"
+    )).toThrow();
     expect(findByTestId(
       portrait,
       "practice-session-guide-coach-pointer-overview-top"
@@ -1958,6 +1962,8 @@ describe("PracticePocScreen", () => {
     });
 
     const landscape = renderLabScenario("practice-active-session-guide");
+    const disabledBack = findByTestId(landscape, "practice-session-guide-back");
+    expect(disabledBack.props.accessibilityState).toEqual({ disabled: true });
     press(landscape, "practice-session-guide-start");
     expect(findByTestId(
       landscape,
@@ -1973,14 +1979,14 @@ describe("PracticePocScreen", () => {
       landscape,
       "practice-session-guide-coach-pointer-unclear-right"
     )).toBeTruthy();
-    expect(findByTestId(
+    expect(() => findByTestId(
       landscape,
       "practice-session-guide-coach-pointer-unclear-right-horizontal"
-    )).toBeTruthy();
-    expect(findByTestId(
+    )).toThrow();
+    expect(() => findByTestId(
       landscape,
       "practice-session-guide-coach-pointer-unclear-right-vertical"
-    )).toBeTruthy();
+    )).toThrow();
     expect(findByTestId(
       landscape,
       "practice-session-guide-coach-pointer-unclear-right-head"
@@ -2004,12 +2010,16 @@ describe("PracticePocScreen", () => {
     )).toBeTruthy();
     expect(findByTestId(
       arrowDuel,
-      "practice-session-guide-coach-pointer-arrow-duel-top-horizontal"
+      "practice-session-guide-coach-pointer-arrow-duel-top-head"
     )).toBeTruthy();
-    expect(findByTestId(
+    expect(() => findByTestId(
+      arrowDuel,
+      "practice-session-guide-coach-pointer-arrow-duel-top-horizontal"
+    )).toThrow();
+    expect(() => findByTestId(
       arrowDuel,
       "practice-session-guide-coach-pointer-arrow-duel-top-endpoint"
-    )).toBeTruthy();
+    )).toThrow();
   });
 
   it("keeps the complete first-use guide operable in the maintained iPhone portrait viewport", () => {
@@ -3383,7 +3393,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-review-strip").props.accessibilityLabel).toContain("scheduled mistake reviews");
     expect(flattenTestStyle(findByTestId(renderer, "practice-review-due-count").props.style).alignItems).toBe("center");
     expect(collectText(findByTestId(renderer, "practice-review-due-count"))).toBe("0");
-    expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-action-area").props.style).width).toBe("50%");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-action-area").props.style).flex).toBe(1);
     expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-counts").props.style).justifyContent).toBe("center");
     expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-chevron").props.style).position).toBe("absolute");
     expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-chevron").props.style).right).toBe(0);
@@ -3444,7 +3454,32 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-review-strip").props.accessibilityLabel).toContain(
       "1 due today"
     );
-    expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-action-area").props.style).width).toBe("50%");
+    const progressCardStyle = flattenTestStyle(
+      findByTestId(renderer, "practice-progress-summary").props.style
+    );
+    const progressDividerStyle = flattenTestStyle(
+      findByTestId(renderer, "practice-progress-divider").props.style
+    );
+    const reviewStripStyle = flattenTestStyle(
+      findByTestId(renderer, "practice-review-strip").props.style
+    );
+    const reviewColumnGapStyle = flattenTestStyle(
+      findByTestId(renderer, "practice-review-strip-column-gap").props.style
+    );
+    const reviewActionStyle = flattenTestStyle(
+      findByTestId(renderer, "practice-review-strip-action-area").props.style
+    );
+
+    expect(reviewStripStyle.paddingHorizontal).toBe(progressCardStyle.paddingHorizontal);
+    expect(
+      Number(reviewColumnGapStyle.width) + 2 * Number(reviewColumnGapStyle.marginHorizontal)
+    ).toBe(
+      Number(progressDividerStyle.width) + 2 * Number(progressDividerStyle.marginHorizontal)
+    );
+    expect(reviewActionStyle.flex).toBe(
+      flattenTestStyle(findByTestId(renderer, "practice-progress-weekly-metric").props.style).flex
+    );
+    expect(reviewActionStyle.width).toBeUndefined();
     expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-counts").props.style).justifyContent).toBe("center");
   });
 
@@ -3644,7 +3679,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "app-shell-header")).toBeTruthy();
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
     expect(styleEntryMatches(findByTestId(renderer, "practice-home-layout").props.style, "flexDirection", "row")).toBe(homeColumns);
-    expect(styleEntryMatches(findByTestId(renderer, "practice-review-strip-action-area").props.style, "width", "50%")).toBe(true);
+    expect(styleEntryMatches(findByTestId(renderer, "practice-review-strip-action-area").props.style, "flex", 1)).toBe(true);
     expect(styleEntryMatches(findByTestId(renderer, "practice-review-strip-counts").props.style, "justifyContent", "center")).toBe(true);
     expect(findByTestId(renderer, "practice-tab")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
