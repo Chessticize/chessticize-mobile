@@ -482,11 +482,12 @@ New Run behavior:
 - A correct attempt that reaches the Slow threshold is automatically marked
   Unclear. Instead of the follow-up question, the Sprint surface shows a
   non-actionable notice explaining that the attempt was marked because it was
-  Slow. A Timed out attempt is also marked Unclear. Both markers remain
-  reversible from History.
+  Slow. Only correct Sprint attempts can be marked Unclear. Wrong and Timed out
+  attempts are mistakes, are added to Review, and are not also marked Unclear.
 - Slow and Timed out remain visible attempt labels. They are not History filter
-  options and do not independently keep an attempt in Needs attention after its
-  Unclear marker is cleared.
+  options. A Slow label does not independently keep an attempt in Needs
+  attention after its Unclear marker is cleared; a Timed out attempt remains
+  there through its active Review entry.
 - Source defaults to All sources rather than Sprint.
 - Time range, rating bucket, source, result, Attention, side, and theme controls
   live behind the compact filter toggle. Attention contains only `Unclear` and

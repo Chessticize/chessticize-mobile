@@ -1,4 +1,100 @@
 {
+  "practice-tactical-profile-building": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Show calm local profile-building progress on the existing Practice Home."
+      }
+    ]
+  },
+  "practice-tactical-profile-collecting": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Use one calm insufficient-evidence state, including after a one-off mistake."
+      }
+    ]
+  },
+  "practice-tactical-profile-balanced": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Show when recent calibrated evidence supports no meaningful training focus."
+      }
+    ]
+  },
+  "practice-tactical-profile-solve-rate": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Explain one solve-reliability weakness with diverse puzzle and session evidence."
+      }
+    ]
+  },
+  "practice-tactical-profile-speed": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Keep completed-puzzle speed weakness separate from solve reliability and Timeout."
+      }
+    ]
+  },
+  "practice-tactical-profile-ranked": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Summarize the clearest focus on Home and cap the full profile at three visible recommendations."
+      }
+    ]
+  },
+  "practice-tactical-profile-task-families-home": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Summarize separate Puzzle solving and Arrow Duel recommendations in one calm Home card."
+      }
+    ]
+  },
+  "practice-tactical-profile-task-families": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Keep Puzzle solving and Arrow Duel focus lanes separate inside one Tactical Profile."
+      }
+    ]
+  },
+  "practice-tactical-profile-limited-inventory": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Keep a credible focus visible while withholding an unsafe or repetitive low-inventory Run."
+      }
+    ]
+  },
+  "practice-tactical-profile-explanation": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Explain comparable performance, evidence diversity, and excluded UI metadata."
+      }
+    ]
+  },
+  "practice-tactical-profile-focused-run": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Preview Rating-anchored quotas that refresh between Runs and stay fixed after start."
+      }
+    ]
+  },
+  "practice-tactical-profile-suppressed": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Let the user decline emphasis while keeping the recommendation reversible."
+      }
+    ]
+  },
   "practice-home": {
     "issues": [
       {
@@ -20,6 +116,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Teach the pass goal, attempts, Slow, and Timed out rules before the first Sprint."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Top-align every first-use Sprint badge with its copy column, and clarify the novice-facing timing language."
       }
     ]
   },
@@ -116,6 +216,38 @@
       {
         "issueNumber": 249,
         "changeNote": "Show the final countdown, lock the board under brief Timed out feedback, then reset for the next puzzle."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Explain the mistake and Review handoff after a timeout, including why Unclear is not shown."
+      }
+    ]
+  },
+  "practice-timeout-review-notice": {
+    "issues": [
+      {
+        "issueNumber": 337,
+        "changeNote": "Show the read-only In Review notice that replaces the Unclear question after a timeout."
+      },
+      {
+        "issueNumber": 342,
+        "changeNote": "Keep the timeout handoff concise while preserving its mistake and Review explanation."
+      }
+    ]
+  },
+  "practice-wrong-review-notice": {
+    "issues": [
+      {
+        "issueNumber": 342,
+        "changeNote": "Explain that the previous wrong answer counted as a mistake and was added to Review."
+      }
+    ]
+  },
+  "practice-slow-unclear-notice": {
+    "issues": [
+      {
+        "issueNumber": 342,
+        "changeNote": "Explain that the previous Slow correct answer was automatically marked Unclear and added to Review."
       }
     ]
   },
@@ -124,6 +256,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Guide metrics, Slow, Timed out, and Mark as unclear in the frozen real Sprint layout."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Keep semantic first-use Sprint guidance visible and route pointers around copy with clear target spacing in maintained layouts."
       }
     ]
   },
@@ -132,6 +268,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Append the Arrow Duel candidate explanation to the shared first-session guide."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Keep the shared semantic guidance and Arrow Duel progress readable in maintained layouts."
       }
     ]
   },
@@ -140,6 +280,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Show only the Arrow Duel-specific step after shared guidance has been seen."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Keep the Arrow Duel semantic callout and guide progress readable in maintained layouts."
       }
     ]
   },
@@ -175,7 +319,7 @@
       },
       {
         "issueNumber": 249,
-        "changeNote": "Mark Timed out attempts Unclear so Needs attention stays based only on Unclear or Review membership."
+        "changeNote": "Treat Timed out as a mistake added to Review without also marking it Unclear."
       }
     ]
   },
@@ -192,6 +336,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Replay all Sprint guides from a direct reversible Settings button."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Place Guidance immediately before Feedback, after Profile whenever Profile is available."
       }
     ]
   },

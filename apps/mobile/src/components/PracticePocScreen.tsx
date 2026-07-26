@@ -24,6 +24,12 @@ import type { StyleProp, ViewStyle } from "react-native";
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
+  buildArrowDuelLandscapeGuideGeometry,
+  buildPortraitGuideCalloutTop,
+  buildPortraitGuidePointerLeft,
+  buildSessionGuideRailConnectorGeometry
+} from "./sessionGuideGeometry.ts";
+import {
   analyzeFenWithUciEngine,
   ALL_THEME_SELECTION,
   applyMovesToFen,
@@ -180,6 +186,11 @@ import {
   consumeSuppressedBoardMove
 } from "./boardMoveSuppression.ts";
 import { usePuzzleEntryPreview } from "./usePuzzleEntryPreview.ts";
+import {
+  TacticalProfileFlow,
+  TacticalProfileHomeCard
+} from "./TacticalProfileSection.tsx";
+import type { TacticalProfilePresentation } from "./tacticalProfilePresentation.ts";
 
 export type {
   PracticeRunDraft,
@@ -188,6 +199,12 @@ export type {
   PracticeRunManagementPresentation,
   PracticeRunPresentation
 } from "./practiceRunPresentation.ts";
+export type {
+  FocusedRunPreview,
+  TacticalProfileIntent,
+  TacticalProfilePresentation,
+  TacticalProfileSignal
+} from "./tacticalProfilePresentation.ts";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -212,6 +229,7 @@ interface Props {
   sprintStartDelayMs?: number;
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
+  tacticalProfilePresentation?: TacticalProfilePresentation;
 }
 
 export type SprintRulesGuidePresentation = {
@@ -239,6 +257,7 @@ export type SprintRulesDesignPreview = {
   firstRunGuide?: SprintRulesGuidePresentation;
   firstRunGuideInitiallyVisible?: boolean;
   initialSessionGuides?: readonly SprintSessionGuidePresentation[];
+  initialPreviousAttemptNotice?: "slow" | "timed_out" | "wrong";
   initialResultUnclearPrompt?: SprintResultUnclearPromptPresentation;
   initialResultState?: SprintState;
   resultUnclearSummary?: SprintResultUnclearSummaryPresentation;
@@ -331,11 +350,43 @@ type FeedbackBoardSnapshot = {
 
 type UnclearPromptState = {
   attemptId: string;
-  autoMarkedReason?: "slow";
   marked: boolean;
   puzzleId: string;
   question: string;
 };
+
+type PreviousAttemptNoticeReason = "slow" | "timed_out" | "wrong";
+
+type PreviousAttemptNoticeState = {
+  attemptId: string;
+  puzzleId: string;
+  reason: PreviousAttemptNoticeReason;
+};
+
+function previousAttemptNoticeFor(
+  attempt: AttemptEvent | null | undefined,
+  sprintStatus: SprintState["status"]
+): PreviousAttemptNoticeState | null {
+  if (!attempt || sprintStatus !== "active") {
+    return null;
+  }
+  if (attempt.result === "timed_out" || attempt.result === "wrong") {
+    return {
+      attemptId: attempt.id,
+      puzzleId: attempt.puzzleId,
+      reason: attempt.result
+    };
+  }
+  return attempt.result === "correct"
+    && attempt.timingStatus === "slow"
+    && attempt.unclear === true
+    ? {
+        attemptId: attempt.id,
+        puzzleId: attempt.puzzleId,
+        reason: "slow"
+      }
+    : null;
+}
 
 type PendingGuidedStart = {
   nextMode: SprintMode;
@@ -471,7 +522,8 @@ export function PracticePocScreen({
   sprintRulesDesignPreview,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
-  systemBack
+  systemBack,
+  tacticalProfilePresentation
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = platformCapabilities.storage.practiceService;
@@ -559,6 +611,16 @@ export function PracticePocScreen({
         }
       : null
   ));
+  const [previousAttemptNotice, setPreviousAttemptNotice] =
+    useState<PreviousAttemptNoticeState | null>(() => (
+      sprintRulesDesignPreview?.initialPreviousAttemptNotice
+        ? {
+            attemptId: "sprint-rules-preview-previous-attempt",
+            puzzleId: "sprint-rules-preview-previous-puzzle",
+            reason: sprintRulesDesignPreview.initialPreviousAttemptNotice
+          }
+        : null
+    ));
   const [boardInputLocked, setBoardInputLocked] = useState(false);
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
   const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
@@ -843,6 +905,10 @@ export function PracticePocScreen({
         setFeedback(null);
         setFeedbackPuzzleId(null);
         setUnclearPrompt(null);
+        setPreviousAttemptNotice(previousAttemptNoticeFor(
+          advanced.attempt,
+          advanced.state.status
+        ));
         if (
           advanced.attempt?.timingStatus === "timed_out" &&
           submittedPuzzle &&
@@ -1475,6 +1541,7 @@ export function PracticePocScreen({
       setFeedback(null);
       setFeedbackPuzzleId(null);
       setUnclearPrompt(null);
+      setPreviousAttemptNotice(null);
       pendingPremoveRef.current = null;
       commitBoardInputLocked(false, "start", started.currentPuzzle?.puzzle.id ?? null);
       clearFeedbackSnapshot();
@@ -1693,23 +1760,21 @@ export function PracticePocScreen({
       const next = service.submitMove(move, captureLiveNowIso());
       playCommittedMoveFeedback("user", move, submittedFen);
       const nextFeedback = (next.feedback as SessionFeedback) ?? null;
+      const nextPreviousAttemptNotice = previousAttemptNoticeFor(
+        next.attempt,
+        next.state.status
+      );
+      setPreviousAttemptNotice(nextPreviousAttemptNotice);
       if (next.attempt) {
-        const isSlowAutoMarked = next.attempt.timingStatus === "slow" &&
-          next.attempt.unclear === true;
         setUnclearPrompt(
-          isUnclearAttemptEligible(next.attempt)
-            && next.attempt.result !== "timed_out"
-            && (!next.attempt.unclear || isSlowAutoMarked || next.attempt.result === "wrong")
+          !nextPreviousAttemptNotice
+            && isUnclearAttemptEligible(next.attempt)
+            && !next.attempt.unclear
           ? {
               attemptId: next.attempt.id,
-              ...(isSlowAutoMarked ? { autoMarkedReason: "slow" as const } : {}),
               marked: Boolean(next.attempt.unclear),
               puzzleId: next.attempt.puzzleId,
-              question: isSlowAutoMarked
-                ? "Marked unclear because the last puzzle was slow."
-                : next.attempt.result === "wrong"
-                  ? "Was it clear why your last move was wrong?"
-                : "Was it clear why the last correct move worked?"
+              question: "Was it clear why the last correct move worked?"
             }
           : null
         );
@@ -1834,6 +1899,7 @@ export function PracticePocScreen({
     setFeedback(null);
     setFeedbackPuzzleId(null);
     setUnclearPrompt(null);
+    setPreviousAttemptNotice(null);
     clearFeedbackSnapshot();
     setError(null);
     pendingPremoveRef.current = null;
@@ -1857,6 +1923,7 @@ export function PracticePocScreen({
       setLastBoardMove(null);
       setFeedback(null);
       setFeedbackPuzzleId(null);
+      setPreviousAttemptNotice(null);
       clearFeedbackSnapshot();
       commitBoardInputLocked(false, "resume", resumed.currentPuzzle?.puzzle.id ?? null);
       navigateToTab("practice");
@@ -2880,9 +2947,7 @@ export function PracticePocScreen({
           >
             <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
             {sprintGuidanceEnabled || sprintRulesDesignPreview?.timeoutCountsAsMistake === true ? (
-              <Text style={styles.puzzleTimeoutOverlayDetail}>
-                Mistake · Marked Unclear · Added to Review · Moving on
-              </Text>
+              <Text style={styles.puzzleTimeoutOverlayDetail}>Added to Review</Text>
             ) : null}
           </View>
         ) : null}
@@ -2946,7 +3011,8 @@ export function PracticePocScreen({
       />
     </View>
   ) : null;
-  const sessionBottomFeedbackNode = shouldShowSessionBoard && unclearPrompt ? (
+  const sessionBottomFeedbackNode = shouldShowSessionBoard
+    && (unclearPrompt || previousAttemptNotice) ? (
     // Fabric must keep this wrapper as a native flex child so the landscape
     // auto margin can pin feedback to the rail bottom instead of flattening it.
     <View
@@ -2957,15 +3023,17 @@ export function PracticePocScreen({
         { width: sessionUsesRail ? adaptiveLayout.sessionRailWidth : boardSize }
       ]}
     >
-      <UnclearAttemptPrompt
-        marked={unclearPrompt.marked}
-        question={unclearPrompt.autoMarkedReason === "slow"
-          ? "Marked unclear because the previous puzzle was slow."
-          : unclearPrompt.question.includes("wrong")
+      {previousAttemptNotice ? (
+        <PreviousAttemptNotice reason={previousAttemptNotice.reason} />
+      ) : unclearPrompt ? (
+        <UnclearAttemptPrompt
+          marked={unclearPrompt.marked}
+          question={unclearPrompt.question.includes("wrong")
             ? unclearPrompt.question
             : "Was the previous puzzle clear?"}
-        onToggle={toggleUnclearPrompt}
-      />
+          onToggle={toggleUnclearPrompt}
+        />
+      ) : null}
     </View>
   ) : null;
   const errorNode = error ? <ErrorPanel error={error} /> : null;
@@ -3227,6 +3295,14 @@ export function PracticePocScreen({
                 ) : null}
 
                 {!isSessionGuideVisible && !isOpenSession && state === null && (
+                  tacticalProfilePresentation?.screen !== undefined
+                  && tacticalProfilePresentation.screen !== "home"
+                ) ? (
+                  <TacticalProfileFlow presentation={tacticalProfilePresentation} />
+                ) : null}
+
+                {!isSessionGuideVisible && !isOpenSession && state === null
+                && (tacticalProfilePresentation?.screen ?? "home") === "home" && (
                   activeRunManagementPresentation?.screen === "home"
                   || (!activeRunManagementPresentation && mode !== "custom")
                 ) ? (
@@ -3243,6 +3319,7 @@ export function PracticePocScreen({
                     runManagement={activeRunManagementPresentation}
                     sprintRulesGuide={sprintRulesGuidePresentation}
                     sprintRulesGuideVisible={sprintRulesGuideVisible}
+                    tacticalProfile={tacticalProfilePresentation}
                     resumableSprint={resumableSprint}
                     onDismissSprintRulesGuide={() => {
                       setSprintRulesGuideVisible(false);
@@ -3682,6 +3759,7 @@ function PracticeHome({
   runManagement,
   sprintRulesGuide,
   sprintRulesGuideVisible,
+  tacticalProfile,
   resumableSprint,
   onDismissSprintRulesGuide,
   onOpenSprintRulesGuide,
@@ -3700,6 +3778,7 @@ function PracticeHome({
   runManagement?: PracticeRunManagementPresentation;
   sprintRulesGuide?: SprintRulesGuidePresentation;
   sprintRulesGuideVisible: boolean;
+  tacticalProfile?: TacticalProfilePresentation;
   resumableSprint: SprintState | null;
   onDismissSprintRulesGuide: () => void;
   onOpenSprintRulesGuide: () => void;
@@ -3780,6 +3859,10 @@ function PracticeHome({
             />
           )}
 
+          {tacticalProfile ? (
+            <TacticalProfileHomeCard presentation={tacticalProfile} />
+          ) : null}
+
           <Text style={styles.sectionLabel}>Review</Text>
           <Pressable
             accessibilityRole="button"
@@ -3792,22 +3875,15 @@ function PracticeHome({
               <Text style={styles.listText}>{reviewStatusLabel}</Text>
             </View>
             <View
-              style={[
-                styles.reviewStripActionArea,
-                adaptiveLayout.usesWideContent ? styles.reviewStripActionAreaWide : null
-              ]}
+              style={styles.reviewStripActionArea}
               testID="practice-review-strip-action-area"
             >
               <View
-                style={[
-                  styles.reviewStripCounts,
-                  adaptiveLayout.usesWideContent ? styles.reviewStripCountsWide : null
-                ]}
+                style={styles.reviewStripCounts}
                 testID="practice-review-strip-counts"
               >
                 <View style={styles.reviewStripMetric} testID="practice-review-due-count">
                   <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
-                  <Text style={styles.reviewStripMetricLabel}>Due today</Text>
                 </View>
                 {overdueReviewCount > 0 ? (
                   <View style={styles.reviewStripMetric} testID="practice-review-overdue-count">
@@ -4143,9 +4219,11 @@ function SprintRulesGuide({
   presentation: SprintRulesGuidePresentation;
   onDismiss: () => void;
 }): React.JSX.Element {
+  const mistakeLimitDetail = `The ${ordinalWord(presentation.maxMistakes)} mistake ends the Sprint.`;
+
   return (
     <View
-      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass before ${presentation.durationLabel} ends. The Sprint ends after ${presentation.maxMistakes} mistakes. A Slow warning automatically marks the puzzle as Unclear and does not count as a mistake. A timeout marks the puzzle Timed out and Unclear, counts as a mistake, adds it to Review, then moves on. For example, solving ${presentation.targetCorrect} puzzles with one wrong answer means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
+      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass. Time limit: Solve the required puzzles before the Sprint clock reaches zero. Mistake limit: ${mistakeLimitDetail} Slow warning: The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake. Puzzle timeout: When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. Mistakes are not marked Unclear. For example, solving ${presentation.targetCorrect} puzzles with one mistake means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
       style={styles.sprintRulesGuide}
       testID="practice-sprint-rules-guide"
     >
@@ -4153,7 +4231,7 @@ function SprintRulesGuide({
         <View style={styles.sprintRulesGuideTitleBlock}>
           <Text style={styles.sprintRulesEyebrow}>YOUR FIRST SPRINT</Text>
           <Text style={styles.sprintRulesGuideTitle}>
-            Solve {presentation.targetCorrect} to pass
+            Solve {presentation.targetCorrect} puzzles to pass
           </Text>
         </View>
         <Pressable
@@ -4169,37 +4247,32 @@ function SprintRulesGuide({
 
       <View style={styles.sprintRulesList}>
         <SprintRuleRow
-          badge={String(presentation.targetCorrect)}
-          detail={`Solve ${presentation.targetCorrect} puzzles to pass the Sprint.`}
-          label="Puzzles to pass"
-        />
-        <SprintRuleRow
           badge={presentation.durationLabel}
-          detail="Reach the goal before the Sprint timer ends."
+          detail="Solve the required puzzles before the Sprint clock reaches zero."
           label="Time limit"
         />
         <SprintRuleRow
           badge={String(presentation.maxMistakes)}
-          detail={`Mistake ${presentation.maxMistakes} ends the Sprint.`}
-          label="Mistakes max"
+          detail={mistakeLimitDetail}
+          label="Mistake limit"
           tone="danger"
         />
         <SprintRuleRow
           badge="SLOW"
-          detail="Automatically marks the puzzle as Unclear; it is not a mistake."
+          detail="The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake."
           label="Slow warning"
           tone="warning"
         />
         <SprintRuleRow
           badge="TIMEOUT"
-          detail="Marks it Timed out and Unclear, counts as a mistake, adds it to Review, then moves on."
+          detail="When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. Mistakes are not marked Unclear."
           label="Puzzle timeout"
           tone="danger"
         />
       </View>
 
       <Text style={styles.sprintRulesGuideFootnote}>
-        Example: {presentation.targetCorrect} solved + 1 wrong = {presentation.targetCorrect + 1} attempted.
+        Example: {presentation.targetCorrect} solved + 1 mistake = {presentation.targetCorrect + 1} attempted.
       </Text>
     </View>
   );
@@ -4216,27 +4289,115 @@ function SprintRuleRow({
   label: string;
   tone?: "default" | "danger" | "warning";
 }): React.JSX.Element {
+  const ruleTestId = safeTestId(label);
+
   return (
-    <View style={styles.sprintRuleRow}>
+    <View style={styles.sprintRuleRow} testID={`practice-sprint-rule-${ruleTestId}`}>
       <View style={[
         styles.sprintRuleBadge,
         tone === "danger" ? styles.sprintRuleBadgeDanger : null,
         tone === "warning" ? styles.sprintRuleBadgeWarning : null
-      ]}>
-        <Text style={[
-          styles.sprintRuleBadgeText,
-          tone === "danger" ? styles.sprintRuleBadgeTextDanger : null,
-          tone === "warning" ? styles.sprintRuleBadgeTextWarning : null
-        ]}>
+      ]} testID={`practice-sprint-rule-${ruleTestId}-badge`}>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.sprintRuleBadgeText,
+            tone === "danger" ? styles.sprintRuleBadgeTextDanger : null,
+            tone === "warning" ? styles.sprintRuleBadgeTextWarning : null
+          ]}
+        >
           {badge}
         </Text>
       </View>
-      <View style={styles.sprintRuleCopy}>
+      <View
+        style={styles.sprintRuleCopy}
+        testID={`practice-sprint-rule-${ruleTestId}-copy`}
+      >
         <Text style={styles.sprintRuleLabel}>{label}</Text>
         <Text style={styles.sprintRuleDetail}>{detail}</Text>
       </View>
     </View>
   );
+}
+
+type SessionGuideCallout = {
+  badge: string;
+  detail: string;
+  id: "arrow-duel" | "overview" | "slow" | "timeout" | "unclear";
+  title: string;
+  tone: "danger" | "info" | "warning";
+};
+
+type SessionGuideMeasuredLayout = {
+  height: number;
+  width: number;
+  x: number;
+  y: number;
+};
+
+type SessionGuideMeasuredLayoutKey =
+  | "slow-callout"
+  | "slow-target"
+  | "unclear-callout"
+  | "unclear-target";
+
+function sameSessionGuideMeasuredLayout(
+  current: SessionGuideMeasuredLayout | undefined,
+  next: SessionGuideMeasuredLayout
+): boolean {
+  return current?.height === next.height
+    && current.width === next.width
+    && current.x === next.x
+    && current.y === next.y;
+}
+
+function sessionGuideCallout(
+  mode: "standard" | "arrow_duel",
+  coachStep: number
+): SessionGuideCallout {
+  if (mode === "arrow_duel") {
+    return {
+      badge: "ARROW DUEL",
+      detail: "Compare the two moves, then play the stronger one on the board. Other moves are ignored.",
+      id: "arrow-duel",
+      title: "The arrows show your two choices",
+      tone: "info"
+    };
+  }
+  if (coachStep === 0) {
+    return {
+      badge: "SPRINT HEADER",
+      detail: "The top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide.",
+      id: "overview",
+      title: "Track your Sprint",
+      tone: "info"
+    };
+  }
+  if (coachStep === 1) {
+    return {
+      badge: "SLOW",
+      detail: "Keep solving. A correct answer will be marked Unclear because you took too long, but it will not count as a mistake.",
+      id: "slow",
+      title: "Amber means you’re taking too long",
+      tone: "warning"
+    };
+  }
+  if (coachStep === 2) {
+    return {
+      badge: "TIMED OUT",
+      detail: "It is added to Review. Mistakes are not marked Unclear. The Sprint then shows the next puzzle.",
+      id: "timeout",
+      title: "This puzzle counts as a mistake",
+      tone: "danger"
+    };
+  }
+  return {
+    badge: "UNCLEAR",
+    detail: "Tap it when your move was correct but the solution still does not make sense to you.",
+    id: "unclear",
+    title: "Use Mark as unclear after a correct answer",
+    tone: "warning"
+  };
 }
 
 function ActiveSessionGuide({
@@ -4259,6 +4420,14 @@ function ActiveSessionGuide({
   totalSteps: number;
 }): React.JSX.Element {
   const isArrowDuel = presentation.mode === "arrow_duel";
+  const guideBoardSize = adaptiveLayout.usesSessionRail
+    ? boardSize
+    : Math.min(
+        boardSize,
+        Math.floor(
+          adaptiveLayout.contentHeight * (adaptiveLayout.isRegularWidth ? 0.42 : 0.34)
+        )
+      );
   const hasNextGuide = stepNumber < totalSteps;
   const unifiedCoachTotal = totalSteps > 1 ? 5 : isArrowDuel ? 1 : 4;
   const unifiedCoachStep = isArrowDuel && totalSteps > 1
@@ -4272,15 +4441,11 @@ function ActiveSessionGuide({
     : isArrowDuel
       ? "Start Arrow Duel"
       : "Start Sprint";
-  const timerCopy = totalSteps > 1
-    ? "Your timer starts after this five-step tour."
-    : "Your timer starts after this guide.";
+  const callout = sessionGuideCallout(presentation.mode, coachStep);
 
   return (
     <View
-      accessibilityLabel={isArrowDuel
-        ? `Your first Arrow Duel. Step ${unifiedCoachStep} of ${unifiedCoachTotal} freezes the same layout used by the real Arrow Duel. Compare the two arrows, then play the stronger move. Only these two moves count; any other move is ignored. ${timerCopy}`
-        : `Your first active Sprint. This ${unifiedCoachTotal === 5 ? "five" : "four"}-step tour freezes the same layout used by the real Sprint. Solve ${presentation.targetCorrect} puzzles to pass in ${presentation.durationLabel}. Slow and Timed out are automatic timing states, not controls. After the target pace, the puzzle timer turns amber. If you solve after that, the completed attempt is saved as Unclear without adding a mistake. At the time limit, Timed out appears over the board, the attempt is marked Unclear, counts as a mistake, is added to Review, and the Sprint moves to the next puzzle. After a correct puzzle, use Mark as unclear when you did not fully understand the solution. ${timerCopy}`}
+      accessibilityLabel={`Guide ${unifiedCoachStep} of ${unifiedCoachTotal}. ${callout.title}. ${callout.detail}`}
       style={styles.sessionGuideCalibrated}
       testID={isArrowDuel ? "practice-arrow-duel-guide" : "practice-active-session-guide"}
     >
@@ -4290,16 +4455,15 @@ function ActiveSessionGuide({
         style={FABRIC_SAFE_HIDDEN_TEXT_STYLE}
         testID="practice-session-guide-progress"
       >
-        STEP {unifiedCoachStep} OF {unifiedCoachTotal} · YOUR FIRST {isArrowDuel ? "ARROW DUEL" : "ACTIVE SPRINT"}
+        GUIDE {unifiedCoachStep} OF {unifiedCoachTotal} · YOUR FIRST {isArrowDuel ? "ARROW DUEL" : "ACTIVE SPRINT"}
       </Text>
       <SessionCoachmarkDemo
         adaptiveLayout={adaptiveLayout}
-        boardSize={boardSize}
+        boardSize={guideBoardSize}
         coachStep={coachStep}
-        guideStepNumber={unifiedCoachStep}
+        guideNumber={unifiedCoachStep}
         mode={presentation.mode}
         presentation={presentation}
-        timerCopy={timerCopy}
       />
 
       <View
@@ -4317,7 +4481,7 @@ function ActiveSessionGuide({
         {hasPreviousCoachStep ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Previous guide step"
+            accessibilityLabel="Previous guide"
             style={[
               styles.sessionGuideCoachBackButton,
               adaptiveLayout.usesSessionRail
@@ -4340,7 +4504,8 @@ function ActiveSessionGuide({
           />
         )}
         <Text
-          accessibilityLabel={`Step ${unifiedCoachStep} of ${unifiedCoachTotal}`}
+          accessibilityLabel={`Guide ${unifiedCoachStep} of ${unifiedCoachTotal}`}
+          numberOfLines={1}
           style={styles.sessionGuideCoachProgress}
           testID="practice-session-guide-coach-progress"
         >
@@ -4358,7 +4523,19 @@ function ActiveSessionGuide({
           testID="practice-session-guide-start"
           onPress={onContinue}
         >
-          <Text style={styles.sessionGuideStartButtonText}>{continueLabel}</Text>
+          <Text
+            adjustsFontSizeToFit={adaptiveLayout.usesSessionRail}
+            minimumFontScale={0.8}
+            numberOfLines={1}
+            style={[
+              styles.sessionGuideStartButtonText,
+              adaptiveLayout.usesSessionRail
+                ? styles.sessionGuideStartButtonTextRail
+                : null
+            ]}
+          >
+            {continueLabel}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -4414,20 +4591,65 @@ function SessionCoachmarkDemo({
   adaptiveLayout,
   boardSize,
   coachStep,
-  guideStepNumber,
+  guideNumber,
   mode,
-  presentation,
-  timerCopy
+  presentation
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
   coachStep: number;
-  guideStepNumber: number;
+  guideNumber: number;
   mode: "standard" | "arrow_duel";
   presentation: SprintSessionGuidePresentation;
-  timerCopy: string;
 }): React.JSX.Element {
   const isArrowDuel = mode === "arrow_duel";
+  const [measuredLayouts, setMeasuredLayouts] = useState<
+    Partial<Record<SessionGuideMeasuredLayoutKey, SessionGuideMeasuredLayout>>
+  >({});
+  const guideFrameRef = useRef<View>(null);
+  const slowTargetRef = useRef<View>(null);
+  const unclearTargetRef = useRef<View>(null);
+  const rememberMeasuredLayout = useCallback((
+    key: SessionGuideMeasuredLayoutKey,
+    next: SessionGuideMeasuredLayout
+  ) => {
+    setMeasuredLayouts((current) => sameSessionGuideMeasuredLayout(current[key], next)
+      ? current
+      : { ...current, [key]: next });
+  }, []);
+  const rememberCalloutLayout = useCallback((
+    key: "slow-callout" | "unclear-callout",
+    event: LayoutChangeEvent
+  ) => {
+    const { height, width, x, y } = event.nativeEvent.layout;
+    rememberMeasuredLayout(key, { height, width, x, y });
+  }, [rememberMeasuredLayout]);
+  const measureTargetInGuideFrame = useCallback((
+    key: "slow-target" | "unclear-target",
+    target: View | null
+  ) => {
+    const guideFrame = guideFrameRef.current;
+    if (!guideFrame || !target) {
+      return;
+    }
+    target.measure((_x, _y, width, height, pageX, pageY) => {
+      guideFrame.measure((
+        _frameX,
+        _frameY,
+        _frameWidth,
+        _frameHeight,
+        framePageX,
+        framePageY
+      ) => {
+        rememberMeasuredLayout(key, {
+          height,
+          width,
+          x: pageX - framePageX,
+          y: pageY - framePageY
+        });
+      });
+    });
+  }, [rememberMeasuredLayout]);
   const boardSquareSize = boardSize / 8;
   const currentPuzzle = isArrowDuel
     ? ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE
@@ -4466,51 +4688,80 @@ function SessionCoachmarkDemo({
         : coachStep === 3
           ? 24
           : 0;
-  const callout = isArrowDuel
+  const callout = sessionGuideCallout(mode, coachStep);
+  const calloutUsesBoard = adaptiveLayout.usesSessionRail
+    && !isArrowDuel
+    && (coachStep === 1 || coachStep === 3);
+  const measuredCallout = callout.id === "slow"
+    ? measuredLayouts["slow-callout"]
+    : callout.id === "unclear"
+      ? measuredLayouts["unclear-callout"]
+      : undefined;
+  const fallbackRailTarget = callout.id === "slow"
     ? {
-        badge: `STEP ${guideStepNumber} · ARROW DUEL`,
-        detail: "Play the stronger move on the board. Only these two moves count; any other move is ignored.",
-        id: "arrow-duel",
-        title: "Compare the two arrows",
-        tone: "info" as const
+        height: 0,
+        width: 0,
+        x: boardSize
+          + adaptiveLayout.sessionRailGap
+          + adaptiveLayout.sessionRailWidth / 2,
+        y: boardSize * 0.58
       }
-    : coachStep === 0
-    ? {
-        badge: "STEP 1 · SESSION AT A GLANCE",
-        detail: `Solved tracks progress toward ${presentation.targetCorrect}. The center clock shows the whole ${presentation.durationLabel} Sprint. The Sprint ends after ${presentation.maxMistakes} mistakes. ${timerCopy}`,
-        id: "overview",
-        title: "This is the same header you will use next",
-        tone: "info" as const
-      }
-    : coachStep === 1
+    : callout.id === "unclear"
       ? {
-          badge: "STEP 2 · SLOW · AUTOMATIC",
-          detail: "If you solve after that, the completed attempt is saved as Unclear without adding a mistake.",
-          id: "slow",
-          title: "The puzzle timer turns amber automatically after the target pace.",
-          tone: "warning" as const
+          height: 0,
+          width: 0,
+          x: boardSize
+            + adaptiveLayout.sessionRailGap
+            + adaptiveLayout.sessionRailWidth * 0.72,
+          y: boardSize - 82
         }
-    : coachStep === 2
-        ? {
-            badge: "STEP 3 · TIMED OUT · AUTOMATIC",
-            detail: "The attempt is marked Unclear, counts as a mistake, is added to Review, and the Sprint moves to the next puzzle.",
-            id: "timeout",
-            title: "Timed out appears over the board automatically at the time limit.",
-            tone: "danger" as const
-          }
-        : {
-            badge: "STEP 4 · AFTER A CORRECT PUZZLE",
-            detail: "Use it after a correct answer when you did not fully understand the solution.",
-            id: "unclear",
-            title: "Mark as unclear is the only control in this tour.",
-            tone: "warning" as const
-          };
+      : undefined;
+  const measuredRailTarget = callout.id === "slow"
+    ? measuredLayouts["slow-target"] ?? fallbackRailTarget
+    : callout.id === "unclear"
+      ? measuredLayouts["unclear-target"] ?? fallbackRailTarget
+      : undefined;
+  const effectiveCalloutHeight = measuredCallout?.height
+    ?? (callout.id === "slow" ? 98 : callout.id === "unclear" ? 82 : undefined);
+  const measuredConnectorGeometry = calloutUsesBoard
+    && effectiveCalloutHeight
+    && measuredRailTarget
+    ? buildSessionGuideRailConnectorGeometry({
+        boardSize,
+        calloutHeight: effectiveCalloutHeight,
+        routeAboveTarget: callout.id === "unclear",
+        target: measuredRailTarget
+      })
+    : undefined;
+  const portraitSlowCalloutTop = !adaptiveLayout.usesSessionRail
+    && callout.id === "slow"
+    && measuredCallout
+    && measuredLayouts["slow-target"]
+    ? buildPortraitGuideCalloutTop({
+        calloutHeight: measuredCallout.height,
+        target: measuredLayouts["slow-target"]
+      })
+    : undefined;
+  const arrowDuelLandscapeGeometry = isArrowDuel && adaptiveLayout.usesSessionRail
+    ? buildArrowDuelLandscapeGuideGeometry(boardSize)
+    : undefined;
   const calloutPlacement = adaptiveLayout.usesSessionRail
-    ? {
+    ? calloutUsesBoard
+      ? {
+          left: 12,
+          top: measuredConnectorGeometry?.calloutTop ?? (coachStep === 1 ? 108 : 146),
+          width: Math.max(0, boardSize - 24)
+        }
+      : isArrowDuel
+        ? {
+            left: 12,
+            top: arrowDuelLandscapeGeometry?.calloutTop
+              ?? Math.round(boardSize * 0.58),
+            width: Math.max(0, boardSize - 24)
+          }
+      : {
         left: boardSize + adaptiveLayout.sessionRailGap,
-        top: isArrowDuel
-          ? 92
-          : coachStep === 0
+        top: coachStep === 0
           ? 112
           : coachStep === 1
             ? 220
@@ -4520,19 +4771,39 @@ function SessionCoachmarkDemo({
         width: adaptiveLayout.sessionRailWidth
       }
     : {
-        left: 0,
-        right: 0,
-        top: isArrowDuel
-          ? boardSquareSize * 3.15 + 4
-          : coachStep === 0
+        ...(isArrowDuel
+          ? {
+              alignSelf: "center" as const,
+              marginTop: 18,
+              position: "relative" as const,
+              width: adaptiveLayout.boardSize
+            }
+          : {
+              left: 0,
+              right: 0,
+              top: coachStep === 0
             ? 113
             : coachStep === 1
-              ? boardSize + 71
+              ? portraitSlowCalloutTop ?? boardSize + 71
               : coachStep === 2
                 ? 92
                 : boardSize + 150
+            })
       };
-  const coachPointer = adaptiveLayout.usesSessionRail && (isArrowDuel || coachStep === 2)
+  const measuredConnectorWidth = measuredConnectorGeometry?.connectorWidth;
+  const measuredConnectorDrop = measuredConnectorGeometry?.connectorDrop ?? 0;
+  const portraitUnclearPointerLeft = !adaptiveLayout.usesSessionRail
+    && callout.id === "unclear"
+    && measuredCallout
+    && measuredLayouts["unclear-target"]
+    ? buildPortraitGuidePointerLeft({
+        calloutWidth: measuredCallout.width,
+        target: measuredLayouts["unclear-target"]
+      })
+    : undefined;
+  const coachPointer = calloutUsesBoard
+    ? "→"
+    : adaptiveLayout.usesSessionRail && coachStep === 2
     ? "←"
     : isArrowDuel || coachStep === 0 || (adaptiveLayout.usesSessionRail && coachStep === 1)
       ? "↑"
@@ -4541,13 +4812,134 @@ function SessionCoachmarkDemo({
     ? "bottom"
     : coachPointer === "←"
       ? "left"
+      : coachPointer === "→"
+        ? "right"
       : "top";
-  const pointerNode = (
+  const pointerNode = isArrowDuel
+    && adaptiveLayout.usesSessionRail
+    && arrowDuelLandscapeGeometry ? (
+    <View
+      accessibilityElementsHidden
+      style={[
+        styles.sessionGuideArrowDuelTargetConnector,
+        {
+          height: arrowDuelLandscapeGeometry.connectorHeight,
+          left: arrowDuelLandscapeGeometry.connectorLeft,
+          top: -arrowDuelLandscapeGeometry.connectorHeight
+        }
+      ]}
+      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+    >
+      <Text style={styles.sessionGuideArrowDuelTargetConnectorHead}>▲</Text>
+    </View>
+  ) : pointerPlacement === "right" && measuredConnectorWidth && measuredConnectorDrop > 0 ? (
+    <View
+      accessibilityElementsHidden
+      style={[
+        styles.sessionGuideCoachTargetRoute,
+        {
+          height: measuredConnectorDrop,
+          right: -measuredConnectorWidth,
+          top: measuredConnectorGeometry?.connectorTop ?? "50%",
+          width: measuredConnectorWidth
+        }
+      ]}
+      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+    >
+      <View
+        style={[
+          styles.sessionGuideCoachTargetRouteHorizontal,
+          callout.tone === "warning"
+            ? styles.sessionGuideCoachTargetConnectorWarning
+            : null,
+          callout.tone === "danger"
+            ? styles.sessionGuideCoachTargetConnectorDanger
+            : null
+        ]}
+        testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}-horizontal`}
+      />
+      <View
+        style={[
+          styles.sessionGuideCoachTargetRouteVertical,
+          { height: measuredConnectorDrop },
+          callout.tone === "warning"
+            ? styles.sessionGuideCoachTargetConnectorWarning
+            : null,
+          callout.tone === "danger"
+            ? styles.sessionGuideCoachTargetConnectorDanger
+            : null
+        ]}
+        testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}-vertical`}
+      />
+      <Text
+        style={[
+          styles.sessionGuideCoachTargetRouteHead,
+          { top: measuredConnectorDrop - 6 },
+          callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
+          callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
+        ]}
+      >
+        ▶
+      </Text>
+    </View>
+  ) : pointerPlacement === "right" && measuredConnectorWidth ? (
+    <View
+      accessibilityElementsHidden
+      style={[
+        styles.sessionGuideCoachTargetConnector,
+        {
+          right: -measuredConnectorWidth,
+          top: measuredConnectorGeometry?.connectorTop ?? "50%",
+          width: measuredConnectorWidth
+        },
+        callout.tone === "warning" ? styles.sessionGuideCoachTargetConnectorWarning : null,
+        callout.tone === "danger" ? styles.sessionGuideCoachTargetConnectorDanger : null
+      ]}
+      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+    >
+      <Text
+        style={[
+          styles.sessionGuideCoachTargetConnectorHead,
+          callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
+          callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
+        ]}
+      >
+        ▶
+      </Text>
+    </View>
+  ) : (
     <Text
       accessibilityElementsHidden
       style={[
         styles.sessionGuideCoachPointer,
+        pointerPlacement === "top" ? styles.sessionGuideCoachPointerTop : null,
+        pointerPlacement === "bottom" ? styles.sessionGuideCoachPointerBottom : null,
         pointerPlacement === "left" ? styles.sessionGuideCoachPointerLeft : null,
+        pointerPlacement === "right" ? styles.sessionGuideCoachPointerRight : null,
+        isArrowDuel && pointerPlacement === "top"
+          ? {
+              left: Math.round(
+                (adaptiveLayout.usesSessionRail
+                  ? 0
+                  : (adaptiveLayout.boardSize - boardSize) / 2)
+                  + boardSize * 0.79
+              ),
+              right: undefined,
+              width: 24
+            }
+          : null,
+        callout.id === "unclear"
+          && !adaptiveLayout.usesSessionRail
+          && pointerPlacement === "bottom"
+          ? {
+              left: portraitUnclearPointerLeft ?? "76%",
+              right: undefined,
+              width: 24
+            }
+          : null,
+        callout.id === "slow" && pointerPlacement === "bottom"
+          ? { bottom: -12 }
+          : null,
         callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
         callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
       ]}
@@ -4567,6 +4959,11 @@ function SessionCoachmarkDemo({
       testID={isArrowDuel
         ? "practice-arrow-duel-guide-coach"
         : `practice-session-guide-coach-${callout.id}`}
+      onLayout={callout.id === "slow"
+        ? (event) => rememberCalloutLayout("slow-callout", event)
+        : callout.id === "unclear"
+          ? (event) => rememberCalloutLayout("unclear-callout", event)
+          : undefined}
     >
       {pointerPlacement !== "bottom" ? pointerNode : null}
       <View
@@ -4591,7 +4988,8 @@ function SessionCoachmarkDemo({
 
   return (
     <View
-      accessibilityLabel={`Frozen copy of the real ${isArrowDuel ? "Arrow Duel" : "Sprint"} screen with a non-interactive example puzzle. Step ${guideStepNumber}. ${callout.title} ${callout.detail}`}
+      accessibilityLabel={`Guide ${guideNumber}. ${callout.title}. ${callout.detail}`}
+      ref={guideFrameRef}
       style={styles.sessionGuideCoachFrame}
       testID={isArrowDuel
         ? "practice-arrow-duel-guide-timing-demo"
@@ -4736,7 +5134,6 @@ function SessionCoachmarkDemo({
                 testID="practice-arrow-duel-guide-candidates"
               />
             ) : null}
-            {isArrowDuel && !adaptiveLayout.usesSessionRail ? calloutNode : null}
             {!isArrowDuel && coachStep === 2 ? (
               <View
                 accessibilityRole="alert"
@@ -4744,18 +5141,18 @@ function SessionCoachmarkDemo({
                 testID="practice-session-guide-timeout-overlay"
               >
                 <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
-                <Text style={styles.puzzleTimeoutOverlayDetail}>
-                  Mistake · Marked Unclear · Added to Review · Moving on
-                </Text>
+                <Text style={styles.puzzleTimeoutOverlayDetail}>Added to Review</Text>
               </View>
             ) : null}
           </View>
+          {isArrowDuel && !adaptiveLayout.usesSessionRail ? calloutNode : null}
           {!adaptiveLayout.usesSessionRail ? (
             <View
               style={[styles.sessionBoardDetails, { width: boardSize }]}
               testID="session-board-details"
             >
               <View
+                ref={slowTargetRef}
                 style={[
                   styles.sessionGuideCoachTimerTarget,
                   styles.sessionGuideCoachLayer,
@@ -4764,6 +5161,9 @@ function SessionCoachmarkDemo({
                 testID={isArrowDuel
                   ? "practice-arrow-duel-guide-demo-timer"
                   : "practice-session-guide-demo-timer"}
+                onLayout={!isArrowDuel
+                  ? () => measureTargetInGuideFrame("slow-target", slowTargetRef.current)
+                  : undefined}
               >
                 <PuzzleTimingIndicator
                   elapsedSeconds={elapsedSeconds}
@@ -4786,7 +5186,7 @@ function SessionCoachmarkDemo({
             style={[
               styles.activeSessionBottomFeedback,
               styles.sessionGuideCoachLayer,
-              { width: boardSize }
+              { width: adaptiveLayout.boardSize }
             ]}
             testID="practice-session-guide-demo-unclear"
           >
@@ -4794,6 +5194,11 @@ function SessionCoachmarkDemo({
               marked={false}
               question="Was the previous puzzle clear?"
               onToggle={() => undefined}
+              onTargetLayout={() => measureTargetInGuideFrame(
+                "unclear-target",
+                unclearTargetRef.current
+              )}
+              targetRef={unclearTargetRef}
             />
           </View>
         ) : null}
@@ -4819,6 +5224,7 @@ function SessionCoachmarkDemo({
             <View
               style={[
                 styles.activeSessionControlRail,
+                styles.sessionGuideControlRail,
                 {
                   minHeight: boardSize,
                   width: adaptiveLayout.sessionRailWidth
@@ -4859,6 +5265,7 @@ function SessionCoachmarkDemo({
                 />
               </View>
               <View
+                ref={slowTargetRef}
                 style={[
                   styles.sessionGuideCoachTimerTarget,
                   styles.sessionGuideCoachLayer,
@@ -4867,6 +5274,9 @@ function SessionCoachmarkDemo({
                 testID={isArrowDuel
                   ? "practice-arrow-duel-guide-demo-timer"
                   : "practice-session-guide-demo-timer"}
+                onLayout={!isArrowDuel
+                  ? () => measureTargetInGuideFrame("slow-target", slowTargetRef.current)
+                  : undefined}
               >
                 <PuzzleTimingIndicator
                   elapsedSeconds={elapsedSeconds}
@@ -4885,8 +5295,8 @@ function SessionCoachmarkDemo({
                   style={[
                     styles.activeSessionBottomFeedback,
                     styles.activeSessionRailBottomFeedback,
-                    styles.sessionGuideRailBottomFeedback,
                     styles.sessionGuideCoachLayer,
+                    styles.sessionGuideRailBottomFeedback,
                     { width: adaptiveLayout.sessionRailWidth }
                   ]}
                   testID="practice-session-guide-demo-unclear"
@@ -4895,6 +5305,11 @@ function SessionCoachmarkDemo({
                     marked={false}
                     question="Was the previous puzzle clear?"
                     onToggle={() => undefined}
+                    onTargetLayout={() => measureTargetInGuideFrame(
+                      "unclear-target",
+                      unclearTargetRef.current
+                    )}
+                    targetRef={unclearTargetRef}
                   />
                 </View>
               ) : null}
@@ -5017,7 +5432,7 @@ function PracticeRunCard({
               ? "practice-mode-arrow-duel-rating"
               : undefined}
         >
-          Rating {run.elo}
+          {run.elo}
         </Text>
         {editing ? (
           <View style={styles.runEditActions}>
@@ -5723,7 +6138,7 @@ function PracticeRunTimingSettings({
       </View>
       <View style={styles.customConfigCard} testID="practice-run-puzzle-timing-card">
         <RunTimingSettingRow
-          detail="Turns the puzzle clock yellow and marks it Unclear; play continues."
+          detail="Turns the puzzle clock yellow. A correct answer after that is marked Unclear; play continues."
           enabled={warningEnabled}
           label="Slow warning"
           maximumSeconds={editor.slowMaximumSeconds}
@@ -5743,7 +6158,7 @@ function PracticeRunTimingSettings({
         />
         <RunTimingSettingRow
           detail={timeoutCountsAsMistake
-            ? "Marks it Timed out and Unclear, counts as a mistake, adds it to Review, and moves on."
+            ? "Marks it Timed out, counts as a mistake, adds it to Review, and moves on."
             : "Marks Timed out and moves on."}
           enabled={timeoutEnabled}
           label="Puzzle timeout"
@@ -7030,14 +7445,73 @@ function ActiveMistakeIndicator({
   );
 }
 
+function PreviousAttemptNotice({
+  reason
+}: {
+  reason: PreviousAttemptNoticeReason;
+}): React.JSX.Element {
+  const presentation = reason === "slow"
+    ? {
+        detail: "It was automatically marked Unclear and added to Review.",
+        status: "Marked Unclear",
+        title: "Previous puzzle took too long"
+      }
+    : reason === "wrong"
+      ? {
+          detail: "It counted as a mistake and was added to Review.",
+          status: "In Review",
+          title: "Previous answer was incorrect"
+        }
+      : {
+          detail: "It counted as a mistake and was added to Review.",
+          status: "In Review",
+          title: "Previous puzzle timed out"
+        };
+  return (
+    <View
+      accessibilityLabel={`${presentation.title}. ${presentation.detail} ${presentation.status}.`}
+      accessibilityLiveRegion="polite"
+      style={styles.unclearPrompt}
+      testID="sprint-previous-attempt-notice"
+    >
+      <View style={styles.previousAttemptNoticeCopy}>
+        <Text style={styles.previousAttemptNoticeTitle}>{presentation.title}</Text>
+        <Text style={styles.previousAttemptNoticeDetail}>
+          {presentation.detail}
+        </Text>
+      </View>
+      <View
+        style={[
+          styles.previousAttemptNoticeStatus,
+          reason === "slow" ? styles.previousAttemptNoticeStatusUnclear : null
+        ]}
+        testID="sprint-previous-attempt-notice-status"
+      >
+        <Text
+          style={[
+            styles.previousAttemptNoticeStatusText,
+            reason === "slow" ? styles.previousAttemptNoticeStatusTextUnclear : null
+          ]}
+        >
+          {presentation.status}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 function UnclearAttemptPrompt({
   marked,
   onToggle,
-  question
+  onTargetLayout,
+  question,
+  targetRef
 }: {
   marked: boolean;
   onToggle: () => void;
+  onTargetLayout?: (event: LayoutChangeEvent) => void;
   question: string;
+  targetRef?: React.RefObject<View | null>;
 }): React.JSX.Element {
   return (
     <View
@@ -7056,9 +7530,11 @@ function UnclearAttemptPrompt({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Mark this attempt as unclear"
+          ref={targetRef}
           style={styles.unclearPromptButton}
           testID="sprint-unclear-toggle"
           onPress={onToggle}
+          onLayout={onTargetLayout}
         >
           <Text style={styles.unclearPromptButtonText}>Mark as unclear</Text>
         </Pressable>
@@ -7270,7 +7746,9 @@ function SprintSummary({
         <View style={styles.resultReviewCopy}>
           <Text style={styles.listText}>Mistakes</Text>
           <Text style={styles.helperText}>
-            {reviewMistakeCount > 0 ? `Review your mistakes · ${reviewImpact}` : reviewImpact}
+            {reviewMistakeCount > 0
+              ? `Review your mistakes · ${reviewImpact}${timedOutReviewCount > 0 ? " · Mistakes are not marked Unclear" : ""}`
+              : reviewImpact}
           </Text>
         </View>
         <View
@@ -11645,54 +12123,6 @@ function SettingsPanel({
 
   return (
     <View style={[styles.settingsPanel, adaptiveLayout.usesWideContent ? styles.settingsPanelWide : null]} testID="settings-panel">
-      {showSprintGuideReset ? (
-        <SettingsSection title="Guidance" testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
-          <View style={styles.settingsGuidanceResetCard} testID="settings-guidance-reset-card">
-            <View style={styles.settingsRowCopy}>
-              <Text style={styles.listText}>Replay practice guides</Text>
-              <Text style={styles.helperText}>
-                Reset the Sprint rules, active-session, and Arrow Duel guides so they appear again when each applies. Runs, ratings, and History stay unchanged.
-              </Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={sprintGuideReady ? "Practice guides reset" : "Reset practice guides"}
-              accessibilityState={{ disabled: sprintGuideReady }}
-              disabled={sprintGuideReady}
-              style={[
-                styles.settingsGuidanceResetButton,
-                sprintGuideReady ? styles.settingsGuidanceResetButtonComplete : null
-              ]}
-              testID="settings-show-sprint-guide"
-              onPress={() => {
-                onResetSprintGuides();
-                setSprintGuideReady(true);
-              }}
-            >
-              <Text
-                style={[
-                  styles.settingsGuidanceResetButtonText,
-                  sprintGuideReady ? styles.settingsGuidanceResetButtonTextComplete : null
-                ]}
-              >
-                {sprintGuideReady ? "Guides reset" : "Reset guides"}
-              </Text>
-            </Pressable>
-          </View>
-          {sprintGuideReady ? (
-            <View
-              accessibilityLiveRegion="polite"
-              style={styles.sprintGuideReadyStatus}
-              testID="settings-sprint-guide-ready"
-            >
-              <Text style={styles.sprintGuideReadyStatusText}>
-                Guides reset. Each guide will replay the next time it applies.
-              </Text>
-            </View>
-          ) : null}
-        </SettingsSection>
-      ) : null}
-
       {progressProtection.kind === "icloud_sync" ? (
         <SettingsSection title="iCloud Sync" testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
           <SettingsRow
@@ -11849,6 +12279,54 @@ function SettingsPanel({
                 setStatusMessage(`${ratingLabelFromKey(ratingKey)} rating set to ${next.rating}`);
               }}
             />
+          ) : null}
+        </SettingsSection>
+      ) : null}
+
+      {showSprintGuideReset ? (
+        <SettingsSection title="Guidance" testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
+          <View style={styles.settingsGuidanceResetCard} testID="settings-guidance-reset-card">
+            <View style={styles.settingsRowCopy}>
+              <Text style={styles.listText}>Replay practice guides</Text>
+              <Text style={styles.helperText}>
+                Reset the Sprint rules, active-session, and Arrow Duel guides so they appear again when each applies. Runs, ratings, and History stay unchanged.
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={sprintGuideReady ? "Practice guides reset" : "Reset practice guides"}
+              accessibilityState={{ disabled: sprintGuideReady }}
+              disabled={sprintGuideReady}
+              style={[
+                styles.settingsGuidanceResetButton,
+                sprintGuideReady ? styles.settingsGuidanceResetButtonComplete : null
+              ]}
+              testID="settings-show-sprint-guide"
+              onPress={() => {
+                onResetSprintGuides();
+                setSprintGuideReady(true);
+              }}
+            >
+              <Text
+                style={[
+                  styles.settingsGuidanceResetButtonText,
+                  sprintGuideReady ? styles.settingsGuidanceResetButtonTextComplete : null
+                ]}
+              >
+                {sprintGuideReady ? "Guides reset" : "Reset guides"}
+              </Text>
+            </Pressable>
+          </View>
+          {sprintGuideReady ? (
+            <View
+              accessibilityLiveRegion="polite"
+              style={styles.sprintGuideReadyStatus}
+              testID="settings-sprint-guide-ready"
+            >
+              <Text style={styles.sprintGuideReadyStatusText}>
+                Guides reset. Each guide will replay the next time it applies.
+              </Text>
+            </View>
           ) : null}
         </SettingsSection>
       ) : null}
@@ -13172,6 +13650,37 @@ function formatDurationLabel(seconds: number): string {
   return `${seconds}s`;
 }
 
+function ordinalWord(value: number): string {
+  const words: Readonly<Record<number, string>> = {
+    1: "first",
+    2: "second",
+    3: "third",
+    4: "fourth",
+    5: "fifth",
+    6: "sixth",
+    7: "seventh",
+    8: "eighth",
+    9: "ninth",
+    10: "tenth"
+  };
+  const word = words[value];
+  if (word) {
+    return word;
+  }
+
+  const modulo100 = value % 100;
+  const suffix = modulo100 >= 11 && modulo100 <= 13
+    ? "th"
+    : value % 10 === 1
+      ? "st"
+      : value % 10 === 2
+        ? "nd"
+        : value % 10 === 3
+          ? "rd"
+          : "th";
+  return `${value}${suffix}`;
+}
+
 function historyRangeLabel(range: HistoryTimeRange): string {
   if (range === "7d") {
     return "7 days";
@@ -13880,9 +14389,10 @@ const styles = StyleSheet.create({
     gap: 8
   },
   sprintRuleRow: {
-    alignItems: "center",
+    alignItems: "flex-start",
     flexDirection: "row",
-    gap: 10
+    gap: 10,
+    minHeight: 54
   },
   sprintRuleBadge: {
     alignItems: "center",
@@ -13890,8 +14400,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     height: 36,
     justifyContent: "center",
-    minWidth: 50,
-    paddingHorizontal: 8
+    paddingHorizontal: 6,
+    width: 72
   },
   sprintRuleBadgeDanger: {
     backgroundColor: "#FEE2E2"
@@ -13996,7 +14506,7 @@ const styles = StyleSheet.create({
     padding: 11,
     paddingTop: 5,
     position: "absolute",
-    zIndex: 4
+    zIndex: 60
   },
   sessionGuideCoachCopy: {
     gap: 3
@@ -14016,9 +14526,28 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: "center"
   },
+  sessionGuideCoachPointerTop: {
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: -22
+  },
+  sessionGuideCoachPointerBottom: {
+    bottom: -22,
+    left: 0,
+    position: "absolute",
+    right: 0
+  },
   sessionGuideCoachPointerLeft: {
     left: -20,
     position: "absolute",
+    top: "50%",
+    transform: [{ translateY: -9 }],
+    width: 18
+  },
+  sessionGuideCoachPointerRight: {
+    position: "absolute",
+    right: -20,
     top: "50%",
     transform: [{ translateY: -9 }],
     width: 18
@@ -14028,6 +14557,65 @@ const styles = StyleSheet.create({
   },
   sessionGuideCoachPointerDanger: {
     color: "#DC2626"
+  },
+  sessionGuideCoachTargetConnector: {
+    backgroundColor: "#2563EB",
+    height: 2,
+    position: "absolute",
+    top: "50%",
+    transform: [{ translateY: -1 }]
+  },
+  sessionGuideCoachTargetConnectorWarning: {
+    backgroundColor: "#D97706"
+  },
+  sessionGuideCoachTargetConnectorDanger: {
+    backgroundColor: "#DC2626"
+  },
+  sessionGuideCoachTargetConnectorHead: {
+    color: "#2563EB",
+    fontSize: 14,
+    lineHeight: 14,
+    position: "absolute",
+    right: -2,
+    top: -6
+  },
+  sessionGuideCoachTargetRoute: {
+    position: "absolute"
+  },
+  sessionGuideCoachTargetRouteHorizontal: {
+    backgroundColor: "#2563EB",
+    height: 2,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  sessionGuideCoachTargetRouteVertical: {
+    backgroundColor: "#2563EB",
+    position: "absolute",
+    right: 0,
+    top: 0,
+    width: 2
+  },
+  sessionGuideCoachTargetRouteHead: {
+    color: "#2563EB",
+    fontSize: 14,
+    lineHeight: 14,
+    position: "absolute",
+    right: 0
+  },
+  sessionGuideArrowDuelTargetConnector: {
+    backgroundColor: "#2563EB",
+    position: "absolute",
+    width: 2
+  },
+  sessionGuideArrowDuelTargetConnectorHead: {
+    color: "#2563EB",
+    fontSize: 14,
+    left: -6,
+    lineHeight: 14,
+    position: "absolute",
+    top: -7
   },
   sessionGuideCoachBadge: {
     color: "#1D4ED8",
@@ -14092,9 +14680,11 @@ const styles = StyleSheet.create({
   sessionGuideCoachProgress: {
     color: "#64748B",
     flex: 1,
+    flexShrink: 0,
     fontFamily: "menlo",
     fontSize: 10,
     fontWeight: "900",
+    minWidth: 42,
     textAlign: "center"
   },
   sessionGuideCoachNextButton: {
@@ -14107,8 +14697,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12
   },
   sessionGuideCoachNextButtonRail: {
+    flexShrink: 1,
     minHeight: 44,
-    minWidth: 92,
+    minWidth: 0,
     paddingHorizontal: 8
   },
   sessionGuideInfoTitle: {
@@ -14125,6 +14716,9 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "900"
+  },
+  sessionGuideStartButtonTextRail: {
+    fontSize: 12
   },
   primaryCompactButton: {
     alignItems: "center",
@@ -14744,11 +15338,10 @@ const styles = StyleSheet.create({
   },
   reviewStripActionArea: {
     alignItems: "center",
+    alignSelf: "stretch",
     flexDirection: "row",
-    flexShrink: 0,
-    gap: 8
-  },
-  reviewStripActionAreaWide: {
+    justifyContent: "center",
+    position: "relative",
     width: "50%"
   },
   reviewStripStatusCopy: {
@@ -14793,24 +15386,27 @@ const styles = StyleSheet.create({
     gap: 10
   },
   reviewStripCounts: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: 10
-  },
-  reviewStripCountsWide: {
+    alignItems: "center",
     flex: 1,
-    justifyContent: "center"
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    paddingHorizontal: 22
   },
   reviewStripChevron: {
     alignItems: "center",
-    height: 32,
+    bottom: 0,
     justifyContent: "center",
+    position: "absolute",
+    right: 0,
+    top: 0,
     width: 18
   },
   reviewStripMetric: {
     alignItems: "center",
+    flexShrink: 1,
     gap: 3,
-    minWidth: 58
+    minWidth: 48
   },
   reviewDueCount: {
     color: "#111827",
@@ -15046,6 +15642,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     gap: 10
   },
+  sessionGuideControlRail: {
+    gap: 4
+  },
   activeSessionBottomFeedback: {
     alignSelf: "center"
   },
@@ -15053,7 +15652,10 @@ const styles = StyleSheet.create({
     marginTop: "auto"
   },
   sessionGuideRailBottomFeedback: {
-    marginBottom: 64
+    bottom: 60,
+    position: "absolute",
+    right: 0,
+    zIndex: 4
   },
   activeSessionShell: {
     gap: 8
@@ -15342,6 +15944,43 @@ const styles = StyleSheet.create({
     color: "#B45309",
     fontSize: 11,
     fontWeight: "900"
+  },
+  previousAttemptNoticeCopy: {
+    flex: 1,
+    gap: 1,
+    minWidth: 0
+  },
+  previousAttemptNoticeTitle: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  previousAttemptNoticeDetail: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "600"
+  },
+  previousAttemptNoticeStatus: {
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    borderColor: "#93C5FD",
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 30,
+    paddingHorizontal: 8
+  },
+  previousAttemptNoticeStatusUnclear: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#F59E0B"
+  },
+  previousAttemptNoticeStatusText: {
+    color: "#1D4ED8",
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  previousAttemptNoticeStatusTextUnclear: {
+    color: "#B45309"
   },
   promptCopy: {
     flex: 1,

@@ -27,6 +27,12 @@ import {
   SERVER_CURATED_THEME_PRESENTATION,
   THEME_CATALOG_LAB_PUZZLES
 } from "./themeCatalogPrototype.ts";
+import {
+  initialTacticalProfileFixtureState,
+  isTacticalProfileScenario,
+  reduceTacticalProfileFixtureState,
+  tacticalProfilePresentationFor
+} from "./tacticalProfileFixture.ts";
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
 
@@ -52,6 +58,11 @@ function LabScenarioContent({
   scenarioId: LabScenarioId;
 }): React.JSX.Element {
   const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>([]);
+  const [tacticalProfileState, setTacticalProfileState] = useState(() =>
+    isTacticalProfileScenario(scenarioId)
+      ? initialTacticalProfileFixtureState(scenarioId)
+      : { screen: "home" as const, selectedTaskFamily: "line" as const }
+  );
   const showsThemeCatalogPrototype = isRunManagementScenario(scenarioId) || [
     "history-populated",
     "history-filters",
@@ -66,6 +77,21 @@ function LabScenarioContent({
   );
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
   useEffect(() => setSelectedCustomThemes([]), [scenarioId]);
+  useEffect(() => {
+    if (isTacticalProfileScenario(scenarioId)) {
+      setTacticalProfileState(initialTacticalProfileFixtureState(scenarioId));
+    }
+  }, [scenarioId]);
+
+  const tacticalProfilePresentation = isTacticalProfileScenario(scenarioId)
+    ? tacticalProfilePresentationFor(
+        scenarioId,
+        tacticalProfileState,
+        (intent) => setTacticalProfileState((current) =>
+          reduceTacticalProfileFixtureState(current, intent)
+        )
+      )
+    : undefined;
 
   return (
     <LabScenarioShell scenarioId={scenarioId}>
@@ -79,6 +105,7 @@ function LabScenarioContent({
           ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
         runEloEditingMovedToHome
+        tacticalProfilePresentation={tacticalProfilePresentation}
         {...runtime.screenProps}
       />
     </LabScenarioShell>
@@ -86,7 +113,7 @@ function LabScenarioContent({
 }
 
 function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
-  return [
+  return isTacticalProfileScenario(scenarioId) || [
     "practice-home",
     "practice-first-sprint-guide",
     "practice-home-edit",
@@ -147,15 +174,14 @@ function sprintRulesDesignPreviewFor(
       timeoutCountsAsMistake: true
     };
   }
-  if (scenarioId === "practice-timing-timeout") {
+  if (
+    scenarioId === "practice-timing-timeout"
+    || scenarioId === "practice-timeout-review-notice"
+  ) {
     return { timeoutCountsAsMistake: true };
   }
   if (scenarioId === "practice-sprint-result-goal") {
     return {
-      initialResultUnclearPrompt: {
-        marked: false,
-        question: "Was it clear why your last move was wrong?"
-      },
       initialResultState: sprintRulesResultState({
         correctCount: 11,
         endReason: "time_expired",
@@ -288,7 +314,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     customTargetCorrect: 1
   };
   if (isRunManagementScenario(scenarioId)) {
-    service = createRunManagementService(scenarioId === "practice-runs-empty");
+    service = createRunManagementService(
+      scenarioId === "practice-runs-empty",
+      scenarioId === "practice-home" ? 28 : 0
+    );
     screenProps.runManagementEnabled = true;
   }
 
@@ -367,6 +396,26 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       break;
   }
 
+  if (
+    scenarioId === "practice-wrong-review-notice"
+    || scenarioId === "practice-slow-unclear-notice"
+  ) {
+    const active = service.startSprint({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 60,
+      targetCorrect: 2
+    }, new Date(LAB_NOW_MS).toISOString());
+    screenProps.sprintRulesDesignPreview = {
+      ...(screenProps.sprintRulesDesignPreview ?? {}),
+      initialPreviousAttemptNotice: scenarioId === "practice-wrong-review-notice"
+        ? "wrong"
+        : "slow",
+      initialResultState: active
+    };
+    screenProps.standardTargetCorrect = 2;
+  }
+
   const initialPuzzleElapsedSeconds = timingScenarioInitialElapsedSeconds(scenarioId);
   if (initialPuzzleElapsedSeconds !== null) {
     screenProps.currentTimeMs = createLivePuzzleClock(
@@ -409,6 +458,12 @@ function timingScenarioInitialElapsedSeconds(scenarioId: LabScenarioId): number 
   }
   if (scenarioId === "practice-timing-timeout") {
     return 52;
+  }
+  if (scenarioId === "practice-timeout-review-notice") {
+    return 59;
+  }
+  if (scenarioId === "practice-slow-unclear-notice") {
+    return 41;
   }
   return null;
 }
@@ -467,8 +522,21 @@ function createSessionGuideService(): PracticeService {
   return new PracticeService(store);
 }
 
-function createRunManagementService(empty: boolean): PracticeService {
-  const service = createSeededService();
+function createRunManagementService(empty: boolean, dueReviewCount = 0): PracticeService {
+  const store = new MemoryStore();
+  const reviewPuzzles = Array.from({ length: dueReviewCount }, (_, index) => ({
+    ...LAB_PUZZLES[index % LAB_PUZZLES.length]!,
+    id: `home-review-${index + 1}`
+  }));
+  store.seedPuzzles([...LAB_PUZZLES, ...reviewPuzzles]);
+  for (const puzzle of reviewPuzzles) {
+    store.scheduleMistakeReview({
+      puzzleId: puzzle.id,
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-07-17T12:00:00.000Z");
+  }
+  const service = new PracticeService(store);
   service.setPracticeRunRating("standard", 925);
   service.setPracticeRunRating("arrow-duel", 875);
   service.createPracticeRun({
@@ -577,8 +645,7 @@ function createHistoryService(
       elapsedMs: 60_000,
       completedAt: "2026-07-17T15:00:12.000Z",
       ratingBefore: 910,
-      ratingAfter: 910,
-      unclear: true
+      ratingAfter: 910
     }),
     historyAttempt({
       id: "history-correct",
@@ -651,6 +718,11 @@ function createHistoryService(
     mode: "standard",
     ratingKey: "standard 5/20"
   }, "2026-07-17T14:00:11.000Z");
+  store.scheduleMistakeReview({
+    puzzleId: LAB_PUZZLES[4]!.id,
+    mode: "standard",
+    ratingKey: "standard 5/20"
+  }, "2026-07-17T15:00:12.000Z");
   return new PracticeService(store);
 }
 

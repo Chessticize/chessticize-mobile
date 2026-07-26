@@ -296,7 +296,9 @@ The storage migration chain currently starts at schema version `1`. The
 `ios-v1.0.0-build-1` release used the legacy unversioned schema and is retained
 as the immutable `schema-v0-ios-1.0.0.sqlite` regression fixture. Version `1`
 adds the server-compatible Glicko fields while assigning an explicit storage
-schema version.
+schema version. iOS 1.2.1 build 1 shipped schema version `8`; its exact
+published-source schema and synthetic user semantics are retained as
+`schema-v8-ios-1.2.1.sqlite`.
 
 The first versioned migration must handle existing unversioned databases. A
 database with `user_version = 0` and known Chessticize tables is a legacy user

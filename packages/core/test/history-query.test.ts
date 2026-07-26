@@ -176,21 +176,35 @@ test("history filters Unclear Attempts and keeps the count scoped outside the Un
     result: "correct",
     completedAt: "2026-06-20T00:01:00.000Z"
   });
+  const legacyTimedOut = timedOutAttempt({
+    id: "legacy-timeout",
+    puzzleId: "p3",
+    completedAt: "2026-06-20T00:02:00.000Z",
+    unclear: true
+  });
 
   assert.deepEqual(
-    filterHistoryAttemptsForQuery({ attempts: [unclear, clear], query: { unclear: true }, reviews: [] })
+    filterHistoryAttemptsForQuery({
+      attempts: [unclear, clear, legacyTimedOut],
+      query: { unclear: true },
+      reviews: []
+    })
       .map((attemptView) => attemptView.id),
     ["unclear"]
   );
-  assert.equal(buildHistoryView({
+  const view = buildHistoryView({
     query: { now: "2026-06-21T12:00:00.000Z", timeRange: "max", unclear: true },
     ratingKeys: [],
-    attempts: [unclear],
-    allAttemptsForOptions: [unclear, clear],
-    unclearCount: 1,
+    attempts: [unclear, legacyTimedOut],
+    allAttemptsForOptions: [unclear, clear, legacyTimedOut],
     elo: [],
     reviews: []
-  }).unclearCount, 1);
+  });
+  assert.equal(view.unclearCount, 1);
+  assert.equal(
+    view.attempts.find((attemptView) => attemptView.id === "legacy-timeout")?.unclear,
+    false
+  );
 });
 
 test("Needs attention is Unclear or in Review and remains AND with other facets", () => {
@@ -232,7 +246,6 @@ test("Needs attention is Unclear or in Review and remains AND with other facets"
         id: "timed-out",
         puzzleId: "timeout-puzzle",
         completedAt: "2026-06-20T00:00:30.000Z",
-        unclear: true,
         themes: ["pin"]
     }),
     attempt({
@@ -251,18 +264,32 @@ test("Needs attention is Unclear or in Review and remains AND with other facets"
       themes: ["pin"]
     })
   ];
-  const reviews = [{
-    puzzleId: "review-puzzle",
-    mode: "standard" as const,
-    ratingKey: "standard 5/20",
-    dueDay: "2026-06-21",
-    intervalDays: 1,
-    reviewCount: 1,
-    successStreak: 0,
-    lapseCount: 1,
-    lastResult: "wrong" as const,
-    lastReviewedAt: "2026-06-20T00:00:10.000Z"
-  }];
+  const reviews = [
+    {
+      puzzleId: "review-puzzle",
+      mode: "standard" as const,
+      ratingKey: "standard 5/20",
+      dueDay: "2026-06-21",
+      intervalDays: 1,
+      reviewCount: 1,
+      successStreak: 0,
+      lapseCount: 1,
+      lastResult: "wrong" as const,
+      lastReviewedAt: "2026-06-20T00:00:10.000Z"
+    },
+    {
+      puzzleId: "timeout-puzzle",
+      mode: "standard" as const,
+      ratingKey: "standard 5/20",
+      dueDay: "2026-06-21",
+      intervalDays: 1,
+      reviewCount: 1,
+      successStreak: 0,
+      lapseCount: 1,
+      lastResult: "wrong" as const,
+      lastReviewedAt: "2026-06-20T00:00:30.000Z"
+    }
+  ];
 
   assert.deepEqual(
     filterHistoryAttemptsForQuery({
@@ -293,7 +320,7 @@ test("Needs attention is Unclear or in Review and remains AND with other facets"
       },
       reviews
     }).map((historyAttempt) => historyAttempt.id),
-    ["wrong-in-review", "correct-in-review"]
+    ["wrong-in-review", "correct-in-review", "timed-out"]
   );
   assert.deepEqual(
     filterHistoryAttemptsForQuery({
@@ -304,7 +331,7 @@ test("Needs attention is Unclear or in Review and remains AND with other facets"
       },
       reviews
     }).map((historyAttempt) => historyAttempt.id),
-    ["timed-out", "unclear-correct"]
+    ["unclear-correct"]
   );
   assert.equal(
     historyAttemptHasReviewQueued(
