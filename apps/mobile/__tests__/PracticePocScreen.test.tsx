@@ -1049,7 +1049,7 @@ describe("PracticePocScreen", () => {
       "The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake."
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
-      "When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on."
+      "When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. Mistakes are not marked Unclear."
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
       "Mistake limit: The third mistake ends the Sprint."
@@ -1296,7 +1296,7 @@ describe("PracticePocScreen", () => {
       "This puzzle counts as a mistake"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-timeout"))).toContain(
-      "It is added to Review. The Sprint then shows the next puzzle."
+      "It is added to Review. Mistakes are not marked Unclear. The Sprint then shows the next puzzle."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-board"))).toContain(
       "Mistake · Added to Review · Moving on"
@@ -1440,13 +1440,13 @@ describe("PracticePocScreen", () => {
       activeSession,
       "practice-active-session-guide"
     ).props.accessibilityLabel).toBe(
-      "Guide 3 of 4. This puzzle counts as a mistake. It is added to Review. The Sprint then shows the next puzzle."
+      "Guide 3 of 4. This puzzle counts as a mistake. It is added to Review. Mistakes are not marked Unclear. The Sprint then shows the next puzzle."
     );
     expect(findByTestId(activeSession, "practice-session-guide-demo-board")).toBeTruthy();
     expect(collectText(
       findByTestId(activeSession, "practice-session-guide-coach-copy-timeout")
     )).toBe(
-      "TIMED OUTThis puzzle counts as a mistakeIt is added to Review. The Sprint then shows the next puzzle."
+      "TIMED OUTThis puzzle counts as a mistakeIt is added to Review. Mistakes are not marked Unclear. The Sprint then shows the next puzzle."
     );
 
     press(activeSession, "practice-session-guide-start");
@@ -1487,7 +1487,7 @@ describe("PracticePocScreen", () => {
       "The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake."
     );
     expect(rulesText).toContain(
-      "When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on."
+      "When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. Mistakes are not marked Unclear."
     );
   });
 
@@ -2018,7 +2018,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "session-puzzle-countdown")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(firstPuzzleFen);
     expect(collectText(findByTestId(renderer, "sprint-previous-attempt-notice"))).toBe(
-      "Previous puzzle timed outIt counted as a mistake and was added to Review.In Review"
+      "Previous puzzle timed outIt counted as a mistake and was added to Review. Mistakes are not marked Unclear.In Review"
     );
     expect(() => findByTestId(renderer, "sprint-unclear-prompt")).toThrow();
     expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
@@ -2174,6 +2174,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
       "1 timed out added to Review"
     );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "Mistakes are not marked Unclear"
+    );
     expect(() => findByTestId(renderer, "sprint-result-unclear-summary")).toThrow();
     expect(service.listReviewQueue()).toHaveLength(1);
   });
@@ -2212,6 +2215,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
     expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
       "1 timed out added to Review"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "Mistakes are not marked Unclear"
     );
   });
 

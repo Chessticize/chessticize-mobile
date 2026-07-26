@@ -4185,7 +4185,7 @@ function SprintRulesGuide({
 
   return (
     <View
-      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass. Time limit: Solve the required puzzles before the Sprint clock reaches zero. Mistake limit: ${mistakeLimitDetail} Slow warning: The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake. Puzzle timeout: When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. For example, solving ${presentation.targetCorrect} puzzles with one mistake means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
+      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass. Time limit: Solve the required puzzles before the Sprint clock reaches zero. Mistake limit: ${mistakeLimitDetail} Slow warning: The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake. Puzzle timeout: When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. Mistakes are not marked Unclear. For example, solving ${presentation.targetCorrect} puzzles with one mistake means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
       style={styles.sprintRulesGuide}
       testID="practice-sprint-rules-guide"
     >
@@ -4227,7 +4227,7 @@ function SprintRulesGuide({
         />
         <SprintRuleRow
           badge="TIMEOUT"
-          detail="When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on."
+          detail="When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. Mistakes are not marked Unclear."
           label="Puzzle timeout"
           tone="danger"
         />
@@ -4347,7 +4347,7 @@ function sessionGuideCallout(
   if (coachStep === 2) {
     return {
       badge: "TIMED OUT",
-      detail: "It is added to Review. The Sprint then shows the next puzzle.",
+      detail: "It is added to Review. Mistakes are not marked Unclear. The Sprint then shows the next puzzle.",
       id: "timeout",
       title: "This puzzle counts as a mistake",
       tone: "danger"
@@ -7310,7 +7310,7 @@ function ActiveMistakeIndicator({
 function PreviousAttemptNotice(): React.JSX.Element {
   return (
     <View
-      accessibilityLabel="Previous puzzle timed out. It counted as a mistake and was added to Review. In Review."
+      accessibilityLabel="Previous puzzle timed out. It counted as a mistake and was added to Review. Mistakes are not marked Unclear. In Review."
       accessibilityLiveRegion="polite"
       style={styles.unclearPrompt}
       testID="sprint-previous-attempt-notice"
@@ -7318,7 +7318,7 @@ function PreviousAttemptNotice(): React.JSX.Element {
       <View style={styles.previousAttemptNoticeCopy}>
         <Text style={styles.previousAttemptNoticeTitle}>Previous puzzle timed out</Text>
         <Text style={styles.previousAttemptNoticeDetail}>
-          It counted as a mistake and was added to Review.
+          It counted as a mistake and was added to Review. Mistakes are not marked Unclear.
         </Text>
       </View>
       <View style={styles.previousAttemptNoticeStatus}>
@@ -7574,7 +7574,9 @@ function SprintSummary({
         <View style={styles.resultReviewCopy}>
           <Text style={styles.listText}>Mistakes</Text>
           <Text style={styles.helperText}>
-            {reviewMistakeCount > 0 ? `Review your mistakes · ${reviewImpact}` : reviewImpact}
+            {reviewMistakeCount > 0
+              ? `Review your mistakes · ${reviewImpact}${timedOutReviewCount > 0 ? " · Mistakes are not marked Unclear" : ""}`
+              : reviewImpact}
           </Text>
         </View>
         <View

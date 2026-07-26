@@ -140,6 +140,6 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
 test("Timed out handoff explains its mistake and Review result on the next puzzle", () => {
   const timedOut = scenarioRegistry["practice-timing-timeout"];
 
-  assert.ok(timedOut.scope.includes.includes("Post-timeout mistake and Review notice"));
-  assert.match(timedOut.description, /explains the Review handoff on the next puzzle/);
+  assert.ok(timedOut.scope.includes.includes("Post-timeout mistake, Review, and no-Unclear notice"));
+  assert.match(timedOut.description, /explains that the mistake entered Review instead of Unclear/);
 });

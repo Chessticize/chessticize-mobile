@@ -123,7 +123,7 @@
       },
       {
         "issueNumber": 337,
-        "changeNote": "Explain the automatic mistake and Review handoff after a timeout in the current active-session layout."
+        "changeNote": "Explain the mistake and Review handoff after a timeout, including why Unclear is not shown."
       }
     ]
   },
