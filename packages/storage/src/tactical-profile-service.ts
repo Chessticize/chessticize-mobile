@@ -105,6 +105,7 @@ export class TacticalProfileService {
   private repositoryReady = false;
   private requiresCanonicalRebuild = false;
   private lastCacheError: string | undefined;
+  private observedSourceRevision: number | undefined;
 
   constructor(options: TacticalProfileServiceOptions) {
     this.progressStore = options.progressStore;
@@ -117,7 +118,7 @@ export class TacticalProfileService {
     this.focusedRunPolicy = options.focusedRunPolicy;
     this.maxDirtyDaysPerRefresh = options.maxDirtyDaysPerRefresh ?? 30;
     try {
-      this.ensureRepositoryReady();
+      this.ensureIdentity();
     } catch (error) {
       this.recordCacheFailure(error);
     }
@@ -193,6 +194,7 @@ export class TacticalProfileService {
         this.sourceRevision
       );
       this.requiresCanonicalRebuild = false;
+      this.observedSourceRevision = this.sourceRevision;
       this.lastCacheError = undefined;
     } catch (error) {
       this.recordCacheFailure(error);
@@ -300,7 +302,7 @@ export class TacticalProfileService {
       this.focusedRunPolicy.recentPuzzleDays
     );
     const runFocuses = distinctRunFocuses(rankedFocuses);
-    const inventoryBands = this.focusedRunPolicy.ratingBandHalfWidths.flatMap((halfWidth) => {
+    for (const halfWidth of this.focusedRunPolicy.ratingBandHalfWidths) {
       const minRating = Math.max(0, anchor.rating - halfWidth);
       const maxRating = anchor.rating + halfWidth;
       const upperBound = this.inventoryUpperBound?.(
@@ -330,7 +332,7 @@ export class TacticalProfileService {
               })
         });
         if (preflight.status !== "ready") {
-          return [];
+          continue;
         }
       }
       const commonFilter = {
@@ -341,25 +343,30 @@ export class TacticalProfileService {
         randomSeed,
         limit: this.focusedRunPolicy!.runSize
       };
-      return [{
+      const candidatesByTheme = new Map(
+        runFocuses.map((focus) => [
+          focus.theme,
+          this.puzzleSource.selectPuzzles({
+            ...commonFilter,
+            themes: [focus.theme]
+          })
+        ])
+      );
+      const mixedCandidates = this.selectMixedPuzzles(
+        commonFilter,
+        runFocuses.map((focus) => focus.theme)
+      );
+      const inventoryBand = {
         minRating,
         maxRating,
         availableByTheme: Object.fromEntries(
           runFocuses.map((focus) => [
             focus.theme,
-            this.puzzleSource.selectPuzzles({
-              ...commonFilter,
-              themes: [focus.theme]
-            }).length
+            candidatesByTheme.get(focus.theme)?.length ?? 0
           ])
         ),
-        mixedAvailableCount: this.selectMixedPuzzles(
-          commonFilter,
-          runFocuses.map((focus) => focus.theme)
-        ).length
-      }];
-    });
-    for (const inventoryBand of inventoryBands) {
+        mixedAvailableCount: mixedCandidates.length
+      };
       const planResult = buildFocusedRunPlan({
         taskFamily,
         ratingAnchor: anchor,
@@ -380,7 +387,8 @@ export class TacticalProfileService {
       const prepared = this.selectPlanPuzzles(
         planResult.plan,
         latestMixed.config,
-        randomSeed
+        candidatesByTheme,
+        mixedCandidates
       );
       if (prepared) {
         return { status: "ready", prepared };
@@ -449,7 +457,10 @@ export class TacticalProfileService {
             if (!puzzle) {
               return [];
             }
-            const sessionConfig = sessions.get(attempt.sessionId)?.config;
+            const session = sessions.get(attempt.sessionId);
+            const sessionConfig = session?.completedAt
+              ? session.config
+              : undefined;
             return [{
               attempt,
               ...(sessionConfig === undefined ? {} : { sessionConfig }),
@@ -499,6 +510,7 @@ export class TacticalProfileService {
         sourceRevision
       );
       this.requiresCanonicalRebuild = false;
+      this.observedSourceRevision = sourceRevision;
       this.lastCacheError = undefined;
       return;
     }
@@ -515,17 +527,28 @@ export class TacticalProfileService {
       );
       this.lastCacheError = undefined;
     }
+    this.observedSourceRevision = sourceRevision;
   }
 
   private markDirtyDaysAtCurrentRevision(completedDays: readonly string[]): void {
     const sourceRevision = this.sourceRevision;
     const state = this.repository.getBuildState();
-    if (!state || !sameIdentity(state, this.identity)) {
+    if (
+      this.requiresCanonicalRebuild ||
+      !state ||
+      !sameIdentity(state, this.identity) ||
+      (
+        this.observedSourceRevision !== undefined &&
+        state.sourceRevision !== this.observedSourceRevision
+      )
+    ) {
       this.repository.reset(
         this.identity,
         this.canonicalCompletedDays(),
         sourceRevision
       );
+      this.requiresCanonicalRebuild = false;
+      this.observedSourceRevision = sourceRevision;
       return;
     }
     this.repository.markDirtyDays(
@@ -533,6 +556,7 @@ export class TacticalProfileService {
       completedDays,
       sourceRevision
     );
+    this.observedSourceRevision = sourceRevision;
   }
 
   private get sourceRevision(): number {
@@ -655,42 +679,24 @@ export class TacticalProfileService {
   private selectPlanPuzzles(
     plan: FocusedRunPlan,
     sourceConfig: SprintConfig,
-    randomSeed: string | number
+    candidatesByTheme: ReadonlyMap<string, readonly Puzzle[]>,
+    mixedCandidates: readonly Puzzle[]
   ): PreparedFocusedRun | undefined {
-    const selectedIds = new Set(plan.excludePuzzleIds);
-    const quotas: Puzzle[][] = [];
-    for (const reason of plan.reasons) {
-      const puzzles = this.puzzleSource.selectPuzzles({
-        mode: plan.taskFamily === "arrow_duel" ? "arrow_duel" : "standard",
-        minRating: plan.minRating,
-        maxRating: plan.maxRating,
-        themes: [reason.theme],
-        excludeIds: [...selectedIds],
-        limit: reason.count,
-        randomSeed: `${randomSeed}:${reason.theme}`
-      });
-      if (puzzles.length !== reason.count) {
-        return undefined;
-      }
-      puzzles.forEach((puzzle) => selectedIds.add(puzzle.id));
-      quotas.push(puzzles);
-    }
-    const mixed = this.selectMixedPuzzles({
-      mode: plan.taskFamily === "arrow_duel" ? "arrow_duel" : "standard",
-      minRating: plan.minRating,
-      maxRating: plan.maxRating,
-      excludeIds: [...selectedIds],
-      limit: plan.mixedControlCount,
-      randomSeed: `${randomSeed}:mixed`
-    }, plan.reasons.map((reason) => reason.theme));
-    if (mixed.length !== plan.mixedControlCount) {
+    const assignment = exactQuotaAssignment({
+      plan,
+      candidatesByTheme,
+      mixedCandidates,
+      minimumPuzzlesPerTheme:
+        this.focusedRunPolicy?.themeShortfallBackfill?.minimumPuzzlesPerTheme
+    });
+    if (!assignment) {
       return undefined;
     }
-    quotas.push(mixed);
-    const puzzles = weaveQuotaPuzzles(quotas);
+    const puzzles = weaveQuotaPuzzles(assignment.quotas);
+    const exactPlan = assignment.plan;
     const config = {
       ...buildSprintConfig({
-        mode: plan.taskFamily === "arrow_duel" ? "arrow_duel" : sourceConfig.mode,
+        mode: exactPlan.taskFamily === "arrow_duel" ? "arrow_duel" : sourceConfig.mode,
         durationSeconds: sourceConfig.durationSeconds,
         perPuzzleSeconds: sourceConfig.perPuzzleSeconds,
         ...(sourceConfig.puzzleTiming === undefined
@@ -701,17 +707,17 @@ export class TacticalProfileService {
         maxAttempts: puzzles.length,
         ratingPolicy: "unrated",
         tacticalFocus: {
-          taskFamily: plan.taskFamily,
-          themes: plan.reasons.map((reason) => reason.theme),
-          mixedControlCount: plan.mixedControlCount,
-          ratingAnchor: plan.ratingAnchor.rating,
-          minRating: plan.minRating,
-          maxRating: plan.maxRating
+          taskFamily: exactPlan.taskFamily,
+          themes: exactPlan.reasons.map((reason) => reason.theme),
+          mixedControlCount: exactPlan.mixedControlCount,
+          ratingAnchor: exactPlan.ratingAnchor.rating,
+          minRating: exactPlan.minRating,
+          maxRating: exactPlan.maxRating
         }
       }),
-      ratingKey: plan.ratingAnchor.ratingKey
+      ratingKey: exactPlan.ratingAnchor.ratingKey
     };
-    return { plan, config, puzzles };
+    return { plan: exactPlan, config, puzzles };
   }
 
   private get identity(): TacticalProfileCacheIdentity {
@@ -848,6 +854,149 @@ function distinctRunFocuses(
       : focus);
   }
   return [...distinct.values()].slice(0, 2);
+}
+
+function exactQuotaAssignment(input: {
+  plan: FocusedRunPlan;
+  candidatesByTheme: ReadonlyMap<string, readonly Puzzle[]>;
+  mixedCandidates: readonly Puzzle[];
+  minimumPuzzlesPerTheme: number | undefined;
+}): { plan: FocusedRunPlan; quotas: Puzzle[][] } | undefined {
+  const reasons = input.plan.reasons;
+  if (reasons.length < 1 || reasons.length > 2) {
+    return undefined;
+  }
+  const excludedIds = new Set(input.plan.excludePuzzleIds);
+  const candidatePools = reasons.map((reason) =>
+    uniquePuzzles(input.candidatesByTheme.get(reason.theme) ?? [])
+      .filter((puzzle) => !excludedIds.has(puzzle.id))
+  );
+  const mixedPool = uniquePuzzles(input.mixedCandidates)
+    .filter((puzzle) => !excludedIds.has(puzzle.id));
+  const minimumCounts = reasons.map((reason) =>
+    input.minimumPuzzlesPerTheme === undefined
+      ? reason.count
+      : Math.min(reason.count, input.minimumPuzzlesPerTheme)
+  );
+
+  if (reasons.length === 1) {
+    const reason = reasons[0] as FocusedRunPlan["reasons"][number];
+    const candidates = candidatePools[0] as Puzzle[];
+    for (
+      let count = reason.count;
+      count >= (minimumCounts[0] as number);
+      count -= 1
+    ) {
+      const selected = candidates.slice(0, count);
+      const selectedIds = new Set(selected.map((puzzle) => puzzle.id));
+      const mixedCount =
+        input.plan.mixedControlCount + reason.count - count;
+      const mixed = mixedPool
+        .filter((puzzle) => !selectedIds.has(puzzle.id))
+        .slice(0, mixedCount);
+      if (selected.length !== count || mixed.length !== mixedCount) {
+        continue;
+      }
+      return {
+        plan: {
+          ...input.plan,
+          reasons: [{ ...reason, count }],
+          mixedControlCount: mixedCount
+        },
+        quotas: [selected, mixed]
+      };
+    }
+    return undefined;
+  }
+
+  const primaryReason = reasons[0] as FocusedRunPlan["reasons"][number];
+  const secondaryReason = reasons[1] as FocusedRunPlan["reasons"][number];
+  const primaryPool = candidatePools[0] as Puzzle[];
+  const secondaryPool = candidatePools[1] as Puzzle[];
+  const primaryIds = new Set(primaryPool.map((puzzle) => puzzle.id));
+  const secondaryIds = new Set(secondaryPool.map((puzzle) => puzzle.id));
+  const primaryOnly = primaryPool.filter(
+    (puzzle) => !secondaryIds.has(puzzle.id)
+  );
+  const secondaryOnly = secondaryPool.filter(
+    (puzzle) => !primaryIds.has(puzzle.id)
+  );
+  const overlap = primaryPool.filter((puzzle) =>
+    secondaryIds.has(puzzle.id)
+  );
+
+  for (
+    let primaryCount = primaryReason.count;
+    primaryCount >= (minimumCounts[0] as number);
+    primaryCount -= 1
+  ) {
+    for (
+      let secondaryCount = secondaryReason.count;
+      secondaryCount >= (minimumCounts[1] as number);
+      secondaryCount -= 1
+    ) {
+      const primaryOverlapCount = Math.max(
+        0,
+        primaryCount - primaryOnly.length
+      );
+      const secondaryOverlapCount = Math.max(
+        0,
+        secondaryCount - secondaryOnly.length
+      );
+      if (
+        primaryCount > primaryPool.length ||
+        secondaryCount > secondaryPool.length ||
+        primaryOverlapCount + secondaryOverlapCount > overlap.length
+      ) {
+        continue;
+      }
+      const primary = [
+        ...primaryOnly.slice(0, primaryCount),
+        ...overlap.slice(0, primaryOverlapCount)
+      ].slice(0, primaryCount);
+      const usedPrimaryIds = new Set(primary.map((puzzle) => puzzle.id));
+      const secondary = [
+        ...secondaryOnly.slice(0, secondaryCount),
+        ...overlap.filter((puzzle) => !usedPrimaryIds.has(puzzle.id))
+      ].slice(0, secondaryCount);
+      if (
+        primary.length !== primaryCount ||
+        secondary.length !== secondaryCount
+      ) {
+        continue;
+      }
+      const selectedIds = new Set([
+        ...primary.map((puzzle) => puzzle.id),
+        ...secondary.map((puzzle) => puzzle.id)
+      ]);
+      const mixedCount =
+        input.plan.mixedControlCount +
+        primaryReason.count - primaryCount +
+        secondaryReason.count - secondaryCount;
+      const mixed = mixedPool
+        .filter((puzzle) => !selectedIds.has(puzzle.id))
+        .slice(0, mixedCount);
+      if (mixed.length !== mixedCount) {
+        continue;
+      }
+      return {
+        plan: {
+          ...input.plan,
+          reasons: [
+            { ...primaryReason, count: primaryCount },
+            { ...secondaryReason, count: secondaryCount }
+          ],
+          mixedControlCount: mixedCount
+        },
+        quotas: [primary, secondary, mixed]
+      };
+    }
+  }
+  return undefined;
+}
+
+function uniquePuzzles(puzzles: readonly Puzzle[]): Puzzle[] {
+  return [...new Map(puzzles.map((puzzle) => [puzzle.id, puzzle])).values()];
 }
 
 function weaveQuotaPuzzles(quotas: readonly Puzzle[][]): Puzzle[] {

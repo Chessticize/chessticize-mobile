@@ -194,6 +194,7 @@ test("calibration joins canonical exports and emits cohort reports without activ
   const manifestPath = join(directory, "manifest.json");
   const policyPath = join(directory, "policy.json");
   const progressPath = join(directory, "progress.json");
+  const decisionEvidencePath = join(directory, "decision-evidence.json");
   const reportPath = join(directory, "report.json");
   const artifactPath = join(directory, "artifact.json");
   try {
@@ -210,10 +211,12 @@ test("calibration joins canonical exports and emits cohort reports without activ
     `);
     writer.close();
     const bytes = await readFile(packPath);
+    const packFileHash =
+      `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
     await writeFile(manifestPath, JSON.stringify({
       format: "sqlite",
       packFileBytes: bytes.length,
-      packFileHash: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+      packFileHash,
       puzzleCount: 1,
       rating: { min: 900, max: 900 },
       tacticalAnalysis: {
@@ -222,7 +225,11 @@ test("calibration joins canonical exports and emits cohort reports without activ
       }
     }));
     await writeFile(policyPath, JSON.stringify(calibrationPolicy()));
-    await writeFile(progressPath, JSON.stringify(calibrationProgress()));
+    const progress = calibrationProgress();
+    const corpusHash = `sha256:${createHash("sha256")
+      .update(JSON.stringify([progress]))
+      .digest("hex")}`;
+    await writeFile(progressPath, JSON.stringify(progress));
 
     const report = await runCalibration({
       progressPaths: [progressPath],
@@ -262,6 +269,65 @@ test("calibration joins canonical exports and emits cohort reports without activ
     assert.match(
       artifact.families.line.reason,
       /required calibration decisions are incomplete/
+    );
+
+    await writeFile(decisionEvidencePath, JSON.stringify({
+      schemaVersion: 1,
+      decisionId: "owner-reviewed-test-decisions",
+      packFileHash,
+      corpusHash,
+      families: {
+        line: completeDecisionEvidence(),
+        arrow_duel: completeDecisionEvidence()
+      }
+    }));
+    const reviewed = await runCalibration({
+      progressPaths: [progressPath],
+      packPath,
+      manifestPath,
+      policyPath,
+      reportPath,
+      artifactPath,
+      decisionEvidencePath,
+      ownerApproved: true
+    });
+    assert.equal(
+      reviewed.input.decisionEvidenceId,
+      "owner-reviewed-test-decisions"
+    );
+    assert.equal(
+      reviewed.families.line.decisionEvidence.actionUtilityCalibration,
+      true
+    );
+    assert.equal(
+      reviewed.families.line.readiness.reasons.some((reason) =>
+        reason.includes("required calibration decisions are incomplete")
+      ),
+      false
+    );
+
+    await writeFile(decisionEvidencePath, JSON.stringify({
+      schemaVersion: 1,
+      decisionId: "wrong-pack",
+      packFileHash: `sha256:${"0".repeat(64)}`,
+      corpusHash,
+      families: {
+        line: completeDecisionEvidence(),
+        arrow_duel: completeDecisionEvidence()
+      }
+    }));
+    await assert.rejects(
+      runCalibration({
+        progressPaths: [progressPath],
+        packPath,
+        manifestPath,
+        policyPath,
+        reportPath,
+        artifactPath,
+        decisionEvidencePath,
+        ownerApproved: true
+      }),
+      /does not match the authenticated pack and corpus/
     );
   } finally {
     await rm(directory, { recursive: true, force: true });

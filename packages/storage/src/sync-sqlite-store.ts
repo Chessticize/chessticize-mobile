@@ -11,6 +11,7 @@ import {
   normalizeThemeSelection,
   normalizeRatingRecord,
   mergePracticeRunCatalogs,
+  namedThemesForSelection,
   orderReviewQueue,
   practiceRunsFromLegacyCustomConfigs,
   preferredReviewScheduleChange,
@@ -681,10 +682,13 @@ export class SyncSQLiteStore implements PracticeStore {
         state.mistakeCount,
         state.ratingBefore
       );
-    this.bumpTacticalProfileSourceRevision();
   }
 
   updateSprintSession(state: SprintState): void {
+    const previous = this.getSprintSessions([state.id])[0];
+    const previouslyEligible =
+      isTacticalProfileEvidenceSession(previous) &&
+      this.countAttempts({ source: "sprint", sessionId: state.id }) > 0;
     this.db
       .prepare(
         `UPDATE sprint_sessions
@@ -707,7 +711,12 @@ export class SyncSQLiteStore implements PracticeStore {
         state.ratingAfter ?? null,
         state.id
       );
-    this.bumpTacticalProfileSourceRevision();
+    const isNowEligible =
+      isTacticalProfileEvidenceSession(state) &&
+      this.countAttempts({ source: "sprint", sessionId: state.id }) > 0;
+    if (!previouslyEligible && isNowEligible) {
+      this.bumpTacticalProfileSourceRevision();
+    }
   }
 
   recordAttempt(attempt: AttemptEvent): void {
@@ -758,7 +767,12 @@ export class SyncSQLiteStore implements PracticeStore {
         storedAttempt.unclear ? 1 : 0,
         storedAttempt.unclearUpdatedAt ?? null
       );
-    if (storedAttempt.source === "sprint") {
+    if (
+      storedAttempt.source === "sprint" &&
+      isTacticalProfileEvidenceSession(
+        this.getSprintSessions([storedAttempt.sessionId])[0]
+      )
+    ) {
       this.bumpTacticalProfileSourceRevision();
     }
   }
@@ -1023,6 +1037,28 @@ export class SyncSQLiteStore implements PracticeStore {
     data: LocalDataImport,
     observer?: LocalDataImportObserver
   ): LocalDataImportResult {
+    const changedProfileSessions: Array<{
+      previous: ExportedSprintSession | undefined;
+      next: ExportedSprintSession;
+    }> = [];
+    let eligibleAttemptChanged = false;
+    const trackingObserver: LocalDataImportObserver = {
+      onSprintSessionChanged: (previous, next) => {
+        changedProfileSessions.push({ previous, next });
+        observer?.onSprintSessionChanged(previous, next);
+      },
+      onAttemptChanged: (previous, next) => {
+        eligibleAttemptChanged ||= [previous, next].some((candidate) => {
+          if (candidate?.source !== "sprint") {
+            return false;
+          }
+          return isTacticalProfileEvidenceSession(
+            this.getSprintSessions([candidate.sessionId])[0]
+          );
+        });
+        observer?.onAttemptChanged(previous, next);
+      }
+    };
     const result: LocalDataImportResult = {
       ratings: 0,
       attempts: 0,
@@ -1066,12 +1102,12 @@ export class SyncSQLiteStore implements PracticeStore {
         }
       }
       for (const session of data.sprintSessions) {
-        if (this.importSprintSession(session, observer)) {
+        if (this.importSprintSession(session, trackingObserver)) {
           result.sprintSessions += 1;
         }
       }
       for (const attempt of data.attempts) {
-        if (this.importAttempt(attempt, observer)) {
+        if (this.importAttempt(attempt, trackingObserver)) {
           result.attempts += 1;
         }
       }
@@ -1090,7 +1126,15 @@ export class SyncSQLiteStore implements PracticeStore {
           result.reviewQueue += 1;
         }
       }
-      if (result.sprintSessions > 0 || result.attempts > 0) {
+      const eligibleSessionChanged = changedProfileSessions.some(
+        ({ previous, next }) =>
+          (
+            isTacticalProfileEvidenceSession(previous) ||
+            isTacticalProfileEvidenceSession(next)
+          ) &&
+          this.countAttempts({ source: "sprint", sessionId: next.id }) > 0
+      );
+      if (eligibleSessionChanged || eligibleAttemptChanged) {
         this.bumpTacticalProfileSourceRevision();
       }
     });
@@ -2883,6 +2927,20 @@ function defaultRunPuzzleTiming(perPuzzleSeconds: number): {
   timeoutAfterSeconds: number | null;
 } {
   return defaultPuzzleTimingPolicy(perPuzzleSeconds);
+}
+
+function isTacticalProfileEvidenceSession(
+  session:
+    | Pick<SprintState, "completedAt" | "config">
+    | Pick<ExportedSprintSession, "completedAt" | "config">
+    | undefined
+): boolean {
+  return Boolean(
+    session?.completedAt &&
+    session.config &&
+    session.config.tacticalFocus === undefined &&
+    namedThemesForSelection(session.config.themes).length === 0
+  );
 }
 
 function normalizedImportedSprintSession(session: ExportedSprintSession): ExportedSprintSession {

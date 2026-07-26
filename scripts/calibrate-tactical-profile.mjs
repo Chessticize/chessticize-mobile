@@ -1,5 +1,4 @@
-import { existsSync } from "node:fs";
-import { createReadStream } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -213,11 +212,17 @@ export async function runCalibration(options) {
     policy.focusedRun.recentPuzzleDays < 0 ||
     !Array.isArray(policy.focusedRun.ratingBandHalfWidths) ||
     policy.focusedRun.ratingBandHalfWidths.length < 1 ||
-    policy.focusedRun.themeShortfallBackfill?.destination !== "mixed_control" ||
-    !Number.isInteger(
-      policy.focusedRun.themeShortfallBackfill?.minimumPuzzlesPerTheme
-    ) ||
-    policy.focusedRun.themeShortfallBackfill.minimumPuzzlesPerTheme < 1
+    (
+      policy.focusedRun.themeShortfallBackfill !== undefined &&
+      (
+        policy.focusedRun.themeShortfallBackfill.destination !==
+          "mixed_control" ||
+        !Number.isInteger(
+          policy.focusedRun.themeShortfallBackfill.minimumPuzzlesPerTheme
+        ) ||
+        policy.focusedRun.themeShortfallBackfill.minimumPuzzlesPerTheme < 1
+      )
+    )
   ) {
     throw new Error("Calibration policy has no valid Focused Run policy");
   }
@@ -225,6 +230,14 @@ export async function runCalibration(options) {
     throw new Error("Puzzle pack manifest has no Tactical Profile feature identity");
   }
   const exports = await loadProgressExports(options.progressPaths);
+  const corpusHash = `sha256:${createHash("sha256")
+    .update(JSON.stringify(exports))
+    .digest("hex")}`;
+  const decisionEvidence = await loadDecisionEvidence(
+    options.decisionEvidencePath,
+    manifest,
+    corpusHash
+  );
   const database = new DatabaseSync(options.packPath, { readOnly: true });
   try {
     await verifyPackIdentity(manifest, options.packPath, database);
@@ -234,7 +247,8 @@ export async function runCalibration(options) {
       familyReports[taskFamily] = calibrateFamily(
         joined.observations.filter((observation) => observation.taskFamily === taskFamily),
         policy,
-        options.ownerApproved
+        options.ownerApproved,
+        decisionEvidence.families[taskFamily]
       );
     }
     const report = {
@@ -245,7 +259,9 @@ export async function runCalibration(options) {
       input: {
         progressExportCount: exports.length,
         attemptCount: joined.inputAttemptCount,
-        joinedObservationCount: joined.observations.length
+        joinedObservationCount: joined.observations.length,
+        corpusHash,
+        decisionEvidenceId: decisionEvidence.decisionId
       },
       missingness: joined.missingness,
       missingnessCohorts: joined.missingnessCohorts,
@@ -265,6 +281,41 @@ export async function runCalibration(options) {
   } finally {
     database.close();
   }
+}
+
+async function loadDecisionEvidence(path, manifest, corpusHash) {
+  if (!path) {
+    return { decisionId: null, families: {} };
+  }
+  const evidence = JSON.parse(await readFile(path, "utf8"));
+  if (
+    evidence.schemaVersion !== 1 ||
+    typeof evidence.decisionId !== "string" ||
+    evidence.decisionId.trim().length === 0 ||
+    evidence.packFileHash !== manifest.packFileHash ||
+    evidence.corpusHash !== corpusHash
+  ) {
+    throw new Error(
+      "Calibration decision evidence does not match the authenticated pack and corpus"
+    );
+  }
+  for (const taskFamily of ["line", "arrow_duel"]) {
+    const family = evidence.families?.[taskFamily];
+    if (
+      !family ||
+      REQUIRED_DECISION_EVIDENCE.some(
+        (decision) => typeof family[decision] !== "boolean"
+      )
+    ) {
+      throw new Error(
+        `Calibration decision evidence is incomplete for ${taskFamily}`
+      );
+    }
+  }
+  return {
+    decisionId: evidence.decisionId.trim(),
+    families: evidence.families
+  };
 }
 
 export async function verifyPackIdentity(manifest, packPath, database) {
@@ -306,7 +357,12 @@ export async function verifyPackIdentity(manifest, packPath, database) {
   }
 }
 
-function calibrateFamily(observations, policy, ownerApproved) {
+function calibrateFamily(
+  observations,
+  policy,
+  ownerApproved,
+  suppliedDecisionEvidence
+) {
   const split = splitWholeSessions(observations, policy.holdoutFraction);
   const solveFit = fitLogistic(
     split.train.map((observation) => solveFeatureRow(observation))
@@ -342,7 +398,8 @@ function calibrateFamily(observations, policy, ownerApproved) {
     decisionEvidence: Object.fromEntries(
       REQUIRED_DECISION_EVIDENCE.map((decision) => [
         decision,
-        decision === "timeoutPolicyStratification"
+        decision === "timeoutPolicyStratification" ||
+          suppliedDecisionEvidence?.[decision] === true
       ])
     ),
     solve: {
@@ -615,9 +672,13 @@ function buildArtifact(report, familyReports, policy, manifest) {
       runSize: policy.focusedRun.runSize,
       recentPuzzleDays: policy.focusedRun.recentPuzzleDays,
       ratingBandHalfWidths: [...policy.focusedRun.ratingBandHalfWidths],
-      themeShortfallBackfill: {
-        ...policy.focusedRun.themeShortfallBackfill
-      }
+      ...(policy.focusedRun.themeShortfallBackfill === undefined
+        ? {}
+        : {
+            themeShortfallBackfill: {
+              ...policy.focusedRun.themeShortfallBackfill
+            }
+          })
     },
     families
   };
@@ -954,6 +1015,9 @@ function parseArguments(argv) {
     artifactPath: values.get("--artifact")?.[0]
       ? resolve(values.get("--artifact")[0])
       : undefined,
+    decisionEvidencePath: values.get("--decision-evidence")?.[0]
+      ? resolve(values.get("--decision-evidence")[0])
+      : undefined,
     ownerApproved: flags.has("--representative-owner-approved")
   };
 }
@@ -967,8 +1031,9 @@ async function main() {
     ...options.progressPaths,
     options.packPath,
     options.manifestPath,
-    options.policyPath
-  ]) {
+    options.policyPath,
+    options.decisionEvidencePath
+  ].filter(Boolean)) {
     if (!existsSync(path)) throw new Error(`Input not found: ${path}`);
   }
   const report = await runCalibration(options);

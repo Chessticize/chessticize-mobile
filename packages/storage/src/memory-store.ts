@@ -9,6 +9,7 @@ import {
   filterHistoryAttemptsForQuery,
   normalizeRatingRecord,
   mergePracticeRunCatalogs,
+  namedThemesForSelection,
   orderReviewQueue,
   preferredReviewScheduleChange,
   removeReviewContext,
@@ -207,17 +208,32 @@ export class MemoryStore implements PracticeStore {
 
   createSprintSession(state: SprintState): void {
     this.sessions.set(state.id, state);
-    this.tacticalProfileSourceRevision += 1;
   }
 
   updateSprintSession(state: SprintState): void {
+    const previous = this.sessions.get(state.id);
+    const previouslyEligible =
+      isTacticalProfileEvidenceSession(previous) &&
+      this.attempts.some((attempt) =>
+        attempt.source === "sprint" && attempt.sessionId === state.id
+      );
     this.sessions.set(state.id, state);
-    this.tacticalProfileSourceRevision += 1;
+    const isNowEligible =
+      isTacticalProfileEvidenceSession(state) &&
+      this.attempts.some((attempt) =>
+        attempt.source === "sprint" && attempt.sessionId === state.id
+      );
+    if (!previouslyEligible && isNowEligible) {
+      this.tacticalProfileSourceRevision += 1;
+    }
   }
 
   recordAttempt(attempt: AttemptEvent): void {
     this.attempts.push(cloneAttemptHistoryRow(attempt));
-    if (attempt.source === "sprint") {
+    if (
+      attempt.source === "sprint" &&
+      isTacticalProfileEvidenceSession(this.sessions.get(attempt.sessionId))
+    ) {
       this.tacticalProfileSourceRevision += 1;
     }
   }
@@ -339,6 +355,11 @@ export class MemoryStore implements PracticeStore {
     data: LocalDataImport,
     observer?: LocalDataImportObserver
   ): LocalDataImportResult {
+    const changedProfileSessions: Array<{
+      previous: ExportedSprintSession | undefined;
+      next: ExportedSprintSession;
+    }> = [];
+    let eligibleAttemptChanged = false;
     const result: LocalDataImportResult = {
       ratings: 0,
       attempts: 0,
@@ -416,6 +437,7 @@ export class MemoryStore implements PracticeStore {
         ...(next.ratingAfter === undefined ? {} : { ratingAfter: next.ratingAfter })
       });
       observer?.onSprintSessionChanged(previous, next);
+      changedProfileSessions.push({ previous, next });
       result.sprintSessions += 1;
     }
     for (const attempt of data.attempts) {
@@ -434,6 +456,14 @@ export class MemoryStore implements PracticeStore {
         this.attempts[existingIndex] = next;
       }
       observer?.onAttemptChanged(previous, next);
+      eligibleAttemptChanged ||= [previous, next].some((candidate) => {
+        if (candidate?.source !== "sprint") {
+          return false;
+        }
+        return isTacticalProfileEvidenceSession(
+          this.sessions.get(candidate.sessionId)
+        );
+      });
       result.attempts += 1;
     }
     const importedReviewChanges: ReviewScheduleChange[] = [
@@ -451,7 +481,17 @@ export class MemoryStore implements PracticeStore {
         result.reviewQueue += 1;
       }
     }
-    if (result.sprintSessions > 0 || result.attempts > 0) {
+    const eligibleSessionChanged = changedProfileSessions.some(
+      ({ previous, next }) =>
+        (
+          isTacticalProfileEvidenceSession(previous) ||
+          isTacticalProfileEvidenceSession(next)
+        ) &&
+        this.attempts.some((attempt) =>
+          attempt.source === "sprint" && attempt.sessionId === next.id
+        )
+    );
+    if (eligibleSessionChanged || eligibleAttemptChanged) {
       this.tacticalProfileSourceRevision += 1;
     }
     return result;
@@ -799,6 +839,20 @@ function exportedSprintSessionFromState(session: SprintState): ExportedSprintSes
       ...(session.config.themes === undefined ? {} : { themes: [...session.config.themes] })
     }
   };
+}
+
+function isTacticalProfileEvidenceSession(
+  session:
+    | Pick<SprintState, "completedAt" | "config">
+    | Pick<ExportedSprintSession, "completedAt" | "config">
+    | undefined
+): boolean {
+  return Boolean(
+    session?.completedAt &&
+    session.config &&
+    session.config.tacticalFocus === undefined &&
+    namedThemesForSelection(session.config.themes).length === 0
+  );
 }
 
 function normalizedImportedSprintSession(session: ExportedSprintSession): ExportedSprintSession {

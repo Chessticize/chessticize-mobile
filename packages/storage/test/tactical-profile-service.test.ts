@@ -77,14 +77,17 @@ test("large SQLite rebuilds and imports keep canonical reads bounded", () => {
           ratingBefore: 925,
           now: new Date(Date.parse(completedAt) - 240_000).toISOString()
         });
-        store.createSprintSession({
+        const completed = {
           ...session,
-          status: "failed",
+          status: "failed" as const,
           completedAt,
-          endReason: "max_mistakes",
+          endReason: "max_mistakes" as const,
           correctCount: 0,
           mistakeCount: 50,
           ratingAfter: 900
+        };
+        store.createSprintSession({
+          ...session
         });
         for (let attemptIndex = 0; attemptIndex < 50; attemptIndex += 1) {
           store.recordAttempt(attempt({
@@ -94,6 +97,7 @@ test("large SQLite rebuilds and imports keep canonical reads bounded", () => {
             completedAt
           }));
         }
+        store.updateSprintSession(completed);
       }
     });
 
@@ -215,7 +219,14 @@ test("a source-revision mismatch rebuilds a stale cache across SQLite lifetimes"
       now: "2026-07-24T00:00:00.000Z"
     });
     changedStore.transaction(() => {
-      changedStore.createSprintSession({
+      changedStore.createSprintSession(session);
+      changedStore.recordAttempt(attempt({
+        id: "crash-window-attempt",
+        sessionId: session.id,
+        puzzleId: "evidence-0",
+        completedAt
+      }));
+      changedStore.updateSprintSession({
         ...session,
         status: "failed",
         completedAt,
@@ -224,12 +235,6 @@ test("a source-revision mismatch rebuilds a stale cache across SQLite lifetimes"
         mistakeCount: 1,
         ratingAfter: 900
       });
-      changedStore.recordAttempt(attempt({
-        id: "crash-window-attempt",
-        sessionId: session.id,
-        puzzleId: "evidence-0",
-        completedAt
-      }));
     });
     const changedRevision = changedStore.getTacticalProfileSourceRevision();
     assert.ok(changedRevision > consumedRevision);
@@ -248,19 +253,54 @@ test("a source-revision mismatch rebuilds a stale cache across SQLite lifetimes"
       calibration: CALIBRATION,
       naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} }
     });
+    const importedAt = "2026-07-23T00:04:00.000Z";
+    const incoming = recoveredStore.exportLocalData();
+    incoming.sprintSessions.push({
+      id: "post-restart-import-session",
+      mode: "standard",
+      ratingKey: config.ratingKey,
+      startedAt: "2026-07-23T00:00:00.000Z",
+      completedAt: importedAt,
+      status: "failed",
+      correctCount: 0,
+      mistakeCount: 1,
+      ratingBefore: 925,
+      ratingAfter: 900,
+      config
+    });
+    incoming.attempts.push(attempt({
+      id: "post-restart-import-attempt",
+      sessionId: "post-restart-import-session",
+      puzzleId: "evidence-1",
+      completedAt: importedAt
+    }));
+    const imported = new PracticeService(
+      recoveredStore,
+      recoveredProfile
+    ).importLocalData(incoming);
+    assert.equal(imported.sprintSessions, 1);
+    assert.equal(imported.attempts, 1);
+    const recoveredRevision =
+      recoveredStore.getTacticalProfileSourceRevision();
 
     const recovered = recoveredProfile.getSnapshot(
       "2026-07-25T00:00:00.000Z"
     );
 
-    assert.equal(recovered.buildState.sourceRevision, changedRevision);
+    assert.ok(recoveredRevision > changedRevision);
+    assert.equal(recovered.buildState.sourceRevision, recoveredRevision);
+    const recoveredCells = recoveredRepository.listDailyCells(identity());
     assert.ok(
-      recoveredRepository
-        .listDailyCells(identity())
-        .some((cell) =>
-          cell.completedDay === "2026-07-24" &&
-          cell.distinctSessionIds.includes("crash-window-session")
-        )
+      recoveredCells.some((cell) =>
+        cell.completedDay === "2026-07-24" &&
+        cell.distinctSessionIds.includes("crash-window-session")
+      )
+    );
+    assert.ok(
+      recoveredCells.some((cell) =>
+        cell.completedDay === "2026-07-23" &&
+        cell.distinctSessionIds.includes("post-restart-import-session")
+      )
     );
     recoveredCacheDb.close();
     recoveredStore.close();
@@ -660,6 +700,12 @@ test("overlapping focus inventory widens before giving up on an exact two-theme 
     games: 12
   });
   seedDualWeaknessHistory(store);
+  const originalSelectPuzzles = store.selectPuzzles.bind(store);
+  let selectionQueries = 0;
+  store.selectPuzzles = (filter) => {
+    selectionQueries += 1;
+    return originalSelectPuzzles(filter);
+  };
   const profile = new TacticalProfileService({
     progressStore: store,
     puzzleSource: store,
@@ -691,6 +737,69 @@ test("overlapping focus inventory widens before giving up on an exact two-theme 
     [["fork", 9], ["pin", 3]]
   );
   assert.equal(result.prepared.plan.mixedControlCount, 3);
+  assert.equal(new Set(result.prepared.puzzles.map((puzzle) => puzzle.id)).size, 15);
+  assert.equal(
+    selectionQueries,
+    6,
+    "each bounded band should query two theme pools and one mixed pool once"
+  );
+});
+
+test("overlap shortfalls backfill only to mixed control at the final rating band", () => {
+  const store = new MemoryStore();
+  store.seedPuzzles([
+    ...Array.from({ length: 12 }, (_, index) =>
+      puzzle(`dual-evidence-${index}`, ["fork", "pin"])
+    ),
+    ...Array.from({ length: 9 }, (_, index) =>
+      puzzle(`final-overlap-${index}`, ["fork", "pin"])
+    ),
+    ...Array.from({ length: 6 }, (_, index) =>
+      puzzle(`final-mixed-${index}`, ["sacrifice"])
+    )
+  ]);
+  store.saveRating({
+    key: "standard 5/20",
+    generation: 0,
+    rating: 925,
+    ratingDeviation: 80,
+    volatility: 0.06,
+    games: 12
+  });
+  seedDualWeaknessHistory(store);
+  const profile = new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository: new MemoryTacticalProfileRepository(),
+    calibration: CALIBRATION,
+    naturalFrequency: {
+      line: { fork: 0.12, pin: 0.12 },
+      arrow_duel: {}
+    },
+    focusedRunPolicy: {
+      runSize: 15,
+      recentPuzzleDays: 30,
+      ratingBandHalfWidths: [100],
+      themeShortfallBackfill: {
+        destination: "mixed_control",
+        minimumPuzzlesPerTheme: 1
+      }
+    }
+  });
+
+  const result = profile.prepareFocusedRun(
+    "line",
+    "2026-07-25T00:00:00.000Z",
+    "overlap-backfill"
+  );
+
+  assert.equal(result.status, "ready", JSON.stringify(result));
+  if (result.status !== "ready") return;
+  assert.deepEqual(
+    result.prepared.plan.reasons.map((reason) => [reason.theme, reason.count]),
+    [["fork", 8], ["pin", 1]]
+  );
+  assert.equal(result.prepared.plan.mixedControlCount, 6);
   assert.equal(new Set(result.prepared.puzzles.map((puzzle) => puzzle.id)).size, 15);
 });
 
@@ -907,6 +1016,119 @@ test("an active Focused Run keeps its frozen puzzle IDs, Rating band, and quotas
   );
 });
 
+for (const storeKind of ["memory", "sqlite"] as const) {
+  test(`${storeKind} source revisions ignore interventions and zero-attempt Runs`, () => {
+    const store = storeKind === "memory"
+      ? new MemoryStore()
+      : new SQLiteStore();
+    try {
+      if (store instanceof SQLiteStore) {
+        store.migrate();
+      }
+      store.seedPuzzles([puzzle("revision-puzzle", ["fork"])]);
+      store.saveRating({
+        key: "standard 5/20",
+        generation: 0,
+        rating: 925,
+        ratingDeviation: 80,
+        volatility: 0.06,
+        games: 0
+      });
+      const before = store.getTacticalProfileSourceRevision();
+      const focusedConfig = buildSprintConfig({
+        mode: "standard",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        maxAttempts: 15,
+        ratingPolicy: "unrated",
+        tacticalFocus: {
+          taskFamily: "line",
+          themes: ["fork"],
+          mixedControlCount: 5,
+          ratingAnchor: 925,
+          minRating: 825,
+          maxRating: 1_025
+        }
+      });
+      const focused = startSprint({
+        id: `${storeKind}-focused-revision`,
+        config: focusedConfig,
+        puzzles: [store.getPuzzle("revision-puzzle")!],
+        ratingBefore: 925,
+        now: "2026-07-25T01:00:00.000Z"
+      });
+      store.transaction(() => {
+        store.createSprintSession(focused);
+        store.recordAttempt(attempt({
+          id: `${storeKind}-focused-attempt`,
+          sessionId: focused.id,
+          puzzleId: "revision-puzzle",
+          completedAt: "2026-07-25T01:00:10.000Z"
+        }));
+        store.updateSprintSession({
+          ...focused,
+          status: "won",
+          completedAt: "2026-07-25T01:00:10.000Z",
+          endReason: "attempt_limit",
+          correctCount: 1,
+          mistakeCount: 0
+        });
+      });
+
+      const ordinaryConfig = buildSprintConfig({
+        mode: "standard",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20
+      });
+      const zeroAttempt = startSprint({
+        id: `${storeKind}-zero-attempt-revision`,
+        config: ordinaryConfig,
+        puzzles: [store.getPuzzle("revision-puzzle")!],
+        ratingBefore: 925,
+        now: "2026-07-25T02:00:00.000Z"
+      });
+      store.createSprintSession(zeroAttempt);
+      store.updateSprintSession({
+        ...zeroAttempt,
+        status: "abandoned",
+        completedAt: "2026-07-25T02:00:01.000Z",
+        endReason: "abandoned"
+      });
+      assert.equal(store.getTacticalProfileSourceRevision(), before);
+
+      const ordinary = startSprint({
+        id: `${storeKind}-ordinary-revision`,
+        config: ordinaryConfig,
+        puzzles: [store.getPuzzle("revision-puzzle")!],
+        ratingBefore: 925,
+        now: "2026-07-25T03:00:00.000Z"
+      });
+      store.transaction(() => {
+        store.createSprintSession(ordinary);
+        store.recordAttempt(attempt({
+          id: `${storeKind}-ordinary-attempt`,
+          sessionId: ordinary.id,
+          puzzleId: "revision-puzzle",
+          completedAt: "2026-07-25T03:00:10.000Z"
+        }));
+        store.updateSprintSession({
+          ...ordinary,
+          status: "failed",
+          completedAt: "2026-07-25T03:00:10.000Z",
+          endReason: "max_mistakes",
+          correctCount: 0,
+          mistakeCount: 1
+        });
+      });
+      assert.equal(store.getTacticalProfileSourceRevision(), before + 1);
+    } finally {
+      if (store instanceof SQLiteStore) {
+        store.close();
+      }
+    }
+  });
+}
+
 test("derived-cache write failures do not undo canonical Sprint or import progress", () => {
   const store = seededStore();
   seedWeaknessHistory(store);
@@ -1070,24 +1292,27 @@ function seedWeaknessHistory(store: MemoryStore | SQLiteStore): void {
       ratingBefore: 925,
       now: startedAt
     });
-    store.createSprintSession({
-      ...session,
-      status: "failed",
-      completedAt,
-      endReason: "max_mistakes",
-      correctCount: 0,
-      mistakeCount: 4,
-      ratingAfter: 900
+    store.transaction(() => {
+      store.createSprintSession(session);
+      for (let offset = 0; offset < 4; offset += 1) {
+        const index = sessionIndex * 4 + offset;
+        store.recordAttempt(attempt({
+          id: `attempt-${index}`,
+          sessionId: session.id,
+          puzzleId: `evidence-${index}`,
+          completedAt
+        }));
+      }
+      store.updateSprintSession({
+        ...session,
+        status: "failed",
+        completedAt,
+        endReason: "max_mistakes",
+        correctCount: 0,
+        mistakeCount: 4,
+        ratingAfter: 900
+      });
     });
-    for (let offset = 0; offset < 4; offset += 1) {
-      const index = sessionIndex * 4 + offset;
-      store.recordAttempt(attempt({
-        id: `attempt-${index}`,
-        sessionId: session.id,
-        puzzleId: `evidence-${index}`,
-        completedAt
-      }));
-    }
   }
 }
 
@@ -1108,24 +1333,27 @@ function seedDualWeaknessHistory(store: MemoryStore): void {
       ratingBefore: 925,
       now: startedAt
     });
-    store.createSprintSession({
-      ...session,
-      status: "failed",
-      completedAt,
-      endReason: "max_mistakes",
-      correctCount: 0,
-      mistakeCount: 4,
-      ratingAfter: 900
+    store.transaction(() => {
+      store.createSprintSession(session);
+      for (let offset = 0; offset < 4; offset += 1) {
+        const index = sessionIndex * 4 + offset;
+        store.recordAttempt(attempt({
+          id: `dual-attempt-${index}`,
+          sessionId: session.id,
+          puzzleId: `dual-evidence-${index}`,
+          completedAt
+        }));
+      }
+      store.updateSprintSession({
+        ...session,
+        status: "failed",
+        completedAt,
+        endReason: "max_mistakes",
+        correctCount: 0,
+        mistakeCount: 4,
+        ratingAfter: 900
+      });
     });
-    for (let offset = 0; offset < 4; offset += 1) {
-      const index = sessionIndex * 4 + offset;
-      store.recordAttempt(attempt({
-        id: `dual-attempt-${index}`,
-        sessionId: session.id,
-        puzzleId: `dual-evidence-${index}`,
-        completedAt
-      }));
-    }
   }
 }
 
