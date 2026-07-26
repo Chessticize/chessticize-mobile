@@ -18,6 +18,26 @@ directory is ignored by Git. Do not use synthetic fixtures, automated-test
 simulators, or hand-authored attempt rows as representative production
 evidence. Do not commit private progress exports.
 
+### Extract a downloaded app container
+
+An Xcode Device Hub download may expose a canonical progress export in its
+CloudKit cache even when the live SQLite file is absent. Extract the newest
+unambiguous snapshot locally:
+
+```sh
+pnpm extract:tactical-profile-progress \
+  --container /path/to/com.chessticize.mobile \
+  --output scratch/tactical-profile-calibration/progress-1.json
+```
+
+The extractor supports both a downloaded app-data directory and an
+`.xcappdata` package whose data is under `AppData/`. It scans locally, ignores
+unrelated cache assets, deduplicates content-equivalent canonical snapshots,
+refuses to guess when multiple distinct snapshots share the latest timestamp,
+refuses to overwrite an existing output, and creates the export with mode
+`0600`. It does not contact a server. CloudKit cache extraction is a development
+handoff fallback, not a guaranteed product export contract.
+
 Fetch and authenticate the immutable Core Pack before calibration:
 
 ```sh
