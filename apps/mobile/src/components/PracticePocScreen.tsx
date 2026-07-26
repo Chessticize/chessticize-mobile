@@ -677,7 +677,7 @@ export function PracticePocScreen({
   const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
-  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
+  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
   const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
@@ -3797,6 +3797,9 @@ export function PracticePocScreen({
                   }}
                   onSourceFilterChange={(source) => {
                     setHistorySourceFilter(source);
+                    if (source !== "sprint") {
+                      setHistoryAttentionReasons([]);
+                    }
                     setHistoryPageOffset(0);
                   }}
                   onResultFilterChange={(result) => {
@@ -3816,6 +3819,7 @@ export function PracticePocScreen({
                     setHistoryPageOffset(0);
                   }}
                   onAttentionReasonChange={(reason) => {
+                    setHistorySourceFilter("sprint");
                     setHistoryAttentionReasons((current) => current.includes(reason)
                       ? current.filter((candidate) => candidate !== reason)
                       : [...current, reason]);
@@ -3823,6 +3827,9 @@ export function PracticePocScreen({
                   }}
                   onAttentionOnlyChange={(attentionOnly) => {
                     setHistoryPageOffset(0);
+                    if (attentionOnly) {
+                      setHistorySourceFilter("sprint");
+                    }
                     setHistoryAttentionReasons((current) => attentionOnly
                       ? current.length > 0
                         ? current
@@ -3833,7 +3840,7 @@ export function PracticePocScreen({
                   onOpenAttempt={openHistoryReview}
                   onResetFilters={() => {
                     setHistoryTimeRange("7d");
-                    setHistorySourceFilter("all");
+                    setHistorySourceFilter("sprint");
                     setHistoryResultFilter("all");
                     setHistorySideFilter("all");
                     historyThemeChoices.dispatch({ type: "select-all-themes" });
@@ -9224,6 +9231,11 @@ function HistoryPanel({
           attentionOnly={attentionOnly}
           onChange={onAttentionOnlyChange}
         />
+        {attentionOnly ? (
+          <Text style={styles.helperText} testID="history-attention-explanation">
+            Needs attention shows original Sprint attempts only.
+          </Text>
+        ) : null}
       </View>
 
       {selectedRatingKey ? (
@@ -9869,7 +9881,7 @@ function HistoryAttentionFilter({
       testID="history-attention-filter"
     >
       <Pressable
-        accessibilityLabel="Needs attention: unclear or in Review"
+        accessibilityLabel="Needs attention: Sprint attempts that are unclear or in Review"
         accessibilityRole="radio"
         accessibilityState={{ checked: attentionOnly }}
         aria-checked={attentionOnly}
