@@ -52,13 +52,73 @@ test("SQLitePuzzlePackSource skips repeated Arrow Duel validation for a manifest
   const packDb = buildPackDatabase(puzzles);
   try {
     const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
-      allPuzzlesArrowDuelEligible: true
+      arrowDuelEligibility: "all"
     });
 
     assert.deepEqual(
       source.selectPuzzles({ mode: "arrow_duel", limit: 10 }).map((puzzle) => puzzle.id).sort(),
       puzzles.map((puzzle) => puzzle.id).sort()
     );
+  } finally {
+    packDb.close();
+  }
+});
+
+test("SQLitePuzzlePackSource keeps promotion puzzles in Standard but excludes them from Arrow Duel", () => {
+  const standardPuzzle = arrowDuelPuzzle({
+    id: "standard-arrow-duel",
+    initialFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",
+    solutionMoves: ["d7d5"],
+    stockfishBestMove: "e7e5",
+    stockfishEval: 50,
+    stockfishEvalAfterFirstMove: 300
+  });
+  const promotionPuzzle = arrowDuelPuzzle({
+    id: "promotion-standard-only",
+    initialFen: "4k3/R3P3/1p3Kpp/2p5/2P5/1r6/4p1P1/8 b - - 0 1",
+    solutionMoves: ["b3e3"],
+    stockfishBestMove: "e2e1r",
+    stockfishEval: -483,
+    stockfishEvalAfterFirstMove: 654
+  });
+  const packDb = buildPackDatabase([standardPuzzle, promotionPuzzle]);
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb));
+
+    assert.deepEqual(
+      source.selectPuzzles({ mode: "standard", limit: 10 }).map((puzzle) => puzzle.id).sort(),
+      [promotionPuzzle.id, standardPuzzle.id].sort()
+    );
+    assert.deepEqual(
+      source.selectPuzzles({ mode: "arrow_duel", limit: 10 }).map((puzzle) => puzzle.id),
+      [standardPuzzle.id]
+    );
+  } finally {
+    packDb.close();
+  }
+});
+
+test("SQLitePuzzlePackSource preserves the manifest fast path while filtering promotion candidates", () => {
+  const manifestQualifiedPuzzle = selectionPuzzle("manifest-qualified", 1500, ["fork"]);
+  const promotionPuzzle = arrowDuelPuzzle({
+    id: "manifest-promotion",
+    initialFen: "4k3/R3P3/1p3Kpp/2p5/2P5/1r6/4p1P1/8 b - - 0 1",
+    solutionMoves: ["b3e3"],
+    stockfishBestMove: "e2e1r",
+    stockfishEval: -483,
+    stockfishEvalAfterFirstMove: 654
+  });
+  const packDb = buildPackDatabase([manifestQualifiedPuzzle, promotionPuzzle]);
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
+      arrowDuelEligibility: "all_non_promotion"
+    });
+
+    assert.deepEqual(
+      source.selectPuzzles({ mode: "arrow_duel", limit: 10 }).map((puzzle) => puzzle.id),
+      [manifestQualifiedPuzzle.id]
+    );
+    assert.equal(source.countPuzzles({ mode: "arrow_duel", limit: 10 }), 1);
   } finally {
     packDb.close();
   }
@@ -180,7 +240,7 @@ test("SQLitePuzzlePackSource fairly merges selected themes before filling from c
   ]);
   try {
     const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
-      allPuzzlesArrowDuelEligible: true
+      arrowDuelEligibility: "all"
     });
 
     const selected = source.selectPuzzles({
@@ -206,7 +266,7 @@ test("SQLitePuzzlePackSource seeded selection reaches beyond one fixed candidate
   );
   try {
     const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
-      allPuzzlesArrowDuelEligible: true
+      arrowDuelEligibility: "all"
     });
     const selectForSeed = (randomSeed: string, themes?: string[]): string[] =>
       source.selectPuzzles({
@@ -502,6 +562,25 @@ function selectionPuzzle(id: string, rating: number, themes: string[]): Puzzle {
     stockfishEval: 0,
     stockfishBestMove: "e2e3",
     stockfishEvalAfterFirstMove: 0
+  };
+}
+
+function arrowDuelPuzzle(
+  overrides: Pick<
+    Puzzle,
+    | "id"
+    | "initialFen"
+    | "solutionMoves"
+    | "stockfishBestMove"
+    | "stockfishEval"
+    | "stockfishEvalAfterFirstMove"
+  >
+): Puzzle {
+  return {
+    ...overrides,
+    rating: 1500,
+    themes: ["tactics"],
+    source: "synthetic"
   };
 }
 

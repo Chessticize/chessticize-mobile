@@ -16,7 +16,9 @@ const familiar15Manifest = require("../../../../fixtures/puzzles/familiar-15-e2e
 export type MobilePuzzleSource = "bundledCore" | "familiar15" | "random1000";
 const DEFAULT_PUZZLE_SOURCE: MobilePuzzleSource = "bundledCore";
 const BUNDLED_CORE_PACK_OPTIONS = {
-  allPuzzlesArrowDuelEligible: bundledCoreManifest.arrowDuelCount === bundledCoreManifest.puzzleCount
+  arrowDuelEligibility: bundledCoreManifest.arrowDuelCount === bundledCoreManifest.puzzleCount
+    ? "all"
+    : "all_non_promotion"
 } as const;
 
 let persistentPracticeService: PracticeService | undefined;
