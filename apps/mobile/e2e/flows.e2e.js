@@ -3,6 +3,7 @@ const {
   dismissRunNameKeyboard,
   openTab,
   openStandardHistoryTrend,
+  historyAttemptRowTestIDForResult,
   launchWithDisabledSynchronization,
   playBoardMove,
   sleep,
@@ -204,7 +205,7 @@ describe('Key user flows', () => {
     await waitForElementTextContaining('settings-review-reminder-schedule-status', 'none', 10000);
   });
 
-  it('filters failed attempts in history and preserves the selection through replay', async () => {
+  it('shows failed attempts in History and preserves current filters through replay', async () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
@@ -229,8 +230,8 @@ describe('Key user flows', () => {
     )).not.toExist().withTimeout(10000);
 
     // Replay round trip must preserve non-default filters: select wrong Sprint
-    // attempts, open one attempt's
-    // replay, exit, and require both choices to remain unchanged.
+    // attempts, open one attempt's replay, exit, and require every choice to
+    // remain unchanged.
     await element(by.id('history-result-wrong')).tap();
     await waitFor(element(
       by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
@@ -251,12 +252,7 @@ describe('Key user flows', () => {
     )).toExist().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
 
-    const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
-    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-      throw new Error(`Could not resolve history attempt row from ${String(resultIdentifier)}`);
-    }
-    const resultRowIdentifier = resultIdentifier.replace(/-result$/, '');
+    const resultRowIdentifier = await historyAttemptRowTestIDForResult('Wrong move');
     await waitForVisibleInPracticeScroll(resultRowIdentifier);
     await element(by.id(resultRowIdentifier)).tap();
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
@@ -294,11 +290,15 @@ describe('Key user flows', () => {
     await waitFor(element(
       by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
     )).not.toExist().withTimeout(10000);
+    await waitFor(element(
+      by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
+    )).not.toExist().withTimeout(10000);
   });
 
   it('adds and starts a saved custom Run', async () => {
-    await createSavedCustomRun('Flow Focus', { shorterDuration: true });
-    await element(by.text('Flow Focus')).tap();
+    const flowFocusSelectTestID = await createSavedCustomRun('Flow Focus', { shorterDuration: true });
+    await waitForVisibleInPracticeScroll(flowFocusSelectTestID);
+    await element(by.id(flowFocusSelectTestID)).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await element(by.id('practice-run-start')).tap();
     await completeFirstUseSessionGuides();
@@ -315,11 +315,12 @@ describe('Key user flows', () => {
     await dismissSprintSummary();
 
     await openTab('practice-tab', 'practice-add-run');
-    await createSavedCustomRun('Persistent Focus', {
+    const persistentFocusSelectTestID = await createSavedCustomRun('Persistent Focus', {
       shorterDuration: true,
       themes: ['mate-in-2', 'fork']
     });
-    await element(by.text('Persistent Focus')).tap();
+    await waitForVisibleInPracticeScroll(persistentFocusSelectTestID);
+    await element(by.id(persistentFocusSelectTestID)).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await element(by.id('practice-run-start')).tap();
     await completeFirstUseSessionGuides();
@@ -387,12 +388,17 @@ async function createSavedCustomRun(name, { shorterDuration = false, themes = []
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await element(by.id('practice-run-save')).tap();
   await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
-  await waitFor(element(by.text(name))).toExist().withTimeout(10000);
-  await element(by.id('practice-main-scroll')).scrollTo('top');
-  await waitFor(element(by.text(name)))
-    .toBeVisible()
-    .whileElement(by.id('practice-main-scroll'))
-    .scroll(100, 'down', 0.5, 0.5);
+  const runName = element(by.text(name));
+  await waitFor(runName).toExist().withTimeout(10000);
+  const attributes = await runName.getAttributes();
+  const candidates = Array.isArray(attributes) ? attributes : [attributes];
+  const nameTestID = candidates
+    .map((candidate) => candidate?.identifier)
+    .find((identifier) => typeof identifier === 'string' && identifier.startsWith('practice-run-name-'));
+  if (!nameTestID) {
+    throw new Error(`Could not resolve selectable Run card for "${name}"`);
+  }
+  return nameTestID.replace('practice-run-name-', 'practice-run-select-');
 }
 
 function durationTextToSeconds(value) {

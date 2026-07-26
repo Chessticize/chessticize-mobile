@@ -101,6 +101,13 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("app-store-06-arrow-duel");
     expect(storeAssetsE2e).toContain("app-store-07-custom-setup");
     expect(storeAssetsE2e).toContain("app-store-08-review-session");
+    expect(storeAssetsE2e).toContain("app-store-09-sprint-rules-guide");
+    expect(storeAssetsE2e).toContain("app-store-10-active-session-guide-header");
+    expect(storeAssetsE2e).toContain("app-store-11-active-session-guide-slow");
+    expect(storeAssetsE2e).toContain("app-store-12-active-session-guide-timeout");
+    expect(storeAssetsE2e).toContain("app-store-13-active-session-guide-unclear");
+    expect(storeAssetsE2e).toContain("app-store-14-arrow-duel-guide");
+    expect(storeAssetsE2e).toContain("app-store-15-sprint-result");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-01-practice-tab')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-05-standard-sprint')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-06-arrow-duel')");
@@ -122,6 +129,11 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-06-arrow-duel')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-08-review-session')");
     expect(storeAssetsE2e).not.toContain("device.setOrientation(");
+    expect(storeAssetsE2e).toContain("by.id('practice-sprint-rules-dismiss')");
+    expect(storeAssetsE2e).toContain("by.id('practice-active-session-guide')");
+    expect(storeAssetsE2e).toContain("by.id('practice-arrow-duel-guide')");
+    expect(storeAssetsE2e).toContain("by.id('practice-session-guide-start')");
+    expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-15-sprint-result')");
     expect(storeAssetsE2e).toContain("waitForScreenOrientation('landscape')");
     expect(storeAssetsE2e).toContain("waitForScreenOrientation('portrait')");
     expect(storeAssetsE2e).toContain("accessibilityLabelFromAttributes");
@@ -151,6 +163,54 @@ describe("App Store assets document", () => {
     expect(storeAssetsDoc).toContain("app-store-05-standard-sprint");
     expect(storeAssetsDoc).toContain("app-store-07-custom-setup");
     expect(storeAssetsDoc).toContain("app-store-08-review-session");
+    expect(storeAssetsDoc).toContain("app-store-09-sprint-rules-guide");
+    expect(storeAssetsDoc).toContain("app-store-14-arrow-duel-guide");
+    expect(storeAssetsDoc).toContain("app-store-15-sprint-result");
+    expect(storeAssetsDoc).toContain("does not install or launch a");
+    expect(storeAssetsDoc).toContain("physical-device build");
+  });
+
+  it("verifies portrait orientation before every portrait store-asset screenshot", () => {
+    const portraitAtTopHelperStart = storeAssetsE2e.indexOf(
+      "async function takePortraitScreenshotAtTop(name)"
+    );
+    const portraitHelperStart = storeAssetsE2e.indexOf(
+      "async function takePortraitScreenshot(name)",
+      portraitAtTopHelperStart
+    );
+    const landscapeHelperStart = storeAssetsE2e.indexOf(
+      "async function takeLandscapeScreenshot",
+      portraitHelperStart
+    );
+    const portraitAtTopHelper = storeAssetsE2e.slice(
+      portraitAtTopHelperStart,
+      portraitHelperStart
+    );
+    const portraitHelper = storeAssetsE2e.slice(portraitHelperStart, landscapeHelperStart);
+    const captureGuard = "if (!capturePortraitAssets)";
+    const restoreTop = "await element(by.id('practice-main-scroll')).scrollTo('top')";
+    const delegateScreenshot = "await takePortraitScreenshot(name)";
+    const waitForPortrait = "await waitForScreenOrientation('portrait')";
+    const takeScreenshot = "await device.takeScreenshot(name)";
+
+    expect(storeAssetsE2e.match(/takePortraitScreenshotAtTop\('app-store-/g)).toHaveLength(11);
+    expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop(scene)");
+    expect(storeAssetsE2e).not.toMatch(/device\.takeScreenshot\('app-store-/);
+    expect(storeAssetsE2e).not.toContain("device.setOrientation(");
+    expect(portraitAtTopHelper.indexOf(captureGuard)).toBeGreaterThan(-1);
+    expect(portraitAtTopHelper.indexOf(restoreTop)).toBeGreaterThan(
+      portraitAtTopHelper.indexOf(captureGuard)
+    );
+    expect(portraitAtTopHelper.indexOf(delegateScreenshot)).toBeGreaterThan(
+      portraitAtTopHelper.indexOf(restoreTop)
+    );
+    expect(portraitHelper.indexOf(captureGuard)).toBeGreaterThan(-1);
+    expect(portraitHelper.indexOf(waitForPortrait)).toBeGreaterThan(
+      portraitHelper.indexOf(captureGuard)
+    );
+    expect(portraitHelper.indexOf(takeScreenshot)).toBeGreaterThan(
+      portraitHelper.indexOf(waitForPortrait)
+    );
   });
 
   it("marks the App Store plan store-assets item implementation complete", () => {
