@@ -451,11 +451,14 @@ posterior percentage as the other's weight. A theme becomes recommendation-
 eligible when either head independently passes its evidence and impact gates.
 If both pass, the explanation may mention both.
 
-Ranking several eligible themes requires a calibrated, bounded action utility
-that combines posterior expected product impact with natural opportunity and
-recency/persistence. Its exact formula is calibration-required. Until such a
-utility is calibrated, Storybook ranking is illustrative fixture data, not a
-production algorithm.
+Ranking several eligible themes requires a bounded action utility that combines
+posterior expected product impact with natural opportunity and
+recency/persistence. The owner-approved production trial may use the
+versioned provisional artifact's utility only while the early-estimate
+disclosure remains visible. Representative calibration must confirm or replace
+its exact formula before the ranking is called validated or the disclosure is
+removed. Storybook ranks remain illustrative fixture data rather than exact
+posterior claims.
 
 The UI should state the reason in plain language:
 
@@ -581,11 +584,14 @@ Focused Run also MUST NOT make its selected sample look like independent
 weakness-discovery evidence. Later ordinary mixed Runs determine whether the
 focus still applies.
 
-Entry and exit MUST use calibrated hysteresis so a recommendation does not
-appear and disappear around one threshold. A completed Focused Run MUST NOT
-immediately re-offer the same action without at least one new eligible ordinary
-mixed session and a new profile evaluation. This is an action-freshness rule,
-not a V1 recovery or mastery model.
+Entry and exit MUST use the versioned artifact's hysteresis so a recommendation
+does not appear and disappear around one threshold. During the owner-approved
+trial those values are provisional and remain covered by the early-estimate
+disclosure; representative calibration must confirm or replace them before the
+model is called validated. A completed Focused Run MUST NOT immediately
+re-offer the same action without at least one new eligible ordinary mixed
+session and a new profile evaluation. This is an action-freshness rule, not a
+V1 recovery or mastery model.
 
 ### Focus and presentation cutoffs
 

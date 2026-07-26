@@ -109,7 +109,16 @@ test("SQLitePuzzlePackSource preserves the manifest fast path while filtering pr
     stockfishEval: -483,
     stockfishEvalAfterFirstMove: 654
   });
-  const packDb = buildPackDatabase([manifestQualifiedPuzzle, promotionPuzzle]);
+  const excludedThemePromotionPuzzle = {
+    ...promotionPuzzle,
+    id: "pin-theme-promotion",
+    themes: ["pin"]
+  };
+  const packDb = buildPackDatabase([
+    manifestQualifiedPuzzle,
+    promotionPuzzle,
+    excludedThemePromotionPuzzle
+  ]);
   try {
     const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
       arrowDuelEligibility: "all_non_promotion"
@@ -120,6 +129,14 @@ test("SQLitePuzzlePackSource preserves the manifest fast path while filtering pr
       [manifestQualifiedPuzzle.id]
     );
     assert.equal(source.countPuzzles({ mode: "arrow_duel", limit: 10 }), 1);
+    assert.deepEqual(
+      source.selectPuzzlesExcludingThemes(
+        { mode: "arrow_duel", limit: 1 },
+        ["pin"]
+      ).map((puzzle) => puzzle.id),
+      [manifestQualifiedPuzzle.id],
+      "promotion filtering must continue beyond the first mixed-control candidate"
+    );
 
     const largeIncludeIds = [
       manifestQualifiedPuzzle.id,

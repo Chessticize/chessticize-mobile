@@ -180,9 +180,12 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       return this.selectPuzzles(filter);
     }
     const excludedIds = new Set(filter.excludeIds ?? []);
+    const shouldFilterPromotionCandidates =
+      filter.mode === "arrow_duel"
+      && this.arrowDuelEligibility === "all_non_promotion";
     const candidateLimit = this.candidateLimit(
       filter.limit,
-      filter.randomSeed !== undefined
+      filter.randomSeed !== undefined || shouldFilterPromotionCandidates
     );
     if (
       filter.includeIds !== undefined &&
