@@ -105,14 +105,20 @@ test("Issue #353 owns the iCloud sync error-detail state in the Settings catalog
       .map((scenario) => scenario.id),
     [
       "settings-ios-sync-error-details",
+      "settings-ios-sync-support-bundle",
       "settings-ios-sync-support-bundle-partial"
     ]
   );
   assert.deepEqual(storyTagsForScenario("settings-ios-sync-error-details"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle"), ["new"]);
   assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle-partial"), ["new"]);
   assert.equal(
     scenarioRegistry["settings-ios-sync-error-details"].storyId,
     "settings--i-cloud-sync-error-details"
+  );
+  assert.equal(
+    scenarioRegistry["settings-ios-sync-support-bundle"].storyId,
+    "settings--i-cloud-sync-support-bundle"
   );
   assert.equal(
     scenarioRegistry["settings-ios-sync-support-bundle-partial"].storyId,

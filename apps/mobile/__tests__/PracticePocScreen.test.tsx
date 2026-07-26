@@ -9809,6 +9809,143 @@ describe("PracticePocScreen", () => {
     });
   });
 
+  it("captures a real sync failure and copies only the bounded diagnostic", async () => {
+    const nativeFailure = Object.assign(new Error("Request rate limited"), {
+      code: "icloud_fetch_failed",
+      domain: "CKErrorDomain",
+      userInfo: {
+        cloudKitCode: 7,
+        CKErrorRetryAfterKey: 12,
+        credential: "must-not-be-copied"
+      }
+    });
+    const copyText = jest.fn(async (_text: string) => undefined);
+    const renderer = renderScreen({
+      iCloudProgressSyncClient: {
+        getAccountStatus: jest.fn(async () => "available"),
+        fetchSnapshot: jest.fn(async () => Promise.reject(nativeFailure)),
+        saveSnapshot: jest.fn(async () => undefined)
+      },
+      iCloudSyncDiagnosticsClient: {
+        copyText,
+        discardSupportBundle: jest.fn(async () => undefined),
+        prepareSupportBundle: jest.fn(async () => ({
+          bundleUrl: "file:///tmp/support.zip",
+          files: ["local-progress.sqlite", "diagnostic.txt", "manifest.json"],
+          kind: "partial" as const
+        })),
+        shareSupportBundle: jest.fn(async () => undefined)
+      }
+    });
+
+    press(renderer, "settings-tab");
+    await waitForAssertion(() => {
+      expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain(
+        "iCloud sync failed"
+      );
+    });
+    press(renderer, "settings-sync-error-details");
+    await pressAsync(renderer, "settings-sync-error-copy");
+
+    expect(copyText).toHaveBeenCalledTimes(1);
+    const copiedDiagnostic = copyText.mock.calls[0]![0];
+    expect(copiedDiagnostic).toContain("Code: icloud_fetch_failed");
+    expect(copiedDiagnostic).toContain("Native code: 7");
+    expect(copiedDiagnostic).not.toContain("must-not-be-copied");
+  });
+
+  it("keeps support diagnostics reachable when iCloud sync is off", async () => {
+    const service = createMobilePracticeService("random1000");
+    service.saveSettings({
+      ...service.getSettings(),
+      sync: {
+        iCloudEnabled: false
+      }
+    });
+    const prepareSupportBundle = jest.fn(async (_input: {
+      diagnosticText: string;
+      metadata: unknown;
+    }) => ({
+      bundleUrl: "file:///tmp/chessticize-support.zip",
+      files: [
+        "local-progress.sqlite",
+        "icloud-progress-snapshot.json",
+        "diagnostic.txt",
+        "manifest.json"
+      ],
+      kind: "complete" as const
+    }));
+    const shareSupportBundle = jest.fn(async () => undefined);
+    const discardSupportBundle = jest.fn(async () => undefined);
+    const renderer = renderScreen({
+      practiceService: service,
+      iCloudSyncDiagnosticsClient: {
+        copyText: jest.fn(async () => undefined),
+        discardSupportBundle,
+        prepareSupportBundle,
+        shareSupportBundle
+      }
+    });
+
+    press(renderer, "settings-tab");
+    expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
+    press(renderer, "settings-sync-support-bundle-entry");
+    await pressAsync(renderer, "settings-sync-support-bundle-prepare");
+
+    expect(prepareSupportBundle).toHaveBeenCalledTimes(1);
+    expect(prepareSupportBundle.mock.calls[0]![0].diagnosticText).toContain(
+      "iCloud sync setting: Off"
+    );
+    await pressAsync(renderer, "settings-sync-support-bundle-share");
+    expect(shareSupportBundle).toHaveBeenCalledWith(
+      "file:///tmp/chessticize-support.zip"
+    );
+    press(renderer, "settings-sync-support-bundle-details");
+    await flushMicrotasks();
+    expect(discardSupportBundle).not.toHaveBeenCalled();
+  });
+
+  it("discards a support bundle that finishes after its diagnostics window closes", async () => {
+    let finishPreparation: ((result: {
+      bundleUrl: string;
+      files: string[];
+      kind: "partial";
+    }) => void) | undefined;
+    const prepareSupportBundle = jest.fn(() => new Promise<{
+      bundleUrl: string;
+      files: string[];
+      kind: "partial";
+    }>((resolve) => {
+      finishPreparation = resolve;
+    }));
+    const discardSupportBundle = jest.fn(async () => undefined);
+    const renderer = renderScreen({
+      iCloudSyncDiagnosticsClient: {
+        copyText: jest.fn(async () => undefined),
+        discardSupportBundle,
+        prepareSupportBundle,
+        shareSupportBundle: jest.fn(async () => undefined)
+      }
+    });
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-sync-support-bundle-entry");
+    press(renderer, "settings-sync-support-bundle-prepare");
+    expect(findByTestId(renderer, "settings-sync-support-bundle-preparing")).toBeTruthy();
+    press(renderer, "settings-sync-error-details-close-icon");
+
+    await act(async () => {
+      finishPreparation?.({
+        bundleUrl: "file:///tmp/late-support.zip",
+        files: ["local-progress.sqlite", "diagnostic.txt", "manifest.json"],
+        kind: "partial"
+      });
+      await Promise.resolve();
+    });
+
+    expect(discardSupportBundle).toHaveBeenCalledWith("file:///tmp/late-support.zip");
+  });
+
   it("shows and copies the issue #353 local iCloud sync diagnostic design", async () => {
     const renderer = renderLabScenario("settings-ios-sync-error-details");
 
@@ -9845,7 +9982,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(modal)).toContain("manifest.json");
     await pressAsync(renderer, "settings-sync-support-bundle-share");
     expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-shared"))).toContain(
-      "Share Sheet requested"
+      "temporary bundle was removed"
     );
 
     press(renderer, "settings-sync-support-bundle-details");

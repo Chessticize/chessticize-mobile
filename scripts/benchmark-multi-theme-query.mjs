@@ -25,7 +25,7 @@ if (!Number.isInteger(iterations) || iterations < 1) {
 const database = new DatabaseSync(packPath, { readOnly: true });
 try {
   const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(database), {
-    allPuzzlesArrowDuelEligible: true
+    arrowDuelEligibility: "all"
   });
   const results = cases.map((benchmarkCase) => benchmarkSelection(source, benchmarkCase));
   const focusedQuotaPlan = benchmarkFocusedQuotaPlan(source);

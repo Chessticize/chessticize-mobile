@@ -32,10 +32,13 @@ const familiar15Manifest = require("../../../../fixtures/puzzles/familiar-15-e2e
 export type MobilePuzzleSource = "bundledCore" | "familiar15" | "random1000";
 const DEFAULT_PUZZLE_SOURCE: MobilePuzzleSource = "bundledCore";
 const BUNDLED_CORE_PACK_OPTIONS = {
-  allPuzzlesArrowDuelEligible: bundledCoreManifest.arrowDuelCount === bundledCoreManifest.puzzleCount
+  arrowDuelEligibility: bundledCoreManifest.arrowDuelCount === bundledCoreManifest.puzzleCount
+    ? "all"
+    : "all_non_promotion"
 } as const;
 
 let persistentPracticeService: PracticeService | undefined;
+let persistentProgressDatabasePath: string | undefined;
 const seededPuzzleSources = new WeakMap<PracticeService, Set<MobilePuzzleSource>>();
 const packBackedServices = new WeakSet<PracticeService>();
 let persistentPracticeServicePromise: Promise<PracticeService> | undefined;
@@ -144,10 +147,15 @@ function createPersistentService(
     store,
     createTacticalProfileService(store, packSource, tacticalProfileRepository)
   );
+  persistentProgressDatabasePath = userStore.databasePath();
   packBackedServices.add(service);
   configureMobilePracticePuzzleSource(service, DEFAULT_PUZZLE_SOURCE);
   persistentPracticeService = service;
   return service;
+}
+
+export function getPersistentMobileProgressDatabasePath(): string | undefined {
+  return persistentProgressDatabasePath;
 }
 
 class LazyPuzzleSource implements PuzzleSource {

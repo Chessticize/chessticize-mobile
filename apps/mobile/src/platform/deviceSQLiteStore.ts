@@ -81,6 +81,10 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
   close(): void {
     this.nativeDb.close();
   }
+
+  databasePath(): string {
+    return this.nativeDb.getDbPath();
+  }
 }
 
 function bundledJsDirectory(): string | undefined {

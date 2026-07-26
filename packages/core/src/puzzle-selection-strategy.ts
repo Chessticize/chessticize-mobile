@@ -80,7 +80,12 @@ export function isServerCompatibleArrowDuelPuzzle(puzzle: Puzzle): boolean {
   if (!blunderMove || !bestMove || bestEval === undefined || evalAfterBlunder === undefined) {
     return false;
   }
-  if (normalizeMove(blunderMove) === normalizeMove(bestMove)) {
+  const normalizedBlunderMove = normalizeMove(blunderMove);
+  const normalizedBestMove = normalizeMove(bestMove);
+  if (hasArrowDuelPromotionCandidate(puzzle)) {
+    return false;
+  }
+  if (normalizedBlunderMove === normalizedBestMove) {
     return false;
   }
 
@@ -88,7 +93,7 @@ export function isServerCompatibleArrowDuelPuzzle(puzzle: Puzzle): boolean {
   if (legalMoves.length < 2) {
     return false;
   }
-  if (!legalMoves.includes(normalizeMove(blunderMove)) || !legalMoves.includes(normalizeMove(bestMove))) {
+  if (!legalMoves.includes(normalizedBlunderMove) || !legalMoves.includes(normalizedBestMove)) {
     return false;
   }
 
@@ -99,6 +104,11 @@ export function isServerCompatibleArrowDuelPuzzle(puzzle: Puzzle): boolean {
     return bestEval >= -60 && bestEval - evalAfterBlunder > 200;
   }
   return false;
+}
+
+export function hasArrowDuelPromotionCandidate(puzzle: Puzzle): boolean {
+  return [puzzle.solutionMoves[0], puzzle.stockfishBestMove]
+    .some((move) => move !== undefined && normalizeMove(move).length === 5);
 }
 
 function legalMovesFromFen(fen: string): string[] {

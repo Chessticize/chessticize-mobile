@@ -2,6 +2,7 @@
 import type { UciEngineTransport } from '../../../../packages/core/src/index.ts';
 import type { PracticeService } from '../../../../packages/storage/src/practice-service.ts';
 import type { ICloudProgressSyncClient } from './iCloudProgressSync.ts';
+import type { ICloudSyncDiagnosticsClient } from './iCloudSyncDiagnostics.ts';
 import type { MobilePuzzleSource } from './mobilePractice.ts';
 import type {
   ReviewReminderNotificationClient,
@@ -16,6 +17,7 @@ export interface MobileStorageCapabilities {
 
 export interface MobileProgressSyncCapabilities {
   client: ICloudProgressSyncClient | null;
+  diagnostics: ICloudSyncDiagnosticsClient | null;
 }
 
 export type MobileProgressProtectionCapabilities =

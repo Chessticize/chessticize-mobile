@@ -61,6 +61,21 @@ export const ICloudSyncErrorDetails: Story = {
   }
 };
 
+export const ICloudSyncSupportBundle: Story = {
+  name: "iCloud support diagnostics",
+  args: { scenarioId: "settings-ios-sync-support-bundle" },
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await clickTestId(canvasElement, "settings-sync-support-bundle-entry");
+    await waitForText(canvasElement, "This bundle contains progress data");
+    await waitForText(canvasElement, "local-progress.sqlite");
+    await waitForText(canvasElement, "icloud-progress-snapshot.json");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-prepare");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-complete");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-share");
+  }
+};
+
 export const ICloudSyncSupportBundlePartial: Story = {
   name: "iCloud sync support bundle · partial",
   args: { scenarioId: "settings-ios-sync-support-bundle-partial" },

@@ -8,7 +8,7 @@
   "presolve": "Chessticize depth-20 Stockfish presolve",
   "presolveDepth": 20,
   "licenseNote": "Derived from Lichess puzzle data with Chessticize presolve metadata.",
-  "manifestHash": "sha256:39624ed2489280ed2529df09a2ac08ca1f4454cc736233f004751391e038d4a0",
+  "manifestHash": "sha256:be689ea75d3155edeefe38a94027f341bc37046d7203b99d68e85182e10470ab",
   "packFileHash": "sha256:0b29bc9672300370484d226ede587a19ed03ab2fa1cbaf2b0eae36b43070b6f0",
   "packFileBytes": 520278016,
   "format": "sqlite",
@@ -1425,5 +1425,5 @@
     "puzzleRatingDeviation": true,
     "featureHash": "sha256:9a4a1613713cfd72da6eb718c717c762b08aa361ec23d88b43e5e029d20fb295"
   },
-  "arrowDuelCount": 1400000
+  "arrowDuelCount": 1392969
 }

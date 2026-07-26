@@ -1,5 +1,6 @@
 import type { PracticeService } from '../../../../packages/storage/src/practice-service.ts';
 import type { ICloudProgressSyncClient } from '../platform/iCloudProgressSync.ts';
+import type { ICloudSyncDiagnosticsClient } from '../platform/iCloudSyncDiagnostics.ts';
 import {
   configureMobilePracticePuzzleSource,
   createMobilePracticeService,
@@ -30,6 +31,7 @@ export interface TestMobilePlatformCapabilityOverrides {
   reviewReminderNotificationClient?: ReviewReminderNotificationClient | null;
   reminderPlatform?: MobilePlatformCapabilities['reminders']['platform'];
   iCloudProgressSyncClient?: ICloudProgressSyncClient | null;
+  iCloudSyncDiagnosticsClient?: ICloudSyncDiagnosticsClient | null;
   progressProtection?: MobileProgressProtectionCapabilities;
   applicationMetadata?: Partial<MobileApplicationMetadata>;
   moveFeedbackClient?: MoveFeedbackClient | null;
@@ -58,6 +60,7 @@ export function createTestMobilePlatformCapabilities(
     progressProtection: overrides.progressProtection ?? { kind: 'icloud_sync' },
     progressSync: {
       client: overrides.iCloudProgressSyncClient ?? null,
+      diagnostics: overrides.iCloudSyncDiagnosticsClient ?? null,
     },
     stockfish: {
       createTransport: overrides.stockfish?.createTransport ?? (() => null),
