@@ -606,7 +606,11 @@ export function PracticePocScreen({
   const { fontScale, height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  const [mode, setMode] = useState<SprintMode>("standard");
+  const [mode, setMode] = useState<SprintMode>(
+    () => sprintRulesDesignPreview?.initialResultState?.config.mode
+      ?? sprintRulesDesignPreview?.initialActiveState?.config.mode
+      ?? "standard"
+  );
   const [startingMode, setStartingMode] = useState<SprintMode | null>(null);
   const [tab, setTab] = useState<Tab>(initialTab);
   const [state, setState] = useState<SprintState | null>(
@@ -7632,7 +7636,10 @@ function SessionStatusBar({
             minimumFontScale={0.75}
             numberOfLines={1}
             testID="session-progress"
-            style={styles.sessionProgressValue}
+            style={[
+              styles.sessionProgressValue,
+              compactMetrics ? styles.sessionMetricTextCompact : null
+            ]}
           >
             {isTacticalFocus
               ? `${completedAttempts} / ${plannedAttempts}`
@@ -7649,7 +7656,10 @@ function SessionStatusBar({
             minimumFontScale={0.75}
             numberOfLines={1}
             testID="session-timer"
-            style={styles.timerText}
+            style={[
+              styles.timerText,
+              compactMetrics ? styles.sessionMetricTextCompact : null
+            ]}
           >
             {timerText}
           </Text>
@@ -7664,7 +7674,10 @@ function SessionStatusBar({
               adjustsFontSizeToFit={compactMetrics}
               minimumFontScale={0.75}
               numberOfLines={1}
-              style={styles.timerText}
+              style={[
+                styles.timerText,
+                compactMetrics ? styles.sessionMetricTextCompact : null
+              ]}
             >
               Unrated
             </Text>
@@ -16205,6 +16218,10 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontVariant: ["tabular-nums"],
     letterSpacing: 0.2
+  },
+  sessionMetricTextCompact: {
+    fontSize: 16,
+    letterSpacing: 0
   },
   puzzleTimingIndicator: {
     alignItems: "center",

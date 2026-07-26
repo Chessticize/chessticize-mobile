@@ -1216,7 +1216,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("keeps Puzzle solving and Arrow Duel focus lanes separate inside one profile", () => {
+  it("keeps Puzzle solving and Arrow Duel focus lanes separate inside one profile", async () => {
     const renderer = renderLabScenario("practice-tactical-profile-task-families-home");
 
     expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
@@ -1260,6 +1260,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain(
       "Choose the best move"
     );
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toContain(
+      "Arrow Duel sprint"
+    );
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 15");
+
+    await boardMove(renderer, "e8f7");
+
+    expect(() => findByTestId(renderer, "error-panel")).toThrow();
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 / 15");
   });
 
   it("uses an explicit cross-mode Home lead and blocks mismatched Focused Runs", () => {
@@ -4805,7 +4814,7 @@ describe("PracticePocScreen", () => {
       .findAllByType(ReactNative.Text)
       .find((node) => collectText(node) === "Completed");
 
-    expect(unratedText?.props.adjustsFontSizeToFit).toBe(true);
+    expect(flattenTestStyle(unratedText?.props.style).fontSize).toBe(16);
     expect(completedText?.props.adjustsFontSizeToFit).toBe(true);
   });
 
