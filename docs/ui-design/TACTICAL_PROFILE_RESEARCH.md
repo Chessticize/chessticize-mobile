@@ -834,10 +834,12 @@ After an owner-approved representative corpus passes calibration, the local
 harness writes the reviewed aggregate report and replacement artifact with
 `--report config/tactical-profile-calibration-report-v1.json` and
 `--artifact config/tactical-profile-calibration-artifact-v1.json`. Build tests
-recompute the report and policy hashes and require every calibrated family to
-match a passing report result. This is a data-only activation seam: no
-product-code change is needed, and a task family that does not pass its own
-gates remains unavailable.
+recompute the report and policy hashes, reconstruct the complete artifact from
+the authenticated report, predeclared policy, and bundled pack, and require an
+exact match. A hand-edited coefficient, threshold, or Focused Run parameter
+therefore fails the build even when it remains finite. This is a data-only
+activation seam: no product-code or test-code change is needed, and a task
+family that does not pass its own gates remains unavailable.
 
 The Phase A PR MUST NOT implement this harness unless a tiny pure local script
 is separately needed to verify a research claim. It MUST NOT upload user data,

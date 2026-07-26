@@ -12,15 +12,13 @@ const bundledArtifact = require(
 ) as TacticalProfileCalibrationArtifact;
 
 describe("production Tactical Profile calibration", () => {
-  it("keeps the checked-in artifact unavailable until representative holdout passes", () => {
+  it("loads the checked-in artifact for its exact bundled pack and policy", () => {
     const calibration = productionTacticalProfileCalibration(bundledManifest);
 
     expect(calibration).toEqual(bundledArtifact);
     expect(calibration.packFeatureHash).toBe(
       bundledManifest.tacticalAnalysis?.featureHash
     );
-    expect(calibration.families.line.status).toBe("unavailable");
-    expect(calibration.families.arrow_duel.status).toBe("unavailable");
   });
 
   it("accepts a valid calibrated artifact for the exact bundled pack", () => {

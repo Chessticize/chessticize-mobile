@@ -680,7 +680,30 @@ function joinCanonicalObservations(exports, database) {
   };
 }
 
-function buildArtifact(report, familyReports, policy, manifest) {
+export function assertCalibrationArtifactMatchesReport(
+  artifact,
+  report,
+  policy,
+  manifest
+) {
+  const expectedArtifact = buildArtifact(
+    report,
+    report.families,
+    policy,
+    manifest
+  );
+  if (
+    calibrationContentHash(artifact) !==
+    calibrationContentHash(expectedArtifact)
+  ) {
+    throw new Error(
+      "Calibration artifact does not exactly match its authenticated report, policy, and pack"
+    );
+  }
+  return expectedArtifact;
+}
+
+export function buildArtifact(report, familyReports, policy, manifest) {
   const parameters = policy.artifactParameters;
   const families = Object.fromEntries(["line", "arrow_duel"].map((family) => {
     const result = familyReports[family];

@@ -10,6 +10,8 @@ import {
   assertValidTacticalProfileCalibrationArtifact
 } from "../packages/core/src/index.ts";
 import {
+  assertCalibrationArtifactMatchesReport,
+  buildArtifact,
   calibrationContentHash,
   evaluateCalibrationReadiness,
   posteriorApproximationReport,
@@ -39,10 +41,6 @@ test("bundled calibration artifact is valid and tied to the predeclared policy a
     artifact.packFeatureHash,
     manifest.tacticalAnalysis.featureHash
   );
-  assert.deepEqual(
-    Object.values(artifact.families).map((family) => family.status),
-    ["unavailable", "unavailable"]
-  );
   const calibratedFamilies = Object.entries(artifact.families)
     .filter(([, family]) => family.status === "calibrated")
     .map(([taskFamily]) => taskFamily);
@@ -70,6 +68,15 @@ test("bundled calibration artifact is valid and tied to the predeclared policy a
     assert.equal(report.input.representativeOwnerApproved, true);
     assert.equal(report.input.policyHash, calibrationContentHash(policy));
     assert.equal(report.packFeatureHash, manifest.tacticalAnalysis.featureHash);
+    assert.deepEqual(
+      artifact,
+      assertCalibrationArtifactMatchesReport(
+        artifact,
+        report,
+        policy,
+        manifest
+      )
+    );
     for (const taskFamily of calibratedFamilies) {
       assert.deepEqual(
         artifact.provenance.familyReadiness[taskFamily],
@@ -78,6 +85,79 @@ test("bundled calibration artifact is valid and tied to the predeclared policy a
       assert.equal(report.families[taskFamily].readiness.ready, true);
     }
   }
+});
+
+test("authenticated reports bind every generated artifact parameter", () => {
+  const policy = calibrationPolicy();
+  const manifest = {
+    tacticalAnalysis: {
+      featureHash: `sha256:${"a".repeat(64)}`
+    }
+  };
+  const calibratedFamily = {
+    readiness: { ready: true, reasons: [] },
+    solve: {
+      coefficients: {
+        intercept: -0.25,
+        ratingGapSlope: 0.01,
+        timeoutLogCoefficient: -0.5
+      }
+    },
+    speed: {
+      coefficients: {
+        interceptLogSeconds: 3,
+        relativeDifficultyCoefficient: 0.002,
+        decisionCountCoefficient: 0.1,
+        paceLogCoefficient: 0.2,
+        slowPolicyLogCoefficient: 0.3
+      },
+      residualSd: 0.4
+    }
+  };
+  const report = {
+    createdAt: "2026-07-26T00:00:00.000Z",
+    policyId: policy.policyId,
+    input: {
+      schemaVersion: 1,
+      policyHash: calibrationContentHash(policy),
+      corpusHash: `sha256:${"b".repeat(64)}`,
+      decisionEvidenceId: "owner-reviewed-decisions",
+      representativeOwnerApproved: true
+    },
+    families: {
+      line: calibratedFamily,
+      arrow_duel: structuredClone(calibratedFamily)
+    }
+  };
+  const artifact = buildArtifact(
+    report,
+    report.families,
+    policy,
+    manifest
+  );
+
+  assert.deepEqual(
+    artifact,
+    assertCalibrationArtifactMatchesReport(
+      artifact,
+      report,
+      policy,
+      manifest
+    )
+  );
+
+  const handEdited = structuredClone(artifact);
+  handEdited.families.line.solve.ratingGapSlope += 0.001;
+  assert.throws(
+    () =>
+      assertCalibrationArtifactMatchesReport(
+        handEdited,
+        report,
+        policy,
+        manifest
+      ),
+    /does not exactly match/
+  );
 });
 
 test("calibration holdout keeps every session wholly on one side", () => {
