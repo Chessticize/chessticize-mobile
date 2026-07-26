@@ -314,7 +314,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     customTargetCorrect: 1
   };
   if (isRunManagementScenario(scenarioId)) {
-    service = createRunManagementService(scenarioId === "practice-runs-empty");
+    service = createRunManagementService(
+      scenarioId === "practice-runs-empty",
+      scenarioId === "practice-home" ? 28 : 0
+    );
     screenProps.runManagementEnabled = true;
   }
 
@@ -519,8 +522,21 @@ function createSessionGuideService(): PracticeService {
   return new PracticeService(store);
 }
 
-function createRunManagementService(empty: boolean): PracticeService {
-  const service = createSeededService();
+function createRunManagementService(empty: boolean, dueReviewCount = 0): PracticeService {
+  const store = new MemoryStore();
+  const reviewPuzzles = Array.from({ length: dueReviewCount }, (_, index) => ({
+    ...LAB_PUZZLES[index % LAB_PUZZLES.length]!,
+    id: `home-review-${index + 1}`
+  }));
+  store.seedPuzzles([...LAB_PUZZLES, ...reviewPuzzles]);
+  for (const puzzle of reviewPuzzles) {
+    store.scheduleMistakeReview({
+      puzzleId: puzzle.id,
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-07-17T12:00:00.000Z");
+  }
+  const service = new PracticeService(store);
   service.setPracticeRunRating("standard", 925);
   service.setPracticeRunRating("arrow-duel", 875);
   service.createPracticeRun({

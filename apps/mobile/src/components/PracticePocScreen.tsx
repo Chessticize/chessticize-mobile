@@ -3874,22 +3874,15 @@ function PracticeHome({
               <Text style={styles.listText}>{reviewStatusLabel}</Text>
             </View>
             <View
-              style={[
-                styles.reviewStripActionArea,
-                adaptiveLayout.usesWideContent ? styles.reviewStripActionAreaWide : null
-              ]}
+              style={styles.reviewStripActionArea}
               testID="practice-review-strip-action-area"
             >
               <View
-                style={[
-                  styles.reviewStripCounts,
-                  adaptiveLayout.usesWideContent ? styles.reviewStripCountsWide : null
-                ]}
+                style={styles.reviewStripCounts}
                 testID="practice-review-strip-counts"
               >
                 <View style={styles.reviewStripMetric} testID="practice-review-due-count">
                   <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
-                  <Text style={styles.reviewStripMetricLabel}>Due today</Text>
                 </View>
                 {overdueReviewCount > 0 ? (
                   <View style={styles.reviewStripMetric} testID="practice-review-overdue-count">
@@ -5359,7 +5352,7 @@ function PracticeRunCard({
               ? "practice-mode-arrow-duel-rating"
               : undefined}
         >
-          Rating {run.elo}
+          {run.elo}
         </Text>
         {editing ? (
           <View style={styles.runEditActions}>
@@ -15240,11 +15233,10 @@ const styles = StyleSheet.create({
   },
   reviewStripActionArea: {
     alignItems: "center",
+    alignSelf: "stretch",
     flexDirection: "row",
-    flexShrink: 0,
-    gap: 8
-  },
-  reviewStripActionAreaWide: {
+    justifyContent: "center",
+    position: "relative",
     width: "50%"
   },
   reviewStripStatusCopy: {
@@ -15289,24 +15281,27 @@ const styles = StyleSheet.create({
     gap: 10
   },
   reviewStripCounts: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: 10
-  },
-  reviewStripCountsWide: {
+    alignItems: "center",
     flex: 1,
-    justifyContent: "center"
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    paddingHorizontal: 22
   },
   reviewStripChevron: {
     alignItems: "center",
-    height: 32,
+    bottom: 0,
     justifyContent: "center",
+    position: "absolute",
+    right: 0,
+    top: 0,
     width: 18
   },
   reviewStripMetric: {
     alignItems: "center",
+    flexShrink: 1,
     gap: 3,
-    minWidth: 58
+    minWidth: 48
   },
   reviewDueCount: {
     color: "#111827",

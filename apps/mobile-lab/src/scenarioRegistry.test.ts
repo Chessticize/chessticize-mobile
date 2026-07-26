@@ -168,6 +168,16 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   ));
 });
 
+test("Issue #344 keeps Practice home value polish on the existing Home scenario", () => {
+  const home = scenarioRegistry["practice-home"];
+
+  assert.ok(home.scope.includes.includes("Numeric trailing Ratings"));
+  assert.ok(home.scope.includes.includes("Single Review status label"));
+  assert.ok(home.scope.includes.includes("Centered Review workload count"));
+  assert.ok(home.issues?.some((issue) => issue.issueNumber === 344));
+  assert.deepEqual(storyTagsForScenario("practice-home"), ["new"]);
+});
+
 test("post-attempt handoffs explain Timeout, Wrong, and Slow-correct results", () => {
   const timedOut = scenarioRegistry["practice-timing-timeout"];
   const afterTimeout = scenarioRegistry["practice-timeout-review-notice"];
