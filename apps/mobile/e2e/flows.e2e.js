@@ -50,10 +50,18 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('settings-sync-support-bundle-modal')))
       .toBeVisible()
       .withTimeout(10000);
+    await waitFor(element(by.id('settings-sync-support-bundle-prepare')))
+      .toBeVisible()
+      .whileElement(by.id('settings-sync-support-bundle-scroll'))
+      .scroll(150, 'down');
     await element(by.id('settings-sync-support-bundle-prepare')).tap();
     await waitFor(element(by.id('settings-sync-support-bundle-share')))
+      .toExist()
+      .withTimeout(20000);
+    await element(by.id('settings-sync-support-bundle-scroll')).scrollTo('bottom');
+    await waitFor(element(by.id('settings-sync-support-bundle-details')))
       .toBeVisible()
-      .withTimeout(60000);
+      .withTimeout(10000);
     await element(by.id('settings-sync-support-bundle-details')).tap();
     await waitFor(element(by.id('settings-sync-support-bundle-modal')))
       .not.toExist()

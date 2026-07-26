@@ -199,6 +199,9 @@ export function ICloudSyncErrorDetails({
             <ScrollView
               contentContainerStyle={styles.modalContent}
               showsVerticalScrollIndicator
+              testID={entryVariant === "support"
+                ? "settings-sync-support-bundle-scroll"
+                : "settings-sync-error-details-scroll"}
             >
               <View style={styles.header}>
                 <View style={styles.headerCopy}>
