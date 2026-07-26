@@ -229,12 +229,15 @@ function resolvedRecommendedTaskFamily(
       .filter((signal) => signal.status === "recommended")
       .map((signal) => signal.taskFamily)
   );
-  if (recommendedFamilies.size > 0) {
-    return preferredTaskFamily(recommendedFamilies, activeTaskFamily);
-  }
   const visibleFamilies = new Set(
     snapshot?.evaluation.signals.map((signal) => signal.taskFamily)
   );
+  if (visibleFamilies.has(activeTaskFamily)) {
+    return activeTaskFamily;
+  }
+  if (recommendedFamilies.size > 0) {
+    return preferredTaskFamily(recommendedFamilies, activeTaskFamily);
+  }
   if (visibleFamilies.size > 0) {
     return preferredTaskFamily(visibleFamilies, activeTaskFamily);
   }

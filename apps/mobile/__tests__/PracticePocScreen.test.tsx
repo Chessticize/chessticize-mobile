@@ -1270,6 +1270,38 @@ describe("PracticePocScreen", () => {
     ).toBeTruthy();
   });
 
+  it("keeps an explicitly selected watch lane visible beside a recommendation", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const mixedStatusCalibration = {
+      ...COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+      evidence: {
+        ...COMPONENT_TACTICAL_PROFILE_CALIBRATION.evidence,
+        minDistinctPuzzles: 9
+      }
+    } satisfies TacticalProfileCalibrationArtifact;
+    const practiceService = createDualFamilyFocusedPracticeService(
+      mixedStatusCalibration,
+      2
+    );
+    expect(
+      practiceService.getTacticalProfileSnapshot()?.evaluation.signals.map(
+        (signal) => [signal.taskFamily, signal.status]
+      )
+    ).toEqual([
+      ["line", "recommended"],
+      ["arrow_duel", "watch"]
+    ]);
+
+    const renderer = renderScreen({ practiceService });
+    press(renderer, "training-focus-open-profile");
+    expect(findByTestId(renderer, "tactical-profile-signal-line:fork")).toBeTruthy();
+
+    press(renderer, "tactical-profile-task-family-arrow_duel");
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+  });
+
   it("opens a cached production Tactical Profile without reading full history or exact inventory", () => {
     jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
     let store: MemoryStore | undefined;
@@ -10525,7 +10557,8 @@ function createArrowTacticalProfileService(
 
 function createDualFamilyFocusedPracticeService(
   calibration: TacticalProfileCalibrationArtifact =
-    COMPONENT_TACTICAL_PROFILE_CALIBRATION
+    COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+  arrowSessionCount = 3
 ): PracticeService {
   const candidates = tacticalProfilePuzzleFixture
     .filter(isServerCompatibleArrowDuelPuzzle)
@@ -10563,7 +10596,8 @@ function createDualFamilyFocusedPracticeService(
     ["line", lineConfig, linePuzzles],
     ["arrow_duel", arrowConfig, arrowPuzzles]
   ] as const) {
-    for (let sessionIndex = 0; sessionIndex < 3; sessionIndex += 1) {
+    const sessionCount = taskFamily === "arrow_duel" ? arrowSessionCount : 3;
+    for (let sessionIndex = 0; sessionIndex < sessionCount; sessionIndex += 1) {
       const day = 10 + sessionIndex * 4;
       const startedAt = `2026-07-${String(day).padStart(2, "0")}T00:00:00.000Z`;
       const completedAt = `2026-07-${String(day).padStart(2, "0")}T00:04:00.000Z`;
