@@ -1770,6 +1770,10 @@ describe("PracticePocScreen", () => {
     });
 
     const portrait = renderLabScenario("practice-active-session-guide");
+    expect(() => findByTestId(
+      portrait,
+      "practice-session-guide-back"
+    )).toThrow();
     expect(findByTestId(
       portrait,
       "practice-session-guide-coach-pointer-overview-top"
@@ -1815,6 +1819,40 @@ describe("PracticePocScreen", () => {
     });
 
     const landscape = renderLabScenario("practice-active-session-guide");
+    const landscapeLayout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height: 402,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 },
+      width: 874
+    });
+    const packedRowHalf = landscapeLayout.sessionPackedRowWidth / 2;
+    const boardCalloutTranslateX = Math.round(-packedRowHalf + 12);
+    const railTranslateX = Math.round(
+      -packedRowHalf + landscapeLayout.boardSize + landscapeLayout.sessionRailGap
+    );
+    const disabledBack = findByTestId(landscape, "practice-session-guide-back");
+    expect(disabledBack.props.disabled).toBe(true);
+    expect(disabledBack.props.accessibilityState).toEqual({ disabled: true });
+    expect(flattenTestStyle(disabledBack.props.style)).toMatchObject({
+      backgroundColor: "#F8FAFC",
+      borderColor: "#E2E8F0"
+    });
+    expect(flattenTestStyle(findByTestId(
+      landscape,
+      "practice-session-guide-coach-overview"
+    ).props.style)).toMatchObject({
+      left: "50%",
+      transform: [{ translateX: railTranslateX }],
+      width: landscapeLayout.sessionRailWidth
+    });
+    expect(flattenTestStyle(findByTestId(
+      landscape,
+      "practice-session-guide-navigation"
+    ).props.style)).toMatchObject({
+      left: "50%",
+      transform: [{ translateX: railTranslateX }],
+      width: landscapeLayout.sessionRailWidth
+    });
     press(landscape, "practice-session-guide-start");
     expect(findByTestId(
       landscape,
@@ -1830,21 +1868,41 @@ describe("PracticePocScreen", () => {
       landscape,
       "practice-session-guide-coach-pointer-unclear-right"
     )).toBeTruthy();
-    expect(findByTestId(
+    expect(flattenTestStyle(findByTestId(
+      landscape,
+      "practice-session-guide-coach-pointer-unclear-right"
+    ).props.style).height).toBe(2);
+    expect(() => findByTestId(
       landscape,
       "practice-session-guide-coach-pointer-unclear-right-horizontal"
-    )).toBeTruthy();
-    expect(findByTestId(
+    )).toThrow();
+    expect(() => findByTestId(
       landscape,
       "practice-session-guide-coach-pointer-unclear-right-vertical"
-    )).toBeTruthy();
+    )).toThrow();
     expect(findByTestId(
       landscape,
       "practice-session-guide-coach-pointer-unclear-right-head"
     )).toBeTruthy();
+    expect(flattenTestStyle(findByTestId(
+      landscape,
+      "practice-session-guide-coach-unclear"
+    ).props.style)).toMatchObject({
+      left: "50%",
+      transform: [{ translateX: boardCalloutTranslateX }],
+      width: landscapeLayout.boardSize - 24
+    });
     expect(flattenTestStyle(
       findByTestId(landscape, "active-session-control-rail-content").props.style
     ).gap).toBe(4);
+    expect(findByTestId(
+      landscape,
+      "sprint-unclear-prompt"
+    ).props.onLayout).toBeDefined();
+    expect(findByTestId(
+      landscape,
+      "sprint-unclear-toggle"
+    ).props.onLayout).toBeUndefined();
     expect(findByTestId(landscape, "sprint-unclear-toggle").props.accessibilityLabel).toBe(
       "Mark this attempt as unclear"
     );
@@ -1861,12 +1919,24 @@ describe("PracticePocScreen", () => {
     )).toBeTruthy();
     expect(findByTestId(
       arrowDuel,
-      "practice-session-guide-coach-pointer-arrow-duel-top-horizontal"
+      "practice-session-guide-coach-pointer-arrow-duel-top-head"
     )).toBeTruthy();
-    expect(findByTestId(
+    expect(() => findByTestId(
+      arrowDuel,
+      "practice-session-guide-coach-pointer-arrow-duel-top-horizontal"
+    )).toThrow();
+    expect(() => findByTestId(
       arrowDuel,
       "practice-session-guide-coach-pointer-arrow-duel-top-endpoint"
-    )).toBeTruthy();
+    )).toThrow();
+    expect(flattenTestStyle(findByTestId(
+      arrowDuel,
+      "practice-arrow-duel-guide-coach"
+    ).props.style)).toMatchObject({
+      left: "50%",
+      transform: [{ translateX: boardCalloutTranslateX }],
+      width: landscapeLayout.boardSize - 24
+    });
   });
 
   it("keeps the complete first-use guide operable in the maintained iPhone portrait viewport", () => {

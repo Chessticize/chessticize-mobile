@@ -83,7 +83,6 @@ export function buildSessionGuideRailConnectorGeometry({
 
 export type ArrowDuelLandscapeGuideGeometry = {
   calloutTop: number;
-  connectorArmWidth: number;
   connectorHeight: number;
   connectorLeft: number;
 };
@@ -95,18 +94,41 @@ export function buildArrowDuelLandscapeGuideGeometry(
   const calloutTop = Math.round(boardSize * 0.58);
   const candidateOriginCenterX = boardSize * (6.5 / 8);
   const candidateOriginCenterY = boardSize * (2.5 / 8);
-  const connectorArmWidth = Math.max(18, Math.round(boardSize / 15));
+  const connectorWidth = 10;
   const targetGap = boardSize / 16 + 6;
 
   return {
     calloutTop,
-    connectorArmWidth,
     connectorHeight: Math.max(
       24,
       Math.round(calloutTop - candidateOriginCenterY - targetGap)
     ),
     connectorLeft: Math.round(
-      candidateOriginCenterX - calloutLeft - connectorArmWidth
+      candidateOriginCenterX - calloutLeft - connectorWidth / 2
     )
+  };
+}
+
+export type SessionGuideLandscapeAlignment = {
+  boardCalloutTranslateX: number;
+  railTranslateX: number;
+};
+
+export function buildSessionGuideLandscapeAlignment({
+  boardSize,
+  sessionRailGap,
+  sessionRailWidth
+}: {
+  boardSize: number;
+  sessionRailGap: number;
+  sessionRailWidth: number;
+}): SessionGuideLandscapeAlignment {
+  const centeredRowLeft = -(
+    boardSize + sessionRailGap + sessionRailWidth
+  ) / 2;
+
+  return {
+    boardCalloutTranslateX: Math.round(centeredRowLeft + 12),
+    railTranslateX: Math.round(centeredRowLeft + boardSize + sessionRailGap)
   };
 }
