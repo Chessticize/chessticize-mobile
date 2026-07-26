@@ -1,5 +1,6 @@
 import type {
   FocusedRunPreview,
+  TacticalProfileEvidenceProgress,
   TacticalProfileIntent,
   TacticalProfilePresentation,
   TacticalProfileScreen,
@@ -151,6 +152,138 @@ const ARROW_DUEL_FOCUS_RUN: FocusedRunPreview = {
   ]
 };
 
+const COLLECTING_EVIDENCE_PROGRESS: TacticalProfileEvidenceProgress = {
+  tone: "collecting",
+  title: "What would make this useful",
+  body: "Three independent checks keep one unusual Run from becoming a training focus.",
+  checks: [
+    {
+      id: "puzzle_variety",
+      label: "Puzzle variety",
+      value: "3 of 4 different puzzles",
+      detail: "One more varied position would meet the minimum comparison check.",
+      status: "building",
+      statusLabel: "1 short"
+    },
+    {
+      id: "session_coverage",
+      label: "Independent Runs",
+      value: "1 of 2 mixed Runs",
+      detail: "A later Run needs to test the pattern independently.",
+      status: "building",
+      statusLabel: "1 short"
+    },
+    {
+      id: "signal_clarity",
+      label: "Signal clarity",
+      value: "No repeated theme yet",
+      detail: "Themes are still trading places instead of separating.",
+      status: "watching",
+      statusLabel: "Watching"
+    }
+  ],
+  footnote: "These checks describe today's evidence. Reaching the minimums does not guarantee that a focus will appear."
+};
+
+const BALANCED_EVIDENCE_PROGRESS: TacticalProfileEvidenceProgress = {
+  tone: "balanced",
+  title: "Why there is no clear focus",
+  body: "There is enough varied evidence to compare, but no single theme stands apart repeatedly.",
+  checks: [
+    {
+      id: "puzzle_variety",
+      label: "Puzzle variety",
+      value: "12 different puzzles",
+      detail: "Enough varied positions are available for a useful comparison.",
+      status: "ready",
+      statusLabel: "Enough"
+    },
+    {
+      id: "session_coverage",
+      label: "Independent Runs",
+      value: "4 mixed Runs",
+      detail: "The comparison spans separate sessions instead of one unusual Run.",
+      status: "ready",
+      statusLabel: "Enough"
+    },
+    {
+      id: "signal_clarity",
+      label: "Signal clarity",
+      value: "Themes remain close",
+      detail: "No theme is repeatedly weaker than comparable puzzles.",
+      status: "watching",
+      statusLabel: "No separation"
+    }
+  ],
+  footnote: "Balanced means no clear training priority right now, not that every theme is perfect."
+};
+
+const LINE_READY_EVIDENCE_PROGRESS: TacticalProfileEvidenceProgress = {
+  tone: "ready",
+  title: "Why this became a focus",
+  body: "The Forks pattern cleared all three evidence checks without relying on one mistake.",
+  checks: [
+    {
+      id: "puzzle_variety",
+      label: "Puzzle variety",
+      value: "7 different puzzles",
+      detail: "The pattern appears across several positions.",
+      status: "ready",
+      statusLabel: "Ready"
+    },
+    {
+      id: "session_coverage",
+      label: "Independent Runs",
+      value: "3 mixed Runs",
+      detail: "The pattern repeats across separate sessions.",
+      status: "ready",
+      statusLabel: "Ready"
+    },
+    {
+      id: "signal_clarity",
+      label: "Signal clarity",
+      value: "Forks stands apart",
+      detail: "The gap is clear enough to make training actionable.",
+      status: "ready",
+      statusLabel: "Ready"
+    }
+  ],
+  footnote: "Actionable does not mean certain. This remains an Early estimate and can change with later mixed Runs."
+};
+
+const ARROW_DUEL_READY_EVIDENCE_PROGRESS: TacticalProfileEvidenceProgress = {
+  tone: "ready",
+  title: "Why this Arrow Duel focus is ready",
+  body: "Arrow Duel uses its own choices, sessions, and Rating instead of borrowing Puzzle solving evidence.",
+  checks: [
+    {
+      id: "puzzle_variety",
+      label: "Choice variety",
+      value: "8 different positions",
+      detail: "The pattern appears across several candidate-move choices.",
+      status: "ready",
+      statusLabel: "Ready"
+    },
+    {
+      id: "session_coverage",
+      label: "Independent Runs",
+      value: "3 Arrow Duel Runs",
+      detail: "The pattern repeats in this mode's own sessions.",
+      status: "ready",
+      statusLabel: "Ready"
+    },
+    {
+      id: "signal_clarity",
+      label: "Signal clarity",
+      value: "Pins stands apart",
+      detail: "The mode-specific gap is clear enough to train.",
+      status: "ready",
+      statusLabel: "Ready"
+    }
+  ],
+  footnote: "This lane updates independently from Puzzle solving as your Arrow Duel Rating and history change."
+};
+
 export function isTacticalProfileScenario(
   scenarioId: LabScenarioId
 ): scenarioId is TacticalProfileScenarioId {
@@ -232,10 +365,24 @@ export function tacticalProfilePresentationFor(
     return { ...base, phase: "building", signals: [] };
   }
   if (scenarioId === "practice-tactical-profile-collecting") {
-    return { ...base, phase: "collecting", signals: [] };
+    return {
+      ...base,
+      phase: "collecting",
+      signals: [],
+      evidenceProgressByTaskFamily: {
+        line: COLLECTING_EVIDENCE_PROGRESS
+      }
+    };
   }
   if (scenarioId === "practice-tactical-profile-balanced") {
-    return { ...base, phase: "balanced", signals: [] };
+    return {
+      ...base,
+      phase: "balanced",
+      signals: [],
+      evidenceProgressByTaskFamily: {
+        line: BALANCED_EVIDENCE_PROGRESS
+      }
+    };
   }
   if (scenarioId === "practice-tactical-profile-speed") {
     return {
@@ -259,10 +406,22 @@ export function tacticalProfilePresentationFor(
       }
     };
   }
-  if (
-    scenarioId === "practice-tactical-profile-task-families"
-    || scenarioId === "practice-tactical-profile-task-families-home"
-  ) {
+  if (scenarioId === "practice-tactical-profile-task-families") {
+    return {
+      ...base,
+      phase: "ready",
+      homeLeadSignalId: FORK_SIGNAL.id,
+      signals: [FORK_SIGNAL, ARROW_PIN_SIGNAL, ARROW_DEFLECTION_SPEED_SIGNAL],
+      evidenceProgressByTaskFamily: {
+        line: LINE_READY_EVIDENCE_PROGRESS,
+        arrow_duel: ARROW_DUEL_READY_EVIDENCE_PROGRESS
+      },
+      focusedRun: state.selectedTaskFamily === "arrow_duel"
+        ? ARROW_DUEL_FOCUS_RUN
+        : SINGLE_FOCUS_RUN
+    };
+  }
+  if (scenarioId === "practice-tactical-profile-task-families-home") {
     return {
       ...base,
       phase: "ready",
@@ -283,6 +442,20 @@ export function tacticalProfilePresentationFor(
       phase: "ready",
       signals: [FORK_SIGNAL, PIN_SPEED_SIGNAL, DEFLECTION_SIGNAL, BACK_RANK_SIGNAL],
       focusedRun: RANKED_FOCUS_RUN
+    };
+  }
+  if (
+    scenarioId === "practice-tactical-profile-solve-rate"
+    || scenarioId === "practice-tactical-profile-explanation"
+  ) {
+    return {
+      ...base,
+      phase: "ready",
+      signals: [FORK_SIGNAL],
+      evidenceProgressByTaskFamily: {
+        line: LINE_READY_EVIDENCE_PROGRESS
+      },
+      focusedRun: SINGLE_FOCUS_RUN
     };
   }
   return {

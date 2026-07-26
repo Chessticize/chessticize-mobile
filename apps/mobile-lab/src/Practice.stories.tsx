@@ -58,6 +58,14 @@ export const TacticalProfileCollectingEvidence: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "training-focus-card");
     await waitForText(canvasElement, "More information needed");
+    await clickTestId(canvasElement, "training-focus-open-profile");
+    await waitForTestId(canvasElement, "tactical-profile-evidence-progress");
+    await waitForText(canvasElement, "3 of 4 different puzzles");
+    await expectTestIdText(
+      canvasElement,
+      "tactical-profile-evidence-footnote",
+      "These checks describe today's evidence. Reaching the minimums does not guarantee that a focus will appear."
+    );
   }
 };
 
@@ -67,6 +75,14 @@ export const TacticalProfileBalanced: Story = {
   tags: ["new"],
   play: async ({ canvasElement }) => {
     await waitForText(canvasElement, "No clear focus yet");
+    await clickTestId(canvasElement, "training-focus-open-profile");
+    await waitForTestId(canvasElement, "tactical-profile-evidence-progress");
+    await waitForText(canvasElement, "Themes remain close");
+    await expectTestIdText(
+      canvasElement,
+      "tactical-profile-evidence-footnote",
+      "Balanced means no clear training priority right now, not that every theme is perfect."
+    );
   }
 };
 
@@ -77,6 +93,8 @@ export const TacticalProfileSolveRate: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "tactical-profile-signal-fork");
     await waitForText(canvasElement, "You complete these less reliably than comparable puzzles.");
+    await waitForTestId(canvasElement, "tactical-profile-evidence-progress");
+    await waitForText(canvasElement, "Why this became a focus");
   }
 };
 
@@ -124,6 +142,12 @@ export const TacticalProfileTaskFamilies: Story = {
       canvasElement,
       "This is an early estimate based on ordinary mixed Arrow Duel Runs. It may change as the model is validated with more players. Review and focused Runs do not shape discovery."
     );
+    await waitForTestId(canvasElement, "tactical-profile-evidence-progress");
+    await waitForText(canvasElement, "Why this Arrow Duel focus is ready");
+    await clickTestId(canvasElement, "tactical-profile-task-family-line");
+    await waitForText(canvasElement, "Why this became a focus");
+    await clickTestId(canvasElement, "tactical-profile-task-family-arrow_duel");
+    await waitForText(canvasElement, "Why this Arrow Duel focus is ready");
   }
 };
 
@@ -143,6 +167,8 @@ export const TacticalProfileExplanation: Story = {
   tags: ["new"],
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "tactical-profile-explanation");
+    await waitForTestId(canvasElement, "tactical-profile-evidence-progress");
+    await waitForText(canvasElement, "Forks stands apart");
     await waitForText(canvasElement, "What does not decide this");
   }
 };

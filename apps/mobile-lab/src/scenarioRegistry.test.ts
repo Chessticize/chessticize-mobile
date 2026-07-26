@@ -166,6 +166,31 @@ test("Issue #250 owns the complete Tactical Profile design state set", () => {
   );
 });
 
+test("Issue #363 owns the existing Tactical Profile explainability scenarios", () => {
+  assert.deepEqual(
+    newScenarios
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 363))
+      .map((scenario) => scenario.id),
+    [
+      "practice-tactical-profile-collecting",
+      "practice-tactical-profile-balanced",
+      "practice-tactical-profile-solve-rate",
+      "practice-tactical-profile-task-families",
+      "practice-tactical-profile-explanation"
+    ]
+  );
+  assert.ok(
+    scenarioRegistry["practice-tactical-profile-collecting"].scope.includes.includes(
+      "No guaranteed focus"
+    )
+  );
+  assert.ok(
+    scenarioRegistry["practice-tactical-profile-task-families"].scope.includes.includes(
+      "Independent evidence snapshots"
+    )
+  );
+});
+
 test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab scenarios", () => {
   const activeSessionGuide = scenarioRegistry["practice-active-session-guide"];
   const arrowDuelGuide = scenarioRegistry["practice-arrow-duel-guide"];

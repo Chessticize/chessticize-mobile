@@ -12,6 +12,10 @@
       {
         "issueNumber": 250,
         "changeNote": "Use one calm insufficient-evidence state, including after a one-off mistake."
+      },
+      {
+        "issueNumber": 363,
+        "changeNote": "Show which evidence checks are still short without promising that one more Run creates a focus."
       }
     ]
   },
@@ -20,6 +24,10 @@
       {
         "issueNumber": 250,
         "changeNote": "Show when the early estimate has not found a repeated pattern strong enough to emphasize."
+      },
+      {
+        "issueNumber": 363,
+        "changeNote": "Explain that enough evidence can still produce no clear focus when themes remain close."
       }
     ]
   },
@@ -28,6 +36,10 @@
       {
         "issueNumber": 250,
         "changeNote": "Explain one solve-reliability weakness with diverse puzzle and session evidence."
+      },
+      {
+        "issueNumber": 363,
+        "changeNote": "Show the evidence checks that made a focus actionable without exposing model probabilities."
       }
     ]
   },
@@ -60,6 +72,10 @@
       {
         "issueNumber": 250,
         "changeNote": "Keep Puzzle solving and Arrow Duel focus lanes separate inside one Tactical Profile."
+      },
+      {
+        "issueNumber": 363,
+        "changeNote": "Give each task family its own evidence snapshot and update explanation."
       }
     ]
   },
@@ -76,6 +92,10 @@
       {
         "issueNumber": 250,
         "changeNote": "Explain comparable performance, evidence diversity, and excluded UI metadata."
+      },
+      {
+        "issueNumber": 363,
+        "changeNote": "Explain why the selected recommendation cleared the variety, session, and clarity checks."
       }
     ]
   },

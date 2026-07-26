@@ -1160,6 +1160,12 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
       "has not found a repeated pattern strong enough to emphasize"
     );
+    expect(collectText(
+      findByTestId(renderer, "tactical-profile-evidence-progress")
+    )).toContain("Themes remain close");
+    expect(collectText(
+      findByTestId(renderer, "tactical-profile-evidence-progress")
+    )).toContain("Balanced means no clear training priority");
   });
 
   it("keeps Practice available and automatically retries a failed Tactical Profile cache", async () => {
@@ -1471,6 +1477,12 @@ describe("PracticePocScreen", () => {
     );
     expect(collectText(findByTestId(solveRate, "tactical-profile-screen"))).not.toContain("%");
     expect(collectText(findByTestId(speed, "tactical-profile-screen"))).not.toContain("%");
+    expect(collectText(
+      findByTestId(solveRate, "tactical-profile-evidence-progress")
+    )).toContain("Why this became a focus");
+    expect(() =>
+      findByTestId(speed, "tactical-profile-evidence-progress")
+    ).toThrow();
   });
 
   it("keeps one-off mistakes inside the shared collecting-evidence state", () => {
@@ -1486,6 +1498,12 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
       "We need results from more different puzzles and sessions"
     );
+    expect(collectText(
+      findByTestId(renderer, "tactical-profile-evidence-progress")
+    )).toContain("3 of 4 different puzzles");
+    expect(collectText(
+      findByTestId(renderer, "tactical-profile-evidence-progress")
+    )).toContain("does not guarantee that a focus will appear");
     expect(() => findByTestId(renderer, "tactical-profile-preview-run")).toThrow();
   });
 
@@ -1695,6 +1713,23 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "tactical-profile-restore");
     expect(findByTestId(renderer, "tactical-profile-recommendations")).toBeTruthy();
+  });
+
+  it("shows Storybook-only evidence snapshots for focus and independent task families", () => {
+    const explanation = renderLabScenario("practice-tactical-profile-explanation");
+    expect(collectText(
+      findByTestId(explanation, "tactical-profile-evidence-progress")
+    )).toContain("Forks stands apart");
+
+    const taskFamilies = renderLabScenario("practice-tactical-profile-task-families");
+    expect(collectText(
+      findByTestId(taskFamilies, "tactical-profile-evidence-progress")
+    )).toContain("Why this Arrow Duel focus is ready");
+
+    press(taskFamilies, "tactical-profile-task-family-line");
+    expect(collectText(
+      findByTestId(taskFamilies, "tactical-profile-evidence-progress")
+    )).toContain("Why this became a focus");
   });
 
   it("teaches first-use Sprint rules and retains a rediscovery entry after dismissal", () => {

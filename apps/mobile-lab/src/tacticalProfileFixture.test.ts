@@ -28,6 +28,74 @@ test("issue #250 fixture covers the independent solve-rate and completed-speed h
   assert.equal(speed.signals[0]?.distinctSessionCount, 3);
 });
 
+test("issue #363 fixture explains collection gaps without promising a focus", () => {
+  const presentation = tacticalProfilePresentationFor(
+    "practice-tactical-profile-collecting",
+    initialTacticalProfileFixtureState("practice-tactical-profile-collecting"),
+    () => {}
+  );
+  const progress = presentation.evidenceProgressByTaskFamily?.line;
+
+  assert.ok(progress);
+  assert.equal(progress.tone, "collecting");
+  assert.deepEqual(
+    progress.checks.map((check) => [check.id, check.value, check.statusLabel]),
+    [
+      ["puzzle_variety", "3 of 4 different puzzles", "1 short"],
+      ["session_coverage", "1 of 2 mixed Runs", "1 short"],
+      ["signal_clarity", "No repeated theme yet", "Watching"]
+    ]
+  );
+  assert.match(progress.footnote, /does not guarantee/);
+});
+
+test("issue #363 fixture distinguishes enough evidence from a separated signal", () => {
+  const balanced = tacticalProfilePresentationFor(
+    "practice-tactical-profile-balanced",
+    initialTacticalProfileFixtureState("practice-tactical-profile-balanced"),
+    () => {}
+  ).evidenceProgressByTaskFamily?.line;
+  const focused = tacticalProfilePresentationFor(
+    "practice-tactical-profile-explanation",
+    initialTacticalProfileFixtureState("practice-tactical-profile-explanation"),
+    () => {}
+  ).evidenceProgressByTaskFamily?.line;
+
+  assert.ok(balanced);
+  assert.ok(focused);
+  assert.deepEqual(
+    balanced.checks.map((check) => check.status),
+    ["ready", "ready", "watching"]
+  );
+  assert.equal(balanced.checks[2]?.value, "Themes remain close");
+  assert.deepEqual(
+    focused.checks.map((check) => check.status),
+    ["ready", "ready", "ready"]
+  );
+  assert.match(focused.footnote, /Early estimate/);
+});
+
+test("issue #363 fixture keeps evidence progress independent by task family", () => {
+  const presentation = tacticalProfilePresentationFor(
+    "practice-tactical-profile-task-families",
+    initialTacticalProfileFixtureState("practice-tactical-profile-task-families"),
+    () => {}
+  );
+
+  assert.equal(
+    presentation.evidenceProgressByTaskFamily?.line?.checks[1]?.value,
+    "3 mixed Runs"
+  );
+  assert.equal(
+    presentation.evidenceProgressByTaskFamily?.arrow_duel?.checks[1]?.value,
+    "3 Arrow Duel Runs"
+  );
+  assert.match(
+    presentation.evidenceProgressByTaskFamily?.arrow_duel?.footnote ?? "",
+    /independently/
+  );
+});
+
 test("issue #250 focused Run fixture preserves explicit mixed-practice quota", () => {
   const presentation = tacticalProfilePresentationFor(
     "practice-tactical-profile-focused-run",
