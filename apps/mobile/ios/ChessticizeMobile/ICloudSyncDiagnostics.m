@@ -8,6 +8,7 @@
 static NSString * const ChessticizeDiagnosticRecordName = @"default";
 static NSString * const ChessticizeDiagnosticPayloadField = @"payload";
 static NSString * const ChessticizeSupportArchivePrefix = @"Chessticize-Support-";
+static NSTimeInterval const ChessticizeCloudKitSnapshotTimeoutSeconds = 8.0;
 
 @interface ICloudSyncDiagnostics : NSObject <RCTBridgeModule>
 @end
@@ -141,52 +142,86 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
                                      NSString *accountStatus,
                                      NSString *unavailableReason))completion
 {
+  NSObject *completionLock = [NSObject new];
+  __block BOOL didFinish = NO;
+  BOOL (^isFinished)(void) = ^BOOL {
+    @synchronized(completionLock) {
+      return didFinish;
+    }
+  };
+  void (^finish)(NSData *, NSString *, NSString *) =
+    ^(NSData *payload, NSString *accountStatus, NSString *unavailableReason) {
+      @synchronized(completionLock) {
+        if (didFinish) {
+          return;
+        }
+        didFinish = YES;
+      }
+      completion(payload, accountStatus, unavailableReason);
+    };
+
+  dispatch_after(
+    dispatch_time(DISPATCH_TIME_NOW,
+                  (int64_t)(ChessticizeCloudKitSnapshotTimeoutSeconds * NSEC_PER_SEC)),
+    dispatch_get_global_queue(QOS_CLASS_UTILITY, 0),
+    ^{
+      finish(nil,
+             @"could_not_determine",
+             @"CloudKit snapshot unavailable: the request timed out after 8 seconds.");
+    });
+
   CKContainer *container = [CKContainer defaultContainer];
   [container accountStatusWithCompletionHandler:^(CKAccountStatus status, NSError *statusError) {
+    if (isFinished()) {
+      return;
+    }
     NSString *statusString = [self stringFromAccountStatus:status];
     if (statusError != nil) {
-      completion(nil,
-                 @"could_not_determine",
-                 [self unavailableReasonForError:statusError
-                                        prefix:@"CloudKit account status unavailable"]);
+      finish(nil,
+             @"could_not_determine",
+             [self unavailableReasonForError:statusError
+                                      prefix:@"CloudKit account status unavailable"]);
       return;
     }
     if (status != CKAccountStatusAvailable) {
-      completion(nil,
-                 statusString,
-                 [NSString stringWithFormat:@"CloudKit snapshot unavailable: iCloud account status is %@.",
-                                            statusString]);
+      finish(nil,
+             statusString,
+             [NSString stringWithFormat:@"CloudKit snapshot unavailable: iCloud account status is %@.",
+                                        statusString]);
       return;
     }
 
     CKRecordID *recordID = [[CKRecordID alloc] initWithRecordName:ChessticizeDiagnosticRecordName];
     [container.privateCloudDatabase fetchRecordWithID:recordID
                                     completionHandler:^(CKRecord *record, NSError *fetchError) {
+      if (isFinished()) {
+        return;
+      }
       if (fetchError != nil) {
         if ([fetchError.domain isEqualToString:CKErrorDomain] &&
             fetchError.code == CKErrorUnknownItem) {
-          completion(nil,
-                     statusString,
-                     @"CloudKit snapshot unavailable: no progress snapshot exists yet.");
+          finish(nil,
+                 statusString,
+                 @"CloudKit snapshot unavailable: no progress snapshot exists yet.");
           return;
         }
-        completion(nil,
-                   statusString,
-                   [self unavailableReasonForError:fetchError
-                                          prefix:@"CloudKit snapshot unavailable"]);
+        finish(nil,
+               statusString,
+               [self unavailableReasonForError:fetchError
+                                        prefix:@"CloudKit snapshot unavailable"]);
         return;
       }
 
       NSError *payloadError = nil;
       NSData *payload = [self payloadDataFromRecord:record error:&payloadError];
       if (payloadError != nil || payload.length == 0) {
-        completion(nil,
-                   statusString,
-                   [self unavailableReasonForError:payloadError
-                                          prefix:@"CloudKit snapshot payload unavailable"]);
+        finish(nil,
+               statusString,
+               [self unavailableReasonForError:payloadError
+                                        prefix:@"CloudKit snapshot payload unavailable"]);
         return;
       }
-      completion(payload, statusString, nil);
+      finish(payload, statusString, nil);
     }];
   }];
 }
