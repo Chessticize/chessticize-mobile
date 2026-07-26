@@ -52,7 +52,7 @@ export function buildSessionGuideRailConnectorGeometry({
   calloutHeight,
   routeAboveTarget = false,
   target,
-  targetGap = 10
+  targetGap = 16
 }: {
   boardSize: number;
   calloutHeight: number;
@@ -63,7 +63,7 @@ export function buildSessionGuideRailConnectorGeometry({
   const inset = 12;
   const calloutRight = boardSize - inset;
   const targetCenterY = target.y + target.height / 2;
-  const routeY = routeAboveTarget ? target.y - 18 : targetCenterY;
+  const routeY = routeAboveTarget ? target.y - 28 : targetCenterY;
   const maximumTop = Math.max(inset, boardSize - calloutHeight - inset);
   const calloutTop = Math.round(Math.min(
     maximumTop,
@@ -94,10 +94,14 @@ export function buildArrowDuelLandscapeGuideGeometry(
   const calloutTop = Math.round(boardSize * 0.58);
   const candidateOriginCenterX = boardSize * (6.5 / 8);
   const candidateOriginCenterY = boardSize * (2.5 / 8);
+  const targetGap = boardSize / 16 + 6;
 
   return {
     calloutTop,
-    connectorHeight: Math.max(24, Math.round(calloutTop - candidateOriginCenterY)),
+    connectorHeight: Math.max(
+      24,
+      Math.round(calloutTop - candidateOriginCenterY - targetGap)
+    ),
     connectorLeft: Math.round(candidateOriginCenterX - calloutLeft)
   };
 }

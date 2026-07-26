@@ -1783,7 +1783,15 @@ describe("PracticePocScreen", () => {
     expect(flattenTestStyle(findByTestId(
       portrait,
       "practice-session-guide-coach-pointer-slow-bottom"
-    ).props.style).bottom).toBe(-12);
+    ).props.style).bottom).toBe(-16);
+    expect(findByTestId(
+      portrait,
+      "practice-session-guide-coach-pointer-slow-bottom-line"
+    )).toBeTruthy();
+    expect(findByTestId(
+      portrait,
+      "practice-session-guide-coach-pointer-slow-bottom-head"
+    )).toBeTruthy();
     press(portrait, "practice-session-guide-start");
     expect(findByTestId(portrait, "practice-session-guide-timeout-overlay")).toBeTruthy();
     press(portrait, "practice-session-guide-start");
@@ -1793,6 +1801,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(
       portrait,
       "practice-session-guide-coach-pointer-unclear-bottom"
+    )).toBeTruthy();
+    expect(findByTestId(
+      portrait,
+      "practice-session-guide-coach-pointer-unclear-bottom-head"
     )).toBeTruthy();
 
     setPracticeViewport({
@@ -1826,6 +1838,10 @@ describe("PracticePocScreen", () => {
       landscape,
       "practice-session-guide-coach-pointer-unclear-right-vertical"
     )).toBeTruthy();
+    expect(findByTestId(
+      landscape,
+      "practice-session-guide-coach-pointer-unclear-right-head"
+    )).toBeTruthy();
     expect(flattenTestStyle(
       findByTestId(landscape, "active-session-control-rail-content").props.style
     ).gap).toBe(4);
@@ -1838,6 +1854,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(
       arrowDuel,
       "practice-session-guide-coach-pointer-arrow-duel-top"
+    )).toBeTruthy();
+    expect(findByTestId(
+      arrowDuel,
+      "practice-session-guide-coach-pointer-arrow-duel-top-endpoint"
     )).toBeTruthy();
   });
 

@@ -4815,6 +4815,12 @@ function SessionCoachmarkDemo({
       : coachPointer === "→"
         ? "right"
       : "top";
+  const pointerColor = callout.tone === "warning"
+    ? "#D97706"
+    : callout.tone === "danger"
+      ? "#DC2626"
+      : "#2563EB";
+  const pointerTestId = `practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`;
   const pointerNode = isArrowDuel
     && adaptiveLayout.usesSessionRail
     && arrowDuelLandscapeGeometry ? (
@@ -4828,9 +4834,12 @@ function SessionCoachmarkDemo({
           top: -arrowDuelLandscapeGeometry.connectorHeight
         }
       ]}
-      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+      testID={pointerTestId}
     >
-      <Text style={styles.sessionGuideArrowDuelTargetConnectorHead}>▲</Text>
+      <View
+        style={styles.sessionGuideArrowDuelTargetConnectorEndpoint}
+        testID={`${pointerTestId}-endpoint`}
+      />
     </View>
   ) : pointerPlacement === "right" && measuredConnectorWidth && measuredConnectorDrop > 0 ? (
     <View
@@ -4844,7 +4853,7 @@ function SessionCoachmarkDemo({
           width: measuredConnectorWidth
         }
       ]}
-      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+      testID={pointerTestId}
     >
       <View
         style={[
@@ -4871,16 +4880,14 @@ function SessionCoachmarkDemo({
         ]}
         testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}-vertical`}
       />
-      <Text
+      <View
         style={[
           styles.sessionGuideCoachTargetRouteHead,
           { top: measuredConnectorDrop - 6 },
-          callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
-          callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
+          { borderLeftColor: pointerColor }
         ]}
-      >
-        ▶
-      </Text>
+        testID={`${pointerTestId}-head`}
+      />
     </View>
   ) : pointerPlacement === "right" && measuredConnectorWidth ? (
     <View
@@ -4895,17 +4902,43 @@ function SessionCoachmarkDemo({
         callout.tone === "warning" ? styles.sessionGuideCoachTargetConnectorWarning : null,
         callout.tone === "danger" ? styles.sessionGuideCoachTargetConnectorDanger : null
       ]}
-      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+      testID={pointerTestId}
     >
-      <Text
+      <View
         style={[
           styles.sessionGuideCoachTargetConnectorHead,
-          callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
-          callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
+          { borderLeftColor: pointerColor }
         ]}
-      >
-        ▶
-      </Text>
+        testID={`${pointerTestId}-head`}
+      />
+    </View>
+  ) : pointerPlacement === "bottom" ? (
+    <View
+      accessibilityElementsHidden
+      style={[
+        styles.sessionGuideCoachPointerBottomShape,
+        callout.id === "unclear" && !adaptiveLayout.usesSessionRail
+          ? {
+              left: portraitUnclearPointerLeft ?? "76%"
+            }
+          : styles.sessionGuideCoachPointerBottomCentered
+      ]}
+      testID={pointerTestId}
+    >
+      <View
+        style={[
+          styles.sessionGuideCoachPointerBottomLine,
+          { backgroundColor: pointerColor }
+        ]}
+        testID={`${pointerTestId}-line`}
+      />
+      <View
+        style={[
+          styles.sessionGuideCoachPointerBottomHead,
+          { borderTopColor: pointerColor }
+        ]}
+        testID={`${pointerTestId}-head`}
+      />
     </View>
   ) : (
     <Text
@@ -4913,7 +4946,6 @@ function SessionCoachmarkDemo({
       style={[
         styles.sessionGuideCoachPointer,
         pointerPlacement === "top" ? styles.sessionGuideCoachPointerTop : null,
-        pointerPlacement === "bottom" ? styles.sessionGuideCoachPointerBottom : null,
         pointerPlacement === "left" ? styles.sessionGuideCoachPointerLeft : null,
         pointerPlacement === "right" ? styles.sessionGuideCoachPointerRight : null,
         isArrowDuel && pointerPlacement === "top"
@@ -4928,22 +4960,10 @@ function SessionCoachmarkDemo({
               width: 24
             }
           : null,
-        callout.id === "unclear"
-          && !adaptiveLayout.usesSessionRail
-          && pointerPlacement === "bottom"
-          ? {
-              left: portraitUnclearPointerLeft ?? "76%",
-              right: undefined,
-              width: 24
-            }
-          : null,
-        callout.id === "slow" && pointerPlacement === "bottom"
-          ? { bottom: -12 }
-          : null,
         callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
         callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
       ]}
-      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+      testID={pointerTestId}
     >
       {coachPointer}
     </Text>
@@ -14532,11 +14552,34 @@ const styles = StyleSheet.create({
     right: 0,
     top: -22
   },
-  sessionGuideCoachPointerBottom: {
-    bottom: -22,
-    left: 0,
+  sessionGuideCoachPointerBottomShape: {
+    bottom: -16,
+    height: 12,
     position: "absolute",
-    right: 0
+    width: 24
+  },
+  sessionGuideCoachPointerBottomCentered: {
+    left: "50%",
+    transform: [{ translateX: -12 }]
+  },
+  sessionGuideCoachPointerBottomLine: {
+    height: 6,
+    left: 11,
+    position: "absolute",
+    top: 0,
+    width: 2
+  },
+  sessionGuideCoachPointerBottomHead: {
+    borderLeftColor: "transparent",
+    borderLeftWidth: 5,
+    borderRightColor: "transparent",
+    borderRightWidth: 5,
+    borderTopWidth: 6,
+    height: 0,
+    left: 7,
+    position: "absolute",
+    top: 6,
+    width: 0
   },
   sessionGuideCoachPointerLeft: {
     left: -20,
@@ -14572,12 +14615,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#DC2626"
   },
   sessionGuideCoachTargetConnectorHead: {
-    color: "#2563EB",
-    fontSize: 14,
-    lineHeight: 14,
+    borderBottomColor: "transparent",
+    borderBottomWidth: 5,
+    borderLeftWidth: 8,
+    borderTopColor: "transparent",
+    borderTopWidth: 5,
+    height: 0,
     position: "absolute",
-    right: -2,
-    top: -6
+    right: -8,
+    top: -4,
+    width: 0
   },
   sessionGuideCoachTargetRoute: {
     position: "absolute"
@@ -14598,24 +14645,29 @@ const styles = StyleSheet.create({
     width: 2
   },
   sessionGuideCoachTargetRouteHead: {
-    color: "#2563EB",
-    fontSize: 14,
-    lineHeight: 14,
+    borderBottomColor: "transparent",
+    borderBottomWidth: 5,
+    borderLeftWidth: 8,
+    borderTopColor: "transparent",
+    borderTopWidth: 5,
+    height: 0,
     position: "absolute",
-    right: 0
+    right: -8,
+    width: 0
   },
   sessionGuideArrowDuelTargetConnector: {
     backgroundColor: "#2563EB",
     position: "absolute",
     width: 2
   },
-  sessionGuideArrowDuelTargetConnectorHead: {
-    color: "#2563EB",
-    fontSize: 14,
-    left: -6,
-    lineHeight: 14,
+  sessionGuideArrowDuelTargetConnectorEndpoint: {
+    backgroundColor: "#2563EB",
+    borderRadius: 4,
+    height: 8,
+    left: -3,
     position: "absolute",
-    top: -7
+    top: -4,
+    width: 8
   },
   sessionGuideCoachBadge: {
     color: "#1D4ED8",
