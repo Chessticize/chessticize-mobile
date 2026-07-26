@@ -120,6 +120,10 @@
       {
         "issueNumber": 249,
         "changeNote": "Show the final countdown, lock the board under brief Timed out feedback, then reset for the next puzzle."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Explain the automatic mistake and Review handoff after a timeout in the current active-session layout."
       }
     ]
   },
