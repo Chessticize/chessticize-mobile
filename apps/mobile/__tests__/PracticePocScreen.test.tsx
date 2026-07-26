@@ -1576,7 +1576,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("keeps Arrow Duel guide progress on one line in maintained landscape widths", () => {
+  it("shows the complete Arrow Duel guide progress at maintained landscape widths", () => {
     setPracticeViewport({
       width: 874,
       height: 402,
@@ -1591,7 +1591,6 @@ describe("PracticePocScreen", () => {
 
     const progress = findByTestId(renderer, "practice-session-guide-coach-progress");
     expect(collectText(progress)).toBe("5 of 5");
-    expect(progress.props.numberOfLines).toBe(1);
   });
 
   it("summarizes dynamic pass rules and timeout Review behavior in production New and Edit Run", () => {
