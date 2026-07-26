@@ -3875,6 +3875,10 @@ function PracticeHome({
               <Text style={styles.listText}>{reviewStatusLabel}</Text>
             </View>
             <View
+              style={styles.practiceSummaryColumnGap}
+              testID="practice-review-strip-column-gap"
+            />
+            <View
               style={styles.reviewStripActionArea}
               testID="practice-review-strip-action-area"
             >
@@ -4815,6 +4819,12 @@ function SessionCoachmarkDemo({
       : coachPointer === "→"
         ? "right"
       : "top";
+  const pointerColor = callout.tone === "warning"
+    ? "#D97706"
+    : callout.tone === "danger"
+      ? "#DC2626"
+      : "#2563EB";
+  const pointerTestId = `practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`;
   const pointerNode = isArrowDuel
     && adaptiveLayout.usesSessionRail
     && arrowDuelLandscapeGeometry ? (
@@ -4825,12 +4835,30 @@ function SessionCoachmarkDemo({
         {
           height: arrowDuelLandscapeGeometry.connectorHeight,
           left: arrowDuelLandscapeGeometry.connectorLeft,
-          top: -arrowDuelLandscapeGeometry.connectorHeight
+          top: -arrowDuelLandscapeGeometry.connectorHeight,
+          width: arrowDuelLandscapeGeometry.connectorArmWidth + 1
         }
       ]}
-      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+      testID={pointerTestId}
     >
-      <Text style={styles.sessionGuideArrowDuelTargetConnectorHead}>▲</Text>
+      <View
+        style={styles.sessionGuideArrowDuelTargetConnectorVertical}
+        testID={`${pointerTestId}-vertical`}
+      />
+      <View
+        style={[
+          styles.sessionGuideArrowDuelTargetConnectorArm,
+          { width: arrowDuelLandscapeGeometry.connectorArmWidth }
+        ]}
+        testID={`${pointerTestId}-horizontal`}
+      />
+      <View
+        style={[
+          styles.sessionGuideArrowDuelTargetConnectorEndpoint,
+          { left: arrowDuelLandscapeGeometry.connectorArmWidth - 4 }
+        ]}
+        testID={`${pointerTestId}-endpoint`}
+      />
     </View>
   ) : pointerPlacement === "right" && measuredConnectorWidth && measuredConnectorDrop > 0 ? (
     <View
@@ -4844,7 +4872,7 @@ function SessionCoachmarkDemo({
           width: measuredConnectorWidth
         }
       ]}
-      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+      testID={pointerTestId}
     >
       <View
         style={[
@@ -4871,16 +4899,15 @@ function SessionCoachmarkDemo({
         ]}
         testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}-vertical`}
       />
-      <Text
+      <View
         style={[
+          styles.sessionGuideCoachTargetArrowHead,
           styles.sessionGuideCoachTargetRouteHead,
           { top: measuredConnectorDrop - 6 },
-          callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
-          callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
+          { borderLeftColor: pointerColor }
         ]}
-      >
-        ▶
-      </Text>
+        testID={`${pointerTestId}-head`}
+      />
     </View>
   ) : pointerPlacement === "right" && measuredConnectorWidth ? (
     <View
@@ -4895,17 +4922,44 @@ function SessionCoachmarkDemo({
         callout.tone === "warning" ? styles.sessionGuideCoachTargetConnectorWarning : null,
         callout.tone === "danger" ? styles.sessionGuideCoachTargetConnectorDanger : null
       ]}
-      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+      testID={pointerTestId}
     >
-      <Text
+      <View
         style={[
+          styles.sessionGuideCoachTargetArrowHead,
           styles.sessionGuideCoachTargetConnectorHead,
-          callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
-          callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
+          { borderLeftColor: pointerColor }
         ]}
-      >
-        ▶
-      </Text>
+        testID={`${pointerTestId}-head`}
+      />
+    </View>
+  ) : pointerPlacement === "bottom" ? (
+    <View
+      accessibilityElementsHidden
+      style={[
+        styles.sessionGuideCoachPointerBottomShape,
+        callout.id === "unclear" && !adaptiveLayout.usesSessionRail
+          ? {
+              left: portraitUnclearPointerLeft ?? "76%"
+            }
+          : styles.sessionGuideCoachPointerBottomCentered
+      ]}
+      testID={pointerTestId}
+    >
+      <View
+        style={[
+          styles.sessionGuideCoachPointerBottomLine,
+          { backgroundColor: pointerColor }
+        ]}
+        testID={`${pointerTestId}-line`}
+      />
+      <View
+        style={[
+          styles.sessionGuideCoachPointerBottomHead,
+          { borderTopColor: pointerColor }
+        ]}
+        testID={`${pointerTestId}-head`}
+      />
     </View>
   ) : (
     <Text
@@ -4913,7 +4967,6 @@ function SessionCoachmarkDemo({
       style={[
         styles.sessionGuideCoachPointer,
         pointerPlacement === "top" ? styles.sessionGuideCoachPointerTop : null,
-        pointerPlacement === "bottom" ? styles.sessionGuideCoachPointerBottom : null,
         pointerPlacement === "left" ? styles.sessionGuideCoachPointerLeft : null,
         pointerPlacement === "right" ? styles.sessionGuideCoachPointerRight : null,
         isArrowDuel && pointerPlacement === "top"
@@ -4928,22 +4981,10 @@ function SessionCoachmarkDemo({
               width: 24
             }
           : null,
-        callout.id === "unclear"
-          && !adaptiveLayout.usesSessionRail
-          && pointerPlacement === "bottom"
-          ? {
-              left: portraitUnclearPointerLeft ?? "76%",
-              right: undefined,
-              width: 24
-            }
-          : null,
-        callout.id === "slow" && pointerPlacement === "bottom"
-          ? { bottom: -12 }
-          : null,
         callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
         callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
       ]}
-      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+      testID={pointerTestId}
     >
       {coachPointer}
     </Text>
@@ -6425,7 +6466,10 @@ function PracticeProgressCard({
           <Text style={styles.progressValue}>{currentRating}</Text>
           <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
         </View>
-        <View style={styles.progressDivider} />
+        <View
+          style={[styles.practiceSummaryColumnGap, styles.progressDivider]}
+          testID="practice-progress-divider"
+        />
         <View style={styles.progressMetric} testID="practice-progress-weekly-metric">
           <Text style={styles.progressMetricLabel}>This Week</Text>
           <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
@@ -14532,11 +14576,34 @@ const styles = StyleSheet.create({
     right: 0,
     top: -22
   },
-  sessionGuideCoachPointerBottom: {
-    bottom: -22,
-    left: 0,
+  sessionGuideCoachPointerBottomShape: {
+    bottom: -16,
+    height: 12,
     position: "absolute",
-    right: 0
+    width: 24
+  },
+  sessionGuideCoachPointerBottomCentered: {
+    left: "50%",
+    transform: [{ translateX: -12 }]
+  },
+  sessionGuideCoachPointerBottomLine: {
+    height: 6,
+    left: 11,
+    position: "absolute",
+    top: 0,
+    width: 2
+  },
+  sessionGuideCoachPointerBottomHead: {
+    borderLeftColor: "transparent",
+    borderLeftWidth: 5,
+    borderRightColor: "transparent",
+    borderRightWidth: 5,
+    borderTopWidth: 6,
+    height: 0,
+    left: 7,
+    position: "absolute",
+    top: 6,
+    width: 0
   },
   sessionGuideCoachPointerLeft: {
     left: -20,
@@ -14571,13 +14638,19 @@ const styles = StyleSheet.create({
   sessionGuideCoachTargetConnectorDanger: {
     backgroundColor: "#DC2626"
   },
-  sessionGuideCoachTargetConnectorHead: {
-    color: "#2563EB",
-    fontSize: 14,
-    lineHeight: 14,
+  sessionGuideCoachTargetArrowHead: {
+    borderBottomColor: "transparent",
+    borderBottomWidth: 5,
+    borderLeftWidth: 8,
+    borderTopColor: "transparent",
+    borderTopWidth: 5,
+    height: 0,
     position: "absolute",
-    right: -2,
-    top: -6
+    width: 0
+  },
+  sessionGuideCoachTargetConnectorHead: {
+    right: -8,
+    top: -4
   },
   sessionGuideCoachTargetRoute: {
     position: "absolute"
@@ -14598,24 +14671,35 @@ const styles = StyleSheet.create({
     width: 2
   },
   sessionGuideCoachTargetRouteHead: {
-    color: "#2563EB",
-    fontSize: 14,
-    lineHeight: 14,
-    position: "absolute",
-    right: 0
+    right: -8
   },
   sessionGuideArrowDuelTargetConnector: {
-    backgroundColor: "#2563EB",
+    position: "absolute"
+  },
+  sessionGuideArrowDuelTargetConnectorVertical: {
+    backgroundColor: "#64748B",
+    bottom: 0,
+    left: 0,
     position: "absolute",
+    top: 0,
     width: 2
   },
-  sessionGuideArrowDuelTargetConnectorHead: {
-    color: "#2563EB",
-    fontSize: 14,
-    left: -6,
-    lineHeight: 14,
+  sessionGuideArrowDuelTargetConnectorArm: {
+    backgroundColor: "#64748B",
+    height: 2,
+    left: 0,
     position: "absolute",
-    top: -7
+    top: 0
+  },
+  sessionGuideArrowDuelTargetConnectorEndpoint: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#2563EB",
+    borderRadius: 4,
+    borderWidth: 2,
+    height: 8,
+    position: "absolute",
+    top: -4,
+    width: 8
   },
   sessionGuideCoachBadge: {
     color: "#1D4ED8",
@@ -15275,6 +15359,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14
   },
+  practiceSummaryColumnGap: {
+    marginHorizontal: 12,
+    width: 1
+  },
   progressMetric: {
     alignItems: "center",
     flex: 1,
@@ -15291,9 +15379,7 @@ const styles = StyleSheet.create({
   },
   progressDivider: {
     alignSelf: "stretch",
-    backgroundColor: "#E2E8F0",
-    marginHorizontal: 12,
-    width: 1
+    backgroundColor: "#E2E8F0"
   },
   progressValue: {
     color: "#111827",
@@ -15333,16 +15419,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 58,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10
   },
   reviewStripActionArea: {
     alignItems: "center",
     alignSelf: "stretch",
+    flex: 1,
     flexDirection: "row",
     justifyContent: "center",
-    position: "relative",
-    width: "50%"
+    position: "relative"
   },
   reviewStripStatusCopy: {
     flex: 1,
