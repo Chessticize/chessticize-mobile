@@ -19,6 +19,7 @@ test("SQLitePuzzlePackSource selects puzzles from a read-only pack schema", asyn
 
     assert.equal(source.countPuzzles(), 4);
     assert.equal(source.getPuzzle("00008")?.stockfishBestMove, "b2b1");
+    assert.equal(source.getPuzzle("00008")?.ratingDeviation, 77);
     assert.equal(source.getPuzzle("00008")?.initialFen.split(" ").length, 6);
     assert.deepEqual(
       source.selectPuzzles({ mode: "standard", limit: 10, themes: ["hangingPiece"] }).map((puzzle) => puzzle.id),
@@ -81,6 +82,82 @@ test("SQLitePuzzlePackSource treats the All theme sentinel as unrestricted", asy
       source.countPuzzles({ mode: "standard", limit: 10, themes: ["mixed"] }),
       source.countPuzzles({ mode: "standard", limit: 10, themes: [] })
     );
+  } finally {
+    packDb.close();
+  }
+});
+
+test("SQLitePuzzlePackSource batch-reads immutable Tactical Profile features", () => {
+  const packDb = buildPackDatabase([
+    tacticalSelectionPuzzle("batch-1", ["fork"]),
+    tacticalSelectionPuzzle("batch-2", ["pin"])
+  ]);
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb));
+    assert.deepEqual(
+      source.getPuzzles(["batch-2", "missing", "batch-1", "batch-2"]).map((puzzle) => [
+        puzzle.id,
+        puzzle.ratingDeviation,
+        puzzle.themes
+      ]),
+      [
+        ["batch-2", 80, ["pin"]],
+        ["batch-1", 80, ["fork"]]
+      ]
+    );
+  } finally {
+    packDb.close();
+  }
+});
+
+test("SQLitePuzzlePackSource exact mixed quota excludes every focused theme", () => {
+  const packDb = buildPackDatabase([
+    tacticalSelectionPuzzle("fork-only", ["fork"]),
+    tacticalSelectionPuzzle("pin-only", ["pin"]),
+    tacticalSelectionPuzzle("overlap", ["fork", "sacrifice"]),
+    tacticalSelectionPuzzle("mixed-1", ["sacrifice"]),
+    tacticalSelectionPuzzle("mixed-2", ["deflection"])
+  ]);
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb));
+    assert.deepEqual(
+      source.selectPuzzlesExcludingThemes({
+        mode: "standard",
+        minRating: 800,
+        maxRating: 1000,
+        limit: 2
+      }, ["fork", "pin"]).map((puzzle) => puzzle.id),
+      ["mixed-1", "mixed-2"]
+    );
+  } finally {
+    packDb.close();
+  }
+});
+
+test("SQLitePuzzlePackSource fills mixed quota beyond a large recent-id exclusion set", () => {
+  const excluded = Array.from({ length: 1_000 }, (_, index) =>
+    tacticalSelectionPuzzle(`excluded-${String(index).padStart(4, "0")}`, ["sacrifice"])
+  );
+  const available = Array.from({ length: 10 }, (_, index) =>
+    tacticalSelectionPuzzle(`survivor-${String(index).padStart(2, "0")}`, ["deflection"])
+  );
+  const packDb = buildPackDatabase([...excluded, ...available]);
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
+      candidateMultiplier: 2,
+      candidateFloor: 5
+    });
+    const selected = source.selectPuzzlesExcludingThemes({
+      mode: "standard",
+      minRating: 800,
+      maxRating: 1_000,
+      limit: 5,
+      excludeIds: excluded.map((puzzle) => puzzle.id),
+      randomSeed: "large-history"
+    }, ["fork"]);
+
+    assert.equal(selected.length, 5);
+    assert.ok(selected.every((puzzle) => puzzle.id.startsWith("survivor-")));
   } finally {
     packDb.close();
   }
@@ -290,6 +367,38 @@ test("PackBackedPracticeStore queries pack puzzles without preloading the user d
   }
 });
 
+test("PackBackedPracticeStore includes Timeout in post-session mistake Review", async () => {
+  const packDb = buildPackDatabase(await loadFixturePuzzles());
+  const userStore = new SQLiteStore(":memory:");
+  try {
+    userStore.migrate();
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
+      allPuzzlesArrowDuelEligible: true
+    });
+    const service = new PracticeService(new PackBackedPracticeStore(userStore, source));
+    const sprint = service.startSprint({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 2,
+      maxMistakes: 3,
+      puzzleSelectionSeed: "pack-timeout"
+    }, "2026-07-25T00:00:00.000Z");
+    const timedOutPuzzleId = sprint.currentPuzzle?.puzzle.id;
+
+    const timedOut = service.advanceSprintTime("2026-07-25T00:01:00.000Z");
+
+    assert.equal(timedOut.attempt?.result, "timed_out");
+    assert.deepEqual(
+      service.getSessionMistakeReview(sprint.id).map((item) => item.puzzle.id),
+      [timedOutPuzzleId]
+    );
+  } finally {
+    userStore.close();
+    packDb.close();
+  }
+});
+
 test("Android Standard Practice seed follows the maintained tracked pack solution", async () => {
   const fixture = await loadAndroidStandardPracticeFixture();
   const packDb = buildPackDatabase([fixture.puzzle]);
@@ -427,6 +536,7 @@ function buildPackDatabase(puzzles: Puzzle[]): DatabaseSync {
       initial_fen TEXT NOT NULL,
       solution_moves TEXT NOT NULL,
       rating INTEGER NOT NULL,
+      rating_deviation INTEGER NOT NULL,
       stockfish_eval REAL NOT NULL,
       stockfish_bestmove TEXT NOT NULL,
       stockfish_eval_after_first_move REAL NOT NULL
@@ -450,10 +560,11 @@ function buildPackDatabase(puzzles: Puzzle[]): DatabaseSync {
       initial_fen,
       solution_moves,
       rating,
+      rating_deviation,
       stockfish_eval,
       stockfish_bestmove,
       stockfish_eval_after_first_move
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertThemeName = db.prepare("INSERT INTO themes (name) VALUES (?)");
   const insertTheme = db.prepare("INSERT INTO puzzle_themes (puzzle_id, theme_id, rating) VALUES (?, ?, ?)");
@@ -470,6 +581,7 @@ function buildPackDatabase(puzzles: Puzzle[]): DatabaseSync {
         puzzle.initialFen.split(/\s+/).slice(0, 4).join(" "),
         puzzle.solutionMoves.join(" "),
         puzzle.rating,
+        puzzle.ratingDeviation ?? 100,
         puzzle.stockfishEval ?? 0,
         puzzle.stockfishBestMove ?? "",
         puzzle.stockfishEvalAfterFirstMove ?? 0
@@ -501,6 +613,21 @@ function selectionPuzzle(id: string, rating: number, themes: string[]): Puzzle {
     source: "synthetic",
     stockfishEval: 0,
     stockfishBestMove: "e2e3",
+    stockfishEvalAfterFirstMove: 0
+  };
+}
+
+function tacticalSelectionPuzzle(id: string, themes: string[]): Puzzle {
+  return {
+    id,
+    initialFen: "8/8/8/8/8/8/4K3/6k1 w - - 0 1",
+    solutionMoves: ["e2e3"],
+    rating: 900,
+    ratingDeviation: 80,
+    themes,
+    source: "synthetic",
+    stockfishEval: 0,
+    stockfishBestMove: id,
     stockfishEvalAfterFirstMove: 0
   };
 }

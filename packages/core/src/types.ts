@@ -12,6 +12,7 @@ export type AttemptSource = "sprint" | "scheduled_review";
 
 export type SprintEndReason =
   | "target_reached"
+  | "attempt_limit"
   | "max_mistakes"
   | "time_expired"
   | "puzzles_exhausted"
@@ -44,6 +45,19 @@ export interface SprintConfig {
   maxMistakes: number;
   ratingKey: string;
   themes?: string[];
+  /** A fixed attempt ceiling used by bounded interventions such as Tactical Focus. */
+  maxAttempts?: number;
+  /** Interventions can reuse a Run's Rating for selection without mutating it. */
+  ratingPolicy?: "rated" | "unrated";
+  /** Explicit intervention identity; never infer this from display copy or a rating key. */
+  tacticalFocus?: {
+    taskFamily: "line" | "arrow_duel";
+    themes: string[];
+    mixedControlCount: number;
+    ratingAnchor: number;
+    minRating: number;
+    maxRating: number;
+  };
 }
 
 export interface PuzzleTimingPolicy {

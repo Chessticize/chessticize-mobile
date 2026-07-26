@@ -72,6 +72,14 @@ describe('Android Progress Backup', () => {
     const migrationJourney = read('e2e/android-migration.e2e.js');
 
     expect(databaseLayout).toContain('progressDatabaseName: "chessticize-mobile.sqlite"');
+    expect(databaseLayout).toContain(
+      'tacticalProfileCacheDatabaseName: "chessticize-tactical-profile-cache.sqlite"',
+    );
+    expect(`${read('android/app/src/main/res/xml-v28/backup_rules.xml')}\n${
+      read('android/app/src/main/res/xml/data_extraction_rules.xml')
+    }`).not.toContain(
+      'chessticize-tactical-profile-cache.sqlite',
+    );
     expect(deviceStore).toContain('return new DeviceSQLiteStore(open({ name }))');
     expect(mobilePractice).toContain(
       'DeviceSQLiteStore.open(MOBILE_DATABASE_LAYOUT.progressDatabaseName)',

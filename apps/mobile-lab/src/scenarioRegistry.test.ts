@@ -115,7 +115,10 @@ test("Issue #250 owns the complete Tactical Profile design state set", () => {
       "practice-tactical-profile-limited-inventory",
       "practice-tactical-profile-explanation",
       "practice-tactical-profile-focused-run",
-      "practice-tactical-profile-suppressed"
+      "practice-tactical-profile-suppressed",
+      "practice-tactical-focus-guide",
+      "practice-tactical-focus-active",
+      "practice-tactical-focus-result"
     ]
   );
   assert.equal(

@@ -11,6 +11,7 @@ import {
   type SyncSqliteStatement,
   type SyncSqliteValue
 } from "../../../../packages/storage/src/sync-sqlite-store.ts";
+import { SQLiteTacticalProfileRepository } from "../../../../packages/storage/src/tactical-profile-repository.ts";
 import { MOBILE_DATABASE_LAYOUT } from "../backend/mobileDatabaseLayout.ts";
 
 export class DeviceSQLiteStore extends SyncSQLiteStore {
@@ -23,6 +24,14 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
 
   static open(name = MOBILE_DATABASE_LAYOUT.progressDatabaseName): DeviceSQLiteStore {
     return new DeviceSQLiteStore(open({ name }));
+  }
+
+  static openTacticalProfileRepository(
+    name = MOBILE_DATABASE_LAYOUT.tacticalProfileCacheDatabaseName
+  ): SQLiteTacticalProfileRepository {
+    return new SQLiteTacticalProfileRepository(
+      new OPSqliteDatabase(open({ name }))
+    );
   }
 
   static async openReadOnlyPuzzlePack(

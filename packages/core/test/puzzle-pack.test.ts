@@ -25,6 +25,9 @@ test("bundled core puzzle pack manifest matches the shipped puzzle artifact", (t
     assert.ok(manifest.seed);
     assert.ok(manifest.ratingBuckets?.length);
     assert.ok(manifest.themeCounts && Object.keys(manifest.themeCounts).length > 0);
+    assert.equal(manifest.tacticalAnalysis?.puzzleRatingDeviation, true);
+    assert.match(manifest.tacticalAnalysis?.featureHash ?? "", /^sha256:[a-f0-9]{64}$/);
+    assert.equal(summary.missingRatingDeviationCount, 0);
     return;
   }
 
@@ -59,14 +62,29 @@ function readBundledManifest(): PuzzlePackManifest {
   return JSON.parse(readFileSync(resolve("fixtures/puzzles/bundled-core-pack.manifest.json"), "utf8")) as PuzzlePackManifest;
 }
 
-function readSqlitePackSummary(): { puzzleCount: number; minRating: number; maxRating: number; bytes: number; sha256: string } {
+function readSqlitePackSummary(): {
+  puzzleCount: number;
+  minRating: number;
+  maxRating: number;
+  missingRatingDeviationCount: number;
+  bytes: number;
+  sha256: string;
+} {
   const path = resolve("fixtures/puzzles/bundled-core-pack.sqlite");
   const db = new DatabaseSync(path);
   try {
-    const row = db.prepare("SELECT COUNT(*) AS puzzleCount, MIN(rating) AS minRating, MAX(rating) AS maxRating FROM puzzles").get() as {
+    const row = db.prepare(`
+      SELECT
+        COUNT(*) AS puzzleCount,
+        MIN(rating) AS minRating,
+        MAX(rating) AS maxRating,
+        SUM(CASE WHEN rating_deviation IS NULL THEN 1 ELSE 0 END) AS missingRatingDeviationCount
+      FROM puzzles
+    `).get() as {
       puzzleCount: number;
       minRating: number;
       maxRating: number;
+      missingRatingDeviationCount: number;
     };
     const bytes = readFileSync(path);
     return {

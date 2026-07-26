@@ -29,6 +29,7 @@ try {
   });
   const results = cases.map((benchmarkCase) => benchmarkSelection(source, benchmarkCase));
   const focusedQuotaPlan = benchmarkFocusedQuotaPlan(source);
+  const largeRecentExclusion = benchmarkLargeRecentExclusion(source);
   const oneTheme = results[0];
   const fiveThemes = results[1];
   const allThemes = results[2];
@@ -56,6 +57,7 @@ try {
     input: { limit, rating },
     results,
     focusedQuotaPlan,
+    largeRecentExclusion,
     fiveToOneMedianRatio: round(fiveThemes.selection.medianMs / oneTheme.selection.medianMs),
     fiveToAllMedianRatio: round(fiveThemes.selection.medianMs / allThemes.selection.medianMs),
     queryPlans
@@ -122,24 +124,67 @@ function selectFocusedQuotaPlan(source, randomSeed) {
     ...primaryIds,
     ...secondary.map((puzzle) => puzzle.id)
   ]);
-  const mixedCandidates = source.selectPuzzles({
+  const mixed = source.selectPuzzlesExcludingThemes({
     mode: "custom",
-    limit: 30,
+    limit: 3,
     minRating: rating - 100,
     maxRating: rating + 100,
-    themes: [],
     excludeIds: [...focusedIds],
     randomSeed: `${randomSeed}:mixed`
-  });
-  const mixed = mixedCandidates
-    .filter((puzzle) => !puzzle.themes.includes("fork") && !puzzle.themes.includes("pin"))
-    .slice(0, 3);
+  }, ["fork", "pin"]);
   if (primary.length !== 9 || secondary.length !== 3 || mixed.length !== 3) {
     throw new Error(
       `focused-quota-plan incomplete: ${primary.length} primary, ${secondary.length} secondary, ${mixed.length} mixed`
     );
   }
   return [...primary, ...secondary, ...mixed];
+}
+
+function benchmarkLargeRecentExclusion(source) {
+  const recentPuzzleIds = source.selectPuzzles({
+    mode: "custom",
+    limit: 1_200,
+    minRating: rating - 100,
+    maxRating: rating + 100
+  }).map((puzzle) => puzzle.id);
+  const samples = [];
+  const benchmarkIterations = Math.min(iterations, 20);
+  for (let index = 0; index < benchmarkIterations; index += 1) {
+    const startedAt = performance.now();
+    const selected = source.selectPuzzlesExcludingThemes({
+      mode: "custom",
+      limit: 3,
+      minRating: rating - 100,
+      maxRating: rating + 100,
+      excludeIds: recentPuzzleIds,
+      randomSeed: `large-recent-${index}`
+    }, ["fork", "pin"]);
+    samples.push(performance.now() - startedAt);
+    if (selected.length !== 3) {
+      throw new Error(`large-recent-exclusion returned ${selected.length} puzzles; expected 3`);
+    }
+    if (selected.some((puzzle) => recentPuzzleIds.includes(puzzle.id))) {
+      throw new Error("large-recent-exclusion returned a recently seen puzzle");
+    }
+    if (selected.some((puzzle) =>
+      puzzle.themes.includes("fork") || puzzle.themes.includes("pin")
+    )) {
+      throw new Error("large-recent-exclusion returned a focused-theme puzzle");
+    }
+  }
+  samples.sort((left, right) => left - right);
+  return {
+    recentPuzzleCount: recentPuzzleIds.length,
+    iterations: benchmarkIterations,
+    returnedPuzzleCount: 3,
+    failures: 0,
+    selection: {
+      medianMs: round(percentile(samples, 0.5)),
+      p95Ms: round(percentile(samples, 0.95)),
+      minMs: round(samples[0]),
+      maxMs: round(samples.at(-1))
+    }
+  };
 }
 
 function benchmarkSelection(source, benchmarkCase) {

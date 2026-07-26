@@ -3,8 +3,11 @@ import type { Puzzle, PuzzlePackManifest } from "../../../../packages/core/src/i
 import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
 import { PackBackedPracticeStore } from "../../../../packages/storage/src/pack-backed-practice-store.ts";
 import { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
+import { MemoryTacticalProfileRepository } from "../../../../packages/storage/src/tactical-profile-repository.ts";
+import { TacticalProfileService } from "../../../../packages/storage/src/tactical-profile-service.ts";
 import type { PuzzleSource } from "../../../../packages/storage/src/puzzle-source.ts";
 import { MOBILE_DATABASE_LAYOUT } from "../backend/mobileDatabaseLayout.ts";
+import { productionTacticalProfileCalibration } from "../backend/tacticalProfileCalibration.ts";
 
 const bundledCoreManifest = require("../../../../fixtures/puzzles/bundled-core-pack.manifest.json") as PuzzlePackManifest;
 const regressionPuzzles = require("../../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];
@@ -26,7 +29,11 @@ let persistentPracticeServicePromise: Promise<PracticeService> | undefined;
 
 export function createMobilePracticeService(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): PracticeService {
   const store = new MemoryStore();
-  const service = new PracticeService(store);
+  const service = new PracticeService(store, createTacticalProfileService(
+    store,
+    store,
+    new MemoryTacticalProfileRepository()
+  ));
   configureMobilePracticePuzzleSource(service, source);
   return service;
 }
@@ -76,7 +83,8 @@ export function createPersistentMobilePracticeServiceSync(): PracticeService | u
         throw new Error("Bundled puzzle pack is unavailable");
       }
       return source;
-    })
+    }),
+    DeviceSQLiteStore.openTacticalProfileRepository()
   );
 }
 
@@ -92,12 +100,25 @@ async function createPersistentMobilePracticeServiceImpl(): Promise<PracticeServ
     MOBILE_DATABASE_LAYOUT.bundledPuzzlePackDatabaseName,
     BUNDLED_CORE_PACK_OPTIONS
   );
-  return createPersistentService(userStore, packSource);
+  return createPersistentService(
+    userStore,
+    packSource,
+    DeviceSQLiteStore.openTacticalProfileRepository()
+  );
 }
 
-function createPersistentService(userStore: InstanceType<typeof import("./deviceSQLiteStore.ts").DeviceSQLiteStore>, packSource: PuzzleSource): PracticeService {
+function createPersistentService(
+  userStore: InstanceType<typeof import("./deviceSQLiteStore.ts").DeviceSQLiteStore>,
+  packSource: PuzzleSource,
+  tacticalProfileRepository: MemoryTacticalProfileRepository | ReturnType<
+    typeof import("./deviceSQLiteStore.ts").DeviceSQLiteStore.openTacticalProfileRepository
+  >
+): PracticeService {
   const store = new PackBackedPracticeStore(userStore, packSource);
-  const service = new PracticeService(store);
+  const service = new PracticeService(
+    store,
+    createTacticalProfileService(store, packSource, tacticalProfileRepository)
+  );
   packBackedServices.add(service);
   configureMobilePracticePuzzleSource(service, DEFAULT_PUZZLE_SOURCE);
   persistentPracticeService = service;
@@ -120,14 +141,67 @@ class LazyPuzzleSource implements PuzzleSource {
     return this.current.getPuzzle(id);
   }
 
+  getPuzzles(ids: readonly string[]): Puzzle[] {
+    return this.current.getPuzzles?.(ids) ??
+      ids.flatMap((id) => {
+        const puzzle = this.current.getPuzzle(id);
+        return puzzle ? [puzzle] : [];
+      });
+  }
+
   selectPuzzles(filter: Parameters<PuzzleSource["selectPuzzles"]>[0]): Puzzle[] {
     return this.current.selectPuzzles(filter);
+  }
+
+  selectPuzzlesExcludingThemes(
+    filter: Parameters<PuzzleSource["selectPuzzles"]>[0],
+    excludedThemes: readonly string[]
+  ): Puzzle[] {
+    const source = this.current;
+    if (source.selectPuzzlesExcludingThemes) {
+      return source.selectPuzzlesExcludingThemes(filter, excludedThemes);
+    }
+    const excluded = new Set(excludedThemes);
+    return source.selectPuzzles({ ...filter, limit: Math.max(filter.limit * 20, 200) })
+      .filter((puzzle) => !puzzle.themes.some((theme) => excluded.has(theme)))
+      .slice(0, filter.limit);
   }
 
   private get current(): PuzzleSource {
     this.source ??= this.openSource();
     return this.source;
   }
+}
+
+function createTacticalProfileService(
+  progressStore: MemoryStore | PackBackedPracticeStore,
+  puzzleSource: PuzzleSource,
+  repository: ConstructorParameters<typeof TacticalProfileService>[0]["repository"]
+): TacticalProfileService {
+  const calibration = productionTacticalProfileCalibration(bundledCoreManifest);
+  return new TacticalProfileService({
+    progressStore,
+    puzzleSource,
+    repository,
+    calibration,
+    naturalFrequency: bundledNaturalFrequency(),
+    ...(calibration.focusedRun === undefined
+      ? {}
+      : { focusedRunPolicy: calibration.focusedRun })
+  });
+}
+
+function bundledNaturalFrequency() {
+  const frequencies = Object.fromEntries(
+    Object.entries(bundledCoreManifest.themeCounts ?? {}).map(([theme, count]) => [
+      theme,
+      count / Math.max(1, bundledCoreManifest.puzzleCount)
+    ])
+  );
+  return {
+    line: frequencies,
+    arrow_duel: frequencies
+  };
 }
 
 export function configureMobilePracticePuzzleSource(service: PracticeService, source: MobilePuzzleSource): void {

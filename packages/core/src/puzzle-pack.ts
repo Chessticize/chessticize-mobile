@@ -26,7 +26,14 @@ export interface PuzzlePackManifest {
   themeCounts?: Record<string, number>;
   ratingBuckets?: PuzzlePackBucketManifest[];
   matePatternCounts?: Record<string, number>;
+  tacticalAnalysis?: PuzzlePackTacticalAnalysisManifest;
   arrowDuelCount: number;
+}
+
+export interface PuzzlePackTacticalAnalysisManifest {
+  schemaVersion: 1;
+  puzzleRatingDeviation: true;
+  featureHash: string;
 }
 
 export interface PuzzlePackBucketManifest {
@@ -53,6 +60,7 @@ export interface BuildPuzzlePackManifestInput {
   format?: "json" | "sqlite";
   seed?: string;
   targetPuzzleCount?: number;
+  tacticalAnalysis?: PuzzlePackTacticalAnalysisManifest;
 }
 
 export function buildPuzzlePackManifest(
@@ -89,6 +97,9 @@ export function buildPuzzlePackManifest(
     themeCounts: countThemes(puzzles),
     ratingBuckets: buildRatingBuckets(puzzles),
     matePatternCounts: countThemes(puzzles, MATE_PATTERN_THEMES),
+    ...(input.tacticalAnalysis === undefined
+      ? {}
+      : { tacticalAnalysis: { ...input.tacticalAnalysis } }),
     arrowDuelCount: puzzles.filter(isServerCompatibleArrowDuelPuzzle).length
   };
 }

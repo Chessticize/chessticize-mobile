@@ -28,6 +28,9 @@ export function buildSprintConfig(input: {
   targetCorrect?: number;
   maxMistakes?: number;
   themes?: readonly string[];
+  maxAttempts?: number;
+  ratingPolicy?: SprintConfig["ratingPolicy"];
+  tacticalFocus?: SprintConfig["tacticalFocus"];
 }): SprintConfig {
   if (!Number.isInteger(input.durationSeconds) || input.durationSeconds <= 0) {
     throw new Error("durationSeconds must be a positive integer");
@@ -43,6 +46,18 @@ export function buildSprintConfig(input: {
   if (!Number.isInteger(maxMistakes) || maxMistakes <= 0) {
     throw new Error("maxMistakes must be a positive integer");
   }
+  if (
+    input.maxAttempts !== undefined &&
+    (!Number.isInteger(input.maxAttempts) || input.maxAttempts <= 0)
+  ) {
+    throw new Error("maxAttempts must be a positive integer");
+  }
+  if (input.tacticalFocus !== undefined && input.ratingPolicy !== "unrated") {
+    throw new Error("Tactical Focus Runs must be unrated");
+  }
+  const tacticalFocusThemes = input.tacticalFocus === undefined
+    ? undefined
+    : validateTacticalFocus(input.mode, input.maxAttempts, input.tacticalFocus);
 
   const selectedThemes = namedThemesForSelection(input.themes);
   const puzzleTiming = resolvePuzzleTimingPolicy(
@@ -64,8 +79,53 @@ export function buildSprintConfig(input: {
     targetCorrect,
     maxMistakes,
     ratingKey,
-    ...(selectedThemes.length === 0 ? {} : { themes: selectedThemes })
+    ...(selectedThemes.length === 0 ? {} : { themes: selectedThemes }),
+    ...(input.maxAttempts === undefined ? {} : { maxAttempts: input.maxAttempts }),
+    ...(input.ratingPolicy === undefined ? {} : { ratingPolicy: input.ratingPolicy }),
+    ...(input.tacticalFocus === undefined
+      ? {}
+      : {
+          tacticalFocus: {
+            ...input.tacticalFocus,
+            themes: [...(tacticalFocusThemes ?? [])]
+          }
+        })
   };
+}
+
+function validateTacticalFocus(
+  mode: SprintMode,
+  maxAttempts: number | undefined,
+  focus: NonNullable<SprintConfig["tacticalFocus"]>
+): string[] {
+  const themes = [...new Set(
+    focus.themes.map((theme) => theme.trim()).filter((theme) => theme.length > 0)
+  )];
+  if (themes.length < 1 || themes.length > 2) {
+    throw new Error("Tactical Focus Runs require one or two distinct themes");
+  }
+  if (
+    !Number.isInteger(focus.mixedControlCount) ||
+    focus.mixedControlCount <= 0 ||
+    maxAttempts === undefined ||
+    focus.mixedControlCount >= maxAttempts
+  ) {
+    throw new Error("Tactical Focus Runs require a bounded mixed allocation");
+  }
+  if (
+    !Number.isFinite(focus.ratingAnchor) ||
+    !Number.isFinite(focus.minRating) ||
+    !Number.isFinite(focus.maxRating) ||
+    focus.minRating > focus.ratingAnchor ||
+    focus.ratingAnchor > focus.maxRating
+  ) {
+    throw new Error("Tactical Focus Rating bounds must contain the anchor");
+  }
+  const expectedTaskFamily = mode === "arrow_duel" ? "arrow_duel" : "line";
+  if (focus.taskFamily !== expectedTaskFamily) {
+    throw new Error("Tactical Focus task family must match the Run mode");
+  }
+  return themes;
 }
 
 export function defaultPuzzleTimingPolicy(perPuzzleSeconds: number): PuzzleTimingPolicy {

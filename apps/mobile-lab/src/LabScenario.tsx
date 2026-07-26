@@ -174,6 +174,19 @@ function sprintRulesDesignPreviewFor(
       timeoutCountsAsMistake: true
     };
   }
+  if (scenarioId === "practice-tactical-focus-guide") {
+    return {
+      initialSessionGuides: [{
+        durationLabel: "5:00",
+        focusedRun: true,
+        maxAttempts: 15,
+        maxMistakes: 15,
+        mode: "standard",
+        targetCorrect: 15
+      }],
+      timeoutCountsAsMistake: true
+    };
+  }
   if (
     scenarioId === "practice-timing-timeout"
     || scenarioId === "practice-timeout-review-notice"
@@ -210,6 +223,40 @@ function sprintRulesDesignPreviewFor(
       }
     };
   }
+  if (scenarioId === "practice-tactical-focus-active") {
+    return {
+      initialActiveState: tacticalFocusActiveState()
+    };
+  }
+  if (scenarioId === "practice-tactical-focus-result") {
+    const initialResultState = sprintRulesResultState({
+      correctCount: 13,
+      endReason: "attempt_limit",
+      mistakeCount: 2,
+      ratingAfter: 1087,
+      status: "won"
+    });
+    return {
+      initialResultState: {
+        ...initialResultState,
+        config: {
+          ...initialResultState.config,
+          targetCorrect: 15,
+          maxMistakes: 15,
+          maxAttempts: 15,
+          ratingPolicy: "unrated",
+          tacticalFocus: {
+            taskFamily: "line",
+            themes: ["fork"],
+            mixedControlCount: 5,
+            ratingAnchor: 1087,
+            minRating: 987,
+            maxRating: 1187
+          }
+        }
+      }
+    };
+  }
   if (scenarioId === "settings-sprint-guidance") {
     return { showSettingsReset: true };
   }
@@ -217,6 +264,58 @@ function sprintRulesDesignPreviewFor(
     return { firstRunGuide, timeoutCountsAsMistake: true };
   }
   return undefined;
+}
+
+function tacticalFocusActiveState(): SprintState {
+  const startedAt = new Date(LAB_NOW_MS - 2 * 60 * 1000).toISOString();
+  const deadlineAt = new Date(LAB_NOW_MS + 3 * 60 * 1000).toISOString();
+  const puzzles = Array.from({ length: 15 }, (_, index) => {
+    const puzzle = LAB_PUZZLES[index % LAB_PUZZLES.length]!;
+    return {
+      ...puzzle,
+      id: `tactical-focus-${index + 1}-${puzzle.id}`
+    };
+  });
+  const activePuzzle = puzzles[10]!;
+  const currentPuzzle = {
+    autoPlayedMoves: [activePuzzle.solutionMoves[0]!],
+    currentFen: "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2",
+    cursor: 1,
+    kind: "line" as const,
+    playedMoves: [],
+    puzzle: activePuzzle,
+    solved: false
+  };
+  return {
+    bestStreak: 4,
+    config: {
+      ...defaultSprintConfig("standard"),
+      maxAttempts: 15,
+      maxMistakes: 15,
+      ratingPolicy: "unrated",
+      tacticalFocus: {
+        taskFamily: "line",
+        themes: ["fork"],
+        mixedControlCount: 5,
+        ratingAnchor: 1087,
+        minRating: 987,
+        maxRating: 1187
+      },
+      targetCorrect: 15
+    },
+    correctCount: 8,
+    currentPuzzle,
+    currentPuzzleIndex: 10,
+    currentStreak: 2,
+    deadlineAt,
+    hasUserSubmittedMove: false,
+    id: "tactical-focus-active",
+    mistakeCount: 2,
+    puzzles,
+    ratingBefore: 1087,
+    startedAt,
+    status: "active"
+  };
 }
 
 function sprintRulesResultState({
@@ -227,7 +326,7 @@ function sprintRulesResultState({
   status
 }: {
   correctCount: number;
-  endReason: "target_reached" | "time_expired";
+  endReason: "attempt_limit" | "target_reached" | "time_expired";
   mistakeCount: number;
   ratingAfter: number;
   status: "failed" | "won";

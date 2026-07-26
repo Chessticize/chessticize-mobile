@@ -16,6 +16,7 @@ interface PuzzlePackRow {
   initial_fen: string;
   solution_moves: string;
   rating: number;
+  rating_deviation?: number;
   stockfish_eval: number;
   stockfish_bestmove: string;
   stockfish_eval_after_first_move: number;
@@ -87,6 +88,25 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     return row ? this.puzzleFromRow(row) : undefined;
   }
 
+  getPuzzles(ids: readonly string[]): Puzzle[] {
+    const normalized = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+    const puzzles: Puzzle[] = [];
+    for (let offset = 0; offset < normalized.length; offset += MAX_SQL_ID_FILTER_VALUES) {
+      const chunk = normalized.slice(offset, offset + MAX_SQL_ID_FILTER_VALUES);
+      const rows = this.db.prepare(`
+        SELECT *
+        FROM puzzles
+        WHERE id IN (${chunk.map(() => "?").join(", ")})
+      `).all(...chunk) as PuzzlePackRow[];
+      puzzles.push(...this.puzzlesFromRows(rows));
+    }
+    const byId = new Map(puzzles.map((puzzle) => [puzzle.id, puzzle]));
+    return normalized.flatMap((id) => {
+      const puzzle = byId.get(id);
+      return puzzle ? [puzzle] : [];
+    });
+  }
+
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
     if (filter.rating !== undefined && filter.minRating === undefined && filter.maxRating === undefined) {
       return this.selectByRatingFallback(filter, filter.rating);
@@ -103,6 +123,109 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       ...(filter.themes === undefined ? {} : { themes: filter.themes }),
       ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
+      ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
+    });
+  }
+
+  selectPuzzlesExcludingThemes(
+    filter: PuzzleSelectionFilter,
+    excludedThemes: readonly string[]
+  ): Puzzle[] {
+    const excludedThemeIds = namedThemesForSelection(excludedThemes)
+      .map((theme) => this.themeId(theme))
+      .filter((themeId): themeId is number => themeId !== undefined);
+    if (excludedThemeIds.length === 0) {
+      return this.selectPuzzles(filter);
+    }
+    const excludedIds = new Set(filter.excludeIds ?? []);
+    const candidateLimit = this.candidateLimit(filter.limit, true);
+    if (
+      filter.includeIds !== undefined &&
+      filter.includeIds.length > MAX_SQL_ID_FILTER_VALUES
+    ) {
+      const excludedThemeSet = new Set(namedThemesForSelection(excludedThemes));
+      return selectUniquePuzzles({
+        puzzles: this.getPuzzles(filter.includeIds)
+          .filter((puzzle) =>
+            !puzzle.themes.some((theme) => excludedThemeSet.has(theme))
+          ),
+        mode: filter.mode,
+        limit: filter.limit,
+        ...(this.allPuzzlesArrowDuelEligible ? { allPuzzlesArrowDuelEligible: true } : {}),
+        ...(filter.rating === undefined ? {} : { rating: filter.rating }),
+        ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
+        ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
+        includeIds: filter.includeIds,
+        excludeIds: [...excludedIds],
+        ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
+      });
+    }
+    const idClauses: string[] = [];
+    const idParams: string[] = [];
+    if (
+      filter.includeIds !== undefined &&
+      filter.includeIds.length > 0 &&
+      filter.includeIds.length <= MAX_SQL_ID_FILTER_VALUES
+    ) {
+      idClauses.push(`puzzles.id IN (${filter.includeIds.map(() => "?").join(", ")})`);
+      idParams.push(...filter.includeIds);
+    }
+    if (
+      filter.excludeIds !== undefined &&
+      filter.excludeIds.length > 0 &&
+      filter.excludeIds.length <= MAX_SQL_ID_FILTER_VALUES
+    ) {
+      idClauses.push(`puzzles.id NOT IN (${filter.excludeIds.map(() => "?").join(", ")})`);
+      idParams.push(...filter.excludeIds);
+    }
+    const queryPage = this.db.prepare(`
+        SELECT puzzles.*
+        FROM puzzles
+        WHERE puzzles.rating >= ?
+          AND puzzles.rating <= ?
+          ${idClauses.map((clause) => `AND ${clause}`).join("\n          ")}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM puzzle_themes
+            WHERE puzzle_themes.puzzle_id = puzzles.id
+              AND puzzle_themes.theme_id IN (${excludedThemeIds.map(() => "?").join(", ")})
+          )
+        ORDER BY puzzles.rating, puzzles.id
+        LIMIT ? OFFSET ?
+      `);
+    const rows: PuzzlePackRow[] = [];
+    const pageSize = candidateLimit;
+    const maximumRowsToScan = candidateLimit +
+      (filter.excludeIds !== undefined &&
+        filter.excludeIds.length > MAX_SQL_ID_FILTER_VALUES
+        ? excludedIds.size
+        : 0);
+    let offset = 0;
+    while (rows.length < candidateLimit && offset < maximumRowsToScan) {
+      const page = queryPage.all(
+        filter.minRating ?? 0,
+        filter.maxRating ?? 4000,
+        ...idParams,
+        ...excludedThemeIds,
+        pageSize,
+        offset
+      ) as PuzzlePackRow[];
+      rows.push(...page.filter((row) => !excludedIds.has(row.id)));
+      offset += page.length;
+      if (page.length < pageSize) {
+        break;
+      }
+    }
+    return selectUniquePuzzles({
+      puzzles: this.puzzlesFromRows(rows.slice(0, candidateLimit)),
+      mode: filter.mode,
+      limit: filter.limit,
+      ...(this.allPuzzlesArrowDuelEligible ? { allPuzzlesArrowDuelEligible: true } : {}),
+      ...(filter.rating === undefined ? {} : { rating: filter.rating }),
+      ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
+      ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
+      ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
+      excludeIds: [...excludedIds],
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
     });
   }
@@ -150,6 +273,15 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
   }
 
   private queryCandidates(filter: PuzzleSelectionFilter): Puzzle[] {
+    if (
+      filter.includeIds !== undefined &&
+      filter.includeIds.length > MAX_SQL_ID_FILTER_VALUES
+    ) {
+      const puzzles = this.getPuzzles(filter.includeIds);
+      return filter.mode === "arrow_duel" && !this.allPuzzlesArrowDuelEligible
+        ? puzzles.filter(isServerCompatibleArrowDuelPuzzle)
+        : puzzles;
+    }
     const selectedThemes = namedThemesForSelection(filter.themes);
     const themeIds = selectedThemes
       .map((theme) => this.themeId(theme))
@@ -247,6 +379,29 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     };
     const hydrateCandidateRows = (rows: Array<{ id: string }>): PuzzlePackRow[] =>
       themeId === undefined ? rows as PuzzlePackRow[] : this.puzzleRowsForIds(rows.map((row) => row.id));
+    const inMemoryExcludedIds =
+      filter.excludeIds !== undefined &&
+      filter.excludeIds.length > MAX_SQL_ID_FILTER_VALUES
+        ? new Set(filter.excludeIds)
+        : undefined;
+    if (inMemoryExcludedIds !== undefined && filter.randomSeed === undefined) {
+      const rows: Array<{ id: string }> = [];
+      const pageSize = Math.max(limit, this.candidateFloor);
+      const maximumRowsToScan = limit + inMemoryExcludedIds.size;
+      let offset = 0;
+      while (rows.length < limit && offset < maximumRowsToScan) {
+        const page = rowsAtOffset(
+          Math.min(pageSize, maximumRowsToScan - offset),
+          offset
+        );
+        rows.push(...page.filter((row) => !inMemoryExcludedIds.has(row.id)));
+        offset += page.length;
+        if (page.length < pageSize) {
+          break;
+        }
+      }
+      return hydrateCandidateRows(rows.slice(0, limit));
+    }
 
     if (filter.randomSeed === undefined) {
       return hydrateCandidateRows(rowsAtOffset(limit));
@@ -266,6 +421,27 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       `${themeId ?? "all"}:${filter.minRating ?? 0}:${filter.maxRating ?? 4000}`,
       countRow.count
     );
+    if (inMemoryExcludedIds !== undefined) {
+      const rows: Array<{ id: string }> = [];
+      const pageSize = Math.max(limit, this.candidateFloor);
+      let scanned = 0;
+      while (rows.length < limit && scanned < countRow.count) {
+        const pageOffset = (offset + scanned) % countRow.count;
+        const rowsBeforeWrap = countRow.count - pageOffset;
+        const rowLimit = Math.min(
+          pageSize,
+          rowsBeforeWrap,
+          countRow.count - scanned
+        );
+        const page = rowsAtOffset(rowLimit, pageOffset);
+        rows.push(...page.filter((row) => !inMemoryExcludedIds.has(row.id)));
+        scanned += page.length;
+        if (page.length === 0) {
+          break;
+        }
+      }
+      return hydrateCandidateRows(rows.slice(0, limit));
+    }
     const rows = rowsAtOffset(limit, offset);
     if (rows.length < limit) {
       rows.push(...rowsAtOffset(limit - rows.length, 0));
@@ -305,6 +481,9 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       initialFen: expandFen(row.initial_fen),
       solutionMoves: splitWords(row.solution_moves),
       rating: row.rating,
+      ...(row.rating_deviation === undefined
+        ? {}
+        : { ratingDeviation: row.rating_deviation }),
       themes,
       source: "lichess",
       stockfishEval: row.stockfish_eval,

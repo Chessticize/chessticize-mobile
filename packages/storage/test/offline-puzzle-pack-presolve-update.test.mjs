@@ -65,6 +65,7 @@ test("updates retained IDs from depth 20 and removes puzzles that stop qualifyin
       initial_fen: PACK_FEN,
       solution_moves: MOVES,
       rating: 1798,
+      rating_deviation: 77,
       stockfish_eval: -453,
       stockfish_bestmove: "b2b1",
       stockfish_eval_after_first_move: 693
@@ -79,6 +80,7 @@ test("updates retained IDs from depth 20 and removes puzzles that stop qualifyin
       initial_fen: PACK_FEN,
       solution_moves: MOVES,
       rating: 1798,
+      rating_deviation: 77,
       stockfish_eval: ORIGINAL_PRESOLVE.stockfishEval,
       stockfish_bestmove: ORIGINAL_PRESOLVE.stockfishBestMove,
       stockfish_eval_after_first_move: ORIGINAL_PRESOLVE.stockfishEvalAfterFirstMove
@@ -172,6 +174,7 @@ async function createFixture(input) {
         initial_fen TEXT NOT NULL,
         solution_moves TEXT NOT NULL,
         rating INTEGER NOT NULL,
+        rating_deviation INTEGER NOT NULL,
         stockfish_eval REAL NOT NULL,
         stockfish_bestmove TEXT NOT NULL,
         stockfish_eval_after_first_move REAL NOT NULL
@@ -196,10 +199,11 @@ async function createFixture(input) {
         initial_fen,
         solution_moves,
         rating,
+        rating_deviation,
         stockfish_eval,
         stockfish_bestmove,
         stockfish_eval_after_first_move
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertTheme = db.prepare(
       "INSERT INTO puzzle_themes (puzzle_id, theme_id, rating) VALUES (?, 1, 1798)"
@@ -210,6 +214,7 @@ async function createFixture(input) {
         PACK_FEN,
         MOVES,
         1798,
+        77,
         ORIGINAL_PRESOLVE.stockfishEval,
         ORIGINAL_PRESOLVE.stockfishBestMove,
         ORIGINAL_PRESOLVE.stockfishEvalAfterFirstMove

@@ -10,3 +10,5 @@ export * from "./sqlite-puzzle-pack-source.ts";
 export * from "./sqlite-store.ts";
 export { CURRENT_SCHEMA_VERSION } from "./sync-sqlite-store.ts";
 export * from "./practice-service.ts";
+export * from "./tactical-profile-repository.ts";
+export * from "./tactical-profile-service.ts";

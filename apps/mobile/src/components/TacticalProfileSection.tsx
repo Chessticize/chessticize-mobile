@@ -100,12 +100,19 @@ function TacticalProfileScreen({
   const familySignals = presentation.signals.filter(
     (signal) => signal.taskFamily === activeTaskFamily
   );
-  const allRecommendedSignals = distinctRecommendedSignals(familySignals);
-  const recommendedSignals = allRecommendedSignals.slice(0, TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT);
-  const hiddenRecommendationCount = allRecommendedSignals.length - recommendedSignals.length;
-  const watchSignals = familySignals.filter((signal) => signal.status === "watch");
+  const distinctSignals = distinctFamilySignals(familySignals);
+  const visibleSignals = distinctSignals.slice(0, TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT);
+  const recommendedSignals = visibleSignals.filter(
+    (signal) => signal.status === "recommended"
+  );
+  const watchSignals = visibleSignals.filter((signal) => signal.status === "watch");
+  const hiddenSignalCount = distinctSignals.length - visibleSignals.length;
   const canPreview = recommendedSignals.length > 0
-    && presentation.focusedRun?.taskFamily === activeTaskFamily;
+    && presentation.focusedRunUnavailable === undefined
+    && (
+      presentation.focusedRun === undefined
+      || presentation.focusedRun.taskFamily === activeTaskFamily
+    );
 
   return (
     <View style={styles.flow} testID="tactical-profile-screen">
@@ -147,13 +154,6 @@ function TacticalProfileScreen({
               onExplain={() => presentation.onIntent({ type: "explain-signal", signalId: signal.id })}
             />
           ))}
-          {hiddenRecommendationCount > 0 ? (
-            <Text style={styles.monitoringNote} testID="tactical-profile-more-signals">
-              {hiddenRecommendationCount === 1
-                ? "1 more pattern is being monitored in the background."
-                : `${hiddenRecommendationCount} more patterns are being monitored in the background.`}
-            </Text>
-          ) : null}
         </View>
       ) : null}
 
@@ -168,6 +168,14 @@ function TacticalProfileScreen({
             />
           ))}
         </View>
+      ) : null}
+
+      {hiddenSignalCount > 0 ? (
+        <Text style={styles.monitoringNote} testID="tactical-profile-more-signals">
+          {hiddenSignalCount === 1
+            ? "1 more pattern is being monitored in the background."
+            : `${hiddenSignalCount} more patterns are being monitored in the background.`}
+        </Text>
       ) : null}
 
       {recommendedSignals.length > 0 && presentation.focusedRunUnavailable ? (
@@ -211,7 +219,12 @@ function RecommendationExplanation({
   if (!signal) {
     return <TacticalProfileScreen presentation={presentation} />;
   }
-  const canPreview = presentation.focusedRun?.taskFamily === signal.taskFamily;
+  const canPreview = signal.status === "recommended"
+    && presentation.focusedRunUnavailable === undefined
+    && (
+      presentation.focusedRun === undefined
+      || presentation.focusedRun.taskFamily === signal.taskFamily
+    );
 
   return (
     <View style={styles.flow} testID="tactical-profile-explanation">
@@ -479,7 +492,11 @@ function SignalKindPill({
   return (
     <View style={[styles.kindPill, kind === "speed" ? styles.kindPillSpeed : styles.kindPillSolve]}>
       <Text style={[styles.kindPillText, kind === "speed" ? styles.kindPillTextSpeed : styles.kindPillTextSolve]}>
-        {kind === "speed" ? "Completed-puzzle speed" : "Solve reliability"}
+        {kind === "speed"
+          ? "Completed-puzzle speed"
+          : kind === "both"
+            ? "Reliability & speed"
+            : "Solve reliability"}
       </Text>
     </View>
   );
@@ -526,9 +543,13 @@ function selectedSignalFor(
 }
 
 function signalSummary(signal: TacticalProfileSignal): string {
-  return signal.kind === "speed"
-    ? "You solve these correctly, but more slowly than comparable puzzles."
-    : "You complete these less reliably than comparable puzzles.";
+  if (signal.kind === "speed") {
+    return "You solve these correctly, but more slowly than comparable puzzles.";
+  }
+  if (signal.kind === "both") {
+    return "You complete these less reliably and solve completed puzzles more slowly than comparable puzzles.";
+  }
+  return "You complete these less reliably than comparable puzzles.";
 }
 
 function profileHeadingFor(
@@ -641,6 +662,19 @@ function distinctRecommendedSignals(
       return false;
     }
     familyThemeKeys.add(signal.themeKey);
+    return true;
+  });
+}
+
+function distinctFamilySignals(
+  signals: readonly TacticalProfileSignal[]
+): TacticalProfileSignal[] {
+  const seenThemeKeys = new Set<string>();
+  return signals.filter((signal) => {
+    if (seenThemeKeys.has(signal.themeKey)) {
+      return false;
+    }
+    seenThemeKeys.add(signal.themeKey);
     return true;
   });
 }

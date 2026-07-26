@@ -46,6 +46,9 @@ export type LabScenarioId =
   | "practice-summary"
   | "practice-sprint-result-goal"
   | "practice-sprint-result-extra-attempt"
+  | "practice-tactical-focus-guide"
+  | "practice-tactical-focus-active"
+  | "practice-tactical-focus-result"
   | "practice-reminder-prompt"
   | "review-empty"
   | "review-due"
@@ -195,6 +198,9 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "practice-summary": defineScenario("practice-summary", "Practice", "Sprint summary", "practice--sprint-summary", "Completed one-puzzle sprint summary reached through the public board callback.", "practice", ["Result", "Rating change", "History and review actions"], ["Practice home", "History", "Review"]),
   "practice-sprint-result-goal": defineScenario("practice-sprint-result-goal", "Practice", "Sprint result · Goal clarity", "practice--sprint-result-goal-clarity", "Failed Sprint Result that shows Solved 11 beside the fixed pass target, separately reports 12 attempts and 92% accuracy, and keeps its mistake separate from prior correct attempts marked Unclear.", "practice", ["Solved 11", "Solve 15 to pass", "12 attempted", "No Unclear action for the final mistake", "Aligned summary counts", "Existing result actions"], ["Production result wiring", "History", "Review"], "contained"),
   "practice-sprint-result-extra-attempt": defineScenario("practice-sprint-result-extra-attempt", "Practice", "Sprint result · Extra attempt", "practice--sprint-result-extra-attempt", "Passed Sprint Result that shows Solved 15 beside the fixed pass target while explicitly reporting the user's 16 actual attempts.", "practice", ["Solved 15", "Solve 15 to pass", "16 attempted", "Accuracy", "Aligned summary counts", "Existing result actions"], ["Production result wiring", "History", "Review"], "contained"),
+  "practice-tactical-focus-guide": defineScenario("practice-tactical-focus-guide", "Practice", "Tactical Focus · first-use guide", "practice--tactical-focus-guide", "The shared active-session guide adapts its header, timeout, score, and start language to a fixed Unrated Focused Run before its clock starts.", "practice", ["Focused Run header guidance", "Fixed-puzzle progress", "Unrated status", "Timeout counts as a completed puzzle", "Start Focused Run"], ["Production onboarding persistence", "Active Focused Run"], "contained"),
+  "practice-tactical-focus-active": defineScenario("practice-tactical-focus-active", "Practice", "Tactical Focus · active run", "practice--tactical-focus-active", "Active fixed Tactical Focus Run that replaces pass and mistake-limit language with completed, remaining, and Unrated status while preserving the familiar board session.", "practice", ["Focused Run header", "Fixed 15-puzzle progress", "Completed and remaining counts", "Unrated status", "Rating unchanged exit copy"], ["Focused Run result", "Review"], "contained"),
+  "practice-tactical-focus-result": defineScenario("practice-tactical-focus-result", "Practice", "Tactical Focus · result", "practice--tactical-focus-result", "Completed fixed Tactical Focus Run that clearly stays unrated, reports the planned-puzzle ending, and returns to Practice instead of immediately replaying stale focus.", "practice", ["Focused Run complete", "Planned puzzles complete", "Unrated Rating", "Back to Practice"], ["Practice home", "Review"], "contained"),
   "practice-reminder-prompt": defineScenario("practice-reminder-prompt", "Practice", "Review reminder prompt", "practice--review-reminder-prompt", "First-mistake notification-permission prompt driven by a maintained fake client.", "practice", ["Permission rationale", "Enable", "Dismiss"], ["Active sprint"]),
   "review-empty": defineScenario("review-empty", "Review", "Empty queue", "review--empty-queue", "Review with no due or future items.", "review", ["Empty state", "Practice return"], ["Practice"]),
   "review-due": defineScenario("review-due", "Review", "Due queue", "review--due-queue", "Deterministic due workload with multiple contexts.", "review", ["Due metrics", "Forecast", "Queue rows", "Start review"], ["Review session", "Practice"]),
@@ -266,6 +272,7 @@ export const navigationCoverage = {
   details: {
     "review-analysis": coveredBy("review-feedback-analysis"),
     "review-session": coveredBy("review-session"),
+    "tactical-profile": coveredBy("practice-tactical-profile-ranked"),
     "practice-run-editor": coveredBy("practice-run-name-validation"),
     "custom-practice": coveredBy("practice-custom-setup"),
     "sprint-result": coveredBy("practice-summary"),

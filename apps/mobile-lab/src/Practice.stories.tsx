@@ -518,6 +518,41 @@ export const SprintResultExtraAttempt: Story = {
   }
 };
 
+export const TacticalFocusActive: Story = {
+  name: "Tactical Focus · active run",
+  args: { scenarioId: "practice-tactical-focus-active" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForText(canvasElement, "Focused Run");
+    await waitForText(canvasElement, "Unrated");
+    await waitForText(canvasElement, "Completed");
+    await waitForText(canvasElement, "Left");
+  }
+};
+
+export const TacticalFocusFirstUseGuide: Story = {
+  name: "Tactical Focus · first-use guide",
+  args: { scenarioId: "practice-tactical-focus-guide" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForText(canvasElement, "Track the fixed Run");
+    await waitForText(canvasElement, "Your Rating will not change.");
+    await waitForText(canvasElement, "Unrated");
+  }
+};
+
+export const TacticalFocusResult: Story = {
+  name: "Tactical Focus · result",
+  args: { scenarioId: "practice-tactical-focus-result" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForText(canvasElement, "Focused Run complete");
+    await waitForText(canvasElement, "Planned puzzles complete");
+    await waitForText(canvasElement, "Unrated");
+    await waitForText(canvasElement, "Back to Practice");
+  }
+};
+
 export const ReviewReminderPrompt: Story = {
   name: "Review reminder prompt",
   args: { scenarioId: "practice-reminder-prompt" },

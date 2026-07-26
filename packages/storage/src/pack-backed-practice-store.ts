@@ -192,7 +192,9 @@ export class PackBackedPracticeStore implements PracticeStore {
   }
 
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[] {
-    const attempts = this.userStore.listAttempts({ sessionId, result: "wrong" }).map(attemptEventFromHistoryRow);
+    const attempts = this.userStore
+      .listAttempts({ sessionId })
+      .map(attemptEventFromHistoryRow);
     const puzzles = attempts
       .map((attempt) => this.getPuzzle(attempt.puzzleId))
       .filter((puzzle): puzzle is Puzzle => Boolean(puzzle));

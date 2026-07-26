@@ -1077,6 +1077,24 @@ describe("PracticePocScreen", () => {
     expect(onIntent).toHaveBeenCalledWith({ type: "open-profile" });
   });
 
+  it("shows the fail-closed collecting state from the production Tactical Profile service", async () => {
+    const renderer = renderScreen({
+      practiceService: createMobilePracticeService("familiar15")
+    });
+    await flushMicrotasks();
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "More information needed"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Keep playing mixed Runs"
+    );
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
+      "Still collecting evidence"
+    );
+  });
+
   it("keeps solve reliability and completed-puzzle speed as plain-language profile signals", () => {
     const solveRate = renderLabScenario("practice-tactical-profile-solve-rate");
     const speed = renderLabScenario("practice-tactical-profile-speed");
@@ -4653,6 +4671,66 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-accuracy"))).toBe(
       "2 attempted · 50% Accuracy"
     );
+  });
+
+  it("explains a completed Tactical Focus Run as fixed, unrated training", () => {
+    const renderer = renderLabScenario("practice-tactical-focus-result");
+
+    expectText(renderer, "Focused Run complete");
+    expect(collectText(findByTestId(renderer, "sprint-result-top-bar"))).toContain(
+      "Focused Run Result"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe(
+      "Planned puzzles complete"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-rating-change"))).toContain(
+      "Unrated"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-rating-range"))).toBe(
+      "1087 unchanged"
+    );
+    expect(() => findByTestId(renderer, "sprint-result-history-trend")).toThrow();
+    expect(() => findByTestId(renderer, "sprint-result-history-button")).toThrow();
+    expect(() => findByTestId(renderer, "sprint-result-goal-label")).toThrow();
+    expect(collectText(findByTestId(renderer, "play-again-button"))).toContain(
+      "Back to Practice"
+    );
+    press(renderer, "play-again-button");
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it("shows fixed progress and no Rating pressure during an active Tactical Focus Run", () => {
+    const renderer = renderLabScenario("practice-tactical-focus-active");
+
+    expect(collectText(findByTestId(renderer, "active-session-shell"))).toContain(
+      "Focused Run"
+    );
+    expect(collectText(findByTestId(renderer, "session-status-metrics"))).toContain(
+      "Unrated"
+    );
+    expect(findByTestId(renderer, "session-score-completed").props.accessibilityLabel)
+      .toBe("Completed 10");
+    expect(findByTestId(renderer, "session-score-left").props.accessibilityLabel)
+      .toBe("Left 5");
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("10 / 15");
+  });
+
+  it("explains fixed and unrated semantics before a first Focused Run", () => {
+    const renderer = renderLabScenario("practice-tactical-focus-guide");
+
+    expectText(renderer, "Track the fixed Run");
+    expectText(renderer, "Your Rating will not change.");
+    expectText(renderer, "Unrated");
+    expect(
+      collectText(findByTestId(renderer, "practice-session-guide-start"))
+    ).toBe("Next");
+    press(renderer, "practice-session-guide-start");
+    press(renderer, "practice-session-guide-start");
+    expectText(renderer, "It is added to Review and counts as one completed puzzle.");
+    press(renderer, "practice-session-guide-start");
+    expect(
+      collectText(findByTestId(renderer, "practice-session-guide-start"))
+    ).toBe("Start Focused Run");
   });
 
   it("separates the fixed pass goal from actual attempts in the Storybook result designs", () => {

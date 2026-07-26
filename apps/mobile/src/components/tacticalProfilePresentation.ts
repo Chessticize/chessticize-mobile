@@ -1,6 +1,6 @@
 import type { TacticalProfileTaskFamily } from "../../../../packages/core/src/index.ts";
 
-export type TacticalProfileSignalKind = "solve_rate" | "speed";
+export type TacticalProfileSignalKind = "solve_rate" | "speed" | "both";
 
 export type TacticalProfileSignal = {
   id: string;

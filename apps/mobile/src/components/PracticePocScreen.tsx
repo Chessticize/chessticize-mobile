@@ -93,11 +93,16 @@ import type {
   SprintGuideKey,
   SprintMode,
   SprintResultSummary,
+  TacticalProfileTaskFamily,
   ThemeChoiceIntent,
   SprintState,
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
-import type { CompletedReviewItem, PracticeService } from "../../../../packages/storage/src/practice-service.ts";
+import {
+  FocusedRunUnavailableError,
+  type CompletedReviewItem,
+  type PracticeService
+} from "../../../../packages/storage/src/practice-service.ts";
 import type {
   ReviewQueueDuePromotionResult,
   ReviewReminderPreference
@@ -191,6 +196,7 @@ import {
   TacticalProfileHomeCard
 } from "./TacticalProfileSection.tsx";
 import type { TacticalProfilePresentation } from "./tacticalProfilePresentation.ts";
+import { useTacticalProfilePresentation } from "./useTacticalProfilePresentation.ts";
 
 export type {
   PracticeRunDraft,
@@ -239,6 +245,8 @@ export type SprintRulesGuidePresentation = {
 };
 
 export type SprintSessionGuidePresentation = SprintRulesGuidePresentation & {
+  focusedRun?: boolean;
+  maxAttempts?: number;
   mode: "standard" | "arrow_duel";
 };
 
@@ -256,6 +264,7 @@ export type SprintResultUnclearPromptPresentation = {
 export type SprintRulesDesignPreview = {
   firstRunGuide?: SprintRulesGuidePresentation;
   firstRunGuideInitiallyVisible?: boolean;
+  initialActiveState?: SprintState;
   initialSessionGuides?: readonly SprintSessionGuidePresentation[];
   initialPreviousAttemptNotice?: "slow" | "timed_out" | "wrong";
   initialResultUnclearPrompt?: SprintResultUnclearPromptPresentation;
@@ -388,10 +397,22 @@ function previousAttemptNoticeFor(
     : null;
 }
 
-type PendingGuidedStart = {
-  nextMode: SprintMode;
-  practiceRunId?: string;
-  useCustomTiming: boolean;
+type PendingGuidedStart =
+  | {
+      kind: "sprint";
+      nextMode: SprintMode;
+      practiceRunId?: string;
+      useCustomTiming: boolean;
+    }
+  | {
+      kind: "focused";
+      taskFamily: TacticalProfileTaskFamily;
+      onUnavailable: (error: unknown) => void;
+    };
+
+type StartingFocusedRun = {
+  taskFamily: TacticalProfileTaskFamily;
+  onUnavailable: (error: unknown) => void;
 };
 
 const SPRINT_RULES_PREVIEW_UNCLEAR_ATTEMPT_ID = "sprint-rules-preview-final-attempt";
@@ -561,6 +582,7 @@ export function PracticePocScreen({
   const pendingGuidedStartRef = useRef<PendingGuidedStart | null>(null);
   const startingModeRef = useRef<SprintMode | null>(null);
   const startingPracticeRunIdRef = useRef<string | null>(null);
+  const startingFocusedRunRef = useRef<StartingFocusedRun | null>(null);
   const deferredBackTransitionsRef = useRef(new Map<string, () => void>());
   const resumeDeferredBackTransitionsRef = useRef<(() => void) | null>(null);
   const predictiveBackIntentRef = useRef<MobileBackIntent | null>(null);
@@ -587,7 +609,9 @@ export function PracticePocScreen({
   const [startingMode, setStartingMode] = useState<SprintMode | null>(null);
   const [tab, setTab] = useState<Tab>(initialTab);
   const [state, setState] = useState<SprintState | null>(
-    () => sprintRulesDesignPreview?.initialResultState ?? null
+    () => sprintRulesDesignPreview?.initialResultState
+      ?? sprintRulesDesignPreview?.initialActiveState
+      ?? null
   );
   const [feedback, setFeedback] = useState<SessionFeedback>(null);
   const [aggregateRevision, setAggregateRevision] = useState(0);
@@ -684,6 +708,14 @@ export function PracticePocScreen({
     onControlledSelectionChange: customThemeSelection?.onChange
   });
   const historyThemeChoices = useThemeChoiceSelection();
+  const resolvedTacticalProfilePresentation = useTacticalProfilePresentation({
+    service,
+    ...(tacticalProfilePresentation === undefined
+      ? {}
+      : { injectedPresentation: tacticalProfilePresentation }),
+    onStartRequested: requestFocusedRunStart,
+    refreshKey: aggregateRevision
+  });
 
   const adaptiveLayout = useMemo(
     () => buildPracticeAdaptiveLayout({ fontScale, height, insets, width }),
@@ -971,6 +1003,7 @@ export function PracticePocScreen({
       }
       startingModeRef.current = null;
       startingPracticeRunIdRef.current = null;
+      startingFocusedRunRef.current = null;
       deferredBackTransitions.clear();
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG__ = undefined;
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__ = undefined;
@@ -1364,7 +1397,12 @@ export function PracticePocScreen({
   function beginFirstUseSessionGuides(
     nextMode: SprintMode,
     useCustomTiming: boolean,
-    practiceRunId?: string
+    practiceRunId?: string,
+    pendingStart?: PendingGuidedStart,
+    presentationOverride?: SprintRulesGuidePresentation & {
+      focusedRun?: boolean;
+      maxAttempts?: number;
+    }
   ): boolean {
     if (!sprintGuidanceEnabled || pendingGuidedStartRef.current) {
       return false;
@@ -1376,12 +1414,13 @@ export function PracticePocScreen({
     if (guideKeys.length === 0) {
       return false;
     }
-    const presentation = sprintGuidePresentationFor(
+    const presentation = presentationOverride ?? sprintGuidePresentationFor(
       nextMode,
       useCustomTiming,
       practiceRunId
     );
-    pendingGuidedStartRef.current = {
+    pendingGuidedStartRef.current = pendingStart ?? {
+      kind: "sprint",
       nextMode,
       useCustomTiming,
       ...(practiceRunId === undefined ? {} : { practiceRunId })
@@ -1419,6 +1458,88 @@ export function PracticePocScreen({
     performStartSprint(nextMode, useCustomTiming, practiceRunId);
   }
 
+  function requestFocusedRunStart(
+    taskFamily: TacticalProfileTaskFamily,
+    onUnavailable: (error: unknown) => void
+  ): void {
+    if (startingModeRef.current !== null) {
+      return;
+    }
+    const nextMode = taskFamily === "arrow_duel" ? "arrow_duel" : "standard";
+    const pendingStart: PendingGuidedStart = {
+      kind: "focused",
+      taskFamily,
+      onUnavailable
+    };
+    const guideKeys = sprintGuidanceEnabled
+      ? sprintSessionGuidesFor(service.getSettings().sprintGuides, nextMode)
+      : [];
+    if (guideKeys.length > 0) {
+      const prepared = service.prepareFocusedRun(taskFamily, captureLiveNowIso());
+      if (prepared.status !== "ready") {
+        onUnavailable(new FocusedRunUnavailableError(prepared.reason));
+        return;
+      }
+      if (beginFirstUseSessionGuides(
+        nextMode,
+        false,
+        undefined,
+        pendingStart,
+        {
+          durationLabel: formatSprintDurationLabel(
+            prepared.prepared.config.durationSeconds
+          ),
+          focusedRun: true,
+          maxAttempts: prepared.prepared.config.maxAttempts,
+          maxMistakes: prepared.prepared.config.maxMistakes,
+          targetCorrect: prepared.prepared.config.targetCorrect
+        }
+      )) {
+        return;
+      }
+    }
+    if (nextMode === "arrow_duel") {
+      startingModeRef.current = nextMode;
+      startingPracticeRunIdRef.current = null;
+      startingFocusedRunRef.current = { taskFamily, onUnavailable };
+      setStartingMode(nextMode);
+      sprintStartTimerRef.current = setTimeout(() => {
+        finishDelayedFocusedRunStart(taskFamily, onUnavailable);
+      }, sprintStartDelayMs);
+      return;
+    }
+    performStartFocusedRun(taskFamily, onUnavailable);
+  }
+
+  function finishDelayedFocusedRunStart(
+    taskFamily: TacticalProfileTaskFamily,
+    onUnavailable: (error: unknown) => void
+  ): void {
+    sprintStartTimerRef.current = null;
+    const expectedMode = taskFamily === "arrow_duel" ? "arrow_duel" : "standard";
+    const startingFocus = startingFocusedRunRef.current;
+    if (
+      startingModeRef.current !== expectedMode ||
+      startingFocus?.taskFamily !== taskFamily ||
+      startingFocus.onUnavailable !== onUnavailable
+    ) {
+      return;
+    }
+    if (deferBackRelevantTransition("delayed-sprint-start", () => {
+      const resumedFocus = startingFocusedRunRef.current;
+      if (
+        startingModeRef.current === expectedMode &&
+        resumedFocus?.taskFamily === taskFamily &&
+        resumedFocus.onUnavailable === onUnavailable
+      ) {
+        performStartFocusedRun(taskFamily, onUnavailable);
+      }
+    })) {
+      return;
+    }
+    performStartFocusedRun(taskFamily, onUnavailable);
+  }
+
   function finishDelayedSprintStart(
     nextMode: SprintMode,
     useCustomTiming: boolean,
@@ -1442,6 +1563,26 @@ export function PracticePocScreen({
       return;
     }
     performStartSprint(nextMode, useCustomTiming, practiceRunId);
+  }
+
+  function performStartFocusedRun(
+    taskFamily: TacticalProfileTaskFamily,
+    onUnavailable: (error: unknown) => void
+  ): void {
+    setError(null);
+    try {
+      adoptStartedSprint(service.startFocusedRun(
+        taskFamily,
+        captureLiveNowIso()
+      ));
+    } catch (caught) {
+      onUnavailable(caught);
+    } finally {
+      startingModeRef.current = null;
+      startingPracticeRunIdRef.current = null;
+      startingFocusedRunRef.current = null;
+      setStartingMode(null);
+    }
   }
 
   function deferBackRelevantTransition(key: string, resumeAfterCancel: () => void): boolean {
@@ -1473,6 +1614,7 @@ export function PracticePocScreen({
     deferredBackTransitionsRef.current.delete("delayed-sprint-start");
     startingModeRef.current = null;
     startingPracticeRunIdRef.current = null;
+    startingFocusedRunRef.current = null;
     setStartingMode(null);
   }
 
@@ -1532,31 +1674,36 @@ export function PracticePocScreen({
             },
         captureLiveNowIso()
       );
-      setMode(nextMode);
-      setSessionMistakeReviewItems([]);
-      commitState(started);
-      setResumableSprint(null);
-      commitBoardFen(started.currentPuzzle?.currentFen ?? null);
-      setLastBoardMove(null);
-      setFeedback(null);
-      setFeedbackPuzzleId(null);
-      setUnclearPrompt(null);
-      setPreviousAttemptNotice(null);
-      pendingPremoveRef.current = null;
-      commitBoardInputLocked(false, "start", started.currentPuzzle?.puzzle.id ?? null);
-      clearFeedbackSnapshot();
-      navigateToTab("practice");
-      // Starting a run changes the managed-run presentation but not History or
-      // Review aggregates. Avoid pulling every persisted attempt/session back
-      // into the UI at this latency-sensitive boundary.
-      internalRunManagement.refresh();
+      adoptStartedSprint(started);
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
       startingModeRef.current = null;
       startingPracticeRunIdRef.current = null;
+      startingFocusedRunRef.current = null;
       setStartingMode(null);
     }
+  }
+
+  function adoptStartedSprint(started: SprintState): void {
+    setMode(started.config.mode);
+    setSessionMistakeReviewItems([]);
+    commitState(started);
+    setResumableSprint(null);
+    commitBoardFen(started.currentPuzzle?.currentFen ?? null);
+    setLastBoardMove(null);
+    setFeedback(null);
+    setFeedbackPuzzleId(null);
+    setUnclearPrompt(null);
+    setPreviousAttemptNotice(null);
+    pendingPremoveRef.current = null;
+    commitBoardInputLocked(false, "start", started.currentPuzzle?.puzzle.id ?? null);
+    clearFeedbackSnapshot();
+    navigateToTab("practice");
+    // Starting a run changes the managed-run presentation but not History or
+    // Review aggregates. Avoid pulling every persisted attempt/session back
+    // into the UI at this latency-sensitive boundary.
+    internalRunManagement.refresh();
   }
 
   function changePuzzleSource(nextSource: MobilePuzzleSource): void {
@@ -2590,13 +2737,27 @@ export function PracticePocScreen({
           ? { kind: "stockfish-diagnostics", owner: "settings" }
           : isFinished
             ? { kind: "sprint-result", owner: "practice" }
+            : tab === "practice" && state === null
+                && resolvedTacticalProfilePresentation?.screen !== undefined
+                && resolvedTacticalProfilePresentation.screen !== "home"
+              ? { kind: "tactical-profile", owner: "practice" }
             : tab === "practice" && state === null && activeRunManagementScreen !== undefined
                 && activeRunManagementScreen !== "home"
               ? { kind: "practice-run-editor", owner: "practice" }
             : tab === "practice" && state === null && mode === "custom"
               ? { kind: "custom-practice", owner: "practice" }
               : null,
-    [activeRunManagementScreen, isFinished, mode, reviewAnalysisOpen, reviewSessionSource, reviewSurfaceOpen, state, tab]
+    [
+      activeRunManagementScreen,
+      isFinished,
+      mode,
+      resolvedTacticalProfilePresentation?.screen,
+      reviewAnalysisOpen,
+      reviewSessionSource,
+      reviewSurfaceOpen,
+      state,
+      tab
+    ]
   );
   const mobileBackState: MobileBackState = {
     activePractice: isOpenSession,
@@ -2649,6 +2810,8 @@ export function PracticePocScreen({
           navigateToTab("settings");
         } else if (resolvedState.detail?.kind === "practice-run-editor") {
           activeRunManagementPresentation?.onIntent({ type: "cancel-edit" });
+        } else if (resolvedState.detail?.kind === "tactical-profile") {
+          resolvedTacticalProfilePresentation?.onIntent({ type: "close-profile" });
         } else if (resolvedState.detail?.kind === "custom-practice") {
           setCustomRatingEditorOpen(false);
           setMode("standard");
@@ -3047,7 +3210,11 @@ export function PracticePocScreen({
   const practiceAnnouncement = error
     ? `Error. ${error}`
     : isSessionGuideVisible
-      ? `${sessionGuidePresentation?.mode === "arrow_duel" ? "Arrow Duel" : "Sprint"} first-session guide. The timer has not started.`
+      ? `${sessionGuidePresentation?.focusedRun
+        ? "Focused Run"
+        : sessionGuidePresentation?.mode === "arrow_duel"
+          ? "Arrow Duel"
+          : "Sprint"} first-session guide. The timer has not started.`
     : boardFeedback
       ? `${boardFeedback.result === "correct" ? "Correct move" : "Wrong move"}. ${boardFeedback.puzzleSolved ? "Puzzle complete." : "Continue the puzzle."}`
       : isActive && displayedSideToMove
@@ -3211,11 +3378,21 @@ export function PracticePocScreen({
                       const pendingStart = pendingGuidedStartRef.current;
                       pendingGuidedStartRef.current = null;
                       if (pendingStart) {
+                        if (pendingStart.kind === "focused") {
+                          requestFocusedRunStart(
+                            pendingStart.taskFamily,
+                            pendingStart.onUnavailable
+                          );
+                          return;
+                        }
                         startSprint(
                           pendingStart.nextMode,
                           pendingStart.useCustomTiming,
                           pendingStart.practiceRunId
                         );
+                        return;
+                      }
+                      if (sessionGuidePresentation.focusedRun) {
                         return;
                       }
                       startSprint(sessionGuidePresentation.mode);
@@ -3295,14 +3472,14 @@ export function PracticePocScreen({
                 ) : null}
 
                 {!isSessionGuideVisible && !isOpenSession && state === null && (
-                  tacticalProfilePresentation?.screen !== undefined
-                  && tacticalProfilePresentation.screen !== "home"
+                  resolvedTacticalProfilePresentation?.screen !== undefined
+                  && resolvedTacticalProfilePresentation.screen !== "home"
                 ) ? (
-                  <TacticalProfileFlow presentation={tacticalProfilePresentation} />
+                  <TacticalProfileFlow presentation={resolvedTacticalProfilePresentation} />
                 ) : null}
 
                 {!isSessionGuideVisible && !isOpenSession && state === null
-                && (tacticalProfilePresentation?.screen ?? "home") === "home" && (
+                && (resolvedTacticalProfilePresentation?.screen ?? "home") === "home" && (
                   activeRunManagementPresentation?.screen === "home"
                   || (!activeRunManagementPresentation && mode !== "custom")
                 ) ? (
@@ -3319,7 +3496,7 @@ export function PracticePocScreen({
                     runManagement={activeRunManagementPresentation}
                     sprintRulesGuide={sprintRulesGuidePresentation}
                     sprintRulesGuideVisible={sprintRulesGuideVisible}
-                    tacticalProfile={tacticalProfilePresentation}
+                    tacticalProfile={resolvedTacticalProfilePresentation}
                     resumableSprint={resumableSprint}
                     onDismissSprintRulesGuide={() => {
                       setSprintRulesGuideVisible(false);
@@ -3407,7 +3584,13 @@ export function PracticePocScreen({
                         sprintRulesDesignPreview?.initialResultUnclearPrompt !== undefined
                       }
                       onToggleUnclear={toggleUnclearPrompt}
-                      onReplay={() => startSprint(mode)}
+                      onReplay={() => {
+                        if (state.config.tacticalFocus) {
+                          resetToIdle();
+                          return;
+                        }
+                        startSprint(mode);
+                      }}
                       onBack={resetToIdle}
                       onOpenHistory={() => {
                         setHistoryRatingKey(state.config.ratingKey);
@@ -4353,7 +4536,8 @@ function sameSessionGuideMeasuredLayout(
 
 function sessionGuideCallout(
   mode: "standard" | "arrow_duel",
-  coachStep: number
+  coachStep: number,
+  focusedRun = false
 ): SessionGuideCallout {
   if (mode === "arrow_duel") {
     return {
@@ -4366,10 +4550,12 @@ function sessionGuideCallout(
   }
   if (coachStep === 0) {
     return {
-      badge: "SPRINT HEADER",
-      detail: "The top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide.",
+      badge: focusedRun ? "FOCUSED RUN" : "SPRINT HEADER",
+      detail: focusedRun
+        ? "The top row shows puzzles completed, time left, and Unrated status. Your Rating will not change."
+        : "The top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide.",
       id: "overview",
-      title: "Track your Sprint",
+      title: focusedRun ? "Track the fixed Run" : "Track your Sprint",
       tone: "info"
     };
   }
@@ -4385,7 +4571,9 @@ function sessionGuideCallout(
   if (coachStep === 2) {
     return {
       badge: "TIMED OUT",
-      detail: "It is added to Review. Mistakes are not marked Unclear. The Sprint then shows the next puzzle.",
+      detail: focusedRun
+        ? "It is added to Review and counts as one completed puzzle. The Focused Run then moves on."
+        : "It is added to Review. Mistakes are not marked Unclear. The Sprint then shows the next puzzle.",
       id: "timeout",
       title: "This puzzle counts as a mistake",
       tone: "danger"
@@ -4420,6 +4608,7 @@ function ActiveSessionGuide({
   totalSteps: number;
 }): React.JSX.Element {
   const isArrowDuel = presentation.mode === "arrow_duel";
+  const isFocusedRun = presentation.focusedRun === true;
   const guideBoardSize = adaptiveLayout.usesSessionRail
     ? boardSize
     : Math.min(
@@ -4438,10 +4627,16 @@ function ActiveSessionGuide({
   const hasPreviousCoachStep = coachStep > 0 || stepNumber > 1;
   const continueLabel = !isArrowDuel && (coachStep < 3 || hasNextGuide)
     ? "Next"
+    : isFocusedRun
+      ? "Start Focused Run"
     : isArrowDuel
       ? "Start Arrow Duel"
       : "Start Sprint";
-  const callout = sessionGuideCallout(presentation.mode, coachStep);
+  const callout = sessionGuideCallout(
+    presentation.mode,
+    coachStep,
+    isFocusedRun
+  );
 
   return (
     <View
@@ -4455,7 +4650,7 @@ function ActiveSessionGuide({
         style={FABRIC_SAFE_HIDDEN_TEXT_STYLE}
         testID="practice-session-guide-progress"
       >
-        GUIDE {unifiedCoachStep} OF {unifiedCoachTotal} · YOUR FIRST {isArrowDuel ? "ARROW DUEL" : "ACTIVE SPRINT"}
+        GUIDE {unifiedCoachStep} OF {unifiedCoachTotal} · YOUR FIRST {isFocusedRun ? "FOCUSED RUN" : isArrowDuel ? "ARROW DUEL" : "ACTIVE SPRINT"}
       </Text>
       <SessionCoachmarkDemo
         adaptiveLayout={adaptiveLayout}
@@ -4659,7 +4854,21 @@ function SessionCoachmarkDemo({
     config: {
       ...defaultSprintConfig(mode),
       maxMistakes: presentation.maxMistakes,
-      targetCorrect: presentation.targetCorrect
+      targetCorrect: presentation.targetCorrect,
+      ...(presentation.focusedRun
+        ? {
+            maxAttempts: presentation.maxAttempts ?? presentation.targetCorrect,
+            ratingPolicy: "unrated" as const,
+            tacticalFocus: {
+              taskFamily: mode === "arrow_duel" ? "arrow_duel" as const : "line" as const,
+              themes: ["fork"],
+              mixedControlCount: 5,
+              ratingAnchor: 1087,
+              minRating: 987,
+              maxRating: 1187
+            }
+          }
+        : {})
     },
     correctCount: 0,
     currentPuzzle,
@@ -4688,7 +4897,11 @@ function SessionCoachmarkDemo({
         : coachStep === 3
           ? 24
           : 0;
-  const callout = sessionGuideCallout(mode, coachStep);
+  const callout = sessionGuideCallout(
+    mode,
+    coachStep,
+    presentation.focusedRun === true
+  );
   const calloutUsesBoard = adaptiveLayout.usesSessionRail
     && !isArrowDuel
     && (coachStep === 1 || coachStep === 3);
@@ -7337,6 +7550,9 @@ function SessionStatusBar({
   onPause?: () => void;
   onResume?: () => void;
 }): React.JSX.Element {
+  const isTacticalFocus = state.config.tacticalFocus !== undefined;
+  const completedAttempts = state.correctCount + state.mistakeCount;
+  const plannedAttempts = state.config.maxAttempts ?? state.config.targetCorrect;
   return (
     <View style={styles.activeSessionShell} testID="active-session-shell">
       <View style={styles.sessionNavRow} testID="session-shell-nav">
@@ -7353,7 +7569,9 @@ function SessionStatusBar({
         ) : (
           <View style={styles.sessionNavButton} />
         )}
-        <Text numberOfLines={1} style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
+        <Text numberOfLines={1} style={styles.sessionNavTitle}>
+          {isTacticalFocus ? "Focused Run" : modeLabel(mode)}
+        </Text>
         <View style={styles.sessionNavActions} testID="session-nav-actions">
           {onPause ? (
             <Pressable
@@ -7391,12 +7609,16 @@ function SessionStatusBar({
         testID="session-status-metrics"
       >
         <View
-          accessibilityLabel={`Progress ${state.correctCount} of ${state.config.targetCorrect}`}
+          accessibilityLabel={isTacticalFocus
+            ? `Puzzles ${completedAttempts} of ${plannedAttempts}`
+            : `Progress ${state.correctCount} of ${state.config.targetCorrect}`}
           style={styles.sessionMetricBlock}
           testID="session-progress-block"
         >
           <Text numberOfLines={1} testID="session-progress" style={styles.sessionProgressValue}>
-            {state.correctCount} / {state.config.targetCorrect}
+            {isTacticalFocus
+              ? `${completedAttempts} / ${plannedAttempts}`
+              : `${state.correctCount} / ${state.config.targetCorrect}`}
           </Text>
         </View>
         <View
@@ -7406,23 +7628,39 @@ function SessionStatusBar({
         >
           <Text numberOfLines={1} testID="session-timer" style={styles.timerText}>{timerText}</Text>
         </View>
-        <View
-          accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
-          style={styles.sessionMetricBlock}
-          testID="session-mistakes-block"
-        >
-          <ActiveMistakeIndicator
-            count={state.mistakeCount}
-            max={state.config.maxMistakes}
-          />
-        </View>
+        {isTacticalFocus ? (
+          <View
+            accessibilityLabel="Rating unchanged"
+            style={styles.sessionMetricBlock}
+            testID="session-rating-policy"
+          >
+            <Text numberOfLines={1} style={styles.timerText}>Unrated</Text>
+          </View>
+        ) : (
+          <View
+            accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
+            style={styles.sessionMetricBlock}
+            testID="session-mistakes-block"
+          >
+            <ActiveMistakeIndicator
+              count={state.mistakeCount}
+              max={state.config.maxMistakes}
+            />
+          </View>
+        )}
       </View>
 
       {confirmAbandon ? (
         <View style={styles.sessionAbandonConfirm} testID="session-abandon-confirmation">
           <View style={styles.sessionAbandonCopy}>
-            <Text style={styles.listText}>Abandon sprint?</Text>
-            <Text style={styles.helperText}>This ends the run and records a failed sprint.</Text>
+            <Text style={styles.listText}>
+              {isTacticalFocus ? "Abandon focused Run?" : "Abandon sprint?"}
+            </Text>
+            <Text style={styles.helperText}>
+              {isTacticalFocus
+                ? "This ends the focused Run. Completed puzzles stay in History and your Rating stays unchanged."
+                : "This ends the run and records a failed sprint."}
+            </Text>
           </View>
           <View style={styles.sessionAbandonActions}>
             <Pressable
@@ -7608,6 +7846,8 @@ function SprintSummary({
   onReview?: () => void;
 }): React.JSX.Element {
   const delta = (state.ratingAfter ?? state.ratingBefore) - state.ratingBefore;
+  const isTacticalFocus = state.config.tacticalFocus !== undefined;
+  const showGoalClarification = clarifyGoal && !isTacticalFocus;
   const reason = formatEndReason(state.endReason);
   const shouldPrioritizeReview = Boolean(onReview);
   const attemptCount = resultSummary?.attemptCount
@@ -7659,20 +7899,26 @@ function SprintSummary({
         >
           <ChevronGlyph direction="left" />
         </Pressable>
-        <Text style={styles.resultTopBarTitle}>Sprint Result</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="View history trends"
-          testID="sprint-result-history-button"
-          style={styles.resultTopBarIconButton}
-          onPress={onOpenHistory}
-        >
-          <ResultTrendGlyph />
-        </Pressable>
+        <Text style={styles.resultTopBarTitle}>
+          {isTacticalFocus ? "Focused Run Result" : "Sprint Result"}
+        </Text>
+        {isTacticalFocus ? (
+          <View style={styles.resultTopBarIconButton} />
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="View history trends"
+            testID="sprint-result-history-button"
+            style={styles.resultTopBarIconButton}
+            onPress={onOpenHistory}
+          >
+            <ResultTrendGlyph />
+          </Pressable>
+        )}
       </View>
 
       <View
-        style={[styles.resultHero, clarifyGoal ? styles.resultHeroClarified : null]}
+        style={[styles.resultHero, showGoalClarification ? styles.resultHeroClarified : null]}
         testID="sprint-result-hero"
       >
         <View style={styles.resultStatusBlock}>
@@ -7680,7 +7926,11 @@ function SprintSummary({
             <SprintResultStatusGlyph status={state.status === "won" ? "won" : "failed"} />
           </View>
           <View style={styles.resultTitleBlock}>
-            <Text style={styles.summaryTitle}>{state.status === "won" ? "Sprint complete" : "Sprint failed"}</Text>
+            <Text style={styles.summaryTitle}>
+              {isTacticalFocus
+                ? state.status === "won" ? "Focused Run complete" : "Focused Run ended"
+                : state.status === "won" ? "Sprint complete" : "Sprint failed"}
+            </Text>
             <Text
               accessibilityLabel={`Result: ${reason}`}
               style={styles.summaryText}
@@ -7692,14 +7942,14 @@ function SprintSummary({
         </View>
         <View style={[
           styles.resultScoreBlock,
-          clarifyGoal ? styles.resultGoalScoreBlock : null
+          showGoalClarification ? styles.resultGoalScoreBlock : null
         ]}>
-          {clarifyGoal ? (
+          {showGoalClarification ? (
             <Text style={styles.resultGoalLabel} testID="sprint-result-goal-label">
               Solve {state.config.targetCorrect} to pass
             </Text>
           ) : null}
-          {clarifyGoal ? (
+          {showGoalClarification ? (
             <Text
               accessibilityLabel={`Solved ${state.correctCount}`}
               style={styles.resultSolvedCount}
@@ -7717,7 +7967,7 @@ function SprintSummary({
             </Text>
           )}
           <Text style={styles.resultAccuracy} testID="sprint-result-accuracy">
-            {clarifyGoal ? `${attemptCount} attempted · ` : ""}
+            {showGoalClarification ? `${attemptCount} attempted · ` : ""}
             {accuracy}% Accuracy
           </Text>
         </View>
@@ -7731,21 +7981,29 @@ function SprintSummary({
         />
       ) : null}
 
-      <ResultHistoryShortcut
-        delta={delta}
-        ratingAfter={ratingAfter}
-        ratingBefore={state.ratingBefore}
-        onPress={onOpenHistory}
-      />
+      {!isTacticalFocus ? (
+        <ResultHistoryShortcut
+          delta={delta}
+          ratingAfter={ratingAfter}
+          ratingBefore={state.ratingBefore}
+          onPress={onOpenHistory}
+        />
+      ) : null}
 
       <View style={styles.resultMetricGrid}>
         <View style={styles.resultMetric} testID="sprint-result-rating-change">
-          <Text style={styles.resultMetricLabel}>Rating Change</Text>
-          <Text style={[styles.resultMetricValue, delta >= 0 ? styles.positive : styles.errorText]}>
-            {delta >= 0 ? "+" : ""}
-            {delta}
+          <Text style={styles.resultMetricLabel}>
+            {isTacticalFocus ? "Rating" : "Rating Change"}
           </Text>
-          <Text testID="sprint-result-rating-range" style={styles.resultMetricSubtext}>{`${state.ratingBefore} -> ${ratingAfter}`}</Text>
+          <Text style={[
+            styles.resultMetricValue,
+            isTacticalFocus ? styles.positive : delta >= 0 ? styles.positive : styles.errorText
+          ]}>
+            {isTacticalFocus ? "Unrated" : `${delta >= 0 ? "+" : ""}${delta}`}
+          </Text>
+          <Text testID="sprint-result-rating-range" style={styles.resultMetricSubtext}>
+            {isTacticalFocus ? `${state.ratingBefore} unchanged` : `${state.ratingBefore} -> ${ratingAfter}`}
+          </Text>
         </View>
         <View style={styles.resultMetric} testID="sprint-result-time">
           <Text style={styles.resultMetricLabel}>Time</Text>
@@ -7816,12 +8074,14 @@ function SprintSummary({
       <View style={styles.summaryRow}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Play again"
+          accessibilityLabel={isTacticalFocus ? "Back to Practice" : "Play again"}
           testID="play-again-button"
           style={shouldPrioritizeReview ? styles.secondaryButton : styles.primaryButton}
           onPress={onReplay}
         >
-          <Text style={shouldPrioritizeReview ? styles.secondaryButtonText : styles.primaryButtonText}>Play again</Text>
+          <Text style={shouldPrioritizeReview ? styles.secondaryButtonText : styles.primaryButtonText}>
+            {isTacticalFocus ? "Back to Practice" : "Play again"}
+          </Text>
         </Pressable>
       </View>
       {onReview && !shouldPrioritizeReview ? (
@@ -8052,16 +8312,44 @@ function PracticeModeGlyph({
 }
 
 function SessionScoreStrip({ state }: { state: SprintState }): React.JSX.Element {
-  const leftCount = Math.max(0, state.config.targetCorrect - state.correctCount);
+  const isTacticalFocus = state.config.tacticalFocus !== undefined;
+  const completedCount = state.correctCount + state.mistakeCount;
+  const leftCount = Math.max(
+    0,
+    (isTacticalFocus
+      ? state.config.maxAttempts ?? state.config.targetCorrect
+      : state.config.targetCorrect) -
+      (isTacticalFocus ? completedCount : state.correctCount)
+  );
   return (
     <View
-      accessibilityLabel={`Session score: solved ${state.correctCount}, mistakes ${state.mistakeCount}, left ${leftCount}`}
+      accessibilityLabel={isTacticalFocus
+        ? `Focused Run: completed ${completedCount}, correct ${state.correctCount}, left ${leftCount}`
+        : `Session score: solved ${state.correctCount}, mistakes ${state.mistakeCount}, left ${leftCount}`}
       style={styles.sessionScoreStrip}
       testID="session-score-strip"
     >
-      <SessionScoreMetric label="Solved" metricTestID="session-score-solved" tone="positive" value={state.correctCount} />
-      <SessionScoreMetric label="Mistakes" metricTestID="session-score-mistakes" tone="negative" value={state.mistakeCount} />
-      <SessionScoreMetric label="Left" metricTestID="session-score-left" tone="neutral" value={leftCount} />
+      <SessionScoreMetric
+        label={isTacticalFocus ? "Completed" : "Solved"}
+        metricTestID={isTacticalFocus ? "session-score-completed" : "session-score-solved"}
+        showLabel={isTacticalFocus}
+        tone="positive"
+        value={isTacticalFocus ? completedCount : state.correctCount}
+      />
+      <SessionScoreMetric
+        label={isTacticalFocus ? "Correct" : "Mistakes"}
+        metricTestID={isTacticalFocus ? "session-score-correct" : "session-score-mistakes"}
+        showLabel={isTacticalFocus}
+        tone={isTacticalFocus ? "positive" : "negative"}
+        value={isTacticalFocus ? state.correctCount : state.mistakeCount}
+      />
+      <SessionScoreMetric
+        label="Left"
+        metricTestID="session-score-left"
+        showLabel={isTacticalFocus}
+        tone="neutral"
+        value={leftCount}
+      />
     </View>
   );
 }
@@ -8069,11 +8357,13 @@ function SessionScoreStrip({ state }: { state: SprintState }): React.JSX.Element
 function SessionScoreMetric({
   label,
   metricTestID,
+  showLabel = false,
   tone,
   value
 }: {
   label: string;
   metricTestID: string;
+  showLabel?: boolean;
   tone: "positive" | "negative" | "neutral";
   value: number;
 }): React.JSX.Element {
@@ -8081,10 +8371,17 @@ function SessionScoreMetric({
     <View
       accessible
       accessibilityLabel={`${label} ${value}`}
-      style={styles.sessionScoreMetric}
+      style={[
+        styles.sessionScoreMetric,
+        showLabel ? styles.sessionScoreMetricLabeled : null
+      ]}
       testID={metricTestID}
     >
-      <SessionScoreGlyph tone={tone} />
+      {showLabel ? (
+        <Text numberOfLines={1} style={styles.sessionScoreLabel}>{label}</Text>
+      ) : (
+        <SessionScoreGlyph tone={tone} />
+      )}
       <Text style={styles.sessionScoreValue} testID={`${metricTestID}-value`}>{value}</Text>
     </View>
   );
@@ -13851,6 +14148,9 @@ function formatEndReason(reason: SprintState["endReason"]): string {
   if (reason === "target_reached") {
     return "Target reached";
   }
+  if (reason === "attempt_limit") {
+    return "Planned puzzles complete";
+  }
   if (reason === "max_mistakes") {
     return "Three mistakes";
   }
@@ -16097,6 +16397,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     justifyContent: "center"
+  },
+  sessionScoreMetricLabeled: {
+    flexDirection: "column",
+    gap: 1
+  },
+  sessionScoreLabel: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.25,
+    lineHeight: 12,
+    textTransform: "uppercase"
   },
   sessionScoreIcon: {
     alignItems: "center",

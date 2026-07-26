@@ -95,6 +95,30 @@
       }
     ]
   },
+  "practice-tactical-focus-guide": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Adapt first-use Active Session guidance to fixed, Unrated Focused Run semantics."
+      }
+    ]
+  },
+  "practice-tactical-focus-active": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Show fixed-puzzle progress and Unrated status throughout an active Focused Run."
+      }
+    ]
+  },
+  "practice-tactical-focus-result": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Explain the fixed Tactical Focus result as unrated and return to Practice before offering another focus."
+      }
+    ]
+  },
   "practice-home": {
     "issues": [
       {
