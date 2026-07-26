@@ -11,6 +11,24 @@ export type SessionGuideRailConnectorGeometry = {
   connectorWidth: number;
 };
 
+export function buildPortraitGuidePointerLeft({
+  calloutWidth,
+  pointerWidth = 24,
+  target
+}: {
+  calloutWidth: number;
+  pointerWidth?: number;
+  target: Pick<SessionGuideLayoutRect, "width" | "x">;
+}): number {
+  const inset = 8;
+  const targetCenter = target.x + target.width / 2;
+  const desiredLeft = targetCenter - pointerWidth / 2;
+  return Math.round(Math.max(
+    inset,
+    Math.min(calloutWidth - pointerWidth - inset, desiredLeft)
+  ));
+}
+
 export function buildSessionGuideRailConnectorGeometry({
   boardSize,
   calloutHeight,

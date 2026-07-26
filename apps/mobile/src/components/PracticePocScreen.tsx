@@ -25,6 +25,7 @@ import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
   buildArrowDuelLandscapeGuideGeometry,
+  buildPortraitGuidePointerLeft,
   buildSessionGuideRailConnectorGeometry
 } from "./sessionGuideGeometry.ts";
 import {
@@ -4733,6 +4734,15 @@ function SessionCoachmarkDemo({
             })
       };
   const measuredConnectorWidth = measuredConnectorGeometry?.connectorWidth;
+  const portraitUnclearPointerLeft = !adaptiveLayout.usesSessionRail
+    && callout.id === "unclear"
+    && measuredCallout
+    && measuredLayouts["unclear-target"]
+    ? buildPortraitGuidePointerLeft({
+        calloutWidth: measuredCallout.width,
+        target: measuredLayouts["unclear-target"]
+      })
+    : undefined;
   const coachPointer = calloutUsesBoard
     ? "→"
     : adaptiveLayout.usesSessionRail && coachStep === 2
@@ -4806,6 +4816,15 @@ function SessionCoachmarkDemo({
                   : (adaptiveLayout.boardSize - boardSize) / 2)
                   + boardSize * 0.79
               ),
+              right: undefined,
+              width: 24
+            }
+          : null,
+        callout.id === "unclear"
+          && !adaptiveLayout.usesSessionRail
+          && pointerPlacement === "bottom"
+          ? {
+              left: portraitUnclearPointerLeft ?? "76%",
               right: undefined,
               width: 24
             }
@@ -5063,6 +5082,11 @@ function SessionCoachmarkDemo({
               marked={false}
               question="Was the previous puzzle clear?"
               onToggle={() => undefined}
+              onTargetLayout={() => measureTargetInGuideFrame(
+                "unclear-target",
+                unclearTargetRef.current
+              )}
+              targetRef={unclearTargetRef}
             />
           </View>
         ) : null}

@@ -1,5 +1,6 @@
 import {
   buildArrowDuelLandscapeGuideGeometry,
+  buildPortraitGuidePointerLeft,
   buildSessionGuideRailConnectorGeometry
 } from "../src/components/sessionGuideGeometry.ts";
 
@@ -44,5 +45,22 @@ describe("session guide geometry", () => {
       connectorHeight: 97,
       connectorLeft: 281
     });
+  });
+
+  it("centers the portrait Unclear pointer on its measured action across widths", () => {
+    expect(buildPortraitGuidePointerLeft({
+      calloutWidth: 402,
+      target: {
+        width: 140,
+        x: 246
+      }
+    })).toBe(304);
+    expect(buildPortraitGuidePointerLeft({
+      calloutWidth: 320,
+      target: {
+        width: 132,
+        x: 174
+      }
+    })).toBe(228);
   });
 });
