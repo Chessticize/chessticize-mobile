@@ -319,7 +319,7 @@ export const ActiveSessionGuide: Story = {
     await waitForTestId(canvasElement, "practice-session-guide-coach-overview");
     await waitForText(
       canvasElement,
-      "This is the same header you will use next"
+      "The top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide."
     );
     expectTestIdAbsent(canvasElement, "session-board");
   }
