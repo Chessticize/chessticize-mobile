@@ -102,7 +102,7 @@ async function createConsistentSQLiteSnapshot(
     location: sourcePath.slice(0, lastSlash),
     name: sourcePath.slice(lastSlash + 1),
     readOnly: true
-  });
+  } as Parameters<typeof open>[0] & { readOnly: boolean });
   try {
     await database.execute("VACUUM INTO ?", [destinationPath]);
   } finally {
