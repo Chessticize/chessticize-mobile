@@ -80,7 +80,12 @@ export function isServerCompatibleArrowDuelPuzzle(puzzle: Puzzle): boolean {
   if (!blunderMove || !bestMove || bestEval === undefined || evalAfterBlunder === undefined) {
     return false;
   }
-  if (normalizeMove(blunderMove) === normalizeMove(bestMove)) {
+  const normalizedBlunderMove = normalizeMove(blunderMove);
+  const normalizedBestMove = normalizeMove(bestMove);
+  if (normalizedBlunderMove.length === 5 || normalizedBestMove.length === 5) {
+    return false;
+  }
+  if (normalizedBlunderMove === normalizedBestMove) {
     return false;
   }
 
@@ -88,7 +93,7 @@ export function isServerCompatibleArrowDuelPuzzle(puzzle: Puzzle): boolean {
   if (legalMoves.length < 2) {
     return false;
   }
-  if (!legalMoves.includes(normalizeMove(blunderMove)) || !legalMoves.includes(normalizeMove(bestMove))) {
+  if (!legalMoves.includes(normalizedBlunderMove) || !legalMoves.includes(normalizedBestMove)) {
     return false;
   }
 

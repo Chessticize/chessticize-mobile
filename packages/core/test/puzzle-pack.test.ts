@@ -17,7 +17,7 @@ test("bundled core puzzle pack manifest matches the shipped puzzle artifact", (t
     const summary = readSqlitePackSummary();
 
     assert.equal(manifest.puzzleCount, summary.puzzleCount);
-    assert.equal(manifest.arrowDuelCount, manifest.puzzleCount);
+    assert.equal(manifest.arrowDuelCount, summary.arrowDuelCount);
     assert.equal(manifest.rating.min, summary.minRating);
     assert.equal(manifest.rating.max, summary.maxRating);
     assert.equal(manifest.packFileBytes, summary.bytes);
@@ -59,12 +59,34 @@ function readBundledManifest(): PuzzlePackManifest {
   return JSON.parse(readFileSync(resolve("fixtures/puzzles/bundled-core-pack.manifest.json"), "utf8")) as PuzzlePackManifest;
 }
 
-function readSqlitePackSummary(): { puzzleCount: number; minRating: number; maxRating: number; bytes: number; sha256: string } {
+function readSqlitePackSummary(): {
+  puzzleCount: number;
+  arrowDuelCount: number;
+  minRating: number;
+  maxRating: number;
+  bytes: number;
+  sha256: string;
+} {
   const path = resolve("fixtures/puzzles/bundled-core-pack.sqlite");
   const db = new DatabaseSync(path);
   try {
-    const row = db.prepare("SELECT COUNT(*) AS puzzleCount, MIN(rating) AS minRating, MAX(rating) AS maxRating FROM puzzles").get() as {
+    const row = db.prepare(`
+      SELECT
+        COUNT(*) AS puzzleCount,
+        SUM(
+          CASE
+            WHEN LENGTH(TRIM(stockfish_bestmove)) = 4
+              AND LENGTH(SUBSTR(TRIM(solution_moves), 1, INSTR(TRIM(solution_moves) || ' ', ' ') - 1)) = 4
+            THEN 1
+            ELSE 0
+          END
+        ) AS arrowDuelCount,
+        MIN(rating) AS minRating,
+        MAX(rating) AS maxRating
+      FROM puzzles
+    `).get() as {
       puzzleCount: number;
+      arrowDuelCount: number;
       minRating: number;
       maxRating: number;
     };
