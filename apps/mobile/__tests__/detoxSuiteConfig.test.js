@@ -1301,6 +1301,18 @@ describe('Detox suite configuration', () => {
     expect(practiceSpec).toContain("waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE'");
   });
 
+  it('reads managed-run ratings through the current public text', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const currentRatingAssertion = (
+      "waitForElementTextContaining('practice-mode-standard-rating', '700', 5000)"
+    );
+
+    expect(flowsSpec.split(currentRatingAssertion)).toHaveLength(3);
+    expect(flowsSpec).not.toContain(
+      "waitForElementTextContaining('practice-mode-standard-rating', 'Rating 700', 5000)"
+    );
+  });
+
   it('runs every active E2E spec by default without loading opt-in capture specs', () => {
     expect(resolveDetoxTestMatch({})).toEqual(ACTIVE_E2E_TEST_MATCH);
     expect(ACTIVE_E2E_TEST_MATCH).toEqual([
