@@ -1303,6 +1303,7 @@ describe('Detox suite configuration', () => {
 
   it('reads managed-run ratings through the current public text', () => {
     const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const currentRatingAssertion = (
       "waitForElementTextContaining('practice-mode-standard-rating', '700', 5000)"
     );
@@ -1310,6 +1311,12 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec.split(currentRatingAssertion)).toHaveLength(3);
     expect(flowsSpec).not.toContain(
       "waitForElementTextContaining('practice-mode-standard-rating', 'Rating 700', 5000)"
+    );
+    expect(practiceSpec).toContain(
+      "waitFor(element(by.text('1000'))).toExist().withTimeout(10000)"
+    );
+    expect(practiceSpec).not.toContain(
+      "waitFor(element(by.text('Rating 1000'))).toExist().withTimeout(10000)"
     );
   });
 
