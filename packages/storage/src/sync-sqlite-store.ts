@@ -1724,6 +1724,44 @@ export class SyncSQLiteStore implements PracticeStore {
     });
   }
 
+  listLatestTerminalFocusedSprintSessions(): ExportedSprintSession[] {
+    const sessions: ExportedSprintSession[] = [];
+    for (const taskFamily of ["line", "arrow_duel"] as const) {
+      const row = this.db
+        .prepare(
+          `SELECT
+            id,
+            mode,
+            rating_key AS ratingKey,
+            rating_generation AS ratingGeneration,
+            config_json AS configJson,
+            run_id AS runId,
+            run_kind AS runKind,
+            run_name AS runName,
+            started_at AS startedAt,
+            completed_at AS completedAt,
+            status,
+            correct_count AS correctCount,
+            mistake_count AS mistakeCount,
+            rating_before AS ratingBefore,
+            rating_after AS ratingAfter
+           FROM sprint_sessions
+           WHERE completed_at IS NOT NULL
+             AND json_extract(
+               config_json,
+               '$.tacticalFocus.taskFamily'
+             ) = ?
+           ORDER BY completed_at DESC, id DESC
+           LIMIT 1`
+        )
+        .get(taskFamily) as SprintSessionExportRow | undefined;
+      if (row) {
+        sessions.push(exportedSprintSessionFromRow(row));
+      }
+    }
+    return sessions;
+  }
+
   listSprintAttemptUtcDays(sessionIds: readonly string[]): string[] {
     const uniqueIds = [...new Set(sessionIds)];
     const days = new Set<string>();

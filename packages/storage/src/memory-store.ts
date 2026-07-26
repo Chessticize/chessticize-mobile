@@ -356,6 +356,37 @@ export class MemoryStore implements PracticeStore {
     });
   }
 
+  listLatestTerminalFocusedSprintSessions(): ExportedSprintSession[] {
+    const latest = new Map<
+      NonNullable<SprintState["config"]["tacticalFocus"]>["taskFamily"],
+      ExportedSprintSession
+    >();
+    for (const state of this.sessions.values()) {
+      const taskFamily = state.config.tacticalFocus?.taskFamily;
+      if (!taskFamily || !state.completedAt) {
+        continue;
+      }
+      const session = exportedSprintSessionFromState(state);
+      const current = latest.get(taskFamily);
+      const currentCompletedAt = current?.completedAt;
+      if (
+        !current ||
+        !currentCompletedAt ||
+        state.completedAt > currentCompletedAt ||
+        (
+          state.completedAt === currentCompletedAt &&
+          session.id > current.id
+        )
+      ) {
+        latest.set(taskFamily, session);
+      }
+    }
+    return (["line", "arrow_duel"] as const).flatMap((taskFamily) => {
+      const session = latest.get(taskFamily);
+      return session ? [session] : [];
+    });
+  }
+
   listSprintAttemptUtcDays(sessionIds: readonly string[]): string[] {
     const includedSessionIds = new Set(sessionIds);
     return [...new Set(

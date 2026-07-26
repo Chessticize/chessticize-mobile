@@ -655,6 +655,10 @@ The runtime design MUST remain bounded:
 - opening Profile compares cached per-family Rating and latest terminal Focused
   Run watermarks, then checks a bounded number of manifest buckets, without
   listing all sessions, attempts, Review rows, or exact puzzle candidates;
+- cache rebuild and recovery use a dedicated canonical query returning at most
+  the latest terminal Focused Run per task family, including zero-attempt Runs;
+- import observers capture changed terminal Focused Run metadata for processing
+  only after the canonical import transaction completes;
 - the exact exclusion-aware inventory query runs only after explicit Preview
   intent and again immediately before Start; and
 - a two-focus Run uses at most three bounded indexed selections: primary,

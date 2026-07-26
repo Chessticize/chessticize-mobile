@@ -149,6 +149,7 @@ export interface PracticeStore {
   listPracticeRatingActivity(): PracticeRatingActivity[];
   hasPlayedRatingKey(ratingKey: string): boolean;
   getSprintSessions(ids: readonly string[]): ExportedSprintSession[];
+  listLatestTerminalFocusedSprintSessions(): ExportedSprintSession[];
   listSprintAttemptUtcDays(sessionIds: readonly string[]): string[];
   listSprintSessions(): ExportedSprintSession[];
   getTacticalProfileSourceRevision(): number;

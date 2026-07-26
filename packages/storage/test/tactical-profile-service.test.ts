@@ -1199,7 +1199,7 @@ test("an imported focused conversion removes a stale mixed anchor across restart
   );
 });
 
-test("an imported ordinary conversion removes a stale focused Run watermark", () => {
+test("imported family and ordinary conversions replace stale focused Run watermarks", () => {
   const store = seededStore();
   seedWeaknessHistory(store);
   const repository = new MemoryTacticalProfileRepository();
@@ -1222,13 +1222,7 @@ test("an imported ordinary conversion removes a stale focused Run watermark", ()
     (session) => session.id === focused.id
   );
   assert.ok(focusedSession?.config?.tacticalFocus);
-  const {
-    tacticalFocus: removedTacticalFocus,
-    ...ordinaryConfig
-  } = focusedSession.config;
-  assert.ok(removedTacticalFocus);
-
-  const imported = practice.importLocalData({
+  const familyImported = practice.importLocalData({
     ...exported,
     ratings: [],
     attempts: [],
@@ -1236,18 +1230,108 @@ test("an imported ordinary conversion removes a stale focused Run watermark", ()
     sprintSessions: [{
       ...focusedSession,
       correctCount: focusedSession.correctCount + 1,
+      config: {
+        ...focusedSession.config,
+        tacticalFocus: {
+          ...focusedSession.config.tacticalFocus,
+          taskFamily: "arrow_duel"
+        }
+      }
+    }],
+    practiceRuns: []
+  });
+  assert.equal(familyImported.sprintSessions, 1);
+  const familySnapshot = profile.getSnapshot("2026-07-25T00:04:00.000Z");
+  assert.equal(familySnapshot.buildState.focusedRunWatermarks?.line, undefined);
+  assert.equal(
+    familySnapshot.buildState.focusedRunWatermarks?.arrow_duel?.sessionId,
+    focused.id
+  );
+  const afterFamilyExport = store.exportLocalData();
+  const arrowSession = afterFamilyExport.sprintSessions.find(
+    (session) => session.id === focused.id
+  );
+  assert.ok(arrowSession?.config?.tacticalFocus);
+  const {
+    tacticalFocus: removedTacticalFocus,
+    ...ordinaryConfig
+  } = arrowSession.config;
+  assert.ok(removedTacticalFocus);
+
+  const ordinaryImported = practice.importLocalData({
+    ...afterFamilyExport,
+    ratings: [],
+    attempts: [],
+    reviewQueue: [],
+    sprintSessions: [{
+      ...arrowSession,
+      correctCount: arrowSession.correctCount + 1,
       config: ordinaryConfig
     }],
     practiceRuns: []
   });
-  assert.equal(imported.sprintSessions, 1);
+  assert.equal(ordinaryImported.sprintSessions, 1);
 
   const restarted = service(store, repository);
   const snapshot = restarted.getSnapshot("2026-07-26T00:00:00.000Z");
 
   assert.equal(snapshot.buildState.focusedRunWatermarks?.line, undefined);
+  assert.equal(snapshot.buildState.focusedRunWatermarks?.arrow_duel, undefined);
   assert.deepEqual(restarted.preflightFocusedRun("line", snapshot), {
     status: "available"
+  });
+});
+
+test("a newly imported zero-attempt focused Run persists across a fresh cache", () => {
+  const source = seededStore();
+  seedWeaknessHistory(source);
+  const sourceProfile = service(
+    source,
+    new MemoryTacticalProfileRepository()
+  );
+  const sourcePractice = new PracticeService(source, sourceProfile);
+  sourceProfile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const focused = sourcePractice.startFocusedRun(
+    "line",
+    "2026-07-25T00:01:00.000Z",
+    "import-zero-attempt-focus"
+  );
+  sourcePractice.abandonSprint("2026-07-25T00:02:00.000Z");
+  const focusedSession = source.exportLocalData().sprintSessions.find(
+    (session) => session.id === focused.id
+  );
+  assert.ok(focusedSession);
+
+  const target = seededStore();
+  seedWeaknessHistory(target);
+  const repository = new MemoryTacticalProfileRepository();
+  const profile = service(target, repository);
+  const practice = new PracticeService(target, profile);
+  profile.getSnapshot("2026-07-25T00:03:00.000Z");
+  const incoming = target.exportLocalData();
+  const imported = practice.importLocalData({
+    ...incoming,
+    ratings: [],
+    attempts: [],
+    reviewQueue: [],
+    sprintSessions: [focusedSession],
+    practiceRuns: []
+  });
+
+  assert.equal(imported.sprintSessions, 1);
+  assert.deepEqual(
+    profile.getSnapshot("2026-07-25T00:04:00.000Z")
+      .buildState.focusedRunWatermarks?.line,
+    {
+      sessionId: focused.id,
+      completedAt: "2026-07-25T00:02:00.000Z"
+    }
+  );
+  const restarted = service(target, new MemoryTacticalProfileRepository());
+  const rebuilt = restarted.getSnapshot("2026-07-26T00:00:00.000Z");
+  assert.deepEqual(restarted.preflightFocusedRun("line", rebuilt), {
+    status: "unavailable",
+    reason: "no_fresh_evidence"
   });
 });
 
@@ -1303,6 +1387,9 @@ test("lightweight Focused Run preflight reads neither canonical history nor exac
   store.listSprintSessions = () => {
     throw new Error("preflight must not read all sessions");
   };
+  store.listLatestTerminalFocusedSprintSessions = () => {
+    throw new Error("preflight must not run cache-recovery session queries");
+  };
   store.listAttempts = () => {
     throw new Error("preflight must not read canonical attempts");
   };
@@ -1350,7 +1437,7 @@ test("Focused Run freshness watermark survives restart until newer mixed evidenc
     reason: "no_fresh_evidence"
   });
 
-  const restarted = service(store, repository);
+  const restarted = service(store, new MemoryTacticalProfileRepository());
   const afterRestart = restarted.getSnapshot("2026-07-25T00:04:00.000Z");
   assert.deepEqual(restarted.preflightFocusedRun("line", afterRestart), {
     status: "unavailable",
@@ -1398,6 +1485,71 @@ test("Focused Run freshness watermark survives restart until newer mixed evidenc
   assert.deepEqual(restarted.preflightFocusedRun("line", refreshed), {
     status: "available"
   });
+});
+
+test("a fresh SQLite cache rebuilds zero-attempt focused freshness after progress reopen", () => {
+  const directory = mkdtempSync(join(tmpdir(), "tactical-profile-focus-reopen-"));
+  const progressPath = join(directory, "progress.sqlite");
+  const cachePath = join(directory, "profile-cache.sqlite");
+  try {
+    const initialStore = new SQLiteStore(progressPath);
+    initialStore.migrate();
+    seedStore(initialStore);
+    seedWeaknessHistory(initialStore);
+    const initialProfile = new TacticalProfileService({
+      progressStore: initialStore,
+      puzzleSource: initialStore,
+      repository: new MemoryTacticalProfileRepository(),
+      calibration: CALIBRATION,
+      naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} },
+      focusedRunPolicy: {
+        runSize: 15,
+        recentPuzzleDays: 30,
+        ratingBandHalfWidths: [100, 200]
+      }
+    });
+    const initialPractice = new PracticeService(initialStore, initialProfile);
+    initialProfile.getSnapshot("2026-07-25T00:00:00.000Z");
+    const focused = initialPractice.startFocusedRun(
+      "line",
+      "2026-07-25T00:01:00.000Z",
+      "sqlite-zero-attempt-focus"
+    );
+    initialPractice.abandonSprint("2026-07-25T00:02:00.000Z");
+    initialStore.close();
+
+    const reopenedStore = new SQLiteStore(progressPath);
+    reopenedStore.migrate();
+    const cacheDb = new DatabaseSync(cachePath);
+    const profile = new TacticalProfileService({
+      progressStore: reopenedStore,
+      puzzleSource: reopenedStore,
+      repository: new SQLiteTacticalProfileRepository(
+        new NodeSqliteDatabase(cacheDb)
+      ),
+      calibration: CALIBRATION,
+      naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} },
+      focusedRunPolicy: {
+        runSize: 15,
+        recentPuzzleDays: 30,
+        ratingBandHalfWidths: [100, 200]
+      }
+    });
+    const snapshot = profile.getSnapshot("2026-07-26T00:00:00.000Z");
+
+    assert.deepEqual(snapshot.buildState.focusedRunWatermarks?.line, {
+      sessionId: focused.id,
+      completedAt: "2026-07-25T00:02:00.000Z"
+    });
+    assert.deepEqual(profile.preflightFocusedRun("line", snapshot), {
+      status: "unavailable",
+      reason: "no_fresh_evidence"
+    });
+    cacheDb.close();
+    reopenedStore.close();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("TacticalProfileService does not re-offer a Focused Run before fresh mixed evidence", () => {

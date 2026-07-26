@@ -1254,6 +1254,9 @@ describe("PracticePocScreen", () => {
     store.listSprintSessions = () => {
       throw new Error("Profile open must not scan all sessions");
     };
+    store.listLatestTerminalFocusedSprintSessions = () => {
+      throw new Error("Profile open must not run cache-recovery session queries");
+    };
     store.listAttempts = () => {
       throw new Error("Profile open must not scan canonical attempts");
     };
@@ -1283,14 +1286,29 @@ describe("PracticePocScreen", () => {
 
   it("withholds the public Preview CTA after a Focused Run until newer mixed evidence", () => {
     jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
-    const practiceService = createArrowFocusedPracticeService();
+    let store: MemoryStore | undefined;
+    const practiceService = createArrowFocusedPracticeService(
+      true,
+      (createdStore) => {
+        store = createdStore;
+      }
+    );
     practiceService.startFocusedRun(
       "arrow_duel",
       "2026-07-25T00:01:00.000Z",
       "public-freshness"
     );
     practiceService.abandonSprint("2026-07-25T00:02:00.000Z");
-    const renderer = renderScreen({ practiceService });
+    if (!store) {
+      throw new Error("expected the production component store");
+    }
+    const restartedPracticeService = new PracticeService(
+      store,
+      createArrowTacticalProfileService(store)
+    );
+    const renderer = renderScreen({
+      practiceService: restartedPracticeService
+    });
 
     press(renderer, "training-focus-open-profile");
 
@@ -10439,31 +10457,38 @@ function createArrowFocusedPracticeService(
 
   return new PracticeService(
     store,
-    new TacticalProfileService({
-      progressStore: store,
-      puzzleSource: store,
-      repository: new MemoryTacticalProfileRepository(),
-      calibration: COMPONENT_TACTICAL_PROFILE_CALIBRATION,
-      naturalFrequency: {
-        line: {},
-        arrow_duel: { pin: 0.12, fork: 0.12 }
-      },
-      naturalFrequencyForRating: (
-        taskFamily
-      ): Readonly<Record<string, number>> =>
-        taskFamily === "arrow_duel"
-          ? { pin: 0.12, fork: 0.12 }
-          : {},
-      ...(inventoryAvailable
-        ? {}
-        : { inventoryUpperBound: () => ({ pin: 0 }) }),
-      focusedRunPolicy: {
-        runSize: 15,
-        recentPuzzleDays: 30,
-        ratingBandHalfWidths: [100, 200]
-      }
-    })
+    createArrowTacticalProfileService(store, inventoryAvailable)
   );
+}
+
+function createArrowTacticalProfileService(
+  store: MemoryStore,
+  inventoryAvailable = true
+): TacticalProfileService {
+  return new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository: new MemoryTacticalProfileRepository(),
+    calibration: COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+    naturalFrequency: {
+      line: {},
+      arrow_duel: { pin: 0.12, fork: 0.12 }
+    },
+    naturalFrequencyForRating: (
+      taskFamily
+    ): Readonly<Record<string, number>> =>
+      taskFamily === "arrow_duel"
+        ? { pin: 0.12, fork: 0.12 }
+        : {},
+    ...(inventoryAvailable
+      ? {}
+      : { inventoryUpperBound: () => ({ pin: 0 }) }),
+    focusedRunPolicy: {
+      runSize: 15,
+      recentPuzzleDays: 30,
+      ratingBandHalfWidths: [100, 200]
+    }
+  });
 }
 
 function createDualFamilyFocusedPracticeService(): PracticeService {

@@ -210,8 +210,7 @@ export class TacticalProfileService {
     this.requiresCanonicalRebuild = true;
     try {
       this.ensureRepositoryReady();
-      this.repository.reset(
-        this.identity,
+      this.resetRepository(
         this.canonicalCompletedDays(),
         this.sourceRevision
       );
@@ -229,6 +228,11 @@ export class TacticalProfileService {
   } {
     const dirtyDays = new Set<string>();
     const changedSessionIds = new Set<string>();
+    const focusedRunCandidates: Array<{
+      taskFamily: TacticalProfileTaskFamily;
+      sessionId: string;
+      completedAt: string;
+    }> = [];
     let knownRatingAnchors: TacticalProfileBuildState["ratingAnchors"];
     let knownFocusedRunWatermarks:
       TacticalProfileBuildState["focusedRunWatermarks"];
@@ -250,6 +254,14 @@ export class TacticalProfileService {
         onSprintSessionChanged: (previous, next) => {
           if (sessionFingerprint(previous) !== sessionFingerprint(next)) {
             changedSessionIds.add(next.id);
+            const taskFamily = next.config?.tacticalFocus?.taskFamily;
+            if (taskFamily && next.completedAt) {
+              focusedRunCandidates.push({
+                taskFamily,
+                sessionId: next.id,
+                completedAt: next.completedAt
+              });
+            }
             if (
               knownRatingAnchors?.line?.sessionId === next.id ||
               knownRatingAnchors?.arrow_duel?.sessionId === next.id ||
@@ -275,6 +287,13 @@ export class TacticalProfileService {
             }
           }
           this.markCanonicalDaysChanged([...dirtyDays].sort());
+          for (const candidate of focusedRunCandidates) {
+            this.markFocusedRunCompleted(
+              candidate.taskFamily,
+              candidate.sessionId,
+              candidate.completedAt
+            );
+          }
         } catch (error) {
           this.recordCacheFailure(error);
         }
@@ -292,6 +311,29 @@ export class TacticalProfileService {
     } catch (error) {
       this.recordCacheFailure(error);
     }
+  }
+
+  private resetRepository(
+    completedDays: readonly string[],
+    sourceRevision: number
+  ): void {
+    this.repository.reset(this.identity, completedDays, sourceRevision);
+    if (!this.focusedRunPolicy) {
+      return;
+    }
+    const current = this.repository.getBuildState();
+    if (!current) {
+      throw new Error("Tactical Profile cache reset did not create build state");
+    }
+    this.repository.saveBuildState({
+      ...current,
+      focusedRunWatermarks: updatedFocusedRunWatermarks(
+        {},
+        focusedRunCandidatesFromSessions(
+          this.progressStore.listLatestTerminalFocusedSprintSessions()
+        )
+      )
+    });
   }
 
   markFocusedRunCompleted(
@@ -743,8 +785,7 @@ export class TacticalProfileService {
     this.ensureRepositoryReady();
     const sourceRevision = this.sourceRevision;
     if (this.requiresCanonicalRebuild) {
-      this.repository.reset(
-        this.identity,
+      this.resetRepository(
         this.canonicalCompletedDays(),
         sourceRevision
       );
@@ -770,8 +811,7 @@ export class TacticalProfileService {
         state.focusedRunWatermarks === undefined
       )
     ) {
-      this.repository.reset(
-        this.identity,
+      this.resetRepository(
         this.canonicalCompletedDays(),
         sourceRevision
       );
@@ -792,8 +832,7 @@ export class TacticalProfileService {
         state.sourceRevision !== this.observedSourceRevision
       )
     ) {
-      this.repository.reset(
-        this.identity,
+      this.resetRepository(
         this.canonicalCompletedDays(),
         sourceRevision
       );
@@ -1061,6 +1100,25 @@ function updatedFocusedRunWatermarks(
     }
   }
   return next;
+}
+
+function focusedRunCandidatesFromSessions(
+  sessions: readonly ExportedSprintSession[]
+): Array<{
+  taskFamily: TacticalProfileTaskFamily;
+  sessionId: string;
+  completedAt: string;
+}> {
+  return sessions.flatMap((session) => {
+    const taskFamily = session.config?.tacticalFocus?.taskFamily;
+    return taskFamily && session.completedAt
+      ? [{
+          taskFamily,
+          sessionId: session.id,
+          completedAt: session.completedAt
+        }]
+      : [];
+  });
 }
 
 function addCanonicalAttemptDay(

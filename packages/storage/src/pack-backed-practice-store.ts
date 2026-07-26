@@ -172,6 +172,10 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.getSprintSessions(ids);
   }
 
+  listLatestTerminalFocusedSprintSessions(): ExportedSprintSession[] {
+    return this.userStore.listLatestTerminalFocusedSprintSessions();
+  }
+
   listSprintAttemptUtcDays(sessionIds: readonly string[]): string[] {
     return this.userStore.listSprintAttemptUtcDays(sessionIds);
   }
