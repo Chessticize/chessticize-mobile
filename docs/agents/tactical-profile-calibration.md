@@ -13,6 +13,14 @@ development workflow. It is not a product API or a user-facing export flow.
 - The matching checked-in manifest and predeclared V1 calibration policy.
 - An owner decision for whether the combined corpus is representative.
 
+The policy's train/holdout attempt and session minimums apply to the combined
+multi-user calibration corpus, not to one player's Profile readiness. An
+individual theme uses the calibrated artifact's distinct-puzzle,
+distinct-session, and posterior-confidence gates; the V1 artifact currently
+requires at least four distinct puzzles and two distinct sessions before a
+theme can leave More information needed. Never present corpus calibration
+minimums as player unlock progress.
+
 Keep progress exports, reports, and working evidence under `scratch/`; that
 directory is ignored by Git. Do not use synthetic fixtures, automated-test
 simulators, or hand-authored attempt rows as representative production

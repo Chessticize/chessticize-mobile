@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -173,6 +174,83 @@ test("refuses ambiguous latest snapshots and containers without progress", async
   }
 });
 
+test("package command proves success and failure through the process boundary", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "tactical-process-extract-"));
+  const validContainer = join(directory, "valid");
+  const invalidContainer = join(directory, "invalid");
+  const validAssets = join(
+    validContainer,
+    "Library",
+    "Caches",
+    "CloudKit",
+    "id",
+    "Assets"
+  );
+  const invalidAssets = join(
+    invalidContainer,
+    "Library",
+    "Caches",
+    "CloudKit",
+    "id",
+    "Assets"
+  );
+  const output = join(directory, "progress.json");
+  const packageManager = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+  try {
+    await Promise.all([
+      mkdir(validAssets, { recursive: true }),
+      mkdir(invalidAssets, { recursive: true })
+    ]);
+    await writeSnapshot(
+      join(validAssets, "snapshot"),
+      "2026-07-26T12:00:00.000Z",
+      progressExport("process-attempt", "process-session")
+    );
+    const invalid = progressExport("invalid-attempt", "invalid-session");
+    invalid.attempts[0].source = "invalid";
+    await writeSnapshot(
+      join(invalidAssets, "snapshot"),
+      "2026-07-26T12:00:00.000Z",
+      invalid
+    );
+
+    const success = spawnSync(packageManager, [
+      "extract:tactical-profile-progress",
+      "--container",
+      validContainer,
+      "--output",
+      output
+    ], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+    assert.equal(success.status, 0, success.stderr);
+    assert.match(success.stdout, /"attemptCount": 1/u);
+    assert.equal(
+      JSON.parse(await readFile(output, "utf8")).attempts[0].id,
+      "process-attempt"
+    );
+
+    const failure = spawnSync(packageManager, [
+      "extract:tactical-profile-progress",
+      "--container",
+      invalidContainer,
+      "--output",
+      join(directory, "invalid-output.json")
+    ], {
+      cwd: resolve("."),
+      encoding: "utf8"
+    });
+    assert.notEqual(failure.status, 0);
+    assert.match(
+      `${failure.stdout}\n${failure.stderr}`,
+      /No canonical LocalDataExport snapshot/u
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 function progressExport(attemptId, sessionId) {
   return {
     schemaVersion: 1,
@@ -187,12 +265,94 @@ function progressExport(attemptId, sessionId) {
         focusedRunSeen: true
       }
     },
-    ratings: [],
-    attempts: [{ id: attemptId }],
-    reviewQueue: [],
-    reviewRemovals: [],
-    sprintSessions: [{ id: sessionId }],
-    practiceRuns: []
+    ratings: [{
+      key: "standard 5/20",
+      generation: 0,
+      rating: 1200,
+      ratingDeviation: 80,
+      volatility: 0.06,
+      games: 1
+    }],
+    attempts: [{
+      id: attemptId,
+      source: "sprint",
+      sessionId,
+      puzzleId: "puzzle-1",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-26T11:59:55.000Z",
+      completedAt: "2026-07-26T12:00:00.000Z",
+      elapsedMs: 5000,
+      ratingBefore: 1200,
+      ratingAfter: 1210
+    }],
+    reviewQueue: [{
+      puzzleId: "puzzle-1",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      dueDay: "2026-07-27",
+      intervalDays: 1,
+      reviewCount: 1,
+      successStreak: 1,
+      lapseCount: 0,
+      lastResult: "correct",
+      lastReviewedAt: "2026-07-26T12:00:00.000Z",
+      dueAt: "2026-07-27T04:00:00.000Z",
+      intervalHours: 24
+    }],
+    reviewRemovals: [{
+      puzzleId: "puzzle-2",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      removedAt: "2026-07-26T12:00:00.000Z"
+    }],
+    sprintSessions: [{
+      id: sessionId,
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      ratingGeneration: 0,
+      startedAt: "2026-07-26T11:55:00.000Z",
+      completedAt: "2026-07-26T12:00:00.000Z",
+      status: "won",
+      correctCount: 1,
+      mistakeCount: 0,
+      ratingBefore: 1200,
+      ratingAfter: 1210,
+      run: { id: "standard", kind: "standard", name: "Standard" },
+      config: {
+        mode: "standard",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        puzzleTiming: {
+          slowAfterSeconds: 40,
+          timeoutAfterSeconds: 60
+        },
+        targetCorrect: 1,
+        maxMistakes: 3,
+        ratingKey: "standard 5/20"
+      }
+    }],
+    practiceRuns: [{
+      id: "standard",
+      kind: "standard",
+      name: "Standard",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      puzzleTiming: {
+        slowAfterSeconds: 40,
+        timeoutAfterSeconds: 60
+      },
+      targetCorrect: 10,
+      maxMistakes: 3,
+      homeOrder: 0,
+      archived: false,
+      updatedAt: "2026-07-26T12:00:00.000Z"
+    }]
   };
 }
 

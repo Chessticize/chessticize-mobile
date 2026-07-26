@@ -9,6 +9,9 @@ import {
 } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  isCanonicalProgressSyncSnapshot
+} from "../packages/storage/src/local-data-export-validation.ts";
 
 const MAX_CANDIDATE_BYTES = 64 * 1024 * 1024;
 
@@ -113,9 +116,7 @@ async function readProgressSnapshot(path) {
     return undefined;
   }
   if (
-    !isPlainObject(parsed) ||
-    !isCanonicalLocalDataExport(parsed.data) ||
-    typeof parsed.updatedAt !== "string"
+    !isCanonicalProgressSyncSnapshot(parsed)
   ) {
     return undefined;
   }
@@ -126,33 +127,6 @@ async function readProgressSnapshot(path) {
     hash: canonicalHash(parsed.data),
     updatedAtMs
   };
-}
-
-function isCanonicalLocalDataExport(value) {
-  if (!isPlainObject(value) || value.schemaVersion !== 1) return false;
-  if (!isPlainObject(value.settings)) return false;
-  for (const key of [
-    "ratings",
-    "attempts",
-    "reviewQueue",
-    "sprintSessions",
-    "practiceRuns"
-  ]) {
-    if (!Array.isArray(value[key])) return false;
-  }
-  if (value.reviewRemovals !== undefined && !Array.isArray(value.reviewRemovals)) {
-    return false;
-  }
-  return (
-    value.attempts.every((attempt) => isPlainObject(attempt) && nonEmptyId(attempt.id)) &&
-    value.sprintSessions.every(
-      (session) => isPlainObject(session) && nonEmptyId(session.id)
-    )
-  );
-}
-
-function nonEmptyId(value) {
-  return typeof value === "string" && value.length > 0;
 }
 
 function isPlainObject(value) {
