@@ -52,7 +52,7 @@ test("SQLitePuzzlePackSource skips repeated Arrow Duel validation for a manifest
   const packDb = buildPackDatabase(puzzles);
   try {
     const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
-      allPuzzlesArrowDuelEligible: true
+      arrowDuelEligibility: "all"
     });
 
     assert.deepEqual(
@@ -111,7 +111,7 @@ test("SQLitePuzzlePackSource preserves the manifest fast path while filtering pr
   const packDb = buildPackDatabase([manifestQualifiedPuzzle, promotionPuzzle]);
   try {
     const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
-      allNonPromotionPuzzlesArrowDuelEligible: true
+      arrowDuelEligibility: "all_non_promotion"
     });
 
     assert.deepEqual(
@@ -240,7 +240,7 @@ test("SQLitePuzzlePackSource fairly merges selected themes before filling from c
   ]);
   try {
     const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
-      allPuzzlesArrowDuelEligible: true
+      arrowDuelEligibility: "all"
     });
 
     const selected = source.selectPuzzles({
@@ -266,7 +266,7 @@ test("SQLitePuzzlePackSource seeded selection reaches beyond one fixed candidate
   );
   try {
     const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
-      allPuzzlesArrowDuelEligible: true
+      arrowDuelEligibility: "all"
     });
     const selectForSeed = (randomSeed: string, themes?: string[]): string[] =>
       source.selectPuzzles({

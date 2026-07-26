@@ -24,35 +24,32 @@ interface PuzzlePackRow {
 
 const MAX_SQL_ID_FILTER_VALUES = 900;
 
+export type SQLitePuzzlePackArrowDuelEligibility = "validate" | "all" | "all_non_promotion";
+
 export interface SQLitePuzzlePackSourceOptions {
   candidateMultiplier?: number;
   candidateFloor?: number;
-  allPuzzlesArrowDuelEligible?: boolean;
-  /** Skips repeated validation after excluding promotion candidates from a manifest-qualified pack. */
-  allNonPromotionPuzzlesArrowDuelEligible?: boolean;
+  /** Controls repeated validation for a manifest-qualified pack. */
+  arrowDuelEligibility?: SQLitePuzzlePackArrowDuelEligibility;
 }
 
 export class SQLitePuzzlePackSource implements PuzzleSource {
   private readonly db: SyncSqliteDatabase;
   private readonly candidateMultiplier: number;
   private readonly candidateFloor: number;
-  private readonly allPuzzlesArrowDuelEligible: boolean;
-  private readonly allNonPromotionPuzzlesArrowDuelEligible: boolean;
+  private readonly arrowDuelEligibility: SQLitePuzzlePackArrowDuelEligibility;
 
   constructor(db: SyncSqliteDatabase, options: SQLitePuzzlePackSourceOptions = {}) {
     this.db = db;
     this.candidateMultiplier = options.candidateMultiplier ?? 50;
     this.candidateFloor = options.candidateFloor ?? 200;
-    this.allPuzzlesArrowDuelEligible = options.allPuzzlesArrowDuelEligible ?? false;
-    this.allNonPromotionPuzzlesArrowDuelEligible =
-      options.allNonPromotionPuzzlesArrowDuelEligible ?? false;
+    this.arrowDuelEligibility = options.arrowDuelEligibility ?? "validate";
   }
 
   countPuzzles(filter?: PuzzleSelectionFilter): number {
     if (filter !== undefined) {
       const requiresArrowDuelSelection =
-        filter.mode === "arrow_duel" &&
-        (!this.allPuzzlesArrowDuelEligible || this.allNonPromotionPuzzlesArrowDuelEligible);
+        filter.mode === "arrow_duel" && this.arrowDuelEligibility !== "all";
       if (requiresArrowDuelSelection || filter.includeIds !== undefined || filter.excludeIds !== undefined) {
         return this.selectPuzzles(filter).length;
       }
@@ -169,7 +166,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       (filter.includeIds !== undefined && filter.includeIds.length > MAX_SQL_ID_FILTER_VALUES) ||
       (filter.excludeIds !== undefined && filter.excludeIds.length > MAX_SQL_ID_FILTER_VALUES);
     const shouldFilterPromotionCandidates =
-      filter.mode === "arrow_duel" && this.allNonPromotionPuzzlesArrowDuelEligible;
+      filter.mode === "arrow_duel" && this.arrowDuelEligibility === "all_non_promotion";
     const limit = this.candidateLimit(
       filter.limit,
       filter.randomSeed !== undefined || hasInMemoryIdFilter || shouldFilterPromotionCandidates
@@ -188,7 +185,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
   }
 
   private get canSkipArrowDuelValidation(): boolean {
-    return this.allPuzzlesArrowDuelEligible || this.allNonPromotionPuzzlesArrowDuelEligible;
+    return this.arrowDuelEligibility !== "validate";
   }
 
   private mergeThemedCandidateRows(

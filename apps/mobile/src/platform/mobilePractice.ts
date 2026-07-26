@@ -15,9 +15,11 @@ const familiar15Manifest = require("../../../../fixtures/puzzles/familiar-15-e2e
 
 export type MobilePuzzleSource = "bundledCore" | "familiar15" | "random1000";
 const DEFAULT_PUZZLE_SOURCE: MobilePuzzleSource = "bundledCore";
-const BUNDLED_CORE_PACK_OPTIONS = bundledCoreManifest.arrowDuelCount === bundledCoreManifest.puzzleCount
-  ? { allPuzzlesArrowDuelEligible: true } as const
-  : { allNonPromotionPuzzlesArrowDuelEligible: true } as const;
+const BUNDLED_CORE_PACK_OPTIONS = {
+  arrowDuelEligibility: bundledCoreManifest.arrowDuelCount === bundledCoreManifest.puzzleCount
+    ? "all"
+    : "all_non_promotion"
+} as const;
 
 let persistentPracticeService: PracticeService | undefined;
 const seededPuzzleSources = new WeakMap<PracticeService, Set<MobilePuzzleSource>>();
