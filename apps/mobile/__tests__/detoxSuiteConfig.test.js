@@ -920,13 +920,31 @@ describe('Detox suite configuration', () => {
     const helperStart = helpers.indexOf('async function completeFirstUseSessionGuides');
     const helperEnd = helpers.indexOf('async function detoxElementExists', helperStart);
     const helper = helpers.slice(helperStart, helperEnd);
+    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
     const requireVisible = helper.indexOf('.toBeVisible()');
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
     const tapGuideAction = helper.indexOf("element(by.id('practice-session-guide-start')).tap()");
+    const acceptStartedSession = helper.indexOf("detoxElementExists('session-board')", tapGuideAction);
 
-    expect(requireVisible).toBeGreaterThan(0);
+    expect(restoreTop).toBeGreaterThan(0);
+    expect(requireVisible).toBeGreaterThan(restoreTop);
     expect(scrollDown).toBeGreaterThan(requireVisible);
     expect(tapGuideAction).toBeGreaterThan(scrollDown);
+    expect(acceptStartedSession).toBeGreaterThan(tapGuideAction);
+  });
+
+  it('dismisses the Run name keyboard through a public editor surface', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const helperStart = helpers.indexOf('async function dismissRunNameKeyboard');
+    const helperEnd = helpers.indexOf('async function detoxElementExists', helperStart);
+    const helper = helpers.slice(helperStart, helperEnd);
+    const submitName = helper.indexOf("element(by.id('practice-run-name-input')).tapReturnKey()");
+    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
+    const tapPublicTitle = helper.indexOf("element(by.id('practice-run-editor-title')).tap()");
+
+    expect(submitName).toBeGreaterThan(0);
+    expect(restoreTop).toBeGreaterThan(submitName);
+    expect(tapPublicTitle).toBeGreaterThan(restoreTop);
   });
 
   it('pins the Arrow Duel screenshot to the exact runtime-selected long-arrow fixture', () => {
@@ -1299,6 +1317,7 @@ describe('Detox suite configuration', () => {
     );
     expect(flowsSpec).not.toContain('history-filter-wrong-only');
     expect(flowsSpec).not.toContain('history-filter-sprint-only');
+    expect(flowsSpec).not.toContain("'Rating 700'");
     expect(flowsSpec).not.toContain('toHaveToggleValue');
   });
 

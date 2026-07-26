@@ -1,5 +1,6 @@
 const {
   completeFirstUseSessionGuides,
+  dismissRunNameKeyboard,
   openTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
@@ -336,13 +337,13 @@ describe('Key user flows', () => {
     await element(by.id('practice-run-edit-standard')).tap();
     await waitFor(element(by.id('practice-run-name-input'))).toBeVisible().withTimeout(10000);
     await element(by.id('practice-run-name-input')).replaceText('Daily Standard');
-    await element(by.id('practice-run-name-input')).tapReturnKey();
+    await dismissRunNameKeyboard();
     await element(by.id('practice-run-elo-input')).replaceText('700');
     await element(by.id('practice-run-save')).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
     await element(by.id('practice-run-home-done')).tap();
-    await waitForElementTextContaining('practice-mode-standard-rating', 'Rating 700', 5000);
+    await waitForElementTextContaining('practice-mode-standard-rating', '700', 5000);
 
     await device.terminateApp();
     await launchWithDisabledSynchronization({
@@ -365,7 +366,7 @@ describe('Key user flows', () => {
     await waitFor(element(by.text('Fork + Mate in 2 · 3 min · 20s pace')))
       .toExist()
       .withTimeout(10000);
-    await waitForElementTextContaining('practice-mode-standard-rating', 'Rating 700', 5000);
+    await waitForElementTextContaining('practice-mode-standard-rating', '700', 5000);
   });
 });
 
@@ -374,8 +375,7 @@ async function createSavedCustomRun(name, { shorterDuration = false, themes = []
   await element(by.id('practice-add-run')).tap();
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-run-name-input')).replaceText(name);
-  await element(by.id('practice-run-name-input')).tapReturnKey();
-  await sleep(750);
+  await dismissRunNameKeyboard();
   if (shorterDuration) {
     await waitForVisibleInPracticeScroll('practice-run-duration-stepper-decrease');
     await element(by.id('practice-run-duration-stepper-decrease')).tap();

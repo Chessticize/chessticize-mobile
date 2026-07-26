@@ -67,11 +67,19 @@ async function completeFirstUseSessionGuides() {
       return;
     }
     if (await detoxElementExists('practice-session-guide-start')) {
-      await waitFor(element(by.id('practice-session-guide-start')))
-        .toBeVisible()
-        .whileElement(by.id('practice-main-scroll'))
-        .scroll(100, 'down', 0.5, 0.5);
-      await element(by.id('practice-session-guide-start')).tap();
+      try {
+        await element(by.id('practice-main-scroll')).scrollTo('top');
+        await waitFor(element(by.id('practice-session-guide-start')))
+          .toBeVisible()
+          .whileElement(by.id('practice-main-scroll'))
+          .scroll(100, 'down', 0.5, 0.5);
+        await element(by.id('practice-session-guide-start')).tap();
+      } catch (error) {
+        if (await detoxElementExists('session-board')) {
+          return;
+        }
+        throw error;
+      }
       await sleep(150);
       continue;
     }
@@ -81,6 +89,14 @@ async function completeFirstUseSessionGuides() {
     }
     await sleep(150);
   }
+}
+
+async function dismissRunNameKeyboard() {
+  await element(by.id('practice-run-name-input')).tapReturnKey();
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await waitFor(element(by.id('practice-run-editor-title'))).toBeVisible().withTimeout(5000);
+  await element(by.id('practice-run-editor-title')).tap();
+  await sleep(500);
 }
 
 async function detoxElementExists(testID) {
@@ -876,6 +892,7 @@ module.exports = {
   bringAndroidAppToForeground,
   collectAndroidUiDiagnostics,
   completeFirstUseSessionGuides,
+  dismissRunNameKeyboard,
   elementText,
   openTab,
   openStandardHistoryTrend,

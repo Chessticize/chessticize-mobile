@@ -86,6 +86,8 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION");
     expect(storeAssetsE2e).toContain("chessticizeStoreAssetCapture");
     expect(storeAssetsE2e).toContain("setStoreAssetRatings({ standard: 800, arrowDuel: 850 })");
+    expect(storeAssetsE2e).toContain("ratingText === '600'");
+    expect(storeAssetsE2e).not.toContain("ratingText === 'Rating 600'");
     expect(storeAssetsE2e).toContain("openTab('practice-tab', 'practice-run-home-edit')");
     expect(storeAssetsE2e).not.toContain("openTab('practice-tab', 'practice-run-management')");
     expect(storeAssetsE2e).toContain(
