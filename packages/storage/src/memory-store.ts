@@ -304,6 +304,13 @@ export class MemoryStore implements PracticeStore {
       .sort((left, right) => right.startedAt.localeCompare(left.startedAt) || right.id.localeCompare(left.id));
   }
 
+  getSprintSessions(ids: readonly string[]): ExportedSprintSession[] {
+    return [...new Set(ids)].flatMap((id) => {
+      const session = this.sessions.get(id);
+      return session ? [exportedSprintSessionFromState(session)] : [];
+    });
+  }
+
   importLocalData(data: LocalDataImport): LocalDataImportResult {
     const result: LocalDataImportResult = {
       ratings: 0,
@@ -775,6 +782,7 @@ function attemptMatchesHistoryFilter(attempt: AttemptEvent, filter: HistoryFilte
     && (!filter.result || attempt.result === filter.result)
     && (!filter.mode || attempt.mode === filter.mode)
     && (!filter.since || attempt.completedAt >= filter.since)
+    && (!filter.until || attempt.completedAt < filter.until)
     && (!filter.puzzleId || attempt.puzzleId === filter.puzzleId)
     && (!filter.sessionId || attempt.sessionId === filter.sessionId);
 }

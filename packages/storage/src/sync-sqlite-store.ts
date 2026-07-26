@@ -230,6 +230,7 @@ interface AppSettingsRow {
   sprint_rules_guide_seen: number;
   sprint_active_session_guide_seen: number;
   sprint_arrow_duel_guide_seen: number;
+  sprint_focused_run_guide_seen: number;
 }
 
 interface SprintSessionExportRow {
@@ -267,7 +268,8 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 11;
+export const CURRENT_SCHEMA_VERSION = 12;
+const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
   from: number;
@@ -286,7 +288,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 7, to: 8, apply: migrateV7ToV8 },
   { from: 8, to: 9, apply: migrateV8ToV9 },
   { from: 9, to: 10, apply: migrateV9ToV10 },
-  { from: 10, to: 11, apply: migrateV10ToV11 }
+  { from: 10, to: 11, apply: migrateV10ToV11 },
+  { from: 11, to: 12, apply: migrateV11ToV12 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -600,8 +603,9 @@ export class SyncSQLiteStore implements PracticeStore {
           move_feedback_haptics_enabled,
           sprint_rules_guide_seen,
           sprint_active_session_guide_seen,
-          sprint_arrow_duel_guide_seen
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          sprint_arrow_duel_guide_seen,
+          sprint_focused_run_guide_seen
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         boolToInt(cloned.sync.iCloudEnabled),
@@ -614,7 +618,8 @@ export class SyncSQLiteStore implements PracticeStore {
         boolToInt(cloned.moveFeedback.hapticsEnabled),
         boolToInt(cloned.sprintGuides.rulesSeen),
         boolToInt(cloned.sprintGuides.activeSessionSeen),
-        boolToInt(cloned.sprintGuides.arrowDuelSeen)
+        boolToInt(cloned.sprintGuides.arrowDuelSeen),
+        boolToInt(cloned.sprintGuides.focusedRunSeen ?? false)
       );
   }
 
@@ -789,6 +794,10 @@ export class SyncSQLiteStore implements PracticeStore {
       clauses.push("completed_at >= ?");
       params.push(filter.since);
     }
+    if (filter.until !== undefined) {
+      clauses.push("completed_at < ?");
+      params.push(filter.until);
+    }
     if (filter.puzzleId !== undefined) {
       clauses.push("puzzle_id = ?");
       params.push(filter.puzzleId);
@@ -821,6 +830,10 @@ export class SyncSQLiteStore implements PracticeStore {
     if (filter.since !== undefined) {
       clauses.push("a.completed_at >= ?");
       params.push(filter.since);
+    }
+    if (filter.until !== undefined) {
+      clauses.push("a.completed_at < ?");
+      params.push(filter.until);
     }
     if (filter.puzzleId !== undefined) {
       clauses.push("a.puzzle_id = ?");
@@ -1566,6 +1579,42 @@ export class SyncSQLiteStore implements PracticeStore {
     return rows.map(exportedSprintSessionFromRow);
   }
 
+  getSprintSessions(ids: readonly string[]): ExportedSprintSession[] {
+    const uniqueIds = [...new Set(ids)];
+    const sessions: ExportedSprintSession[] = [];
+    for (let offset = 0; offset < uniqueIds.length; offset += MAX_SQL_ID_FILTER_VALUES) {
+      const chunk = uniqueIds.slice(offset, offset + MAX_SQL_ID_FILTER_VALUES);
+      const rows = this.db
+        .prepare(
+          `SELECT
+            id,
+            mode,
+            rating_key AS ratingKey,
+            rating_generation AS ratingGeneration,
+            config_json AS configJson,
+            run_id AS runId,
+            run_kind AS runKind,
+            run_name AS runName,
+            started_at AS startedAt,
+            completed_at AS completedAt,
+            status,
+            correct_count AS correctCount,
+            mistake_count AS mistakeCount,
+            rating_before AS ratingBefore,
+            rating_after AS ratingAfter
+           FROM sprint_sessions
+           WHERE id IN (${chunk.map(() => "?").join(", ")})`
+        )
+        .all(...chunk) as SprintSessionExportRow[];
+      sessions.push(...rows.map(exportedSprintSessionFromRow));
+    }
+    const byId = new Map(sessions.map((session) => [session.id, session]));
+    return uniqueIds.flatMap((id) => {
+      const session = byId.get(id);
+      return session ? [session] : [];
+    });
+  }
+
   private importSprintSession(session: ExportedSprintSession): boolean {
     const existingRow = this.db
       .prepare(
@@ -2202,6 +2251,7 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   // version while still lacking these columns.
   ensureMoveFeedbackColumns(db);
   migrateV10ToV11(db);
+  migrateV11ToV12(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -2209,7 +2259,8 @@ function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
     hasColumn(db, "app_settings", "move_feedback_haptics_enabled") &&
     hasColumn(db, "app_settings", "sprint_rules_guide_seen") &&
     hasColumn(db, "app_settings", "sprint_active_session_guide_seen") &&
-    hasColumn(db, "app_settings", "sprint_arrow_duel_guide_seen");
+    hasColumn(db, "app_settings", "sprint_arrow_duel_guide_seen") &&
+    hasColumn(db, "app_settings", "sprint_focused_run_guide_seen");
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -2383,6 +2434,15 @@ function migrateV10ToV11(db: SyncSqliteDatabase): void {
   );
 }
 
+function migrateV11ToV12(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "sprint_focused_run_guide_seen",
+    "ALTER TABLE app_settings ADD COLUMN sprint_focused_run_guide_seen INTEGER NOT NULL DEFAULT 0 CHECK (sprint_focused_run_guide_seen IN (0, 1))"
+  );
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -2527,7 +2587,8 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
     sprintGuides: {
       rulesSeen: intToBool(row.sprint_rules_guide_seen),
       activeSessionSeen: intToBool(row.sprint_active_session_guide_seen),
-      arrowDuelSeen: intToBool(row.sprint_arrow_duel_guide_seen)
+      arrowDuelSeen: intToBool(row.sprint_arrow_duel_guide_seen),
+      focusedRunSeen: intToBool(row.sprint_focused_run_guide_seen)
     }
   };
 }

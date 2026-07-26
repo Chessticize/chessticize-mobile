@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   evaluateCalibrationReadiness,
+  posteriorApproximationReport,
   reliabilityBins,
   scoreBinaryPredictions,
   splitWholeSessions
@@ -55,12 +56,31 @@ test("artifact readiness fails closed without explicit representative-corpus app
     trainAttemptCount: 1000,
     holdoutAttemptCount: 400,
     solve: {
+      coefficients: {
+        intercept: 0,
+        ratingGapSlope: 1,
+        timeoutLogCoefficient: 0
+      },
+      converged: true,
+      calibrationConverged: true,
       brierScore: 0.2,
       logLoss: 0.6,
       calibrationIntercept: 0,
-      calibrationSlope: 1
+      calibrationSlope: 1,
+      posteriorApproximation: {
+        maximumMeanErrorRating: 8,
+        maximumSdErrorRating: 4
+      }
     },
     speed: {
+      coefficients: {
+        interceptLogSeconds: 3,
+        relativeDifficultyCoefficient: 0,
+        decisionCountCoefficient: 0,
+        paceLogCoefficient: 0,
+        slowPolicyLogCoefficient: 0
+      },
+      residualSd: 0.4,
       holdoutCount: 200,
       meanLogResidual: 0,
       rootMeanSquareLogResidual: 0.4
@@ -81,7 +101,9 @@ test("artifact readiness fails closed without explicit representative-corpus app
       minimumCalibrationSlope: 0.75,
       maximumCalibrationSlope: 1.25,
       maximumSpeedMeanLogResidualMagnitude: 0.12,
-      maximumSpeedRootMeanSquareLogResidual: 0.65
+      maximumSpeedRootMeanSquareLogResidual: 0.65,
+      maximumOneStepPosteriorMeanErrorRating: 12,
+      maximumOneStepPosteriorSdErrorRating: 8
     }
   };
   assert.deepEqual(evaluateCalibrationReadiness(report, policy, true), {
@@ -92,6 +114,29 @@ test("artifact readiness fails closed without explicit representative-corpus app
     ready: false,
     reasons: ["representative corpus has not been explicitly owner-approved"]
   });
+
+  const invalid = structuredClone(report);
+  invalid.solve.converged = false;
+  invalid.solve.coefficients.ratingGapSlope = Number.NaN;
+  invalid.solve.posteriorApproximation.maximumMeanErrorRating = 13;
+  assert.deepEqual(
+    evaluateCalibrationReadiness(invalid, policy, true).reasons,
+    [
+      "solve optimizer did not converge",
+      "solve calibration contains non-finite values",
+      "one-step posterior approximation gate failed"
+    ]
+  );
+});
+
+test("predeclared one-step posterior fixtures stay within the policy tolerance", () => {
+  const report = posteriorApproximationReport(100);
+  assert.deepEqual(
+    report.fixtures.map((fixture) => fixture.name),
+    ["balanced", "weak", "strong", "near-separation"]
+  );
+  assert.ok(report.maximumMeanErrorRating < 12);
+  assert.ok(report.maximumSdErrorRating < 8);
 });
 
 function observation(sessionId, completedAt) {

@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import {
+  approximateSolveThemePosterior,
+  exactSolveThemePosterior,
   tacticalProfileSolveBaselineFeatures,
   tacticalProfileSpeedBaselineFeatures
 } from "../packages/core/src/index.ts";
@@ -92,6 +94,44 @@ export function evaluateCalibrationReadiness(report, policy, ownerApproved) {
   }
   const minimums = policy.minimums;
   const gates = policy.holdoutGates;
+  if (report.solve.converged !== true) {
+    reasons.push("solve optimizer did not converge");
+  }
+  if (report.solve.calibrationConverged !== true) {
+    reasons.push("holdout calibration optimizer did not converge");
+  }
+  if (
+    !allFinite(Object.values(report.solve.coefficients ?? {})) ||
+    !allFinite([
+      report.solve.brierScore,
+      report.solve.logLoss,
+      report.solve.calibrationIntercept,
+      report.solve.calibrationSlope
+    ])
+  ) {
+    reasons.push("solve calibration contains non-finite values");
+  }
+  if (
+    !allFinite(Object.values(report.speed.coefficients ?? {})) ||
+    !Number.isFinite(report.speed.residualSd) ||
+    !(report.speed.residualSd > 0) ||
+    !allFinite([
+      report.speed.meanLogResidual,
+      report.speed.rootMeanSquareLogResidual
+    ])
+  ) {
+    reasons.push("speed calibration contains invalid values");
+  }
+  if (
+    !Number.isFinite(report.solve.posteriorApproximation?.maximumMeanErrorRating) ||
+    report.solve.posteriorApproximation.maximumMeanErrorRating >
+      gates.maximumOneStepPosteriorMeanErrorRating ||
+    !Number.isFinite(report.solve.posteriorApproximation?.maximumSdErrorRating) ||
+    report.solve.posteriorApproximation.maximumSdErrorRating >
+      gates.maximumOneStepPosteriorSdErrorRating
+  ) {
+    reasons.push("one-step posterior approximation gate failed");
+  }
   if (report.trainSessionCount < minimums.trainSessionsPerFamily) {
     reasons.push("too few training sessions");
   }
@@ -234,11 +274,15 @@ function calibrateFamily(observations, policy, ownerApproved) {
         timeoutLogCoefficient: solveFit.coefficients[2]
       },
       converged: solveFit.converged,
+      calibrationConverged: calibration.converged,
       brierScore: solveScore.brierScore,
       logLoss: solveScore.logLoss,
       calibrationIntercept: calibration.coefficients[0] ?? null,
       calibrationSlope: calibration.coefficients[1] ?? null,
-      reliability: reliabilityBins(scoredHoldout)
+      reliability: reliabilityBins(scoredHoldout),
+      posteriorApproximation: posteriorApproximationReport(
+        policy.artifactParameters.solveThemePriorSdRating
+      )
     },
     speed: {
       coefficients: {
@@ -263,6 +307,46 @@ function calibrateFamily(observations, policy, ownerApproved) {
   return {
     ...report,
     readiness: evaluateCalibrationReadiness(report, policy, ownerApproved)
+  };
+}
+
+export function posteriorApproximationReport(priorSd) {
+  const fixtures = [
+    posteriorFixture("balanced", 24, (index) => index % 2 === 0 ? 1 : 0),
+    posteriorFixture("weak", 24, (index) => index % 4 === 0 ? 1 : 0),
+    posteriorFixture("strong", 24, (index) => index % 4 === 0 ? 0 : 1),
+    posteriorFixture("near-separation", 24, () => 0)
+  ].map(({ name, observations }) => {
+    const approximate = approximateSolveThemePosterior(observations, priorSd);
+    const exact = exactSolveThemePosterior(observations, priorSd);
+    return {
+      name,
+      meanErrorRating: Math.abs(approximate.mean - exact.mean),
+      sdErrorRating: Math.abs(
+        approximate.standardDeviation - exact.standardDeviation
+      )
+    };
+  });
+  return {
+    fixtures,
+    maximumMeanErrorRating: Math.max(
+      ...fixtures.map((fixture) => fixture.meanErrorRating)
+    ),
+    maximumSdErrorRating: Math.max(
+      ...fixtures.map((fixture) => fixture.sdErrorRating)
+    )
+  };
+}
+
+function posteriorFixture(name, count, outcomeForIndex) {
+  return {
+    name,
+    observations: Array.from({ length: count }, (_, index) => ({
+      baselineProbability: 0.35 + (index % 5) * 0.075,
+      sensitivity: 0.0035 + (index % 3) * 0.0005,
+      success: outcomeForIndex(index),
+      weight: 0.75 + (index % 4) * 0.125
+    }))
   };
 }
 
@@ -581,6 +665,11 @@ function quantileOrNull(values, probability) {
   if (values.length === 0) return null;
   const sorted = [...values].sort((left, right) => left - right);
   return sorted[Math.floor((sorted.length - 1) * probability)];
+}
+
+function allFinite(values) {
+  return values.length > 0 &&
+    values.every((value) => typeof value === "number" && Number.isFinite(value));
 }
 
 function deduplicateById(items) {

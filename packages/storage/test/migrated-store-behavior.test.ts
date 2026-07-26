@@ -82,7 +82,12 @@ for (const label of STORE_LABELS) {
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "09:45" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },
-        sprintGuides: { rulesSeen: true, activeSessionSeen: true, arrowDuelSeen: false }
+        sprintGuides: {
+          rulesSeen: true,
+          activeSessionSeen: true,
+          arrowDuelSeen: false,
+          focusedRunSeen: true
+        }
       });
 
       assert.deepEqual(updated, service.getSettings());
@@ -90,7 +95,12 @@ for (const label of STORE_LABELS) {
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "09:45" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },
-        sprintGuides: { rulesSeen: true, activeSessionSeen: true, arrowDuelSeen: false }
+        sprintGuides: {
+          rulesSeen: true,
+          activeSessionSeen: true,
+          arrowDuelSeen: false,
+          focusedRunSeen: true
+        }
       });
     } finally {
       await cleanup();

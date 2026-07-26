@@ -159,12 +159,14 @@ function sprintRulesDesignPreviewFor(
   ) {
     const sharedGuide = {
       durationLabel: "5:00",
+      guideKey: "active_session" as const,
       maxMistakes: 3,
       mode: "standard" as const,
       targetCorrect: 15
     };
     const arrowDuelGuide = {
       ...sharedGuide,
+      guideKey: "arrow_duel" as const,
       mode: "arrow_duel" as const
     };
     return {
@@ -179,6 +181,7 @@ function sprintRulesDesignPreviewFor(
       initialSessionGuides: [{
         durationLabel: "5:00",
         focusedRun: true,
+        guideKey: "focused_run",
         maxAttempts: 15,
         maxMistakes: 15,
         mode: "standard",

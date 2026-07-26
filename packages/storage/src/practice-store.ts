@@ -137,6 +137,7 @@ export interface PracticeStore {
   getPracticeProgressSummary(nowMs: number, ratingKey: string): PracticeProgressSummary;
   listPracticeRatingActivity(): PracticeRatingActivity[];
   hasPlayedRatingKey(ratingKey: string): boolean;
+  getSprintSessions(ids: readonly string[]): ExportedSprintSession[];
   listSprintSessions(): ExportedSprintSession[];
   exportLocalData(): LocalDataExport;
   importLocalData(data: LocalDataImport): LocalDataImportResult;

@@ -246,6 +246,7 @@ export type SprintRulesGuidePresentation = {
 
 export type SprintSessionGuidePresentation = SprintRulesGuidePresentation & {
   focusedRun?: boolean;
+  guideKey?: Exclude<SprintGuideKey, "rules">;
   maxAttempts?: number;
   mode: "standard" | "arrow_duel";
 };
@@ -1409,7 +1410,8 @@ export function PracticePocScreen({
     }
     const guideKeys = sprintSessionGuidesFor(
       service.getSettings().sprintGuides,
-      nextMode
+      nextMode,
+      { focusedRun: presentationOverride?.focusedRun === true }
     );
     if (guideKeys.length === 0) {
       return false;
@@ -1427,6 +1429,7 @@ export function PracticePocScreen({
     };
     setSessionGuidePresentations(guideKeys.map((guide) => ({
       ...presentation,
+      guideKey: guide,
       mode: guide === "arrow_duel" ? "arrow_duel" : "standard"
     })));
     setSessionGuideCoachStep(0);
@@ -1472,7 +1475,11 @@ export function PracticePocScreen({
       onUnavailable
     };
     const guideKeys = sprintGuidanceEnabled
-      ? sprintSessionGuidesFor(service.getSettings().sprintGuides, nextMode)
+      ? sprintSessionGuidesFor(
+          service.getSettings().sprintGuides,
+          nextMode,
+          { focusedRun: true }
+        )
       : [];
     if (guideKeys.length > 0) {
       const prepared = service.prepareFocusedRun(taskFamily, captureLiveNowIso());
@@ -3356,9 +3363,10 @@ export function PracticePocScreen({
                       if (sessionGuidePresentations[nextIndex]) {
                         if (sprintGuidanceEnabled) {
                           saveSprintGuideSeen(
-                            sessionGuidePresentation.mode === "arrow_duel"
-                              ? "arrow_duel"
-                              : "active_session"
+                            sessionGuidePresentation.guideKey
+                              ?? (sessionGuidePresentation.mode === "arrow_duel"
+                                ? "arrow_duel"
+                                : "active_session")
                           );
                         }
                         setSessionGuideIndex(nextIndex);
@@ -3368,9 +3376,10 @@ export function PracticePocScreen({
 
                       if (sprintGuidanceEnabled) {
                         saveSprintGuideSeen(
-                          sessionGuidePresentation.mode === "arrow_duel"
-                            ? "arrow_duel"
-                            : "active_session"
+                          sessionGuidePresentation.guideKey
+                            ?? (sessionGuidePresentation.mode === "arrow_duel"
+                              ? "arrow_duel"
+                              : "active_session")
                         );
                       }
                       setSessionGuideIndex(null);

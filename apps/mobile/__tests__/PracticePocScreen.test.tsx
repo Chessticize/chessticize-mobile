@@ -1095,6 +1095,116 @@ describe("PracticePocScreen", () => {
     );
   });
 
+  it("uses the only recommended Arrow Duel family and shows returning users the dedicated Focused Run guide", () => {
+    const service = createMobilePracticeService("familiar15");
+    service.saveSettings({
+      ...service.getSettings(),
+      sprintGuides: {
+        rulesSeen: true,
+        activeSessionSeen: true,
+        arrowDuelSeen: true,
+        focusedRunSeen: false
+      }
+    });
+    const arrowPuzzle = firstArrowDuelPuzzleForTest().puzzle;
+    const focusedPuzzles = Array.from({ length: 15 }, (_, index) => ({
+      ...arrowPuzzle,
+      id: `focused-arrow-${index}`
+    }));
+    const focusedConfig = {
+      ...defaultSprintConfig("arrow_duel"),
+      targetCorrect: 15,
+      maxMistakes: 15,
+      maxAttempts: 15,
+      ratingPolicy: "unrated" as const,
+      tacticalFocus: {
+        taskFamily: "arrow_duel" as const,
+        themes: ["pin"],
+        mixedControlCount: 5,
+        ratingAnchor: 875,
+        minRating: 775,
+        maxRating: 975
+      }
+    };
+    const prepareFocusedRun = jest.spyOn(service, "prepareFocusedRun").mockReturnValue({
+      status: "ready",
+      prepared: {
+        plan: {
+          taskFamily: "arrow_duel",
+          ratingAnchor: { ratingKey: focusedConfig.ratingKey, rating: 875 },
+          reasons: [{ theme: "pin", reason: "solve_rate", count: 10 }],
+          mixedControlCount: 5,
+          minRating: 775,
+          maxRating: 975,
+          excludePuzzleIds: []
+        },
+        config: focusedConfig,
+        puzzles: focusedPuzzles
+      }
+    });
+    jest.spyOn(service, "getTacticalProfileSnapshot").mockReturnValue({
+      phase: "ready",
+      evaluation: {
+        phase: "ready",
+        signals: [{
+          id: "arrow_duel:pin",
+          taskFamily: "arrow_duel",
+          theme: "pin",
+          reason: "solve_rate",
+          confidence: "high",
+          status: "recommended",
+          solveConfidence: 0.95,
+          speedConfidence: 0,
+          expectedFailuresPer100: 8,
+          completedTimeMultiplier: 1,
+          actionPriority: 0.4,
+          distinctPuzzleCount: 8,
+          distinctSessionCount: 3
+        }],
+        rankedFocuses: [],
+        observedThemeCount: 1
+      },
+      cutoffs: {
+        line: { home: [], profile: [], run: [], monitored: [] },
+        arrow_duel: { home: [], profile: [], run: [], monitored: [] }
+      },
+      buildState: {
+        modelVersion: "test",
+        packFeatureHash: "test",
+        calibrationId: "test",
+        status: "ready",
+        dirtyDayCount: 0
+      },
+      unavailableFamilies: {}
+    } as NonNullable<ReturnType<PracticeService["getTacticalProfileSnapshot"]>>);
+
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true,
+      sprintGuidanceEnabled: true
+    });
+
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
+      "Arrow Duel"
+    );
+    press(renderer, "tactical-profile-preview-run");
+    expect(prepareFocusedRun).toHaveBeenLastCalledWith("arrow_duel");
+    press(renderer, "focused-run-start");
+    expect(findByTestId(renderer, "practice-active-session-guide")).toBeTruthy();
+    expectText(renderer, "Track the fixed Run");
+    expect(service.getSettings().sprintGuides.focusedRunSeen).toBe(false);
+
+    for (let step = 0; step < 4; step += 1) {
+      press(renderer, "practice-session-guide-start");
+    }
+
+    expect(service.getSettings().sprintGuides.focusedRunSeen).toBe(true);
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(prepareFocusedRun).toHaveBeenCalledTimes(2);
+    expect(prepareFocusedRun.mock.calls.every(([family]) => family === "arrow_duel")).toBe(true);
+  });
+
   it("keeps solve reliability and completed-puzzle speed as plain-language profile signals", () => {
     const solveRate = renderLabScenario("practice-tactical-profile-solve-rate");
     const speed = renderLabScenario("practice-tactical-profile-speed");
@@ -1526,7 +1636,8 @@ describe("PracticePocScreen", () => {
     expect(service.getSettings().sprintGuides).toEqual({
       rulesSeen: false,
       activeSessionSeen: false,
-      arrowDuelSeen: false
+      arrowDuelSeen: false,
+      focusedRunSeen: false
     });
     expect(collectText(findByTestId(renderer, "settings-show-sprint-guide"))).toBe("Guides reset");
     expect(collectText(findByTestId(renderer, "settings-sprint-guide-ready"))).toContain(

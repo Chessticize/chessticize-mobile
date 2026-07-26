@@ -256,14 +256,23 @@ export class TacticalProfileService {
       return ready;
     }
 
-    const sessions = new Map(
-      this.progressStore.listSprintSessions().map((session) => [session.id, session])
+    const attempts = dirtyDays.flatMap((day) =>
+      this.progressStore.listAttempts({
+        source: "sprint",
+        since: `${day}T00:00:00.000Z`,
+        until: `${nextUtcDay(day)}T00:00:00.000Z`
+      })
     );
-    const attempts = this.progressStore.listAttempts();
+    const sessions = new Map(
+      this.progressStore
+        .getSprintSessions(attempts.map((attempt) => attempt.sessionId))
+        .map((session) => [session.id, session])
+    );
     const attemptsByDay = new Map<string, typeof attempts>();
+    const dirtyDaySet = new Set(dirtyDays);
     for (const attempt of attempts) {
       const day = utcDay(attempt.completedAt);
-      if (!day || !dirtyDays.includes(day)) {
+      if (!day || !dirtyDaySet.has(day)) {
         continue;
       }
       const dayAttempts = attemptsByDay.get(day) ?? [];
@@ -439,6 +448,15 @@ export class TacticalProfileService {
       calibrationId: this.calibration.calibrationId
     };
   }
+}
+
+function nextUtcDay(day: string): string {
+  const date = new Date(`${day}T00:00:00.000Z`);
+  if (!Number.isFinite(date.getTime())) {
+    throw new Error(`Invalid Tactical Profile dirty day: ${day}`);
+  }
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
 }
 
 function latestOrdinaryMixedSession(

@@ -67,6 +67,25 @@ test("syncPracticeProgress uploads the current local progress snapshot when enab
   assert.equal(transport.saved[0]?.data.ratings[0]?.games, 1);
 });
 
+test("Focused Run guide progress stays device-local across progress sync merges", async () => {
+  const localService = new PracticeService(await seededMemoryStore());
+  localService.saveSettings({
+    ...localService.getSettings(),
+    sprintGuides: {
+      ...localService.getSettings().sprintGuides,
+      focusedRunSeen: true
+    }
+  });
+  const local = localService.exportLocalData();
+  const remote: LocalDataImport = structuredClone(local);
+  remote.settings.sprintGuides.focusedRunSeen = false;
+
+  assert.equal(
+    mergeLocalDataExports(local, remote).settings.sprintGuides.focusedRunSeen,
+    true
+  );
+});
+
 test("new sprint sessions capture the active rating generation for sync", async () => {
   const store = await seededMemoryStore();
   store.saveRating({

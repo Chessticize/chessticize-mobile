@@ -10,6 +10,7 @@ import {
 import { MemoryStore } from "../src/memory-store.ts";
 import { PracticeService } from "../src/practice-service.ts";
 import { MemoryTacticalProfileRepository } from "../src/tactical-profile-repository.ts";
+import { SQLiteStore } from "../src/sqlite-store.ts";
 import { TacticalProfileService } from "../src/tactical-profile-service.ts";
 
 test("TacticalProfileService rebuilds dirty days and converges after duplicate import", () => {
@@ -47,6 +48,93 @@ test("a clean Tactical Profile read uses daily cells without rescanning canonica
   assert.equal(rawHistoryReads, 0);
   assert.equal(snapshot.buildState.evaluatedAt, "2026-07-25T00:00:00.000Z");
   assert.deepEqual(snapshot.evaluation, first.evaluation);
+});
+
+test("large SQLite dirty rebuilds use day-bounded attempts and exact session reads", () => {
+  const store = new SQLiteStore();
+  try {
+    store.migrate();
+    store.seedPuzzles([puzzle("large-history-puzzle", ["fork"])]);
+    const config = buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20
+    });
+    store.transaction(() => {
+      for (let dayIndex = 0; dayIndex < 60; dayIndex += 1) {
+        const completedAt = new Date(
+          Date.UTC(2025, 0, 1 + dayIndex, 0, 4)
+        ).toISOString();
+        const session = startSprint({
+          id: `large-session-${dayIndex}`,
+          config,
+          puzzles: [store.getPuzzle("large-history-puzzle")!],
+          ratingBefore: 925,
+          now: new Date(Date.parse(completedAt) - 240_000).toISOString()
+        });
+        store.createSprintSession({
+          ...session,
+          status: "failed",
+          completedAt,
+          endReason: "max_mistakes",
+          correctCount: 0,
+          mistakeCount: 50,
+          ratingAfter: 900
+        });
+        for (let attemptIndex = 0; attemptIndex < 50; attemptIndex += 1) {
+          store.recordAttempt(attempt({
+            id: `large-attempt-${dayIndex}-${attemptIndex}`,
+            sessionId: session.id,
+            puzzleId: "large-history-puzzle",
+            completedAt
+          }));
+        }
+      }
+    });
+
+    const originalListAttempts = store.listAttempts.bind(store);
+    const originalGetSprintSessions = store.getSprintSessions.bind(store);
+    const filters: Parameters<typeof store.listAttempts>[0][] = [];
+    const sessionReadSizes: number[] = [];
+    store.listAttempts = (filter = {}) => {
+      filters.push(filter);
+      return originalListAttempts(filter);
+    };
+    store.getSprintSessions = (ids) => {
+      sessionReadSizes.push(new Set(ids).size);
+      return originalGetSprintSessions(ids);
+    };
+    const profile = new TacticalProfileService({
+      progressStore: store,
+      puzzleSource: store,
+      repository: new MemoryTacticalProfileRepository(),
+      calibration: CALIBRATION,
+      naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} },
+      maxDirtyDaysPerRefresh: 30
+    });
+
+    const startedAt = Date.now();
+    const first = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+    const second = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+    const elapsedMs = Date.now() - startedAt;
+
+    assert.equal(first.phase, "building");
+    assert.notEqual(second.phase, "building");
+    assert.equal(
+      filters.filter((filter) => filter?.since === undefined).length,
+      1,
+      "only the initial dirty-day discovery may scan canonical history"
+    );
+    const bounded = filters.filter((filter) => filter?.since !== undefined);
+    assert.equal(bounded.length, 60);
+    assert.ok(bounded.every((filter) =>
+      filter?.source === "sprint" && filter.until !== undefined
+    ));
+    assert.deepEqual(sessionReadSizes, [30, 30]);
+    assert.ok(elapsedMs < 4_000, `large dirty rebuild took ${elapsedMs}ms`);
+  } finally {
+    store.close();
+  }
 });
 
 test("chronological, reversed, and duplicate canonical imports converge to identical cells", () => {

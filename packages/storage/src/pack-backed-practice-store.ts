@@ -167,6 +167,10 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.listSprintSessions();
   }
 
+  getSprintSessions(ids: readonly string[]): ExportedSprintSession[] {
+    return this.userStore.getSprintSessions(ids);
+  }
+
   exportLocalData(): LocalDataExport {
     return this.userStore.exportLocalData();
   }

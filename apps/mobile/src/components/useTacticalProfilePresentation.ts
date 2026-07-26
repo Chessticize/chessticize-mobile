@@ -89,8 +89,12 @@ export function useTacticalProfilePresentation(input: {
       setScreen("suppressed");
       return;
     }
+    const intentTaskFamily = resolvedRecommendedTaskFamily(
+      snapshot,
+      activeTaskFamily
+    );
     if (intent.type === "preview-focused-run") {
-      const result = service.prepareFocusedRun(activeTaskFamily);
+      const result = service.prepareFocusedRun(intentTaskFamily);
       if (result.status !== "ready") {
         setPrepared(undefined);
         setFocusedRunUnavailable(unavailableCopy(result.reason));
@@ -115,11 +119,11 @@ export function useTacticalProfilePresentation(input: {
     setScreen("home");
     setPrepared(undefined);
     try {
-      onStartRequested(activeTaskFamily, handleUnavailable);
+      onStartRequested(intentTaskFamily, handleUnavailable);
     } catch (error) {
       handleUnavailable(error);
     }
-  }, [activeTaskFamily, onStartRequested, refresh, service]);
+  }, [activeTaskFamily, onStartRequested, refresh, service, snapshot]);
 
   return useMemo(() => {
     if (injectedPresentation) {
@@ -134,13 +138,10 @@ export function useTacticalProfilePresentation(input: {
         .filter((signal) => signal.status === "recommended")
         .map((signal) => signal.taskFamily)
     );
-    const resolvedTaskFamily = recommendedFamilies.has(activeTaskFamily)
-      ? activeTaskFamily
-      : recommendedFamilies.has("line")
-        ? "line"
-        : recommendedFamilies.has("arrow_duel")
-          ? "arrow_duel"
-          : activeTaskFamily;
+    const resolvedTaskFamily = resolvedRecommendedTaskFamily(
+      snapshot,
+      activeTaskFamily
+    );
     // Cross-family ordering is deliberately not inferred from model array
     // order. Until an approved calibration artifact carries that policy, the
     // shared Home card stays mode-neutral when both families qualify.
@@ -174,6 +175,24 @@ export function useTacticalProfilePresentation(input: {
     selectedSignalId,
     snapshot
   ]);
+}
+
+function resolvedRecommendedTaskFamily(
+  snapshot: TacticalProfileSnapshot | undefined,
+  activeTaskFamily: TacticalProfileTaskFamily
+): TacticalProfileTaskFamily {
+  const recommendedFamilies = new Set(
+    snapshot?.evaluation.signals
+      .filter((signal) => signal.status === "recommended")
+      .map((signal) => signal.taskFamily)
+  );
+  return recommendedFamilies.has(activeTaskFamily)
+    ? activeTaskFamily
+    : recommendedFamilies.has("line")
+      ? "line"
+      : recommendedFamilies.has("arrow_duel")
+        ? "arrow_duel"
+        : activeTaskFamily;
 }
 
 function signalPresentation(

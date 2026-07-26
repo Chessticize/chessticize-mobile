@@ -16,7 +16,9 @@
     "minimumCalibrationSlope": 0.75,
     "maximumCalibrationSlope": 1.25,
     "maximumSpeedMeanLogResidualMagnitude": 0.12,
-    "maximumSpeedRootMeanSquareLogResidual": 0.65
+    "maximumSpeedRootMeanSquareLogResidual": 0.65,
+    "maximumOneStepPosteriorMeanErrorRating": 12,
+    "maximumOneStepPosteriorSdErrorRating": 8
   },
   "focusedRun": {
     "runSize": 15,
@@ -33,7 +35,7 @@
     "minDistinctSessions": 2,
     "minimumOpportunityWeight": 0.25,
     "opportunityExponent": 0.5,
-    "solveThemePriorSdRating": 200,
+    "solveThemePriorSdRating": 100,
     "solvePracticalDeficitRating": 20,
     "minimumExpectedFailuresPer100": 2,
     "speedThemePriorSdLogSeconds": 0.5,

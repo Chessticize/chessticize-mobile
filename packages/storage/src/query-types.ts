@@ -22,6 +22,7 @@ export interface HistoryFilter {
   result?: AttemptOutcome;
   mode?: SprintMode;
   since?: string;
+  until?: string;
   puzzleId?: string;
   sessionId?: string;
 }
