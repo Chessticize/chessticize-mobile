@@ -97,3 +97,54 @@ test("Issue #247 stays on the existing Settings product clone with its approved 
     false
   );
 });
+
+test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab scenarios", () => {
+  const activeSessionGuide = scenarioRegistry["practice-active-session-guide"];
+  const arrowDuelGuide = scenarioRegistry["practice-arrow-duel-guide"];
+  const firstSprintGuide = scenarioRegistry["practice-first-sprint-guide"];
+  const settingsGuidance = scenarioRegistry["settings-sprint-guidance"];
+
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "SPRINT HEADER, SLOW, TIMED OUT, and UNCLEAR guidance"
+  ));
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Current-guide-only accessibility announcement"
+  ));
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Measured landscape connectors to the amber timer and Mark as unclear control"
+  ));
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Full-width production Unclear prompt in portrait"
+  ));
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Portrait arrows outside callout borders"
+  ));
+  assert.match(activeSessionGuide.description, /terminate at the amber timer and Mark as unclear control/);
+  assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
+  assert.ok(arrowDuelGuide.scope.includes.includes("The arrows show your two choices"));
+  assert.ok(arrowDuelGuide.scope.includes.includes("Portrait callout below the board"));
+  assert.ok(arrowDuelGuide.scope.includes.includes("Landscape callout in the empty board lane"));
+  assert.match(arrowDuelGuide.description, /two arrows are the user's two choices/);
+  assert.doesNotMatch(
+    `${activeSessionGuide.description} ${arrowDuelGuide.description}`,
+    /\b(?:step|tour)\b/i
+  );
+  assert.ok(firstSprintGuide.issues?.some(
+    (issue) => issue.issueNumber === 337 && issue.changeNote.includes("fixed badge and copy columns")
+  ));
+  assert.ok(settingsGuidance.issues?.some(
+    (issue) => issue.issueNumber === 337 && issue.changeNote.includes("immediately before Feedback")
+  ));
+});
+
+test("Timed out handoff explains its mistake and Review result on the next puzzle", () => {
+  const timedOut = scenarioRegistry["practice-timing-timeout"];
+  const afterTimeout = scenarioRegistry["practice-timeout-review-notice"];
+
+  assert.ok(timedOut.scope.includes.includes("Post-timeout mistake, Review, and no-Unclear notice"));
+  assert.match(timedOut.description, /explains that the mistake entered Review instead of Unclear/);
+  assert.equal(afterTimeout.storyId, "practice--timeout-review-notice");
+  assert.ok(afterTimeout.scope.includes.includes("Read-only In Review notice"));
+  assert.ok(afterTimeout.scope.includes.includes("No Unclear question"));
+  assert.match(afterTimeout.description, /replaces the Unclear question/);
+});

@@ -1,5 +1,6 @@
 import type { AttemptEvent } from "./types.ts";
 import { isAttemptMistake } from "./attempt-outcome.ts";
+import { isAttemptMarkedUnclear } from "./attempt-clarity.ts";
 
 export interface SprintResultSummary {
   accuracyPercent: number;
@@ -24,7 +25,9 @@ export function buildSprintResultSummary(
   attempts: readonly AttemptEvent[]
 ): SprintResultSummary {
   const sprintAttempts = attempts.filter((attempt) => attempt.source === "sprint");
-  const unclearAttempts = sprintAttempts.filter((attempt) => attempt.unclear === true);
+  const unclearAttempts = sprintAttempts.filter(
+    (attempt) => isAttemptMarkedUnclear(attempt)
+  );
   const slowMarkedCount = unclearAttempts.filter(
     (attempt) => attempt.timingStatus === "slow"
   ).length;
