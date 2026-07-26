@@ -411,11 +411,13 @@ export function buildHistoryView(input: {
   const query = validateHistoryQuery(input.query);
   const range = resolveHistoryRange(query.now, query.timeRange);
   const page = resolveHistoryPage(query.page, input.attempts.length);
-  const attempts = applyHistoryPage(input.attempts, page).map((attempt) => (
-    isAttemptMarkedUnclear(attempt)
-      ? attempt
-      : { ...attempt, unclear: false, unclearUpdatedAt: undefined }
-  ));
+  const attempts = applyHistoryPage(input.attempts, page).map((attempt) => {
+    if (isAttemptMarkedUnclear(attempt)) {
+      return attempt;
+    }
+    const { unclearUpdatedAt: _invalidUnclearUpdatedAt, ...attemptWithoutUnclearTimestamp } = attempt;
+    return { ...attemptWithoutUnclearTimestamp, unclear: false };
+  });
   const attemptsForOptions = input.allAttemptsForOptions ?? input.attempts;
   const availableThemes = input.availableThemes ?? collectThemes(attemptsForOptions);
   const availableSpeeds = input.availableSpeeds ?? collectHistorySpeeds(attemptsForOptions);
