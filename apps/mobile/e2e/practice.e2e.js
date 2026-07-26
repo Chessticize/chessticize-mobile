@@ -30,7 +30,7 @@ const {
 // The visual assertion measures absolute painted arrow area. Pin the public
 // service's packaged-core selection to two long candidate vectors so random
 // move geometry cannot turn that rendering check into a pixel-count lottery.
-const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v3:4';
+const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v4:23';
 
 describe('Practice POC', () => {
   beforeEach(async () => {
@@ -169,7 +169,7 @@ describe('Practice POC', () => {
 
     await waitFor(element(by.id('tactical-profile-screen'))).toExist().withTimeout(10000);
     await waitFor(element(by.text('Still collecting evidence'))).toExist().withTimeout(10000);
-    await element(by.id('tactical-profile-back-home')).tap();
+    await element(by.id('tactical-profile-back')).tap();
     await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
   });
 
@@ -187,10 +187,10 @@ describe('Practice POC', () => {
     await startPracticeMode('arrow-duel');
     await waitForVisibleInPracticeScroll('session-board');
     // The default 5/30 Arrow Duel config and pinned seed select packaged puzzle
-    // d9wOh through PracticeService's rating fallback. Candidate order is
+    // bfPfS through PracticeService's rating fallback. Candidate order is
     // session-seeded, so wait for both long vectors without assuming order.
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'e7g5', 10000);
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h7g5', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f8', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f7', 10000);
 
     const boardFrame = await frameFor(element(by.id('session-board')));
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');

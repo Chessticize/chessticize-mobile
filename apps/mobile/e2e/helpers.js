@@ -71,7 +71,20 @@ async function completeFirstUseSessionGuides() {
         .toBeVisible()
         .whileElement(by.id('practice-main-scroll'))
         .scroll(100, 'down', 0.5, 0.5);
-      await element(by.id('practice-session-guide-start')).tap();
+      try {
+        await element(by.id('practice-session-guide-start')).tap();
+      } catch (error) {
+        // A successful press can replace the current guide step before Detox
+        // finishes resolving the native action. Accept only a public successor
+        // state; preserve every unrelated interaction failure.
+        await sleep(250);
+        const guideStillAvailable = await detoxElementExists('practice-session-guide-start');
+        const sessionStarted = await detoxElementExists('session-board');
+        const sessionStarting = await detoxElementExists('sprint-loading-overlay');
+        if (!guideStillAvailable && !sessionStarted && !sessionStarting) {
+          throw error;
+        }
+      }
       await sleep(250);
       continue;
     }

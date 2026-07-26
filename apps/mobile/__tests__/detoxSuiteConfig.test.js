@@ -923,10 +923,24 @@ describe('Detox suite configuration', () => {
     const requireVisible = helper.indexOf('.toBeVisible()');
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
     const tapGuideAction = helper.indexOf("element(by.id('practice-session-guide-start')).tap()");
+    const handleRemountRace = helper.indexOf('catch (error)', tapGuideAction);
+    const confirmGuideAdvanced = helper.indexOf(
+      "detoxElementExists('practice-session-guide-start')",
+      handleRemountRace
+    );
+    const confirmSessionStarted = helper.indexOf(
+      "detoxElementExists('session-board')",
+      handleRemountRace
+    );
+    const preserveUnexpectedFailure = helper.indexOf('throw error', handleRemountRace);
 
     expect(requireVisible).toBeGreaterThan(0);
     expect(scrollDown).toBeGreaterThan(requireVisible);
     expect(tapGuideAction).toBeGreaterThan(scrollDown);
+    expect(handleRemountRace).toBeGreaterThan(tapGuideAction);
+    expect(confirmGuideAdvanced).toBeGreaterThan(handleRemountRace);
+    expect(confirmSessionStarted).toBeGreaterThan(handleRemountRace);
+    expect(preserveUnexpectedFailure).toBeGreaterThan(confirmSessionStarted);
   });
 
   it('scrolls responsive Review actions inside the independent control rail', () => {
@@ -980,6 +994,21 @@ describe('Detox suite configuration', () => {
     expect(requireResultTopBarVisible).toBeGreaterThan(normalizeResultScroll);
   });
 
+  it('returns from the active Tactical Profile through its public header control', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const caseStart = practiceSpec.indexOf(
+      "it('opens the real local Tactical Profile and returns to Practice'"
+    );
+    const caseEnd = practiceSpec.indexOf(
+      "it('renders the standard sprint board'",
+      caseStart
+    );
+    const tacticalProfileCase = practiceSpec.slice(caseStart, caseEnd);
+
+    expect(tacticalProfileCase).toContain("element(by.id('tactical-profile-back')).tap()");
+    expect(tacticalProfileCase).not.toContain('tactical-profile-back-home');
+  });
+
   it('pins the Arrow Duel screenshot to the exact runtime-selected long-arrow fixture', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const renderCaseStart = practiceSpec.indexOf("it('renders Arrow Duel candidate arrows on the board'");
@@ -987,23 +1016,24 @@ describe('Detox suite configuration', () => {
     const renderCase = practiceSpec.slice(renderCaseStart, renderCaseEnd);
 
     expect(practiceSpec).toContain(
-      "const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v3:4';"
+      "const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v4:23';"
     );
     expect(practiceSpec).toContain(
       'chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED'
     );
     expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'e7g5', 10000)"
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f8', 10000)"
     );
     expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'h7g5', 10000)"
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f7', 10000)"
     );
-    expect(renderCase.indexOf("'e7g5'")).toBeLessThan(
+    expect(renderCase.indexOf("'f1f8'")).toBeLessThan(
       renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
     );
-    expect(renderCase.indexOf("'h7g5'")).toBeLessThan(
+    expect(renderCase.indexOf("'f1f7'")).toBeLessThan(
       renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
     );
+    expect(renderCase).toContain('bfPfS');
     expect(renderCase).not.toContain('eQNYb');
     expect(renderCase).not.toContain("'d7d1'");
     expect(renderCase).not.toContain("'d7f7'");
