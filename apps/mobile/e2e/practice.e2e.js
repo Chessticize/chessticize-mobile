@@ -5,6 +5,7 @@ const {
   elementText,
   sleep,
   frameFor,
+  historyAttemptRowTestIDForResult,
   launchWithDisabledSynchronization,
   openTab,
   openStandardHistoryTrend,
@@ -271,7 +272,9 @@ describe('Practice POC', () => {
     await waitFor(element(
       by.text('Attention: Unclear').withAncestor(by.id('history-active-filter-summary'))
     )).toExist().withTimeout(10000);
-    await tapVisibleHistoryResult('Correct');
+    const resultRowIdentifier = await historyAttemptRowTestIDForResult('Correct');
+    await waitForVisibleInPracticeScroll(resultRowIdentifier);
+    await element(by.id(resultRowIdentifier)).tap();
     await waitForVisibleInPracticeScroll('review-schedule-add');
     await waitForVisibleInPracticeScroll('history-attempt-unclear');
     await expect(element(by.id('history-attempt-detail'))).not.toExist();
@@ -425,7 +428,9 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await tapVisibleHistoryResult('Wrong move');
+    const resultRowIdentifier = await historyAttemptRowTestIDForResult('Wrong move');
+    await waitForVisibleInPracticeScroll(resultRowIdentifier);
+    await element(by.id(resultRowIdentifier)).tap();
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
     await waitForVisibleInPracticeScroll('review-analysis-button');
     await element(by.id('review-analysis-button')).tap();
@@ -434,26 +439,6 @@ describe('Practice POC', () => {
     await waitForElementTextContaining('review-analysis-line-0', 'Top move', 90000);
   });
 });
-
-async function tapVisibleHistoryResult(label) {
-  const buttonAttributes = await element(by.traits(['button'])).getAttributes();
-  const buttons = Array.isArray(buttonAttributes)
-    ? buttonAttributes
-    : Array.isArray(buttonAttributes.elements)
-      ? buttonAttributes.elements
-      : [buttonAttributes];
-  const resultRow = buttons.find((attributes) => (
-    typeof attributes.identifier === 'string'
-    && attributes.identifier.startsWith('history-attempt-')
-    && typeof attributes.label === 'string'
-    && attributes.label.includes(`, ${label},`)
-  ));
-  if (!resultRow) {
-    throw new Error(`Could not resolve a public History row for result "${label}"`);
-  }
-  await waitForVisibleInPracticeScroll(resultRow.identifier);
-  await element(by.id(resultRow.identifier)).tap();
-}
 
 function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame) {
   const png = readRgbaPng(screenshotPath);

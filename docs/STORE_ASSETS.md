@@ -111,26 +111,29 @@ and named by display group.
 
 The Detox capture spec is opt-in so normal Mobile JS CI does not spend time on
 store-asset screenshots. Release screenshot capture must use the Release
-simulator app so development-only controls stay out of App Store assets. Build
-the Release app bundle, then run the capture flow for the simulator size you
-are validating:
+simulator app so development-only controls stay out of App Store assets. For an
+exact-head visual baseline, run the calibration wrapper for the exact simulator
+name and UDID you are validating:
 
 ```sh
-DETOX_IOS_DEVICE="iPhone 17 Pro Max" pnpm mobile:e2e:build:ios:release
-DETOX_IOS_DEVICE="iPhone 17 Pro Max" pnpm mobile:e2e:store-assets:ios:release
-DETOX_IOS_DEVICE="iPhone 17e" pnpm mobile:e2e:store-assets:ios:release
-DETOX_IOS_DEVICE="iPad Pro 13-inch (M5)" pnpm mobile:e2e:store-assets:ios:release
+DETOX_IOS_DEVICE="iPad Pro 11-inch (M5)" \
+DETOX_IOS_DEVICE_UDID="<exact-simulator-udid>" \
+DETOX_MAX_WORKERS=1 \
+  .codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh
 ```
 
 Set `CHESSTICIZE_IOS_PREPARE=1` when the local CocoaPods workspace or bundled
 gems need to be refreshed before building the Release simulator app.
 
-The script sets `CHESSTICIZE_CAPTURE_STORE_ASSETS=1` and captures the eight
-store-candidate scenes plus seven visual-QA scenes. Setting
-`CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS=1` also captures the four
-layout-sensitive product scenes and all seven visual-QA scenes in landscape.
-These are simulator artifacts; the capture flow does not install or launch a
-physical-device build.
+The wrapper builds once, runs separate portrait and landscape journeys through
+the host Simulator rotation controls, and collects fifteen portrait plus eleven
+landscape PNGs. Internally it runs `pnpm mobile:e2e:build:ios:release`, then sets
+`CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait` and
+`CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape` for the two opt-in Detox runs.
+When diagnosing an already-built Release app directly, set exactly one of those
+values yourself before `pnpm mobile:e2e:store-assets:ios:release`; one direct run
+captures only its selected orientation. These are simulator artifacts; the
+capture flow does not install or launch a physical-device build.
 
 | Screenshot name | Store scene |
 | --- | --- |

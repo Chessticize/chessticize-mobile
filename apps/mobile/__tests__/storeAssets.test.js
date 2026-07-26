@@ -152,6 +152,10 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("expect(element(by.text('Themes'))).toExist()");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:build:ios:release");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios:release");
+    expect(storeAssetsDoc).toContain("capture-release-baseline.sh");
+    expect(storeAssetsDoc).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait");
+    expect(storeAssetsDoc).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape");
+    expect(storeAssetsDoc).not.toContain("CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS");
     expect(storeAssetsDoc).toContain("pnpm app-store:screenshot-audit");
     expect(storeAssetsDoc).toContain("deterministic active-player profile");
     expect(storeAssetsDoc).toContain("two reviews still due plus one completed-today result");
