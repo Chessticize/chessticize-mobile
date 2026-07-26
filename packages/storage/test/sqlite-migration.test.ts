@@ -584,7 +584,7 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
             perPuzzleSeconds: undefined,
             runId: undefined,
             runName: undefined,
-            unclear: undefined
+            unclear: false
           },
           {
             id: "ios-121-standard-wrong",
@@ -593,7 +593,7 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
             perPuzzleSeconds: 20,
             runId: "standard",
             runName: "Standard",
-            unclear: undefined
+            unclear: false
           },
           {
             id: "ios-121-standard-correct",

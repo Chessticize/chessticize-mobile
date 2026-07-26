@@ -12,6 +12,7 @@ import type {
 import { calculateSprintRatingChange, DEFAULT_RATING_DEVIATION, DEFAULT_VOLATILITY } from "./ratings.ts";
 import { beginArrowDuelPuzzle, beginLinePuzzle, submitArrowDuelChoice, submitLineMove } from "./puzzle-session.ts";
 import { resolvePuzzleTimingPolicy } from "./sprint-config.ts";
+import { isUnclearAttemptEligible } from "./attempt-clarity.ts";
 
 export function startSprint(input: {
   id?: string;
@@ -308,8 +309,10 @@ function buildAttemptEvent(state: SprintState, feedback: PuzzleFeedback, now: st
     attempt.elapsedMs! >= slowAfterSeconds * 1000
   ) {
     attempt.timingStatus = "slow";
-    attempt.unclear = true;
-    attempt.unclearUpdatedAt = attempt.completedAt;
+    if (isUnclearAttemptEligible(attempt)) {
+      attempt.unclear = true;
+      attempt.unclearUpdatedAt = attempt.completedAt;
+    }
   }
   if (state.currentPuzzle.kind === "arrow_duel") {
     attempt.arrowDuelCandidateOrder = [...state.currentPuzzle.candidates];
@@ -335,9 +338,7 @@ function buildTimeoutAttempt(state: SprintState, now: string): AttemptEvent {
     completedAt: timedOutAt,
     elapsedMs: currentPuzzleElapsedMs(state, timedOutAt),
     timingStatus: "timed_out",
-    ratingBefore: state.ratingBefore,
-    unclear: true,
-    unclearUpdatedAt: timedOutAt
+    ratingBefore: state.ratingBefore
   };
   if (state.currentPuzzle.kind === "arrow_duel") {
     attempt.arrowDuelCandidateOrder = [...state.currentPuzzle.candidates];

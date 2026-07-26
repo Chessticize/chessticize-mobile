@@ -38,8 +38,9 @@ _Avoid_: Exact reminder time, alarm time
 
 **Unclear Attempt**:
 A completed Sprint attempt whose explanation needs attention. The user may mark
-an eligible correct attempt manually; Slow correct and Timed out attempts are
-marked automatically. The marker can later be cleared from History.
+an eligible correct attempt manually; a Slow correct attempt is marked
+automatically. Wrong and Timed out attempts are mistakes instead, and are never
+marked Unclear. The marker can later be cleared from History.
 _Avoid_: Unclear puzzle, mistake, Review item
 
 **Manual Review Enrollment**:

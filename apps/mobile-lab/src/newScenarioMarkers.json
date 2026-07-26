@@ -116,6 +116,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Teach the pass goal, attempts, Slow, and Timed out rules before the first Sprint."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Align every first-use Sprint rule to fixed badge and copy columns, and clarify the novice-facing timing language."
       }
     ]
   },
@@ -212,6 +216,18 @@
       {
         "issueNumber": 249,
         "changeNote": "Show the final countdown, lock the board under brief Timed out feedback, then reset for the next puzzle."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Explain the mistake and Review handoff after a timeout, including why Unclear is not shown."
+      }
+    ]
+  },
+  "practice-timeout-review-notice": {
+    "issues": [
+      {
+        "issueNumber": 337,
+        "changeNote": "Show the read-only In Review notice that replaces the Unclear question after a timeout."
       }
     ]
   },
@@ -220,6 +236,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Guide metrics, Slow, Timed out, and Mark as unclear in the frozen real Sprint layout."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Keep semantic first-use Sprint guidance and navigation visible in maintained portrait and landscape layouts."
       }
     ]
   },
@@ -228,6 +248,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Append the Arrow Duel candidate explanation to the shared first-session guide."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Keep the shared semantic guidance and Arrow Duel progress readable in maintained layouts."
       }
     ]
   },
@@ -236,6 +260,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Show only the Arrow Duel-specific step after shared guidance has been seen."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Keep the Arrow Duel semantic callout and guide progress readable in maintained layouts."
       }
     ]
   },
@@ -271,7 +299,7 @@
       },
       {
         "issueNumber": 249,
-        "changeNote": "Mark Timed out attempts Unclear so Needs attention stays based only on Unclear or Review membership."
+        "changeNote": "Treat Timed out as a mistake added to Review without also marking it Unclear."
       }
     ]
   },
@@ -288,6 +316,10 @@
       {
         "issueNumber": 328,
         "changeNote": "Replay all Sprint guides from a direct reversible Settings button."
+      },
+      {
+        "issueNumber": 337,
+        "changeNote": "Place Guidance immediately before Feedback, after Profile whenever Profile is available."
       }
     ]
   },
