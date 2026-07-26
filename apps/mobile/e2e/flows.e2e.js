@@ -58,11 +58,9 @@ describe('Key user flows', () => {
       .toExist()
       .withTimeout(20000);
     if (device.getPlatform() === 'android') {
-      await waitForElementTextContaining(
-        'settings-sync-support-bundle-complete',
-        'Android diagnostics bundle ready',
-        10000
-      );
+      await waitFor(element(by.text('Android diagnostics bundle ready')))
+        .toExist()
+        .withTimeout(10000);
     }
     await element(by.id('settings-sync-support-bundle-scroll')).scrollTo('bottom');
     await waitFor(element(by.id('settings-sync-support-bundle-details')))
