@@ -48,6 +48,15 @@ async function playBoardMove(testID, move, flipped = false) {
   await board.tapAtPoint(pointForSquare(move.slice(0, 2)));
   await sleep(250);
   await board.tapAtPoint(pointForSquare(move.slice(2, 4)));
+  const promotion = move.slice(4, 5).toLowerCase();
+  if (promotion) {
+    if (!/^[qrbn]$/.test(promotion)) {
+      throw new Error(`Unsupported promotion piece in move "${move}"`);
+    }
+    const promotionChoice = element(by.id(`promotion-choice-${promotion}`));
+    await waitFor(promotionChoice).toExist().withTimeout(10000);
+    await promotionChoice.tap();
+  }
 }
 
 async function startPracticeMode(mode) {

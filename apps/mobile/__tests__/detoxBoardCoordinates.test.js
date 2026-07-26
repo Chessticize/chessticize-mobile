@@ -6,6 +6,7 @@ const {
   boardPoint,
   parseAndroidDisplayDensity,
   parseAndroidDisplaySize,
+  playBoardMove,
 } = require('../e2e/helpers');
 
 describe('Detox Android board coordinates', () => {
@@ -26,6 +27,57 @@ describe('Detox Android board coordinates', () => {
     })).toBe('Black to move');
     expect(accessibilityLabelFromAttributes([{ label: 'White to move' }]))
       .toBe('White to move');
+  });
+
+  it('completes a promotion move through the public promotion choice', async () => {
+    const originalBy = global.by;
+    const originalDevice = global.device;
+    const originalElement = global.element;
+    const originalWaitFor = global.waitFor;
+    const promotionTap = jest.fn();
+    const board = {
+      getAttributes: jest.fn().mockResolvedValue({
+        frame: { x: 0, y: 0, width: 800, height: 800 },
+      }),
+      tapAtPoint: jest.fn().mockResolvedValue(undefined),
+    };
+
+    global.by = { id: (testID) => testID };
+    global.device = { getPlatform: () => 'ios' };
+    global.element = (matcher) => {
+      if (matcher === 'session-board') {
+        return board;
+      }
+      if (matcher === 'promotion-choice-q') {
+        return { tap: promotionTap };
+      }
+      return {};
+    };
+    global.waitFor = () => ({
+      toExist: () => ({
+        withTimeout: async () => undefined,
+      }),
+      not: {
+        toExist: () => ({
+          withTimeout: async () => undefined,
+        }),
+      },
+    });
+
+    try {
+      await playBoardMove('session-board', 'e2e1q', true);
+      expect(board.tapAtPoint).toHaveBeenCalledTimes(2);
+      expect(promotionTap).toHaveBeenCalledTimes(1);
+    } finally {
+      if (originalBy === undefined) delete global.by;
+      else global.by = originalBy;
+      if (originalDevice === undefined) delete global.device;
+      else global.device = originalDevice;
+      if (originalElement === undefined) delete global.element;
+      else global.element = originalElement;
+      if (originalWaitFor === undefined) delete global.waitFor;
+      else global.waitFor = originalWaitFor;
+    }
   });
 
   it('converts Android pixel frame coordinates to element-local dp taps', () => {
