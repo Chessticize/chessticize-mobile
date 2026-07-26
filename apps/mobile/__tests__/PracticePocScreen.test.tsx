@@ -1260,7 +1260,17 @@ describe("PracticePocScreen", () => {
     store.selectPuzzles = () => {
       throw new Error("Profile open must not run an exact puzzle query");
     };
+    store.selectPuzzlesForRatingBands = () => {
+      throw new Error("Profile open must not run an exact rating-band query");
+    };
+    const originalListReviewQueue = store.listReviewQueue.bind(store);
+    let reviewExclusionReads = 0;
+    store.listReviewQueue = () => {
+      reviewExclusionReads += 1;
+      return originalListReviewQueue();
+    };
     const renderer = renderScreen({ practiceService });
+    reviewExclusionReads = 0;
 
     press(renderer, "training-focus-open-profile");
 
@@ -1268,6 +1278,26 @@ describe("PracticePocScreen", () => {
       findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
     ).toBeTruthy();
     expect(findByTestId(renderer, "tactical-profile-preview-run")).toBeTruthy();
+    expect(reviewExclusionReads).toBe(0);
+  });
+
+  it("withholds the public Preview CTA after a Focused Run until newer mixed evidence", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const practiceService = createArrowFocusedPracticeService();
+    practiceService.startFocusedRun(
+      "arrow_duel",
+      "2026-07-25T00:01:00.000Z",
+      "public-freshness"
+    );
+    practiceService.abandonSprint("2026-07-25T00:02:00.000Z");
+    const renderer = renderScreen({ practiceService });
+
+    press(renderer, "training-focus-open-profile");
+
+    expect(collectText(findByTestId(renderer, "focused-run-unavailable"))).toContain(
+      "Play another mixed Run first"
+    );
+    expect(() => findByTestId(renderer, "tactical-profile-preview-run")).toThrow();
   });
 
   it("keeps a production-service focus visible while withholding an inventory-blocked Run", () => {

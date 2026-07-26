@@ -652,9 +652,9 @@ The runtime design MUST remain bounded:
 - profile updates process the attempts from newly completed or dirty days;
 - profile reads rank the fixed curated catalog from daily cells rather than
   rescanning raw history;
-- opening Profile checks the cached per-family Rating anchor against a bounded
-  number of manifest buckets, without listing all sessions, attempts, Review
-  rows, or exact puzzle candidates;
+- opening Profile compares cached per-family Rating and latest terminal Focused
+  Run watermarks, then checks a bounded number of manifest buckets, without
+  listing all sessions, attempts, Review rows, or exact puzzle candidates;
 - the exact exclusion-aware inventory query runs only after explicit Preview
   intent and again immediately before Start; and
 - a two-focus Run uses at most three bounded indexed selections: primary,
@@ -745,15 +745,17 @@ hash change triggers a full derived rebuild.
 
 Record at least model version, pack feature hash, calibration identity, build
 status, dirty-day count, deterministic progress/watermark, and the last eligible
-ordinary mixed session's Rating key per task family. Import changes that alter,
-move, or disqualify a stored Rating anchor require a canonical derived rebuild
-before the state can survive restart. Backfill newest days first so the UI may
-show a truthful partial "Building profile" state.
+ordinary mixed session's Rating key and latest terminal Focused Run watermark
+per task family. Import changes that alter, move, or disqualify either stored
+anchor require a canonical derived rebuild before the state can survive restart.
+Backfill newest days first so the UI may show a truthful partial "Building
+profile" state.
 
 Derived cells:
 
 - are local-only;
 - are not canonical progress;
+- may fail or rebuild without rolling back a canonical progress write or import;
 - are never exported or synced;
 - can always be rebuilt from canonical attempts, sessions, and the matching
   bundled pack; and

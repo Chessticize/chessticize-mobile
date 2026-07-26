@@ -30,6 +30,7 @@ import type {
 import type {
   TacticalProfileBuildState,
   TacticalProfileCacheIdentity,
+  TacticalProfileFocusedRunWatermark,
   TacticalProfileRatingAnchor,
   TacticalProfileRepository
 } from "./tactical-profile-repository.ts";
@@ -228,6 +229,17 @@ export class TacticalProfileService {
   } {
     const dirtyDays = new Set<string>();
     const changedSessionIds = new Set<string>();
+    let knownRatingAnchors: TacticalProfileBuildState["ratingAnchors"];
+    let knownFocusedRunWatermarks:
+      TacticalProfileBuildState["focusedRunWatermarks"];
+    try {
+      this.ensureRepositoryReady();
+      const buildState = this.repository.getBuildState();
+      knownRatingAnchors = buildState?.ratingAnchors;
+      knownFocusedRunWatermarks = buildState?.focusedRunWatermarks;
+    } catch (error) {
+      this.recordCacheFailure(error);
+    }
     let completed = false;
     return {
       observer: {
@@ -238,10 +250,11 @@ export class TacticalProfileService {
         onSprintSessionChanged: (previous, next) => {
           if (sessionFingerprint(previous) !== sessionFingerprint(next)) {
             changedSessionIds.add(next.id);
-            const ratingAnchors = this.repository.getBuildState()?.ratingAnchors;
             if (
-              ratingAnchors?.line?.sessionId === next.id ||
-              ratingAnchors?.arrow_duel?.sessionId === next.id
+              knownRatingAnchors?.line?.sessionId === next.id ||
+              knownRatingAnchors?.arrow_duel?.sessionId === next.id ||
+              knownFocusedRunWatermarks?.line?.sessionId === next.id ||
+              knownFocusedRunWatermarks?.arrow_duel?.sessionId === next.id
             ) {
               this.requiresCanonicalRebuild = true;
             }
@@ -281,6 +294,34 @@ export class TacticalProfileService {
     }
   }
 
+  markFocusedRunCompleted(
+    taskFamily: TacticalProfileTaskFamily,
+    sessionId: string,
+    completedAt: string
+  ): void {
+    try {
+      this.ensureRepositoryReady();
+      const current = this.repository.getBuildState();
+      if (!current || !sameIdentity(current, this.identity)) {
+        this.requiresCanonicalRebuild = true;
+        return;
+      }
+      this.repository.saveBuildState({
+        ...current,
+        focusedRunWatermarks: updatedFocusedRunWatermarks(
+          current.focusedRunWatermarks ?? {},
+          [{
+            taskFamily,
+            sessionId,
+            completedAt
+          }]
+        )
+      });
+    } catch (error) {
+      this.recordCacheFailure(error);
+    }
+  }
+
   preflightFocusedRun(
     taskFamily: TacticalProfileTaskFamily,
     snapshot = this.getSnapshot()
@@ -299,7 +340,18 @@ export class TacticalProfileService {
     }
 
     const anchor = snapshot.buildState.ratingAnchors?.[taskFamily];
-    if (!anchor || !this.inventoryUpperBound) {
+    if (!anchor) {
+      return { status: "unavailable", reason: "no_mixed_run" };
+    }
+    const focusedRunWatermark =
+      snapshot.buildState.focusedRunWatermarks?.[taskFamily];
+    if (
+      focusedRunWatermark &&
+      focusedRunWatermark.completedAt >= anchor.completedAt
+    ) {
+      return { status: "unavailable", reason: "no_fresh_evidence" };
+    }
+    if (!this.inventoryUpperBound) {
       return { status: "available" };
     }
     const rating = this.progressStore.getRating(anchor.ratingKey).rating;
@@ -564,9 +616,18 @@ export class TacticalProfileService {
         ...(previousState?.recommendedSignalIds === undefined
           ? {}
           : { recommendedSignalIds: previousState.recommendedSignalIds }),
-        ...(this.naturalFrequencyForRating === undefined
+        ...(
+          this.naturalFrequencyForRating === undefined &&
+          this.focusedRunPolicy === undefined
+            ? {}
+            : { ratingAnchors: previousState?.ratingAnchors ?? {} }
+        ),
+        ...(this.focusedRunPolicy === undefined
           ? {}
-          : { ratingAnchors: previousState?.ratingAnchors ?? {} })
+          : {
+              focusedRunWatermarks:
+                previousState?.focusedRunWatermarks ?? {}
+            })
       };
       this.repository.saveBuildState(ready);
       return ready;
@@ -584,11 +645,30 @@ export class TacticalProfileService {
         .getSprintSessions(attempts.map((attempt) => attempt.sessionId))
         .map((session) => [session.id, session])
     );
-    const ratingAnchors = this.naturalFrequencyForRating === undefined
+    const ratingAnchors =
+      this.naturalFrequencyForRating === undefined &&
+      this.focusedRunPolicy === undefined
+        ? undefined
+        : updatedRatingAnchors(
+            previousState?.ratingAnchors ?? {},
+            [...sessions.values()]
+          );
+    const focusedRunWatermarks = this.focusedRunPolicy === undefined
       ? undefined
-      : updatedRatingAnchors(
-          previousState?.ratingAnchors ?? {},
+      : updatedFocusedRunWatermarks(
+          previousState?.focusedRunWatermarks ?? {},
           [...sessions.values()]
+            .filter((session) => session.completedAt !== undefined)
+            .flatMap((session) => {
+              const taskFamily = session.config?.tacticalFocus?.taskFamily;
+              return taskFamily && session.completedAt
+                ? [{
+                    taskFamily,
+                    sessionId: session.id,
+                    completedAt: session.completedAt
+                  }]
+                : [];
+            })
         );
     const attemptsByDay = new Map<string, typeof attempts>();
     const dirtyDaySet = new Set(dirtyDays);
@@ -639,7 +719,10 @@ export class TacticalProfileService {
         ...(previousState?.recommendedSignalIds === undefined
           ? {}
           : { recommendedSignalIds: previousState.recommendedSignalIds }),
-        ...(ratingAnchors === undefined ? {} : { ratingAnchors })
+        ...(ratingAnchors === undefined ? {} : { ratingAnchors }),
+        ...(focusedRunWatermarks === undefined
+          ? {}
+          : { focusedRunWatermarks })
       };
       this.repository.saveBuildState(state);
       return state;
@@ -676,8 +759,15 @@ export class TacticalProfileService {
       !sameIdentity(state, this.identity) ||
       state.sourceRevision !== sourceRevision ||
       (
-        this.naturalFrequencyForRating !== undefined &&
+        (
+          this.naturalFrequencyForRating !== undefined ||
+          this.focusedRunPolicy !== undefined
+        ) &&
         state.ratingAnchors === undefined
+      ) ||
+      (
+        this.focusedRunPolicy !== undefined &&
+        state.focusedRunWatermarks === undefined
       )
     ) {
       this.repository.reset(
@@ -926,6 +1016,48 @@ function updatedRatingAnchors(
       )
     ) {
       next[taskFamily] = candidate;
+    }
+  }
+  return next;
+}
+
+function updatedFocusedRunWatermarks(
+  previous: Readonly<Partial<Record<
+    TacticalProfileTaskFamily,
+    TacticalProfileFocusedRunWatermark
+  >>>,
+  candidates: ReadonlyArray<{
+    taskFamily: TacticalProfileTaskFamily;
+    sessionId: string;
+    completedAt: string;
+  }>
+): Partial<Record<
+  TacticalProfileTaskFamily,
+  TacticalProfileFocusedRunWatermark
+>> {
+  const next: Partial<Record<
+    TacticalProfileTaskFamily,
+    TacticalProfileFocusedRunWatermark
+  >> = {
+    ...(previous.line === undefined ? {} : { line: { ...previous.line } }),
+    ...(previous.arrow_duel === undefined
+      ? {}
+      : { arrow_duel: { ...previous.arrow_duel } })
+  };
+  for (const candidate of candidates) {
+    const current = next[candidate.taskFamily];
+    if (
+      !current ||
+      candidate.completedAt > current.completedAt ||
+      (
+        candidate.completedAt === current.completedAt &&
+        candidate.sessionId > current.sessionId
+      )
+    ) {
+      next[candidate.taskFamily] = {
+        sessionId: candidate.sessionId,
+        completedAt: candidate.completedAt
+      };
     }
   }
   return next;

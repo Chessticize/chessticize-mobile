@@ -5,7 +5,7 @@ import type {
 } from "../../core/src/index.ts";
 import type { SyncSqliteDatabase } from "./sync-sqlite-store.ts";
 
-export const TACTICAL_PROFILE_CACHE_SCHEMA_VERSION = 4;
+export const TACTICAL_PROFILE_CACHE_SCHEMA_VERSION = 5;
 
 export type TacticalProfileCacheIdentity = Pick<
   TacticalProfileCalibrationArtifact,
@@ -20,6 +20,11 @@ export type TacticalProfileRatingAnchor = {
   completedAt: string;
 };
 
+export type TacticalProfileFocusedRunWatermark = {
+  sessionId: string;
+  completedAt: string;
+};
+
 export type TacticalProfileBuildState = TacticalProfileCacheIdentity & {
   status: TacticalProfileBuildStatus;
   dirtyDayCount: number;
@@ -31,6 +36,10 @@ export type TacticalProfileBuildState = TacticalProfileCacheIdentity & {
   ratingAnchors?: Readonly<Partial<Record<
     TacticalProfileTaskFamily,
     TacticalProfileRatingAnchor
+  >>>;
+  focusedRunWatermarks?: Readonly<Partial<Record<
+    TacticalProfileTaskFamily,
+    TacticalProfileFocusedRunWatermark
   >>>;
 };
 
@@ -80,7 +89,9 @@ export class MemoryTacticalProfileRepository implements TacticalProfileRepositor
       ...identity,
       status: this.dirtyDays.size > 0 ? "building" : "ready",
       dirtyDayCount: this.dirtyDays.size,
-      sourceRevision
+      sourceRevision,
+      ratingAnchors: {},
+      focusedRunWatermarks: {}
     };
   }
 
@@ -107,7 +118,13 @@ export class MemoryTacticalProfileRepository implements TacticalProfileRepositor
         : { recommendedSignalIds: [...this.buildState.recommendedSignalIds] }),
       ...(this.buildState?.ratingAnchors === undefined
         ? {}
-        : { ratingAnchors: cloneRatingAnchors(this.buildState.ratingAnchors) })
+        : { ratingAnchors: cloneRatingAnchors(this.buildState.ratingAnchors) }),
+      ...(this.buildState?.focusedRunWatermarks === undefined
+        ? {}
+        : {
+            focusedRunWatermarks:
+              cloneFocusedRunWatermarks(this.buildState.focusedRunWatermarks)
+          })
     };
   }
 
@@ -248,7 +265,8 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           last_error TEXT,
           evaluated_at TEXT,
           recommended_signal_ids_json TEXT,
-          rating_anchors_json TEXT
+          rating_anchors_json TEXT,
+          focused_run_watermarks_json TEXT
         );
       `);
       } else {
@@ -269,6 +287,12 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
             ALTER TABLE weakness_build_state ADD COLUMN rating_anchors_json TEXT;
           `);
         }
+        if (current <= 4) {
+          this.db.exec(`
+            ALTER TABLE weakness_build_state
+            ADD COLUMN focused_run_watermarks_json TEXT;
+          `);
+        }
       }
       this.db.exec(`PRAGMA user_version = ${TACTICAL_PROFILE_CACHE_SCHEMA_VERSION}`);
     });
@@ -287,7 +311,8 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         last_error AS lastError,
         evaluated_at AS evaluatedAt,
         recommended_signal_ids_json AS recommendedSignalIdsJson,
-        rating_anchors_json AS ratingAnchorsJson
+        rating_anchors_json AS ratingAnchorsJson,
+        focused_run_watermarks_json AS focusedRunWatermarksJson
       FROM weakness_build_state
       WHERE singleton_id = 1
     `).get() as BuildStateRow | undefined;
@@ -310,7 +335,9 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         ...identity,
         status: days.length > 0 ? "building" : "ready",
         dirtyDayCount: days.length,
-        sourceRevision
+        sourceRevision,
+        ratingAnchors: {},
+        focusedRunWatermarks: {}
       });
     });
   }
@@ -339,7 +366,10 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           : { recommendedSignalIds: current.recommendedSignalIds }),
         ...(current?.ratingAnchors === undefined
           ? {}
-          : { ratingAnchors: current.ratingAnchors })
+          : { ratingAnchors: current.ratingAnchors }),
+        ...(current?.focusedRunWatermarks === undefined
+          ? {}
+          : { focusedRunWatermarks: current.focusedRunWatermarks })
       });
     });
   }
@@ -471,8 +501,9 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         last_error,
         evaluated_at,
         recommended_signal_ids_json,
-        rating_anchors_json
-      ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        rating_anchors_json,
+        focused_run_watermarks_json
+      ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(singleton_id) DO UPDATE SET
         model_version = excluded.model_version,
         pack_feature_hash = excluded.pack_feature_hash,
@@ -484,7 +515,8 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         last_error = excluded.last_error,
         evaluated_at = excluded.evaluated_at,
         recommended_signal_ids_json = excluded.recommended_signal_ids_json,
-        rating_anchors_json = excluded.rating_anchors_json
+        rating_anchors_json = excluded.rating_anchors_json,
+        focused_run_watermarks_json = excluded.focused_run_watermarks_json
     `).run(
       state.modelVersion,
       state.packFeatureHash,
@@ -500,7 +532,12 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         : JSON.stringify(uniqueStrings(state.recommendedSignalIds)),
       state.ratingAnchors === undefined
         ? null
-        : JSON.stringify(cloneRatingAnchors(state.ratingAnchors))
+        : JSON.stringify(cloneRatingAnchors(state.ratingAnchors)),
+      state.focusedRunWatermarks === undefined
+        ? null
+        : JSON.stringify(
+            cloneFocusedRunWatermarks(state.focusedRunWatermarks)
+          )
     );
   }
 
@@ -558,6 +595,7 @@ interface BuildStateRow {
   evaluatedAt: string | null;
   recommendedSignalIdsJson: string | null;
   ratingAnchorsJson: string | null;
+  focusedRunWatermarksJson: string | null;
 }
 
 interface DailyCellRow extends Omit<
@@ -585,7 +623,13 @@ function buildStateFromRow(row: BuildStateRow): TacticalProfileBuildState {
       : { recommendedSignalIds: parseStringArray(row.recommendedSignalIdsJson) }),
     ...(row.ratingAnchorsJson === null
       ? {}
-      : { ratingAnchors: parseRatingAnchors(row.ratingAnchorsJson) })
+      : { ratingAnchors: parseRatingAnchors(row.ratingAnchorsJson) }),
+    ...(row.focusedRunWatermarksJson === null
+      ? {}
+      : {
+          focusedRunWatermarks:
+            parseFocusedRunWatermarks(row.focusedRunWatermarksJson)
+        })
   };
 }
 
@@ -597,7 +641,13 @@ function cloneBuildState(state: TacticalProfileBuildState): TacticalProfileBuild
       : { recommendedSignalIds: uniqueStrings(state.recommendedSignalIds) }),
     ...(state.ratingAnchors === undefined
       ? {}
-      : { ratingAnchors: cloneRatingAnchors(state.ratingAnchors) })
+      : { ratingAnchors: cloneRatingAnchors(state.ratingAnchors) }),
+    ...(state.focusedRunWatermarks === undefined
+      ? {}
+      : {
+          focusedRunWatermarks:
+            cloneFocusedRunWatermarks(state.focusedRunWatermarks)
+        })
   };
 }
 
@@ -611,6 +661,20 @@ function cloneRatingAnchors(
     (["line", "arrow_duel"] as const).flatMap((taskFamily) => {
       const anchor = anchors[taskFamily];
       return anchor ? [[taskFamily, { ...anchor }]] : [];
+    })
+  );
+}
+
+function cloneFocusedRunWatermarks(
+  watermarks: Readonly<Partial<Record<
+    TacticalProfileTaskFamily,
+    TacticalProfileFocusedRunWatermark
+  >>>
+): Partial<Record<TacticalProfileTaskFamily, TacticalProfileFocusedRunWatermark>> {
+  return Object.fromEntries(
+    (["line", "arrow_duel"] as const).flatMap((taskFamily) => {
+      const watermark = watermarks[taskFamily];
+      return watermark ? [[taskFamily, { ...watermark }]] : [];
     })
   );
 }
@@ -670,6 +734,60 @@ function parseRatingAnchors(
     };
   }
   return anchors;
+}
+
+function parseFocusedRunWatermarks(
+  value: string
+): Partial<Record<
+  TacticalProfileTaskFamily,
+  TacticalProfileFocusedRunWatermark
+>> {
+  const parsed = JSON.parse(value) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Invalid Tactical Profile focused Run watermarks");
+  }
+  const parsedRecord = parsed as Record<string, unknown>;
+  if (
+    Object.keys(parsedRecord).some(
+      (key) => key !== "line" && key !== "arrow_duel"
+    )
+  ) {
+    throw new Error("Invalid Tactical Profile focused Run watermarks");
+  }
+  const watermarks: Partial<Record<
+    TacticalProfileTaskFamily,
+    TacticalProfileFocusedRunWatermark
+  >> = {};
+  for (const taskFamily of ["line", "arrow_duel"] as const) {
+    const candidate = parsedRecord[taskFamily];
+    if (candidate === undefined) {
+      continue;
+    }
+    if (
+      !candidate ||
+      typeof candidate !== "object" ||
+      Array.isArray(candidate)
+    ) {
+      throw new Error("Invalid Tactical Profile focused Run watermark");
+    }
+    const record = candidate as Record<string, unknown>;
+    if (
+      typeof record.sessionId !== "string" ||
+      record.sessionId.length === 0 ||
+      typeof record.completedAt !== "string" ||
+      !isCanonicalIsoTimestamp(record.completedAt) ||
+      Object.keys(record).some(
+        (key) => key !== "sessionId" && key !== "completedAt"
+      )
+    ) {
+      throw new Error("Invalid Tactical Profile focused Run watermark");
+    }
+    watermarks[taskFamily] = {
+      sessionId: record.sessionId,
+      completedAt: record.completedAt
+    };
+  }
+  return watermarks;
 }
 
 function isCanonicalIsoTimestamp(value: string): boolean {

@@ -868,10 +868,19 @@ export class PracticeService {
   private markTacticalProfileForCompletedSprint(state: SprintState): void {
     if (
       !this.tacticalProfile ||
-      state.completedAt === undefined ||
-      state.config.tacticalFocus !== undefined ||
-      namedThemesForSelection(state.config.themes).length > 0
+      state.completedAt === undefined
     ) {
+      return;
+    }
+    if (state.config.tacticalFocus !== undefined) {
+      this.tacticalProfile.markFocusedRunCompleted(
+        state.config.tacticalFocus.taskFamily,
+        state.id,
+        state.completedAt
+      );
+      return;
+    }
+    if (namedThemesForSelection(state.config.themes).length > 0) {
       return;
     }
     const attempts = this.store.listAttempts({

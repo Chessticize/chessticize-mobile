@@ -656,6 +656,7 @@ test("a changed canonical import dirties only its affected UTC day", () => {
 
 test("a changed imported session config dirties every day containing that session", () => {
   const store = seededStore();
+  seedWeaknessHistory(store);
   const config = buildSprintConfig({
     mode: "standard",
     durationSeconds: 300,
@@ -666,19 +667,19 @@ test("a changed imported session config dirties every day containing that sessio
     config,
     puzzles: [store.getPuzzle("evidence-0")!],
     ratingBefore: 925,
-    now: "2026-07-20T00:00:00.000Z"
+    now: "2026-07-15T00:00:00.000Z"
   });
   const completed = {
     ...session,
     status: "failed" as const,
-    completedAt: "2026-07-21T00:04:00.000Z",
+    completedAt: "2026-07-16T00:04:00.000Z",
     endReason: "max_mistakes" as const,
     correctCount: 0,
     mistakeCount: 2,
     ratingAfter: 900
   };
   store.createSprintSession(completed);
-  for (const [index, day] of ["2026-07-20", "2026-07-21"].entries()) {
+  for (const [index, day] of ["2026-07-15", "2026-07-16"].entries()) {
     store.recordAttempt(attempt({
       id: `multi-day-attempt-${index}`,
       sessionId: session.id,
@@ -696,7 +697,7 @@ test("a changed imported session config dirties every day containing that sessio
     candidate.id === session.id
       ? {
           ...candidate,
-          completedAt: "2026-07-22T00:04:00.000Z",
+          completedAt: "2026-07-17T00:04:00.000Z",
           config: { ...config, themes: ["fork"] }
         }
       : candidate
@@ -705,7 +706,7 @@ test("a changed imported session config dirties every day containing that sessio
 
   assert.deepEqual(
     repository.markedDays.slice(-1),
-    [["2026-07-20", "2026-07-21"]]
+    [["2026-07-15", "2026-07-16"]]
   );
 });
 
@@ -1198,6 +1199,58 @@ test("an imported focused conversion removes a stale mixed anchor across restart
   );
 });
 
+test("an imported ordinary conversion removes a stale focused Run watermark", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new MemoryTacticalProfileRepository();
+  const profile = service(store, repository);
+  const practice = new PracticeService(store, profile);
+  profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const focused = practice.startFocusedRun(
+    "line",
+    "2026-07-25T00:01:00.000Z",
+    "imported-focused-conversion"
+  );
+  practice.abandonSprint("2026-07-25T00:02:00.000Z");
+  assert.equal(
+    profile.getSnapshot("2026-07-25T00:03:00.000Z")
+      .buildState.focusedRunWatermarks?.line?.sessionId,
+    focused.id
+  );
+  const exported = store.exportLocalData();
+  const focusedSession = exported.sprintSessions.find(
+    (session) => session.id === focused.id
+  );
+  assert.ok(focusedSession?.config?.tacticalFocus);
+  const {
+    tacticalFocus: removedTacticalFocus,
+    ...ordinaryConfig
+  } = focusedSession.config;
+  assert.ok(removedTacticalFocus);
+
+  const imported = practice.importLocalData({
+    ...exported,
+    ratings: [],
+    attempts: [],
+    reviewQueue: [],
+    sprintSessions: [{
+      ...focusedSession,
+      correctCount: focusedSession.correctCount + 1,
+      config: ordinaryConfig
+    }],
+    practiceRuns: []
+  });
+  assert.equal(imported.sprintSessions, 1);
+
+  const restarted = service(store, repository);
+  const snapshot = restarted.getSnapshot("2026-07-26T00:00:00.000Z");
+
+  assert.equal(snapshot.buildState.focusedRunWatermarks?.line, undefined);
+  assert.deepEqual(restarted.preflightFocusedRun("line", snapshot), {
+    status: "available"
+  });
+});
+
 test("manifest inventory preflight skips exact queries for an impossible theme", () => {
   const store = seededStore();
   seedWeaknessHistory(store);
@@ -1256,11 +1309,95 @@ test("lightweight Focused Run preflight reads neither canonical history nor exac
   store.selectPuzzles = () => {
     throw new Error("preflight must not run an exact puzzle query");
   };
+  store.selectPuzzlesForRatingBands = () => {
+    throw new Error("preflight must not run an exact rating-band query");
+  };
+  store.listReviewQueue = () => {
+    throw new Error("preflight must not read Review exclusions");
+  };
 
   assert.deepEqual(
     profile.preflightFocusedRun("line", snapshot),
     { status: "unavailable", reason: "insufficient_inventory" }
   );
+});
+
+test("Focused Run freshness watermark survives restart until newer mixed evidence", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new MemoryTacticalProfileRepository();
+  const profile = service(store, repository);
+  const practice = new PracticeService(store, profile);
+  const before = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  assert.deepEqual(profile.preflightFocusedRun("line", before), {
+    status: "available"
+  });
+
+  const focused = practice.startFocusedRun(
+    "line",
+    "2026-07-25T00:01:00.000Z",
+    "freshness-watermark"
+  );
+  practice.abandonSprint("2026-07-25T00:02:00.000Z");
+  const blocked = profile.getSnapshot("2026-07-25T00:03:00.000Z");
+
+  assert.deepEqual(blocked.buildState.focusedRunWatermarks?.line, {
+    sessionId: focused.id,
+    completedAt: "2026-07-25T00:02:00.000Z"
+  });
+  assert.deepEqual(profile.preflightFocusedRun("line", blocked), {
+    status: "unavailable",
+    reason: "no_fresh_evidence"
+  });
+
+  const restarted = service(store, repository);
+  const afterRestart = restarted.getSnapshot("2026-07-25T00:04:00.000Z");
+  assert.deepEqual(restarted.preflightFocusedRun("line", afterRestart), {
+    status: "unavailable",
+    reason: "no_fresh_evidence"
+  });
+
+  const config = buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20
+  });
+  const mixed = startSprint({
+    id: "newer-mixed-session",
+    config,
+    puzzles: [store.getPuzzle("evidence-0")!],
+    ratingBefore: 925,
+    now: "2026-07-26T00:00:00.000Z"
+  });
+  const completedAt = "2026-07-26T00:01:00.000Z";
+  store.transaction(() => {
+    store.createSprintSession(mixed);
+    store.recordAttempt(attempt({
+      id: "newer-mixed-attempt",
+      sessionId: mixed.id,
+      puzzleId: "evidence-0",
+      completedAt
+    }));
+    store.updateSprintSession({
+      ...mixed,
+      status: "failed",
+      completedAt,
+      endReason: "max_mistakes",
+      correctCount: 0,
+      mistakeCount: 1,
+      ratingAfter: 900
+    });
+  });
+  restarted.markAttemptDayDirty(completedAt);
+  const refreshed = restarted.getSnapshot("2026-07-26T00:02:00.000Z");
+
+  assert.equal(
+    refreshed.buildState.ratingAnchors?.line?.sessionId,
+    "newer-mixed-session"
+  );
+  assert.deepEqual(restarted.preflightFocusedRun("line", refreshed), {
+    status: "available"
+  });
 });
 
 test("TacticalProfileService does not re-offer a Focused Run before fresh mixed evidence", () => {
@@ -1595,6 +1732,44 @@ test("derived-cache write failures do not undo canonical Sprint or import progre
   assert.ok(imported.attempts >= 0);
   assert.doesNotThrow(() =>
     practice.getTacticalProfileSnapshot("2026-07-25T02:00:00.000Z")
+  );
+});
+
+test("a derived-cache read failure cannot roll back a changed canonical session import", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new RecoveringTacticalProfileRepository();
+  const profile = service(store, repository);
+  const practice = new PracticeService(store, profile);
+  profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const incoming = store.exportLocalData();
+  incoming.sprintSessions = incoming.sprintSessions.map((session) =>
+    session.id === "mixed-session-2"
+      ? {
+          ...session,
+          correctCount: session.correctCount + 1,
+          config: {
+            ...session.config!,
+            themes: ["fork"]
+          }
+        }
+      : session
+  );
+  repository.failBuildStateReadsUntilReset();
+
+  const imported = practice.importLocalData(incoming);
+
+  assert.equal(imported.sprintSessions, 1);
+  assert.deepEqual(
+    store.listSprintSessions().find(
+      (session) => session.id === "mixed-session-2"
+    )?.config?.themes,
+    ["fork"]
+  );
+  const recovered = profile.getSnapshot("2026-07-25T01:00:00.000Z");
+  assert.equal(
+    recovered.buildState.status,
+    "ready"
   );
 });
 
