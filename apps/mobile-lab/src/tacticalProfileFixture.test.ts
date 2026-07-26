@@ -82,6 +82,7 @@ test("issue #250 task-family fixture keeps Arrow Duel in its own lane and Run", 
     ]
   );
   assert.equal(presentation.activeTaskFamily, "arrow_duel");
+  assert.equal(presentation.homeLeadSignalId, "fork");
   assert.equal(presentation.focusedRun?.taskFamily, "arrow_duel");
   assert.equal(presentation.focusedRun?.ratingLabel, "Arrow Duel Rating 875");
   assert.deepEqual(

@@ -21,8 +21,7 @@ export function TacticalProfileHomeCard({
 }: {
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
-  const primarySignal = presentation.signals.find((signal) => signal.status === "recommended")
-    ?? presentation.signals[0];
+  const primarySignal = homeLeadSignalFor(presentation);
   const content = homeContentFor(presentation, primarySignal);
   const recommendationCount = recommendedThemeLabels(presentation).length;
   const taskFamilies = recommendedTaskFamilies(presentation.signals);
@@ -212,6 +211,7 @@ function RecommendationExplanation({
   if (!signal) {
     return <TacticalProfileScreen presentation={presentation} />;
   }
+  const canPreview = presentation.focusedRun?.taskFamily === signal.taskFamily;
 
   return (
     <View style={styles.flow} testID="tactical-profile-explanation">
@@ -244,7 +244,7 @@ function RecommendationExplanation({
           Slow and Unclear labels, or whether a puzzle is in Review, do not count as proof of a theme weakness.
         </Text>
       </View>
-      {presentation.focusedRun ? (
+      {canPreview ? (
         <View style={styles.flowActions}>
           <Pressable
             accessibilityRole="button"
@@ -274,7 +274,7 @@ function FocusedRunPreviewScreen({
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
   const preview = presentation.focusedRun;
-  if (!preview) {
+  if (!preview || preview.taskFamily !== activeTaskFamilyFor(presentation)) {
     return <TacticalProfileScreen presentation={presentation} />;
   }
 
@@ -452,7 +452,7 @@ function TaskFamilySelector({
               {taskFamilyLabel(taskFamily)}
             </Text>
             <Text style={[styles.taskFamilyTabBody, selected ? styles.taskFamilyTabBodySelected : null]}>
-              {taskFamily === "arrow_duel" ? "Choose between two moves" : "Standard, Blitz & Custom"}
+              {TASK_FAMILY_COPY[taskFamily].selectorBody}
             </Text>
           </Pressable>
         );
@@ -631,15 +631,31 @@ function recommendedThemeLabels(presentation: TacticalProfilePresentation): stri
 function distinctRecommendedSignals(
   signals: readonly TacticalProfileSignal[]
 ): TacticalProfileSignal[] {
-  const seenThemes = new Set<string>();
+  const seenThemeKeys: Record<TacticalProfileTaskFamily, Set<string>> = {
+    line: new Set<string>(),
+    arrow_duel: new Set<string>()
+  };
   return signals.filter((signal) => {
-    const identity = `${signal.taskFamily}:${signal.themeLabel}`;
-    if (signal.status !== "recommended" || seenThemes.has(identity)) {
+    const familyThemeKeys = seenThemeKeys[signal.taskFamily];
+    if (signal.status !== "recommended" || familyThemeKeys.has(signal.themeKey)) {
       return false;
     }
-    seenThemes.add(identity);
+    familyThemeKeys.add(signal.themeKey);
     return true;
   });
+}
+
+function homeLeadSignalFor(
+  presentation: TacticalProfilePresentation
+): TacticalProfileSignal | undefined {
+  const recommendedSignals = distinctRecommendedSignals(presentation.signals);
+  const taskFamilies = recommendedTaskFamilies(recommendedSignals);
+  if (taskFamilies.length <= 1) {
+    return recommendedSignals[0] ?? presentation.signals[0];
+  }
+  return presentation.homeLeadSignalId === undefined
+    ? undefined
+    : recommendedSignals.find((signal) => signal.id === presentation.homeLeadSignalId);
 }
 
 function recommendedTaskFamilies(
@@ -661,22 +677,43 @@ function activeTaskFamilyFor(
 }
 
 function taskFamilyLabel(taskFamily: TacticalProfileTaskFamily): string {
-  return taskFamily === "arrow_duel" ? "Arrow Duel" : "Puzzle solving";
+  return TASK_FAMILY_COPY[taskFamily].label;
 }
 
 function taskFamilyRunLabel(taskFamily: TacticalProfileTaskFamily): string {
-  return taskFamily === "arrow_duel" ? "Arrow Duel" : "puzzle-solving";
+  return TASK_FAMILY_COPY[taskFamily].runLabel;
 }
 
 function taskFamilyComparisonLabel(taskFamily: TacticalProfileTaskFamily): string {
-  return taskFamily === "arrow_duel" ? "Arrow Duel choices" : "puzzles";
+  return TASK_FAMILY_COPY[taskFamily].comparisonLabel;
 }
 
 function focusedRunRatingGuardrail(taskFamily: TacticalProfileTaskFamily): string {
-  return taskFamily === "arrow_duel"
-    ? "• Rebuilt for your current Arrow Duel Rating before each new Run"
-    : "• Rebuilt for your current Rating before each new Run";
+  return TASK_FAMILY_COPY[taskFamily].ratingGuardrail;
 }
+
+const TASK_FAMILY_COPY = {
+  line: {
+    label: "Puzzle solving",
+    selectorBody: "Standard, Blitz & Custom",
+    runLabel: "puzzle-solving",
+    comparisonLabel: "puzzles",
+    ratingGuardrail: "• Rebuilt for your current Rating before each new Run"
+  },
+  arrow_duel: {
+    label: "Arrow Duel",
+    selectorBody: "Choose between two moves",
+    runLabel: "Arrow Duel",
+    comparisonLabel: "Arrow Duel choices",
+    ratingGuardrail: "• Rebuilt for your current Arrow Duel Rating before each new Run"
+  }
+} satisfies Record<TacticalProfileTaskFamily, {
+  label: string;
+  selectorBody: string;
+  runLabel: string;
+  comparisonLabel: string;
+  ratingGuardrail: string;
+}>;
 
 function homeActionLabel(
   presentation: TacticalProfilePresentation,

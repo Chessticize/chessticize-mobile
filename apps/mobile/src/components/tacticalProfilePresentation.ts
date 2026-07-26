@@ -5,6 +5,7 @@ export type TacticalProfileSignalKind = "solve_rate" | "speed";
 export type TacticalProfileSignal = {
   id: string;
   taskFamily: TacticalProfileTaskFamily;
+  themeKey: string;
   themeLabel: string;
   kind: TacticalProfileSignalKind;
   distinctPuzzleCount: number;
@@ -61,6 +62,7 @@ export type TacticalProfilePresentation = {
   phase: TacticalProfilePhase;
   screen: TacticalProfileScreen;
   activeTaskFamily?: TacticalProfileTaskFamily;
+  homeLeadSignalId?: string;
   signals: readonly TacticalProfileSignal[];
   selectedSignalId?: string;
   focusedRun?: FocusedRunPreview;

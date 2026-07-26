@@ -31,6 +31,7 @@ export type TacticalProfileFixtureState = {
 const FORK_SIGNAL: TacticalProfileSignal = {
   id: "fork",
   taskFamily: "line",
+  themeKey: "fork",
   themeLabel: "Forks",
   kind: "solve_rate",
   distinctPuzzleCount: 7,
@@ -42,6 +43,7 @@ const FORK_SIGNAL: TacticalProfileSignal = {
 const PIN_SPEED_SIGNAL: TacticalProfileSignal = {
   id: "pin-speed",
   taskFamily: "line",
+  themeKey: "pin",
   themeLabel: "Pins",
   kind: "speed",
   distinctPuzzleCount: 6,
@@ -53,6 +55,7 @@ const PIN_SPEED_SIGNAL: TacticalProfileSignal = {
 const DEFLECTION_SIGNAL: TacticalProfileSignal = {
   id: "deflection",
   taskFamily: "line",
+  themeKey: "deflection",
   themeLabel: "Deflection",
   kind: "solve_rate",
   distinctPuzzleCount: 5,
@@ -64,6 +67,7 @@ const DEFLECTION_SIGNAL: TacticalProfileSignal = {
 const BACK_RANK_SIGNAL: TacticalProfileSignal = {
   id: "back-rank",
   taskFamily: "line",
+  themeKey: "backRankMate",
   themeLabel: "Back-rank mates",
   kind: "solve_rate",
   distinctPuzzleCount: 6,
@@ -75,6 +79,7 @@ const BACK_RANK_SIGNAL: TacticalProfileSignal = {
 const SMOTHERED_MATE_SIGNAL: TacticalProfileSignal = {
   id: "smothered-mate",
   taskFamily: "line",
+  themeKey: "smotheredMate",
   themeLabel: "Smothered mates",
   kind: "solve_rate",
   distinctPuzzleCount: 4,
@@ -86,6 +91,7 @@ const SMOTHERED_MATE_SIGNAL: TacticalProfileSignal = {
 const ARROW_PIN_SIGNAL: TacticalProfileSignal = {
   id: "arrow-pin",
   taskFamily: "arrow_duel",
+  themeKey: "pin",
   themeLabel: "Pins",
   kind: "solve_rate",
   distinctPuzzleCount: 8,
@@ -97,6 +103,7 @@ const ARROW_PIN_SIGNAL: TacticalProfileSignal = {
 const ARROW_DEFLECTION_SPEED_SIGNAL: TacticalProfileSignal = {
   id: "arrow-deflection-speed",
   taskFamily: "arrow_duel",
+  themeKey: "deflection",
   themeLabel: "Deflection",
   kind: "speed",
   distinctPuzzleCount: 6,
@@ -250,6 +257,7 @@ export function tacticalProfilePresentationFor(
     return {
       ...base,
       phase: "ready",
+      homeLeadSignalId: FORK_SIGNAL.id,
       signals: [FORK_SIGNAL, ARROW_PIN_SIGNAL, ARROW_DEFLECTION_SPEED_SIGNAL],
       focusedRun: state.selectedTaskFamily === "arrow_duel"
         ? ARROW_DUEL_FOCUS_RUN

@@ -1041,6 +1041,7 @@ describe("PracticePocScreen", () => {
         {
           id: "fork",
           taskFamily: "line",
+          themeKey: "fork",
           themeLabel: "Forks",
           kind: "solve_rate",
           distinctPuzzleCount: 7,
@@ -1148,6 +1149,9 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "tactical-profile-task-family-arrow_duel");
 
+    expect(
+      findByTestId(renderer, "tactical-profile-task-family-arrow_duel").props.accessibilityState
+    ).toEqual({ selected: true });
     expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
       "Arrow Duel"
     );
@@ -1162,6 +1166,84 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
       "Mixed Arrow Duel"
     );
+  });
+
+  it("uses an explicit cross-mode Home lead and blocks mismatched Focused Runs", () => {
+    const onIntent = jest.fn();
+    const lineSignal: TacticalProfilePresentation["signals"][number] = {
+      id: "line-fork",
+      taskFamily: "line",
+      themeKey: "fork",
+      themeLabel: "Forks",
+      kind: "solve_rate",
+      distinctPuzzleCount: 7,
+      distinctSessionCount: 3,
+      priorityLabel: "Recommended",
+      status: "recommended"
+    };
+    const arrowSignal: TacticalProfilePresentation["signals"][number] = {
+      id: "arrow-pin",
+      taskFamily: "arrow_duel",
+      themeKey: "pin",
+      themeLabel: "Pins",
+      kind: "solve_rate",
+      distinctPuzzleCount: 8,
+      distinctSessionCount: 3,
+      priorityLabel: "Recommended",
+      status: "recommended"
+    };
+    const arrowRun: NonNullable<TacticalProfilePresentation["focusedRun"]> = {
+      taskFamily: "arrow_duel",
+      title: "Arrow Duel focus",
+      ratingLabel: "Arrow Duel Rating 875",
+      durationLabel: "5 min",
+      totalPuzzleCount: 15,
+      allocations: [
+        { id: "arrow-pin", label: "Pins", puzzleCount: 10, tone: "primary" },
+        { id: "arrow-mixed", label: "Mixed Arrow Duel", puzzleCount: 5, tone: "mixed" }
+      ]
+    };
+    const presentation: TacticalProfilePresentation = {
+      phase: "ready",
+      screen: "home",
+      activeTaskFamily: "line",
+      homeLeadSignalId: lineSignal.id,
+      signals: [arrowSignal, lineSignal],
+      focusedRun: arrowRun,
+      onIntent
+    };
+
+    const home = renderScreen({
+      runManagementEnabled: true,
+      tacticalProfilePresentation: presentation
+    });
+    expect(collectText(findByTestId(home, "training-focus-primary-mode"))).toContain(
+      "Puzzle solving"
+    );
+    expect(collectText(findByTestId(home, "training-focus-card"))).toContain(
+      "Forks is your clearest focus"
+    );
+
+    const explanation = renderScreen({
+      runManagementEnabled: true,
+      tacticalProfilePresentation: {
+        ...presentation,
+        screen: "explanation",
+        selectedSignalId: lineSignal.id
+      }
+    });
+    expect(findByTestId(explanation, "tactical-profile-explanation")).toBeTruthy();
+    expect(() => findByTestId(explanation, "tactical-profile-explanation-preview")).toThrow();
+
+    const preview = renderScreen({
+      runManagementEnabled: true,
+      tacticalProfilePresentation: {
+        ...presentation,
+        screen: "focused_run"
+      }
+    });
+    expect(() => findByTestId(preview, "focused-run-preview")).toThrow();
+    expect(findByTestId(preview, "tactical-profile-screen")).toBeTruthy();
   });
 
   it("keeps a credible low-inventory focus but withholds the unsafe Run CTA", () => {
