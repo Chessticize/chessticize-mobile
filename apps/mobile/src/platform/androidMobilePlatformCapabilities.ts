@@ -49,6 +49,7 @@ export function composeAndroidMobilePlatformCapabilities(
     },
     progressSync: {
       client: null,
+      diagnostics: null,
     },
     stockfish: {
       createTransport: createNativeStockfishTransport,

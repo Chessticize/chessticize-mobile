@@ -26,7 +26,10 @@ describe('Key user flows', () => {
   beforeEach(async () => {
     await launchWithDisabledSynchronization({
       newInstance: true,
-      delete: true
+      delete: true,
+      launchArgs: {
+        chessticizeICloudDiagnosticsFixture: 'unavailable'
+      }
     });
   });
 
@@ -37,6 +40,35 @@ describe('Key user flows', () => {
       `${expectedInstalledPublicVersion()} (${expectedInstalledBuildNumber()})`,
       10000
     );
+  });
+
+  it('prepares support diagnostics from Settings without requiring a sync error', async () => {
+    if (device.getPlatform() !== 'ios') {
+      return;
+    }
+
+    await openTab('settings-tab', 'settings-app-version');
+    await waitForVisibleInPracticeScroll('settings-sync-support-bundle-entry');
+    await element(by.id('settings-sync-support-bundle-entry')).tap();
+    await waitFor(element(by.id('settings-sync-support-bundle-modal')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await element(by.id('settings-sync-support-bundle-scroll')).scrollTo('bottom');
+    await waitFor(element(by.id('settings-sync-support-bundle-prepare')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await element(by.id('settings-sync-support-bundle-prepare')).tap();
+    await waitFor(element(by.id('settings-sync-support-bundle-share')))
+      .toExist()
+      .withTimeout(20000);
+    await element(by.id('settings-sync-support-bundle-scroll')).scrollTo('bottom');
+    await waitFor(element(by.id('settings-sync-support-bundle-details')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await element(by.id('settings-sync-support-bundle-details')).tap();
+    await waitFor(element(by.id('settings-sync-support-bundle-modal')))
+      .not.toExist()
+      .withTimeout(10000);
   });
 
   it('fails a standard sprint and shows actionable results', async () => {

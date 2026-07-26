@@ -565,6 +565,16 @@ New Run behavior:
 - iCloud Sync appears near the top. It defaults on, shows the real enabled state
   and current account/sync status, and exposes a manual Sync Now action while
   sync is enabled.
+- The iCloud Sync section keeps an `Export Support Diagnostics` entry available
+  even when sync is off and no error is visible. It requires confirmation before
+  preparing a package, identifies sensitive progress content, includes a
+  consistent local SQLite snapshot and the private CloudKit JSON snapshot when
+  available, and delegates the handoff to the iOS Share Sheet. Prepared files
+  are removed when the Share Sheet or diagnostics window closes and have a
+  bounded one-hour lifetime.
+- A visible sync failure adds `View Error Details`, including bounded technical
+  fields and a copy action. It must not expose raw native metadata that can
+  contain credentials or account identifiers.
 - On regular-width iPad, Settings should use grouped navigation plus a detail panel; do not make each settings row stretch across the full display.
 - Rating difficulty controls should be hidden behind an `Edit rating` row to keep the
   default Settings surface compact.

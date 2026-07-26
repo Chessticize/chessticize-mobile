@@ -34,6 +34,7 @@ describe('mobile platform capabilities', () => {
     expect(capabilities.storage.configurePuzzleSource).toBeDefined();
     expect(capabilities.progressProtection).toEqual({ kind: 'icloud_sync' });
     expect(capabilities.progressSync.client).toBeNull();
+    expect(capabilities.progressSync.diagnostics).toBeNull();
     expect(capabilities.stockfish.createTransport()).toBeNull();
     await expect(capabilities.stockfish.prewarm()).resolves.toBe(false);
     expect(capabilities.reminders.scheduler).toBeNull();
@@ -61,6 +62,7 @@ describe('mobile platform capabilities', () => {
     expect(capabilities.storage.configurePuzzleSource).toBeDefined();
     expect(capabilities.progressProtection).toEqual({ kind: 'android_managed_backup' });
     expect(capabilities.progressSync.client).toBeNull();
+    expect(capabilities.progressSync.diagnostics).toBeNull();
     expect(capabilities.stockfish.createTransport).toBe(createNativeStockfishTransport);
     expect(capabilities.stockfish.prewarm).toBe(prewarmNativeStockfishTransport);
     expect(capabilities.reminders.platform).toBe('android');
@@ -158,6 +160,7 @@ describe('mobile platform capabilities', () => {
     expect(capabilities.storage.practiceService).toBe(service);
     expect(capabilities.progressProtection).toEqual({ kind: 'icloud_sync' });
     expect(capabilities.progressSync.client).toBe(progressSyncClient);
+    expect(capabilities.progressSync.diagnostics).toBeNull();
     expect(capabilities.reminders.scheduler).toBe(scheduler);
     expect(capabilities.reminders.notificationClient).toBe(notificationClient);
     expect(capabilities.applicationMetadata).toMatchObject({
