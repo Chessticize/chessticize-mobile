@@ -12405,9 +12405,6 @@ function SettingsPanel({
               ) : null}
             </>
           ) : null}
-          {iCloudSyncSupportBundle ? (
-            <ICloudSyncSupportDiagnosticsEntry presentation={iCloudSyncSupportBundle} />
-          ) : null}
         </SettingsSection>
       ) : (
         <SettingsSection
@@ -12579,6 +12576,9 @@ function SettingsPanel({
       <FeedbackSupportCard
         feedbackIssuesUrl={applicationMetadata.feedbackIssuesUrl}
         openFeedbackIssues={feedbackIssuesOpener}
+        supportBundle={iCloudSyncSupportBundle}
+        supportEmail={applicationMetadata.supportEmail}
+        supportEmailUrl={applicationMetadata.supportEmailUrl}
         wide={adaptiveLayout.usesWideContent}
       />
 
@@ -12642,16 +12642,6 @@ function SettingsPanel({
             void Linking.openURL(LICHESS_PUZZLE_DATABASE_URL);
           }}
         />
-        <SettingsExternalLinkRow
-          label="Support"
-          value="Email"
-          detail="Private questions and account support"
-          linkLabel={applicationMetadata.supportEmail}
-          testID="settings-support-email"
-          onPress={() => {
-            void Linking.openURL(applicationMetadata.supportEmailUrl);
-          }}
-        />
       </SettingsSection>
 
       {statusMessage ? <Text style={styles.settingsStatusText} testID="settings-status-message">{statusMessage}</Text> : null}
@@ -12673,10 +12663,16 @@ function SettingsPanel({
 function FeedbackSupportCard({
   feedbackIssuesUrl,
   openFeedbackIssues,
+  supportBundle,
+  supportEmail,
+  supportEmailUrl,
   wide
 }: {
   feedbackIssuesUrl: string;
   openFeedbackIssues: (url: string) => Promise<void>;
+  supportBundle?: ICloudSyncSupportBundlePresentation;
+  supportEmail: string;
+  supportEmailUrl: string;
   wide: boolean;
 }): React.JSX.Element {
   const [confirmationVisible, setConfirmationVisible] = useState(false);
@@ -12742,6 +12738,19 @@ function FeedbackSupportCard({
           You will review and submit your issue on GitHub.
         </Text>
       </View>
+      <SettingsExternalLinkRow
+        label="Email Support"
+        value="Email"
+        detail="Private questions and account support"
+        linkLabel={supportEmail}
+        testID="settings-support-email"
+        onPress={() => {
+          void Linking.openURL(supportEmailUrl);
+        }}
+      />
+      {supportBundle ? (
+        <ICloudSyncSupportDiagnosticsEntry presentation={supportBundle} />
+      ) : null}
       {confirmationVisible ? (
         <Modal
           animationType="fade"
