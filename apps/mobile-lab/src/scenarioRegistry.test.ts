@@ -142,15 +142,15 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
     "Current-guide-only accessibility announcement"
   ));
   assert.ok(activeSessionGuide.scope.includes.includes(
-    "Measured landscape connectors to the amber timer and Mark as unclear control"
+    "Measured landscape connectors routed around copy with target clearance"
   ));
   assert.ok(activeSessionGuide.scope.includes.includes(
     "Full-width production Unclear prompt in portrait"
   ));
   assert.ok(activeSessionGuide.scope.includes.includes(
-    "Portrait arrows outside callout borders"
+    "Portrait arrows outside callout borders with target clearance"
   ));
-  assert.match(activeSessionGuide.description, /terminate at the amber timer and Mark as unclear control/);
+  assert.match(activeSessionGuide.description, /route around copy and stop short/);
   assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
   assert.ok(arrowDuelGuide.scope.includes.includes("The arrows show your two choices"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Portrait callout below the board"));
@@ -161,20 +161,21 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
     /\b(?:step|tour)\b/i
   );
   assert.ok(firstSprintGuide.issues?.some(
-    (issue) => issue.issueNumber === 337 && issue.changeNote.includes("fixed badge and copy columns")
+    (issue) => issue.issueNumber === 337 && issue.changeNote.includes("Top-align")
   ));
   assert.ok(settingsGuidance.issues?.some(
     (issue) => issue.issueNumber === 337 && issue.changeNote.includes("immediately before Feedback")
   ));
 });
 
-test("Issue #344 keeps Practice home value polish on the existing Home scenario", () => {
+test("Practice home keeps its merged value polish in the baseline scenario", () => {
   const home = scenarioRegistry["practice-home"];
 
   assert.ok(home.scope.includes.includes("Numeric trailing Ratings"));
   assert.ok(home.scope.includes.includes("Single Review status label"));
   assert.ok(home.scope.includes.includes("Centered Review workload count"));
-  assert.ok(home.issues?.some((issue) => issue.issueNumber === 344));
+  assert.ok(home.issues?.some((issue) => issue.issueNumber === 328));
+  assert.equal(home.issues?.some((issue) => issue.issueNumber === 344), false);
   assert.deepEqual(storyTagsForScenario("practice-home"), ["new"]);
 });
 

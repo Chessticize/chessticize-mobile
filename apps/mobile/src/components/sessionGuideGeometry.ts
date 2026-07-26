@@ -7,9 +7,27 @@ export type SessionGuideLayoutRect = {
 
 export type SessionGuideRailConnectorGeometry = {
   calloutTop: number;
+  connectorDrop: number;
   connectorTop: number;
   connectorWidth: number;
 };
+
+export function buildPortraitGuideCalloutTop({
+  calloutHeight,
+  pointerReach = 12,
+  target,
+  targetGap = 8
+}: {
+  calloutHeight: number;
+  pointerReach?: number;
+  target: Pick<SessionGuideLayoutRect, "y">;
+  targetGap?: number;
+}): number {
+  return Math.round(Math.max(
+    0,
+    target.y - calloutHeight - pointerReach - targetGap
+  ));
+}
 
 export function buildPortraitGuidePointerLeft({
   calloutWidth,
@@ -32,26 +50,34 @@ export function buildPortraitGuidePointerLeft({
 export function buildSessionGuideRailConnectorGeometry({
   boardSize,
   calloutHeight,
-  target
+  routeAboveTarget = false,
+  target,
+  targetGap = 10
 }: {
   boardSize: number;
   calloutHeight: number;
+  routeAboveTarget?: boolean;
   target: SessionGuideLayoutRect;
+  targetGap?: number;
 }): SessionGuideRailConnectorGeometry {
   const inset = 12;
   const calloutRight = boardSize - inset;
-  const targetCenterX = target.x + target.width / 2;
   const targetCenterY = target.y + target.height / 2;
+  const routeY = routeAboveTarget ? target.y - 18 : targetCenterY;
   const maximumTop = Math.max(inset, boardSize - calloutHeight - inset);
   const calloutTop = Math.round(Math.min(
     maximumTop,
-    Math.max(inset, targetCenterY - calloutHeight / 2)
+    Math.max(inset, routeY - calloutHeight / 2)
   ));
 
   return {
     calloutTop,
-    connectorTop: Math.round(targetCenterY - calloutTop),
-    connectorWidth: Math.max(18, Math.round(targetCenterX - calloutRight))
+    connectorDrop: Math.max(0, Math.round(targetCenterY - routeY)),
+    connectorTop: Math.round(routeY - calloutTop),
+    connectorWidth: Math.max(
+      18,
+      Math.round(target.x - targetGap - calloutRight)
+    )
   };
 }
 

@@ -1357,6 +1357,9 @@ describe("PracticePocScreen", () => {
       const renderer = renderLabScenario("practice-first-sprint-guide");
       for (const ruleId of ruleIds) {
         expect(findByTestId(renderer, `practice-sprint-rule-${ruleId}-badge`)).toBeTruthy();
+        expect(flattenTestStyle(
+          findByTestId(renderer, `practice-sprint-rule-${ruleId}`).props.style
+        ).alignItems).toBe("flex-start");
         expect(collectText(
           findByTestId(renderer, `practice-sprint-rule-${ruleId}-copy`)
         ).length).toBeGreaterThan(0);
@@ -1777,6 +1780,10 @@ describe("PracticePocScreen", () => {
       portrait,
       "practice-session-guide-coach-pointer-slow-bottom"
     )).toBeTruthy();
+    expect(flattenTestStyle(findByTestId(
+      portrait,
+      "practice-session-guide-coach-pointer-slow-bottom"
+    ).props.style).bottom).toBe(-12);
     press(portrait, "practice-session-guide-start");
     expect(findByTestId(portrait, "practice-session-guide-timeout-overlay")).toBeTruthy();
     press(portrait, "practice-session-guide-start");
@@ -1811,6 +1818,17 @@ describe("PracticePocScreen", () => {
       landscape,
       "practice-session-guide-coach-pointer-unclear-right"
     )).toBeTruthy();
+    expect(findByTestId(
+      landscape,
+      "practice-session-guide-coach-pointer-unclear-right-horizontal"
+    )).toBeTruthy();
+    expect(findByTestId(
+      landscape,
+      "practice-session-guide-coach-pointer-unclear-right-vertical"
+    )).toBeTruthy();
+    expect(flattenTestStyle(
+      findByTestId(landscape, "active-session-control-rail-content").props.style
+    ).gap).toBe(4);
     expect(findByTestId(landscape, "sprint-unclear-toggle").props.accessibilityLabel).toBe(
       "Mark this attempt as unclear"
     );

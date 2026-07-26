@@ -25,6 +25,7 @@ import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
   buildArrowDuelLandscapeGuideGeometry,
+  buildPortraitGuideCalloutTop,
   buildPortraitGuidePointerLeft,
   buildSessionGuideRailConnectorGeometry
 } from "./sessionGuideGeometry.ts";
@@ -4631,13 +4632,23 @@ function SessionCoachmarkDemo({
     if (!guideFrame || !target) {
       return;
     }
-    target.measureLayout(
-      guideFrame,
-      (x, y, width, height) => {
-        rememberMeasuredLayout(key, { height, width, x, y });
-      },
-      () => undefined
-    );
+    target.measure((_x, _y, width, height, pageX, pageY) => {
+      guideFrame.measure((
+        _frameX,
+        _frameY,
+        _frameWidth,
+        _frameHeight,
+        framePageX,
+        framePageY
+      ) => {
+        rememberMeasuredLayout(key, {
+          height,
+          width,
+          x: pageX - framePageX,
+          y: pageY - framePageY
+        });
+      });
+    });
   }, [rememberMeasuredLayout]);
   const boardSquareSize = boardSize / 8;
   const currentPuzzle = isArrowDuel
@@ -4718,7 +4729,17 @@ function SessionCoachmarkDemo({
     ? buildSessionGuideRailConnectorGeometry({
         boardSize,
         calloutHeight: effectiveCalloutHeight,
+        routeAboveTarget: callout.id === "unclear",
         target: measuredRailTarget
+      })
+    : undefined;
+  const portraitSlowCalloutTop = !adaptiveLayout.usesSessionRail
+    && callout.id === "slow"
+    && measuredCallout
+    && measuredLayouts["slow-target"]
+    ? buildPortraitGuideCalloutTop({
+        calloutHeight: measuredCallout.height,
+        target: measuredLayouts["slow-target"]
       })
     : undefined;
   const arrowDuelLandscapeGeometry = isArrowDuel && adaptiveLayout.usesSessionRail
@@ -4763,13 +4784,14 @@ function SessionCoachmarkDemo({
               top: coachStep === 0
             ? 113
             : coachStep === 1
-              ? boardSize + 71
+              ? portraitSlowCalloutTop ?? boardSize + 71
               : coachStep === 2
                 ? 92
                 : boardSize + 150
             })
       };
   const measuredConnectorWidth = measuredConnectorGeometry?.connectorWidth;
+  const measuredConnectorDrop = measuredConnectorGeometry?.connectorDrop ?? 0;
   const portraitUnclearPointerLeft = !adaptiveLayout.usesSessionRail
     && callout.id === "unclear"
     && measuredCallout
@@ -4809,6 +4831,56 @@ function SessionCoachmarkDemo({
       testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
     >
       <Text style={styles.sessionGuideArrowDuelTargetConnectorHead}>▲</Text>
+    </View>
+  ) : pointerPlacement === "right" && measuredConnectorWidth && measuredConnectorDrop > 0 ? (
+    <View
+      accessibilityElementsHidden
+      style={[
+        styles.sessionGuideCoachTargetRoute,
+        {
+          height: measuredConnectorDrop,
+          right: -measuredConnectorWidth,
+          top: measuredConnectorGeometry?.connectorTop ?? "50%",
+          width: measuredConnectorWidth
+        }
+      ]}
+      testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`}
+    >
+      <View
+        style={[
+          styles.sessionGuideCoachTargetRouteHorizontal,
+          callout.tone === "warning"
+            ? styles.sessionGuideCoachTargetConnectorWarning
+            : null,
+          callout.tone === "danger"
+            ? styles.sessionGuideCoachTargetConnectorDanger
+            : null
+        ]}
+        testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}-horizontal`}
+      />
+      <View
+        style={[
+          styles.sessionGuideCoachTargetRouteVertical,
+          { height: measuredConnectorDrop },
+          callout.tone === "warning"
+            ? styles.sessionGuideCoachTargetConnectorWarning
+            : null,
+          callout.tone === "danger"
+            ? styles.sessionGuideCoachTargetConnectorDanger
+            : null
+        ]}
+        testID={`practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}-vertical`}
+      />
+      <Text
+        style={[
+          styles.sessionGuideCoachTargetRouteHead,
+          { top: measuredConnectorDrop - 6 },
+          callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
+          callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
+        ]}
+      >
+        ▶
+      </Text>
     </View>
   ) : pointerPlacement === "right" && measuredConnectorWidth ? (
     <View
@@ -4864,6 +4936,9 @@ function SessionCoachmarkDemo({
               right: undefined,
               width: 24
             }
+          : null,
+        callout.id === "slow" && pointerPlacement === "bottom"
+          ? { bottom: -12 }
           : null,
         callout.tone === "warning" ? styles.sessionGuideCoachPointerWarning : null,
         callout.tone === "danger" ? styles.sessionGuideCoachPointerDanger : null
@@ -5086,6 +5161,9 @@ function SessionCoachmarkDemo({
                 testID={isArrowDuel
                   ? "practice-arrow-duel-guide-demo-timer"
                   : "practice-session-guide-demo-timer"}
+                onLayout={!isArrowDuel
+                  ? () => measureTargetInGuideFrame("slow-target", slowTargetRef.current)
+                  : undefined}
               >
                 <PuzzleTimingIndicator
                   elapsedSeconds={elapsedSeconds}
@@ -5146,6 +5224,7 @@ function SessionCoachmarkDemo({
             <View
               style={[
                 styles.activeSessionControlRail,
+                styles.sessionGuideControlRail,
                 {
                   minHeight: boardSize,
                   width: adaptiveLayout.sessionRailWidth
@@ -5186,6 +5265,7 @@ function SessionCoachmarkDemo({
                 />
               </View>
               <View
+                ref={slowTargetRef}
                 style={[
                   styles.sessionGuideCoachTimerTarget,
                   styles.sessionGuideCoachLayer,
@@ -14309,7 +14389,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   sprintRuleRow: {
-    alignItems: "center",
+    alignItems: "flex-start",
     flexDirection: "row",
     gap: 10,
     minHeight: 54
@@ -14498,6 +14578,31 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: -2,
     top: -6
+  },
+  sessionGuideCoachTargetRoute: {
+    position: "absolute"
+  },
+  sessionGuideCoachTargetRouteHorizontal: {
+    backgroundColor: "#2563EB",
+    height: 2,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  sessionGuideCoachTargetRouteVertical: {
+    backgroundColor: "#2563EB",
+    position: "absolute",
+    right: 0,
+    top: 0,
+    width: 2
+  },
+  sessionGuideCoachTargetRouteHead: {
+    color: "#2563EB",
+    fontSize: 14,
+    lineHeight: 14,
+    position: "absolute",
+    right: 0
   },
   sessionGuideArrowDuelTargetConnector: {
     backgroundColor: "#2563EB",
@@ -15536,6 +15641,9 @@ const styles = StyleSheet.create({
   activeSessionControlRail: {
     flexGrow: 1,
     gap: 10
+  },
+  sessionGuideControlRail: {
+    gap: 4
   },
   activeSessionBottomFeedback: {
     alignSelf: "center"
