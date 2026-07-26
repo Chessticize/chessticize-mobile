@@ -1435,6 +1435,38 @@ describe("PracticePocScreen", () => {
     expect(service.getSettings().sprintGuides.activeSessionSeen).toBe(false);
   });
 
+  it("keeps the guide close control available without starting or completing the guide", () => {
+    for (let coachStep = 0; coachStep < 4; coachStep += 1) {
+      const service = createMobilePracticeService("random1000");
+      const renderer = renderScreen({
+        sprintGuidanceEnabled: true,
+        practiceService: service,
+        runManagementEnabled: true
+      });
+
+      press(renderer, "practice-run-start");
+      for (let step = 0; step < coachStep; step += 1) {
+        press(renderer, "practice-session-guide-start");
+      }
+
+      expect(findByTestId(renderer, "session-abandon").props.accessibilityLabel).toBe(
+        "Exit guide"
+      );
+      press(renderer, "session-abandon");
+
+      expect(() => findByTestId(renderer, "practice-active-session-guide")).toThrow();
+      expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+      expect(service.getActiveSprint()).toBeUndefined();
+      expect(service.getSettings().sprintGuides.activeSessionSeen).toBe(false);
+
+      press(renderer, "practice-run-start");
+      expect(findByTestId(renderer, "practice-active-session-guide")).toBeTruthy();
+      expect(service.getSettings().sprintGuides.activeSessionSeen).toBe(false);
+
+      act(() => renderer.unmount());
+    }
+  });
+
   it("shows both guides for a first Arrow Duel, then only its own guide after shared guidance", () => {
     const freshService = createMobilePracticeService("random1000");
     const firstArrowDuel = renderScreen({
@@ -1484,6 +1516,56 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(returningArrowDuel, "practice-arrow-duel-guide")).toBeTruthy();
     expect(() => findByTestId(returningArrowDuel, "practice-active-session-guide")).toThrow();
     expect(collectText(findByTestId(returningArrowDuel, "practice-session-guide-coach-progress"))).toBe("1 of 1");
+  });
+
+  it("lets Arrow Duel leave either guide without completing its own guidance", () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({
+      sprintGuidanceEnabled: true,
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "practice-run-select-arrow-duel");
+    press(renderer, "practice-run-start");
+    for (let step = 0; step < 4; step += 1) {
+      press(renderer, "practice-session-guide-start");
+    }
+
+    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
+      "5 of 5"
+    );
+    expect(findByTestId(renderer, "session-abandon").props.accessibilityLabel).toBe(
+      "Exit guide"
+    );
+    press(renderer, "session-abandon");
+
+    expect(() => findByTestId(renderer, "practice-arrow-duel-guide")).toThrow();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(service.getSettings().sprintGuides).toMatchObject({
+      activeSessionSeen: true,
+      arrowDuelSeen: false
+    });
+
+    press(renderer, "practice-run-start");
+    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
+    expect(() => findByTestId(renderer, "practice-active-session-guide")).toThrow();
+    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
+      "1 of 1"
+    );
+    press(renderer, "session-abandon");
+
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(service.getSettings().sprintGuides.arrowDuelSeen).toBe(false);
+    press(renderer, "practice-run-start");
+    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
+      "1 of 1"
+    );
+
+    act(() => renderer.unmount());
   });
 
   it("resets all production guide eligibility immediately from Settings", () => {

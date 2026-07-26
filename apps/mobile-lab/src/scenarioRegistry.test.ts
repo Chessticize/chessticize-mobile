@@ -150,16 +150,31 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.ok(activeSessionGuide.scope.includes.includes(
     "Fixed-shape downward portrait arrows outside callout borders with target clearance"
   ));
-  assert.match(activeSessionGuide.description, /route around copy and stop short/);
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Always-available direct guide exit without completion"
+  ));
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Compact portrait timeout pointer with board clearance"
+  ));
+  assert.match(activeSessionGuide.description, /direct Exit guide control available/);
   assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
   assert.ok(arrowDuelGuide.scope.includes.includes("The arrows show your two choices"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Portrait callout below the board"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Landscape callout in the empty board lane"));
   assert.ok(arrowDuelGuide.scope.includes.includes(
-    "Landscape dot endpoint stops clear of the candidate piece"
+    "Straight upward landscape connector stops clear of the candidate origin"
+  ));
+  assert.ok(arrowDuelGuide.scope.includes.includes(
+    "Always-available direct guide exit without completion"
   ));
   assert.match(arrowDuelGuide.description, /two arrows are the user's two choices/);
+  assert.match(arrowDuelGuide.description, /straight upward connector/);
   assert.match(arrowDuelGuide.description, /cannot read as a third move arrow/);
+  const arrowDuelGuideOnly = scenarioRegistry["practice-arrow-duel-guide-only"];
+  assert.ok(arrowDuelGuideOnly.scope.includes.includes(
+    "Always-available direct guide exit without completion"
+  ));
+  assert.match(arrowDuelGuideOnly.description, /eligible for the next Arrow Duel/);
   assert.doesNotMatch(
     `${activeSessionGuide.description} ${arrowDuelGuide.description}`,
     /\b(?:step|tour)\b/i
