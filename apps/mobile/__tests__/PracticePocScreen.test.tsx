@@ -26,7 +26,9 @@ import {
 } from "../src/platform/mobilePractice";
 import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/src/practice-service";
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
-import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, type ArrowDuelState, type AttemptEvent, type Puzzle, type PuzzleTimingPolicy, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
+import { MemoryTacticalProfileRepository } from "../../../packages/storage/src/tactical-profile-repository";
+import { TacticalProfileService } from "../../../packages/storage/src/tactical-profile-service";
+import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, isServerCompatibleArrowDuelPuzzle, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, startSprint, type ArrowDuelState, type AttemptEvent, type Puzzle, type PuzzleTimingPolicy, type SprintState, type TacticalProfileCalibrationArtifact, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/platform/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/platform/iCloudProgressSync";
 import { FakeMoveFeedbackClient } from "../src/platform/moveFeedback";
@@ -42,6 +44,8 @@ import {
   expectNoRenderedTextHasNonPositiveFontSize,
   flattenTestStyle
 } from "../test-support/testRendererSupport";
+
+const tacticalProfilePuzzleFixture = require("../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -1038,6 +1042,7 @@ describe("PracticePocScreen", () => {
     const onIntent = jest.fn();
     const presentation: TacticalProfilePresentation = {
       phase: "ready",
+      assurance: "validated",
       screen: "home",
       signals: [
         {
@@ -1075,6 +1080,383 @@ describe("PracticePocScreen", () => {
     );
     press(renderer, "training-focus-open-profile");
     expect(onIntent).toHaveBeenCalledWith({ type: "open-profile" });
+  });
+
+  it("does not show provisional disclosure on validated profile detail screens", () => {
+    const presentation: TacticalProfilePresentation = {
+      phase: "ready",
+      assurance: "validated",
+      screen: "explanation",
+      selectedSignalId: "fork",
+      signals: [
+        {
+          id: "fork",
+          taskFamily: "line",
+          themeKey: "fork",
+          themeLabel: "Forks",
+          kind: "solve_rate",
+          distinctPuzzleCount: 7,
+          distinctSessionCount: 3,
+          priorityLabel: "Recommended",
+          status: "recommended"
+        }
+      ],
+      focusedRun: {
+        taskFamily: "line",
+        title: "Fork repair",
+        ratingLabel: "Puzzle-solving Rating 925",
+        durationLabel: "5 min",
+        totalPuzzleCount: 15,
+        allocations: [
+          { id: "fork", label: "Forks", puzzleCount: 10, tone: "primary" },
+          { id: "mixed", label: "Mixed practice", puzzleCount: 5, tone: "mixed" }
+        ]
+      },
+      onIntent: jest.fn()
+    };
+
+    for (const screen of ["explanation", "focused_run", "suppressed"] as const) {
+      const renderer = renderScreen({
+        runManagementEnabled: true,
+        tacticalProfilePresentation: { ...presentation, screen }
+      });
+      expect(() =>
+        findByTestId(renderer, "tactical-profile-early-estimate")
+      ).toThrow();
+    }
+  });
+
+  it("labels the production Tactical Profile as an early estimate", async () => {
+    const renderer = renderScreen({
+      practiceService: createMobilePracticeService("familiar15")
+    });
+    await flushMicrotasks();
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Early estimate"
+    );
+    expect(
+      findByTestId(renderer, "training-focus-card").props.accessibilityLabel
+    ).toContain("Early estimate");
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).not.toContain(
+      "Personalized training is not enabled"
+    );
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
+      "This is an early estimate"
+    );
+  });
+
+  it("explains provisional balanced results without claiming no weakness exists", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-balanced");
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "No clear focus yet"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).not.toContain(
+      "No focus needed"
+    );
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
+      "has not found a repeated pattern strong enough to emphasize"
+    );
+  });
+
+  it("keeps Practice available and automatically retries a failed Tactical Profile cache", async () => {
+    const store = new MemoryStore();
+    const repository = new RecoveringTacticalProfileRepository();
+    repository.failReads(2);
+    const renderer = renderScreen({
+      practiceService: new PracticeService(
+        store,
+        new TacticalProfileService({
+          progressStore: store,
+          puzzleSource: store,
+          repository,
+          calibration: COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+          naturalFrequency: { line: {}, arrow_duel: {} }
+        })
+      )
+    });
+    await flushMicrotasks();
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Building profile"
+    );
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+
+    await act(async () => {
+      jest.advanceTimersByTime(1_000);
+      await Promise.resolve();
+    });
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Building profile"
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(2_000);
+      await Promise.resolve();
+    });
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "More information needed"
+    );
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it("uses the only recommended Arrow Duel family and shows returning users the dedicated Focused Run guide", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const service = createArrowFocusedPracticeService();
+    service.saveSettings({
+      ...service.getSettings(),
+      sprintGuides: {
+        rulesSeen: true,
+        activeSessionSeen: true,
+        arrowDuelSeen: false,
+        focusedRunSeen: false
+      }
+    });
+
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true,
+      sprintGuidanceEnabled: true
+    });
+
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
+      "Arrow Duel"
+    );
+    press(renderer, "tactical-profile-preview-run");
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Arrow Duel Rating 1800"
+    );
+    press(renderer, "focused-run-start");
+    expect(findByTestId(renderer, "practice-active-session-guide")).toBeTruthy();
+    expectText(renderer, "Track the fixed Run");
+    expect(service.getSettings().sprintGuides.focusedRunSeen).toBe(false);
+
+    for (let step = 0; step < 4; step += 1) {
+      press(renderer, "practice-session-guide-start");
+    }
+
+    expect(service.getSettings().sprintGuides.focusedRunSeen).toBe(true);
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
+    expect(service.getSettings().sprintGuides.arrowDuelSeen).toBe(false);
+
+    press(renderer, "practice-session-guide-start");
+    expect(service.getSettings().sprintGuides.arrowDuelSeen).toBe(true);
+    expect(service.getActiveSprint()).toBeUndefined();
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+
+    expect(service.getActiveSprint()).toMatchObject({
+      status: "active",
+      config: {
+        mode: "arrow_duel",
+        ratingPolicy: "unrated",
+        maxAttempts: 15,
+        tacticalFocus: {
+          taskFamily: "arrow_duel",
+          mixedControlCount: 5,
+          ratingAnchor: 1800
+        }
+      }
+    });
+  });
+
+  it("maps two production task-family recommendations to one explicit Home lead", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const practiceService = createDualFamilyFocusedPracticeService();
+    expect(
+      practiceService.getTacticalProfileSnapshot()?.homeLeadSignalId
+    ).toBe("arrow_duel:pin");
+    const renderer = renderScreen({
+      practiceService
+    });
+
+    const card = collectText(findByTestId(renderer, "training-focus-card"));
+    expect(card).toContain("2 modes with recommendations");
+    expect(card).toContain("Pin is your clearest focus");
+    expect(card).toContain("Puzzle solving also has 1 recommendation.");
+    expect(collectText(findByTestId(renderer, "training-focus-primary-mode"))).toContain(
+      "Arrow Duel"
+    );
+
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
+      "Arrow Duel"
+    );
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+    expect(() => findByTestId(renderer, "tactical-profile-signal-line:fork")).toThrow();
+
+    press(renderer, "tactical-profile-task-family-line");
+    press(renderer, "tactical-profile-explain-line:fork");
+    press(renderer, "tactical-profile-back");
+    expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
+      "Puzzle solving"
+    );
+  });
+
+  it("keeps watch-only evidence visible in both task-family lanes", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const watchOnlyCalibration = {
+      ...COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+      evidence: {
+        ...COMPONENT_TACTICAL_PROFILE_CALIBRATION.evidence,
+        minDistinctPuzzles: 13
+      }
+    } satisfies TacticalProfileCalibrationArtifact;
+    const practiceService = createDualFamilyFocusedPracticeService(
+      watchOnlyCalibration
+    );
+    expect(
+      practiceService.getTacticalProfileSnapshot()?.evaluation.signals.map(
+        (signal) => signal.status
+      )
+    ).toEqual(["watch", "watch"]);
+
+    const renderer = renderScreen({ practiceService });
+    press(renderer, "training-focus-open-profile");
+
+    expect(findByTestId(renderer, "tactical-profile-task-family-selector")).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-signal-line:fork")).toBeTruthy();
+    press(renderer, "tactical-profile-task-family-arrow_duel");
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+  });
+
+  it("keeps an explicitly selected watch lane visible beside a recommendation", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const mixedStatusCalibration = {
+      ...COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+      evidence: {
+        ...COMPONENT_TACTICAL_PROFILE_CALIBRATION.evidence,
+        minDistinctPuzzles: 9
+      }
+    } satisfies TacticalProfileCalibrationArtifact;
+    const practiceService = createDualFamilyFocusedPracticeService(
+      mixedStatusCalibration,
+      2
+    );
+    expect(
+      practiceService.getTacticalProfileSnapshot()?.evaluation.signals.map(
+        (signal) => [signal.taskFamily, signal.status]
+      )
+    ).toEqual([
+      ["line", "recommended"],
+      ["arrow_duel", "watch"]
+    ]);
+
+    const renderer = renderScreen({ practiceService });
+    press(renderer, "training-focus-open-profile");
+    expect(findByTestId(renderer, "tactical-profile-signal-line:fork")).toBeTruthy();
+
+    press(renderer, "tactical-profile-task-family-arrow_duel");
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+  });
+
+  it("opens a cached production Tactical Profile without reading full history or exact inventory", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    let store: MemoryStore | undefined;
+    const practiceService = createArrowFocusedPracticeService(
+      true,
+      (createdStore) => {
+        store = createdStore;
+      }
+    );
+    practiceService.getTacticalProfileSnapshot();
+    if (!store) {
+      throw new Error("expected the production component store");
+    }
+    store.listSprintSessions = () => {
+      throw new Error("Profile open must not scan all sessions");
+    };
+    store.listLatestTerminalFocusedSprintSessions = () => {
+      throw new Error("Profile open must not run cache-recovery session queries");
+    };
+    store.listAttempts = () => {
+      throw new Error("Profile open must not scan canonical attempts");
+    };
+    store.selectPuzzles = () => {
+      throw new Error("Profile open must not run an exact puzzle query");
+    };
+    store.selectPuzzlesForRatingBands = () => {
+      throw new Error("Profile open must not run an exact rating-band query");
+    };
+    const originalListReviewQueue = store.listReviewQueue.bind(store);
+    let reviewExclusionReads = 0;
+    store.listReviewQueue = () => {
+      reviewExclusionReads += 1;
+      return originalListReviewQueue();
+    };
+    const renderer = renderScreen({ practiceService });
+    reviewExclusionReads = 0;
+
+    press(renderer, "training-focus-open-profile");
+
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-preview-run")).toBeTruthy();
+    expect(reviewExclusionReads).toBe(0);
+  });
+
+  it("withholds the public Preview CTA after a Focused Run until newer mixed evidence", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    let store: MemoryStore | undefined;
+    const practiceService = createArrowFocusedPracticeService(
+      true,
+      (createdStore) => {
+        store = createdStore;
+      }
+    );
+    practiceService.startFocusedRun(
+      "arrow_duel",
+      "2026-07-25T00:01:00.000Z",
+      "public-freshness"
+    );
+    practiceService.abandonSprint("2026-07-25T00:02:00.000Z");
+    if (!store) {
+      throw new Error("expected the production component store");
+    }
+    const restartedPracticeService = new PracticeService(
+      store,
+      createArrowTacticalProfileService(store)
+    );
+    const renderer = renderScreen({
+      practiceService: restartedPracticeService
+    });
+
+    press(renderer, "training-focus-open-profile");
+
+    expect(collectText(findByTestId(renderer, "focused-run-unavailable"))).toContain(
+      "Play another mixed Run first"
+    );
+    expect(() => findByTestId(renderer, "tactical-profile-preview-run")).toThrow();
+  });
+
+  it("keeps a production-service focus visible while withholding an inventory-blocked Run", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const renderer = renderScreen({
+      practiceService: createArrowFocusedPracticeService(false)
+    });
+
+    press(renderer, "training-focus-open-profile");
+
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
+      "Not enough new puzzles nearby"
+    );
+    expect(() => findByTestId(renderer, "tactical-profile-preview-run")).toThrow();
   });
 
   it("keeps solve reliability and completed-puzzle speed as plain-language profile signals", () => {
@@ -1131,7 +1513,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("keeps Puzzle solving and Arrow Duel focus lanes separate inside one profile", () => {
+  it("keeps Puzzle solving and Arrow Duel focus lanes separate inside one profile", async () => {
     const renderer = renderLabScenario("practice-tactical-profile-task-families-home");
 
     expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
@@ -1168,6 +1550,22 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
       "Mixed Arrow Duel"
     );
+
+    press(renderer, "focused-run-start");
+    expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+    expect(findByTestId(renderer, "session-rating-policy")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain(
+      "Choose the best move"
+    );
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toContain(
+      "Arrow Duel sprint"
+    );
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 15");
+
+    await boardMove(renderer, "e8f7");
+
+    expect(() => findByTestId(renderer, "error-panel")).toThrow();
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 / 15");
   });
 
   it("uses an explicit cross-mode Home lead and blocks mismatched Focused Runs", () => {
@@ -1268,6 +1666,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "tactical-profile-explanation"))).toContain(
       "Slow and Unclear labels, or whether a puzzle is in Review, do not count as proof"
     );
+    expect(collectText(findByTestId(renderer, "tactical-profile-early-estimate"))).toContain(
+      "Use this as a training suggestion"
+    );
 
     press(renderer, "tactical-profile-explanation-preview");
     expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
@@ -1282,9 +1683,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
       "Later ordinary mixed Runs decide whether this focus still applies."
     );
+    expect(collectText(findByTestId(renderer, "tactical-profile-early-estimate"))).toContain(
+      "Use this as a training suggestion"
+    );
 
     press(renderer, "focused-run-not-now");
     expect(findByTestId(renderer, "tactical-profile-suppressed")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "tactical-profile-early-estimate"))).toContain(
+      "Use this as a training suggestion"
+    );
 
     press(renderer, "tactical-profile-restore");
     expect(findByTestId(renderer, "tactical-profile-recommendations")).toBeTruthy();
@@ -1590,7 +1997,8 @@ describe("PracticePocScreen", () => {
     expect(service.getSettings().sprintGuides).toEqual({
       rulesSeen: false,
       activeSessionSeen: false,
-      arrowDuelSeen: false
+      arrowDuelSeen: false,
+      focusedRunSeen: false
     });
     expect(collectText(findByTestId(renderer, "settings-show-sprint-guide"))).toBe("Guides reset");
     expect(collectText(findByTestId(renderer, "settings-sprint-guide-ready"))).toContain(
@@ -4770,6 +5178,85 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-accuracy"))).toBe(
       "2 attempted · 50% Accuracy"
     );
+  });
+
+  it("explains a completed Tactical Focus Run as fixed, unrated training", () => {
+    const renderer = renderLabScenario("practice-tactical-focus-result");
+
+    expectText(renderer, "Focused Run complete");
+    expect(collectText(findByTestId(renderer, "sprint-result-top-bar"))).toContain(
+      "Focused Run Result"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe(
+      "Planned puzzles complete"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-rating-change"))).toContain(
+      "Unrated"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-rating-range"))).toBe(
+      "1087 unchanged"
+    );
+    expect(() => findByTestId(renderer, "sprint-result-history-trend")).toThrow();
+    expect(() => findByTestId(renderer, "sprint-result-history-button")).toThrow();
+    expect(() => findByTestId(renderer, "sprint-result-goal-label")).toThrow();
+    expect(collectText(findByTestId(renderer, "play-again-button"))).toContain(
+      "Back to Practice"
+    );
+    press(renderer, "play-again-button");
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it("shows fixed progress and no Rating pressure during an active Tactical Focus Run", () => {
+    const renderer = renderLabScenario("practice-tactical-focus-active");
+
+    expect(collectText(findByTestId(renderer, "active-session-shell"))).toContain(
+      "Focused Run"
+    );
+    expect(collectText(findByTestId(renderer, "session-status-metrics"))).toContain(
+      "Unrated"
+    );
+    expect(findByTestId(renderer, "session-score-completed").props.accessibilityLabel)
+      .toBe("Completed 10");
+    expect(findByTestId(renderer, "session-score-left").props.accessibilityLabel)
+      .toBe("Left 5");
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("10 / 15");
+  });
+
+  it("keeps Focused Run metric labels readable in the maintained landscape rail", () => {
+    setPracticeViewport({
+      width: 874,
+      height: 402,
+      scale: 3,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 }
+    });
+    const renderer = renderLabScenario("practice-tactical-focus-active");
+    const unratedText = findByTestId(renderer, "session-rating-policy")
+      .findAllByType(ReactNative.Text)
+      .find((node) => collectText(node) === "Unrated");
+    const completedText = findByTestId(renderer, "session-score-completed")
+      .findAllByType(ReactNative.Text)
+      .find((node) => collectText(node) === "Completed");
+
+    expect(flattenTestStyle(unratedText?.props.style).fontSize).toBe(16);
+    expect(completedText?.props.adjustsFontSizeToFit).toBe(true);
+  });
+
+  it("explains fixed and unrated semantics before a first Focused Run", () => {
+    const renderer = renderLabScenario("practice-tactical-focus-guide");
+
+    expectText(renderer, "Track the fixed Run");
+    expectText(renderer, "Your Rating will not change.");
+    expectText(renderer, "Unrated");
+    expect(
+      collectText(findByTestId(renderer, "practice-session-guide-start"))
+    ).toBe("Next");
+    press(renderer, "practice-session-guide-start");
+    press(renderer, "practice-session-guide-start");
+    expectText(renderer, "It is added to Review and counts as one completed puzzle.");
+    press(renderer, "practice-session-guide-start");
+    expect(
+      collectText(findByTestId(renderer, "practice-session-guide-start"))
+    ).toBe("Start Focused Run");
   });
 
   it("separates the fixed pass goal from actual attempts in the Storybook result designs", () => {
@@ -10397,6 +10884,238 @@ function firstArrowDuelPuzzleForTest(): ArrowDuelState {
   return requireArrowDuelState(state);
 }
 
+function createArrowFocusedPracticeService(
+  inventoryAvailable = true,
+  exposeStore?: (store: MemoryStore) => void
+): PracticeService {
+  const candidates = tacticalProfilePuzzleFixture
+    .filter((puzzle) =>
+      puzzle.rating >= 1700
+      && puzzle.rating <= 1900
+      && isServerCompatibleArrowDuelPuzzle(puzzle)
+    )
+    .slice(0, 44);
+  if (candidates.length < 44) {
+    throw new Error("Tactical Profile component fixture needs 44 Arrow Duel puzzles");
+  }
+  const evidence = candidates.slice(0, 12).map((puzzle) => ({
+    ...puzzle,
+    ratingDeviation: 80,
+    themes: ["pin"]
+  }));
+  const focused = candidates.slice(12, 24).map((puzzle) => ({
+    ...puzzle,
+    ratingDeviation: 80,
+    themes: ["pin"]
+  }));
+  const mixed = candidates.slice(24).map((puzzle) => ({
+    ...puzzle,
+    ratingDeviation: 80,
+    themes: ["fork"]
+  }));
+  const store = new MemoryStore();
+  store.seedPuzzles([...evidence, ...focused, ...mixed]);
+  const config = defaultSprintConfig("arrow_duel");
+  store.saveRating({
+    key: config.ratingKey,
+    generation: 0,
+    rating: 1800,
+    ratingDeviation: 80,
+    volatility: 0.06,
+    games: 12
+  });
+
+  for (let sessionIndex = 0; sessionIndex < 3; sessionIndex += 1) {
+    const day = 10 + sessionIndex * 4;
+    const startedAt = `2026-07-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+    const completedAt = `2026-07-${String(day).padStart(2, "0")}T00:04:00.000Z`;
+    const sessionPuzzles = evidence.slice(sessionIndex * 4, sessionIndex * 4 + 4);
+    const session = startSprint({
+      id: `arrow-profile-session-${sessionIndex}`,
+      config,
+      puzzles: sessionPuzzles,
+      ratingBefore: 1800,
+      now: startedAt
+    });
+    store.createSprintSession({
+      ...session,
+      status: "failed",
+      completedAt,
+      endReason: "max_mistakes",
+      correctCount: 0,
+      mistakeCount: 4,
+      ratingAfter: 1800
+    });
+    for (const [offset, puzzle] of sessionPuzzles.entries()) {
+      store.recordAttempt({
+        id: `arrow-profile-attempt-${sessionIndex}-${offset}`,
+        source: "sprint",
+        sessionId: session.id,
+        puzzleId: puzzle.id,
+        mode: "arrow_duel",
+        ratingKey: config.ratingKey,
+        result: "wrong",
+        submittedMove: puzzle.solutionMoves[0],
+        expectedMove: puzzle.stockfishBestMove as string,
+        arrowDuelCandidateOrder: [
+          puzzle.stockfishBestMove as string,
+          puzzle.solutionMoves[0] as string
+        ],
+        startedAt: completedAt,
+        completedAt,
+        elapsedMs: 10_000,
+        ratingBefore: 1800
+      });
+    }
+  }
+  exposeStore?.(store);
+
+  return new PracticeService(
+    store,
+    createArrowTacticalProfileService(store, inventoryAvailable)
+  );
+}
+
+function createArrowTacticalProfileService(
+  store: MemoryStore,
+  inventoryAvailable = true
+): TacticalProfileService {
+  return new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository: new MemoryTacticalProfileRepository(),
+    calibration: COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+    naturalFrequency: {
+      line: {},
+      arrow_duel: { pin: 0.12, fork: 0.12 }
+    },
+    naturalFrequencyForRating: (
+      taskFamily
+    ): Readonly<Record<string, number>> =>
+      taskFamily === "arrow_duel"
+        ? { pin: 0.12, fork: 0.12 }
+        : {},
+    ...(inventoryAvailable
+      ? {}
+      : { inventoryUpperBound: () => ({ pin: 0 }) }),
+    focusedRunPolicy: {
+      runSize: 15,
+      recentPuzzleDays: 30,
+      ratingBandHalfWidths: [100, 200]
+    }
+  });
+}
+
+function createDualFamilyFocusedPracticeService(
+  calibration: TacticalProfileCalibrationArtifact =
+    COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+  arrowSessionCount = 3
+): PracticeService {
+  const candidates = tacticalProfilePuzzleFixture
+    .filter(isServerCompatibleArrowDuelPuzzle)
+    .slice(0, 24);
+  if (candidates.length < 24) {
+    throw new Error("Dual-family Tactical Profile fixture needs 24 puzzles");
+  }
+  const linePuzzles = candidates.slice(0, 12).map((puzzle) => ({
+    ...puzzle,
+    rating: 900,
+    ratingDeviation: 80,
+    themes: ["fork"]
+  }));
+  const arrowPuzzles = candidates.slice(12, 24).map((puzzle) => ({
+    ...puzzle,
+    rating: 900,
+    ratingDeviation: 80,
+    themes: ["pin"]
+  }));
+  const store = new MemoryStore();
+  store.seedPuzzles([...linePuzzles, ...arrowPuzzles]);
+  const lineConfig = defaultSprintConfig("standard");
+  const arrowConfig = defaultSprintConfig("arrow_duel");
+  for (const config of [lineConfig, arrowConfig]) {
+    store.saveRating({
+      key: config.ratingKey,
+      generation: 0,
+      rating: 900,
+      ratingDeviation: 80,
+      volatility: 0.06,
+      games: 12
+    });
+  }
+  for (const [taskFamily, config, puzzles] of [
+    ["line", lineConfig, linePuzzles],
+    ["arrow_duel", arrowConfig, arrowPuzzles]
+  ] as const) {
+    const sessionCount = taskFamily === "arrow_duel" ? arrowSessionCount : 3;
+    for (let sessionIndex = 0; sessionIndex < sessionCount; sessionIndex += 1) {
+      const day = 10 + sessionIndex * 4;
+      const startedAt = `2026-07-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+      const completedAt = `2026-07-${String(day).padStart(2, "0")}T00:04:00.000Z`;
+      const sessionPuzzles = puzzles.slice(
+        sessionIndex * 4,
+        sessionIndex * 4 + 4
+      );
+      const session = startSprint({
+        id: `${taskFamily}-dual-profile-session-${sessionIndex}`,
+        config,
+        puzzles: sessionPuzzles,
+        ratingBefore: 900,
+        now: startedAt
+      });
+      store.createSprintSession({
+        ...session,
+        status: "failed",
+        completedAt,
+        endReason: "max_mistakes",
+        correctCount: 0,
+        mistakeCount: 4,
+        ratingAfter: 900
+      });
+      for (const [offset, puzzle] of sessionPuzzles.entries()) {
+        store.recordAttempt({
+          id: `${taskFamily}-dual-profile-attempt-${sessionIndex}-${offset}`,
+          source: "sprint",
+          sessionId: session.id,
+          puzzleId: puzzle.id,
+          mode: config.mode,
+          ratingKey: config.ratingKey,
+          result: "wrong",
+          submittedMove: puzzle.solutionMoves[0],
+          expectedMove: taskFamily === "arrow_duel"
+            ? puzzle.stockfishBestMove as string
+            : puzzle.solutionMoves[1] ?? puzzle.solutionMoves[0],
+          ...(taskFamily === "arrow_duel"
+            ? {
+                arrowDuelCandidateOrder: [
+                  puzzle.stockfishBestMove as string,
+                  puzzle.solutionMoves[0]
+                ] as [string, string]
+              }
+            : {}),
+          startedAt: completedAt,
+          completedAt,
+          elapsedMs: 10_000,
+          ratingBefore: 900
+        });
+      }
+    }
+  }
+  return new PracticeService(
+    store,
+    new TacticalProfileService({
+      progressStore: store,
+      puzzleSource: store,
+      repository: new MemoryTacticalProfileRepository(),
+      calibration,
+      naturalFrequency: {
+        line: { fork: 0.12 },
+        arrow_duel: { pin: 0.12 }
+      }
+    })
+  );
+}
+
 function sharedHistoryPuzzle(): Puzzle {
   return {
     id: "shared-history",
@@ -10407,6 +11126,87 @@ function sharedHistoryPuzzle(): Puzzle {
     source: "lichess",
     stockfishBestMove: "e2e3"
   };
+}
+
+const COMPONENT_TACTICAL_PROFILE_CALIBRATION = {
+  schemaVersion: 1,
+  modelVersion: "component-test-v1",
+  calibrationId: "component-test-calibration",
+  packFeatureHash: "component-test-pack-rd",
+  createdAt: "2026-07-01T00:00:00.000Z",
+  provenance: {
+    inputSchemaVersion: 1,
+    policyId: "component-test-policy",
+    policyHash: `sha256:${"1".repeat(64)}`,
+    corpusHash: `sha256:${"2".repeat(64)}`,
+    reportHash: `sha256:${"3".repeat(64)}`,
+    decisionEvidenceId: "component-test-decisions",
+    representativeOwnerApproved: true,
+    familyReadiness: {
+      line: { ready: true, reasons: [] },
+      arrow_duel: { ready: true, reasons: [] }
+    }
+  },
+  recencyHalfLifeDays: 90,
+  evidence: {
+    watchProbability: 0.75,
+    recommendationExitProbability: 0.85,
+    recommendationProbability: 0.9,
+    strongProbability: 0.97,
+    minDistinctPuzzles: 4,
+    minDistinctSessions: 2
+  },
+  opportunity: {
+    minimumWeight: 0.25,
+    exponent: 0.5
+  },
+  families: {
+    line: componentTacticalProfileCalibratedFamily(),
+    arrow_duel: componentTacticalProfileCalibratedFamily()
+  }
+} as const satisfies TacticalProfileCalibrationArtifact;
+
+function componentTacticalProfileCalibratedFamily() {
+  return {
+    status: "calibrated",
+    solve: {
+      intercept: 0,
+      ratingGapSlope: 1,
+      timeoutLogCoefficient: 0,
+      timeoutReferenceSeconds: 60,
+      themePriorSdRating: 100,
+      practicalDeficitRating: 20,
+      minExpectedFailuresPer100: 2
+    },
+    speed: {
+      interceptLogSeconds: Math.log(30),
+      relativeDifficultyCoefficient: 0,
+      decisionCountCoefficient: 0,
+      paceLogCoefficient: 0,
+      slowPolicyLogCoefficient: 0,
+      residualSd: 0.25,
+      themePriorSdLogSeconds: 0.5,
+      practicalTimeMultiplier: 1.2
+    }
+  } as const;
+}
+
+class RecoveringTacticalProfileRepository extends MemoryTacticalProfileRepository {
+  private remainingFailedReads = 0;
+
+  failReads(count: number): void {
+    this.remainingFailedReads = count;
+  }
+
+  override listDirtyDays(
+    ...args: Parameters<MemoryTacticalProfileRepository["listDirtyDays"]>
+  ): string[] {
+    if (this.remainingFailedReads > 0) {
+      this.remainingFailedReads -= 1;
+      throw new Error("simulated Tactical Profile cache read failure");
+    }
+    return super.listDirtyDays(...args);
+  }
 }
 
 function createUnclearHistoryReviewService(): PracticeService {

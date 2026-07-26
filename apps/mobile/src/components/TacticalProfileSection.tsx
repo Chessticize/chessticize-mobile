@@ -31,7 +31,9 @@ export function TacticalProfileHomeCard({
     <View testID="training-focus-section">
       <Text style={styles.sectionLabel}>Training focus</Text>
       <View
-        accessibilityLabel={`Training focus. ${content.title}. ${content.body}`}
+        accessibilityLabel={`Training focus. ${content.title}. ${content.body}${
+          presentation.assurance === "provisional" ? " Early estimate." : ""
+        }`}
         style={[styles.homeCard, homeToneStyle(content.tone)]}
         testID="training-focus-card"
       >
@@ -44,6 +46,11 @@ export function TacticalProfileHomeCard({
               {content.status}
             </Text>
           </View>
+          {presentation.assurance === "provisional" ? (
+            <Text style={styles.earlyEstimateLabel} testID="training-focus-early-estimate">
+              Early estimate
+            </Text>
+          ) : null}
         </View>
         {primarySignal && taskFamilies.length > 1 ? (
           <Text style={styles.modeLabel} testID="training-focus-primary-mode">
@@ -96,16 +103,23 @@ function TacticalProfileScreen({
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
   const activeTaskFamily = activeTaskFamilyFor(presentation);
-  const taskFamilies = recommendedTaskFamilies(presentation.signals);
+  const taskFamilies = signalTaskFamilies(presentation.signals);
   const familySignals = presentation.signals.filter(
     (signal) => signal.taskFamily === activeTaskFamily
   );
-  const allRecommendedSignals = distinctRecommendedSignals(familySignals);
-  const recommendedSignals = allRecommendedSignals.slice(0, TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT);
-  const hiddenRecommendationCount = allRecommendedSignals.length - recommendedSignals.length;
-  const watchSignals = familySignals.filter((signal) => signal.status === "watch");
+  const distinctSignals = distinctFamilySignals(familySignals);
+  const visibleSignals = distinctSignals.slice(0, TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT);
+  const recommendedSignals = visibleSignals.filter(
+    (signal) => signal.status === "recommended"
+  );
+  const watchSignals = visibleSignals.filter((signal) => signal.status === "watch");
+  const hiddenSignalCount = distinctSignals.length - visibleSignals.length;
   const canPreview = recommendedSignals.length > 0
-    && presentation.focusedRun?.taskFamily === activeTaskFamily;
+    && presentation.focusedRunUnavailable === undefined
+    && (
+      presentation.focusedRun === undefined
+      || presentation.focusedRun.taskFamily === activeTaskFamily
+    );
 
   return (
     <View style={styles.flow} testID="tactical-profile-screen">
@@ -130,7 +144,7 @@ function TacticalProfileScreen({
         <Text style={styles.contextTitle}>{profileHeadingFor(presentation, familySignals)}</Text>
         <Text style={styles.body}>{profileBodyFor(presentation)}</Text>
         <Text style={styles.contextFoot}>
-          Based on ordinary mixed {taskFamilyRunLabel(activeTaskFamily)} Runs. Review and focused Runs do not shape discovery.
+          {profileContextFor(presentation)}
         </Text>
       </View>
 
@@ -147,13 +161,6 @@ function TacticalProfileScreen({
               onExplain={() => presentation.onIntent({ type: "explain-signal", signalId: signal.id })}
             />
           ))}
-          {hiddenRecommendationCount > 0 ? (
-            <Text style={styles.monitoringNote} testID="tactical-profile-more-signals">
-              {hiddenRecommendationCount === 1
-                ? "1 more pattern is being monitored in the background."
-                : `${hiddenRecommendationCount} more patterns are being monitored in the background.`}
-            </Text>
-          ) : null}
         </View>
       ) : null}
 
@@ -168,6 +175,14 @@ function TacticalProfileScreen({
             />
           ))}
         </View>
+      ) : null}
+
+      {hiddenSignalCount > 0 ? (
+        <Text style={styles.monitoringNote} testID="tactical-profile-more-signals">
+          {hiddenSignalCount === 1
+            ? "1 more pattern is being monitored in the background."
+            : `${hiddenSignalCount} more patterns are being monitored in the background.`}
+        </Text>
       ) : null}
 
       {recommendedSignals.length > 0 && presentation.focusedRunUnavailable ? (
@@ -211,7 +226,12 @@ function RecommendationExplanation({
   if (!signal) {
     return <TacticalProfileScreen presentation={presentation} />;
   }
-  const canPreview = presentation.focusedRun?.taskFamily === signal.taskFamily;
+  const canPreview = signal.status === "recommended"
+    && presentation.focusedRunUnavailable === undefined
+    && (
+      presentation.focusedRun === undefined
+      || presentation.focusedRun.taskFamily === signal.taskFamily
+    );
 
   return (
     <View style={styles.flow} testID="tactical-profile-explanation">
@@ -221,6 +241,7 @@ function RecommendationExplanation({
         title={signal.themeLabel}
         onBack={() => presentation.onIntent({ type: "open-profile" })}
       />
+      <EarlyEstimateNotice presentation={presentation} />
       <View style={styles.explanationHero}>
         <SignalKindPill kind={signal.kind} />
         <Text style={styles.explanationTitle}>{signalSummary(signal)}</Text>
@@ -286,6 +307,7 @@ function FocusedRunPreviewScreen({
         title={preview.title}
         onBack={() => presentation.onIntent({ type: "open-profile" })}
       />
+      <EarlyEstimateNotice presentation={presentation} />
       <Text style={styles.previewSummary}>
         {preview.totalPuzzleCount} puzzles · {preview.durationLabel}
       </Text>
@@ -367,6 +389,7 @@ function SuppressedRecommendation({
       <Text style={styles.suppressedBody}>
         We will keep gathering evidence in mixed Runs without emphasizing this recommendation.
       </Text>
+      <EarlyEstimateNotice presentation={presentation} />
       <Pressable
         accessibilityRole="button"
         style={styles.primaryButton}
@@ -479,7 +502,11 @@ function SignalKindPill({
   return (
     <View style={[styles.kindPill, kind === "speed" ? styles.kindPillSpeed : styles.kindPillSolve]}>
       <Text style={[styles.kindPillText, kind === "speed" ? styles.kindPillTextSpeed : styles.kindPillTextSolve]}>
-        {kind === "speed" ? "Completed-puzzle speed" : "Solve reliability"}
+        {kind === "speed"
+          ? "Completed-puzzle speed"
+          : kind === "both"
+            ? "Reliability & speed"
+            : "Solve reliability"}
       </Text>
     </View>
   );
@@ -526,17 +553,26 @@ function selectedSignalFor(
 }
 
 function signalSummary(signal: TacticalProfileSignal): string {
-  return signal.kind === "speed"
-    ? "You solve these correctly, but more slowly than comparable puzzles."
-    : "You complete these less reliably than comparable puzzles.";
+  if (signal.kind === "speed") {
+    return "You solve these correctly, but more slowly than comparable puzzles.";
+  }
+  if (signal.kind === "both") {
+    return "You complete these less reliably and solve completed puzzles more slowly than comparable puzzles.";
+  }
+  return "You complete these less reliably than comparable puzzles.";
 }
 
 function profileHeadingFor(
   presentation: TacticalProfilePresentation,
   signals: readonly TacticalProfileSignal[]
 ): string {
+  if (activeTaskFamilyUnavailable(presentation)) {
+    return `${taskFamilyLabel(activeTaskFamilyFor(presentation))} insights aren't ready`;
+  }
   if (presentation.phase === "balanced") {
-    return "No meaningful weakness right now";
+    return presentation.assurance === "provisional"
+      ? "No clear focus yet"
+      : "No meaningful weakness right now";
   }
   if (presentation.phase === "collecting") {
     return "Still collecting evidence";
@@ -548,13 +584,28 @@ function profileHeadingFor(
 }
 
 function profileBodyFor(presentation: TacticalProfilePresentation): string {
+  if (activeTaskFamilyUnavailable(presentation)) {
+    return "Playing more mixed Runs won't unlock recommendations yet.";
+  }
   if (presentation.phase === "balanced") {
-    return "Your recent completed puzzles look balanced after accounting for difficulty and Run settings.";
+    return presentation.assurance === "provisional"
+      ? "This early model has not found a repeated pattern strong enough to emphasize."
+      : "Your recent completed puzzles look balanced after accounting for difficulty and Run settings.";
   }
   if (presentation.phase === "collecting") {
     return "Keep playing mixed Runs. We need results from more different puzzles and sessions before recommending a focus.";
   }
   return "Recommendations separate evidence, practical impact, and training priority.";
+}
+
+function profileContextFor(presentation: TacticalProfilePresentation): string {
+  if (activeTaskFamilyUnavailable(presentation)) {
+    return "Your practice history remains saved for a future validated model.";
+  }
+  if (presentation.assurance === "provisional") {
+    return `This is an early estimate based on ordinary mixed ${taskFamilyRunLabel(activeTaskFamilyFor(presentation))} Runs. It may change as the model is validated with more players. Review and focused Runs do not shape discovery.`;
+  }
+  return `Based on ordinary mixed ${taskFamilyRunLabel(activeTaskFamilyFor(presentation))} Runs. Review and focused Runs do not shape discovery.`;
 }
 
 function homeContentFor(
@@ -574,6 +625,14 @@ function homeContentFor(
       tone: "blue"
     };
   }
+  if (allTaskFamiliesUnavailable(presentation)) {
+    return {
+      status: "Not available yet",
+      title: "Training insights aren't ready",
+      body: "Personalized training is not enabled in this version. Your practice history remains saved.",
+      tone: "neutral"
+    };
+  }
   if (presentation.phase === "collecting") {
     return {
       status: "Collecting evidence",
@@ -583,6 +642,14 @@ function homeContentFor(
     };
   }
   if (presentation.phase === "balanced") {
+    if (presentation.assurance === "provisional") {
+      return {
+        status: "Still learning",
+        title: "No clear focus yet",
+        body: "The early model has not found a repeated pattern strong enough to emphasize.",
+        tone: "neutral"
+      };
+    }
     return {
       status: "No focus needed",
       title: "Recent play looks balanced",
@@ -624,6 +691,24 @@ function homeContentFor(
   };
 }
 
+function EarlyEstimateNotice({
+  presentation
+}: {
+  presentation: TacticalProfilePresentation;
+}): React.JSX.Element | null {
+  if (presentation.assurance !== "provisional") {
+    return null;
+  }
+  return (
+    <View style={styles.earlyEstimateNotice} testID="tactical-profile-early-estimate">
+      <Text style={styles.earlyEstimateNoticeTitle}>Early estimate</Text>
+      <Text style={styles.earlyEstimateNoticeBody}>
+        Use this as a training suggestion while we validate the model with more players.
+      </Text>
+    </View>
+  );
+}
+
 function recommendedThemeLabels(presentation: TacticalProfilePresentation): string[] {
   return distinctRecommendedSignals(presentation.signals).map((signal) => signal.themeLabel);
 }
@@ -641,6 +726,19 @@ function distinctRecommendedSignals(
       return false;
     }
     familyThemeKeys.add(signal.themeKey);
+    return true;
+  });
+}
+
+function distinctFamilySignals(
+  signals: readonly TacticalProfileSignal[]
+): TacticalProfileSignal[] {
+  const seenThemeKeys = new Set<string>();
+  return signals.filter((signal) => {
+    if (seenThemeKeys.has(signal.themeKey)) {
+      return false;
+    }
+    seenThemeKeys.add(signal.themeKey);
     return true;
   });
 }
@@ -666,6 +764,28 @@ function recommendedTaskFamilies(
       .filter((signal) => signal.status === "recommended")
       .map((signal) => signal.taskFamily)
   )];
+}
+
+function signalTaskFamilies(
+  signals: readonly TacticalProfileSignal[]
+): TacticalProfileTaskFamily[] {
+  return [...new Set(signals.map((signal) => signal.taskFamily))];
+}
+
+function activeTaskFamilyUnavailable(
+  presentation: TacticalProfilePresentation
+): boolean {
+  return presentation.phase === "collecting"
+    && presentation.unavailableFamilies?.[activeTaskFamilyFor(presentation)] !== undefined;
+}
+
+function allTaskFamiliesUnavailable(
+  presentation: TacticalProfilePresentation
+): boolean {
+  return presentation.phase === "collecting"
+    && (["line", "arrow_duel"] as const).every(
+      (taskFamily) => presentation.unavailableFamilies?.[taskFamily] !== undefined
+    );
 }
 
 function activeTaskFamilyFor(
@@ -798,7 +918,18 @@ const styles = StyleSheet.create({
     borderColor: "#CBD5E1"
   },
   homeHeader: {
-    alignItems: "flex-start"
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "space-between"
+  },
+  earlyEstimateLabel: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    textTransform: "uppercase"
   },
   statusPill: {
     alignItems: "center",
@@ -942,6 +1073,27 @@ const styles = StyleSheet.create({
   contextFoot: {
     color: "#64748B",
     fontSize: 12,
+    lineHeight: 18
+  },
+  earlyEstimateNotice: {
+    backgroundColor: "#FFF7ED",
+    borderColor: "#FED7AA",
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 3,
+    paddingHorizontal: 14,
+    paddingVertical: 11
+  },
+  earlyEstimateNoticeTitle: {
+    color: "#9A3412",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    textTransform: "uppercase"
+  },
+  earlyEstimateNoticeBody: {
+    color: "#7C2D12",
+    fontSize: 13,
     lineHeight: 18
   },
   taskFamilySelector: {

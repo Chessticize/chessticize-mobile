@@ -11,6 +11,7 @@ import {
   normalizeThemeSelection,
   normalizeRatingRecord,
   mergePracticeRunCatalogs,
+  namedThemesForSelection,
   orderReviewQueue,
   practiceRunsFromLegacyCustomConfigs,
   preferredReviewScheduleChange,
@@ -54,6 +55,7 @@ import type {
   ClearLocalHistoryResult,
   ExportedSprintSession,
   LocalDataImport,
+  LocalDataImportObserver,
   LocalDataImportResult,
   LocalDataExport,
   PracticeRatingActivity,
@@ -63,7 +65,14 @@ import type {
 } from "./practice-store.ts";
 import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
 import { clonePracticeSettings, defaultPracticeSettings, normalizeReviewReminderPreference, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
-import { selectUniquePuzzles } from "./puzzle-selection.ts";
+import {
+  selectUniquePuzzles,
+  selectUniquePuzzlesForRatingBands
+} from "./puzzle-selection.ts";
+import type {
+  RatingBandPuzzleSelection,
+  RatingBandPuzzleSelectionInput
+} from "./puzzle-source.ts";
 import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync.ts";
 import { assignLegacyRatingGenerations } from "./rating-history.ts";
 import type { PracticeProgressSummary } from "./rating-history.ts";
@@ -230,6 +239,7 @@ interface AppSettingsRow {
   sprint_rules_guide_seen: number;
   sprint_active_session_guide_seen: number;
   sprint_arrow_duel_guide_seen: number;
+  sprint_focused_run_guide_seen: number;
 }
 
 interface SprintSessionExportRow {
@@ -267,7 +277,8 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 11;
+export const CURRENT_SCHEMA_VERSION = 13;
+const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
   from: number;
@@ -286,7 +297,9 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 7, to: 8, apply: migrateV7ToV8 },
   { from: 8, to: 9, apply: migrateV8ToV9 },
   { from: 9, to: 10, apply: migrateV9ToV10 },
-  { from: 10, to: 11, apply: migrateV10ToV11 }
+  { from: 10, to: 11, apply: migrateV10ToV11 },
+  { from: 11, to: 12, apply: migrateV11ToV12 },
+  { from: 12, to: 13, apply: migrateV12ToV13 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -400,8 +413,18 @@ export class SyncSQLiteStore implements PracticeStore {
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
     const rows = this.db
-      .prepare("SELECT * FROM puzzles WHERE rating >= ? AND rating <= ? ORDER BY rating ASC, id ASC")
-      .all(filter.minRating ?? 0, filter.maxRating ?? 4000) as PuzzleRow[];
+      .prepare(
+        filter.preferredRating === undefined
+          ? "SELECT * FROM puzzles WHERE rating >= ? AND rating <= ? ORDER BY rating ASC, id ASC"
+          : "SELECT * FROM puzzles WHERE rating >= ? AND rating <= ? ORDER BY ABS(rating - ?) ASC, id ASC"
+      )
+      .all(
+        filter.minRating ?? 0,
+        filter.maxRating ?? 4000,
+        ...(filter.preferredRating === undefined
+          ? []
+          : [filter.preferredRating])
+      ) as PuzzleRow[];
 
     return selectUniquePuzzles({
       puzzles: rows.map(puzzleFromRow),
@@ -415,6 +438,28 @@ export class SyncSQLiteStore implements PracticeStore {
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
     });
+  }
+
+  selectPuzzlesForRatingBands(
+    input: RatingBandPuzzleSelectionInput
+  ): RatingBandPuzzleSelection[] {
+    const widestHalfWidth = Math.max(...input.halfWidths, 0);
+    const rows = this.db
+      .prepare(
+        `SELECT *
+         FROM puzzles
+         WHERE rating >= ? AND rating <= ?
+         ORDER BY ABS(rating - ?) ASC, id ASC`
+      )
+      .all(
+        Math.max(0, input.ratingAnchor - widestHalfWidth),
+        input.ratingAnchor + widestHalfWidth,
+        input.ratingAnchor
+      ) as PuzzleRow[];
+    return selectUniquePuzzlesForRatingBands(
+      rows.map(puzzleFromRow),
+      input
+    );
   }
 
   getRating(key: string): RatingRecord {
@@ -600,8 +645,9 @@ export class SyncSQLiteStore implements PracticeStore {
           move_feedback_haptics_enabled,
           sprint_rules_guide_seen,
           sprint_active_session_guide_seen,
-          sprint_arrow_duel_guide_seen
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          sprint_arrow_duel_guide_seen,
+          sprint_focused_run_guide_seen
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         boolToInt(cloned.sync.iCloudEnabled),
@@ -614,7 +660,8 @@ export class SyncSQLiteStore implements PracticeStore {
         boolToInt(cloned.moveFeedback.hapticsEnabled),
         boolToInt(cloned.sprintGuides.rulesSeen),
         boolToInt(cloned.sprintGuides.activeSessionSeen),
-        boolToInt(cloned.sprintGuides.arrowDuelSeen)
+        boolToInt(cloned.sprintGuides.arrowDuelSeen),
+        boolToInt(cloned.sprintGuides.focusedRunSeen ?? false)
       );
   }
 
@@ -677,6 +724,10 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   updateSprintSession(state: SprintState): void {
+    const previous = this.getSprintSessions([state.id])[0];
+    const previouslyEligible =
+      isTacticalProfileEvidenceSession(previous) &&
+      this.countAttempts({ source: "sprint", sessionId: state.id }) > 0;
     this.db
       .prepare(
         `UPDATE sprint_sessions
@@ -699,6 +750,12 @@ export class SyncSQLiteStore implements PracticeStore {
         state.ratingAfter ?? null,
         state.id
       );
+    const isNowEligible =
+      isTacticalProfileEvidenceSession(state) &&
+      this.countAttempts({ source: "sprint", sessionId: state.id }) > 0;
+    if (!previouslyEligible && isNowEligible) {
+      this.bumpTacticalProfileSourceRevision();
+    }
   }
 
   recordAttempt(attempt: AttemptEvent): void {
@@ -749,6 +806,14 @@ export class SyncSQLiteStore implements PracticeStore {
         storedAttempt.unclear ? 1 : 0,
         storedAttempt.unclearUpdatedAt ?? null
       );
+    if (
+      storedAttempt.source === "sprint" &&
+      isTacticalProfileEvidenceSession(
+        this.getSprintSessions([storedAttempt.sessionId])[0]
+      )
+    ) {
+      this.bumpTacticalProfileSourceRevision();
+    }
   }
 
   setAttemptUnclear(attemptId: string, unclear: boolean, updatedAt: string): AttemptHistoryRow {
@@ -789,6 +854,10 @@ export class SyncSQLiteStore implements PracticeStore {
       clauses.push("completed_at >= ?");
       params.push(filter.since);
     }
+    if (filter.until !== undefined) {
+      clauses.push("completed_at < ?");
+      params.push(filter.until);
+    }
     if (filter.puzzleId !== undefined) {
       clauses.push("puzzle_id = ?");
       params.push(filter.puzzleId);
@@ -821,6 +890,10 @@ export class SyncSQLiteStore implements PracticeStore {
     if (filter.since !== undefined) {
       clauses.push("a.completed_at >= ?");
       params.push(filter.since);
+    }
+    if (filter.until !== undefined) {
+      clauses.push("a.completed_at < ?");
+      params.push(filter.until);
     }
     if (filter.puzzleId !== undefined) {
       clauses.push("a.puzzle_id = ?");
@@ -999,7 +1072,32 @@ export class SyncSQLiteStore implements PracticeStore {
     };
   }
 
-  importLocalData(data: LocalDataImport): LocalDataImportResult {
+  importLocalData(
+    data: LocalDataImport,
+    observer?: LocalDataImportObserver
+  ): LocalDataImportResult {
+    const changedProfileSessions: Array<{
+      previous: ExportedSprintSession | undefined;
+      next: ExportedSprintSession;
+    }> = [];
+    let eligibleAttemptChanged = false;
+    const trackingObserver: LocalDataImportObserver = {
+      onSprintSessionChanged: (previous, next) => {
+        changedProfileSessions.push({ previous, next });
+        observer?.onSprintSessionChanged(previous, next);
+      },
+      onAttemptChanged: (previous, next) => {
+        eligibleAttemptChanged ||= [previous, next].some((candidate) => {
+          if (candidate?.source !== "sprint") {
+            return false;
+          }
+          return isTacticalProfileEvidenceSession(
+            this.getSprintSessions([candidate.sessionId])[0]
+          );
+        });
+        observer?.onAttemptChanged(previous, next);
+      }
+    };
     const result: LocalDataImportResult = {
       ratings: 0,
       attempts: 0,
@@ -1043,12 +1141,12 @@ export class SyncSQLiteStore implements PracticeStore {
         }
       }
       for (const session of data.sprintSessions) {
-        if (this.importSprintSession(session)) {
+        if (this.importSprintSession(session, trackingObserver)) {
           result.sprintSessions += 1;
         }
       }
       for (const attempt of data.attempts) {
-        if (this.importAttempt(attempt)) {
+        if (this.importAttempt(attempt, trackingObserver)) {
           result.attempts += 1;
         }
       }
@@ -1067,11 +1165,32 @@ export class SyncSQLiteStore implements PracticeStore {
           result.reviewQueue += 1;
         }
       }
+      const eligibleSessionChanged = changedProfileSessions.some(
+        ({ previous, next }) =>
+          (
+            isTacticalProfileEvidenceSession(previous) ||
+            isTacticalProfileEvidenceSession(next)
+          ) &&
+          this.countAttempts({ source: "sprint", sessionId: next.id }) > 0
+      );
+      if (eligibleSessionChanged || eligibleAttemptChanged) {
+        this.bumpTacticalProfileSourceRevision();
+      }
     });
     return result;
   }
 
   clearLocalHistory(): ClearLocalHistoryResult {
+    const hadTacticalProfileEvidence = this
+      .listSprintSessions()
+      .some(
+        (session) =>
+          isTacticalProfileEvidenceSession(session) &&
+          this.countAttempts({
+            source: "sprint",
+            sessionId: session.id
+          }) > 0
+      );
     const result: ClearLocalHistoryResult = {
       attempts: countRows(this.db, "attempts"),
       reviewEvents: countRows(this.db, "review_events"),
@@ -1083,6 +1202,9 @@ export class SyncSQLiteStore implements PracticeStore {
     this.db.prepare("DELETE FROM review_queue").run();
     this.db.prepare("DELETE FROM review_schedule_removals").run();
     this.db.prepare("DELETE FROM sprint_sessions WHERE status NOT IN ('active', 'paused')").run();
+    if (hadTacticalProfileEvidence) {
+      this.bumpTacticalProfileSourceRevision();
+    }
     return result;
   }
 
@@ -1566,7 +1688,118 @@ export class SyncSQLiteStore implements PracticeStore {
     return rows.map(exportedSprintSessionFromRow);
   }
 
-  private importSprintSession(session: ExportedSprintSession): boolean {
+  getSprintSessions(ids: readonly string[]): ExportedSprintSession[] {
+    const uniqueIds = [...new Set(ids)];
+    const sessions: ExportedSprintSession[] = [];
+    for (let offset = 0; offset < uniqueIds.length; offset += MAX_SQL_ID_FILTER_VALUES) {
+      const chunk = uniqueIds.slice(offset, offset + MAX_SQL_ID_FILTER_VALUES);
+      const rows = this.db
+        .prepare(
+          `SELECT
+            id,
+            mode,
+            rating_key AS ratingKey,
+            rating_generation AS ratingGeneration,
+            config_json AS configJson,
+            run_id AS runId,
+            run_kind AS runKind,
+            run_name AS runName,
+            started_at AS startedAt,
+            completed_at AS completedAt,
+            status,
+            correct_count AS correctCount,
+            mistake_count AS mistakeCount,
+            rating_before AS ratingBefore,
+            rating_after AS ratingAfter
+           FROM sprint_sessions
+           WHERE id IN (${chunk.map(() => "?").join(", ")})`
+        )
+        .all(...chunk) as SprintSessionExportRow[];
+      sessions.push(...rows.map(exportedSprintSessionFromRow));
+    }
+    const byId = new Map(sessions.map((session) => [session.id, session]));
+    return uniqueIds.flatMap((id) => {
+      const session = byId.get(id);
+      return session ? [session] : [];
+    });
+  }
+
+  listLatestTerminalFocusedSprintSessions(): ExportedSprintSession[] {
+    const sessions: ExportedSprintSession[] = [];
+    for (const taskFamily of ["line", "arrow_duel"] as const) {
+      const row = this.db
+        .prepare(
+          `SELECT
+            id,
+            mode,
+            rating_key AS ratingKey,
+            rating_generation AS ratingGeneration,
+            config_json AS configJson,
+            run_id AS runId,
+            run_kind AS runKind,
+            run_name AS runName,
+            started_at AS startedAt,
+            completed_at AS completedAt,
+            status,
+            correct_count AS correctCount,
+            mistake_count AS mistakeCount,
+            rating_before AS ratingBefore,
+            rating_after AS ratingAfter
+           FROM sprint_sessions
+           WHERE completed_at IS NOT NULL
+             AND json_extract(
+               config_json,
+               '$.tacticalFocus.taskFamily'
+             ) = ?
+           ORDER BY completed_at DESC, id DESC
+           LIMIT 1`
+        )
+        .get(taskFamily) as SprintSessionExportRow | undefined;
+      if (row) {
+        sessions.push(exportedSprintSessionFromRow(row));
+      }
+    }
+    return sessions;
+  }
+
+  listSprintAttemptUtcDays(sessionIds: readonly string[]): string[] {
+    const uniqueIds = [...new Set(sessionIds)];
+    const days = new Set<string>();
+    for (let offset = 0; offset < uniqueIds.length; offset += MAX_SQL_ID_FILTER_VALUES) {
+      const chunk = uniqueIds.slice(offset, offset + MAX_SQL_ID_FILTER_VALUES);
+      const rows = this.db
+        .prepare(
+          `SELECT DISTINCT strftime('%Y-%m-%d', completed_at) AS day
+           FROM attempts
+           WHERE source = 'sprint'
+             AND session_id IN (${chunk.map(() => "?").join(", ")})
+             AND strftime('%Y-%m-%d', completed_at) IS NOT NULL`
+        )
+        .all(...chunk) as Array<{ day: string }>;
+      for (const row of rows) {
+        days.add(row.day);
+      }
+    }
+    return [...days].sort();
+  }
+
+  getTacticalProfileSourceRevision(): number {
+    const row = this.db.prepare(`
+      SELECT revision
+      FROM tactical_profile_source_state
+      WHERE singleton_id = 1
+    `).get() as { revision?: unknown } | undefined;
+    return typeof row?.revision === "number" &&
+        Number.isSafeInteger(row.revision) &&
+        row.revision >= 0
+      ? row.revision
+      : 0;
+  }
+
+  private importSprintSession(
+    session: ExportedSprintSession,
+    observer?: LocalDataImportObserver
+  ): boolean {
     const existingRow = this.db
       .prepare(
         `SELECT
@@ -1638,6 +1871,7 @@ export class SyncSQLiteStore implements PracticeStore {
           next.ratingAfter ?? null,
           next.id
         );
+      observer?.onSprintSessionChanged(previous, next);
       return true;
     }
     this.db
@@ -1679,10 +1913,14 @@ export class SyncSQLiteStore implements PracticeStore {
         next.ratingBefore,
         next.ratingAfter ?? null
       );
+    observer?.onSprintSessionChanged(previous, next);
     return true;
   }
 
-  private importAttempt(attempt: AttemptEvent): boolean {
+  private importAttempt(
+    attempt: AttemptEvent,
+    observer?: LocalDataImportObserver
+  ): boolean {
     const existing = this.attemptById(attempt.id);
     if (existing) {
       const next = preferredAttemptHistoryRow(existing, attempt);
@@ -1731,13 +1969,16 @@ export class SyncSQLiteStore implements PracticeStore {
           next.unclearUpdatedAt ?? null,
           next.id
         );
+      observer?.onAttemptChanged(existing, next);
       return true;
     }
     if (!this.getPuzzle(attempt.puzzleId)) {
       return false;
     }
     this.ensureSessionForAttempt(attempt);
-    this.recordAttempt(cloneAttemptHistoryRow(attempt));
+    const next = cloneAttemptHistoryRow(attempt);
+    this.recordAttempt(next);
+    observer?.onAttemptChanged(undefined, next);
     return true;
   }
 
@@ -1811,6 +2052,14 @@ export class SyncSQLiteStore implements PracticeStore {
         attempt.ratingBefore,
         null
       );
+  }
+
+  private bumpTacticalProfileSourceRevision(): void {
+    this.db.prepare(`
+      UPDATE tactical_profile_source_state
+      SET revision = revision + 1
+      WHERE singleton_id = 1
+    `).run();
   }
 
 }
@@ -2202,6 +2451,7 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   // version while still lacking these columns.
   ensureMoveFeedbackColumns(db);
   migrateV10ToV11(db);
+  migrateV11ToV12(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -2209,7 +2459,8 @@ function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
     hasColumn(db, "app_settings", "move_feedback_haptics_enabled") &&
     hasColumn(db, "app_settings", "sprint_rules_guide_seen") &&
     hasColumn(db, "app_settings", "sprint_active_session_guide_seen") &&
-    hasColumn(db, "app_settings", "sprint_arrow_duel_guide_seen");
+    hasColumn(db, "app_settings", "sprint_arrow_duel_guide_seen") &&
+    hasColumn(db, "app_settings", "sprint_focused_run_guide_seen");
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -2383,6 +2634,36 @@ function migrateV10ToV11(db: SyncSqliteDatabase): void {
   );
 }
 
+function migrateV11ToV12(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "sprint_focused_run_guide_seen",
+    "ALTER TABLE app_settings ADD COLUMN sprint_focused_run_guide_seen INTEGER NOT NULL DEFAULT 0 CHECK (sprint_focused_run_guide_seen IN (0, 1))"
+  );
+}
+
+function migrateV12ToV13(db: SyncSqliteDatabase): void {
+  if (hasColumn(db, "sprint_sessions", "config_json")) {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS sprint_sessions_tactical_focus_family_completed_at_id_idx
+      ON sprint_sessions(
+        json_extract(config_json, '$.tacticalFocus.taskFamily'),
+        completed_at DESC,
+        id DESC
+      );
+    `);
+  }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tactical_profile_source_state (
+      singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+      revision INTEGER NOT NULL CHECK (revision >= 0)
+    );
+    INSERT OR IGNORE INTO tactical_profile_source_state (singleton_id, revision)
+    VALUES (1, 0);
+  `);
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -2527,7 +2808,8 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
     sprintGuides: {
       rulesSeen: intToBool(row.sprint_rules_guide_seen),
       activeSessionSeen: intToBool(row.sprint_active_session_guide_seen),
-      arrowDuelSeen: intToBool(row.sprint_arrow_duel_guide_seen)
+      arrowDuelSeen: intToBool(row.sprint_arrow_duel_guide_seen),
+      focusedRunSeen: intToBool(row.sprint_focused_run_guide_seen)
     }
   };
 }
@@ -2742,6 +3024,20 @@ function defaultRunPuzzleTiming(perPuzzleSeconds: number): {
   timeoutAfterSeconds: number | null;
 } {
   return defaultPuzzleTimingPolicy(perPuzzleSeconds);
+}
+
+function isTacticalProfileEvidenceSession(
+  session:
+    | Pick<SprintState, "completedAt" | "config">
+    | Pick<ExportedSprintSession, "completedAt" | "config">
+    | undefined
+): boolean {
+  return Boolean(
+    session?.completedAt &&
+    session.config &&
+    session.config.tacticalFocus === undefined &&
+    namedThemesForSelection(session.config.themes).length === 0
+  );
 }
 
 function normalizedImportedSprintSession(session: ExportedSprintSession): ExportedSprintSession {

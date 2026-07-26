@@ -8,6 +8,7 @@ import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import {
   MATE_PATTERN_THEMES,
+  curatedPuzzleThemes,
   isServerCompatibleArrowDuelPuzzle
 } from "../packages/core/src/index.ts";
 
@@ -179,6 +180,7 @@ function initializeDatabase(db) {
       initial_fen TEXT NOT NULL,
       solution_moves TEXT NOT NULL,
       rating INTEGER NOT NULL,
+      rating_deviation INTEGER NOT NULL,
       stockfish_eval REAL NOT NULL,
       stockfish_bestmove TEXT NOT NULL,
       stockfish_eval_after_first_move REAL NOT NULL
@@ -474,10 +476,11 @@ function writeSelectedPack(db, selected) {
       initial_fen,
       solution_moves,
       rating,
+      rating_deviation,
       stockfish_eval,
       stockfish_bestmove,
       stockfish_eval_after_first_move
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertThemeName = db.prepare("INSERT INTO themes (name) VALUES (?)");
   const insertPuzzleTheme = db.prepare("INSERT INTO puzzle_themes (puzzle_id, theme_id, rating) VALUES (?, ?, ?)");
@@ -496,6 +499,7 @@ function writeSelectedPack(db, selected) {
         canonicalPositionFen(puzzle.initialFen),
         puzzle.solutionMoves.join(" "),
         puzzle.rating,
+        puzzle.ratingDeviation,
         puzzle.stockfishEval,
         puzzle.stockfishBestMove,
         puzzle.stockfishEvalAfterFirstMove
@@ -519,8 +523,12 @@ function buildSqliteManifest(path, input, options) {
     let arrowDuelCount = 0;
     let minRating = Number.POSITIVE_INFINITY;
     let maxRating = Number.NEGATIVE_INFINITY;
+    const tacticalFeatureHash = createHash("sha256");
 
     for (const puzzle of iteratePackPuzzles(packDb)) {
+      if (!Number.isFinite(puzzle.ratingDeviation)) {
+        throw new Error(`Pack puzzle ${puzzle.id} is missing Rating Deviation`);
+      }
       puzzleCount += 1;
       if (isServerCompatibleArrowDuelPuzzle(puzzle)) {
         arrowDuelCount += 1;
@@ -530,6 +538,14 @@ function buildSqliteManifest(path, input, options) {
       }
       minRating = Math.min(minRating, puzzle.rating);
       maxRating = Math.max(maxRating, puzzle.rating);
+      tacticalFeatureHash.update(JSON.stringify([
+        puzzle.id,
+        puzzle.rating,
+        puzzle.ratingDeviation,
+        curatedPuzzleThemes(puzzle.themes),
+        puzzle.solutionMoves.length
+      ]));
+      tacticalFeatureHash.update("\n");
       const bucketMin = ratingBucket(puzzle.rating, options.maxRating);
       const bucket = buckets.get(bucketMin) ?? {
         minRating: bucketMin,
@@ -588,6 +604,11 @@ function buildSqliteManifest(path, input, options) {
           matePatternCounts: mapToSortedObject(bucket.matePatternCounts)
         })),
       matePatternCounts: mapToSortedObject(matePatternCounts),
+      tacticalAnalysis: {
+        schemaVersion: 1,
+        puzzleRatingDeviation: true,
+        featureHash: `sha256:${tacticalFeatureHash.digest("hex")}`
+      },
       arrowDuelCount
     };
   } finally {
@@ -700,6 +721,7 @@ function* iteratePackPuzzles(db) {
       puzzles.initial_fen,
       puzzles.solution_moves,
       puzzles.rating,
+      puzzles.rating_deviation,
       puzzles.stockfish_eval,
       puzzles.stockfish_bestmove,
       puzzles.stockfish_eval_after_first_move,
@@ -720,6 +742,7 @@ function* iteratePackPuzzles(db) {
         initialFen: expandFen(row.initial_fen),
         solutionMoves: splitWords(row.solution_moves),
         rating: row.rating,
+        ratingDeviation: row.rating_deviation,
         themes: [],
         source: "lichess",
         stockfishEval: row.stockfish_eval,

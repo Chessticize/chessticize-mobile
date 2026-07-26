@@ -1,0 +1,167 @@
+# Tactical Profile Calibration Handoff
+
+This runbook promotes the Tactical Profile from its explicitly disclosed
+provisional trial to validated calibration without weakening representative-
+data, holdout, or human-review gates. Calibration is a local development
+workflow. It is not a product API or a user-facing export flow.
+
+## Current provisional trial
+
+On 2026-07-26 the owner approved trying the model with no additional
+representative corpus available. The checked-in artifact therefore uses
+`provisional` families and the decision identity
+`owner-approved-provisional-trial-2026-07-26`. It deliberately keeps
+`representativeOwnerApproved: false` and null corpus/report hashes.
+
+The app labels these results as an early estimate. This state is usable for
+local recommendations and Focused Runs, but it is not calibration evidence and
+must not be described as validated. Existing canonical history is rebuilt into
+derived daily cells under the new calibration identity; users do not need to
+re-earn eligible attempts.
+
+## Required inputs
+
+- One or more private JSON progress exports. Each file may contain one canonical
+  `LocalDataExport` object or an array of exports.
+- The exact Core Pack v3 SQLite file at
+  `fixtures/puzzles/bundled-core-pack.sqlite`.
+- The matching checked-in manifest and predeclared V1 calibration policy.
+- An owner decision for whether the combined corpus is representative.
+
+The policy's train/holdout attempt and session minimums apply to the combined
+multi-user calibration corpus, not to one player's Profile readiness. An
+individual theme uses the calibrated artifact's distinct-puzzle,
+distinct-session, and posterior-confidence gates; the V1 artifact currently
+requires at least four distinct puzzles and two distinct sessions before a
+theme can leave More information needed. Never present corpus calibration
+minimums as player unlock progress.
+
+Keep progress exports, reports, and working evidence under `scratch/`; that
+directory is ignored by Git. Do not use synthetic fixtures, automated-test
+simulators, or hand-authored attempt rows as representative production
+evidence. Do not commit private progress exports.
+
+### Extract a downloaded app container
+
+An Xcode Device Hub download may expose a canonical progress export in its
+CloudKit cache even when the live SQLite file is absent. Extract the newest
+unambiguous snapshot locally:
+
+```sh
+pnpm extract:tactical-profile-progress \
+  --container /path/to/com.chessticize.mobile \
+  --output scratch/tactical-profile-calibration/progress-1.json
+```
+
+The extractor supports both a downloaded app-data directory and an
+`.xcappdata` package whose data is under `AppData/`. It scans locally, ignores
+unrelated cache assets, deduplicates content-equivalent canonical snapshots,
+refuses to guess when multiple distinct snapshots share the latest timestamp,
+refuses to overwrite an existing output, and creates the export with mode
+`0600`. It does not contact a server. CloudKit cache extraction is a development
+handoff fallback, not a guaranteed product export contract.
+
+Fetch and authenticate the immutable Core Pack before calibration:
+
+```sh
+pnpm fetch:core-pack
+```
+
+## First pass: create the report and review template
+
+Create a new working directory, then run the harness with every approved input
+export. Repeat `--progress` for additional files.
+
+```sh
+mkdir -p scratch/tactical-profile-calibration
+pnpm calibrate:tactical-profile \
+  --progress scratch/tactical-profile-calibration/progress-1.json \
+  --pack fixtures/puzzles/bundled-core-pack.sqlite \
+  --manifest fixtures/puzzles/bundled-core-pack.manifest.json \
+  --policy config/tactical-profile-calibration-policy-v1.json \
+  --report scratch/tactical-profile-calibration/report-first-pass.json \
+  --artifact scratch/tactical-profile-calibration/artifact-first-pass.json \
+  --decision-template scratch/tactical-profile-calibration/decision-evidence.json
+```
+
+The generated decision template is authenticated to the exact pack file,
+canonical corpus, policy, and decision-relevant analysis output hashes. The
+harness creates it once and refuses to overwrite it. Every decision starts as
+`null`, so the template cannot be reused as completed evidence without explicit
+review. Do not edit any hash. If calibration code or its analysis output changes
+between passes, generate a new first-pass template and review the new report.
+
+Review the report separately for `line` and `arrow_duel`. The owner must decide
+whether the corpus is representative, and the reviewer must replace every
+`null` decision with a boolean:
+
+- `candidateModelComparison`: the selected solve and speed models beat or
+  justify rejection of their predeclared alternatives on holdout data.
+- `timeoutPolicyStratification`: train and holdout results cover the required
+  Timeout-policy cohorts without an unaddressed policy effect.
+- `residualInfluencePolicy`: speed residual tails and influential observations
+  have an accepted treatment.
+- `heteroscedasticityPolicy`: changing residual spread has been assessed and
+  either modeled or explicitly accepted.
+- `priorCalibration`: solve and speed prior scales are supported.
+- `practicalThresholdCalibration`: practical deficit and confidence thresholds
+  are supported.
+- `opportunityTransformCalibration`: the opportunity weighting and exponent are
+  supported.
+- `actionUtilityCalibration`: recommendation and watch cutoffs are supported by
+  the intended training utility.
+- `focusedRunPolicyCalibration`: rating bands, recency exclusion, quota mix, and
+  sparse-theme fallback are supported.
+- `homeLeadCalibration`: the Home summary ordering and lead recommendation
+  policy are supported.
+
+Set a unique, non-empty `decisionId` that identifies the reviewed decision
+record. A `false` decision is valid evidence of review, but it keeps that family
+unavailable and is reported as explicitly rejected rather than incomplete.
+
+## Second pass: activation candidate
+
+Only after the review is complete and the owner approves the corpus as
+representative, rerun the same exact inputs with the reviewed evidence:
+
+```sh
+pnpm calibrate:tactical-profile \
+  --progress scratch/tactical-profile-calibration/progress-1.json \
+  --pack fixtures/puzzles/bundled-core-pack.sqlite \
+  --manifest fixtures/puzzles/bundled-core-pack.manifest.json \
+  --policy config/tactical-profile-calibration-policy-v1.json \
+  --report scratch/tactical-profile-calibration/report-reviewed.json \
+  --artifact scratch/tactical-profile-calibration/artifact-reviewed.json \
+  --decision-evidence scratch/tactical-profile-calibration/decision-evidence.json \
+  --representative-owner-approved \
+  --require-all-families-ready
+```
+
+`--require-all-families-ready` refuses to write the activation artifact unless
+both Line and Arrow Duel pass the predeclared readiness gates. The reviewed
+report is still written when a family fails so its reasons can be inspected.
+Never change the predeclared policy after looking at the final holdout merely to
+make a failed result pass.
+
+When both families pass:
+
+1. Review the report's missingness and family readiness reasons one final time.
+2. Add the reviewed report at
+   `config/tactical-profile-calibration-report-v1.json` and replace
+   `config/tactical-profile-calibration-artifact-v1.json` with the reviewed
+   artifact. The report is intentionally absent before activation so an
+   unrepresentative or synthetic report cannot look canonical.
+3. Run the root tests, typecheck, process validation, and the focused
+   calibration test before publishing the activation commit.
+4. Record the corpus scope, owner approval, decision ID, exact pack hash,
+   validation results, and review checkpoint in the PR without including
+   private progress data.
+
+If the corpus is absent, unrepresentative, too small, missing required Timeout
+cohorts, or fails a holdout gate, keep the checked-in artifact provisional (or
+unavailable for any family whose trial is withdrawn) and collect more real
+evidence. Do not manufacture corpus/report hashes or promote a family to
+`calibrated`. Existing user history does not need to be re-earned: the local
+service rebuilds canonical attempts and Sprint sessions into derived daily
+cells for a new artifact identity, while the harness separately scans approved
+private exports for population calibration.

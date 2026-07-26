@@ -8,8 +8,15 @@ import {
 } from "../../core/src/index.ts";
 import type { Puzzle } from "../../core/src/index.ts";
 import type { PuzzleSelectionFilter } from "./query-types.ts";
-import { selectUniquePuzzles } from "./puzzle-selection.ts";
-import type { PuzzleSource } from "./puzzle-source.ts";
+import {
+  selectUniquePuzzles,
+  selectUniquePuzzlesForRatingBands
+} from "./puzzle-selection.ts";
+import type {
+  PuzzleSource,
+  RatingBandPuzzleSelection,
+  RatingBandPuzzleSelectionInput
+} from "./puzzle-source.ts";
 import type { SyncSqliteDatabase } from "./sync-sqlite-store.ts";
 
 interface PuzzlePackRow {
@@ -17,9 +24,15 @@ interface PuzzlePackRow {
   initial_fen: string;
   solution_moves: string;
   rating: number;
+  rating_deviation?: number;
   stockfish_eval: number;
   stockfish_bestmove: string;
   stockfish_eval_after_first_move: number;
+}
+
+interface PuzzleCandidateRow {
+  id: string;
+  rating: number;
 }
 
 const MAX_SQL_ID_FILTER_VALUES = 900;
@@ -92,6 +105,25 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     return row ? this.puzzleFromRow(row) : undefined;
   }
 
+  getPuzzles(ids: readonly string[]): Puzzle[] {
+    const normalized = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+    const puzzles: Puzzle[] = [];
+    for (let offset = 0; offset < normalized.length; offset += MAX_SQL_ID_FILTER_VALUES) {
+      const chunk = normalized.slice(offset, offset + MAX_SQL_ID_FILTER_VALUES);
+      const rows = this.db.prepare(`
+        SELECT *
+        FROM puzzles
+        WHERE id IN (${chunk.map(() => "?").join(", ")})
+      `).all(...chunk) as PuzzlePackRow[];
+      puzzles.push(...this.puzzlesFromRows(rows));
+    }
+    const byId = new Map(puzzles.map((puzzle) => [puzzle.id, puzzle]));
+    return normalized.flatMap((id) => {
+      const puzzle = byId.get(id);
+      return puzzle ? [puzzle] : [];
+    });
+  }
+
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
     if (filter.rating !== undefined && filter.minRating === undefined && filter.maxRating === undefined) {
       return this.selectByRatingFallback(filter, filter.rating);
@@ -110,6 +142,196 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
     });
+  }
+
+  selectPuzzlesForRatingBands(
+    input: RatingBandPuzzleSelectionInput
+  ): RatingBandPuzzleSelection[] {
+    const widestHalfWidth = Math.max(...input.halfWidths, 0);
+    const candidateLimit = this.candidateLimit(input.filter.limit, true);
+    const { randomSeed: _randomSeed, ...unseededFilter } =
+      input.filter;
+    const filter: PuzzleSelectionFilter = {
+      ...unseededFilter,
+      minRating: Math.max(0, input.ratingAnchor - widestHalfWidth),
+      maxRating: input.ratingAnchor + widestHalfWidth,
+      preferredRating: input.ratingAnchor,
+      limit: candidateLimit
+    };
+    const candidates =
+      input.excludedThemes === undefined ||
+      input.excludedThemes.length === 0
+        ? this.selectPuzzles(filter)
+        : this.selectPuzzlesExcludingThemes(
+            filter,
+            input.excludedThemes
+          );
+    return selectUniquePuzzlesForRatingBands(candidates, input);
+  }
+
+  selectPuzzlesExcludingThemes(
+    filter: PuzzleSelectionFilter,
+    excludedThemes: readonly string[]
+  ): Puzzle[] {
+    const excludedThemeIds = namedThemesForSelection(excludedThemes)
+      .map((theme) => this.themeId(theme))
+      .filter((themeId): themeId is number => themeId !== undefined);
+    if (excludedThemeIds.length === 0) {
+      return this.selectPuzzles(filter);
+    }
+    const excludedIds = new Set(filter.excludeIds ?? []);
+    const shouldFilterPromotionCandidates =
+      filter.mode === "arrow_duel"
+      && this.arrowDuelEligibility === "all_non_promotion";
+    const candidateLimit = this.candidateLimit(
+      filter.limit,
+      filter.randomSeed !== undefined || shouldFilterPromotionCandidates
+    );
+    if (
+      filter.includeIds !== undefined &&
+      filter.includeIds.length > MAX_SQL_ID_FILTER_VALUES
+    ) {
+      const excludedThemeSet = new Set(namedThemesForSelection(excludedThemes));
+      return selectUniquePuzzles({
+        puzzles: this.filterArrowDuelCandidates(
+          this.getPuzzles(filter.includeIds)
+            .filter((puzzle) =>
+              !puzzle.themes.some((theme) => excludedThemeSet.has(theme))
+            ),
+          filter.mode
+        ),
+        mode: filter.mode,
+        limit: filter.limit,
+        ...(this.canSkipArrowDuelValidation ? { allPuzzlesArrowDuelEligible: true } : {}),
+        ...(filter.rating === undefined ? {} : { rating: filter.rating }),
+        ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
+        ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
+        includeIds: filter.includeIds,
+        excludeIds: [...excludedIds],
+        ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
+      });
+    }
+    const idClauses: string[] = [];
+    const idParams: string[] = [];
+    if (
+      filter.includeIds !== undefined &&
+      filter.includeIds.length > 0 &&
+      filter.includeIds.length <= MAX_SQL_ID_FILTER_VALUES
+    ) {
+      idClauses.push(`puzzles.id IN (${filter.includeIds.map(() => "?").join(", ")})`);
+      idParams.push(...filter.includeIds);
+    }
+    if (
+      filter.excludeIds !== undefined &&
+      filter.excludeIds.length > 0 &&
+      filter.excludeIds.length <= MAX_SQL_ID_FILTER_VALUES
+    ) {
+      idClauses.push(`puzzles.id NOT IN (${filter.excludeIds.map(() => "?").join(", ")})`);
+      idParams.push(...filter.excludeIds);
+    }
+    const selectedFromRows = (rows: readonly PuzzlePackRow[]): Puzzle[] =>
+      selectUniquePuzzles({
+        puzzles: this.filterArrowDuelCandidates(
+          this.puzzlesFromRows(rows),
+          filter.mode
+        ),
+        mode: filter.mode,
+        limit: filter.limit,
+        ...(this.canSkipArrowDuelValidation ? { allPuzzlesArrowDuelEligible: true } : {}),
+        ...(filter.rating === undefined ? {} : { rating: filter.rating }),
+        ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
+        ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
+        ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
+        excludeIds: [...excludedIds],
+        ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
+      });
+    if (filter.preferredRating !== undefined) {
+      const preferredRating = filter.preferredRating;
+      const sideLimit = candidateLimit +
+        (
+          filter.excludeIds !== undefined &&
+          filter.excludeIds.length > MAX_SQL_ID_FILTER_VALUES
+            ? excludedIds.size
+            : 0
+        );
+      const rowsOnSide = (
+        operator: "<=" | ">",
+        direction: "ASC" | "DESC"
+      ): PuzzlePackRow[] => this.db.prepare(`
+        SELECT puzzles.*
+        FROM puzzles
+        WHERE puzzles.rating >= ?
+          AND puzzles.rating <= ?
+          ${idClauses.map((clause) => `AND ${clause}`).join("\n          ")}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM puzzle_themes
+            WHERE puzzle_themes.puzzle_id = puzzles.id
+              AND puzzle_themes.theme_id IN (${excludedThemeIds.map(() => "?").join(", ")})
+          )
+          AND puzzles.rating ${operator} ?
+        ORDER BY puzzles.rating ${direction}, puzzles.id ASC
+        LIMIT ?
+      `).all(
+        filter.minRating ?? 0,
+        filter.maxRating ?? 4000,
+        ...idParams,
+        ...excludedThemeIds,
+        preferredRating,
+        sideLimit
+      ) as PuzzlePackRow[];
+      const rows = [
+        ...rowsOnSide("<=", "DESC"),
+        ...rowsOnSide(">", "ASC")
+      ]
+        .sort((left, right) =>
+          Math.abs(left.rating - preferredRating) -
+            Math.abs(right.rating - preferredRating) ||
+          left.id.localeCompare(right.id)
+        )
+        .filter((row) => !excludedIds.has(row.id))
+        .slice(0, candidateLimit);
+      return selectedFromRows(rows);
+    }
+    const queryPage = this.db.prepare(`
+        SELECT puzzles.*
+        FROM puzzles
+        WHERE puzzles.rating >= ?
+          AND puzzles.rating <= ?
+          ${idClauses.map((clause) => `AND ${clause}`).join("\n          ")}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM puzzle_themes
+            WHERE puzzle_themes.puzzle_id = puzzles.id
+              AND puzzle_themes.theme_id IN (${excludedThemeIds.map(() => "?").join(", ")})
+          )
+        ORDER BY puzzles.rating, puzzles.id
+        LIMIT ? OFFSET ?
+      `);
+    const rows: PuzzlePackRow[] = [];
+    const pageSize = candidateLimit;
+    const maximumRowsToScan = candidateLimit +
+      (filter.excludeIds !== undefined &&
+        filter.excludeIds.length > MAX_SQL_ID_FILTER_VALUES
+        ? excludedIds.size
+        : 0);
+    let offset = 0;
+    while (rows.length < candidateLimit && offset < maximumRowsToScan) {
+      const page = queryPage.all(
+        filter.minRating ?? 0,
+        filter.maxRating ?? 4000,
+        ...idParams,
+        ...excludedThemeIds,
+        pageSize,
+        offset
+      ) as PuzzlePackRow[];
+      rows.push(...page.filter((row) => !excludedIds.has(row.id)));
+      offset += page.length;
+      if (page.length < pageSize) {
+        break;
+      }
+    }
+    return selectedFromRows(rows.slice(0, candidateLimit));
   }
 
   private selectByRatingFallback(filter: PuzzleSelectionFilter, rating: number): Puzzle[] {
@@ -155,6 +377,15 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
   }
 
   private queryCandidates(filter: PuzzleSelectionFilter): Puzzle[] {
+    if (
+      filter.includeIds !== undefined &&
+      filter.includeIds.length > MAX_SQL_ID_FILTER_VALUES
+    ) {
+      return this.filterArrowDuelCandidates(
+        this.getPuzzles(filter.includeIds),
+        filter.mode
+      );
+    }
     const selectedThemes = namedThemesForSelection(filter.themes);
     const themeIds = selectedThemes
       .map((theme) => this.themeId(theme))
@@ -174,18 +405,27 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     const rows = themeIds.length > 1
       ? this.mergeThemedCandidateRows(themeIds, filter, limit)
       : this.queryCandidateRows(filter, themeIds[0], limit);
-    let puzzles = this.puzzlesFromRows(rows);
-    if (shouldFilterPromotionCandidates) {
-      puzzles = puzzles.filter((puzzle) => !hasArrowDuelPromotionCandidate(puzzle));
-    }
-    if (filter.mode === "arrow_duel" && !this.canSkipArrowDuelValidation) {
-      return puzzles.filter(isServerCompatibleArrowDuelPuzzle);
-    }
-    return puzzles;
+    return this.filterArrowDuelCandidates(
+      this.puzzlesFromRows(rows),
+      filter.mode
+    );
   }
 
   private get canSkipArrowDuelValidation(): boolean {
     return this.arrowDuelEligibility !== "validate";
+  }
+
+  private filterArrowDuelCandidates(
+    puzzles: readonly Puzzle[],
+    mode: PuzzleSelectionFilter["mode"]
+  ): Puzzle[] {
+    if (mode !== "arrow_duel" || this.arrowDuelEligibility === "all") {
+      return [...puzzles];
+    }
+    if (this.arrowDuelEligibility === "all_non_promotion") {
+      return puzzles.filter((puzzle) => !hasArrowDuelPromotionCandidate(puzzle));
+    }
+    return puzzles.filter(isServerCompatibleArrowDuelPuzzle);
   }
 
   private mergeThemedCandidateRows(
@@ -193,7 +433,9 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     filter: PuzzleSelectionFilter,
     limit: number
   ): PuzzlePackRow[] {
-    const rowsByTheme = themeIds.map((themeId) => this.queryCandidateRows(filter, themeId, limit));
+    const rowsByTheme = themeIds.map((themeId) =>
+      this.queryCandidateRows(filter, themeId, limit)
+    );
     const selected: PuzzlePackRow[] = [];
     const seenIds = new Set<string>();
     const maximumRows = Math.max(0, ...rowsByTheme.map((rows) => rows.length));
@@ -227,7 +469,8 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     let idColumn = "puzzles.id";
     if (themeId !== undefined) {
       from = "puzzle_themes";
-      selectedColumns = "puzzle_themes.puzzle_id AS id";
+      selectedColumns =
+        "puzzle_themes.puzzle_id AS id, puzzle_themes.rating AS rating";
       ratingColumn = "puzzle_themes.rating";
       idColumn = "puzzle_themes.puzzle_id";
       clauses.push("puzzle_themes.theme_id = ?");
@@ -244,7 +487,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       params.push(...filter.excludeIds);
     }
 
-    const rowsAtOffset = (rowLimit: number, offset?: number): Array<{ id: string }> => {
+    const rowsAtOffset = (rowLimit: number, offset?: number): PuzzleCandidateRow[] => {
       const offsetClause = offset === undefined ? "" : " OFFSET ?";
       const sql = `
         SELECT ${selectedColumns}
@@ -257,10 +500,64 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         ...params,
         rowLimit,
         ...(offset === undefined ? [] : [offset])
-      ) as Array<{ id: string }>;
+      ) as PuzzleCandidateRow[];
     };
-    const hydrateCandidateRows = (rows: Array<{ id: string }>): PuzzlePackRow[] =>
+    const hydrateCandidateRows = (rows: PuzzleCandidateRow[]): PuzzlePackRow[] =>
       themeId === undefined ? rows as PuzzlePackRow[] : this.puzzleRowsForIds(rows.map((row) => row.id));
+    const inMemoryExcludedIds =
+      filter.excludeIds !== undefined &&
+      filter.excludeIds.length > MAX_SQL_ID_FILTER_VALUES
+        ? new Set(filter.excludeIds)
+        : undefined;
+    if (filter.preferredRating !== undefined) {
+      const preferredRating = filter.preferredRating;
+      const sideLimit = limit + (inMemoryExcludedIds?.size ?? 0);
+      const rowsOnSide = (
+        operator: "<=" | ">",
+        direction: "ASC" | "DESC"
+      ): PuzzleCandidateRow[] => this.db.prepare(`
+        SELECT ${selectedColumns}
+        FROM ${from}
+        WHERE ${clauses.join(" AND ")}
+          AND ${ratingColumn} ${operator} ?
+        ORDER BY ${ratingColumn} ${direction}, ${idColumn} ASC
+        LIMIT ?
+      `).all(
+        ...params,
+        preferredRating,
+        sideLimit
+      ) as PuzzleCandidateRow[];
+      const rows = [
+        ...rowsOnSide("<=", "DESC"),
+        ...rowsOnSide(">", "ASC")
+      ]
+        .sort((left, right) =>
+          Math.abs(left.rating - preferredRating) -
+            Math.abs(right.rating - preferredRating) ||
+          left.id.localeCompare(right.id)
+        )
+        .filter((row) => !inMemoryExcludedIds?.has(row.id))
+        .slice(0, limit);
+      return hydrateCandidateRows(rows);
+    }
+    if (inMemoryExcludedIds !== undefined && filter.randomSeed === undefined) {
+      const rows: PuzzleCandidateRow[] = [];
+      const pageSize = Math.max(limit, this.candidateFloor);
+      const maximumRowsToScan = limit + inMemoryExcludedIds.size;
+      let offset = 0;
+      while (rows.length < limit && offset < maximumRowsToScan) {
+        const page = rowsAtOffset(
+          Math.min(pageSize, maximumRowsToScan - offset),
+          offset
+        );
+        rows.push(...page.filter((row) => !inMemoryExcludedIds.has(row.id)));
+        offset += page.length;
+        if (page.length < pageSize) {
+          break;
+        }
+      }
+      return hydrateCandidateRows(rows.slice(0, limit));
+    }
 
     if (filter.randomSeed === undefined) {
       return hydrateCandidateRows(rowsAtOffset(limit));
@@ -280,6 +577,27 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       `${themeId ?? "all"}:${filter.minRating ?? 0}:${filter.maxRating ?? 4000}`,
       countRow.count
     );
+    if (inMemoryExcludedIds !== undefined) {
+      const rows: PuzzleCandidateRow[] = [];
+      const pageSize = Math.max(limit, this.candidateFloor);
+      let scanned = 0;
+      while (rows.length < limit && scanned < countRow.count) {
+        const pageOffset = (offset + scanned) % countRow.count;
+        const rowsBeforeWrap = countRow.count - pageOffset;
+        const rowLimit = Math.min(
+          pageSize,
+          rowsBeforeWrap,
+          countRow.count - scanned
+        );
+        const page = rowsAtOffset(rowLimit, pageOffset);
+        rows.push(...page.filter((row) => !inMemoryExcludedIds.has(row.id)));
+        scanned += page.length;
+        if (page.length === 0) {
+          break;
+        }
+      }
+      return hydrateCandidateRows(rows.slice(0, limit));
+    }
     const rows = rowsAtOffset(limit, offset);
     if (rows.length < limit) {
       rows.push(...rowsAtOffset(limit - rows.length, 0));
@@ -319,6 +637,9 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       initialFen: expandFen(row.initial_fen),
       solutionMoves: splitWords(row.solution_moves),
       rating: row.rating,
+      ...(row.rating_deviation === undefined
+        ? {}
+        : { ratingDeviation: row.rating_deviation }),
       themes,
       source: "lichess",
       stockfishEval: row.stockfish_eval,

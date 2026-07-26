@@ -79,14 +79,13 @@ this patch.
 
 The release Core Pack is generated as `fixtures/puzzles/bundled-core-pack.sqlite`
 and copied into the native app bundle as a read-only SQLite database asset. The
-2026-07-10 depth-20 migrated pack contains 1,389,240 Arrow Duel eligible
-puzzles across the 600-2200 rating range. It retains the original sampled IDs
-except for 10,760 rows that no longer qualified under the depth-20 presolve;
-no replacement rows were sampled. Its measured artifact size is `513,323,008`
-bytes (`489.54 MiB`), below the 800 MB hard cap in
-`docs/PUZZLE_PACK_SAMPLING.md`. The manifest records the exact file hash and
+2026-07-26 Tactical Profile pack contains 1,400,000 Arrow Duel eligible puzzles
+across the 600-2200 rating range, including immutable Puzzle Rating Deviation
+for every row. Its measured artifact size is `520,278,016` bytes (`496.18 MiB`),
+below the 800 MB hard cap in `docs/PUZZLE_PACK_SAMPLING.md`. The manifest
+records the exact file hash, Tactical Profile feature hash, and
 per-bucket/theme counts. The artifact is published as the immutable
-`core-pack-v2` GitHub Release asset.
+`core-pack-v3` GitHub Release asset.
 
 ## Screenshot Set
 

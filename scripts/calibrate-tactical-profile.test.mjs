@@ -1,0 +1,906 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import {
+  assertValidTacticalProfileCalibrationArtifact
+} from "../packages/core/src/index.ts";
+import {
+  assertDecisionEvidenceMatchesAnalysis,
+  assertCalibrationArtifactMatchesReport,
+  buildArtifact,
+  buildDecisionEvidenceTemplate,
+  calibrationContentHash,
+  calibrationDecisionAnalysisHash,
+  evaluateCalibrationReadiness,
+  parseCalibrationArguments,
+  posteriorApproximationReport,
+  reliabilityBins,
+  runCalibration,
+  scoreBinaryPredictions,
+  splitWholeSessions,
+  verifyPackIdentity
+} from "./calibrate-tactical-profile.mjs";
+
+test("bundled calibration artifact is valid and tied to the predeclared policy and pack", async () => {
+  const [artifact, policy, manifest] = await Promise.all([
+    readFile("config/tactical-profile-calibration-artifact-v1.json", "utf8"),
+    readFile("config/tactical-profile-calibration-policy-v1.json", "utf8"),
+    readFile("fixtures/puzzles/bundled-core-pack.manifest.json", "utf8")
+  ]).then((values) => values.map((value) => JSON.parse(value)));
+
+  assert.doesNotThrow(() =>
+    assertValidTacticalProfileCalibrationArtifact(artifact)
+  );
+  assert.equal(artifact.provenance.policyId, policy.policyId);
+  assert.equal(
+    artifact.provenance.policyHash,
+    calibrationContentHash(policy)
+  );
+  assert.equal(
+    artifact.packFeatureHash,
+    manifest.tacticalAnalysis.featureHash
+  );
+  const calibratedFamilies = Object.entries(artifact.families)
+    .filter(([, family]) => family.status === "calibrated")
+    .map(([taskFamily]) => taskFamily);
+  if (calibratedFamilies.length > 0) {
+    const reportPath =
+      "config/tactical-profile-calibration-report-v1.json";
+    assert.equal(
+      existsSync(reportPath),
+      true,
+      "A production calibration report must accompany calibrated families"
+    );
+    const report = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(
+      artifact.provenance.reportHash,
+      calibrationContentHash(report)
+    );
+    assert.equal(
+      artifact.provenance.corpusHash,
+      report.input.corpusHash
+    );
+    assert.equal(
+      artifact.provenance.decisionEvidenceId,
+      report.input.decisionEvidenceId
+    );
+    assert.equal(report.input.representativeOwnerApproved, true);
+    assert.equal(report.input.policyHash, calibrationContentHash(policy));
+    assert.equal(report.packFeatureHash, manifest.tacticalAnalysis.featureHash);
+    assert.deepEqual(
+      artifact,
+      assertCalibrationArtifactMatchesReport(
+        artifact,
+        report,
+        policy,
+        manifest
+      )
+    );
+    for (const taskFamily of calibratedFamilies) {
+      assert.deepEqual(
+        artifact.provenance.familyReadiness[taskFamily],
+        report.families[taskFamily].readiness
+      );
+      assert.equal(report.families[taskFamily].readiness.ready, true);
+    }
+  }
+});
+
+test("authenticated reports bind every generated artifact parameter", () => {
+  const policy = calibrationPolicy();
+  const manifest = {
+    tacticalAnalysis: {
+      featureHash: `sha256:${"a".repeat(64)}`
+    }
+  };
+  const calibratedFamily = {
+    readiness: { ready: true, reasons: [] },
+    solve: {
+      coefficients: {
+        intercept: -0.25,
+        ratingGapSlope: 0.01,
+        timeoutLogCoefficient: -0.5
+      }
+    },
+    speed: {
+      coefficients: {
+        interceptLogSeconds: 3,
+        relativeDifficultyCoefficient: 0.002,
+        decisionCountCoefficient: 0.1,
+        paceLogCoefficient: 0.2,
+        slowPolicyLogCoefficient: 0.3
+      },
+      residualSd: 0.4
+    }
+  };
+  const report = {
+    createdAt: "2026-07-26T00:00:00.000Z",
+    policyId: policy.policyId,
+    input: {
+      schemaVersion: 1,
+      policyHash: calibrationContentHash(policy),
+      corpusHash: `sha256:${"b".repeat(64)}`,
+      decisionEvidenceId: "owner-reviewed-decisions",
+      representativeOwnerApproved: true
+    },
+    families: {
+      line: calibratedFamily,
+      arrow_duel: structuredClone(calibratedFamily)
+    }
+  };
+  const artifact = buildArtifact(
+    report,
+    report.families,
+    policy,
+    manifest
+  );
+
+  assert.deepEqual(
+    artifact,
+    assertCalibrationArtifactMatchesReport(
+      artifact,
+      report,
+      policy,
+      manifest
+    )
+  );
+
+  const handEdited = structuredClone(artifact);
+  handEdited.families.line.solve.ratingGapSlope += 0.001;
+  assert.throws(
+    () =>
+      assertCalibrationArtifactMatchesReport(
+        handEdited,
+        report,
+        policy,
+        manifest
+      ),
+    /does not exactly match/
+  );
+});
+
+test("decision evidence templates bind review to the exact calibration inputs", () => {
+  const report = {
+    input: {
+      corpusHash: `sha256:${"b".repeat(64)}`,
+      policyHash: `sha256:${"c".repeat(64)}`
+    }
+  };
+  const manifest = {
+    packFileHash: `sha256:${"a".repeat(64)}`
+  };
+
+  assert.deepEqual(buildDecisionEvidenceTemplate(report, manifest), {
+    schemaVersion: 2,
+    decisionId: "",
+    packFileHash: manifest.packFileHash,
+    corpusHash: report.input.corpusHash,
+    policyHash: report.input.policyHash,
+    analysisHash: calibrationDecisionAnalysisHash(report),
+    families: {
+      line: emptyDecisionEvidence(),
+      arrow_duel: emptyDecisionEvidence()
+    }
+  });
+});
+
+test("decision evidence follows the reviewed analysis rather than only its inputs", () => {
+  const report = {
+    schemaVersion: 1,
+    createdAt: "2026-07-26T00:00:00.000Z",
+    policyId: "test-policy",
+    packFeatureHash: `sha256:${"a".repeat(64)}`,
+    input: {
+      schemaVersion: 1,
+      corpusHash: `sha256:${"b".repeat(64)}`,
+      policyHash: `sha256:${"c".repeat(64)}`,
+      decisionEvidenceId: null,
+      representativeOwnerApproved: false
+    },
+    missingness: { missingPuzzle: 0 },
+    missingnessCohorts: [],
+    families: {
+      line: {
+        decisionEvidence: emptyDecisionEvidence(),
+        readiness: { ready: false, reasons: ["review required"] },
+        solve: { coefficients: { intercept: 0.25 } }
+      }
+    }
+  };
+  const analysisHash = calibrationDecisionAnalysisHash(report);
+  const reviewOnlyChange = structuredClone(report);
+  reviewOnlyChange.createdAt = "2026-07-27T00:00:00.000Z";
+  reviewOnlyChange.input.decisionEvidenceId = "reviewed";
+  reviewOnlyChange.input.representativeOwnerApproved = true;
+  reviewOnlyChange.families.line.decisionEvidence =
+    completeDecisionEvidence();
+  reviewOnlyChange.families.line.readiness = { ready: true, reasons: [] };
+  assert.equal(
+    calibrationDecisionAnalysisHash(reviewOnlyChange),
+    analysisHash
+  );
+
+  const changedAnalysis = structuredClone(reviewOnlyChange);
+  changedAnalysis.families.line.solve.coefficients.intercept = 0.5;
+  assert.notEqual(
+    calibrationDecisionAnalysisHash(changedAnalysis),
+    analysisHash
+  );
+  changedAnalysis.input.analysisHash =
+    calibrationDecisionAnalysisHash(changedAnalysis);
+  assert.throws(
+    () =>
+      assertDecisionEvidenceMatchesAnalysis(
+        { analysisHash },
+        changedAnalysis
+      ),
+    /does not match the reviewed analysis/
+  );
+});
+
+test("calibration CLI parses the two-pass review and activation controls", () => {
+  const options = parseCalibrationArguments([
+    "--progress",
+    "progress-1.json",
+    "--progress",
+    "progress-2.json",
+    "--pack",
+    "pack.sqlite",
+    "--manifest",
+    "manifest.json",
+    "--decision-template",
+    "decision.json",
+    "--representative-owner-approved",
+    "--require-all-families-ready"
+  ]);
+
+  assert.deepEqual(
+    options.progressPaths.map((path) => path.slice(path.lastIndexOf("/") + 1)),
+    ["progress-1.json", "progress-2.json"]
+  );
+  assert.equal(
+    options.decisionTemplatePath.slice(
+      options.decisionTemplatePath.lastIndexOf("/") + 1
+    ),
+    "decision.json"
+  );
+  assert.equal(options.ownerApproved, true);
+  assert.equal(options.requireAllFamiliesReady, true);
+});
+
+test("calibration content hashes ignore JSON object key order", () => {
+  assert.equal(
+    calibrationContentHash({ b: 2, a: { d: 4, c: 3 } }),
+    calibrationContentHash({ a: { c: 3, d: 4 }, b: 2 })
+  );
+});
+
+test("activation readiness cannot be asserted without an artifact output", async () => {
+  await assert.rejects(
+    runCalibration({ requireAllFamiliesReady: true }),
+    /requires --artifact/
+  );
+});
+
+test("calibration holdout keeps every session wholly on one side", () => {
+  const observations = [
+    observation("s1", "2026-01-01"),
+    observation("s1", "2026-01-01"),
+    observation("s2", "2026-01-02"),
+    observation("s3", "2026-01-03"),
+    observation("s4", "2026-01-04"),
+    observation("s5", "2026-01-05")
+  ];
+  const split = splitWholeSessions(observations, 0.4);
+  assert.deepEqual(new Set(split.train.map((row) => row.sessionId)), new Set(["s1", "s2", "s3"]));
+  assert.deepEqual(new Set(split.holdout.map((row) => row.sessionId)), new Set(["s4", "s5"]));
+});
+
+test("proper scoring and reliability reports are deterministic", () => {
+  const rows = [
+    { probability: 0.8, outcome: 1 },
+    { probability: 0.2, outcome: 0 },
+    { probability: 0.7, outcome: 0 }
+  ];
+  const score = scoreBinaryPredictions(rows);
+  assert.ok(Math.abs(score.brierScore - 0.19) < 1e-12);
+  assert.ok(score.logLoss > 0);
+  assert.deepEqual(reliabilityBins(rows, 2), [
+    {
+      minProbability: 0,
+      maxProbability: 0.5,
+      count: 1,
+      meanPredicted: 0.2,
+      observedRate: 0
+    },
+    {
+      minProbability: 0.5,
+      maxProbability: 1,
+      count: 2,
+      meanPredicted: 0.75,
+      observedRate: 0.5
+    }
+  ]);
+});
+
+test("artifact readiness fails closed without explicit representative-corpus approval", () => {
+  const report = {
+    trainSessionCount: 100,
+    holdoutSessionCount: 40,
+    trainAttemptCount: 1000,
+    holdoutAttemptCount: 400,
+    decisionEvidence: completeDecisionEvidence(),
+    solve: {
+      coefficients: {
+        intercept: 0,
+        ratingGapSlope: 1,
+        timeoutLogCoefficient: 0
+      },
+      converged: true,
+      calibrationConverged: true,
+      brierScore: 0.2,
+      logLoss: 0.6,
+      calibrationIntercept: 0,
+      calibrationSlope: 1,
+      posteriorApproximation: {
+        maximumMeanErrorRating: 8,
+        maximumSdErrorRating: 4
+      },
+      timeoutPolicyTrain: [
+        { timeoutPolicySeconds: 30, count: 100 },
+        { timeoutPolicySeconds: 60, count: 100 }
+      ],
+      timeoutPolicyHoldout: [
+        { timeoutPolicySeconds: 30, count: 50 },
+        { timeoutPolicySeconds: 60, count: 50 }
+      ]
+    },
+    speed: {
+      coefficients: {
+        interceptLogSeconds: 3,
+        relativeDifficultyCoefficient: 0,
+        decisionCountCoefficient: 0,
+        paceLogCoefficient: 0,
+        slowPolicyLogCoefficient: 0
+      },
+      residualSd: 0.4,
+      holdoutCount: 200,
+      meanLogResidual: 0,
+      rootMeanSquareLogResidual: 0.4
+    }
+  };
+  const policy = {
+    minimums: {
+      trainSessionsPerFamily: 50,
+      holdoutSessionsPerFamily: 20,
+      trainAttemptsPerFamily: 500,
+      holdoutAttemptsPerFamily: 200,
+      reliableSpeedHoldoutAttemptsPerFamily: 100,
+      timeoutPolicyHoldoutCohortsPerFamily: 2,
+      timeoutPolicyHoldoutAttemptsPerCohort: 50,
+      timeoutPolicyTrainCohortsPerFamily: 2,
+      timeoutPolicyTrainAttemptsPerCohort: 100
+    },
+    holdoutGates: {
+      maximumBrierScore: 0.25,
+      maximumLogLoss: 0.7,
+      maximumCalibrationInterceptMagnitude: 0.25,
+      minimumCalibrationSlope: 0.75,
+      maximumCalibrationSlope: 1.25,
+      maximumSpeedMeanLogResidualMagnitude: 0.12,
+      maximumSpeedRootMeanSquareLogResidual: 0.65,
+      maximumOneStepPosteriorMeanErrorRating: 12,
+      maximumOneStepPosteriorSdErrorRating: 8
+    }
+  };
+  assert.deepEqual(evaluateCalibrationReadiness(report, policy, true), {
+    ready: true,
+    reasons: []
+  });
+  assert.deepEqual(evaluateCalibrationReadiness(report, policy, false), {
+    ready: false,
+    reasons: ["representative corpus has not been explicitly owner-approved"]
+  });
+  const incompleteDecision = structuredClone(report);
+  incompleteDecision.decisionEvidence.actionUtilityCalibration = null;
+  assert.deepEqual(
+    evaluateCalibrationReadiness(incompleteDecision, policy, true).reasons,
+    ["required calibration decisions are incomplete: actionUtilityCalibration"]
+  );
+  const rejectedDecision = structuredClone(report);
+  rejectedDecision.decisionEvidence.actionUtilityCalibration = false;
+  assert.deepEqual(
+    evaluateCalibrationReadiness(rejectedDecision, policy, true).reasons,
+    ["required calibration decisions were rejected: actionUtilityCalibration"]
+  );
+  const oneTimeoutPolicy = structuredClone(report);
+  oneTimeoutPolicy.solve.timeoutPolicyHoldout = [
+    { timeoutPolicySeconds: 30, count: 100 }
+  ];
+  assert.deepEqual(
+    evaluateCalibrationReadiness(
+      oneTimeoutPolicy,
+      policy,
+      true
+    ).reasons,
+    ["too few qualified timeout-policy holdout cohorts"]
+  );
+  const oneTrainingTimeoutPolicy = structuredClone(report);
+  oneTrainingTimeoutPolicy.solve.timeoutPolicyTrain = [
+    { timeoutPolicySeconds: 30, count: 200 }
+  ];
+  assert.deepEqual(
+    evaluateCalibrationReadiness(
+      oneTrainingTimeoutPolicy,
+      policy,
+      true
+    ).reasons,
+    ["too few qualified timeout-policy training cohorts"]
+  );
+
+  const invalid = structuredClone(report);
+  invalid.solve.converged = false;
+  invalid.solve.coefficients.ratingGapSlope = Number.NaN;
+  invalid.solve.posteriorApproximation.maximumMeanErrorRating = 13;
+  assert.deepEqual(
+    evaluateCalibrationReadiness(invalid, policy, true).reasons,
+    [
+      "solve optimizer did not converge",
+      "solve calibration contains non-finite values",
+      "one-step posterior approximation gate failed"
+    ]
+  );
+});
+
+test("calibration authenticates the exact SQLite pack before fitting", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "tactical-pack-identity-"));
+  const packPath = join(directory, "pack.sqlite");
+  try {
+    const writer = new DatabaseSync(packPath);
+    writer.exec(`
+      CREATE TABLE puzzles (
+        id TEXT PRIMARY KEY,
+        rating INTEGER NOT NULL,
+        rating_deviation INTEGER,
+        solution_moves TEXT NOT NULL
+      );
+      INSERT INTO puzzles (id, rating, rating_deviation, solution_moves)
+      VALUES ('p1', 900, 80, 'e2e4');
+    `);
+    writer.close();
+    const bytes = await readFile(packPath);
+    const manifest = {
+      format: "sqlite",
+      packFileBytes: (await stat(packPath)).size,
+      packFileHash: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+      puzzleCount: 1,
+      rating: { min: 900, max: 900 }
+    };
+    const reader = new DatabaseSync(packPath, { readOnly: true });
+    try {
+      await verifyPackIdentity(manifest, packPath, reader);
+      await assert.rejects(
+        verifyPackIdentity(
+          { ...manifest, packFileHash: `sha256:${"0".repeat(64)}` },
+          packPath,
+          reader
+        ),
+        /hash does not match/
+      );
+      await assert.rejects(
+        verifyPackIdentity(
+          { ...manifest, puzzleCount: 2 },
+          packPath,
+          reader
+        ),
+        /features do not match/
+      );
+    } finally {
+      reader.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("calibration joins canonical exports and emits cohort reports without activating provisional decisions", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "tactical-calibration-e2e-"));
+  const packPath = join(directory, "pack.sqlite");
+  const manifestPath = join(directory, "manifest.json");
+  const policyPath = join(directory, "policy.json");
+  const progressPath = join(directory, "progress.json");
+  const decisionEvidencePath = join(directory, "decision-evidence.json");
+  const decisionTemplatePath = join(directory, "decision-template.json");
+  const reportPath = join(directory, "report.json");
+  const artifactPath = join(directory, "artifact.json");
+  try {
+    const writer = new DatabaseSync(packPath);
+    writer.exec(`
+      CREATE TABLE puzzles (
+        id TEXT PRIMARY KEY,
+        rating INTEGER NOT NULL,
+        rating_deviation INTEGER,
+        solution_moves TEXT NOT NULL
+      );
+      INSERT INTO puzzles (id, rating, rating_deviation, solution_moves)
+      VALUES ('p1', 900, 80, 'e2e4 e7e5');
+    `);
+    writer.close();
+    const bytes = await readFile(packPath);
+    const packFileHash =
+      `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+    await writeFile(manifestPath, JSON.stringify({
+      format: "sqlite",
+      packFileBytes: bytes.length,
+      packFileHash,
+      puzzleCount: 1,
+      rating: { min: 900, max: 900 },
+      tacticalAnalysis: {
+        puzzleRatingDeviation: true,
+        featureHash: `sha256:${"1".repeat(64)}`
+      }
+    }));
+    const policy = calibrationPolicy();
+    const policyHash = calibrationContentHash(policy);
+    await writeFile(policyPath, JSON.stringify(policy));
+    const progress = calibrationProgress();
+    const corpusHash = calibrationContentHash([progress]);
+    await writeFile(progressPath, JSON.stringify(progress));
+
+    const report = await runCalibration({
+      progressPaths: [progressPath],
+      packPath,
+      manifestPath,
+      policyPath,
+      reportPath,
+      artifactPath,
+      decisionTemplatePath,
+      ownerApproved: false
+    });
+    const artifact = JSON.parse(await readFile(artifactPath, "utf8"));
+    const decisionTemplate = JSON.parse(
+      await readFile(decisionTemplatePath, "utf8")
+    );
+
+    assert.equal(report.input.joinedObservationCount, 4);
+    assert.equal(artifact.provenance.inputSchemaVersion, 1);
+    assert.equal(artifact.provenance.policyId, policy.policyId);
+    assert.equal(artifact.provenance.policyHash, policyHash);
+    assert.equal(artifact.provenance.corpusHash, corpusHash);
+    assert.equal(
+      artifact.provenance.reportHash,
+      calibrationContentHash(report)
+    );
+    assert.equal(
+      artifact.provenance.representativeOwnerApproved,
+      false
+    );
+    assert.deepEqual(decisionTemplate, {
+      schemaVersion: 2,
+      decisionId: "",
+      packFileHash,
+      corpusHash,
+      policyHash,
+      analysisHash: report.input.analysisHash,
+      families: {
+        line: emptyDecisionEvidence(),
+        arrow_duel: emptyDecisionEvidence()
+      }
+    });
+    assert.deepEqual(
+      artifact.provenance.familyReadiness.line,
+      report.families.line.readiness
+    );
+    assert.doesNotThrow(() =>
+      assertValidTacticalProfileCalibrationArtifact(artifact)
+    );
+    assert.deepEqual(
+      report.missingnessCohorts.map((cohort) => [
+        cohort.taskFamily,
+        cohort.timeoutPolicySeconds,
+        cohort.joinedObservationCount
+      ]),
+      [["line", 30, 2], ["line", 60, 2]]
+    );
+    assert.deepEqual(
+      report.families.line.solve.timeoutPolicyHoldout.map(
+        (cohort) => cohort.timeoutPolicySeconds
+      ),
+      [60]
+    );
+    assert.equal(
+      report.families.line.decisionEvidence.timeoutPolicyStratification,
+      null
+    );
+    assert.equal(
+      report.families.line.decisionEvidence.actionUtilityCalibration,
+      null
+    );
+    assert.equal(artifact.families.line.status, "unavailable");
+    assert.match(
+      artifact.families.line.reason,
+      /required calibration decisions are incomplete/
+    );
+
+    await assert.rejects(
+      runCalibration({
+        progressPaths: [progressPath],
+        packPath,
+        manifestPath,
+        policyPath,
+        reportPath,
+        artifactPath,
+        decisionTemplatePath
+      }),
+      /Decision evidence template already exists/
+    );
+
+    decisionTemplate.decisionId = "owner-reviewed-test-decisions";
+    decisionTemplate.families = {
+      line: completeDecisionEvidence(),
+      arrow_duel: completeDecisionEvidence()
+    };
+    const reviewedAnalysisHash = decisionTemplate.analysisHash;
+    decisionTemplate.analysisHash = `sha256:${"f".repeat(64)}`;
+    await writeFile(
+      decisionEvidencePath,
+      JSON.stringify(decisionTemplate)
+    );
+    await assert.rejects(
+      runCalibration({
+        progressPaths: [progressPath],
+        packPath,
+        manifestPath,
+        policyPath,
+        reportPath,
+        artifactPath,
+        decisionEvidencePath,
+        ownerApproved: true
+      }),
+      /does not match the reviewed analysis/
+    );
+    decisionTemplate.analysisHash = reviewedAnalysisHash;
+    await writeFile(
+      decisionEvidencePath,
+      JSON.stringify(decisionTemplate)
+    );
+    await assert.rejects(
+      runCalibration({
+        progressPaths: [progressPath],
+        packPath,
+        manifestPath,
+        policyPath,
+        reportPath,
+        artifactPath,
+        decisionEvidencePath,
+        decisionTemplatePath,
+        ownerApproved: true
+      }),
+      /cannot be used together/
+    );
+    const reviewed = await runCalibration({
+      progressPaths: [progressPath],
+      packPath,
+      manifestPath,
+      policyPath,
+      reportPath,
+      artifactPath,
+      decisionEvidencePath,
+      ownerApproved: true
+    });
+    assert.equal(
+      reviewed.input.decisionEvidenceId,
+      "owner-reviewed-test-decisions"
+    );
+    assert.equal(
+      reviewed.families.line.decisionEvidence.actionUtilityCalibration,
+      true
+    );
+    assert.equal(
+      reviewed.families.line.readiness.reasons.some((reason) =>
+        reason.includes("required calibration decisions are incomplete")
+      ),
+      false
+    );
+    await assert.rejects(
+      runCalibration({
+        progressPaths: [progressPath],
+        packPath,
+        manifestPath,
+        policyPath,
+        reportPath,
+        artifactPath,
+        decisionEvidencePath,
+        ownerApproved: true,
+        requireAllFamiliesReady: true
+      }),
+      /both task families must pass/
+    );
+
+    await writeFile(decisionEvidencePath, JSON.stringify({
+      schemaVersion: 2,
+      decisionId: "wrong-pack",
+      packFileHash: `sha256:${"0".repeat(64)}`,
+      corpusHash,
+      policyHash,
+      analysisHash: reviewedAnalysisHash,
+      families: {
+        line: completeDecisionEvidence(),
+        arrow_duel: completeDecisionEvidence()
+      }
+    }));
+    await assert.rejects(
+      runCalibration({
+        progressPaths: [progressPath],
+        packPath,
+        manifestPath,
+        policyPath,
+        reportPath,
+        artifactPath,
+        decisionEvidencePath,
+        ownerApproved: true
+      }),
+      /does not match the authenticated inputs/
+    );
+
+    await writeFile(decisionEvidencePath, JSON.stringify({
+      schemaVersion: 2,
+      decisionId: "wrong-policy",
+      packFileHash,
+      corpusHash,
+      policyHash: `sha256:${"0".repeat(64)}`,
+      analysisHash: reviewedAnalysisHash,
+      families: {
+        line: completeDecisionEvidence(),
+        arrow_duel: completeDecisionEvidence()
+      }
+    }));
+    await assert.rejects(
+      runCalibration({
+        progressPaths: [progressPath],
+        packPath,
+        manifestPath,
+        policyPath,
+        reportPath,
+        artifactPath,
+        decisionEvidencePath,
+        ownerApproved: true
+      }),
+      /does not match the authenticated inputs/
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("predeclared one-step posterior fixtures stay within the policy tolerance", () => {
+  const report = posteriorApproximationReport(100);
+  assert.deepEqual(
+    report.fixtures.map((fixture) => fixture.name),
+    ["balanced", "weak", "strong", "near-separation"]
+  );
+  assert.ok(report.maximumMeanErrorRating < 12);
+  assert.ok(report.maximumSdErrorRating < 8);
+});
+
+function observation(sessionId, completedAt) {
+  return { sessionId, completedAt };
+}
+
+function completeDecisionEvidence() {
+  return {
+    candidateModelComparison: true,
+    timeoutPolicyStratification: true,
+    residualInfluencePolicy: true,
+    heteroscedasticityPolicy: true,
+    priorCalibration: true,
+    practicalThresholdCalibration: true,
+    opportunityTransformCalibration: true,
+    actionUtilityCalibration: true,
+    focusedRunPolicyCalibration: true,
+    homeLeadCalibration: true
+  };
+}
+
+function emptyDecisionEvidence() {
+  return Object.fromEntries(
+    Object.keys(completeDecisionEvidence()).map((decision) => [
+      decision,
+      null
+    ])
+  );
+}
+
+function calibrationPolicy() {
+  return {
+    schemaVersion: 1,
+    policyId: "test-policy",
+    holdoutFraction: 0.5,
+    minimums: {
+      trainSessionsPerFamily: 1,
+      holdoutSessionsPerFamily: 1,
+      trainAttemptsPerFamily: 1,
+      holdoutAttemptsPerFamily: 1,
+      reliableSpeedHoldoutAttemptsPerFamily: 1,
+      timeoutPolicyHoldoutCohortsPerFamily: 2,
+      timeoutPolicyHoldoutAttemptsPerCohort: 1,
+      timeoutPolicyTrainCohortsPerFamily: 2,
+      timeoutPolicyTrainAttemptsPerCohort: 1
+    },
+    holdoutGates: {
+      maximumBrierScore: 1,
+      maximumLogLoss: 10,
+      maximumCalibrationInterceptMagnitude: 10,
+      minimumCalibrationSlope: -10,
+      maximumCalibrationSlope: 10,
+      maximumSpeedMeanLogResidualMagnitude: 10,
+      maximumSpeedRootMeanSquareLogResidual: 10,
+      maximumOneStepPosteriorMeanErrorRating: 100,
+      maximumOneStepPosteriorSdErrorRating: 100
+    },
+    focusedRun: {
+      runSize: 15,
+      recentPuzzleDays: 30,
+      ratingBandHalfWidths: [100, 200],
+      themeShortfallBackfill: {
+        destination: "mixed_control",
+        minimumPuzzlesPerTheme: 1
+      }
+    },
+    artifactParameters: {
+      recencyHalfLifeDays: 90,
+      watchProbability: 0.75,
+      recommendationExitProbability: 0.85,
+      recommendationProbability: 0.9,
+      strongProbability: 0.97,
+      minDistinctPuzzles: 4,
+      minDistinctSessions: 2,
+      minimumOpportunityWeight: 0.25,
+      opportunityExponent: 0.5,
+      solveThemePriorSdRating: 100,
+      solvePracticalDeficitRating: 20,
+      minimumExpectedFailuresPer100: 2,
+      speedThemePriorSdLogSeconds: 0.5,
+      practicalTimeMultiplier: 1.2
+    }
+  };
+}
+
+function calibrationProgress() {
+  const sprintSessions = [];
+  const attempts = [];
+  for (let index = 0; index < 4; index += 1) {
+    const sessionId = `s${index + 1}`;
+    const timeoutAfterSeconds = index < 2 ? 30 : 60;
+    const completedAt = `2026-01-0${index + 1}T00:00:10.000Z`;
+    sprintSessions.push({
+      id: sessionId,
+      completedAt,
+      config: {
+        mode: "standard",
+        themes: ["mixed"],
+        perPuzzleSeconds: 20,
+        puzzleTiming: {
+          slowAfterSeconds: 40,
+          timeoutAfterSeconds
+        }
+      }
+    });
+    attempts.push({
+      id: `a${index + 1}`,
+      source: "sprint",
+      sessionId,
+      puzzleId: "p1",
+      result: index % 2 === 0 ? "correct" : "wrong",
+      ratingBefore: 900 + index * 10,
+      elapsedMs: 10_000 + index * 1_000,
+      completedAt
+    });
+  }
+  return { sprintSessions, attempts };
+}

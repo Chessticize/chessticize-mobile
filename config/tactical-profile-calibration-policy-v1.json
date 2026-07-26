@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "policyId": "tactical-profile-calibration-policy-v1",
+  "holdoutFraction": 0.2,
+  "minimums": {
+    "trainSessionsPerFamily": 50,
+    "holdoutSessionsPerFamily": 20,
+    "trainAttemptsPerFamily": 500,
+    "holdoutAttemptsPerFamily": 200,
+    "reliableSpeedHoldoutAttemptsPerFamily": 100,
+    "timeoutPolicyHoldoutCohortsPerFamily": 2,
+    "timeoutPolicyHoldoutAttemptsPerCohort": 50,
+    "timeoutPolicyTrainCohortsPerFamily": 2,
+    "timeoutPolicyTrainAttemptsPerCohort": 100
+  },
+  "holdoutGates": {
+    "maximumBrierScore": 0.25,
+    "maximumLogLoss": 0.7,
+    "maximumCalibrationInterceptMagnitude": 0.25,
+    "minimumCalibrationSlope": 0.75,
+    "maximumCalibrationSlope": 1.25,
+    "maximumSpeedMeanLogResidualMagnitude": 0.12,
+    "maximumSpeedRootMeanSquareLogResidual": 0.65,
+    "maximumOneStepPosteriorMeanErrorRating": 12,
+    "maximumOneStepPosteriorSdErrorRating": 8
+  },
+  "focusedRun": {
+    "runSize": 15,
+    "recentPuzzleDays": 30,
+    "ratingBandHalfWidths": [100, 200]
+  },
+  "artifactParameters": {
+    "recencyHalfLifeDays": 90,
+    "watchProbability": 0.75,
+    "recommendationExitProbability": 0.85,
+    "recommendationProbability": 0.9,
+    "strongProbability": 0.97,
+    "minDistinctPuzzles": 4,
+    "minDistinctSessions": 2,
+    "minimumOpportunityWeight": 0.25,
+    "opportunityExponent": 0.5,
+    "solveThemePriorSdRating": 100,
+    "solvePracticalDeficitRating": 20,
+    "minimumExpectedFailuresPer100": 2,
+    "speedThemePriorSdLogSeconds": 0.5,
+    "practicalTimeMultiplier": 1.2
+  }
+}

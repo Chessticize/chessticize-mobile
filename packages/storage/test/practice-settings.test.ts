@@ -17,7 +17,8 @@ test("Sprint guide progress defaults unseen and legacy settings normalize safely
   assert.deepEqual(defaultPracticeSettings().sprintGuides, {
     rulesSeen: false,
     activeSessionSeen: false,
-    arrowDuelSeen: false
+    arrowDuelSeen: false,
+    focusedRunSeen: false
   });
 
   const legacySettings = {
@@ -32,7 +33,8 @@ test("Sprint guide progress defaults unseen and legacy settings normalize safely
   assert.deepEqual(clonePracticeSettings(legacySettings).sprintGuides, {
     rulesSeen: false,
     activeSessionSeen: false,
-    arrowDuelSeen: false
+    arrowDuelSeen: false,
+    focusedRunSeen: false
   });
 });
 
@@ -46,7 +48,8 @@ test("Sprint guide progress is cloned independently", () => {
   assert.deepEqual(cloned.sprintGuides, {
     rulesSeen: true,
     activeSessionSeen: false,
-    arrowDuelSeen: false
+    arrowDuelSeen: false,
+    focusedRunSeen: false
   });
 });
 

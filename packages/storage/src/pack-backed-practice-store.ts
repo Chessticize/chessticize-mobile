@@ -20,6 +20,7 @@ import type {
   ClearLocalHistoryResult,
   ExportedSprintSession,
   LocalDataImport,
+  LocalDataImportObserver,
   LocalDataImportResult,
   LocalDataExport,
   PracticeSettings,
@@ -167,11 +168,30 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.listSprintSessions();
   }
 
+  getSprintSessions(ids: readonly string[]): ExportedSprintSession[] {
+    return this.userStore.getSprintSessions(ids);
+  }
+
+  listLatestTerminalFocusedSprintSessions(): ExportedSprintSession[] {
+    return this.userStore.listLatestTerminalFocusedSprintSessions();
+  }
+
+  listSprintAttemptUtcDays(sessionIds: readonly string[]): string[] {
+    return this.userStore.listSprintAttemptUtcDays(sessionIds);
+  }
+
+  getTacticalProfileSourceRevision(): number {
+    return this.userStore.getTacticalProfileSourceRevision();
+  }
+
   exportLocalData(): LocalDataExport {
     return this.userStore.exportLocalData();
   }
 
-  importLocalData(data: LocalDataImport): LocalDataImportResult {
+  importLocalData(
+    data: LocalDataImport,
+    observer?: LocalDataImportObserver
+  ): LocalDataImportResult {
     const referencedPuzzleIds = new Set([
       ...data.attempts.map((attempt) => attempt.puzzleId),
       ...data.reviewQueue.map((review) => review.puzzleId),
@@ -184,7 +204,7 @@ export class PackBackedPracticeStore implements PracticeStore {
     if (missingReferencedPuzzles.length > 0) {
       this.userStore.seedPuzzles(missingReferencedPuzzles);
     }
-    return this.userStore.importLocalData(data);
+    return this.userStore.importLocalData(data, observer);
   }
 
   clearLocalHistory(): ClearLocalHistoryResult {
@@ -192,7 +212,9 @@ export class PackBackedPracticeStore implements PracticeStore {
   }
 
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[] {
-    const attempts = this.userStore.listAttempts({ sessionId, result: "wrong" }).map(attemptEventFromHistoryRow);
+    const attempts = this.userStore
+      .listAttempts({ sessionId })
+      .map(attemptEventFromHistoryRow);
     const puzzles = attempts
       .map((attempt) => this.getPuzzle(attempt.puzzleId))
       .filter((puzzle): puzzle is Puzzle => Boolean(puzzle));
