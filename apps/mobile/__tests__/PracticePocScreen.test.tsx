@@ -26,7 +26,9 @@ import {
 } from "../src/platform/mobilePractice";
 import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/src/practice-service";
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
-import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, type ArrowDuelState, type AttemptEvent, type Puzzle, type PuzzleTimingPolicy, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
+import { MemoryTacticalProfileRepository } from "../../../packages/storage/src/tactical-profile-repository";
+import { TacticalProfileService } from "../../../packages/storage/src/tactical-profile-service";
+import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, isServerCompatibleArrowDuelPuzzle, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, startSprint, type ArrowDuelState, type AttemptEvent, type Puzzle, type PuzzleTimingPolicy, type SprintState, type TacticalProfileCalibrationArtifact, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/platform/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/platform/iCloudProgressSync";
 import { FakeMoveFeedbackClient } from "../src/platform/moveFeedback";
@@ -42,6 +44,8 @@ import {
   expectNoRenderedTextHasNonPositiveFontSize,
   flattenTestStyle
 } from "../test-support/testRendererSupport";
+
+const tacticalProfilePuzzleFixture = require("../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -1096,87 +1100,16 @@ describe("PracticePocScreen", () => {
   });
 
   it("uses the only recommended Arrow Duel family and shows returning users the dedicated Focused Run guide", () => {
-    const service = createMobilePracticeService("familiar15");
+    const service = createArrowFocusedPracticeService();
     service.saveSettings({
       ...service.getSettings(),
       sprintGuides: {
         rulesSeen: true,
         activeSessionSeen: true,
-        arrowDuelSeen: true,
+        arrowDuelSeen: false,
         focusedRunSeen: false
       }
     });
-    const arrowPuzzle = firstArrowDuelPuzzleForTest().puzzle;
-    const focusedPuzzles = Array.from({ length: 15 }, (_, index) => ({
-      ...arrowPuzzle,
-      id: `focused-arrow-${index}`
-    }));
-    const focusedConfig = {
-      ...defaultSprintConfig("arrow_duel"),
-      targetCorrect: 15,
-      maxMistakes: 15,
-      maxAttempts: 15,
-      ratingPolicy: "unrated" as const,
-      tacticalFocus: {
-        taskFamily: "arrow_duel" as const,
-        themes: ["pin"],
-        mixedControlCount: 5,
-        ratingAnchor: 875,
-        minRating: 775,
-        maxRating: 975
-      }
-    };
-    const prepareFocusedRun = jest.spyOn(service, "prepareFocusedRun").mockReturnValue({
-      status: "ready",
-      prepared: {
-        plan: {
-          taskFamily: "arrow_duel",
-          ratingAnchor: { ratingKey: focusedConfig.ratingKey, rating: 875 },
-          reasons: [{ theme: "pin", reason: "solve_rate", count: 10 }],
-          mixedControlCount: 5,
-          minRating: 775,
-          maxRating: 975,
-          excludePuzzleIds: []
-        },
-        config: focusedConfig,
-        puzzles: focusedPuzzles
-      }
-    });
-    jest.spyOn(service, "getTacticalProfileSnapshot").mockReturnValue({
-      phase: "ready",
-      evaluation: {
-        phase: "ready",
-        signals: [{
-          id: "arrow_duel:pin",
-          taskFamily: "arrow_duel",
-          theme: "pin",
-          reason: "solve_rate",
-          confidence: "high",
-          status: "recommended",
-          solveConfidence: 0.95,
-          speedConfidence: 0,
-          expectedFailuresPer100: 8,
-          completedTimeMultiplier: 1,
-          actionPriority: 0.4,
-          distinctPuzzleCount: 8,
-          distinctSessionCount: 3
-        }],
-        rankedFocuses: [],
-        observedThemeCount: 1
-      },
-      cutoffs: {
-        line: { home: [], profile: [], run: [], monitored: [] },
-        arrow_duel: { home: [], profile: [], run: [], monitored: [] }
-      },
-      buildState: {
-        modelVersion: "test",
-        packFeatureHash: "test",
-        calibrationId: "test",
-        status: "ready",
-        dirtyDayCount: 0
-      },
-      unavailableFamilies: {}
-    } as NonNullable<ReturnType<PracticeService["getTacticalProfileSnapshot"]>>);
 
     const renderer = renderScreen({
       practiceService: service,
@@ -1189,7 +1122,9 @@ describe("PracticePocScreen", () => {
       "Arrow Duel"
     );
     press(renderer, "tactical-profile-preview-run");
-    expect(prepareFocusedRun).toHaveBeenLastCalledWith("arrow_duel");
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Arrow Duel Rating 1800"
+    );
     press(renderer, "focused-run-start");
     expect(findByTestId(renderer, "practice-active-session-guide")).toBeTruthy();
     expectText(renderer, "Track the fixed Run");
@@ -1201,8 +1136,29 @@ describe("PracticePocScreen", () => {
 
     expect(service.getSettings().sprintGuides.focusedRunSeen).toBe(true);
     expect(service.getActiveSprint()).toBeUndefined();
-    expect(prepareFocusedRun).toHaveBeenCalledTimes(2);
-    expect(prepareFocusedRun.mock.calls.every(([family]) => family === "arrow_duel")).toBe(true);
+    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
+    expect(service.getSettings().sprintGuides.arrowDuelSeen).toBe(false);
+
+    press(renderer, "practice-session-guide-start");
+    expect(service.getSettings().sprintGuides.arrowDuelSeen).toBe(true);
+    expect(service.getActiveSprint()).toBeUndefined();
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+
+    expect(service.getActiveSprint()).toMatchObject({
+      status: "active",
+      config: {
+        mode: "arrow_duel",
+        ratingPolicy: "unrated",
+        maxAttempts: 15,
+        tacticalFocus: {
+          taskFamily: "arrow_duel",
+          mixedControlCount: 5,
+          ratingAnchor: 1800
+        }
+      }
+    });
   });
 
   it("keeps solve reliability and completed-puzzle speed as plain-language profile signals", () => {
@@ -10169,6 +10125,108 @@ function firstArrowDuelPuzzleForTest(): ArrowDuelState {
   return requireArrowDuelState(state);
 }
 
+function createArrowFocusedPracticeService(): PracticeService {
+  const candidates = tacticalProfilePuzzleFixture
+    .filter((puzzle) =>
+      puzzle.rating >= 1700
+      && puzzle.rating <= 1900
+      && isServerCompatibleArrowDuelPuzzle(puzzle)
+    )
+    .slice(0, 44);
+  if (candidates.length < 44) {
+    throw new Error("Tactical Profile component fixture needs 44 Arrow Duel puzzles");
+  }
+  const evidence = candidates.slice(0, 12).map((puzzle) => ({
+    ...puzzle,
+    ratingDeviation: 80,
+    themes: ["pin"]
+  }));
+  const focused = candidates.slice(12, 24).map((puzzle) => ({
+    ...puzzle,
+    ratingDeviation: 80,
+    themes: ["pin"]
+  }));
+  const mixed = candidates.slice(24).map((puzzle) => ({
+    ...puzzle,
+    ratingDeviation: 80,
+    themes: ["fork"]
+  }));
+  const store = new MemoryStore();
+  store.seedPuzzles([...evidence, ...focused, ...mixed]);
+  const config = defaultSprintConfig("arrow_duel");
+  store.saveRating({
+    key: config.ratingKey,
+    generation: 0,
+    rating: 1800,
+    ratingDeviation: 80,
+    volatility: 0.06,
+    games: 12
+  });
+
+  for (let sessionIndex = 0; sessionIndex < 3; sessionIndex += 1) {
+    const day = 10 + sessionIndex * 4;
+    const startedAt = `2026-07-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+    const completedAt = `2026-07-${String(day).padStart(2, "0")}T00:04:00.000Z`;
+    const sessionPuzzles = evidence.slice(sessionIndex * 4, sessionIndex * 4 + 4);
+    const session = startSprint({
+      id: `arrow-profile-session-${sessionIndex}`,
+      config,
+      puzzles: sessionPuzzles,
+      ratingBefore: 1800,
+      now: startedAt
+    });
+    store.createSprintSession({
+      ...session,
+      status: "failed",
+      completedAt,
+      endReason: "max_mistakes",
+      correctCount: 0,
+      mistakeCount: 4,
+      ratingAfter: 1800
+    });
+    for (const [offset, puzzle] of sessionPuzzles.entries()) {
+      store.recordAttempt({
+        id: `arrow-profile-attempt-${sessionIndex}-${offset}`,
+        source: "sprint",
+        sessionId: session.id,
+        puzzleId: puzzle.id,
+        mode: "arrow_duel",
+        ratingKey: config.ratingKey,
+        result: "wrong",
+        submittedMove: puzzle.solutionMoves[0],
+        expectedMove: puzzle.stockfishBestMove as string,
+        arrowDuelCandidateOrder: [
+          puzzle.stockfishBestMove as string,
+          puzzle.solutionMoves[0] as string
+        ],
+        startedAt: completedAt,
+        completedAt,
+        elapsedMs: 10_000,
+        ratingBefore: 1800
+      });
+    }
+  }
+
+  return new PracticeService(
+    store,
+    new TacticalProfileService({
+      progressStore: store,
+      puzzleSource: store,
+      repository: new MemoryTacticalProfileRepository(),
+      calibration: COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+      naturalFrequency: {
+        line: {},
+        arrow_duel: { pin: 0.12, fork: 0.12 }
+      },
+      focusedRunPolicy: {
+        runSize: 15,
+        recentPuzzleDays: 30,
+        ratingBandHalfWidths: [100, 200]
+      }
+    })
+  );
+}
+
 function sharedHistoryPuzzle(): Puzzle {
   return {
     id: "shared-history",
@@ -10179,6 +10237,56 @@ function sharedHistoryPuzzle(): Puzzle {
     source: "lichess",
     stockfishBestMove: "e2e3"
   };
+}
+
+const COMPONENT_TACTICAL_PROFILE_CALIBRATION = {
+  schemaVersion: 1,
+  modelVersion: "component-test-v1",
+  calibrationId: "component-test-calibration",
+  packFeatureHash: "component-test-pack-rd",
+  createdAt: "2026-07-01T00:00:00.000Z",
+  recencyHalfLifeDays: 90,
+  evidence: {
+    watchProbability: 0.75,
+    recommendationExitProbability: 0.85,
+    recommendationProbability: 0.9,
+    strongProbability: 0.97,
+    minDistinctPuzzles: 4,
+    minDistinctSessions: 2
+  },
+  opportunity: {
+    minimumWeight: 0.25,
+    exponent: 0.5
+  },
+  families: {
+    line: componentTacticalProfileCalibratedFamily(),
+    arrow_duel: componentTacticalProfileCalibratedFamily()
+  }
+} as const satisfies TacticalProfileCalibrationArtifact;
+
+function componentTacticalProfileCalibratedFamily() {
+  return {
+    status: "calibrated",
+    solve: {
+      intercept: 0,
+      ratingGapSlope: 1,
+      timeoutLogCoefficient: 0,
+      timeoutReferenceSeconds: 60,
+      themePriorSdRating: 100,
+      practicalDeficitRating: 20,
+      minExpectedFailuresPer100: 2
+    },
+    speed: {
+      interceptLogSeconds: Math.log(30),
+      relativeDifficultyCoefficient: 0,
+      decisionCountCoefficient: 0,
+      paceLogCoefficient: 0,
+      slowPolicyLogCoefficient: 0,
+      residualSd: 0.25,
+      themePriorSdLogSeconds: 0.5,
+      practicalTimeMultiplier: 1.2
+    }
+  } as const;
 }
 
 function createUnclearHistoryReviewService(): PracticeService {
