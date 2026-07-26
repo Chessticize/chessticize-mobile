@@ -20,7 +20,7 @@ describe("session guide geometry", () => {
       calloutTop: 170,
       connectorTop: 50,
       connectorDrop: 0,
-      connectorWidth: 50
+      connectorWidth: 44
     });
   });
 
@@ -37,17 +37,18 @@ describe("session guide geometry", () => {
       }
     })).toEqual({
       calloutTop: 252,
-      connectorTop: 56,
-      connectorDrop: 33,
-      connectorWidth: 164
+      connectorTop: 68,
+      connectorDrop: 21,
+      connectorWidth: 158
     });
   });
 
-  it("extends the Arrow Duel guide connector to the candidate origin instead of empty board space", () => {
+  it("points toward the Arrow Duel candidate origin without joining its move arrows", () => {
     expect(buildArrowDuelLandscapeGuideGeometry(360)).toEqual({
       calloutTop: 209,
-      connectorHeight: 97,
-      connectorLeft: 281
+      connectorArmWidth: 24,
+      connectorHeight: 68,
+      connectorLeft: 257
     });
   });
 

@@ -148,14 +148,18 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
     "Full-width production Unclear prompt in portrait"
   ));
   assert.ok(activeSessionGuide.scope.includes.includes(
-    "Portrait arrows outside callout borders with target clearance"
+    "Fixed-shape downward portrait arrows outside callout borders with target clearance"
   ));
   assert.match(activeSessionGuide.description, /route around copy and stop short/);
   assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
   assert.ok(arrowDuelGuide.scope.includes.includes("The arrows show your two choices"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Portrait callout below the board"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Landscape callout in the empty board lane"));
+  assert.ok(arrowDuelGuide.scope.includes.includes(
+    "Landscape dot endpoint stops clear of the candidate piece"
+  ));
   assert.match(arrowDuelGuide.description, /two arrows are the user's two choices/);
+  assert.match(arrowDuelGuide.description, /cannot read as a third move arrow/);
   assert.doesNotMatch(
     `${activeSessionGuide.description} ${arrowDuelGuide.description}`,
     /\b(?:step|tour)\b/i
