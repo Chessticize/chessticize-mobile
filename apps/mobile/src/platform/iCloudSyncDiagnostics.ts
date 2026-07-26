@@ -27,6 +27,17 @@ export type ICloudSyncDiagnosticMetadata = {
   latestSyncStatus: string;
 };
 
+export type AndroidSupportDiagnosticMetadata = {
+  appVersion: string;
+  buildNumber?: string;
+  platform: "android";
+  progressProtection: "android_managed_backup";
+};
+
+export type SupportDiagnosticMetadata =
+  | AndroidSupportDiagnosticMetadata
+  | ICloudSyncDiagnosticMetadata;
+
 export type PreparedICloudSyncSupportBundle = {
   bundleUrl: string;
   files: readonly string[];
@@ -39,12 +50,12 @@ export interface ICloudSyncDiagnosticsClient {
   discardSupportBundle(bundleUrl: string): Promise<void>;
   prepareSupportBundle(input: {
     diagnosticText: string;
-    metadata: ICloudSyncDiagnosticMetadata;
+    metadata: SupportDiagnosticMetadata;
   }): Promise<PreparedICloudSyncSupportBundle>;
   shareSupportBundle(bundleUrl: string): Promise<void>;
 }
 
-type NativePreparedSupportBundle = {
+export type NativePreparedSupportBundle = {
   bundleUrl?: unknown;
   files?: unknown;
   kind?: unknown;
@@ -57,7 +68,7 @@ type NativeICloudSyncDiagnosticsModule = {
   prepareSupportBundle?: (
     databasePath: string,
     diagnosticText: string,
-    metadata: ICloudSyncDiagnosticMetadata
+    metadata: SupportDiagnosticMetadata
   ) => Promise<NativePreparedSupportBundle>;
   shareSupportBundle?: (bundleUrl: string) => Promise<unknown>;
 };
@@ -175,6 +186,21 @@ export function formatICloudSyncOverviewDiagnostic(
   ].join("\n");
 }
 
+export function formatAndroidSupportOverviewDiagnostic(
+  metadata: Pick<AndroidSupportDiagnosticMetadata, "appVersion" | "buildNumber">,
+  createdAt: string
+): string {
+  return [
+    "Chessticize Support Diagnostic",
+    `App: ${appVersionLabel(metadata)}`,
+    `Created at: ${createdAt}`,
+    "Platform: Android",
+    "Progress protection: Android-managed backup",
+    "Support database snapshot: included when the bundle is prepared",
+    "Continuous cloud sync: unavailable on Android"
+  ].join("\n");
+}
+
 export function iCloudSyncAttemptLabel(reason: string): ICloudSyncAttempt {
   switch (reason) {
     case "startup":
@@ -188,7 +214,7 @@ export function iCloudSyncAttemptLabel(reason: string): ICloudSyncAttempt {
   }
 }
 
-function normalizePreparedSupportBundle(
+export function normalizePreparedSupportBundle(
   value: NativePreparedSupportBundle | undefined
 ): PreparedICloudSyncSupportBundle {
   if (

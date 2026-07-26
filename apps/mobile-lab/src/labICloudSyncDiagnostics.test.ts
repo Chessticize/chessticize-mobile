@@ -6,7 +6,7 @@ import {
 } from "./labICloudSyncDiagnostics.ts";
 import { scenarioRegistry } from "./scenarioRegistry.ts";
 
-test("every iOS Settings scenario keeps support diagnostics available", () => {
+test("every Settings scenario keeps platform-appropriate support diagnostics available", async () => {
   const settingsScenarios = Object.values(scenarioRegistry).filter(
     (scenario) => scenario.group === "Settings"
   );
@@ -17,7 +17,21 @@ test("every iOS Settings scenario keeps support diagnostics available", () => {
 
     if (scenario.id === "settings-android-backup") {
       assert.equal(platform, "android");
-      assert.equal(diagnostics, null);
+      assert.ok(diagnostics);
+      const bundle = await diagnostics.prepareSupportBundle({
+        diagnosticText: "Android diagnostic",
+        metadata: {
+          appVersion: "1.2.2",
+          buildNumber: "38",
+          platform: "android",
+          progressProtection: "android_managed_backup"
+        }
+      });
+      assert.deepEqual(bundle.files, [
+        "local-progress.sqlite",
+        "diagnostic.txt",
+        "manifest.json"
+      ]);
       continue;
     }
 

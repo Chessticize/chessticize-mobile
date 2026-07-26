@@ -12,21 +12,23 @@ export function labMobilePlatformForScenario(
 export function createLabICloudSyncDiagnosticsClient(
   platform: LabMobilePlatform
 ): ICloudSyncDiagnosticsClient | null {
-  if (platform !== "ios") {
-    return null;
-  }
-
   return {
     copyText: async () => {},
     discardSupportBundle: async () => {},
     prepareSupportBundle: async () => ({
       bundleUrl: "file:///tmp/chessticize-support.zip",
-      files: [
-        "local-progress.sqlite",
-        "icloud-progress-snapshot.json",
-        "diagnostic.txt",
-        "manifest.json"
-      ],
+      files: platform === "android"
+        ? [
+            "local-progress.sqlite",
+            "diagnostic.txt",
+            "manifest.json"
+          ]
+        : [
+            "local-progress.sqlite",
+            "icloud-progress-snapshot.json",
+            "diagnostic.txt",
+            "manifest.json"
+          ],
       kind: "complete"
     }),
     shareSupportBundle: async () => {}

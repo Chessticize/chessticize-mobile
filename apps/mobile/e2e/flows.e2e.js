@@ -43,10 +43,6 @@ describe('Key user flows', () => {
   });
 
   it('prepares support diagnostics from Settings without requiring a sync error', async () => {
-    if (device.getPlatform() !== 'ios') {
-      return;
-    }
-
     await openTab('settings-tab', 'settings-app-version');
     await waitForVisibleInPracticeScroll('settings-sync-support-bundle-entry');
     await element(by.id('settings-sync-support-bundle-entry')).tap();
@@ -61,6 +57,13 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('settings-sync-support-bundle-share')))
       .toExist()
       .withTimeout(20000);
+    if (device.getPlatform() === 'android') {
+      await waitForElementTextContaining(
+        'settings-sync-support-bundle-complete',
+        'Android diagnostics bundle ready',
+        10000
+      );
+    }
     await element(by.id('settings-sync-support-bundle-scroll')).scrollTo('bottom');
     await waitFor(element(by.id('settings-sync-support-bundle-details')))
       .toBeVisible()

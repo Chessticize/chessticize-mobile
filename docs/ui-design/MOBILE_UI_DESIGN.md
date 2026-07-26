@@ -569,11 +569,14 @@ New Run behavior:
   `Export Support Diagnostics`, then Email Support as the final row.
   Diagnostics remain available even when
   sync is off and no error is visible. Export requires confirmation before
-  preparing a package, identifies sensitive progress content, includes a
+  preparing a package and identifies sensitive progress content. iOS includes a
   consistent local SQLite snapshot and the private CloudKit JSON snapshot when
-  available, and delegates the handoff to the iOS Share Sheet. Prepared files
-  are removed when the Share Sheet or diagnostics window closes and have a
-  bounded one-hour lifetime.
+  available. Android includes the consistent local SQLite snapshot without
+  claiming that an iCloud snapshot exists. Both platforms add bounded
+  diagnostic and manifest files with database health and checksums. iOS removes
+  a shared bundle when its Share Sheet closes; Android keeps it only long enough
+  for the chosen recipient to read it. Closing the diagnostics window discards
+  unshared files, and both platforms retain a bounded one-hour lifetime.
 - A visible sync failure adds `View Error Details`, including bounded technical
   fields and a copy action. It must not expose raw native metadata that can
   contain credentials or account identifiers.
