@@ -27,6 +27,7 @@ import {
   buildArrowDuelLandscapeGuideGeometry,
   buildPortraitGuideCalloutTop,
   buildPortraitGuidePointerLeft,
+  buildPortraitTimeoutGuideGeometry,
   buildSessionGuideLandscapeAlignment,
   buildSessionGuideRailConnectorGeometry
 } from "./sessionGuideGeometry.ts";
@@ -198,6 +199,10 @@ import {
 } from "./TacticalProfileSection.tsx";
 import type { TacticalProfilePresentation } from "./tacticalProfilePresentation.ts";
 import { useTacticalProfilePresentation } from "./useTacticalProfilePresentation.ts";
+import {
+  ICloudSyncErrorDetails,
+  type ICloudSyncErrorDetailsPresentation
+} from "./ICloudSyncErrorDetails.tsx";
 
 export type {
   PracticeRunDraft,
@@ -221,6 +226,7 @@ interface Props {
   customTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   feedbackIssuesOpener?: (url: string) => Promise<void>;
+  iCloudSyncErrorDetails?: ICloudSyncErrorDetailsPresentation;
   currentTimeMs?: () => number;
   sprintGuidanceEnabled?: boolean;
   moveFeedbackSettings?: {
@@ -533,6 +539,7 @@ export function PracticePocScreen({
   customTargetCorrect,
   debugTrace,
   feedbackIssuesOpener = openFeedbackIssuesInBrowser,
+  iCloudSyncErrorDetails,
   currentTimeMs = Date.now,
   sprintGuidanceEnabled = false,
   moveFeedbackSettings,
@@ -2779,6 +2786,13 @@ export function PracticePocScreen({
   };
   const predictiveBackEnabled = resolveMobileBackIntent(mobileBackState, "button").kind !== "delegate-platform";
 
+  function dismissSessionGuide(): void {
+    pendingGuidedStartRef.current = null;
+    setSessionGuidePresentations([]);
+    setSessionGuideIndex(null);
+    setSessionGuideCoachStep(0);
+  }
+
   function executeMobileBackIntent(
     intent: MobileBackIntent,
     resolvedState: MobileBackState = mobileBackState
@@ -2800,10 +2814,7 @@ export function PracticePocScreen({
         } else if (intent.transient === "starting-practice") {
           cancelStartingSprint();
         } else if (intent.transient === "sprint-session-guide") {
-          pendingGuidedStartRef.current = null;
-          setSessionGuidePresentations([]);
-          setSessionGuideIndex(null);
-          setSessionGuideCoachStep(0);
+          dismissSessionGuide();
         }
         return true;
       case "close-analysis":
@@ -3345,6 +3356,7 @@ export function PracticePocScreen({
                     presentation={sessionGuidePresentation}
                     stepNumber={sessionGuideIndex + 1}
                     totalSteps={sessionGuidePresentations.length}
+                    onExit={dismissSessionGuide}
                     onBack={() => {
                       if (sessionGuideCoachStep > 0) {
                         setSessionGuideCoachStep((current) => Math.max(current - 1, 0));
@@ -3801,7 +3813,8 @@ export function PracticePocScreen({
                 reviewReminderPreference={reviewReminderPreference}
                 showRatingControls={!ratingEditingMovedToHome}
                 iCloudSyncEnabled={iCloudSyncEnabled}
-                iCloudSyncStatus={iCloudSyncStatus}
+                iCloudSyncErrorDetails={iCloudSyncErrorDetails}
+                iCloudSyncStatus={iCloudSyncErrorDetails ? "iCloud sync failed" : iCloudSyncStatus}
                 moveFeedbackPreferences={moveFeedbackPreferences}
                 moveFeedbackPreviewer={moveFeedbackSettings?.preview}
                 showSprintGuideReset={
@@ -4539,6 +4552,8 @@ type SessionGuideMeasuredLayout = {
 type SessionGuideMeasuredLayoutKey =
   | "slow-callout"
   | "slow-target"
+  | "timeout-callout"
+  | "timeout-target"
   | "unclear-callout"
   | "unclear-target";
 
@@ -4612,6 +4627,7 @@ function ActiveSessionGuide({
   coachStep,
   onBack,
   onContinue,
+  onExit,
   presentation,
   stepNumber,
   totalSteps
@@ -4621,6 +4637,7 @@ function ActiveSessionGuide({
   coachStep: number;
   onBack: () => void;
   onContinue: () => void;
+  onExit: () => void;
   presentation: SprintSessionGuidePresentation;
   stepNumber: number;
   totalSteps: number;
@@ -4683,6 +4700,7 @@ function ActiveSessionGuide({
         coachStep={coachStep}
         guideNumber={unifiedCoachStep}
         mode={presentation.mode}
+        onExit={onExit}
         presentation={presentation}
       />
 
@@ -4833,6 +4851,7 @@ function SessionCoachmarkDemo({
   coachStep,
   guideNumber,
   mode,
+  onExit,
   presentation
 }: {
   adaptiveLayout: AdaptiveLayout;
@@ -4840,6 +4859,7 @@ function SessionCoachmarkDemo({
   coachStep: number;
   guideNumber: number;
   mode: "standard" | "arrow_duel";
+  onExit: () => void;
   presentation: SprintSessionGuidePresentation;
 }): React.JSX.Element {
   const isArrowDuel = mode === "arrow_duel";
@@ -4849,6 +4869,7 @@ function SessionCoachmarkDemo({
   const guideFrameRef = useRef<View>(null);
   const guideRowRef = useRef<View>(null);
   const slowTargetRef = useRef<View>(null);
+  const timeoutTargetRef = useRef<View>(null);
   const unclearTargetRef = useRef<View>(null);
   const rememberMeasuredLayout = useCallback((
     key: SessionGuideMeasuredLayoutKey,
@@ -4859,14 +4880,14 @@ function SessionCoachmarkDemo({
       : { ...current, [key]: next });
   }, []);
   const rememberCalloutLayout = useCallback((
-    key: "slow-callout" | "unclear-callout",
+    key: "slow-callout" | "timeout-callout" | "unclear-callout",
     event: LayoutChangeEvent
   ) => {
     const { height, width, x, y } = event.nativeEvent.layout;
     rememberMeasuredLayout(key, { height, width, x, y });
   }, [rememberMeasuredLayout]);
   const measureTargetInGuideFrame = useCallback((
-    key: "slow-target" | "unclear-target",
+    key: "slow-target" | "timeout-target" | "unclear-target",
     target: View | null
   ) => {
     const measurementFrame = adaptiveLayout.usesSessionRail
@@ -4955,9 +4976,11 @@ function SessionCoachmarkDemo({
     && (coachStep === 1 || coachStep === 3);
   const measuredCallout = callout.id === "slow"
     ? measuredLayouts["slow-callout"]
-    : callout.id === "unclear"
-      ? measuredLayouts["unclear-callout"]
-      : undefined;
+    : callout.id === "timeout"
+      ? measuredLayouts["timeout-callout"]
+      : callout.id === "unclear"
+        ? measuredLayouts["unclear-callout"]
+        : undefined;
   const fallbackRailTarget = callout.id === "slow"
     ? {
         height: 0,
@@ -5000,6 +5023,16 @@ function SessionCoachmarkDemo({
         target: measuredLayouts["slow-target"]
       })
     : undefined;
+  const portraitTimeoutGeometry = !adaptiveLayout.usesSessionRail
+    && callout.id === "timeout"
+    && measuredCallout
+    && measuredLayouts["timeout-target"]
+    ? buildPortraitTimeoutGuideGeometry({
+        boardTop: measuredLayouts["timeout-target"].y,
+        calloutHeight: measuredCallout.height
+      })
+    : undefined;
+  const portraitTimeoutPointerReach = portraitTimeoutGeometry?.pointerReach ?? 12;
   const arrowDuelLandscapeGeometry = isArrowDuel && adaptiveLayout.usesSessionRail
     ? buildArrowDuelLandscapeGuideGeometry(boardSize)
     : undefined;
@@ -5060,7 +5093,7 @@ function SessionCoachmarkDemo({
             : coachStep === 1
               ? portraitSlowCalloutTop ?? boardSize + 71
               : coachStep === 2
-                ? 92
+                ? portraitTimeoutGeometry?.calloutTop ?? 82
                 : boardSize + 150
             })
       };
@@ -5094,6 +5127,8 @@ function SessionCoachmarkDemo({
     : callout.tone === "danger"
       ? "#DC2626"
       : "#2563EB";
+  const usesPortraitTimeoutPointer = !adaptiveLayout.usesSessionRail
+    && callout.id === "timeout";
   const pointerTestId = `practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`;
   const pointerNode = isArrowDuel
     && adaptiveLayout.usesSessionRail
@@ -5198,6 +5233,12 @@ function SessionCoachmarkDemo({
       accessibilityElementsHidden
       style={[
         styles.sessionGuideCoachPointerBottomShape,
+        usesPortraitTimeoutPointer
+          ? {
+              bottom: -portraitTimeoutPointerReach,
+              height: portraitTimeoutPointerReach
+            }
+          : null,
         callout.id === "unclear" && !adaptiveLayout.usesSessionRail
           ? {
               left: portraitUnclearPointerLeft ?? "76%"
@@ -5262,6 +5303,8 @@ function SessionCoachmarkDemo({
         : `practice-session-guide-coach-${callout.id}`}
       onLayout={callout.id === "slow"
         ? (event) => rememberCalloutLayout("slow-callout", event)
+        : callout.id === "timeout"
+          ? (event) => rememberCalloutLayout("timeout-callout", event)
         : callout.id === "unclear"
           ? (event) => rememberCalloutLayout("unclear-callout", event)
           : undefined}
@@ -5299,18 +5342,17 @@ function SessionCoachmarkDemo({
       {!adaptiveLayout.usesSessionRail ? (
         <>
           <View
-            style={[
-              styles.sessionGuideCoachLayer,
-              !isArrowDuel && coachStep === 0 ? null : styles.sessionGuideCoachDimmed
-            ]}
+            style={styles.sessionGuideCoachLayer}
             testID="practice-session-guide-metrics"
           >
             <SessionStatusBar
+              closeAccessibilityLabel="Exit guide"
               confirmAbandon={false}
+              dimmedExceptClose={isArrowDuel || coachStep !== 0}
               mode={mode}
               state={guideState}
               timerText={presentation.durationLabel}
-              onAbandon={() => undefined}
+              onClose={onExit}
               onConfirmAbandonChange={() => undefined}
               onPause={() => undefined}
             />
@@ -5359,6 +5401,9 @@ function SessionCoachmarkDemo({
               ? "Fixed example Arrow Duel puzzle, White to move, two candidate arrows, not interactive"
               : "Fixed example chess puzzle, White to move, not interactive"}
             accessibilityRole="image"
+            ref={!isArrowDuel && !adaptiveLayout.usesSessionRail
+              ? timeoutTargetRef
+              : undefined}
             style={[
               styles.boardSurface,
               styles.sessionGuideCoachBoardSurface,
@@ -5369,6 +5414,12 @@ function SessionCoachmarkDemo({
             testID={isArrowDuel
               ? "practice-arrow-duel-guide-demo-board"
               : "practice-session-guide-demo-board"}
+            onLayout={!isArrowDuel && !adaptiveLayout.usesSessionRail
+              ? () => measureTargetInGuideFrame(
+                  "timeout-target",
+                  timeoutTargetRef.current
+                )
+              : undefined}
           >
             <View
               style={[
@@ -5538,19 +5589,18 @@ function SessionCoachmarkDemo({
               testID="active-session-control-rail-content"
             >
               <View
-                style={[
-                  styles.sessionGuideCoachLayer,
-                  !isArrowDuel && coachStep === 0 ? null : styles.sessionGuideCoachDimmed
-                ]}
+                style={styles.sessionGuideCoachLayer}
                 testID="practice-session-guide-metrics"
               >
                 <SessionStatusBar
+                  closeAccessibilityLabel="Exit guide"
                   compactMetrics
                   confirmAbandon={false}
+                  dimmedExceptClose={isArrowDuel || coachStep !== 0}
                   mode={mode}
                   state={guideState}
                   timerText={presentation.durationLabel}
-                  onAbandon={() => undefined}
+                  onClose={onExit}
                   onConfirmAbandonChange={() => undefined}
                   onPause={() => undefined}
                 />
@@ -7589,22 +7639,28 @@ function PuzzleTimingIndicator({
 }
 
 function SessionStatusBar({
+  closeAccessibilityLabel = "Abandon sprint",
   compactMetrics = false,
   confirmAbandon,
+  dimmedExceptClose = false,
   mode,
   state,
   timerText,
   onAbandon,
+  onClose,
   onConfirmAbandonChange,
   onPause,
   onResume
 }: {
+  closeAccessibilityLabel?: string;
   compactMetrics?: boolean;
   confirmAbandon: boolean;
+  dimmedExceptClose?: boolean;
   mode: SprintMode;
   state: SprintState;
   timerText: string;
   onAbandon?: () => void;
+  onClose?: () => void;
   onConfirmAbandonChange: (visible: boolean) => void;
   onPause?: () => void;
   onResume?: () => void;
@@ -7615,23 +7671,35 @@ function SessionStatusBar({
   return (
     <View style={styles.activeSessionShell} testID="active-session-shell">
       <View style={styles.sessionNavRow} testID="session-shell-nav">
-        {onAbandon ? (
+        {onClose || onAbandon ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Abandon sprint"
+            accessibilityLabel={closeAccessibilityLabel}
             testID="session-abandon"
             style={styles.sessionNavButton}
-            onPress={() => onConfirmAbandonChange(true)}
+            onPress={onClose ?? (() => onConfirmAbandonChange(true))}
           >
             <CloseGlyph />
           </Pressable>
         ) : (
           <View style={styles.sessionNavButton} />
         )}
-        <Text numberOfLines={1} style={styles.sessionNavTitle}>
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.sessionNavTitle,
+            dimmedExceptClose ? styles.sessionGuideCoachDimmed : null
+          ]}
+        >
           {isTacticalFocus ? "Focused Run" : modeLabel(mode)}
         </Text>
-        <View style={styles.sessionNavActions} testID="session-nav-actions">
+        <View
+          style={[
+            styles.sessionNavActions,
+            dimmedExceptClose ? styles.sessionGuideCoachDimmed : null
+          ]}
+          testID="session-nav-actions"
+        >
           {onPause ? (
             <Pressable
               accessibilityRole="button"
@@ -7663,7 +7731,8 @@ function SessionStatusBar({
       <View
         style={[
           styles.sessionActiveMetricRow,
-          compactMetrics ? styles.sessionActiveMetricRowCompact : null
+          compactMetrics ? styles.sessionActiveMetricRowCompact : null,
+          dimmedExceptClose ? styles.sessionGuideCoachDimmed : null
         ]}
         testID="session-status-metrics"
       >
@@ -12529,6 +12598,7 @@ function SettingsPanel({
   onSaveReviewReminderPreference,
   onSyncICloudNow,
   iCloudSyncEnabled,
+  iCloudSyncErrorDetails,
   iCloudSyncStatus,
   moveFeedbackPreferences,
   moveFeedbackPreviewer,
@@ -12557,6 +12627,7 @@ function SettingsPanel({
   onSaveReviewReminderPreference: (preference: ReviewReminderPreference) => void;
   onSyncICloudNow: () => Promise<string>;
   iCloudSyncEnabled: boolean;
+  iCloudSyncErrorDetails?: ICloudSyncErrorDetailsPresentation;
   iCloudSyncStatus: string;
   moveFeedbackPreferences: MoveFeedbackPreferences;
   moveFeedbackPreviewer?: MoveFeedbackPreviewer;
@@ -12606,16 +12677,21 @@ function SettingsPanel({
             />
           </View>
           {iCloudSyncEnabled ? (
-            <SettingsActionRow
-              label="Sync Now"
-              detail="Merge ratings, history, and review queue with your private iCloud."
-              testID="settings-sync-now"
-              onPress={() => {
-                void onSyncICloudNow().then((message) => {
-                  setStatusMessage(message);
-                });
-              }}
-            />
+            <>
+              <SettingsActionRow
+                label="Sync Now"
+                detail="Merge ratings, history, and review queue with your private iCloud."
+                testID="settings-sync-now"
+                onPress={() => {
+                  void onSyncICloudNow().then((message) => {
+                    setStatusMessage(message);
+                  });
+                }}
+              />
+              {iCloudSyncErrorDetails ? (
+                <ICloudSyncErrorDetails presentation={iCloudSyncErrorDetails} />
+              ) : null}
+            </>
           ) : null}
         </SettingsSection>
       ) : (
@@ -14911,7 +14987,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     gap: 12,
     overflow: "hidden",
-    pointerEvents: "none",
+    pointerEvents: "box-none",
     position: "relative",
     width: "100%"
   },

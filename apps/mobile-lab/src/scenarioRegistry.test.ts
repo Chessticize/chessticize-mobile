@@ -98,6 +98,38 @@ test("Issue #247 stays on the existing Settings product clone with its approved 
   );
 });
 
+test("Issue #353 owns the iCloud sync error-detail state in the Settings catalog", () => {
+  assert.deepEqual(
+    newScenarios
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 353))
+      .map((scenario) => scenario.id),
+    [
+      "settings-ios-sync-error-details",
+      "settings-ios-sync-support-bundle-partial"
+    ]
+  );
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-error-details"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle-partial"), ["new"]);
+  assert.equal(
+    scenarioRegistry["settings-ios-sync-error-details"].storyId,
+    "settings--i-cloud-sync-error-details"
+  );
+  assert.equal(
+    scenarioRegistry["settings-ios-sync-support-bundle-partial"].storyId,
+    "settings--i-cloud-sync-support-bundle-partial"
+  );
+  assert.ok(
+    scenarioRegistry["settings-ios-sync-error-details"].scope.includes.includes(
+      "Copy success feedback"
+    )
+  );
+  assert.ok(
+    scenarioRegistry["settings-ios-sync-support-bundle-partial"].scope.includes.includes(
+      "Explicit partial-bundle warning"
+    )
+  );
+});
+
 test("Issue #250 owns the complete Tactical Profile design state set", () => {
   assert.deepEqual(
     newScenarios
@@ -153,16 +185,31 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.ok(activeSessionGuide.scope.includes.includes(
     "Fixed-shape downward portrait arrows outside callout borders with target clearance"
   ));
-  assert.match(activeSessionGuide.description, /route around copy and stop short/);
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Always-available direct guide exit without completion"
+  ));
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Raised portrait Timed Out callout with full pointer and board clearance"
+  ));
+  assert.match(activeSessionGuide.description, /full red pointer above that board/);
   assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
   assert.ok(arrowDuelGuide.scope.includes.includes("The arrows show your two choices"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Portrait callout below the board"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Landscape callout in the empty board lane"));
   assert.ok(arrowDuelGuide.scope.includes.includes(
-    "Landscape dot endpoint stops clear of the candidate piece"
+    "Straight upward landscape connector stops clear of the candidate origin"
+  ));
+  assert.ok(arrowDuelGuide.scope.includes.includes(
+    "Always-available direct guide exit without completion"
   ));
   assert.match(arrowDuelGuide.description, /two arrows are the user's two choices/);
+  assert.match(arrowDuelGuide.description, /straight upward connector/);
   assert.match(arrowDuelGuide.description, /cannot read as a third move arrow/);
+  const arrowDuelGuideOnly = scenarioRegistry["practice-arrow-duel-guide-only"];
+  assert.ok(arrowDuelGuideOnly.scope.includes.includes(
+    "Always-available direct guide exit without completion"
+  ));
+  assert.match(arrowDuelGuideOnly.description, /eligible for the next Arrow Duel/);
   assert.doesNotMatch(
     `${activeSessionGuide.description} ${arrowDuelGuide.description}`,
     /\b(?:step|tour)\b/i
