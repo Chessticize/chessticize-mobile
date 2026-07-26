@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "modelVersion": "tactical-profile-v1",
+  "calibrationId": "tactical-profile-v1-awaiting-representative-holdout",
+  "packFeatureHash": "sha256:9a4a1613713cfd72da6eb718c717c762b08aa361ec23d88b43e5e029d20fb295",
+  "createdAt": "2026-07-25T00:00:00.000Z",
+  "recencyHalfLifeDays": 90,
+  "evidence": {
+    "watchProbability": 0.75,
+    "recommendationExitProbability": 0.85,
+    "recommendationProbability": 0.9,
+    "strongProbability": 0.97,
+    "minDistinctPuzzles": 4,
+    "minDistinctSessions": 2
+  },
+  "opportunity": {
+    "minimumWeight": 0.25,
+    "exponent": 0.5
+  },
+  "focusedRun": {
+    "runSize": 15,
+    "recentPuzzleDays": 30,
+    "ratingBandHalfWidths": [
+      100,
+      200
+    ]
+  },
+  "families": {
+    "line": {
+      "status": "unavailable",
+      "reason": "A representative holdout calibration has not passed yet"
+    },
+    "arrow_duel": {
+      "status": "unavailable",
+      "reason": "A representative holdout calibration has not passed yet"
+    }
+  }
+}

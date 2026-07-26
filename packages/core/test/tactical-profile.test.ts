@@ -4,6 +4,7 @@ import {
   applyTacticalFocusCutoffs,
   applyTacticalFocusCutoffsByTaskFamily,
   approximateSolveThemePosterior,
+  assertValidTacticalProfileCalibrationArtifact,
   buildTacticalProfileDailyCells,
   buildFocusedRunPlan,
   canReofferFocusedRun,
@@ -65,6 +66,50 @@ test("task families keep independent focus cutoffs even for the same theme", () 
     "fork",
     "deflection"
   ]);
+});
+
+test("calibration artifact validation rejects unsafe external artifact shapes", () => {
+  assert.doesNotThrow(() =>
+    assertValidTacticalProfileCalibrationArtifact(CALIBRATION)
+  );
+  assert.throws(
+    () =>
+      assertValidTacticalProfileCalibrationArtifact({
+        ...CALIBRATION,
+        evidence: {
+          ...CALIBRATION.evidence,
+          minDistinctPuzzles: 0
+        }
+      }),
+    /minimum distinct puzzles/
+  );
+  assert.throws(
+    () =>
+      assertValidTacticalProfileCalibrationArtifact({
+        ...CALIBRATION,
+        families: {
+          line: CALIBRATION.families.line
+        }
+      }),
+    /arrow_duel calibration/
+  );
+  assert.throws(
+    () =>
+      assertValidTacticalProfileCalibrationArtifact({
+        ...CALIBRATION,
+        families: {
+          ...CALIBRATION.families,
+          line: {
+            ...CALIBRATION.families.line,
+            solve: {
+              ...CALIBRATION.families.line.solve,
+              ratingGapSlope: Number.NaN
+            }
+          }
+        }
+      }),
+    /Rating-gap slope/
+  );
 });
 
 test("one-focus 15-puzzle plan allocates 10 focused and 5 mixed puzzles", () => {

@@ -818,6 +818,21 @@ task family lacks adequate calibration evidence, that family remains
 "Collecting evidence" or unavailable rather than borrowing unvalidated
 coefficients.
 
+### Production artifact handoff
+
+The mobile app loads
+`config/tactical-profile-calibration-artifact-v1.json` through the domain-owned
+artifact validator and requires its pack-feature hash to match the bundled Core
+Pack exactly. The checked-in artifact keeps both task families unavailable
+until representative holdout evidence passes the predeclared gates. An invalid
+artifact or pack mismatch also fails closed.
+
+After an owner-approved representative corpus passes calibration, the local
+harness can write the reviewed replacement directly with
+`--artifact config/tactical-profile-calibration-artifact-v1.json`. This is a
+data-only activation seam: no product-code change is needed, and a task family
+that does not pass its own gates remains unavailable.
+
 The Phase A PR MUST NOT implement this harness unless a tiny pure local script
 is separately needed to verify a research claim. It MUST NOT upload user data,
 add telemetry, or add runtime behavior.

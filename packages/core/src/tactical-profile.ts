@@ -16,6 +16,7 @@ export const TACTICAL_PROFILE_PACE_REFERENCE_SECONDS = 20;
 export const TACTICAL_PROFILE_SLOW_REFERENCE_SECONDS = 40;
 
 export type TacticalProfileTaskFamily = "line" | "arrow_duel";
+const TACTICAL_PROFILE_TASK_FAMILIES = ["line", "arrow_duel"] as const;
 
 export type TacticalFocusReason = "solve_rate" | "completed_speed" | "both";
 
@@ -609,7 +610,7 @@ export function buildTacticalProfileDailyCells(
   inputs: readonly TacticalProfileAttemptInput[],
   calibration: TacticalProfileCalibrationArtifact
 ): TacticalProfileDailyCell[] {
-  assertValidCalibration(calibration);
+  assertValidTacticalProfileCalibrationArtifact(calibration);
   const cells = new Map<string, MutableTacticalProfileDailyCell>();
 
   for (const input of inputs) {
@@ -695,7 +696,7 @@ export function evaluateTacticalProfile(input: {
   now: string;
   previousRecommendedSignalIds?: readonly string[];
 }): TacticalProfileEvaluation {
-  assertValidCalibration(input.calibration);
+  assertValidTacticalProfileCalibrationArtifact(input.calibration);
   const nowMs = new Date(input.now).getTime();
   if (!Number.isFinite(nowMs)) {
     throw new Error("Tactical Profile evaluation time must be a valid ISO timestamp");
@@ -1212,98 +1213,236 @@ function validSolveObservation(observation: SolveThemeObservation): boolean {
     observation.weight > 0;
 }
 
-function assertValidCalibration(calibration: TacticalProfileCalibrationArtifact): void {
+export function assertValidTacticalProfileCalibrationArtifact(
+  candidate: unknown
+): asserts candidate is TacticalProfileCalibrationArtifact {
+  if (!isRecord(candidate)) {
+    throw new Error("Tactical Profile calibration identity is invalid");
+  }
+  const calibration = candidate;
   if (
     calibration.schemaVersion !== 1 ||
-    calibration.modelVersion.trim().length === 0 ||
-    calibration.calibrationId.trim().length === 0 ||
-    calibration.packFeatureHash.trim().length === 0
+    nonEmptyString(calibration.modelVersion) === undefined ||
+    nonEmptyString(calibration.calibrationId) === undefined ||
+    nonEmptyString(calibration.packFeatureHash) === undefined ||
+    nonEmptyString(calibration.createdAt) === undefined ||
+    !Number.isFinite(Date.parse(calibration.createdAt as string))
   ) {
     throw new Error("Tactical Profile calibration identity is invalid");
   }
+  if (!isRecord(calibration.evidence)) {
+    throw new Error("Tactical Profile evidence policy is invalid");
+  }
   assertProbability(
     "watch probability",
-    calibration.evidence.watchProbability
+    finiteNumber("watch probability", calibration.evidence.watchProbability)
   );
   assertProbability(
     "recommendation exit probability",
-    calibration.evidence.recommendationExitProbability
+    finiteNumber(
+      "recommendation exit probability",
+      calibration.evidence.recommendationExitProbability
+    )
   );
   assertProbability(
     "recommendation probability",
-    calibration.evidence.recommendationProbability
+    finiteNumber(
+      "recommendation probability",
+      calibration.evidence.recommendationProbability
+    )
   );
   assertProbability(
     "strong probability",
-    calibration.evidence.strongProbability
+    finiteNumber("strong probability", calibration.evidence.strongProbability)
   );
   if (
-    calibration.evidence.watchProbability >
-      calibration.evidence.recommendationExitProbability ||
-    calibration.evidence.recommendationExitProbability >
-      calibration.evidence.recommendationProbability ||
-    calibration.evidence.recommendationProbability >
-      calibration.evidence.strongProbability
+    (calibration.evidence.watchProbability as number) >
+      (calibration.evidence.recommendationExitProbability as number) ||
+    (calibration.evidence.recommendationExitProbability as number) >
+      (calibration.evidence.recommendationProbability as number) ||
+    (calibration.evidence.recommendationProbability as number) >
+      (calibration.evidence.strongProbability as number)
   ) {
     throw new Error("Tactical Profile evidence probabilities must be ordered");
   }
-  assertPositiveFinite("recency half-life", calibration.recencyHalfLifeDays);
+  assertPositiveInteger(
+    "minimum distinct puzzles",
+    calibration.evidence.minDistinctPuzzles
+  );
+  assertPositiveInteger(
+    "minimum distinct sessions",
+    calibration.evidence.minDistinctSessions
+  );
+  assertPositiveFinite(
+    "recency half-life",
+    finiteNumber("recency half-life", calibration.recencyHalfLifeDays)
+  );
+  if (!isRecord(calibration.opportunity)) {
+    throw new Error("Tactical Profile opportunity policy is invalid");
+  }
   assertPositiveFinite(
     "minimum opportunity weight",
-    calibration.opportunity.minimumWeight
+    finiteNumber(
+      "minimum opportunity weight",
+      calibration.opportunity.minimumWeight
+    )
   );
-  assertPositiveFinite("opportunity exponent", calibration.opportunity.exponent);
-  if (calibration.focusedRun) {
+  assertPositiveFinite(
+    "opportunity exponent",
+    finiteNumber("opportunity exponent", calibration.opportunity.exponent)
+  );
+  if (calibration.focusedRun !== undefined) {
+    if (!isRecord(calibration.focusedRun)) {
+      throw new Error("Tactical Profile Focused Run policy is invalid");
+    }
+    const ratingBandHalfWidths = calibration.focusedRun.ratingBandHalfWidths;
+    const backfill = calibration.focusedRun.themeShortfallBackfill;
     if (
       !Number.isInteger(calibration.focusedRun.runSize) ||
-      calibration.focusedRun.runSize < 1 ||
+      (calibration.focusedRun.runSize as number) < 1 ||
       !Number.isInteger(calibration.focusedRun.recentPuzzleDays) ||
-      calibration.focusedRun.recentPuzzleDays < 0 ||
-      calibration.focusedRun.ratingBandHalfWidths.length < 1 ||
-      calibration.focusedRun.ratingBandHalfWidths.some(
-        (halfWidth) => !Number.isInteger(halfWidth) || halfWidth < 1
+      (calibration.focusedRun.recentPuzzleDays as number) < 0 ||
+      !Array.isArray(ratingBandHalfWidths) ||
+      ratingBandHalfWidths.length < 1 ||
+      ratingBandHalfWidths.some(
+        (halfWidth) =>
+          !Number.isInteger(halfWidth) || (halfWidth as number) < 1
       ) ||
-      calibration.focusedRun.ratingBandHalfWidths.some(
+      ratingBandHalfWidths.some(
         (halfWidth, index, widths) => index > 0 && halfWidth <= (widths[index - 1] as number)
       ) ||
-      !validThemeShortfallBackfill(
-        calibration.focusedRun.themeShortfallBackfill
-      )
+      !validUnknownThemeShortfallBackfill(backfill)
     ) {
       throw new Error("Tactical Profile Focused Run policy is invalid");
     }
   }
-  for (const family of Object.values(calibration.families)) {
-    if (family.status !== "calibrated") {
+  if (!isRecord(calibration.families)) {
+    throw new Error("Tactical Profile family calibration is invalid");
+  }
+  for (const taskFamily of TACTICAL_PROFILE_TASK_FAMILIES) {
+    const family = calibration.families[taskFamily];
+    if (!isRecord(family)) {
+      throw new Error(`Tactical Profile ${taskFamily} calibration is invalid`);
+    }
+    if (family.status === "unavailable") {
+      if (nonEmptyString(family.reason) === undefined) {
+        throw new Error(
+          `Tactical Profile ${taskFamily} unavailable reason is invalid`
+        );
+      }
       continue;
     }
+    if (family.status !== "calibrated" || !isRecord(family.solve)) {
+      throw new Error(`Tactical Profile ${taskFamily} calibration is invalid`);
+    }
+    finiteNumber("solve intercept", family.solve.intercept);
+    assertPositiveFinite(
+      "solve Rating-gap slope",
+      finiteNumber("solve Rating-gap slope", family.solve.ratingGapSlope)
+    );
+    finiteNumber(
+      "solve Timeout coefficient",
+      family.solve.timeoutLogCoefficient
+    );
     assertPositiveFinite(
       "solve prior standard deviation",
-      family.solve.themePriorSdRating
+      finiteNumber(
+        "solve prior standard deviation",
+        family.solve.themePriorSdRating
+      )
     );
     assertPositiveFinite(
       "solve timeout reference",
-      family.solve.timeoutReferenceSeconds
+      finiteNumber(
+        "solve timeout reference",
+        family.solve.timeoutReferenceSeconds
+      )
     );
     assertPositiveFinite(
       "solve practical deficit",
-      family.solve.practicalDeficitRating
+      finiteNumber(
+        "solve practical deficit",
+        family.solve.practicalDeficitRating
+      )
     );
     assertPositiveFinite(
       "solve practical impact",
-      family.solve.minExpectedFailuresPer100
+      finiteNumber(
+        "solve practical impact",
+        family.solve.minExpectedFailuresPer100
+      )
     );
-    if (family.speed) {
-      assertPositiveFinite("speed residual deviation", family.speed.residualSd);
+    if (family.speed !== undefined) {
+      if (!isRecord(family.speed)) {
+        throw new Error("Tactical Profile speed calibration is invalid");
+      }
+      finiteNumber("speed intercept", family.speed.interceptLogSeconds);
+      finiteNumber(
+        "speed relative-difficulty coefficient",
+        family.speed.relativeDifficultyCoefficient
+      );
+      finiteNumber(
+        "speed decision-count coefficient",
+        family.speed.decisionCountCoefficient
+      );
+      finiteNumber("speed pace coefficient", family.speed.paceLogCoefficient);
+      finiteNumber(
+        "speed Slow-policy coefficient",
+        family.speed.slowPolicyLogCoefficient
+      );
+      assertPositiveFinite(
+        "speed residual deviation",
+        finiteNumber("speed residual deviation", family.speed.residualSd)
+      );
       assertPositiveFinite(
         "speed prior standard deviation",
-        family.speed.themePriorSdLogSeconds
+        finiteNumber(
+          "speed prior standard deviation",
+          family.speed.themePriorSdLogSeconds
+        )
       );
-      if (family.speed.practicalTimeMultiplier <= 1) {
+      const practicalTimeMultiplier = finiteNumber(
+        "speed practical multiplier",
+        family.speed.practicalTimeMultiplier
+      );
+      if (practicalTimeMultiplier <= 1) {
         throw new Error("Speed practical multiplier must exceed one");
       }
     }
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0
+    ? value
+    : undefined;
+}
+
+function finiteNumber(label: string, value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`${label} must be finite`);
+  }
+  return value;
+}
+
+function assertPositiveInteger(label: string, value: unknown): void {
+  if (!Number.isInteger(value) || (value as number) < 1) {
+    throw new Error(`${label} must be a positive integer`);
+  }
+}
+
+function validUnknownThemeShortfallBackfill(value: unknown): boolean {
+  return value === undefined ||
+    (
+      isRecord(value) &&
+      value.destination === "mixed_control" &&
+      Number.isInteger(value.minimumPuzzlesPerTheme) &&
+      (value.minimumPuzzlesPerTheme as number) > 0
+    );
 }
 
 function assertProbability(label: string, value: number): void {
