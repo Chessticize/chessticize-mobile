@@ -308,6 +308,32 @@ test("completed-puzzle speed remains eligible when the Slow label is disabled", 
   );
 });
 
+test("correct attempts at or beyond the Timeout boundary do not become speed evidence", () => {
+  const cells = buildTacticalProfileDailyCells([
+    tacticalAttempt({
+      attempt: {
+        id: "attempt-at-timeout",
+        puzzleId: "puzzle-at-timeout",
+        elapsedMs: 60_000
+      },
+      puzzle: { id: "puzzle-at-timeout" }
+    }),
+    tacticalAttempt({
+      attempt: {
+        id: "attempt-after-timeout",
+        puzzleId: "puzzle-after-timeout",
+        elapsedMs: 60_001
+      },
+      puzzle: { id: "puzzle-after-timeout" }
+    })
+  ], CALIBRATION);
+
+  assert.equal(cells.length, 1);
+  assert.equal(cells[0]?.solveWeight, 2);
+  assert.equal(cells[0]?.speedWeight, 0);
+  assert.equal(cells[0]?.speedPrecision, 0);
+});
+
 test("one multi-theme attempt conserves one total theme observation", () => {
   const cells = buildTacticalProfileDailyCells([
     tacticalAttempt({
@@ -343,6 +369,36 @@ test("Timeout contributes one solve failure and no completed-speed observation",
   assert.equal(cell.solveWeight, 1);
   assert.equal(cell.speedWeight, 0);
   assert.equal(cell.speedPrecision, 0);
+});
+
+test("legacy timing gaps are never reconstructed from timestamps or current defaults", () => {
+  const missingElapsed = tacticalAttempt();
+  delete missingElapsed.attempt.elapsedMs;
+  const missingPolicy = tacticalAttempt();
+  delete missingPolicy.sessionConfig?.puzzleTiming;
+
+  const [elapsedCell] = buildTacticalProfileDailyCells(
+    [missingElapsed],
+    CALIBRATION
+  );
+  const policyCells = buildTacticalProfileDailyCells(
+    [missingPolicy],
+    CALIBRATION
+  );
+
+  assert.ok(elapsedCell);
+  assert.equal(elapsedCell.solveObservedSuccess, 1);
+  assert.equal(elapsedCell.speedWeight, 0);
+  assert.deepEqual(policyCells, []);
+});
+
+test("a puzzle with no curated theme contributes no theme posterior cell", () => {
+  assert.deepEqual(
+    buildTacticalProfileDailyCells([
+      tacticalAttempt({ puzzle: { themes: ["notCurated"] } })
+    ], CALIBRATION),
+    []
+  );
 });
 
 test("Unclear and Slow workflow labels do not change objective model evidence", () => {
@@ -419,6 +475,9 @@ test("consistent completed-puzzle slowness recommends but one extreme solve does
   const extreme = buildTacticalProfileDailyCells([
     tacticalAttempt({
       attempt: { elapsedMs: 179_000 },
+      sessionConfig: {
+        puzzleTiming: { slowAfterSeconds: 40, timeoutAfterSeconds: 180 }
+      },
       puzzle: { id: "pin-extreme", themes: ["pin"] }
     })
   ], CALIBRATION);

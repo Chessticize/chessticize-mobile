@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   TacticalFocusReason,
   TacticalProfileTaskFamily
@@ -39,6 +39,7 @@ export function useTacticalProfilePresentation(input: {
   const [prepared, setPrepared] = useState<PreparedFocusedRun | undefined>();
   const [focusedRunUnavailable, setFocusedRunUnavailable] =
     useState<TacticalProfilePresentation["focusedRunUnavailable"]>();
+  const failedRetryCount = useRef(0);
 
   useEffect(() => {
     if (injectedPresentation) {
@@ -49,13 +50,21 @@ export function useTacticalProfilePresentation(input: {
 
   useEffect(() => {
     if (injectedPresentation || snapshot?.phase !== "building") {
+      failedRetryCount.current = 0;
       return;
     }
+    const failed = snapshot.buildState.status === "failed";
+    const retryDelayMs = failed
+      ? Math.min(30_000, 1_000 * 2 ** failedRetryCount.current)
+      : 25;
+    failedRetryCount.current = failed
+      ? failedRetryCount.current + 1
+      : 0;
     const refreshTimer = setTimeout(() => {
       setSnapshot(service.getTacticalProfileSnapshot());
-    }, 25);
+    }, retryDelayMs);
     return () => clearTimeout(refreshTimer);
-  }, [injectedPresentation, service, snapshot?.buildState.dirtyDayCount, snapshot?.phase]);
+  }, [injectedPresentation, service, snapshot]);
 
   const refresh = useCallback(() => {
     const next = service.getTacticalProfileSnapshot();

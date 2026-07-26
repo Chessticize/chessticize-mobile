@@ -47,6 +47,7 @@ import type {
   ClearLocalHistoryResult,
   ExportedSprintSession,
   LocalDataImport,
+  LocalDataImportObserver,
   LocalDataImportResult,
   LocalDataExport,
   PracticeRatingActivity,
@@ -311,7 +312,23 @@ export class MemoryStore implements PracticeStore {
     });
   }
 
-  importLocalData(data: LocalDataImport): LocalDataImportResult {
+  listSprintAttemptUtcDays(sessionIds: readonly string[]): string[] {
+    const includedSessionIds = new Set(sessionIds);
+    return [...new Set(
+      this.attempts
+        .filter((attempt) =>
+          attempt.source === "sprint" &&
+          includedSessionIds.has(attempt.sessionId)
+        )
+        .map((attempt) => utcDay(attempt.completedAt))
+        .filter((day): day is string => day !== undefined)
+    )].sort();
+  }
+
+  importLocalData(
+    data: LocalDataImport,
+    observer?: LocalDataImportObserver
+  ): LocalDataImportResult {
     const result: LocalDataImportResult = {
       ratings: 0,
       attempts: 0,
@@ -388,6 +405,7 @@ export class MemoryStore implements PracticeStore {
         ratingBefore: next.ratingBefore,
         ...(next.ratingAfter === undefined ? {} : { ratingAfter: next.ratingAfter })
       });
+      observer?.onSprintSessionChanged(previous, next);
       result.sprintSessions += 1;
     }
     for (const attempt of data.attempts) {
@@ -405,6 +423,7 @@ export class MemoryStore implements PracticeStore {
       } else {
         this.attempts[existingIndex] = next;
       }
+      observer?.onAttemptChanged(previous, next);
       result.attempts += 1;
     }
     const importedReviewChanges: ReviewScheduleChange[] = [
@@ -785,6 +804,13 @@ function attemptMatchesHistoryFilter(attempt: AttemptEvent, filter: HistoryFilte
     && (!filter.until || attempt.completedAt < filter.until)
     && (!filter.puzzleId || attempt.puzzleId === filter.puzzleId)
     && (!filter.sessionId || attempt.sessionId === filter.sessionId);
+}
+
+function utcDay(timestamp: string): string | undefined {
+  const date = new Date(timestamp);
+  return Number.isFinite(date.getTime())
+    ? date.toISOString().slice(0, 10)
+    : undefined;
 }
 
 function reviewQueueKey(context: ReviewContext): string {

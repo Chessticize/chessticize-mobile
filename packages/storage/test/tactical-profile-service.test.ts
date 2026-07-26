@@ -50,7 +50,7 @@ test("a clean Tactical Profile read uses daily cells without rescanning canonica
   assert.deepEqual(snapshot.evaluation, first.evaluation);
 });
 
-test("large SQLite dirty rebuilds use day-bounded attempts and exact session reads", () => {
+test("large SQLite rebuilds and imports keep canonical reads bounded", () => {
   const store = new SQLiteStore();
   try {
     store.migrate();
@@ -94,8 +94,11 @@ test("large SQLite dirty rebuilds use day-bounded attempts and exact session rea
 
     const originalListAttempts = store.listAttempts.bind(store);
     const originalGetSprintSessions = store.getSprintSessions.bind(store);
+    const originalListSprintAttemptUtcDays =
+      store.listSprintAttemptUtcDays.bind(store);
     const filters: Parameters<typeof store.listAttempts>[0][] = [];
     const sessionReadSizes: number[] = [];
+    const importDayReadSizes: number[] = [];
     store.listAttempts = (filter = {}) => {
       filters.push(filter);
       return originalListAttempts(filter);
@@ -103,6 +106,10 @@ test("large SQLite dirty rebuilds use day-bounded attempts and exact session rea
     store.getSprintSessions = (ids) => {
       sessionReadSizes.push(new Set(ids).size);
       return originalGetSprintSessions(ids);
+    };
+    store.listSprintAttemptUtcDays = (ids) => {
+      importDayReadSizes.push(new Set(ids).size);
+      return originalListSprintAttemptUtcDays(ids);
     };
     const profile = new TacticalProfileService({
       progressStore: store,
@@ -132,6 +139,31 @@ test("large SQLite dirty rebuilds use day-bounded attempts and exact session rea
     ));
     assert.deepEqual(sessionReadSizes, [30, 30]);
     assert.ok(elapsedMs < 4_000, `large dirty rebuild took ${elapsedMs}ms`);
+
+    const incoming = store.exportLocalData();
+    incoming.sprintSessions = incoming.sprintSessions.map((session) => ({
+      ...session,
+      completedAt: new Date(
+        Date.parse(session.completedAt ?? session.startedAt) + 86_400_000
+      ).toISOString(),
+      config: {
+        ...session.config!,
+        themes: ["fork"]
+      }
+    }));
+    filters.length = 0;
+    const importStartedAt = Date.now();
+    const imported = new PracticeService(store, profile).importLocalData(incoming);
+    const importElapsedMs = Date.now() - importStartedAt;
+
+    assert.equal(imported.sprintSessions, 60);
+    assert.equal(imported.attempts, 0);
+    assert.deepEqual(importDayReadSizes, [60]);
+    assert.equal(filters.length, 0);
+    assert.ok(
+      importElapsedMs < 4_000,
+      `large no-attempt-change import took ${importElapsedMs}ms`
+    );
   } finally {
     store.close();
   }
@@ -155,6 +187,249 @@ test("chronological, reversed, and duplicate canonical imports converge to ident
   });
 
   assert.equal(new Set(serializedCells).size, 1);
+});
+
+test("a no-op canonical import preserves cache identity and recommendation hysteresis", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new RecoveringTacticalProfileRepository();
+  const profile = service(store, repository);
+  const practice = new PracticeService(store, profile);
+  const before = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const resetCount = repository.resetCount;
+  const markedDayCount = repository.markedDays.length;
+  const incoming = store.exportLocalData();
+  const listAttempts = store.listAttempts.bind(store);
+  const listSprintSessions = store.listSprintSessions.bind(store);
+  const listSprintAttemptUtcDays =
+    store.listSprintAttemptUtcDays.bind(store);
+  let fullSprintAttemptReads = 0;
+  let fullSprintSessionReads = 0;
+  let sessionDayReads = 0;
+  store.listAttempts = (filter) => {
+    if (
+      filter?.source === "sprint" &&
+      filter.sessionId === undefined &&
+      filter.since === undefined &&
+      filter.until === undefined
+    ) {
+      fullSprintAttemptReads += 1;
+    }
+    return listAttempts(filter);
+  };
+  store.listSprintSessions = () => {
+    fullSprintSessionReads += 1;
+    return listSprintSessions();
+  };
+  store.listSprintAttemptUtcDays = (sessionIds) => {
+    sessionDayReads += 1;
+    return listSprintAttemptUtcDays(sessionIds);
+  };
+
+  const imported = practice.importLocalData(incoming);
+  const after = profile.getSnapshot("2026-07-26T00:00:00.000Z");
+
+  assert.deepEqual(imported, {
+    ratings: 0,
+    attempts: 0,
+    reviewQueue: 0,
+    sprintSessions: 0,
+    practiceRuns: 0
+  });
+  assert.equal(repository.resetCount, resetCount);
+  assert.equal(repository.markedDays.length, markedDayCount);
+  assert.equal(fullSprintAttemptReads, 0);
+  assert.equal(sessionDayReads, 0);
+  assert.equal(
+    fullSprintSessionReads,
+    1,
+    "the rating reconciliation may read sessions once, but Profile import tracking must not scan them"
+  );
+  assert.equal(after.buildState.evaluatedAt, before.buildState.evaluatedAt);
+  assert.deepEqual(
+    after.buildState.recommendedSignalIds,
+    before.buildState.recommendedSignalIds
+  );
+});
+
+test("a changed canonical import dirties only its affected UTC day", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new RecoveringTacticalProfileRepository();
+  const profile = service(store, repository);
+  const practice = new PracticeService(store, profile);
+  profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const resetCount = repository.resetCount;
+  const importedDay = "2026-07-24";
+  const importedAt = `${importedDay}T00:04:00.000Z`;
+  const config = buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20
+  });
+  const incoming = store.exportLocalData();
+  incoming.sprintSessions.push({
+    id: "imported-mixed-session",
+    mode: "standard",
+    ratingKey: config.ratingKey,
+    startedAt: `${importedDay}T00:00:00.000Z`,
+    completedAt: importedAt,
+    status: "failed",
+    correctCount: 0,
+    mistakeCount: 1,
+    ratingBefore: 925,
+    ratingAfter: 900,
+    config
+  });
+  incoming.attempts.push(attempt({
+    id: "imported-mixed-attempt",
+    sessionId: "imported-mixed-session",
+    puzzleId: "evidence-0",
+    completedAt: importedAt
+  }));
+
+  const imported = practice.importLocalData(incoming);
+
+  assert.equal(imported.sprintSessions, 1);
+  assert.equal(imported.attempts, 1);
+  assert.equal(repository.resetCount, resetCount);
+  assert.deepEqual(repository.markedDays.slice(-1), [[importedDay]]);
+});
+
+test("a changed imported session config dirties every day containing that session", () => {
+  const store = seededStore();
+  const config = buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20
+  });
+  const session = startSprint({
+    id: "multi-day-session",
+    config,
+    puzzles: [store.getPuzzle("evidence-0")!],
+    ratingBefore: 925,
+    now: "2026-07-20T00:00:00.000Z"
+  });
+  const completed = {
+    ...session,
+    status: "failed" as const,
+    completedAt: "2026-07-21T00:04:00.000Z",
+    endReason: "max_mistakes" as const,
+    correctCount: 0,
+    mistakeCount: 2,
+    ratingAfter: 900
+  };
+  store.createSprintSession(completed);
+  for (const [index, day] of ["2026-07-20", "2026-07-21"].entries()) {
+    store.recordAttempt(attempt({
+      id: `multi-day-attempt-${index}`,
+      sessionId: session.id,
+      puzzleId: "evidence-0",
+      completedAt: `${day}T00:04:00.000Z`
+    }));
+  }
+  const repository = new RecoveringTacticalProfileRepository();
+  const profile = service(store, repository);
+  const practice = new PracticeService(store, profile);
+  profile.getSnapshot("2026-07-25T00:00:00.000Z");
+
+  const incoming = store.exportLocalData();
+  incoming.sprintSessions = incoming.sprintSessions.map((candidate) =>
+    candidate.id === session.id
+      ? {
+          ...candidate,
+          completedAt: "2026-07-22T00:04:00.000Z",
+          config: { ...config, themes: ["fork"] }
+        }
+      : candidate
+  );
+  practice.importLocalData(incoming);
+
+  assert.deepEqual(
+    repository.markedDays.slice(-1),
+    [["2026-07-20", "2026-07-21"]]
+  );
+});
+
+test("an attempt-first split import converges when its session arrives later", () => {
+  const store = seededStore();
+  const repository = new MemoryTacticalProfileRepository();
+  const profile = service(store, repository);
+  const practice = new PracticeService(store, profile);
+  profile.getSnapshot("2026-07-19T00:00:00.000Z");
+  const completedAt = "2026-07-20T00:04:00.000Z";
+  const config = buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20
+  });
+  const attemptOnly = store.exportLocalData();
+  attemptOnly.attempts.push(attempt({
+    id: "attempt-before-session",
+    sessionId: "late-session",
+    puzzleId: "evidence-0",
+    completedAt
+  }));
+
+  practice.importLocalData(attemptOnly);
+  profile.getSnapshot("2026-07-20T01:00:00.000Z");
+  assert.equal(repository.listDailyCells(identity()).length, 0);
+
+  const sessionOnly = store.exportLocalData();
+  sessionOnly.attempts = [];
+  sessionOnly.sprintSessions.push({
+    id: "late-session",
+    mode: "standard",
+    ratingKey: config.ratingKey,
+    startedAt: "2026-07-20T00:00:00.000Z",
+    completedAt,
+    status: "failed",
+    correctCount: 0,
+    mistakeCount: 1,
+    ratingBefore: 925,
+    ratingAfter: 900,
+    config
+  });
+
+  practice.importLocalData(sessionOnly);
+  profile.getSnapshot("2026-07-20T02:00:00.000Z");
+
+  assert.equal(repository.listDailyCells(identity()).length, 1);
+});
+
+test("a model or pack identity change rebuilds the derived cache from canonical history", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new MemoryTacticalProfileRepository();
+  const firstProfile = service(store, repository);
+  firstProfile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const firstCells = repository.listDailyCells(identity());
+  const recalibrated: TacticalProfileCalibrationArtifact = {
+    ...CALIBRATION,
+    modelVersion: "test-v2",
+    calibrationId: "test-calibration-v2",
+    packFeatureHash: "test-pack-rd-v2"
+  };
+  const secondProfile = new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository,
+    calibration: recalibrated,
+    naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} }
+  });
+
+  const rebuilt = secondProfile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const rebuiltCells = repository.listDailyCells({
+    modelVersion: recalibrated.modelVersion,
+    packFeatureHash: recalibrated.packFeatureHash,
+    calibrationId: recalibrated.calibrationId
+  });
+
+  assert.equal(rebuilt.phase, "ready");
+  assert.deepEqual(
+    rebuiltCells.map(withoutCacheIdentity),
+    firstCells.map(withoutCacheIdentity)
+  );
 });
 
 test("TacticalProfileService preserves 10 / 5 quotas, exact deduplication, and an unrated fixed Run", () => {
@@ -201,6 +476,32 @@ test("TacticalProfileService preserves 10 / 5 quotas, exact deduplication, and a
   );
 });
 
+test("a new Focused Run uses the current family Rating without rewriting old evidence", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new MemoryTacticalProfileRepository();
+  const profile = service(store, repository);
+  profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const oldEvidence = repository.listDailyCells(identity());
+  const current = store.getRating("standard 5/20");
+  store.saveRating({ ...current, generation: current.generation + 1, rating: 1000 });
+
+  const prepared = profile.prepareFocusedRun(
+    "line",
+    "2026-07-25T00:00:00.000Z",
+    "rating-growth"
+  );
+
+  assert.equal(prepared.status, "ready", JSON.stringify(prepared));
+  if (prepared.status !== "ready") {
+    return;
+  }
+  assert.equal(prepared.prepared.plan.ratingAnchor.rating, 1000);
+  assert.equal(prepared.prepared.plan.minRating, 900);
+  assert.equal(prepared.prepared.plan.maxRating, 1100);
+  assert.deepEqual(repository.listDailyCells(identity()), oldEvidence);
+});
+
 test("TacticalProfileService does not re-offer a Focused Run before fresh mixed evidence", () => {
   const store = seededStore();
   seedWeaknessHistory(store);
@@ -230,6 +531,29 @@ test("TacticalProfileService does not re-offer a Focused Run before fresh mixed 
     profile.prepareFocusedRun("line", "2026-07-25T00:00:00.000Z"),
     { status: "unavailable", reason: "no_fresh_evidence" }
   );
+
+  const abandonedWithoutEvidence = startSprint({
+    id: "abandoned-without-evidence",
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20
+    }),
+    puzzles: [store.getPuzzle("mixed-0")!],
+    ratingBefore: 925,
+    now: "2026-07-24T00:30:00.000Z"
+  });
+  store.createSprintSession({
+    ...abandonedWithoutEvidence,
+    status: "abandoned",
+    completedAt: "2026-07-24T00:31:00.000Z",
+    endReason: "abandoned"
+  });
+
+  assert.deepEqual(
+    profile.prepareFocusedRun("line", "2026-07-25T00:00:00.000Z"),
+    { status: "unavailable", reason: "no_fresh_evidence" }
+  );
 });
 
 test("PracticeService starts the prepared Focused Run through the normal session boundary", () => {
@@ -252,6 +576,83 @@ test("PracticeService starts the prepared Focused Run through the normal session
     practice.listSprintSessions().find((session) => session.id === started.id)?.config?.maxAttempts,
     15
   );
+});
+
+test("derived-cache write failures do not undo canonical Sprint or import progress", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new RecoveringTacticalProfileRepository();
+  const profile = service(store, repository);
+  profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const practice = new PracticeService(store, profile);
+  store.seedPuzzles([playablePuzzle("cache-failure-run")]);
+  practice.setPuzzleSelectionScopeIds(["cache-failure-run"]);
+
+  repository.failNext("markDirtyDays");
+  const started = practice.startSprint({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20,
+    targetCorrect: 1,
+    maxMistakes: 1
+  }, "2026-07-25T01:00:00.000Z");
+  const completed = practice.advanceSprintTime("2026-07-25T01:01:01.000Z");
+
+  assert.equal(completed.state.status, "failed");
+  assert.ok(store.listAttempts({ sessionId: started.id }).length > 0);
+  assert.equal(
+    store.listSprintSessions().find((session) => session.id === started.id)?.status,
+    "failed"
+  );
+
+  repository.failNext("reset");
+  const imported = practice.importLocalData(store.exportLocalData());
+  assert.ok(imported.attempts >= 0);
+  assert.doesNotThrow(() =>
+    practice.getTacticalProfileSnapshot("2026-07-25T02:00:00.000Z")
+  );
+});
+
+test("a recoverable cache read failure returns a fail-closed snapshot and rebuilds later", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new RecoveringTacticalProfileRepository();
+  const profile = service(store, repository);
+  profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  repository.failNext("listDirtyDays");
+
+  const unavailable = profile.getSnapshot("2026-07-25T01:00:00.000Z");
+  const recovered = profile.getSnapshot("2026-07-25T02:00:00.000Z");
+
+  assert.equal(unavailable.phase, "building");
+  assert.equal(unavailable.buildState.status, "failed");
+  assert.match(unavailable.buildState.lastError ?? "", /simulated listDirtyDays failure/);
+  assert.equal(unavailable.evaluation.signals.length, 0);
+  assert.equal(recovered.phase, "ready");
+  assert.equal(recovered.buildState.status, "ready");
+});
+
+test("a persistent malformed build state is reset before the next recovery read", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new RecoveringTacticalProfileRepository();
+  const profile = service(store, repository);
+  profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const resetCount = repository.resetCount;
+  repository.failBuildStateReadsUntilReset();
+
+  const unavailable = profile.getSnapshot("2026-07-25T01:00:00.000Z");
+  const recovered = profile.getSnapshot("2026-07-25T02:00:00.000Z");
+
+  assert.equal(unavailable.phase, "building");
+  assert.equal(unavailable.buildState.status, "failed");
+  assert.match(
+    unavailable.buildState.lastError ?? "",
+    /simulated persistent getBuildState failure/
+  );
+  assert.equal(repository.resetCount, resetCount + 1);
+  assert.equal(recovered.phase, "ready");
+  assert.equal(recovered.buildState.status, "ready");
 });
 
 test("an uncalibrated task family remains collecting without scanning it into recommendations", () => {
@@ -393,12 +794,95 @@ function puzzle(id: string, themes: string[]): Puzzle {
   };
 }
 
+function playablePuzzle(id: string): Puzzle {
+  return {
+    id,
+    initialFen: "r1bqk2r/pp1nbNp1/2p1p2p/8/2BP4/1PN3P1/P3QP1P/3R1RK1 b kq - 0 19",
+    solutionMoves: ["e8f7", "e2e6", "f7f8", "e6f7"],
+    rating: 925,
+    ratingDeviation: 80,
+    themes: ["mate", "mateIn2", "middlegame", "short"],
+    source: "lichess",
+    stockfishBestMove: "e2e6"
+  };
+}
+
 function identity() {
   return {
     modelVersion: CALIBRATION.modelVersion,
     packFeatureHash: CALIBRATION.packFeatureHash,
     calibrationId: CALIBRATION.calibrationId
   };
+}
+
+function withoutCacheIdentity(
+  cell: ReturnType<MemoryTacticalProfileRepository["listDailyCells"]>[number]
+) {
+  const {
+    modelVersion: _modelVersion,
+    packFeatureHash: _packFeatureHash,
+    calibrationId: _calibrationId,
+    ...evidence
+  } = cell;
+  return evidence;
+}
+
+class RecoveringTacticalProfileRepository extends MemoryTacticalProfileRepository {
+  private nextFailure: "listDirtyDays" | "markDirtyDays" | "reset" | undefined;
+  private persistentBuildStateFailure = false;
+  readonly markedDays: string[][] = [];
+  resetCount = 0;
+
+  failNext(operation: NonNullable<RecoveringTacticalProfileRepository["nextFailure"]>): void {
+    this.nextFailure = operation;
+  }
+
+  failBuildStateReadsUntilReset(): void {
+    this.persistentBuildStateFailure = true;
+  }
+
+  override getBuildState(
+    ...args: Parameters<MemoryTacticalProfileRepository["getBuildState"]>
+  ): ReturnType<MemoryTacticalProfileRepository["getBuildState"]> {
+    if (this.persistentBuildStateFailure) {
+      throw new Error("simulated persistent getBuildState failure");
+    }
+    return super.getBuildState(...args);
+  }
+
+  override listDirtyDays(
+    ...args: Parameters<MemoryTacticalProfileRepository["listDirtyDays"]>
+  ): string[] {
+    this.maybeFail("listDirtyDays");
+    return super.listDirtyDays(...args);
+  }
+
+  override markDirtyDays(
+    ...args: Parameters<MemoryTacticalProfileRepository["markDirtyDays"]>
+  ): void {
+    this.maybeFail("markDirtyDays");
+    this.markedDays.push([...args[1]]);
+    super.markDirtyDays(...args);
+  }
+
+  override reset(
+    ...args: Parameters<MemoryTacticalProfileRepository["reset"]>
+  ): void {
+    this.maybeFail("reset");
+    this.resetCount += 1;
+    super.reset(...args);
+    this.persistentBuildStateFailure = false;
+  }
+
+  private maybeFail(
+    operation: NonNullable<RecoveringTacticalProfileRepository["nextFailure"]>
+  ): void {
+    if (this.nextFailure !== operation) {
+      return;
+    }
+    this.nextFailure = undefined;
+    throw new Error(`simulated ${operation} failure`);
+  }
 }
 
 const CALIBRATION = {

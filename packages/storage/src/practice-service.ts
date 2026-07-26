@@ -384,11 +384,17 @@ export class PracticeService {
   }
 
   importLocalData(data: LocalDataImport): LocalDataImportResult {
-    const result = this.store.importLocalData(data);
-    this.tacticalProfile?.markCanonicalImportChanged();
+    const tacticalProfileImport =
+      this.tacticalProfile?.beginCanonicalImport();
+    const result = this.store.importLocalData(
+      data,
+      tacticalProfileImport?.observer
+    );
+    tacticalProfileImport?.finish();
+    const repairedRatings = this.reconcilePersistedRatings();
     return {
       ...result,
-      ratings: result.ratings + this.reconcilePersistedRatings()
+      ratings: result.ratings + repairedRatings
     };
   }
 

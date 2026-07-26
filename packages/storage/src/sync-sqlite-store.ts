@@ -54,6 +54,7 @@ import type {
   ClearLocalHistoryResult,
   ExportedSprintSession,
   LocalDataImport,
+  LocalDataImportObserver,
   LocalDataImportResult,
   LocalDataExport,
   PracticeRatingActivity,
@@ -1012,7 +1013,10 @@ export class SyncSQLiteStore implements PracticeStore {
     };
   }
 
-  importLocalData(data: LocalDataImport): LocalDataImportResult {
+  importLocalData(
+    data: LocalDataImport,
+    observer?: LocalDataImportObserver
+  ): LocalDataImportResult {
     const result: LocalDataImportResult = {
       ratings: 0,
       attempts: 0,
@@ -1056,12 +1060,12 @@ export class SyncSQLiteStore implements PracticeStore {
         }
       }
       for (const session of data.sprintSessions) {
-        if (this.importSprintSession(session)) {
+        if (this.importSprintSession(session, observer)) {
           result.sprintSessions += 1;
         }
       }
       for (const attempt of data.attempts) {
-        if (this.importAttempt(attempt)) {
+        if (this.importAttempt(attempt, observer)) {
           result.attempts += 1;
         }
       }
@@ -1615,7 +1619,31 @@ export class SyncSQLiteStore implements PracticeStore {
     });
   }
 
-  private importSprintSession(session: ExportedSprintSession): boolean {
+  listSprintAttemptUtcDays(sessionIds: readonly string[]): string[] {
+    const uniqueIds = [...new Set(sessionIds)];
+    const days = new Set<string>();
+    for (let offset = 0; offset < uniqueIds.length; offset += MAX_SQL_ID_FILTER_VALUES) {
+      const chunk = uniqueIds.slice(offset, offset + MAX_SQL_ID_FILTER_VALUES);
+      const rows = this.db
+        .prepare(
+          `SELECT DISTINCT strftime('%Y-%m-%d', completed_at) AS day
+           FROM attempts
+           WHERE source = 'sprint'
+             AND session_id IN (${chunk.map(() => "?").join(", ")})
+             AND strftime('%Y-%m-%d', completed_at) IS NOT NULL`
+        )
+        .all(...chunk) as Array<{ day: string }>;
+      for (const row of rows) {
+        days.add(row.day);
+      }
+    }
+    return [...days].sort();
+  }
+
+  private importSprintSession(
+    session: ExportedSprintSession,
+    observer?: LocalDataImportObserver
+  ): boolean {
     const existingRow = this.db
       .prepare(
         `SELECT
@@ -1687,6 +1715,7 @@ export class SyncSQLiteStore implements PracticeStore {
           next.ratingAfter ?? null,
           next.id
         );
+      observer?.onSprintSessionChanged(previous, next);
       return true;
     }
     this.db
@@ -1728,10 +1757,14 @@ export class SyncSQLiteStore implements PracticeStore {
         next.ratingBefore,
         next.ratingAfter ?? null
       );
+    observer?.onSprintSessionChanged(previous, next);
     return true;
   }
 
-  private importAttempt(attempt: AttemptEvent): boolean {
+  private importAttempt(
+    attempt: AttemptEvent,
+    observer?: LocalDataImportObserver
+  ): boolean {
     const existing = this.attemptById(attempt.id);
     if (existing) {
       const next = preferredAttemptHistoryRow(existing, attempt);
@@ -1780,13 +1813,16 @@ export class SyncSQLiteStore implements PracticeStore {
           next.unclearUpdatedAt ?? null,
           next.id
         );
+      observer?.onAttemptChanged(existing, next);
       return true;
     }
     if (!this.getPuzzle(attempt.puzzleId)) {
       return false;
     }
     this.ensureSessionForAttempt(attempt);
-    this.recordAttempt(cloneAttemptHistoryRow(attempt));
+    const next = cloneAttemptHistoryRow(attempt);
+    this.recordAttempt(next);
+    observer?.onAttemptChanged(undefined, next);
     return true;
   }
 

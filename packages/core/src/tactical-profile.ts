@@ -1060,8 +1060,12 @@ function speedObservationFor(
     !puzzleTiming ||
     puzzleTiming.timeoutAfterSeconds === null ||
     !Number.isFinite(puzzleTiming.timeoutAfterSeconds) ||
+    (puzzleTiming.timeoutAfterSeconds as number) <= 0 ||
+    (elapsedMs as number) >= (puzzleTiming.timeoutAfterSeconds as number) * 1000 ||
     !Number.isFinite(sessionConfig.perPuzzleSeconds) ||
-    sessionConfig.perPuzzleSeconds <= 0
+    sessionConfig.perPuzzleSeconds <= 0 ||
+    !Number.isFinite(input.puzzle.rating) ||
+    !Number.isFinite(input.attempt.ratingBefore)
   ) {
     return undefined;
   }

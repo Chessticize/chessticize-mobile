@@ -15,7 +15,12 @@ import type {
   TacticalProfileTaskFamily,
   TaskFamilyRankedTacticalFocus
 } from "../../core/src/index.ts";
-import type { PracticeStore, ExportedSprintSession } from "./practice-store.ts";
+import type {
+  ExportedSprintSession,
+  LocalDataImportObserver,
+  PracticeStore
+} from "./practice-store.ts";
+import type { AttemptHistoryRow } from "./query-types.ts";
 import type { PuzzleSource } from "./puzzle-source.ts";
 import type {
   TacticalProfileBuildState,
@@ -77,6 +82,9 @@ export class TacticalProfileService {
   private readonly naturalFrequency: TacticalProfileNaturalFrequency;
   private readonly focusedRunPolicy: TacticalProfileFocusedRunPolicy | undefined;
   private readonly maxDirtyDaysPerRefresh: number;
+  private repositoryReady = false;
+  private requiresCanonicalRebuild = false;
+  private lastCacheError: string | undefined;
 
   constructor(options: TacticalProfileServiceOptions) {
     this.progressStore = options.progressStore;
@@ -86,10 +94,24 @@ export class TacticalProfileService {
     this.naturalFrequency = options.naturalFrequency;
     this.focusedRunPolicy = options.focusedRunPolicy;
     this.maxDirtyDaysPerRefresh = options.maxDirtyDaysPerRefresh ?? 30;
-    this.repository.migrate();
+    try {
+      this.ensureRepositoryReady();
+    } catch (error) {
+      this.recordCacheFailure(error);
+    }
   }
 
   getSnapshot(now = new Date().toISOString()): TacticalProfileSnapshot {
+    try {
+      this.ensureRepositoryReady();
+      return this.readSnapshot(now);
+    } catch (error) {
+      this.recordCacheFailure(error);
+      return this.failedSnapshot();
+    }
+  }
+
+  private readSnapshot(now: string): TacticalProfileSnapshot {
     this.ensureIdentity();
     const hadDirtyDays = this.repository.listDirtyDays(this.identity).length > 0;
     const buildState = this.refreshDirtyDays();
@@ -130,13 +152,79 @@ export class TacticalProfileService {
   markAttemptDayDirty(completedAt: string): void {
     const day = utcDay(completedAt);
     if (day) {
-      this.ensureIdentity();
-      this.repository.markDirtyDays(this.identity, [day]);
+      try {
+        this.ensureRepositoryReady();
+        this.ensureIdentity();
+        this.repository.markDirtyDays(this.identity, [day]);
+      } catch (error) {
+        this.recordCacheFailure(error);
+      }
     }
   }
 
   markCanonicalImportChanged(): void {
-    this.repository.reset(this.identity, this.canonicalCompletedDays());
+    this.requiresCanonicalRebuild = true;
+    try {
+      this.ensureRepositoryReady();
+      this.repository.reset(this.identity, this.canonicalCompletedDays());
+      this.requiresCanonicalRebuild = false;
+      this.lastCacheError = undefined;
+    } catch (error) {
+      this.recordCacheFailure(error);
+    }
+  }
+
+  beginCanonicalImport(): {
+    observer: LocalDataImportObserver;
+    finish: () => void;
+  } {
+    const dirtyDays = new Set<string>();
+    const changedSessionIds = new Set<string>();
+    let completed = false;
+    return {
+      observer: {
+        onAttemptChanged: (previous, next) => {
+          addCanonicalAttemptDay(dirtyDays, previous);
+          addCanonicalAttemptDay(dirtyDays, next);
+        },
+        onSprintSessionChanged: (previous, next) => {
+          if (sessionFingerprint(previous) !== sessionFingerprint(next)) {
+            changedSessionIds.add(next.id);
+          }
+        }
+      },
+      finish: () => {
+        if (completed) {
+          return;
+        }
+        completed = true;
+        try {
+          if (changedSessionIds.size > 0) {
+            for (const day of this.progressStore.listSprintAttemptUtcDays(
+              [...changedSessionIds]
+            )) {
+              dirtyDays.add(day);
+            }
+          }
+          this.markCanonicalDaysChanged([...dirtyDays].sort());
+        } catch (error) {
+          this.recordCacheFailure(error);
+        }
+      }
+    };
+  }
+
+  private markCanonicalDaysChanged(completedDays: readonly string[]): void {
+    if (completedDays.length === 0) {
+      return;
+    }
+    try {
+      this.ensureRepositoryReady();
+      this.ensureIdentity();
+      this.repository.markDirtyDays(this.identity, completedDays);
+    } catch (error) {
+      this.recordCacheFailure(error);
+    }
   }
 
   prepareFocusedRun(
@@ -158,7 +246,15 @@ export class TacticalProfileService {
       return { status: "unavailable", reason: "no_focus" };
     }
     const sessions = this.progressStore.listSprintSessions();
-    const latestMixed = latestOrdinaryMixedSession(sessions, taskFamily);
+    const latestMixed = latestOrdinaryMixedSession(
+      sessions,
+      taskFamily,
+      (sessionId) =>
+        this.progressStore.listAttempts({
+          source: "sprint",
+          sessionId
+        }).length > 0
+    );
     if (!latestMixed?.config) {
       return { status: "unavailable", reason: "no_mixed_run" };
     }
@@ -329,10 +425,57 @@ export class TacticalProfileService {
   }
 
   private ensureIdentity(): void {
+    this.ensureRepositoryReady();
+    if (this.requiresCanonicalRebuild) {
+      this.repository.reset(this.identity, this.canonicalCompletedDays());
+      this.requiresCanonicalRebuild = false;
+      this.lastCacheError = undefined;
+      return;
+    }
     const state = this.repository.getBuildState();
     if (!state || !sameIdentity(state, this.identity)) {
       this.repository.reset(this.identity, this.canonicalCompletedDays());
+      this.lastCacheError = undefined;
     }
+  }
+
+  private ensureRepositoryReady(): void {
+    if (this.repositoryReady) {
+      return;
+    }
+    this.repository.migrate();
+    this.repositoryReady = true;
+  }
+
+  private recordCacheFailure(error: unknown): void {
+    this.repositoryReady = false;
+    this.requiresCanonicalRebuild = true;
+    this.lastCacheError = error instanceof Error ? error.message : String(error);
+  }
+
+  private failedSnapshot(): TacticalProfileSnapshot {
+    const reason = "Local Tactical Profile cache is temporarily unavailable";
+    const evaluation: TacticalProfileEvaluation = {
+      phase: "collecting",
+      signals: [],
+      rankedFocuses: [],
+      observedThemeCount: 0
+    };
+    return {
+      phase: "building",
+      evaluation,
+      cutoffs: applyTacticalFocusCutoffsByTaskFamily([]),
+      buildState: {
+        ...this.identity,
+        status: "failed",
+        dirtyDayCount: 0,
+        lastError: this.lastCacheError ?? reason
+      },
+      unavailableFamilies: {
+        line: reason,
+        arrow_duel: reason
+      }
+    };
   }
 
   private canonicalCompletedDays(): string[] {
@@ -450,6 +593,56 @@ export class TacticalProfileService {
   }
 }
 
+function addCanonicalAttemptDay(
+  dirtyDays: Set<string>,
+  attempt: AttemptHistoryRow | undefined
+): void {
+  if (attempt?.source !== "sprint") {
+    return;
+  }
+  const day = utcDay(attempt.completedAt);
+  if (day) {
+    dirtyDays.add(day);
+  }
+}
+
+function sessionFingerprint(
+  session: ExportedSprintSession | undefined
+): string | undefined {
+  if (!session) {
+    return undefined;
+  }
+  const config = session.config;
+  const focus = config?.tacticalFocus;
+  return JSON.stringify([
+    session.mode,
+    session.ratingKey,
+    session.status,
+    session.completedAt ?? null,
+    config?.mode ?? null,
+    config?.durationSeconds ?? null,
+    config?.perPuzzleSeconds ?? null,
+    config?.puzzleTiming?.slowAfterSeconds ?? null,
+    config?.puzzleTiming?.timeoutAfterSeconds ?? null,
+    config?.targetCorrect ?? null,
+    config?.maxMistakes ?? null,
+    config?.maxAttempts ?? null,
+    config?.ratingKey ?? null,
+    config?.ratingPolicy ?? null,
+    [...(config?.themes ?? [])].sort(),
+    focus
+      ? [
+          focus.taskFamily,
+          [...focus.themes].sort(),
+          focus.mixedControlCount,
+          focus.ratingAnchor,
+          focus.minRating,
+          focus.maxRating
+        ]
+      : null
+  ]);
+}
+
 function nextUtcDay(day: string): string {
   const date = new Date(`${day}T00:00:00.000Z`);
   if (!Number.isFinite(date.getTime())) {
@@ -461,7 +654,8 @@ function nextUtcDay(day: string): string {
 
 function latestOrdinaryMixedSession(
   sessions: readonly ExportedSprintSession[],
-  taskFamily: TacticalProfileTaskFamily
+  taskFamily: TacticalProfileTaskFamily,
+  hasCanonicalAttempt: (sessionId: string) => boolean
 ): ExportedSprintSession | undefined {
   return sessions
     .filter((session) => session.completedAt !== undefined)
@@ -472,8 +666,8 @@ function latestOrdinaryMixedSession(
       const family = session.config.mode === "arrow_duel" ? "arrow_duel" : "line";
       return family === taskFamily && namedThemesForSelection(session.config.themes).length === 0;
     })
-    .sort(compareCompletedSessions)
-    .at(-1);
+    .sort((left, right) => compareCompletedSessions(right, left))
+    .find((session) => hasCanonicalAttempt(session.id));
 }
 
 function latestFocusedSession(

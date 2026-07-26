@@ -20,6 +20,7 @@ import type {
   ClearLocalHistoryResult,
   ExportedSprintSession,
   LocalDataImport,
+  LocalDataImportObserver,
   LocalDataImportResult,
   LocalDataExport,
   PracticeSettings,
@@ -171,11 +172,18 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.getSprintSessions(ids);
   }
 
+  listSprintAttemptUtcDays(sessionIds: readonly string[]): string[] {
+    return this.userStore.listSprintAttemptUtcDays(sessionIds);
+  }
+
   exportLocalData(): LocalDataExport {
     return this.userStore.exportLocalData();
   }
 
-  importLocalData(data: LocalDataImport): LocalDataImportResult {
+  importLocalData(
+    data: LocalDataImport,
+    observer?: LocalDataImportObserver
+  ): LocalDataImportResult {
     const referencedPuzzleIds = new Set([
       ...data.attempts.map((attempt) => attempt.puzzleId),
       ...data.reviewQueue.map((review) => review.puzzleId),
@@ -188,7 +196,7 @@ export class PackBackedPracticeStore implements PracticeStore {
     if (missingReferencedPuzzles.length > 0) {
       this.userStore.seedPuzzles(missingReferencedPuzzles);
     }
-    return this.userStore.importLocalData(data);
+    return this.userStore.importLocalData(data, observer);
   }
 
   clearLocalHistory(): ClearLocalHistoryResult {

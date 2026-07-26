@@ -1099,6 +1099,47 @@ describe("PracticePocScreen", () => {
     );
   });
 
+  it("keeps Practice available and automatically retries a failed Tactical Profile cache", async () => {
+    const store = new MemoryStore();
+    const repository = new RecoveringTacticalProfileRepository();
+    repository.failReads(2);
+    const renderer = renderScreen({
+      practiceService: new PracticeService(
+        store,
+        new TacticalProfileService({
+          progressStore: store,
+          puzzleSource: store,
+          repository,
+          calibration: COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+          naturalFrequency: { line: {}, arrow_duel: {} }
+        })
+      )
+    });
+    await flushMicrotasks();
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Building profile"
+    );
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+
+    await act(async () => {
+      jest.advanceTimersByTime(1_000);
+      await Promise.resolve();
+    });
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Building profile"
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(2_000);
+      await Promise.resolve();
+    });
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "More information needed"
+    );
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
   it("uses the only recommended Arrow Duel family and shows returning users the dedicated Focused Run guide", () => {
     jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
     const service = createArrowFocusedPracticeService();
@@ -10323,6 +10364,24 @@ function componentTacticalProfileCalibratedFamily() {
       practicalTimeMultiplier: 1.2
     }
   } as const;
+}
+
+class RecoveringTacticalProfileRepository extends MemoryTacticalProfileRepository {
+  private remainingFailedReads = 0;
+
+  failReads(count: number): void {
+    this.remainingFailedReads = count;
+  }
+
+  override listDirtyDays(
+    ...args: Parameters<MemoryTacticalProfileRepository["listDirtyDays"]>
+  ): string[] {
+    if (this.remainingFailedReads > 0) {
+      this.remainingFailedReads -= 1;
+      throw new Error("simulated Tactical Profile cache read failure");
+    }
+    return super.listDirtyDays(...args);
+  }
 }
 
 function createUnclearHistoryReviewService(): PracticeService {
