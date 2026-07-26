@@ -100,10 +100,6 @@
       {
         "issueNumber": 328,
         "changeNote": "Keep How Sprint works discoverable and use Rating in the Practice home."
-      },
-      {
-        "issueNumber": 344,
-        "changeNote": "Remove repeated Rating and Due today labels while centering the Review count in the card's right half."
       }
     ]
   },
@@ -123,7 +119,7 @@
       },
       {
         "issueNumber": 337,
-        "changeNote": "Align every first-use Sprint rule to fixed badge and copy columns, and clarify the novice-facing timing language."
+        "changeNote": "Top-align every first-use Sprint badge with its copy column, and clarify the novice-facing timing language."
       }
     ]
   },
@@ -263,7 +259,7 @@
       },
       {
         "issueNumber": 337,
-        "changeNote": "Keep semantic first-use Sprint guidance and navigation visible in maintained portrait and landscape layouts."
+        "changeNote": "Keep semantic first-use Sprint guidance visible and route pointers around copy with clear target spacing in maintained layouts."
       }
     ]
   },

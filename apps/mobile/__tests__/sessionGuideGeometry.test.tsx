@@ -1,5 +1,6 @@
 import {
   buildArrowDuelLandscapeGuideGeometry,
+  buildPortraitGuideCalloutTop,
   buildPortraitGuidePointerLeft,
   buildSessionGuideRailConnectorGeometry
 } from "../src/components/sessionGuideGeometry.ts";
@@ -18,14 +19,16 @@ describe("session guide geometry", () => {
     })).toEqual({
       calloutTop: 170,
       connectorTop: 50,
-      connectorWidth: 116
+      connectorDrop: 0,
+      connectorWidth: 50
     });
   });
 
-  it("keeps the connector aligned when the callout must stay inside the board lane", () => {
+  it("routes above a landscape prompt before turning toward its action", () => {
     expect(buildSessionGuideRailConnectorGeometry({
       boardSize: 360,
       calloutHeight: 96,
+      routeAboveTarget: true,
       target: {
         height: 30,
         width: 126,
@@ -34,8 +37,9 @@ describe("session guide geometry", () => {
       }
     })).toEqual({
       calloutTop: 252,
-      connectorTop: 89,
-      connectorWidth: 237
+      connectorTop: 56,
+      connectorDrop: 33,
+      connectorWidth: 164
     });
   });
 
@@ -62,5 +66,14 @@ describe("session guide geometry", () => {
         x: 174
       }
     })).toBe(228);
+  });
+
+  it("keeps a portrait callout and its pointer clear of the measured target", () => {
+    expect(buildPortraitGuideCalloutTop({
+      calloutHeight: 154,
+      target: {
+        y: 779
+      }
+    })).toBe(605);
   });
 });

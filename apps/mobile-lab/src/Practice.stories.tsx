@@ -29,8 +29,8 @@ export const Home: Story = {
   args: { scenarioId: "practice-home" },
   tags: ["new"],
   play: async ({ canvasElement }) => {
-    await expectTestIdText(canvasElement, "practice-mode-standard-rating", "1054");
-    await expectTestIdText(canvasElement, "practice-mode-arrow-duel-rating", "966");
+    await expectTestIdText(canvasElement, "practice-mode-standard-rating", "925");
+    await expectTestIdText(canvasElement, "practice-mode-arrow-duel-rating", "875");
     await expectTestIdText(canvasElement, "practice-review-due-count", "28");
   }
 };
