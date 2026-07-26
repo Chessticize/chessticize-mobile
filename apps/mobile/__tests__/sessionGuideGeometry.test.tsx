@@ -2,6 +2,7 @@ import {
   buildArrowDuelLandscapeGuideGeometry,
   buildPortraitGuideCalloutTop,
   buildPortraitGuidePointerLeft,
+  buildSessionGuideLandscapeAlignment,
   buildSessionGuideRailConnectorGeometry
 } from "../src/components/sessionGuideGeometry.ts";
 
@@ -24,31 +25,40 @@ describe("session guide geometry", () => {
     });
   });
 
-  it("routes above a landscape prompt before turning toward its action", () => {
+  it("points straight toward the center of a landscape information card", () => {
     expect(buildSessionGuideRailConnectorGeometry({
       boardSize: 360,
       calloutHeight: 96,
-      routeAboveTarget: true,
       target: {
-        height: 30,
-        width: 126,
-        x: 522,
-        y: 326
+        height: 72,
+        width: 240,
+        x: 384,
+        y: 268
       }
     })).toEqual({
       calloutTop: 252,
-      connectorTop: 68,
-      connectorDrop: 21,
-      connectorWidth: 158
+      connectorTop: 52,
+      connectorDrop: 0,
+      connectorWidth: 20
     });
   });
 
-  it("points toward the Arrow Duel candidate origin without joining its move arrows", () => {
+  it("points straight up toward the Arrow Duel candidate origin", () => {
     expect(buildArrowDuelLandscapeGuideGeometry(360)).toEqual({
       calloutTop: 209,
-      connectorArmWidth: 24,
       connectorHeight: 68,
-      connectorLeft: 257
+      connectorLeft: 276
+    });
+  });
+
+  it("aligns landscape guide cards with the centered board and control rail", () => {
+    expect(buildSessionGuideLandscapeAlignment({
+      boardSize: 360,
+      sessionRailGap: 24,
+      sessionRailWidth: 240
+    })).toEqual({
+      boardCalloutTranslateX: -300,
+      railTranslateX: 72
     });
   });
 

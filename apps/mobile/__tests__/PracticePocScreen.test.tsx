@@ -1770,6 +1770,10 @@ describe("PracticePocScreen", () => {
     });
 
     const portrait = renderLabScenario("practice-active-session-guide");
+    expect(() => findByTestId(
+      portrait,
+      "practice-session-guide-back"
+    )).toThrow();
     expect(findByTestId(
       portrait,
       "practice-session-guide-coach-pointer-overview-top"
@@ -1815,6 +1819,8 @@ describe("PracticePocScreen", () => {
     });
 
     const landscape = renderLabScenario("practice-active-session-guide");
+    const disabledBack = findByTestId(landscape, "practice-session-guide-back");
+    expect(disabledBack.props.accessibilityState).toEqual({ disabled: true });
     press(landscape, "practice-session-guide-start");
     expect(findByTestId(
       landscape,
@@ -1830,14 +1836,14 @@ describe("PracticePocScreen", () => {
       landscape,
       "practice-session-guide-coach-pointer-unclear-right"
     )).toBeTruthy();
-    expect(findByTestId(
+    expect(() => findByTestId(
       landscape,
       "practice-session-guide-coach-pointer-unclear-right-horizontal"
-    )).toBeTruthy();
-    expect(findByTestId(
+    )).toThrow();
+    expect(() => findByTestId(
       landscape,
       "practice-session-guide-coach-pointer-unclear-right-vertical"
-    )).toBeTruthy();
+    )).toThrow();
     expect(findByTestId(
       landscape,
       "practice-session-guide-coach-pointer-unclear-right-head"
@@ -1861,12 +1867,16 @@ describe("PracticePocScreen", () => {
     )).toBeTruthy();
     expect(findByTestId(
       arrowDuel,
-      "practice-session-guide-coach-pointer-arrow-duel-top-horizontal"
+      "practice-session-guide-coach-pointer-arrow-duel-top-head"
     )).toBeTruthy();
-    expect(findByTestId(
+    expect(() => findByTestId(
+      arrowDuel,
+      "practice-session-guide-coach-pointer-arrow-duel-top-horizontal"
+    )).toThrow();
+    expect(() => findByTestId(
       arrowDuel,
       "practice-session-guide-coach-pointer-arrow-duel-top-endpoint"
-    )).toBeTruthy();
+    )).toThrow();
   });
 
   it("keeps the complete first-use guide operable in the maintained iPhone portrait viewport", () => {
