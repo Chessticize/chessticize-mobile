@@ -379,9 +379,11 @@ posteriorMean = posteriorVariance * U
 The sums are evaluated around `delta = 0`. This is a one-step quadratic
 score/Fisher or Laplace approximation, not an exact closed-form logistic
 posterior. The prior scale and all baseline parameters are calibration-required.
-Production adoption requires golden-fixture comparison with an exact
-one-dimensional Newton or grid posterior. Laplace methods are approximations
-based on posterior curvature, not identities
+Calling the model validated, or removing its early-estimate disclosure,
+requires golden-fixture comparison with an exact one-dimensional Newton or grid
+posterior. The owner-approved provisional production trial does not satisfy
+that validation gate. Laplace methods are approximations based on posterior
+curvature, not identities
 ([Tierney and Kadane 1986](https://doi.org/10.1080/01621459.1986.10478240)).
 
 Fisher information, posterior variance, and explicit diversity guards are the
@@ -781,8 +783,10 @@ depends on days and curated themes, not linearly on raw attempt count.
 
 ## 13. Calibration harness specification
 
-Production adoption requires a local-only development harness, expected to live
-behind the CLI/development boundary rather than a product API.
+Validated adoption and removal of the early-estimate disclosure require a
+local-only development harness, expected to live behind the CLI/development
+boundary rather than a product API. The owner-approved provisional production
+trial remains explicitly disclosed until this gate passes.
 
 ### Inputs
 
@@ -834,12 +838,12 @@ The harness determines:
 - the speed residual family and influence handling; and
 - acceptable one-step-versus-exact posterior error.
 
-Every production coefficient, tolerance, and threshold must be emitted in a
+Every shipped coefficient, tolerance, and threshold must be emitted in a
 versioned calibration artifact with input schema and pack-feature identity.
 Go/no-go tolerances must be declared before evaluating the final holdout. If a
-task family lacks adequate calibration evidence, that family remains
-"Collecting evidence" or unavailable rather than borrowing unvalidated
-coefficients.
+task family lacks adequate representative calibration evidence, it may use only
+an explicitly owner-approved provisional artifact with the early-estimate
+disclosure; otherwise that family remains "Collecting evidence" or unavailable.
 
 ### Production artifact handoff
 
@@ -917,8 +921,10 @@ decision.
 
 ### Provisional V1 defaults
 
-These values are starting points, not scientific facts. Offline calibration
-must confirm or replace them before production:
+These values are starting points, not scientific facts. They may be used in the
+owner-approved production trial only with the early-estimate disclosure.
+Representative holdout calibration must confirm or replace them before the
+model is called validated or the disclosure is removed:
 
 | Value | Classification | Intended use |
 | --- | --- | --- |
@@ -931,7 +937,11 @@ must confirm or replace them before production:
 | `70%` primary / `30%` mixed-control | Provisional V1 default | One-weakness Focused Run |
 | `60%` primary / `20%` secondary / `20%` mixed-control | Provisional V1 default | Two-weakness Focused Run |
 
-### Calibration-required with no safe production default
+### Owner-approved provisional trial values requiring validation
+
+The checked-in provisional artifact supplies bounded trial values for these
+terms. They are product experiments, not validated population truths, and must
+remain behind the same early-estimate disclosure:
 
 - solve-family intercepts and Glicko-shaped slopes;
 - Timeout, pace, Slow-threshold, decision-count, and Run-rule effects;

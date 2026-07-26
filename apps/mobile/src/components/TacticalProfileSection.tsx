@@ -389,6 +389,7 @@ function SuppressedRecommendation({
       <Text style={styles.suppressedBody}>
         We will keep gathering evidence in mixed Runs without emphasizing this recommendation.
       </Text>
+      <EarlyEstimateNotice presentation={presentation} />
       <Pressable
         accessibilityRole="button"
         style={styles.primaryButton}

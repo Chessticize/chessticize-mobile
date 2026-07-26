@@ -1042,6 +1042,7 @@ describe("PracticePocScreen", () => {
     const onIntent = jest.fn();
     const presentation: TacticalProfilePresentation = {
       phase: "ready",
+      assurance: "validated",
       screen: "home",
       signals: [
         {
@@ -1079,6 +1080,50 @@ describe("PracticePocScreen", () => {
     );
     press(renderer, "training-focus-open-profile");
     expect(onIntent).toHaveBeenCalledWith({ type: "open-profile" });
+  });
+
+  it("does not show provisional disclosure on validated profile detail screens", () => {
+    const presentation: TacticalProfilePresentation = {
+      phase: "ready",
+      assurance: "validated",
+      screen: "explanation",
+      selectedSignalId: "fork",
+      signals: [
+        {
+          id: "fork",
+          taskFamily: "line",
+          themeKey: "fork",
+          themeLabel: "Forks",
+          kind: "solve_rate",
+          distinctPuzzleCount: 7,
+          distinctSessionCount: 3,
+          priorityLabel: "Recommended",
+          status: "recommended"
+        }
+      ],
+      focusedRun: {
+        taskFamily: "line",
+        title: "Fork repair",
+        ratingLabel: "Puzzle-solving Rating 925",
+        durationLabel: "5 min",
+        totalPuzzleCount: 15,
+        allocations: [
+          { id: "fork", label: "Forks", puzzleCount: 10, tone: "primary" },
+          { id: "mixed", label: "Mixed practice", puzzleCount: 5, tone: "mixed" }
+        ]
+      },
+      onIntent: jest.fn()
+    };
+
+    for (const screen of ["explanation", "focused_run", "suppressed"] as const) {
+      const renderer = renderScreen({
+        runManagementEnabled: true,
+        tacticalProfilePresentation: { ...presentation, screen }
+      });
+      expect(() =>
+        findByTestId(renderer, "tactical-profile-early-estimate")
+      ).toThrow();
+    }
   });
 
   it("labels the production Tactical Profile as an early estimate", async () => {
@@ -1621,6 +1666,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "tactical-profile-explanation"))).toContain(
       "Slow and Unclear labels, or whether a puzzle is in Review, do not count as proof"
     );
+    expect(collectText(findByTestId(renderer, "tactical-profile-early-estimate"))).toContain(
+      "Use this as a training suggestion"
+    );
 
     press(renderer, "tactical-profile-explanation-preview");
     expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
@@ -1635,9 +1683,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
       "Later ordinary mixed Runs decide whether this focus still applies."
     );
+    expect(collectText(findByTestId(renderer, "tactical-profile-early-estimate"))).toContain(
+      "Use this as a training suggestion"
+    );
 
     press(renderer, "focused-run-not-now");
     expect(findByTestId(renderer, "tactical-profile-suppressed")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "tactical-profile-early-estimate"))).toContain(
+      "Use this as a training suggestion"
+    );
 
     press(renderer, "tactical-profile-restore");
     expect(findByTestId(renderer, "tactical-profile-recommendations")).toBeTruthy();

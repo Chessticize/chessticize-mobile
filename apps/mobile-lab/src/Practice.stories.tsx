@@ -122,7 +122,7 @@ export const TacticalProfileTaskFamilies: Story = {
     await waitForTestId(canvasElement, "tactical-profile-signal-arrow-deflection-speed");
     await waitForText(
       canvasElement,
-      "Based on ordinary mixed Arrow Duel Runs. Review and focused Runs do not shape discovery."
+      "This is an early estimate based on ordinary mixed Arrow Duel Runs. It may change as the model is validated with more players. Review and focused Runs do not shape discovery."
     );
   }
 };
@@ -165,6 +165,7 @@ export const TacticalProfileSuppressed: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "tactical-profile-suppressed");
     await waitForText(canvasElement, "Focus hidden for now");
+    await waitForTestId(canvasElement, "tactical-profile-early-estimate");
   }
 };
 

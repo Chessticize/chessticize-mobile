@@ -120,6 +120,33 @@ test("SQLitePuzzlePackSource preserves the manifest fast path while filtering pr
       [manifestQualifiedPuzzle.id]
     );
     assert.equal(source.countPuzzles({ mode: "arrow_duel", limit: 10 }), 1);
+
+    const largeIncludeIds = [
+      manifestQualifiedPuzzle.id,
+      promotionPuzzle.id,
+      ...Array.from({ length: 900 }, (_, index) => `missing-${index}`)
+    ];
+    assert.deepEqual(
+      source.selectPuzzles({
+        mode: "arrow_duel",
+        limit: 10,
+        includeIds: largeIncludeIds
+      }).map((puzzle) => puzzle.id),
+      [manifestQualifiedPuzzle.id],
+      "the large include-id path must retain the promotion exclusion"
+    );
+    assert.deepEqual(
+      source.selectPuzzlesExcludingThemes(
+        {
+          mode: "arrow_duel",
+          limit: 10,
+          includeIds: largeIncludeIds
+        },
+        ["pin"]
+      ).map((puzzle) => puzzle.id),
+      [manifestQualifiedPuzzle.id],
+      "the Tactical Profile exclusion path must retain the promotion exclusion"
+    );
   } finally {
     packDb.close();
   }
