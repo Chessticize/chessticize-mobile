@@ -4882,6 +4882,7 @@ function SessionCoachmarkDemo({
       />
       <View
         style={[
+          styles.sessionGuideCoachTargetArrowHead,
           styles.sessionGuideCoachTargetRouteHead,
           { top: measuredConnectorDrop - 6 },
           { borderLeftColor: pointerColor }
@@ -4906,6 +4907,7 @@ function SessionCoachmarkDemo({
     >
       <View
         style={[
+          styles.sessionGuideCoachTargetArrowHead,
           styles.sessionGuideCoachTargetConnectorHead,
           { borderLeftColor: pointerColor }
         ]}
@@ -14614,7 +14616,7 @@ const styles = StyleSheet.create({
   sessionGuideCoachTargetConnectorDanger: {
     backgroundColor: "#DC2626"
   },
-  sessionGuideCoachTargetConnectorHead: {
+  sessionGuideCoachTargetArrowHead: {
     borderBottomColor: "transparent",
     borderBottomWidth: 5,
     borderLeftWidth: 8,
@@ -14622,9 +14624,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 5,
     height: 0,
     position: "absolute",
-    right: -8,
-    top: -4,
     width: 0
+  },
+  sessionGuideCoachTargetConnectorHead: {
+    right: -8,
+    top: -4
   },
   sessionGuideCoachTargetRoute: {
     position: "absolute"
@@ -14645,15 +14649,7 @@ const styles = StyleSheet.create({
     width: 2
   },
   sessionGuideCoachTargetRouteHead: {
-    borderBottomColor: "transparent",
-    borderBottomWidth: 5,
-    borderLeftWidth: 8,
-    borderTopColor: "transparent",
-    borderTopWidth: 5,
-    height: 0,
-    position: "absolute",
-    right: -8,
-    width: 0
+    right: -8
   },
   sessionGuideArrowDuelTargetConnector: {
     backgroundColor: "#2563EB",

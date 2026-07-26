@@ -148,7 +148,7 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
     "Full-width production Unclear prompt in portrait"
   ));
   assert.ok(activeSessionGuide.scope.includes.includes(
-    "Fixed-shape portrait arrows outside callout borders with target clearance"
+    "Fixed-shape downward portrait arrows outside callout borders with target clearance"
   ));
   assert.match(activeSessionGuide.description, /route around copy and stop short/);
   assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
