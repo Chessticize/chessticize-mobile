@@ -147,7 +147,10 @@ function sprintRulesDesignPreviewFor(
       timeoutCountsAsMistake: true
     };
   }
-  if (scenarioId === "practice-timing-timeout") {
+  if (
+    scenarioId === "practice-timing-timeout"
+    || scenarioId === "practice-timeout-review-notice"
+  ) {
     return { timeoutCountsAsMistake: true };
   }
   if (scenarioId === "practice-sprint-result-goal") {
@@ -405,6 +408,9 @@ function timingScenarioInitialElapsedSeconds(scenarioId: LabScenarioId): number 
   }
   if (scenarioId === "practice-timing-timeout") {
     return 52;
+  }
+  if (scenarioId === "practice-timeout-review-notice") {
+    return 59;
   }
   return null;
 }

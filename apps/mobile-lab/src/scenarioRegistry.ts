@@ -18,6 +18,7 @@ export type LabScenarioId =
   | "practice-runs-empty"
   | "practice-timing-warning"
   | "practice-timing-timeout"
+  | "practice-timeout-review-notice"
   | "practice-preparing"
   | "practice-active"
   | "practice-active-session-guide"
@@ -113,6 +114,17 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "practice-runs-empty": defineScenario("practice-runs-empty", "Practice", "Empty Home and restore", "practice--empty-home-and-restore", "Home after every run is hidden, with clear Add Run and restore paths that preserve prior ratings.", "practice", ["Empty state", "Add Run", "Retained run list", "Restore to Home"], ["New Run", "Practice home"]),
   "practice-timing-warning": defineScenario("practice-timing-warning", "Practice", "Active session · Slow", "practice--slow-warning", "The existing active-session baseline runs a real puzzle clock with the compact elapsed time changing to amber after the Slow threshold.", "practice", ["Existing active session", "Live puzzle clock", "Compact amber elapsed time", "Portrait below-board placement", "Landscape right rail"], ["Production timer", "History persistence"], "contained"),
   "practice-timing-timeout": defineScenario("practice-timing-timeout", "Practice", "Active session · Timed out handoff", "practice--puzzle-timeout", "The existing active-session baseline starts eight seconds before timeout, shows a compact countdown, locks the board under brief Timed out feedback, then resets the live puzzle clock and explains that the mistake entered Review instead of Unclear.", "practice", ["Existing active session", "Live final countdown", "Locked board overlay", "Automatic next-puzzle reset", "Post-timeout mistake, Review, and no-Unclear notice", "Portrait below-board placement", "Landscape right rail"], ["Production sprint rule", "History persistence"], "contained"),
+  "practice-timeout-review-notice": defineScenario(
+    "practice-timeout-review-notice",
+    "Practice",
+    "Active session · after timeout",
+    "practice--timeout-review-notice",
+    "The next puzzle replaces the Unclear question with the production read-only notice explaining that the previous puzzle timed out, counted as a mistake, and was added to Review.",
+    "practice",
+    ["Existing active session", "Next puzzle in progress", "Read-only In Review notice", "Timeout counted as a mistake", "No Unclear question", "Portrait below-board placement", "Landscape right rail"],
+    ["Production sprint rule", "History persistence"],
+    "contained"
+  ),
   "practice-preparing": defineScenario("practice-preparing", "Practice", "Preparing", "practice--preparing", "Stable preparing overlay before an Arrow Duel sprint starts.", "practice", ["Preparing overlay", "Cancel through Back intent"], ["Active sprint", "Practice home"]),
   "practice-active": defineScenario("practice-active", "Practice", "Active session", "practice--active-session", "Existing active Standard sprint with a live compact puzzle elapsed-time indicator that does not add another layout bar.", "practice", ["Sprint timer", "Live compact puzzle elapsed time", "Progress", "Board state", "Portrait below-board placement", "Landscape right rail"], ["Sprint result"]),
   "practice-active-session-guide": defineScenario("practice-active-session-guide", "Practice", "Active session · first-use guide", "practice--active-session-guide", "Four semantic first-use explanations shown before the Sprint begins. The frozen demonstration preserves the real Sprint hierarchy while using a height-aware portrait board, the real full-width portrait Unclear prompt, external portrait pointers, and measured board-to-rail connectors that terminate at the amber timer and Mark as unclear control in landscape.", "practice", ["No real session chessboard during guidance", "Frozen real-Sprint composition", "Height-aware portrait board", "Full-width production Unclear prompt in portrait", "Portrait arrows outside callout borders", "Measured landscape connectors to the amber timer and Mark as unclear control", "Shared session header, prompt, timer, score, and Unclear components", "SPRINT HEADER, SLOW, TIMED OUT, and UNCLEAR guidance", "Amber explains that the user is taking too long", "Current target stays bright while unrelated UI is dimmed", "Current-guide-only accessibility announcement", "Timed out is explained as a mistake and Review entry, not Unclear", "Start Sprint only after the final guide"], ["Production onboarding persistence", "Active Sprint"], "contained"),

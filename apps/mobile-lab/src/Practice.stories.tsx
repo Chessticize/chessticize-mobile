@@ -248,6 +248,23 @@ export const PuzzleTimeout: Story = {
   }
 };
 
+export const TimeoutReviewNotice: Story = {
+  name: "Active session · after timeout",
+  args: { scenarioId: "practice-timeout-review-notice" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await openPracticeSession(canvasElement);
+    await waitForTestId(canvasElement, "sprint-previous-attempt-notice");
+    await waitForText(canvasElement, "Previous puzzle timed out");
+    await waitForText(
+      canvasElement,
+      "It counted as a mistake and was added to Review. Mistakes are not marked Unclear."
+    );
+    await waitForText(canvasElement, "In Review");
+    expectTestIdAbsent(canvasElement, "sprint-unclear-prompt");
+  }
+};
+
 export const UnclearFollowUp: Story = {
   name: "Unclear follow-up",
   args: { scenarioId: "practice-unclear-follow-up" },

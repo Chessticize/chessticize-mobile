@@ -127,6 +127,14 @@
       }
     ]
   },
+  "practice-timeout-review-notice": {
+    "issues": [
+      {
+        "issueNumber": 337,
+        "changeNote": "Show the read-only In Review notice that replaces the Unclear question after a timeout."
+      }
+    ]
+  },
   "practice-active-session-guide": {
     "issues": [
       {
