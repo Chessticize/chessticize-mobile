@@ -98,6 +98,32 @@ test("SQLitePuzzlePackSource keeps promotion puzzles in Standard but excludes th
   }
 });
 
+test("SQLitePuzzlePackSource preserves the manifest fast path while filtering promotion candidates", () => {
+  const manifestQualifiedPuzzle = selectionPuzzle("manifest-qualified", 1500, ["fork"]);
+  const promotionPuzzle = arrowDuelPuzzle({
+    id: "manifest-promotion",
+    initialFen: "4k3/R3P3/1p3Kpp/2p5/2P5/1r6/4p1P1/8 b - - 0 1",
+    solutionMoves: ["b3e3"],
+    stockfishBestMove: "e2e1r",
+    stockfishEval: -483,
+    stockfishEvalAfterFirstMove: 654
+  });
+  const packDb = buildPackDatabase([manifestQualifiedPuzzle, promotionPuzzle]);
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
+      allNonPromotionPuzzlesArrowDuelEligible: true
+    });
+
+    assert.deepEqual(
+      source.selectPuzzles({ mode: "arrow_duel", limit: 10 }).map((puzzle) => puzzle.id),
+      [manifestQualifiedPuzzle.id]
+    );
+    assert.equal(source.countPuzzles({ mode: "arrow_duel", limit: 10 }), 1);
+  } finally {
+    packDb.close();
+  }
+});
+
 test("SQLitePuzzlePackSource treats the All theme sentinel as unrestricted", async () => {
   const packDb = buildPackDatabase(await loadFixturePuzzles());
   try {
