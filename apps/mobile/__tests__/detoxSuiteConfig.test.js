@@ -1260,11 +1260,12 @@ describe('Detox suite configuration', () => {
 
   it('keeps the shared flows suite portable across iOS and Android', () => {
     const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
     const reminderCaseStart = flowsSpec.indexOf(
       "it('handles review reminders through the platform capability'"
     );
     const reminderCaseEnd = flowsSpec.indexOf(
-      "it('shows failed attempts in history with the wrong-only toggle'"
+      "it('filters failed attempts in history and preserves the selection through replay'"
     );
     const reminderCase = flowsSpec.slice(reminderCaseStart, reminderCaseEnd);
 
@@ -1285,10 +1286,19 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).toContain('releaseVersion.iosPublicVersion');
     expect(flowsSpec).toContain('releaseVersion.androidVersionCode');
     expect(flowsSpec).toContain('releaseVersion.iosBuildNumber');
-    expect(flowsSpec).toContain("historyToggleValue('Wrong puzzles only', false)");
-    expect(flowsSpec).toContain("historyToggleValue('Sprint attempts only', true)");
-    expect(flowsSpec).toContain("return `${label}, ${active ? 'On' : 'Off'}`");
-    expect(flowsSpec).toContain("return active ? '1' : '0'");
+    expect(helpers).toContain("by.id('history-filter-toggle')");
+    expect(helpers).toContain("by.id('history-rating-filters')");
+    expect(flowsSpec).toContain("by.id('history-result-wrong')");
+    expect(flowsSpec).toContain("by.id('history-source-sprint')");
+    expect(flowsSpec).toContain("by.id('history-theme-disclosure')");
+    expect(flowsSpec).toContain(
+      "by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))"
+    );
+    expect(flowsSpec).toContain(
+      "by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))"
+    );
+    expect(flowsSpec).not.toContain('history-filter-wrong-only');
+    expect(flowsSpec).not.toContain('history-filter-sprint-only');
     expect(flowsSpec).not.toContain('toHaveToggleValue');
   });
 
