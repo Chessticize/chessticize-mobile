@@ -1,4 +1,84 @@
 {
+  "practice-tactical-profile-building": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Show calm local profile-building progress on the existing Practice Home."
+      }
+    ]
+  },
+  "practice-tactical-profile-collecting": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Distinguish insufficient evidence from a detected tactical weakness."
+      }
+    ]
+  },
+  "practice-tactical-profile-balanced": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Show when recent calibrated evidence supports no meaningful training focus."
+      }
+    ]
+  },
+  "practice-tactical-profile-solve-rate": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Explain one solve-reliability weakness with diverse puzzle and session evidence."
+      }
+    ]
+  },
+  "practice-tactical-profile-speed": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Keep completed-puzzle speed weakness separate from solve reliability and Timeout."
+      }
+    ]
+  },
+  "practice-tactical-profile-ranked": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Rank several actionable weaknesses without exposing false posterior precision."
+      }
+    ]
+  },
+  "practice-tactical-profile-rare-signal": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Review one rare miss without turning it into a theme-level recommendation."
+      }
+    ]
+  },
+  "practice-tactical-profile-explanation": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Explain comparable performance, evidence diversity, and excluded UI metadata."
+      }
+    ]
+  },
+  "practice-tactical-profile-focused-run": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Preview explicit weakness and mixed-control quotas before starting focused training."
+      }
+    ]
+  },
+  "practice-tactical-profile-suppressed": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Let the user decline emphasis while keeping the recommendation reversible."
+      }
+    ]
+  },
   "practice-home": {
     "issues": [
       {

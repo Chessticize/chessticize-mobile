@@ -28,6 +28,107 @@ export const Home: Story = {
   args: { scenarioId: "practice-home" }
 };
 
+export const TacticalProfileBuilding: Story = {
+  name: "Tactical profile · building",
+  args: { scenarioId: "practice-tactical-profile-building" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "training-focus-building-indicator");
+    await waitForText(canvasElement, "Finding stable patterns");
+  }
+};
+
+export const TacticalProfileCollectingEvidence: Story = {
+  name: "Tactical profile · collecting evidence",
+  args: { scenarioId: "practice-tactical-profile-collecting" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "training-focus-card");
+    await waitForText(canvasElement, "More variety needed");
+  }
+};
+
+export const TacticalProfileBalanced: Story = {
+  name: "Tactical profile · no meaningful weakness",
+  args: { scenarioId: "practice-tactical-profile-balanced" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForText(canvasElement, "Recent play looks balanced");
+  }
+};
+
+export const TacticalProfileSolveRate: Story = {
+  name: "Tactical profile · solve reliability",
+  args: { scenarioId: "practice-tactical-profile-solve-rate" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "tactical-profile-signal-fork");
+    await waitForText(canvasElement, "You complete these less reliably than comparable puzzles.");
+  }
+};
+
+export const TacticalProfileCompletedSpeed: Story = {
+  name: "Tactical profile · completed-puzzle speed",
+  args: { scenarioId: "practice-tactical-profile-speed" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "tactical-profile-signal-pin-speed");
+    await waitForText(canvasElement, "You solve these correctly, but more slowly than comparable puzzles.");
+  }
+};
+
+export const TacticalProfileRanked: Story = {
+  name: "Tactical profile · ranked weaknesses",
+  args: { scenarioId: "practice-tactical-profile-ranked" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "tactical-profile-signal-fork");
+    await waitForTestId(canvasElement, "tactical-profile-signal-pin-speed");
+    await waitForTestId(canvasElement, "tactical-profile-signal-deflection");
+  }
+};
+
+export const TacticalProfileRareSignal: Story = {
+  name: "Tactical profile · rare one-off mistake",
+  args: { scenarioId: "practice-tactical-profile-rare-signal" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "training-focus-card");
+    await waitForText(canvasElement, "One miss is not a theme weakness");
+  }
+};
+
+export const TacticalProfileExplanation: Story = {
+  name: "Tactical profile · recommendation explanation",
+  args: { scenarioId: "practice-tactical-profile-explanation" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "tactical-profile-explanation");
+    await waitForText(canvasElement, "What does not decide this");
+  }
+};
+
+export const TacticalProfileFocusedRun: Story = {
+  name: "Tactical profile · focused Run preview",
+  args: { scenarioId: "practice-tactical-profile-focused-run" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "focused-run-allocation-bar");
+    await waitForText(canvasElement, "Mixed control");
+    await waitForTestId(canvasElement, "focused-run-start");
+  }
+};
+
+export const TacticalProfileSuppressed: Story = {
+  name: "Tactical profile · focus hidden",
+  args: { scenarioId: "practice-tactical-profile-suppressed" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "tactical-profile-suppressed");
+    await waitForText(canvasElement, "Focus hidden for now");
+  }
+};
+
 export const FirstSprintGuide: Story = {
   name: "First Sprint guide",
   args: { scenarioId: "practice-first-sprint-guide" },

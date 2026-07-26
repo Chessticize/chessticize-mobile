@@ -97,3 +97,32 @@ test("Issue #247 stays on the existing Settings product clone with its approved 
     false
   );
 });
+
+test("Issue #250 owns the complete Tactical Profile design state set", () => {
+  assert.deepEqual(
+    newScenarios
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 250))
+      .map((scenario) => scenario.id),
+    [
+      "practice-tactical-profile-building",
+      "practice-tactical-profile-collecting",
+      "practice-tactical-profile-balanced",
+      "practice-tactical-profile-solve-rate",
+      "practice-tactical-profile-speed",
+      "practice-tactical-profile-ranked",
+      "practice-tactical-profile-rare-signal",
+      "practice-tactical-profile-explanation",
+      "practice-tactical-profile-focused-run",
+      "practice-tactical-profile-suppressed"
+    ]
+  );
+  assert.equal(
+    scenarioRegistry["practice-tactical-profile-focused-run"].scope.includes
+      .includes("Mixed-control allocation"),
+    true
+  );
+  assert.equal(
+    scenarioRegistry["history-populated"].issues?.some((issue) => issue.issueNumber === 250) ?? false,
+    false
+  );
+});

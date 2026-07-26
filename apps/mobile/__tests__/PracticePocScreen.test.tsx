@@ -8,7 +8,8 @@ import TestRenderer, { act } from "react-test-renderer";
 import {
   PracticePocScreen,
   type PracticeDebugTraceEvent,
-  type PracticeRunManagementPresentation
+  type PracticeRunManagementPresentation,
+  type TacticalProfilePresentation
 } from "../src/components/PracticePocScreen";
 import {
   buildPracticeAdaptiveLayout,
@@ -1021,6 +1022,7 @@ describe("PracticePocScreen", () => {
   it("keeps How Sprint works available on the ordinary Practice Home story", () => {
     const renderer = renderLabScenario("practice-home");
 
+    expect(() => findByTestId(renderer, "training-focus-section")).toThrow();
     expect(() => findByTestId(renderer, "practice-sprint-rules-guide")).toThrow();
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-open"))).toContain(
       "How Sprint works"
@@ -1028,6 +1030,96 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "practice-sprint-rules-open");
     expect(findByTestId(renderer, "practice-sprint-rules-guide")).toBeTruthy();
+  });
+
+  it("contains the Tactical Profile entry behind its optional design presentation", () => {
+    const onIntent = jest.fn();
+    const presentation: TacticalProfilePresentation = {
+      phase: "ready",
+      screen: "home",
+      signals: [
+        {
+          id: "fork",
+          themeLabel: "Forks",
+          kind: "solve_rate",
+          distinctPuzzleCount: 7,
+          distinctSessionCount: 3,
+          priorityLabel: "Recommended",
+          status: "recommended"
+        }
+      ],
+      focusedRun: {
+        title: "Fork repair",
+        durationLabel: "5 min",
+        totalPuzzleCount: 15,
+        allocations: [
+          { id: "fork", label: "Forks", puzzleCount: 10, tone: "primary" },
+          { id: "mixed", label: "Mixed control", puzzleCount: 5, tone: "mixed" }
+        ]
+      },
+      onIntent
+    };
+    const renderer = renderScreen({
+      runManagementEnabled: true,
+      tacticalProfilePresentation: presentation
+    });
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Forks may need attention"
+    );
+    press(renderer, "training-focus-open-profile");
+    expect(onIntent).toHaveBeenCalledWith({ type: "open-profile" });
+  });
+
+  it("keeps solve reliability and completed-puzzle speed as plain-language profile signals", () => {
+    const solveRate = renderLabScenario("practice-tactical-profile-solve-rate");
+    const speed = renderLabScenario("practice-tactical-profile-speed");
+
+    expect(collectText(findByTestId(solveRate, "tactical-profile-signal-fork"))).toContain(
+      "You complete these less reliably than comparable puzzles."
+    );
+    expect(collectText(findByTestId(speed, "tactical-profile-signal-pin-speed"))).toContain(
+      "You solve these correctly, but more slowly than comparable puzzles."
+    );
+    expect(collectText(findByTestId(solveRate, "tactical-profile-screen"))).not.toContain("%");
+    expect(collectText(findByTestId(speed, "tactical-profile-screen"))).not.toContain("%");
+  });
+
+  it("keeps a rare one-off miss in evidence collection without a focused Run CTA", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-rare-signal");
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "One miss is not a theme weakness"
+    );
+    press(renderer, "training-focus-open-profile");
+    expect(findByTestId(renderer, "tactical-profile-watch-signals")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
+      "The individual puzzle can go to Review"
+    );
+    expect(() => findByTestId(renderer, "tactical-profile-preview-run")).toThrow();
+  });
+
+  it("walks explanation, quota preview, decline, and restore through public Tactical Profile actions", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-ranked");
+
+    press(renderer, "tactical-profile-explain-fork");
+    expect(collectText(findByTestId(renderer, "tactical-profile-explanation"))).toContain(
+      "Slow and Unclear labels, or whether a puzzle is in Review, do not count as proof"
+    );
+
+    press(renderer, "tactical-profile-explanation-preview");
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Explicit quotas keep one theme from taking over the Run."
+    );
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Mixed control"
+    );
+
+    press(renderer, "focused-run-not-now");
+    expect(findByTestId(renderer, "tactical-profile-suppressed")).toBeTruthy();
+
+    press(renderer, "tactical-profile-restore");
+    expect(findByTestId(renderer, "tactical-profile-recommendations")).toBeTruthy();
   });
 
   it("teaches first-use Sprint rules and retains a rediscovery entry after dismissal", () => {
@@ -9152,7 +9244,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -9274,6 +9366,7 @@ function renderScreen({
   sprintStartDelayMs,
   standardTargetCorrect,
   systemBack,
+  tacticalProfilePresentation,
   themeCatalogPresentation,
   ...capabilityOverrides
 }: RenderScreenOptions = {}): TestRenderer.ReactTestRenderer {
@@ -9298,6 +9391,7 @@ function renderScreen({
         sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}
         systemBack={systemBack}
+        tacticalProfilePresentation={tacticalProfilePresentation}
         themeCatalogPresentation={themeCatalogPresentation}
       />
     );

@@ -180,6 +180,11 @@ import {
   consumeSuppressedBoardMove
 } from "./boardMoveSuppression.ts";
 import { usePuzzleEntryPreview } from "./usePuzzleEntryPreview.ts";
+import {
+  TacticalProfileFlow,
+  TacticalProfileHomeCard
+} from "./TacticalProfileSection.tsx";
+import type { TacticalProfilePresentation } from "./tacticalProfilePresentation.ts";
 
 export type {
   PracticeRunDraft,
@@ -188,6 +193,12 @@ export type {
   PracticeRunManagementPresentation,
   PracticeRunPresentation
 } from "./practiceRunPresentation.ts";
+export type {
+  FocusedRunPreview,
+  TacticalProfileIntent,
+  TacticalProfilePresentation,
+  TacticalProfileSignal
+} from "./tacticalProfilePresentation.ts";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -212,6 +223,7 @@ interface Props {
   sprintStartDelayMs?: number;
   standardTargetCorrect?: number;
   systemBack?: MobileSystemBackSource;
+  tacticalProfilePresentation?: TacticalProfilePresentation;
 }
 
 export type SprintRulesGuidePresentation = {
@@ -471,7 +483,8 @@ export function PracticePocScreen({
   sprintRulesDesignPreview,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
-  systemBack
+  systemBack,
+  tacticalProfilePresentation
 }: Props): React.JSX.Element {
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = platformCapabilities.storage.practiceService;
@@ -3227,6 +3240,14 @@ export function PracticePocScreen({
                 ) : null}
 
                 {!isSessionGuideVisible && !isOpenSession && state === null && (
+                  tacticalProfilePresentation?.screen !== undefined
+                  && tacticalProfilePresentation.screen !== "home"
+                ) ? (
+                  <TacticalProfileFlow presentation={tacticalProfilePresentation} />
+                ) : null}
+
+                {!isSessionGuideVisible && !isOpenSession && state === null
+                && (tacticalProfilePresentation?.screen ?? "home") === "home" && (
                   activeRunManagementPresentation?.screen === "home"
                   || (!activeRunManagementPresentation && mode !== "custom")
                 ) ? (
@@ -3243,6 +3264,7 @@ export function PracticePocScreen({
                     runManagement={activeRunManagementPresentation}
                     sprintRulesGuide={sprintRulesGuidePresentation}
                     sprintRulesGuideVisible={sprintRulesGuideVisible}
+                    tacticalProfile={tacticalProfilePresentation}
                     resumableSprint={resumableSprint}
                     onDismissSprintRulesGuide={() => {
                       setSprintRulesGuideVisible(false);
@@ -3682,6 +3704,7 @@ function PracticeHome({
   runManagement,
   sprintRulesGuide,
   sprintRulesGuideVisible,
+  tacticalProfile,
   resumableSprint,
   onDismissSprintRulesGuide,
   onOpenSprintRulesGuide,
@@ -3700,6 +3723,7 @@ function PracticeHome({
   runManagement?: PracticeRunManagementPresentation;
   sprintRulesGuide?: SprintRulesGuidePresentation;
   sprintRulesGuideVisible: boolean;
+  tacticalProfile?: TacticalProfilePresentation;
   resumableSprint: SprintState | null;
   onDismissSprintRulesGuide: () => void;
   onOpenSprintRulesGuide: () => void;
@@ -3779,6 +3803,10 @@ function PracticeHome({
               ratingContextLabel={selectedRun?.name}
             />
           )}
+
+          {tacticalProfile ? (
+            <TacticalProfileHomeCard presentation={tacticalProfile} />
+          ) : null}
 
           <Text style={styles.sectionLabel}>Review</Text>
           <Pressable
