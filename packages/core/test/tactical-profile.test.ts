@@ -238,6 +238,40 @@ test("calibration artifact validation rejects unsafe external artifact shapes", 
   }
 });
 
+test("an owner-approved provisional trial remains distinct from validated calibration", () => {
+  const provisional = provisionalCalibration();
+
+  assert.doesNotThrow(() =>
+    assertValidTacticalProfileCalibrationArtifact(provisional)
+  );
+  assert.equal(
+    buildTacticalProfileDailyCells([tacticalAttempt()], provisional).length,
+    1
+  );
+  assert.throws(
+    () =>
+      assertValidTacticalProfileCalibrationArtifact({
+        ...provisional,
+        provenance: {
+          ...provisional.provenance,
+          decisionEvidenceId: null
+        }
+      }),
+    /owner-approved provisional trial/
+  );
+  assert.throws(
+    () =>
+      assertValidTacticalProfileCalibrationArtifact({
+        ...provisional,
+        provenance: {
+          ...provisional.provenance,
+          representativeOwnerApproved: true
+        }
+      }),
+    /owner-approved provisional trial/
+  );
+});
+
 test("one-focus 15-puzzle plan allocates 10 focused and 5 mixed puzzles", () => {
   const result = buildFocusedRunPlan({
     taskFamily: "line",
@@ -1012,6 +1046,27 @@ const CALIBRATION = {
     arrow_duel: calibratedFamily()
   }
 } as const satisfies TacticalProfileCalibrationArtifact;
+
+function provisionalCalibration(): TacticalProfileCalibrationArtifact {
+  return {
+    ...CALIBRATION,
+    calibrationId: "test-provisional-trial",
+    provenance: {
+      ...CALIBRATION.provenance,
+      corpusHash: null,
+      reportHash: null,
+      decisionEvidenceId: "owner-approved-provisional-trial",
+      representativeOwnerApproved: false
+    },
+    families: {
+      line: { ...CALIBRATION.families.line, status: "provisional" },
+      arrow_duel: {
+        ...CALIBRATION.families.arrow_duel,
+        status: "provisional"
+      }
+    }
+  };
+}
 
 function calibratedFamily() {
   return {

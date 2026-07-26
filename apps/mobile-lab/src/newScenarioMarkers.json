@@ -19,7 +19,7 @@
     "issues": [
       {
         "issueNumber": 250,
-        "changeNote": "Show when recent calibrated evidence supports no meaningful training focus."
+        "changeNote": "Show when the early estimate has not found a repeated pattern strong enough to emphasize."
       }
     ]
   },

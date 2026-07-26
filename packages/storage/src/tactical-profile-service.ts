@@ -4,12 +4,14 @@ import {
   buildSprintConfig,
   buildTacticalProfileDailyCells,
   evaluateTacticalProfile,
-  namedThemesForSelection
+  namedThemesForSelection,
+  tacticalProfileCalibrationAssurance
 } from "../../core/src/index.ts";
 import type {
   FocusedRunPlan,
   Puzzle,
   SprintConfig,
+  TacticalProfileCalibrationAssurance,
   TacticalProfileCalibrationArtifact,
   TacticalProfileEvaluation,
   TacticalProfileTaskFamily,
@@ -27,6 +29,7 @@ import type {
   RatingBandPuzzleSelection,
   RatingBandPuzzleSelectionInput
 } from "./puzzle-source.ts";
+import { sameTacticalProfileCacheIdentity } from "./tactical-profile-repository.ts";
 import type {
   TacticalProfileBuildState,
   TacticalProfileCacheIdentity,
@@ -58,6 +61,7 @@ export type TacticalProfileFocusedRunPolicy = NonNullable<
 
 export type TacticalProfileSnapshot = {
   phase: "building" | TacticalProfileEvaluation["phase"];
+  assurance: TacticalProfileCalibrationAssurance;
   evaluation: TacticalProfileEvaluation;
   cutoffs: ReturnType<typeof applyTacticalFocusCutoffsByTaskFamily>;
   buildState: TacticalProfileBuildState;
@@ -176,7 +180,7 @@ export class TacticalProfileService {
       this.repository.saveBuildState(completedBuildState);
     }
     const homeLeadSignalId =
-      this.calibration.provenance.representativeOwnerApproved &&
+      tacticalProfileCalibrationAssurance(this.calibration) !== "unavailable" &&
       this.calibration.provenance.decisionEvidenceId !== null
         ? evaluation.signals.find(
             (signal) => signal.status === "recommended"
@@ -184,12 +188,13 @@ export class TacticalProfileService {
         : undefined;
     return {
       phase: buildState.dirtyDayCount > 0 ? "building" : evaluation.phase,
+      assurance: tacticalProfileCalibrationAssurance(this.calibration),
       evaluation,
       cutoffs: applyTacticalFocusCutoffsByTaskFamily(evaluation.rankedFocuses),
       buildState: completedBuildState,
       unavailableFamilies: unavailableFamilies(this.calibration),
-      // Action utility is comparable across task families only after the
-      // authenticated calibration has approved the Home-lead policy.
+      // A provisional artifact may order suggestions for the explicit trial,
+      // but the presentation must disclose that this is not validated yet.
       ...(homeLeadSignalId === undefined ? {} : { homeLeadSignalId })
     };
   }
@@ -344,7 +349,10 @@ export class TacticalProfileService {
     try {
       this.ensureRepositoryReady();
       const current = this.repository.getBuildState();
-      if (!current || !sameIdentity(current, this.identity)) {
+      if (
+        !current ||
+        !sameTacticalProfileCacheIdentity(current, this.identity)
+      ) {
         this.requiresCanonicalRebuild = true;
         return;
       }
@@ -797,7 +805,7 @@ export class TacticalProfileService {
     const state = this.repository.getBuildState();
     if (
       !state ||
-      !sameIdentity(state, this.identity) ||
+      !sameTacticalProfileCacheIdentity(state, this.identity) ||
       state.sourceRevision !== sourceRevision ||
       (
         (
@@ -826,7 +834,7 @@ export class TacticalProfileService {
     if (
       this.requiresCanonicalRebuild ||
       !state ||
-      !sameIdentity(state, this.identity) ||
+      !sameTacticalProfileCacheIdentity(state, this.identity) ||
       (
         this.observedSourceRevision !== undefined &&
         state.sourceRevision !== this.observedSourceRevision
@@ -876,6 +884,7 @@ export class TacticalProfileService {
     };
     return {
       phase: "building",
+      assurance: "unavailable",
       evaluation,
       cutoffs: applyTacticalFocusCutoffsByTaskFamily([]),
       buildState: {
@@ -1421,15 +1430,6 @@ function greatestCommonDivisor(left: number, right: number): number {
 function utcDay(timestamp: string): string | undefined {
   const date = new Date(timestamp);
   return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : undefined;
-}
-
-function sameIdentity(
-  left: TacticalProfileCacheIdentity,
-  right: TacticalProfileCacheIdentity
-): boolean {
-  return left.modelVersion === right.modelVersion &&
-    left.packFeatureHash === right.packFeatureHash &&
-    left.calibrationId === right.calibrationId;
 }
 
 function unavailableFamilies(

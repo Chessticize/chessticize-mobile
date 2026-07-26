@@ -35,6 +35,33 @@ test("TacticalProfileService rebuilds dirty days and converges after duplicate i
   assert.deepEqual(repository.listDailyCells(identity()), firstCells);
 });
 
+test("an owner-approved provisional trial scans existing history into an early estimate", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new MemoryTacticalProfileRepository();
+  const calibration = provisionalCalibration();
+  const profile = new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository,
+    calibration,
+    naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} }
+  });
+
+  const snapshot = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+
+  assert.equal(snapshot.assurance, "provisional");
+  assert.equal(snapshot.phase, "ready");
+  assert.equal(snapshot.homeLeadSignalId, "line:fork");
+  assert.ok(
+    repository.listDailyCells({
+      modelVersion: calibration.modelVersion,
+      packFeatureHash: calibration.packFeatureHash,
+      calibrationId: calibration.calibrationId
+    }).length > 0
+  );
+});
+
 test("one rare-theme miss enters Review without becoming a Tactical Profile recommendation", () => {
   const store = seededStore();
   store.seedPuzzles([{
@@ -2324,6 +2351,27 @@ const CALIBRATION = {
     arrow_duel: calibratedFamily()
   }
 } as const satisfies TacticalProfileCalibrationArtifact;
+
+function provisionalCalibration(): TacticalProfileCalibrationArtifact {
+  return {
+    ...CALIBRATION,
+    calibrationId: "test-provisional-trial",
+    provenance: {
+      ...CALIBRATION.provenance,
+      corpusHash: null,
+      reportHash: null,
+      decisionEvidenceId: "owner-approved-provisional-trial",
+      representativeOwnerApproved: false
+    },
+    families: {
+      line: { ...CALIBRATION.families.line, status: "provisional" },
+      arrow_duel: {
+        ...CALIBRATION.families.arrow_duel,
+        status: "provisional"
+      }
+    }
+  };
+}
 
 function calibratedFamily() {
   return {

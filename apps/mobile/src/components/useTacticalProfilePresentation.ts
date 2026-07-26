@@ -194,6 +194,7 @@ export function useTacticalProfilePresentation(input: {
     );
     return {
       phase: snapshot.phase,
+      assurance: snapshot.assurance,
       screen,
       activeTaskFamily: resolvedTaskFamily,
       signals,

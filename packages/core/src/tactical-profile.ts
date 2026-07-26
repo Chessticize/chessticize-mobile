@@ -409,28 +409,55 @@ export type TacticalProfileFamilyCalibration =
       status: "unavailable";
       reason: string;
     }
-  | {
-      status: "calibrated";
-      solve: {
-        intercept: number;
-        ratingGapSlope: number;
-        timeoutLogCoefficient: number;
-        timeoutReferenceSeconds: number;
-        themePriorSdRating: number;
-        practicalDeficitRating: number;
-        minExpectedFailuresPer100: number;
-      };
-      speed?: {
-        interceptLogSeconds: number;
-        relativeDifficultyCoefficient: number;
-        decisionCountCoefficient: number;
-        paceLogCoefficient: number;
-        slowPolicyLogCoefficient: number;
-        residualSd: number;
-        themePriorSdLogSeconds: number;
-        practicalTimeMultiplier: number;
-      };
-    };
+  | TacticalProfileActiveFamilyCalibration;
+
+export type TacticalProfileActiveFamilyCalibration = {
+  status: "calibrated" | "provisional";
+  solve: {
+    intercept: number;
+    ratingGapSlope: number;
+    timeoutLogCoefficient: number;
+    timeoutReferenceSeconds: number;
+    themePriorSdRating: number;
+    practicalDeficitRating: number;
+    minExpectedFailuresPer100: number;
+  };
+  speed?: {
+    interceptLogSeconds: number;
+    relativeDifficultyCoefficient: number;
+    decisionCountCoefficient: number;
+    paceLogCoefficient: number;
+    slowPolicyLogCoefficient: number;
+    residualSd: number;
+    themePriorSdLogSeconds: number;
+    practicalTimeMultiplier: number;
+  };
+};
+
+export type TacticalProfileCalibrationAssurance =
+  | "unavailable"
+  | "provisional"
+  | "validated";
+
+export function tacticalProfileCalibrationAssurance(
+  calibration: TacticalProfileCalibrationArtifact
+): TacticalProfileCalibrationAssurance {
+  const families = Object.values(calibration.families);
+  if (families.some((family) => family.status === "provisional")) {
+    return "provisional";
+  }
+  if (families.some((family) => family.status === "calibrated")) {
+    return "validated";
+  }
+  return "unavailable";
+}
+
+function isActiveFamilyCalibration(
+  calibration: TacticalProfileFamilyCalibration
+): calibration is TacticalProfileActiveFamilyCalibration {
+  return calibration.status === "calibrated" ||
+    calibration.status === "provisional";
+}
 
 export type TacticalProfileAttemptInput = {
   attempt: Pick<
@@ -635,7 +662,7 @@ export function buildTacticalProfileDailyCells(
       continue;
     }
     const familyCalibration = calibration.families[classification.taskFamily];
-    if (familyCalibration.status !== "calibrated") {
+    if (!isActiveFamilyCalibration(familyCalibration)) {
       continue;
     }
     const completedDay = utcCompletedDay(input.attempt.completedAt);
@@ -724,7 +751,7 @@ export function evaluateTacticalProfile(input: {
       continue;
     }
     const familyCalibration = input.calibration.families[cell.taskFamily];
-    if (familyCalibration.status !== "calibrated") {
+    if (!isActiveFamilyCalibration(familyCalibration)) {
       continue;
     }
     const decay = recencyWeight(
@@ -755,7 +782,7 @@ export function evaluateTacticalProfile(input: {
   const previousRecommendedSignalIds = new Set(input.previousRecommendedSignalIds ?? []);
   for (const aggregate of aggregates.values()) {
     const familyCalibration = input.calibration.families[aggregate.taskFamily];
-    if (familyCalibration.status !== "calibrated") {
+    if (!isActiveFamilyCalibration(familyCalibration)) {
       continue;
     }
     const solvePosterior = posteriorFromScoreInformation(
@@ -1074,7 +1101,7 @@ function mutableEvaluationAggregate(
 
 function solveObservationFor(
   input: TacticalProfileAttemptInput,
-  calibration: Extract<TacticalProfileFamilyCalibration, { status: "calibrated" }>
+  calibration: TacticalProfileActiveFamilyCalibration
 ): SolveThemeObservation | undefined {
   const ratingDeviation = input.puzzle.ratingDeviation;
   const timeoutAfterSeconds = input.sessionConfig?.puzzleTiming?.timeoutAfterSeconds;
@@ -1112,7 +1139,7 @@ function solveObservationFor(
 function speedObservationFor(
   input: TacticalProfileAttemptInput,
   taskFamily: TacticalProfileTaskFamily,
-  calibration: Extract<TacticalProfileFamilyCalibration, { status: "calibrated" }>
+  calibration: TacticalProfileActiveFamilyCalibration
 ): { residual: number; variance: number } | undefined {
   const speed = calibration.speed;
   const elapsedMs = input.attempt.elapsedMs;
@@ -1386,18 +1413,33 @@ export function assertValidTacticalProfileCalibrationArtifact(
       }
       continue;
     }
-    if (family.status !== "calibrated" || !isRecord(family.solve)) {
+    if (
+      (family.status !== "calibrated" && family.status !== "provisional") ||
+      !isRecord(family.solve)
+    ) {
       throw new Error(`Tactical Profile ${taskFamily} calibration is invalid`);
     }
-    if (
+    if (family.status === "calibrated") {
+      if (
+        !readiness.ready ||
+        provenance.representativeOwnerApproved !== true ||
+        !validSha256(provenance.corpusHash) ||
+        !validSha256(provenance.reportHash) ||
+        nonEmptyString(provenance.decisionEvidenceId) === undefined
+      ) {
+        throw new Error(
+          `Tactical Profile ${taskFamily} has no authenticated calibration readiness`
+        );
+      }
+    } else if (
       !readiness.ready ||
-      provenance.representativeOwnerApproved !== true ||
-      !validSha256(provenance.corpusHash) ||
-      !validSha256(provenance.reportHash) ||
+      provenance.representativeOwnerApproved !== false ||
+      provenance.corpusHash !== null ||
+      provenance.reportHash !== null ||
       nonEmptyString(provenance.decisionEvidenceId) === undefined
     ) {
       throw new Error(
-        `Tactical Profile ${taskFamily} has no authenticated calibration readiness`
+        `Tactical Profile ${taskFamily} has no owner-approved provisional trial`
       );
     }
     finiteNumber("solve intercept", family.solve.intercept);

@@ -1,8 +1,8 @@
 # Tactical Profile / Training Focus Research Specification
 
-Date: 2026-07-25
+Date: 2026-07-25; production-trial decision updated 2026-07-26
 
-Scope: Issue [#250](https://github.com/Chessticize/chessticize-mobile/issues/250), Phase A research and Storybook design only
+Scope: Issue [#250](https://github.com/Chessticize/chessticize-mobile/issues/250), research, approved Storybook design, and production-trial decision record
 
 Current-main audit: [`aeb0e1c24bcf84b9e8af2003ed25dc303d3f7d1a`](https://github.com/Chessticize/chessticize-mobile/tree/aeb0e1c24bcf84b9e8af2003ed25dc303d3f7d1a)
 
@@ -25,10 +25,15 @@ values are classified as:
 - **Provisional V1 default**: the initial value if offline calibration does not
   reject it; it is not a scientific fact.
 - **Calibration-required**: production must not freeze a value or functional
-  form until the local calibration harness supports it.
+  form as validated until the local calibration harness supports it.
 
-No production model, storage schema, sync payload, automatic selection,
-navigation, analytics, or rollout is authorized by this document.
+The original Phase A approval did not authorize production behavior. On
+2026-07-26, after the available private history proved insufficient for a
+representative holdout, the owner explicitly approved a provisional production
+trial. The trial may use disclosed starting coefficients to learn from ordinary
+mixed Runs, but MUST describe its output as an early estimate and MUST NOT
+represent those coefficients or recommendations as validated. No analytics,
+private-data upload, or sync payload is authorized.
 
 ## 1. Problem and product goals
 
@@ -841,12 +846,14 @@ coefficients.
 The mobile app loads
 `config/tactical-profile-calibration-artifact-v1.json` through the domain-owned
 artifact validator and requires its pack-feature hash and predeclared policy
-identity/hash to match the bundled Core Pack and V1 policy exactly. A calibrated
+identity/hash to match the bundled Core Pack and V1 policy exactly. A validated
 family must also carry the input schema, corpus hash, report hash, reviewed
-decision-evidence identity, explicit owner approval, and a passing family
-readiness result. The checked-in artifact keeps both task families unavailable
-until representative holdout evidence passes those gates. An invalid artifact,
-missing pack identity, policy mismatch, or pack mismatch also fails closed.
+decision-evidence identity, explicit representative-corpus approval, and a
+passing family readiness result. The owner-approved provisional trial instead
+requires an explicit decision-evidence identity, null corpus/report hashes,
+`representativeOwnerApproved: false`, and a `provisional` family status. An
+invalid artifact, missing decision, missing pack identity, policy mismatch, or
+pack mismatch fails closed.
 The repeatable two-pass operator workflow, authenticated decision template, and
 activation checks are documented in
 [`docs/agents/tactical-profile-calibration.md`](../agents/tactical-profile-calibration.md).
@@ -858,9 +865,10 @@ harness writes the reviewed aggregate report and replacement artifact with
 recompute the report and policy hashes, reconstruct the complete artifact from
 the authenticated report, predeclared policy, and bundled pack, and require an
 exact match. A hand-edited coefficient, threshold, or Focused Run parameter
-therefore fails the build even when it remains finite. This is a data-only
-activation seam: no product-code or test-code change is needed, and a task
-family that does not pass its own gates remains unavailable.
+therefore fails the build even when it remains finite. Replacing provisional
+families with validated families is a data-only activation seam: no
+product-code or test-code change is needed, and a task family that does not
+pass its own gates remains unavailable.
 
 The Phase A PR MUST NOT implement this harness unless a tiny pure local script
 is separately needed to verify a research claim. It MUST NOT upload user data,
@@ -1022,8 +1030,9 @@ Before Phase B can claim implementation complete:
    the protected pack artifact.
 4. Define and test reliable-timing eligibility and unknown legacy policy
    behavior without timestamp reconstruction.
-5. Implement the local-only calibration harness and freeze a versioned,
-   holdout-validated calibration artifact.
+5. Implement the local-only calibration harness. A holdout-validated artifact
+   is required before removing the early-estimate disclosure or calling the
+   model validated; the owner-approved provisional trial is not a substitute.
 6. Establish go/no-go thresholds for reliability, Brier score, log loss, speed
    residuals, and one-step posterior error.
 7. Add pure domain contracts for cohort classification, weighting, both heads,
@@ -1041,8 +1050,10 @@ Before Phase B can claim implementation complete:
 12. Run the risk-scoped core, storage, CLI, component, Interaction Lab, and
     release validation required by the repository testing architecture.
 
-Until these prerequisites pass, Storybook data is deterministic presentation
-data only and issue #250 remains open.
+The owner-approved trial may ship before representative holdout calibration,
+provided the provisional contract and early-estimate disclosure above remain
+intact. Issue #250 must not claim validated calibration until every applicable
+prerequisite passes.
 
 ## 18. Decisions intentionally deferred to V2
 

@@ -1,8 +1,23 @@
 # Tactical Profile Calibration Handoff
 
-This runbook activates Tactical Profile calibration without weakening its
-representative-data, holdout, or human-review gates. Calibration is a local
-development workflow. It is not a product API or a user-facing export flow.
+This runbook promotes the Tactical Profile from its explicitly disclosed
+provisional trial to validated calibration without weakening representative-
+data, holdout, or human-review gates. Calibration is a local development
+workflow. It is not a product API or a user-facing export flow.
+
+## Current provisional trial
+
+On 2026-07-26 the owner approved trying the model with no additional
+representative corpus available. The checked-in artifact therefore uses
+`provisional` families and the decision identity
+`owner-approved-provisional-trial-2026-07-26`. It deliberately keeps
+`representativeOwnerApproved: false` and null corpus/report hashes.
+
+The app labels these results as an early estimate. This state is usable for
+local recommendations and Focused Runs, but it is not calibration evidence and
+must not be described as validated. Existing canonical history is rebuilt into
+derived daily cells under the new calibration identity; users do not need to
+re-earn eligible attempts.
 
 ## Required inputs
 
@@ -143,7 +158,10 @@ When both families pass:
    private progress data.
 
 If the corpus is absent, unrepresentative, too small, missing required Timeout
-cohorts, or fails a holdout gate, leave the checked-in artifact unavailable and
-collect more real evidence. Existing user history does not need to be rebuilt:
-canonical attempts and Sprint sessions can be scanned once against the exact
-pack by this harness.
+cohorts, or fails a holdout gate, keep the checked-in artifact provisional (or
+unavailable for any family whose trial is withdrawn) and collect more real
+evidence. Do not manufacture corpus/report hashes or promote a family to
+`calibrated`. Existing user history does not need to be re-earned: the local
+service rebuilds canonical attempts and Sprint sessions into derived daily
+cells for a new artifact identity, while the harness separately scans approved
+private exports for population calibration.

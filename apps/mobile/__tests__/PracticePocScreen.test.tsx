@@ -1081,24 +1081,39 @@ describe("PracticePocScreen", () => {
     expect(onIntent).toHaveBeenCalledWith({ type: "open-profile" });
   });
 
-  it("shows the fail-closed collecting state from the production Tactical Profile service", async () => {
+  it("labels the production Tactical Profile as an early estimate", async () => {
     const renderer = renderScreen({
       practiceService: createMobilePracticeService("familiar15")
     });
     await flushMicrotasks();
 
     expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
-      "Training insights aren't ready"
+      "Early estimate"
     );
-    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
-      "Personalized training is not enabled in this version"
-    );
+    expect(
+      findByTestId(renderer, "training-focus-card").props.accessibilityLabel
+    ).toContain("Early estimate");
     expect(collectText(findByTestId(renderer, "training-focus-card"))).not.toContain(
-      "Keep playing mixed Runs"
+      "Personalized training is not enabled"
     );
     press(renderer, "training-focus-open-profile");
     expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
-      "Playing more mixed Runs won't unlock recommendations yet"
+      "This is an early estimate"
+    );
+  });
+
+  it("explains provisional balanced results without claiming no weakness exists", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-balanced");
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "No clear focus yet"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).not.toContain(
+      "No focus needed"
+    );
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
+      "has not found a repeated pattern strong enough to emphasize"
     );
   });
 

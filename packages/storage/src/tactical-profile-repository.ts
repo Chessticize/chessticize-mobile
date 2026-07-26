@@ -146,7 +146,10 @@ export class MemoryTacticalProfileRepository implements TacticalProfileRepositor
         }
       }
       for (const cell of cells) {
-        if (!sameIdentity(cell, identity) || cell.completedDay !== completedDay) {
+        if (
+          !sameTacticalProfileCacheIdentity(cell, identity) ||
+          cell.completedDay !== completedDay
+        ) {
           throw new Error("Tactical Profile daily cell identity does not match its cache");
         }
         this.cells.set(cellKey(cell), cloneCell(cell));
@@ -182,7 +185,10 @@ export class MemoryTacticalProfileRepository implements TacticalProfileRepositor
   }
 
   private assertIdentity(identity: TacticalProfileCacheIdentity): void {
-    if (this.buildState && !sameIdentity(this.buildState, identity)) {
+    if (
+      this.buildState &&
+      !sameTacticalProfileCacheIdentity(this.buildState, identity)
+    ) {
       throw new Error("Tactical Profile cache identity mismatch");
     }
   }
@@ -424,7 +430,10 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const cell of cells) {
-        if (!sameIdentity(cell, identity) || cell.completedDay !== completedDay) {
+        if (
+          !sameTacticalProfileCacheIdentity(cell, identity) ||
+          cell.completedDay !== completedDay
+        ) {
           throw new Error("Tactical Profile daily cell identity does not match its cache");
         }
         insert.run(
@@ -577,7 +586,7 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
 
   private requireIdentity(identity: TacticalProfileCacheIdentity): void {
     const state = this.getBuildState();
-    if (state && !sameIdentity(state, identity)) {
+    if (state && !sameTacticalProfileCacheIdentity(state, identity)) {
       throw new Error("Tactical Profile cache identity mismatch");
     }
   }
@@ -840,7 +849,7 @@ function isUtcDay(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-function sameIdentity(
+export function sameTacticalProfileCacheIdentity(
   left: TacticalProfileCacheIdentity,
   right: TacticalProfileCacheIdentity
 ): boolean {

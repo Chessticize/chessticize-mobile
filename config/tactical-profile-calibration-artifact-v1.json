@@ -1,29 +1,25 @@
 {
   "schemaVersion": 1,
   "modelVersion": "tactical-profile-v1",
-  "calibrationId": "tactical-profile-v1-awaiting-representative-holdout",
+  "calibrationId": "tactical-profile-v1-provisional-owner-trial",
   "packFeatureHash": "sha256:9a4a1613713cfd72da6eb718c717c762b08aa361ec23d88b43e5e029d20fb295",
-  "createdAt": "2026-07-25T00:00:00.000Z",
+  "createdAt": "2026-07-26T00:00:00.000Z",
   "provenance": {
     "inputSchemaVersion": 1,
     "policyId": "tactical-profile-calibration-policy-v1",
     "policyHash": "sha256:5737cc64347b3d5822bb511882837457bca4da16df28342db5e10d1e22a8bff1",
     "corpusHash": null,
     "reportHash": null,
-    "decisionEvidenceId": null,
+    "decisionEvidenceId": "owner-approved-provisional-trial-2026-07-26",
     "representativeOwnerApproved": false,
     "familyReadiness": {
       "line": {
-        "ready": false,
-        "reasons": [
-          "A representative holdout calibration has not passed yet"
-        ]
+        "ready": true,
+        "reasons": []
       },
       "arrow_duel": {
-        "ready": false,
-        "reasons": [
-          "A representative holdout calibration has not passed yet"
-        ]
+        "ready": true,
+        "reasons": []
       }
     }
   },
@@ -50,12 +46,48 @@
   },
   "families": {
     "line": {
-      "status": "unavailable",
-      "reason": "A representative holdout calibration has not passed yet"
+      "status": "provisional",
+      "solve": {
+        "intercept": 0,
+        "ratingGapSlope": 1,
+        "timeoutLogCoefficient": 0,
+        "timeoutReferenceSeconds": 60,
+        "themePriorSdRating": 100,
+        "practicalDeficitRating": 20,
+        "minExpectedFailuresPer100": 2
+      },
+      "speed": {
+        "interceptLogSeconds": 3.4011973816621555,
+        "relativeDifficultyCoefficient": 0,
+        "decisionCountCoefficient": 0,
+        "paceLogCoefficient": 0,
+        "slowPolicyLogCoefficient": 0,
+        "residualSd": 0.25,
+        "themePriorSdLogSeconds": 0.5,
+        "practicalTimeMultiplier": 1.2
+      }
     },
     "arrow_duel": {
-      "status": "unavailable",
-      "reason": "A representative holdout calibration has not passed yet"
+      "status": "provisional",
+      "solve": {
+        "intercept": 0,
+        "ratingGapSlope": 1,
+        "timeoutLogCoefficient": 0,
+        "timeoutReferenceSeconds": 60,
+        "themePriorSdRating": 100,
+        "practicalDeficitRating": 20,
+        "minExpectedFailuresPer100": 2
+      },
+      "speed": {
+        "interceptLogSeconds": 3.4011973816621555,
+        "relativeDifficultyCoefficient": 0,
+        "decisionCountCoefficient": 0,
+        "paceLogCoefficient": 0,
+        "slowPolicyLogCoefficient": 0,
+        "residualSd": 0.25,
+        "themePriorSdLogSeconds": 0.5,
+        "practicalTimeMultiplier": 1.2
+      }
     }
   }
 }

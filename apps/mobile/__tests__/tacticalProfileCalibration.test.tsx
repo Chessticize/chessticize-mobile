@@ -40,6 +40,9 @@ describe("production Tactical Profile calibration", () => {
     const calibration = productionTacticalProfileCalibration(bundledManifest);
 
     expect(calibration).toEqual(bundledArtifact);
+    expect(calibration.families.line.status).toBe("provisional");
+    expect(calibration.families.arrow_duel.status).toBe("provisional");
+    expect(calibration.provenance.representativeOwnerApproved).toBe(false);
     expect(calibration.packFeatureHash).toBe(
       bundledManifest.tacticalAnalysis?.featureHash
     );
@@ -78,6 +81,26 @@ describe("production Tactical Profile calibration", () => {
     expect(calibration.calibrationId).toBe(
       "tactical-profile-v1-unavailable"
     );
+    expect(calibration.families.line).toEqual({
+      status: "unavailable",
+      reason: "The bundled Tactical Profile calibration artifact is invalid"
+    });
+  });
+
+  it("rejects provisional coefficients without an explicit owner trial decision", () => {
+    const selfAsserted = {
+      ...bundledArtifact,
+      provenance: {
+        ...bundledArtifact.provenance,
+        decisionEvidenceId: null
+      }
+    };
+
+    const calibration = productionTacticalProfileCalibration(
+      bundledManifest,
+      selfAsserted
+    );
+
     expect(calibration.families.line).toEqual({
       status: "unavailable",
       reason: "The bundled Tactical Profile calibration artifact is invalid"

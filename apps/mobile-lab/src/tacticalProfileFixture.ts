@@ -221,6 +221,7 @@ export function tacticalProfilePresentationFor(
   onIntent: (intent: TacticalProfileIntent) => void
 ): TacticalProfilePresentation {
   const base = {
+    assurance: "provisional" as const,
     screen: state.screen,
     activeTaskFamily: state.selectedTaskFamily,
     ...(state.selectedSignalId === undefined ? {} : { selectedSignalId: state.selectedSignalId }),

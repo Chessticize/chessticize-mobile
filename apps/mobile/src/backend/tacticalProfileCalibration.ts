@@ -16,9 +16,9 @@ const CALIBRATION_POLICY_HASH =
 
 /**
  * Loads the checked-in calibration artifact only when both its domain contract
- * and Core Pack feature identity are valid. Any failure keeps both task
- * families unavailable instead of letting provisional coefficients reach the
- * product.
+ * and Core Pack feature identity are valid. The contract permits the explicit
+ * owner-approved provisional trial, but any malformed or mismatched artifact
+ * keeps both task families unavailable.
  */
 export function productionTacticalProfileCalibration(
   manifest: PuzzlePackManifest,
