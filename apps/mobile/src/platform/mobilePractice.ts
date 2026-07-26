@@ -9,7 +9,10 @@ import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
 import { PackBackedPracticeStore } from "../../../../packages/storage/src/pack-backed-practice-store.ts";
 import { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import { selectUniquePuzzlesForRatingBands } from "../../../../packages/storage/src/puzzle-selection.ts";
-import { MemoryTacticalProfileRepository } from "../../../../packages/storage/src/tactical-profile-repository.ts";
+import {
+  MemoryTacticalProfileRepository,
+  type TacticalProfileRepository
+} from "../../../../packages/storage/src/tactical-profile-repository.ts";
 import { TacticalProfileService } from "../../../../packages/storage/src/tactical-profile-service.ts";
 import type {
   PuzzleSource,
@@ -94,7 +97,9 @@ export function createPersistentMobilePracticeServiceSync(): PracticeService | u
       }
       return source;
     }),
-    DeviceSQLiteStore.openTacticalProfileRepository()
+    openTacticalProfileRepositoryWithFallback(
+      () => DeviceSQLiteStore.openTacticalProfileRepository()
+    )
   );
 }
 
@@ -113,16 +118,26 @@ async function createPersistentMobilePracticeServiceImpl(): Promise<PracticeServ
   return createPersistentService(
     userStore,
     packSource,
-    DeviceSQLiteStore.openTacticalProfileRepository()
+    openTacticalProfileRepositoryWithFallback(
+      () => DeviceSQLiteStore.openTacticalProfileRepository()
+    )
   );
+}
+
+export function openTacticalProfileRepositoryWithFallback(
+  openRepository: () => TacticalProfileRepository
+): TacticalProfileRepository {
+  try {
+    return openRepository();
+  } catch {
+    return new MemoryTacticalProfileRepository();
+  }
 }
 
 function createPersistentService(
   userStore: InstanceType<typeof import("./deviceSQLiteStore.ts").DeviceSQLiteStore>,
   packSource: PuzzleSource,
-  tacticalProfileRepository: MemoryTacticalProfileRepository | ReturnType<
-    typeof import("./deviceSQLiteStore.ts").DeviceSQLiteStore.openTacticalProfileRepository
-  >
+  tacticalProfileRepository: TacticalProfileRepository
 ): PracticeService {
   const store = new PackBackedPracticeStore(userStore, packSource);
   const service = new PracticeService(

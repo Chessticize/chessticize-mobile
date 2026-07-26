@@ -2644,6 +2644,16 @@ function migrateV11ToV12(db: SyncSqliteDatabase): void {
 }
 
 function migrateV12ToV13(db: SyncSqliteDatabase): void {
+  if (hasColumn(db, "sprint_sessions", "config_json")) {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS sprint_sessions_tactical_focus_family_completed_at_id_idx
+      ON sprint_sessions(
+        json_extract(config_json, '$.tacticalFocus.taskFamily'),
+        completed_at DESC,
+        id DESC
+      );
+    `);
+  }
   db.exec(`
     CREATE TABLE IF NOT EXISTS tactical_profile_source_state (
       singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),

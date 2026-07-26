@@ -197,6 +197,7 @@ export function useTacticalProfilePresentation(input: {
       screen,
       activeTaskFamily: resolvedTaskFamily,
       signals,
+      unavailableFamilies: snapshot.unavailableFamilies,
       ...(snapshot.homeLeadSignalId === undefined
         ? {}
         : { homeLeadSignalId: snapshot.homeLeadSignalId }),
@@ -228,13 +229,34 @@ function resolvedRecommendedTaskFamily(
       .filter((signal) => signal.status === "recommended")
       .map((signal) => signal.taskFamily)
   );
-  return recommendedFamilies.has(activeTaskFamily)
+  if (recommendedFamilies.size > 0) {
+    return preferredTaskFamily(recommendedFamilies, activeTaskFamily);
+  }
+  const visibleFamilies = new Set(
+    snapshot?.evaluation.signals.map((signal) => signal.taskFamily)
+  );
+  if (visibleFamilies.size > 0) {
+    return preferredTaskFamily(visibleFamilies, activeTaskFamily);
+  }
+  const availableFamilies = new Set(
+    (["line", "arrow_duel"] as const).filter(
+      (taskFamily) => snapshot?.unavailableFamilies[taskFamily] === undefined
+    )
+  );
+  return availableFamilies.size > 0
+    ? preferredTaskFamily(availableFamilies, activeTaskFamily)
+    : activeTaskFamily;
+}
+
+function preferredTaskFamily(
+  taskFamilies: ReadonlySet<TacticalProfileTaskFamily>,
+  activeTaskFamily: TacticalProfileTaskFamily
+): TacticalProfileTaskFamily {
+  return taskFamilies.has(activeTaskFamily)
     ? activeTaskFamily
-    : recommendedFamilies.has("line")
+    : taskFamilies.has("line")
       ? "line"
-      : recommendedFamilies.has("arrow_duel")
-        ? "arrow_duel"
-        : activeTaskFamily;
+      : "arrow_duel";
 }
 
 function homeLeadTaskFamily(

@@ -96,7 +96,7 @@ function TacticalProfileScreen({
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
   const activeTaskFamily = activeTaskFamilyFor(presentation);
-  const taskFamilies = recommendedTaskFamilies(presentation.signals);
+  const taskFamilies = signalTaskFamilies(presentation.signals);
   const familySignals = presentation.signals.filter(
     (signal) => signal.taskFamily === activeTaskFamily
   );
@@ -137,7 +137,7 @@ function TacticalProfileScreen({
         <Text style={styles.contextTitle}>{profileHeadingFor(presentation, familySignals)}</Text>
         <Text style={styles.body}>{profileBodyFor(presentation)}</Text>
         <Text style={styles.contextFoot}>
-          Based on ordinary mixed {taskFamilyRunLabel(activeTaskFamily)} Runs. Review and focused Runs do not shape discovery.
+          {profileContextFor(presentation)}
         </Text>
       </View>
 
@@ -556,6 +556,9 @@ function profileHeadingFor(
   presentation: TacticalProfilePresentation,
   signals: readonly TacticalProfileSignal[]
 ): string {
+  if (activeTaskFamilyUnavailable(presentation)) {
+    return `${taskFamilyLabel(activeTaskFamilyFor(presentation))} insights aren't ready`;
+  }
   if (presentation.phase === "balanced") {
     return "No meaningful weakness right now";
   }
@@ -569,6 +572,9 @@ function profileHeadingFor(
 }
 
 function profileBodyFor(presentation: TacticalProfilePresentation): string {
+  if (activeTaskFamilyUnavailable(presentation)) {
+    return "Playing more mixed Runs won't unlock recommendations yet.";
+  }
   if (presentation.phase === "balanced") {
     return "Your recent completed puzzles look balanced after accounting for difficulty and Run settings.";
   }
@@ -576,6 +582,13 @@ function profileBodyFor(presentation: TacticalProfilePresentation): string {
     return "Keep playing mixed Runs. We need results from more different puzzles and sessions before recommending a focus.";
   }
   return "Recommendations separate evidence, practical impact, and training priority.";
+}
+
+function profileContextFor(presentation: TacticalProfilePresentation): string {
+  if (activeTaskFamilyUnavailable(presentation)) {
+    return "Your practice history remains saved for a future validated model.";
+  }
+  return `Based on ordinary mixed ${taskFamilyRunLabel(activeTaskFamilyFor(presentation))} Runs. Review and focused Runs do not shape discovery.`;
 }
 
 function homeContentFor(
@@ -593,6 +606,14 @@ function homeContentFor(
       title: "Finding stable patterns",
       body: "Preparing a local profile from your mixed Run history.",
       tone: "blue"
+    };
+  }
+  if (allTaskFamiliesUnavailable(presentation)) {
+    return {
+      status: "Not available yet",
+      title: "Training insights aren't ready",
+      body: "Personalized training is not enabled in this version. Your practice history remains saved.",
+      tone: "neutral"
     };
   }
   if (presentation.phase === "collecting") {
@@ -700,6 +721,28 @@ function recommendedTaskFamilies(
       .filter((signal) => signal.status === "recommended")
       .map((signal) => signal.taskFamily)
   )];
+}
+
+function signalTaskFamilies(
+  signals: readonly TacticalProfileSignal[]
+): TacticalProfileTaskFamily[] {
+  return [...new Set(signals.map((signal) => signal.taskFamily))];
+}
+
+function activeTaskFamilyUnavailable(
+  presentation: TacticalProfilePresentation
+): boolean {
+  return presentation.phase === "collecting"
+    && presentation.unavailableFamilies?.[activeTaskFamilyFor(presentation)] !== undefined;
+}
+
+function allTaskFamiliesUnavailable(
+  presentation: TacticalProfilePresentation
+): boolean {
+  return presentation.phase === "collecting"
+    && (["line", "arrow_duel"] as const).every(
+      (taskFamily) => presentation.unavailableFamilies?.[taskFamily] !== undefined
+    );
 }
 
 function activeTaskFamilyFor(

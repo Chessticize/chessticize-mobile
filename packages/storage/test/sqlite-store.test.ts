@@ -472,6 +472,15 @@ test("optimized SQLite indexes cover production range and ordering queries", asy
         index: "sprint_sessions_rating_key_completed_at_id_idx"
       },
       {
+        sql: `SELECT id FROM sprint_sessions
+              WHERE completed_at IS NOT NULL
+              AND json_extract(config_json, '$.tacticalFocus.taskFamily') = ?
+              ORDER BY completed_at DESC, id DESC
+              LIMIT 1`,
+        params: ["arrow_duel"],
+        index: "sprint_sessions_tactical_focus_family_completed_at_id_idx"
+      },
+      {
         sql: `SELECT a.id
               FROM attempts a
               JOIN sprint_sessions s ON s.id = a.session_id

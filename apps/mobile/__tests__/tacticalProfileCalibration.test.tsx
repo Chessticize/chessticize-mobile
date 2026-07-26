@@ -3,6 +3,7 @@ import type {
   TacticalProfileCalibrationArtifact
 } from "../../../packages/core/src/index";
 import { productionTacticalProfileCalibration } from "../src/backend/tacticalProfileCalibration";
+import { openTacticalProfileRepositoryWithFallback } from "../src/platform/mobilePractice";
 
 const bundledManifest = require(
   "../../../fixtures/puzzles/bundled-core-pack.manifest.json"
@@ -12,6 +13,29 @@ const bundledArtifact = require(
 ) as TacticalProfileCalibrationArtifact;
 
 describe("production Tactical Profile calibration", () => {
+  it("falls back to a disposable cache when the native cache cannot open", () => {
+    const open = jest.fn(() => {
+      throw new Error("native cache unavailable");
+    });
+
+    const repository = openTacticalProfileRepositoryWithFallback(open);
+    repository.reset(
+      {
+        modelVersion: "test-model",
+        packFeatureHash: "test-pack",
+        calibrationId: "test-calibration"
+      },
+      [],
+      0
+    );
+
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(repository.getBuildState()).toMatchObject({
+      status: "ready",
+      sourceRevision: 0
+    });
+  });
+
   it("loads the checked-in artifact for its exact bundled pack and policy", () => {
     const calibration = productionTacticalProfileCalibration(bundledManifest);
 

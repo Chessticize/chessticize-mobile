@@ -1088,14 +1088,17 @@ describe("PracticePocScreen", () => {
     await flushMicrotasks();
 
     expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
-      "More information needed"
+      "Training insights aren't ready"
     );
     expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Personalized training is not enabled in this version"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).not.toContain(
       "Keep playing mixed Runs"
     );
     press(renderer, "training-focus-open-profile");
     expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
-      "Still collecting evidence"
+      "Playing more mixed Runs won't unlock recommendations yet"
     );
   });
 
@@ -1236,6 +1239,35 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
       "Puzzle solving"
     );
+  });
+
+  it("keeps watch-only evidence visible in both task-family lanes", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const watchOnlyCalibration = {
+      ...COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+      evidence: {
+        ...COMPONENT_TACTICAL_PROFILE_CALIBRATION.evidence,
+        minDistinctPuzzles: 13
+      }
+    } satisfies TacticalProfileCalibrationArtifact;
+    const practiceService = createDualFamilyFocusedPracticeService(
+      watchOnlyCalibration
+    );
+    expect(
+      practiceService.getTacticalProfileSnapshot()?.evaluation.signals.map(
+        (signal) => signal.status
+      )
+    ).toEqual(["watch", "watch"]);
+
+    const renderer = renderScreen({ practiceService });
+    press(renderer, "training-focus-open-profile");
+
+    expect(findByTestId(renderer, "tactical-profile-task-family-selector")).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-signal-line:fork")).toBeTruthy();
+    press(renderer, "tactical-profile-task-family-arrow_duel");
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
   });
 
   it("opens a cached production Tactical Profile without reading full history or exact inventory", () => {
@@ -10491,7 +10523,10 @@ function createArrowTacticalProfileService(
   });
 }
 
-function createDualFamilyFocusedPracticeService(): PracticeService {
+function createDualFamilyFocusedPracticeService(
+  calibration: TacticalProfileCalibrationArtifact =
+    COMPONENT_TACTICAL_PROFILE_CALIBRATION
+): PracticeService {
   const candidates = tacticalProfilePuzzleFixture
     .filter(isServerCompatibleArrowDuelPuzzle)
     .slice(0, 24);
@@ -10587,7 +10622,7 @@ function createDualFamilyFocusedPracticeService(): PracticeService {
       progressStore: store,
       puzzleSource: store,
       repository: new MemoryTacticalProfileRepository(),
-      calibration: COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+      calibration,
       naturalFrequency: {
         line: { fork: 0.12 },
         arrow_duel: { pin: 0.12 }

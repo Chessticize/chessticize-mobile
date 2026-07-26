@@ -1071,6 +1071,15 @@
           "started_at",
           "id"
         ]
+      },
+      {
+        "name": "sprint_sessions_tactical_focus_family_completed_at_id_idx",
+        "unique": false,
+        "columns": [
+          "",
+          "completed_at",
+          "id"
+        ]
       }
     ],
     "foreignKeys": []

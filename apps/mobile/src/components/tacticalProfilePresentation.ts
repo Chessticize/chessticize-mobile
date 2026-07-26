@@ -62,6 +62,9 @@ export type TacticalProfilePresentation = {
   phase: TacticalProfilePhase;
   screen: TacticalProfileScreen;
   activeTaskFamily?: TacticalProfileTaskFamily;
+  unavailableFamilies?: Readonly<
+    Partial<Record<TacticalProfileTaskFamily, string>>
+  >;
   homeLeadSignalId?: string;
   signals: readonly TacticalProfileSignal[];
   selectedSignalId?: string;
