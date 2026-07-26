@@ -22,6 +22,7 @@ test("bundled core puzzle pack manifest matches the shipped puzzle artifact", (t
     assert.equal(manifest.rating.max, summary.maxRating);
     assert.equal(manifest.packFileBytes, summary.bytes);
     assert.equal(manifest.packFileHash, `sha256:${summary.sha256}`);
+    assert.equal(manifest.manifestHash, hashManifest(manifest));
     assert.ok(manifest.seed);
     assert.ok(manifest.ratingBuckets?.length);
     assert.ok(manifest.themeCounts && Object.keys(manifest.themeCounts).length > 0);
@@ -57,6 +58,29 @@ function readBundledPuzzles(): Puzzle[] {
 
 function readBundledManifest(): PuzzlePackManifest {
   return JSON.parse(readFileSync(resolve("fixtures/puzzles/bundled-core-pack.manifest.json"), "utf8")) as PuzzlePackManifest;
+}
+
+function hashManifest(manifest: PuzzlePackManifest): string {
+  const canonical = stableJson({ ...manifest, manifestHash: "" });
+  return `sha256:${createHash("sha256").update(canonical).digest("hex")}`;
+}
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(sortJsonValue(value));
+}
+
+function sortJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortJsonValue);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, sortJsonValue(item)])
+    );
+  }
+  return value;
 }
 
 function readSqlitePackSummary(): {
