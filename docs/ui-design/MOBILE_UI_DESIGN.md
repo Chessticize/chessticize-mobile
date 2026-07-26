@@ -565,8 +565,9 @@ New Run behavior:
 - iCloud Sync appears near the top. It defaults on, shows the real enabled state
   and current account/sync status, and exposes a manual Sync Now action while
   sync is enabled.
-- Help & Feedback groups GitHub feedback, Email Support, and an
-  `Export Support Diagnostics` entry. Diagnostics remain available even when
+- Help & Feedback keeps three support entries in this order: GitHub feedback,
+  `Export Support Diagnostics`, then Email Support as the final row.
+  Diagnostics remain available even when
   sync is off and no error is visible. Export requires confirmation before
   preparing a package, identifies sensitive progress content, includes a
   consistent local SQLite snapshot and the private CloudKit JSON snapshot when
@@ -590,8 +591,9 @@ New Run behavior:
   and Puzzle Data. License opens the repository license file, Source
   opens the public repository, Stockfish opens the embedded Stockfish engine
   source in the repository, and Puzzle Data opens the Lichess puzzle database.
-- Help & Feedback keeps Email Support and diagnostics next to the privacy-bounded
-  GitHub feedback entry. Email Support opens `support@chessticize.com`.
+- Help & Feedback keeps diagnostics and Email Support next to the
+  privacy-bounded GitHub feedback entry, with Email Support always last. Email
+  Support opens `support@chessticize.com`.
 - On phone widths, About rows must leave enough horizontal room for label,
   detail, and link text. Keep right-side values short and do not combine
   multiple unrelated links into one row.
