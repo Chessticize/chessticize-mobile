@@ -48,6 +48,28 @@ export async function expectTestIdText(
   });
 }
 
+export async function expectTestIdHorizontalCentersAligned(
+  canvasElement: HTMLElement,
+  firstTestID: string,
+  secondTestID: string,
+  tolerance = 0.5
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const first = await page.findByTestId(firstTestID, {}, { timeout: 4_000 });
+  const second = await page.findByTestId(secondTestID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    const firstRect = first.getBoundingClientRect();
+    const secondRect = second.getBoundingClientRect();
+    const offset = secondRect.left + secondRect.width / 2
+      - (firstRect.left + firstRect.width / 2);
+    if (Math.abs(offset) > tolerance) {
+      throw new Error(
+        `Expected ${firstTestID} and ${secondTestID} centers within ${tolerance}px; offset ${offset.toFixed(2)}px`
+      );
+    }
+  });
+}
+
 export async function replaceTextTestId(
   canvasElement: HTMLElement,
   testID: string,
