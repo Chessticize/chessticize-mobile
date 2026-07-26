@@ -6,6 +6,7 @@ import {
   dragTestId,
   expectReorderAnimation,
   expectRunCardInsets,
+  expectTestIdHorizontalCentersAligned,
   expectTestIdText,
   expectTestIdAbsent,
   expectTestIdsInOrder,
@@ -32,6 +33,11 @@ export const Home: Story = {
     await expectTestIdText(canvasElement, "practice-mode-standard-rating", "925");
     await expectTestIdText(canvasElement, "practice-mode-arrow-duel-rating", "875");
     await expectTestIdText(canvasElement, "practice-review-due-count", "28");
+    await expectTestIdHorizontalCentersAligned(
+      canvasElement,
+      "practice-progress-weekly-metric",
+      "practice-review-due-count"
+    );
   }
 };
 

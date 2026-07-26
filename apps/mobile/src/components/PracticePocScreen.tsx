@@ -3875,6 +3875,10 @@ function PracticeHome({
               <Text style={styles.listText}>{reviewStatusLabel}</Text>
             </View>
             <View
+              style={styles.practiceSummaryColumnGap}
+              testID="practice-review-strip-column-gap"
+            />
+            <View
               style={styles.reviewStripActionArea}
               testID="practice-review-strip-action-area"
             >
@@ -6462,7 +6466,10 @@ function PracticeProgressCard({
           <Text style={styles.progressValue}>{currentRating}</Text>
           <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
         </View>
-        <View style={styles.progressDivider} />
+        <View
+          style={[styles.practiceSummaryColumnGap, styles.progressDivider]}
+          testID="practice-progress-divider"
+        />
         <View style={styles.progressMetric} testID="practice-progress-weekly-metric">
           <Text style={styles.progressMetricLabel}>This Week</Text>
           <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
@@ -15352,6 +15359,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14
   },
+  practiceSummaryColumnGap: {
+    marginHorizontal: 12,
+    width: 1
+  },
   progressMetric: {
     alignItems: "center",
     flex: 1,
@@ -15368,9 +15379,7 @@ const styles = StyleSheet.create({
   },
   progressDivider: {
     alignSelf: "stretch",
-    backgroundColor: "#E2E8F0",
-    marginHorizontal: 12,
-    width: 1
+    backgroundColor: "#E2E8F0"
   },
   progressValue: {
     color: "#111827",
@@ -15410,16 +15419,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 58,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10
   },
   reviewStripActionArea: {
     alignItems: "center",
     alignSelf: "stretch",
+    flex: 1,
     flexDirection: "row",
     justifyContent: "center",
-    position: "relative",
-    width: "50%"
+    position: "relative"
   },
   reviewStripStatusCopy: {
     flex: 1,
