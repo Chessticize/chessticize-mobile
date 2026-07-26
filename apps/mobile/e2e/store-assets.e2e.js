@@ -1,6 +1,7 @@
 const { execFileSync } = require('node:child_process');
 const { resolve } = require('node:path');
 const {
+  accessibilityLabelFromAttributes,
   frameFor,
   launchWithDisabledSynchronization,
   openTab,
@@ -227,27 +228,39 @@ async function takeLandscapeScreenshot(name, assertLayout) {
 }
 
 async function waitForScreenOrientation(orientation) {
+  const expectedLayoutClassSuffix = orientation === 'landscape' ? 'Landscape' : 'Portrait';
   let lastFrame = null;
   let lastFrameError = null;
+  let lastLayoutLabel = '';
   let previousExpectedFrame = null;
   let stableFrameCount = 0;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
-      lastFrame = await frameFor(element(by.id('adaptive-layout')));
+      const adaptiveLayoutElement = element(by.id('adaptive-layout'));
+      lastFrame = await frameFor(adaptiveLayoutElement);
+      lastLayoutLabel = accessibilityLabelFromAttributes(
+        await adaptiveLayoutElement.getAttributes()
+      );
       lastFrameError = null;
       const hasExpectedOrientation = orientation === 'landscape'
         ? lastFrame.width > lastFrame.height
         : lastFrame.height > lastFrame.width;
+      // After the host Simulator rotates, UIKit can publish the new root
+      // bounds before React Native has recomputed its adaptive layout class.
+      // A portrait PNG taken during that gap can contain a stale landscape
+      // board and rail, so require both public signals to agree.
+      const hasExpectedLayoutClass = lastLayoutLabel.endsWith(expectedLayoutClassSuffix);
       const matchesPreviousFrame = previousExpectedFrame !== null
         && ['x', 'y', 'width', 'height'].every(
           (key) => Math.abs(lastFrame[key] - previousExpectedFrame[key]) <= 1
         );
-      stableFrameCount = hasExpectedOrientation
+      const hasExpectedLayout = hasExpectedOrientation && hasExpectedLayoutClass;
+      stableFrameCount = hasExpectedLayout
         ? matchesPreviousFrame
           ? stableFrameCount + 1
           : 1
         : 0;
-      previousExpectedFrame = hasExpectedOrientation ? lastFrame : null;
+      previousExpectedFrame = hasExpectedLayout ? lastFrame : null;
       if (stableFrameCount >= 3) {
         return;
       }
@@ -261,6 +274,7 @@ async function waitForScreenOrientation(orientation) {
   throw new Error(
     `Timed out waiting for ${orientation} store-asset layout; `
     + `last observed frame=${JSON.stringify(lastFrame)}; `
+    + `last observed layout label=${JSON.stringify(lastLayoutLabel)}; `
     + `last frame error=${lastFrameError === null ? 'none' : errorMessage(lastFrameError)}`
   );
 }

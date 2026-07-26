@@ -124,7 +124,11 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).not.toContain("device.setOrientation(");
     expect(storeAssetsE2e).toContain("waitForScreenOrientation('landscape')");
     expect(storeAssetsE2e).toContain("waitForScreenOrientation('portrait')");
+    expect(storeAssetsE2e).toContain("accessibilityLabelFromAttributes");
+    expect(storeAssetsE2e).toContain("expectedLayoutClassSuffix");
+    expect(storeAssetsE2e).toContain("lastLayoutLabel.endsWith(expectedLayoutClassSuffix)");
     expect(storeAssetsE2e).toContain("last observed frame=${JSON.stringify(lastFrame)}");
+    expect(storeAssetsE2e).toContain("last observed layout label=${JSON.stringify(lastLayoutLabel)}");
     expect(storeAssetsE2e).toContain("stableFrameCount >= 3");
     expect(storeAssetsE2e).toContain("last frame error=${lastFrameError");
     expect(uiCalibrationRunner).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait");
