@@ -66,7 +66,7 @@ describe("iCloud sync diagnostics bridge", () => {
   it("keeps copied diagnostics bounded to useful non-credential fields", () => {
     const failure = captureICloudSyncFailure({
       code: "icloud_fetch_failed",
-      message: "Request rate limited",
+      message: "Request for private@example.com used credential=secret",
       userInfo: {
         cloudKitCode: 7,
         nativeErrorDomain: "CKErrorDomain",
@@ -97,9 +97,35 @@ describe("iCloud sync diagnostics bridge", () => {
     expect(text).toContain("Native code: 7");
     expect(text).toContain("Domain: CKErrorDomain");
     expect(text).toContain("Retry after: 12 seconds");
+    expect(text).toContain("Message: CloudKit could not fetch the progress snapshot.");
     expect(overview).toContain("Latest sync status: iCloud sync failed");
+    expect(text).not.toContain("private@example.com");
+    expect(text).not.toContain("secret");
     expect(overview).not.toContain("private@example.com");
     expect(overview).not.toContain("secret");
+  });
+
+  it("classifies payload writes as save failures and rejects unbounded identifiers", () => {
+    const failure = captureICloudSyncFailure({
+      code: "icloud_payload_write_failed",
+      domain: "private@example.com",
+      message: "Could not write /private/account@example.com/snapshot.json",
+      userInfo: {
+        nativeErrorCode: "identifier@example.com"
+      }
+    }, {
+      attempt: "Manual",
+      occurredAt: "2026-07-26T16:42:00.000Z"
+    });
+
+    expect(failure.phase).toBe("Save to iCloud");
+    expect(failure.domain).toBe("CloudKit");
+    expect(failure.nativeCode).toBeUndefined();
+    expect(failure.message).toBe(
+      "Chessticize could not prepare the progress snapshot for iCloud."
+    );
+    expect(formatICloudSyncFailureDiagnostic(failure, { appVersion: "1.2.3" }))
+      .not.toContain("account@example.com");
   });
 
   it("rejects malformed native bundle results", async () => {

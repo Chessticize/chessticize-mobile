@@ -109,8 +109,8 @@ export function captureICloudSyncFailure(
 ): ICloudSyncFailureDiagnostic {
   const record = objectRecord(error);
   const userInfo = objectRecord(record?.userInfo);
-  const code = stringValue(record?.code) ?? "icloud_sync_failed";
-  const nativeCode = numberOrStringValue(
+  const code = safeIdentifier(record?.code, "icloud_sync_failed");
+  const nativeCode = numericIdentifier(
     userInfo?.cloudKitCode ?? userInfo?.nativeErrorCode ?? userInfo?.CKErrorCode
   );
   const retryAfterSeconds = finiteNumber(
@@ -120,10 +120,11 @@ export function captureICloudSyncFailure(
   return {
     attempt: input.attempt,
     code,
-    domain: stringValue(record?.domain)
-      ?? stringValue(userInfo?.nativeErrorDomain)
-      ?? domainForCode(code),
-    message: errorMessage(error),
+    domain: safeIdentifier(
+      record?.domain ?? userInfo?.nativeErrorDomain,
+      domainForCode(code)
+    ),
+    message: safeMessageForCode(code),
     ...(nativeCode ? { nativeCode } : {}),
     occurredAt: input.occurredAt,
     phase: phaseForCode(code),
@@ -213,11 +214,15 @@ function phaseForCode(code: string): string {
   if (code.includes("account")) {
     return "Check iCloud Account";
   }
+  if (
+    code === "icloud_payload_write_failed"
+    || code.includes("save")
+    || code.includes("conflict")
+  ) {
+    return "Save to iCloud";
+  }
   if (code.includes("fetch") || code.includes("payload")) {
     return "Fetch from iCloud";
-  }
-  if (code.includes("save") || code.includes("conflict")) {
-    return "Save to iCloud";
   }
   return "Merge Progress";
 }
@@ -246,11 +251,12 @@ function stringValue(value: unknown): string | undefined {
     : undefined;
 }
 
-function numberOrStringValue(value: unknown): string | undefined {
+function numericIdentifier(value: unknown): string | undefined {
   if (typeof value === "number" && Number.isFinite(value)) {
     return String(value);
   }
-  return stringValue(value);
+  const text = stringValue(value);
+  return text && /^-?\d{1,12}$/.test(text) ? text : undefined;
 }
 
 function finiteNumber(value: unknown): number | undefined {
@@ -260,10 +266,29 @@ function finiteNumber(value: unknown): number | undefined {
   return undefined;
 }
 
-function errorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
+function safeIdentifier(value: unknown, fallback: string): string {
+  const text = stringValue(value);
+  if (!text || text.length > 80 || !/^[A-Za-z0-9_.-]+$/.test(text)) {
+    return fallback;
   }
-  const message = stringValue(objectRecord(error)?.message);
-  return message ?? "Unknown iCloud sync error";
+  return text;
+}
+
+function safeMessageForCode(code: string): string {
+  switch (code) {
+    case "icloud_account_unavailable":
+      return "The iCloud account is not available for sync.";
+    case "icloud_fetch_failed":
+      return "CloudKit could not fetch the progress snapshot.";
+    case "icloud_payload_invalid":
+      return "The iCloud progress snapshot payload is invalid.";
+    case "icloud_payload_write_failed":
+      return "Chessticize could not prepare the progress snapshot for iCloud.";
+    case "icloud_save_conflict":
+      return "The iCloud progress snapshot changed during sync.";
+    case "icloud_save_failed":
+      return "CloudKit could not save the progress snapshot.";
+    default:
+      return "iCloud sync failed. Use the bounded code and domain below for support.";
+  }
 }

@@ -85,10 +85,14 @@ describe("iOS App Store privacy artifacts", () => {
     expect(implementation).toContain("UIActivityViewController");
     expect(implementation).toContain("sha256");
     expect(implementation).toContain("PRAGMA quick_check");
+    expect(implementation).toContain("integrityCheckPassed");
     expect(implementation).toContain("operatingSystemVersion");
     expect(implementation).toContain("appleIdIncluded");
     expect(implementation).toContain("ChessticizeCloudKitSnapshotTimeoutSeconds");
     expect(implementation).toContain("the request timed out after 8 seconds");
+    expect(implementation).toContain("ChessticizeSupportArchiveLifetimeSeconds");
+    expect(implementation).toContain("completionWithItemsHandler");
+    expect(implementation).toContain("chessticizeICloudDiagnosticsFixture");
     expect(pbxproj).toContain("ICloudSyncDiagnostics.m in Sources");
     expect(pbxproj).toContain("libsqlite3.tbd in Frameworks");
   });

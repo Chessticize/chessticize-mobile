@@ -37,7 +37,9 @@ RCT_EXPORT_METHOD(fetchSnapshot:(RCTPromiseResolveBlock)resolve
         resolve((id)nil);
         return;
       }
-      reject(@"icloud_fetch_failed", error.localizedDescription, [self diagnosticError:error]);
+      reject(@"icloud_fetch_failed",
+             @"CloudKit could not fetch the progress snapshot.",
+             [self diagnosticError:error]);
       return;
     }
     if (record == nil) {
@@ -48,7 +50,9 @@ RCT_EXPORT_METHOD(fetchSnapshot:(RCTPromiseResolveBlock)resolve
     NSError *payloadError = nil;
     NSString *payload = [self payloadStringFromRecord:record error:&payloadError];
     if (payloadError != nil) {
-      reject(@"icloud_payload_invalid", payloadError.localizedDescription, [self diagnosticError:payloadError]);
+      reject(@"icloud_payload_invalid",
+             @"The iCloud progress snapshot payload is invalid.",
+             [self diagnosticError:payloadError]);
       return;
     }
     resolve(@{
@@ -72,7 +76,9 @@ RCT_EXPORT_METHOD(saveSnapshot:(NSString *)payload
   [[self privateDatabase] fetchRecordWithID:recordID completionHandler:^(CKRecord *record, NSError *fetchError) {
     BOOL recordDoesNotExist = fetchError != nil && [self isUnknownItemError:fetchError];
     if (fetchError != nil && !recordDoesNotExist) {
-      reject(@"icloud_fetch_failed", fetchError.localizedDescription, [self diagnosticError:fetchError]);
+      reject(@"icloud_fetch_failed",
+             @"CloudKit could not fetch the progress snapshot.",
+             [self diagnosticError:fetchError]);
       return;
     }
     if (recordDoesNotExist && expectedChangeTag != nil) {
@@ -102,7 +108,9 @@ RCT_EXPORT_METHOD(saveSnapshot:(NSString *)payload
   NSError *writeError = nil;
   NSURL *payloadURL = [self writeTemporaryPayload:payload error:&writeError];
   if (writeError != nil || payloadURL == nil) {
-    reject(@"icloud_payload_write_failed", writeError.localizedDescription, [self diagnosticError:writeError]);
+    reject(@"icloud_payload_write_failed",
+           @"Chessticize could not prepare the progress snapshot for iCloud.",
+           [self diagnosticError:writeError]);
     return;
   }
 
@@ -117,7 +125,9 @@ RCT_EXPORT_METHOD(saveSnapshot:(NSString *)payload
         reject(@"icloud_save_conflict", @"The iCloud progress snapshot changed during save.", [self diagnosticError:saveError]);
         return;
       }
-      reject(@"icloud_save_failed", saveError.localizedDescription, [self diagnosticError:saveError]);
+      reject(@"icloud_save_failed",
+             @"CloudKit could not save the progress snapshot.",
+             [self diagnosticError:saveError]);
       return;
     }
     resolve(@{
@@ -175,11 +185,15 @@ RCT_EXPORT_METHOD(saveSnapshot:(NSString *)payload
   if (error == nil) {
     return nil;
   }
-  NSMutableDictionary *userInfo = [error.userInfo mutableCopy] ?: [NSMutableDictionary dictionary];
+  NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
   userInfo[@"nativeErrorCode"] = @(error.code);
   userInfo[@"nativeErrorDomain"] = error.domain ?: @"unavailable";
   if ([error.domain isEqualToString:CKErrorDomain]) {
     userInfo[@"cloudKitCode"] = @(error.code);
+  }
+  id retryAfter = error.userInfo[CKErrorRetryAfterKey];
+  if ([retryAfter isKindOfClass:[NSNumber class]]) {
+    userInfo[CKErrorRetryAfterKey] = retryAfter;
   }
   return [NSError errorWithDomain:error.domain code:error.code userInfo:userInfo];
 }

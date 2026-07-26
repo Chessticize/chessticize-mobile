@@ -9469,9 +9469,48 @@ describe("PracticePocScreen", () => {
     );
     press(renderer, "settings-sync-support-bundle-details");
     await flushMicrotasks();
-    expect(discardSupportBundle).toHaveBeenCalledWith(
-      "file:///tmp/chessticize-support.zip"
-    );
+    expect(discardSupportBundle).not.toHaveBeenCalled();
+  });
+
+  it("discards a support bundle that finishes after its diagnostics window closes", async () => {
+    let finishPreparation: ((result: {
+      bundleUrl: string;
+      files: string[];
+      kind: "partial";
+    }) => void) | undefined;
+    const prepareSupportBundle = jest.fn(() => new Promise<{
+      bundleUrl: string;
+      files: string[];
+      kind: "partial";
+    }>((resolve) => {
+      finishPreparation = resolve;
+    }));
+    const discardSupportBundle = jest.fn(async () => undefined);
+    const renderer = renderScreen({
+      iCloudSyncDiagnosticsClient: {
+        copyText: jest.fn(async () => undefined),
+        discardSupportBundle,
+        prepareSupportBundle,
+        shareSupportBundle: jest.fn(async () => undefined)
+      }
+    });
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-sync-support-bundle-entry");
+    press(renderer, "settings-sync-support-bundle-prepare");
+    expect(findByTestId(renderer, "settings-sync-support-bundle-preparing")).toBeTruthy();
+    press(renderer, "settings-sync-error-details-close-icon");
+
+    await act(async () => {
+      finishPreparation?.({
+        bundleUrl: "file:///tmp/late-support.zip",
+        files: ["local-progress.sqlite", "diagnostic.txt", "manifest.json"],
+        kind: "partial"
+      });
+      await Promise.resolve();
+    });
+
+    expect(discardSupportBundle).toHaveBeenCalledWith("file:///tmp/late-support.zip");
   });
 
   it("shows and copies the issue #353 local iCloud sync diagnostic design", async () => {
@@ -9510,7 +9549,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(modal)).toContain("manifest.json");
     await pressAsync(renderer, "settings-sync-support-bundle-share");
     expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-shared"))).toContain(
-      "Share Sheet requested"
+      "temporary bundle was removed"
     );
 
     press(renderer, "settings-sync-support-bundle-details");

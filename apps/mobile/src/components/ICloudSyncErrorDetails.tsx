@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -69,10 +69,39 @@ export function ICloudSyncErrorDetails({
   const [bundleResult, setBundleResult] = useState<ICloudSyncSupportBundleResult | null>(null);
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [shareState, setShareState] = useState<ShareState>("idle");
+  const bundleResultRef = useRef<ICloudSyncSupportBundleResult | null>(null);
+  const preparationGenerationRef = useRef(0);
+  const supportBundleRef = useRef(presentation.supportBundle);
+  const visibleRef = useRef(false);
+  supportBundleRef.current = presentation.supportBundle;
+
+  useEffect(() => () => {
+    visibleRef.current = false;
+    preparationGenerationRef.current += 1;
+    const pendingResult = bundleResultRef.current;
+    bundleResultRef.current = null;
+    if (pendingResult) {
+      discardSupportBundleResult(pendingResult);
+    }
+  }, []);
+
+  function discardSupportBundleResult(result: ICloudSyncSupportBundleResult): void {
+    const discard = supportBundleRef.current?.onDiscard;
+    if (!discard) {
+      return;
+    }
+    void Promise.resolve(discard(result)).catch(() => {
+      // Native expiry remains the final cleanup boundary if explicit discard fails.
+    });
+  }
 
   function close(): void {
-    if (bundleResult) {
-      void presentation.supportBundle?.onDiscard?.(bundleResult);
+    visibleRef.current = false;
+    preparationGenerationRef.current += 1;
+    const pendingResult = bundleResultRef.current;
+    bundleResultRef.current = null;
+    if (pendingResult) {
+      discardSupportBundleResult(pendingResult);
     }
     setVisible(false);
     setCopyState("idle");
@@ -96,13 +125,35 @@ export function ICloudSyncErrorDetails({
     if (!presentation.supportBundle) {
       return;
     }
+    const preparationGeneration = preparationGenerationRef.current + 1;
+    preparationGenerationRef.current = preparationGeneration;
+    const replacedResult = bundleResultRef.current;
+    bundleResultRef.current = null;
+    setBundleResult(null);
+    if (replacedResult) {
+      discardSupportBundleResult(replacedResult);
+    }
     setPrepareError(null);
     setPanel("preparing");
     try {
       const result = await presentation.supportBundle.onPrepare();
+      if (
+        !visibleRef.current
+        || preparationGenerationRef.current !== preparationGeneration
+      ) {
+        discardSupportBundleResult(result);
+        return;
+      }
+      bundleResultRef.current = result;
       setBundleResult(result);
       setPanel("ready");
     } catch (error) {
+      if (
+        !visibleRef.current
+        || preparationGenerationRef.current !== preparationGeneration
+      ) {
+        return;
+      }
       setPrepareError(error instanceof Error ? error.message : "The support bundle could not be prepared.");
       setPanel("export-confirmation");
     }
@@ -115,6 +166,7 @@ export function ICloudSyncErrorDetails({
     setShareState("sharing");
     try {
       await presentation.supportBundle.onShare(bundleResult);
+      bundleResultRef.current = null;
       setShareState("shared");
     } catch {
       setShareState("failed");
@@ -146,6 +198,9 @@ export function ICloudSyncErrorDetails({
           : `View iCloud sync error details. Last failed ${presentation.occurredAtLabel}.`}
         accessibilityRole="button"
         onPress={() => {
+          visibleRef.current = true;
+          preparationGenerationRef.current += 1;
+          bundleResultRef.current = null;
           setCopyState("idle");
           setPanel(entryVariant === "support" ? "export-confirmation" : "details");
           setBundleResult(null);
@@ -503,7 +558,7 @@ export function ICloudSyncErrorDetails({
                       style={styles.copySuccess}
                       testID="settings-sync-support-bundle-shared"
                     >
-                      Share Sheet requested. Choose where to send the bundle.
+                      Share Sheet closed. The temporary bundle was removed.
                     </Text>
                   ) : null}
                   {shareState === "failed" ? (
@@ -540,19 +595,27 @@ export function ICloudSyncErrorDetails({
                     <Pressable
                       accessibilityLabel="Share iCloud sync support bundle"
                       accessibilityRole="button"
-                      accessibilityState={{ disabled: shareState === "sharing" }}
-                      disabled={shareState === "sharing"}
+                      accessibilityState={{
+                        disabled: shareState === "sharing" || shareState === "shared"
+                      }}
+                      disabled={shareState === "sharing" || shareState === "shared"}
                       onPress={() => {
                         void shareSupportBundle();
                       }}
                       style={[
                         styles.primaryButton,
-                        shareState === "sharing" ? styles.primaryButtonDisabled : null
+                        shareState === "sharing" || shareState === "shared"
+                          ? styles.primaryButtonDisabled
+                          : null
                       ]}
                       testID="settings-sync-support-bundle-share"
                     >
                       <Text style={styles.primaryButtonText}>
-                        {shareState === "sharing" ? "Opening…" : "Share Support Bundle"}
+                        {shareState === "sharing"
+                          ? "Opening…"
+                          : shareState === "shared"
+                            ? "Bundle Removed"
+                            : "Share Support Bundle"}
                       </Text>
                     </Pressable>
                   </View>

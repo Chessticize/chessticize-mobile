@@ -8,7 +8,9 @@
 static NSString * const ChessticizeDiagnosticRecordName = @"default";
 static NSString * const ChessticizeDiagnosticPayloadField = @"payload";
 static NSString * const ChessticizeSupportArchivePrefix = @"Chessticize-Support-";
+static NSString * const ChessticizeSupportWorkingDirectoryPrefix = @"chessticize-support-work-";
 static NSTimeInterval const ChessticizeCloudKitSnapshotTimeoutSeconds = 8.0;
+static NSTimeInterval const ChessticizeSupportArchiveLifetimeSeconds = 60.0 * 60.0;
 
 @interface ICloudSyncDiagnostics : NSObject <RCTBridgeModule>
 @end
@@ -16,6 +18,15 @@ static NSTimeInterval const ChessticizeCloudKitSnapshotTimeoutSeconds = 8.0;
 @implementation ICloudSyncDiagnostics
 
 RCT_EXPORT_MODULE();
+
+- (instancetype)init
+{
+  self = [super init];
+  if (self != nil) {
+    [self removeManagedSupportArtifactsBeforeDate:nil];
+  }
+  return self;
+}
 
 RCT_EXPORT_METHOD(copyText:(NSString *)text
                   resolver:(RCTPromiseResolveBlock)resolve
@@ -41,6 +52,9 @@ RCT_EXPORT_METHOD(prepareSupportBundle:(NSString *)databasePath
     reject(@"support_diagnostic_invalid", @"The support diagnostic text is invalid.", nil);
     return;
   }
+
+  [self removeManagedSupportArtifactsBeforeDate:
+    [NSDate dateWithTimeIntervalSinceNow:-ChessticizeSupportArchiveLifetimeSeconds]];
 
   NSError *directoryError = nil;
   NSURL *workingDirectory = [self createWorkingDirectory:&directoryError];
@@ -105,6 +119,21 @@ RCT_EXPORT_METHOD(shareSupportBundle:(NSString *)bundleUrl
     UIActivityViewController *activityController =
       [[UIActivityViewController alloc] initWithActivityItems:@[url]
                                        applicationActivities:nil];
+    activityController.completionWithItemsHandler =
+      ^(UIActivityType activityType,
+        BOOL completed,
+        NSArray *returnedItems,
+        NSError *activityError) {
+        NSError *removeError = nil;
+        if ([[NSFileManager defaultManager] fileExistsAtPath:url.path] &&
+            ![[NSFileManager defaultManager] removeItemAtURL:url error:&removeError]) {
+          reject(@"support_bundle_cleanup_failed",
+                 @"The Share Sheet closed, but the temporary support bundle could not be removed.",
+                 removeError);
+          return;
+        }
+        resolve(@YES);
+      };
     UIPopoverPresentationController *popover = activityController.popoverPresentationController;
     if (popover != nil) {
       popover.sourceView = presenter.view;
@@ -114,9 +143,7 @@ RCT_EXPORT_METHOD(shareSupportBundle:(NSString *)bundleUrl
                                       1);
       popover.permittedArrowDirections = 0;
     }
-    [presenter presentViewController:activityController animated:YES completion:^{
-      resolve(@YES);
-    }];
+    [presenter presentViewController:activityController animated:YES completion:nil];
   });
 }
 
@@ -142,6 +169,15 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
                                      NSString *accountStatus,
                                      NSString *unavailableReason))completion
 {
+  NSString *fixture = [self processArgumentValueForName:
+    @"chessticizeICloudDiagnosticsFixture"];
+  if ([fixture isEqualToString:@"unavailable"]) {
+    completion(nil,
+               @"could_not_determine",
+               @"CloudKit snapshot unavailable in the deterministic test fixture.");
+    return;
+  }
+
   NSObject *completionLock = [NSObject new];
   __block BOOL didFinish = NO;
   BOOL (^isFinished)(void) = ^BOOL {
@@ -239,6 +275,17 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
     @"diagnostic.txt",
     nil
   ];
+  NSURL *localDatabaseURL =
+    [workingDirectory URLByAppendingPathComponent:@"local-progress.sqlite"];
+  NSDictionary *localDatabaseHealth = [self databaseHealthForURL:localDatabaseURL];
+  if (![localDatabaseHealth[@"integrityCheckPassed"] boolValue]) {
+    [[NSFileManager defaultManager] removeItemAtURL:workingDirectory error:nil];
+    reject(@"support_database_integrity_failed",
+           @"The local database snapshot did not pass SQLite integrity checks.",
+           nil);
+    return;
+  }
+
   if (cloudPayload.length > 0) {
     NSURL *cloudURL = [workingDirectory URLByAppendingPathComponent:@"icloud-progress-snapshot.json"];
     NSError *cloudWriteError = nil;
@@ -261,6 +308,7 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
                                  kind:kind
                    cloudAccountStatus:cloudAccountStatus
                     unavailableReason:unavailableReason
+                  localDatabaseHealth:localDatabaseHealth
                              metadata:metadata
                                 error:&manifestError]) {
     [[NSFileManager defaultManager] removeItemAtURL:workingDirectory error:nil];
@@ -280,6 +328,13 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
     return;
   }
   [[NSFileManager defaultManager] removeItemAtURL:workingDirectory error:nil];
+  dispatch_after(
+    dispatch_time(DISPATCH_TIME_NOW,
+                  (int64_t)(ChessticizeSupportArchiveLifetimeSeconds * NSEC_PER_SEC)),
+    dispatch_get_global_queue(QOS_CLASS_UTILITY, 0),
+    ^{
+      [[NSFileManager defaultManager] removeItemAtURL:archiveURL error:nil];
+    });
 
   resolve(@{
     @"bundleUrl": archiveURL.absoluteString,
@@ -294,6 +349,7 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
                             kind:(NSString *)kind
               cloudAccountStatus:(NSString *)cloudAccountStatus
                unavailableReason:(NSString *)unavailableReason
+             localDatabaseHealth:(NSDictionary *)localDatabaseHealth
                         metadata:(NSDictionary *)metadata
                            error:(NSError **)error
 {
@@ -318,7 +374,6 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
   }
 
   NSString *containerIdentifier = [CKContainer defaultContainer].containerIdentifier ?: @"unavailable";
-  NSURL *localDatabaseURL = [directory URLByAppendingPathComponent:@"local-progress.sqlite"];
   NSDictionary *manifest = @{
     @"bundleFormatVersion": @1,
     @"createdAt": [self iso8601StringForDate:[NSDate date]],
@@ -341,7 +396,7 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
       @"operatingSystemVersion": UIDevice.currentDevice.systemVersion ?: @"unavailable",
       @"deviceFamily": [self deviceFamily]
     },
-    @"localDatabase": [self databaseHealthForURL:localDatabaseURL],
+    @"localDatabase": localDatabaseHealth,
     @"cloudSnapshot": @{
       @"available": @([kind isEqualToString:@"complete"]),
       @"unavailableReason": unavailableReason ?: [NSNull null]
@@ -545,7 +600,8 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
 
 - (NSURL *)createWorkingDirectory:(NSError **)error
 {
-  NSString *name = [NSString stringWithFormat:@"chessticize-support-work-%@",
+  NSString *name = [NSString stringWithFormat:@"%@%@",
+                                              ChessticizeSupportWorkingDirectoryPrefix,
                                               [NSUUID UUID].UUIDString];
   NSURL *url = [NSURL fileURLWithPath:[NSTemporaryDirectory()
     stringByAppendingPathComponent:name]
@@ -618,6 +674,7 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
     return @{
       @"capturedWith": @"sqlite3_backup",
       @"healthAvailable": @NO,
+      @"integrityCheckPassed": @NO,
       @"healthError": message ?: @"Could not open the database snapshot."
     };
   }
@@ -633,14 +690,21 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
                          userVersion != nil &&
                          pageCount != nil &&
                          freelistCount != nil;
+  BOOL integrityCheckPassed =
+    healthAvailable && [quickCheck caseInsensitiveCompare:@"ok"] == NSOrderedSame;
   return @{
     @"capturedWith": @"sqlite3_backup",
     @"healthAvailable": @(healthAvailable),
+    @"integrityCheckPassed": @(integrityCheckPassed),
     @"integrityCheck": quickCheck ?: [NSNull null],
     @"userVersion": userVersion ?: [NSNull null],
     @"pageCount": pageCount ?: [NSNull null],
     @"freelistCount": freelistCount ?: [NSNull null],
-    @"healthError": healthAvailable ? [NSNull null] : (errorMessage ?: @"Database health check failed.")
+    @"healthError": integrityCheckPassed
+      ? [NSNull null]
+      : (healthAvailable
+          ? @"PRAGMA quick_check did not return ok."
+          : (errorMessage ?: @"Database health check failed."))
   };
 }
 
@@ -798,6 +862,64 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
          [url.pathExtension.lowercaseString isEqualToString:@"zip"];
 }
 
+- (BOOL)isManagedSupportWorkingDirectory:(NSURL *)url
+{
+  NSString *temporaryPath = [NSURL fileURLWithPath:NSTemporaryDirectory()
+                                        isDirectory:YES].standardizedURL.path;
+  NSString *path = url.standardizedURL.path;
+  return [path hasPrefix:[temporaryPath stringByAppendingString:@"/"]] &&
+         [url.lastPathComponent hasPrefix:ChessticizeSupportWorkingDirectoryPrefix];
+}
+
+- (void)removeManagedSupportArtifactsBeforeDate:(NSDate *)cutoffDate
+{
+  NSURL *temporaryDirectory = [NSURL fileURLWithPath:NSTemporaryDirectory()
+                                         isDirectory:YES];
+  NSArray<NSURL *> *contents = [[NSFileManager defaultManager]
+    contentsOfDirectoryAtURL:temporaryDirectory
+  includingPropertiesForKeys:@[NSURLContentModificationDateKey]
+                     options:NSDirectoryEnumerationSkipsHiddenFiles
+                       error:nil];
+  for (NSURL *url in contents) {
+    if (![self isManagedSupportArchive:url] &&
+        ![self isManagedSupportWorkingDirectory:url]) {
+      continue;
+    }
+    if (cutoffDate != nil) {
+      NSDate *modifiedAt = nil;
+      [url getResourceValue:&modifiedAt
+                     forKey:NSURLContentModificationDateKey
+                      error:nil];
+      if (modifiedAt != nil && [modifiedAt compare:cutoffDate] == NSOrderedDescending) {
+        continue;
+      }
+    }
+    [[NSFileManager defaultManager] removeItemAtURL:url error:nil];
+  }
+}
+
+- (NSString *)processArgumentValueForName:(NSString *)name
+{
+  NSArray<NSString *> *arguments = NSProcessInfo.processInfo.arguments;
+  NSString *dashedName = [@"-" stringByAppendingString:name];
+  NSString *plainPrefix = [name stringByAppendingString:@"="];
+  NSString *dashedPrefix = [dashedName stringByAppendingString:@"="];
+  for (NSUInteger index = 0; index < arguments.count; index += 1) {
+    NSString *argument = arguments[index];
+    if ([argument isEqualToString:name] || [argument isEqualToString:dashedName]) {
+      NSUInteger valueIndex = index + 1;
+      return valueIndex < arguments.count ? arguments[valueIndex] : nil;
+    }
+    if ([argument hasPrefix:dashedPrefix]) {
+      return [argument substringFromIndex:dashedPrefix.length];
+    }
+    if ([argument hasPrefix:plainPrefix]) {
+      return [argument substringFromIndex:plainPrefix.length];
+    }
+  }
+  return nil;
+}
+
 - (NSString *)safeString:(id)value fallback:(NSString *)fallback
 {
   return [value isKindOfClass:[NSString class]] && [value length] > 0
@@ -810,11 +932,20 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
   if (error == nil) {
     return [NSString stringWithFormat:@"%@: unknown error.", prefix];
   }
-  return [NSString stringWithFormat:@"%@: %@ (%ld): %@",
+  NSString *domain = error.domain;
+  NSCharacterSet *invalidCharacters = [[NSCharacterSet
+    characterSetWithCharactersInString:
+      @"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"]
+    invertedSet];
+  if (domain.length == 0 ||
+      domain.length > 80 ||
+      [domain rangeOfCharacterFromSet:invalidCharacters].location != NSNotFound) {
+    domain = @"ErrorDomain";
+  }
+  return [NSString stringWithFormat:@"%@: %@ (%ld).",
                                     prefix,
-                                    error.domain,
-                                    (long)error.code,
-                                    error.localizedDescription];
+                                    domain,
+                                    (long)error.code];
 }
 
 - (NSString *)stringFromAccountStatus:(CKAccountStatus)status

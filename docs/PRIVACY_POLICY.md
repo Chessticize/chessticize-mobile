@@ -33,7 +33,9 @@ to reproduce merge behavior.
 
 Chessticize does not upload or receive this package. After it is prepared, you
 choose whether and where to send it through the iOS Share Sheet. The temporary
-package is removed when you close the diagnostics window.
+package is removed when the Share Sheet or diagnostics window closes. It is
+also removed on the next app launch or after a one-hour lifetime while the app
+remains running.
 
 On Android, Android Progress Backup can copy the local progress database for
 encrypted cloud restore or supported device-to-device transfer when those

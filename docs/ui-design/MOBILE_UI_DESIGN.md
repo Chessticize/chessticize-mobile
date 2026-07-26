@@ -569,7 +569,9 @@ New Run behavior:
   even when sync is off and no error is visible. It requires confirmation before
   preparing a package, identifies sensitive progress content, includes a
   consistent local SQLite snapshot and the private CloudKit JSON snapshot when
-  available, and delegates the handoff to the iOS Share Sheet.
+  available, and delegates the handoff to the iOS Share Sheet. Prepared files
+  are removed when the Share Sheet or diagnostics window closes and have a
+  bounded one-hour lifetime.
 - A visible sync failure adds `View Error Details`, including bounded technical
   fields and a copy action. It must not expose raw native metadata that can
   contain credentials or account identifiers.

@@ -26,7 +26,10 @@ describe('Key user flows', () => {
   beforeEach(async () => {
     await launchWithDisabledSynchronization({
       newInstance: true,
-      delete: true
+      delete: true,
+      launchArgs: {
+        chessticizeICloudDiagnosticsFixture: 'unavailable'
+      }
     });
   });
 
