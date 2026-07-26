@@ -39,6 +39,7 @@ describe('Android support diagnostics native boundary', () => {
     expect(nativeModule).toContain('.put("accountIdentifiersIncluded", false)');
     expect(nativeModule).toContain('.put("credentialsIncluded", false)');
     expect(nativeModule).toContain('.put("hardwareIdentifiersIncluded", false)');
+    expect(nativeModule).toContain('worker.shutdownNow()');
     expect(nativeModule).not.toContain('ANDROID_ID');
     expect(nativeModule).not.toContain('Build.SERIAL');
   });

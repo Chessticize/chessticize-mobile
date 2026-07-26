@@ -526,14 +526,21 @@ export function ICloudSyncErrorDetails({
                       style={styles.partialCard}
                       testID="settings-sync-support-bundle-partial"
                     >
-                      <Text style={styles.partialTitle}>iCloud snapshot couldn&apos;t be included</Text>
+                      <Text style={styles.partialTitle}>
+                        {isAndroidSupportBundle
+                          ? "Local SQLite snapshot couldn't be included"
+                          : "iCloud snapshot couldn't be included"}
+                      </Text>
                       <Text style={styles.partialCopy}>
                         {bundleResult.unavailableReason
-                          ?? "CloudKit did not return a progress snapshot."}
+                          ?? (isAndroidSupportBundle
+                            ? "The local progress snapshot was unavailable."
+                            : "CloudKit did not return a progress snapshot.")}
                       </Text>
                       <Text style={styles.partialHelp}>
-                        The local database and diagnostic can still help, but this bundle is not a
-                        complete reproduction.
+                        {isAndroidSupportBundle
+                          ? "The diagnostic and manifest can still help, but this bundle does not include the local progress database needed for reproduction."
+                          : "The local database and diagnostic can still help, but this bundle is not a complete reproduction."}
                       </Text>
                     </View>
                   ) : (

@@ -253,7 +253,7 @@ class AndroidSupportDiagnosticsModule(
   }
 
   override fun invalidate() {
-    worker.shutdown()
+    worker.shutdownNow()
     super.invalidate()
   }
 

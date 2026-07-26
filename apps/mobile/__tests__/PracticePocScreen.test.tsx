@@ -9360,6 +9360,37 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("iCloud");
   });
 
+  it("uses Android copy when a partial support bundle lacks the local SQLite snapshot", async () => {
+    const renderer = renderScreen({
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      iCloudSyncDiagnosticsClient: {
+        copyText: jest.fn(async () => undefined),
+        discardSupportBundle: jest.fn(async () => undefined),
+        prepareSupportBundle: jest.fn(async () => ({
+          bundleUrl: "file:///cache/Chessticize-Support.zip",
+          files: ["diagnostic.txt", "manifest.json"],
+          kind: "partial" as const,
+          unavailableReason: "The local SQLite snapshot could not be created."
+        })),
+        shareSupportBundle: jest.fn(async () => undefined)
+      }
+    });
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-sync-support-bundle-entry");
+    await pressAsync(renderer, "settings-sync-support-bundle-prepare");
+
+    const partial = findByTestId(renderer, "settings-sync-support-bundle-partial");
+    expect(collectText(partial)).toContain("Local SQLite snapshot couldn't be included");
+    expect(collectText(partial)).toContain("The local SQLite snapshot could not be created.");
+    expect(collectText(partial)).toContain(
+      "does not include the local progress database needed for reproduction"
+    );
+    expect(collectText(renderer.root)).not.toContain("iCloud");
+    expect(collectText(renderer.root)).not.toContain("CloudKit");
+  });
+
   it("opens the official Android GitHub Releases page only after a user gesture", () => {
     const renderer = renderScreen({
       progressProtection: { kind: "android_managed_backup" },
