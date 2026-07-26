@@ -117,6 +117,13 @@ export const AndroidBackup: Story = {
     await waitForTestId(canvasElement, "settings-android-backup-section");
     await waitForTestId(canvasElement, "settings-move-feedback-section");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-previews");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-entry");
+    await waitForText(canvasElement, "local-progress.sqlite");
+    await waitForText(canvasElement, "App, Android, database, and progress-protection details.");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-prepare");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-complete");
+    await waitForText(canvasElement, "Android diagnostics bundle ready");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-share");
   }
 };
 

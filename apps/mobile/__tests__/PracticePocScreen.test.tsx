@@ -9866,9 +9866,25 @@ describe("PracticePocScreen", () => {
     openURLSpy.mockRestore();
   });
 
-  it("shows Android-managed restore protection without exposing iCloud controls", () => {
+  it("shows Android-managed restore protection and exports local diagnostics without iCloud claims", async () => {
+    const prepareSupportBundle = jest.fn(async (_input: {
+      diagnosticText: string;
+      metadata: unknown;
+    }) => ({
+      bundleUrl: "file:///cache/Chessticize-Support.zip",
+      files: ["local-progress.sqlite", "diagnostic.txt", "manifest.json"],
+      kind: "complete" as const
+    }));
+    const shareSupportBundle = jest.fn(async () => undefined);
     const renderer = renderScreen({
-      progressProtection: { kind: "android_managed_backup" }
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      iCloudSyncDiagnosticsClient: {
+        copyText: jest.fn(async () => undefined),
+        discardSupportBundle: jest.fn(async () => undefined),
+        prepareSupportBundle,
+        shareSupportBundle
+      }
     });
 
     press(renderer, "settings-tab");
@@ -9885,7 +9901,71 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-sync-section")).toThrow();
     expect(() => findByTestId(renderer, "settings-icloud-sync-controls")).toThrow();
     expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
+    expect(collectText(findByTestId(renderer, "settings-feedback-section")))
+      .toContain("Export Support Diagnostics");
+    expect(collectText(findByTestId(renderer, "settings-feedback-section")))
+      .toContain("Share a local SQLite snapshot");
+    expect(testIdOrder(
+      renderer,
+      "settings-sync-support-bundle-entry",
+      "settings-support-email"
+    )).toBeLessThan(0);
+
+    press(renderer, "settings-sync-support-bundle-entry");
+    const modal = findByTestId(renderer, "settings-sync-support-bundle-modal");
+    expect(collectText(modal)).toContain("Android lets you choose where to send the bundle");
+    expect(collectText(modal)).toContain("local-progress.sqlite");
+    expect(collectText(modal)).not.toContain("icloud-progress-snapshot.json");
+    await pressAsyncWithin(modal, "settings-sync-support-bundle-prepare");
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-complete")))
+      .toContain("Android diagnostics bundle ready");
+    expect(prepareSupportBundle).toHaveBeenCalledTimes(1);
+    expect(prepareSupportBundle.mock.calls[0]![0].diagnosticText)
+      .toContain("Progress protection: Android-managed backup");
+    expect(prepareSupportBundle.mock.calls[0]![0].metadata).toMatchObject({
+      platform: "android",
+      progressProtection: "android_managed_backup"
+    });
+    await pressAsync(renderer, "settings-sync-support-bundle-share");
+    expect(shareSupportBundle).toHaveBeenCalledWith(
+      "file:///cache/Chessticize-Support.zip"
+    );
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-shared")))
+      .toContain("expires automatically");
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-share")))
+      .toContain("Share Options Opened");
     expect(collectText(renderer.root)).not.toContain("iCloud");
+  });
+
+  it("uses Android copy when a partial support bundle lacks the local SQLite snapshot", async () => {
+    const renderer = renderScreen({
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      iCloudSyncDiagnosticsClient: {
+        copyText: jest.fn(async () => undefined),
+        discardSupportBundle: jest.fn(async () => undefined),
+        prepareSupportBundle: jest.fn(async () => ({
+          bundleUrl: "file:///cache/Chessticize-Support.zip",
+          files: ["diagnostic.txt", "manifest.json"],
+          kind: "partial" as const,
+          unavailableReason: "The local SQLite snapshot could not be created."
+        })),
+        shareSupportBundle: jest.fn(async () => undefined)
+      }
+    });
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-sync-support-bundle-entry");
+    await pressAsync(renderer, "settings-sync-support-bundle-prepare");
+
+    const partial = findByTestId(renderer, "settings-sync-support-bundle-partial");
+    expect(collectText(partial)).toContain("Local SQLite snapshot couldn't be included");
+    expect(collectText(partial)).toContain("The local SQLite snapshot could not be created.");
+    expect(collectText(partial)).toContain(
+      "does not include the local progress database needed for reproduction"
+    );
+    expect(collectText(renderer.root)).not.toContain("iCloud");
+    expect(collectText(renderer.root)).not.toContain("CloudKit");
   });
 
   it("opens the official Android GitHub Releases page only after a user gesture", () => {

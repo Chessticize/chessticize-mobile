@@ -127,10 +127,12 @@ import {
 import type { ICloudAccountStatus } from "../platform/iCloudProgressSync.ts";
 import {
   captureICloudSyncFailure,
+  formatAndroidSupportOverviewDiagnostic,
   formatICloudSyncFailureDiagnostic,
   formatICloudSyncOverviewDiagnostic,
   iCloudSyncAttemptLabel,
-  type ICloudSyncFailureDiagnostic
+  type ICloudSyncFailureDiagnostic,
+  type SupportDiagnosticMetadata
 } from "../platform/iCloudSyncDiagnostics.ts";
 import type {
   MobileApplicationMetadata,
@@ -760,6 +762,17 @@ export function PracticePocScreen({
     iCloudSyncEnabled,
     latestSyncStatus: iCloudSyncStatus
   };
+  const supportDiagnosticMetadata: SupportDiagnosticMetadata =
+    progressProtection.kind === "android_managed_backup"
+      ? {
+          appVersion: platformCapabilities.applicationMetadata.versionName,
+          ...(platformCapabilities.applicationMetadata.buildNumber
+            ? { buildNumber: platformCapabilities.applicationMetadata.buildNumber }
+            : {}),
+          platform: "android",
+          progressProtection: "android_managed_backup"
+        }
+      : syncDiagnosticMetadata;
   const generatedSupportBundle = iCloudSyncDiagnosticsClient
     ? {
         onDiscard: async (result) => {
@@ -768,13 +781,19 @@ export function PracticePocScreen({
           }
         },
         onPrepare: async () => {
+          const createdAt = new Date(currentTimeMs()).toISOString();
           const prepared = await iCloudSyncDiagnosticsClient.prepareSupportBundle({
-            diagnosticText: formatICloudSyncOverviewDiagnostic(
-              syncDiagnosticMetadata,
-              new Date(currentTimeMs()).toISOString(),
-              lastICloudSyncFailure
-            ),
-            metadata: syncDiagnosticMetadata
+            diagnosticText: progressProtection.kind === "android_managed_backup"
+              ? formatAndroidSupportOverviewDiagnostic(
+                  supportDiagnosticMetadata,
+                  createdAt
+                )
+              : formatICloudSyncOverviewDiagnostic(
+                  syncDiagnosticMetadata,
+                  createdAt,
+                  lastICloudSyncFailure
+                ),
+            metadata: supportDiagnosticMetadata
           });
           return prepared;
         },
@@ -783,7 +802,10 @@ export function PracticePocScreen({
             throw new Error("The prepared support bundle is unavailable.");
           }
           await iCloudSyncDiagnosticsClient.shareSupportBundle(result.bundleUrl);
-        }
+        },
+        platform: progressProtection.kind === "android_managed_backup"
+          ? "android"
+          : "ios"
       } satisfies ICloudSyncSupportBundlePresentation
     : undefined;
   const effectiveSupportBundle = iCloudSyncSupportBundle ?? generatedSupportBundle;

@@ -4,7 +4,9 @@ import {
   configureMobilePracticePuzzleSource,
   createPersistentMobilePracticeService,
   createPersistentMobilePracticeServiceSync,
+  getPersistentMobileProgressDatabasePath,
 } from './mobilePractice.ts';
+import { createNativeAndroidSupportDiagnosticsClient } from './androidSupportDiagnostics.ts';
 import {
   MOBILE_ANDROID_RELEASES_URL,
   type MobileApplicationMetadata,
@@ -37,6 +39,7 @@ export async function createAndroidMobilePlatformCapabilities(): Promise<MobileP
 export function composeAndroidMobilePlatformCapabilities(
   service: PracticeService,
   applicationMetadata: MobileApplicationMetadata = readNativeApplicationMetadata(),
+  progressDatabasePath: string | undefined = getPersistentMobileProgressDatabasePath(),
 ): MobilePlatformCapabilities {
   return {
     storage: {
@@ -49,7 +52,7 @@ export function composeAndroidMobilePlatformCapabilities(
     },
     progressSync: {
       client: null,
-      diagnostics: null,
+      diagnostics: createNativeAndroidSupportDiagnosticsClient(progressDatabasePath),
     },
     stockfish: {
       createTransport: createNativeStockfishTransport,
