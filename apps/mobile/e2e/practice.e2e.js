@@ -29,7 +29,7 @@ const {
 // The visual assertion measures absolute painted arrow area. Pin the public
 // service's packaged-core selection to two long candidate vectors so random
 // move geometry cannot turn that rendering check into a pixel-count lottery.
-const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v2:54824';
+const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v3:4';
 
 describe('Practice POC', () => {
   beforeEach(async () => {
@@ -121,7 +121,7 @@ describe('Practice POC', () => {
     await device.terminateApp();
     await launchWithDisabledSynchronization({ newInstance: true, delete: false });
     await waitFor(element(by.text('Calculation Focus'))).toExist().withTimeout(180000);
-    await waitFor(element(by.text('Rating 1000'))).toExist().withTimeout(10000);
+    await waitFor(element(by.text('1000'))).toExist().withTimeout(10000);
   });
 
   it('persists first-use Sprint guidance and replays it after Settings reset', async () => {
@@ -144,10 +144,11 @@ describe('Practice POC', () => {
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
-    await waitFor(element(by.id('sprint-summary-panel'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(10000);
+    await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
     await element(by.id('back-practice-button')).tap();
 
-    await openTab('settings-tab', 'settings-guidance-section');
+    await openTab('settings-tab', 'settings-show-sprint-guide');
     await element(by.id('settings-show-sprint-guide')).tap();
     await waitFor(element(by.id('settings-sprint-guide-ready'))).toExist().withTimeout(10000);
 
@@ -170,10 +171,10 @@ describe('Practice POC', () => {
     await startPracticeMode('arrow-duel');
     await waitForVisibleInPracticeScroll('session-board');
     // The default 5/30 Arrow Duel config and pinned seed select packaged puzzle
-    // 03wH4 through PracticeService's rating fallback. Candidate order is
+    // d9wOh through PracticeService's rating fallback. Candidate order is
     // session-seeded, so wait for both long vectors without assuming order.
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'c3e4', 10000);
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h4f6', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'e7g5', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h7g5', 10000);
 
     const boardFrame = await frameFor(element(by.id('session-board')));
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');
@@ -263,21 +264,18 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitForElementAccessibilityLabelContaining(
-      'history-filter-unclear',
-      'Unclear attempts',
-      10000
-    );
-    await element(by.id('history-filter-unclear')).tap();
-    await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
-    const resultAttributes = await element(by.text('Correct')).atIndex(0).getAttributes();
-    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-      throw new Error(`Could not resolve unclear History row from ${String(resultIdentifier)}`);
-    }
-    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    await waitForVisibleInPracticeScroll('history-attention-flag-in-review');
+    await element(by.id('history-attention-flag-in-review')).tap();
+    await element(by.id('history-filter-toggle')).tap();
+    await waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000);
+    const unclearAttemptBadge = element(by.text('Unclear')).atIndex(0);
+    await waitFor(unclearAttemptBadge)
+      .toBeVisible()
+      .whileElement(by.id('practice-main-scroll'))
+      .scroll(100, 'down', 0.5, 0.5);
+    await unclearAttemptBadge.tap();
     await waitForVisibleInPracticeScroll('review-schedule-add');
-    await waitForVisibleInPracticeScroll('history-attempt-unclear');
+    await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
     await expect(element(by.id('history-attempt-detail'))).not.toExist();
     await expect(element(by.id('bookmark-glyph'))).not.toExist();
 
@@ -292,7 +290,7 @@ describe('Practice POC', () => {
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('review-context-actions-rail'))).toExist().withTimeout(10000);
     await expect(element(by.id('review-schedule-control'))).toBeVisible();
-    await expect(element(by.id('history-attempt-unclear'))).toBeVisible();
+    await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
     const screenFrame = await frameFor(element(by.id('safe-area-shell')));
     const boardFrame = await frameFor(element(by.id('review-board')));
     const actionRailFrame = await frameFor(element(by.id('review-context-actions-rail')));
@@ -330,7 +328,7 @@ describe('Practice POC', () => {
 
     await element(by.id('review-schedule-add')).tap();
     await waitFor(element(by.id('review-schedule-state'))).toHaveText('Due tomorrow').withTimeout(10000);
-    await waitFor(element(by.id('history-attempt-unclear'))).not.toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-attempt-clear-unclear'))).not.toExist().withTimeout(10000);
 
     await element(by.id('review-schedule-remove')).tap();
     await waitFor(element(by.id('review-schedule-removal-confirmation'))).toBeVisible().withTimeout(10000);
@@ -347,12 +345,8 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitForElementAccessibilityLabelContaining(
-      'history-filter-unclear',
-      'Unclear attempts',
-      10000
-    );
-    await element(by.id('history-filter-unclear')).tap();
+    await waitForVisibleInPracticeScroll('history-attention-flag-in-review');
+    await element(by.id('history-attention-flag-in-review')).tap();
     await waitFor(element(by.id('history-empty-state'))).toExist().withTimeout(10000);
   });
 
@@ -429,13 +423,14 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
-    const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
-    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-      throw new Error(`Could not resolve persisted history attempt row from ${String(resultIdentifier)}`);
-    }
-    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    await element(by.id('history-filter-toggle')).tap();
+    await waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000);
+    const persistedWrongResult = element(by.text('Wrong move')).atIndex(0);
+    await waitFor(persistedWrongResult)
+      .toBeVisible()
+      .whileElement(by.id('practice-main-scroll'))
+      .scroll(100, 'down', 0.5, 0.5);
+    await persistedWrongResult.tap();
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
     await waitForVisibleInPracticeScroll('review-analysis-button');
     await element(by.id('review-analysis-button')).tap();

@@ -936,18 +936,21 @@ describe('Detox suite configuration', () => {
     const renderCase = practiceSpec.slice(renderCaseStart, renderCaseEnd);
 
     expect(practiceSpec).toContain(
-      "const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v2:54824';"
+      "const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v3:4';"
     );
     expect(practiceSpec).toContain(
       'chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED'
     );
     expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'c3e4', 10000)"
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'e7g5', 10000)"
     );
     expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'h4f6', 10000)"
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'h7g5', 10000)"
     );
-    expect(renderCase.indexOf("'c3e4'")).toBeLessThan(
+    expect(renderCase.indexOf("'e7g5'")).toBeLessThan(
+      renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
+    );
+    expect(renderCase.indexOf("'h7g5'")).toBeLessThan(
       renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
     );
     expect(renderCase).not.toContain('eQNYb');
