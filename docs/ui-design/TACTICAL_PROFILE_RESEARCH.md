@@ -674,10 +674,10 @@ for the calibrated `±100 / ±200` Rating bands. An initial implementation using
 `541.950 ms`. The retained adapter performs bounded lower/upper index scans
 behind each quota selection and merges them by distance. Against the
 1,400,000-puzzle Core Pack v3, a ten-iteration run completed the primary,
-secondary, and mixed nested-band selections in a median `14.859 ms`, p95
-`15.364 ms`, and max `15.364 ms`, returning the exact `9 / 3 / 3` candidates
-at both bands. This is repeatable feasibility evidence, not a target-device
-latency gate.
+secondary, and mixed nested-band selections in a median `31.599 ms`, p95
+`37.687 ms`, and max `37.687 ms`, constructing an exact, cross-quota-unique
+`9 / 3 / 3` allocation at both bands. This is repeatable feasibility evidence,
+not a target-device latency gate.
 
 ## 12. Local-only incremental storage design
 

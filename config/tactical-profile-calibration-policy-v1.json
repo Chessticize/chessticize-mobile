@@ -9,7 +9,9 @@
     "holdoutAttemptsPerFamily": 200,
     "reliableSpeedHoldoutAttemptsPerFamily": 100,
     "timeoutPolicyHoldoutCohortsPerFamily": 2,
-    "timeoutPolicyHoldoutAttemptsPerCohort": 50
+    "timeoutPolicyHoldoutAttemptsPerCohort": 50,
+    "timeoutPolicyTrainCohortsPerFamily": 2,
+    "timeoutPolicyTrainAttemptsPerCohort": 100
   },
   "holdoutGates": {
     "maximumBrierScore": 0.25,

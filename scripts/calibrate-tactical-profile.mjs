@@ -182,6 +182,17 @@ export function evaluateCalibrationReadiness(report, policy, ownerApproved) {
   ) {
     reasons.push("too few qualified timeout-policy holdout cohorts");
   }
+  const qualifiedTimeoutPolicyTrainCohorts =
+    report.solve.timeoutPolicyTrain?.filter(
+      (cohort) =>
+        cohort.count >= minimums.timeoutPolicyTrainAttemptsPerCohort
+    ).length ?? 0;
+  if (
+    qualifiedTimeoutPolicyTrainCohorts <
+    minimums.timeoutPolicyTrainCohortsPerFamily
+  ) {
+    reasons.push("too few qualified timeout-policy training cohorts");
+  }
   if (report.solve.brierScore === null || report.solve.brierScore > gates.maximumBrierScore) {
     reasons.push("Brier score gate failed");
   }
@@ -238,6 +249,14 @@ export async function runCalibration(options) {
       policy.minimums?.timeoutPolicyHoldoutAttemptsPerCohort
     ) ||
     policy.minimums.timeoutPolicyHoldoutAttemptsPerCohort < 1 ||
+    !Number.isInteger(
+      policy.minimums?.timeoutPolicyTrainCohortsPerFamily
+    ) ||
+    policy.minimums.timeoutPolicyTrainCohortsPerFamily < 2 ||
+    !Number.isInteger(
+      policy.minimums?.timeoutPolicyTrainAttemptsPerCohort
+    ) ||
+    policy.minimums.timeoutPolicyTrainAttemptsPerCohort < 1 ||
     (
       policy.focusedRun.themeShortfallBackfill !== undefined &&
       (
@@ -448,6 +467,10 @@ function calibrateFamily(
       calibrationIntercept: calibration.coefficients[0] ?? null,
       calibrationSlope: calibration.coefficients[1] ?? null,
       reliability: reliabilityBins(scoredHoldout),
+      timeoutPolicyTrain: timeoutPolicyHoldoutReport(
+        split.train,
+        solveFit.coefficients
+      ),
       timeoutPolicyHoldout: timeoutPolicyHoldoutReport(
         split.holdout,
         solveFit.coefficients

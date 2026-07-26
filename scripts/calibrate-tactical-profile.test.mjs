@@ -80,6 +80,10 @@ test("artifact readiness fails closed without explicit representative-corpus app
         maximumMeanErrorRating: 8,
         maximumSdErrorRating: 4
       },
+      timeoutPolicyTrain: [
+        { timeoutPolicySeconds: 30, count: 100 },
+        { timeoutPolicySeconds: 60, count: 100 }
+      ],
       timeoutPolicyHoldout: [
         { timeoutPolicySeconds: 30, count: 50 },
         { timeoutPolicySeconds: 60, count: 50 }
@@ -107,7 +111,9 @@ test("artifact readiness fails closed without explicit representative-corpus app
       holdoutAttemptsPerFamily: 200,
       reliableSpeedHoldoutAttemptsPerFamily: 100,
       timeoutPolicyHoldoutCohortsPerFamily: 2,
-      timeoutPolicyHoldoutAttemptsPerCohort: 50
+      timeoutPolicyHoldoutAttemptsPerCohort: 50,
+      timeoutPolicyTrainCohortsPerFamily: 2,
+      timeoutPolicyTrainAttemptsPerCohort: 100
     },
     holdoutGates: {
       maximumBrierScore: 0.25,
@@ -140,6 +146,18 @@ test("artifact readiness fails closed without explicit representative-corpus app
       true
     ).reasons,
     ["too few qualified timeout-policy holdout cohorts"]
+  );
+  const oneTrainingTimeoutPolicy = structuredClone(report);
+  oneTrainingTimeoutPolicy.solve.timeoutPolicyTrain = [
+    { timeoutPolicySeconds: 30, count: 200 }
+  ];
+  assert.deepEqual(
+    evaluateCalibrationReadiness(
+      oneTrainingTimeoutPolicy,
+      policy,
+      true
+    ).reasons,
+    ["too few qualified timeout-policy training cohorts"]
   );
 
   const invalid = structuredClone(report);
@@ -423,7 +441,9 @@ function calibrationPolicy() {
       holdoutAttemptsPerFamily: 1,
       reliableSpeedHoldoutAttemptsPerFamily: 1,
       timeoutPolicyHoldoutCohortsPerFamily: 2,
-      timeoutPolicyHoldoutAttemptsPerCohort: 1
+      timeoutPolicyHoldoutAttemptsPerCohort: 1,
+      timeoutPolicyTrainCohortsPerFamily: 2,
+      timeoutPolicyTrainAttemptsPerCohort: 1
     },
     holdoutGates: {
       maximumBrierScore: 1,

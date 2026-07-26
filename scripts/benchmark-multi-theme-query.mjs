@@ -71,38 +71,69 @@ try {
 
 function benchmarkNestedRatingBandSelections(source) {
   const run = (randomSeed) => {
+    let selectionCount = 0;
+    const select = (input) => {
+      selectionCount += 1;
+      return source.selectPuzzlesForRatingBands(input);
+    };
     const input = {
       ratingAnchor: rating,
       halfWidths: [100, 200]
     };
-    const primary = source.selectPuzzlesForRatingBands({
+    const primary = select({
       ...input,
       filter: {
         mode: "custom",
-        limit: 9,
+        limit: 15,
         themes: ["fork"],
         randomSeed: `${randomSeed}:primary`
       }
     });
-    const secondary = source.selectPuzzlesForRatingBands({
+    const secondary = select({
       ...input,
       filter: {
         mode: "custom",
-        limit: 3,
+        limit: 15,
         themes: ["pin"],
         randomSeed: `${randomSeed}:secondary`
       }
     });
-    const mixed = source.selectPuzzlesForRatingBands({
+    const mixed = select({
       ...input,
       filter: {
         mode: "custom",
-        limit: 3,
+        limit: 15,
         randomSeed: `${randomSeed}:mixed`
       },
       excludedThemes: ["fork", "pin"]
     });
-    return { primary, secondary, mixed };
+    if (selectionCount !== 3) {
+      throw new Error(
+        `nested-rating-band selection used ${selectionCount} selections; expected 3`
+      );
+    }
+    const allocations = Object.fromEntries(
+      input.halfWidths.map((halfWidth) => [
+        halfWidth,
+        allocateNestedBand({
+          halfWidth,
+          primary: puzzlesForBand(primary, halfWidth, "primary"),
+          secondary: puzzlesForBand(
+            secondary,
+            halfWidth,
+            "secondary"
+          ),
+          mixed: puzzlesForBand(mixed, halfWidth, "mixed")
+        })
+      ])
+    );
+    return {
+      primary,
+      secondary,
+      mixed,
+      selectionCount,
+      allocations
+    };
   };
   for (let index = 0; index < 5; index += 1) {
     run(`warm-${index}`);
@@ -113,42 +144,20 @@ function benchmarkNestedRatingBandSelections(source) {
     const startedAt = performance.now();
     latest = run(`sample-${index}`);
     samples.push(performance.now() - startedAt);
-    for (const halfWidth of [100, 200]) {
-      const counts = [
-        latest.primary.find((band) => band.halfWidth === halfWidth)
-          ?.puzzles.length,
-        latest.secondary.find((band) => band.halfWidth === halfWidth)
-          ?.puzzles.length,
-        latest.mixed.find((band) => band.halfWidth === halfWidth)
-          ?.puzzles.length
-      ];
-      if (counts.some((count) => count === undefined)) {
-        throw new Error(
-          `nested-rating-band selection omitted ±${halfWidth}`
-        );
-      }
-    }
   }
   samples.sort((left, right) => left - right);
   return {
-    indexedSelectionCount: 3,
+    indexedSelectionCount: latest.selectionCount,
     ratingBandHalfWidths: [100, 200],
     returnedByBand: Object.fromEntries(
       [100, 200].map((halfWidth) => [
         halfWidth,
         {
-          primary:
-            latest.primary.find(
-              (band) => band.halfWidth === halfWidth
-            )?.puzzles.length ?? 0,
-          secondary:
-            latest.secondary.find(
-              (band) => band.halfWidth === halfWidth
-            )?.puzzles.length ?? 0,
-          mixed:
-            latest.mixed.find(
-              (band) => band.halfWidth === halfWidth
-            )?.puzzles.length ?? 0
+          primary: latest.allocations[halfWidth].primary.length,
+          secondary: latest.allocations[halfWidth].secondary.length,
+          mixed: latest.allocations[halfWidth].mixed.length,
+          uniquePuzzleCount:
+            latest.allocations[halfWidth].all.length
         }
       ])
     ),
@@ -159,6 +168,90 @@ function benchmarkNestedRatingBandSelections(source) {
       maxMs: round(samples.at(-1))
     }
   };
+}
+
+function puzzlesForBand(selections, halfWidth, quota) {
+  const band = selections.find(
+    (selection) => selection.halfWidth === halfWidth
+  );
+  if (!band) {
+    throw new Error(
+      `nested-rating-band selection omitted ${quota} ±${halfWidth}`
+    );
+  }
+  if (
+    new Set(band.puzzles.map((puzzle) => puzzle.id)).size !==
+    band.puzzles.length
+  ) {
+    throw new Error(
+      `nested-rating-band ${quota} ±${halfWidth} returned duplicate ids`
+    );
+  }
+  return band.puzzles;
+}
+
+function allocateNestedBand(input) {
+  const primaryIds = new Set(input.primary.map((puzzle) => puzzle.id));
+  const secondaryIds = new Set(
+    input.secondary.map((puzzle) => puzzle.id)
+  );
+  const primaryOnly = input.primary.filter(
+    (puzzle) => !secondaryIds.has(puzzle.id)
+  );
+  const secondaryOnly = input.secondary.filter(
+    (puzzle) => !primaryIds.has(puzzle.id)
+  );
+  const overlap = input.primary.filter((puzzle) =>
+    secondaryIds.has(puzzle.id)
+  );
+  const primaryOverlapCount = Math.max(0, 9 - primaryOnly.length);
+  const secondaryOverlapCount = Math.max(0, 3 - secondaryOnly.length);
+  if (
+    input.primary.length < 9 ||
+    input.secondary.length < 3 ||
+    primaryOverlapCount + secondaryOverlapCount > overlap.length
+  ) {
+    throw new Error(
+      `nested-rating-band ±${input.halfWidth} cannot satisfy 9 / 3 focused quotas`
+    );
+  }
+  const primary = [
+    ...primaryOnly.slice(0, 9),
+    ...overlap.slice(0, primaryOverlapCount)
+  ].slice(0, 9);
+  const usedPrimaryIds = new Set(
+    primary.map((puzzle) => puzzle.id)
+  );
+  const secondary = [
+    ...secondaryOnly.slice(0, 3),
+    ...overlap.filter(
+      (puzzle) => !usedPrimaryIds.has(puzzle.id)
+    )
+  ].slice(0, 3);
+  const usedFocusedIds = new Set([
+    ...usedPrimaryIds,
+    ...secondary.map((puzzle) => puzzle.id)
+  ]);
+  const mixed = input.mixed
+    .filter(
+      (puzzle) =>
+        !usedFocusedIds.has(puzzle.id) &&
+        !puzzle.themes.includes("fork") &&
+        !puzzle.themes.includes("pin")
+    )
+    .slice(0, 3);
+  const all = [...primary, ...secondary, ...mixed];
+  if (
+    primary.length !== 9 ||
+    secondary.length !== 3 ||
+    mixed.length !== 3 ||
+    new Set(all.map((puzzle) => puzzle.id)).size !== 15
+  ) {
+    throw new Error(
+      `nested-rating-band ±${input.halfWidth} failed exact 9 / 3 / 3 allocation`
+    );
+  }
+  return { primary, secondary, mixed, all };
 }
 
 function benchmarkFocusedQuotaPlan(source) {
