@@ -576,8 +576,16 @@ export class MemoryStore implements PracticeStore {
     });
     const attempts = query.unclear === undefined
       ? attemptsIgnoringUnclear
-      : attemptsIgnoringUnclear.filter((attempt) => Boolean(attempt.unclear) === query.unclear);
-    const unclearCount = attemptsIgnoringUnclear.filter((attempt) => Boolean(attempt.unclear)).length;
+      : filterHistoryAttemptsForQuery({
+          attempts: attemptsIgnoringUnclear,
+          query: { unclear: query.unclear },
+          reviews
+        });
+    const unclearCount = filterHistoryAttemptsForQuery({
+      attempts: attemptsIgnoringUnclear,
+      query: { unclear: true },
+      reviews
+    }).length;
     return buildHistoryView({
       query,
       ratingKeys: this.listPlayedRatings(),

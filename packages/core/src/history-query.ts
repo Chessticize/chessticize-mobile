@@ -6,6 +6,7 @@ import {
 } from "./theme-catalog.ts";
 import { isPracticeRunRatingKey } from "./practice-runs.ts";
 import { isAttemptMistake } from "./attempt-outcome.ts";
+import { isAttemptMarkedUnclear } from "./attempt-clarity.ts";
 import type {
   AttemptEvent,
   AttemptOutcome,
@@ -410,7 +411,11 @@ export function buildHistoryView(input: {
   const query = validateHistoryQuery(input.query);
   const range = resolveHistoryRange(query.now, query.timeRange);
   const page = resolveHistoryPage(query.page, input.attempts.length);
-  const attempts = applyHistoryPage(input.attempts, page);
+  const attempts = applyHistoryPage(input.attempts, page).map((attempt) => (
+    isAttemptMarkedUnclear(attempt)
+      ? attempt
+      : { ...attempt, unclear: false, unclearUpdatedAt: undefined }
+  ));
   const attemptsForOptions = input.allAttemptsForOptions ?? input.attempts;
   const availableThemes = input.availableThemes ?? collectThemes(attemptsForOptions);
   const availableSpeeds = input.availableSpeeds ?? collectHistorySpeeds(attemptsForOptions);
@@ -422,7 +427,8 @@ export function buildHistoryView(input: {
     ratingKeys: input.ratingKeys,
     availableThemes,
     availableSpeeds,
-    unclearCount: input.unclearCount ?? attemptsForOptions.filter((attempt) => Boolean(attempt.unclear)).length,
+    unclearCount: input.unclearCount
+      ?? attemptsForOptions.filter((attempt) => isAttemptMarkedUnclear(attempt)).length,
     attempts,
     elo: input.elo,
     puzzleStats,
@@ -452,9 +458,10 @@ export function filterHistoryAttemptsForQuery(input: {
     .filter((attempt) => input.query.maxRating === undefined || attempt.puzzleRating <= input.query.maxRating)
     .filter((attempt) => puzzleMatchesAnyTheme(attempt.themes, selectedThemes))
     .filter((attempt) => input.query.speedSeconds === undefined || historyAttemptSpeedSeconds(attempt) === input.query.speedSeconds)
-    .filter((attempt) => input.query.unclear === undefined || Boolean(attempt.unclear) === input.query.unclear)
+    .filter((attempt) => input.query.unclear === undefined ||
+      isAttemptMarkedUnclear(attempt) === input.query.unclear)
     .filter((attempt) => !input.query.attentionOnly ||
-      Boolean(attempt.unclear) ||
+      isAttemptMarkedUnclear(attempt) ||
       (
         queuedReviewKeys !== null &&
         historyAttemptReviewQueuedFromKeys(attempt, queuedReviewKeys)

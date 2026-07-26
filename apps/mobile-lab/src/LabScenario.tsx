@@ -152,10 +152,6 @@ function sprintRulesDesignPreviewFor(
   }
   if (scenarioId === "practice-sprint-result-goal") {
     return {
-      initialResultUnclearPrompt: {
-        marked: false,
-        question: "Was it clear why your last move was wrong?"
-      },
       initialResultState: sprintRulesResultState({
         correctCount: 11,
         endReason: "time_expired",
@@ -577,8 +573,7 @@ function createHistoryService(
       elapsedMs: 60_000,
       completedAt: "2026-07-17T15:00:12.000Z",
       ratingBefore: 910,
-      ratingAfter: 910,
-      unclear: true
+      ratingAfter: 910
     }),
     historyAttempt({
       id: "history-correct",
@@ -651,6 +646,11 @@ function createHistoryService(
     mode: "standard",
     ratingKey: "standard 5/20"
   }, "2026-07-17T14:00:11.000Z");
+  store.scheduleMistakeReview({
+    puzzleId: LAB_PUZZLES[4]!.id,
+    mode: "standard",
+    ratingKey: "standard 5/20"
+  }, "2026-07-17T15:00:12.000Z");
   return new PracticeService(store);
 }
 

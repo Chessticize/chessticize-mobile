@@ -1732,8 +1732,7 @@ export function PracticePocScreen({
           next.attempt.unclear === true;
         setUnclearPrompt(
           isUnclearAttemptEligible(next.attempt)
-            && next.attempt.result !== "timed_out"
-            && (!next.attempt.unclear || isSlowAutoMarked || next.attempt.result === "wrong")
+            && (!next.attempt.unclear || isSlowAutoMarked)
           ? {
               attemptId: next.attempt.id,
               ...(isSlowAutoMarked ? { autoMarkedReason: "slow" as const } : {}),
@@ -1741,8 +1740,6 @@ export function PracticePocScreen({
               puzzleId: next.attempt.puzzleId,
               question: isSlowAutoMarked
                 ? "Marked unclear because the last puzzle was slow."
-                : next.attempt.result === "wrong"
-                  ? "Was it clear why your last move was wrong?"
                 : "Was it clear why the last correct move worked?"
             }
           : null
@@ -2917,7 +2914,7 @@ export function PracticePocScreen({
             <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
             {sprintGuidanceEnabled || sprintRulesDesignPreview?.timeoutCountsAsMistake === true ? (
               <Text style={styles.puzzleTimeoutOverlayDetail}>
-                Mistake · Marked Unclear · Added to Review · Moving on
+                Mistake · Added to Review · Moving on
               </Text>
             ) : null}
           </View>
@@ -4188,7 +4185,7 @@ function SprintRulesGuide({
 
   return (
     <View
-      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass. Time limit: Solve the required puzzles before the Sprint clock reaches zero. Mistake limit: ${mistakeLimitDetail} Slow warning: The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake. Puzzle timeout: When the puzzle timer runs out, it counts as a mistake, is marked Unclear, is added to Review, and the Sprint moves on. For example, solving ${presentation.targetCorrect} puzzles with one mistake means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
+      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass. Time limit: Solve the required puzzles before the Sprint clock reaches zero. Mistake limit: ${mistakeLimitDetail} Slow warning: The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake. Puzzle timeout: When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. For example, solving ${presentation.targetCorrect} puzzles with one mistake means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
       style={styles.sprintRulesGuide}
       testID="practice-sprint-rules-guide"
     >
@@ -4230,7 +4227,7 @@ function SprintRulesGuide({
         />
         <SprintRuleRow
           badge="TIMEOUT"
-          detail="When the puzzle timer runs out, it counts as a mistake, is marked Unclear, is added to Review, and the Sprint moves on."
+          detail="When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on."
           label="Puzzle timeout"
           tone="danger"
         />
@@ -4350,7 +4347,7 @@ function sessionGuideCallout(
   if (coachStep === 2) {
     return {
       badge: "TIMED OUT",
-      detail: "It is also marked Unclear and added to Review. The Sprint then shows the next puzzle.",
+      detail: "It is added to Review. The Sprint then shows the next puzzle.",
       id: "timeout",
       title: "This puzzle counts as a mistake",
       tone: "danger"
@@ -5015,7 +5012,7 @@ function SessionCoachmarkDemo({
               >
                 <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
                 <Text style={styles.puzzleTimeoutOverlayDetail}>
-                  Mistake · Marked Unclear · Added to Review · Moving on
+                  Mistake · Added to Review · Moving on
                 </Text>
               </View>
             ) : null}
@@ -6003,7 +6000,7 @@ function PracticeRunTimingSettings({
       </View>
       <View style={styles.customConfigCard} testID="practice-run-puzzle-timing-card">
         <RunTimingSettingRow
-          detail="Turns the puzzle clock yellow and marks it Unclear; play continues."
+          detail="Turns the puzzle clock yellow. A correct answer after that is marked Unclear; play continues."
           enabled={warningEnabled}
           label="Slow warning"
           maximumSeconds={editor.slowMaximumSeconds}
@@ -6023,7 +6020,7 @@ function PracticeRunTimingSettings({
         />
         <RunTimingSettingRow
           detail={timeoutCountsAsMistake
-            ? "Marks it Timed out and Unclear, counts as a mistake, adds it to Review, and moves on."
+            ? "Marks it Timed out, counts as a mistake, adds it to Review, and moves on."
             : "Marks Timed out and moves on."}
           enabled={timeoutEnabled}
           label="Puzzle timeout"
@@ -7313,7 +7310,7 @@ function ActiveMistakeIndicator({
 function PreviousAttemptNotice(): React.JSX.Element {
   return (
     <View
-      accessibilityLabel="Previous puzzle timed out. It was already marked Unclear, counted as a mistake, and added to Review. In Review."
+      accessibilityLabel="Previous puzzle timed out. It counted as a mistake and was added to Review. In Review."
       accessibilityLiveRegion="polite"
       style={styles.unclearPrompt}
       testID="sprint-previous-attempt-notice"
@@ -7321,7 +7318,7 @@ function PreviousAttemptNotice(): React.JSX.Element {
       <View style={styles.previousAttemptNoticeCopy}>
         <Text style={styles.previousAttemptNoticeTitle}>Previous puzzle timed out</Text>
         <Text style={styles.previousAttemptNoticeDetail}>
-          It was already marked Unclear, counted as a mistake, and added to Review.
+          It counted as a mistake and was added to Review.
         </Text>
       </View>
       <View style={styles.previousAttemptNoticeStatus}>

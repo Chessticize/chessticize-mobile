@@ -195,7 +195,7 @@
       },
       {
         "issueNumber": 249,
-        "changeNote": "Mark Timed out attempts Unclear so Needs attention stays based only on Unclear or Review membership."
+        "changeNote": "Treat Timed out as a mistake added to Review without also marking it Unclear."
       }
     ]
   },
