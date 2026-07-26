@@ -39,6 +39,49 @@ export const IosSync: Story = {
   }
 };
 
+export const ICloudSyncErrorDetails: Story = {
+  name: "iCloud sync error details",
+  args: { scenarioId: "settings-ios-sync-error-details" },
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await waitForText(canvasElement, "iCloud sync failed");
+    await clickTestId(canvasElement, "settings-sync-error-details");
+    await waitForTestId(canvasElement, "settings-sync-error-details-modal");
+    await waitForText(canvasElement, "The request was rate limited. Please try again later.");
+    await waitForText(canvasElement, "Your progress stays private");
+    await clickTestId(canvasElement, "settings-sync-error-copy");
+    await waitForTestId(canvasElement, "settings-sync-error-copy-success");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-open");
+    await waitForText(canvasElement, "This bundle contains progress data");
+    await waitForText(canvasElement, "local-progress.sqlite");
+    await waitForText(canvasElement, "icloud-progress-snapshot.json");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-prepare");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-complete");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-share");
+  }
+};
+
+export const ICloudSyncSupportBundlePartial: Story = {
+  name: "iCloud sync support bundle · partial",
+  args: { scenarioId: "settings-ios-sync-support-bundle-partial" },
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await clickTestId(canvasElement, "settings-sync-error-details");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-open");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-prepare");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-partial");
+    await waitForText(
+      canvasElement,
+      "CloudKit snapshot unavailable: The request was rate limited."
+    );
+    await waitForText(
+      canvasElement,
+      "The local database and diagnostic can still help, but this bundle is not a complete reproduction."
+    );
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-share");
+  }
+};
+
 export const SprintGuideReset: Story = {
   name: "Guidance · replay Sprint and Arrow Duel guides",
   args: { scenarioId: "settings-sprint-guidance" },

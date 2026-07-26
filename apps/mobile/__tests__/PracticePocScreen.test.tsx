@@ -9376,6 +9376,72 @@ describe("PracticePocScreen", () => {
     });
   });
 
+  it("shows and copies the issue #353 local iCloud sync diagnostic design", async () => {
+    const renderer = renderLabScenario("settings-ios-sync-error-details");
+
+    press(renderer, "settings-tab");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain(
+      "iCloud sync failed"
+    );
+    press(renderer, "settings-sync-error-details");
+
+    const modal = findByTestId(renderer, "settings-sync-error-details-modal");
+    expect(collectText(modal)).toContain("The request was rate limited. Please try again later.");
+    expect(collectText(modal)).toContain("Your progress stays private");
+    expect(collectText(findByTestId(renderer, "settings-sync-error-diagnostic-text"))).toContain(
+      "Phase: Fetch from iCloud"
+    );
+    expect(() => findByTestId(renderer, "settings-sync-error-copy-success")).toThrow();
+
+    await pressAsync(renderer, "settings-sync-error-copy");
+
+    expect(collectText(findByTestId(renderer, "settings-sync-error-copy-success"))).toContain(
+      "Copied"
+    );
+
+    press(renderer, "settings-sync-support-bundle-open");
+    expect(collectText(modal)).toContain("This bundle contains progress data");
+    expect(collectText(modal)).toContain("local-progress.sqlite");
+    expect(collectText(modal)).toContain("icloud-progress-snapshot.json");
+
+    await pressAsync(renderer, "settings-sync-support-bundle-prepare");
+
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-complete"))).toContain(
+      "Complete reproduction bundle"
+    );
+    expect(collectText(modal)).toContain("manifest.json");
+    await pressAsync(renderer, "settings-sync-support-bundle-share");
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-shared"))).toContain(
+      "Share Sheet requested"
+    );
+
+    press(renderer, "settings-sync-support-bundle-details");
+    press(renderer, "settings-sync-error-details-close");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain(
+      "iCloud sync failed"
+    );
+  });
+
+  it("marks the issue #353 support bundle partial when CloudKit export is unavailable", async () => {
+    const renderer = renderLabScenario("settings-ios-sync-support-bundle-partial");
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-sync-error-details");
+    press(renderer, "settings-sync-support-bundle-open");
+    await pressAsync(renderer, "settings-sync-support-bundle-prepare");
+
+    const partial = findByTestId(renderer, "settings-sync-support-bundle-partial");
+    expect(collectText(partial)).toContain("iCloud snapshot couldn't be included");
+    expect(collectText(partial)).toContain(
+      "CloudKit snapshot unavailable: The request was rate limited."
+    );
+    expect(collectText(partial)).toContain("not a complete reproduction");
+    expect(collectText(findByTestId(renderer, "settings-sync-error-details-modal"))).not.toContain(
+      "icloud-progress-snapshot.json"
+    );
+    expect(findByTestId(renderer, "settings-sync-support-bundle-share")).toBeTruthy();
+  });
+
   it("does not sync while iCloud is off and syncs once when it is enabled", async () => {
     const service = createMobilePracticeService("random1000");
     service.saveSettings({

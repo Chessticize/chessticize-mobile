@@ -298,6 +298,49 @@ export function LabScenarioShell({
   );
 }
 
+function iCloudSyncErrorDetailsPresentation(
+  bundleKind: "complete" | "partial"
+): NonNullable<ScreenProps["iCloudSyncErrorDetails"]> {
+  return {
+    copyText: [
+      "Chessticize iCloud Sync Diagnostic",
+      "App: 1.2.2 (38)",
+      "Failed at: 2026-07-26T16:42:00.000Z",
+      "Sync attempt: Manual",
+      "Phase: Fetch from iCloud",
+      "Code: icloud_fetch_failed",
+      "Domain: CKErrorDomain",
+      "Message: The request was rate limited. Please try again later.",
+      "Retry after: 12 seconds"
+    ].join("\n"),
+    message: "The request was rate limited. Please try again later.",
+    occurredAtLabel: "Jul 26, 2026 at 9:42 AM",
+    onCopy: async () => {},
+    supportBundle: {
+      onPrepare: async () => bundleKind === "complete"
+        ? {
+            kind: "complete",
+            files: [
+              "local-progress.sqlite",
+              "icloud-progress-snapshot.json",
+              "diagnostic.txt",
+              "manifest.json"
+            ]
+          }
+        : {
+            kind: "partial",
+            files: [
+              "local-progress.sqlite",
+              "diagnostic.txt",
+              "manifest.json"
+            ],
+            unavailableReason: "CloudKit snapshot unavailable: The request was rate limited."
+          },
+      onShare: async () => {}
+    }
+  };
+}
+
 function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
   let service = createSeededService();
   let configurePuzzleSource = true;
@@ -380,6 +423,12 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
         preview: previewBrowserMoveFeedback
       };
       break;
+    case "settings-ios-sync-error-details":
+      screenProps.iCloudSyncErrorDetails = iCloudSyncErrorDetailsPresentation("complete");
+      break;
+    case "settings-ios-sync-support-bundle-partial":
+      screenProps.iCloudSyncErrorDetails = iCloudSyncErrorDetailsPresentation("partial");
+      break;
     case "settings-notifications-denied":
       notificationStatus = "denied";
       break;
@@ -435,6 +484,15 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       ? new FakeICloudProgressSyncClient(undefined, "no_account")
       : null
   };
+  if (
+    scenarioId === "settings-ios-sync-error-details"
+    || scenarioId === "settings-ios-sync-support-bundle-partial"
+  ) {
+    capabilityOverrides.applicationMetadata = {
+      versionName: "1.2.2",
+      buildNumber: "38"
+    };
+  }
   if (configurePuzzleSource) {
     capabilityOverrides.configurePuzzleSource = (
       currentService: PracticeService,
