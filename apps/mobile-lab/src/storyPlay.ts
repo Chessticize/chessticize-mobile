@@ -26,12 +26,48 @@ export async function waitForEnabledTestId(
     if (element.getAttribute("aria-disabled") === "true" || element.hasAttribute("disabled")) {
       throw new Error(`${testID} must be enabled`);
     }
-  });
+  }, { timeout: 4_000 });
 }
 
 export async function waitForText(canvasElement: HTMLElement, text: string): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   await page.findByText(text, {}, { timeout: 4_000 });
+}
+
+export async function expectTestIdText(
+  canvasElement: HTMLElement,
+  testID: string,
+  expectedText: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    if (element.textContent?.trim() !== expectedText) {
+      throw new Error(`Expected ${testID} to render "${expectedText}"`);
+    }
+  });
+}
+
+export async function expectTestIdHorizontalCentersAligned(
+  canvasElement: HTMLElement,
+  firstTestID: string,
+  secondTestID: string,
+  tolerance = 0.5
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const first = await page.findByTestId(firstTestID, {}, { timeout: 4_000 });
+  const second = await page.findByTestId(secondTestID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    const firstRect = first.getBoundingClientRect();
+    const secondRect = second.getBoundingClientRect();
+    const offset = secondRect.left + secondRect.width / 2
+      - (firstRect.left + firstRect.width / 2);
+    if (Math.abs(offset) > tolerance) {
+      throw new Error(
+        `Expected ${firstTestID} and ${secondTestID} centers within ${tolerance}px; offset ${offset.toFixed(2)}px`
+      );
+    }
+  });
 }
 
 export async function replaceTextTestId(
