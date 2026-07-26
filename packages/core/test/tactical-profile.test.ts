@@ -72,30 +72,128 @@ test("calibration artifact validation rejects unsafe external artifact shapes", 
   assert.doesNotThrow(() =>
     assertValidTacticalProfileCalibrationArtifact(CALIBRATION)
   );
-  assert.throws(
-    () =>
-      assertValidTacticalProfileCalibrationArtifact({
+  const fixtures: Array<{
+    name: string;
+    candidate: unknown;
+    error: RegExp;
+  }> = [
+    {
+      name: "identity",
+      candidate: { ...CALIBRATION, createdAt: "not-a-date" },
+      error: /identity/
+    },
+    {
+      name: "provenance",
+      candidate: {
+        ...CALIBRATION,
+        provenance: {
+          ...CALIBRATION.provenance,
+          policyHash: "not-a-hash"
+        }
+      },
+      error: /provenance/
+    },
+    {
+      name: "family readiness provenance",
+      candidate: {
+        ...CALIBRATION,
+        provenance: {
+          ...CALIBRATION.provenance,
+          familyReadiness: {
+            ...CALIBRATION.provenance.familyReadiness,
+            line: { ready: false, reasons: [] }
+          }
+        }
+      },
+      error: /line readiness provenance/
+    },
+    {
+      name: "minimum diversity",
+      candidate: {
         ...CALIBRATION,
         evidence: {
           ...CALIBRATION.evidence,
           minDistinctPuzzles: 0
         }
-      }),
-    /minimum distinct puzzles/
-  );
-  assert.throws(
-    () =>
-      assertValidTacticalProfileCalibrationArtifact({
+      },
+      error: /minimum distinct puzzles/
+    },
+    {
+      name: "probability ordering",
+      candidate: {
+        ...CALIBRATION,
+        evidence: {
+          ...CALIBRATION.evidence,
+          watchProbability: 0.95
+        }
+      },
+      error: /probabilities must be ordered/
+    },
+    {
+      name: "opportunity",
+      candidate: {
+        ...CALIBRATION,
+        opportunity: {
+          ...CALIBRATION.opportunity,
+          exponent: 0
+        }
+      },
+      error: /opportunity exponent/
+    },
+    {
+      name: "Focused Run",
+      candidate: {
+        ...CALIBRATION,
+        focusedRun: {
+          runSize: 15,
+          recentPuzzleDays: 30,
+          ratingBandHalfWidths: [200, 100]
+        }
+      },
+      error: /Focused Run policy/
+    },
+    {
+      name: "missing family",
+      candidate: {
         ...CALIBRATION,
         families: {
           line: CALIBRATION.families.line
         }
-      }),
-    /arrow_duel calibration/
-  );
-  assert.throws(
-    () =>
-      assertValidTacticalProfileCalibrationArtifact({
+      },
+      error: /arrow_duel calibration/
+    },
+    {
+      name: "unavailable reason",
+      candidate: {
+        ...CALIBRATION,
+        provenance: {
+          ...CALIBRATION.provenance,
+          familyReadiness: {
+            ...CALIBRATION.provenance.familyReadiness,
+            line: { ready: false, reasons: ["holdout failed"] }
+          }
+        },
+        families: {
+          ...CALIBRATION.families,
+          line: { status: "unavailable", reason: " " }
+        }
+      },
+      error: /unavailable reason/
+    },
+    {
+      name: "self-asserted readiness",
+      candidate: {
+        ...CALIBRATION,
+        provenance: {
+          ...CALIBRATION.provenance,
+          representativeOwnerApproved: false
+        }
+      },
+      error: /authenticated calibration readiness/
+    },
+    {
+      name: "solve coefficients",
+      candidate: {
         ...CALIBRATION,
         families: {
           ...CALIBRATION.families,
@@ -107,9 +205,36 @@ test("calibration artifact validation rejects unsafe external artifact shapes", 
             }
           }
         }
-      }),
-    /Rating-gap slope/
-  );
+      },
+      error: /Rating-gap slope/
+    },
+    {
+      name: "speed coefficients",
+      candidate: {
+        ...CALIBRATION,
+        families: {
+          ...CALIBRATION.families,
+          line: {
+            ...CALIBRATION.families.line,
+            speed: {
+              ...CALIBRATION.families.line.speed,
+              practicalTimeMultiplier: 1
+            }
+          }
+        }
+      },
+      error: /practical multiplier/
+    }
+  ];
+
+  for (const fixture of fixtures) {
+    assert.throws(
+      () =>
+        assertValidTacticalProfileCalibrationArtifact(fixture.candidate),
+      fixture.error,
+      fixture.name
+    );
+  }
 });
 
 test("one-focus 15-puzzle plan allocates 10 focused and 5 mixed puzzles", () => {
@@ -835,6 +960,19 @@ const CALIBRATION = {
   calibrationId: "test-calibration",
   packFeatureHash: "test-pack-rd",
   createdAt: "2026-07-01T00:00:00.000Z",
+  provenance: {
+    inputSchemaVersion: 1,
+    policyId: "test-policy",
+    policyHash: `sha256:${"1".repeat(64)}`,
+    corpusHash: `sha256:${"2".repeat(64)}`,
+    reportHash: `sha256:${"3".repeat(64)}`,
+    decisionEvidenceId: "test-decisions",
+    representativeOwnerApproved: true,
+    familyReadiness: {
+      line: { ready: true, reasons: [] },
+      arrow_duel: { ready: true, reasons: [] }
+    }
+  },
   recencyHalfLifeDays: 90,
   evidence: {
     watchProbability: 0.75,

@@ -4,6 +4,29 @@
   "calibrationId": "tactical-profile-v1-awaiting-representative-holdout",
   "packFeatureHash": "sha256:9a4a1613713cfd72da6eb718c717c762b08aa361ec23d88b43e5e029d20fb295",
   "createdAt": "2026-07-25T00:00:00.000Z",
+  "provenance": {
+    "inputSchemaVersion": 1,
+    "policyId": "tactical-profile-calibration-policy-v1",
+    "policyHash": "sha256:5737cc64347b3d5822bb511882837457bca4da16df28342db5e10d1e22a8bff1",
+    "corpusHash": null,
+    "reportHash": null,
+    "decisionEvidenceId": null,
+    "representativeOwnerApproved": false,
+    "familyReadiness": {
+      "line": {
+        "ready": false,
+        "reasons": [
+          "A representative holdout calibration has not passed yet"
+        ]
+      },
+      "arrow_duel": {
+        "ready": false,
+        "reasons": [
+          "A representative holdout calibration has not passed yet"
+        ]
+      }
+    }
+  },
   "recencyHalfLifeDays": 90,
   "evidence": {
     "watchProbability": 0.75,

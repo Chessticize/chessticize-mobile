@@ -303,12 +303,14 @@ export async function runCalibration(options) {
       policyId: policy.policyId,
       packFeatureHash: manifest.tacticalAnalysis.featureHash,
       input: {
+        schemaVersion: 1,
         progressExportCount: exports.length,
         attemptCount: joined.inputAttemptCount,
         joinedObservationCount: joined.observations.length,
         corpusHash,
         policyHash,
-        decisionEvidenceId: decisionEvidence.decisionId
+        decisionEvidenceId: decisionEvidence.decisionId,
+        representativeOwnerApproved: options.ownerApproved === true
       },
       missingness: joined.missingness,
       missingnessCohorts: joined.missingnessCohorts,
@@ -711,6 +713,25 @@ function buildArtifact(report, familyReports, policy, manifest) {
     calibrationId: `${policy.policyId}-${report.createdAt}`,
     packFeatureHash: manifest.tacticalAnalysis.featureHash,
     createdAt: report.createdAt,
+    provenance: {
+      inputSchemaVersion: report.input.schemaVersion,
+      policyId: report.policyId,
+      policyHash: report.input.policyHash,
+      corpusHash: report.input.corpusHash,
+      reportHash: calibrationContentHash(report),
+      decisionEvidenceId: report.input.decisionEvidenceId,
+      representativeOwnerApproved:
+        report.input.representativeOwnerApproved,
+      familyReadiness: Object.fromEntries(
+        ["line", "arrow_duel"].map((family) => [
+          family,
+          {
+            ready: familyReports[family].readiness.ready,
+            reasons: [...familyReports[family].readiness.reasons]
+          }
+        ])
+      )
+    },
     recencyHalfLifeDays: parameters.recencyHalfLifeDays,
     evidence: {
       watchProbability: parameters.watchProbability,

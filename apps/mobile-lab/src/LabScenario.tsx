@@ -876,6 +876,19 @@ const LAB_TACTICAL_PROFILE_CALIBRATION = {
   calibrationId: "interaction-lab-tactical-profile",
   packFeatureHash: "interaction-lab-pack-rd",
   createdAt: "2026-07-01T00:00:00.000Z",
+  provenance: {
+    inputSchemaVersion: 1,
+    policyId: "interaction-lab-policy",
+    policyHash: `sha256:${"1".repeat(64)}`,
+    corpusHash: `sha256:${"2".repeat(64)}`,
+    reportHash: `sha256:${"3".repeat(64)}`,
+    decisionEvidenceId: "interaction-lab-decisions",
+    representativeOwnerApproved: true,
+    familyReadiness: {
+      line: { ready: true, reasons: [] },
+      arrow_duel: { ready: true, reasons: [] }
+    }
+  },
   recencyHalfLifeDays: 90,
   evidence: {
     watchProbability: 0.75,

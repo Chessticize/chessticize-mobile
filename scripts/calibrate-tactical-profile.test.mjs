@@ -1,10 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import {
+  assertValidTacticalProfileCalibrationArtifact
+} from "../packages/core/src/index.ts";
 import {
   calibrationContentHash,
   evaluateCalibrationReadiness,
@@ -15,6 +19,66 @@ import {
   splitWholeSessions,
   verifyPackIdentity
 } from "./calibrate-tactical-profile.mjs";
+
+test("bundled calibration artifact is valid and tied to the predeclared policy and pack", async () => {
+  const [artifact, policy, manifest] = await Promise.all([
+    readFile("config/tactical-profile-calibration-artifact-v1.json", "utf8"),
+    readFile("config/tactical-profile-calibration-policy-v1.json", "utf8"),
+    readFile("fixtures/puzzles/bundled-core-pack.manifest.json", "utf8")
+  ]).then((values) => values.map((value) => JSON.parse(value)));
+
+  assert.doesNotThrow(() =>
+    assertValidTacticalProfileCalibrationArtifact(artifact)
+  );
+  assert.equal(artifact.provenance.policyId, policy.policyId);
+  assert.equal(
+    artifact.provenance.policyHash,
+    calibrationContentHash(policy)
+  );
+  assert.equal(
+    artifact.packFeatureHash,
+    manifest.tacticalAnalysis.featureHash
+  );
+  assert.deepEqual(
+    Object.values(artifact.families).map((family) => family.status),
+    ["unavailable", "unavailable"]
+  );
+  const calibratedFamilies = Object.entries(artifact.families)
+    .filter(([, family]) => family.status === "calibrated")
+    .map(([taskFamily]) => taskFamily);
+  if (calibratedFamilies.length > 0) {
+    const reportPath =
+      "config/tactical-profile-calibration-report-v1.json";
+    assert.equal(
+      existsSync(reportPath),
+      true,
+      "A production calibration report must accompany calibrated families"
+    );
+    const report = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(
+      artifact.provenance.reportHash,
+      calibrationContentHash(report)
+    );
+    assert.equal(
+      artifact.provenance.corpusHash,
+      report.input.corpusHash
+    );
+    assert.equal(
+      artifact.provenance.decisionEvidenceId,
+      report.input.decisionEvidenceId
+    );
+    assert.equal(report.input.representativeOwnerApproved, true);
+    assert.equal(report.input.policyHash, calibrationContentHash(policy));
+    assert.equal(report.packFeatureHash, manifest.tacticalAnalysis.featureHash);
+    for (const taskFamily of calibratedFamilies) {
+      assert.deepEqual(
+        artifact.provenance.familyReadiness[taskFamily],
+        report.families[taskFamily].readiness
+      );
+      assert.equal(report.families[taskFamily].readiness.ready, true);
+    }
+  }
+});
 
 test("calibration holdout keeps every session wholly on one side", () => {
   const observations = [
@@ -282,6 +346,25 @@ test("calibration joins canonical exports and emits cohort reports without activ
     const artifact = JSON.parse(await readFile(artifactPath, "utf8"));
 
     assert.equal(report.input.joinedObservationCount, 4);
+    assert.equal(artifact.provenance.inputSchemaVersion, 1);
+    assert.equal(artifact.provenance.policyId, policy.policyId);
+    assert.equal(artifact.provenance.policyHash, policyHash);
+    assert.equal(artifact.provenance.corpusHash, corpusHash);
+    assert.equal(
+      artifact.provenance.reportHash,
+      calibrationContentHash(report)
+    );
+    assert.equal(
+      artifact.provenance.representativeOwnerApproved,
+      true
+    );
+    assert.deepEqual(
+      artifact.provenance.familyReadiness.line,
+      report.families.line.readiness
+    );
+    assert.doesNotThrow(() =>
+      assertValidTacticalProfileCalibrationArtifact(artifact)
+    );
     assert.deepEqual(
       report.missingnessCohorts.map((cohort) => [
         cohort.taskFamily,

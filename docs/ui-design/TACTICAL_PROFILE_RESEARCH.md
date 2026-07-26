@@ -822,16 +822,22 @@ coefficients.
 
 The mobile app loads
 `config/tactical-profile-calibration-artifact-v1.json` through the domain-owned
-artifact validator and requires its pack-feature hash to match the bundled Core
-Pack exactly. The checked-in artifact keeps both task families unavailable
-until representative holdout evidence passes the predeclared gates. An invalid
-artifact or pack mismatch also fails closed.
+artifact validator and requires its pack-feature hash and predeclared policy
+identity/hash to match the bundled Core Pack and V1 policy exactly. A calibrated
+family must also carry the input schema, corpus hash, report hash, reviewed
+decision-evidence identity, explicit owner approval, and a passing family
+readiness result. The checked-in artifact keeps both task families unavailable
+until representative holdout evidence passes those gates. An invalid artifact,
+missing pack identity, policy mismatch, or pack mismatch also fails closed.
 
 After an owner-approved representative corpus passes calibration, the local
-harness can write the reviewed replacement directly with
-`--artifact config/tactical-profile-calibration-artifact-v1.json`. This is a
-data-only activation seam: no product-code change is needed, and a task family
-that does not pass its own gates remains unavailable.
+harness writes the reviewed aggregate report and replacement artifact with
+`--report config/tactical-profile-calibration-report-v1.json` and
+`--artifact config/tactical-profile-calibration-artifact-v1.json`. Build tests
+recompute the report and policy hashes and require every calibrated family to
+match a passing report result. This is a data-only activation seam: no
+product-code change is needed, and a task family that does not pass its own
+gates remains unavailable.
 
 The Phase A PR MUST NOT implement this harness unless a tiny pure local script
 is separately needed to verify a research claim. It MUST NOT upload user data,

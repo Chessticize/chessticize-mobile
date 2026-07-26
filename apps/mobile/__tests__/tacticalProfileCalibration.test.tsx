@@ -27,6 +27,7 @@ describe("production Tactical Profile calibration", () => {
     const calibrated = {
       ...bundledArtifact,
       calibrationId: "representative-holdout-pass",
+      provenance: calibratedProvenance(),
       families: {
         line: calibratedFamily(),
         arrow_duel: calibratedFamily()
@@ -36,6 +37,29 @@ describe("production Tactical Profile calibration", () => {
     expect(
       productionTacticalProfileCalibration(bundledManifest, calibrated)
     ).toBe(calibrated);
+  });
+
+  it("rejects calibrated coefficients without authenticated readiness", () => {
+    const selfAsserted = {
+      ...bundledArtifact,
+      families: {
+        line: calibratedFamily(),
+        arrow_duel: calibratedFamily()
+      }
+    };
+
+    const calibration = productionTacticalProfileCalibration(
+      bundledManifest,
+      selfAsserted
+    );
+
+    expect(calibration.calibrationId).toBe(
+      "tactical-profile-v1-unavailable"
+    );
+    expect(calibration.families.line).toEqual({
+      status: "unavailable",
+      reason: "The bundled Tactical Profile calibration artifact is invalid"
+    });
   });
 
   it("fails closed when an artifact is malformed", () => {
@@ -81,7 +105,68 @@ describe("production Tactical Profile calibration", () => {
         "The Tactical Profile calibration does not match the bundled puzzle pack"
     });
   });
+
+  it("fails closed when calibration uses a different policy hash", () => {
+    const mismatched = {
+      ...bundledArtifact,
+      provenance: {
+        ...bundledArtifact.provenance,
+        policyHash: `sha256:${"0".repeat(64)}`
+      }
+    };
+
+    const calibration = productionTacticalProfileCalibration(
+      bundledManifest,
+      mismatched
+    );
+
+    expect(calibration.families.line).toEqual({
+      status: "unavailable",
+      reason:
+        "The Tactical Profile calibration does not match the predeclared policy"
+    });
+  });
+
+  it("fails closed before comparison when the Core Pack has no feature identity", () => {
+    const missingIdentityManifest = { ...bundledManifest };
+    delete missingIdentityManifest.tacticalAnalysis;
+    const sentinelCandidate = {
+      ...bundledArtifact,
+      packFeatureHash:
+        "unavailable:bundled-pack-has-no-tactical-feature-identity",
+      provenance: calibratedProvenance(),
+      families: {
+        line: calibratedFamily(),
+        arrow_duel: calibratedFamily()
+      }
+    };
+
+    const calibration = productionTacticalProfileCalibration(
+      missingIdentityManifest,
+      sentinelCandidate
+    );
+
+    expect(calibration.families.line).toEqual({
+      status: "unavailable",
+      reason:
+        "The bundled puzzle pack has no Tactical Profile feature identity"
+    });
+  });
 });
+
+function calibratedProvenance(): TacticalProfileCalibrationArtifact["provenance"] {
+  return {
+    ...bundledArtifact.provenance,
+    corpusHash: `sha256:${"1".repeat(64)}`,
+    reportHash: `sha256:${"2".repeat(64)}`,
+    decisionEvidenceId: "owner-reviewed-decisions",
+    representativeOwnerApproved: true,
+    familyReadiness: {
+      line: { ready: true, reasons: [] },
+      arrow_duel: { ready: true, reasons: [] }
+    }
+  };
+}
 
 function calibratedFamily() {
   return {

@@ -366,6 +366,22 @@ export type TacticalProfileCalibrationArtifact = {
   calibrationId: string;
   packFeatureHash: string;
   createdAt: string;
+  provenance: {
+    inputSchemaVersion: 1;
+    policyId: string;
+    policyHash: string;
+    corpusHash: string | null;
+    reportHash: string | null;
+    decisionEvidenceId: string | null;
+    representativeOwnerApproved: boolean;
+    familyReadiness: Record<
+      TacticalProfileTaskFamily,
+      {
+        ready: boolean;
+        reasons: readonly string[];
+      }
+    >;
+  };
   recencyHalfLifeDays: number;
   evidence: {
     watchProbability: number;
@@ -1230,6 +1246,35 @@ export function assertValidTacticalProfileCalibrationArtifact(
   ) {
     throw new Error("Tactical Profile calibration identity is invalid");
   }
+  const provenance = calibration.provenance;
+  if (
+    !isRecord(provenance) ||
+    provenance.inputSchemaVersion !== 1 ||
+    nonEmptyString(provenance.policyId) === undefined ||
+    !validSha256(provenance.policyHash) ||
+    typeof provenance.representativeOwnerApproved !== "boolean" ||
+    !isRecord(provenance.familyReadiness)
+  ) {
+    throw new Error("Tactical Profile calibration provenance is invalid");
+  }
+  const familyReadiness = provenance.familyReadiness;
+  for (const taskFamily of TACTICAL_PROFILE_TASK_FAMILIES) {
+    const readiness = familyReadiness[taskFamily];
+    if (
+      !isRecord(readiness) ||
+      typeof readiness.ready !== "boolean" ||
+      !Array.isArray(readiness.reasons) ||
+      readiness.reasons.some(
+        (reason) => nonEmptyString(reason) === undefined
+      ) ||
+      (readiness.ready && readiness.reasons.length > 0) ||
+      (!readiness.ready && readiness.reasons.length === 0)
+    ) {
+      throw new Error(
+        `Tactical Profile ${taskFamily} readiness provenance is invalid`
+      );
+    }
+  }
   if (!isRecord(calibration.evidence)) {
     throw new Error("Tactical Profile evidence policy is invalid");
   }
@@ -1321,10 +1366,19 @@ export function assertValidTacticalProfileCalibrationArtifact(
   }
   for (const taskFamily of TACTICAL_PROFILE_TASK_FAMILIES) {
     const family = calibration.families[taskFamily];
+    const readiness = familyReadiness[taskFamily] as {
+      ready: boolean;
+      reasons: readonly string[];
+    };
     if (!isRecord(family)) {
       throw new Error(`Tactical Profile ${taskFamily} calibration is invalid`);
     }
     if (family.status === "unavailable") {
+      if (readiness.ready) {
+        throw new Error(
+          `Tactical Profile ${taskFamily} availability contradicts its readiness`
+        );
+      }
       if (nonEmptyString(family.reason) === undefined) {
         throw new Error(
           `Tactical Profile ${taskFamily} unavailable reason is invalid`
@@ -1334,6 +1388,17 @@ export function assertValidTacticalProfileCalibrationArtifact(
     }
     if (family.status !== "calibrated" || !isRecord(family.solve)) {
       throw new Error(`Tactical Profile ${taskFamily} calibration is invalid`);
+    }
+    if (
+      !readiness.ready ||
+      provenance.representativeOwnerApproved !== true ||
+      !validSha256(provenance.corpusHash) ||
+      !validSha256(provenance.reportHash) ||
+      nonEmptyString(provenance.decisionEvidenceId) === undefined
+    ) {
+      throw new Error(
+        `Tactical Profile ${taskFamily} has no authenticated calibration readiness`
+      );
     }
     finiteNumber("solve intercept", family.solve.intercept);
     assertPositiveFinite(
@@ -1427,6 +1492,10 @@ function finiteNumber(label: string, value: unknown): number {
     throw new Error(`${label} must be finite`);
   }
   return value;
+}
+
+function validSha256(value: unknown): value is string {
+  return typeof value === "string" && /^sha256:[a-f0-9]{64}$/.test(value);
 }
 
 function assertPositiveInteger(label: string, value: unknown): void {
