@@ -61,7 +61,14 @@ import { buildPracticeProgressSummary } from "./rating-history.ts";
 import { clonePracticeSettings, defaultPracticeSettings, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
-import { selectUniquePuzzles } from "./puzzle-selection.ts";
+import {
+  selectUniquePuzzles,
+  selectUniquePuzzlesForRatingBands
+} from "./puzzle-selection.ts";
+import type {
+  RatingBandPuzzleSelection,
+  RatingBandPuzzleSelectionInput
+} from "./puzzle-source.ts";
 import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync.ts";
 import { cloneAttemptHistoryRow, preferredAttemptHistoryRow, sameAttemptHistoryRow } from "./attempt-sync.ts";
 import {
@@ -101,7 +108,13 @@ export class MemoryStore implements PracticeStore {
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
     return selectUniquePuzzles({
-      puzzles: [...this.puzzles.values()].sort((left, right) => left.rating - right.rating || left.id.localeCompare(right.id)),
+      puzzles: [...this.puzzles.values()].sort((left, right) =>
+        filter.preferredRating === undefined
+          ? left.rating - right.rating || left.id.localeCompare(right.id)
+          : Math.abs(left.rating - filter.preferredRating) -
+              Math.abs(right.rating - filter.preferredRating) ||
+            left.id.localeCompare(right.id)
+      ),
       mode: filter.mode,
       limit: filter.limit,
       ...(filter.rating === undefined ? {} : { rating: filter.rating }),
@@ -112,6 +125,15 @@ export class MemoryStore implements PracticeStore {
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
     });
+  }
+
+  selectPuzzlesForRatingBands(
+    input: RatingBandPuzzleSelectionInput
+  ): RatingBandPuzzleSelection[] {
+    return selectUniquePuzzlesForRatingBands(
+      [...this.puzzles.values()],
+      input
+    );
   }
 
   getRating(key: string): RatingRecord {
@@ -498,6 +520,16 @@ export class MemoryStore implements PracticeStore {
   }
 
   clearLocalHistory(): ClearLocalHistoryResult {
+    const evidenceSessionIds = new Set(
+      [...this.sessions.values()]
+        .filter(isTacticalProfileEvidenceSession)
+        .map((session) => session.id)
+    );
+    const hadTacticalProfileEvidence = this.attempts.some(
+      (attempt) =>
+        attempt.source === "sprint" &&
+        evidenceSessionIds.has(attempt.sessionId)
+    );
     const result: ClearLocalHistoryResult = {
       attempts: this.attempts.length,
       reviewEvents: 0,
@@ -512,7 +544,7 @@ export class MemoryStore implements PracticeStore {
         this.sessions.delete(id);
       }
     }
-    if (result.attempts > 0 || result.sprintSessions > 0) {
+    if (hadTacticalProfileEvidence) {
       this.tacticalProfileSourceRevision += 1;
     }
     return result;

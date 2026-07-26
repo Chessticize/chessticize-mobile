@@ -100,6 +100,12 @@ export function reliabilityBins(rows, binCount = 10) {
   }));
 }
 
+export function calibrationContentHash(value) {
+  return `sha256:${createHash("sha256")
+    .update(JSON.stringify(canonicalJsonValue(value)))
+    .digest("hex")}`;
+}
+
 export function evaluateCalibrationReadiness(report, policy, ownerApproved) {
   const reasons = [];
   if (!ownerApproved) {
@@ -165,6 +171,17 @@ export function evaluateCalibrationReadiness(report, policy, ownerApproved) {
   if (report.holdoutAttemptCount < minimums.holdoutAttemptsPerFamily) {
     reasons.push("too few holdout attempts");
   }
+  const qualifiedTimeoutPolicyCohorts =
+    report.solve.timeoutPolicyHoldout?.filter(
+      (cohort) =>
+        cohort.count >= minimums.timeoutPolicyHoldoutAttemptsPerCohort
+    ).length ?? 0;
+  if (
+    qualifiedTimeoutPolicyCohorts <
+    minimums.timeoutPolicyHoldoutCohortsPerFamily
+  ) {
+    reasons.push("too few qualified timeout-policy holdout cohorts");
+  }
   if (report.solve.brierScore === null || report.solve.brierScore > gates.maximumBrierScore) {
     reasons.push("Brier score gate failed");
   }
@@ -201,6 +218,7 @@ export function evaluateCalibrationReadiness(report, policy, ownerApproved) {
 
 export async function runCalibration(options) {
   const policy = JSON.parse(await readFile(options.policyPath, "utf8"));
+  const policyHash = calibrationContentHash(policy);
   const manifest = JSON.parse(await readFile(options.manifestPath, "utf8"));
   if (policy.schemaVersion !== 1) {
     throw new Error("Unsupported calibration policy schema");
@@ -212,6 +230,14 @@ export async function runCalibration(options) {
     policy.focusedRun.recentPuzzleDays < 0 ||
     !Array.isArray(policy.focusedRun.ratingBandHalfWidths) ||
     policy.focusedRun.ratingBandHalfWidths.length < 1 ||
+    !Number.isInteger(
+      policy.minimums?.timeoutPolicyHoldoutCohortsPerFamily
+    ) ||
+    policy.minimums.timeoutPolicyHoldoutCohortsPerFamily < 2 ||
+    !Number.isInteger(
+      policy.minimums?.timeoutPolicyHoldoutAttemptsPerCohort
+    ) ||
+    policy.minimums.timeoutPolicyHoldoutAttemptsPerCohort < 1 ||
     (
       policy.focusedRun.themeShortfallBackfill !== undefined &&
       (
@@ -236,7 +262,8 @@ export async function runCalibration(options) {
   const decisionEvidence = await loadDecisionEvidence(
     options.decisionEvidencePath,
     manifest,
-    corpusHash
+    corpusHash,
+    policyHash
   );
   const database = new DatabaseSync(options.packPath, { readOnly: true });
   try {
@@ -261,6 +288,7 @@ export async function runCalibration(options) {
         attemptCount: joined.inputAttemptCount,
         joinedObservationCount: joined.observations.length,
         corpusHash,
+        policyHash,
         decisionEvidenceId: decisionEvidence.decisionId
       },
       missingness: joined.missingness,
@@ -283,7 +311,12 @@ export async function runCalibration(options) {
   }
 }
 
-async function loadDecisionEvidence(path, manifest, corpusHash) {
+async function loadDecisionEvidence(
+  path,
+  manifest,
+  corpusHash,
+  policyHash
+) {
   if (!path) {
     return { decisionId: null, families: {} };
   }
@@ -293,10 +326,11 @@ async function loadDecisionEvidence(path, manifest, corpusHash) {
     typeof evidence.decisionId !== "string" ||
     evidence.decisionId.trim().length === 0 ||
     evidence.packFileHash !== manifest.packFileHash ||
-    evidence.corpusHash !== corpusHash
+    evidence.corpusHash !== corpusHash ||
+    evidence.policyHash !== policyHash
   ) {
     throw new Error(
-      "Calibration decision evidence does not match the authenticated pack and corpus"
+      "Calibration decision evidence does not match the authenticated pack, corpus, and policy"
     );
   }
   for (const taskFamily of ["line", "arrow_duel"]) {
@@ -398,8 +432,7 @@ function calibrateFamily(
     decisionEvidence: Object.fromEntries(
       REQUIRED_DECISION_EVIDENCE.map((decision) => [
         decision,
-        decision === "timeoutPolicyStratification" ||
-          suppliedDecisionEvidence?.[decision] === true
+        suppliedDecisionEvidence?.[decision] === true
       ])
     ),
     solve: {
@@ -932,6 +965,20 @@ function logit(probability) {
 
 function clampProbability(probability) {
   return Math.min(1 - EPSILON, Math.max(EPSILON, probability));
+}
+
+function canonicalJsonValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(canonicalJsonValue);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, canonicalJsonValue(value[key])])
+    );
+  }
+  return value;
 }
 
 function meanOrNull(values) {

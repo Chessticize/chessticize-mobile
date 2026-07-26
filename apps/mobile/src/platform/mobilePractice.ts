@@ -8,9 +8,14 @@ import {
 import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
 import { PackBackedPracticeStore } from "../../../../packages/storage/src/pack-backed-practice-store.ts";
 import { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
+import { selectUniquePuzzlesForRatingBands } from "../../../../packages/storage/src/puzzle-selection.ts";
 import { MemoryTacticalProfileRepository } from "../../../../packages/storage/src/tactical-profile-repository.ts";
 import { TacticalProfileService } from "../../../../packages/storage/src/tactical-profile-service.ts";
-import type { PuzzleSource } from "../../../../packages/storage/src/puzzle-source.ts";
+import type {
+  PuzzleSource,
+  RatingBandPuzzleSelection,
+  RatingBandPuzzleSelectionInput
+} from "../../../../packages/storage/src/puzzle-source.ts";
 import { MOBILE_DATABASE_LAYOUT } from "../backend/mobileDatabaseLayout.ts";
 import { productionTacticalProfileCalibration } from "../backend/tacticalProfileCalibration.ts";
 
@@ -156,6 +161,24 @@ class LazyPuzzleSource implements PuzzleSource {
 
   selectPuzzles(filter: Parameters<PuzzleSource["selectPuzzles"]>[0]): Puzzle[] {
     return this.current.selectPuzzles(filter);
+  }
+
+  selectPuzzlesForRatingBands(
+    input: RatingBandPuzzleSelectionInput
+  ): RatingBandPuzzleSelection[] {
+    const source = this.current;
+    if (source.selectPuzzlesForRatingBands) {
+      return source.selectPuzzlesForRatingBands(input);
+    }
+    const widestHalfWidth = Math.max(...input.halfWidths, 0);
+    const candidates = source.selectPuzzles({
+      ...input.filter,
+      minRating: Math.max(0, input.ratingAnchor - widestHalfWidth),
+      maxRating: input.ratingAnchor + widestHalfWidth,
+      preferredRating: input.ratingAnchor,
+      limit: Math.max(input.filter.limit * 50, 200)
+    });
+    return selectUniquePuzzlesForRatingBands(candidates, input);
   }
 
   selectPuzzlesExcludingThemes(

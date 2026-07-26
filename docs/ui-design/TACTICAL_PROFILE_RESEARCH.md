@@ -668,6 +668,17 @@ zero failures and zero duplicate puzzle IDs. Median selection time was
 Mac. The five-theme generic selection median/p95 was `20.611 / 22.417 ms`.
 These values support feasibility but are not production latency guarantees.
 
+On 2026-07-26, the benchmark gained the production nested-band selection path
+for the calibrated `±100 / ±200` Rating bands. An initial implementation using
+`ORDER BY ABS(rating - anchor)` was rejected after a five-iteration median of
+`541.950 ms`. The retained adapter performs bounded lower/upper index scans
+behind each quota selection and merges them by distance. Against the
+1,400,000-puzzle Core Pack v3, a ten-iteration run completed the primary,
+secondary, and mixed nested-band selections in a median `14.859 ms`, p95
+`15.364 ms`, and max `15.364 ms`, returning the exact `9 / 3 / 3` candidates
+at both bands. This is repeatable feasibility evidence, not a target-device
+latency gate.
+
 ## 12. Local-only incremental storage design
 
 The target derived-cache design consists of:

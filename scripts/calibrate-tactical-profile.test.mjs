@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {
+  calibrationContentHash,
   evaluateCalibrationReadiness,
   posteriorApproximationReport,
   reliabilityBins,
@@ -78,7 +79,11 @@ test("artifact readiness fails closed without explicit representative-corpus app
       posteriorApproximation: {
         maximumMeanErrorRating: 8,
         maximumSdErrorRating: 4
-      }
+      },
+      timeoutPolicyHoldout: [
+        { timeoutPolicySeconds: 30, count: 50 },
+        { timeoutPolicySeconds: 60, count: 50 }
+      ]
     },
     speed: {
       coefficients: {
@@ -100,7 +105,9 @@ test("artifact readiness fails closed without explicit representative-corpus app
       holdoutSessionsPerFamily: 20,
       trainAttemptsPerFamily: 500,
       holdoutAttemptsPerFamily: 200,
-      reliableSpeedHoldoutAttemptsPerFamily: 100
+      reliableSpeedHoldoutAttemptsPerFamily: 100,
+      timeoutPolicyHoldoutCohortsPerFamily: 2,
+      timeoutPolicyHoldoutAttemptsPerCohort: 50
     },
     holdoutGates: {
       maximumBrierScore: 0.25,
@@ -122,6 +129,18 @@ test("artifact readiness fails closed without explicit representative-corpus app
     ready: false,
     reasons: ["representative corpus has not been explicitly owner-approved"]
   });
+  const oneTimeoutPolicy = structuredClone(report);
+  oneTimeoutPolicy.solve.timeoutPolicyHoldout = [
+    { timeoutPolicySeconds: 30, count: 100 }
+  ];
+  assert.deepEqual(
+    evaluateCalibrationReadiness(
+      oneTimeoutPolicy,
+      policy,
+      true
+    ).reasons,
+    ["too few qualified timeout-policy holdout cohorts"]
+  );
 
   const invalid = structuredClone(report);
   invalid.solve.converged = false;
@@ -224,7 +243,9 @@ test("calibration joins canonical exports and emits cohort reports without activ
         featureHash: `sha256:${"1".repeat(64)}`
       }
     }));
-    await writeFile(policyPath, JSON.stringify(calibrationPolicy()));
+    const policy = calibrationPolicy();
+    const policyHash = calibrationContentHash(policy);
+    await writeFile(policyPath, JSON.stringify(policy));
     const progress = calibrationProgress();
     const corpusHash = `sha256:${createHash("sha256")
       .update(JSON.stringify([progress]))
@@ -259,7 +280,7 @@ test("calibration joins canonical exports and emits cohort reports without activ
     );
     assert.equal(
       report.families.line.decisionEvidence.timeoutPolicyStratification,
-      true
+      false
     );
     assert.equal(
       report.families.line.decisionEvidence.actionUtilityCalibration,
@@ -276,6 +297,7 @@ test("calibration joins canonical exports and emits cohort reports without activ
       decisionId: "owner-reviewed-test-decisions",
       packFileHash,
       corpusHash,
+      policyHash,
       families: {
         line: completeDecisionEvidence(),
         arrow_duel: completeDecisionEvidence()
@@ -311,6 +333,7 @@ test("calibration joins canonical exports and emits cohort reports without activ
       decisionId: "wrong-pack",
       packFileHash: `sha256:${"0".repeat(64)}`,
       corpusHash,
+      policyHash,
       families: {
         line: completeDecisionEvidence(),
         arrow_duel: completeDecisionEvidence()
@@ -327,7 +350,32 @@ test("calibration joins canonical exports and emits cohort reports without activ
         decisionEvidencePath,
         ownerApproved: true
       }),
-      /does not match the authenticated pack and corpus/
+      /does not match the authenticated pack, corpus, and policy/
+    );
+
+    await writeFile(decisionEvidencePath, JSON.stringify({
+      schemaVersion: 1,
+      decisionId: "wrong-policy",
+      packFileHash,
+      corpusHash,
+      policyHash: `sha256:${"0".repeat(64)}`,
+      families: {
+        line: completeDecisionEvidence(),
+        arrow_duel: completeDecisionEvidence()
+      }
+    }));
+    await assert.rejects(
+      runCalibration({
+        progressPaths: [progressPath],
+        packPath,
+        manifestPath,
+        policyPath,
+        reportPath,
+        artifactPath,
+        decisionEvidencePath,
+        ownerApproved: true
+      }),
+      /does not match the authenticated pack, corpus, and policy/
     );
   } finally {
     await rm(directory, { recursive: true, force: true });
@@ -373,7 +421,9 @@ function calibrationPolicy() {
       holdoutSessionsPerFamily: 1,
       trainAttemptsPerFamily: 1,
       holdoutAttemptsPerFamily: 1,
-      reliableSpeedHoldoutAttemptsPerFamily: 1
+      reliableSpeedHoldoutAttemptsPerFamily: 1,
+      timeoutPolicyHoldoutCohortsPerFamily: 2,
+      timeoutPolicyHoldoutAttemptsPerCohort: 1
     },
     holdoutGates: {
       maximumBrierScore: 1,

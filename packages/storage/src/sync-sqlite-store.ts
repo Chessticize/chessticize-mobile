@@ -65,7 +65,14 @@ import type {
 } from "./practice-store.ts";
 import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
 import { clonePracticeSettings, defaultPracticeSettings, normalizeReviewReminderPreference, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
-import { selectUniquePuzzles } from "./puzzle-selection.ts";
+import {
+  selectUniquePuzzles,
+  selectUniquePuzzlesForRatingBands
+} from "./puzzle-selection.ts";
+import type {
+  RatingBandPuzzleSelection,
+  RatingBandPuzzleSelectionInput
+} from "./puzzle-source.ts";
 import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync.ts";
 import { assignLegacyRatingGenerations } from "./rating-history.ts";
 import type { PracticeProgressSummary } from "./rating-history.ts";
@@ -406,8 +413,18 @@ export class SyncSQLiteStore implements PracticeStore {
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
     const rows = this.db
-      .prepare("SELECT * FROM puzzles WHERE rating >= ? AND rating <= ? ORDER BY rating ASC, id ASC")
-      .all(filter.minRating ?? 0, filter.maxRating ?? 4000) as PuzzleRow[];
+      .prepare(
+        filter.preferredRating === undefined
+          ? "SELECT * FROM puzzles WHERE rating >= ? AND rating <= ? ORDER BY rating ASC, id ASC"
+          : "SELECT * FROM puzzles WHERE rating >= ? AND rating <= ? ORDER BY ABS(rating - ?) ASC, id ASC"
+      )
+      .all(
+        filter.minRating ?? 0,
+        filter.maxRating ?? 4000,
+        ...(filter.preferredRating === undefined
+          ? []
+          : [filter.preferredRating])
+      ) as PuzzleRow[];
 
     return selectUniquePuzzles({
       puzzles: rows.map(puzzleFromRow),
@@ -421,6 +438,28 @@ export class SyncSQLiteStore implements PracticeStore {
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
     });
+  }
+
+  selectPuzzlesForRatingBands(
+    input: RatingBandPuzzleSelectionInput
+  ): RatingBandPuzzleSelection[] {
+    const widestHalfWidth = Math.max(...input.halfWidths, 0);
+    const rows = this.db
+      .prepare(
+        `SELECT *
+         FROM puzzles
+         WHERE rating >= ? AND rating <= ?
+         ORDER BY ABS(rating - ?) ASC, id ASC`
+      )
+      .all(
+        Math.max(0, input.ratingAnchor - widestHalfWidth),
+        input.ratingAnchor + widestHalfWidth,
+        input.ratingAnchor
+      ) as PuzzleRow[];
+    return selectUniquePuzzlesForRatingBands(
+      rows.map(puzzleFromRow),
+      input
+    );
   }
 
   getRating(key: string): RatingRecord {
@@ -1142,6 +1181,16 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   clearLocalHistory(): ClearLocalHistoryResult {
+    const hadTacticalProfileEvidence = this
+      .listSprintSessions()
+      .some(
+        (session) =>
+          isTacticalProfileEvidenceSession(session) &&
+          this.countAttempts({
+            source: "sprint",
+            sessionId: session.id
+          }) > 0
+      );
     const result: ClearLocalHistoryResult = {
       attempts: countRows(this.db, "attempts"),
       reviewEvents: countRows(this.db, "review_events"),
@@ -1153,7 +1202,7 @@ export class SyncSQLiteStore implements PracticeStore {
     this.db.prepare("DELETE FROM review_queue").run();
     this.db.prepare("DELETE FROM review_schedule_removals").run();
     this.db.prepare("DELETE FROM sprint_sessions WHERE status NOT IN ('active', 'paused')").run();
-    if (result.attempts > 0 || result.sprintSessions > 0) {
+    if (hadTacticalProfileEvidence) {
       this.bumpTacticalProfileSourceRevision();
     }
     return result;

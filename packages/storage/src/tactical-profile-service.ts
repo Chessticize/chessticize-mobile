@@ -21,7 +21,12 @@ import type {
   PracticeStore
 } from "./practice-store.ts";
 import type { AttemptHistoryRow } from "./query-types.ts";
-import type { PuzzleSource } from "./puzzle-source.ts";
+import { selectUniquePuzzlesForRatingBands } from "./puzzle-selection.ts";
+import type {
+  PuzzleSource,
+  RatingBandPuzzleSelection,
+  RatingBandPuzzleSelectionInput
+} from "./puzzle-source.ts";
 import type {
   TacticalProfileBuildState,
   TacticalProfileCacheIdentity,
@@ -302,6 +307,7 @@ export class TacticalProfileService {
       this.focusedRunPolicy.recentPuzzleDays
     );
     const runFocuses = distinctRunFocuses(rankedFocuses);
+    const viableHalfWidths: number[] = [];
     for (const halfWidth of this.focusedRunPolicy.ratingBandHalfWidths) {
       const minRating = Math.max(0, anchor.rating - halfWidth);
       const maxRating = anchor.rating + halfWidth;
@@ -335,27 +341,55 @@ export class TacticalProfileService {
           continue;
         }
       }
-      const commonFilter = {
-        mode: taskFamily === "arrow_duel" ? "arrow_duel" as const : "standard" as const,
-        minRating,
-        maxRating,
-        excludeIds: exclusions,
-        randomSeed,
-        limit: this.focusedRunPolicy!.runSize
-      };
+      viableHalfWidths.push(halfWidth);
+    }
+    if (viableHalfWidths.length === 0) {
+      return { status: "unavailable", reason: "insufficient_inventory" };
+    }
+    const commonFilter = {
+      mode:
+        taskFamily === "arrow_duel"
+          ? "arrow_duel" as const
+          : "standard" as const,
+      excludeIds: exclusions,
+      randomSeed,
+      limit: this.focusedRunPolicy.runSize
+    };
+    const candidatesByThemeAndBand = new Map(
+      runFocuses.map((focus) => [
+        focus.theme,
+        this.selectRatingBandPuzzles({
+          filter: {
+            ...commonFilter,
+            themes: [focus.theme]
+          },
+          ratingAnchor: anchor.rating,
+          halfWidths: viableHalfWidths
+        })
+      ])
+    );
+    const mixedCandidatesByBand = this.selectRatingBandPuzzles({
+      filter: commonFilter,
+      ratingAnchor: anchor.rating,
+      halfWidths: viableHalfWidths,
+      excludedThemes: runFocuses.map((focus) => focus.theme)
+    });
+    for (const halfWidth of viableHalfWidths) {
+      const minRating = Math.max(0, anchor.rating - halfWidth);
+      const maxRating = anchor.rating + halfWidth;
       const candidatesByTheme = new Map(
         runFocuses.map((focus) => [
           focus.theme,
-          this.puzzleSource.selectPuzzles({
-            ...commonFilter,
-            themes: [focus.theme]
-          })
+          candidatesByThemeAndBand
+            .get(focus.theme)
+            ?.find((selection) => selection.halfWidth === halfWidth)
+            ?.puzzles ?? []
         ])
       );
-      const mixedCandidates = this.selectMixedPuzzles(
-        commonFilter,
-        runFocuses.map((focus) => focus.theme)
-      );
+      const mixedCandidates =
+        mixedCandidatesByBand.find(
+          (selection) => selection.halfWidth === halfWidth
+        )?.puzzles ?? [];
       const inventoryBand = {
         minRating,
         maxRating,
@@ -395,6 +429,31 @@ export class TacticalProfileService {
       }
     }
     return { status: "unavailable", reason: "insufficient_inventory" };
+  }
+
+  private selectRatingBandPuzzles(
+    input: RatingBandPuzzleSelectionInput
+  ): RatingBandPuzzleSelection[] {
+    if (this.puzzleSource.selectPuzzlesForRatingBands) {
+      return this.puzzleSource.selectPuzzlesForRatingBands(input);
+    }
+    const widestHalfWidth = Math.max(...input.halfWidths, 0);
+    const { randomSeed: _randomSeed, ...unseededFilter } =
+      input.filter;
+    const candidateFilter = {
+      ...unseededFilter,
+      minRating: Math.max(0, input.ratingAnchor - widestHalfWidth),
+      maxRating: input.ratingAnchor + widestHalfWidth,
+      preferredRating: input.ratingAnchor,
+      limit: Math.max(input.filter.limit * 50, 200)
+    };
+    const candidates = input.excludedThemes === undefined
+      ? this.puzzleSource.selectPuzzles(candidateFilter)
+      : this.selectMixedPuzzles(
+          candidateFilter,
+          input.excludedThemes
+        );
+    return selectUniquePuzzlesForRatingBands(candidates, input);
   }
 
   private refreshDirtyDays(): TacticalProfileBuildState {

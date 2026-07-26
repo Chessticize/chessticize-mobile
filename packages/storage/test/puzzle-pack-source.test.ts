@@ -134,6 +134,75 @@ test("SQLitePuzzlePackSource exact mixed quota excludes every focused theme", ()
   }
 });
 
+test("SQLitePuzzlePackSource resolves nested Rating bands in one deep selection", () => {
+  const ratedPuzzle = (
+    id: string,
+    themes: string[],
+    rating: number
+  ): Puzzle => ({
+    ...tacticalSelectionPuzzle(id, themes),
+    rating
+  });
+  const packDb = buildPackDatabase([
+    ratedPuzzle("fork-narrow-a", ["fork"], 850),
+    ratedPuzzle("fork-narrow-b", ["fork"], 950),
+    ratedPuzzle("fork-wide", ["fork"], 1_050),
+    ratedPuzzle("mixed-narrow-a", ["sacrifice"], 850),
+    ratedPuzzle("mixed-narrow-b", ["deflection"], 950),
+    ratedPuzzle("mixed-wide", ["clearance"], 1_050)
+  ]);
+  try {
+    const source = new SQLitePuzzlePackSource(
+      new NodeSqliteDatabase(packDb),
+      { candidateMultiplier: 2, candidateFloor: 5 }
+    );
+    const focused = source.selectPuzzlesForRatingBands({
+      filter: {
+        mode: "standard",
+        limit: 3,
+        themes: ["fork"],
+        randomSeed: "nested-bands"
+      },
+      ratingAnchor: 900,
+      halfWidths: [100, 200]
+    });
+    const mixed = source.selectPuzzlesForRatingBands({
+      filter: {
+        mode: "standard",
+        limit: 3,
+        randomSeed: "nested-bands-mixed"
+      },
+      ratingAnchor: 900,
+      halfWidths: [100, 200],
+      excludedThemes: ["fork"]
+    });
+
+    assert.deepEqual(
+      focused.map((selection) => [
+        selection.halfWidth,
+        selection.puzzles.length
+      ]),
+      [[100, 2], [200, 3]]
+    );
+    assert.deepEqual(
+      mixed.map((selection) => [
+        selection.halfWidth,
+        selection.puzzles.length
+      ]),
+      [[100, 2], [200, 3]]
+    );
+    assert.ok(
+      mixed.every((selection) =>
+        selection.puzzles.every(
+          (puzzle) => !puzzle.themes.includes("fork")
+        )
+      )
+    );
+  } finally {
+    packDb.close();
+  }
+});
+
 test("SQLitePuzzlePackSource fills mixed quota beyond a large recent-id exclusion set", () => {
   const excluded = Array.from({ length: 1_000 }, (_, index) =>
     tacticalSelectionPuzzle(`excluded-${String(index).padStart(4, "0")}`, ["sacrifice"])

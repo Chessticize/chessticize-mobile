@@ -9,6 +9,7 @@ export interface PuzzleSelectionFilter {
   mode: SprintMode;
   limit: number;
   rating?: number;
+  preferredRating?: number;
   minRating?: number;
   maxRating?: number;
   themes?: string[];

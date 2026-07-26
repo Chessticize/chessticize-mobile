@@ -700,11 +700,12 @@ test("overlapping focus inventory widens before giving up on an exact two-theme 
     games: 12
   });
   seedDualWeaknessHistory(store);
-  const originalSelectPuzzles = store.selectPuzzles.bind(store);
+  const originalSelectRatingBands =
+    store.selectPuzzlesForRatingBands.bind(store);
   let selectionQueries = 0;
-  store.selectPuzzles = (filter) => {
+  store.selectPuzzlesForRatingBands = (input) => {
     selectionQueries += 1;
-    return originalSelectPuzzles(filter);
+    return originalSelectRatingBands(input);
   };
   const profile = new TacticalProfileService({
     progressStore: store,
@@ -740,8 +741,8 @@ test("overlapping focus inventory widens before giving up on an exact two-theme 
   assert.equal(new Set(result.prepared.puzzles.map((puzzle) => puzzle.id)).size, 15);
   assert.equal(
     selectionQueries,
-    6,
-    "each bounded band should query two theme pools and one mixed pool once"
+    3,
+    "nested rating widening should select primary, secondary, and mixed once"
   );
 });
 
@@ -1074,6 +1075,13 @@ for (const storeKind of ["memory", "sqlite"] as const) {
           mistakeCount: 0
         });
       });
+      assert.equal(store.getTacticalProfileSourceRevision(), before);
+      store.clearLocalHistory();
+      assert.equal(
+        store.getTacticalProfileSourceRevision(),
+        before,
+        "clearing intervention-only history must not invalidate the profile"
+      );
 
       const ordinaryConfig = buildSprintConfig({
         mode: "standard",
@@ -1095,6 +1103,12 @@ for (const storeKind of ["memory", "sqlite"] as const) {
         endReason: "abandoned"
       });
       assert.equal(store.getTacticalProfileSourceRevision(), before);
+      store.clearLocalHistory();
+      assert.equal(
+        store.getTacticalProfileSourceRevision(),
+        before,
+        "clearing zero-attempt history must not invalidate the profile"
+      );
 
       const ordinary = startSprint({
         id: `${storeKind}-ordinary-revision`,
@@ -1121,6 +1135,12 @@ for (const storeKind of ["memory", "sqlite"] as const) {
         });
       });
       assert.equal(store.getTacticalProfileSourceRevision(), before + 1);
+      store.clearLocalHistory();
+      assert.equal(
+        store.getTacticalProfileSourceRevision(),
+        before + 2,
+        "clearing canonical ordinary-mixed evidence must invalidate the profile"
+      );
     } finally {
       if (store instanceof SQLiteStore) {
         store.close();

@@ -29,6 +29,8 @@ try {
   });
   const results = cases.map((benchmarkCase) => benchmarkSelection(source, benchmarkCase));
   const focusedQuotaPlan = benchmarkFocusedQuotaPlan(source);
+  const nestedRatingBandSelections =
+    benchmarkNestedRatingBandSelections(source);
   const largeRecentExclusion = benchmarkLargeRecentExclusion(source);
   const oneTheme = results[0];
   const fiveThemes = results[1];
@@ -57,6 +59,7 @@ try {
     input: { limit, rating },
     results,
     focusedQuotaPlan,
+    nestedRatingBandSelections,
     largeRecentExclusion,
     fiveToOneMedianRatio: round(fiveThemes.selection.medianMs / oneTheme.selection.medianMs),
     fiveToAllMedianRatio: round(fiveThemes.selection.medianMs / allThemes.selection.medianMs),
@@ -64,6 +67,98 @@ try {
   }, null, 2)}\n`);
 } finally {
   database.close();
+}
+
+function benchmarkNestedRatingBandSelections(source) {
+  const run = (randomSeed) => {
+    const input = {
+      ratingAnchor: rating,
+      halfWidths: [100, 200]
+    };
+    const primary = source.selectPuzzlesForRatingBands({
+      ...input,
+      filter: {
+        mode: "custom",
+        limit: 9,
+        themes: ["fork"],
+        randomSeed: `${randomSeed}:primary`
+      }
+    });
+    const secondary = source.selectPuzzlesForRatingBands({
+      ...input,
+      filter: {
+        mode: "custom",
+        limit: 3,
+        themes: ["pin"],
+        randomSeed: `${randomSeed}:secondary`
+      }
+    });
+    const mixed = source.selectPuzzlesForRatingBands({
+      ...input,
+      filter: {
+        mode: "custom",
+        limit: 3,
+        randomSeed: `${randomSeed}:mixed`
+      },
+      excludedThemes: ["fork", "pin"]
+    });
+    return { primary, secondary, mixed };
+  };
+  for (let index = 0; index < 5; index += 1) {
+    run(`warm-${index}`);
+  }
+  const samples = [];
+  let latest;
+  for (let index = 0; index < iterations; index += 1) {
+    const startedAt = performance.now();
+    latest = run(`sample-${index}`);
+    samples.push(performance.now() - startedAt);
+    for (const halfWidth of [100, 200]) {
+      const counts = [
+        latest.primary.find((band) => band.halfWidth === halfWidth)
+          ?.puzzles.length,
+        latest.secondary.find((band) => band.halfWidth === halfWidth)
+          ?.puzzles.length,
+        latest.mixed.find((band) => band.halfWidth === halfWidth)
+          ?.puzzles.length
+      ];
+      if (counts.some((count) => count === undefined)) {
+        throw new Error(
+          `nested-rating-band selection omitted ±${halfWidth}`
+        );
+      }
+    }
+  }
+  samples.sort((left, right) => left - right);
+  return {
+    indexedSelectionCount: 3,
+    ratingBandHalfWidths: [100, 200],
+    returnedByBand: Object.fromEntries(
+      [100, 200].map((halfWidth) => [
+        halfWidth,
+        {
+          primary:
+            latest.primary.find(
+              (band) => band.halfWidth === halfWidth
+            )?.puzzles.length ?? 0,
+          secondary:
+            latest.secondary.find(
+              (band) => band.halfWidth === halfWidth
+            )?.puzzles.length ?? 0,
+          mixed:
+            latest.mixed.find(
+              (band) => band.halfWidth === halfWidth
+            )?.puzzles.length ?? 0
+        }
+      ])
+    ),
+    selection: {
+      medianMs: round(percentile(samples, 0.5)),
+      p95Ms: round(percentile(samples, 0.95)),
+      minMs: round(samples[0]),
+      maxMs: round(samples.at(-1))
+    }
+  };
 }
 
 function benchmarkFocusedQuotaPlan(source) {
