@@ -72,9 +72,37 @@ export function useTacticalProfilePresentation(input: {
     return next;
   }, [service]);
 
+  const preflightFocusedRun = useCallback((
+    taskFamily: TacticalProfileTaskFamily,
+    currentSnapshot: TacticalProfileSnapshot | undefined
+  ): void => {
+    const hasRecommendation = currentSnapshot?.evaluation.signals.some(
+      (signal) =>
+        signal.taskFamily === taskFamily &&
+        signal.status === "recommended"
+    ) ?? false;
+    if (!hasRecommendation) {
+      setPrepared(undefined);
+      setFocusedRunUnavailable(undefined);
+      return;
+    }
+    const result = service.prepareFocusedRun(taskFamily);
+    if (result.status === "ready") {
+      setPrepared(result.prepared);
+      setFocusedRunUnavailable(undefined);
+      return;
+    }
+    setPrepared(undefined);
+    setFocusedRunUnavailable(unavailableCopy(result.reason));
+  }, [service]);
+
   const onIntent = useCallback((intent: TacticalProfileIntent): void => {
     if (intent.type === "open-profile" || intent.type === "restore-recommendation") {
-      refresh();
+      const next = refresh();
+      preflightFocusedRun(
+        resolvedRecommendedTaskFamily(next, activeTaskFamily),
+        next
+      );
       setScreen("profile");
       return;
     }
@@ -85,8 +113,7 @@ export function useTacticalProfilePresentation(input: {
     if (intent.type === "select-task-family") {
       setActiveTaskFamily(intent.taskFamily);
       setSelectedSignalId(undefined);
-      setPrepared(undefined);
-      setFocusedRunUnavailable(undefined);
+      preflightFocusedRun(intent.taskFamily, snapshot);
       return;
     }
     if (intent.type === "explain-signal") {
@@ -103,6 +130,10 @@ export function useTacticalProfilePresentation(input: {
       activeTaskFamily
     );
     if (intent.type === "preview-focused-run") {
+      if (prepared?.plan.taskFamily === intentTaskFamily) {
+        setScreen("focused_run");
+        return;
+      }
       const result = service.prepareFocusedRun(intentTaskFamily);
       if (result.status !== "ready") {
         setPrepared(undefined);
@@ -132,7 +163,15 @@ export function useTacticalProfilePresentation(input: {
     } catch (error) {
       handleUnavailable(error);
     }
-  }, [activeTaskFamily, onStartRequested, refresh, service, snapshot]);
+  }, [
+    activeTaskFamily,
+    onStartRequested,
+    preflightFocusedRun,
+    prepared,
+    refresh,
+    service,
+    snapshot
+  ]);
 
   return useMemo(() => {
     if (injectedPresentation) {
@@ -142,31 +181,18 @@ export function useTacticalProfilePresentation(input: {
       return undefined;
     }
     const signals = snapshot.evaluation.signals.map(signalPresentation);
-    const recommendedFamilies = new Set(
-      signals
-        .filter((signal) => signal.status === "recommended")
-        .map((signal) => signal.taskFamily)
-    );
     const resolvedTaskFamily = resolvedRecommendedTaskFamily(
       snapshot,
       activeTaskFamily
     );
-    // Cross-family ordering is deliberately not inferred from model array
-    // order. Until an approved calibration artifact carries that policy, the
-    // shared Home card stays mode-neutral when both families qualify.
-    const homeLeadSignalId = recommendedFamilies.size === 1
-      ? signals.find(
-          (signal) =>
-            signal.status === "recommended" &&
-            recommendedFamilies.has(signal.taskFamily)
-        )?.id
-      : undefined;
     return {
       phase: snapshot.phase,
       screen,
       activeTaskFamily: resolvedTaskFamily,
       signals,
-      ...(homeLeadSignalId === undefined ? {} : { homeLeadSignalId }),
+      ...(snapshot.homeLeadSignalId === undefined
+        ? {}
+        : { homeLeadSignalId: snapshot.homeLeadSignalId }),
       ...(selectedSignalId === undefined ? {} : { selectedSignalId }),
       ...(prepared === undefined
         ? {}

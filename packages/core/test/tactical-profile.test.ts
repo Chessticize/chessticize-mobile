@@ -13,6 +13,7 @@ import {
   exactSolveThemePosterior,
   focusedRunPlanRefreshDecision,
   shouldReevaluateTacticalProfile,
+  tacticalProfileSolveBaselineFeatures,
   tacticalProfileSpeedBaselineFeatures,
   type TacticalProfileAttemptInput,
   type TacticalProfileCalibrationArtifact
@@ -599,18 +600,24 @@ test("correct attempts at or beyond the Timeout boundary do not become speed evi
 test("one multi-theme attempt conserves one total theme observation", () => {
   const cells = buildTacticalProfileDailyCells([
     tacticalAttempt({
-      puzzle: { themes: ["fork", "pin", "fork", "notCurated"] }
+      puzzle: {
+        themes: ["fork", "pin", "deflection", "fork", "notCurated"]
+      }
     })
   ], CALIBRATION);
 
-  assert.equal(cells.length, 2);
+  assert.equal(cells.length, 3);
   assert.equal(
     cells.reduce((sum, cell) => sum + cell.solveWeight, 0),
     1
   );
   assert.deepEqual(
     cells.map((cell) => [cell.theme, cell.solveWeight]),
-    [["fork", 0.5], ["pin", 0.5]]
+    [
+      ["deflection", 1 / 3],
+      ["fork", 1 / 3],
+      ["pin", 1 / 3]
+    ]
   );
 });
 
@@ -654,11 +661,25 @@ test("legacy timing gaps are never reconstructed from timestamps or current defa
   assert.deepEqual(policyCells, []);
 });
 
-test("a puzzle with no curated theme contributes no theme posterior cell", () => {
+test("a puzzle with no curated theme keeps baseline features but contributes no theme posterior cell", () => {
+  const input = tacticalAttempt({
+    puzzle: { themes: ["notCurated"] }
+  });
+  const baseline = tacticalProfileSolveBaselineFeatures({
+    puzzleRating: input.puzzle.rating,
+    puzzleRatingDeviation: input.puzzle.ratingDeviation!,
+    ratingBefore: input.attempt.ratingBefore,
+    timeoutAfterSeconds:
+      input.sessionConfig!.puzzleTiming!.timeoutAfterSeconds!,
+    timeoutReferenceSeconds:
+      CALIBRATION.families.line.status === "calibrated"
+        ? CALIBRATION.families.line.solve.timeoutReferenceSeconds
+        : 60
+  });
+
+  assert.ok(Object.values(baseline).every(Number.isFinite));
   assert.deepEqual(
-    buildTacticalProfileDailyCells([
-      tacticalAttempt({ puzzle: { themes: ["notCurated"] } })
-    ], CALIBRATION),
+    buildTacticalProfileDailyCells([input], CALIBRATION),
     []
   );
 });

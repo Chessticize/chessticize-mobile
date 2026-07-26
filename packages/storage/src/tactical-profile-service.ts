@@ -30,6 +30,7 @@ import type {
 import type {
   TacticalProfileBuildState,
   TacticalProfileCacheIdentity,
+  TacticalProfileRatingAnchor,
   TacticalProfileRepository
 } from "./tactical-profile-repository.ts";
 
@@ -60,6 +61,7 @@ export type TacticalProfileSnapshot = {
   cutoffs: ReturnType<typeof applyTacticalFocusCutoffsByTaskFamily>;
   buildState: TacticalProfileBuildState;
   unavailableFamilies: Readonly<Partial<Record<TacticalProfileTaskFamily, string>>>;
+  homeLeadSignalId?: string;
 };
 
 export type PreparedFocusedRun = {
@@ -150,7 +152,7 @@ export class TacticalProfileService {
     const evaluation = evaluateTacticalProfile({
       cells: this.repository.listDailyCells(this.identity),
       calibration: this.calibration,
-      naturalFrequency: this.currentNaturalFrequency(),
+      naturalFrequency: this.currentNaturalFrequency(buildState),
       now: evaluatedAt,
       ...(buildState.recommendedSignalIds === undefined
         ? {}
@@ -168,12 +170,22 @@ export class TacticalProfileService {
     if (buildState.dirtyDayCount === 0) {
       this.repository.saveBuildState(completedBuildState);
     }
+    const homeLeadSignalId =
+      this.calibration.provenance.representativeOwnerApproved &&
+      this.calibration.provenance.decisionEvidenceId !== null
+        ? evaluation.signals.find(
+            (signal) => signal.status === "recommended"
+          )?.id
+        : undefined;
     return {
       phase: buildState.dirtyDayCount > 0 ? "building" : evaluation.phase,
       evaluation,
       cutoffs: applyTacticalFocusCutoffsByTaskFamily(evaluation.rankedFocuses),
       buildState: completedBuildState,
-      unavailableFamilies: unavailableFamilies(this.calibration)
+      unavailableFamilies: unavailableFamilies(this.calibration),
+      // Action utility is comparable across task families only after the
+      // authenticated calibration has approved the Home-lead policy.
+      ...(homeLeadSignalId === undefined ? {} : { homeLeadSignalId })
     };
   }
 
@@ -222,6 +234,13 @@ export class TacticalProfileService {
         onSprintSessionChanged: (previous, next) => {
           if (sessionFingerprint(previous) !== sessionFingerprint(next)) {
             changedSessionIds.add(next.id);
+            const ratingAnchors = this.repository.getBuildState()?.ratingAnchors;
+            if (
+              ratingAnchors?.line?.sessionId === next.id ||
+              ratingAnchors?.arrow_duel?.sessionId === next.id
+            ) {
+              this.requiresCanonicalRebuild = true;
+            }
           }
         }
       },
@@ -476,7 +495,10 @@ export class TacticalProfileService {
           : { evaluatedAt: previousState.evaluatedAt }),
         ...(previousState?.recommendedSignalIds === undefined
           ? {}
-          : { recommendedSignalIds: previousState.recommendedSignalIds })
+          : { recommendedSignalIds: previousState.recommendedSignalIds }),
+        ...(this.naturalFrequencyForRating === undefined
+          ? {}
+          : { ratingAnchors: previousState?.ratingAnchors ?? {} })
       };
       this.repository.saveBuildState(ready);
       return ready;
@@ -494,6 +516,12 @@ export class TacticalProfileService {
         .getSprintSessions(attempts.map((attempt) => attempt.sessionId))
         .map((session) => [session.id, session])
     );
+    const ratingAnchors = this.naturalFrequencyForRating === undefined
+      ? undefined
+      : updatedRatingAnchors(
+          previousState?.ratingAnchors ?? {},
+          [...sessions.values()]
+        );
     const attemptsByDay = new Map<string, typeof attempts>();
     const dirtyDaySet = new Set(dirtyDays);
     for (const attempt of attempts) {
@@ -542,7 +570,8 @@ export class TacticalProfileService {
           : { evaluatedAt: previousState.evaluatedAt }),
         ...(previousState?.recommendedSignalIds === undefined
           ? {}
-          : { recommendedSignalIds: previousState.recommendedSignalIds })
+          : { recommendedSignalIds: previousState.recommendedSignalIds }),
+        ...(ratingAnchors === undefined ? {} : { ratingAnchors })
       };
       this.repository.saveBuildState(state);
       return state;
@@ -577,7 +606,11 @@ export class TacticalProfileService {
     if (
       !state ||
       !sameIdentity(state, this.identity) ||
-      state.sourceRevision !== sourceRevision
+      state.sourceRevision !== sourceRevision ||
+      (
+        this.naturalFrequencyForRating !== undefined &&
+        state.ratingAnchors === undefined
+      )
     ) {
       this.repository.reset(
         this.identity,
@@ -662,11 +695,12 @@ export class TacticalProfileService {
     };
   }
 
-  private currentNaturalFrequency(): TacticalProfileNaturalFrequency {
+  private currentNaturalFrequency(
+    buildState: TacticalProfileBuildState
+  ): TacticalProfileNaturalFrequency {
     if (!this.naturalFrequencyForRating) {
       return this.naturalFrequency;
     }
-    const sessions = this.progressStore.listSprintSessions();
     const frequencies: Record<
       TacticalProfileTaskFamily,
       Readonly<Record<string, number>>
@@ -675,14 +709,11 @@ export class TacticalProfileService {
       arrow_duel: this.naturalFrequency.arrow_duel
     };
     for (const taskFamily of ["line", "arrow_duel"] as const) {
-      const latest = latestOrdinaryMixedSessionByConfiguration(
-        sessions,
-        taskFamily
-      );
-      if (!latest?.config) {
+      const anchor = buildState.ratingAnchors?.[taskFamily];
+      if (!anchor) {
         continue;
       }
-      const rating = this.progressStore.getRating(latest.config.ratingKey).rating;
+      const rating = this.progressStore.getRating(anchor.ratingKey).rating;
       frequencies[taskFamily] = this.naturalFrequencyForRating(
         taskFamily,
         rating
@@ -786,6 +817,50 @@ export class TacticalProfileService {
       calibrationId: this.calibration.calibrationId
     };
   }
+}
+
+function updatedRatingAnchors(
+  previous: Readonly<Partial<Record<
+    TacticalProfileTaskFamily,
+    TacticalProfileRatingAnchor
+  >>>,
+  sessions: readonly ExportedSprintSession[]
+): Partial<Record<TacticalProfileTaskFamily, TacticalProfileRatingAnchor>> {
+  const next: Partial<Record<
+    TacticalProfileTaskFamily,
+    TacticalProfileRatingAnchor
+  >> = {
+    ...(previous.line === undefined ? {} : { line: { ...previous.line } }),
+    ...(previous.arrow_duel === undefined
+      ? {}
+      : { arrow_duel: { ...previous.arrow_duel } })
+  };
+  for (const taskFamily of ["line", "arrow_duel"] as const) {
+    const session = latestOrdinaryMixedSessionByConfiguration(
+      sessions,
+      taskFamily
+    );
+    if (!session?.config || !session.completedAt) {
+      continue;
+    }
+    const candidate: TacticalProfileRatingAnchor = {
+      sessionId: session.id,
+      ratingKey: session.config.ratingKey,
+      completedAt: session.completedAt
+    };
+    const current = next[taskFamily];
+    if (
+      !current ||
+      candidate.completedAt > current.completedAt ||
+      (
+        candidate.completedAt === current.completedAt &&
+        candidate.sessionId > current.sessionId
+      )
+    ) {
+      next[taskFamily] = candidate;
+    }
+  }
+  return next;
 }
 
 function addCanonicalAttemptDay(

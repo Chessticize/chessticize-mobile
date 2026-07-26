@@ -5,7 +5,7 @@ import type {
 } from "../../core/src/index.ts";
 import type { SyncSqliteDatabase } from "./sync-sqlite-store.ts";
 
-export const TACTICAL_PROFILE_CACHE_SCHEMA_VERSION = 3;
+export const TACTICAL_PROFILE_CACHE_SCHEMA_VERSION = 4;
 
 export type TacticalProfileCacheIdentity = Pick<
   TacticalProfileCalibrationArtifact,
@@ -13,6 +13,12 @@ export type TacticalProfileCacheIdentity = Pick<
 >;
 
 export type TacticalProfileBuildStatus = "empty" | "building" | "ready" | "failed";
+
+export type TacticalProfileRatingAnchor = {
+  sessionId: string;
+  ratingKey: string;
+  completedAt: string;
+};
 
 export type TacticalProfileBuildState = TacticalProfileCacheIdentity & {
   status: TacticalProfileBuildStatus;
@@ -22,6 +28,10 @@ export type TacticalProfileBuildState = TacticalProfileCacheIdentity & {
   lastError?: string;
   evaluatedAt?: string;
   recommendedSignalIds?: readonly string[];
+  ratingAnchors?: Readonly<Partial<Record<
+    TacticalProfileTaskFamily,
+    TacticalProfileRatingAnchor
+  >>>;
 };
 
 export interface TacticalProfileRepository {
@@ -94,7 +104,10 @@ export class MemoryTacticalProfileRepository implements TacticalProfileRepositor
         : { evaluatedAt: this.buildState.evaluatedAt }),
       ...(this.buildState?.recommendedSignalIds === undefined
         ? {}
-        : { recommendedSignalIds: [...this.buildState.recommendedSignalIds] })
+        : { recommendedSignalIds: [...this.buildState.recommendedSignalIds] }),
+      ...(this.buildState?.ratingAnchors === undefined
+        ? {}
+        : { ratingAnchors: cloneRatingAnchors(this.buildState.ratingAnchors) })
     };
   }
 
@@ -234,7 +247,8 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           watermark_day TEXT,
           last_error TEXT,
           evaluated_at TEXT,
-          recommended_signal_ids_json TEXT
+          recommended_signal_ids_json TEXT,
+          rating_anchors_json TEXT
         );
       `);
       } else {
@@ -248,6 +262,11 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           this.db.exec(`
             ALTER TABLE weakness_build_state
             ADD COLUMN source_revision INTEGER NOT NULL DEFAULT -1;
+          `);
+        }
+        if (current <= 3) {
+          this.db.exec(`
+            ALTER TABLE weakness_build_state ADD COLUMN rating_anchors_json TEXT;
           `);
         }
       }
@@ -267,7 +286,8 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         watermark_day AS watermarkDay,
         last_error AS lastError,
         evaluated_at AS evaluatedAt,
-        recommended_signal_ids_json AS recommendedSignalIdsJson
+        recommended_signal_ids_json AS recommendedSignalIdsJson,
+        rating_anchors_json AS ratingAnchorsJson
       FROM weakness_build_state
       WHERE singleton_id = 1
     `).get() as BuildStateRow | undefined;
@@ -316,7 +336,10 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         ...(current?.evaluatedAt === undefined ? {} : { evaluatedAt: current.evaluatedAt }),
         ...(current?.recommendedSignalIds === undefined
           ? {}
-          : { recommendedSignalIds: current.recommendedSignalIds })
+          : { recommendedSignalIds: current.recommendedSignalIds }),
+        ...(current?.ratingAnchors === undefined
+          ? {}
+          : { ratingAnchors: current.ratingAnchors })
       });
     });
   }
@@ -447,8 +470,9 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         watermark_day,
         last_error,
         evaluated_at,
-        recommended_signal_ids_json
-      ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        recommended_signal_ids_json,
+        rating_anchors_json
+      ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(singleton_id) DO UPDATE SET
         model_version = excluded.model_version,
         pack_feature_hash = excluded.pack_feature_hash,
@@ -459,7 +483,8 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         watermark_day = excluded.watermark_day,
         last_error = excluded.last_error,
         evaluated_at = excluded.evaluated_at,
-        recommended_signal_ids_json = excluded.recommended_signal_ids_json
+        recommended_signal_ids_json = excluded.recommended_signal_ids_json,
+        rating_anchors_json = excluded.rating_anchors_json
     `).run(
       state.modelVersion,
       state.packFeatureHash,
@@ -472,7 +497,10 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
       state.evaluatedAt ?? null,
       state.recommendedSignalIds === undefined
         ? null
-        : JSON.stringify(uniqueStrings(state.recommendedSignalIds))
+        : JSON.stringify(uniqueStrings(state.recommendedSignalIds)),
+      state.ratingAnchors === undefined
+        ? null
+        : JSON.stringify(cloneRatingAnchors(state.ratingAnchors))
     );
   }
 
@@ -529,6 +557,7 @@ interface BuildStateRow {
   lastError: string | null;
   evaluatedAt: string | null;
   recommendedSignalIdsJson: string | null;
+  ratingAnchorsJson: string | null;
 }
 
 interface DailyCellRow extends Omit<
@@ -553,7 +582,10 @@ function buildStateFromRow(row: BuildStateRow): TacticalProfileBuildState {
     ...(row.evaluatedAt === null ? {} : { evaluatedAt: row.evaluatedAt }),
     ...(row.recommendedSignalIdsJson === null
       ? {}
-      : { recommendedSignalIds: parseStringArray(row.recommendedSignalIdsJson) })
+      : { recommendedSignalIds: parseStringArray(row.recommendedSignalIdsJson) }),
+    ...(row.ratingAnchorsJson === null
+      ? {}
+      : { ratingAnchors: parseRatingAnchors(row.ratingAnchorsJson) })
   };
 }
 
@@ -562,8 +594,87 @@ function cloneBuildState(state: TacticalProfileBuildState): TacticalProfileBuild
     ...state,
     ...(state.recommendedSignalIds === undefined
       ? {}
-      : { recommendedSignalIds: uniqueStrings(state.recommendedSignalIds) })
+      : { recommendedSignalIds: uniqueStrings(state.recommendedSignalIds) }),
+    ...(state.ratingAnchors === undefined
+      ? {}
+      : { ratingAnchors: cloneRatingAnchors(state.ratingAnchors) })
   };
+}
+
+function cloneRatingAnchors(
+  anchors: Readonly<Partial<Record<
+    TacticalProfileTaskFamily,
+    TacticalProfileRatingAnchor
+  >>>
+): Partial<Record<TacticalProfileTaskFamily, TacticalProfileRatingAnchor>> {
+  return Object.fromEntries(
+    (["line", "arrow_duel"] as const).flatMap((taskFamily) => {
+      const anchor = anchors[taskFamily];
+      return anchor ? [[taskFamily, { ...anchor }]] : [];
+    })
+  );
+}
+
+function parseRatingAnchors(
+  value: string
+): Partial<Record<TacticalProfileTaskFamily, TacticalProfileRatingAnchor>> {
+  const parsed = JSON.parse(value) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Invalid Tactical Profile rating anchors");
+  }
+  const parsedRecord = parsed as Record<string, unknown>;
+  if (
+    Object.keys(parsedRecord).some(
+      (key) => key !== "line" && key !== "arrow_duel"
+    )
+  ) {
+    throw new Error("Invalid Tactical Profile rating anchors");
+  }
+  const anchors: Partial<Record<
+    TacticalProfileTaskFamily,
+    TacticalProfileRatingAnchor
+  >> = {};
+  for (const taskFamily of ["line", "arrow_duel"] as const) {
+    const candidate = parsedRecord[taskFamily];
+    if (candidate === undefined) {
+      continue;
+    }
+    if (
+      !candidate ||
+      typeof candidate !== "object" ||
+      Array.isArray(candidate)
+    ) {
+      throw new Error("Invalid Tactical Profile rating anchor");
+    }
+    const record = candidate as Record<string, unknown>;
+    if (
+      typeof record.sessionId !== "string" ||
+      record.sessionId.length === 0 ||
+      typeof record.ratingKey !== "string" ||
+      record.ratingKey.length === 0 ||
+      typeof record.completedAt !== "string" ||
+      !isCanonicalIsoTimestamp(record.completedAt) ||
+      Object.keys(record).some(
+        (key) =>
+          key !== "sessionId" &&
+          key !== "ratingKey" &&
+          key !== "completedAt"
+      )
+    ) {
+      throw new Error("Invalid Tactical Profile rating anchor");
+    }
+    anchors[taskFamily] = {
+      sessionId: record.sessionId,
+      ratingKey: record.ratingKey,
+      completedAt: record.completedAt
+    };
+  }
+  return anchors;
+}
+
+function isCanonicalIsoTimestamp(value: string): boolean {
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString() === value;
 }
 
 function uniqueStrings(values: readonly string[]): string[] {

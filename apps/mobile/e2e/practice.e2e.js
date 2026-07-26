@@ -161,6 +161,18 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(180000);
   });
 
+  it('opens the real local Tactical Profile and returns to Practice', async () => {
+    await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(180000);
+    await element(by.id('practice-sprint-rules-dismiss')).tap();
+    await waitForVisibleInPracticeScroll('training-focus-open-profile');
+    await element(by.id('training-focus-open-profile')).tap();
+
+    await waitFor(element(by.id('tactical-profile-screen'))).toExist().withTimeout(10000);
+    await waitFor(element(by.text('Still collecting evidence'))).toExist().withTimeout(10000);
+    await element(by.id('tactical-profile-back-home')).tap();
+    await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
+  });
+
   it('renders the standard sprint board', async () => {
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');

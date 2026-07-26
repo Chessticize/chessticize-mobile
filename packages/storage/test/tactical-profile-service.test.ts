@@ -35,22 +35,73 @@ test("TacticalProfileService rebuilds dirty days and converges after duplicate i
   assert.deepEqual(repository.listDailyCells(identity()), firstCells);
 });
 
+test("one rare-theme miss enters Review without becoming a Tactical Profile recommendation", () => {
+  const store = seededStore();
+  store.seedPuzzles([{
+    ...playablePuzzle("rare-review-miss"),
+    themes: ["smotheredMate"]
+  }]);
+  const repository = new MemoryTacticalProfileRepository();
+  const profile = service(store, repository);
+  const practice = new PracticeService(store, profile);
+  practice.setPuzzleSelectionScopeIds(["rare-review-miss"]);
+  practice.startSprint({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20,
+    targetCorrect: 1,
+    maxMistakes: 1
+  }, "2026-07-20T00:00:00.000Z");
+
+  const result = practice.submitMove(
+    "e2e3",
+    "2026-07-20T00:00:10.000Z"
+  );
+  const snapshot = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+
+  assert.equal(result.attempt?.result, "wrong");
+  assert.equal(
+    practice.listReviewQueue().some(
+      (review) => review.puzzleId === "rare-review-miss"
+    ),
+    true
+  );
+  assert.equal(snapshot.phase, "collecting");
+  assert.equal(snapshot.evaluation.signals.length, 0);
+});
+
 test("a clean Tactical Profile read uses daily cells without rescanning canonical history", () => {
   const store = seededStore();
   seedWeaknessHistory(store);
-  const profile = service(store, new MemoryTacticalProfileRepository());
-  const first = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const repository = new MemoryTacticalProfileRepository();
+  const createProfile = () => new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository,
+    calibration: CALIBRATION,
+    naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} },
+    naturalFrequencyForRating: (taskFamily, rating) =>
+      taskFamily === "line" ? { fork: rating / 10_000 } : {}
+  });
+  const first = createProfile().getSnapshot("2026-07-25T00:00:00.000Z");
   const originalListAttempts = store.listAttempts.bind(store);
+  const originalListSprintSessions = store.listSprintSessions.bind(store);
   let rawHistoryReads = 0;
+  let fullSessionHistoryReads = 0;
   store.listAttempts = (filter = {}) => {
     rawHistoryReads += 1;
     return originalListAttempts(filter);
   };
+  store.listSprintSessions = () => {
+    fullSessionHistoryReads += 1;
+    return originalListSprintSessions();
+  };
 
-  const snapshot = profile.getSnapshot("2026-07-26T00:00:00.000Z");
+  const snapshot = createProfile().getSnapshot("2026-07-26T00:00:00.000Z");
 
   assert.equal(snapshot.phase, "ready");
   assert.equal(rawHistoryReads, 0);
+  assert.equal(fullSessionHistoryReads, 0);
   assert.equal(snapshot.buildState.evaluatedAt, "2026-07-25T00:00:00.000Z");
   assert.deepEqual(snapshot.evaluation, first.evaluation);
 });
@@ -328,6 +379,154 @@ test("chronological, reversed, and duplicate canonical imports converge to ident
 
   assert.equal(new Set(serializedCells).size, 1);
 });
+
+test("multi-call, out-of-order, repeated, and batched imports recompute each dirty day once", () => {
+  const source = seededStore();
+  seedWeaknessHistory(source);
+  const exported = source.exportLocalData();
+  const chronological = [...exported.attempts].sort((left, right) =>
+    left.completedAt.localeCompare(right.completedAt) ||
+    left.id.localeCompare(right.id)
+  );
+  const importForAttempts = (attempts: typeof exported.attempts) => ({
+    ...exported,
+    attempts,
+    sprintSessions: exported.sprintSessions.filter((session) =>
+      attempts.some((attempt) => attempt.sessionId === session.id)
+    )
+  });
+  const variants = [
+    [exported],
+    chronological.map((entry) => importForAttempts([entry])),
+    [...chronological].reverse().map((entry) => importForAttempts([entry])),
+    [exported, exported]
+  ];
+  const serializedCells = variants.map((imports) => {
+    const target = seededStore();
+    const repository = new CountingTacticalProfileRepository();
+    const profile = service(target, repository);
+    const practice = new PracticeService(target, profile);
+    profile.getSnapshot("2026-07-09T00:00:00.000Z");
+    for (const incoming of imports) {
+      practice.importLocalData(incoming);
+    }
+
+    profile.getSnapshot("2026-07-25T00:00:00.000Z");
+
+    assert.deepEqual(
+      [...repository.replacedDays.entries()].sort(),
+      [
+        ["2026-07-10", 1],
+        ["2026-07-14", 1],
+        ["2026-07-18", 1]
+      ]
+    );
+    return JSON.stringify(repository.listDailyCells(identity()));
+  });
+
+  assert.equal(new Set(serializedCells).size, 1);
+});
+
+test("scheduled Review attempts leave discovery revision, cache, and snapshot unchanged", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new MemoryTacticalProfileRepository();
+  const profile = service(store, repository);
+  const before = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  const revision = store.getTacticalProfileSourceRevision();
+  const cells = repository.listDailyCells(identity());
+  const buildState = repository.getBuildState();
+  store.recordAttempt({
+    ...attempt({
+      id: "scheduled-review-isolation",
+      sessionId: "mixed-session-0",
+      puzzleId: "evidence-0",
+      completedAt: "2026-07-25T01:00:00.000Z"
+    }),
+    source: "scheduled_review"
+  });
+
+  const after = profile.getSnapshot("2026-07-25T02:00:00.000Z");
+
+  assert.equal(store.getTacticalProfileSourceRevision(), revision);
+  assert.deepEqual(repository.listDirtyDays(identity()), []);
+  assert.deepEqual(repository.listDailyCells(identity()), cells);
+  assert.deepEqual(repository.getBuildState(), buildState);
+  assert.deepEqual(after.evaluation, before.evaluation);
+});
+
+for (const storeKind of ["memory", "sqlite"] as const) {
+  test(`${storeKind} Unclear mutation leaves Tactical Profile cache and result unchanged`, () => {
+    const store = storeKind === "memory"
+      ? new MemoryStore()
+      : new SQLiteStore();
+    try {
+      if (store instanceof SQLiteStore) {
+        store.migrate();
+      }
+      store.seedPuzzles([{
+        ...playablePuzzle(`${storeKind}-unclear-profile`),
+        themes: ["fork"]
+      }]);
+      store.saveRating({
+        key: "standard 5/20",
+        generation: 0,
+        rating: 925,
+        ratingDeviation: 80,
+        volatility: 0.06,
+        games: 0
+      });
+      const repository = new MemoryTacticalProfileRepository();
+      const profile = new TacticalProfileService({
+        progressStore: store,
+        puzzleSource: store,
+        repository,
+        calibration: CALIBRATION,
+        naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} }
+      });
+      const practice = new PracticeService(store, profile);
+      practice.setPuzzleSelectionScopeIds([`${storeKind}-unclear-profile`]);
+      practice.startSprint({
+        mode: "standard",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        targetCorrect: 1,
+        maxMistakes: 1
+      }, "2026-07-20T00:00:00.000Z");
+      practice.submitMove(
+        "e2e6",
+        "2026-07-20T00:00:10.000Z"
+      );
+      const completed = practice.submitMove(
+        "e6f7",
+        "2026-07-20T00:00:20.000Z"
+      );
+      const attemptId = completed.attempt?.id;
+      assert.ok(attemptId);
+      const before = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+      const revision = store.getTacticalProfileSourceRevision();
+      const cells = repository.listDailyCells(identity());
+      const buildState = repository.getBuildState();
+
+      practice.setAttemptUnclear(
+        attemptId,
+        true,
+        "2026-07-25T01:00:00.000Z"
+      );
+      const after = profile.getSnapshot("2026-07-25T02:00:00.000Z");
+
+      assert.equal(store.getTacticalProfileSourceRevision(), revision);
+      assert.deepEqual(repository.listDirtyDays(identity()), []);
+      assert.deepEqual(repository.listDailyCells(identity()), cells);
+      assert.deepEqual(repository.getBuildState(), buildState);
+      assert.deepEqual(after.evaluation, before.evaluation);
+    } finally {
+      if (store instanceof SQLiteStore) {
+        store.close();
+      }
+    }
+  });
+}
 
 test("a no-op canonical import preserves cache identity and recommendation hysteresis", () => {
   const store = seededStore();
@@ -982,6 +1181,11 @@ test("PracticeService starts the prepared Focused Run through the normal session
 
 test("an active Focused Run keeps its frozen puzzle IDs, Rating band, and quotas", () => {
   const store = seededStore();
+  store.seedPuzzles(
+    Array.from({ length: 12 }, (_, index) =>
+      puzzle(`recommendation-change-${index}`, ["pin"])
+    )
+  );
   seedWeaknessHistory(store);
   const profile = service(store, new MemoryTacticalProfileRepository());
   const practice = new PracticeService(store, profile);
@@ -995,15 +1199,65 @@ test("an active Focused Run keeps its frozen puzzle IDs, Rating band, and quotas
     tacticalFocus: structuredClone(started.config.tacticalFocus),
     maxAttempts: started.config.maxAttempts
   };
+  const recommendationsBefore = profile
+    .getSnapshot("2026-07-25T00:00:00.000Z")
+    .evaluation.signals
+    .filter((signal) => signal.status === "recommended")
+    .map((signal) => signal.id);
   const rating = store.getRating(started.config.ratingKey);
   store.saveRating({
     ...rating,
     generation: rating.generation + 1,
     rating: rating.rating + 300
   });
+  const ordinaryConfig = buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20
+  });
+  for (let sessionIndex = 0; sessionIndex < 3; sessionIndex += 1) {
+    const completedAt =
+      `2026-07-${String(25 + sessionIndex).padStart(2, "0")}T01:00:00.000Z`;
+    const session = startSprint({
+      id: `recommendation-change-session-${sessionIndex}`,
+      config: ordinaryConfig,
+      puzzles: [
+        store.getPuzzle(`recommendation-change-${sessionIndex * 4}`)!
+      ],
+      ratingBefore: 925,
+      now: completedAt
+    });
+    store.createSprintSession(session);
+    for (let offset = 0; offset < 4; offset += 1) {
+      const index = sessionIndex * 4 + offset;
+      store.recordAttempt(attempt({
+        id: `recommendation-change-attempt-${index}`,
+        sessionId: session.id,
+        puzzleId: `recommendation-change-${index}`,
+        completedAt
+      }));
+    }
+    store.updateSprintSession({
+      ...session,
+      status: "failed",
+      completedAt,
+      endReason: "max_mistakes",
+      correctCount: 0,
+      mistakeCount: 4,
+      ratingAfter: 900
+    });
+  }
+  profile.markCanonicalImportChanged();
+  const recommendationsAfter = profile
+    .getSnapshot("2026-07-28T00:00:00.000Z")
+    .evaluation.signals
+    .filter((signal) => signal.status === "recommended")
+    .map((signal) => signal.id);
 
   const active = practice.getActiveSprint();
 
+  assert.notDeepEqual(recommendationsAfter, recommendationsBefore);
+  assert.ok(recommendationsAfter.includes("line:pin"));
   assert.deepEqual(active?.puzzles.map((puzzle) => puzzle.id), frozen.puzzleIds);
   assert.deepEqual(active?.config.tacticalFocus, frozen.tacticalFocus);
   assert.equal(active?.config.maxAttempts, frozen.maxAttempts);
@@ -1518,6 +1772,20 @@ class RecoveringTacticalProfileRepository extends MemoryTacticalProfileRepositor
     }
     this.nextFailure = undefined;
     throw new Error(`simulated ${operation} failure`);
+  }
+}
+
+class CountingTacticalProfileRepository extends MemoryTacticalProfileRepository {
+  readonly replacedDays = new Map<string, number>();
+
+  override replaceDay(
+    ...args: Parameters<MemoryTacticalProfileRepository["replaceDay"]>
+  ): void {
+    this.replacedDays.set(
+      args[1],
+      (this.replacedDays.get(args[1]) ?? 0) + 1
+    );
+    super.replaceDay(...args);
   }
 }
 

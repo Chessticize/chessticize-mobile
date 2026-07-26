@@ -6,6 +6,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   MemoryStore,
+  MemoryTacticalProfileRepository,
   PackBackedPracticeStore,
   PracticeService,
   ProgressSyncConflictError,
@@ -65,6 +66,81 @@ test("syncPracticeProgress uploads the current local progress snapshot when enab
   assert.equal(transport.saved[0]?.data.attempts.length, 1);
   assert.equal(transport.saved[0]?.data.reviewQueue.length, 1);
   assert.equal(transport.saved[0]?.data.ratings[0]?.games, 1);
+});
+
+test("derived Tactical Profile cache cannot enter local export or iCloud sync payloads", async () => {
+  const store = await seededMemoryStore();
+  const service = new PracticeService(store);
+  enableSync(service);
+  const repository = new MemoryTacticalProfileRepository();
+  const identity = {
+    modelVersion: "private-derived-model",
+    packFeatureHash: "private-derived-pack",
+    calibrationId: "private-derived-calibration"
+  };
+  repository.reset(identity, ["2026-07-01"], 1);
+  repository.replaceDay(identity, "2026-07-01", [{
+    ...identity,
+    completedDay: "2026-07-01",
+    taskFamily: "line",
+    theme: "private-derived-theme",
+    solveScore: 1,
+    solveInformation: 1,
+    solveExpectedSuccess: 0,
+    solveObservedSuccess: 0,
+    solveSensitivity: 1,
+    solveWeight: 1,
+    speedWeightedResidual: 0,
+    speedPrecision: 0,
+    speedWeight: 0,
+    distinctPuzzleIds: ["private-derived-puzzle"],
+    distinctSessionIds: ["private-derived-session"]
+  }]);
+  repository.saveBuildState({
+    ...identity,
+    status: "ready",
+    dirtyDayCount: 0,
+    sourceRevision: 1,
+    recommendedSignalIds: ["private-derived-signal"],
+    ratingAnchors: {
+      line: {
+        sessionId: "private-derived-session",
+        ratingKey: "private-derived-rating",
+        completedAt: "2026-07-01T00:00:00.000Z"
+      }
+    }
+  });
+  const transport = new RecordingTransport();
+
+  const localExport = store.exportLocalData();
+  await syncPracticeProgress(store, transport, {
+    deviceId: "device-a",
+    now: () => "2026-07-07T00:00:00.000Z"
+  });
+
+  assert.deepEqual(Object.keys(localExport).sort(), [
+    "attempts",
+    "practiceRuns",
+    "ratings",
+    "reviewQueue",
+    "reviewRemovals",
+    "schemaVersion",
+    "settings",
+    "sprintSessions"
+  ]);
+  const exported = JSON.stringify(localExport);
+  const uploaded = JSON.stringify(transport.saved[0]?.data);
+  for (const privateValue of [
+    "private-derived-model",
+    "private-derived-theme",
+    "private-derived-puzzle",
+    "private-derived-session",
+    "private-derived-signal",
+    "private-derived-rating"
+  ]) {
+    assert.equal(exported.includes(privateValue), false);
+    assert.equal(uploaded.includes(privateValue), false);
+  }
 });
 
 test("Focused Run guide progress stays device-local across progress sync merges", async () => {

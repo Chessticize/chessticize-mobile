@@ -36,7 +36,14 @@ for (const fixture of repositoryFixtures()) {
       sourceRevision: 7,
       watermarkDay: "2026-07-02",
       evaluatedAt: "2026-07-03T00:00:00.000Z",
-      recommendedSignalIds: ["line:pin", "line:fork", "line:pin"]
+      recommendedSignalIds: ["line:pin", "line:fork", "line:pin"],
+      ratingAnchors: {
+        line: {
+          sessionId: "latest-line-session",
+          ratingKey: "standard 5/20",
+          completedAt: "2026-07-02T00:05:00.000Z"
+        }
+      }
     });
 
     assert.deepEqual(repository.listDirtyDays(IDENTITY), []);
@@ -48,6 +55,13 @@ for (const fixture of repositoryFixtures()) {
       repository.getBuildState()?.evaluatedAt,
       "2026-07-03T00:00:00.000Z"
     );
+    assert.deepEqual(repository.getBuildState()?.ratingAnchors, {
+      line: {
+        sessionId: "latest-line-session",
+        ratingKey: "standard 5/20",
+        completedAt: "2026-07-02T00:05:00.000Z"
+      }
+    });
     assert.deepEqual(
       repository.listDailyCells(IDENTITY).map((entry) => [
         entry.completedDay,
@@ -62,6 +76,10 @@ for (const fixture of repositoryFixtures()) {
     );
 
     repository.markDirtyDays(IDENTITY, ["2026-07-01", "bad-day"], 8);
+    assert.equal(
+      repository.getBuildState()?.ratingAnchors?.line?.sessionId,
+      "latest-line-session"
+    );
     repository.replaceDay(IDENTITY, "2026-07-01", [cell("2026-07-01", "fork", 4)]);
     assert.equal(repository.listDailyCells(IDENTITY)[0]?.solveScore, 4);
   });
@@ -154,7 +172,7 @@ test("SQLite Tactical Profile cache migrates schema v1 build state", () => {
 
   assert.equal(
     (native.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
-    3
+    4
   );
   assert.deepEqual(repository.getBuildState(), {
     ...IDENTITY,
@@ -163,6 +181,94 @@ test("SQLite Tactical Profile cache migrates schema v1 build state", () => {
     sourceRevision: -1,
     watermarkDay: "2026-07-01"
   });
+});
+
+test("SQLite Tactical Profile cache migrates schema v3 build state to rating anchors", () => {
+  const native = new DatabaseSync(":memory:");
+  native.exec(`
+    CREATE TABLE weakness_build_state (
+      singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+      model_version TEXT NOT NULL,
+      pack_feature_hash TEXT NOT NULL,
+      calibration_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      dirty_day_count INTEGER NOT NULL,
+      source_revision INTEGER NOT NULL,
+      watermark_day TEXT,
+      last_error TEXT,
+      evaluated_at TEXT,
+      recommended_signal_ids_json TEXT
+    );
+    INSERT INTO weakness_build_state (
+      singleton_id,
+      model_version,
+      pack_feature_hash,
+      calibration_id,
+      status,
+      dirty_day_count,
+      source_revision,
+      watermark_day,
+      evaluated_at,
+      recommended_signal_ids_json
+    ) VALUES (
+      1,
+      'model-v1',
+      'sha256:pack',
+      'calibration-v1',
+      'ready',
+      0,
+      9,
+      '2026-07-03',
+      '2026-07-04T00:00:00.000Z',
+      '["line:fork"]'
+    );
+    PRAGMA user_version = 3;
+  `);
+  const repository = new SQLiteTacticalProfileRepository(
+    new NodeSqliteDatabase(native)
+  );
+
+  repository.migrate();
+
+  assert.equal(
+    (native.prepare("PRAGMA user_version").get() as { user_version: number })
+      .user_version,
+    4
+  );
+  assert.deepEqual(repository.getBuildState(), {
+    ...IDENTITY,
+    status: "ready",
+    dirtyDayCount: 0,
+    sourceRevision: 9,
+    watermarkDay: "2026-07-03",
+    evaluatedAt: "2026-07-04T00:00:00.000Z",
+    recommendedSignalIds: ["line:fork"]
+  });
+});
+
+test("SQLite Tactical Profile cache fails closed on malformed rating anchors", () => {
+  const native = new DatabaseSync(":memory:");
+  const repository = new SQLiteTacticalProfileRepository(
+    new NodeSqliteDatabase(native)
+  );
+  repository.migrate();
+  repository.reset(IDENTITY, [], 1);
+  native.prepare(`
+    UPDATE weakness_build_state
+    SET rating_anchors_json = ?
+    WHERE singleton_id = 1
+  `).run(JSON.stringify({
+    line: {
+      sessionId: "session-1",
+      ratingKey: "standard 5/20",
+      completedAt: "not-a-timestamp"
+    }
+  }));
+
+  assert.throws(
+    () => repository.getBuildState(),
+    /Invalid Tactical Profile rating anchor/
+  );
 });
 
 function repositoryFixtures(): Array<{

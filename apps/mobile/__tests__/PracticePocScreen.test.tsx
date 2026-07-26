@@ -1203,6 +1203,42 @@ describe("PracticePocScreen", () => {
     });
   });
 
+  it("maps two production task-family recommendations to one explicit Home lead", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const practiceService = createDualFamilyFocusedPracticeService();
+    expect(
+      practiceService.getTacticalProfileSnapshot()?.homeLeadSignalId
+    ).toBe("arrow_duel:pin");
+    const renderer = renderScreen({
+      practiceService
+    });
+
+    const card = collectText(findByTestId(renderer, "training-focus-card"));
+    expect(card).toContain("2 modes with recommendations");
+    expect(card).toContain("Pin is your clearest focus");
+    expect(card).toContain("Puzzle solving also has 1 recommendation.");
+    expect(collectText(findByTestId(renderer, "training-focus-primary-mode"))).toContain(
+      "Arrow Duel"
+    );
+  });
+
+  it("keeps a production-service focus visible while withholding an inventory-blocked Run", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const renderer = renderScreen({
+      practiceService: createArrowFocusedPracticeService(false)
+    });
+
+    press(renderer, "training-focus-open-profile");
+
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
+      "Not enough new puzzles nearby"
+    );
+    expect(() => findByTestId(renderer, "tactical-profile-preview-run")).toThrow();
+  });
+
   it("keeps solve reliability and completed-puzzle speed as plain-language profile signals", () => {
     const solveRate = renderLabScenario("practice-tactical-profile-solve-rate");
     const speed = renderLabScenario("practice-tactical-profile-speed");
@@ -10237,7 +10273,9 @@ function firstArrowDuelPuzzleForTest(): ArrowDuelState {
   return requireArrowDuelState(state);
 }
 
-function createArrowFocusedPracticeService(): PracticeService {
+function createArrowFocusedPracticeService(
+  inventoryAvailable = true
+): PracticeService {
   const candidates = tacticalProfilePuzzleFixture
     .filter((puzzle) =>
       puzzle.rating >= 1700
@@ -10330,10 +10368,118 @@ function createArrowFocusedPracticeService(): PracticeService {
         line: {},
         arrow_duel: { pin: 0.12, fork: 0.12 }
       },
+      ...(inventoryAvailable
+        ? {}
+        : { inventoryUpperBound: () => ({ pin: 0 }) }),
       focusedRunPolicy: {
         runSize: 15,
         recentPuzzleDays: 30,
         ratingBandHalfWidths: [100, 200]
+      }
+    })
+  );
+}
+
+function createDualFamilyFocusedPracticeService(): PracticeService {
+  const candidates = tacticalProfilePuzzleFixture
+    .filter(isServerCompatibleArrowDuelPuzzle)
+    .slice(0, 24);
+  if (candidates.length < 24) {
+    throw new Error("Dual-family Tactical Profile fixture needs 24 puzzles");
+  }
+  const linePuzzles = candidates.slice(0, 12).map((puzzle) => ({
+    ...puzzle,
+    rating: 900,
+    ratingDeviation: 80,
+    themes: ["fork"]
+  }));
+  const arrowPuzzles = candidates.slice(12, 24).map((puzzle) => ({
+    ...puzzle,
+    rating: 900,
+    ratingDeviation: 80,
+    themes: ["pin"]
+  }));
+  const store = new MemoryStore();
+  store.seedPuzzles([...linePuzzles, ...arrowPuzzles]);
+  const lineConfig = defaultSprintConfig("standard");
+  const arrowConfig = defaultSprintConfig("arrow_duel");
+  for (const config of [lineConfig, arrowConfig]) {
+    store.saveRating({
+      key: config.ratingKey,
+      generation: 0,
+      rating: 900,
+      ratingDeviation: 80,
+      volatility: 0.06,
+      games: 12
+    });
+  }
+  for (const [taskFamily, config, puzzles] of [
+    ["line", lineConfig, linePuzzles],
+    ["arrow_duel", arrowConfig, arrowPuzzles]
+  ] as const) {
+    for (let sessionIndex = 0; sessionIndex < 3; sessionIndex += 1) {
+      const day = 10 + sessionIndex * 4;
+      const startedAt = `2026-07-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+      const completedAt = `2026-07-${String(day).padStart(2, "0")}T00:04:00.000Z`;
+      const sessionPuzzles = puzzles.slice(
+        sessionIndex * 4,
+        sessionIndex * 4 + 4
+      );
+      const session = startSprint({
+        id: `${taskFamily}-dual-profile-session-${sessionIndex}`,
+        config,
+        puzzles: sessionPuzzles,
+        ratingBefore: 900,
+        now: startedAt
+      });
+      store.createSprintSession({
+        ...session,
+        status: "failed",
+        completedAt,
+        endReason: "max_mistakes",
+        correctCount: 0,
+        mistakeCount: 4,
+        ratingAfter: 900
+      });
+      for (const [offset, puzzle] of sessionPuzzles.entries()) {
+        store.recordAttempt({
+          id: `${taskFamily}-dual-profile-attempt-${sessionIndex}-${offset}`,
+          source: "sprint",
+          sessionId: session.id,
+          puzzleId: puzzle.id,
+          mode: config.mode,
+          ratingKey: config.ratingKey,
+          result: "wrong",
+          submittedMove: puzzle.solutionMoves[0],
+          expectedMove: taskFamily === "arrow_duel"
+            ? puzzle.stockfishBestMove as string
+            : puzzle.solutionMoves[1] ?? puzzle.solutionMoves[0],
+          ...(taskFamily === "arrow_duel"
+            ? {
+                arrowDuelCandidateOrder: [
+                  puzzle.stockfishBestMove as string,
+                  puzzle.solutionMoves[0]
+                ] as [string, string]
+              }
+            : {}),
+          startedAt: completedAt,
+          completedAt,
+          elapsedMs: 10_000,
+          ratingBefore: 900
+        });
+      }
+    }
+  }
+  return new PracticeService(
+    store,
+    new TacticalProfileService({
+      progressStore: store,
+      puzzleSource: store,
+      repository: new MemoryTacticalProfileRepository(),
+      calibration: COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+      naturalFrequency: {
+        line: { fork: 0.12 },
+        arrow_duel: { pin: 0.12 }
       }
     })
   );

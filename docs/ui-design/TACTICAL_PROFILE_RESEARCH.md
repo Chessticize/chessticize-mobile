@@ -6,6 +6,11 @@ Scope: Issue [#250](https://github.com/Chessticize/chessticize-mobile/issues/250
 
 Current-main audit: [`aeb0e1c24bcf84b9e8af2003ed25dc303d3f7d1a`](https://github.com/Chessticize/chessticize-mobile/tree/aeb0e1c24bcf84b9e8af2003ed25dc303d3f7d1a)
 
+Design approval record: the owner approved the complete Phase A Interaction
+Lab flow for implementation, and that approved design was merged as
+[PR #341](https://github.com/Chessticize/chessticize-mobile/pull/341) at
+[`f6ba30e`](https://github.com/Chessticize/chessticize-mobile/commit/f6ba30e).
+
 This document is the durable product and statistical contract for the Phase A
 Tactical Profile / Training Focus design. Later issue comments supersede earlier
 proposals where they conflict. In particular, the accepted contract is the
