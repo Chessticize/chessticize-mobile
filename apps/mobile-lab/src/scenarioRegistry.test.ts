@@ -154,9 +154,9 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
     "Always-available direct guide exit without completion"
   ));
   assert.ok(activeSessionGuide.scope.includes.includes(
-    "Compact portrait timeout pointer with board clearance"
+    "Raised portrait Timed Out callout with full pointer and board clearance"
   ));
-  assert.match(activeSessionGuide.description, /direct Exit guide control available/);
+  assert.match(activeSessionGuide.description, /full red pointer above that board/);
   assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
   assert.ok(arrowDuelGuide.scope.includes.includes("The arrows show your two choices"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Portrait callout below the board"));

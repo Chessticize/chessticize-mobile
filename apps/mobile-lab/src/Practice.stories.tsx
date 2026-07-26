@@ -345,6 +345,14 @@ export const ActiveSessionGuideTimedOut: Story = {
       canvasElement,
       "practice-session-guide-coach-pointer-timeout-bottom"
     );
+    await waitForTestId(
+      canvasElement,
+      "practice-session-guide-coach-pointer-timeout-bottom-line"
+    );
+    await waitForTestId(
+      canvasElement,
+      "practice-session-guide-coach-pointer-timeout-bottom-head"
+    );
     await waitForText(canvasElement, "This puzzle counts as a mistake");
   }
 };
