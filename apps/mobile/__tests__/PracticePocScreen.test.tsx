@@ -3146,7 +3146,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-filter-timed-out-only")).toThrow();
     expect(() => findByTestId(renderer, "history-rating-filters")).toThrow();
     expect(() => findByTestId(renderer, "history-range-filters")).toThrow();
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Sprint");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Source: Sprint");
     expect(collectText(findByTestId(renderer, "history-attempt-history-correct-slow"))).toBe("Slow");
     expect(collectText(findByTestId(renderer, "history-attempt-history-wrong-result"))).toBe(
       "Wrong move"
@@ -3168,10 +3168,13 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityLabel).toBe(
-      "Needs attention: unclear or in Review"
+      "Needs attention: Sprint attempts that are unclear or in Review"
+    );
+    expect(collectText(findByTestId(renderer, "history-attention-explanation"))).toBe(
+      "Needs attention shows original Sprint attempts only."
     );
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
-      "7 days·All puzzles"
+      "7 days·All puzzles·Source: Sprint"
     );
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
@@ -3204,7 +3207,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-rating-filters")).toBeTruthy();
     expect(findByTestId(renderer, "history-range-filters")).toBeTruthy();
     expect(hasStyleEntry(
-      findByTestId(renderer, "history-source-all"),
+      findByTestId(renderer, "history-source-sprint"),
       "backgroundColor",
       "#2563EB"
     )).toBe(true);
@@ -3303,13 +3306,13 @@ describe("PracticePocScreen", () => {
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
-      "7 days·All puzzles"
+      "7 days·All puzzles·Source: Sprint"
     );
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
     expect(hasStyleEntry(
-      findByTestId(renderer, "history-source-all"),
+      findByTestId(renderer, "history-source-sprint"),
       "backgroundColor",
       "#2563EB"
     )).toBe(true);
@@ -3329,6 +3332,93 @@ describe("PracticePocScreen", () => {
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
+  });
+
+  it("keeps Needs attention Sprint-only and makes Review attempts an explicit All-history choice", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.recordAttempt({
+      id: "original-sprint-mistake",
+      source: "sprint",
+      sessionId: "original-sprint-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "wrong",
+      submittedMove: "e2e3",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-17T11:59:55.000Z",
+      completedAt: "2026-07-17T12:00:00.000Z",
+      ratingBefore: 600
+    });
+    store.recordAttempt({
+      id: "correct-review-attempt",
+      source: "scheduled_review",
+      sessionId: "correct-review-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-17T12:01:55.000Z",
+      completedAt: "2026-07-17T12:02:00.000Z",
+      ratingBefore: 600
+    });
+    store.scheduleMistakeReview({
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-07-17T12:02:00.000Z");
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-17T12:03:00.000Z"),
+      practiceService: new PracticeService(store)
+    });
+
+    press(renderer, "history-tab");
+
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-attention-explanation"))).toBe(
+      "Needs attention shows original Sprint attempts only."
+    );
+
+    press(renderer, "history-filter-toggle");
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
+    press(renderer, "history-source-all");
+
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(() => findByTestId(renderer, "history-attention-explanation")).toThrow();
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-correct-review-attempt")).toBeTruthy();
+
+    press(renderer, "history-attention-needs-attention");
+
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
+
+    press(renderer, "history-source-review");
+
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(findByTestId(renderer, "history-attempt-correct-review-attempt")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-original-sprint-mistake")).toThrow();
+
+    press(renderer, "history-attention-needs-attention");
+
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
+
+    press(renderer, "history-attention-all");
+
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
   });
 
   it("includes Timed out attempts in the History Wrong filter while preserving their label", async () => {
@@ -6653,12 +6743,12 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-active-filter-summary")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Sprint");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Source: Sprint");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Result: Wrong");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expectHistoryRowAccessibility(renderer, "Move e6f7");
     press(renderer, "history-filter-toggle");
-    expect(historyFilterSelected(renderer, "history-source-all")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(false);
     press(renderer, "history-result-wrong");
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(true);
@@ -7168,7 +7258,7 @@ describe("PracticePocScreen", () => {
     expect(scheduler.calls.length).toBeGreaterThan(0);
   });
 
-  it("resets history filters to the default all-sources view", () => {
+  it("resets history filters to the default Sprint Needs attention view", () => {
     const renderer = renderStandardSequenceScreen();
 
     startStandardSprint(renderer);
@@ -7192,17 +7282,17 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-filter-reset");
 
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(false);
-    expect(historyFilterSelected(renderer, "history-source-all")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: true
     });
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Sprint");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Source: Sprint");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Result: Wrong");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("All Time");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Black");
-    expect(renderer.root.findAllByProps({ testID: "history-source-all" }).some(
+    expect(renderer.root.findAllByProps({ testID: "history-source-sprint" }).some(
       (node) => node.props.accessibilityState?.selected === true
     )).toBe(true);
     expect(renderer.root.findAllByProps({ testID: "history-result-all" }).some(
@@ -7728,7 +7818,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(secondRenderer, "history-result-wrong")).toThrow();
     expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("All puzzles");
-    expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).not.toContain("Sprint");
+    expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("Source: Sprint");
   });
 
   it("keeps history analysis review on the current puzzle after a retry is solved", async () => {
