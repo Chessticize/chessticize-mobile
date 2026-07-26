@@ -98,20 +98,16 @@ test("Issue #247 stays on the existing Settings product clone with its approved 
   );
 });
 
-test("Issue #353 owns the iCloud sync error-detail state in the Settings catalog", () => {
+test("the closed Issue #353 scenarios keep their stable URLs without new markers", () => {
   assert.deepEqual(
     newScenarios
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 353))
       .map((scenario) => scenario.id),
-    [
-      "settings-ios-sync-error-details",
-      "settings-ios-sync-support-bundle",
-      "settings-ios-sync-support-bundle-partial"
-    ]
+    []
   );
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync-error-details"), ["new"]);
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle"), ["new"]);
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle-partial"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-error-details"), []);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle"), []);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle-partial"), []);
   assert.equal(
     scenarioRegistry["settings-ios-sync-error-details"].storyId,
     "settings--i-cloud-sync-error-details"
@@ -125,8 +121,8 @@ test("Issue #353 owns the iCloud sync error-detail state in the Settings catalog
     "settings--i-cloud-sync-support-bundle-partial"
   );
   assert.ok(
-    scenarioRegistry["settings-ios-sync-error-details"].scope.includes.includes(
-      "Copy success feedback"
+    scenarioRegistry["settings-ios-sync-support-bundle"].scope.includes.includes(
+      "Help & Feedback placement"
     )
   );
   assert.ok(

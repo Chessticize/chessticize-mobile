@@ -66,6 +66,8 @@ export const ICloudSyncSupportBundle: Story = {
   args: { scenarioId: "settings-ios-sync-support-bundle" },
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
+    await waitForTestId(canvasElement, "settings-feedback-section");
+    await waitForText(canvasElement, "Email Support");
     await clickTestId(canvasElement, "settings-sync-support-bundle-entry");
     await waitForText(canvasElement, "This bundle contains progress data");
     await waitForText(canvasElement, "local-progress.sqlite");
@@ -152,6 +154,8 @@ export const FeedbackEntryDesign: Story = {
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-feedback-section");
+    await waitForText(canvasElement, "Email Support");
+    await waitForText(canvasElement, "support@chessticize.com");
     await clickTestId(canvasElement, "settings-feedback-open-github");
     await waitForTestId(canvasElement, "settings-feedback-handoff-confirmation");
   }

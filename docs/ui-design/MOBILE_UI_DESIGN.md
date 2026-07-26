@@ -52,7 +52,7 @@ Screen inventory:
 | Analysis Review | Board, compact toolbar, Stockfish status, candidate line rows, guided arrows when applicable | Reset, flip, analyze, navigate, finish review | Review Complete, History |
 | History | All-puzzle attempt list, All/Needs attention selector, conditional rating trend, expandable filters | Switch result scope, refine filters, inspect attempt context, open attempt | Attempt Detail, Review Item |
 | Custom Sprint Setup | Mode/theme/timing controls, editable rating, estimate, start | Start sprint, save template | Active Sprint |
-| Settings | iCloud Sync, notifications, profile, about, puzzle-data source notes | Toggle sync, adjust reminders, inspect licenses and support contact | External license/source/data/support links |
+| Settings | iCloud Sync, notifications, profile, Help & Feedback, about, puzzle-data source notes | Toggle sync, adjust reminders, contact support, export diagnostics, inspect licenses | External feedback/email/license/source/data links |
 
 ## Mobile Information Architecture
 
@@ -64,7 +64,7 @@ Use a four-tab app shell:
   expandable range, rating-bucket, source, result, review-state, side, and
   theme filters.
 - Settings: iCloud Sync, notification preferences, advanced rating adjustment,
-  About links, support contact, and puzzle data attribution.
+  Help & Feedback actions, About links, and puzzle data attribution.
 
 There should be no mobile Home tab, Game Review tab, or Packs tab in v1.
 
@@ -249,8 +249,8 @@ Core components:
 - `SettingsRow`: label, value, status, and disclosure or switch.
 - `SettingsExternalLinkRow`: label, short value, readable detail, and a
   tappable link target without compressing the primary copy on phone widths.
-- `AboutLinkRows`: separate external rows for License, Source, Stockfish,
-  Puzzle Data, and Support.
+- `AboutLinkRows`: separate external rows for License, Source, Stockfish, and
+  Puzzle Data.
 
 ## Core Screen Drafts
 
@@ -565,8 +565,10 @@ New Run behavior:
 - iCloud Sync appears near the top. It defaults on, shows the real enabled state
   and current account/sync status, and exposes a manual Sync Now action while
   sync is enabled.
-- The iCloud Sync section keeps an `Export Support Diagnostics` entry available
-  even when sync is off and no error is visible. It requires confirmation before
+- Help & Feedback keeps three support entries in this order: GitHub feedback,
+  `Export Support Diagnostics`, then Email Support as the final row.
+  Diagnostics remain available even when
+  sync is off and no error is visible. Export requires confirmation before
   preparing a package, identifies sensitive progress content, includes a
   consistent local SQLite snapshot and the private CloudKit JSON snapshot when
   available, and delegates the handoff to the iOS Share Sheet. Prepared files
@@ -586,9 +588,11 @@ New Run behavior:
   backed by the CloudKit transport, entitlement, merge engine, and truthful UI
   state.
 - About must use separate readable link rows for License, Source, Stockfish,
-  Puzzle Data, and Support. License opens the repository license file, Source
+  and Puzzle Data. License opens the repository license file, Source
   opens the public repository, Stockfish opens the embedded Stockfish engine
-  source in the repository, Puzzle Data opens the Lichess puzzle database, and
+  source in the repository, and Puzzle Data opens the Lichess puzzle database.
+- Help & Feedback keeps diagnostics and Email Support next to the
+  privacy-bounded GitHub feedback entry, with Email Support always last. Email
   Support opens `support@chessticize.com`.
 - On phone widths, About rows must leave enough horizontal room for label,
   detail, and link text. Keep right-side values short and do not combine

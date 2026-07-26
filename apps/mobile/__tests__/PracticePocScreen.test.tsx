@@ -9736,6 +9736,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(feedbackSection)).toContain("Your data stays in the app");
     expect(collectText(feedbackSection)).toContain("Ratings, history, and puzzle data are not attached");
     expect(collectText(feedbackSection)).toContain("You will review and submit your issue on GitHub");
+    expect(collectText(feedbackSection)).toContain("Email Support");
+    expect(collectText(feedbackSection)).toContain("support@chessticize.com");
+    expect(collectText(findByTestId(renderer, "settings-about-section")))
+      .not.toContain("support@chessticize.com");
     expect(findByTestId(renderer, "settings-feedback-open-github").props.accessibilityRole).toBe("button");
     expect(testIdOrder(renderer, "settings-profile-section", "settings-feedback-section")).toBeLessThan(0);
     expect(testIdOrder(renderer, "settings-feedback-section", "settings-about-section")).toBeLessThan(0);
@@ -9767,6 +9771,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-feedback-handoff-confirmation")))
       .toContain("Couldn't open GitHub Issues. Try again.");
     press(renderer, "settings-feedback-handoff-cancel");
+    press(renderer, "settings-support-email");
+    expect(openURLSpy).toHaveBeenLastCalledWith("mailto:support@chessticize.com");
     openURLSpy.mockRestore();
   });
 
@@ -9943,6 +9949,16 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "settings-tab");
     expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
+    expect(collectText(findByTestId(renderer, "settings-sync-section")))
+      .not.toContain("Export Support Diagnostics");
+    const feedbackSection = findByTestId(renderer, "settings-feedback-section");
+    expect(collectText(feedbackSection)).toContain("Email Support");
+    expect(collectText(feedbackSection)).toContain("Export Support Diagnostics");
+    expect(testIdOrder(
+      renderer,
+      "settings-sync-support-bundle-entry",
+      "settings-support-email"
+    )).toBeLessThan(0);
     press(renderer, "settings-sync-support-bundle-entry");
     await pressAsync(renderer, "settings-sync-support-bundle-prepare");
 
@@ -10028,7 +10044,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(modal)).toContain("local-progress.sqlite");
     expect(collectText(modal)).toContain("icloud-progress-snapshot.json");
 
-    await pressAsync(renderer, "settings-sync-support-bundle-prepare");
+    await pressAsyncWithin(modal, "settings-sync-support-bundle-prepare");
 
     expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-complete"))).toContain(
       "Complete reproduction bundle"
@@ -10051,8 +10067,9 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "settings-tab");
     press(renderer, "settings-sync-error-details");
+    const modal = findByTestId(renderer, "settings-sync-error-details-modal");
     press(renderer, "settings-sync-support-bundle-open");
-    await pressAsync(renderer, "settings-sync-support-bundle-prepare");
+    await pressAsyncWithin(modal, "settings-sync-support-bundle-prepare");
 
     const partial = findByTestId(renderer, "settings-sync-support-bundle-partial");
     expect(collectText(partial)).toContain("iCloud snapshot couldn't be included");
@@ -11241,6 +11258,20 @@ function press(renderer: TestRenderer.ReactTestRenderer, testID: string): void {
 async function pressAsync(renderer: TestRenderer.ReactTestRenderer, testID: string): Promise<void> {
   await act(async () => {
     const target = findByTestId(renderer, testID);
+    if (target.props.disabled) {
+      throw new Error(`${testID} is disabled`);
+    }
+    target.props.onPress();
+    await Promise.resolve();
+  });
+}
+
+async function pressAsyncWithin(
+  root: TestRenderer.ReactTestInstance,
+  testID: string
+): Promise<void> {
+  await act(async () => {
+    const target = root.findByProps({ testID });
     if (target.props.disabled) {
       throw new Error(`${testID} is disabled`);
     }
