@@ -25,7 +25,8 @@ describe('Android Practice History release slice', () => {
       .toContainEqual({ kind: 'detox', suite: 'android-history' });
     expect(workflow).toContain('pnpm mobile:validate:android:matrix');
     expect(spec).toContain('failStandardSprint()');
-    expect(spec).toContain("by.id('history-filter-wrong-only')");
+    expect(spec).toContain("by.id('history-result-wrong')");
+    expect(spec).toContain("historyAttemptRowTestIDForResult('Wrong move')");
     expect(spec).toContain("expect(element(by.id('history-attempt-detail'))).not.toExist()");
     expect(spec).toContain("waitForVisibleInPracticeScroll('review-schedule-control')");
     expect(spec).toContain("'review-analysis-button'");

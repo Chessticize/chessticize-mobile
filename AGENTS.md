@@ -5,10 +5,17 @@ All repository documentation must be written in English. User-facing GUI copy mu
 For development-loop decisions, use the repo-local skill at `.codex/skills/chessticize-mobile-dev-loop/SKILL.md`. It defines the preferred order for core/backend tests, CLI E2E checks, mobile component tests, and iOS simulator/Detox screenshot verification.
 
 For repeatable Storybook-to-Release simulator calibration across the maintained
-eight-scene UI baseline, use
+fifteen-scene, twenty-six-image UI baseline, use
 `.codex/skills/chessticize-mobile-ui-calibration/SKILL.md`.
 
 For Android release orchestration, use the repo-local skill at `.codex/skills/chessticize-android-release/SKILL.md`. It governs clean-machine preflight, exact-artifact Play and GitHub publication, protected recovery, risk-scoped CI/emulator validation, and final issue closure.
+
+For audits of all product changes since a released mobile source commit, use
+the repo-local skill at
+`.codex/skills/chessticize-release-delta-qa/SKILL.md`. It governs exact source
+identity, exact-head Release simulator captures, per-scene visual inspection,
+supporting interaction evidence, validation-drift repair, and GitHub issue
+grouping.
 
 ## Agent wayfinding
 

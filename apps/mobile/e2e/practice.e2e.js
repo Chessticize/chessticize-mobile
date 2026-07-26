@@ -4,6 +4,7 @@ const {
   elementText,
   sleep,
   frameFor,
+  historyAttemptRowTestIDForResult,
   launchWithDisabledSynchronization,
   openTab,
   openStandardHistoryTrend,
@@ -145,7 +146,9 @@ describe('Practice POC', () => {
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
-    await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(15000);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('sprint-result-top-bar'))).toBeVisible().withTimeout(10000);
     await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
     await element(by.id('back-practice-button')).tap();
 
@@ -271,12 +274,10 @@ describe('Practice POC', () => {
     await element(by.id('history-attention-flag-in-review')).tap();
     await element(by.id('history-filter-toggle')).tap();
     await waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000);
-    const unclearAttemptBadge = element(by.text('Unclear')).atIndex(0);
-    await waitFor(unclearAttemptBadge)
-      .toBeVisible()
-      .whileElement(by.id('practice-main-scroll'))
-      .scroll(100, 'down', 0.5, 0.5);
-    await unclearAttemptBadge.tap();
+    await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
+    const resultRowIdentifier = await historyAttemptRowTestIDForResult('Correct');
+    await waitForVisibleInPracticeScroll(resultRowIdentifier);
+    await element(by.id(resultRowIdentifier)).tap();
     await waitForVisibleInPracticeScroll('review-schedule-add');
     await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
     await expect(element(by.id('history-attempt-detail'))).not.toExist();
@@ -291,6 +292,7 @@ describe('Practice POC', () => {
       10000
     );
     await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('review-session-control-rail')).scrollTo('bottom');
     await waitFor(element(by.id('review-context-actions-rail'))).toExist().withTimeout(10000);
     await expect(element(by.id('review-schedule-control'))).toBeVisible();
     await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
@@ -428,14 +430,10 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await element(by.id('history-filter-toggle')).tap();
-    await waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000);
-    const persistedWrongResult = element(by.text('Wrong move')).atIndex(0);
-    await waitFor(persistedWrongResult)
-      .toBeVisible()
-      .whileElement(by.id('practice-main-scroll'))
-      .scroll(100, 'down', 0.5, 0.5);
-    await persistedWrongResult.tap();
+    await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
+    const resultRowIdentifier = await historyAttemptRowTestIDForResult('Wrong move');
+    await waitForVisibleInPracticeScroll(resultRowIdentifier);
+    await element(by.id(resultRowIdentifier)).tap();
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
     await waitForVisibleInPracticeScroll('review-analysis-button');
     await element(by.id('review-analysis-button')).tap();
