@@ -2,6 +2,7 @@ import {
   buildArrowDuelLandscapeGuideGeometry,
   buildPortraitGuideCalloutTop,
   buildPortraitGuidePointerLeft,
+  buildPortraitTimeoutGuideGeometry,
   buildSessionGuideLandscapeAlignment,
   buildSessionGuideRailConnectorGeometry
 } from "../src/components/sessionGuideGeometry.ts";
@@ -86,5 +87,22 @@ describe("session guide geometry", () => {
         y: 779
       }
     })).toBe(605);
+  });
+
+  it("raises the portrait Timed Out callout enough to show its full pointer above the board", () => {
+    const boardTop = 228;
+    const calloutHeight = 128;
+    const geometry = buildPortraitTimeoutGuideGeometry({
+      boardTop,
+      calloutHeight
+    });
+
+    expect(geometry).toEqual({
+      calloutTop: 82,
+      pointerReach: 12
+    });
+    expect(
+      boardTop - (geometry.calloutTop + calloutHeight + geometry.pointerReach)
+    ).toBe(6);
   });
 });

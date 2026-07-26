@@ -47,6 +47,31 @@ export function buildPortraitGuidePointerLeft({
   ));
 }
 
+export type PortraitTimeoutGuideGeometry = {
+  calloutTop: number;
+  pointerReach: number;
+};
+
+export function buildPortraitTimeoutGuideGeometry({
+  boardTop,
+  calloutHeight
+}: {
+  boardTop: number;
+  calloutHeight: number;
+}): PortraitTimeoutGuideGeometry {
+  const pointerReach = 12;
+
+  return {
+    calloutTop: buildPortraitGuideCalloutTop({
+      calloutHeight,
+      pointerReach,
+      target: { y: boardTop },
+      targetGap: 6
+    }),
+    pointerReach
+  };
+}
+
 export function buildSessionGuideRailConnectorGeometry({
   boardSize,
   calloutHeight,

@@ -27,6 +27,7 @@ import {
   buildArrowDuelLandscapeGuideGeometry,
   buildPortraitGuideCalloutTop,
   buildPortraitGuidePointerLeft,
+  buildPortraitTimeoutGuideGeometry,
   buildSessionGuideLandscapeAlignment,
   buildSessionGuideRailConnectorGeometry
 } from "./sessionGuideGeometry.ts";
@@ -4348,6 +4349,8 @@ type SessionGuideMeasuredLayout = {
 type SessionGuideMeasuredLayoutKey =
   | "slow-callout"
   | "slow-target"
+  | "timeout-callout"
+  | "timeout-target"
   | "unclear-callout"
   | "unclear-target";
 
@@ -4651,6 +4654,7 @@ function SessionCoachmarkDemo({
   const guideFrameRef = useRef<View>(null);
   const guideRowRef = useRef<View>(null);
   const slowTargetRef = useRef<View>(null);
+  const timeoutTargetRef = useRef<View>(null);
   const unclearTargetRef = useRef<View>(null);
   const rememberMeasuredLayout = useCallback((
     key: SessionGuideMeasuredLayoutKey,
@@ -4661,14 +4665,14 @@ function SessionCoachmarkDemo({
       : { ...current, [key]: next });
   }, []);
   const rememberCalloutLayout = useCallback((
-    key: "slow-callout" | "unclear-callout",
+    key: "slow-callout" | "timeout-callout" | "unclear-callout",
     event: LayoutChangeEvent
   ) => {
     const { height, width, x, y } = event.nativeEvent.layout;
     rememberMeasuredLayout(key, { height, width, x, y });
   }, [rememberMeasuredLayout]);
   const measureTargetInGuideFrame = useCallback((
-    key: "slow-target" | "unclear-target",
+    key: "slow-target" | "timeout-target" | "unclear-target",
     target: View | null
   ) => {
     const measurementFrame = adaptiveLayout.usesSessionRail
@@ -4739,9 +4743,11 @@ function SessionCoachmarkDemo({
     && (coachStep === 1 || coachStep === 3);
   const measuredCallout = callout.id === "slow"
     ? measuredLayouts["slow-callout"]
-    : callout.id === "unclear"
-      ? measuredLayouts["unclear-callout"]
-      : undefined;
+    : callout.id === "timeout"
+      ? measuredLayouts["timeout-callout"]
+      : callout.id === "unclear"
+        ? measuredLayouts["unclear-callout"]
+        : undefined;
   const fallbackRailTarget = callout.id === "slow"
     ? {
         height: 0,
@@ -4784,6 +4790,16 @@ function SessionCoachmarkDemo({
         target: measuredLayouts["slow-target"]
       })
     : undefined;
+  const portraitTimeoutGeometry = !adaptiveLayout.usesSessionRail
+    && callout.id === "timeout"
+    && measuredCallout
+    && measuredLayouts["timeout-target"]
+    ? buildPortraitTimeoutGuideGeometry({
+        boardTop: measuredLayouts["timeout-target"].y,
+        calloutHeight: measuredCallout.height
+      })
+    : undefined;
+  const portraitTimeoutPointerReach = portraitTimeoutGeometry?.pointerReach ?? 12;
   const arrowDuelLandscapeGeometry = isArrowDuel && adaptiveLayout.usesSessionRail
     ? buildArrowDuelLandscapeGuideGeometry(boardSize)
     : undefined;
@@ -4844,7 +4860,7 @@ function SessionCoachmarkDemo({
             : coachStep === 1
               ? portraitSlowCalloutTop ?? boardSize + 71
               : coachStep === 2
-                ? 92
+                ? portraitTimeoutGeometry?.calloutTop ?? 82
                 : boardSize + 150
             })
       };
@@ -4878,7 +4894,7 @@ function SessionCoachmarkDemo({
     : callout.tone === "danger"
       ? "#DC2626"
       : "#2563EB";
-  const usesCompactPortraitTimeoutPointer = !adaptiveLayout.usesSessionRail
+  const usesPortraitTimeoutPointer = !adaptiveLayout.usesSessionRail
     && callout.id === "timeout";
   const pointerTestId = `practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`;
   const pointerNode = isArrowDuel
@@ -4984,8 +5000,11 @@ function SessionCoachmarkDemo({
       accessibilityElementsHidden
       style={[
         styles.sessionGuideCoachPointerBottomShape,
-        usesCompactPortraitTimeoutPointer
-          ? styles.sessionGuideCoachTimeoutPointerBottomShape
+        usesPortraitTimeoutPointer
+          ? {
+              bottom: -portraitTimeoutPointerReach,
+              height: portraitTimeoutPointerReach
+            }
           : null,
         callout.id === "unclear" && !adaptiveLayout.usesSessionRail
           ? {
@@ -4998,9 +5017,6 @@ function SessionCoachmarkDemo({
       <View
         style={[
           styles.sessionGuideCoachPointerBottomLine,
-          usesCompactPortraitTimeoutPointer
-            ? styles.sessionGuideCoachTimeoutPointerBottomLine
-            : null,
           { backgroundColor: pointerColor }
         ]}
         testID={`${pointerTestId}-line`}
@@ -5008,9 +5024,6 @@ function SessionCoachmarkDemo({
       <View
         style={[
           styles.sessionGuideCoachPointerBottomHead,
-          usesCompactPortraitTimeoutPointer
-            ? styles.sessionGuideCoachTimeoutPointerBottomHead
-            : null,
           { borderTopColor: pointerColor }
         ]}
         testID={`${pointerTestId}-head`}
@@ -5057,6 +5070,8 @@ function SessionCoachmarkDemo({
         : `practice-session-guide-coach-${callout.id}`}
       onLayout={callout.id === "slow"
         ? (event) => rememberCalloutLayout("slow-callout", event)
+        : callout.id === "timeout"
+          ? (event) => rememberCalloutLayout("timeout-callout", event)
         : callout.id === "unclear"
           ? (event) => rememberCalloutLayout("unclear-callout", event)
           : undefined}
@@ -5153,6 +5168,9 @@ function SessionCoachmarkDemo({
               ? "Fixed example Arrow Duel puzzle, White to move, two candidate arrows, not interactive"
               : "Fixed example chess puzzle, White to move, not interactive"}
             accessibilityRole="image"
+            ref={!isArrowDuel && !adaptiveLayout.usesSessionRail
+              ? timeoutTargetRef
+              : undefined}
             style={[
               styles.boardSurface,
               styles.sessionGuideCoachBoardSurface,
@@ -5163,6 +5181,12 @@ function SessionCoachmarkDemo({
             testID={isArrowDuel
               ? "practice-arrow-duel-guide-demo-board"
               : "practice-session-guide-demo-board"}
+            onLayout={!isArrowDuel && !adaptiveLayout.usesSessionRail
+              ? () => measureTargetInGuideFrame(
+                  "timeout-target",
+                  timeoutTargetRef.current
+                )
+              : undefined}
           >
             <View
               style={[
@@ -14686,17 +14710,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 6,
     width: 0
-  },
-  sessionGuideCoachTimeoutPointerBottomShape: {
-    bottom: -6,
-    height: 6
-  },
-  sessionGuideCoachTimeoutPointerBottomLine: {
-    height: 2
-  },
-  sessionGuideCoachTimeoutPointerBottomHead: {
-    borderTopWidth: 4,
-    top: 2
   },
   sessionGuideCoachPointerLeft: {
     left: -20,
