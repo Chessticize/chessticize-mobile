@@ -1,6 +1,7 @@
 export * from "./types.ts";
 export * from "./sprint-config.ts";
 export * from "./theme-catalog.ts";
+export * from "./tactical-profile.ts";
 export * from "./ratings.ts";
 export * from "./puzzle-session.ts";
 export * from "./review-scheduler.ts";

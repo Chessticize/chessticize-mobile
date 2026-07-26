@@ -28,6 +28,7 @@ try {
     allPuzzlesArrowDuelEligible: true
   });
   const results = cases.map((benchmarkCase) => benchmarkSelection(source, benchmarkCase));
+  const focusedQuotaPlan = benchmarkFocusedQuotaPlan(source);
   const oneTheme = results[0];
   const fiveThemes = results[1];
   const allThemes = results[2];
@@ -54,12 +55,91 @@ try {
     iterations,
     input: { limit, rating },
     results,
+    focusedQuotaPlan,
     fiveToOneMedianRatio: round(fiveThemes.selection.medianMs / oneTheme.selection.medianMs),
     fiveToAllMedianRatio: round(fiveThemes.selection.medianMs / allThemes.selection.medianMs),
     queryPlans
   }, null, 2)}\n`);
 } finally {
   database.close();
+}
+
+function benchmarkFocusedQuotaPlan(source) {
+  for (let index = 0; index < 5; index += 1) {
+    selectFocusedQuotaPlan(source, `warm-${index}`);
+  }
+  const samples = [];
+  for (let index = 0; index < iterations; index += 1) {
+    const startedAt = performance.now();
+    const selected = selectFocusedQuotaPlan(source, `sample-${index}`);
+    samples.push(performance.now() - startedAt);
+    if (selected.length !== 15) {
+      throw new Error(`focused-quota-plan returned ${selected.length} puzzles; expected 15`);
+    }
+    if (new Set(selected.map((puzzle) => puzzle.id)).size !== selected.length) {
+      throw new Error("focused-quota-plan returned duplicate puzzle ids");
+    }
+  }
+  samples.sort((left, right) => left - right);
+  return {
+    allocations: [
+      { theme: "fork", count: 9 },
+      { theme: "pin", count: 3 },
+      { theme: "mixed", excludesThemes: ["fork", "pin"], count: 3 }
+    ],
+    returnedPuzzleCount: 15,
+    duplicatePuzzleIds: 0,
+    failures: 0,
+    selection: {
+      medianMs: round(percentile(samples, 0.5)),
+      p95Ms: round(percentile(samples, 0.95)),
+      minMs: round(samples[0]),
+      maxMs: round(samples.at(-1))
+    }
+  };
+}
+
+function selectFocusedQuotaPlan(source, randomSeed) {
+  const primary = source.selectPuzzles({
+    mode: "custom",
+    limit: 9,
+    minRating: rating - 100,
+    maxRating: rating + 100,
+    themes: ["fork"],
+    randomSeed: `${randomSeed}:primary`
+  });
+  const primaryIds = new Set(primary.map((puzzle) => puzzle.id));
+  const secondary = source.selectPuzzles({
+    mode: "custom",
+    limit: 3,
+    minRating: rating - 100,
+    maxRating: rating + 100,
+    themes: ["pin"],
+    excludeIds: [...primaryIds],
+    randomSeed: `${randomSeed}:secondary`
+  });
+  const focusedIds = new Set([
+    ...primaryIds,
+    ...secondary.map((puzzle) => puzzle.id)
+  ]);
+  const mixedCandidates = source.selectPuzzles({
+    mode: "custom",
+    limit: 30,
+    minRating: rating - 100,
+    maxRating: rating + 100,
+    themes: [],
+    excludeIds: [...focusedIds],
+    randomSeed: `${randomSeed}:mixed`
+  });
+  const mixed = mixedCandidates
+    .filter((puzzle) => !puzzle.themes.includes("fork") && !puzzle.themes.includes("pin"))
+    .slice(0, 3);
+  if (primary.length !== 9 || secondary.length !== 3 || mixed.length !== 3) {
+    throw new Error(
+      `focused-quota-plan incomplete: ${primary.length} primary, ${secondary.length} secondary, ${mixed.length} mixed`
+    );
+  }
+  return [...primary, ...secondary, ...mixed];
 }
 
 function benchmarkSelection(source, benchmarkCase) {

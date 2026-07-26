@@ -98,6 +98,37 @@ test("Issue #247 stays on the existing Settings product clone with its approved 
   );
 });
 
+test("Issue #250 owns the complete Tactical Profile design state set", () => {
+  assert.deepEqual(
+    newScenarios
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 250))
+      .map((scenario) => scenario.id),
+    [
+      "practice-tactical-profile-building",
+      "practice-tactical-profile-collecting",
+      "practice-tactical-profile-balanced",
+      "practice-tactical-profile-solve-rate",
+      "practice-tactical-profile-speed",
+      "practice-tactical-profile-ranked",
+      "practice-tactical-profile-task-families-home",
+      "practice-tactical-profile-task-families",
+      "practice-tactical-profile-limited-inventory",
+      "practice-tactical-profile-explanation",
+      "practice-tactical-profile-focused-run",
+      "practice-tactical-profile-suppressed"
+    ]
+  );
+  assert.equal(
+    scenarioRegistry["practice-tactical-profile-focused-run"].scope.includes
+      .includes("Mixed-practice allocation"),
+    true
+  );
+  assert.equal(
+    scenarioRegistry["history-populated"].issues?.some((issue) => issue.issueNumber === 250) ?? false,
+    false
+  );
+});
+
 test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab scenarios", () => {
   const activeSessionGuide = scenarioRegistry["practice-active-session-guide"];
   const arrowDuelGuide = scenarioRegistry["practice-arrow-duel-guide"];

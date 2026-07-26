@@ -8,7 +8,8 @@ import TestRenderer, { act } from "react-test-renderer";
 import {
   PracticePocScreen,
   type PracticeDebugTraceEvent,
-  type PracticeRunManagementPresentation
+  type PracticeRunManagementPresentation,
+  type TacticalProfilePresentation
 } from "../src/components/PracticePocScreen";
 import {
   buildPracticeAdaptiveLayout,
@@ -1020,6 +1021,7 @@ describe("PracticePocScreen", () => {
   it("keeps How Sprint works available on the ordinary Practice Home story", () => {
     const renderer = renderLabScenario("practice-home");
 
+    expect(() => findByTestId(renderer, "training-focus-section")).toThrow();
     expect(() => findByTestId(renderer, "practice-sprint-rules-guide")).toThrow();
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-open"))).toContain(
       "How Sprint works"
@@ -1027,6 +1029,262 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "practice-sprint-rules-open");
     expect(findByTestId(renderer, "practice-sprint-rules-guide")).toBeTruthy();
+  });
+
+  it("contains the Tactical Profile entry behind its optional design presentation", () => {
+    const onIntent = jest.fn();
+    const presentation: TacticalProfilePresentation = {
+      phase: "ready",
+      screen: "home",
+      signals: [
+        {
+          id: "fork",
+          taskFamily: "line",
+          themeKey: "fork",
+          themeLabel: "Forks",
+          kind: "solve_rate",
+          distinctPuzzleCount: 7,
+          distinctSessionCount: 3,
+          priorityLabel: "Recommended",
+          status: "recommended"
+        }
+      ],
+      focusedRun: {
+        taskFamily: "line",
+        title: "Fork repair",
+        ratingLabel: "Puzzle-solving Rating 925",
+        durationLabel: "5 min",
+        totalPuzzleCount: 15,
+        allocations: [
+          { id: "fork", label: "Forks", puzzleCount: 10, tone: "primary" },
+          { id: "mixed", label: "Mixed practice", puzzleCount: 5, tone: "mixed" }
+        ]
+      },
+      onIntent
+    };
+    const renderer = renderScreen({
+      runManagementEnabled: true,
+      tacticalProfilePresentation: presentation
+    });
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Forks may need attention"
+    );
+    press(renderer, "training-focus-open-profile");
+    expect(onIntent).toHaveBeenCalledWith({ type: "open-profile" });
+  });
+
+  it("keeps solve reliability and completed-puzzle speed as plain-language profile signals", () => {
+    const solveRate = renderLabScenario("practice-tactical-profile-solve-rate");
+    const speed = renderLabScenario("practice-tactical-profile-speed");
+
+    expect(collectText(findByTestId(solveRate, "tactical-profile-signal-fork"))).toContain(
+      "You complete these less reliably than comparable puzzles."
+    );
+    expect(collectText(findByTestId(speed, "tactical-profile-signal-pin-speed"))).toContain(
+      "You solve these correctly, but more slowly than comparable puzzles."
+    );
+    expect(collectText(findByTestId(solveRate, "tactical-profile-screen"))).not.toContain("%");
+    expect(collectText(findByTestId(speed, "tactical-profile-screen"))).not.toContain("%");
+  });
+
+  it("keeps one-off mistakes inside the shared collecting-evidence state", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-collecting");
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "More information needed"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).not.toContain(
+      "One miss"
+    );
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
+      "We need results from more different puzzles and sessions"
+    );
+    expect(() => findByTestId(renderer, "tactical-profile-preview-run")).toThrow();
+  });
+
+  it("summarizes several focuses on Home and caps the full profile at three", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-ranked");
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "4 recommendations"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Forks is your clearest focus"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "There are 3 more themes worth reviewing."
+    );
+
+    press(renderer, "training-focus-open-profile");
+
+    expect(findByTestId(renderer, "tactical-profile-signal-fork")).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-signal-pin-speed")).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-signal-deflection")).toBeTruthy();
+    expect(() => findByTestId(renderer, "tactical-profile-signal-back-rank")).toThrow();
+    expect(collectText(findByTestId(renderer, "tactical-profile-more-signals"))).toContain(
+      "1 more pattern is being monitored"
+    );
+  });
+
+  it("keeps Puzzle solving and Arrow Duel focus lanes separate inside one profile", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-task-families-home");
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "2 modes with recommendations"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Arrow Duel also has 2 recommendations."
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-primary-mode"))).toContain(
+      "Puzzle solving"
+    );
+
+    press(renderer, "training-focus-open-profile");
+    expect(findByTestId(renderer, "tactical-profile-task-family-selector")).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-signal-fork")).toBeTruthy();
+    expect(() => findByTestId(renderer, "tactical-profile-signal-arrow-pin")).toThrow();
+
+    press(renderer, "tactical-profile-task-family-arrow_duel");
+
+    expect(
+      findByTestId(renderer, "tactical-profile-task-family-arrow_duel").props.accessibilityState
+    ).toEqual({ selected: true });
+    expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
+      "Arrow Duel"
+    );
+    expect(findByTestId(renderer, "tactical-profile-signal-arrow-pin")).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-signal-arrow-deflection-speed")).toBeTruthy();
+    expect(() => findByTestId(renderer, "tactical-profile-signal-fork")).toThrow();
+
+    press(renderer, "tactical-profile-preview-run");
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Arrow Duel Rating 875"
+    );
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Mixed Arrow Duel"
+    );
+  });
+
+  it("uses an explicit cross-mode Home lead and blocks mismatched Focused Runs", () => {
+    const onIntent = jest.fn();
+    const lineSignal: TacticalProfilePresentation["signals"][number] = {
+      id: "line-fork",
+      taskFamily: "line",
+      themeKey: "fork",
+      themeLabel: "Forks",
+      kind: "solve_rate",
+      distinctPuzzleCount: 7,
+      distinctSessionCount: 3,
+      priorityLabel: "Recommended",
+      status: "recommended"
+    };
+    const arrowSignal: TacticalProfilePresentation["signals"][number] = {
+      id: "arrow-pin",
+      taskFamily: "arrow_duel",
+      themeKey: "pin",
+      themeLabel: "Pins",
+      kind: "solve_rate",
+      distinctPuzzleCount: 8,
+      distinctSessionCount: 3,
+      priorityLabel: "Recommended",
+      status: "recommended"
+    };
+    const arrowRun: NonNullable<TacticalProfilePresentation["focusedRun"]> = {
+      taskFamily: "arrow_duel",
+      title: "Arrow Duel focus",
+      ratingLabel: "Arrow Duel Rating 875",
+      durationLabel: "5 min",
+      totalPuzzleCount: 15,
+      allocations: [
+        { id: "arrow-pin", label: "Pins", puzzleCount: 10, tone: "primary" },
+        { id: "arrow-mixed", label: "Mixed Arrow Duel", puzzleCount: 5, tone: "mixed" }
+      ]
+    };
+    const presentation: TacticalProfilePresentation = {
+      phase: "ready",
+      screen: "home",
+      activeTaskFamily: "line",
+      homeLeadSignalId: lineSignal.id,
+      signals: [arrowSignal, lineSignal],
+      focusedRun: arrowRun,
+      onIntent
+    };
+
+    const home = renderScreen({
+      runManagementEnabled: true,
+      tacticalProfilePresentation: presentation
+    });
+    expect(collectText(findByTestId(home, "training-focus-primary-mode"))).toContain(
+      "Puzzle solving"
+    );
+    expect(collectText(findByTestId(home, "training-focus-card"))).toContain(
+      "Forks is your clearest focus"
+    );
+
+    const explanation = renderScreen({
+      runManagementEnabled: true,
+      tacticalProfilePresentation: {
+        ...presentation,
+        screen: "explanation",
+        selectedSignalId: lineSignal.id
+      }
+    });
+    expect(findByTestId(explanation, "tactical-profile-explanation")).toBeTruthy();
+    expect(() => findByTestId(explanation, "tactical-profile-explanation-preview")).toThrow();
+
+    const preview = renderScreen({
+      runManagementEnabled: true,
+      tacticalProfilePresentation: {
+        ...presentation,
+        screen: "focused_run"
+      }
+    });
+    expect(() => findByTestId(preview, "focused-run-preview")).toThrow();
+    expect(findByTestId(preview, "tactical-profile-screen")).toBeTruthy();
+  });
+
+  it("keeps a credible low-inventory focus but withholds the unsafe Run CTA", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-limited-inventory");
+
+    expect(collectText(findByTestId(renderer, "focused-run-unavailable"))).toContain(
+      "Not enough new puzzles nearby"
+    );
+    expect(collectText(findByTestId(renderer, "focused-run-unavailable"))).toContain(
+      "current Rating"
+    );
+    expect(() => findByTestId(renderer, "tactical-profile-preview-run")).toThrow();
+  });
+
+  it("walks explanation, quota preview, decline, and restore through public Tactical Profile actions", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-ranked");
+
+    press(renderer, "training-focus-open-profile");
+    press(renderer, "tactical-profile-explain-fork");
+    expect(collectText(findByTestId(renderer, "tactical-profile-explanation"))).toContain(
+      "Slow and Unclear labels, or whether a puzzle is in Review, do not count as proof"
+    );
+
+    press(renderer, "tactical-profile-explanation-preview");
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Only the two clearest focuses can enter one Run."
+    );
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Mixed practice"
+    );
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Rebuilt for your current Rating before each new Run"
+    );
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Later ordinary mixed Runs decide whether this focus still applies."
+    );
+
+    press(renderer, "focused-run-not-now");
+    expect(findByTestId(renderer, "tactical-profile-suppressed")).toBeTruthy();
+
+    press(renderer, "tactical-profile-restore");
+    expect(findByTestId(renderer, "tactical-profile-recommendations")).toBeTruthy();
   });
 
   it("teaches first-use Sprint rules and retains a rediscovery entry after dismissal", () => {
@@ -9259,7 +9517,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -9381,6 +9639,7 @@ function renderScreen({
   sprintStartDelayMs,
   standardTargetCorrect,
   systemBack,
+  tacticalProfilePresentation,
   themeCatalogPresentation,
   ...capabilityOverrides
 }: RenderScreenOptions = {}): TestRenderer.ReactTestRenderer {
@@ -9405,6 +9664,7 @@ function renderScreen({
         sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}
         systemBack={systemBack}
+        tacticalProfilePresentation={tacticalProfilePresentation}
         themeCatalogPresentation={themeCatalogPresentation}
       />
     );

@@ -27,6 +27,12 @@ import {
   SERVER_CURATED_THEME_PRESENTATION,
   THEME_CATALOG_LAB_PUZZLES
 } from "./themeCatalogPrototype.ts";
+import {
+  initialTacticalProfileFixtureState,
+  isTacticalProfileScenario,
+  reduceTacticalProfileFixtureState,
+  tacticalProfilePresentationFor
+} from "./tacticalProfileFixture.ts";
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
 
@@ -52,6 +58,11 @@ function LabScenarioContent({
   scenarioId: LabScenarioId;
 }): React.JSX.Element {
   const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>([]);
+  const [tacticalProfileState, setTacticalProfileState] = useState(() =>
+    isTacticalProfileScenario(scenarioId)
+      ? initialTacticalProfileFixtureState(scenarioId)
+      : { screen: "home" as const, selectedTaskFamily: "line" as const }
+  );
   const showsThemeCatalogPrototype = isRunManagementScenario(scenarioId) || [
     "history-populated",
     "history-filters",
@@ -66,6 +77,21 @@ function LabScenarioContent({
   );
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
   useEffect(() => setSelectedCustomThemes([]), [scenarioId]);
+  useEffect(() => {
+    if (isTacticalProfileScenario(scenarioId)) {
+      setTacticalProfileState(initialTacticalProfileFixtureState(scenarioId));
+    }
+  }, [scenarioId]);
+
+  const tacticalProfilePresentation = isTacticalProfileScenario(scenarioId)
+    ? tacticalProfilePresentationFor(
+        scenarioId,
+        tacticalProfileState,
+        (intent) => setTacticalProfileState((current) =>
+          reduceTacticalProfileFixtureState(current, intent)
+        )
+      )
+    : undefined;
 
   return (
     <LabScenarioShell scenarioId={scenarioId}>
@@ -79,6 +105,7 @@ function LabScenarioContent({
           ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
         runEloEditingMovedToHome
+        tacticalProfilePresentation={tacticalProfilePresentation}
         {...runtime.screenProps}
       />
     </LabScenarioShell>
@@ -86,7 +113,7 @@ function LabScenarioContent({
 }
 
 function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
-  return [
+  return isTacticalProfileScenario(scenarioId) || [
     "practice-home",
     "practice-first-sprint-guide",
     "practice-home-edit",
