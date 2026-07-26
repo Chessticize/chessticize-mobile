@@ -1,19 +1,22 @@
 ---
 name: chessticize-mobile-ui-calibration
-description: Capture and visually calibrate Chessticize Mobile's Storybook Interaction Lab against an exact-head iOS Release simulator build across the maintained portrait and landscape baseline scenes, archive local screenshots, enforce production-only UI, and record PR evidence. Use when UI work needs native screenshot parity, when Storybook may differ from the real app, when Custom Setup or Review controls need verification, when refreshing the project's foundational UI screenshots, or before preparing App Store screenshot sets.
+description: Capture and visually calibrate Chessticize Mobile's Storybook Interaction Lab against an exact-head iOS Release simulator build across the maintained portrait and landscape baseline scenes, judge functional rendering, copy quality, and presentation quality including hierarchy, alignment, typography, spacing, balance, and polish, archive local screenshots, enforce production-only UI, and record PR evidence. Use when UI work needs native screenshot parity, copy review, or aesthetic and layout review, when Storybook may differ from the real app, when Custom Setup or Review controls need verification, when refreshing the project's foundational UI screenshots, or before preparing App Store screenshot sets.
 ---
 
 # Chessticize Mobile UI Calibration
 
 Compare the Storybook presentation contract with product-accurate Release
-simulator rendering. Use the maintained eight-scene Detox journey plus its four
-adaptive-layout landscape captures so future calibration stays repeatable
-instead of depending on manually seeded app data.
+simulator rendering. Use the maintained fifteen-scene Detox journey plus its
+eleven adaptive-layout landscape captures so future calibration stays
+repeatable instead of depending on manually seeded app data.
 
 ## Safety And Scope
 
 - Use a dedicated simulator such as `iPhone 17-Detox`. Never use a simulator
   that contains manual-test data; Detox launches with `delete: true`.
+- Do not install or launch this workflow's build on a physical device. Real
+  device checks are a separate, explicitly requested workflow and are never
+  accepted as substitutes for the named simulator evidence.
 - Commit the intended changes and require a clean tracked worktree before
   producing exact-head evidence. Any later visual, runtime, native, dependency,
   capture-fixture, or build-configuration change invalidates it. Documentation,
@@ -58,9 +61,9 @@ The script:
 1. Requires macOS, a clean worktree, and a fixed Git `HEAD`.
 2. Runs `pnpm mobile:doctor:ios`.
 3. Builds the Release simulator app with bundled JavaScript.
-4. Runs the deterministic eight-scene store-assets journey with one worker,
-   capturing four layout-sensitive scenes in both orientations.
-5. Copies the eight portrait and four landscape PNGs to
+4. Runs the deterministic fifteen-scene store-assets journey with one worker,
+   capturing eleven layout-sensitive scenes in both orientations.
+5. Copies the fifteen portrait and eleven landscape PNGs to
    `scratch/rendering-checks/<short-sha>/release/`.
 6. Confirms that `HEAD` and the tracked worktree did not change.
 
@@ -68,7 +71,7 @@ Set `CHESSTICIZE_IOS_PREPARE=1` only when the CocoaPods workspace or locked
 bundle genuinely needs preparation. Environment preparation must not update
 tracked lockfiles unintentionally.
 
-### 3. Inspect all twelve captures
+### 3. Inspect all twenty-six captures
 
 Open every PNG, not only the flow that originally changed:
 
@@ -82,14 +85,50 @@ Open every PNG, not only the flow that originally changed:
 | `app-store-06-arrow-duel` | Both candidate arrows render on the real board without clipping. |
 | `app-store-07-custom-setup` | The theme chips wrap cleanly and the theme row has no `Theme` heading. |
 | `app-store-08-review-session` | Review progress, timer, real board, arrows, and instruction are visible without overlap. |
+| `app-store-09-sprint-rules-guide` | First-use rules clearly distinguish target, duration, mistakes, Slow, and timeout before a Sprint starts. |
+| `app-store-10-active-session-guide-header` | The Sprint header guide preserves the real hierarchy and keeps its callout legible. |
+| `app-store-11-active-session-guide-slow` | The Slow guide makes the amber timing state readable without implying a user control. |
+| `app-store-12-active-session-guide-timeout` | The Timed Out guide shows the automatic timeout overlay and its mistake, Unclear, and Review consequences without clipping. |
+| `app-store-13-active-session-guide-unclear` | The Unclear guide explains the manual action and points to the visible control. |
+| `app-store-14-arrow-duel-guide` | The Arrow Duel guide shows both candidate arrows, bounded copy, and the delayed timer start. |
+| `app-store-15-sprint-result` | The failed result clearly reports reason, solved/attempted accuracy, rating, mistakes, Review impact, and history action. |
 
 The `practice-tab`, `standard-sprint`, `arrow-duel`, and `review-session`
-landscape variants must preserve the native Safe Area, adaptive board/rail
-geometry, readable controls, and unclipped content at the same simulator size.
+landscape variants, plus every first-use guide and Sprint-result landscape
+variant, must preserve the native Safe Area, adaptive board/rail geometry,
+readable controls, and unclipped content at the same simulator size.
 
 Compare hierarchy, copy, wrapping, disabled states, Safe Area, board geometry,
 and bottom-tab overlap against Storybook. Treat Storybook as the design
 contract and Release simulator screenshots as native acceptance evidence.
+
+Judge functional rendering and presentation quality separately. Functional
+containment is necessary but not sufficient for a visual pass. For every image,
+also inspect:
+
+- Focal hierarchy and whether the reading order is obvious.
+- Shared edges, columns, baselines, and alignment consistency.
+- Padding, margins, spacing rhythm, density, and whitespace balance.
+- Type scale, weight, line length, wrapping, and readability.
+- Copy clarity, accuracy, grammar, concision, tone, product terminology, and
+  consistency with the visible behavior.
+- Visual balance between the board, rail, callouts, navigation, and screen
+  edges.
+- Consistency of colors, borders, radii, icons, and sibling-screen patterns.
+- Whether guidance visually points to and plainly explains the UI element to a
+  first-time user, without internal tour language, unexplained jargon, or
+  redundant instructions.
+- Overall polish at the tested viewport and orientation.
+
+Treat an observable aesthetic or layout defect as a real mismatch when it
+reduces scanability, comprehension, balance, consistency, or perceived quality,
+even if the flow remains usable. Record the screenshot, visible symptom, and
+user impact instead of reporting a vague personal preference.
+
+Treat misleading, ambiguous, awkward, repetitive, inconsistent, or
+novice-hostile copy as a real mismatch even when it renders without clipping.
+The text must describe the UI and consequence the user can actually observe,
+not merely mirror an internal implementation name.
 
 ### 4. Fix and repeat
 
@@ -100,7 +139,8 @@ When a mismatch is real:
 2. Fix the shared production component rather than adding a Storybook-only
    imitation.
 3. Run focused component tests and `pnpm mobile:typecheck`.
-4. Commit the change, rerun the capture script, and inspect all eight images.
+4. Commit the change, rerun the capture script, and inspect all twenty-six
+   images.
 
 Do not add pixel-perfect native snapshot diffs by default. System fonts,
 rendering versions, and antialiasing create noisy changes; keep semantic
@@ -128,7 +168,7 @@ dimensions are not an accepted App Store upload size.
 - If CocoaPods reports `pathname contains null byte`, treat it as an environment
   preparation problem involving pnpm-linked pod paths. Do not commit an
   unrelated `Podfile.lock` rewrite to make calibration pass.
-- If the screenshot command passes but fewer than twelve PNGs are found, inspect
+- If the screenshot command passes but fewer than twenty-six PNGs are found, inspect
   the Detox artifact directory and the first failing scene before rerunning.
 - If Debug controls appear, confirm the build configuration is
   `ios.sim.release`; do not accept the images as a production baseline.
@@ -142,6 +182,8 @@ Update the PR validation record with:
 - Capture command and Detox pass count.
 - Local screenshot directory.
 - The Storybook URL reviewed.
-- Visual findings, especially Custom Setup heading removal, Review CTA/debug
+- Separate functional, copy, and presentation findings, including hierarchy,
+  alignment, spacing, typography, whitespace balance, overall polish, novice
+  clarity, terminology, Custom Setup heading removal, Review CTA/debug
   isolation, board arrows, clipping, wrapping, and Safe Area behavior.
 - Any required device families or final App Store assets still outstanding.

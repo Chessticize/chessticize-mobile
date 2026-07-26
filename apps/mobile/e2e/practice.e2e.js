@@ -4,6 +4,7 @@ const {
   elementText,
   sleep,
   frameFor,
+  historyAttemptRowTestIDForResult,
   launchWithDisabledSynchronization,
   openTab,
   openStandardHistoryTrend,
@@ -121,7 +122,7 @@ describe('Practice POC', () => {
     await device.terminateApp();
     await launchWithDisabledSynchronization({ newInstance: true, delete: false });
     await waitFor(element(by.text('Calculation Focus'))).toExist().withTimeout(180000);
-    await waitFor(element(by.text('Rating 1000'))).toExist().withTimeout(10000);
+    await waitFor(element(by.text('1000'))).toExist().withTimeout(10000);
   });
 
   it('persists first-use Sprint guidance and replays it after Settings reset', async () => {
@@ -144,10 +145,12 @@ describe('Practice POC', () => {
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
-    await waitFor(element(by.id('sprint-summary-panel'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(15000);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('sprint-result-top-bar'))).toBeVisible().withTimeout(10000);
     await element(by.id('back-practice-button')).tap();
 
-    await openTab('settings-tab', 'settings-guidance-section');
+    await openTab('settings-tab', 'settings-show-sprint-guide');
     await element(by.id('settings-show-sprint-guide')).tap();
     await waitFor(element(by.id('settings-sprint-guide-ready'))).toExist().withTimeout(10000);
 
@@ -263,19 +266,10 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitForElementAccessibilityLabelContaining(
-      'history-filter-unclear',
-      'Unclear attempts',
-      10000
-    );
-    await element(by.id('history-filter-unclear')).tap();
     await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
-    const resultAttributes = await element(by.text('Correct')).atIndex(0).getAttributes();
-    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-      throw new Error(`Could not resolve unclear History row from ${String(resultIdentifier)}`);
-    }
-    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    const resultRowIdentifier = await historyAttemptRowTestIDForResult('Correct');
+    await waitForVisibleInPracticeScroll(resultRowIdentifier);
+    await element(by.id(resultRowIdentifier)).tap();
     await waitForVisibleInPracticeScroll('review-schedule-add');
     await waitForVisibleInPracticeScroll('history-attempt-unclear');
     await expect(element(by.id('history-attempt-detail'))).not.toExist();
@@ -290,6 +284,7 @@ describe('Practice POC', () => {
       10000
     );
     await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('review-session-control-rail')).scrollTo('bottom');
     await waitFor(element(by.id('review-context-actions-rail'))).toExist().withTimeout(10000);
     await expect(element(by.id('review-schedule-control'))).toBeVisible();
     await expect(element(by.id('history-attempt-unclear'))).toBeVisible();
@@ -347,12 +342,6 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitForElementAccessibilityLabelContaining(
-      'history-filter-unclear',
-      'Unclear attempts',
-      10000
-    );
-    await element(by.id('history-filter-unclear')).tap();
     await waitFor(element(by.id('history-empty-state'))).toExist().withTimeout(10000);
   });
 
@@ -430,12 +419,9 @@ describe('Practice POC', () => {
     });
     await openStandardHistoryTrend();
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
-    const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
-    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-      throw new Error(`Could not resolve persisted history attempt row from ${String(resultIdentifier)}`);
-    }
-    await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+    const resultRowIdentifier = await historyAttemptRowTestIDForResult('Wrong move');
+    await waitForVisibleInPracticeScroll(resultRowIdentifier);
+    await element(by.id(resultRowIdentifier)).tap();
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
     await waitForVisibleInPracticeScroll('review-analysis-button');
     await element(by.id('review-analysis-button')).tap();

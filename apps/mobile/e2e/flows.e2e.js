@@ -2,6 +2,7 @@ const {
   completeFirstUseSessionGuides,
   openTab,
   openStandardHistoryTrend,
+  historyAttemptRowTestIDForResult,
   launchWithDisabledSynchronization,
   playBoardMove,
   sleep,
@@ -203,65 +204,41 @@ describe('Key user flows', () => {
     await waitForElementTextContaining('settings-review-reminder-schedule-status', 'none', 10000);
   });
 
-  it('shows failed attempts in history with the wrong-only toggle', async () => {
+  it('shows failed attempts in History and preserves current filters through replay', async () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
     await openStandardHistoryTrend();
 
-    await waitFor(element(by.id('history-filter-wrong-only')))
-      .toBeVisible()
-      .whileElement(by.id('history-range-filters'))
-      .scroll(120, 'right');
-    await expect(element(by.id('history-filter-reset'))).not.toExist();
-    await expect(element(by.id('history-filter-wrong-only')))
-      .toHaveValue(historyToggleValue('Wrong puzzles only', false));
-    await expect(element(by.id('history-filter-sprint-only')))
-      .toHaveValue(historyToggleValue('Sprint attempts only', true));
-    await element(by.id('history-filter-wrong-only')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only')))
-      .toHaveValue(historyToggleValue('Wrong puzzles only', true))
-      .withTimeout(10000);
+    await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
+    await element(by.id('history-result-wrong')).tap();
+    await waitFor(element(
+      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
-    await element(by.id('history-filter-wrong-only')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only')))
-      .toHaveValue(historyToggleValue('Wrong puzzles only', false))
-      .withTimeout(10000);
+    await element(by.id('history-result-all')).tap();
+    await waitFor(element(
+      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+    )).not.toExist().withTimeout(10000);
 
-    // Replay round trip must preserve the toggles' non-default state: turn the
-    // wrong-only filter on and sprint-only filter off, open a wrong attempt's
-    // replay, exit, and require both choices to remain unchanged.
-    await element(by.id('history-filter-wrong-only')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only')))
-      .toHaveValue(historyToggleValue('Wrong puzzles only', true))
-      .withTimeout(10000);
-    await waitFor(element(by.id('history-filter-sprint-only')))
-      .toBeVisible()
-      .whileElement(by.id('history-quick-filters'))
-      .scroll(120, 'right');
-    await element(by.id('history-filter-sprint-only')).tap();
-    await waitFor(element(by.id('history-filter-sprint-only')))
-      .toHaveValue(historyToggleValue('Sprint attempts only', false))
-      .withTimeout(10000);
-    await element(by.id('history-filter-toggle')).tap();
+    // Replay round trip must preserve the current non-default filters.
+    await element(by.id('history-result-wrong')).tap();
+    await element(by.id('history-source-sprint')).tap();
+    await waitFor(element(
+      by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('history-theme-disclosure');
+    await element(by.id('history-theme-disclosure')).tap();
     await waitForVisibleInPracticeScroll('history-theme-mate-in-2');
     await element(by.id('history-theme-mate-in-2')).tap();
     await waitForVisibleInPracticeScroll('history-theme-mate-in-3');
     await element(by.id('history-theme-mate-in-3')).tap();
     await waitFor(element(
-      by.text('Mate in 2').withAncestor(by.id('history-active-filter-summary'))
-    )).toExist().withTimeout(10000);
-    await waitFor(element(
-      by.text('Mate in 3').withAncestor(by.id('history-active-filter-summary'))
+      by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
     )).toExist().withTimeout(10000);
     await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
 
-    const resultAttributes = await element(by.text('Wrong move')).atIndex(0).getAttributes();
-    const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-    if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-      throw new Error(`Could not resolve history attempt row from ${String(resultIdentifier)}`);
-    }
-    const resultRowIdentifier = resultIdentifier.replace(/-result$/, '');
+    const resultRowIdentifier = await historyAttemptRowTestIDForResult('Wrong move');
     await waitForVisibleInPracticeScroll(resultRowIdentifier);
     await element(by.id(resultRowIdentifier)).tap();
     await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
@@ -274,32 +251,33 @@ describe('Key user flows', () => {
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('review-exit'))).toBeVisible().withTimeout(10000);
     await element(by.id('review-exit')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only')))
-      .toHaveValue(historyToggleValue('Wrong puzzles only', true))
-      .withTimeout(10000);
-    await waitFor(element(by.id('history-filter-sprint-only')))
-      .toHaveValue(historyToggleValue('Sprint attempts only', false))
-      .withTimeout(10000);
+    await waitFor(element(
+      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
     await expect(element(
-      by.text('Mate in 2').withAncestor(by.id('history-active-filter-summary'))
+      by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
     )).toExist();
     await expect(element(
-      by.text('Mate in 3').withAncestor(by.id('history-active-filter-summary'))
+      by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
     )).toExist();
     await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
     await expect(element(by.text('Reset filters'))).toExist();
     await element(by.id('history-filter-reset')).tap();
-    await waitFor(element(by.id('history-filter-wrong-only')))
-      .toHaveValue(historyToggleValue('Wrong puzzles only', false))
-      .withTimeout(10000);
-    await waitFor(element(by.id('history-filter-sprint-only')))
-      .toHaveValue(historyToggleValue('Sprint attempts only', true))
-      .withTimeout(10000);
+    await waitFor(element(
+      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+    )).not.toExist().withTimeout(10000);
+    await waitFor(element(
+      by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
+    )).not.toExist().withTimeout(10000);
+    await waitFor(element(
+      by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
+    )).not.toExist().withTimeout(10000);
   });
 
   it('adds and starts a saved custom Run', async () => {
-    await createSavedCustomRun('Flow Focus', { shorterDuration: true });
-    await element(by.text('Flow Focus')).tap();
+    const flowFocusSelectTestID = await createSavedCustomRun('Flow Focus', { shorterDuration: true });
+    await waitForVisibleInPracticeScroll(flowFocusSelectTestID);
+    await element(by.id(flowFocusSelectTestID)).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await element(by.id('practice-run-start')).tap();
     await completeFirstUseSessionGuides();
@@ -316,11 +294,12 @@ describe('Key user flows', () => {
     await dismissSprintSummary();
 
     await openTab('practice-tab', 'practice-add-run');
-    await createSavedCustomRun('Persistent Focus', {
+    const persistentFocusSelectTestID = await createSavedCustomRun('Persistent Focus', {
       shorterDuration: true,
       themes: ['mate-in-2', 'fork']
     });
-    await element(by.text('Persistent Focus')).tap();
+    await waitForVisibleInPracticeScroll(persistentFocusSelectTestID);
+    await element(by.id(persistentFocusSelectTestID)).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await element(by.id('practice-run-start')).tap();
     await completeFirstUseSessionGuides();
@@ -344,7 +323,7 @@ describe('Key user flows', () => {
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
     await element(by.id('practice-run-home-done')).tap();
-    await waitForElementTextContaining('practice-mode-standard-rating', 'Rating 700', 5000);
+    await waitForElementTextContaining('practice-mode-standard-rating', '700', 5000);
 
     await device.terminateApp();
     await launchWithDisabledSynchronization({
@@ -367,7 +346,7 @@ describe('Key user flows', () => {
     await waitFor(element(by.text('Fork + Mate in 2 · 3 min · 20s pace')))
       .toExist()
       .withTimeout(10000);
-    await waitForElementTextContaining('practice-mode-standard-rating', 'Rating 700', 5000);
+    await waitForElementTextContaining('practice-mode-standard-rating', '700', 5000);
   });
 });
 
@@ -388,7 +367,17 @@ async function createSavedCustomRun(name, { shorterDuration = false, themes = []
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await element(by.id('practice-run-save')).tap();
   await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
-  await waitFor(element(by.text(name))).toExist().withTimeout(10000);
+  const runName = element(by.text(name));
+  await waitFor(runName).toExist().withTimeout(10000);
+  const attributes = await runName.getAttributes();
+  const candidates = Array.isArray(attributes) ? attributes : [attributes];
+  const nameTestID = candidates
+    .map((candidate) => candidate?.identifier)
+    .find((identifier) => typeof identifier === 'string' && identifier.startsWith('practice-run-name-'));
+  if (!nameTestID) {
+    throw new Error(`Could not resolve selectable Run card for "${name}"`);
+  }
+  return nameTestID.replace('practice-run-name-', 'practice-run-select-');
 }
 
 function durationTextToSeconds(value) {
@@ -409,13 +398,6 @@ function expectedInstalledPublicVersion() {
   return device.getPlatform() === 'android'
     ? releaseVersion.publicVersion
     : releaseVersion.iosPublicVersion;
-}
-
-function historyToggleValue(label, active) {
-  if (device.getPlatform() === 'android') {
-    return `${label}, ${active ? 'On' : 'Off'}`;
-  }
-  return active ? '1' : '0';
 }
 
 async function dismissSprintSummary() {

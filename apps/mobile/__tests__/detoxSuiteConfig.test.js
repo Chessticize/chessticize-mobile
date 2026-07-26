@@ -929,6 +929,57 @@ describe('Detox suite configuration', () => {
     expect(tapGuideAction).toBeGreaterThan(scrollDown);
   });
 
+  it('scrolls responsive Review actions inside the independent control rail', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const caseStart = practiceSpec.indexOf(
+      "it('persists Unclear, places its History actions responsively"
+    );
+    const caseEnd = practiceSpec.indexOf(
+      "it('opens last sprint mistake review",
+      caseStart
+    );
+    const responsiveHistoryCase = practiceSpec.slice(caseStart, caseEnd);
+    const normalizeOuterScroll = responsiveHistoryCase.indexOf(
+      "element(by.id('practice-main-scroll')).scrollTo('top')"
+    );
+    const scrollControlRail = responsiveHistoryCase.indexOf(
+      "element(by.id('review-session-control-rail')).scrollTo('bottom')"
+    );
+    const requireUnclearVisible = responsiveHistoryCase.indexOf(
+      "expect(element(by.id('history-attempt-unclear'))).toBeVisible()"
+    );
+
+    expect(normalizeOuterScroll).toBeGreaterThan(0);
+    expect(scrollControlRail).toBeGreaterThan(normalizeOuterScroll);
+    expect(requireUnclearVisible).toBeGreaterThan(scrollControlRail);
+  });
+
+  it('checks the visible Sprint result boundary after first-use guidance', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const caseStart = practiceSpec.indexOf(
+      "it('persists first-use Sprint guidance and replays it after Settings reset'"
+    );
+    const caseEnd = practiceSpec.indexOf(
+      "it('renders the standard sprint board'",
+      caseStart
+    );
+    const firstUseCase = practiceSpec.slice(caseStart, caseEnd);
+    const requireResultExists = firstUseCase.indexOf(
+      "waitFor(element(by.id('sprint-summary-panel'))).toExist()"
+    );
+    const normalizeResultScroll = firstUseCase.indexOf(
+      "element(by.id('practice-main-scroll')).scrollTo('top')",
+      requireResultExists
+    );
+    const requireResultTopBarVisible = firstUseCase.indexOf(
+      "waitFor(element(by.id('sprint-result-top-bar'))).toBeVisible()"
+    );
+
+    expect(requireResultExists).toBeGreaterThan(0);
+    expect(normalizeResultScroll).toBeGreaterThan(requireResultExists);
+    expect(requireResultTopBarVisible).toBeGreaterThan(normalizeResultScroll);
+  });
+
   it('pins the Arrow Duel screenshot to the exact runtime-selected long-arrow fixture', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const renderCaseStart = practiceSpec.indexOf("it('renders Arrow Duel candidate arrows on the board'");
@@ -1250,6 +1301,25 @@ describe('Detox suite configuration', () => {
     expect(practiceSpec).toContain("waitForElementTextContaining('review-analysis-engine-status', 'SF 18 NNUE'");
   });
 
+  it('reads managed-run ratings through the current public text', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const currentRatingAssertion = (
+      "waitForElementTextContaining('practice-mode-standard-rating', '700', 5000)"
+    );
+
+    expect(flowsSpec.split(currentRatingAssertion)).toHaveLength(3);
+    expect(flowsSpec).not.toContain(
+      "waitForElementTextContaining('practice-mode-standard-rating', 'Rating 700', 5000)"
+    );
+    expect(practiceSpec).toContain(
+      "waitFor(element(by.text('1000'))).toExist().withTimeout(10000)"
+    );
+    expect(practiceSpec).not.toContain(
+      "waitFor(element(by.text('Rating 1000'))).toExist().withTimeout(10000)"
+    );
+  });
+
   it('runs every active E2E spec by default without loading opt-in capture specs', () => {
     expect(resolveDetoxTestMatch({})).toEqual(ACTIVE_E2E_TEST_MATCH);
     expect(ACTIVE_E2E_TEST_MATCH).toEqual([
@@ -1264,7 +1334,7 @@ describe('Detox suite configuration', () => {
       "it('handles review reminders through the platform capability'"
     );
     const reminderCaseEnd = flowsSpec.indexOf(
-      "it('shows failed attempts in history with the wrong-only toggle'"
+      "it('shows failed attempts in History and preserves current filters through replay'"
     );
     const reminderCase = flowsSpec.slice(reminderCaseStart, reminderCaseEnd);
 
@@ -1285,10 +1355,13 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).toContain('releaseVersion.iosPublicVersion');
     expect(flowsSpec).toContain('releaseVersion.androidVersionCode');
     expect(flowsSpec).toContain('releaseVersion.iosBuildNumber');
-    expect(flowsSpec).toContain("historyToggleValue('Wrong puzzles only', false)");
-    expect(flowsSpec).toContain("historyToggleValue('Sprint attempts only', true)");
-    expect(flowsSpec).toContain("return `${label}, ${active ? 'On' : 'Off'}`");
-    expect(flowsSpec).toContain("return active ? '1' : '0'");
+    expect(flowsSpec).toContain("by.id('history-result-wrong')");
+    expect(flowsSpec).toContain("by.id('history-source-sprint')");
+    expect(flowsSpec).toContain("by.text('2 themes selected')");
+    expect(flowsSpec).toContain("historyAttemptRowTestIDForResult('Wrong move')");
+    expect(flowsSpec).not.toContain("history-filter-wrong-only");
+    expect(flowsSpec).not.toContain("history-filter-sprint-only");
+    expect(flowsSpec).not.toContain('historyToggleValue');
     expect(flowsSpec).not.toContain('toHaveToggleValue');
   });
 

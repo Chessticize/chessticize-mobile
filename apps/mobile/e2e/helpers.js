@@ -62,7 +62,7 @@ async function startPracticeMode(mode) {
 }
 
 async function completeFirstUseSessionGuides() {
-  for (let step = 0; step < 5; step += 1) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
     if (await detoxElementExists('session-board')) {
       return;
     }
@@ -72,15 +72,16 @@ async function completeFirstUseSessionGuides() {
         .whileElement(by.id('practice-main-scroll'))
         .scroll(100, 'down', 0.5, 0.5);
       await element(by.id('practice-session-guide-start')).tap();
-      await sleep(150);
+      await sleep(250);
       continue;
     }
     if (await detoxElementExists('sprint-loading-overlay')) {
       await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
       return;
     }
-    await sleep(150);
+    await sleep(250);
   }
+  await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
 }
 
 async function detoxElementExists(testID) {
@@ -842,10 +843,32 @@ async function openTab(tabTestID, contentTestID) {
 
 async function openStandardHistoryTrend() {
   await openTab('history-tab', 'history-action-header');
+  await waitFor(element(by.id('history-filter-toggle'))).toBeVisible().withTimeout(10000);
+  await element(by.id('history-filter-toggle')).tap();
   await waitFor(element(by.id('history-rating-standard 5/20'))).toBeVisible().withTimeout(10000);
   await element(by.id('history-rating-standard 5/20')).tap();
   await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
   await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
+}
+
+async function historyAttemptRowTestIDForResult(resultLabel) {
+  const matches = element(by.text(resultLabel));
+  for (let index = 0; index < 20; index += 1) {
+    let attributes;
+    try {
+      attributes = await matches.atIndex(index).getAttributes();
+    } catch {
+      break;
+    }
+    const candidates = Array.isArray(attributes) ? attributes : [attributes];
+    for (const candidate of candidates) {
+      const identifier = candidate?.identifier;
+      if (typeof identifier === 'string' && /^history-attempt-.+-result$/.test(identifier)) {
+        return identifier.replace(/-result$/, '');
+      }
+    }
+  }
+  throw new Error(`Could not resolve a History attempt row with result "${resultLabel}"`);
 }
 
 async function failStandardSprint() {
@@ -871,6 +894,7 @@ module.exports = {
   collectAndroidUiDiagnostics,
   completeFirstUseSessionGuides,
   elementText,
+  historyAttemptRowTestIDForResult,
   openTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,

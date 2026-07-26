@@ -14,10 +14,24 @@ EXPECTED_SCENES=(
   app-store-06-arrow-duel
   app-store-07-custom-setup
   app-store-08-review-session
+  app-store-09-sprint-rules-guide
+  app-store-10-active-session-guide-header
+  app-store-11-active-session-guide-slow
+  app-store-12-active-session-guide-timeout
+  app-store-13-active-session-guide-unclear
+  app-store-14-arrow-duel-guide
+  app-store-15-sprint-result
   app-store-01-practice-tab-landscape
   app-store-05-standard-sprint-landscape
   app-store-06-arrow-duel-landscape
   app-store-08-review-session-landscape
+  app-store-09-sprint-rules-guide-landscape
+  app-store-10-active-session-guide-header-landscape
+  app-store-11-active-session-guide-slow-landscape
+  app-store-12-active-session-guide-timeout-landscape
+  app-store-13-active-session-guide-unclear-landscape
+  app-store-14-arrow-duel-guide-landscape
+  app-store-15-sprint-result-landscape
 )
 
 fail() {
