@@ -1220,6 +1220,54 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "training-focus-primary-mode"))).toContain(
       "Arrow Duel"
     );
+
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
+      "Arrow Duel"
+    );
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+    expect(() => findByTestId(renderer, "tactical-profile-signal-line:fork")).toThrow();
+
+    press(renderer, "tactical-profile-task-family-line");
+    press(renderer, "tactical-profile-explain-line:fork");
+    press(renderer, "tactical-profile-back");
+    expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
+      "Puzzle solving"
+    );
+  });
+
+  it("opens a cached production Tactical Profile without reading full history or exact inventory", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    let store: MemoryStore | undefined;
+    const practiceService = createArrowFocusedPracticeService(
+      true,
+      (createdStore) => {
+        store = createdStore;
+      }
+    );
+    practiceService.getTacticalProfileSnapshot();
+    if (!store) {
+      throw new Error("expected the production component store");
+    }
+    store.listSprintSessions = () => {
+      throw new Error("Profile open must not scan all sessions");
+    };
+    store.listAttempts = () => {
+      throw new Error("Profile open must not scan canonical attempts");
+    };
+    store.selectPuzzles = () => {
+      throw new Error("Profile open must not run an exact puzzle query");
+    };
+    const renderer = renderScreen({ practiceService });
+
+    press(renderer, "training-focus-open-profile");
+
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-preview-run")).toBeTruthy();
   });
 
   it("keeps a production-service focus visible while withholding an inventory-blocked Run", () => {
@@ -10274,7 +10322,8 @@ function firstArrowDuelPuzzleForTest(): ArrowDuelState {
 }
 
 function createArrowFocusedPracticeService(
-  inventoryAvailable = true
+  inventoryAvailable = true,
+  exposeStore?: (store: MemoryStore) => void
 ): PracticeService {
   const candidates = tacticalProfilePuzzleFixture
     .filter((puzzle) =>
@@ -10356,6 +10405,7 @@ function createArrowFocusedPracticeService(
       });
     }
   }
+  exposeStore?.(store);
 
   return new PracticeService(
     store,
@@ -10368,6 +10418,12 @@ function createArrowFocusedPracticeService(
         line: {},
         arrow_duel: { pin: 0.12, fork: 0.12 }
       },
+      naturalFrequencyForRating: (
+        taskFamily
+      ): Readonly<Record<string, number>> =>
+        taskFamily === "arrow_duel"
+          ? { pin: 0.12, fork: 0.12 }
+          : {},
       ...(inventoryAvailable
         ? {}
         : { inventoryUpperBound: () => ({ pin: 0 }) }),

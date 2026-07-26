@@ -83,6 +83,10 @@ export type PrepareFocusedRunResult =
         | "policy_unavailable";
     };
 
+export type FocusedRunPreflightResult =
+  | { status: "available" }
+  | Exclude<PrepareFocusedRunResult, { status: "ready" }>;
+
 export type TacticalProfileServiceOptions = {
   progressStore: PracticeStore;
   puzzleSource: PuzzleSource;
@@ -266,7 +270,7 @@ export class TacticalProfileService {
   }
 
   private markCanonicalDaysChanged(completedDays: readonly string[]): void {
-    if (completedDays.length === 0) {
+    if (completedDays.length === 0 && !this.requiresCanonicalRebuild) {
       return;
     }
     try {
@@ -275,6 +279,70 @@ export class TacticalProfileService {
     } catch (error) {
       this.recordCacheFailure(error);
     }
+  }
+
+  preflightFocusedRun(
+    taskFamily: TacticalProfileTaskFamily,
+    snapshot = this.getSnapshot()
+  ): FocusedRunPreflightResult {
+    if (!this.focusedRunPolicy) {
+      return { status: "unavailable", reason: "policy_unavailable" };
+    }
+    if (snapshot.phase === "building") {
+      return { status: "unavailable", reason: "profile_not_ready" };
+    }
+    const rankedFocuses = snapshot.evaluation.rankedFocuses.filter(
+      (focus) => focus.taskFamily === taskFamily
+    );
+    if (rankedFocuses.length === 0) {
+      return { status: "unavailable", reason: "no_focus" };
+    }
+
+    const anchor = snapshot.buildState.ratingAnchors?.[taskFamily];
+    if (!anchor || !this.inventoryUpperBound) {
+      return { status: "available" };
+    }
+    const rating = this.progressStore.getRating(anchor.ratingKey).rating;
+    const runFocuses = distinctRunFocuses(rankedFocuses);
+    for (const halfWidth of this.focusedRunPolicy.ratingBandHalfWidths) {
+      const minRating = Math.max(0, rating - halfWidth);
+      const maxRating = rating + halfWidth;
+      const upperBound = this.inventoryUpperBound(
+        taskFamily,
+        minRating,
+        maxRating,
+        runFocuses.map((focus) => focus.theme)
+      );
+      if (!upperBound) {
+        return { status: "available" };
+      }
+      const result = buildFocusedRunPlan({
+        taskFamily,
+        ratingAnchor: {
+          ratingKey: anchor.ratingKey,
+          rating
+        },
+        rankedFocuses: runFocuses,
+        runSize: this.focusedRunPolicy.runSize,
+        inventoryBands: [{
+          minRating,
+          maxRating,
+          availableByTheme: upperBound,
+          mixedAvailableCount: this.focusedRunPolicy.runSize
+        }],
+        excludePuzzleIds: [],
+        ...(this.focusedRunPolicy.themeShortfallBackfill === undefined
+          ? {}
+          : {
+              themeShortfallBackfill:
+                this.focusedRunPolicy.themeShortfallBackfill
+            })
+      });
+      if (result.status === "ready") {
+        return { status: "available" };
+      }
+    }
+    return { status: "unavailable", reason: "insufficient_inventory" };
   }
 
   prepareFocusedRun(

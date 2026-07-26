@@ -408,18 +408,37 @@ test("multi-call, out-of-order, repeated, and batched imports recompute each dir
     const practice = new PracticeService(target, profile);
     profile.getSnapshot("2026-07-09T00:00:00.000Z");
     for (const incoming of imports) {
-      practice.importLocalData(incoming);
+      const before = new Map(repository.replacedDays);
+      const imported = practice.importLocalData(incoming);
+      profile.getSnapshot("2026-07-25T00:00:00.000Z");
+      const replacements = replacementDeltas(
+        before,
+        repository.replacedDays
+      );
+      assert.ok(
+        [...replacements.values()].every((count) => count === 1),
+        `each dirty day must be replaced once per import batch: ${JSON.stringify(
+          [...replacements]
+        )}`
+      );
+      if (
+        imported.attempts === 0 &&
+        imported.sprintSessions === 0
+      ) {
+        assert.equal(replacements.size, 0);
+      }
     }
 
+    const beforeNoOp = new Map(repository.replacedDays);
+    const noOp = practice.importLocalData(exported);
     profile.getSnapshot("2026-07-25T00:00:00.000Z");
 
-    assert.deepEqual(
-      [...repository.replacedDays.entries()].sort(),
-      [
-        ["2026-07-10", 1],
-        ["2026-07-14", 1],
-        ["2026-07-18", 1]
-      ]
+    assert.equal(noOp.attempts, 0);
+    assert.equal(noOp.sprintSessions, 0);
+    assert.equal(
+      replacementDeltas(beforeNoOp, repository.replacedDays).size,
+      0,
+      "repeating an identical import must not replace cached days"
     );
     return JSON.stringify(repository.listDailyCells(identity()));
   });
@@ -1073,6 +1092,112 @@ test("Rating growth re-evaluates opportunity frequency without rewriting evidenc
   assert.deepEqual(repository.listDailyCells(identity()), oldEvidence);
 });
 
+test("an imported rating-key change replaces the persisted anchor across restart", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new MemoryTacticalProfileRepository();
+  const createProfile = () => new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository,
+    calibration: CALIBRATION,
+    naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} },
+    naturalFrequencyForRating: (taskFamily) =>
+      taskFamily === "line" ? { fork: 0.12 } : {}
+  });
+  const profile = createProfile();
+  const before = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  assert.equal(before.buildState.ratingAnchors?.line?.sessionId, "mixed-session-2");
+  const exported = store.exportLocalData();
+  const currentAnchor = exported.sprintSessions.find(
+    (session) => session.id === "mixed-session-2"
+  );
+  assert.ok(currentAnchor?.config);
+  const replacementRatingKey = "zzzz imported standard rating";
+  const imported = new PracticeService(store, profile).importLocalData({
+    ...exported,
+    ratings: [{
+      ...store.getRating("standard 5/20"),
+      key: replacementRatingKey,
+      generation: 9,
+      rating: 975
+    }],
+    attempts: [],
+    reviewQueue: [],
+    sprintSessions: [{
+      ...currentAnchor,
+      ratingKey: replacementRatingKey,
+      config: {
+        ...currentAnchor.config,
+        ratingKey: replacementRatingKey
+      }
+    }],
+    practiceRuns: []
+  });
+  assert.equal(imported.sprintSessions, 1);
+
+  const restarted = createProfile().getSnapshot("2026-07-26T00:00:00.000Z");
+
+  assert.deepEqual(restarted.buildState.ratingAnchors?.line, {
+    sessionId: "mixed-session-2",
+    ratingKey: replacementRatingKey,
+    completedAt: "2026-07-18T00:04:00.000Z"
+  });
+});
+
+test("an imported focused conversion removes a stale mixed anchor across restart", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const repository = new MemoryTacticalProfileRepository();
+  const createProfile = () => new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository,
+    calibration: CALIBRATION,
+    naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} },
+    naturalFrequencyForRating: (taskFamily) =>
+      taskFamily === "line" ? { fork: 0.12 } : {}
+  });
+  const profile = createProfile();
+  const before = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  assert.equal(before.buildState.ratingAnchors?.line?.sessionId, "mixed-session-2");
+  const exported = store.exportLocalData();
+  const currentAnchor = exported.sprintSessions.find(
+    (session) => session.id === "mixed-session-2"
+  );
+  assert.ok(currentAnchor?.config);
+  const imported = new PracticeService(store, profile).importLocalData({
+    ...exported,
+    ratings: [],
+    attempts: [],
+    reviewQueue: [],
+    sprintSessions: [{
+      ...currentAnchor,
+      correctCount: currentAnchor.correctCount + 1,
+      config: {
+        ...currentAnchor.config,
+        tacticalFocus: {
+          taskFamily: "line",
+          themes: ["fork"],
+          mixedControlCount: 5,
+          ratingAnchor: 925,
+          minRating: 825,
+          maxRating: 1025
+        }
+      }
+    }],
+    practiceRuns: []
+  });
+  assert.equal(imported.sprintSessions, 1);
+
+  const restarted = createProfile().getSnapshot("2026-07-26T00:00:00.000Z");
+
+  assert.equal(
+    restarted.buildState.ratingAnchors?.line?.sessionId,
+    "mixed-session-1"
+  );
+});
+
 test("manifest inventory preflight skips exact queries for an impossible theme", () => {
   const store = seededStore();
   seedWeaknessHistory(store);
@@ -1101,6 +1226,41 @@ test("manifest inventory preflight skips exact queries for an impossible theme",
     { status: "unavailable", reason: "insufficient_inventory" }
   );
   assert.equal(exactQueries, 0);
+});
+
+test("lightweight Focused Run preflight reads neither canonical history nor exact inventory", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const profile = new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository: new MemoryTacticalProfileRepository(),
+    calibration: CALIBRATION,
+    naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} },
+    naturalFrequencyForRating: (taskFamily) =>
+      taskFamily === "line" ? { fork: 0.12 } : {},
+    inventoryUpperBound: () => ({ fork: 0 }),
+    focusedRunPolicy: {
+      runSize: 15,
+      recentPuzzleDays: 30,
+      ratingBandHalfWidths: [100, 200]
+    }
+  });
+  const snapshot = profile.getSnapshot("2026-07-25T00:00:00.000Z");
+  store.listSprintSessions = () => {
+    throw new Error("preflight must not read all sessions");
+  };
+  store.listAttempts = () => {
+    throw new Error("preflight must not read canonical attempts");
+  };
+  store.selectPuzzles = () => {
+    throw new Error("preflight must not run an exact puzzle query");
+  };
+
+  assert.deepEqual(
+    profile.preflightFocusedRun("line", snapshot),
+    { status: "unavailable", reason: "insufficient_inventory" }
+  );
 });
 
 test("TacticalProfileService does not re-offer a Focused Run before fresh mixed evidence", () => {
@@ -1787,6 +1947,17 @@ class CountingTacticalProfileRepository extends MemoryTacticalProfileRepository 
     );
     super.replaceDay(...args);
   }
+}
+
+function replacementDeltas(
+  before: ReadonlyMap<string, number>,
+  after: ReadonlyMap<string, number>
+): Map<string, number> {
+  return new Map(
+    [...after]
+      .map(([day, count]) => [day, count - (before.get(day) ?? 0)] as const)
+      .filter(([, count]) => count > 0)
+  );
 }
 
 const CALIBRATION = {

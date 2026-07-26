@@ -65,6 +65,7 @@ import type { ReviewReminderSettings } from "../../core/src/index.ts";
 import { reconcileRatingWithSprintSessions } from "./rating-history.ts";
 import {
   TacticalProfileService,
+  type FocusedRunPreflightResult,
   type PrepareFocusedRunResult,
   type TacticalProfileSnapshot
 } from "./tactical-profile-service.ts";
@@ -406,6 +407,14 @@ export class PracticeService {
 
   getTacticalProfileSnapshot(now = new Date().toISOString()): TacticalProfileSnapshot | undefined {
     return this.tacticalProfile?.getSnapshot(now);
+  }
+
+  preflightFocusedRun(
+    taskFamily: TacticalProfileTaskFamily,
+    snapshot?: TacticalProfileSnapshot
+  ): FocusedRunPreflightResult {
+    return this.tacticalProfile?.preflightFocusedRun(taskFamily, snapshot) ??
+      { status: "unavailable", reason: "policy_unavailable" };
   }
 
   prepareFocusedRun(

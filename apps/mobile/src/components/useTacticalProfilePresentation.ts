@@ -86,9 +86,9 @@ export function useTacticalProfilePresentation(input: {
       setFocusedRunUnavailable(undefined);
       return;
     }
-    const result = service.prepareFocusedRun(taskFamily);
-    if (result.status === "ready") {
-      setPrepared(result.prepared);
+    const result = service.preflightFocusedRun(taskFamily, currentSnapshot);
+    if (result.status === "available") {
+      setPrepared(undefined);
       setFocusedRunUnavailable(undefined);
       return;
     }
@@ -99,8 +99,14 @@ export function useTacticalProfilePresentation(input: {
   const onIntent = useCallback((intent: TacticalProfileIntent): void => {
     if (intent.type === "open-profile" || intent.type === "restore-recommendation") {
       const next = refresh();
+      const taskFamily =
+        intent.type === "open-profile" && screen === "home"
+          ? homeLeadTaskFamily(next) ??
+            resolvedRecommendedTaskFamily(next, activeTaskFamily)
+          : resolvedRecommendedTaskFamily(next, activeTaskFamily);
+      setActiveTaskFamily(taskFamily);
       preflightFocusedRun(
-        resolvedRecommendedTaskFamily(next, activeTaskFamily),
+        taskFamily,
         next
       );
       setScreen("profile");
@@ -169,6 +175,7 @@ export function useTacticalProfilePresentation(input: {
     preflightFocusedRun,
     prepared,
     refresh,
+    screen,
     service,
     snapshot
   ]);
@@ -228,6 +235,17 @@ function resolvedRecommendedTaskFamily(
       : recommendedFamilies.has("arrow_duel")
         ? "arrow_duel"
         : activeTaskFamily;
+}
+
+function homeLeadTaskFamily(
+  snapshot: TacticalProfileSnapshot | undefined
+): TacticalProfileTaskFamily | undefined {
+  if (!snapshot?.homeLeadSignalId) {
+    return undefined;
+  }
+  return snapshot.evaluation.signals.find(
+    (signal) => signal.id === snapshot.homeLeadSignalId
+  )?.taskFamily;
 }
 
 function signalPresentation(
