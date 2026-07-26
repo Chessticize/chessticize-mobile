@@ -44,7 +44,7 @@ export const TacticalProfileCollectingEvidence: Story = {
   tags: ["new"],
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "training-focus-card");
-    await waitForText(canvasElement, "More variety needed");
+    await waitForText(canvasElement, "More information needed");
   }
 };
 
@@ -82,19 +82,19 @@ export const TacticalProfileRanked: Story = {
   args: { scenarioId: "practice-tactical-profile-ranked" },
   tags: ["new"],
   play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "tactical-profile-signal-fork");
-    await waitForTestId(canvasElement, "tactical-profile-signal-pin-speed");
-    await waitForTestId(canvasElement, "tactical-profile-signal-deflection");
+    await waitForText(canvasElement, "4 recommendations");
+    await waitForText(canvasElement, "Forks is your clearest focus");
+    await waitForText(canvasElement, "There are 3 more themes worth reviewing.");
   }
 };
 
-export const TacticalProfileRareSignal: Story = {
-  name: "Tactical profile · rare one-off mistake",
-  args: { scenarioId: "practice-tactical-profile-rare-signal" },
+export const TacticalProfileLimitedInventory: Story = {
+  name: "Tactical profile · limited nearby puzzles",
+  args: { scenarioId: "practice-tactical-profile-limited-inventory" },
   tags: ["new"],
   play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "training-focus-card");
-    await waitForText(canvasElement, "One miss is not a theme weakness");
+    await waitForTestId(canvasElement, "focused-run-unavailable");
+    await waitForText(canvasElement, "Not enough new puzzles nearby");
   }
 };
 
@@ -114,7 +114,7 @@ export const TacticalProfileFocusedRun: Story = {
   tags: ["new"],
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "focused-run-allocation-bar");
-    await waitForText(canvasElement, "Mixed control");
+    await waitForText(canvasElement, "Mixed practice");
     await waitForTestId(canvasElement, "focused-run-start");
   }
 };

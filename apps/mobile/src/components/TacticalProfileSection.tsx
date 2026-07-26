@@ -6,6 +6,7 @@ import {
   Text,
   View
 } from "react-native";
+import { TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT } from "../../../../packages/core/src/index.ts";
 import type {
   FocusedRunAllocation,
   TacticalProfilePresentation,
@@ -19,6 +20,7 @@ export function TacticalProfileHomeCard({
 }): React.JSX.Element {
   const primarySignal = presentation.signals[0];
   const content = homeContentFor(presentation, primarySignal);
+  const recommendationCount = recommendedThemeLabels(presentation).length;
   const canOpen = presentation.phase !== "building";
 
   return (
@@ -52,7 +54,7 @@ export function TacticalProfileHomeCard({
             onPress={() => presentation.onIntent({ type: "open-profile" })}
           >
             <Text style={styles.cardActionText}>
-              {presentation.phase === "ready" ? "Review focus" : "View tactical profile"}
+              {homeActionLabel(presentation, recommendationCount)}
             </Text>
             <Text style={styles.cardActionChevron}>›</Text>
           </Pressable>
@@ -84,7 +86,9 @@ function TacticalProfileScreen({
 }: {
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
-  const recommendedSignals = presentation.signals.filter((signal) => signal.status === "recommended");
+  const allRecommendedSignals = distinctRecommendedSignals(presentation.signals);
+  const recommendedSignals = allRecommendedSignals.slice(0, TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT);
+  const hiddenRecommendationCount = allRecommendedSignals.length - recommendedSignals.length;
   const watchSignals = presentation.signals.filter((signal) => signal.status === "watch");
   const canPreview = recommendedSignals.length > 0 && presentation.focusedRun !== undefined;
 
@@ -117,6 +121,13 @@ function TacticalProfileScreen({
               onExplain={() => presentation.onIntent({ type: "explain-signal", signalId: signal.id })}
             />
           ))}
+          {hiddenRecommendationCount > 0 ? (
+            <Text style={styles.monitoringNote} testID="tactical-profile-more-signals">
+              {hiddenRecommendationCount === 1
+                ? "1 more pattern is being monitored in the background."
+                : `${hiddenRecommendationCount} more patterns are being monitored in the background.`}
+            </Text>
+          ) : null}
         </View>
       ) : null}
 
@@ -130,6 +141,14 @@ function TacticalProfileScreen({
               onExplain={() => presentation.onIntent({ type: "explain-signal", signalId: signal.id })}
             />
           ))}
+        </View>
+      ) : null}
+
+      {recommendedSignals.length > 0 && presentation.focusedRunUnavailable ? (
+        <View style={styles.unavailableCard} testID="focused-run-unavailable">
+          <Text style={styles.sectionLabel}>Focused Run availability</Text>
+          <Text style={styles.contextTitle}>{presentation.focusedRunUnavailable.title}</Text>
+          <Text style={styles.body}>{presentation.focusedRunUnavailable.body}</Text>
         </View>
       ) : null}
 
@@ -246,7 +265,7 @@ function FocusedRunPreviewScreen({
       <View style={styles.allocationCard}>
         <Text style={styles.sectionTitle}>Training mix</Text>
         <Text style={styles.body}>
-          Explicit quotas keep one theme from taking over the Run.
+          Explicit quotas keep one theme from taking over. Only the two clearest focuses can enter one Run.
         </Text>
         <View style={styles.allocationBar} testID="focused-run-allocation-bar">
           {preview.allocations.map((allocation) => (
@@ -274,11 +293,14 @@ function FocusedRunPreviewScreen({
       </View>
       <View style={styles.previewGuardrails}>
         <Text style={styles.sectionTitle}>How puzzles are chosen</Text>
-        <Text style={styles.guardrailItem}>• New puzzles near your current Rating</Text>
+        <Text style={styles.guardrailItem}>• Rebuilt for your current Rating before each new Run</Text>
         <Text style={styles.guardrailItem}>• Recently seen and scheduled Review puzzles avoided</Text>
-        <Text style={styles.guardrailItem}>• Mixed puzzles preserved so discovery continues</Text>
+        <Text style={styles.guardrailItem}>• The mix stays fixed after the Run starts</Text>
+        <Text style={styles.guardrailItem}>• Mixed practice keeps the session broad</Text>
       </View>
-      <Text style={styles.previewFoot}>This preview does not change your saved Runs.</Text>
+      <Text style={styles.previewFoot}>
+        Later ordinary mixed Runs decide whether this focus still applies. This preview does not change your saved Runs.
+      </Text>
       <View style={styles.flowActions}>
         <Pressable
           accessibilityRole="button"
@@ -444,9 +466,6 @@ function profileHeadingFor(presentation: TacticalProfilePresentation): string {
   if (presentation.phase === "collecting") {
     return "Still collecting evidence";
   }
-  if (presentation.phase === "rare_signal") {
-    return "One mistake is not a theme weakness";
-  }
   if (presentation.signals.length > 1) {
     return "Your clearest training opportunities";
   }
@@ -459,9 +478,6 @@ function profileBodyFor(presentation: TacticalProfilePresentation): string {
   }
   if (presentation.phase === "collecting") {
     return "Keep playing mixed Runs. We need results from more different puzzles and sessions before recommending a focus.";
-  }
-  if (presentation.phase === "rare_signal") {
-    return "The individual puzzle can go to Review, but this theme needs more independent evidence before focused training is recommended.";
   }
   return "Recommendations separate evidence, practical impact, and training priority.";
 }
@@ -486,8 +502,8 @@ function homeContentFor(
   if (presentation.phase === "collecting") {
     return {
       status: "Collecting evidence",
-      title: "More variety needed",
-      body: "Keep playing mixed Runs so one puzzle or one session cannot decide a training focus.",
+      title: "More information needed",
+      body: "Keep playing mixed Runs. We will recommend a focus after a pattern repeats across different puzzles and sessions.",
       tone: "neutral"
     };
   }
@@ -499,12 +515,13 @@ function homeContentFor(
       tone: "green"
     };
   }
-  if (presentation.phase === "rare_signal") {
+  const themeLabels = recommendedThemeLabels(presentation);
+  if (themeLabels.length > 1 && primarySignal) {
     return {
-      status: "Collecting evidence",
-      title: "One miss is not a theme weakness",
-      body: "Review the puzzle now; wait for more puzzles and sessions before focusing the whole theme.",
-      tone: "amber"
+      status: `${themeLabels.length} recommendations`,
+      title: `${primarySignal.themeLabel} is your clearest focus`,
+      body: secondaryFocusSummary(themeLabels.slice(1)),
+      tone: "blue"
     };
   }
   return {
@@ -513,6 +530,47 @@ function homeContentFor(
     body: primarySignal ? signalSummary(primarySignal) : "Review the evidence before choosing focused training.",
     tone: "blue"
   };
+}
+
+function recommendedThemeLabels(presentation: TacticalProfilePresentation): string[] {
+  return [...new Set(
+    presentation.signals
+      .filter((signal) => signal.status === "recommended")
+      .map((signal) => signal.themeLabel)
+  )];
+}
+
+function distinctRecommendedSignals(
+  signals: readonly TacticalProfileSignal[]
+): TacticalProfileSignal[] {
+  const seenThemes = new Set<string>();
+  return signals.filter((signal) => {
+    if (signal.status !== "recommended" || seenThemes.has(signal.themeLabel)) {
+      return false;
+    }
+    seenThemes.add(signal.themeLabel);
+    return true;
+  });
+}
+
+function homeActionLabel(
+  presentation: TacticalProfilePresentation,
+  recommendationCount: number
+): string {
+  if (presentation.phase !== "ready") {
+    return "View tactical profile";
+  }
+  return recommendationCount > 1 ? "Review focuses" : "Review focus";
+}
+
+function secondaryFocusSummary(themeLabels: readonly string[]): string {
+  if (themeLabels.length === 1) {
+    return `${themeLabels[0]} is also worth reviewing.`;
+  }
+  if (themeLabels.length === 2) {
+    return `${themeLabels[0]} and ${themeLabels[1]} are also worth reviewing.`;
+  }
+  return `There are ${themeLabels.length} more themes worth reviewing.`;
 }
 
 function formatCount(count: number, singular: string, plural: string): string {
@@ -716,6 +774,20 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 12,
     lineHeight: 18
+  },
+  monitoringNote: {
+    color: "#64748B",
+    fontSize: 13,
+    lineHeight: 19,
+    paddingHorizontal: 4
+  },
+  unavailableCard: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#FDE68A",
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 8,
+    padding: 18
   },
   signalSection: {
     gap: 10

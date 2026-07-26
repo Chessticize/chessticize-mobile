@@ -11,7 +11,7 @@
     "issues": [
       {
         "issueNumber": 250,
-        "changeNote": "Distinguish insufficient evidence from a detected tactical weakness."
+        "changeNote": "Use one calm insufficient-evidence state, including after a one-off mistake."
       }
     ]
   },
@@ -43,15 +43,15 @@
     "issues": [
       {
         "issueNumber": 250,
-        "changeNote": "Rank several actionable weaknesses without exposing false posterior precision."
+        "changeNote": "Summarize the clearest focus on Home and cap the full profile at three visible recommendations."
       }
     ]
   },
-  "practice-tactical-profile-rare-signal": {
+  "practice-tactical-profile-limited-inventory": {
     "issues": [
       {
         "issueNumber": 250,
-        "changeNote": "Review one rare miss without turning it into a theme-level recommendation."
+        "changeNote": "Keep a credible focus visible while withholding an unsafe or repetitive low-inventory Run."
       }
     ]
   },
@@ -67,7 +67,7 @@
     "issues": [
       {
         "issueNumber": 250,
-        "changeNote": "Preview explicit weakness and mixed-control quotas before starting focused training."
+        "changeNote": "Preview Rating-anchored quotas that refresh between Runs and stay fixed after start."
       }
     ]
   },

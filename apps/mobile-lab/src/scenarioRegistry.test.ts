@@ -110,7 +110,7 @@ test("Issue #250 owns the complete Tactical Profile design state set", () => {
       "practice-tactical-profile-solve-rate",
       "practice-tactical-profile-speed",
       "practice-tactical-profile-ranked",
-      "practice-tactical-profile-rare-signal",
+      "practice-tactical-profile-limited-inventory",
       "practice-tactical-profile-explanation",
       "practice-tactical-profile-focused-run",
       "practice-tactical-profile-suppressed"
@@ -118,7 +118,7 @@ test("Issue #250 owns the complete Tactical Profile design state set", () => {
   );
   assert.equal(
     scenarioRegistry["practice-tactical-profile-focused-run"].scope.includes
-      .includes("Mixed-control allocation"),
+      .includes("Mixed-practice allocation"),
     true
   );
   assert.equal(

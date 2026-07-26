@@ -54,6 +54,11 @@ It belongs in the existing Practice product clone and must remain quiet during
 an active puzzle. The Phase A Storybook should show calm state and action copy,
 not expose model internals as a dashboard.
 
+One isolated mistake MUST reuse the ordinary collecting-evidence presentation.
+The product may explain the general diversity rule inside Tactical Profile, but
+it MUST NOT elevate one miss into its own Home status or imply that the user
+made a special mistake that was "not worth" training.
+
 ## 2. Normative target semantics
 
 These rules are normative even where current `main` differs:
@@ -489,6 +494,10 @@ OR-theme query:
 ```ts
 interface FocusedRunPlan {
   taskFamily: "line" | "arrow_duel";
+  ratingAnchor: {
+    ratingKey: string;
+    rating: number;
+  };
   reasons: Array<{
     theme: CuratedTheme;
     reason: "solve_rate" | "completed_speed" | "both";
@@ -534,6 +543,110 @@ calibration-required.
 Phase A may show an in-memory Focused Run preview and a "Keep mixed" decline
 action. It MUST NOT wire production selection or imply that a long-lived
 suppression preference has been stored.
+
+### Rating anchor and refresh lifecycle
+
+Weakness discovery and puzzle delivery use Rating differently:
+
+- discovery compares every attempt with the user's stored `ratingBefore` and
+  the puzzle Rating from that attempt, so a later Rating increase does not
+  suddenly invalidate older evidence;
+- recency weighting gradually reduces the influence of older Rating contexts;
+  and
+- a new Focused Run anchors puzzle selection to the latest current
+  mixed/unfiltered Run Rating for the same task family, never to a stale
+  recommendation snapshot or a theme-focused intervention Rating.
+
+The profile MUST incrementally re-evaluate after each completed eligible
+mixed/unfiltered Run and after canonical import recomputation. User-visible
+recommendation changes occur only at a session boundary. The quota planner MUST
+rebuild the plan immediately before every new Focused Run using the latest
+Rating, ranked recommendations, recent-puzzle exclusions, and inventory.
+
+Once a Run starts, its Rating range, puzzle IDs, and quota allocation are
+immutable. The app MUST NOT change the mix midway through the Run. Finishing a
+Focused Run also MUST NOT make its selected sample look like independent
+weakness-discovery evidence. Later ordinary mixed Runs determine whether the
+focus still applies.
+
+Entry and exit MUST use calibrated hysteresis so a recommendation does not
+appear and disappear around one threshold. A completed Focused Run MUST NOT
+immediately re-offer the same action without at least one new eligible ordinary
+mixed session and a new profile evaluation. This is an action-freshness rule,
+not a V1 recovery or mastery model.
+
+### Focus and presentation cutoffs
+
+The product MUST keep focus scarce:
+
+- Practice Home shows only the clearest theme and summarizes the number of
+  additional eligible recommendations;
+- Tactical Profile shows at most the top three distinct themes and keeps lower
+  ranked candidates in background monitoring; and
+- one Focused Run trains at most the top two distinct themes.
+
+Multiple statistical heads for the same atomic theme count as one presented
+focus. If both heads pass, the explanation may mention both reasons. Ranking and
+cutoffs happen after the independent evidence and impact gates; hiding a lower
+ranked theme from the visible top three MUST NOT rewrite its posterior.
+
+### Current-Rating inventory gate
+
+Statistical confidence and trainability are separate. A credible weakness MAY
+remain visible even when the bundled pack cannot safely supply a Focused Run
+near the current Rating, but the product MUST withhold the start action unless
+the complete quota can be filled.
+
+Availability planning MUST:
+
+1. preflight natural inventory from manifest Rating-bucket theme counts;
+2. perform an exact indexed availability check after recent and Review puzzle
+   exclusions;
+3. begin with the calibrated current-Rating band and widen only through a
+   bounded, symmetric fallback approved by calibration;
+4. preserve the maximum-theme and minimum-mixed constraints at every fallback;
+   and
+5. decline to construct the Run when the full plan remains unavailable.
+
+The planner MUST NOT silently repeat recently seen puzzles, stretch beyond the
+maximum accepted difficulty band, substitute a broad parent theme for the
+detected atomic theme, or remove the mixed allocation. Ratings outside useful
+pack coverage use the same gate rather than pretending the nearest available
+bucket is Rating-matched.
+
+This gate is necessary even in the current 1,389,240-puzzle pack. For example,
+the current manifest contains only `4` `smotheredMate` puzzles at Rating
+`2100–2199`, `1` `intermezzo` puzzle at `600–699`, `4` `interference` puzzles at
+`600–699`, and `12` `mateIn4` puzzles at `600–699`. Global theme totals alone
+therefore cannot establish local trainability.
+
+### Runtime cost and feasibility boundary
+
+The runtime design MUST remain bounded:
+
+- profile updates process the attempts from newly completed or dirty days;
+- profile reads rank the fixed curated catalog from daily cells rather than
+  rescanning raw history;
+- inventory preflight examines a bounded number of manifest buckets; and
+- a two-focus Run uses at most three bounded indexed selections: primary,
+  secondary, and mixed.
+
+The repository benchmark must continue to validate the exact `9 / 3 / 3`
+orchestration, shared exclusions, cross-quota deduplication, and a mixed
+allocation that excludes both focused themes. Desktop measurements are
+feasibility evidence only; Phase B still requires sparse-inventory, large
+recent-exclusion, and target-device validation before choosing a performance
+gate.
+
+On 2026-07-25, `BENCHMARK_ITERATIONS=100 pnpm
+benchmark:multi-theme-query <pack>` ran against a retained bundled SQLite pack
+whose manifest was byte-identical to the tracked manifest
+(`SHA-256 7f1335f9fa3282480c88076c70157c19a8af38854edce3b980196aabbc0ed65e`).
+The explicit `9 fork / 3 pin / 3 mixed` plan completed all `100` iterations with
+zero failures and zero duplicate puzzle IDs. Median selection time was
+`36.967 ms`, p95 was `45.482 ms`, and max was `46.166 ms` on the development
+Mac. The five-theme generic selection median/p95 was `20.611 / 22.417 ms`.
+These values support feasibility but are not production latency guarantees.
 
 ## 12. Local-only incremental storage design
 
@@ -714,6 +827,9 @@ decision.
 | Timeout contributes `1` solve-rate failure and `0` V1 speed observations | Normative product rule | Prevents double counting |
 | UTC completed-day keys | Normative product rule | Makes rebuilds deterministic across time zones |
 | At least `2` task families (`line`, `arrow_duel`) | Normative product rule | Prevents unlike tasks sharing one baseline |
+| Home `1`, Profile `3`, Focused Run `2` | Normative product rule | Keeps the product focused while lower-ranked themes remain monitored |
+| Rebuild before each Run; freeze after start | Normative product rule | Tracks current Rating without changing an active session |
+| Full current-Rating inventory gate | Normative product rule | Prevents unsafe widening, repeats, or loss of mixed practice |
 
 ### Provisional V1 defaults
 
@@ -746,7 +862,7 @@ must confirm or replace them before production:
 - natural-frequency interpolation and bounded opportunity transform;
 - maximum analysis horizon, if any;
 - recent-puzzle exclusion interval and Focused Run Rating band;
-- maximum simultaneously presented recommendations; and
+- recommendation exit threshold and ranking hysteresis; and
 - multi-head action utility and ranking weights.
 
 Storybook may use rounded illustrative fixture values, but it MUST label them as
@@ -789,6 +905,16 @@ the model.
     rebuild matches a clean calculation from canonical progress and the pack.
 14. **Large-history query:** after the cache is built, profile query work grows
     with retained daily/theme cells, not linearly with raw attempt count.
+15. **Rating growth:** a new Focused Run uses the latest applicable ordinary
+    mixed Rating while old evidence remains normalized by its stored
+    `ratingBefore`.
+16. **Active-Run immutability:** a Rating or recommendation change during a Run
+    does not change that Run's puzzle IDs, Rating range, or quotas.
+17. **Focus cutoff:** four eligible themes show one Home lead and at most three
+    Profile recommendations; the Run contains at most two theme quotas.
+18. **Sparse current-Rating inventory:** a credible theme remains an insight,
+    but no start action appears when exclusions and bounded widening cannot fill
+    the complete quota.
 
 Additional required boundary fixtures:
 
@@ -799,6 +925,8 @@ Additional required boundary fixtures:
 - a Timeout is in Review but not Unclear under target semantics;
 - a puzzle with no curated theme can calibrate the baseline but no theme;
 - an unavailable Focused Run quota preserves the mixed-control floor;
+- a completed Focused Run is not re-offered before new eligible ordinary mixed
+  evidence causes another evaluation;
 - two different task families never share one theme posterior; and
 - one-step score/Fisher results stay within the predeclared tolerance of exact
   Newton/grid results on weak, strong, balanced, and near-separation fixtures.
@@ -827,10 +955,10 @@ Before Phase B can claim implementation complete:
 9. Keep derived caches out of export and iCloud sync and test that boundary.
 10. Add production navigation and service wiring only after design approval,
     while retaining the approved Storybook scenarios as living documentation.
-11. Add user-visible loading/building, insufficient evidence, no meaningful
-    weakness, solve-rate weakness, completed-speed weakness, multiple ranked
-    weaknesses, rare one-off, explanation, Focused Run preview, and decline
-    states.
+11. Add user-visible loading/building, insufficient evidence (including a rare
+    one-off), no meaningful weakness, solve-rate weakness, completed-speed
+    weakness, capped ranked weaknesses, limited-inventory, explanation, Focused
+    Run preview, and decline states.
 12. Run the risk-scoped core, storage, CLI, component, Interaction Lab, and
     release validation required by the repository testing architecture.
 

@@ -1054,7 +1054,7 @@ describe("PracticePocScreen", () => {
         totalPuzzleCount: 15,
         allocations: [
           { id: "fork", label: "Forks", puzzleCount: 10, tone: "primary" },
-          { id: "mixed", label: "Mixed control", puzzleCount: 5, tone: "mixed" }
+          { id: "mixed", label: "Mixed practice", puzzleCount: 5, tone: "mixed" }
         ]
       },
       onIntent
@@ -1085,16 +1085,54 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(speed, "tactical-profile-screen"))).not.toContain("%");
   });
 
-  it("keeps a rare one-off miss in evidence collection without a focused Run CTA", () => {
-    const renderer = renderLabScenario("practice-tactical-profile-rare-signal");
+  it("keeps one-off mistakes inside the shared collecting-evidence state", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-collecting");
 
     expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
-      "One miss is not a theme weakness"
+      "More information needed"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).not.toContain(
+      "One miss"
     );
     press(renderer, "training-focus-open-profile");
-    expect(findByTestId(renderer, "tactical-profile-watch-signals")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
-      "The individual puzzle can go to Review"
+      "We need results from more different puzzles and sessions"
+    );
+    expect(() => findByTestId(renderer, "tactical-profile-preview-run")).toThrow();
+  });
+
+  it("summarizes several focuses on Home and caps the full profile at three", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-ranked");
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "4 recommendations"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Forks is your clearest focus"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "There are 3 more themes worth reviewing."
+    );
+
+    press(renderer, "training-focus-open-profile");
+
+    expect(findByTestId(renderer, "tactical-profile-signal-fork")).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-signal-pin-speed")).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-signal-deflection")).toBeTruthy();
+    expect(() => findByTestId(renderer, "tactical-profile-signal-back-rank")).toThrow();
+    expect(collectText(findByTestId(renderer, "tactical-profile-more-signals"))).toContain(
+      "1 more pattern is being monitored"
+    );
+  });
+
+  it("keeps a credible low-inventory focus but withholds the unsafe Run CTA", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-limited-inventory");
+
+    expect(collectText(findByTestId(renderer, "focused-run-unavailable"))).toContain(
+      "Not enough new puzzles nearby"
+    );
+    expect(collectText(findByTestId(renderer, "focused-run-unavailable"))).toContain(
+      "current Rating"
     );
     expect(() => findByTestId(renderer, "tactical-profile-preview-run")).toThrow();
   });
@@ -1102,6 +1140,7 @@ describe("PracticePocScreen", () => {
   it("walks explanation, quota preview, decline, and restore through public Tactical Profile actions", () => {
     const renderer = renderLabScenario("practice-tactical-profile-ranked");
 
+    press(renderer, "training-focus-open-profile");
     press(renderer, "tactical-profile-explain-fork");
     expect(collectText(findByTestId(renderer, "tactical-profile-explanation"))).toContain(
       "Slow and Unclear labels, or whether a puzzle is in Review, do not count as proof"
@@ -1109,10 +1148,16 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "tactical-profile-explanation-preview");
     expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
-      "Explicit quotas keep one theme from taking over the Run."
+      "Only the two clearest focuses can enter one Run."
     );
     expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
-      "Mixed control"
+      "Mixed practice"
+    );
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Rebuilt for your current Rating before each new Run"
+    );
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Later ordinary mixed Runs decide whether this focus still applies."
     );
 
     press(renderer, "focused-run-not-now");

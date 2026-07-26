@@ -14,7 +14,7 @@ export type TacticalProfileScenarioId =
   | "practice-tactical-profile-solve-rate"
   | "practice-tactical-profile-speed"
   | "practice-tactical-profile-ranked"
-  | "practice-tactical-profile-rare-signal"
+  | "practice-tactical-profile-limited-inventory"
   | "practice-tactical-profile-explanation"
   | "practice-tactical-profile-focused-run"
   | "practice-tactical-profile-suppressed";
@@ -54,14 +54,24 @@ const DEFLECTION_SIGNAL: TacticalProfileSignal = {
   status: "recommended"
 };
 
-const RARE_SKEWER_SIGNAL: TacticalProfileSignal = {
-  id: "skewer",
-  themeLabel: "Skewers",
+const BACK_RANK_SIGNAL: TacticalProfileSignal = {
+  id: "back-rank",
+  themeLabel: "Back-rank mates",
   kind: "solve_rate",
-  distinctPuzzleCount: 1,
-  distinctSessionCount: 1,
-  priorityLabel: "Watch · more evidence needed",
-  status: "watch"
+  distinctPuzzleCount: 6,
+  distinctSessionCount: 3,
+  priorityLabel: "Monitored · below display cutoff",
+  status: "recommended"
+};
+
+const SMOTHERED_MATE_SIGNAL: TacticalProfileSignal = {
+  id: "smothered-mate",
+  themeLabel: "Smothered mates",
+  kind: "solve_rate",
+  distinctPuzzleCount: 4,
+  distinctSessionCount: 2,
+  priorityLabel: "Recommended · limited nearby supply",
+  status: "recommended"
 };
 
 const SINGLE_FOCUS_RUN: FocusedRunPreview = {
@@ -70,7 +80,7 @@ const SINGLE_FOCUS_RUN: FocusedRunPreview = {
   totalPuzzleCount: 15,
   allocations: [
     { id: "fork", label: "Forks", puzzleCount: 10, tone: "primary" },
-    { id: "mixed", label: "Mixed control", puzzleCount: 5, tone: "mixed" }
+    { id: "mixed", label: "Mixed practice", puzzleCount: 5, tone: "mixed" }
   ]
 };
 
@@ -81,7 +91,7 @@ const RANKED_FOCUS_RUN: FocusedRunPreview = {
   allocations: [
     { id: "fork", label: "Forks", puzzleCount: 9, tone: "primary" },
     { id: "pin", label: "Pins", puzzleCount: 3, tone: "secondary" },
-    { id: "mixed", label: "Mixed control", puzzleCount: 3, tone: "mixed" }
+    { id: "mixed", label: "Mixed practice", puzzleCount: 3, tone: "mixed" }
   ]
 };
 
@@ -106,7 +116,7 @@ export function initialTacticalProfileFixtureState(
   if (
     scenarioId === "practice-tactical-profile-solve-rate"
     || scenarioId === "practice-tactical-profile-speed"
-    || scenarioId === "practice-tactical-profile-ranked"
+    || scenarioId === "practice-tactical-profile-limited-inventory"
   ) {
     return { screen: "profile" };
   }
@@ -163,8 +173,16 @@ export function tacticalProfilePresentationFor(
       }
     };
   }
-  if (scenarioId === "practice-tactical-profile-rare-signal") {
-    return { ...base, phase: "rare_signal", signals: [RARE_SKEWER_SIGNAL] };
+  if (scenarioId === "practice-tactical-profile-limited-inventory") {
+    return {
+      ...base,
+      phase: "ready",
+      signals: [SMOTHERED_MATE_SIGNAL],
+      focusedRunUnavailable: {
+        title: "Not enough new puzzles nearby",
+        body: "This focus stays in your profile, but there are not enough unseen Smothered mate puzzles near your current Rating to fill a Run without repeats or a much wider difficulty range."
+      }
+    };
   }
   if (
     scenarioId === "practice-tactical-profile-ranked"
@@ -174,7 +192,7 @@ export function tacticalProfilePresentationFor(
     return {
       ...base,
       phase: "ready",
-      signals: [FORK_SIGNAL, PIN_SPEED_SIGNAL, DEFLECTION_SIGNAL],
+      signals: [FORK_SIGNAL, PIN_SPEED_SIGNAL, DEFLECTION_SIGNAL, BACK_RANK_SIGNAL],
       focusedRun: RANKED_FOCUS_RUN
     };
   }

@@ -14,8 +14,7 @@ export type TacticalProfilePhase =
   | "building"
   | "collecting"
   | "balanced"
-  | "ready"
-  | "rare_signal";
+  | "ready";
 
 export type TacticalProfileScreen =
   | "home"
@@ -38,6 +37,11 @@ export type FocusedRunPreview = {
   allocations: readonly FocusedRunAllocation[];
 };
 
+export type FocusedRunUnavailable = {
+  title: string;
+  body: string;
+};
+
 export type TacticalProfileIntent =
   | { type: "open-profile" }
   | { type: "close-profile" }
@@ -53,5 +57,6 @@ export type TacticalProfilePresentation = {
   signals: readonly TacticalProfileSignal[];
   selectedSignalId?: string;
   focusedRun?: FocusedRunPreview;
+  focusedRunUnavailable?: FocusedRunUnavailable;
   onIntent: (intent: TacticalProfileIntent) => void;
 };

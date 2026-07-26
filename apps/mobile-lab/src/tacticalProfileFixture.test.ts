@@ -27,7 +27,7 @@ test("issue #250 fixture covers the independent solve-rate and completed-speed h
   assert.equal(speed.signals[0]?.distinctSessionCount, 3);
 });
 
-test("issue #250 focused Run fixture preserves explicit mixed-control quota", () => {
+test("issue #250 focused Run fixture preserves explicit mixed-practice quota", () => {
   const presentation = tacticalProfilePresentationFor(
     "practice-tactical-profile-focused-run",
     initialTacticalProfileFixtureState("practice-tactical-profile-focused-run"),
@@ -43,6 +43,35 @@ test("issue #250 focused Run fixture preserves explicit mixed-control quota", ()
   assert.ok(preview.allocations.some((allocation) => allocation.tone === "mixed"));
   assert.ok(Math.max(...preview.allocations.map((allocation) => allocation.puzzleCount))
     / preview.totalPuzzleCount <= 0.7);
+});
+
+test("issue #250 ranked fixture keeps four recommendations but trains only the top two", () => {
+  const presentation = tacticalProfilePresentationFor(
+    "practice-tactical-profile-ranked",
+    initialTacticalProfileFixtureState("practice-tactical-profile-ranked"),
+    () => {}
+  );
+
+  assert.equal(presentation.screen, "home");
+  assert.equal(presentation.signals.length, 4);
+  assert.deepEqual(
+    presentation.focusedRun?.allocations
+      .filter((allocation) => allocation.tone !== "mixed")
+      .map((allocation) => allocation.label),
+    ["Forks", "Pins"]
+  );
+});
+
+test("issue #250 limited-inventory fixture withholds a Focused Run without hiding the insight", () => {
+  const presentation = tacticalProfilePresentationFor(
+    "practice-tactical-profile-limited-inventory",
+    initialTacticalProfileFixtureState("practice-tactical-profile-limited-inventory"),
+    () => {}
+  );
+
+  assert.equal(presentation.signals[0]?.status, "recommended");
+  assert.equal(presentation.focusedRun, undefined);
+  assert.match(presentation.focusedRunUnavailable?.body ?? "", /current Rating/);
 });
 
 test("issue #250 fixture intents keep preview and suppression reversible", () => {
@@ -69,6 +98,7 @@ test("issue #250 fixture intents keep preview and suppression reversible", () =>
 
 test("only issue #250 Tactical Profile scenario ids enter the design fixture", () => {
   assert.equal(isTacticalProfileScenario("practice-tactical-profile-building"), true);
+  assert.equal(isTacticalProfileScenario("practice-tactical-profile-limited-inventory"), true);
   assert.equal(isTacticalProfileScenario("practice-home"), false);
   assert.equal(isTacticalProfileScenario("history-populated"), false);
 });
