@@ -574,9 +574,11 @@ New Run behavior:
   available. Android includes the consistent local SQLite snapshot without
   claiming that an iCloud snapshot exists. Both platforms add bounded
   diagnostic and manifest files with database health and checksums. iOS removes
-  a shared bundle when its Share Sheet closes; Android keeps it only long enough
-  for the chosen recipient to read it. Closing the diagnostics window discards
-  unshared files, and both platforms retain a bounded one-hour lifetime.
+  a shared bundle when its Share Sheet closes. Android refuses new reads from
+  its private share URI after one hour, revokes URI access during best-effort
+  cleanup, and deletes the cached copy at the next available cleanup opportunity;
+  a recipient may retain any copy it already chose to save. Closing the
+  diagnostics window discards unshared files.
 - A visible sync failure adds `View Error Details`, including bounded technical
   fields and a copy action. It must not expose raw native metadata that can
   contain credentials or account identifiers.

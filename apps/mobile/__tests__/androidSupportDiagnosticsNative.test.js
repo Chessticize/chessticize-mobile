@@ -16,7 +16,9 @@ describe('Android support diagnostics native boundary', () => {
     );
 
     expect(application).toContain('add(AndroidSupportDiagnosticsPackage())');
-    expect(manifest).toContain('android:name="androidx.core.content.FileProvider"');
+    expect(manifest).toContain(
+      'android:name=".ExpiringSupportFileProvider"'
+    );
     expect(manifest).toContain('android:authorities="${applicationId}.support-files"');
     expect(manifest).toContain('android:exported="false"');
     expect(paths).toContain('path="support-diagnostics/archives/"');
@@ -42,11 +44,17 @@ describe('Android support diagnostics native boundary', () => {
     expect(nativeModule).toContain('.put("hardwareIdentifiersIncluded", false)');
     expect(nativeModule).toContain('worker.shutdownNow()');
     expect(nativeModule).toContain('SupportDiagnosticsCleanupReceiver');
+    expect(nativeModule).toContain('class ExpiringSupportFileProvider');
+    expect(nativeModule).toContain('override fun openFile');
+    expect(nativeModule).toContain('SupportDiagnosticsArchiveContract.isReadable');
     expect(nativeModule).toContain('setAndAllowWhileIdle');
     expect(nativeModule).toContain('scheduleNextCleanup');
     expect(nativeModule).not.toContain('worker.schedule(');
     expect(manifest).toContain(
       'android:name=".SupportDiagnosticsCleanupReceiver"'
+    );
+    expect(manifest).not.toContain(
+      'android:name="androidx.core.content.FileProvider"'
     );
     expect(manifest).not.toContain('android.permission.SCHEDULE_EXACT_ALARM');
     expect(nativeModule).not.toContain('ANDROID_ID');

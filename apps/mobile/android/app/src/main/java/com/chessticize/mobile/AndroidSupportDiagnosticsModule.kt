@@ -10,6 +10,7 @@ import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.os.Build
+import android.os.ParcelFileDescriptor
 import androidx.core.content.FileProvider
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.Arguments
@@ -23,6 +24,7 @@ import com.facebook.react.uimanager.ViewManager
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -32,7 +34,6 @@ import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import org.json.JSONArray
@@ -145,9 +146,14 @@ class AndroidSupportDiagnosticsModule(
 
         val archiveDirectory = archiveRoot()
         archiveDirectory.mkdirs()
+        val createdAt = System.currentTimeMillis()
         val archive = File(
           archiveDirectory,
-          "$ARCHIVE_PREFIX${archiveTimestamp()}-${UUID.randomUUID()}.zip",
+          SupportDiagnosticsArchiveContract.archiveName(
+            timestamp = archiveTimestamp(Date(createdAt)),
+            expiresAt = createdAt + SupportDiagnosticsArchiveContract.LIFETIME_MILLIS,
+            identifier = UUID.randomUUID().toString(),
+          ),
         )
         writeZip(archive, includedFiles)
         directory.deleteRecursively()
@@ -177,7 +183,10 @@ class AndroidSupportDiagnosticsModule(
       archive == null
       || !archive.isFile
       || archive.extension.lowercase() != "zip"
-      || SupportDiagnosticsArchiveLifecycle.deleteIfExpired(archive)
+      || SupportDiagnosticsArchiveLifecycle.deleteIfExpired(
+        reactApplicationContext,
+        archive,
+      )
     ) {
       promise.reject(
         "support_bundle_missing",
@@ -438,10 +447,10 @@ class AndroidSupportDiagnosticsModule(
     )
   }
 
-  private fun archiveTimestamp(): String =
+  private fun archiveTimestamp(date: Date): String =
     SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).apply {
       timeZone = TimeZone.getTimeZone("UTC")
-    }.format(Date())
+    }.format(date)
 
   private fun iso8601(date: Date): String =
     SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
@@ -462,7 +471,38 @@ class AndroidSupportDiagnosticsModule(
 private const val SUPPORT_ROOT_DIRECTORY = "support-diagnostics"
 private const val ARCHIVE_DIRECTORY = "archives"
 private const val ARCHIVE_PREFIX = "Chessticize-Support-"
-private const val ARCHIVE_LIFETIME_HOURS = 1L
+
+internal object SupportDiagnosticsArchiveContract {
+  const val LIFETIME_MILLIS = 60L * 60L * 1_000L
+  private const val EXPIRY_MARKER = "-expires-"
+
+  fun archiveName(
+    timestamp: String,
+    expiresAt: Long,
+    identifier: String,
+  ): String =
+    "$ARCHIVE_PREFIX$timestamp$EXPIRY_MARKER$expiresAt-$identifier.zip"
+
+  fun expiryAt(archiveName: String): Long? {
+    if (
+      !archiveName.startsWith(ARCHIVE_PREFIX)
+      || !archiveName.endsWith(".zip")
+      || !archiveName.contains(EXPIRY_MARKER)
+    ) {
+      return null
+    }
+    return archiveName
+      .substringAfter(EXPIRY_MARKER)
+      .substringBefore("-")
+      .toLongOrNull()
+      ?.takeIf { expiry -> expiry > 0L }
+  }
+
+  fun isReadable(
+    archiveName: String,
+    now: Long = System.currentTimeMillis(),
+  ): Boolean = expiryAt(archiveName)?.let { expiry -> now < expiry } == true
+}
 
 private object SupportDiagnosticsArchiveLifecycle {
   const val ACTION_CLEANUP =
@@ -482,7 +522,10 @@ private object SupportDiagnosticsArchiveLifecycle {
     val alarmManager = applicationContext.getSystemService(AlarmManager::class.java)
       ?: return
     val nextExpiry = managedArchives(applicationContext)
-      .minOfOrNull { archive -> archive.lastModified() + archiveLifetimeMillis() }
+      .mapNotNull { archive ->
+        SupportDiagnosticsArchiveContract.expiryAt(archive.name)
+      }
+      .minOrNull()
 
     alarmManager.cancel(pendingIntent)
     if (nextExpiry == null) {
@@ -497,11 +540,11 @@ private object SupportDiagnosticsArchiveLifecycle {
     )
   }
 
-  fun deleteIfExpired(archive: File): Boolean {
-    if (!isExpired(archive)) {
+  fun deleteIfExpired(context: Context, archive: File): Boolean {
+    if (SupportDiagnosticsArchiveContract.isReadable(archive.name)) {
       return false
     }
-    archive.delete()
+    expireArchive(context, archive)
     return true
   }
 
@@ -513,8 +556,8 @@ private object SupportDiagnosticsArchiveLifecycle {
 
   private fun removeExpiredArchives(context: Context) {
     managedArchives(context).forEach { archive ->
-      if (isExpired(archive)) {
-        archive.delete()
+      if (!SupportDiagnosticsArchiveContract.isReadable(archive.name)) {
+        expireArchive(context, archive)
       }
     }
   }
@@ -524,13 +567,20 @@ private object SupportDiagnosticsArchiveLifecycle {
       ?.filter { file -> file.isFile && file.name.startsWith(ARCHIVE_PREFIX) }
       .orEmpty()
 
-  private fun isExpired(
-    archive: File,
-    now: Long = System.currentTimeMillis(),
-  ): Boolean = archive.lastModified() <= now - archiveLifetimeMillis()
-
-  private fun archiveLifetimeMillis(): Long =
-    TimeUnit.HOURS.toMillis(ARCHIVE_LIFETIME_HOURS)
+  private fun expireArchive(context: Context, archive: File) {
+    runCatching {
+      val contentUri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.support-files",
+        archive,
+      )
+      context.revokeUriPermission(
+        contentUri,
+        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+      )
+    }
+    archive.delete()
+  }
 
   private fun cleanupPendingIntent(context: Context): PendingIntent =
     PendingIntent.getBroadcast(
@@ -541,6 +591,22 @@ private object SupportDiagnosticsArchiveLifecycle {
       },
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
+}
+
+class ExpiringSupportFileProvider : FileProvider() {
+  @Throws(FileNotFoundException::class)
+  override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
+    if (
+      mode != "r"
+      || !SupportDiagnosticsArchiveContract.isReadable(
+        uri.lastPathSegment.orEmpty(),
+      )
+    ) {
+      throw FileNotFoundException("The support bundle share window has expired.")
+    }
+    return super.openFile(uri, mode)
+      ?: throw FileNotFoundException("The support bundle is unavailable.")
+  }
 }
 
 class SupportDiagnosticsCleanupReceiver : BroadcastReceiver() {
