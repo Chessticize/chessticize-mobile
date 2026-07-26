@@ -298,7 +298,8 @@ test("PracticeService persists settings through the store boundary", () => {
     sprintGuides: {
       rulesSeen: false,
       activeSessionSeen: false,
-      arrowDuelSeen: false
+      arrowDuelSeen: false,
+      focusedRunSeen: false
     }
   });
 
@@ -319,7 +320,8 @@ test("PracticeService persists settings through the store boundary", () => {
     sprintGuides: {
       rulesSeen: true,
       activeSessionSeen: true,
-      arrowDuelSeen: false
+      arrowDuelSeen: false,
+      focusedRunSeen: true
     }
   });
 
@@ -345,7 +347,8 @@ test("PracticeService persists settings through the store boundary", () => {
     sprintGuides: {
       rulesSeen: true,
       activeSessionSeen: true,
-      arrowDuelSeen: false
+      arrowDuelSeen: false,
+      focusedRunSeen: true
     }
   });
 });

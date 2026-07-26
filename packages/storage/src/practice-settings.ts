@@ -37,7 +37,8 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
     sprintGuides: {
       rulesSeen: settings.sprintGuides?.rulesSeen ?? false,
       activeSessionSeen: settings.sprintGuides?.activeSessionSeen ?? false,
-      arrowDuelSeen: settings.sprintGuides?.arrowDuelSeen ?? false
+      arrowDuelSeen: settings.sprintGuides?.arrowDuelSeen ?? false,
+      focusedRunSeen: settings.sprintGuides?.focusedRunSeen ?? false
     }
   });
 }
@@ -57,7 +58,8 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
     sprintGuides: {
       rulesSeen: settings.sprintGuides?.rulesSeen ?? false,
       activeSessionSeen: settings.sprintGuides?.activeSessionSeen ?? false,
-      arrowDuelSeen: settings.sprintGuides?.arrowDuelSeen ?? false
+      arrowDuelSeen: settings.sprintGuides?.arrowDuelSeen ?? false,
+      focusedRunSeen: settings.sprintGuides?.focusedRunSeen ?? false
     }
   };
 }

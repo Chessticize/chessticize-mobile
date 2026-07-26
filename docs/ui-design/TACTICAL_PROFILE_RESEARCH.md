@@ -1,10 +1,15 @@
 # Tactical Profile / Training Focus Research Specification
 
-Date: 2026-07-25
+Date: 2026-07-25; production-trial decision updated 2026-07-26
 
-Scope: Issue [#250](https://github.com/Chessticize/chessticize-mobile/issues/250), Phase A research and Storybook design only
+Scope: Issue [#250](https://github.com/Chessticize/chessticize-mobile/issues/250), research, approved Storybook design, and production-trial decision record
 
 Current-main audit: [`aeb0e1c24bcf84b9e8af2003ed25dc303d3f7d1a`](https://github.com/Chessticize/chessticize-mobile/tree/aeb0e1c24bcf84b9e8af2003ed25dc303d3f7d1a)
+
+Design approval record: the owner approved the complete Phase A Interaction
+Lab flow for implementation, and that approved design was merged as
+[PR #341](https://github.com/Chessticize/chessticize-mobile/pull/341) at
+[`f6ba30e`](https://github.com/Chessticize/chessticize-mobile/commit/f6ba30e).
 
 This document is the durable product and statistical contract for the Phase A
 Tactical Profile / Training Focus design. Later issue comments supersede earlier
@@ -20,10 +25,15 @@ values are classified as:
 - **Provisional V1 default**: the initial value if offline calibration does not
   reject it; it is not a scientific fact.
 - **Calibration-required**: production must not freeze a value or functional
-  form until the local calibration harness supports it.
+  form as validated until the local calibration harness supports it.
 
-No production model, storage schema, sync payload, automatic selection,
-navigation, analytics, or rollout is authorized by this document.
+The original Phase A approval did not authorize production behavior. On
+2026-07-26, after the available private history proved insufficient for a
+representative holdout, the owner explicitly approved a provisional production
+trial. The trial may use disclosed starting coefficients to learn from ordinary
+mixed Runs, but MUST describe its output as an early estimate and MUST NOT
+represent those coefficients or recommendations as validated. No analytics,
+private-data upload, or sync payload is authorized.
 
 ## 1. Problem and product goals
 
@@ -369,9 +379,11 @@ posteriorMean = posteriorVariance * U
 The sums are evaluated around `delta = 0`. This is a one-step quadratic
 score/Fisher or Laplace approximation, not an exact closed-form logistic
 posterior. The prior scale and all baseline parameters are calibration-required.
-Production adoption requires golden-fixture comparison with an exact
-one-dimensional Newton or grid posterior. Laplace methods are approximations
-based on posterior curvature, not identities
+Calling the model validated, or removing its early-estimate disclosure,
+requires golden-fixture comparison with an exact one-dimensional Newton or grid
+posterior. The owner-approved provisional production trial does not satisfy
+that validation gate. Laplace methods are approximations based on posterior
+curvature, not identities
 ([Tierney and Kadane 1986](https://doi.org/10.1080/01621459.1986.10478240)).
 
 Fisher information, posterior variance, and explicit diversity guards are the
@@ -439,11 +451,14 @@ posterior percentage as the other's weight. A theme becomes recommendation-
 eligible when either head independently passes its evidence and impact gates.
 If both pass, the explanation may mention both.
 
-Ranking several eligible themes requires a calibrated, bounded action utility
-that combines posterior expected product impact with natural opportunity and
-recency/persistence. Its exact formula is calibration-required. Until such a
-utility is calibrated, Storybook ranking is illustrative fixture data, not a
-production algorithm.
+Ranking several eligible themes requires a bounded action utility that combines
+posterior expected product impact with natural opportunity and
+recency/persistence. The owner-approved production trial may use the
+versioned provisional artifact's utility only while the early-estimate
+disclosure remains visible. Representative calibration must confirm or replace
+its exact formula before the ranking is called validated or the disclosure is
+removed. Storybook ranks remain illustrative fixture data rather than exact
+posterior claims.
 
 The UI should state the reason in plain language:
 
@@ -569,11 +584,14 @@ Focused Run also MUST NOT make its selected sample look like independent
 weakness-discovery evidence. Later ordinary mixed Runs determine whether the
 focus still applies.
 
-Entry and exit MUST use calibrated hysteresis so a recommendation does not
-appear and disappear around one threshold. A completed Focused Run MUST NOT
-immediately re-offer the same action without at least one new eligible ordinary
-mixed session and a new profile evaluation. This is an action-freshness rule,
-not a V1 recovery or mastery model.
+Entry and exit MUST use the versioned artifact's hysteresis so a recommendation
+does not appear and disappear around one threshold. During the owner-approved
+trial those values are provisional and remain covered by the early-estimate
+disclosure; representative calibration must confirm or replace them before the
+model is called validated. A completed Focused Run MUST NOT immediately
+re-offer the same action without at least one new eligible ordinary mixed
+session and a new profile evaluation. This is an action-freshness rule, not a
+V1 recovery or mastery model.
 
 ### Focus and presentation cutoffs
 
@@ -647,7 +665,15 @@ The runtime design MUST remain bounded:
 - profile updates process the attempts from newly completed or dirty days;
 - profile reads rank the fixed curated catalog from daily cells rather than
   rescanning raw history;
-- inventory preflight examines a bounded number of manifest buckets; and
+- opening Profile compares cached per-family Rating and latest terminal Focused
+  Run watermarks, then checks a bounded number of manifest buckets, without
+  listing all sessions, attempts, Review rows, or exact puzzle candidates;
+- cache rebuild and recovery use a dedicated canonical query returning at most
+  the latest terminal Focused Run per task family, including zero-attempt Runs;
+- import observers capture changed terminal Focused Run metadata for processing
+  only after the canonical import transaction completes;
+- the exact exclusion-aware inventory query runs only after explicit Preview
+  intent and again immediately before Start; and
 - a two-focus Run uses at most three bounded indexed selections: primary,
   secondary, and mixed.
 
@@ -667,6 +693,17 @@ zero failures and zero duplicate puzzle IDs. Median selection time was
 `36.967 ms`, p95 was `45.482 ms`, and max was `46.166 ms` on the development
 Mac. The five-theme generic selection median/p95 was `20.611 / 22.417 ms`.
 These values support feasibility but are not production latency guarantees.
+
+On 2026-07-26, the benchmark gained the production nested-band selection path
+for the calibrated `±100 / ±200` Rating bands. An initial implementation using
+`ORDER BY ABS(rating - anchor)` was rejected after a five-iteration median of
+`541.950 ms`. The retained adapter performs bounded lower/upper index scans
+behind each quota selection and merges them by distance. Against the
+1,400,000-puzzle Core Pack v3, a ten-iteration run completed the primary,
+secondary, and mixed nested-band selections in a median `31.599 ms`, p95
+`37.687 ms`, and max `37.687 ms`, constructing an exact, cross-quota-unique
+`9 / 3 / 3` allocation at both bands. This is repeatable feasibility evidence,
+not a target-device latency gate.
 
 ## 12. Local-only incremental storage design
 
@@ -724,13 +761,18 @@ hash change triggers a full derived rebuild.
 ### `weakness_build_state`
 
 Record at least model version, pack feature hash, calibration identity, build
-status, dirty-day count, and deterministic progress/watermark. Backfill newest
-days first so the UI may show a truthful partial "Building profile" state.
+status, dirty-day count, deterministic progress/watermark, and the last eligible
+ordinary mixed session's Rating key and latest terminal Focused Run watermark
+per task family. Import changes that alter, move, or disqualify either stored
+anchor require a canonical derived rebuild before the state can survive restart.
+Backfill newest days first so the UI may show a truthful partial "Building
+profile" state.
 
 Derived cells:
 
 - are local-only;
 - are not canonical progress;
+- may fail or rebuild without rolling back a canonical progress write or import;
 - are never exported or synced;
 - can always be rebuilt from canonical attempts, sessions, and the matching
   bundled pack; and
@@ -747,8 +789,10 @@ depends on days and curated themes, not linearly on raw attempt count.
 
 ## 13. Calibration harness specification
 
-Production adoption requires a local-only development harness, expected to live
-behind the CLI/development boundary rather than a product API.
+Validated adoption and removal of the early-estimate disclosure require a
+local-only development harness, expected to live behind the CLI/development
+boundary rather than a product API. The owner-approved provisional production
+trial remains explicitly disclosed until this gate passes.
 
 ### Inputs
 
@@ -800,12 +844,41 @@ The harness determines:
 - the speed residual family and influence handling; and
 - acceptable one-step-versus-exact posterior error.
 
-Every production coefficient, tolerance, and threshold must be emitted in a
+Every shipped coefficient, tolerance, and threshold must be emitted in a
 versioned calibration artifact with input schema and pack-feature identity.
 Go/no-go tolerances must be declared before evaluating the final holdout. If a
-task family lacks adequate calibration evidence, that family remains
-"Collecting evidence" or unavailable rather than borrowing unvalidated
-coefficients.
+task family lacks adequate representative calibration evidence, it may use only
+an explicitly owner-approved provisional artifact with the early-estimate
+disclosure; otherwise that family remains "Collecting evidence" or unavailable.
+
+### Production artifact handoff
+
+The mobile app loads
+`config/tactical-profile-calibration-artifact-v1.json` through the domain-owned
+artifact validator and requires its pack-feature hash and predeclared policy
+identity/hash to match the bundled Core Pack and V1 policy exactly. A validated
+family must also carry the input schema, corpus hash, report hash, reviewed
+decision-evidence identity, explicit representative-corpus approval, and a
+passing family readiness result. The owner-approved provisional trial instead
+requires an explicit decision-evidence identity, null corpus/report hashes,
+`representativeOwnerApproved: false`, and a `provisional` family status. An
+invalid artifact, missing decision, missing pack identity, policy mismatch, or
+pack mismatch fails closed.
+The repeatable two-pass operator workflow, authenticated decision template, and
+activation checks are documented in
+[`docs/agents/tactical-profile-calibration.md`](../agents/tactical-profile-calibration.md).
+
+After an owner-approved representative corpus passes calibration, the local
+harness writes the reviewed aggregate report and replacement artifact with
+`--report config/tactical-profile-calibration-report-v1.json` and
+`--artifact config/tactical-profile-calibration-artifact-v1.json`. Build tests
+recompute the report and policy hashes, reconstruct the complete artifact from
+the authenticated report, predeclared policy, and bundled pack, and require an
+exact match. A hand-edited coefficient, threshold, or Focused Run parameter
+therefore fails the build even when it remains finite. Replacing provisional
+families with validated families is a data-only activation seam: no
+product-code or test-code change is needed, and a task family that does not
+pass its own gates remains unavailable.
 
 The Phase A PR MUST NOT implement this harness unless a tiny pure local script
 is separately needed to verify a research claim. It MUST NOT upload user data,
@@ -854,8 +927,10 @@ decision.
 
 ### Provisional V1 defaults
 
-These values are starting points, not scientific facts. Offline calibration
-must confirm or replace them before production:
+These values are starting points, not scientific facts. They may be used in the
+owner-approved production trial only with the early-estimate disclosure.
+Representative holdout calibration must confirm or replace them before the
+model is called validated or the disclosure is removed:
 
 | Value | Classification | Intended use |
 | --- | --- | --- |
@@ -868,7 +943,11 @@ must confirm or replace them before production:
 | `70%` primary / `30%` mixed-control | Provisional V1 default | One-weakness Focused Run |
 | `60%` primary / `20%` secondary / `20%` mixed-control | Provisional V1 default | Two-weakness Focused Run |
 
-### Calibration-required with no safe production default
+### Owner-approved provisional trial values requiring validation
+
+The checked-in provisional artifact supplies bounded trial values for these
+terms. They are product experiments, not validated population truths, and must
+remain behind the same early-estimate disclosure:
 
 - solve-family intercepts and Glicko-shaped slopes;
 - Timeout, pace, Slow-threshold, decision-count, and Run-rule effects;
@@ -967,8 +1046,9 @@ Before Phase B can claim implementation complete:
    the protected pack artifact.
 4. Define and test reliable-timing eligibility and unknown legacy policy
    behavior without timestamp reconstruction.
-5. Implement the local-only calibration harness and freeze a versioned,
-   holdout-validated calibration artifact.
+5. Implement the local-only calibration harness. A holdout-validated artifact
+   is required before removing the early-estimate disclosure or calling the
+   model validated; the owner-approved provisional trial is not a substitute.
 6. Establish go/no-go thresholds for reliability, Brier score, log loss, speed
    residuals, and one-step posterior error.
 7. Add pure domain contracts for cohort classification, weighting, both heads,
@@ -986,8 +1066,10 @@ Before Phase B can claim implementation complete:
 12. Run the risk-scoped core, storage, CLI, component, Interaction Lab, and
     release validation required by the repository testing architecture.
 
-Until these prerequisites pass, Storybook data is deterministic presentation
-data only and issue #250 remains open.
+The owner-approved trial may ship before representative holdout calibration,
+provided the provisional contract and early-estimate disclosure above remain
+intact. Issue #250 must not claim validated calibration until every applicable
+prerequisite passes.
 
 ## 18. Decisions intentionally deferred to V2
 

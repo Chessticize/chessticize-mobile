@@ -81,6 +81,17 @@ describe("mobile Back contract", () => {
       label: "Practice",
       testID: "tab-practice"
     });
+
+    const tacticalProfileState: MobileBackState = {
+      ...rootState,
+      detail: { kind: "tactical-profile", owner: "practice" }
+    };
+    const tacticalProfileIntent = resolveMobileBackIntent(tacticalProfileState, "button");
+    expect(tacticalProfileIntent).toEqual({ kind: "return-to-owner", owner: "practice" });
+    expect(mobileBackDestination(tacticalProfileIntent, tacticalProfileState)).toEqual({
+      label: "Practice",
+      testID: "tab-practice"
+    });
   });
 
   it("guards active practice, returns non-root tabs to Practice, and delegates only at root", () => {

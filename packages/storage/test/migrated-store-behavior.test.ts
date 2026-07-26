@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { copyFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { PracticeService, SQLiteStore } from "../src/index.ts";
+import { MemoryStore, PracticeService, SQLiteStore } from "../src/index.ts";
+import type { LocalDataImportObserver } from "../src/practice-store.ts";
 import type { Puzzle } from "../../core/src/index.ts";
 
 const RELEASED_V0_FIXTURE = resolve(
@@ -82,7 +83,12 @@ for (const label of STORE_LABELS) {
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "09:45" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },
-        sprintGuides: { rulesSeen: true, activeSessionSeen: true, arrowDuelSeen: false }
+        sprintGuides: {
+          rulesSeen: true,
+          activeSessionSeen: true,
+          arrowDuelSeen: false,
+          focusedRunSeen: true
+        }
       });
 
       assert.deepEqual(updated, service.getSettings());
@@ -90,7 +96,12 @@ for (const label of STORE_LABELS) {
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "09:45" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },
-        sprintGuides: { rulesSeen: true, activeSessionSeen: true, arrowDuelSeen: false }
+        sprintGuides: {
+          rulesSeen: true,
+          activeSessionSeen: true,
+          arrowDuelSeen: false,
+          focusedRunSeen: true
+        }
       });
     } finally {
       await cleanup();
@@ -240,6 +251,61 @@ for (const label of STORE_LABELS) {
         sprintSessions: 0
       });
       assert.deepEqual(service.exportLocalData(), exported);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  test(`[shared-behavior:${label}] import observers report only canonical rows that changed`, async () => {
+    const { store, cleanup } = await openStore(label);
+    try {
+      const sourceStore = new MemoryStore();
+      const source = new PracticeService(sourceStore);
+      const puzzle = sharedBehaviorPuzzle(label);
+      source.setPuzzleSelectionScope([puzzle]);
+      source.startSprint(
+        {
+          mode: "standard",
+          durationSeconds: 300,
+          perPuzzleSeconds: 20,
+          targetCorrect: 1,
+          maxMistakes: 3,
+          themes: [sharedBehaviorTheme(label)]
+        },
+        "2026-06-22T00:00:00.000Z"
+      );
+      source.submitMove("e2e6", "2026-06-22T00:00:05.000Z");
+      source.submitMove("e6f7", "2026-06-22T00:00:10.000Z");
+      store.seedPuzzles([puzzle]);
+      const incoming = source.exportLocalData();
+      const changedAttempts: string[] = [];
+      const changedSessions: string[] = [];
+      const observer: LocalDataImportObserver = {
+        onAttemptChanged: (previous, next) => {
+          assert.equal(previous, undefined);
+          changedAttempts.push(next.id);
+        },
+        onSprintSessionChanged: (previous, next) => {
+          assert.equal(previous, undefined);
+          changedSessions.push(next.id);
+        }
+      };
+
+      const imported = store.importLocalData(incoming, observer);
+      assert.equal(imported.attempts, 1);
+      assert.equal(imported.sprintSessions, 1);
+      assert.equal(changedAttempts.length, 1);
+      assert.equal(changedSessions.length, 1);
+      assert.deepEqual(
+        store.listSprintAttemptUtcDays(changedSessions),
+        ["2026-06-22"]
+      );
+
+      changedAttempts.length = 0;
+      changedSessions.length = 0;
+      store.importLocalData(incoming, observer);
+      assert.deepEqual(changedAttempts, []);
+      assert.deepEqual(changedSessions, []);
     } finally {
       await cleanup();
     }

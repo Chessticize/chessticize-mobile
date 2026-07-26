@@ -654,6 +654,40 @@ test("abandonSprint rates a failed run after the first wrong move", () => {
   assert.ok(abandoned.ratingAfter < abandoned.ratingBefore);
 });
 
+test("Tactical Focus stops at the fixed attempt ceiling without changing Rating", () => {
+  let state = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 4,
+      maxMistakes: 4,
+      maxAttempts: 3,
+      ratingPolicy: "unrated",
+      tacticalFocus: {
+        taskFamily: "line",
+        themes: ["fork"],
+        mixedControlCount: 1,
+        ratingAnchor: 900,
+        minRating: 800,
+        maxRating: 1000
+      }
+    }),
+    puzzles: [oneMovePuzzle("p1"), oneMovePuzzle("p2"), oneMovePuzzle("p3")],
+    ratingBefore: 900,
+    now: NOW
+  });
+
+  state = submitSprintMove(state, "e6e7", "2026-06-20T00:00:01.000Z").state;
+  state = submitSprintMove(state, "e6d6", "2026-06-20T00:00:02.000Z").state;
+  state = submitSprintMove(state, "e6e7", "2026-06-20T00:00:03.000Z").state;
+
+  assert.equal(state.status, "won");
+  assert.equal(state.endReason, "attempt_limit");
+  assert.equal(state.correctCount + state.mistakeCount, 3);
+  assert.equal(state.ratingAfter, undefined);
+});
+
 function samplePuzzle(id: string): Puzzle {
   return {
     id,

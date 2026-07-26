@@ -5,6 +5,10 @@ import {
   puzzleMatchesAnyTheme
 } from "../../core/src/index.ts";
 import type { Puzzle, SprintMode } from "../../core/src/index.ts";
+import type {
+  RatingBandPuzzleSelection,
+  RatingBandPuzzleSelectionInput
+} from "./puzzle-source.ts";
 
 export interface SelectUniquePuzzlesInput {
   puzzles: Puzzle[];
@@ -26,6 +30,43 @@ export function selectUniquePuzzles(input: SelectUniquePuzzlesInput): Puzzle[] {
   }
 
   return selectMatchingPuzzles(input, new Set<string>(), new Set(input.excludeIds ?? []));
+}
+
+export function selectUniquePuzzlesForRatingBands(
+  puzzles: readonly Puzzle[],
+  input: RatingBandPuzzleSelectionInput
+): RatingBandPuzzleSelection[] {
+  const { randomSeed, ...filter } = input.filter;
+  const excludedThemes = new Set(input.excludedThemes ?? []);
+  const candidates = excludedThemes.size === 0
+    ? [...puzzles]
+    : puzzles.filter((puzzle) =>
+        !puzzle.themes.some((theme) => excludedThemes.has(theme))
+      );
+  return [...new Set(input.halfWidths)]
+    .filter((halfWidth) => Number.isFinite(halfWidth) && halfWidth >= 0)
+    .sort((left, right) => left - right)
+    .map((halfWidth) => {
+      const minRating = Math.max(0, input.ratingAnchor - halfWidth);
+      const maxRating = input.ratingAnchor + halfWidth;
+      return {
+        halfWidth,
+        minRating,
+        maxRating,
+        puzzles: selectUniquePuzzles({
+          puzzles: candidates,
+          ...filter,
+          minRating,
+          maxRating,
+          ...(randomSeed === undefined
+            ? {}
+            : {
+                randomSeed:
+                  `${randomSeed}:${halfWidth}`
+              })
+        })
+      };
+    });
 }
 
 function selectPuzzlesByServerEloFallback(input: SelectUniquePuzzlesInput & { rating: number }): Puzzle[] {

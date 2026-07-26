@@ -22,6 +22,8 @@
     "process:validate": "node scripts/validate-development-process.mjs",
     "generate:offline-puzzles": "node --experimental-strip-types scripts/generate-offline-puzzle-fixture.mjs",
     "benchmark:multi-theme-query": "node --experimental-strip-types scripts/benchmark-multi-theme-query.mjs",
+    "extract:tactical-profile-progress": "node --experimental-strip-types scripts/extract-tactical-profile-progress.mjs",
+    "calibrate:tactical-profile": "node --experimental-strip-types scripts/calibrate-tactical-profile.mjs",
     "update:offline-puzzle-presolve": "node --experimental-strip-types scripts/update-offline-puzzle-pack-presolve.mjs",
     "typecheck": "tsc --noEmit",
     "mobile:start": "pnpm --filter ChessticizeMobile start",

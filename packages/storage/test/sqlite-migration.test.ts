@@ -37,7 +37,8 @@ const SNAPSHOT_TABLES = [
   "practice_runs",
   "review_queue",
   "review_schedule_removals",
-  "review_events"
+  "review_events",
+  "tactical_profile_source_state"
 ] as const;
 
 test("SQLite migrates an empty database to the current schema version", async () => {
@@ -328,7 +329,12 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "20:30" } },
         moveFeedback: { soundEnabled: true, hapticsEnabled: true },
-        sprintGuides: { rulesSeen: false, activeSessionSeen: false, arrowDuelSeen: false }
+        sprintGuides: {
+          rulesSeen: false,
+          activeSessionSeen: false,
+          arrowDuelSeen: false,
+          focusedRunSeen: false
+        }
       });
       assert.deepEqual(
         service.listSprintSessions().filter((session) => session.status === "active" || session.status === "paused").map((session) => ({
@@ -422,7 +428,12 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
         sync: { iCloudEnabled: false },
         notifications: { reviewReminder: { mode: "off" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },
-        sprintGuides: { rulesSeen: true, activeSessionSeen: false, arrowDuelSeen: false }
+        sprintGuides: {
+          rulesSeen: true,
+          activeSessionSeen: false,
+          arrowDuelSeen: false,
+          focusedRunSeen: false
+        }
       });
       service.recordReviewAttempt(
         {
@@ -503,7 +514,8 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
         sprintGuides: {
           rulesSeen: false,
           activeSessionSeen: false,
-          arrowDuelSeen: false
+          arrowDuelSeen: false,
+          focusedRunSeen: false
         }
       });
       assert.deepEqual(service.getRating("standard 5/20"), {
@@ -710,7 +722,8 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
         sprintGuides: {
           rulesSeen: true,
           activeSessionSeen: true,
-          arrowDuelSeen: false
+          arrowDuelSeen: false,
+          focusedRunSeen: true
         }
       });
       assert.equal(service.listHistory().length, 6);
@@ -732,7 +745,8 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
     assert.deepEqual(reopenedService.getSettings().sprintGuides, {
       rulesSeen: true,
       activeSessionSeen: true,
-      arrowDuelSeen: false
+      arrowDuelSeen: false,
+      focusedRunSeen: true
     });
     reopened.close();
     assert.deepEqual(databaseSnapshot(databasePath), afterWrite);

@@ -78,6 +78,17 @@ export interface LocalDataImportResult {
   practiceRuns: number;
 }
 
+export interface LocalDataImportObserver {
+  onAttemptChanged(
+    previous: AttemptHistoryRow | undefined,
+    next: AttemptHistoryRow
+  ): void;
+  onSprintSessionChanged(
+    previous: ExportedSprintSession | undefined,
+    next: ExportedSprintSession
+  ): void;
+}
+
 export interface PracticeSettings {
   sync: {
     iCloudEnabled: boolean;
@@ -137,9 +148,16 @@ export interface PracticeStore {
   getPracticeProgressSummary(nowMs: number, ratingKey: string): PracticeProgressSummary;
   listPracticeRatingActivity(): PracticeRatingActivity[];
   hasPlayedRatingKey(ratingKey: string): boolean;
+  getSprintSessions(ids: readonly string[]): ExportedSprintSession[];
+  listLatestTerminalFocusedSprintSessions(): ExportedSprintSession[];
+  listSprintAttemptUtcDays(sessionIds: readonly string[]): string[];
   listSprintSessions(): ExportedSprintSession[];
+  getTacticalProfileSourceRevision(): number;
   exportLocalData(): LocalDataExport;
-  importLocalData(data: LocalDataImport): LocalDataImportResult;
+  importLocalData(
+    data: LocalDataImport,
+    observer?: LocalDataImportObserver
+  ): LocalDataImportResult;
   clearLocalHistory(): ClearLocalHistoryResult;
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[];
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState;

@@ -62,11 +62,11 @@ export const TacticalProfileCollectingEvidence: Story = {
 };
 
 export const TacticalProfileBalanced: Story = {
-  name: "Tactical profile · no meaningful weakness",
+  name: "Tactical profile · no clear focus yet",
   args: { scenarioId: "practice-tactical-profile-balanced" },
   tags: ["new"],
   play: async ({ canvasElement }) => {
-    await waitForText(canvasElement, "Recent play looks balanced");
+    await waitForText(canvasElement, "No clear focus yet");
   }
 };
 
@@ -122,7 +122,7 @@ export const TacticalProfileTaskFamilies: Story = {
     await waitForTestId(canvasElement, "tactical-profile-signal-arrow-deflection-speed");
     await waitForText(
       canvasElement,
-      "Based on ordinary mixed Arrow Duel Runs. Review and focused Runs do not shape discovery."
+      "This is an early estimate based on ordinary mixed Arrow Duel Runs. It may change as the model is validated with more players. Review and focused Runs do not shape discovery."
     );
   }
 };
@@ -165,6 +165,7 @@ export const TacticalProfileSuppressed: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "tactical-profile-suppressed");
     await waitForText(canvasElement, "Focus hidden for now");
+    await waitForTestId(canvasElement, "tactical-profile-early-estimate");
   }
 };
 
@@ -590,6 +591,41 @@ export const SprintResultExtraAttempt: Story = {
     await waitForTestId(canvasElement, "sprint-result-solved");
     await waitForTestId(canvasElement, "sprint-result-unclear-count-column");
     await waitForTestId(canvasElement, "sprint-result-mistakes-count-column");
+  }
+};
+
+export const TacticalFocusActive: Story = {
+  name: "Tactical Focus · active run",
+  args: { scenarioId: "practice-tactical-focus-active" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForText(canvasElement, "Focused Run");
+    await waitForText(canvasElement, "Unrated");
+    await waitForText(canvasElement, "Completed");
+    await waitForText(canvasElement, "Left");
+  }
+};
+
+export const TacticalFocusGuide: Story = {
+  name: "Tactical Focus · first-use guide",
+  args: { scenarioId: "practice-tactical-focus-guide" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForText(canvasElement, "Track the fixed Run");
+    await waitForText(canvasElement, "Your Rating will not change.");
+    await waitForText(canvasElement, "Unrated");
+  }
+};
+
+export const TacticalFocusResult: Story = {
+  name: "Tactical Focus · result",
+  args: { scenarioId: "practice-tactical-focus-result" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForText(canvasElement, "Focused Run complete");
+    await waitForText(canvasElement, "Planned puzzles complete");
+    await waitForText(canvasElement, "Unrated");
+    await waitForText(canvasElement, "Back to Practice");
   }
 };
 

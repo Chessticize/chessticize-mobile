@@ -89,6 +89,14 @@ test("issue #250 task-family fixture keeps Arrow Duel in its own lane and Run", 
     presentation.focusedRun?.allocations.map((allocation) => allocation.label),
     ["Pins", "Deflection", "Mixed Arrow Duel"]
   );
+
+  const preview = reduceTacticalProfileFixtureState(initial, {
+    type: "preview-focused-run"
+  });
+  const started = reduceTacticalProfileFixtureState(preview, {
+    type: "start-focused-run"
+  });
+  assert.equal(started.startedTaskFamily, "arrow_duel");
 });
 
 test("issue #250 limited-inventory fixture withholds a Focused Run without hiding the insight", () => {
