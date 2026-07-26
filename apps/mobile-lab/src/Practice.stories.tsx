@@ -88,6 +88,32 @@ export const TacticalProfileRanked: Story = {
   }
 };
 
+export const TacticalProfileTaskFamiliesHome: Story = {
+  name: "Tactical profile · two-mode Home summary",
+  args: { scenarioId: "practice-tactical-profile-task-families-home" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForText(canvasElement, "2 modes with recommendations");
+    await waitForText(canvasElement, "Arrow Duel also has 2 recommendations.");
+    await waitForTestId(canvasElement, "training-focus-primary-mode");
+  }
+};
+
+export const TacticalProfileTaskFamilies: Story = {
+  name: "Tactical profile · Puzzle solving and Arrow Duel",
+  args: { scenarioId: "practice-tactical-profile-task-families" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "tactical-profile-task-family-selector");
+    await waitForTestId(canvasElement, "tactical-profile-signal-arrow-pin");
+    await waitForTestId(canvasElement, "tactical-profile-signal-arrow-deflection-speed");
+    await waitForText(
+      canvasElement,
+      "Based on ordinary mixed Arrow Duel Runs. Review and focused Runs do not shape discovery."
+    );
+  }
+};
+
 export const TacticalProfileLimitedInventory: Story = {
   name: "Tactical profile · limited nearby puzzles",
   args: { scenarioId: "practice-tactical-profile-limited-inventory" },

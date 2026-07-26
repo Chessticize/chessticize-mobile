@@ -110,6 +110,8 @@ test("Issue #250 owns the complete Tactical Profile design state set", () => {
       "practice-tactical-profile-solve-rate",
       "practice-tactical-profile-speed",
       "practice-tactical-profile-ranked",
+      "practice-tactical-profile-task-families-home",
+      "practice-tactical-profile-task-families",
       "practice-tactical-profile-limited-inventory",
       "practice-tactical-profile-explanation",
       "practice-tactical-profile-focused-run",

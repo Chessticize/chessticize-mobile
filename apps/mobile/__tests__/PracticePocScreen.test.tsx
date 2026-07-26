@@ -1040,6 +1040,7 @@ describe("PracticePocScreen", () => {
       signals: [
         {
           id: "fork",
+          taskFamily: "line",
           themeLabel: "Forks",
           kind: "solve_rate",
           distinctPuzzleCount: 7,
@@ -1049,7 +1050,9 @@ describe("PracticePocScreen", () => {
         }
       ],
       focusedRun: {
+        taskFamily: "line",
         title: "Fork repair",
+        ratingLabel: "Puzzle-solving Rating 925",
         durationLabel: "5 min",
         totalPuzzleCount: 15,
         allocations: [
@@ -1122,6 +1125,42 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "tactical-profile-signal-back-rank")).toThrow();
     expect(collectText(findByTestId(renderer, "tactical-profile-more-signals"))).toContain(
       "1 more pattern is being monitored"
+    );
+  });
+
+  it("keeps Puzzle solving and Arrow Duel focus lanes separate inside one profile", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-task-families-home");
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "2 modes with recommendations"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Arrow Duel also has 2 recommendations."
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-primary-mode"))).toContain(
+      "Puzzle solving"
+    );
+
+    press(renderer, "training-focus-open-profile");
+    expect(findByTestId(renderer, "tactical-profile-task-family-selector")).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-signal-fork")).toBeTruthy();
+    expect(() => findByTestId(renderer, "tactical-profile-signal-arrow-pin")).toThrow();
+
+    press(renderer, "tactical-profile-task-family-arrow_duel");
+
+    expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
+      "Arrow Duel"
+    );
+    expect(findByTestId(renderer, "tactical-profile-signal-arrow-pin")).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-signal-arrow-deflection-speed")).toBeTruthy();
+    expect(() => findByTestId(renderer, "tactical-profile-signal-fork")).toThrow();
+
+    press(renderer, "tactical-profile-preview-run");
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Arrow Duel Rating 875"
+    );
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Mixed Arrow Duel"
     );
   });
 

@@ -47,6 +47,22 @@
       }
     ]
   },
+  "practice-tactical-profile-task-families-home": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Summarize separate Puzzle solving and Arrow Duel recommendations in one calm Home card."
+      }
+    ]
+  },
+  "practice-tactical-profile-task-families": {
+    "issues": [
+      {
+        "issueNumber": 250,
+        "changeNote": "Keep Puzzle solving and Arrow Duel focus lanes separate inside one Tactical Profile."
+      }
+    ]
+  },
   "practice-tactical-profile-limited-inventory": {
     "issues": [
       {

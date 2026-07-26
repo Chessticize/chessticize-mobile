@@ -61,7 +61,7 @@ function LabScenarioContent({
   const [tacticalProfileState, setTacticalProfileState] = useState(() =>
     isTacticalProfileScenario(scenarioId)
       ? initialTacticalProfileFixtureState(scenarioId)
-      : { screen: "home" as const }
+      : { screen: "home" as const, selectedTaskFamily: "line" as const }
   );
   const showsThemeCatalogPrototype = isRunManagementScenario(scenarioId) || [
     "history-populated",

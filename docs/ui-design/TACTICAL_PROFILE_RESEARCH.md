@@ -590,6 +590,26 @@ focus. If both heads pass, the explanation may mention both reasons. Ranking and
 cutoffs happen after the independent evidence and impact gates; hiding a lower
 ranked theme from the visible top three MUST NOT rewrite its posterior.
 
+Task families remain separate presentation lanes as well as separate
+statistical units:
+
+- Puzzle solving and Arrow Duel share one Tactical Profile destination, with an
+  explicit mode selector when both have eligible recommendations;
+- the `1 / 3 / 2` Home, Profile, and Focused Run limits apply inside the
+  selected task family rather than combining unlike recommendations;
+- Practice Home still renders one Training focus card, names the lead
+  recommendation's mode, and summarizes the other mode instead of adding a
+  competing second card;
+- a Focused Run contains puzzles from exactly one task family and anchors to
+  that family's current Rating; and
+- the same atomic theme MAY appear independently in both lanes because
+  `theme x task family` is the model unit.
+
+The product MUST NOT mix Puzzle solving and Arrow Duel recommendations into one
+raw-score leaderboard or one Focused Run. The production policy for choosing
+which mode supplies the single Home lead is calibration-required; Phase A
+fixtures are illustrative and MUST NOT define that policy by array order.
+
 ### Current-Rating inventory gate
 
 Statistical confidence and trainability are separate. A credible weakness MAY
@@ -828,6 +848,7 @@ decision.
 | UTC completed-day keys | Normative product rule | Makes rebuilds deterministic across time zones |
 | At least `2` task families (`line`, `arrow_duel`) | Normative product rule | Prevents unlike tasks sharing one baseline |
 | Home `1`, Profile `3`, Focused Run `2` | Normative product rule | Keeps the product focused while lower-ranked themes remain monitored |
+| One Profile destination, separate task-family lanes | Normative product rule | Prevents unlike evidence, Ratings, and Runs from being mixed |
 | Rebuild before each Run; freeze after start | Normative product rule | Tracks current Rating without changing an active session |
 | Full current-Rating inventory gate | Normative product rule | Prevents unsafe widening, repeats, or loss of mixed practice |
 
@@ -915,6 +936,9 @@ the model.
 18. **Sparse current-Rating inventory:** a credible theme remains an insight,
     but no start action appears when exclusions and bounded widening cannot fill
     the complete quota.
+19. **Two task families:** one Home card can summarize recommendations in both
+    modes, but the Profile selector, visible cutoffs, Rating anchor, and Focused
+    Run remain specific to Puzzle solving or Arrow Duel.
 
 Additional required boundary fixtures:
 

@@ -1,7 +1,10 @@
+import type { TacticalProfileTaskFamily } from "../../../../packages/core/src/index.ts";
+
 export type TacticalProfileSignalKind = "solve_rate" | "speed";
 
 export type TacticalProfileSignal = {
   id: string;
+  taskFamily: TacticalProfileTaskFamily;
   themeLabel: string;
   kind: TacticalProfileSignalKind;
   distinctPuzzleCount: number;
@@ -31,7 +34,9 @@ export type FocusedRunAllocation = {
 };
 
 export type FocusedRunPreview = {
+  taskFamily: TacticalProfileTaskFamily;
   title: string;
+  ratingLabel: string;
   durationLabel: string;
   totalPuzzleCount: number;
   allocations: readonly FocusedRunAllocation[];
@@ -45,6 +50,7 @@ export type FocusedRunUnavailable = {
 export type TacticalProfileIntent =
   | { type: "open-profile" }
   | { type: "close-profile" }
+  | { type: "select-task-family"; taskFamily: TacticalProfileTaskFamily }
   | { type: "explain-signal"; signalId: string }
   | { type: "preview-focused-run" }
   | { type: "start-focused-run" }
@@ -54,6 +60,7 @@ export type TacticalProfileIntent =
 export type TacticalProfilePresentation = {
   phase: TacticalProfilePhase;
   screen: TacticalProfileScreen;
+  activeTaskFamily?: TacticalProfileTaskFamily;
   signals: readonly TacticalProfileSignal[];
   selectedSignalId?: string;
   focusedRun?: FocusedRunPreview;

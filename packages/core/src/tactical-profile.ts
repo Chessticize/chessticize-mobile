@@ -2,11 +2,17 @@ export const TACTICAL_PROFILE_HOME_FOCUS_LIMIT = 1;
 export const TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT = 3;
 export const FOCUSED_RUN_THEME_LIMIT = 2;
 
+export type TacticalProfileTaskFamily = "line" | "arrow_duel";
+
 export type TacticalFocusReason = "solve_rate" | "completed_speed" | "both";
 
 export type RankedTacticalFocus = {
   theme: string;
   reason: TacticalFocusReason;
+};
+
+export type TaskFamilyRankedTacticalFocus = RankedTacticalFocus & {
+  taskFamily: TacticalProfileTaskFamily;
 };
 
 export type TacticalFocus = {
@@ -34,7 +40,7 @@ export type FocusedRunInventoryBand = {
 };
 
 export type FocusedRunPlan = {
-  taskFamily: "line" | "arrow_duel";
+  taskFamily: TacticalProfileTaskFamily;
   ratingAnchor: FocusedRunRatingAnchor;
   reasons: ReadonlyArray<TacticalFocus & { count: number }>;
   mixedControlCount: number;
@@ -83,6 +89,23 @@ export function applyTacticalFocusCutoffs(
     profile: distinct.slice(0, TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT),
     run: distinct.slice(0, FOCUSED_RUN_THEME_LIMIT),
     monitored: distinct.slice(TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT)
+  };
+}
+
+export function applyTacticalFocusCutoffsByTaskFamily(
+  ranked: readonly TaskFamilyRankedTacticalFocus[]
+): Readonly<Record<TacticalProfileTaskFamily, TacticalFocusCutoffs>> {
+  return {
+    line: applyTacticalFocusCutoffs(
+      ranked
+        .filter((focus) => focus.taskFamily === "line")
+        .map(({ theme, reason }) => ({ theme, reason }))
+    ),
+    arrow_duel: applyTacticalFocusCutoffs(
+      ranked
+        .filter((focus) => focus.taskFamily === "arrow_duel")
+        .map(({ theme, reason }) => ({ theme, reason }))
+    )
   };
 }
 

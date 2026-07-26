@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   applyTacticalFocusCutoffs,
+  applyTacticalFocusCutoffsByTaskFamily,
   buildFocusedRunPlan,
   canReofferFocusedRun,
   focusedRunPlanRefreshDecision,
@@ -34,6 +35,27 @@ test("focus cutoffs combine both signal heads for one theme", () => {
   assert.deepEqual(cutoffs.profile, [
     { theme: "fork", reason: "both" },
     { theme: "pin", reason: "solve_rate" }
+  ]);
+});
+
+test("task families keep independent focus cutoffs even for the same theme", () => {
+  const cutoffs = applyTacticalFocusCutoffsByTaskFamily([
+    { taskFamily: "line", theme: "fork", reason: "solve_rate" },
+    { taskFamily: "line", theme: "pin", reason: "completed_speed" },
+    { taskFamily: "arrow_duel", theme: "fork", reason: "completed_speed" },
+    { taskFamily: "arrow_duel", theme: "deflection", reason: "solve_rate" }
+  ]);
+
+  assert.deepEqual(cutoffs.line.home, [
+    { theme: "fork", reason: "solve_rate" }
+  ]);
+  assert.deepEqual(cutoffs.arrow_duel.home, [
+    { theme: "fork", reason: "completed_speed" }
+  ]);
+  assert.deepEqual(cutoffs.line.run.map((focus) => focus.theme), ["fork", "pin"]);
+  assert.deepEqual(cutoffs.arrow_duel.run.map((focus) => focus.theme), [
+    "fork",
+    "deflection"
   ]);
 });
 
