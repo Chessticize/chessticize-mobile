@@ -30,7 +30,8 @@ test("the Practice catalog covers the post-correct Unclear follow-up", () => {
   assert.ok(scenario);
   assert.equal(scenario.group, "Practice");
   assert.ok(scenario.scope.includes.includes("Previous-attempt clarity question"));
-  assert.equal(scenario.isNew, undefined);
+  assert.ok(scenario.scope.includes.includes("Blue read-only Marked status"));
+  assert.equal(scenario.isNew, true);
 });
 
 test("every typed navigation coverage entry points to a registered scenario", () => {
@@ -296,8 +297,10 @@ test("Issue #390 owns a four-entry Replay whose status is shown by existing acti
   assert.deepEqual(issueScenarios, [
     "history-attempt-detail",
     "history-replay-unavailable",
+    "practice-slow-unclear-notice",
     "practice-sprint-result-goal",
-    "practice-sprint-result-replay"
+    "practice-sprint-result-replay",
+    "practice-unclear-follow-up"
   ]);
   assert.match(historyReplay.description, /Replay terminology/);
   assert.equal(result.storyId, "practice--sprint-result-goal-clarity");
