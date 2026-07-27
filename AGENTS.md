@@ -98,6 +98,17 @@ ADR is not itself a defect.
   created from current `main`, named `codex/mobile-<version>-release`. Open its
   release PR to `main` as a draft immediately so the branch, intended release
   identity, accumulated checks, and remaining gates stay visible.
+- After the release branch is cut, `main` remains open for the next version's
+  feature development. Do not merge or rebase advancing `main` back into the
+  release branch by default. Bring over only a change explicitly selected for
+  the current release, through a reviewed PR targeting the release branch, so
+  later-version work cannot leak into the candidate.
+- Release-branch history is append-only. Never rebase the release branch,
+  amend or replace a commit already pushed to it, force-push it, or squash the
+  release branch when integrating it to `main`. Correct mistakes with new
+  commits. Protect every active release branch against force pushes and
+  deletion, require linear history on that branch, and apply the protection to
+  administrators.
 - During release preparation, each contributor or agent works on its own
   branch and opens a PR whose base is the dedicated release branch. Do not push
   another contributor's work directly to the release branch and do not route
@@ -109,18 +120,22 @@ ADR is not itself a defect.
   clean exact head of the integrated release branch. Contributor-branch
   evidence is supporting evidence only; rerun or document valid evidence reuse
   after integration according to the validation-relevant-input rules.
+- The exact validated release-branch head is the binary source and immutable
+  platform-tag target. The later merge commit on `main` is a forward-integration
+  record whose release-side parent preserves that exact commit and its SHA; it
+  must not replace, move, or be substituted for that release tag.
 - Keep the release PR draft until its complete release identity, approved
   build-specific notes, required fast checks, selected native evidence, and
-  release review are recorded. The final release PR is the only rebase-merge
+  release review are recorded. The final release PR is the only merge-commit
   exception: merge it to `main` with
-  `gh pr merge --rebase --delete-branch`, preserving the release branch's
-  already-squashed work-package commits without a merge commit. GitHub
-  repository settings must keep rebase merge enabled for this step. Never
-  merge a partially integrated release branch to `main`.
+  `gh pr merge --merge --delete-branch`, preserving the release branch's
+  already-squashed work-package commits under one explicit release merge
+  commit. GitHub repository settings must keep merge commits enabled for this
+  step. Never merge a partially integrated release branch to `main`.
 - Use a draft PR only while its stated goal is still incomplete, and push to it frequently. Draft pushes run only path-scoped fast checks. The agent is authorized to `git push` to open PR branches in this repository without asking for per-push confirmation.
 - If the PR's stated goal is already complete when it is opened or first pushed, open it as ready for review rather than as a draft. If an existing draft becomes complete, mark it ready for review (`gh pr ready`) proactively, without waiting to be asked. Ready PRs run the Mobile JS checks; iOS native builds and Detox run locally under the risk-scoped validation policy.
 - For a Storybook-only PR, the coherent issue-scoped design increment is the stated goal. It may merge while the linked product issue remains open; the absent product wiring is deliberately out of scope until explicit design approval.
-- The agent is authorized to merge a ready-for-review PR (`gh pr merge --squash --delete-branch`, matching this repo's required convention for every PR except the final release PR to `main`) once it is complete, every required fast check is green, and the risk-scoped validation described below is recorded. Merge to main when the feature PR is complete, not after every increment. Do not create a new branch for each small follow-up while a feature PR is still open — push to the open PR instead.
+- The agent is authorized to merge a ready-for-review PR (`gh pr merge --squash --delete-branch`, matching this repo's required convention for every PR except the final release PR to `main`, which requires a merge commit) once it is complete, every required fast check is green, and the risk-scoped validation described below is recorded. Merge to main when the feature PR is complete, not after every increment. Do not create a new branch for each small follow-up while a feature PR is still open — push to the open PR instead.
 - `main` has no branch protection, so GitHub will not itself enforce this policy. Before merging, inspect the actual required check status (for example `gh pr checks`) and confirm any required local native evidence or documented evidence-reuse comparison. Do not treat an unverified assumption as local evidence.
 - Do not mark a PR ready or merge it while part of its stated goal is unfinished, a required check is red, its selected native-validation scope is incomplete, or the PR description calls out a known unresolved product issue.
 - GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native validation is required only for release candidates and changes to native implementation, native integration/configuration, native dependencies, or native validation infrastructure. Record the tested commit SHA, build result, required suite results, Xcode version, simulator, clean-worktree confirmation, and any later evidence-reuse comparison.

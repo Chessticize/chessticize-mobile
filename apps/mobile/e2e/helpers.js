@@ -85,13 +85,19 @@ async function completeFirstUseSessionGuides() {
         await element(by.id('practice-session-guide-start')).tap();
       } catch (error) {
         // The guide can remount while Detox resolves its scroll, visibility, or
-        // press action. Retry when the public action is still present, accept a
-        // public successor state, and preserve every unrelated failure.
+        // press action. Retry a known native visibility/null race while the
+        // public action remains available, accept a public successor state,
+        // and preserve every unrelated failure.
         await sleep(250);
         const guideStillAvailable = await detoxElementExists('practice-session-guide-start');
         const sessionStarted = await detoxElementExists('session-board');
         const sessionStarting = await detoxElementExists('sprint-loading-overlay');
-        if (!guideStillAvailable && !sessionStarted && !sessionStarting) {
+        if (
+          !guideStillAvailable
+          && !sessionStarted
+          && !sessionStarting
+          && !isTransientGuideInteractionError(error)
+        ) {
           throw error;
         }
       }
@@ -113,6 +119,11 @@ async function dismissRunNameKeyboard() {
   await waitFor(element(by.id('practice-run-editor-title'))).toBeVisible().withTimeout(5000);
   await element(by.id('practice-run-editor-title')).tap();
   await sleep(500);
+}
+
+function isTransientGuideInteractionError(error) {
+  const message = error?.message ?? String(error);
+  return /visibility|doesn't match the selected view|was null|timeout expired/i.test(message);
 }
 
 async function detoxElementExists(testID) {
