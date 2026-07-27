@@ -3233,7 +3233,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-filter-timed-out-only")).toThrow();
     expect(() => findByTestId(renderer, "history-rating-filters")).toThrow();
     expect(() => findByTestId(renderer, "history-range-filters")).toThrow();
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Sprint");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Source: Sprint");
     expect(collectText(findByTestId(renderer, "history-attempt-history-correct-slow"))).toBe("Slow");
     expect(collectText(findByTestId(renderer, "history-attempt-history-wrong-result"))).toBe(
       "Wrong move"
@@ -3255,10 +3255,13 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityLabel).toBe(
-      "Needs attention: unclear or in Review"
+      "Needs attention: Sprint attempts that are unclear or in Review"
+    );
+    expect(collectText(findByTestId(renderer, "history-attention-explanation"))).toBe(
+      "Needs attention shows original Sprint attempts only."
     );
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
-      "7 days·All puzzles"
+      "7 days·All puzzles·Source: Sprint"
     );
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
@@ -3291,7 +3294,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-rating-filters")).toBeTruthy();
     expect(findByTestId(renderer, "history-range-filters")).toBeTruthy();
     expect(hasStyleEntry(
-      findByTestId(renderer, "history-source-all"),
+      findByTestId(renderer, "history-source-sprint"),
       "backgroundColor",
       "#2563EB"
     )).toBe(true);
@@ -3390,13 +3393,13 @@ describe("PracticePocScreen", () => {
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
-      "7 days·All puzzles"
+      "7 days·All puzzles·Source: Sprint"
     );
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
     expect(hasStyleEntry(
-      findByTestId(renderer, "history-source-all"),
+      findByTestId(renderer, "history-source-sprint"),
       "backgroundColor",
       "#2563EB"
     )).toBe(true);
@@ -3416,6 +3419,93 @@ describe("PracticePocScreen", () => {
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
+  });
+
+  it("keeps Needs attention Sprint-only and makes Review attempts an explicit All-history choice", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.recordAttempt({
+      id: "original-sprint-mistake",
+      source: "sprint",
+      sessionId: "original-sprint-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "wrong",
+      submittedMove: "e2e3",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-17T11:59:55.000Z",
+      completedAt: "2026-07-17T12:00:00.000Z",
+      ratingBefore: 600
+    });
+    store.recordAttempt({
+      id: "correct-review-attempt",
+      source: "scheduled_review",
+      sessionId: "correct-review-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-17T12:01:55.000Z",
+      completedAt: "2026-07-17T12:02:00.000Z",
+      ratingBefore: 600
+    });
+    store.scheduleMistakeReview({
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-07-17T12:02:00.000Z");
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-17T12:03:00.000Z"),
+      practiceService: new PracticeService(store)
+    });
+
+    press(renderer, "history-tab");
+
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-attention-explanation"))).toBe(
+      "Needs attention shows original Sprint attempts only."
+    );
+
+    press(renderer, "history-filter-toggle");
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
+    press(renderer, "history-source-all");
+
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(() => findByTestId(renderer, "history-attention-explanation")).toThrow();
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-correct-review-attempt")).toBeTruthy();
+
+    press(renderer, "history-attention-needs-attention");
+
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
+
+    press(renderer, "history-source-review");
+
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(findByTestId(renderer, "history-attempt-correct-review-attempt")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-original-sprint-mistake")).toThrow();
+
+    press(renderer, "history-attention-needs-attention");
+
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
+
+    press(renderer, "history-attention-all");
+
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
   });
 
   it("includes Timed out attempts in the History Wrong filter while preserving their label", async () => {
@@ -6740,12 +6830,12 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-active-filter-summary")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Sprint");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Source: Sprint");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Result: Wrong");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expectHistoryRowAccessibility(renderer, "Move e6f7");
     press(renderer, "history-filter-toggle");
-    expect(historyFilterSelected(renderer, "history-source-all")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(false);
     press(renderer, "history-result-wrong");
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(true);
@@ -7255,7 +7345,7 @@ describe("PracticePocScreen", () => {
     expect(scheduler.calls.length).toBeGreaterThan(0);
   });
 
-  it("resets history filters to the default all-sources view", () => {
+  it("resets history filters to the default Sprint Needs attention view", () => {
     const renderer = renderStandardSequenceScreen();
 
     startStandardSprint(renderer);
@@ -7279,17 +7369,17 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-filter-reset");
 
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(false);
-    expect(historyFilterSelected(renderer, "history-source-all")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: true
     });
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Sprint");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Source: Sprint");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Result: Wrong");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("All Time");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Black");
-    expect(renderer.root.findAllByProps({ testID: "history-source-all" }).some(
+    expect(renderer.root.findAllByProps({ testID: "history-source-sprint" }).some(
       (node) => node.props.accessibilityState?.selected === true
     )).toBe(true);
     expect(renderer.root.findAllByProps({ testID: "history-result-all" }).some(
@@ -7815,7 +7905,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(secondRenderer, "history-result-wrong")).toThrow();
     expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("All puzzles");
-    expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).not.toContain("Sprint");
+    expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("Source: Sprint");
   });
 
   it("keeps history analysis review on the current puzzle after a retry is solved", async () => {
@@ -9863,9 +9953,25 @@ describe("PracticePocScreen", () => {
     openURLSpy.mockRestore();
   });
 
-  it("shows Android-managed restore protection without exposing iCloud controls", () => {
+  it("shows Android-managed restore protection and exports local diagnostics without iCloud claims", async () => {
+    const prepareSupportBundle = jest.fn(async (_input: {
+      diagnosticText: string;
+      metadata: unknown;
+    }) => ({
+      bundleUrl: "file:///cache/Chessticize-Support.zip",
+      files: ["local-progress.sqlite", "diagnostic.txt", "manifest.json"],
+      kind: "complete" as const
+    }));
+    const shareSupportBundle = jest.fn(async () => undefined);
     const renderer = renderScreen({
-      progressProtection: { kind: "android_managed_backup" }
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      iCloudSyncDiagnosticsClient: {
+        copyText: jest.fn(async () => undefined),
+        discardSupportBundle: jest.fn(async () => undefined),
+        prepareSupportBundle,
+        shareSupportBundle
+      }
     });
 
     press(renderer, "settings-tab");
@@ -9882,7 +9988,71 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-sync-section")).toThrow();
     expect(() => findByTestId(renderer, "settings-icloud-sync-controls")).toThrow();
     expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
+    expect(collectText(findByTestId(renderer, "settings-feedback-section")))
+      .toContain("Export Support Diagnostics");
+    expect(collectText(findByTestId(renderer, "settings-feedback-section")))
+      .toContain("Share a local SQLite snapshot");
+    expect(testIdOrder(
+      renderer,
+      "settings-sync-support-bundle-entry",
+      "settings-support-email"
+    )).toBeLessThan(0);
+
+    press(renderer, "settings-sync-support-bundle-entry");
+    const modal = findByTestId(renderer, "settings-sync-support-bundle-modal");
+    expect(collectText(modal)).toContain("Android lets you choose where to send the bundle");
+    expect(collectText(modal)).toContain("local-progress.sqlite");
+    expect(collectText(modal)).not.toContain("icloud-progress-snapshot.json");
+    await pressAsyncWithin(modal, "settings-sync-support-bundle-prepare");
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-complete")))
+      .toContain("Android diagnostics bundle ready");
+    expect(prepareSupportBundle).toHaveBeenCalledTimes(1);
+    expect(prepareSupportBundle.mock.calls[0]![0].diagnosticText)
+      .toContain("Progress protection: Android-managed backup");
+    expect(prepareSupportBundle.mock.calls[0]![0].metadata).toMatchObject({
+      platform: "android",
+      progressProtection: "android_managed_backup"
+    });
+    await pressAsync(renderer, "settings-sync-support-bundle-share");
+    expect(shareSupportBundle).toHaveBeenCalledWith(
+      "file:///cache/Chessticize-Support.zip"
+    );
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-shared")))
+      .toContain("expires automatically");
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-share")))
+      .toContain("Share Options Opened");
     expect(collectText(renderer.root)).not.toContain("iCloud");
+  });
+
+  it("uses Android copy when a partial support bundle lacks the local SQLite snapshot", async () => {
+    const renderer = renderScreen({
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      iCloudSyncDiagnosticsClient: {
+        copyText: jest.fn(async () => undefined),
+        discardSupportBundle: jest.fn(async () => undefined),
+        prepareSupportBundle: jest.fn(async () => ({
+          bundleUrl: "file:///cache/Chessticize-Support.zip",
+          files: ["diagnostic.txt", "manifest.json"],
+          kind: "partial" as const,
+          unavailableReason: "The local SQLite snapshot could not be created."
+        })),
+        shareSupportBundle: jest.fn(async () => undefined)
+      }
+    });
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-sync-support-bundle-entry");
+    await pressAsync(renderer, "settings-sync-support-bundle-prepare");
+
+    const partial = findByTestId(renderer, "settings-sync-support-bundle-partial");
+    expect(collectText(partial)).toContain("Local SQLite snapshot couldn't be included");
+    expect(collectText(partial)).toContain("The local SQLite snapshot could not be created.");
+    expect(collectText(partial)).toContain(
+      "does not include the local progress database needed for reproduction"
+    );
+    expect(collectText(renderer.root)).not.toContain("iCloud");
+    expect(collectText(renderer.root)).not.toContain("CloudKit");
   });
 
   it("opens the official Android GitHub Releases page only after a user gesture", () => {

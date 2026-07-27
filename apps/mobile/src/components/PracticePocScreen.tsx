@@ -127,10 +127,12 @@ import {
 import type { ICloudAccountStatus } from "../platform/iCloudProgressSync.ts";
 import {
   captureICloudSyncFailure,
+  formatAndroidSupportOverviewDiagnostic,
   formatICloudSyncFailureDiagnostic,
   formatICloudSyncOverviewDiagnostic,
   iCloudSyncAttemptLabel,
-  type ICloudSyncFailureDiagnostic
+  type ICloudSyncFailureDiagnostic,
+  type SupportDiagnosticMetadata
 } from "../platform/iCloudSyncDiagnostics.ts";
 import type {
   MobileApplicationMetadata,
@@ -689,7 +691,7 @@ export function PracticePocScreen({
   const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
-  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
+  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
   const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
@@ -775,6 +777,17 @@ export function PracticePocScreen({
     iCloudSyncEnabled,
     latestSyncStatus: iCloudSyncStatus
   };
+  const supportDiagnosticMetadata: SupportDiagnosticMetadata =
+    progressProtection.kind === "android_managed_backup"
+      ? {
+          appVersion: platformCapabilities.applicationMetadata.versionName,
+          ...(platformCapabilities.applicationMetadata.buildNumber
+            ? { buildNumber: platformCapabilities.applicationMetadata.buildNumber }
+            : {}),
+          platform: "android",
+          progressProtection: "android_managed_backup"
+        }
+      : syncDiagnosticMetadata;
   const generatedSupportBundle = iCloudSyncDiagnosticsClient
     ? {
         onDiscard: async (result) => {
@@ -783,13 +796,19 @@ export function PracticePocScreen({
           }
         },
         onPrepare: async () => {
+          const createdAt = new Date(currentTimeMs()).toISOString();
           const prepared = await iCloudSyncDiagnosticsClient.prepareSupportBundle({
-            diagnosticText: formatICloudSyncOverviewDiagnostic(
-              syncDiagnosticMetadata,
-              new Date(currentTimeMs()).toISOString(),
-              lastICloudSyncFailure
-            ),
-            metadata: syncDiagnosticMetadata
+            diagnosticText: progressProtection.kind === "android_managed_backup"
+              ? formatAndroidSupportOverviewDiagnostic(
+                  supportDiagnosticMetadata,
+                  createdAt
+                )
+              : formatICloudSyncOverviewDiagnostic(
+                  syncDiagnosticMetadata,
+                  createdAt,
+                  lastICloudSyncFailure
+                ),
+            metadata: supportDiagnosticMetadata
           });
           return prepared;
         },
@@ -798,7 +817,10 @@ export function PracticePocScreen({
             throw new Error("The prepared support bundle is unavailable.");
           }
           await iCloudSyncDiagnosticsClient.shareSupportBundle(result.bundleUrl);
-        }
+        },
+        platform: progressProtection.kind === "android_managed_backup"
+          ? "android"
+          : "ios"
       } satisfies ICloudSyncSupportBundlePresentation
     : undefined;
   const effectiveSupportBundle = iCloudSyncSupportBundle ?? generatedSupportBundle;
@@ -3802,6 +3824,9 @@ export function PracticePocScreen({
                   }}
                   onSourceFilterChange={(source) => {
                     setHistorySourceFilter(source);
+                    if (source !== "sprint") {
+                      setHistoryAttentionReasons([]);
+                    }
                     setHistoryPageOffset(0);
                   }}
                   onResultFilterChange={(result) => {
@@ -3821,6 +3846,7 @@ export function PracticePocScreen({
                     setHistoryPageOffset(0);
                   }}
                   onAttentionReasonChange={(reason) => {
+                    setHistorySourceFilter("sprint");
                     setHistoryAttentionReasons((current) => current.includes(reason)
                       ? current.filter((candidate) => candidate !== reason)
                       : [...current, reason]);
@@ -3828,6 +3854,9 @@ export function PracticePocScreen({
                   }}
                   onAttentionOnlyChange={(attentionOnly) => {
                     setHistoryPageOffset(0);
+                    if (attentionOnly) {
+                      setHistorySourceFilter("sprint");
+                    }
                     setHistoryAttentionReasons((current) => attentionOnly
                       ? current.length > 0
                         ? current
@@ -3841,7 +3870,7 @@ export function PracticePocScreen({
                     : undefined}
                   onResetFilters={() => {
                     setHistoryTimeRange("7d");
-                    setHistorySourceFilter("all");
+                    setHistorySourceFilter("sprint");
                     setHistoryResultFilter("all");
                     setHistorySideFilter("all");
                     historyThemeChoices.dispatch({ type: "select-all-themes" });
@@ -9237,6 +9266,11 @@ function HistoryPanel({
           attentionOnly={attentionOnly}
           onChange={onAttentionOnlyChange}
         />
+        {attentionOnly ? (
+          <Text style={styles.helperText} testID="history-attention-explanation">
+            Needs attention shows original Sprint attempts only.
+          </Text>
+        ) : null}
       </View>
 
       {selectedRatingKey ? (
@@ -9882,7 +9916,7 @@ function HistoryAttentionFilter({
       testID="history-attention-filter"
     >
       <Pressable
-        accessibilityLabel="Needs attention: unclear or in Review"
+        accessibilityLabel="Needs attention: Sprint attempts that are unclear or in Review"
         accessibilityRole="radio"
         accessibilityState={{ checked: attentionOnly }}
         aria-checked={attentionOnly}

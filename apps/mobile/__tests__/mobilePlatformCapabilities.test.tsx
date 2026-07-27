@@ -52,17 +52,26 @@ describe('mobile platform capabilities', () => {
       openSystemSettings: jest.fn(),
       consumeInitialRoute: jest.fn(),
     };
+    (NativeModules as Record<string, unknown>).AndroidSupportDiagnostics = {
+      copyText: jest.fn(),
+      createSupportBundleWorkspace: jest.fn(),
+      discardSupportBundle: jest.fn(),
+      discardSupportBundleWorkspace: jest.fn(),
+      finishSupportBundle: jest.fn(),
+      shareSupportBundle: jest.fn(),
+    };
     const service = createMobilePracticeService('random1000');
     const capabilities = composeAndroidMobilePlatformCapabilities(
       service,
       installedApplicationMetadata,
+      '/data/user/0/com.chessticize.mobile/databases/progress.sqlite',
     );
 
     expect(capabilities.storage.practiceService).toBe(service);
     expect(capabilities.storage.configurePuzzleSource).toBeDefined();
     expect(capabilities.progressProtection).toEqual({ kind: 'android_managed_backup' });
     expect(capabilities.progressSync.client).toBeNull();
-    expect(capabilities.progressSync.diagnostics).toBeNull();
+    expect(capabilities.progressSync.diagnostics).not.toBeNull();
     expect(capabilities.stockfish.createTransport).toBe(createNativeStockfishTransport);
     expect(capabilities.stockfish.prewarm).toBe(prewarmNativeStockfishTransport);
     expect(capabilities.reminders.platform).toBe('android');
@@ -73,6 +82,7 @@ describe('mobile platform capabilities', () => {
       releasePageUrl: 'https://github.com/Chessticize/chessticize-mobile/releases',
     });
     delete (NativeModules as Record<string, unknown>).ReviewReminderNotifications;
+    delete (NativeModules as Record<string, unknown>).AndroidSupportDiagnostics;
   });
 
   it('exposes the manual GitHub Releases link only through Android capabilities', () => {
