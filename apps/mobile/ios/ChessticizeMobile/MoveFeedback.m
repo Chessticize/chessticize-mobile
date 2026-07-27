@@ -36,7 +36,7 @@ RCT_EXPORT_MODULE();
     self.capturePlayer.volume = 0.3;
     [self.movePlayer prepareToPlay];
     [self.capturePlayer prepareToPlay];
-    self.impactGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+    self.impactGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
     [self.impactGenerator prepare];
   }
   return self;
