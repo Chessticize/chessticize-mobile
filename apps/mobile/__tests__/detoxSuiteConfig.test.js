@@ -933,6 +933,10 @@ describe('Detox suite configuration', () => {
       handleRemountRace
     );
     const preserveUnexpectedFailure = helper.indexOf('throw error', handleRemountRace);
+    const classifyTransientRace = helper.indexOf(
+      'isTransientGuideInteractionError(error)',
+      handleRemountRace
+    );
 
     expect(requireVisible).toBeGreaterThan(0);
     expect(scrollDown).toBeGreaterThan(requireVisible);
@@ -940,6 +944,7 @@ describe('Detox suite configuration', () => {
     expect(handleRemountRace).toBeGreaterThan(tapGuideAction);
     expect(confirmGuideAdvanced).toBeGreaterThan(handleRemountRace);
     expect(confirmSessionStarted).toBeGreaterThan(handleRemountRace);
+    expect(classifyTransientRace).toBeGreaterThan(confirmSessionStarted);
     expect(preserveUnexpectedFailure).toBeGreaterThan(confirmSessionStarted);
   });
 
@@ -1488,6 +1493,12 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('captureScreenshot: (label) => device.takeScreenshot(label)');
     expect(spec).toContain("require('./adaptiveScreenshotEvidence')");
     expect(spec).toContain('const archiveAdaptiveScreenshot = createAdaptiveScreenshotArchiver();');
+    expect(spec).toContain(
+      "waitFor(element(by.id('practice-progress-summary'))).toExist().withTimeout(10000)"
+    );
+    expect(spec).not.toContain(
+      "waitFor(element(by.id('practice-progress-summary'))).toBeVisible().withTimeout(10000)"
+    );
     expect(spec).toContain('expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenFrame);');
     expect(spec).not.toContain('await sleep(5000)');
     expect(settledLayoutHelper).toContain("frameForIfPresent('active-session-adaptive-layout')");

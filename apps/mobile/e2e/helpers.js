@@ -76,12 +76,19 @@ async function completeFirstUseSessionGuides() {
       } catch (error) {
         // The guide can disappear after the existence check or a successful
         // press can replace it before Detox resolves the native action. Accept
-        // only a public successor state; preserve unrelated interaction failures.
+        // a public successor state, and retry the known native visibility/null
+        // race while the responsive guide remounts. The bounded loop still
+        // fails closed if no public session state appears.
         await sleep(250);
         const guideStillAvailable = await detoxElementExists('practice-session-guide-start');
         const sessionStarted = await detoxElementExists('session-board');
         const sessionStarting = await detoxElementExists('sprint-loading-overlay');
-        if (!guideStillAvailable && !sessionStarted && !sessionStarting) {
+        if (
+          !guideStillAvailable
+          && !sessionStarted
+          && !sessionStarting
+          && !isTransientGuideInteractionError(error)
+        ) {
           throw error;
         }
       }
@@ -95,6 +102,11 @@ async function completeFirstUseSessionGuides() {
     await sleep(250);
   }
   await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+}
+
+function isTransientGuideInteractionError(error) {
+  const message = error?.message ?? String(error);
+  return /visibility|doesn't match the selected view|was null|timeout expired/i.test(message);
 }
 
 async function detoxElementExists(testID) {

@@ -13,6 +13,7 @@ const standardFixture = require('../../../fixtures/puzzles/android-standard-prac
 const TEST_NOW_MS = '1784030400000';
 const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000);
 const TEST_SEED = standardFixture.puzzleSelectionSeed;
+const EXPECTED_ENTRY_MOVE = standardFixture.puzzle.solutionMoves[0];
 const EXPECTED_AUTO_REPLY_MOVE = standardFixture.puzzle.solutionMoves[2];
 
 describe(`Android Standard Practice offline persistence (${standardFixture.puzzle.id})`, () => {
@@ -37,8 +38,14 @@ describe(`Android Standard Practice offline persistence (${standardFixture.puzzl
     await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('practice-prompt');
-    await waitFor(element(by.text('For black.'))).toExist().withTimeout(10000);
     await waitForVisibleInPracticeScroll('session-board');
+    await waitForElementAccessibilityLabelContaining(
+      'session-board',
+      `Last move ${EXPECTED_ENTRY_MOVE.slice(0, 2)} to ${EXPECTED_ENTRY_MOVE.slice(2, 4)}`,
+      30000,
+      50
+    );
+    await waitFor(element(by.text('For black.'))).toExist().withTimeout(10000);
 
     // The real SQLite pack adapter selects the seeded bundled line. The app
     // auto-plays each white move; the user solves the two black moves.
