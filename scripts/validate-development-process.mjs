@@ -68,6 +68,7 @@ const prTemplate = read(".github/pull_request_template.md");
 const releaseNotes = read("docs/RELEASE_NOTES.md");
 const releaseNotesTemplate = read("docs/releases/RELEASE_NOTES_TEMPLATE.md");
 const releaseSourcePolicy = read("docs/RELEASE_SOURCE_POLICY.md");
+const androidValidation = read("docs/ANDROID_VALIDATION.md");
 const appStoreUpload = read("docs/APP_STORE_UPLOAD.md");
 const androidPlayRelease = read("docs/ANDROID_PLAY_RELEASE.md");
 const androidGitHubRelease = read("docs/ANDROID_GITHUB_RELEASE.md");
@@ -321,6 +322,9 @@ assert.match(androidReleaseSkill, /Mark unobserved Console gates\s+UNKNOWN/);
 assert.match(androidReleaseSkill, /published annotated canonical tag/);
 assert.match(androidReleaseSkill, /Internal and Closed tracks/);
 assert.match(androidReleaseSkill, /first\s+launch, the boundary changed, or Play reports a problem/);
+assert.match(androidReleaseSkill, /Respect RC freeze generations/);
+assert.match(androidReleaseSkill, /host-side test-runner defect/);
+assert.match(androidReleaseSkill, /invalidate the generation before merging/);
 assert.match(agents, /\.codex\/skills\/chessticize-android-release\/SKILL\.md/);
 assert.match(androidPlayRelease, /successful APK-mirror workflow run/);
 assert.match(androidPlayRelease, /exactly the required source manifest/);
@@ -417,6 +421,29 @@ for (const option of [
 assert.match(prTemplate, /only for releases and native-impacting changes/i);
 assert.match(prTemplate, /App-input comparison/i);
 assert.match(prTemplate, /test-runner-only change/i);
+assert.match(prTemplate, /RC freeze \(release PRs and release-blocker PRs only\)/);
+assert.match(prTemplate, /Evidence-only test-runner correction/);
+assert.match(prTemplate, /prior RC was invalidated/);
+assert.match(androidValidation, /During an active RC freeze/);
+assert.match(androidValidation, /invalidates that RC\s+generation/);
+assert.match(androidValidation, /rebuild only the affected artifacts and validation scope/);
+
+for (const rcFreezePolicy of [
+  agents,
+  releaseSourcePolicy,
+  devLoopSkill,
+  androidReleaseSkill
+]) {
+  assert.match(rcFreezePolicy, /RC freeze|RC frozen|frozen RC/i);
+  assert.match(rcFreezePolicy, /planned development/);
+  assert.match(rcFreezePolicy, /test-runner defect|host-side spec/);
+  assert.match(rcFreezePolicy, /invalidat(?:e|es)[\s\S]{0,80}generation/);
+  assert.match(
+    rcFreezePolicy,
+    /next\s+(?:RC\s+)?generation|new frozen\s+generation/
+  );
+  assert.match(rcFreezePolicy, /exact-head fast checks/);
+}
 
 for (const releaseDoc of releaseDocs) {
   assert.match(releaseDoc, /exact/);
