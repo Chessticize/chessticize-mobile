@@ -129,6 +129,7 @@ async function launchArrowDuelApp({ deleteData, resetAppState, testNowMs }) {
     newInstance: true,
     launchArgs: {
       chessticizeArrowDuelTargetCorrect: String(fixture.targetCorrect),
+      chessticizePuzzleSelectionId: fixture.puzzle.id,
       chessticizePuzzleSelectionSeed: fixture.puzzleSelectionSeed,
       chessticizeTestNowMs: testNowMs,
     },

@@ -50,6 +50,7 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain('setAndroidNetworkEnabled(false)');
     expect(journey).toContain('resetAppState: true');
     expect(journey).toContain('chessticizeArrowDuelTargetCorrect');
+    expect(journey).toContain('chessticizePuzzleSelectionId: fixture.puzzle.id');
     expect(journey).toContain('waitForElementAccessibilityLabelContaining');
     expect(journey).toContain('fixture.wrongMove');
     expect(journey).toContain('fixture.correctMove');
