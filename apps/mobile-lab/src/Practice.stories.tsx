@@ -383,6 +383,8 @@ export const UnclearFollowUp: Story = {
     await waitForEnabledTestId(canvasElement, "lab-board-correct");
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForTestId(canvasElement, "sprint-unclear-prompt");
+    await clickTestId(canvasElement, "sprint-unclear-toggle");
+    await waitForTestId(canvasElement, "sprint-unclear-marked");
   }
 };
 

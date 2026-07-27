@@ -393,7 +393,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
   });
 
-  it("binds Unclear to the completed attempt and replaces the yellow action with a yellow confirmation", async () => {
+  it("binds Unclear to the completed attempt and replaces the yellow action with a blue read-only status", async () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service, standardTargetCorrect: 1 });
 
@@ -415,8 +415,11 @@ describe("PracticePocScreen", () => {
     expect(attemptId).toBeTruthy();
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
     expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
-    expect(styleContains(findByTestId(renderer, "sprint-unclear-marked").props.style, "#FFFBEB")).toBe(true);
-    expect(styleContains(findByTestId(renderer, "sprint-unclear-marked").props.style, "#F59E0B")).toBe(true);
+    expect(flattenTestStyle(findByTestId(renderer, "sprint-unclear-marked").props.style))
+      .toMatchObject({ backgroundColor: "#EFF6FF", borderColor: "#93C5FD" });
+    expect(flattenTestStyle(
+      findByTestId(renderer, "sprint-unclear-marked").findByType(ReactNative.Text).props.style
+    ).color).toBe("#1D4ED8");
     expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
     expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
     expect(findByTestId(renderer, "sprint-unclear-prompt").props.style).toEqual(promptStyle);
@@ -3242,6 +3245,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-previous-attempt-notice"))).toBe(
       "Previous puzzle took too longIt was automatically marked Unclear and added to Review.Marked Unclear"
     );
+    expect(flattenTestStyle(
+      findByTestId(renderer, "sprint-previous-attempt-notice-status").props.style
+    )).toMatchObject({ backgroundColor: "#EFF6FF", borderColor: "#93C5FD" });
+    expect(flattenTestStyle(
+      findByTestId(renderer, "sprint-previous-attempt-notice-status")
+        .findByType(ReactNative.Text).props.style
+    ).color).toBe("#1D4ED8");
     expect(() => findByTestId(renderer, "sprint-unclear-prompt")).toThrow();
     expect(() => findByTestId(renderer, "sprint-unclear-marked")).toThrow();
     expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
