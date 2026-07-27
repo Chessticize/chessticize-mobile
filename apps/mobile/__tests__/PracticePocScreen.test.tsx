@@ -7821,6 +7821,44 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("Source: Sprint");
   });
 
+  it("keeps a multi-move History replay fixed while a board drag is active", async () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service });
+
+    startStandardSprint(renderer);
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "g6g5");
+    abandonSprint(renderer);
+
+    press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
+    const correctAttemptRow = historyAttemptRows(renderer)
+      .find((row) => collectText(row).includes("Correct"));
+    expect(correctAttemptRow).toBeTruthy();
+    press(renderer, correctAttemptRow!.props.testID);
+
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+
+    act(() => {
+      findByTestId(renderer, "review-board").props.onTouchStart();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+
+    act(() => {
+      findByTestId(renderer, "review-board").props.onTouchEnd();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+
+    act(() => {
+      findByTestId(renderer, "review-board").props.onTouchStart();
+      findByTestId(renderer, "review-board").props.onTouchCancel();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+  });
+
   it("keeps history analysis review on the current puzzle after a retry is solved", async () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service });
