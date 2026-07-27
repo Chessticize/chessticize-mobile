@@ -2,11 +2,12 @@
 #import <React/RCTBridgeModule.h>
 #import <UIKit/UIKit.h>
 
-@interface MoveFeedback : NSObject <RCTBridgeModule, AVAudioPlayerDelegate>
-@property (nonatomic, strong, nullable) AVAudioPlayer *movePlayer;
-@property (nonatomic, strong, nullable) AVAudioPlayer *capturePlayer;
-@property (nonatomic, strong, nullable) AVAudioPlayer *activePlayer;
-@property (nonatomic, strong) NSMutableArray<NSString *> *pendingSoundCues;
+@interface MoveFeedback : NSObject <RCTBridgeModule>
+@property (nonatomic, strong) AVAudioEngine *audioEngine;
+@property (nonatomic, strong, nullable) AVAudioPCMBuffer *moveBuffer;
+@property (nonatomic, strong, nullable) AVAudioPCMBuffer *captureBuffer;
+@property (nonatomic, copy) NSArray<AVAudioPlayerNode *> *playerNodes;
+@property (nonatomic, assign) NSUInteger nextPlayerNodeIndex;
 @property (nonatomic, strong) UIImpactFeedbackGenerator *impactGenerator;
 @property (nonatomic, strong) dispatch_queue_t audioQueue;
 @end
@@ -28,7 +29,6 @@ RCT_EXPORT_MODULE();
       "com.chessticize.movefeedback.audio",
       DISPATCH_QUEUE_SERIAL
     );
-    self.pendingSoundCues = [NSMutableArray array];
     AVAudioSession *session = [AVAudioSession sharedInstance];
     NSError *sessionError = nil;
     [session setCategory:AVAudioSessionCategoryAmbient
@@ -38,18 +38,26 @@ RCT_EXPORT_MODULE();
     if (sessionError == nil) {
       [session setActive:YES error:&sessionError];
     }
-    self.movePlayer = [self playerForResource:@"freesound-546119-piece-placement"];
-    self.capturePlayer = [self playerForResource:@"freesound-546120-piece-capture"];
-    self.movePlayer.volume = 1.0;
-    self.capturePlayer.volume = 0.3;
-    self.movePlayer.delegate = self;
-    self.capturePlayer.delegate = self;
-    [self.movePlayer prepareToPlay];
-    [self.capturePlayer prepareToPlay];
+    [self configureAudioEngine];
+    NSNotificationCenter *notificationCenter = [NSNotificationCenter defaultCenter];
+    [notificationCenter addObserver:self
+                           selector:@selector(handleAudioSessionInterruption:)
+                               name:AVAudioSessionInterruptionNotification
+                             object:session];
+    [notificationCenter addObserver:self
+                           selector:@selector(handleAudioEngineConfigurationChange:)
+                               name:AVAudioEngineConfigurationChangeNotification
+                             object:self.audioEngine];
     self.impactGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
     [self.impactGenerator prepare];
   }
   return self;
+}
+
+- (void)dealloc
+{
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  [self.audioEngine stop];
 }
 
 RCT_EXPORT_METHOD(play:(NSString *)cue
@@ -72,70 +80,118 @@ RCT_EXPORT_METHOD(play:(NSString *)cue
 
   if (playSound) {
     dispatch_async(self.audioQueue, ^{
-      [self.pendingSoundCues addObject:cue];
-      [self playNextQueuedSound];
+      [self playSoundForCue:cue];
     });
   }
 
   resolve(nil);
 }
 
-- (void)playNextQueuedSound
+- (void)playSoundForCue:(NSString *)cue
 {
-  if (self.activePlayer != nil || self.pendingSoundCues.count == 0) {
+  AVAudioPCMBuffer *buffer = [cue isEqualToString:@"capture"]
+    ? self.captureBuffer
+    : self.moveBuffer;
+  if (buffer == nil || self.playerNodes.count == 0 || ![self startAudioEngine]) {
     return;
   }
 
-  NSString *cue = self.pendingSoundCues.firstObject;
-  [self.pendingSoundCues removeObjectAtIndex:0];
-  AVAudioPlayer *player = [cue isEqualToString:@"capture"]
-    ? self.capturePlayer
-    : self.movePlayer;
-  if (player == nil) {
-    [self playNextQueuedSound];
-    return;
-  }
-
-  player.currentTime = 0;
-  self.activePlayer = player;
-  if (![player play]) {
-    self.activePlayer = nil;
-    [self playNextQueuedSound];
-  }
+  NSUInteger playerNodeIndex = self.nextPlayerNodeIndex % self.playerNodes.count;
+  self.nextPlayerNodeIndex = (playerNodeIndex + 1) % self.playerNodes.count;
+  AVAudioPlayerNode *playerNode = self.playerNodes[playerNodeIndex];
+  playerNode.volume = [cue isEqualToString:@"capture"] ? 0.3 : 1.0;
+  [playerNode scheduleBuffer:buffer atTime:nil options:0 completionHandler:nil];
+  [playerNode play];
 }
 
-- (void)completePlaybackForPlayer:(AVAudioPlayer *)player
+- (void)configureAudioEngine
+{
+  self.moveBuffer = [self pcmBufferForResource:@"freesound-546119-piece-placement"];
+  self.captureBuffer = [self pcmBufferForResource:@"freesound-546120-piece-capture"];
+  self.audioEngine = [[AVAudioEngine alloc] init];
+  self.audioEngine.autoShutdownEnabled = NO;
+  AVAudioFormat *processingFormat = self.moveBuffer.format ?: self.captureBuffer.format;
+  if (processingFormat == nil) {
+    self.playerNodes = @[];
+    return;
+  }
+
+  NSMutableArray<AVAudioPlayerNode *> *playerNodes = [NSMutableArray arrayWithCapacity:4];
+  for (NSUInteger index = 0; index < 4; index++) {
+    AVAudioPlayerNode *playerNode = [[AVAudioPlayerNode alloc] init];
+    [self.audioEngine attachNode:playerNode];
+    [self.audioEngine connect:playerNode
+                           to:self.audioEngine.mainMixerNode
+                       format:processingFormat];
+    [playerNodes addObject:playerNode];
+  }
+  self.playerNodes = playerNodes;
+  [self.audioEngine prepare];
+  [self startAudioEngine];
+}
+
+- (BOOL)startAudioEngine
+{
+  if (self.audioEngine.isRunning) {
+    return YES;
+  }
+  NSError *engineError = nil;
+  BOOL started = [self.audioEngine startAndReturnError:&engineError];
+  return started && engineError == nil;
+}
+
+- (void)handleAudioSessionInterruption:(NSNotification *)notification
+{
+  NSNumber *interruptionType = notification.userInfo[AVAudioSessionInterruptionTypeKey];
+  if (interruptionType == nil
+      || interruptionType.unsignedIntegerValue != AVAudioSessionInterruptionTypeEnded) {
+    return;
+  }
+  [self enqueueAudioEngineRestart];
+}
+
+- (void)handleAudioEngineConfigurationChange:(NSNotification *)notification
+{
+  (void)notification;
+  [self enqueueAudioEngineRestart];
+}
+
+- (void)enqueueAudioEngineRestart
 {
   dispatch_async(self.audioQueue, ^{
-    if (player != self.activePlayer || player.isPlaying) {
-      return;
-    }
-    self.activePlayer = nil;
-    [self playNextQueuedSound];
+    [self restartAudioEngine];
   });
 }
 
-- (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player
-                       successfully:(BOOL)flag
+- (void)restartAudioEngine
 {
-  [self completePlaybackForPlayer:player];
+  [self.audioEngine stop];
+  [self.audioEngine prepare];
+  [self startAudioEngine];
 }
 
-- (void)audioPlayerDecodeErrorDidOccur:(AVAudioPlayer *)player
-                                 error:(nullable NSError *)error
-{
-  [self completePlaybackForPlayer:player];
-}
-
-- (nullable AVAudioPlayer *)playerForResource:(NSString *)resource
+- (nullable AVAudioPCMBuffer *)pcmBufferForResource:(NSString *)resource
 {
   NSURL *url = [[NSBundle mainBundle] URLForResource:resource withExtension:@"mp3"];
   if (url == nil) {
     return nil;
   }
-  NSError *error = nil;
-  AVAudioPlayer *player = [[AVAudioPlayer alloc] initWithContentsOfURL:url error:&error];
-  return error == nil ? player : nil;
+  NSError *fileError = nil;
+  AVAudioFile *file = [[AVAudioFile alloc] initForReading:url error:&fileError];
+  if (file == nil || fileError != nil) {
+    return nil;
+  }
+  AVAudioPCMBuffer *buffer = [[AVAudioPCMBuffer alloc]
+    initWithPCMFormat:file.processingFormat
+    frameCapacity:(AVAudioFrameCount)file.length];
+  if (buffer == nil) {
+    return nil;
+  }
+  NSError *readError = nil;
+  if (![file readIntoBuffer:buffer error:&readError] || readError != nil) {
+    return nil;
+  }
+  return buffer;
 }
 
 @end
