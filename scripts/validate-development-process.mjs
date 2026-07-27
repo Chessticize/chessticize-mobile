@@ -369,6 +369,11 @@ assert.match(uiCalibrationRunnerSource, /git status --porcelain --untracked-file
 assert.match(uiCalibrationRunnerSource, /brew --prefix ruby@3\.3/);
 assert.match(uiCalibrationRunnerSource, /CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait/);
 assert.match(uiCalibrationRunnerSource, /CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape/);
+assert.match(
+  uiCalibrationRunnerSource,
+  /DEVICE_NAME="\$\{DETOX_IOS_DEVICE:-iPad Pro 11-inch \(M5\)\}"/
+);
+assert.match(uiCalibrationRunnerSource, /\[\[ "\$DEVICE_NAME" == \*iPad\* \]\]/);
 assert.match(uiCalibrationRunnerSource, /set-simulator-orientation\.sh/);
 assert.match(uiCalibrationRunnerSource, /resolve-ios-simulator-target\.js/);
 assert.match(uiCalibrationRunnerSource, /assert-png-orientation\.js/);

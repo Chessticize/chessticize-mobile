@@ -2284,7 +2284,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("keeps every guide target and connector in the public portrait and landscape flow", () => {
+  it("keeps every guide target and connector in the public portrait and wide-short flow", () => {
     setPracticeViewport({
       width: 402,
       height: 874,
@@ -4307,7 +4307,7 @@ describe("PracticePocScreen", () => {
   it.each([
     { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 288, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
     { label: "modern iPhone portrait", width: 430, height: 932, scale: 3, layout: "compactPortrait", boardSize: 398, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
-    { label: "compact iPhone landscape", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, railWidth: 64, sessionRail: true, homeColumns: false },
+    { label: "compact wide-short window", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, railWidth: 64, sessionRail: true, homeColumns: false },
     { label: "iPad A16 portrait", width: 820, height: 1180, scale: 2, layout: "regularPortrait", boardSize: 788, sideRail: true, railWidth: 76, sessionRail: false, homeColumns: false },
     { label: "iPad Pro portrait", width: 1032, height: 1376, scale: 2, layout: "regularPortrait", boardSize: 860, sideRail: true, railWidth: 168, sessionRail: false, homeColumns: true },
     { label: "iPad landscape", width: 1180, height: 820, scale: 2, layout: "regularLandscape", boardSize: 640, sideRail: true, railWidth: 168, sessionRail: true, homeColumns: true },
@@ -4408,7 +4408,7 @@ describe("PracticePocScreen", () => {
       .toThrow();
   });
 
-  it("keeps the complete iPhone Pro Max landscape session chrome publicly reachable", () => {
+  it("keeps the complete compact wide-short session chrome publicly reachable", () => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
     }).__setWindowDimensions?.({ width: 956, height: 440, scale: 3, fontScale: 1 });
@@ -4438,7 +4438,7 @@ describe("PracticePocScreen", () => {
     {
       height: 402,
       insets: { top: 0, right: 62, bottom: 21, left: 62 },
-      label: "iPhone 17 landscape",
+      label: "compact wide-short resizable window",
       scale: 3,
       width: 874
     },
@@ -4511,7 +4511,7 @@ describe("PracticePocScreen", () => {
     expect(boardLane.findByProps({ testID: "review-board" })).toBeTruthy();
   });
 
-  it("keeps the Review board fixed while rotating into its unobstructed landscape lane", () => {
+  it("keeps the Review board fixed while resizing into its unobstructed wide-short lane", () => {
     setPracticeViewport({
       width: 402,
       height: 874,
@@ -4602,7 +4602,7 @@ describe("PracticePocScreen", () => {
 
   it.each([
     { actionContainer: "review-context-actions-bottom", height: 932, label: "phone portrait", width: 430 },
-    { actionContainer: "review-context-actions-rail", height: 390, label: "phone landscape", width: 844 },
+    { actionContainer: "review-context-actions-rail", height: 390, label: "compact wide-short window", width: 844 },
     { actionContainer: "review-context-actions-rail", height: 820, label: "iPad landscape", width: 1180 }
   ])("places History Review actions in the available $label layout", ({ actionContainer, height, width }) => {
     (ReactNative as unknown as {
@@ -4752,7 +4752,7 @@ describe("PracticePocScreen", () => {
 
   it.each([
     { label: "phone portrait", width: 430, height: 932 },
-    { label: "phone landscape", width: 844, height: 390 },
+    { label: "compact wide-short window", width: 844, height: 390 },
     { label: "tablet portrait", width: 820, height: 1180 },
     { label: "tablet landscape", width: 1180, height: 820 }
   ])("keeps Custom, History, Review, reminders, backup, and Settings reachable on $label", ({ width, height }) => {

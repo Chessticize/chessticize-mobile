@@ -1457,6 +1457,11 @@ describe('Detox suite configuration', () => {
     expect(helpers).toContain("/^history-attempt-.+-result$/");
     expect(practiceSpec).toContain('waitForVisibleInPracticeScroll(resultRowIdentifier)');
     expect(practiceSpec).toContain('element(by.id(resultRowIdentifier)).tap()');
+    expect(practiceSpec).toContain("orientation: 'portrait'");
+    expect(practiceSpec).toContain("by.id('review-context-actions-bottom')");
+    expect(practiceSpec).toContain("screenshotLabel: 'history-review-actions-ipad-landscape'");
+    expect(practiceSpec).not.toContain("device.setOrientation('landscape')");
+    expect(practiceSpec).not.toContain("for (const orientation of ['portrait', 'landscape'])");
     expect(practiceSpec).not.toContain('history-filter-unclear');
     expect(practiceSpec).not.toContain("endsWith('-result')");
   });

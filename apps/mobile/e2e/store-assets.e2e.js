@@ -22,6 +22,13 @@ if (!['portrait', 'landscape'].includes(captureOrientation)) {
 }
 const capturePortraitAssets = captureOrientation === 'portrait';
 const captureLandscapeAssets = captureOrientation === 'landscape';
+const captureDeviceName = process.env.DETOX_IOS_DEVICE || 'iPhone 17-Detox';
+if (captureLandscapeAssets && !captureDeviceName.includes('iPad')) {
+  throw new Error(
+    'Landscape iOS capture requires a dedicated iPad Simulator; '
+    + 'ordinary full-screen iPhone capture is portrait-only'
+  );
+}
 const puzzlePackPath = resolve(__dirname, '../../../fixtures/puzzles/bundled-core-pack.sqlite');
 const sprintNowMs = Date.parse('2026-07-08T18:00:00.000Z');
 const reviewNowMs = Date.parse('2026-07-09T18:00:00.000Z');
