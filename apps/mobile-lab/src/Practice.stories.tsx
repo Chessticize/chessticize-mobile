@@ -15,7 +15,8 @@ import {
   replaceTextTestId,
   waitForEnabledTestId,
   waitForTestId,
-  waitForText
+  waitForText,
+  waitForVisibleTestId
 } from "./storyPlay.ts";
 
 const meta = {
@@ -443,6 +444,30 @@ export const SprintResultGoalClarity: Story = {
     await waitForTestId(canvasElement, "sprint-unclear-toggle");
     await waitForTestId(canvasElement, "sprint-result-unclear-count-column");
     await waitForTestId(canvasElement, "sprint-result-mistakes-count-column");
+    await waitForTestId(canvasElement, "sprint-result-review-note");
+    await expectTestIdText(canvasElement, "review-mistakes-button", "Review 3 attempts");
+    await waitForVisibleTestId(canvasElement, "review-mistakes-button");
+  }
+};
+
+export const SprintResultFlaggedReplay: Story = {
+  name: "Sprint result · Flagged replay",
+  args: { scenarioId: "practice-sprint-result-replay" },
+  play: async ({ canvasElement }) => {
+    await waitForVisibleTestId(canvasElement, "review-mistakes-button");
+    await clickTestId(canvasElement, "review-mistakes-button");
+    await waitForTestId(canvasElement, "review-session");
+    await expectTestIdText(canvasElement, "review-source-pill", "Sprint replay");
+    await expectTestIdText(canvasElement, "review-context-unclear", "Unclear");
+    expectTestIdAbsent(canvasElement, "review-context-needs-review");
+
+    await clickTestId(canvasElement, "review-next");
+    expectTestIdAbsent(canvasElement, "review-context-unclear");
+    await expectTestIdText(canvasElement, "review-context-needs-review", "Needs review");
+
+    await clickTestId(canvasElement, "review-next");
+    await expectTestIdText(canvasElement, "review-context-unclear", "Unclear");
+    await expectTestIdText(canvasElement, "review-context-needs-review", "Needs review");
   }
 };
 

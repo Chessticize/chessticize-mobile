@@ -283,3 +283,27 @@ test("post-attempt handoffs explain Timeout, Wrong, and Slow-correct results", (
   assert.ok(afterSlow.scope.includes.includes("No manual Unclear action"));
   assert.match(afterSlow.description, /automatically marked Unclear/);
 });
+
+test("Issue #390 owns the post-Sprint flagged replay design without collapsing reasons", () => {
+  const result = scenarioRegistry["practice-sprint-result-goal"];
+  const replay = scenarioRegistry["practice-sprint-result-replay"];
+  const issueScenarios = newScenarios
+    .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 390))
+    .map((scenario) => scenario.id)
+    .sort();
+
+  assert.deepEqual(issueScenarios, [
+    "practice-sprint-result-goal",
+    "practice-sprint-result-replay"
+  ]);
+  assert.equal(result.storyId, "practice--sprint-result-goal-clarity");
+  assert.ok(result.scope.includes.includes("Neutral replay entry"));
+  assert.match(result.description, /Unclear and Needs review/);
+  assert.equal(replay.storyId, "practice--sprint-result-flagged-replay");
+  assert.ok(replay.scope.includes.includes("Unclear-only reason"));
+  assert.ok(replay.scope.includes.includes("Needs-review-only reason"));
+  assert.ok(replay.scope.includes.includes("Combined reasons"));
+  assert.match(replay.description, /independent context badges/);
+  assert.deepEqual(storyTagsForScenario(result.id), ["new"]);
+  assert.deepEqual(storyTagsForScenario(replay.id), ["new"]);
+});

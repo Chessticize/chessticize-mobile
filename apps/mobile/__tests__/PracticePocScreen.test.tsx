@@ -8270,6 +8270,52 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(playAgainButton, "backgroundColor", "#2563EB")).toBe(false);
   });
 
+  it("previews post-Sprint replay with separate Unclear and Needs review reasons", async () => {
+    const renderer = renderLabScenario("practice-sprint-result-replay");
+
+    expect(collectText(findByTestId(renderer, "sprint-result-unclear-summary"))).toContain(
+      "Included in replay"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "Needs review"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
+      "An attempt can have both"
+    );
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
+      "Review 3 attempts"
+    );
+
+    press(renderer, "review-mistakes-button");
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-source-pill"))).toBe("Sprint replay");
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("1 / 3");
+    expect(collectText(findByTestId(renderer, "review-context-unclear"))).toBe("Unclear");
+    expect(() => findByTestId(renderer, "review-context-needs-review")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe(
+      "Not scheduled for Review"
+    );
+
+    press(renderer, "review-next");
+    await settleEntryPreview();
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("2 / 3");
+    expect(() => findByTestId(renderer, "review-context-unclear")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-context-needs-review"))).toBe(
+      "Needs review"
+    );
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
+
+    press(renderer, "review-next");
+    await settleEntryPreview();
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("3 / 3");
+    expect(collectText(findByTestId(renderer, "review-context-unclear"))).toBe("Unclear");
+    expect(collectText(findByTestId(renderer, "review-context-needs-review"))).toBe(
+      "Needs review"
+    );
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
+  });
+
   it("opens a one-shot mistake review after a timeout-only sprint failure", async () => {
     const service = createMobilePracticeService("random1000");
     startSprintWithPuzzleTiming(service, {

@@ -13,6 +13,12 @@ export type ReviewEntry = {
   source: "session" | "due" | "history";
   curatedThemes: string[];
   attempt?: AttemptEvent | HistoryAttemptView;
+  attention?: ReviewAttentionPresentation;
+};
+
+export type ReviewAttentionPresentation = {
+  unclear: boolean;
+  needsReview: boolean;
 };
 
 export function buildReviewEntry(

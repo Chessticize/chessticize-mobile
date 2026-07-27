@@ -245,7 +245,10 @@ function sprintRulesDesignPreviewFor(
   ) {
     return { timeoutCountsAsMistake: true };
   }
-  if (scenarioId === "practice-sprint-result-goal") {
+  if (
+    scenarioId === "practice-sprint-result-goal"
+    || scenarioId === "practice-sprint-result-replay"
+  ) {
     return {
       initialResultState: sprintRulesResultState({
         correctCount: 11,
@@ -254,6 +257,7 @@ function sprintRulesDesignPreviewFor(
         ratingAfter: 1070,
         status: "failed"
       }),
+      resultReplayItems: sprintResultReplayDesignItems(),
       resultUnclearSummary: {
         slowMarkedCount: 1,
         userMarkedCount: 1
@@ -411,6 +415,63 @@ function sprintRulesResultState({
   };
 }
 
+function sprintResultReplayDesignItems(): NonNullable<
+  React.ComponentProps<typeof PracticePocScreen>["sprintRulesDesignPreview"]
+>["resultReplayItems"] {
+  const completedAt = "2026-07-18T18:00:00.000Z";
+  return [
+    {
+      puzzle: LAB_PUZZLES[0]!,
+      attempt: historyAttempt({
+        completedAt,
+        id: "sprint-result-replay-unclear",
+        puzzleId: LAB_PUZZLES[0]!.id,
+        ratingAfter: 1092,
+        ratingBefore: 1087,
+        result: "correct",
+        unclear: true
+      }),
+      attention: {
+        unclear: true,
+        needsReview: false
+      }
+    },
+    {
+      puzzle: LAB_PUZZLES[1]!,
+      attempt: historyAttempt({
+        completedAt,
+        id: "sprint-result-replay-needs-review",
+        puzzleId: LAB_PUZZLES[1]!.id,
+        ratingAfter: 1078,
+        ratingBefore: 1092,
+        result: "wrong"
+      }),
+      attention: {
+        unclear: false,
+        needsReview: true
+      }
+    },
+    {
+      puzzle: LAB_PUZZLES[2]!,
+      attempt: historyAttempt({
+        completedAt,
+        elapsedMs: 45_000,
+        id: "sprint-result-replay-both",
+        puzzleId: LAB_PUZZLES[2]!.id,
+        ratingAfter: 1084,
+        ratingBefore: 1078,
+        result: "correct",
+        timingStatus: "slow",
+        unclear: true
+      }),
+      attention: {
+        unclear: true,
+        needsReview: true
+      }
+    }
+  ];
+}
+
 export function LabScenarioShell({
   children,
   scenarioId
@@ -527,6 +588,11 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
   }
 
   switch (scenarioId) {
+    case "practice-sprint-result-goal":
+    case "practice-sprint-result-replay":
+      service = createSprintResultReplayService();
+      configurePuzzleSource = false;
+      break;
     case "practice-blunder-move-preview":
       service = createIssue272Service(false);
       configurePuzzleSource = false;
@@ -1037,6 +1103,19 @@ function createReviewService(kind: "due" | "overdue"): PracticeService {
       mode: index === 2 ? "arrow_duel" : "standard",
       ratingKey: index === 2 ? "arrow duel 5/30" : `standard 5/${20 + index * 10}`
     }, enrolledAt);
+  }
+  return new PracticeService(store);
+}
+
+function createSprintResultReplayService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles(LAB_PUZZLES);
+  for (const puzzle of LAB_PUZZLES.slice(1, 3)) {
+    store.scheduleMistakeReview({
+      puzzleId: puzzle.id,
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-07-18T18:00:00.000Z");
   }
   return new PracticeService(store);
 }

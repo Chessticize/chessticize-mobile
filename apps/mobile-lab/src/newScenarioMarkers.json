@@ -1,1 +1,18 @@
-{}
+{
+  "practice-sprint-result-goal": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "Neutral post-Sprint replay entry for Unclear and Needs review attempts"
+      }
+    ]
+  },
+  "practice-sprint-result-replay": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "Independent Unclear and Needs review badges during flagged replay"
+      }
+    ]
+  }
+}

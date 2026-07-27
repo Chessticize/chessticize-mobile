@@ -150,7 +150,11 @@ import {
   normalizeStoredThemeChoiceSelection,
   useThemeChoiceSelection
 } from "./useThemeChoiceSelection.ts";
-import { buildReviewEntry, type ReviewEntry } from "../backend/reviewEntry.ts";
+import {
+  buildReviewEntry,
+  type ReviewAttentionPresentation,
+  type ReviewEntry
+} from "../backend/reviewEntry.ts";
 import {
   canonicalFen,
   decidePremoveQueue,
@@ -299,6 +303,14 @@ export type SprintResultUnclearPromptPresentation = {
   question: string;
 };
 
+export type SprintResultReplayDesignItem = SessionMistakeReviewItem & {
+  attention: ReviewAttentionPresentation;
+};
+
+type SessionReviewPresentationItem = SessionMistakeReviewItem & {
+  attention?: ReviewAttentionPresentation;
+};
+
 export type SprintRulesDesignPreview = {
   firstRunGuide?: SprintRulesGuidePresentation;
   firstRunGuideInitiallyVisible?: boolean;
@@ -307,6 +319,7 @@ export type SprintRulesDesignPreview = {
   initialPreviousAttemptNotice?: "slow" | "timed_out" | "wrong";
   initialResultUnclearPrompt?: SprintResultUnclearPromptPresentation;
   initialResultState?: SprintState;
+  resultReplayItems?: readonly SprintResultReplayDesignItem[];
   resultUnclearSummary?: SprintResultUnclearSummaryPresentation;
   showRunEditorSummary?: boolean;
   showSettingsReset?: boolean;
@@ -663,7 +676,10 @@ export function PracticePocScreen({
   const [aggregateRevision, setAggregateRevision] = useState(0);
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueState[]>([]);
   const [dueReviewItems, setDueReviewItems] = useState<ReviewQueueItem[]>([]);
-  const [sessionMistakeReviewItems, setSessionMistakeReviewItems] = useState<SessionMistakeReviewItem[]>([]);
+  const [sessionMistakeReviewItems, setSessionMistakeReviewItems] =
+    useState<SessionReviewPresentationItem[]>(() => [
+      ...(sprintRulesDesignPreview?.resultReplayItems ?? [])
+    ]);
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => currentTimeMs());
   const [resumableSprint, setResumableSprint] = useState<SprintState | null>(null);
@@ -2228,7 +2244,10 @@ export function PracticePocScreen({
 
   function showReviewMistakes(): void {
     const sessionId = stateRef.current?.id;
-    const reviewItems = sessionId ? service.getSessionMistakeReview(sessionId) : [];
+    const reviewItems: SessionReviewPresentationItem[] =
+      sprintRulesDesignPreview?.resultReplayItems
+        ? [...sprintRulesDesignPreview.resultReplayItems]
+        : sessionId ? service.getSessionMistakeReview(sessionId) : [];
     resetToIdle();
     setSessionMistakeReviewItems(reviewItems);
     navigateToTab("review");
@@ -3741,6 +3760,7 @@ export function PracticePocScreen({
                       unclearSummary={
                         sprintRulesDesignPreview?.resultUnclearSummary
                       }
+                      replayItems={sprintRulesDesignPreview?.resultReplayItems}
                       includePromptInUnclearSummary={
                         sprintRulesDesignPreview?.initialResultUnclearPrompt !== undefined
                       }
@@ -3758,7 +3778,12 @@ export function PracticePocScreen({
                         setHistoryPageOffset(0);
                         navigateToTab("history");
                       }}
-                      onReview={state.mistakeCount > 0 ? showReviewMistakes : undefined}
+                      onReview={
+                        state.mistakeCount > 0
+                        || (sprintRulesDesignPreview?.resultReplayItems?.length ?? 0) > 0
+                          ? showReviewMistakes
+                          : undefined
+                      }
                     />
                   </>
                 ) : null}
@@ -8153,6 +8178,7 @@ function SprintSummary({
   includePromptInUnclearSummary,
   unclearPrompt,
   unclearSummary,
+  replayItems,
   resultSummary,
   onToggleUnclear,
   onReplay,
@@ -8166,6 +8192,7 @@ function SprintSummary({
   includePromptInUnclearSummary: boolean;
   unclearPrompt: UnclearPromptState | null;
   unclearSummary?: SprintResultUnclearSummaryPresentation;
+  replayItems?: readonly SprintResultReplayDesignItem[];
   resultSummary?: SprintResultSummary;
   onToggleUnclear: () => void;
   onReplay: () => void;
@@ -8184,6 +8211,8 @@ function SprintSummary({
     ?? Math.round((state.correctCount / Math.max(1, attemptCount)) * 100);
   const ratingAfter = state.ratingAfter ?? state.ratingBefore;
   const reviewMistakeCount = resultSummary?.review.mistakeCount ?? state.mistakeCount;
+  const replayNeedsReviewCount = replayItems?.filter((item) => item.attention.needsReview).length;
+  const replayItemCount = replayItems?.length;
   const timedOutReviewCount = resultSummary?.review.timedOutCount ?? 0;
   const wrongMoveReviewCount = Math.max(0, reviewMistakeCount - timedOutReviewCount);
   const reviewImpact = wrongMoveReviewCount > 0 && timedOutReviewCount > 0
@@ -8347,14 +8376,18 @@ function SprintSummary({
 
       {resolvedUnclearSummary && unclearCount > 0 ? (
         <View
-          accessibilityLabel={`Unclear ${unclearCount}. ${unclearSources}. Saved in History. Does not affect your Sprint result.`}
+          accessibilityLabel={`Unclear ${unclearCount}. ${unclearSources}. ${
+            replayItems ? "Included in replay." : "Saved in History."
+          } Does not affect your Sprint result.`}
           style={styles.resultUnclearRow}
           testID="sprint-result-unclear-summary"
         >
           <View style={styles.resultUnclearCopy}>
             <Text style={styles.listText}>Unclear</Text>
             <Text style={styles.helperText} testID="sprint-result-unclear-sources">{unclearSources}</Text>
-            <Text style={styles.resultUnclearNote}>Saved in History · Does not affect your Sprint result</Text>
+            <Text style={styles.resultUnclearNote}>
+              {replayItems ? "Included in replay" : "Saved in History"} · Does not affect your Sprint result
+            </Text>
           </View>
           <View
             style={[styles.resultSummaryCountColumn, styles.resultUnclearCountBadge]}
@@ -8367,9 +8400,13 @@ function SprintSummary({
 
       <View style={styles.resultReviewRow} testID="sprint-result-review-impact">
         <View style={styles.resultReviewCopy}>
-          <Text style={styles.listText}>Mistakes</Text>
+          <Text style={styles.listText}>{replayItems ? "Needs review" : "Mistakes"}</Text>
           <Text style={styles.helperText}>
-            {reviewMistakeCount > 0
+            {replayItems
+              ? `${replayNeedsReviewCount ?? 0} ${
+                  replayNeedsReviewCount === 1 ? "attempt" : "attempts"
+                } · Included in replay`
+              : reviewMistakeCount > 0
               ? `Review your mistakes · ${reviewImpact}${timedOutReviewCount > 0 ? " · Mistakes are not marked Unclear" : ""}`
               : reviewImpact}
           </Text>
@@ -8382,20 +8419,30 @@ function SprintSummary({
             testID="sprint-result-mistakes"
             style={[styles.resultReviewCount, reviewMistakeCount > 0 ? styles.errorText : styles.positive]}
           >
-            {reviewMistakeCount}
+            {replayNeedsReviewCount ?? reviewMistakeCount}
           </Text>
         </View>
       </View>
 
+      {replayItems ? (
+        <Text style={styles.resultReviewNote} testID="sprint-result-review-note">
+          Replay includes Unclear and Needs review attempts. An attempt can have both.
+        </Text>
+      ) : null}
+
       {onReview && shouldPrioritizeReview ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Review mistakes"
+          accessibilityLabel={replayItems
+            ? `Review ${replayItemCount} attempts`
+            : "Review mistakes"}
           testID="review-mistakes-button"
           style={[styles.primaryButton, styles.summaryPrimaryAction]}
           onPress={onReview}
         >
-          <Text style={styles.primaryButtonText}>Review Mistakes</Text>
+          <Text style={styles.primaryButtonText}>
+            {replayItems ? `Review ${replayItemCount} attempts` : "Review Mistakes"}
+          </Text>
         </Pressable>
       ) : null}
 
@@ -8415,12 +8462,16 @@ function SprintSummary({
       {onReview && !shouldPrioritizeReview ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Review mistakes"
+          accessibilityLabel={replayItems
+            ? `Review ${replayItemCount} attempts`
+            : "Review mistakes"}
           testID="review-mistakes-button"
           style={styles.secondaryButton}
           onPress={onReview}
         >
-          <Text style={styles.secondaryButtonText}>Review Mistakes</Text>
+          <Text style={styles.secondaryButtonText}>
+            {replayItems ? `Review ${replayItemCount} attempts` : "Review Mistakes"}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -10532,7 +10583,7 @@ function ReviewPanel({
   reviewQueue: ReviewQueueState[];
   reviewReminderScheduleStatus?: string;
   service: PracticeService;
-  sessionMistakeReviewItems: SessionMistakeReviewItem[];
+  sessionMistakeReviewItems: SessionReviewPresentationItem[];
   stockfish: MobileStockfishCapabilities;
   systemBackCommand: ReviewBackCommand | null;
 }): React.JSX.Element {
@@ -10541,7 +10592,8 @@ function ReviewPanel({
     mode: item.attempt.mode,
     ratingKey: item.attempt.ratingKey,
     source: "session",
-    attempt: item.attempt
+    attempt: item.attempt,
+    attention: item.attention
   }));
   const preferredEntries = sessionEntries.length > 0
     ? sessionEntries
@@ -11922,7 +11974,29 @@ function ReviewSession({
       <View style={styles.reviewContextStrip} testID="review-context-strip">
         {currentEntry.source === "session" ? (
           <View style={styles.reviewContextPill} testID="review-source-pill">
-            <Text style={styles.reviewContextPillText}>Sprint review</Text>
+            <Text style={styles.reviewContextPillText}>
+              {currentEntry.attention ? "Sprint replay" : "Sprint review"}
+            </Text>
+          </View>
+        ) : null}
+        {currentEntry.attention?.unclear ? (
+          <View
+            style={[styles.reviewContextPill, styles.reviewContextPillUnclear]}
+            testID="review-context-unclear"
+          >
+            <Text style={[styles.reviewContextPillText, styles.reviewContextPillTextUnclear]}>
+              Unclear
+            </Text>
+          </View>
+        ) : null}
+        {currentEntry.attention?.needsReview ? (
+          <View
+            style={[styles.reviewContextPill, styles.reviewContextPillNeedsReview]}
+            testID="review-context-needs-review"
+          >
+            <Text style={[styles.reviewContextPillText, styles.reviewContextPillTextNeedsReview]}>
+              Needs review
+            </Text>
           </View>
         ) : null}
         {reviewRemainingSeconds !== null ? (
@@ -17258,7 +17332,8 @@ const styles = StyleSheet.create({
   },
   summaryPrimaryAction: {
     alignSelf: "stretch",
-    flex: 0
+    flex: 0,
+    minHeight: 42
   },
   secondaryButton: {
     alignItems: "center",
@@ -17597,6 +17672,13 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0
   },
+  resultReviewNote: {
+    color: "#475569",
+    fontSize: 11,
+    fontWeight: "600",
+    lineHeight: 16,
+    paddingHorizontal: 2
+  },
   resultSummaryCountColumn: {
     alignItems: "center",
     justifyContent: "center",
@@ -17731,6 +17813,14 @@ const styles = StyleSheet.create({
   reviewContextPillDanger: {
     borderColor: "#FCA5A5"
   },
+  reviewContextPillUnclear: {
+    backgroundColor: "#FFFBEB",
+    borderColor: "#F59E0B"
+  },
+  reviewContextPillNeedsReview: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FCA5A5"
+  },
   reviewTimerPill: {
     justifyContent: "center",
     minHeight: 38,
@@ -17748,6 +17838,12 @@ const styles = StyleSheet.create({
     color: "#334155",
     fontSize: 12,
     fontWeight: "800"
+  },
+  reviewContextPillTextUnclear: {
+    color: "#B45309"
+  },
+  reviewContextPillTextNeedsReview: {
+    color: "#B91C1C"
   },
   reviewBoardLayout: {
     gap: 12
