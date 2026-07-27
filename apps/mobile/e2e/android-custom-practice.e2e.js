@@ -110,6 +110,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       // saved attempt and its Android Stockfish analysis.
       await element(by.id('sprint-result-history-button')).tap();
       await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
+      await showAllHistoryAttempts();
       await openFirstCorrectHistoryAttempt();
       await waitForVisibleInPracticeScroll('review-board');
       await expect(element(by.id('history-attempt-detail'))).not.toExist();
@@ -141,6 +142,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
 
       await openTab('history-tab', 'history-action-header');
+      await showAllHistoryAttempts();
       await waitFor(element(by.text(`${CUSTOM_RUN_NAME} · 30s pace`))).toExist().withTimeout(10000);
       await element(by.text(`${CUSTOM_RUN_NAME} · 30s pace`)).tap();
       await waitForElementTextContaining('history-chart-value', String(practiceFixture.expectedRatingAfter), 10000);
@@ -201,4 +203,10 @@ async function openFirstCorrectHistoryAttempt() {
   await waitForVisibleInPracticeScroll(rowTestID);
   await element(by.id(rowTestID)).tap();
   await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
+}
+
+async function showAllHistoryAttempts() {
+  await waitFor(element(by.id('history-attention-all'))).toBeVisible().withTimeout(10000);
+  await element(by.id('history-attention-all')).tap();
+  await waitFor(element(by.id('history-attention-explanation'))).not.toExist().withTimeout(10000);
 }
