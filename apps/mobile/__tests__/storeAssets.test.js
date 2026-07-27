@@ -229,6 +229,48 @@ describe("App Store assets document", () => {
     );
   });
 
+  it("settles the landscape editor after dismissing the number pad before saving", () => {
+    const ratingHelperStart = storeAssetsE2e.indexOf(
+      "async function setStoreAssetRatings"
+    );
+    const ratingHelperEnd = storeAssetsE2e.indexOf(
+      "async function failArrowDuelSprint",
+      ratingHelperStart
+    );
+    const ratingHelper = storeAssetsE2e.slice(ratingHelperStart, ratingHelperEnd);
+    expect(ratingHelper).toContain(
+      "await element(by.id('practice-main-scroll')).scrollTo('top');\n"
+      + "    await sleep(500);\n"
+      + "    await element(by.id('practice-main-scroll')).scrollTo('top');\n"
+      + "    await waitFor(element(by.id('practice-run-editor-title')))\n"
+      + "      .toBeVisible()\n"
+      + "      .withTimeout(5000);\n"
+      + "    await element(by.id('practice-run-save')).tap();"
+    );
+    expect(ratingHelper).not.toContain(
+      "await element(by.id('practice-run-name-input')).tap();"
+    );
+    expect(ratingHelper).not.toContain(
+      "await dismissRunNameKeyboard();"
+    );
+    expect(ratingHelper).not.toContain(
+      "await waitFor(element(by.id('practice-run-save')))"
+    );
+
+    const reviewHelperStart = storeAssetsE2e.indexOf(
+      "async function completeOneWrongReview"
+    );
+    const reviewHelperEnd = storeAssetsE2e.indexOf(
+      "async function captureMainTabScenes",
+      reviewHelperStart
+    );
+    const reviewHelper = storeAssetsE2e.slice(reviewHelperStart, reviewHelperEnd);
+    expect(reviewHelper).toContain(
+      "await waitForVisibleInPracticeScroll('review-reminder-permission-dismiss');\n"
+      + "  await element(by.id('review-reminder-permission-dismiss')).tap();"
+    );
+  });
+
   it("marks the App Store plan store-assets item implementation complete", () => {
     expect(appStorePlan).toContain("`docs/STORE_ASSETS.md` now records");
     expect(appStorePlan).toMatch(

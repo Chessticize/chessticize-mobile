@@ -314,8 +314,8 @@ the mirror and Play track states independently until both are complete.
 
 For a bounded follow-up release:
 
-For Android version `1.2.1` build `7`, release notes and this support document must
-name the canonical source tag `android-v1.2.1-build-7` and the public source
+For Android version `1.3` build `8`, release notes and this support document must
+name the canonical source tag `android-v1.3.0-build-8` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 must bind the annotated tag, commit, application ID, version, version code, and
 AAB SHA-256 before Play distribution. A missing or lightweight public tag, a
