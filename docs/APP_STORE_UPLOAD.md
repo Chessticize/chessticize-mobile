@@ -42,18 +42,25 @@ active Ruby is unsupported.
 
 GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
 validation is the only iOS native release gate. Select delta, targeted, or full
-scope under `docs/TESTING_ARCHITECTURE.md`, then record the tested commit SHA
-and Git tree, Xcode version, dedicated simulator, build result, suite results,
-and clean-worktree confirmation. A squash-merged candidate may reuse passing
-PR-head evidence when a documented diff from `<tested-sha>` to the candidate
-shows no changes to validation-relevant development inputs. Compare both SHAs
-and review the changed paths; mobile runtime sources, native/platform projects,
-dependency manifests, lockfiles and patches, build/release configuration, and
-the selected native specs and fixtures must be unchanged. Documentation,
-review metadata, and merge ancestry may differ without forcing a native rerun.
+scope under `docs/TESTING_ARCHITECTURE.md`, then record the App source SHA,
+test-runner SHA, App-input digest, App-bundle checksum, Xcode version, dedicated
+simulator, build result, suite results, and clean-worktree confirmation. A
+squash-merged candidate may reuse the passing PR-head App bundle when
+`node apps/mobile/scripts/mobile-app-inputs.js compare` proves that its App
+source is an ancestor and the App-input digest is unchanged.
 
-Any validation-relevant development-input difference requires a new local
-build and the selected local Detox scope. React Native's Hermes compiler
+Mobile runtime/domain sources, native/platform projects and native test-bundle
+sources, dependency manifests, lockfiles and patches, build/release
+configuration, and bundled fixtures/resources are App build inputs; a change
+requires a new local build and the selected local Detox scope. Host-side specs,
+selectors, assertions, screenshot/evidence collectors, and non-bundled
+fixtures invalidate only their affected test evidence. Use
+`CHESSTICIZE_E2E_REUSE_APP_SOURCE_SHA=<app-source-sha>` with the local E2E
+runner to verify the existing bundle and rerun that scope without rebuilding.
+Documentation, review metadata, agent guidance, and merge ancestry require
+neither.
+
+React Native's Hermes compiler
 setting is intentionally patched to use a stable `PODS_ROOT`-based path; an
 absolute checkout path in an evaluated podspec makes `Podfile.lock`
 non-portable and is a release blocker, regardless of whether the dependency

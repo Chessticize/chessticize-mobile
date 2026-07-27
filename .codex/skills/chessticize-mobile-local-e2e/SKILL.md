@@ -5,8 +5,8 @@ description: Prepare and validate the Chessticize Mobile macOS/iOS environment a
 
 # Chessticize Mobile Local E2E
 
-Run the selected iOS Detox scope on a dedicated simulator and record the tested
-commit plus the validation-relevant development inputs. Treat environment
+Run the selected iOS Detox scope on a dedicated simulator and record the App
+source, test runner, App-input digest, and artifact checksum. Treat environment
 preparation, PR native-impact selection, evidence reuse, and release validation
 as separate phases.
 
@@ -15,13 +15,14 @@ as separate phases.
 - Run only on macOS with full Xcode and an installed iOS Simulator runtime.
 - Use a dedicated simulator such as `iPhone 17-Detox`. Never use the simulator that holds manual-test data: Detox launches with `delete: true` and wipes the app sandbox.
 - Commit the intended code first and require a clean worktree before producing merge evidence.
-- Rebuild and rerun the selected scope after a validation-relevant development
-  input changes. Those inputs include mobile runtime sources, native/platform
-  projects, dependency manifests, lockfiles and patches, build/release
-  configuration, and the selected native specs and fixtures. Documentation,
-  review metadata, and merge-parent changes alone do not force a rerun. A later
-  commit or squash merge may reuse evidence after a documented diff proves
-  these inputs are unchanged.
+- Rebuild and rerun the selected scope after an App build input changes. Those
+  inputs include mobile runtime/domain sources, native/platform projects and
+  native test-bundle sources, dependency manifests, lockfiles and patches,
+  build/release configuration, and bundled fixtures/resources. Host-side
+  specs, selectors, assertions, screenshot/evidence collectors, and
+  non-bundled fixtures are test-runner inputs: verify the App-input digest,
+  reuse the checksummed App bundle, and rerun only the affected scope.
+  Documentation, review metadata, and merge-parent changes force neither.
 - Choose `flows`, `practice`, or `full` from the repository risk matrix. Do not default a routine PR to `full` without a broad native reason.
 - GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
   validation is required only for releases and native-impacting changes. All
@@ -175,11 +176,28 @@ The runner:
 2. Requires a clean git worktree and records `HEAD`.
 3. Rejects unhydrated Git LFS pointer files for the Stockfish NNUE networks.
 4. Verifies the dedicated simulator and iOS environment.
-5. Builds the app with bundled JavaScript.
+5. Builds the app with bundled JavaScript, or verifies and reuses a checksummed
+   existing App bundle when `CHESSTICIZE_E2E_REUSE_APP_SOURCE_SHA` names an
+   ancestor whose App-input digest matches the current test runner.
 6. Normalizes only the known worktree-dependent Hermes checksum when that is the build's sole tracked change; any other tracked or untracked build output fails the gate.
 7. Runs the selected suite, or both suites for `full`, with one worker.
 8. Verifies the commit and worktree did not change.
-9. Prints per-step timing and a PR evidence summary.
+9. Prints per-step timing plus separate App source and test-runner identities.
+
+For a test-runner-only correction after one normal build, rerun the affected
+scope without rebuilding:
+
+```sh
+CHESSTICIZE_E2E_SCOPE=practice \
+  CHESSTICIZE_E2E_REUSE_APP_SOURCE_SHA=<app-source-sha> \
+  DETOX_IOS_DEVICE="iPhone 17-Detox" \
+  .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
+```
+
+The normal build writes an ignored artifact manifest containing the App source
+SHA, App-input digest, and App-bundle checksum. Reuse fails closed if the
+manifest is absent, the artifact bytes changed, an App build input changed, or
+the App source is not an ancestor of the test runner.
 
 To run commands manually, use the same order and run only the selected scope. This example shows `practice`:
 
@@ -215,7 +233,7 @@ Its presence proves the Detox app does not depend on Metro.
 - `jest: command not found` from Detox: ensure `apps/mobile/node_modules/.bin` is in `PATH`, or invoke the repository script, which does this.
 - Analysis-button tests disconnect from Detox without a crash report: check that both `Resources/*.nnue` files exceed 1 MB. If they are 132-134 byte LFS pointers, run the scoped `git lfs pull` command above, rebuild, and rerun the focused test before both complete suites.
 - Missing `main.jsbundle`: rebuild with `pnpm mobile:e2e:build:ios`; do not trust a Metro-only app.
-- A suite fails: inspect the exact failing spec and product state. Rerun the focused spec to diagnose, fix the cause, then rebuild and rerun the originally selected scope. Rerun both suites only when `full` was required.
+- A suite fails: inspect the exact failing spec and product state. Rerun the focused spec to diagnose and classify the cause. Rebuild after a product/App-input fix; after a host-side test-runner fix, verify and reuse the App bundle and rerun only the affected scope. Rerun both suites only when `full` was required or the changed test helper affects both.
 - `pod install` changes only the Hermes checksum in `Podfile.lock`: the runner verifies that exact diff and normalizes it because React Native embeds the worktree path in the podspec checksum.
 - `pod install` dirties the Xcode project, workspace, another lock entry, or any other tracked file: stop. Fix the environment or intentionally commit the CocoaPods change; the runner must not hide it.
 
@@ -224,8 +242,8 @@ Its presence proves the Detox app does not depend on Metro.
 When a PR or release requires native validation, add a PR or release record
 containing:
 
-- Full tested commit SHA.
-- Full tested Git tree ID.
+- Full App source SHA and test-runner SHA.
+- App-input digest and App-bundle checksum.
 - Selected scope and rationale.
 - Xcode version and simulator name.
 - Build command and success.
@@ -235,8 +253,9 @@ containing:
 
 Then verify all relevant fast checks on the current head. Later documentation,
 review metadata, or merge-parent changes do not invalidate native evidence.
-When the head differs from the tested commit, record both SHAs and the diff
-showing that validation-relevant development inputs are unchanged. Rerun after
-any mobile runtime, native/platform, dependency, build/release, or selected
-native test/fixture change. Release runs use delta, targeted, or full scope and
-require both suites only for broad native risk.
+When the test runner differs from the App source, retain the fail-closed
+App-input comparison. Rebuild after any runtime, native/platform, native
+test-bundle, dependency, build/release, or bundled fixture/resource change.
+Rerun only affected test evidence after a host-side spec, selector, assertion,
+collector, or non-bundled fixture change. Release runs use delta, targeted, or
+full scope and require both suites only for broad native risk.

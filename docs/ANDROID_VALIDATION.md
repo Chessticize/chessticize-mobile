@@ -46,13 +46,13 @@ inspection remains `pnpm mobile:verify:android:abis` after the APK exists.
   Back, or native-module boundary.
 - **Full Android validation:** one build followed by complete `flows` and
   `practice` for app startup, shared navigation or storage wiring, global launch
-  fixtures, native build configuration, Detox infrastructure, or an otherwise
-  unbounded native risk.
+  fixtures bundled into the App, native build configuration, or an otherwise
+  unbounded native risk. A broad host-side Detox runner change may rerun both
+  suites against the verified existing APKs without rebuilding them.
 
-Record the chosen scope and rationale in the PR. A later
-validation-relevant development change invalidates that evidence; documentation,
-review metadata, and merge ancestry alone follow the recorded evidence-reuse
-rule below.
+Record the chosen scope and rationale in the PR. App build inputs, test-runner
+inputs, and record-only inputs follow the separate evidence identities in
+`docs/TESTING_ARCHITECTURE.md`.
 
 ## Automated matrix
 
@@ -91,10 +91,12 @@ pnpm mobile:validate:android:matrix -- --api-level 36 \
 ```
 
 Replace `36` with `24` only for the bounded compatibility smoke. The command
-rejects an unsupported API, a missing or mismatched exact commit SHA, a dirty
-tracked worktree, a failed/missing step, or incomplete build/device data. It
-writes passing evidence only after every selected command succeeds and it has
-rechecked the checkout head and clean tracked worktree.
+rejects an unsupported API or suite, a missing or mismatched test-runner SHA, a
+dirty tracked worktree, changed App inputs, changed artifact bytes, a
+failed/missing step, or incomplete build/device data. It writes passing
+evidence only after every selected command succeeds and it has rechecked the
+checkout head and clean tracked worktree. Add `--suite <name>` only for a
+focused test-only rerun.
 
 CI gives the complete matrix command a 30-minute deadline inside a 40-minute
 job. This is deliberately much larger than the normal API 24 and API 36
@@ -106,9 +108,64 @@ retrying. Only `api-<level>.json`, written after every step passes, is release
 evidence; the progress file is diagnostic evidence and never converts a
 partial run into a pass.
 
+## Test-only reruns with retained APKs
+
+When a failure is classified as a host-side spec, selector, wait, assertion,
+evidence collector, or non-bundled fixture defect, do not rebuild the App.
+Commit the test correction, keep current-head fast checks green, then dispatch
+`Mobile Android test-only rerun` with:
+
+- `source_run_id`: the retained `Mobile Android` run whose
+  `Android build baseline` job passed;
+- `app_source_sha`: that run's exact App source SHA; and
+- `target`: `api-24`, `api-36-full`, or the smallest affected API 36 suite.
+
+The workflow checks that the source run used
+`.github/workflows/mobile-android.yml`, its build job passed, the App source is
+an ancestor of the test runner, and the fail-closed App-input digest is
+identical. It downloads the immutable `android-practice-apks` artifact and
+records both APK checksums. It never invokes Gradle.
+
+GitHub can dispatch this workflow only after the workflow file exists on the
+default branch. While the policy first lives on an active release branch,
+download the same retained artifact on the Android build machine and invoke
+the matrix directly:
+
+```sh
+gh run download <source-run-id> \
+  --name android-practice-apks \
+  --dir apps/mobile/android/app/build/outputs/apk
+node apps/mobile/scripts/mobile-app-inputs.js compare \
+  --app-source-sha <app-source-sha> \
+  --test-runner-sha "$(git rev-parse HEAD)" \
+  --output apps/mobile/artifacts/android-validation/app-input-comparison.json
+ANDROID_VALIDATION_COMMIT_SHA="$(git rev-parse HEAD)" \
+ANDROID_VALIDATION_APP_SOURCE_SHA=<app-source-sha> \
+ANDROID_VALIDATION_BUILD_RESULT=success \
+ANDROID_VALIDATION_DEVICE_ABI=x86_64 \
+ANDROID_VALIDATION_DEVICE_PROFILE=pixel_2 \
+DETOX_ANDROID_DEVICE=emulator-5554 \
+pnpm mobile:validate:android:matrix -- --api-level 36 \
+  --suite android-history \
+  --output apps/mobile/artifacts/android-validation/test-only-android-history.json
+```
+
+Replace `android-history` with the smallest affected suite. This local path
+performs the same App-input comparison and APK checksum recording as the hosted
+workflow; it also never invokes Gradle.
+
+For a transient failure on the same commit, use GitHub's specific-job rerun
+instead. For a test correction on a new commit, use the test-only workflow so
+the evidence records distinct App source and test-runner SHAs. If the
+classifier reports any App build input change, stop and run a normal build plus
+the selected native scope. Expected-result changes require failure
+classification and review; they must not normalize an unexplained product
+regression. The classifier is a trust anchor and intentionally invalidates
+reuse when its own implementation changes.
+
 ## Adaptive contract
 
-Manual exact-head workflow dispatch runs
+Manual full-workflow dispatch runs
 `apps/mobile/scripts/android-adaptive-layout-evidence.sh` on API 36. It reaches
 the real sprint through public UI and checks phone rotation plus representative
 tablet, foldable/resizable, ChromeOS-style, and large-text profiles. Retain the
@@ -130,7 +187,7 @@ public UI.
 Every required native result must record the following fields and retain the
 workflow run plus artifacts with the PR or release record:
 
-- tested commit SHA and build result;
+- App source SHA, test-runner SHA, App-input digest, APK checksums, and build result;
 - commands and selected validation scope;
 - device matrix, including API/OS, ABI, profile/model, and serial or redacted
   physical identifier;
@@ -138,15 +195,20 @@ workflow run plus artifacts with the PR or release record:
 - clean tracked worktree confirmation before and after execution;
 - artifact names/links and screenshot review where visual behavior is in scope.
 
-The automated API evidence JSON uses schema version 1 and records `commitSha`,
-`buildResult`, `commands`, `deviceMatrix`, `suiteResults`, `worktreeClean`, and
-the overall `result`. A missing required field is not passing evidence.
+The automated API evidence JSON uses schema version 2 and records
+`appSourceSha`, `testRunnerSha`, `appInputDigest`, `artifacts`, `buildResult`,
+`commands`, `deviceMatrix`, `suiteResults`, `worktreeClean`, and the overall
+`result`. `commitSha` remains a compatibility alias for `testRunnerSha`. A
+missing required field is not passing evidence.
 
-The tested SHA does not have to equal a later PR or release head when a
-documented diff proves that validation-relevant development inputs are
-unchanged. Record both SHAs and the comparison. Runtime, native/platform,
-dependency, build/release, or selected native spec/fixture changes require a
-rerun; documentation, review metadata, and merge ancestry alone do not.
+The two SHAs may differ when
+`node apps/mobile/scripts/mobile-app-inputs.js compare` proves the App build
+inputs are unchanged. Runtime/domain, native/platform or native test-APK,
+dependency, build/release, or bundled fixture/resource changes require a new
+build and selected native scope. Host-side specs, selectors, assertions,
+collectors, and non-bundled fixtures require only the affected test rerun.
+Documentation, review metadata, agent guidance, and merge ancestry require
+neither.
 
 ## Optional physical ARM64 diagnostic checklist
 

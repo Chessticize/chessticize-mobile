@@ -3,6 +3,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const {
+  compareMobileAppInputs,
+  hashArtifactPath,
+} = require('./mobile-app-inputs');
 
 const API36_SUITES = [
   'android-offline-practice',
@@ -16,8 +20,13 @@ const API36_SUITES = [
   'practice',
 ];
 
-function validationStepsForApiLevel(apiLevel) {
+function validationStepsForApiLevel(apiLevel, selectedSuite) {
   if (apiLevel === 24) {
+    if (selectedSuite && selectedSuite !== 'android-api24-smoke') {
+      throw new Error(
+        `Unsupported Android API 24 suite ${selectedSuite}. Expected android-api24-smoke.`
+      );
+    }
     return [
       { kind: 'prepare', command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh' },
       { kind: 'install', command: 'apps/mobile/scripts/install-android-detox-apks.sh' },
@@ -26,6 +35,23 @@ function validationStepsForApiLevel(apiLevel) {
   }
 
   if (apiLevel === 36) {
+    if (selectedSuite && !API36_SUITES.includes(selectedSuite)) {
+      throw new Error(
+        `Unsupported Android API 36 suite ${selectedSuite}.`
+      );
+    }
+    if (selectedSuite) {
+      return [
+        { kind: 'prepare', command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh' },
+        ...(selectedSuite === 'android-review-reminders'
+          ? [{
+            kind: 'native',
+            command: 'apps/mobile/scripts/android-review-reminder-native-evidence.sh',
+          }]
+          : []),
+        { kind: 'detox', suite: selectedSuite },
+      ];
+    }
     return [
       { kind: 'prepare', command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh' },
       { kind: 'native', command: 'apps/mobile/scripts/android-review-reminder-native-evidence.sh' },
@@ -50,19 +76,22 @@ function progressPathForEvidence(outputPath) {
 
 function writeProgress({
   apiLevel,
-  commitSha,
+  appSourceSha,
   currentStep,
   outputPath,
   result,
   stepResults,
   steps,
+  testRunnerSha,
 }) {
   const resultById = new Map(
     stepResults.map((stepResult) => [stepResult.id, stepResult])
   );
   const progress = {
-    schemaVersion: 1,
-    commitSha,
+    schemaVersion: 2,
+    commitSha: testRunnerSha,
+    appSourceSha,
+    testRunnerSha,
     apiLevel,
     currentStep,
     result,
@@ -94,15 +123,37 @@ function renderValidationCommand(step) {
 
 function createAndroidValidationEvidence({
   apiLevel,
+  appBuildInputsUnchanged,
+  appArtifactSha256,
+  appInputDigest,
+  appSourceSha,
   buildResult,
-  commitSha,
   device,
   steps,
   stepResults,
+  testArtifactSha256,
+  testRunnerSha,
   trackedWorktreeStatus,
 }) {
-  if (!/^[0-9a-f]{40}$/i.test(commitSha ?? '')) {
-    throw new Error('Android validation evidence requires an exact 40-character commit SHA.');
+  if (appBuildInputsUnchanged !== true) {
+    throw new Error(
+      'Android validation evidence requires a passing App build input comparison.',
+    );
+  }
+  if (!/^[0-9a-f]{40}$/i.test(appSourceSha ?? '')) {
+    throw new Error('Android validation evidence requires an exact 40-character App source SHA.');
+  }
+  if (!/^[0-9a-f]{40}$/i.test(testRunnerSha ?? '')) {
+    throw new Error('Android validation evidence requires an exact 40-character test runner SHA.');
+  }
+  for (const [label, digest] of [
+    ['App input', appInputDigest],
+    ['App APK', appArtifactSha256],
+    ['test APK', testArtifactSha256],
+  ]) {
+    if (!/^[0-9a-f]{64}$/i.test(digest ?? '')) {
+      throw new Error(`Android validation evidence requires an exact ${label} SHA-256.`);
+    }
   }
   if (buildResult !== 'success') {
     throw new Error('Android validation build result must be success.');
@@ -128,8 +179,17 @@ function createAndroidValidationEvidence({
   }
 
   return {
-    schemaVersion: 1,
-    commitSha,
+    schemaVersion: 2,
+    commitSha: testRunnerSha,
+    appSourceSha,
+    testRunnerSha,
+    appInputDigest,
+    appBuildInputsUnchanged,
+    artifacts: {
+      appApkSha256: appArtifactSha256,
+      testApkSha256: testArtifactSha256,
+    },
+    reusedAppBuild: appSourceSha !== testRunnerSha,
     buildResult,
     commands: steps.map(renderValidationCommand),
     deviceMatrix: [device],
@@ -143,25 +203,31 @@ function createAndroidValidationEvidence({
 
 function runAndroidValidationMatrix({
   apiLevel,
+  appBuildInputsUnchanged,
+  appArtifactSha256,
+  appInputDigest,
+  appSourceSha,
   buildResult,
   device,
-  expectedCommitSha,
+  expectedTestRunnerSha,
   outputPath,
   readGitHead,
   readTrackedWorktreeStatus,
   runStep,
+  selectedSuite,
+  testArtifactSha256,
 }) {
-  const steps = validationStepsForApiLevel(apiLevel);
+  const steps = validationStepsForApiLevel(apiLevel, selectedSuite);
   fs.rmSync(outputPath, { force: true });
   fs.rmSync(progressPathForEvidence(outputPath), { force: true });
 
-  if (!/^[0-9a-f]{40}$/i.test(expectedCommitSha ?? '')) {
-    throw new Error('Android validation requires an explicit exact 40-character commit SHA.');
+  if (!/^[0-9a-f]{40}$/i.test(expectedTestRunnerSha ?? '')) {
+    throw new Error('Android validation requires an explicit exact 40-character test runner SHA.');
   }
   const initialHead = readGitHead();
-  if (initialHead !== expectedCommitSha) {
+  if (initialHead !== expectedTestRunnerSha) {
     throw new Error(
-      `Android validation requested ${expectedCommitSha}, which does not match checkout ${initialHead}.`
+      `Android validation requested test runner ${expectedTestRunnerSha}, which does not match checkout ${initialHead}.`
     );
   }
   const initialStatus = readTrackedWorktreeStatus();
@@ -172,36 +238,39 @@ function runAndroidValidationMatrix({
   const stepResults = [];
   writeProgress({
     apiLevel,
-    commitSha: initialHead,
+    appSourceSha,
     currentStep: null,
     outputPath,
     result: 'running',
     stepResults,
     steps,
+    testRunnerSha: initialHead,
   });
   for (const step of steps) {
     const id = stepId(step);
     stepResults.push({ id, result: 'running' });
     writeProgress({
       apiLevel,
-      commitSha: initialHead,
+      appSourceSha,
       currentStep: id,
       outputPath,
       result: 'running',
       stepResults,
       steps,
+      testRunnerSha: initialHead,
     });
     const exitCode = runStep(step);
     if (exitCode !== 0) {
       stepResults[stepResults.length - 1] = { id, result: 'fail', exitCode };
       writeProgress({
         apiLevel,
-        commitSha: initialHead,
+        appSourceSha,
         currentStep: id,
         outputPath,
         result: 'fail',
         stepResults,
         steps,
+        testRunnerSha: initialHead,
       });
       throw new Error(
         `Android validation step ${id} failed with exit code ${exitCode}.`
@@ -210,40 +279,47 @@ function runAndroidValidationMatrix({
     stepResults[stepResults.length - 1] = { id, result: 'pass' };
     writeProgress({
       apiLevel,
-      commitSha: initialHead,
+      appSourceSha,
       currentStep: null,
       outputPath,
       result: 'running',
       stepResults,
       steps,
+      testRunnerSha: initialHead,
     });
   }
 
   const finalHead = readGitHead();
-  if (finalHead !== expectedCommitSha) {
+  if (finalHead !== expectedTestRunnerSha) {
     throw new Error(
-      `Android validation checkout moved from ${expectedCommitSha} to ${finalHead}.`
+      `Android validation checkout moved from ${expectedTestRunnerSha} to ${finalHead}.`
     );
   }
   const evidence = createAndroidValidationEvidence({
     apiLevel,
+    appBuildInputsUnchanged,
+    appArtifactSha256,
+    appInputDigest,
+    appSourceSha,
     buildResult,
-    commitSha: finalHead,
     device,
     steps,
     stepResults,
+    testArtifactSha256,
+    testRunnerSha: finalHead,
     trackedWorktreeStatus: readTrackedWorktreeStatus(),
   });
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, `${JSON.stringify(evidence, null, 2)}\n`);
   writeProgress({
     apiLevel,
-    commitSha: finalHead,
+    appSourceSha,
     currentStep: null,
     outputPath,
     result: 'pass',
     stepResults,
     steps,
+    testRunnerSha: finalHead,
   });
   return evidence;
 }
@@ -264,6 +340,9 @@ function parseCliArgs(args) {
     if (argument === '--api-level') {
       parsed.apiLevel = Number(normalizedArgs[index + 1]);
       index += 1;
+    } else if (argument === '--suite') {
+      parsed.selectedSuite = normalizedArgs[index + 1];
+      index += 1;
     } else if (argument === '--output') {
       parsed.outputPath = normalizedArgs[index + 1];
       index += 1;
@@ -274,7 +353,7 @@ function parseCliArgs(args) {
   if (!parsed.outputPath) {
     throw new Error('Android validation requires --output <path>.');
   }
-  validationStepsForApiLevel(parsed.apiLevel);
+  validationStepsForApiLevel(parsed.apiLevel, parsed.selectedSuite);
   return parsed;
 }
 
@@ -287,11 +366,32 @@ function runGit(repoRoot, args) {
 }
 
 function runCli(args = process.argv.slice(2), environment = process.env) {
-  const { apiLevel, outputPath } = parseCliArgs(args);
+  const { apiLevel, outputPath, selectedSuite } = parseCliArgs(args);
   const repoRoot = path.resolve(__dirname, '../../..');
   const absoluteOutputPath = path.resolve(repoRoot, outputPath);
-  const expectedCommitSha = requiredEnvironment('ANDROID_VALIDATION_COMMIT_SHA', environment);
+  const expectedTestRunnerSha = requiredEnvironment(
+    'ANDROID_VALIDATION_COMMIT_SHA',
+    environment,
+  ).toLowerCase();
+  const appSourceSha = (
+    environment.ANDROID_VALIDATION_APP_SOURCE_SHA || expectedTestRunnerSha
+  ).toLowerCase();
+  const comparison = compareMobileAppInputs({
+    appSourceSha,
+    repoRoot,
+    testRunnerSha: expectedTestRunnerSha,
+  });
   const buildResult = requiredEnvironment('ANDROID_VALIDATION_BUILD_RESULT', environment);
+  const appApkPath = path.resolve(
+    repoRoot,
+    environment.CHESSTICIZE_ANDROID_E2E_APK
+      || 'apps/mobile/android/app/build/outputs/apk/e2e/app-e2e.apk',
+  );
+  const testApkPath = path.resolve(
+    repoRoot,
+    environment.CHESSTICIZE_ANDROID_E2E_TEST_APK
+      || 'apps/mobile/android/app/build/outputs/apk/androidTest/e2e/app-e2e-androidTest.apk',
+  );
   const device = {
     abi: requiredEnvironment('ANDROID_VALIDATION_DEVICE_ABI', environment),
     apiLevel,
@@ -300,9 +400,13 @@ function runCli(args = process.argv.slice(2), environment = process.env) {
   };
   return runAndroidValidationMatrix({
     apiLevel,
+    appBuildInputsUnchanged: comparison.appBuildInputsUnchanged,
+    appArtifactSha256: hashArtifactPath(appApkPath),
+    appInputDigest: comparison.appInputDigest,
+    appSourceSha,
     buildResult,
     device,
-    expectedCommitSha,
+    expectedTestRunnerSha,
     outputPath: absoluteOutputPath,
     readGitHead: () => runGit(repoRoot, ['rev-parse', 'HEAD']),
     readTrackedWorktreeStatus: () => runGit(
@@ -336,6 +440,8 @@ function runCli(args = process.argv.slice(2), environment = process.env) {
       }
       return result.status;
     },
+    selectedSuite,
+    testArtifactSha256: hashArtifactPath(testApkPath),
   });
 }
 

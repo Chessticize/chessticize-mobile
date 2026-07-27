@@ -10,14 +10,20 @@ const {
 } = require('../scripts/android-validation-matrix');
 
 const EXACT_SHA = '0123456789abcdef0123456789abcdef01234567';
+const APP_INPUT_DIGEST = 'a'.repeat(64);
+const APP_APK_DIGEST = 'b'.repeat(64);
+const TEST_APK_DIGEST = 'c'.repeat(64);
 
 function passingEvidenceInput(overrides = {}) {
   const apiLevel = overrides.apiLevel ?? 24;
   const steps = validationStepsForApiLevel(apiLevel);
   return {
     apiLevel,
+    appBuildInputsUnchanged: true,
+    appArtifactSha256: APP_APK_DIGEST,
+    appInputDigest: APP_INPUT_DIGEST,
+    appSourceSha: EXACT_SHA,
     buildResult: 'success',
-    commitSha: EXACT_SHA,
     device: {
       abi: 'x86_64',
       apiLevel,
@@ -29,6 +35,8 @@ function passingEvidenceInput(overrides = {}) {
       id: step.suite ?? step.command,
       result: 'pass',
     })),
+    testArtifactSha256: TEST_APK_DIGEST,
+    testRunnerSha: EXACT_SHA,
     trackedWorktreeStatus: '',
     ...overrides,
   };
@@ -128,10 +136,32 @@ describe('Android validation matrix', () => {
     expect(suites.filter((suite) => suite === 'practice')).toHaveLength(1);
   });
 
+  it('can rerun one affected API 36 suite without rebuilding or running unrelated suites', () => {
+    expect(validationStepsForApiLevel(36, 'android-history')).toEqual([
+      { kind: 'prepare', command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh' },
+      { kind: 'detox', suite: 'android-history' },
+    ]);
+    expect(validationStepsForApiLevel(36, 'android-review-reminders')).toEqual([
+      { kind: 'prepare', command: 'apps/mobile/scripts/prepare-android-offline-e2e.sh' },
+      {
+        kind: 'native',
+        command: 'apps/mobile/scripts/android-review-reminder-native-evidence.sh',
+      },
+      { kind: 'detox', suite: 'android-review-reminders' },
+    ]);
+  });
+
   it('fails closed for an unsupported API level', () => {
     expect(() => validationStepsForApiLevel(30)).toThrow(
       'Unsupported Android validation API level 30. Expected 24 or 36.'
     );
+  });
+
+  it('fails closed for a suite outside the selected API contract', () => {
+    expect(() => validationStepsForApiLevel(36, 'android-api24-smoke'))
+      .toThrow('Unsupported Android API 36 suite');
+    expect(() => validationStepsForApiLevel(24, 'android-history'))
+      .toThrow('Unsupported Android API 24 suite');
   });
 
   it('accepts direct CLI arguments and one conventional leading separator only', () => {
@@ -152,12 +182,33 @@ describe('Android validation matrix', () => {
       .toThrow('Unknown Android validation argument --.');
     expect(() => parseCliArgs([...argumentsWithoutSeparator, '--']))
       .toThrow('Unknown Android validation argument --.');
+    expect(parseCliArgs([
+      '--api-level',
+      '36',
+      '--suite',
+      'android-history',
+      '--output',
+      expected.outputPath,
+    ])).toEqual({
+      apiLevel: 36,
+      selectedSuite: 'android-history',
+      outputPath: expected.outputPath,
+    });
   });
 
-  it('records exact-head commands, device matrix, suite results, and a clean worktree', () => {
+  it('records App source, test runner, artifact identity, commands, and a clean worktree', () => {
     expect(createAndroidValidationEvidence(passingEvidenceInput())).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       commitSha: EXACT_SHA,
+      appSourceSha: EXACT_SHA,
+      testRunnerSha: EXACT_SHA,
+      appInputDigest: APP_INPUT_DIGEST,
+      appBuildInputsUnchanged: true,
+      artifacts: {
+        appApkSha256: APP_APK_DIGEST,
+        testApkSha256: TEST_APK_DIGEST,
+      },
+      reusedAppBuild: false,
       buildResult: 'success',
       commands: [
         'apps/mobile/scripts/prepare-android-offline-e2e.sh',
@@ -177,7 +228,12 @@ describe('Android validation matrix', () => {
   });
 
   it.each([
-    [{ commitSha: '' }, 'exact 40-character commit SHA'],
+    [{ appBuildInputsUnchanged: false }, 'passing App build input comparison'],
+    [{ appSourceSha: '' }, 'exact 40-character App source SHA'],
+    [{ testRunnerSha: '' }, 'exact 40-character test runner SHA'],
+    [{ appInputDigest: '' }, 'exact App input SHA-256'],
+    [{ appArtifactSha256: '' }, 'exact App APK SHA-256'],
+    [{ testArtifactSha256: '' }, 'exact test APK SHA-256'],
     [{ trackedWorktreeStatus: ' M apps/mobile/App.tsx' }, 'tracked worktree must be clean'],
     [{ stepResults: [] }, 'result for every validation step'],
     [{ buildResult: 'unknown' }, 'build result must be success'],
@@ -194,6 +250,10 @@ describe('Android validation matrix', () => {
 
     const evidence = runAndroidValidationMatrix({
       apiLevel: 24,
+      appBuildInputsUnchanged: true,
+      appArtifactSha256: APP_APK_DIGEST,
+      appInputDigest: APP_INPUT_DIGEST,
+      appSourceSha: EXACT_SHA,
       buildResult: 'success',
       device: {
         abi: 'x86_64',
@@ -201,7 +261,7 @@ describe('Android validation matrix', () => {
         profile: 'pixel_2',
         serial: 'emulator-5554',
       },
-      expectedCommitSha: EXACT_SHA,
+      expectedTestRunnerSha: EXACT_SHA,
       outputPath,
       readGitHead: () => EXACT_SHA,
       readTrackedWorktreeStatus: () => '',
@@ -209,13 +269,16 @@ describe('Android validation matrix', () => {
         executed.push(step);
         return 0;
       },
+      testArtifactSha256: TEST_APK_DIGEST,
     });
 
     expect(executed).toEqual(validationStepsForApiLevel(24));
     expect(JSON.parse(fs.readFileSync(outputPath, 'utf8'))).toEqual(evidence);
     expect(JSON.parse(fs.readFileSync(progressPath, 'utf8'))).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       commitSha: EXACT_SHA,
+      appSourceSha: EXACT_SHA,
+      testRunnerSha: EXACT_SHA,
       apiLevel: 24,
       currentStep: null,
       result: 'pass',
@@ -245,6 +308,10 @@ describe('Android validation matrix', () => {
 
     expect(() => runAndroidValidationMatrix({
       apiLevel: 24,
+      appBuildInputsUnchanged: true,
+      appArtifactSha256: APP_APK_DIGEST,
+      appInputDigest: APP_INPUT_DIGEST,
+      appSourceSha: EXACT_SHA,
       buildResult: 'success',
       device: {
         abi: 'x86_64',
@@ -252,7 +319,7 @@ describe('Android validation matrix', () => {
         profile: 'pixel_2',
         serial: 'emulator-5554',
       },
-      expectedCommitSha: EXACT_SHA,
+      expectedTestRunnerSha: EXACT_SHA,
       outputPath,
       readGitHead: () => EXACT_SHA,
       readTrackedWorktreeStatus: () => '',
@@ -260,6 +327,7 @@ describe('Android validation matrix', () => {
         calls += 1;
         return step.kind === 'detox' ? 9 : 0;
       },
+      testArtifactSha256: TEST_APK_DIGEST,
     })).toThrow('Android validation step android-api24-smoke failed with exit code 9.');
 
     expect(calls).toBe(3);
@@ -282,6 +350,9 @@ describe('Android validation matrix', () => {
   it('rejects evidence when the requested SHA does not match the checkout', () => {
     expect(() => runAndroidValidationMatrix({
       apiLevel: 24,
+      appArtifactSha256: APP_APK_DIGEST,
+      appInputDigest: APP_INPUT_DIGEST,
+      appSourceSha: EXACT_SHA,
       buildResult: 'success',
       device: {
         abi: 'x86_64',
@@ -289,11 +360,24 @@ describe('Android validation matrix', () => {
         profile: 'pixel_2',
         serial: 'emulator-5554',
       },
-      expectedCommitSha: EXACT_SHA,
+      expectedTestRunnerSha: EXACT_SHA,
       outputPath: path.join(os.tmpdir(), 'must-not-exist.json'),
       readGitHead: () => 'ffffffffffffffffffffffffffffffffffffffff',
       readTrackedWorktreeStatus: () => '',
       runStep: () => 0,
+      testArtifactSha256: TEST_APK_DIGEST,
     })).toThrow('does not match checkout');
+  });
+
+  it('marks a different test-runner SHA as an explicit reused App build', () => {
+    const testRunnerSha = 'f'.repeat(40);
+    expect(createAndroidValidationEvidence(passingEvidenceInput({
+      testRunnerSha,
+    }))).toMatchObject({
+      commitSha: testRunnerSha,
+      appSourceSha: EXACT_SHA,
+      testRunnerSha,
+      reusedAppBuild: true,
+    });
   });
 });
