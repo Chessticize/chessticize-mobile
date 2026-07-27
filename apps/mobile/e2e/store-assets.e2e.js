@@ -2,6 +2,7 @@ const { execFileSync } = require('node:child_process');
 const { resolve } = require('node:path');
 const {
   accessibilityLabelFromAttributes,
+  dismissRunNameKeyboard,
   frameFor,
   launchWithDisabledSynchronization,
   openTab,
@@ -82,9 +83,8 @@ async function setStoreAssetRatings({ standard, arrowDuel }) {
     await waitFor(element(by.id('practice-run-elo-input')))
       .toHaveText(String(targetRating))
       .withTimeout(10000);
-    await element(by.id('practice-run-editor-title')).tap();
-    await sleep(500);
-    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('practice-run-name-input')).tap();
+    await dismissRunNameKeyboard();
     await waitFor(element(by.id('practice-run-save')))
       .toBeVisible()
       .withTimeout(10000);
