@@ -15,7 +15,7 @@ const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000);
 const CUSTOM_RUN_NAME = `${practiceFixture.customRunTheme.label} Focus`;
 const CUSTOM_RUN_THEME_TEST_ID = `custom-theme-${practiceFixture.customRunTheme.id}`;
 const EXPECTED_AUTO_REPLY_MOVE = practiceFixture.puzzle.solutionMoves[2];
-const EXPECTED_RATING_DELTA = practiceFixture.expectedRatingAfter - practiceFixture.puzzle.rating;
+const EXPECTED_RATING_DELTA = practiceFixture.expectedRatingAfter - practiceFixture.expectedRatingBefore;
 
 describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, () => {
   beforeAll(async () => {
