@@ -251,7 +251,7 @@ describe('Key user flows', () => {
     )).not.toExist().withTimeout(10000);
     await waitFor(element(
       by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
-    )).not.toExist().withTimeout(10000);
+    )).toExist().withTimeout(10000);
     await element(by.id('history-result-wrong')).tap();
     await waitFor(element(
       by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
@@ -262,9 +262,8 @@ describe('Key user flows', () => {
       by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
     )).not.toExist().withTimeout(10000);
 
-    // Replay round trip must preserve non-default filters: select wrong Sprint
-    // attempts, open one attempt's replay, exit, and require every choice to
-    // remain unchanged.
+    // Replay round trip must preserve the non-default result and theme filters
+    // while retaining the default Sprint source.
     await element(by.id('history-result-wrong')).tap();
     await waitFor(element(
       by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
@@ -322,7 +321,7 @@ describe('Key user flows', () => {
     )).not.toExist().withTimeout(10000);
     await waitFor(element(
       by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
-    )).not.toExist().withTimeout(10000);
+    )).toExist().withTimeout(10000);
     await waitFor(element(
       by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
     )).not.toExist().withTimeout(10000);

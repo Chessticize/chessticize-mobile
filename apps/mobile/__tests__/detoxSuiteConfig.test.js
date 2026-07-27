@@ -1387,6 +1387,9 @@ describe('Detox suite configuration', () => {
       "it('shows failed attempts in History and preserves current filters through replay'"
     );
     const reminderCase = flowsSpec.slice(reminderCaseStart, reminderCaseEnd);
+    const historyCaseStart = reminderCaseEnd;
+    const historyCaseEnd = flowsSpec.indexOf("it('adds and starts a saved custom Run'");
+    const historyCase = flowsSpec.slice(historyCaseStart, historyCaseEnd);
 
     expect(flowsSpec).toContain("device.getPlatform() === 'android'");
     expect(reminderCase).toContain('grantAndroidNotificationPermission();');
@@ -1416,6 +1419,11 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).toContain(
       "by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))"
     );
+    expect(
+      historyCase.match(
+        /by\.text\('Source: Sprint'\)[\s\S]{0,120}\)\)\.not\.toExist\(\)/g
+      ) ?? []
+    ).toHaveLength(0);
     expect(flowsSpec).toContain("by.text('2 themes selected')");
     expect(flowsSpec).toContain("historyAttemptRowTestIDForResult('Wrong move')");
     expect(flowsSpec).not.toContain('history-filter-wrong-only');
