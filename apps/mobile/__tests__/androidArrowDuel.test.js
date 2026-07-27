@@ -55,12 +55,17 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain('fixture.wrongMove');
     expect(journey).toContain('fixture.correctMove');
     expect(journey).toContain("by.id('move-feedback-overlay')");
+    expect(journey).toContain(
+      "waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(15000)"
+    );
+    expect(journey).not.toContain('sleep(1800)');
     expect(journey).toContain("by.text('Sprint complete')");
     expect(journey).toContain("by.text('Sprint failed')");
     expect(journey).toContain("by.id('sprint-result-reason')");
     expect(journey).toContain('device.pressBack()');
     expect(journey).toContain('device.terminateApp()');
     expect(journey).toContain('deleteData: false');
+    expect(journey).toContain("element(by.id('history-filter-toggle')).tap()");
     expect(journey).toContain("by.id('history-rating-arrow_duel 5/30')");
     expect(journey).not.toContain("by.id('history-rating-arrow duel 5/30')");
     expect(journey).toContain("by.id('review-analysis-button')");

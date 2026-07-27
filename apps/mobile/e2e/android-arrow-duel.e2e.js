@@ -2,7 +2,6 @@ const {
   launchWithDisabledSynchronization,
   openTab,
   playBoardMove,
-  sleep,
   startPracticeMode,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
@@ -45,7 +44,7 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
       await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
       await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 1').withTimeout(10000);
-      await sleep(1800);
+      await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(15000);
 
       await element(by.id('session-abandon')).tap();
       await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
@@ -152,6 +151,7 @@ async function startArrowDuel() {
 
 async function openArrowDuelHistory() {
   await openTab('history-tab', 'history-action-header');
+  await element(by.id('history-filter-toggle')).tap();
   await waitForVisibleInPracticeScroll('history-rating-arrow_duel 5/30');
   await element(by.id('history-rating-arrow_duel 5/30')).tap();
 }
