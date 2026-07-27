@@ -1494,6 +1494,12 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain("require('./adaptiveScreenshotEvidence')");
     expect(spec).toContain('const archiveAdaptiveScreenshot = createAdaptiveScreenshotArchiver();');
     expect(spec).toContain(
+      "waitFor(element(by.id('practice-run-standard'))).toExist().withTimeout(10000)"
+    );
+    expect(spec).not.toContain(
+      "waitFor(element(by.id('practice-run-standard'))).toBeVisible().withTimeout(10000)"
+    );
+    expect(spec).toContain(
       "waitFor(element(by.id('practice-progress-summary'))).toExist().withTimeout(10000)"
     );
     expect(spec).not.toContain(

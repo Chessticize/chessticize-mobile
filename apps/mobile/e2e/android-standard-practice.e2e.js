@@ -23,6 +23,7 @@ describe(`Android Standard Practice offline persistence (${standardFixture.puzzl
       resetAppState: true,
       newInstance: true,
       launchArgs: {
+        chessticizePuzzleSelectionId: standardFixture.puzzle.id,
         chessticizePuzzleSelectionSeed: TEST_SEED,
         chessticizeStandardTargetCorrect: String(standardFixture.targetCorrect),
         chessticizeTestNowMs: TEST_NOW_MS,
