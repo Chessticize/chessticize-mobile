@@ -105,6 +105,7 @@ const BASE_PRESENTATION: Omit<
   assurance: "provisional",
   periodLabel: "Last 8 weeks",
   sampleLabel: "ordinary mixed Runs",
+  sampleUnitLabel: "eligible puzzles",
   noWeaknessLabel:
     "No theme currently passes the evidence, practical-impact, and diversity checks for either solve reliability or completed-puzzle speed."
 };

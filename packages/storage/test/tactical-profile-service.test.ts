@@ -62,6 +62,29 @@ test("an owner-approved provisional trial scans existing history into an early e
   );
 });
 
+test("TacticalProfileService reconstructs six model-aligned points across eight weeks", () => {
+  const store = seededStore();
+  seedWeaknessHistory(store);
+  const profile = service(store, new MemoryTacticalProfileRepository());
+
+  const progress = profile.getProgress("2026-07-25T00:00:00.000Z");
+  const latestFork = progress.snapshots.at(-1)?.estimates.find(
+    (estimate) => estimate.taskFamily === "line" && estimate.theme === "fork"
+  );
+
+  assert.equal(progress.phase, "ready");
+  assert.equal(progress.periodStart, "2026-05-30T00:00:00.000Z");
+  assert.equal(progress.periodEnd, "2026-07-25T00:00:00.000Z");
+  assert.equal(progress.snapshots.length, 6);
+  assert.equal(progress.snapshots[0]?.estimates.length, 0);
+  assert.equal(latestFork?.distinctPuzzleCount, 12);
+  assert.equal(latestFork?.distinctSessionCount, 3);
+  assert.ok((latestFork?.solveEvidenceWeight ?? 0) > 0);
+  assert.equal(latestFork?.speedEvidenceWeight, 0);
+  assert.equal(progress.evaluation.signals[0]?.status, "recommended");
+  assert.equal(progress.evaluation.signals[0]?.reason, "solve_rate");
+});
+
 test("one rare-theme miss enters Review without becoming a Tactical Profile recommendation", () => {
   const store = seededStore();
   store.seedPuzzles([{
@@ -125,8 +148,10 @@ test("a clean Tactical Profile read uses daily cells without rescanning canonica
   };
 
   const snapshot = createProfile().getSnapshot("2026-07-26T00:00:00.000Z");
+  const progress = createProfile().getProgress("2026-07-26T00:00:00.000Z");
 
   assert.equal(snapshot.phase, "ready");
+  assert.equal(progress.snapshots.length, 6);
   assert.equal(rawHistoryReads, 0);
   assert.equal(fullSessionHistoryReads, 0);
   assert.equal(snapshot.buildState.evaluatedAt, "2026-07-25T00:00:00.000Z");

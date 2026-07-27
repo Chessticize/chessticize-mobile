@@ -168,7 +168,13 @@ export function HistoryProgressScreen({
         {selectedSeries ? (
           <>
             <Text style={styles.metricLabel}>{selectedSeries.metricLabel}</Text>
-            <StrengthTrendChart series={selectedSeries} />
+            <StrengthTrendChart
+              sampleUnitLabel={presentation.sampleUnitLabel}
+              series={selectedSeries}
+            />
+            <Text style={styles.sampleKey}>
+              n = {presentation.sampleUnitLabel}
+            </Text>
             <Text style={styles.baselineLabel}>
               {selectedSeries.baselineLabel}
             </Text>
@@ -203,14 +209,18 @@ export function HistoryProgressScreen({
 }
 
 function StrengthTrendChart({
+  sampleUnitLabel,
   series
 }: {
+  sampleUnitLabel: string;
   series: HistoryStrengthSeries;
 }): React.JSX.Element {
   return (
     <View
       accessibilityLabel={`${series.label} ${series.metricLabel}. ${series.points
-        .map((point) => `${point.label}: ${point.valueLabel} from ${point.sampleSize} eligible puzzles`)
+        .map((point) =>
+          `${point.label}: ${point.valueLabel} from ${point.sampleSize} ${sampleUnitLabel}`
+        )
         .join(". ")}`}
       style={styles.chart}
       testID="history-strength-chart"
@@ -238,7 +248,7 @@ function StrengthTrendChart({
               {point.label}
             </Text>
             <Text
-              accessibilityLabel={`${point.sampleSize} eligible puzzles`}
+              accessibilityLabel={`${point.sampleSize} ${sampleUnitLabel}`}
               numberOfLines={1}
               style={styles.chartSample}
             >
@@ -560,7 +570,7 @@ const styles = StyleSheet.create({
     textAlign: "right"
   },
   chart: {
-    height: 176,
+    height: 192,
     justifyContent: "flex-end",
     overflow: "hidden",
     position: "relative"
@@ -625,6 +635,10 @@ const styles = StyleSheet.create({
     fontSize: 9,
     textAlign: "center",
     width: "100%"
+  },
+  sampleKey: {
+    color: "#64748B",
+    fontSize: 10
   },
   summary: {
     color: "#475569",

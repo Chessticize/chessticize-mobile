@@ -9,6 +9,7 @@ import {
   buildFocusedRunPlan,
   canReofferFocusedRun,
   classifyTacticalProfileAttempt,
+  estimateTacticalProfileThemes,
   evaluateTacticalProfile,
   exactSolveThemePosterior,
   focusedRunPlanRefreshDecision,
@@ -735,6 +736,97 @@ test("Unclear and Slow workflow labels do not change objective model evidence", 
     buildTacticalProfileDailyCells([plain], CALIBRATION),
     buildTacticalProfileDailyCells([labeled], CALIBRATION)
   );
+});
+
+test("theme estimates expose both model heads for balanced progress", () => {
+  const cells = buildTacticalProfileDailyCells(
+    Array.from({ length: 8 }, (_, index) => tacticalAttempt({
+      attempt: {
+        id: `estimate-${index}`,
+        sessionId: `estimate-session-${index % 2}`,
+        completedAt: `2026-07-${String(10 + index).padStart(2, "0")}T00:00:20.000Z`,
+        elapsedMs: 24_000
+      },
+      puzzle: {
+        id: `estimate-puzzle-${index}`,
+        themes: ["fork"]
+      }
+    })),
+    CALIBRATION
+  );
+
+  const [estimate] = estimateTacticalProfileThemes({
+    cells,
+    calibration: CALIBRATION,
+    now: "2026-07-25T00:00:00.000Z"
+  });
+
+  assert.ok(estimate);
+  assert.equal(estimate.theme, "fork");
+  assert.equal(estimate.distinctPuzzleCount, 8);
+  assert.equal(estimate.distinctSessionCount, 2);
+  assert.ok(estimate.solveEvidenceWeight > 0);
+  assert.ok(estimate.speedEvidenceWeight > 0);
+  assert.ok(Number.isFinite(estimate.expectedFailuresPer100));
+  assert.ok(Number.isFinite(estimate.completedTimeMultiplier));
+});
+
+test("historical theme estimates exclude cells completed after the requested date", () => {
+  const cells = buildTacticalProfileDailyCells([
+    tacticalAttempt({
+      attempt: {
+        id: "past-estimate",
+        result: "wrong",
+        sessionId: "past-session",
+        completedAt: "2026-07-10T00:00:20.000Z"
+      },
+      puzzle: { id: "past-puzzle", themes: ["fork"] }
+    }),
+    tacticalAttempt({
+      attempt: {
+        id: "future-estimate",
+        sessionId: "future-session",
+        completedAt: "2026-07-24T00:00:20.000Z"
+      },
+      puzzle: { id: "future-puzzle", themes: ["fork"] }
+    })
+  ], CALIBRATION);
+  const historical = estimateTacticalProfileThemes({
+    cells,
+    calibration: CALIBRATION,
+    now: "2026-07-15T00:00:00.000Z"
+  });
+  const pastOnly = estimateTacticalProfileThemes({
+    cells: cells.filter((cell) => cell.completedDay <= "2026-07-15"),
+    calibration: CALIBRATION,
+    now: "2026-07-15T00:00:00.000Z"
+  });
+  const current = estimateTacticalProfileThemes({
+    cells,
+    calibration: CALIBRATION,
+    now: "2026-07-25T00:00:00.000Z"
+  });
+  const historicalEvaluation = evaluateTacticalProfile({
+    cells,
+    calibration: CALIBRATION,
+    naturalFrequency: { line: { fork: 0.1 }, arrow_duel: {} },
+    now: "2026-07-15T00:00:00.000Z"
+  });
+  const pastOnlyEvaluation = evaluateTacticalProfile({
+    cells: cells.filter((cell) => cell.completedDay <= "2026-07-15"),
+    calibration: CALIBRATION,
+    naturalFrequency: { line: { fork: 0.1 }, arrow_duel: {} },
+    now: "2026-07-15T00:00:00.000Z"
+  });
+
+  assert.deepEqual(historical, pastOnly);
+  assert.deepEqual(historicalEvaluation, pastOnlyEvaluation);
+  assert.ok(
+    (current[0]?.solveEvidenceWeight ?? 0) >
+    (historical[0]?.solveEvidenceWeight ?? 0)
+  );
+  assert.equal(historical[0]?.distinctPuzzleCount, 1);
+  assert.equal(current[0]?.distinctPuzzleCount, 2);
 });
 
 test("one rare-theme miss stays collecting while diverse repeated misses can recommend", () => {

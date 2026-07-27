@@ -553,6 +553,19 @@ export type TacticalProfileEvaluation = {
   observedThemeCount: number;
 };
 
+export type TacticalProfileThemeEstimate = {
+  taskFamily: TacticalProfileTaskFamily;
+  theme: string;
+  distinctPuzzleCount: number;
+  distinctSessionCount: number;
+  solveEvidenceWeight: number;
+  speedEvidenceWeight: number;
+  solveConfidence: number;
+  speedConfidence: number;
+  expectedFailuresPer100: number;
+  completedTimeMultiplier: number;
+};
+
 export type SolveThemeObservation = {
   baselineProbability: number;
   sensitivity: number;
@@ -740,106 +753,19 @@ export function evaluateTacticalProfile(input: {
   previousRecommendedSignalIds?: readonly string[];
 }): TacticalProfileEvaluation {
   assertValidTacticalProfileCalibrationArtifact(input.calibration);
-  const nowMs = new Date(input.now).getTime();
-  if (!Number.isFinite(nowMs)) {
-    throw new Error("Tactical Profile evaluation time must be a valid ISO timestamp");
-  }
-  const aggregates = new Map<string, MutableEvaluationAggregate>();
-
-  for (const cell of input.cells) {
-    if (!sameCacheIdentity(cell, input.calibration)) {
-      continue;
-    }
-    const familyCalibration = input.calibration.families[cell.taskFamily];
-    if (!isActiveFamilyCalibration(familyCalibration)) {
-      continue;
-    }
-    const decay = recencyWeight(
-      cell.completedDay,
-      nowMs,
-      input.calibration.recencyHalfLifeDays
-    );
-    const key = `${cell.taskFamily}\u0000${cell.theme}`;
-    const aggregate = aggregates.get(key) ?? mutableEvaluationAggregate(
-      cell.taskFamily,
-      cell.theme
-    );
-    aggregate.solveScore += decay * cell.solveScore;
-    aggregate.solveInformation += decay * cell.solveInformation;
-    aggregate.solveExpectedSuccess += decay * cell.solveExpectedSuccess;
-    aggregate.solveObservedSuccess += decay * cell.solveObservedSuccess;
-    aggregate.solveSensitivity += decay * cell.solveSensitivity;
-    aggregate.solveWeight += decay * cell.solveWeight;
-    aggregate.speedWeightedResidual += decay * cell.speedWeightedResidual;
-    aggregate.speedPrecision += decay * cell.speedPrecision;
-    aggregate.speedWeight += decay * cell.speedWeight;
-    cell.distinctPuzzleIds.forEach((id) => aggregate.distinctPuzzleIds.add(id));
-    cell.distinctSessionIds.forEach((id) => aggregate.distinctSessionIds.add(id));
-    aggregates.set(key, aggregate);
-  }
-
   const signals: TacticalProfileModelSignal[] = [];
   const previousRecommendedSignalIds = new Set(input.previousRecommendedSignalIds ?? []);
-  for (const aggregate of aggregates.values()) {
-    const familyCalibration = input.calibration.families[aggregate.taskFamily];
-    if (!isActiveFamilyCalibration(familyCalibration)) {
-      continue;
-    }
-    const solvePosterior = posteriorFromScoreInformation(
-      aggregate.solveScore,
-      aggregate.solveInformation,
-      familyCalibration.solve.themePriorSdRating
+  const analyses = tacticalProfileThemeAnalyses(
+    input.cells,
+    input.calibration,
+    input.now
+  );
+  for (const analysis of analyses) {
+    const watchConfidence = Math.max(
+      analysis.solveConfidence,
+      analysis.speedConfidence
     );
-    const solveConfidence = normalCdf(
-      (-familyCalibration.solve.practicalDeficitRating - solvePosterior.mean) /
-      solvePosterior.standardDeviation
-    );
-    const representativeProbability = aggregate.solveWeight > 0
-      ? clampProbability(aggregate.solveExpectedSuccess / aggregate.solveWeight)
-      : 0.5;
-    const representativeSensitivity = aggregate.solveWeight > 0
-      ? aggregate.solveSensitivity / aggregate.solveWeight
-      : 0;
-    const expectedFailuresPer100 = Math.max(
-      0,
-      100 * (
-        representativeProbability -
-        logistic(
-          logit(representativeProbability) +
-          representativeSensitivity * solvePosterior.mean
-        )
-      )
-    );
-    const solveImpactPasses =
-      expectedFailuresPer100 >= familyCalibration.solve.minExpectedFailuresPer100;
-    const solveRecommended =
-      solveConfidence >= input.calibration.evidence.recommendationProbability &&
-      solveImpactPasses;
-
-    const speedPosterior = familyCalibration.speed && aggregate.speedPrecision > 0
-      ? posteriorFromWeightedNormal(
-          aggregate.speedWeightedResidual,
-          aggregate.speedPrecision,
-          familyCalibration.speed.themePriorSdLogSeconds
-        )
-      : undefined;
-    const speedThreshold = familyCalibration.speed
-      ? Math.log(familyCalibration.speed.practicalTimeMultiplier)
-      : Number.POSITIVE_INFINITY;
-    const speedConfidence = speedPosterior
-      ? 1 - normalCdf(
-          (speedThreshold - speedPosterior.mean) /
-          speedPosterior.standardDeviation
-        )
-      : 0;
-    const completedTimeMultiplier = speedPosterior
-      ? Math.exp(speedPosterior.mean)
-      : 1;
-    const speedRecommended =
-      speedConfidence >= input.calibration.evidence.recommendationProbability &&
-      completedTimeMultiplier >= (familyCalibration.speed?.practicalTimeMultiplier ?? Infinity);
-    const watchConfidence = Math.max(solveConfidence, speedConfidence);
-    const signalId = `${aggregate.taskFamily}:${aggregate.theme}`;
+    const signalId = `${analysis.taskFamily}:${analysis.theme}`;
     const wasRecommended = previousRecommendedSignalIds.has(signalId);
     const minimumVisibleConfidence = wasRecommended
       ? Math.min(
@@ -851,51 +777,62 @@ export function evaluateTacticalProfile(input: {
       continue;
     }
 
-    const diversityPasses =
-      aggregate.distinctPuzzleIds.size >= input.calibration.evidence.minDistinctPuzzles &&
-      aggregate.distinctSessionIds.size >= input.calibration.evidence.minDistinctSessions;
     const solveRetained =
       wasRecommended &&
-      solveConfidence >= input.calibration.evidence.recommendationExitProbability &&
-      solveImpactPasses;
+      analysis.solveConfidence >= input.calibration.evidence.recommendationExitProbability &&
+      analysis.solveImpactPasses;
     const speedRetained =
       wasRecommended &&
-      speedConfidence >= input.calibration.evidence.recommendationExitProbability &&
-      completedTimeMultiplier >= (familyCalibration.speed?.practicalTimeMultiplier ?? Infinity);
-    const recommended = diversityPasses &&
-      (solveRecommended || speedRecommended || solveRetained || speedRetained);
+      analysis.speedConfidence >= input.calibration.evidence.recommendationExitProbability &&
+      analysis.completedTimeMultiplier >= analysis.practicalTimeMultiplier;
+    const recommended = analysis.diversityPasses &&
+      (
+        analysis.solveRecommended ||
+        analysis.speedRecommended ||
+        solveRetained ||
+        speedRetained
+      );
     const solveWatch =
-      solveConfidence >= input.calibration.evidence.watchProbability &&
-      solveImpactPasses;
+      analysis.solveConfidence >= input.calibration.evidence.watchProbability &&
+      analysis.solveImpactPasses;
     const speedWatch =
-      speedConfidence >= input.calibration.evidence.watchProbability &&
-      completedTimeMultiplier > 1;
+      analysis.speedConfidence >= input.calibration.evidence.watchProbability &&
+      analysis.completedTimeMultiplier > 1;
     const reason: TacticalFocusReason =
-      ((solveRecommended || solveRetained) && (speedRecommended || speedRetained)) ||
+      (
+        (analysis.solveRecommended || solveRetained) &&
+        (analysis.speedRecommended || speedRetained)
+      ) ||
         (solveWatch && speedWatch)
         ? "both"
-        : speedRecommended || speedWatch
+        : analysis.speedRecommended || speedWatch
           ? "completed_speed"
           : "solve_rate";
     const naturalFrequency =
-      normalizedNaturalFrequency(input.naturalFrequency[aggregate.taskFamily]?.[aggregate.theme]);
+      normalizedNaturalFrequency(
+        input.naturalFrequency[analysis.taskFamily]?.[analysis.theme]
+      );
     const opportunityWeight = Math.max(
       input.calibration.opportunity.minimumWeight,
       naturalFrequency ** input.calibration.opportunity.exponent
     );
-    const solveUtility = solveImpactPasses
-      ? expectedFailuresPer100 /
-        familyCalibration.solve.minExpectedFailuresPer100
+    const solveUtility = analysis.solveImpactPasses
+      ? analysis.expectedFailuresPer100 /
+        analysis.minExpectedFailuresPer100
       : 0;
-    const speedUtility = familyCalibration.speed && completedTimeMultiplier > 1
-      ? (completedTimeMultiplier - 1) /
-        (familyCalibration.speed.practicalTimeMultiplier - 1)
+    const speedUtility =
+      analysis.hasSpeedCalibration && analysis.completedTimeMultiplier > 1
+      ? (analysis.completedTimeMultiplier - 1) /
+        (analysis.practicalTimeMultiplier - 1)
       : 0;
-    const strongestConfidence = Math.max(solveConfidence, speedConfidence);
+    const strongestConfidence = Math.max(
+      analysis.solveConfidence,
+      analysis.speedConfidence
+    );
     signals.push({
       id: signalId,
-      taskFamily: aggregate.taskFamily,
-      theme: aggregate.theme,
+      taskFamily: analysis.taskFamily,
+      theme: analysis.theme,
       reason,
       status: recommended ? "recommended" : "watch",
       confidence:
@@ -904,12 +841,12 @@ export function evaluateTacticalProfile(input: {
           : strongestConfidence >= input.calibration.evidence.recommendationProbability
             ? "high"
             : "developing",
-      distinctPuzzleCount: aggregate.distinctPuzzleIds.size,
-      distinctSessionCount: aggregate.distinctSessionIds.size,
-      solveConfidence,
-      speedConfidence,
-      expectedFailuresPer100,
-      completedTimeMultiplier,
+      distinctPuzzleCount: analysis.distinctPuzzleCount,
+      distinctSessionCount: analysis.distinctSessionCount,
+      solveConfidence: analysis.solveConfidence,
+      speedConfidence: analysis.speedConfidence,
+      expectedFailuresPer100: analysis.expectedFailuresPer100,
+      completedTimeMultiplier: analysis.completedTimeMultiplier,
       actionPriority: Math.max(solveUtility, speedUtility) * opportunityWeight
     });
   }
@@ -927,11 +864,8 @@ export function evaluateTacticalProfile(input: {
       theme: signal.theme,
       reason: signal.reason
     }));
-  const hasDiverseEvidence = [...aggregates.values()].some((aggregate) =>
-    aggregate.distinctPuzzleIds.size >=
-      input.calibration.evidence.minDistinctPuzzles &&
-    aggregate.distinctSessionIds.size >=
-      input.calibration.evidence.minDistinctSessions
+  const hasDiverseEvidence = analyses.some(
+    (analysis) => analysis.diversityPasses
   );
   return {
     phase: rankedFocuses.length > 0
@@ -941,8 +875,32 @@ export function evaluateTacticalProfile(input: {
         : "balanced",
     signals,
     rankedFocuses,
-    observedThemeCount: aggregates.size
+    observedThemeCount: analyses.length
   };
+}
+
+export function estimateTacticalProfileThemes(input: {
+  cells: readonly TacticalProfileDailyCell[];
+  calibration: TacticalProfileCalibrationArtifact;
+  now: string;
+}): TacticalProfileThemeEstimate[] {
+  assertValidTacticalProfileCalibrationArtifact(input.calibration);
+  return tacticalProfileThemeAnalyses(
+    input.cells,
+    input.calibration,
+    input.now
+  ).map((analysis) => ({
+    taskFamily: analysis.taskFamily,
+    theme: analysis.theme,
+    distinctPuzzleCount: analysis.distinctPuzzleCount,
+    distinctSessionCount: analysis.distinctSessionCount,
+    solveEvidenceWeight: analysis.solveEvidenceWeight,
+    speedEvidenceWeight: analysis.speedEvidenceWeight,
+    solveConfidence: analysis.solveConfidence,
+    speedConfidence: analysis.speedConfidence,
+    expectedFailuresPer100: analysis.expectedFailuresPer100,
+    completedTimeMultiplier: analysis.completedTimeMultiplier
+  }));
 }
 
 export function approximateSolveThemePosterior(
@@ -1026,6 +984,158 @@ type MutableEvaluationAggregate = {
   distinctPuzzleIds: Set<string>;
   distinctSessionIds: Set<string>;
 };
+
+type TacticalProfileThemeAnalysis = TacticalProfileThemeEstimate & {
+  diversityPasses: boolean;
+  solveImpactPasses: boolean;
+  solveRecommended: boolean;
+  speedRecommended: boolean;
+  hasSpeedCalibration: boolean;
+  minExpectedFailuresPer100: number;
+  practicalTimeMultiplier: number;
+};
+
+function tacticalProfileThemeAnalyses(
+  cells: readonly TacticalProfileDailyCell[],
+  calibration: TacticalProfileCalibrationArtifact,
+  now: string
+): TacticalProfileThemeAnalysis[] {
+  const nowMs = new Date(now).getTime();
+  if (!Number.isFinite(nowMs)) {
+    throw new Error("Tactical Profile evaluation time must be a valid ISO timestamp");
+  }
+  const nowDay = new Date(nowMs).toISOString().slice(0, 10);
+  const aggregates = new Map<string, MutableEvaluationAggregate>();
+
+  for (const cell of cells) {
+    if (
+      !sameCacheIdentity(cell, calibration) ||
+      cell.completedDay > nowDay
+    ) {
+      continue;
+    }
+    const familyCalibration = calibration.families[cell.taskFamily];
+    if (!isActiveFamilyCalibration(familyCalibration)) {
+      continue;
+    }
+    const decay = recencyWeight(
+      cell.completedDay,
+      nowMs,
+      calibration.recencyHalfLifeDays
+    );
+    const key = `${cell.taskFamily}\u0000${cell.theme}`;
+    const aggregate = aggregates.get(key) ?? mutableEvaluationAggregate(
+      cell.taskFamily,
+      cell.theme
+    );
+    aggregate.solveScore += decay * cell.solveScore;
+    aggregate.solveInformation += decay * cell.solveInformation;
+    aggregate.solveExpectedSuccess += decay * cell.solveExpectedSuccess;
+    aggregate.solveObservedSuccess += decay * cell.solveObservedSuccess;
+    aggregate.solveSensitivity += decay * cell.solveSensitivity;
+    aggregate.solveWeight += decay * cell.solveWeight;
+    aggregate.speedWeightedResidual += decay * cell.speedWeightedResidual;
+    aggregate.speedPrecision += decay * cell.speedPrecision;
+    aggregate.speedWeight += decay * cell.speedWeight;
+    cell.distinctPuzzleIds.forEach((id) => aggregate.distinctPuzzleIds.add(id));
+    cell.distinctSessionIds.forEach((id) => aggregate.distinctSessionIds.add(id));
+    aggregates.set(key, aggregate);
+  }
+
+  return [...aggregates.values()]
+    .map((aggregate): TacticalProfileThemeAnalysis => {
+      const familyCalibration = calibration.families[aggregate.taskFamily];
+      if (!isActiveFamilyCalibration(familyCalibration)) {
+        throw new Error("Tactical Profile active family changed during evaluation");
+      }
+      const solvePosterior = posteriorFromScoreInformation(
+        aggregate.solveScore,
+        aggregate.solveInformation,
+        familyCalibration.solve.themePriorSdRating
+      );
+      const solveConfidence = normalCdf(
+        (
+          -familyCalibration.solve.practicalDeficitRating -
+          solvePosterior.mean
+        ) / solvePosterior.standardDeviation
+      );
+      const representativeProbability = aggregate.solveWeight > 0
+        ? clampProbability(
+            aggregate.solveExpectedSuccess / aggregate.solveWeight
+          )
+        : 0.5;
+      const representativeSensitivity = aggregate.solveWeight > 0
+        ? aggregate.solveSensitivity / aggregate.solveWeight
+        : 0;
+      const expectedFailuresPer100 = Math.max(
+        0,
+        100 * (
+          representativeProbability -
+          logistic(
+            logit(representativeProbability) +
+            representativeSensitivity * solvePosterior.mean
+          )
+        )
+      );
+      const solveImpactPasses =
+        expectedFailuresPer100 >=
+        familyCalibration.solve.minExpectedFailuresPer100;
+      const solveRecommended =
+        solveConfidence >= calibration.evidence.recommendationProbability &&
+        solveImpactPasses;
+      const speedPosterior =
+        familyCalibration.speed && aggregate.speedPrecision > 0
+          ? posteriorFromWeightedNormal(
+              aggregate.speedWeightedResidual,
+              aggregate.speedPrecision,
+              familyCalibration.speed.themePriorSdLogSeconds
+            )
+          : undefined;
+      const practicalTimeMultiplier =
+        familyCalibration.speed?.practicalTimeMultiplier ??
+        Number.POSITIVE_INFINITY;
+      const speedThreshold = Math.log(practicalTimeMultiplier);
+      const speedConfidence = speedPosterior
+        ? 1 - normalCdf(
+            (speedThreshold - speedPosterior.mean) /
+            speedPosterior.standardDeviation
+          )
+        : 0;
+      const completedTimeMultiplier = speedPosterior
+        ? Math.exp(speedPosterior.mean)
+        : 1;
+      return {
+        taskFamily: aggregate.taskFamily,
+        theme: aggregate.theme,
+        distinctPuzzleCount: aggregate.distinctPuzzleIds.size,
+        distinctSessionCount: aggregate.distinctSessionIds.size,
+        solveEvidenceWeight: aggregate.solveWeight,
+        speedEvidenceWeight: aggregate.speedWeight,
+        solveConfidence,
+        speedConfidence,
+        expectedFailuresPer100,
+        completedTimeMultiplier,
+        diversityPasses:
+          aggregate.distinctPuzzleIds.size >=
+            calibration.evidence.minDistinctPuzzles &&
+          aggregate.distinctSessionIds.size >=
+            calibration.evidence.minDistinctSessions,
+        solveImpactPasses,
+        solveRecommended,
+        speedRecommended:
+          speedConfidence >= calibration.evidence.recommendationProbability &&
+          completedTimeMultiplier >= practicalTimeMultiplier,
+        hasSpeedCalibration: familyCalibration.speed !== null,
+        minExpectedFailuresPer100:
+          familyCalibration.solve.minExpectedFailuresPer100,
+        practicalTimeMultiplier
+      };
+    })
+    .sort((left, right) =>
+      left.taskFamily.localeCompare(right.taskFamily) ||
+      left.theme.localeCompare(right.theme)
+    );
+}
 
 function mutableDailyCell(input: {
   calibration: TacticalProfileCalibrationArtifact;

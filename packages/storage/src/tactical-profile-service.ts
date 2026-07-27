@@ -3,6 +3,7 @@ import {
   buildFocusedRunPlan,
   buildSprintConfig,
   buildTacticalProfileDailyCells,
+  estimateTacticalProfileThemes,
   evaluateTacticalProfile,
   namedThemesForSelection,
   tacticalProfileCalibrationAssurance
@@ -15,6 +16,7 @@ import type {
   TacticalProfileCalibrationArtifact,
   TacticalProfileEvaluation,
   TacticalProfileTaskFamily,
+  TacticalProfileThemeEstimate,
   TaskFamilyRankedTacticalFocus
 } from "../../core/src/index.ts";
 import type {
@@ -67,6 +69,23 @@ export type TacticalProfileSnapshot = {
   buildState: TacticalProfileBuildState;
   unavailableFamilies: Readonly<Partial<Record<TacticalProfileTaskFamily, string>>>;
   homeLeadSignalId?: string;
+};
+
+export type TacticalProfileProgressSnapshot = {
+  asOf: string;
+  estimates: readonly TacticalProfileThemeEstimate[];
+};
+
+export type TacticalProfileProgress = {
+  phase: TacticalProfileSnapshot["phase"];
+  buildStatus: TacticalProfileSnapshot["buildState"]["status"];
+  assurance: TacticalProfileCalibrationAssurance;
+  periodStart: string;
+  periodEnd: string;
+  snapshots: readonly TacticalProfileProgressSnapshot[];
+  evaluation: TacticalProfileEvaluation;
+  minDistinctPuzzles: number;
+  minDistinctSessions: number;
 };
 
 export type PreparedFocusedRun = {
@@ -147,6 +166,45 @@ export class TacticalProfileService {
     } catch (error) {
       this.recordCacheFailure(error);
       return this.failedSnapshot();
+    }
+  }
+
+  getProgress(now = new Date().toISOString()): TacticalProfileProgress {
+    const snapshot = this.getSnapshot(now);
+    const periodEnd = snapshot.buildState.evaluatedAt ?? now;
+    const asOfDates = tacticalProgressAsOfDates(periodEnd);
+    if (snapshot.phase === "building") {
+      return tacticalProfileProgressFromSnapshot(
+        snapshot,
+        asOfDates,
+        [],
+        this.calibration.evidence
+      );
+    }
+    try {
+      this.ensureRepositoryReady();
+      const cells = this.repository.listDailyCells(this.identity);
+      return tacticalProfileProgressFromSnapshot(
+        snapshot,
+        asOfDates,
+        asOfDates.map((asOf) => ({
+          asOf,
+          estimates: estimateTacticalProfileThemes({
+            cells,
+            calibration: this.calibration,
+            now: asOf
+          })
+        })),
+        this.calibration.evidence
+      );
+    } catch (error) {
+      this.recordCacheFailure(error);
+      return tacticalProfileProgressFromSnapshot(
+        this.failedSnapshot(),
+        asOfDates,
+        [],
+        this.calibration.evidence
+      );
     }
   }
 
@@ -1023,6 +1081,47 @@ export class TacticalProfileService {
       calibrationId: this.calibration.calibrationId
     };
   }
+}
+
+const TACTICAL_PROGRESS_DAY_OFFSETS = [56, 45, 34, 22, 11, 0] as const;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function tacticalProgressAsOfDates(periodEnd: string): string[] {
+  const periodEndMs = new Date(periodEnd).getTime();
+  if (!Number.isFinite(periodEndMs)) {
+    return [];
+  }
+  return TACTICAL_PROGRESS_DAY_OFFSETS.map(
+    (daysBeforeEnd) => new Date(
+      periodEndMs - daysBeforeEnd * DAY_MS
+    ).toISOString()
+  );
+}
+
+function tacticalProfileProgressFromSnapshot(
+  snapshot: TacticalProfileSnapshot,
+  asOfDates: readonly string[],
+  snapshots: readonly TacticalProfileProgressSnapshot[],
+  evidence: Pick<
+    TacticalProfileCalibrationArtifact["evidence"],
+    "minDistinctPuzzles" | "minDistinctSessions"
+  >
+): TacticalProfileProgress {
+  const periodEnd =
+    snapshot.buildState.evaluatedAt ??
+    asOfDates.at(-1) ??
+    new Date(0).toISOString();
+  return {
+    phase: snapshot.phase,
+    buildStatus: snapshot.buildState.status,
+    assurance: snapshot.assurance,
+    periodStart: asOfDates[0] ?? periodEnd,
+    periodEnd,
+    snapshots,
+    evaluation: snapshot.evaluation,
+    minDistinctPuzzles: evidence.minDistinctPuzzles,
+    minDistinctSessions: evidence.minDistinctSessions
+  };
 }
 
 function updatedRatingAnchors(
