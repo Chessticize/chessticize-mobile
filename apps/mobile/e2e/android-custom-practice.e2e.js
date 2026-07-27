@@ -155,7 +155,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await waitForVisibleInPracticeScroll('practice-progress-summary');
       await waitForElementAccessibilityLabelContaining(
         'practice-progress-summary',
-        `Rating ${practiceFixture.expectedRatingAfter}`,
+        `rating ${practiceFixture.expectedRatingAfter}`,
         10000,
         50
       );
