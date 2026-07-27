@@ -120,6 +120,28 @@ ADR is not itself a defect.
   clean exact head of the integrated release branch. Contributor-branch
   evidence is supporting evidence only; rerun or document valid evidence reuse
   after integration according to the App-input and test-runner identity rules.
+- Freeze an RC only after known release work has converged. Record the RC
+  generation, frozen exact head, scope, App-input digest, and blockers in a
+  draft release-PR comment without committing a freeze marker. A frozen RC
+  rejects planned development, features, opportunistic refactors, and
+  non-blocking polish.
+- A validation-discovered host-side test-runner defect does not move the frozen
+  App head. Correct it on a separate evidence branch based on the frozen App
+  source, prove unchanged App inputs and artifact bytes, and rerun only the
+  affected scope. Record both SHAs and integrate that test correction into
+  `main` later through an ordinary squash PR; do not merge it into the frozen
+  release branch.
+- A validation-discovered product, App-input, or required release-identity
+  defect invalidates the current RC generation before the release branch
+  moves. Enter remediation, merge only reviewed focused blocker fixes, batch
+  all known fixes in a convergence sweep, then freeze the new exact head as the
+  next RC generation. Exact-head fast checks always rerun; rebuild and rerun
+  only the artifacts and validation scopes invalidated by the changed
+  boundary. Never relabel evidence from the invalidated generation.
+- Queue record-only changes until after release unless they are required for
+  the release. A required record correction uses remediation and a new RC
+  generation, although unchanged native App evidence may still be reused after
+  the fail-closed comparison. See `docs/RELEASE_SOURCE_POLICY.md`.
 - The exact validated release-branch head is the binary source and immutable
   platform-tag target. The later merge commit on `main` is a forward-integration
   record whose release-side parent preserves that exact commit and its SHA; it

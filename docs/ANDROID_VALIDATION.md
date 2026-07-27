@@ -110,6 +110,14 @@ partial run into a pass.
 
 ## Test-only reruns with retained APKs
 
+During an active RC freeze, first classify the finding under
+`docs/RELEASE_SOURCE_POLICY.md`. A host-side test-runner correction uses the
+retained-APK path below without moving the frozen release branch. A product,
+App-input, or required release-identity correction invalidates that RC
+generation before its focused fix merges; freeze a new generation afterward
+and rebuild only the affected artifacts and validation scope. Planned
+development and non-blocking polish wait for the next version.
+
 When a failure is classified as a host-side spec, selector, wait, assertion,
 evidence collector, or non-bundled fixture defect, do not rebuild the App.
 Commit the test correction, keep current-head fast checks green, then dispatch

@@ -253,6 +253,26 @@ passes. Record both SHAs, the App-input digest, and artifact checksum rather
 than requiring identical full Git trees. Rerun an affected test scope after a
 test-runner-only change without rebuilding the App.
 
+### Validation findings after RC freeze
+
+RC freeze stops planned development, not blocker remediation. Follow the state
+machine in `docs/RELEASE_SOURCE_POLICY.md`:
+
+- a transient failure on unchanged inputs gets one specific-job retry;
+- a host-side spec, selector, wait, assertion, collector, or non-bundled
+  fixture fix stays on a separate evidence branch, keeps the frozen App source
+  unchanged, and reruns only its affected scope after the App-input and
+  artifact checks pass; and
+- a product, App-input, or required release-identity fix invalidates the
+  generation before merge, enters remediation, and creates a new frozen
+  generation after the focused fix and convergence sweep.
+
+For a new generation, always rerun current-head fast checks. Rebuild affected
+App artifacts and rerun the smallest scope that proves the changed boundary;
+do not select Full native validation solely because the RC number advanced.
+Queue record-only work until after release unless it is required for the
+release.
+
 ### Prefer Incremental Review
 
 After a coherent PR has an accepted review baseline, review only the new diff,

@@ -123,6 +123,33 @@ public Release has exactly the source manifest, Play-signed APK, and checksum,
 and its receipt is retained. A source-only Release remains a valid pre-mirror
 state; report `APK mirror pending` whenever mirroring is still open.
 
+## Respect RC freeze generations
+
+Freeze only after known release work has converged. Record the generation,
+exact release-branch head, scope, App-input digest, and blockers in the draft
+release PR without committing a marker that changes the recorded head.
+
+During a frozen generation:
+
+- reject planned development, features, refactors, and non-blocking polish;
+- retry one transient failure only on unchanged inputs;
+- fix a host-side test-runner defect on a separate evidence branch based on the
+  frozen App source, authenticate the retained App artifact, and rerun only the
+  affected scope without moving the release branch;
+- invalidate the generation before merging any required product, App-input, or
+  release-identity fix, enter remediation, batch known blockers, then freeze
+  the new head as the next generation; and
+- queue record-only work unless it is required for the release.
+
+Exact-head fast checks run for every new generation. Rebuild and rerun only
+artifacts and validation gates invalidated by the changed boundary; do not
+restart a full matrix merely because the release-branch SHA changed. Only the
+latest accepted generation may be tagged, signed, submitted, or published.
+Preserve invalidated evidence, and apply the platform replacement rules if an
+immutable tag, signed candidate, or store-consumed build identity already
+exists. See `docs/RELEASE_SOURCE_POLICY.md` for the complete state transition
+and evidence record.
+
 ## Preserve invariants
 
 - Publish matching source before or with every distributed binary, including

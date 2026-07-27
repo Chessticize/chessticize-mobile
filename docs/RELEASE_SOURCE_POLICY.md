@@ -79,6 +79,65 @@ Every other PR uses squash merge. Create immutable platform tags and source
 Releases only from the final approved release commit; never tag an intermediate
 contributor branch or a partially integrated release branch.
 
+## Release Candidate Freeze
+
+Use an explicit release-candidate generation instead of treating the release
+branch as permanently frozen:
+
+1. **Integration open:** approved work for the release may enter through
+   contributor PRs. Do not spend final release-build or native-validation time
+   while known product PRs are still pending.
+2. **RC frozen:** after the convergence sweep and final integration, record
+   `RC-Generation`, `RC-State: frozen`, the exact 40-character release-branch
+   head, freeze time, intended validation scope, App-input digest, and known
+   blockers in a comment on the draft release PR. The comment is the durable
+   freeze record; do not commit a marker that would move the head it records.
+   Only one generation is active.
+3. **RC accepted:** required current-head fast checks, selected native evidence,
+   release review, notes, and identity gates pass for that generation. Only the
+   latest accepted generation may be tagged, signed, submitted, or published.
+4. **Remediation:** a required App or release-identity correction invalidates
+   the active generation before the release branch moves. Record
+   `RC-State: invalidated`, the blocking finding, and the invalidated evidence.
+   Open the branch only to focused blocker-fix PRs, perform another convergence
+   sweep, then freeze the new exact head as `RC-<n+1>`. Never edit, reuse, or
+   relabel the old generation.
+
+An RC freeze rejects planned development, features, opportunistic refactors,
+and non-blocking polish. Defer those changes to the next version on `main`.
+Validation findings use these exception paths:
+
+- **Transient infrastructure failure on unchanged inputs:** preserve the
+  failure and rerun the specific failed job once. Repeated or deterministic
+  failure requires classification rather than more retries.
+- **Host-side test-runner defect:** keep the release branch and frozen App
+  source unchanged. Fix the spec, selector, wait, assertion, evidence collector,
+  or non-bundled fixture on a separate evidence branch based on the frozen App
+  source. After the fail-closed App-input comparison and artifact checksum pass,
+  rerun only the affected scope against the retained App artifact. Record the
+  App source SHA, test-runner SHA, digest, checksum, finding, and result on the
+  release PR. Do not merge the evidence-only correction into the frozen release
+  branch; integrate it into `main` later through an ordinary squash PR.
+- **Product, App-input, or required release-identity defect:** invalidate the
+  current generation and enter remediation. Add the lowest reliable regression
+  test, merge the reviewed focused fix into the release branch with squash,
+  batch all other known blockers, and freeze the resulting head as the next
+  generation. Run exact-head fast checks, rebuild affected App or signed
+  artifacts, and rerun only the validation gates invalidated by the changed
+  boundary. Full native validation is required only when the resulting risk is
+  broad.
+- **Record-only correction:** queue non-blocking documentation, review
+  metadata, or agent-guidance changes until after release so the frozen head
+  stays stable. If the correction is required for this release, use remediation
+  and a new generation; native App evidence may still be reused when the
+  fail-closed comparison passes, but current-head fast and exact identity checks
+  remain required.
+
+If a frozen generation already has an immutable platform tag, signed candidate,
+or store-consumed build identity, follow the platform replacement rules. Never
+move the tag or reuse the consumed build number or Android version code.
+Retain invalidated generations and their artifacts as audit evidence.
+
 ## Pre-Retry Convergence Sweep
 
 Do not immediately restart a complete release matrix after its first failure.
