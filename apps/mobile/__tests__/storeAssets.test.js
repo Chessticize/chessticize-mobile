@@ -218,7 +218,7 @@ describe("App Store assets document", () => {
     );
   });
 
-  it("dismisses the rating popover and restores the editor top before saving", () => {
+  it("saves a changed rating without tapping through the landscape number pad", () => {
     const ratingHelperStart = storeAssetsE2e.indexOf(
       "async function setStoreAssetRatings"
     );
@@ -228,15 +228,16 @@ describe("App Store assets document", () => {
     );
     const ratingHelper = storeAssetsE2e.slice(ratingHelperStart, ratingHelperEnd);
     expect(ratingHelper).toContain(
-      "await element(by.id('practice-run-name-input')).tap();\n"
-      + "    await dismissRunNameKeyboard();\n"
-      + "    await waitFor(element(by.id('practice-run-save')))\n"
+      "await waitFor(element(by.id('practice-run-save')))\n"
       + "      .toBeVisible()\n"
       + "      .withTimeout(10000);\n"
       + "    await element(by.id('practice-run-save')).tap();"
     );
     expect(ratingHelper).not.toContain(
-      "await element(by.id('practice-run-editor-title')).tap();"
+      "await element(by.id('practice-run-name-input')).tap();"
+    );
+    expect(ratingHelper).not.toContain(
+      "await dismissRunNameKeyboard();"
     );
 
     const reviewHelperStart = storeAssetsE2e.indexOf(
