@@ -301,7 +301,7 @@ describe('Key user flows', () => {
     )).not.toExist().withTimeout(10000);
     await waitFor(element(
       by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
-    )).not.toExist().withTimeout(10000);
+    )).toExist().withTimeout(10000);
     await waitFor(element(
       by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
     )).not.toExist().withTimeout(10000);

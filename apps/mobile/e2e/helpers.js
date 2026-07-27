@@ -67,16 +67,16 @@ async function completeFirstUseSessionGuides() {
       return;
     }
     if (await detoxElementExists('practice-session-guide-start')) {
-      await waitFor(element(by.id('practice-session-guide-start')))
-        .toBeVisible()
-        .whileElement(by.id('practice-main-scroll'))
-        .scroll(100, 'down', 0.5, 0.5);
       try {
+        await waitFor(element(by.id('practice-session-guide-start')))
+          .toBeVisible()
+          .whileElement(by.id('practice-main-scroll'))
+          .scroll(100, 'down', 0.5, 0.5);
         await element(by.id('practice-session-guide-start')).tap();
       } catch (error) {
-        // A successful press can replace the current guide step before Detox
-        // finishes resolving the native action. Accept only a public successor
-        // state; preserve every unrelated interaction failure.
+        // The guide can disappear after the existence check or a successful
+        // press can replace it before Detox resolves the native action. Accept
+        // only a public successor state; preserve unrelated interaction failures.
         await sleep(250);
         const guideStillAvailable = await detoxElementExists('practice-session-guide-start');
         const sessionStarted = await detoxElementExists('session-board');
