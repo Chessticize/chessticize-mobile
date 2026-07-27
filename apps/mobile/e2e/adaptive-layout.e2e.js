@@ -235,10 +235,10 @@ async function waitForSettledSprintLayout(
 
 async function waitForHomeTopFrame() {
   await waitFor(element(by.id('practice-action-header'))).toBeVisible().withTimeout(10000);
-  await waitFor(element(by.id('practice-run-standard'))).toBeVisible().withTimeout(10000);
-  // Progress intentionally follows the saved-run catalog and can begin below
-  // the fold on maintained phone viewports. Prove that it rendered without
-  // requiring the top-frame screenshot to expose offscreen content.
+  // Saved-run content can begin below the first-fold guide on maintained phone
+  // viewports. Prove that the catalog rendered without requiring the top-frame
+  // screenshot to expose offscreen content.
+  await waitFor(element(by.id('practice-run-standard'))).toExist().withTimeout(10000);
   await waitFor(element(by.id('practice-progress-summary'))).toExist().withTimeout(10000);
 
   if (expectReviewStripVisible) {

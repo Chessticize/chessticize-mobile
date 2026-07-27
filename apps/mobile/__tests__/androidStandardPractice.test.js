@@ -116,6 +116,9 @@ describe('Android Standard Practice release slice', () => {
     ]);
     expect(practiceJourney).toContain('android-standard-practice.fixture.json');
     expect(practiceJourney).toContain('standardFixture.puzzleSelectionSeed');
+    expect(practiceJourney).toContain(
+      'chessticizePuzzleSelectionId: standardFixture.puzzle.id'
+    );
     expect(practiceJourney).toContain('chessticizeStandardTargetCorrect');
     expect(practiceJourney).toContain('standardFixture.puzzle.solutionMoves[0]');
     expect(practiceJourney).toContain('standardFixture.puzzle.solutionMoves[2]');
