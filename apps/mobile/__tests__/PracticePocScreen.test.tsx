@@ -2794,6 +2794,13 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     press(renderer, "history-attempt-history-unclear");
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe(
+      "Replay screen"
+    );
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+    expect(collectText(findByTestId(renderer, "history-attempt-clear-unclear"))).toBe(
+      "Mark clear"
+    );
     expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
 
     press(renderer, "review-analysis-button");
@@ -7976,7 +7983,11 @@ describe("PracticePocScreen", () => {
       arrowDuelCandidateOrder: ["a1a2", "a2a3"]
     });
     const systemBack = createTestSystemBackSource("android");
-    const renderer = renderScreen({ practiceService: new PracticeService(store), systemBack });
+    const renderer = renderScreen({
+      practiceService: new PracticeService(store),
+      replayTerminologyDesignPreview: true,
+      systemBack
+    });
 
     press(renderer, "history-tab");
     press(renderer, "history-attention-all");
@@ -8011,6 +8022,9 @@ describe("PracticePocScreen", () => {
     );
     press(renderer, "history-attempt-malformed-context-attempt");
     expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe("Replay screen");
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+    expect(findByTestId(renderer, "review-exit").props.accessibilityLabel).toBe("Exit replay");
     expect(collectText(findByTestId(renderer, "history-replay-unavailable"))).toBe(
       "The saved mode or rating context is invalid, so this attempt cannot be replayed safely."
     );
@@ -8268,6 +8282,68 @@ describe("PracticePocScreen", () => {
     expect(collectText(reviewButton)).toContain("Review Mistakes");
     expect(hasStyleEntry(reviewButton, "backgroundColor", "#2563EB")).toBe(true);
     expect(hasStyleEntry(playAgainButton, "backgroundColor", "#2563EB")).toBe(false);
+  });
+
+  it("previews two Unclear and two In Review attempts as a four-entry Replay with status actions", async () => {
+    const renderer = renderLabScenario("practice-sprint-result-replay");
+
+    expect(collectText(findByTestId(renderer, "sprint-result-unclear-summary"))).toContain(
+      "Included in replay"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "In Review"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
+      "2 Unclear + 2 in Review"
+    );
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
+      "Replay 4 attempts"
+    );
+
+    press(renderer, "review-mistakes-button");
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe(
+      "Replay screen"
+    );
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("1 / 4");
+    expect(() => findByTestId(renderer, "review-source-pill")).toThrow();
+    expect(() => findByTestId(renderer, "review-context-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "review-context-needs-review")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-attempt-clear-unclear"))).toBe(
+      "Mark clear"
+    );
+    expect(() => findByTestId(renderer, "review-schedule-add")).toThrow();
+    press(renderer, "history-attempt-clear-unclear");
+    expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
+
+    press(renderer, "review-next");
+    await settleEntryPreview();
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("2 / 4");
+    expect(collectText(findByTestId(renderer, "history-attempt-clear-unclear"))).toBe(
+      "Mark clear"
+    );
+    expect(() => findByTestId(renderer, "review-context-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "review-context-needs-review")).toThrow();
+
+    press(renderer, "review-next");
+    await settleEntryPreview();
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("3 / 4");
+    expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe(
+      "Remove from Review"
+    );
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
+
+    press(renderer, "review-next");
+    await settleEntryPreview();
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("4 / 4");
+    expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe(
+      "Remove from Review"
+    );
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
   });
 
   it("opens a one-shot mistake review after a timeout-only sprint failure", async () => {
@@ -11012,7 +11088,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "replayTerminologyDesignPreview" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
     onRenderCommit?: () => void;
     platformCapabilities?: MobilePlatformCapabilities;
   };
@@ -11129,6 +11205,7 @@ function renderScreen({
   onRenderCommit,
   puzzleSelectionId,
   puzzleSelectionSeed,
+  replayTerminologyDesignPreview,
   runEloEditingMovedToHome,
   runManagementEnabled,
   runManagementPresentation,
@@ -11154,6 +11231,7 @@ function renderScreen({
         moveFeedbackSettings={moveFeedbackSettings}
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
+        replayTerminologyDesignPreview={replayTerminologyDesignPreview}
         runEloEditingMovedToHome={runEloEditingMovedToHome}
         runManagementEnabled={runManagementEnabled}
         runManagementPresentation={runManagementPresentation}

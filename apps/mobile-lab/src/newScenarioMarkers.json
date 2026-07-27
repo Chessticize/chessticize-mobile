@@ -1,1 +1,34 @@
-{}
+{
+  "practice-sprint-result-goal": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "Four-entry post-Sprint Replay for two Unclear and two In Review attempts"
+      }
+    ]
+  },
+  "practice-sprint-result-replay": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "Replay terminology with Mark clear and Remove from Review actions"
+      }
+    ]
+  },
+  "history-attempt-detail": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "History rows open Replay with Replay and Review kept distinct"
+      }
+    ]
+  },
+  "history-replay-unavailable": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "Unavailable History entries keep Replay terminology"
+      }
+    ]
+  }
+}

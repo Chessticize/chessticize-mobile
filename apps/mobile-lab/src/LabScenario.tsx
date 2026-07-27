@@ -245,7 +245,10 @@ function sprintRulesDesignPreviewFor(
   ) {
     return { timeoutCountsAsMistake: true };
   }
-  if (scenarioId === "practice-sprint-result-goal") {
+  if (
+    scenarioId === "practice-sprint-result-goal"
+    || scenarioId === "practice-sprint-result-replay"
+  ) {
     return {
       initialResultState: sprintRulesResultState({
         correctCount: 11,
@@ -254,6 +257,7 @@ function sprintRulesDesignPreviewFor(
         ratingAfter: 1070,
         status: "failed"
       }),
+      resultReplayItems: sprintResultReplayDesignItems(),
       resultUnclearSummary: {
         slowMarkedCount: 1,
         userMarkedCount: 1
@@ -411,6 +415,70 @@ function sprintRulesResultState({
   };
 }
 
+function sprintResultReplayDesignItems(): NonNullable<
+  NonNullable<
+    React.ComponentProps<typeof PracticePocScreen>["sprintRulesDesignPreview"]
+  >["resultReplayItems"]
+> {
+  const completedAt = "2026-07-18T18:00:00.000Z";
+  return [
+    {
+      puzzle: LAB_PUZZLES[0]!,
+      attempt: historyAttempt({
+        completedAt,
+        id: "sprint-result-replay-unclear",
+        puzzleId: LAB_PUZZLES[0]!.id,
+        ratingAfter: 1092,
+        ratingBefore: 1087,
+        result: "correct",
+        unclear: true
+      }),
+      inReview: false
+    },
+    {
+      puzzle: LAB_PUZZLES[1]!,
+      attempt: historyAttempt({
+        completedAt,
+        elapsedMs: 45_000,
+        id: "sprint-result-replay-unclear-slow",
+        puzzleId: LAB_PUZZLES[1]!.id,
+        ratingAfter: 1098,
+        ratingBefore: 1092,
+        result: "correct",
+        timingStatus: "slow",
+        unclear: true
+      }),
+      inReview: false
+    },
+    {
+      puzzle: LAB_PUZZLES[2]!,
+      attempt: historyAttempt({
+        completedAt,
+        id: "sprint-result-replay-in-review-wrong",
+        puzzleId: LAB_PUZZLES[2]!.id,
+        ratingAfter: 1084,
+        ratingBefore: 1098,
+        result: "wrong"
+      }),
+      inReview: true
+    },
+    {
+      puzzle: LAB_PUZZLES[3]!,
+      attempt: historyAttempt({
+        completedAt,
+        elapsedMs: 20_000,
+        id: "sprint-result-replay-in-review-timeout",
+        puzzleId: LAB_PUZZLES[3]!.id,
+        ratingAfter: 1084,
+        ratingBefore: 1084,
+        result: "timed_out",
+        timingStatus: "timed_out"
+      }),
+      inReview: true
+    }
+  ];
+}
+
 export function LabScenarioShell({
   children,
   scenarioId
@@ -511,6 +579,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
+    replayTerminologyDesignPreview:
+      scenarioId.startsWith("history-")
+      || scenarioId === "practice-sprint-result-goal"
+      || scenarioId === "practice-sprint-result-replay",
     sprintRulesDesignPreview: sprintRulesDesignPreviewFor(scenarioId),
     standardTargetCorrect: 1,
     arrowDuelTargetCorrect: 1,
@@ -527,6 +599,11 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
   }
 
   switch (scenarioId) {
+    case "practice-sprint-result-goal":
+    case "practice-sprint-result-replay":
+      service = createSprintResultReplayService();
+      configurePuzzleSource = false;
+      break;
     case "practice-blunder-move-preview":
       service = createIssue272Service(false);
       configurePuzzleSource = false;
@@ -1041,6 +1118,19 @@ function createReviewService(kind: "due" | "overdue"): PracticeService {
   return new PracticeService(store);
 }
 
+function createSprintResultReplayService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles(LAB_PUZZLES);
+  for (const { puzzle } of sprintResultReplayDesignItems().filter((item) => item.inReview)) {
+    store.scheduleMistakeReview({
+      puzzleId: puzzle.id,
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-07-18T18:00:00.000Z");
+  }
+  return new PracticeService(store);
+}
+
 function createHistoryService(
   replayUnavailableOnly: boolean,
   puzzles = LAB_PUZZLES
@@ -1061,8 +1151,9 @@ function createHistoryService(
       startedAt: "2026-07-17T16:00:00.000Z",
       completedAt: "2026-07-17T16:00:08.000Z",
       ratingBefore: 880,
-      ratingAfter: 860
-    });
+      ratingAfter: 860,
+      arrowDuelCandidateOrderStatus: "corrupt"
+    } as unknown as AttemptEvent);
     return new PracticeService(store);
   }
 
