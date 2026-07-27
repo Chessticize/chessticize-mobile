@@ -62,6 +62,12 @@ The product uses two distinct terms:
 - **Replay**: an unscored inspection and analysis surface opened from Sprint Result, Review results, or History. It supports retrying moves, stepping through lines, and Stockfish analysis. It must not create attempts, change ELO, or update Review scheduling.
 - **Review**: the official spaced-repetition flow for scheduled puzzle contexts. It records Review attempts, updates the Review queue, and appears in History.
 
+Post-Sprint Replay is a duplicate-free union of persisted attempts from that
+Sprint which are marked Unclear or whose exact `(puzzle, mode, ratingKey)`
+context is currently in Review. Unclear and Review membership remain
+independent: an attempt in both states appears once, `Mark clear` changes only
+Unclear, and `Remove from Review` changes only the Review Schedule.
+
 Attempt history must preserve source type:
 
 - `sprint`: an attempt made during a sprint.

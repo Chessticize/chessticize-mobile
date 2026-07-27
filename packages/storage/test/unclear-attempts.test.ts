@@ -25,6 +25,12 @@ test("MemoryStore persists reversible Unclear markers and duplicate-safe manual 
   assert.equal(marked.unclear, true);
   assert.equal(markedAgain.unclearUpdatedAt, "2026-07-17T12:00:00.000Z");
   assert.deepEqual(unclearAttemptIds(service), [attemptId]);
+  const sessionId = service.listHistory().find((attempt) => attempt.id === attemptId)?.sessionId ??
+    assert.fail("expected the completed Sprint session");
+  assert.deepEqual(
+    service.getSessionReplay(sessionId).map((item) => [item.attempt.id, item.inReview]),
+    [[attemptId, false]]
+  );
 
   const context = { puzzleId: "unclear-puzzle", mode: "standard" as const, ratingKey: "standard 5/20" };
   const enrolled = service.enrollReview(context, "2026-07-17T23:30:00.000Z");
@@ -38,6 +44,10 @@ test("MemoryStore persists reversible Unclear markers and duplicate-safe manual 
   service.enrollReview(alternateContext, "2026-07-17T23:30:00.000Z");
   assert.notDeepEqual(service.getReviewQueueState(alternateContext), service.getReviewQueueState(context));
   assert.equal(service.listReviewQueue().length, 2);
+  assert.deepEqual(
+    service.getSessionReplay(sessionId).map((item) => [item.attempt.id, item.inReview]),
+    [[attemptId, true]]
+  );
 
   service.setAttemptUnclear(attemptId, false, "2026-07-17T14:00:00.000Z");
   assert.deepEqual(unclearAttemptIds(service), []);
@@ -45,6 +55,12 @@ test("MemoryStore persists reversible Unclear markers and duplicate-safe manual 
     now: "2026-07-18T00:00:00.000Z",
     timeRange: "max"
   }).unclearCount, 0);
+  assert.deepEqual(
+    service.getSessionReplay(sessionId).map((item) => [item.attempt.id, item.inReview]),
+    [[attemptId, true]]
+  );
+  service.removeReview(context, "2026-07-18T00:00:00.000Z");
+  assert.deepEqual(service.getSessionReplay(sessionId), []);
 });
 
 test("SQLite reopens marked attempts, manual enrollments, and cleared marker state", async () => {
@@ -74,6 +90,12 @@ test("SQLite reopens marked attempts, manual enrollments, and cleared marker sta
     service = new PracticeService(store);
     assert.deepEqual(unclearAttemptIds(service), [attemptId]);
     assert.equal(service.listReviewQueue()[0]?.enrolledAt, "2026-07-17T23:30:00.000Z");
+    const sessionId = service.listHistory().find((attempt) => attempt.id === attemptId)?.sessionId ??
+      assert.fail("expected the reopened Sprint session");
+    assert.deepEqual(
+      service.getSessionReplay(sessionId).map((item) => [item.attempt.id, item.inReview]),
+      [[attemptId, true]]
+    );
 
     const scheduled = service.recordReviewAttempt({
       puzzleId: "unclear-puzzle",
@@ -93,6 +115,15 @@ test("SQLite reopens marked attempts, manual enrollments, and cleared marker sta
     );
 
     service.setAttemptUnclear(attemptId, false, "2026-07-17T14:00:00.000Z");
+    assert.deepEqual(
+      service.getSessionReplay(sessionId).map((item) => [item.attempt.id, item.inReview]),
+      [[attemptId, true]]
+    );
+    service.removeReview(
+      { puzzleId: "unclear-puzzle", mode: "standard", ratingKey: "standard 5/20" },
+      "2026-07-18T12:02:00.000Z"
+    );
+    assert.deepEqual(service.getSessionReplay(sessionId), []);
     store.close();
 
     store = new SQLiteStore(databasePath);
@@ -102,6 +133,7 @@ test("SQLite reopens marked attempts, manual enrollments, and cleared marker sta
     const persisted = service.listHistory().find((attempt) => attempt.id === attemptId);
     assert.equal(persisted?.unclear, false);
     assert.equal(persisted?.unclearUpdatedAt, "2026-07-17T14:00:00.000Z");
+    assert.deepEqual(service.getSessionReplay(sessionId), []);
   } finally {
     store?.close();
     await rm(directory, { recursive: true, force: true });

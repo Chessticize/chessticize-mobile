@@ -11,14 +11,14 @@
 ## Customer-facing changes
 
 - Explore Tactical Profiles built from your history, then create focused Practice Runs for tactical weaknesses.
-- Configure puzzle timing and follow clearer Sprint guidance, outcomes, and Review effects.
+- Configure puzzle timing, understand Sprint outcomes, and replay Unclear or scheduled attempts together.
 - Add optional move sounds and haptic feedback while keeping practice offline and local-first.
 
 ## Store copy (`en-US`)
 
 ```text
 • Turn tactical strengths and weaknesses into focused Practice Runs.
-• Understand Sprint timing, outcomes, and Review effects more clearly.
+• Understand Sprint outcomes, then replay Unclear and scheduled attempts.
 • Add optional move sounds and haptic feedback.
 
 Details and source: https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.3.0-build-8
@@ -28,8 +28,8 @@ Details and source: https://github.com/Chessticize/chessticize-mobile/releases/t
 
 Chessticize 1.3 adds Tactical Profiles that turn practice history into visible
 strengths, weaknesses, and focused Practice Runs. It also adds configurable
-puzzle timing, clearer Sprint guidance and outcomes, and optional move sound
-and haptic feedback.
+puzzle timing, clearer Sprint outcomes, post-Sprint Replay, and optional move
+sound and haptic feedback.
 
 ## Release-note review
 

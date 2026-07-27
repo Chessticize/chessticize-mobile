@@ -429,6 +429,28 @@ describe("PracticePocScreen", () => {
       unclear: true
     });
     expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
+    expect(collectText(findByTestId(renderer, "sprint-result-unclear-summary"))).toContain(
+      "Included in replay"
+    );
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
+      "Replay 1 attempts"
+    );
+
+    const historyCountBeforeReplay = service.listHistory().length;
+    const ratingBeforeReplay = service.getRating("standard 5/20");
+    press(renderer, "review-mistakes-button");
+
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+    expect(collectText(findByTestId(renderer, "history-attempt-clear-unclear"))).toBe(
+      "Mark clear"
+    );
+    expect(() => findByTestId(renderer, "review-schedule-add")).toThrow();
+    expect(service.listHistory()).toHaveLength(historyCountBeforeReplay);
+    expect(service.getRating("standard 5/20")).toEqual(ratingBeforeReplay);
+
+    press(renderer, "history-attempt-clear-unclear");
+    expect(service.getHistoryAttempt(attemptId ?? "")).toMatchObject({ unclear: false });
+    expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
   });
 
   it.each([
@@ -3259,7 +3281,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("reports timeout as one Mistake and one Review item", () => {
+  it("reports a timeout as one in-Review Replay attempt without marking it Unclear", () => {
     const service = createMobilePracticeService("random1000");
     service.saveSettings({
       ...service.getSettings(),
@@ -3287,10 +3309,7 @@ describe("PracticePocScreen", () => {
 
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
     expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "1 timed out added to Review"
-    );
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "Mistakes are not marked Unclear"
+      "1 attempt · Included in replay"
     );
     expect(() => findByTestId(renderer, "sprint-result-unclear-summary")).toThrow();
     expect(service.listReviewQueue()).toHaveLength(1);
@@ -3329,10 +3348,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "sprint-previous-attempt-notice")).toThrow();
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
     expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "1 timed out added to Review"
-    );
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "Mistakes are not marked Unclear"
+      "1 attempt · Included in replay"
     );
   });
 
@@ -6900,8 +6916,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-rating-range"))).toContain("600");
     expect(collectText(findByTestId(renderer, "sprint-result-rating-change"))).toContain("600 -> 600");
     expect(findByTestId(renderer, "sprint-result-review-impact")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("Mistakes");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("No new review items");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("In Review");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("0 attempts");
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("0");
     expect(() => findByTestId(renderer, "sprint-result-rating-snapshot")).toThrow();
     expect(findByTestId(renderer, "sprint-result-history-trend")).toBeTruthy();
@@ -6913,7 +6929,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "sprint-result-history-trend").props.accessibilityLabel).toContain("rating 600 to 600");
     expect(collectText(findByTestId(renderer, "sprint-result-trend-start"))).toBe("600");
     expect(collectText(findByTestId(renderer, "sprint-result-trend-current"))).toBe("600");
-    expectText(renderer, "Mistakes");
+    expectText(renderer, "In Review");
     expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "sprint-result-history-button"))).toBe("");
     expect(findByTestId(renderer, "sprint-result-history-button").props.accessibilityLabel).toBe("View history trends");
@@ -7985,7 +8001,6 @@ describe("PracticePocScreen", () => {
     const systemBack = createTestSystemBackSource("android");
     const renderer = renderScreen({
       practiceService: new PracticeService(store),
-      replayTerminologyDesignPreview: true,
       systemBack
     });
 
@@ -8270,16 +8285,20 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Sprint failed");
     expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("Three mistakes");
     expect(findByTestId(renderer, "sprint-result-reason").props.accessibilityLabel).toBe("Result: Three mistakes");
-    expectText(renderer, "3 mistakes queued");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("Mistakes");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("Review your mistakes");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("In Review");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "3 attempts · Included in replay"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
+      "0 Unclear + 3 in Review · 3 total"
+    );
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("3");
     expect(collectText(renderer.root)).not.toContain("Start new sprint");
     const reviewButton = findByTestId(renderer, "review-mistakes-button");
     const playAgainButton = findByTestId(renderer, "play-again-button");
     expect(reviewButton).toBeTruthy();
     expect(playAgainButton).toBeTruthy();
-    expect(collectText(reviewButton)).toContain("Review Mistakes");
+    expect(collectText(reviewButton)).toContain("Replay 3 attempts");
     expect(hasStyleEntry(reviewButton, "backgroundColor", "#2563EB")).toBe(true);
     expect(hasStyleEntry(playAgainButton, "backgroundColor", "#2563EB")).toBe(false);
   });
@@ -8296,6 +8315,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
       "2 Unclear + 2 in Review"
     );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
+      "4 total"
+    );
     expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
       "Replay 4 attempts"
     );
@@ -8303,6 +8325,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-mistakes-button");
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
     expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe(
       "Replay screen"
     );
@@ -8344,6 +8367,56 @@ describe("PracticePocScreen", () => {
       "Remove from Review"
     );
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
+  });
+
+  it("shows an overlapping Unclear and in-Review attempt once in the Replay total", () => {
+    const puzzle = sharedHistoryPuzzle();
+    const replayAttempt = (id: string, unclear: boolean): AttemptEvent => ({
+      id,
+      source: "sprint",
+      sessionId: "overlap-result",
+      puzzleId: puzzle.id,
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-18T11:59:55.000Z",
+      completedAt: "2026-07-18T12:00:00.000Z",
+      ratingBefore: 900,
+      ...(unclear ? { unclear: true } : {})
+    });
+    const renderer = renderScreen({
+      sprintRulesDesignPreview: {
+        initialResultState: {
+          ...completedRatingSprintState({
+            id: "overlap-result",
+            mode: "standard",
+            completedAt: "2026-07-18T12:00:00.000Z",
+            ratingBefore: 900,
+            ratingAfter: 900
+          }),
+          correctCount: 3,
+          currentPuzzleIndex: 3
+        },
+        resultReplayItems: [
+          { attempt: replayAttempt("unclear-only", true), inReview: false, puzzle },
+          { attempt: replayAttempt("both", true), inReview: true, puzzle },
+          { attempt: replayAttempt("review-only", false), inReview: true, puzzle }
+        ],
+        resultUnclearSummary: {
+          slowMarkedCount: 0,
+          userMarkedCount: 2
+        }
+      }
+    });
+
+    expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
+      "2 Unclear + 2 in Review · 1 in both · 3 total"
+    );
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
+      "Replay 3 attempts"
+    );
   });
 
   it("opens a one-shot mistake review after a timeout-only sprint failure", async () => {
@@ -8408,8 +8481,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe("Remove from Review");
     press(renderer, "review-schedule-remove");
     press(renderer, "review-schedule-removal-confirm");
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
-    expect(collectText(findByTestId(renderer, "review-schedule-add"))).toBe("Add to Review");
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
+    expect(() => findByTestId(renderer, "review-schedule-add")).toThrow();
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "review-previous").props.disabled).toBe(true);
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
@@ -11088,7 +11161,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "replayTerminologyDesignPreview" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
     onRenderCommit?: () => void;
     platformCapabilities?: MobilePlatformCapabilities;
   };
@@ -11205,7 +11278,6 @@ function renderScreen({
   onRenderCommit,
   puzzleSelectionId,
   puzzleSelectionSeed,
-  replayTerminologyDesignPreview,
   runEloEditingMovedToHome,
   runManagementEnabled,
   runManagementPresentation,
@@ -11231,7 +11303,6 @@ function renderScreen({
         moveFeedbackSettings={moveFeedbackSettings}
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
-        replayTerminologyDesignPreview={replayTerminologyDesignPreview}
         runEloEditingMovedToHome={runEloEditingMovedToHome}
         runManagementEnabled={runManagementEnabled}
         runManagementPresentation={runManagementPresentation}

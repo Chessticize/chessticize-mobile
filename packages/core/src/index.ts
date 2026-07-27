@@ -9,6 +9,7 @@ export * from "./review-schedule-change.ts";
 export * from "./sprint-session.ts";
 export * from "./puzzle-selection-strategy.ts";
 export * from "./session-review.ts";
+export * from "./session-replay.ts";
 export * from "./history-query.ts";
 export * from "./attempt-clarity.ts";
 export * from "./attempt-outcome.ts";

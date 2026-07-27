@@ -365,7 +365,7 @@ Arrow Duel Replay and Review rules:
 
 - The page title and every Sprint Result or History entry CTA use `Replay`, never `Review`.
 - Replay does not create attempts, change ELO, or advance or reset a Review Schedule.
-- Post-Sprint Replay contains the union presented on Sprint Result. Two Unclear attempts plus two distinct In Review attempts produce four Replay entries.
+- Post-Sprint Replay contains the duplicate-free union presented on Sprint Result. Two Unclear attempts plus two distinct In Review attempts produce four Replay entries. An attempt that is both Unclear and In Review contributes to both status counts but appears only once in the Replay total.
 - Replay does not add new status badges. An Unclear entry exposes `Mark clear`; an In Review entry exposes `Remove from Review`.
 
 Replay is the shared unscored board surface opened from Sprint Result, Review results, and History.

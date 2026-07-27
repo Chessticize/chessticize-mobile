@@ -579,10 +579,6 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
-    replayTerminologyDesignPreview:
-      scenarioId.startsWith("history-")
-      || scenarioId === "practice-sprint-result-goal"
-      || scenarioId === "practice-sprint-result-replay",
     sprintRulesDesignPreview: sprintRulesDesignPreviewFor(scenarioId),
     standardTargetCorrect: 1,
     arrowDuelTargetCorrect: 1,
