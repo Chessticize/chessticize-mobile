@@ -36,6 +36,17 @@ Prepare each coordinated mobile release on
 `codex/mobile-<version>-release`, created from current `main`, with one draft
 release PR targeting `main`.
 
+After that cut, `main` remains open for the next version's feature work. Do not
+merge or rebase advancing `main` back into the release branch by default.
+Selectively backport only changes approved for the current release through
+reviewed PRs targeting the release branch.
+
+Release-branch history is append-only. Never rebase the release branch, amend
+or replace an already-pushed release commit, force-push the branch, or squash
+the release branch into `main`. Make every correction as a new commit. Protect
+each active release branch against force pushes and deletion, require linear
+history, and enforce those protections for administrators.
+
 Each contributor or agent works on a separate branch and opens a PR targeting
 the release branch. A contributor PR must be complete, reviewed, and green
 before it is squash-merged into the release branch. These integration PRs use
@@ -48,15 +59,22 @@ contributor branch as exact integrated release evidence. Reuse earlier evidence
 only when the repository's validation-relevant-input comparison proves it is
 still valid.
 
+The exact validated release-branch head is the source for the submitted
+binaries and the immutable iOS and Android platform tags. The later merge
+commit on `main` records forward integration with concurrently developed
+next-version work. Its release-side parent preserves the exact release commit
+and SHA; the merge commit is not the released source tag target and must never
+move or replace that tag.
+
 Keep the release PR draft until the exact identity, approved build-specific
 customer notes, fast checks, selected native evidence, and release review are
-complete. The final release PR to `main` is the only rebase-merge exception.
-Keep rebase merge enabled in the GitHub repository and merge that PR with
-`gh pr merge --rebase --delete-branch`, preserving the release branch's
-already-squashed work-package commits without a merge commit. Every other PR
-uses squash merge. Create immutable platform tags and source Releases only
-from the final approved release commit; never tag an intermediate contributor
-branch or a partially integrated release branch.
+complete. The final release PR to `main` is the only merge-commit exception.
+Keep merge commits enabled in the GitHub repository and merge that PR with
+`gh pr merge --merge --delete-branch`, preserving the release branch's
+already-squashed work-package commits under one explicit release merge commit.
+Every other PR uses squash merge. Create immutable platform tags and source
+Releases only from the final approved release commit; never tag an intermediate
+contributor branch or a partially integrated release branch.
 
 ## Pre-Retry Convergence Sweep
 
