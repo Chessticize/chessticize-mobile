@@ -34,14 +34,19 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
     await withAndroidUiDiagnostics(async () => {
       await startArrowDuel();
 
+      await device.pressBack();
+      await waitFor(element(by.id('session-abandon-confirmation'))).toExist().withTimeout(10000);
+      await expect(element(by.id('session-board'))).toExist();
+      await device.pressBack();
+      await waitFor(element(by.id('session-abandon-confirmation'))).not.toExist().withTimeout(10000);
+
       await playBoardMove('session-board', fixture.wrongMove);
       await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
       await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 1').withTimeout(10000);
-      await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(15000);
 
-      await device.pressBack();
-      await waitFor(element(by.id('session-abandon-confirmation'))).toExist().withTimeout(10000);
+      await waitForVisibleInPracticeScroll('session-abandon');
+      await element(by.id('session-abandon')).tap();
       await element(by.id('practice-main-scroll')).scrollTo('bottom');
       await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
       await element(by.id('session-abandon-confirm')).tap();

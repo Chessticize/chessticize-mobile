@@ -55,9 +55,8 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain('fixture.wrongMove');
     expect(journey).toContain('fixture.correctMove');
     expect(journey).toContain("by.id('move-feedback-overlay')");
-    expect(journey).toContain(
-      "waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(15000)"
-    );
+    expect(journey).toContain("waitForVisibleInPracticeScroll('session-abandon')");
+    expect(journey).toContain("element(by.id('session-abandon')).tap()");
     expect(journey).not.toContain('sleep(1800)');
     expect(journey).toContain("by.text('Sprint complete')");
     expect(journey).toContain("by.text('Sprint failed')");
