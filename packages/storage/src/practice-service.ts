@@ -67,6 +67,7 @@ import {
   TacticalProfileService,
   type FocusedRunPreflightResult,
   type PrepareFocusedRunResult,
+  type TacticalProfileProgress,
   type TacticalProfileSnapshot
 } from "./tactical-profile-service.ts";
 import type { TacticalProfileTaskFamily } from "../../core/src/index.ts";
@@ -407,6 +408,10 @@ export class PracticeService {
 
   getTacticalProfileSnapshot(now = new Date().toISOString()): TacticalProfileSnapshot | undefined {
     return this.tacticalProfile?.getSnapshot(now);
+  }
+
+  getTacticalProfileProgress(now = new Date().toISOString()): TacticalProfileProgress | undefined {
+    return this.tacticalProfile?.getProgress(now);
   }
 
   preflightFocusedRun(

@@ -166,6 +166,46 @@ test("Issue #250 owns the complete Tactical Profile design state set", () => {
   );
 });
 
+test("Issue #363 owns model-aligned History progress and weakness states", () => {
+  assert.deepEqual(
+    newScenarios
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 363))
+      .map((scenario) => scenario.id),
+    [
+      "history-populated",
+      "history-progress",
+      "history-progress-weakness",
+      "history-progress-speed-weakness"
+    ]
+  );
+  assert.deepEqual(storyTagsForScenario("history-progress"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("history-progress-weakness"), ["new"]);
+  assert.deepEqual(
+    storyTagsForScenario("history-progress-speed-weakness"),
+    ["new"]
+  );
+  assert.ok(
+    scenarioRegistry["history-progress"].scope.includes.includes(
+      "Progress over time"
+    )
+  );
+  assert.ok(
+    scenarioRegistry["history-progress-weakness"].scope.includes.includes(
+      "Solve reliability effect"
+    )
+  );
+  assert.ok(
+    scenarioRegistry["history-progress-speed-weakness"].scope.includes.includes(
+      "Reliable elapsed-time eligibility"
+    )
+  );
+  assert.ok(
+    scenarioRegistry["history-progress"].scope.exits.includes(
+      "Training recommendation"
+    )
+  );
+});
+
 test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab scenarios", () => {
   const activeSessionGuide = scenarioRegistry["practice-active-session-guide"];
   const arrowDuelGuide = scenarioRegistry["practice-arrow-duel-guide"];

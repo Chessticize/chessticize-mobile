@@ -50,6 +50,10 @@ import {
   reduceTacticalProfileFixtureState,
   tacticalProfilePresentationFor
 } from "./tacticalProfileFixture.ts";
+import {
+  historyProgressPresentationFor,
+  isHistoryProgressScenario
+} from "./historyProgressFixture.ts";
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
 
@@ -81,8 +85,10 @@ function LabScenarioContent({
       : { screen: "home" as const, selectedTaskFamily: "line" as const }
   );
   const [startedFocusedRun, setStartedFocusedRun] = useState<SprintState | null>(null);
-  const showsThemeCatalogPrototype = isRunManagementScenario(scenarioId) || [
-    "history-populated",
+  const showsThemeCatalogPrototype =
+    isRunManagementScenario(scenarioId)
+    || isHistoryProgressScenario(scenarioId)
+    || [
     "history-filters",
     "history-attempt-detail"
   ].includes(scenarioId);
@@ -140,6 +146,9 @@ function LabScenarioContent({
           selectedThemes: selectedCustomThemes,
           onChange: setSelectedCustomThemes
         }}
+        historyProgressPresentation={isHistoryProgressScenario(scenarioId)
+          ? historyProgressPresentationFor(scenarioId)
+          : undefined}
         platformCapabilities={runtime.platformCapabilities}
         themeCatalogPresentation={showsThemeCatalogPrototype
           ? SERVER_CURATED_THEME_PRESENTATION
@@ -560,6 +569,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "history-populated":
     case "history-filters":
     case "history-attempt-detail":
+    case "history-progress":
+    case "history-progress-weakness":
+    case "history-progress-speed-weakness":
       service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
       configurePuzzleSource = false;
       break;

@@ -214,6 +214,16 @@ import {
   type ICloudSyncErrorDetailsPresentation,
   type ICloudSyncSupportBundlePresentation
 } from "./ICloudSyncErrorDetails.tsx";
+import {
+  HistoryProgressEntryButton,
+  HistoryProgressScreen
+} from "./HistoryProgressSection.tsx";
+import type {
+  HistoryProgressPresentation
+} from "./historyProgressPresentation.ts";
+import {
+  useHistoryProgressPresentation
+} from "./useHistoryProgressPresentation.ts";
 
 export type {
   PracticeRunDraft,
@@ -228,6 +238,13 @@ export type {
   TacticalProfilePresentation,
   TacticalProfileSignal
 } from "./tacticalProfilePresentation.ts";
+export type {
+  HistoryProgressPoint,
+  HistoryProgressPresentation,
+  HistoryProgressWeakness,
+  HistoryWeaknessEffect,
+  HistoryStrengthSeries
+} from "./historyProgressPresentation.ts";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -237,6 +254,7 @@ interface Props {
   customTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   feedbackIssuesOpener?: (url: string) => Promise<void>;
+  historyProgressPresentation?: HistoryProgressPresentation;
   iCloudSyncErrorDetails?: ICloudSyncErrorDetailsPresentation;
   iCloudSyncSupportBundle?: ICloudSyncSupportBundlePresentation;
   currentTimeMs?: () => number;
@@ -551,6 +569,7 @@ export function PracticePocScreen({
   customTargetCorrect,
   debugTrace,
   feedbackIssuesOpener = openFeedbackIssuesInBrowser,
+  historyProgressPresentation,
   iCloudSyncErrorDetails,
   iCloudSyncSupportBundle,
   currentTimeMs = Date.now,
@@ -690,6 +709,7 @@ export function PracticePocScreen({
   const [historyReplayBoardTouchActive, setHistoryReplayBoardTouchActive] = useState(false);
   const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryUnavailableAttempt | null>(null);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
+  const [historyProgressOpen, setHistoryProgressOpen] = useState(false);
   const [reviewSessionSource, setReviewSessionSource] = useState<ReviewEntry["source"] | null>(null);
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
@@ -740,6 +760,14 @@ export function PracticePocScreen({
     onControlledSelectionChange: customThemeSelection?.onChange
   });
   const historyThemeChoices = useThemeChoiceSelection();
+  const resolvedHistoryProgressPresentation = useHistoryProgressPresentation({
+    enabled: tab === "history" || historyProgressOpen,
+    service,
+    ...(historyProgressPresentation === undefined
+      ? {}
+      : { injectedPresentation: historyProgressPresentation }),
+    refreshKey: aggregateRevision
+  });
   const resolvedTacticalProfilePresentation = useTacticalProfilePresentation({
     service,
     ...(tacticalProfilePresentation === undefined
@@ -1123,6 +1151,7 @@ export function PracticePocScreen({
   function navigateToTab(nextTab: Tab): void {
     if (nextTab !== "history") {
       setHistoryFiltersExpanded(false);
+      setHistoryProgressOpen(false);
     }
     if (nextTab !== "review") {
       setReviewFiltersExpanded(false);
@@ -2793,6 +2822,7 @@ export function PracticePocScreen({
   // and re-scanned a history that grows with every solved puzzle.
   const historyPanelVisible =
     tab === "history" &&
+    !historyProgressOpen &&
     historyReviewEntries.length === 0 &&
     historyUnavailableAttempt === null;
   const historyView = historyPanelVisible
@@ -2852,22 +2882,25 @@ export function PracticePocScreen({
             kind: "review-session",
             owner: tab === "review" && reviewSessionSource === "session" ? "practice" : tab
           }
-        : tab === "analysis"
-          ? { kind: "stockfish-diagnostics", owner: "settings" }
-          : isFinished
-            ? { kind: "sprint-result", owner: "practice" }
-            : tab === "practice" && state === null
+        : tab === "history" && historyProgressOpen
+          ? { kind: "history-progress", owner: "history" }
+          : tab === "analysis"
+            ? { kind: "stockfish-diagnostics", owner: "settings" }
+            : isFinished
+              ? { kind: "sprint-result", owner: "practice" }
+              : tab === "practice" && state === null
                 && resolvedTacticalProfilePresentation?.screen !== undefined
                 && resolvedTacticalProfilePresentation.screen !== "home"
-              ? { kind: "tactical-profile", owner: "practice" }
-            : tab === "practice" && state === null && activeRunManagementScreen !== undefined
+                ? { kind: "tactical-profile", owner: "practice" }
+              : tab === "practice" && state === null && activeRunManagementScreen !== undefined
                 && activeRunManagementScreen !== "home"
-              ? { kind: "practice-run-editor", owner: "practice" }
-            : tab === "practice" && state === null && mode === "custom"
-              ? { kind: "custom-practice", owner: "practice" }
-              : null,
+                ? { kind: "practice-run-editor", owner: "practice" }
+              : tab === "practice" && state === null && mode === "custom"
+                ? { kind: "custom-practice", owner: "practice" }
+                : null,
     [
       activeRunManagementScreen,
+      historyProgressOpen,
       isFinished,
       mode,
       resolvedTacticalProfilePresentation?.screen,
@@ -2931,6 +2964,8 @@ export function PracticePocScreen({
           }
         } else if (resolvedState.detail?.kind === "stockfish-diagnostics") {
           navigateToTab("settings");
+        } else if (resolvedState.detail?.kind === "history-progress") {
+          setHistoryProgressOpen(false);
         } else if (resolvedState.detail?.kind === "practice-run-editor") {
           activeRunManagementPresentation?.onIntent({ type: "cancel-edit" });
         } else if (resolvedState.detail?.kind === "tactical-profile") {
@@ -3770,6 +3805,18 @@ export function PracticePocScreen({
                   reviewScheduleControlVisible
                   stockfish={stockfish}
                 />
+              ) : resolvedHistoryProgressPresentation && historyProgressOpen ? (
+                <View
+                  style={[
+                    styles.historyPanel,
+                    adaptiveLayout.usesWideContent ? styles.historyPanelWide : null
+                  ]}
+                >
+                  <HistoryProgressScreen
+                    presentation={resolvedHistoryProgressPresentation}
+                    onBack={() => setHistoryProgressOpen(false)}
+                  />
+                </View>
               ) : historyView ? (
                 <HistoryPanel
                   adaptiveLayout={adaptiveLayout}
@@ -3842,6 +3889,12 @@ export function PracticePocScreen({
                   }}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
+                  onOpenProgress={resolvedHistoryProgressPresentation
+                    ? () => {
+                        setHistoryFiltersExpanded(false);
+                        setHistoryProgressOpen(true);
+                      }
+                    : undefined}
                   onResetFilters={() => {
                     setHistoryTimeRange("7d");
                     setHistorySourceFilter("sprint");
@@ -9064,6 +9117,7 @@ function HistoryPanel({
   onAttentionReasonChange,
   onPageOffsetChange,
   onOpenAttempt,
+  onOpenProgress,
   onFiltersExpandedChange,
   onResetFilters,
   onAttentionOnlyChange
@@ -9096,6 +9150,7 @@ function HistoryPanel({
   onAttentionReasonChange: (reason: HistoryAttentionReason) => void;
   onPageOffsetChange: (offset: number) => void;
   onOpenAttempt: (attemptId: string) => void;
+  onOpenProgress?: () => void;
   onFiltersExpandedChange: (expanded: boolean) => void;
   onResetFilters: () => void;
   onAttentionOnlyChange: (attentionOnly: boolean) => void;
@@ -9122,6 +9177,9 @@ function HistoryPanel({
       <View style={styles.historyHeaderRow} testID="history-action-header">
         <Text style={styles.screenTitle}>History</Text>
         <View style={styles.historyHeaderActions}>
+          {onOpenProgress ? (
+            <HistoryProgressEntryButton onPress={onOpenProgress} />
+          ) : null}
           {filtersExpanded ? (
             <Pressable
               accessibilityRole="button"
