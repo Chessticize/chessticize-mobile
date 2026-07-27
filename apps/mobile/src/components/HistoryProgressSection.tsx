@@ -237,6 +237,13 @@ function StrengthTrendChart({
             <Text numberOfLines={1} style={styles.chartLabel}>
               {point.label}
             </Text>
+            <Text
+              accessibilityLabel={`${point.sampleSize} eligible puzzles`}
+              numberOfLines={1}
+              style={styles.chartSample}
+            >
+              n={point.sampleSize}
+            </Text>
           </View>
         ))}
       </View>
@@ -578,13 +585,13 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     flexDirection: "row",
     gap: 7,
-    height: 176
+    height: 192
   },
   chartColumn: {
     alignItems: "center",
     flex: 1,
     gap: 5,
-    height: 176,
+    height: 192,
     justifyContent: "flex-end",
     minWidth: 28
   },
@@ -609,6 +616,12 @@ const styles = StyleSheet.create({
   },
   chartLabel: {
     color: "#64748B",
+    fontSize: 9,
+    textAlign: "center",
+    width: "100%"
+  },
+  chartSample: {
+    color: "#94A3B8",
     fontSize: 9,
     textAlign: "center",
     width: "100%"

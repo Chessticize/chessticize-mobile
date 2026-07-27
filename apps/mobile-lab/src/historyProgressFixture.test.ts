@@ -21,6 +21,13 @@ test("history progress fixture shows model-aligned reliability and speed progres
   assert.equal(presentation.weakness, undefined);
 });
 
+test("existing populated History clone exposes the approved progress entry", () => {
+  const presentation = historyProgressPresentationFor("history-populated");
+
+  assert.equal(presentation.initialSeriesId, "forks");
+  assert.equal(presentation.strengths.length, 2);
+});
+
 test("history solve-rate weakness fixture mirrors the model effect", () => {
   const presentation = historyProgressPresentationFor(
     "history-progress-weakness"
@@ -32,6 +39,7 @@ test("history solve-rate weakness fixture mirrors the model effect", () => {
   assert.equal(weakness.label, "Skewers");
   assert.equal(weakness.reason, "solve_rate");
   assert.equal(weakness.effects[0]?.valueLabel, "14 extra misses");
+  assert.match(weakness.effects[0]?.comparisonLabel ?? "", /Other well-sampled themes/);
   assert.match(weakness.explanation, /evidence, practical-impact, and diversity/);
   assert.match(weakness.evidenceLabel, /6 sessions/);
 });
@@ -48,6 +56,7 @@ test("history speed weakness uses reliable completed-puzzle time", () => {
   assert.equal(weakness.reason, "completed_speed");
   assert.equal(weakness.effects[0]?.valueLabel, "1.34× expected time");
   assert.match(weakness.effects[0]?.comparisonLabel ?? "", /34% longer/);
+  assert.match(weakness.effects[0]?.comparisonLabel ?? "", /Other well-sampled themes/);
   assert.match(weakness.eligibilityLabel, /correct, before-timeout/);
   assert.match(weakness.eligibilityLabel, /Slow and Unclear labels do not decide/);
 });

@@ -85,13 +85,12 @@ function LabScenarioContent({
       : { screen: "home" as const, selectedTaskFamily: "line" as const }
   );
   const [startedFocusedRun, setStartedFocusedRun] = useState<SprintState | null>(null);
-  const showsThemeCatalogPrototype = isRunManagementScenario(scenarioId) || [
-    "history-populated",
+  const showsThemeCatalogPrototype =
+    isRunManagementScenario(scenarioId)
+    || isHistoryProgressScenario(scenarioId)
+    || [
     "history-filters",
-    "history-attempt-detail",
-    "history-progress",
-    "history-progress-weakness",
-    "history-progress-speed-weakness"
+    "history-attempt-detail"
   ].includes(scenarioId);
   const entryPreviewEnabled = isPuzzleEntryPreviewScenario(scenarioId);
 

@@ -28,6 +28,7 @@ export const PopulatedHistory: Story = {
     await waitForTestId(canvasElement, "history-attempt-history-unclear");
     await waitForTestId(canvasElement, "history-attention-filter");
     await waitForTestId(canvasElement, "history-active-filter-summary");
+    await waitForTestId(canvasElement, "history-progress-button");
     (canvasElement.querySelector('[data-testid="history-attention-needs-attention"]') as HTMLElement | null)?.blur();
   }
 };

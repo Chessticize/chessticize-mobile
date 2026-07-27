@@ -2501,6 +2501,7 @@ describe("PracticePocScreen", () => {
     );
     expect(railTestIDs.size).toBe(7);
     expect(railTestIDs).toContain("history-attempt-history-unclear-themes-matein3");
+    expect(findByTestId(renderer, "history-progress-button")).toBeTruthy();
   });
 
   it("opens the Storybook-only tactical progress page from History", async () => {
@@ -2521,6 +2522,9 @@ describe("PracticePocScreen", () => {
     );
     expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
       "Extra misses per 100 comparable puzzles"
+    );
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "n=71"
     );
     expect(findByTestId(renderer, "history-no-clear-weakness")).toBeTruthy();
 
@@ -2550,6 +2554,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(weakness)).toContain("14 extra misses");
     expect(collectText(weakness)).toContain("per 100 comparable puzzles");
     expect(collectText(weakness)).toContain(
+      "Other well-sampled themes remain closer"
+    );
+    expect(collectText(weakness)).toContain(
       "evidence, practical-impact, and diversity checks"
     );
     expect(collectText(weakness)).toContain("26 different puzzles · 6 sessions");
@@ -2570,6 +2577,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(weakness)).toContain("Completed-puzzle speed");
     expect(collectText(weakness)).toContain("1.34× expected time");
     expect(collectText(weakness)).toContain("about 34% longer");
+    expect(collectText(weakness)).toContain(
+      "Other well-sampled themes remain closer"
+    );
     expect(collectText(weakness)).toContain(
       "Only correct, before-timeout attempts with reliable elapsed time"
     );

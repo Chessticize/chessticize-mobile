@@ -5,6 +5,7 @@ import type {
 import type { LabScenarioId } from "./scenarioRegistry.ts";
 
 export type HistoryProgressScenarioId =
+  | "history-populated"
   | "history-progress"
   | "history-progress-weakness"
   | "history-progress-speed-weakness";
@@ -111,7 +112,8 @@ const BASE_PRESENTATION: Omit<
 export function isHistoryProgressScenario(
   scenarioId: LabScenarioId
 ): scenarioId is HistoryProgressScenarioId {
-  return scenarioId === "history-progress"
+  return scenarioId === "history-populated"
+    || scenarioId === "history-progress"
     || scenarioId === "history-progress-weakness"
     || scenarioId === "history-progress-speed-weakness";
 }
@@ -119,7 +121,7 @@ export function isHistoryProgressScenario(
 export function historyProgressPresentationFor(
   scenarioId: HistoryProgressScenarioId
 ): HistoryProgressPresentation {
-  if (scenarioId === "history-progress") {
+  if (scenarioId === "history-populated" || scenarioId === "history-progress") {
     return {
       ...BASE_PRESENTATION,
       initialSeriesId: "forks",
@@ -140,7 +142,7 @@ export function historyProgressPresentationFor(
             valueLabel: "1.34× expected time",
             metricLabel: "on correctly completed puzzles",
             comparisonLabel:
-              "Completed Pin puzzles take about 34% longer than the matched model expectation after accounting for difficulty, pace, timing policy, and decision count."
+              "Completed Pin puzzles take about 34% longer than the matched model expectation after accounting for difficulty, pace, timing policy, and decision count. Other well-sampled themes remain closer to their matched expectations."
           }
         ],
         evidenceLabel: "26 different puzzles · 6 sessions",
@@ -168,7 +170,7 @@ export function historyProgressPresentationFor(
           valueLabel: "14 extra misses",
           metricLabel: "per 100 comparable puzzles",
           comparisonLabel:
-            "Skewers are completed less reliably than the model expects after matching puzzle difficulty, your Rating, and task family."
+            "Skewers are completed less reliably than the model expects after matching puzzle difficulty, your Rating, and task family. Other well-sampled themes remain closer to their matched solve expectations."
         }
       ],
       evidenceLabel: "26 different puzzles · 6 sessions",
