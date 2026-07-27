@@ -4764,7 +4764,7 @@ describe("PracticePocScreen", () => {
     expect(moveFeedbackClient.requests).toEqual([{
       cue: "move",
       playSound: true,
-      playHaptic: false
+      playHaptic: true
     }]);
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(activePuzzle.currentFen);
@@ -9733,7 +9733,7 @@ describe("PracticePocScreen", () => {
     expect(moveFeedbackClient.requests).toEqual([{
       cue: "capture",
       playSound: true,
-      playHaptic: false
+      playHaptic: true
     }]);
     await boardMove(renderer, "d8a8");
     expect(moveFeedbackClient.requests).toHaveLength(1);
@@ -9743,7 +9743,7 @@ describe("PracticePocScreen", () => {
       {
         cue: "capture",
         playSound: true,
-        playHaptic: false
+        playHaptic: true
       },
       {
         cue: "capture",
@@ -9758,7 +9758,7 @@ describe("PracticePocScreen", () => {
       {
         cue: "capture",
         playSound: true,
-        playHaptic: false
+        playHaptic: true
       },
       {
         cue: "capture",
@@ -9768,7 +9768,7 @@ describe("PracticePocScreen", () => {
       {
         cue: "move",
         playSound: true,
-        playHaptic: false
+        playHaptic: true
       }
     ]);
   });

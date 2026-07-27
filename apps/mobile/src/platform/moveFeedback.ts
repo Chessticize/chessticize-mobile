@@ -66,7 +66,7 @@ export async function emitCommittedMoveFeedback(
   const request = {
     cue: feedback.cue,
     playSound: preferences.soundEnabled,
-    playHaptic: feedback.actor === "user" && preferences.hapticsEnabled
+    playHaptic: preferences.hapticsEnabled
   };
   if (!request.playSound && !request.playHaptic) {
     return;
