@@ -218,7 +218,7 @@ describe("App Store assets document", () => {
     );
   });
 
-  it("saves a changed rating without tapping through the landscape number pad", () => {
+  it("scrolls the editor to its visible Save action above the landscape number pad", () => {
     const ratingHelperStart = storeAssetsE2e.indexOf(
       "async function setStoreAssetRatings"
     );
@@ -228,9 +228,7 @@ describe("App Store assets document", () => {
     );
     const ratingHelper = storeAssetsE2e.slice(ratingHelperStart, ratingHelperEnd);
     expect(ratingHelper).toContain(
-      "await waitFor(element(by.id('practice-run-save')))\n"
-      + "      .toBeVisible()\n"
-      + "      .withTimeout(10000);\n"
+      "await element(by.id('practice-main-scroll')).scrollTo('top');\n"
       + "    await element(by.id('practice-run-save')).tap();"
     );
     expect(ratingHelper).not.toContain(
@@ -238,6 +236,9 @@ describe("App Store assets document", () => {
     );
     expect(ratingHelper).not.toContain(
       "await dismissRunNameKeyboard();"
+    );
+    expect(ratingHelper).not.toContain(
+      "await waitFor(element(by.id('practice-run-save')))"
     );
 
     const reviewHelperStart = storeAssetsE2e.indexOf(
