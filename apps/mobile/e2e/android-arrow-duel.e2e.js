@@ -46,8 +46,8 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 1').withTimeout(10000);
       await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(15000);
 
-      await device.pressBack();
-      await element(by.id('practice-main-scroll')).scrollTo('top');
+      await waitForVisibleInPracticeScroll('session-abandon');
+      await element(by.id('session-abandon')).tap();
       await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
       await element(by.id('session-abandon-confirm')).tap();
       await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(30000);
@@ -153,4 +153,7 @@ async function openArrowDuelHistory() {
   await element(by.id('history-filter-toggle')).tap();
   await waitForVisibleInPracticeScroll('history-rating-arrow_duel 5/30');
   await element(by.id('history-rating-arrow_duel 5/30')).tap();
+  await waitFor(element(by.id('history-filter-toggle'))).toBeVisible().withTimeout(10000);
+  await element(by.id('history-filter-toggle')).tap();
+  await waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000);
 }
