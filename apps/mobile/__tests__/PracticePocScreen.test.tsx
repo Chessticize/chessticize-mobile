@@ -2450,6 +2450,10 @@ describe("PracticePocScreen", () => {
       renderer,
       "practice-session-guide-prompt"
     ).props.style);
+    const promptPanelStyle = flattenTestStyle(findByTestId(
+      renderer,
+      "practice-prompt"
+    ).props.style);
     const layout = buildPracticeAdaptiveLayout({
       fontScale: 1,
       height,
@@ -2458,6 +2462,8 @@ describe("PracticePocScreen", () => {
     });
 
     expect(promptStyle.alignSelf).toBe("center");
+    expect(promptPanelStyle.minHeight).toBe(72);
+    expect(promptPanelStyle.height).toBeUndefined();
     if (layout.usesSessionRail) {
       const railStyle = flattenTestStyle(findByTestId(
         renderer,
@@ -4545,6 +4551,9 @@ describe("PracticePocScreen", () => {
       practiceService: createMobilePracticeService("familiar15")
     });
     startStandardSprint(sprintRenderer);
+    const sprintPromptStyle = flattenTestStyle(
+      findByTestId(sprintRenderer, "practice-prompt").props.style
+    );
     const sprintBoardSize = Number(
       flattenTestStyle(findByTestId(sprintRenderer, "session-board").props.style).width
     );
@@ -4563,6 +4572,9 @@ describe("PracticePocScreen", () => {
     const layoutStyle = flattenTestStyle(reviewLayout.props.style);
     const boardLaneStyle = flattenTestStyle(boardLane.props.style);
     const controlRailStyle = flattenTestStyle(controlRail.props.style);
+    const reviewPromptStyle = flattenTestStyle(
+      findByTestId(reviewRenderer, "practice-prompt").props.style
+    );
 
     expect(boardStyle.width).toBe(sprintBoardSize);
     expect(boardStyle.height).toBe(sprintBoardSize);
@@ -4571,6 +4583,10 @@ describe("PracticePocScreen", () => {
     expect(boardLaneStyle.width).toBe(sprintBoardSize);
     expect(controlRailStyle.width).toBe(expectedLayout.sessionRailWidth);
     expect(controlRailStyle.height).toBe(sprintBoardSize);
+    expect(sprintPromptStyle.minHeight).toBe(72);
+    expect(sprintPromptStyle.height).toBeUndefined();
+    expect(reviewPromptStyle.minHeight).toBe(72);
+    expect(reviewPromptStyle.height).toBeUndefined();
     expect(sprintBoardSize + 2 * PRACTICE_UI_PADDING)
       .toBeLessThanOrEqual(expectedLayout.contentHeight);
     expect(findByTestId(reviewRenderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
@@ -9662,14 +9678,18 @@ describe("PracticePocScreen", () => {
 
     const reviewStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
     const solvedReviewFen = mustFenAfterMove(reviewStartFen, firstPuzzle.correctMove);
-    const unsolvedPromptHeight = flattenTestStyle(
+    const unsolvedPromptStyle = flattenTestStyle(
       findByTestId(renderer, "practice-prompt").props.style
-    ).height;
-    expect(unsolvedPromptHeight).toBe(72);
+    );
+    expect(unsolvedPromptStyle.minHeight).toBe(72);
+    expect(unsolvedPromptStyle.height).toBeUndefined();
     await boardMove(renderer, firstPuzzle.correctMove);
     expectText(renderer, "Solved");
-    expect(flattenTestStyle(findByTestId(renderer, "practice-prompt").props.style).height)
-      .toBe(unsolvedPromptHeight);
+    const solvedPromptStyle = flattenTestStyle(
+      findByTestId(renderer, "practice-prompt").props.style
+    );
+    expect(solvedPromptStyle.minHeight).toBe(unsolvedPromptStyle.minHeight);
+    expect(solvedPromptStyle.height).toBeUndefined();
     press(renderer, "review-analysis-button");
 
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(solvedReviewFen);
