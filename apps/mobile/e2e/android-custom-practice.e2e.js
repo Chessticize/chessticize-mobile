@@ -69,7 +69,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await element(by.id('practice-run-save')).tap();
       await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
       await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
-      await element(by.text(CUSTOM_RUN_NAME)).tap();
+      await selectPracticeRunByName(CUSTOM_RUN_NAME);
       await element(by.id('practice-main-scroll')).scrollTo('top');
       await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
       await element(by.id('practice-run-start')).tap();
@@ -151,7 +151,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await openTab('practice-tab', 'practice-action-header');
       await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
       await waitFor(element(by.text(`Rating ${practiceFixture.expectedRatingAfter}`))).toExist().withTimeout(10000);
-      await element(by.text(CUSTOM_RUN_NAME)).tap();
+      await selectPracticeRunByName(CUSTOM_RUN_NAME);
       await waitForVisibleInPracticeScroll('practice-progress-summary');
       await waitForElementAccessibilityLabelContaining(
         'practice-progress-summary',
@@ -176,6 +176,17 @@ async function openNewRunEditor() {
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id('custom-mode-regular'))).toBeVisible().withTimeout(10000);
+}
+
+async function selectPracticeRunByName(runName) {
+  const nameAttributes = await element(by.text(runName)).getAttributes();
+  const identifier = (Array.isArray(nameAttributes) ? nameAttributes[0] : nameAttributes).identifier;
+  if (typeof identifier !== 'string' || !identifier.startsWith('practice-run-name-')) {
+    throw new Error(`Could not resolve saved Run selection from ${String(identifier)}`);
+  }
+  const selectTestID = identifier.replace(/^practice-run-name-/, 'practice-run-select-');
+  await waitForVisibleInPracticeScroll(selectTestID);
+  await element(by.id(selectTestID)).tap();
 }
 
 async function openFirstCorrectHistoryAttempt() {
