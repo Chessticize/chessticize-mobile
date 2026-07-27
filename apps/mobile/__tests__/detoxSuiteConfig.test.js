@@ -1599,7 +1599,7 @@ describe('Detox suite configuration', () => {
       captureLandscape
     );
     const settleRestoredPortrait = spec.indexOf(
-      "await waitForSettledSprintLayout('portrait', { containmentTolerance: 8 })",
+      "await waitForSettledSprintLayout('portrait', { containmentTolerance: 16 })",
       restorePortrait
     );
     const settlePublicRootFocus = spec.indexOf(

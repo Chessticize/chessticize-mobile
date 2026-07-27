@@ -63,6 +63,8 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain("by.text('Sprint failed')");
     expect(journey).toContain("by.id('sprint-result-reason')");
     expect(journey).toContain('device.pressBack()');
+    expect(journey).toContain("by.label(/^Open Arrow Duel puzzle history, Correct/)");
+    expect(journey).not.toContain('resultAttributes');
     expect(journey).toContain('device.terminateApp()');
     expect(journey).toContain('deleteData: false');
     expect(journey).toContain("element(by.id('history-filter-toggle')).tap()");
