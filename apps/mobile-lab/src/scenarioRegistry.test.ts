@@ -284,7 +284,8 @@ test("post-attempt handoffs explain Timeout, Wrong, and Slow-correct results", (
   assert.match(afterSlow.description, /automatically marked Unclear/);
 });
 
-test("Issue #390 owns the post-Sprint flagged replay design without collapsing reasons", () => {
+test("Issue #390 owns a four-entry Replay whose status is shown by existing actions", () => {
+  const historyReplay = scenarioRegistry["history-attempt-detail"];
   const result = scenarioRegistry["practice-sprint-result-goal"];
   const replay = scenarioRegistry["practice-sprint-result-replay"];
   const issueScenarios = newScenarios
@@ -293,17 +294,21 @@ test("Issue #390 owns the post-Sprint flagged replay design without collapsing r
     .sort();
 
   assert.deepEqual(issueScenarios, [
+    "history-attempt-detail",
     "practice-sprint-result-goal",
     "practice-sprint-result-replay"
   ]);
+  assert.match(historyReplay.description, /Replay terminology/);
   assert.equal(result.storyId, "practice--sprint-result-goal-clarity");
   assert.ok(result.scope.includes.includes("Neutral replay entry"));
-  assert.match(result.description, /Unclear and Needs review/);
+  assert.match(result.description, /two Unclear and two In Review/);
   assert.equal(replay.storyId, "practice--sprint-result-flagged-replay");
-  assert.ok(replay.scope.includes.includes("Unclear-only reason"));
-  assert.ok(replay.scope.includes.includes("Needs-review-only reason"));
-  assert.ok(replay.scope.includes.includes("Combined reasons"));
-  assert.match(replay.description, /independent context badges/);
+  assert.ok(replay.scope.includes.includes("Four-attempt Replay"));
+  assert.ok(replay.scope.includes.includes("Mark clear"));
+  assert.ok(replay.scope.includes.includes("Remove from Review"));
+  assert.ok(replay.scope.exits.includes("New replay status badges"));
+  assert.match(replay.description, /existing actions instead of new status badges/);
+  assert.deepEqual(storyTagsForScenario(historyReplay.id), ["new"]);
   assert.deepEqual(storyTagsForScenario(result.id), ["new"]);
   assert.deepEqual(storyTagsForScenario(replay.id), ["new"]);
 });

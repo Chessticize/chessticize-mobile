@@ -2794,6 +2794,13 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     press(renderer, "history-attempt-history-unclear");
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe(
+      "Replay screen"
+    );
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+    expect(collectText(findByTestId(renderer, "history-attempt-clear-unclear"))).toBe(
+      "Mark clear"
+    );
     expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
 
     press(renderer, "review-analysis-button");
@@ -8270,48 +8277,64 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(playAgainButton, "backgroundColor", "#2563EB")).toBe(false);
   });
 
-  it("previews post-Sprint replay with separate Unclear and Needs review reasons", async () => {
+  it("previews two Unclear and two In Review attempts as a four-entry Replay with status actions", async () => {
     const renderer = renderLabScenario("practice-sprint-result-replay");
 
     expect(collectText(findByTestId(renderer, "sprint-result-unclear-summary"))).toContain(
       "Included in replay"
     );
     expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "Needs review"
+      "In Review"
     );
     expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
-      "An attempt can have both"
+      "2 Unclear + 2 in Review"
     );
     expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
-      "Review 3 attempts"
+      "Replay 4 attempts"
     );
 
     press(renderer, "review-mistakes-button");
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "review-source-pill"))).toBe("Sprint replay");
-    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("1 / 3");
-    expect(collectText(findByTestId(renderer, "review-context-unclear"))).toBe("Unclear");
-    expect(() => findByTestId(renderer, "review-context-needs-review")).toThrow();
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe(
-      "Not scheduled for Review"
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe(
+      "Replay screen"
     );
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("1 / 4");
+    expect(() => findByTestId(renderer, "review-source-pill")).toThrow();
+    expect(() => findByTestId(renderer, "review-context-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "review-context-needs-review")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-attempt-clear-unclear"))).toBe(
+      "Mark clear"
+    );
+    expect(() => findByTestId(renderer, "review-schedule-add")).toThrow();
+    press(renderer, "history-attempt-clear-unclear");
+    expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
 
     press(renderer, "review-next");
     await settleEntryPreview();
-    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("2 / 3");
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("2 / 4");
+    expect(collectText(findByTestId(renderer, "history-attempt-clear-unclear"))).toBe(
+      "Mark clear"
+    );
     expect(() => findByTestId(renderer, "review-context-unclear")).toThrow();
-    expect(collectText(findByTestId(renderer, "review-context-needs-review"))).toBe(
-      "Needs review"
+    expect(() => findByTestId(renderer, "review-context-needs-review")).toThrow();
+
+    press(renderer, "review-next");
+    await settleEntryPreview();
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("3 / 4");
+    expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe(
+      "Remove from Review"
     );
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
 
     press(renderer, "review-next");
     await settleEntryPreview();
-    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("3 / 3");
-    expect(collectText(findByTestId(renderer, "review-context-unclear"))).toBe("Unclear");
-    expect(collectText(findByTestId(renderer, "review-context-needs-review"))).toBe(
-      "Needs review"
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("4 / 4");
+    expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe(
+      "Remove from Review"
     );
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
   });

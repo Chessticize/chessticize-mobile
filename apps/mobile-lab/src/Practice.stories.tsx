@@ -445,7 +445,7 @@ export const SprintResultGoalClarity: Story = {
     await waitForTestId(canvasElement, "sprint-result-unclear-count-column");
     await waitForTestId(canvasElement, "sprint-result-mistakes-count-column");
     await waitForTestId(canvasElement, "sprint-result-review-note");
-    await expectTestIdText(canvasElement, "review-mistakes-button", "Review 3 attempts");
+    await expectTestIdText(canvasElement, "review-mistakes-button", "Replay 4 attempts");
     await waitForVisibleTestId(canvasElement, "review-mistakes-button");
   }
 };
@@ -457,17 +457,27 @@ export const SprintResultFlaggedReplay: Story = {
     await waitForVisibleTestId(canvasElement, "review-mistakes-button");
     await clickTestId(canvasElement, "review-mistakes-button");
     await waitForTestId(canvasElement, "review-session");
-    await expectTestIdText(canvasElement, "review-source-pill", "Sprint replay");
-    await expectTestIdText(canvasElement, "review-context-unclear", "Unclear");
+    await expectTestIdText(canvasElement, "review-title", "Replay");
+    expectTestIdAbsent(canvasElement, "review-source-pill");
+    expectTestIdAbsent(canvasElement, "review-context-unclear");
     expectTestIdAbsent(canvasElement, "review-context-needs-review");
+    await expectTestIdText(canvasElement, "history-attempt-clear-unclear", "Mark clear");
+    expectTestIdAbsent(canvasElement, "review-schedule-add");
+    await clickTestId(canvasElement, "history-attempt-clear-unclear");
+    expectTestIdAbsent(canvasElement, "history-attempt-clear-unclear");
 
     await clickTestId(canvasElement, "review-next");
     expectTestIdAbsent(canvasElement, "review-context-unclear");
-    await expectTestIdText(canvasElement, "review-context-needs-review", "Needs review");
+    expectTestIdAbsent(canvasElement, "review-context-needs-review");
+    await expectTestIdText(canvasElement, "history-attempt-clear-unclear", "Mark clear");
 
     await clickTestId(canvasElement, "review-next");
-    await expectTestIdText(canvasElement, "review-context-unclear", "Unclear");
-    await expectTestIdText(canvasElement, "review-context-needs-review", "Needs review");
+    await expectTestIdText(canvasElement, "review-schedule-remove", "Remove from Review");
+    expectTestIdAbsent(canvasElement, "history-attempt-clear-unclear");
+
+    await clickTestId(canvasElement, "review-next");
+    await expectTestIdText(canvasElement, "review-schedule-remove", "Remove from Review");
+    expectTestIdAbsent(canvasElement, "history-attempt-clear-unclear");
   }
 };
 

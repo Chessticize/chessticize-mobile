@@ -431,43 +431,48 @@ function sprintResultReplayDesignItems(): NonNullable<
         result: "correct",
         unclear: true
       }),
-      attention: {
-        unclear: true,
-        needsReview: false
-      }
+      inReview: false
     },
     {
       puzzle: LAB_PUZZLES[1]!,
       attempt: historyAttempt({
         completedAt,
-        id: "sprint-result-replay-needs-review",
+        elapsedMs: 45_000,
+        id: "sprint-result-replay-unclear-slow",
         puzzleId: LAB_PUZZLES[1]!.id,
-        ratingAfter: 1078,
+        ratingAfter: 1098,
         ratingBefore: 1092,
-        result: "wrong"
+        result: "correct",
+        timingStatus: "slow",
+        unclear: true
       }),
-      attention: {
-        unclear: false,
-        needsReview: true
-      }
+      inReview: false
     },
     {
       puzzle: LAB_PUZZLES[2]!,
       attempt: historyAttempt({
         completedAt,
-        elapsedMs: 45_000,
-        id: "sprint-result-replay-both",
+        id: "sprint-result-replay-in-review-wrong",
         puzzleId: LAB_PUZZLES[2]!.id,
         ratingAfter: 1084,
-        ratingBefore: 1078,
-        result: "correct",
-        timingStatus: "slow",
-        unclear: true
+        ratingBefore: 1098,
+        result: "wrong"
       }),
-      attention: {
-        unclear: true,
-        needsReview: true
-      }
+      inReview: true
+    },
+    {
+      puzzle: LAB_PUZZLES[3]!,
+      attempt: historyAttempt({
+        completedAt,
+        elapsedMs: 20_000,
+        id: "sprint-result-replay-in-review-timeout",
+        puzzleId: LAB_PUZZLES[3]!.id,
+        ratingAfter: 1084,
+        ratingBefore: 1084,
+        result: "timed_out",
+        timingStatus: "timed_out"
+      }),
+      inReview: true
     }
   ];
 }
@@ -572,6 +577,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
+    replayTerminologyDesignPreview:
+      scenarioId.startsWith("history-")
+      || scenarioId === "practice-sprint-result-goal"
+      || scenarioId === "practice-sprint-result-replay",
     sprintRulesDesignPreview: sprintRulesDesignPreviewFor(scenarioId),
     standardTargetCorrect: 1,
     arrowDuelTargetCorrect: 1,
@@ -1110,7 +1119,7 @@ function createReviewService(kind: "due" | "overdue"): PracticeService {
 function createSprintResultReplayService(): PracticeService {
   const store = new MemoryStore();
   store.seedPuzzles(LAB_PUZZLES);
-  for (const puzzle of LAB_PUZZLES.slice(1, 3)) {
+  for (const puzzle of LAB_PUZZLES.slice(2, 4)) {
     store.scheduleMistakeReview({
       puzzleId: puzzle.id,
       mode: "standard",

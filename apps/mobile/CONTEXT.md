@@ -40,15 +40,23 @@ _Avoid_: Exact reminder time, alarm time
 A completed Sprint attempt whose explanation needs attention. The user may mark
 an eligible correct attempt manually; a Slow correct attempt is marked
 automatically. Wrong and Timed out attempts are mistakes instead, and are never
-marked Unclear. The marker can later be cleared from History.
+marked Unclear. The marker can later be cleared from Replay.
 _Avoid_: Unclear puzzle, mistake, Review item
 
+**Replay**:
+An unscored return to one or more completed attempts for retry or analysis. Replay may be opened from Sprint Result or History, does not record another attempt, and does not itself change Review scheduling.
+_Avoid_: Analysis Review, mistake review, Review session
+
+**Review**:
+The official spaced-repetition activity for scheduled puzzle contexts. Review records attempts and updates the Review Schedule; Replay does neither.
+_Avoid_: Replay, free analysis, attempt inspection
+
 **Manual Review Enrollment**:
-The user's explicit addition of an exact puzzle, mode, and rating-key context from a Review-owned session or a History replay without implying that an attempt was wrong. When an Unclear History attempt initiates enrollment, the same atomic operation clears only that attempt's Unclear marker.
+The user's explicit addition of an exact puzzle, mode, and rating-key context from Replay without implying that an attempt was wrong. When an Unclear History attempt initiates enrollment, the same atomic operation clears only that attempt's Unclear marker.
 _Avoid_: Manual mistake, forced review
 
 **Review Schedule Control**:
-The two-state product affordance shown inside a Review-owned session or a History replay; it displays whether that exact Review Context is scheduled and lets the user manually enroll it or remove its existing Review Schedule. Manual enrollment acts immediately, while removal requires confirmation. Active Practice and Sprint Result do not expose this control.
+The two-state product affordance shown inside Replay; it displays whether that exact Review Context is scheduled and lets the user manually enroll it or remove its existing Review Schedule. Manual enrollment acts immediately, while removal requires confirmation. A Replay can use the applicable `Mark clear` or `Remove from Review` action to expose status without adding a new badge.
 _Avoid_: Review toggle, Review checkbox
 
 **Review Due Label**:

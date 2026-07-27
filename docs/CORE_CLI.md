@@ -55,23 +55,23 @@ date promotion remain user-store state.
 
 Sprint ratings use the same server-compatible Glicko-2 shape as `chessticize-server`: a new rating bucket starts at 600 with rating deviation 350 and volatility 0.06, and ratings are floored at 600. A completed sprint is one rated game against a system opponent at the user's current rating. Winning the first sprint from a fresh 600 bucket moves the rating to about 775, so cold-start calibration is intentionally much faster than a fixed-K Elo update. Failing at the floor keeps the rating at 600 while still reducing rating deviation.
 
-## Review And History Semantics
+## Replay, Review, And History Semantics
 
-The backend distinguishes two concepts that are both easy to call "review" in casual product discussion:
+The product uses two distinct terms:
 
-- **Analysis Review**: an unscored replay/analyze surface opened from sprint results, scheduled review results, or History. It supports retrying moves, stepping through lines, and Stockfish analysis. It must not create attempts, change ELO, or update spaced repetition scheduling.
-- **Scheduled Review**: the official spaced repetition flow for puzzles that were previously missed. It records review attempts, updates the review queue, and appears in History.
+- **Replay**: an unscored inspection and analysis surface opened from Sprint Result, Review results, or History. It supports retrying moves, stepping through lines, and Stockfish analysis. It must not create attempts, change ELO, or update Review scheduling.
+- **Review**: the official spaced-repetition flow for scheduled puzzle contexts. It records Review attempts, updates the Review queue, and appears in History.
 
 Attempt history must preserve source type:
 
 - `sprint`: an attempt made during a sprint.
-- `scheduled_review`: an attempt made during official spaced repetition review.
+- `scheduled_review`: an attempt made during official Review.
 
-History queries should be able to include both source types, filter by either source type, and include correct as well as wrong attempts. Analysis Review exploration is excluded from History.
+History queries should be able to include both source types, filter by either source type, and include correct as well as wrong attempts. Replay exploration is excluded from History.
 
-Scheduled review items keep puzzle-specific scheduling state. A correct scheduled review advances the interval. A failed scheduled review resets or contracts the interval and keeps the puzzle in the review cycle. Review queues may be partitioned by mode or sprint type so that Standard, legacy Blitz data, Arrow Duel, theme sprint, and custom sprint speeds do not get mixed into a single training context.
+Review items keep puzzle-specific scheduling state. A correct Review advances the interval. A failed Review resets or contracts the interval and keeps the puzzle in the Review cycle. Review queues may be partitioned by mode or sprint type so that Standard, legacy Blitz data, Arrow Duel, theme sprint, and custom sprint speeds do not get mixed into a single training context.
 
-Opening a History row should produce an Analysis Review context with the original attempt metadata and a filtered previous/next cursor. It should not create a Scheduled Review attempt unless the user explicitly starts an official due review item.
+Opening a History row should produce a Replay context with the original attempt metadata and a filtered previous/next cursor. It should not create a Review attempt unless the user explicitly starts an official due Review item.
 
 ## CLI Protocol
 

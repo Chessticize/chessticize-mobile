@@ -150,11 +150,7 @@ import {
   normalizeStoredThemeChoiceSelection,
   useThemeChoiceSelection
 } from "./useThemeChoiceSelection.ts";
-import {
-  buildReviewEntry,
-  type ReviewAttentionPresentation,
-  type ReviewEntry
-} from "../backend/reviewEntry.ts";
+import { buildReviewEntry, type ReviewEntry } from "../backend/reviewEntry.ts";
 import {
   canonicalFen,
   decidePremoveQueue,
@@ -272,6 +268,7 @@ interface Props {
   runManagementPresentation?: PracticeRunManagementPresentation;
   runEloEditingMovedToHome?: boolean;
   initialTab?: MobileBackPrimaryTab;
+  replayTerminologyDesignPreview?: boolean;
   sprintRulesDesignPreview?: SprintRulesDesignPreview;
   sprintStartDelayMs?: number;
   standardTargetCorrect?: number;
@@ -304,11 +301,7 @@ export type SprintResultUnclearPromptPresentation = {
 };
 
 export type SprintResultReplayDesignItem = SessionMistakeReviewItem & {
-  attention: ReviewAttentionPresentation;
-};
-
-type SessionReviewPresentationItem = SessionMistakeReviewItem & {
-  attention?: ReviewAttentionPresentation;
+  inReview: boolean;
 };
 
 export type SprintRulesDesignPreview = {
@@ -594,6 +587,7 @@ export function PracticePocScreen({
   runManagementPresentation,
   runEloEditingMovedToHome = false,
   initialTab = "practice",
+  replayTerminologyDesignPreview = false,
   sprintRulesDesignPreview,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
   standardTargetCorrect,
@@ -677,7 +671,7 @@ export function PracticePocScreen({
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueState[]>([]);
   const [dueReviewItems, setDueReviewItems] = useState<ReviewQueueItem[]>([]);
   const [sessionMistakeReviewItems, setSessionMistakeReviewItems] =
-    useState<SessionReviewPresentationItem[]>(() => [
+    useState<SessionMistakeReviewItem[]>(() => [
       ...(sprintRulesDesignPreview?.resultReplayItems ?? [])
     ]);
   const [error, setError] = useState<string | null>(null);
@@ -2244,13 +2238,27 @@ export function PracticePocScreen({
 
   function showReviewMistakes(): void {
     const sessionId = stateRef.current?.id;
-    const reviewItems: SessionReviewPresentationItem[] =
+    const reviewItems: SessionMistakeReviewItem[] =
       sprintRulesDesignPreview?.resultReplayItems
         ? [...sprintRulesDesignPreview.resultReplayItems]
         : sessionId ? service.getSessionMistakeReview(sessionId) : [];
     resetToIdle();
     setSessionMistakeReviewItems(reviewItems);
     navigateToTab("review");
+  }
+
+  function clearSessionReplayUnclear(attemptId: string): void {
+    setSessionMistakeReviewItems((items) => items.map((item) => (
+      item.attempt.id === attemptId
+        ? {
+            ...item,
+            attempt: withAttemptClarity(item.attempt, {
+              unclear: false,
+              unclearUpdatedAt: new Date(currentTimeMs()).toISOString()
+            })
+          }
+        : item
+    )));
   }
 
   function openReviewQueue(): void {
@@ -3102,7 +3110,13 @@ export function PracticePocScreen({
   const bottomTabsVisible = appChromeVisible && !sideNavigationVisible;
   const sessionUsesRail = shouldShowSessionBoard && adaptiveLayout.usesSessionRail;
   const sessionPackedRowWidth = adaptiveLayout.sessionPackedRowWidth;
-  const screenTitle = screenTitleFor(tab);
+  const screenTitle = replayTerminologyDesignPreview
+    && (
+      (tab === "review" && reviewSessionSource === "session")
+      || (tab === "history" && historyReviewEntries.length > 0)
+    )
+    ? "Replay"
+    : screenTitleFor(tab);
   const screenSubtitle = tab === "practice"
     ? `Offline-ready · ${seededPuzzleCount(puzzleSource)} puzzles`
     : screenSubtitleFor(tab);
@@ -3827,6 +3841,7 @@ export function PracticePocScreen({
                   onComplete={() => setHistoryReviewEntries([])}
                   onReviewEnrollmentChanged={reviewScheduleChanged}
                   onReturnToOwner={() => setHistoryReviewEntries([])}
+                  replayTerminology={replayTerminologyDesignPreview}
                   reviewScheduleControlVisible
                   stockfish={stockfish}
                 />
@@ -3965,6 +3980,7 @@ export function PracticePocScreen({
                   refreshState();
                 }}
                 onReviewScheduleChanged={reviewScheduleChanged}
+                onSessionAttemptClearUnclear={clearSessionReplayUnclear}
                 onPromoteNextFutureReviewsToDue={arePracticeTestControlsEnabled() ? promoteNextFutureReviewsToDue : undefined}
                 onScheduleTestReviewReminder={arePracticeTestControlsEnabled() ? scheduleDevReviewReminderNotification : undefined}
                 onSessionSourceChange={setReviewSessionSource}
@@ -3972,6 +3988,7 @@ export function PracticePocScreen({
                 filtersExpanded={reviewFiltersExpanded}
                 onFiltersExpandedChange={setReviewFiltersExpanded}
                 reviewReminderScheduleStatus={arePracticeTestControlsEnabled() ? reviewReminderScheduleStatus : undefined}
+                replayTerminologyDesignPreview={replayTerminologyDesignPreview}
                 stockfish={stockfish}
                 systemBackCommand={reviewBackCommand}
               />
@@ -8211,7 +8228,7 @@ function SprintSummary({
     ?? Math.round((state.correctCount / Math.max(1, attemptCount)) * 100);
   const ratingAfter = state.ratingAfter ?? state.ratingBefore;
   const reviewMistakeCount = resultSummary?.review.mistakeCount ?? state.mistakeCount;
-  const replayNeedsReviewCount = replayItems?.filter((item) => item.attention.needsReview).length;
+  const replayInReviewCount = replayItems?.filter((item) => item.inReview).length;
   const replayItemCount = replayItems?.length;
   const timedOutReviewCount = resultSummary?.review.timedOutCount ?? 0;
   const wrongMoveReviewCount = Math.max(0, reviewMistakeCount - timedOutReviewCount);
@@ -8400,11 +8417,11 @@ function SprintSummary({
 
       <View style={styles.resultReviewRow} testID="sprint-result-review-impact">
         <View style={styles.resultReviewCopy}>
-          <Text style={styles.listText}>{replayItems ? "Needs review" : "Mistakes"}</Text>
+          <Text style={styles.listText}>{replayItems ? "In Review" : "Mistakes"}</Text>
           <Text style={styles.helperText}>
             {replayItems
-              ? `${replayNeedsReviewCount ?? 0} ${
-                  replayNeedsReviewCount === 1 ? "attempt" : "attempts"
+              ? `${replayInReviewCount ?? 0} ${
+                  replayInReviewCount === 1 ? "attempt" : "attempts"
                 } · Included in replay`
               : reviewMistakeCount > 0
               ? `Review your mistakes · ${reviewImpact}${timedOutReviewCount > 0 ? " · Mistakes are not marked Unclear" : ""}`
@@ -8419,14 +8436,14 @@ function SprintSummary({
             testID="sprint-result-mistakes"
             style={[styles.resultReviewCount, reviewMistakeCount > 0 ? styles.errorText : styles.positive]}
           >
-            {replayNeedsReviewCount ?? reviewMistakeCount}
+            {replayInReviewCount ?? reviewMistakeCount}
           </Text>
         </View>
       </View>
 
       {replayItems ? (
         <Text style={styles.resultReviewNote} testID="sprint-result-review-note">
-          Replay includes Unclear and Needs review attempts. An attempt can have both.
+          {unclearCount} Unclear + {replayInReviewCount ?? 0} in Review · Replay does not change Review scheduling
         </Text>
       ) : null}
 
@@ -8434,14 +8451,14 @@ function SprintSummary({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={replayItems
-            ? `Review ${replayItemCount} attempts`
+            ? `Replay ${replayItemCount} attempts`
             : "Review mistakes"}
           testID="review-mistakes-button"
           style={[styles.primaryButton, styles.summaryPrimaryAction]}
           onPress={onReview}
         >
           <Text style={styles.primaryButtonText}>
-            {replayItems ? `Review ${replayItemCount} attempts` : "Review Mistakes"}
+            {replayItems ? `Replay ${replayItemCount} attempts` : "Review Mistakes"}
           </Text>
         </Pressable>
       ) : null}
@@ -8463,14 +8480,14 @@ function SprintSummary({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={replayItems
-            ? `Review ${replayItemCount} attempts`
+            ? `Replay ${replayItemCount} attempts`
             : "Review mistakes"}
           testID="review-mistakes-button"
           style={styles.secondaryButton}
           onPress={onReview}
         >
           <Text style={styles.secondaryButtonText}>
-            {replayItems ? `Review ${replayItemCount} attempts` : "Review Mistakes"}
+            {replayItems ? `Replay ${replayItemCount} attempts` : "Review Mistakes"}
           </Text>
         </Pressable>
       ) : null}
@@ -10554,8 +10571,10 @@ function ReviewPanel({
   onPromoteNextFutureReviewsToDue,
   onReviewRecorded,
   onReviewScheduleChanged,
+  onSessionAttemptClearUnclear,
   onSessionSourceChange,
   onScheduleTestReviewReminder,
+  replayTerminologyDesignPreview,
   reviewQueue,
   reviewReminderScheduleStatus,
   service,
@@ -10578,12 +10597,14 @@ function ReviewPanel({
   onPromoteNextFutureReviewsToDue?: () => ReviewQueueDuePromotionResult;
   onReviewRecorded: (completedAt: string) => void;
   onReviewScheduleChanged: (clearedAttemptId?: string) => void;
+  onSessionAttemptClearUnclear?: (attemptId: string) => void;
   onSessionSourceChange?: (source: ReviewEntry["source"] | null) => void;
   onScheduleTestReviewReminder?: () => Promise<ReviewReminderScheduleResult>;
+  replayTerminologyDesignPreview?: boolean;
   reviewQueue: ReviewQueueState[];
   reviewReminderScheduleStatus?: string;
   service: PracticeService;
-  sessionMistakeReviewItems: SessionReviewPresentationItem[];
+  sessionMistakeReviewItems: SessionMistakeReviewItem[];
   stockfish: MobileStockfishCapabilities;
   systemBackCommand: ReviewBackCommand | null;
 }): React.JSX.Element {
@@ -10592,8 +10613,7 @@ function ReviewPanel({
     mode: item.attempt.mode,
     ratingKey: item.attempt.ratingKey,
     source: "session",
-    attempt: item.attempt,
-    attention: item.attention
+    attempt: item.attempt
   }));
   const preferredEntries = sessionEntries.length > 0
     ? sessionEntries
@@ -10705,6 +10725,21 @@ function ReviewPanel({
     }
   }
 
+  function clearSessionAttemptUnclear(attemptId: string): void {
+    setActiveEntries((entries) => entries.map((entry) => (
+      entry.source === "session" && entry.attempt?.id === attemptId
+        ? {
+            ...entry,
+            attempt: withAttemptClarity(entry.attempt, {
+              unclear: false,
+              unclearUpdatedAt: new Date(currentTimeMs()).toISOString()
+            })
+          }
+        : entry
+    )));
+    onSessionAttemptClearUnclear?.(attemptId);
+  }
+
   if (activeEntries.length > 0) {
     const activeReviewGeneration = activeReviewGenerationRef.current;
     return (
@@ -10722,9 +10757,16 @@ function ReviewPanel({
         service={service}
         onReviewRecorded={onReviewRecorded}
         onReviewEnrollmentChanged={onReviewScheduleChanged}
+        onAttemptClearUnclear={
+          replayTerminologyDesignPreview
+            ? clearSessionAttemptUnclear
+            : undefined
+        }
         onAnalysisActiveChange={onAnalysisActiveChange}
         onComplete={(source) => finishActiveReview(source, activeReviewGeneration)}
         onReturnToOwner={returnActiveReviewToOwner}
+        replayControlsOnly={replayTerminologyDesignPreview}
+        replayTerminology={replayTerminologyDesignPreview}
         reviewScheduleControlVisible
         stockfish={stockfish}
         systemBackCommand={systemBackCommand}
@@ -11130,6 +11172,8 @@ function ReviewSession({
   onComplete,
   onReviewEnrollmentChanged,
   onReturnToOwner,
+  replayControlsOnly = false,
+  replayTerminology = false,
   reviewScheduleControlVisible = false,
   scheduledReviewCompletedCount = 0,
   scheduledReviewTotal = entries.length,
@@ -11151,6 +11195,8 @@ function ReviewSession({
   onComplete: (source: ReviewEntry["source"]) => void;
   onReviewEnrollmentChanged?: (clearedAttemptId?: string) => void;
   onReturnToOwner: (source: ReviewEntry["source"]) => void;
+  replayControlsOnly?: boolean;
+  replayTerminology?: boolean;
   reviewScheduleControlVisible?: boolean;
   scheduledReviewCompletedCount?: number;
   scheduledReviewTotal?: number;
@@ -11240,6 +11286,7 @@ function ReviewSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [systemBackCommand?.id]);
   const currentEntry = entries[entryIndex];
+  const isReplay = replayTerminology && currentEntry.source !== "due";
   const hasNextScheduledReview = entryIndex + 1 < entries.length;
   const currentPuzzle = currentReviewPuzzleState(reviewState);
   const currentFen = currentPuzzle.currentFen;
@@ -11829,16 +11876,21 @@ function ReviewSession({
     boardRef.current?.resetBoard(previous);
   }
 
-  const reviewScheduleControlNode = reviewScheduleControlVisible && currentEntry.source !== "due" ? (
+  const reviewContext = currentEntry.source !== "due"
+    ? {
+        puzzleId: currentEntry.puzzle.id,
+        mode: currentEntry.mode,
+        ratingKey: currentEntry.ratingKey
+      }
+    : null;
+  const reviewScheduleControlNode = reviewScheduleControlVisible
+    && reviewContext
+    && (!replayControlsOnly || service.getReviewQueueState(reviewContext)) ? (
     <ReviewScheduleControl
       key={`${currentEntry.puzzle.id}:${currentEntry.mode}:${currentEntry.ratingKey}`}
       actionVisible
       compact
-      context={{
-        puzzleId: currentEntry.puzzle.id,
-        mode: currentEntry.mode,
-        ratingKey: currentEntry.ratingKey
-      }}
+      context={reviewContext}
       currentTimeMs={currentTimeMs}
       initiatingAttemptId={currentEntry.source === "history" && currentEntry.attempt?.unclear
         ? currentEntry.attempt.id
@@ -11848,10 +11900,14 @@ function ReviewSession({
       refreshToken={reviewResultRecorded}
     />
   ) : null;
-  const historyUnclearActionNode = currentEntry.source === "history"
+  const historyUnclearActionNode = (currentEntry.source === "history"
+    || (isReplay && currentEntry.source === "session"))
     && currentEntry.attempt?.unclear
     && onAttemptClearUnclear ? (
-      <HistoryUnclearAction onClear={() => onAttemptClearUnclear(currentEntry.attempt!.id)} />
+      <HistoryUnclearAction
+        actionLabel={isReplay ? "Mark clear" : "Clear"}
+        onClear={() => onAttemptClearUnclear(currentEntry.attempt!.id)}
+      />
     ) : null;
   const hasReviewContextActions = reviewScheduleControlNode !== null || historyUnclearActionNode !== null;
   const hasAnalysisPanelContent = guidedEvalLines.length > 0
@@ -11894,7 +11950,7 @@ function ReviewSession({
       <View style={styles.reviewTopNav}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Exit review"
+          accessibilityLabel={isReplay ? "Exit replay" : "Exit review"}
           testID="review-exit"
           style={styles.iconButton}
           onPress={() => onReturnToOwner(currentEntry.source)}
@@ -11902,7 +11958,9 @@ function ReviewSession({
           <CloseGlyph />
         </Pressable>
         <View style={styles.reviewTitleBlock}>
-          <Text style={styles.panelTitle}>Review</Text>
+          <Text style={styles.panelTitle} testID="review-title">
+            {isReplay ? "Replay" : "Review"}
+          </Text>
           <Text testID="review-progress" style={styles.helperText}>
             {reviewProgressPosition} / {reviewProgressTotal} · {modeLabel(currentEntry.mode)}
           </Text>
@@ -11934,7 +11992,7 @@ function ReviewSession({
             <>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Previous review puzzle"
+                accessibilityLabel={isReplay ? "Previous replay puzzle" : "Previous review puzzle"}
                 accessibilityState={{ disabled: !canReviewPrevious }}
                 disabled={!canReviewPrevious}
                 testID="review-previous"
@@ -11945,7 +12003,7 @@ function ReviewSession({
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Next review puzzle"
+                accessibilityLabel={isReplay ? "Next replay puzzle" : "Next review puzzle"}
                 accessibilityState={{ disabled: !canReviewNext }}
                 disabled={!canReviewNext}
                 testID="review-next"
@@ -11972,31 +12030,9 @@ function ReviewSession({
         </View>
       </View>
       <View style={styles.reviewContextStrip} testID="review-context-strip">
-        {currentEntry.source === "session" ? (
+        {currentEntry.source === "session" && !isReplay ? (
           <View style={styles.reviewContextPill} testID="review-source-pill">
-            <Text style={styles.reviewContextPillText}>
-              {currentEntry.attention ? "Sprint replay" : "Sprint review"}
-            </Text>
-          </View>
-        ) : null}
-        {currentEntry.attention?.unclear ? (
-          <View
-            style={[styles.reviewContextPill, styles.reviewContextPillUnclear]}
-            testID="review-context-unclear"
-          >
-            <Text style={[styles.reviewContextPillText, styles.reviewContextPillTextUnclear]}>
-              Unclear
-            </Text>
-          </View>
-        ) : null}
-        {currentEntry.attention?.needsReview ? (
-          <View
-            style={[styles.reviewContextPill, styles.reviewContextPillNeedsReview]}
-            testID="review-context-needs-review"
-          >
-            <Text style={[styles.reviewContextPillText, styles.reviewContextPillTextNeedsReview]}>
-              Needs review
-            </Text>
+            <Text style={styles.reviewContextPillText}>Sprint review</Text>
           </View>
         ) : null}
         {reviewRemainingSeconds !== null ? (
@@ -12154,10 +12190,12 @@ function ReviewSession({
       <View
         accessible
         accessibilityLabel={feedback
-          ? `${feedback.result === "correct" ? "Correct move" : "Wrong move"}. ${feedback.puzzleSolved ? "Puzzle complete." : "Continue the review."}`
+          ? `${feedback.result === "correct" ? "Correct move" : "Wrong move"}. ${feedback.puzzleSolved
+              ? "Puzzle complete."
+              : isReplay ? "Continue the replay." : "Continue the review."}`
           : analysisEnabled
             ? `Analysis ${analysisEngineLabel || "ready"}. ${sideToMoveAccessibilityLabel(reviewSideToMove)}.${lastMove ? ` Last move ${lastMove.from} to ${lastMove.to}.` : ""}`
-            : `Review puzzle ${reviewProgressPosition} of ${reviewProgressTotal}. ${sideToMoveAccessibilityLabel(reviewSideToMove)}.`}
+            : `${isReplay ? "Replay" : "Review"} puzzle ${reviewProgressPosition} of ${reviewProgressTotal}. ${sideToMoveAccessibilityLabel(reviewSideToMove)}.`}
         accessibilityLiveRegion="polite"
         style={styles.accessibilityAnnouncement}
         testID="review-announcement"
@@ -12537,7 +12575,13 @@ function HistoryAttemptReplayUnavailable({
   );
 }
 
-function HistoryUnclearAction({ onClear }: { onClear: () => void }): React.JSX.Element {
+function HistoryUnclearAction({
+  actionLabel = "Clear",
+  onClear
+}: {
+  actionLabel?: "Clear" | "Mark clear";
+  onClear: () => void;
+}): React.JSX.Element {
   return (
     <View
       accessibilityLabel="This attempt is marked unclear"
@@ -12549,12 +12593,12 @@ function HistoryUnclearAction({ onClear }: { onClear: () => void }): React.JSX.E
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Clear unclear mark"
+        accessibilityLabel={actionLabel === "Mark clear" ? "Mark attempt clear" : "Clear unclear mark"}
         style={styles.historyAttemptClearButton}
         testID="history-attempt-clear-unclear"
         onPress={onClear}
       >
-        <Text style={styles.historyAttemptClearButtonText}>Clear</Text>
+        <Text style={styles.historyAttemptClearButtonText}>{actionLabel}</Text>
       </Pressable>
     </View>
   );
@@ -17813,14 +17857,6 @@ const styles = StyleSheet.create({
   reviewContextPillDanger: {
     borderColor: "#FCA5A5"
   },
-  reviewContextPillUnclear: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#F59E0B"
-  },
-  reviewContextPillNeedsReview: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FCA5A5"
-  },
   reviewTimerPill: {
     justifyContent: "center",
     minHeight: 38,
@@ -17838,12 +17874,6 @@ const styles = StyleSheet.create({
     color: "#334155",
     fontSize: 12,
     fontWeight: "800"
-  },
-  reviewContextPillTextUnclear: {
-    color: "#B45309"
-  },
-  reviewContextPillTextNeedsReview: {
-    color: "#B91C1C"
   },
   reviewBoardLayout: {
     gap: 12

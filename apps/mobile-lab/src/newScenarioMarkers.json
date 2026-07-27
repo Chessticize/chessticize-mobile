@@ -3,7 +3,7 @@
     "issues": [
       {
         "issueNumber": 390,
-        "changeNote": "Neutral post-Sprint replay entry for Unclear and Needs review attempts"
+        "changeNote": "Four-entry post-Sprint Replay for two Unclear and two In Review attempts"
       }
     ]
   },
@@ -11,7 +11,15 @@
     "issues": [
       {
         "issueNumber": 390,
-        "changeNote": "Independent Unclear and Needs review badges during flagged replay"
+        "changeNote": "Replay terminology with Mark clear and Remove from Review actions"
+      }
+    ]
+  },
+  "history-attempt-detail": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "History rows open Replay with Replay and Review kept distinct"
       }
     ]
   }
