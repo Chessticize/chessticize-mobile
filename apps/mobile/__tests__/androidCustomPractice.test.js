@@ -41,6 +41,16 @@ describe('Android Custom Practice release slice', () => {
     expect(spec).toContain("identifier.startsWith('practice-run-name-')");
     expect(spec).toContain("nameTestID.replace('practice-run-name-', 'practice-run-select-')");
     expect(spec).not.toContain("element(by.text(CUSTOM_RUN_NAME)).tap()");
+    const scrollToCustomRun = "await waitForVisibleInPracticeScroll(customRunSelectTestID);";
+    const tapCustomRun = "await element(by.id(customRunSelectTestID)).tap();";
+    const firstScroll = spec.indexOf(scrollToCustomRun);
+    const firstTap = spec.indexOf(tapCustomRun, firstScroll);
+    const secondScroll = spec.indexOf(scrollToCustomRun, firstScroll + 1);
+    const secondTap = spec.indexOf(tapCustomRun, secondScroll);
+    expect(firstScroll).toBeGreaterThan(-1);
+    expect(firstTap).toBeGreaterThan(firstScroll);
+    expect(secondScroll).toBeGreaterThan(firstTap);
+    expect(secondTap).toBeGreaterThan(secondScroll);
     expect(spec).toContain('android-standard-practice.fixture.json');
     expect(fixture.customRunTheme).toEqual({
       id: 'mate-in-2',
