@@ -3822,7 +3822,7 @@ export function PracticePocScreen({
                         setHistoryPageOffset(0);
                         navigateToTab("history");
                       }}
-                      onReview={
+                      onOpenReplay={
                         sprintReplayItems.length > 0
                           ? showSessionReplay
                           : undefined
@@ -8229,7 +8229,7 @@ function SprintSummary({
   onReplay,
   onBack,
   onOpenHistory,
-  onReview
+  onOpenReplay
 }: {
   state: SprintState;
   clarifyGoal: boolean;
@@ -8243,13 +8243,13 @@ function SprintSummary({
   onReplay: () => void;
   onBack: () => void;
   onOpenHistory: () => void;
-  onReview?: () => void;
+  onOpenReplay?: () => void;
 }): React.JSX.Element {
   const delta = (state.ratingAfter ?? state.ratingBefore) - state.ratingBefore;
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
   const showGoalClarification = clarifyGoal && !isTacticalFocus;
   const reason = formatEndReason(state.endReason);
-  const shouldPrioritizeReview = Boolean(onReview);
+  const shouldPrioritizeReplay = Boolean(onOpenReplay);
   const attemptCount = resultSummary?.attemptCount
     ?? state.correctCount + state.mistakeCount;
   const accuracy = resultSummary?.accuracyPercent
@@ -8257,6 +8257,9 @@ function SprintSummary({
   const ratingAfter = state.ratingAfter ?? state.ratingBefore;
   const replayInReviewCount = replayItems?.filter((item) => item.inReview).length ?? 0;
   const replayItemCount = replayItems?.length ?? 0;
+  const replayAttemptCountLabel = `${replayItemCount} ${
+    replayItemCount === 1 ? "attempt" : "attempts"
+  }`;
   const replayOverlapCount = replayItems?.filter(
     (item) => item.inReview && isAttemptMarkedUnclear(item.attempt)
   ).length ?? 0;
@@ -8466,16 +8469,16 @@ function SprintSummary({
         </Text>
       ) : null}
 
-      {onReview && shouldPrioritizeReview ? (
+      {onOpenReplay && shouldPrioritizeReplay ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Replay ${replayItemCount} attempts`}
+          accessibilityLabel={`Replay ${replayAttemptCountLabel}`}
           testID="review-mistakes-button"
           style={[styles.primaryButton, styles.summaryPrimaryAction]}
-          onPress={onReview}
+          onPress={onOpenReplay}
         >
           <Text style={styles.primaryButtonText}>
-            Replay {replayItemCount} attempts
+            Replay {replayAttemptCountLabel}
           </Text>
         </Pressable>
       ) : null}
@@ -8485,24 +8488,24 @@ function SprintSummary({
           accessibilityRole="button"
           accessibilityLabel={isTacticalFocus ? "Back to Practice" : "Play again"}
           testID="play-again-button"
-          style={shouldPrioritizeReview ? styles.secondaryButton : styles.primaryButton}
+          style={shouldPrioritizeReplay ? styles.secondaryButton : styles.primaryButton}
           onPress={onReplay}
         >
-          <Text style={shouldPrioritizeReview ? styles.secondaryButtonText : styles.primaryButtonText}>
+          <Text style={shouldPrioritizeReplay ? styles.secondaryButtonText : styles.primaryButtonText}>
             {isTacticalFocus ? "Back to Practice" : "Play again"}
           </Text>
         </Pressable>
       </View>
-      {onReview && !shouldPrioritizeReview ? (
+      {onOpenReplay && !shouldPrioritizeReplay ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Replay ${replayItemCount} attempts`}
+          accessibilityLabel={`Replay ${replayAttemptCountLabel}`}
           testID="review-mistakes-button"
           style={styles.secondaryButton}
-          onPress={onReview}
+          onPress={onOpenReplay}
         >
           <Text style={styles.secondaryButtonText}>
-            Replay {replayItemCount} attempts
+            Replay {replayAttemptCountLabel}
           </Text>
         </Pressable>
       ) : null}
@@ -10108,7 +10111,7 @@ function HistoryAttemptRow({
   const durationLabel = detail.elapsedSeconds === null ? "Duration unavailable" : `${detail.elapsedSeconds}s`;
   const compactMeta = `${sourceLabel} · ${durationLabel} · ${dateLabel}`;
   const rowAccessibilityLabel = [
-    `Open ${historyAttemptModeLabel(detail.mode)} puzzle history`,
+    `Replay ${historyAttemptModeLabel(detail.mode)} puzzle`,
     resultLabel,
     submittedMoveLabel,
     attempt.unclear ? "Marked unclear" : null,

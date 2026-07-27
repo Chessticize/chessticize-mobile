@@ -433,7 +433,7 @@ describe("PracticePocScreen", () => {
       "Included in replay"
     );
     expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
-      "Replay 1 attempts"
+      "Replay 1 attempt"
     );
 
     const historyCountBeforeReplay = service.listHistory().length;
@@ -7208,6 +7208,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-result`))).toBe("Wrong move");
     expect(() => findByTestId(renderer, `history-attempt-${historyAttemptId}-move`)).toThrow();
     expect(historyAttemptRow.props.accessibilityLabel).toContain("Played g6g5 · Best f4g3");
+    expect(historyAttemptRow.props.accessibilityLabel).toContain("Replay Standard puzzle");
     expect(historyAttemptRow.props.accessibilityLabel).not.toContain("Review due");
     expect(collectText(historyAttemptRow)).not.toContain("Played g6g5 · Best f4g3");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-identity`))).toMatch(
@@ -8035,6 +8036,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-attempt-malformed-context-attempt-meta"))).toContain(
       "Unknown source"
     );
+    expect(
+      findByTestId(renderer, "history-attempt-malformed-context-attempt").props.accessibilityLabel
+    ).toContain("Replay Unknown mode puzzle");
     press(renderer, "history-attempt-malformed-context-attempt");
     expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
     expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe("Replay screen");
