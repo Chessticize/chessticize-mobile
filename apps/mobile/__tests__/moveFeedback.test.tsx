@@ -38,7 +38,7 @@ describe("move feedback", () => {
     }]);
   });
 
-  it("never requests haptics for an opponent reply", async () => {
+  it("requests haptics for an opponent reply when haptics are enabled", async () => {
     const client = new FakeMoveFeedbackClient();
 
     await emitCommittedMoveFeedback(
@@ -50,7 +50,7 @@ describe("move feedback", () => {
     expect(client.requests).toEqual([{
       cue: "move",
       playSound: true,
-      playHaptic: false
+      playHaptic: true
     }]);
   });
 

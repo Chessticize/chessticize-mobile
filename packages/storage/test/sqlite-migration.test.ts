@@ -328,7 +328,7 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
       assert.deepEqual(service.getSettings(), {
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "20:30" } },
-        moveFeedback: { soundEnabled: true, hapticsEnabled: true },
+        moveFeedback: { soundEnabled: false, hapticsEnabled: true },
         sprintGuides: {
           rulesSeen: false,
           activeSessionSeen: false,
@@ -510,7 +510,7 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
         notifications: {
           reviewReminder: { mode: "fixed", fixedLocalTime: "07:35" }
         },
-        moveFeedback: { soundEnabled: true, hapticsEnabled: true },
+        moveFeedback: { soundEnabled: false, hapticsEnabled: true },
         sprintGuides: {
           rulesSeen: false,
           activeSessionSeen: false,
@@ -917,6 +917,57 @@ test("SQLite schema at the current version matches the committed golden snapshot
   }
 });
 
+test("SQLite v14 applies the quiet move-feedback default once", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-quiet-feedback-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setupStore = new SQLiteStore(databasePath);
+    setupStore.migrate();
+    const setupService = new PracticeService(setupStore);
+    setupService.saveSettings({
+      ...setupService.getSettings(),
+      moveFeedback: {
+        soundEnabled: true,
+        hapticsEnabled: true
+      }
+    });
+    setupStore.db.exec("PRAGMA user_version = 13");
+    setupStore.close();
+
+    const migratedStore = new SQLiteStore(databasePath);
+    migratedStore.migrate();
+    const migratedService = new PracticeService(migratedStore);
+    try {
+      assert.deepEqual(migratedService.getSettings().moveFeedback, {
+        soundEnabled: false,
+        hapticsEnabled: true
+      });
+      migratedService.saveSettings({
+        ...migratedService.getSettings(),
+        moveFeedback: {
+          soundEnabled: true,
+          hapticsEnabled: true
+        }
+      });
+    } finally {
+      migratedStore.close();
+    }
+
+    const reopenedStore = new SQLiteStore(databasePath);
+    reopenedStore.migrate();
+    try {
+      assert.deepEqual(new PracticeService(reopenedStore).getSettings().moveFeedback, {
+        soundEnabled: true,
+        hapticsEnabled: true
+      });
+    } finally {
+      reopenedStore.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("SQLite repairs divergent timing schemas that omitted move feedback columns", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-divergent-timing-schema-"));
   try {
@@ -941,7 +992,7 @@ test("SQLite repairs divergent timing schemas that omitted move feedback columns
       const repairedService = new PracticeService(repairedStore);
       try {
         assert.deepEqual(repairedService.getSettings().moveFeedback, {
-          soundEnabled: true,
+          soundEnabled: false,
           hapticsEnabled: true
         });
         assert.doesNotThrow(() => {

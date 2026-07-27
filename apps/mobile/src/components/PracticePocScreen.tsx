@@ -11257,7 +11257,7 @@ function ReviewSession({
   const reviewPerPuzzleSeconds = perPuzzleSecondsForReviewEntry(currentEntry);
   const reviewCuratedThemes = currentEntry.curatedThemes;
   const reviewRemainingSeconds =
-    currentEntry.source === "due" && (!reviewResultRecorded || reviewTimedOut)
+    currentEntry.source === "due"
       ? Math.max(0, reviewPerPuzzleSeconds - Math.floor((reviewNowMs - reviewStartedAtMs) / 1000))
       : null;
   const analysisEngineLabel =
@@ -11920,7 +11920,10 @@ function ReviewSession({
           </View>
         ) : null}
         {reviewRemainingSeconds !== null ? (
-          <View style={[styles.reviewContextPill, styles.reviewTimerPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}>
+          <View
+            style={[styles.reviewContextPill, styles.reviewTimerPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}
+            testID="review-timer-slot"
+          >
             <Text
               numberOfLines={1}
               testID="review-timer"
@@ -16669,7 +16672,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    minHeight: 72,
+    height: 72,
     paddingHorizontal: 12,
     paddingVertical: 9
   },

@@ -15,7 +15,7 @@ export function defaultPracticeSettings(): PracticeSettings {
       }
     },
     moveFeedback: {
-      soundEnabled: true,
+      soundEnabled: false,
       hapticsEnabled: true
     },
     sprintGuides: defaultSprintGuideProgress()
@@ -31,7 +31,7 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
       reviewReminder: settings.notifications.reviewReminder
     },
     moveFeedback: {
-      soundEnabled: settings.moveFeedback?.soundEnabled ?? true,
+      soundEnabled: settings.moveFeedback?.soundEnabled ?? false,
       hapticsEnabled: settings.moveFeedback?.hapticsEnabled ?? true
     },
     sprintGuides: {
@@ -52,7 +52,7 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
       reviewReminder: normalizeReviewReminderPreference(settings.notifications.reviewReminder)
     },
     moveFeedback: {
-      soundEnabled: settings.moveFeedback?.soundEnabled ?? true,
+      soundEnabled: settings.moveFeedback?.soundEnabled ?? false,
       hapticsEnabled: settings.moveFeedback?.hapticsEnabled ?? true
     },
     sprintGuides: {

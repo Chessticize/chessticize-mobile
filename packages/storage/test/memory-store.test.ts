@@ -292,7 +292,7 @@ test("PracticeService persists settings through the store boundary", () => {
       }
     },
     moveFeedback: {
-      soundEnabled: true,
+      soundEnabled: false,
       hapticsEnabled: true
     },
     sprintGuides: {

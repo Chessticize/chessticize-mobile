@@ -4898,6 +4898,13 @@ describe("PracticePocScreen", () => {
 
   it("locks Standard input on the first rendered frame until the blunder animation completes", async () => {
     const service = createMobilePracticeService("familiar15");
+    service.saveSettings({
+      ...service.getSettings(),
+      moveFeedback: {
+        soundEnabled: true,
+        hapticsEnabled: true
+      }
+    });
     const moveFeedbackClient = new FakeMoveFeedbackClient();
     const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
 
@@ -4931,7 +4938,7 @@ describe("PracticePocScreen", () => {
     expect(moveFeedbackClient.requests).toEqual([{
       cue: "move",
       playSound: true,
-      playHaptic: false
+      playHaptic: true
     }]);
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(activePuzzle.currentFen);
@@ -8835,6 +8842,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-reset-puzzle")).toThrow();
     expect(() => findByTestId(renderer, "review-side-to-move")).toThrow();
     expect(styleEntryMatches(findByTestId(renderer, "review-context-strip").props.style, "justifyContent", "center")).toBe(true);
+    expect(findByTestId(renderer, "review-timer-slot")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e2e6");
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("locked");
     await settleEntryPreview();
@@ -8849,9 +8857,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e6f7");
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
 
+    const timerBeforeSolvedFeedback = collectText(findByTestId(renderer, "review-timer"));
     await boardMove(renderer, "e6f7");
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+    });
 
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
+    expect(collectText(findByTestId(renderer, "review-timer"))).toBe(timerBeforeSolvedFeedback);
     expect(promptKingTestIDs(renderer)).toEqual(initialPromptKingTestIDs);
     await settleFeedbackSnapshot();
 
@@ -9543,7 +9557,14 @@ describe("PracticePocScreen", () => {
 
     const reviewStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
     const solvedReviewFen = mustFenAfterMove(reviewStartFen, firstPuzzle.correctMove);
+    const unsolvedPromptHeight = flattenTestStyle(
+      findByTestId(renderer, "practice-prompt").props.style
+    ).height;
+    expect(unsolvedPromptHeight).toBe(72);
     await boardMove(renderer, firstPuzzle.correctMove);
+    expectText(renderer, "Solved");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-prompt").props.style).height)
+      .toBe(unsolvedPromptHeight);
     press(renderer, "review-analysis-button");
 
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(solvedReviewFen);
@@ -9885,7 +9906,16 @@ describe("PracticePocScreen", () => {
       )
     ).toBeLessThan(0);
     expect(() => findByTestId(renderer, "settings-move-feedback-previews")).toThrow();
+    expect(service.getSettings().moveFeedback).toEqual({
+      soundEnabled: false,
+      hapticsEnabled: true
+    });
 
+    press(renderer, "settings-move-sound-toggle");
+    expect(service.getSettings().moveFeedback).toEqual({
+      soundEnabled: true,
+      hapticsEnabled: true
+    });
     press(renderer, "settings-move-sound-toggle");
     expect(service.getSettings().moveFeedback).toEqual({
       soundEnabled: false,
@@ -9908,11 +9938,14 @@ describe("PracticePocScreen", () => {
     const moveFeedbackClient = new FakeMoveFeedbackClient();
     const renderer = renderStandardSequenceScreen({ moveFeedbackClient });
 
+    press(renderer, "settings-tab");
+    press(renderer, "settings-move-sound-toggle");
+    press(renderer, "practice-tab");
     startStandardSprint(renderer);
     expect(moveFeedbackClient.requests).toEqual([{
       cue: "capture",
       playSound: true,
-      playHaptic: false
+      playHaptic: true
     }]);
     await boardMove(renderer, "d8a8");
     expect(moveFeedbackClient.requests).toHaveLength(1);
@@ -9922,7 +9955,7 @@ describe("PracticePocScreen", () => {
       {
         cue: "capture",
         playSound: true,
-        playHaptic: false
+        playHaptic: true
       },
       {
         cue: "capture",
@@ -9937,7 +9970,7 @@ describe("PracticePocScreen", () => {
       {
         cue: "capture",
         playSound: true,
-        playHaptic: false
+        playHaptic: true
       },
       {
         cue: "capture",
@@ -9947,7 +9980,7 @@ describe("PracticePocScreen", () => {
       {
         cue: "move",
         playSound: true,
-        playHaptic: false
+        playHaptic: true
       }
     ]);
   });

@@ -855,7 +855,7 @@ async function openTab(tabTestID, contentTestID) {
 }
 
 async function openStandardHistoryTrend() {
-  await openTab('history-tab', 'history-action-header');
+  await openTab('history-tab', 'history-filter-toggle');
   if (!(await detoxElementExists('history-rating-standard 5/20'))) {
     await waitFor(element(by.id('history-filter-toggle'))).toBeVisible().withTimeout(10000);
     await element(by.id('history-filter-toggle')).tap();

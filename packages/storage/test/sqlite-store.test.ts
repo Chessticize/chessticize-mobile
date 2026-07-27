@@ -211,7 +211,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
     assert.deepEqual(store.getSettings(), {
       sync: { iCloudEnabled: false },
       notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "19:00" } },
-      moveFeedback: { soundEnabled: true, hapticsEnabled: true },
+      moveFeedback: { soundEnabled: false, hapticsEnabled: true },
       sprintGuides: {
         rulesSeen: false,
         activeSessionSeen: false,
@@ -870,7 +870,7 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
             }
           },
           moveFeedback: {
-            soundEnabled: true,
+            soundEnabled: false,
             hapticsEnabled: true
           },
           sprintGuides: {
