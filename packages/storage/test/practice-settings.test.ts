@@ -6,9 +6,9 @@ import {
 } from "../src/practice-settings.ts";
 import type { PracticeSettings } from "../src/practice-store.ts";
 
-test("move feedback settings default to sound and haptics enabled", () => {
+test("move feedback settings default to sound off and haptics enabled", () => {
   assert.deepEqual(defaultPracticeSettings().moveFeedback, {
-    soundEnabled: true,
+    soundEnabled: false,
     hapticsEnabled: true
   });
 });
@@ -53,14 +53,14 @@ test("Sprint guide progress is cloned independently", () => {
   });
 });
 
-test("legacy settings without move feedback normalize to enabled defaults", () => {
+test("legacy settings without move feedback normalize to quiet haptic defaults", () => {
   const legacySettings = {
     sync: { iCloudEnabled: true },
     notifications: { reviewReminder: { mode: "smart" as const } }
   } as PracticeSettings;
 
   assert.deepEqual(clonePracticeSettings(legacySettings).moveFeedback, {
-    soundEnabled: true,
+    soundEnabled: false,
     hapticsEnabled: true
   });
 });

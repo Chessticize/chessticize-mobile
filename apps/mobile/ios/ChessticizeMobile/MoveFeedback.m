@@ -21,13 +21,22 @@ RCT_EXPORT_MODULE();
 {
   self = [super init];
   if (self) {
+    AVAudioSession *session = [AVAudioSession sharedInstance];
+    NSError *sessionError = nil;
+    [session setCategory:AVAudioSessionCategoryAmbient
+                    mode:AVAudioSessionModeDefault
+                 options:AVAudioSessionCategoryOptionMixWithOthers
+                   error:&sessionError];
+    if (sessionError == nil) {
+      [session setActive:YES error:&sessionError];
+    }
     self.movePlayer = [self playerForResource:@"freesound-546119-piece-placement"];
     self.capturePlayer = [self playerForResource:@"freesound-546120-piece-capture"];
     self.movePlayer.volume = 1.0;
     self.capturePlayer.volume = 0.3;
     [self.movePlayer prepareToPlay];
     [self.capturePlayer prepareToPlay];
-    self.impactGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+    self.impactGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
     [self.impactGenerator prepare];
   }
   return self;
@@ -45,28 +54,17 @@ RCT_EXPORT_METHOD(play:(NSString *)cue
   }
 
   dispatch_async(dispatch_get_main_queue(), ^{
-    if (playSound) {
-      AVAudioSession *session = [AVAudioSession sharedInstance];
-      NSError *sessionError = nil;
-      [session setCategory:AVAudioSessionCategoryAmbient
-                      mode:AVAudioSessionModeDefault
-                   options:AVAudioSessionCategoryOptionMixWithOthers
-                     error:&sessionError];
-      if (sessionError == nil) {
-        [session setActive:YES error:&sessionError];
-      }
-      if (sessionError == nil) {
-        AVAudioPlayer *player = [cue isEqualToString:@"capture"]
-          ? self.capturePlayer
-          : self.movePlayer;
-        player.currentTime = 0;
-        [player play];
-      }
-    }
-
     if (playHaptic) {
       [self.impactGenerator impactOccurred];
       [self.impactGenerator prepare];
+    }
+
+    if (playSound) {
+      AVAudioPlayer *player = [cue isEqualToString:@"capture"]
+        ? self.capturePlayer
+        : self.movePlayer;
+      player.currentTime = 0;
+      [player play];
     }
     resolve(nil);
   });

@@ -277,7 +277,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 13;
+export const CURRENT_SCHEMA_VERSION = 14;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -299,7 +299,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 9, to: 10, apply: migrateV9ToV10 },
   { from: 10, to: 11, apply: migrateV10ToV11 },
   { from: 11, to: 12, apply: migrateV11ToV12 },
-  { from: 12, to: 13, apply: migrateV12ToV13 }
+  { from: 12, to: 13, apply: migrateV12ToV13 },
+  { from: 13, to: 14, apply: migrateV13ToV14 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -2449,7 +2450,15 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   // The timing and move-feedback branches both used schema v9 before they were
   // merged. Devices that ran the timing build can therefore report the current
   // version while still lacking these columns.
+  const hadMoveFeedbackSoundColumn = hasColumn(
+    db,
+    "app_settings",
+    "move_feedback_sound_enabled"
+  );
   ensureMoveFeedbackColumns(db);
+  if (!hadMoveFeedbackSoundColumn) {
+    db.exec("UPDATE app_settings SET move_feedback_sound_enabled = 0");
+  }
   migrateV10ToV11(db);
   migrateV11ToV12(db);
 }
@@ -2662,6 +2671,15 @@ function migrateV12ToV13(db: SyncSqliteDatabase): void {
     INSERT OR IGNORE INTO tactical_profile_source_state (singleton_id, revision)
     VALUES (1, 0);
   `);
+}
+
+function migrateV13ToV14(db: SyncSqliteDatabase): void {
+  // Sound was previously on by default, and the stored boolean cannot
+  // distinguish that inherited default from an explicit opt-in. Apply the new
+  // quiet default once during upgrade; later user changes persist because this
+  // migration cannot run again after user_version reaches 14.
+  ensureMoveFeedbackColumns(db);
+  db.exec("UPDATE app_settings SET move_feedback_sound_enabled = 0");
 }
 
 function readSchemaVersion(db: SyncSqliteDatabase): number {
