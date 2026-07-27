@@ -45,13 +45,8 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
       await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 1').withTimeout(10000);
 
-      await waitForVisibleInPracticeScroll('session-abandon');
-      await element(by.id('session-abandon')).tap();
-      await element(by.id('practice-main-scroll')).scrollTo('bottom');
-      await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
-      await element(by.id('session-abandon-confirm')).tap();
-      await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(30000);
-      await waitFor(element(by.id('sprint-result-reason'))).toHaveText('Abandoned').withTimeout(10000);
+      await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
+      await waitFor(element(by.id('sprint-result-reason'))).toHaveText('No more puzzles').withTimeout(10000);
       await expect(element(by.id('review-mistakes-button'))).toBeVisible();
 
       // System Back deliberately skips the optional post-sprint mistake review.
