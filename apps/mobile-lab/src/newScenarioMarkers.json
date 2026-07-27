@@ -22,5 +22,13 @@
         "changeNote": "History rows open Replay with Replay and Review kept distinct"
       }
     ]
+  },
+  "history-replay-unavailable": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "Unavailable History entries keep Replay terminology"
+      }
+    ]
   }
 }

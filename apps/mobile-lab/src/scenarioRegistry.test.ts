@@ -295,6 +295,7 @@ test("Issue #390 owns a four-entry Replay whose status is shown by existing acti
 
   assert.deepEqual(issueScenarios, [
     "history-attempt-detail",
+    "history-replay-unavailable",
     "practice-sprint-result-goal",
     "practice-sprint-result-replay"
   ]);
