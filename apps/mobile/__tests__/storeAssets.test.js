@@ -218,7 +218,7 @@ describe("App Store assets document", () => {
     );
   });
 
-  it("scrolls the editor to its visible Save action above the landscape number pad", () => {
+  it("settles the landscape editor after dismissing the number pad before saving", () => {
     const ratingHelperStart = storeAssetsE2e.indexOf(
       "async function setStoreAssetRatings"
     );
@@ -229,6 +229,11 @@ describe("App Store assets document", () => {
     const ratingHelper = storeAssetsE2e.slice(ratingHelperStart, ratingHelperEnd);
     expect(ratingHelper).toContain(
       "await element(by.id('practice-main-scroll')).scrollTo('top');\n"
+      + "    await sleep(500);\n"
+      + "    await element(by.id('practice-main-scroll')).scrollTo('top');\n"
+      + "    await waitFor(element(by.id('practice-run-editor-title')))\n"
+      + "      .toBeVisible()\n"
+      + "      .withTimeout(5000);\n"
       + "    await element(by.id('practice-run-save')).tap();"
     );
     expect(ratingHelper).not.toContain(

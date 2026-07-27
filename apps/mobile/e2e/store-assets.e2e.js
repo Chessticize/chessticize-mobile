@@ -83,6 +83,11 @@ async function setStoreAssetRatings({ standard, arrowDuel }) {
       .toHaveText(String(targetRating))
       .withTimeout(10000);
     await element(by.id('practice-main-scroll')).scrollTo('top');
+    await sleep(500);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('practice-run-editor-title')))
+      .toBeVisible()
+      .withTimeout(5000);
     await element(by.id('practice-run-save')).tap();
   }
   await element(by.id('practice-main-scroll')).scrollTo('top');
