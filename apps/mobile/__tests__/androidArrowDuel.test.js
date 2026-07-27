@@ -63,7 +63,7 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain("by.text('Sprint failed')");
     expect(journey).toContain("by.id('sprint-result-reason')");
     expect(journey).toContain('device.pressBack()');
-    expect(journey).toContain("waitForVisibleInPracticeScroll('session-abandon')");
+    expect(journey).toContain("element(by.id('practice-main-scroll')).scrollTo('bottom')");
     expect(journey).toContain("const result = element(by.text('Correct')).atIndex(0)");
     expect(journey).toContain('await result.tap()');
     expect(journey).not.toContain('resultAttributes');
@@ -71,6 +71,7 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain('deleteData: false');
     expect(journey).toContain("element(by.id('history-filter-toggle')).tap()");
     expect(journey).toContain("by.id('history-rating-arrow_duel 5/30')");
+    expect(journey).toContain("waitForVisibleInPracticeScroll('history-attention-all')");
     expect(journey).toContain(
       "waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000)"
     );
