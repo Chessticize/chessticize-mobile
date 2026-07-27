@@ -102,9 +102,16 @@ Primary flows:
 - Business state comes from the local backend/domain core. UI screens render view models and dispatch typed intents.
 - No hidden scoring changes: UI controls such as hint, skip, undo, or analysis must not appear in scored sprint mode unless the scoring rules explicitly support them.
 
-## Adaptive Layout And Orientation
+## Adaptive Layout And Window Shape
 
-The current implementation and App Store target support compact portrait, compact landscape, regular-width iPad portrait, regular-width iPad landscape, and iPad split-view widths. Release QA still needs simulator screenshots across those classes before App Store submission.
+The App Store target keeps full-screen iPhone use in portrait, while the
+implementation continues to support compact portrait, compact wide-short,
+regular-width iPad portrait, regular-width iPad landscape, and iPad split-view
+windows. The wide-short class is a window-shape contract for resizable,
+mirrored, split-view, and possible foldable environments; it is not a promise
+that ordinary full-screen iPhones rotate. Release QA uses native iPhone
+portrait and iPad portrait/landscape screenshots, plus component and
+Interaction Lab coverage for the remaining window shapes.
 
 ![Adaptive mobile layouts](assets/mobile-adaptive-layouts.png)
 
@@ -113,7 +120,7 @@ Adaptive classes:
 | Class | Typical viewport | Navigation | Content rule |
 | --- | --- | --- | --- |
 | Compact portrait | iPhone portrait, narrow split view | Bottom tab bar when app chrome is visible | Existing one-column scroll. Active sessions hide tabs and stack status, board, score, prompt, and results vertically. |
-| Compact landscape | iPhone landscape, short-height split view | Icon rail outside active sessions; no bottom tab bar while playing | Active session uses a board lane plus a right control rail. The control rail owns status, prompt, score, pause/abandon, and overflow scrolling. |
+| Compact landscape | Compact wide-short resizable or mirrored window, short-height split view | Icon rail outside active sessions; no bottom tab bar while playing | Active session uses a board lane plus a right control rail. The control rail owns status, prompt, score, pause/abandon, and overflow scrolling. |
 | Regular portrait | iPad portrait, tall large split view | Persistent side rail with labels when width allows, icon-only rail below that | Active practice uses a large board-first vertical flow so the board can grow with the tall screen. Dashboard, history, settings, and review surfaces can still use wider content where useful. |
 | Regular landscape | iPad landscape, wide large split view | Persistent side rail with labels when width allows, icon-only rail below that | Use two-pane or three-pane layouts with constrained content width. Active-session controls sit beside the board where space allows. |
 
@@ -699,9 +706,14 @@ Accessibility rules:
 - Component tests should verify user-visible behavior, not component internals.
 - UI should receive view models from backend/domain packages; React components must not compute sprint outcomes, rating updates, review scheduling, or Arrow Duel correctness.
 - E2E flows should cover Practice start, Arrow Duel choice, wrong-answer review, custom sprint setup, history filtering, Settings iCloud Sync, and About link attribution.
-- Design QA should include iPhone SE-sized portrait, modern iPhone portrait, compact iPhone landscape, iPad portrait, iPad landscape, and iPad split-view widths.
+- Design QA should include iPhone SE-sized portrait, modern iPhone portrait,
+  compact wide-short and foldable-sized windows, iPad portrait, iPad landscape,
+  and iPad split-view widths.
 - Adaptive component tests should render the app shell with explicit width/height pairs and assert chrome placement, board sizing, rail visibility, and absence of overlapping controls.
-- Simulator screenshot QA should include at least one active sprint, one Arrow Duel state, one Analysis Review state, and one History/Settings regular-width state before App Store submission.
+- Simulator screenshot QA should keep iPhones in portrait and use an iPad for
+  landscape and resizable native evidence. It should include at least one
+  active Sprint, one Arrow Duel state, one Analysis Review state, and one
+  History/Settings regular-width state before App Store submission.
 - E2E assertions should target stable labels/test IDs from this document.
 
 ## Open Design Questions

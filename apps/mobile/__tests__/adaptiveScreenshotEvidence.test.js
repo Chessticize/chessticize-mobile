@@ -69,7 +69,7 @@ describe('adaptive screenshot evidence', () => {
     let collisionError;
 
     try {
-      archiveScreenshot(secondSource, 'phone landscape');
+      archiveScreenshot(secondSource, 'Phone-Landscape');
     } catch (error) {
       collisionError = error;
     }

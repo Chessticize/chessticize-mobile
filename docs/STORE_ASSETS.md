@@ -135,15 +135,18 @@ DETOX_MAX_WORKERS=1 \
 Set `CHESSTICIZE_IOS_PREPARE=1` when the local CocoaPods workspace or bundled
 gems need to be refreshed before building the Release simulator app.
 
-The wrapper builds once, runs separate portrait and landscape journeys through
-the host Simulator rotation controls, and collects fifteen portrait plus eleven
-landscape PNGs. Internally it runs `pnpm mobile:e2e:build:ios:release`, then sets
+The full calibration wrapper requires a dedicated iPad simulator. It builds
+once, runs separate portrait and landscape journeys through the host Simulator
+rotation controls, and collects fifteen portrait plus eleven landscape PNGs.
+Internally it runs `pnpm mobile:e2e:build:ios:release`, then sets
 `CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait` and
 `CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape` for the two opt-in Detox runs.
-When diagnosing an already-built Release app directly, set exactly one of those
-values yourself before `pnpm mobile:e2e:store-assets:ios:release`; one direct run
-captures only its selected orientation. These are simulator artifacts; the
-capture flow does not install or launch a physical-device build.
+Ordinary full-screen iPhones are portrait-only; capture their required store
+sets by running the portrait journey directly. When diagnosing an already-built
+Release app directly, set exactly one of those values yourself before
+`pnpm mobile:e2e:store-assets:ios:release`; one direct run captures only its
+selected orientation. These are simulator artifacts; the capture flow does not
+install or launch a physical-device build.
 
 | Screenshot name | Store scene |
 | --- | --- |
@@ -249,8 +252,10 @@ inspection.
 ## Capture Checklist
 
 - Use portrait orientation for the required App Store scene set audited here.
-- Capture separate landscape/iPad QA evidence for the adaptive orientation pass
-  before release sign-off.
+- Keep native iPhone QA in portrait. Capture the maintained landscape journey
+  on iPad before release sign-off.
+- Keep compact wide-short, live-resize, and foldable-sized component or
+  Interaction Lab evidence even though ordinary iPhones do not rotate.
 - Use the clean release palette and current app icon.
 - Keep all screenshots in English.
 - Prefer deterministic fixture data so ratings, history, and review states are

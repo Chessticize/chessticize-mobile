@@ -6,7 +6,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 ORIENTATION_RUNNER="$SCRIPT_DIR/set-simulator-orientation.sh"
 SIMULATOR_TARGET_RESOLVER="$REPO_ROOT/apps/mobile/scripts/resolve-ios-simulator-target.js"
 PNG_ORIENTATION_VALIDATOR="$REPO_ROOT/apps/mobile/scripts/assert-png-orientation.js"
-DEVICE_NAME="${DETOX_IOS_DEVICE:-iPhone 17-Detox}"
+DEVICE_NAME="${DETOX_IOS_DEVICE:-iPad Pro 11-inch (M5)}"
 WORKER_COUNT="${DETOX_MAX_WORKERS:-1}"
 PORTRAIT_SCENES=(
   app-store-01-practice-tab
@@ -47,6 +47,8 @@ fail() {
 cd "$REPO_ROOT"
 
 [[ "$(uname -s)" == "Darwin" ]] || fail "Release simulator calibration requires macOS."
+[[ "$DEVICE_NAME" == *iPad* ]] || \
+  fail "Full portrait/landscape calibration requires a dedicated iPad Simulator; run iPhone store capture in portrait only."
 git rev-parse --show-toplevel >/dev/null 2>&1 || fail "Run inside the Chessticize Mobile repository."
 command -v brew >/dev/null 2>&1 || fail "Homebrew is required to select the locked Ruby 3.3 toolchain."
 command -v node >/dev/null 2>&1 || fail "Node.js is required to resolve the exact Simulator."

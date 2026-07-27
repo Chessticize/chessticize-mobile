@@ -94,6 +94,16 @@ function loadDetoxConfig(env) {
 }
 
 describe("iOS Simulator calibration identity", () => {
+  it("reserves the full portrait-landscape calibration wrapper for iPad", () => {
+    expect(calibrationRunner).toContain(
+      'DEVICE_NAME="${DETOX_IOS_DEVICE:-iPad Pro 11-inch (M5)}"'
+    );
+    expect(calibrationRunner).toContain('[[ "$DEVICE_NAME" == *iPad* ]]');
+    expect(calibrationRunner).toContain(
+      "run iPhone store capture in portrait only"
+    );
+  });
+
   it("requires an exact UDID when runtimes contain duplicate device names", () => {
     expect(() =>
       resolveIosSimulatorTarget(simulatorPayload(), {

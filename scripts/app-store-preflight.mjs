@@ -109,9 +109,7 @@ const targetedDeviceFamily = deviceFamilies.length === 1 ? unquoteBuildSetting(d
 const iphoneOrientations = plistStringArrayForKey(infoPlist, "UISupportedInterfaceOrientations");
 const ipadOrientations = plistStringArrayForKey(infoPlist, "UISupportedInterfaceOrientations~ipad");
 const expectedIphoneOrientations = [
-  "UIInterfaceOrientationPortrait",
-  "UIInterfaceOrientationLandscapeLeft",
-  "UIInterfaceOrientationLandscapeRight"
+  "UIInterfaceOrientationPortrait"
 ];
 const expectedIpadOrientations = [
   "UIInterfaceOrientationPortrait",
@@ -262,7 +260,9 @@ check(
     storeAssetsE2e.includes("app-store-06-arrow-duel") &&
     storeAssetsE2e.includes("app-store-07-custom-setup") &&
     storeAssetsE2e.includes("app-store-08-review-session") &&
+    storeAssetsE2e.includes("Landscape iOS capture requires a dedicated iPad Simulator") &&
     storeAssets.includes("pnpm app-store:screenshot-audit") &&
+    storeAssets.includes("The full calibration wrapper requires a dedicated iPad simulator.") &&
     storeAssets.includes("iphone-6.9") &&
     storeAssets.includes("iphone-6.1") &&
     storeAssets.includes("ipad-13") &&

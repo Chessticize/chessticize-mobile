@@ -219,7 +219,9 @@ regression suite should include the following minimum journeys:
    fixture.
 10. Real board and Arrow Duel rendering, plus Stockfish analysis integration.
 11. A Standard board that remains fully contained and frame-stable through
-    representative correct and wrong feedback in portrait and landscape.
+    representative correct and wrong feedback on a native portrait iPhone.
+    Component behavior covers the same contract in compact wide-short and
+    regular landscape windows; release visual QA covers native iPad landscape.
 
 Do not add separate Detox tests for every timeout, abandon timing, Custom
 theme, History filter, iCloud merge result, illegal move, or review scheduling

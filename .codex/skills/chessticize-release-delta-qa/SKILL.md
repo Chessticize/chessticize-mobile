@@ -100,12 +100,16 @@ scope from the union of changes since the release, not only the newest PR.
   simulator and inspect the resulting presentation. The maintained baseline is
   a regression safety net; it does not replace deeper checks of the release
   delta.
-- Exercise both portrait and landscape for every changed state that uses
-  adaptive layout, Safe Area geometry, board/control rails, wrapping, scrolling,
-  fixed navigation, or screen-size branches. A portrait pass is not evidence
-  for the corresponding landscape state.
+- Exercise native iPhone portrait and iPad portrait/landscape for every changed
+  state that uses adaptive layout, Safe Area geometry, board/control rails,
+  wrapping, scrolling, fixed navigation, or screen-size branches. Add compact
+  wide-short, live-resize, and foldable-sized component or Interaction Lab
+  evidence for the same changed state. A portrait pass is not evidence for a
+  wide or landscape layout.
 - Always capture and inspect the maintained fifteen Release scenes plus the
-  eleven layout-sensitive landscape scenes on a dedicated iPhone simulator.
+  eleven layout-sensitive landscape scenes on a dedicated iPad simulator.
+- Keep ordinary full-screen iPhone simulator captures in portrait. Do not
+  restore iPhone rotation merely to satisfy an older screenshot matrix.
 - Add another device family when the delta touches adaptive layout, Safe Area,
   board/rail geometry, navigation geometry, text wrapping, or screen-size
   branching. Use installed named simulators; do not invent a nonexistent
@@ -137,14 +141,14 @@ the app without Metro.
 From the clean exact application head, run the existing calibration workflow:
 
 ```sh
-DETOX_IOS_DEVICE="iPhone 17-Detox" \
+DETOX_IOS_DEVICE="iPad Pro 11-inch (M5)" \
   .codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh
 ```
 
-For each additional required device family, rerun the same journey with that
-installed dedicated simulator name and archive its screenshots separately.
-Preserve each device's output directory before starting another capture so a
-later run cannot overwrite the evidence.
+Use the full wrapper only with an installed dedicated iPad. Capture required
+iPhone Release scenes with the portrait-only store-assets journey and archive
+its screenshots separately. Preserve each device's output directory before
+starting another capture so a later run cannot overwrite the evidence.
 
 Verify orientation from the app's observed adaptive-layout frame or the
 captured image dimensions before accepting each portrait or landscape file.
@@ -287,7 +291,8 @@ Report:
 - Release build and capture commands, screenshot directories, Xcode, simulator
   profiles, orientations, and clean-worktree evidence.
 - Per-scene functional, copy, and presentation results with explicit
-  observations, including every maintained portrait and landscape image.
+  observations, including every maintained portrait and iPad landscape image
+  plus the required compact wide-short and foldable-sized lower-layer rows.
 - Matrix totals for pass, fail, blocked, and not-applicable.
 - Validation-drift repairs, their original failure evidence, exact changed
   artifacts, and passing rerun evidence.
