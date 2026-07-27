@@ -38,6 +38,9 @@ describe('Android Custom Practice release slice', () => {
     expect(spec).toContain("by.id('practice-add-run')");
     expect(spec).toContain("by.id('practice-run-name-input')");
     expect(spec).toContain("by.id('practice-run-start')");
+    expect(spec).toContain("identifier.startsWith('practice-run-name-')");
+    expect(spec).toContain("nameTestID.replace('practice-run-name-', 'practice-run-select-')");
+    expect(spec).not.toContain("element(by.text(CUSTOM_RUN_NAME)).tap()");
     expect(spec).toContain('android-standard-practice.fixture.json');
     expect(fixture.customRunTheme).toEqual({
       id: 'mate-in-2',

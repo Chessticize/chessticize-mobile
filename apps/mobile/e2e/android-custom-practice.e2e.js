@@ -68,8 +68,9 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await element(by.id('practice-main-scroll')).scrollTo('top');
       await element(by.id('practice-run-save')).tap();
       await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
-      await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
-      await element(by.text(CUSTOM_RUN_NAME)).tap();
+      const customRunSelectTestID = await resolveSavedRunSelectTestId(CUSTOM_RUN_NAME);
+      await waitForVisibleInPracticeScroll(customRunSelectTestID);
+      await element(by.id(customRunSelectTestID)).tap();
       await element(by.id('practice-main-scroll')).scrollTo('top');
       await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
       await element(by.id('practice-run-start')).tap();
@@ -151,7 +152,8 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await openTab('practice-tab', 'practice-action-header');
       await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
       await waitFor(element(by.text(`Rating ${practiceFixture.expectedRatingAfter}`))).toExist().withTimeout(10000);
-      await element(by.text(CUSTOM_RUN_NAME)).tap();
+      await waitForVisibleInPracticeScroll(customRunSelectTestID);
+      await element(by.id(customRunSelectTestID)).tap();
       await waitForVisibleInPracticeScroll('practice-progress-summary');
       await waitForElementAccessibilityLabelContaining(
         'practice-progress-summary',
@@ -176,6 +178,20 @@ async function openNewRunEditor() {
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id('custom-mode-regular'))).toBeVisible().withTimeout(10000);
+}
+
+async function resolveSavedRunSelectTestId(runName) {
+  const runNameElement = element(by.text(runName));
+  await waitFor(runNameElement).toExist().withTimeout(10000);
+  const attributes = await runNameElement.getAttributes();
+  const candidates = Array.isArray(attributes) ? attributes : [attributes];
+  const nameTestID = candidates
+    .map((candidate) => candidate?.identifier)
+    .find((identifier) => typeof identifier === 'string' && identifier.startsWith('practice-run-name-'));
+  if (!nameTestID) {
+    throw new Error(`Could not resolve selectable Run card for "${runName}"`);
+  }
+  return nameTestID.replace('practice-run-name-', 'practice-run-select-');
 }
 
 async function openFirstCorrectHistoryAttempt() {
