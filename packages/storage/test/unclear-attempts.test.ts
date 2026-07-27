@@ -48,8 +48,15 @@ test("MemoryStore persists reversible Unclear markers and duplicate-safe manual 
     service.getSessionReplay(sessionId).map((item) => [item.attempt.id, item.inReview]),
     [[attemptId, true]]
   );
+  service.removeReview(context, "2026-07-18T00:00:00.000Z");
+  assert.deepEqual(
+    service.getSessionReplay(sessionId).map((item) => [item.attempt.id, item.inReview]),
+    [[attemptId, false]]
+  );
+  assert.equal(service.getHistoryAttempt(attemptId)?.unclear, true);
+  service.enrollReview(context, "2026-07-18T00:01:00.000Z");
 
-  service.setAttemptUnclear(attemptId, false, "2026-07-17T14:00:00.000Z");
+  service.setAttemptUnclear(attemptId, false, "2026-07-18T00:02:00.000Z");
   assert.deepEqual(unclearAttemptIds(service), []);
   assert.equal(service.getHistoryView({
     now: "2026-07-18T00:00:00.000Z",
@@ -59,7 +66,7 @@ test("MemoryStore persists reversible Unclear markers and duplicate-safe manual 
     service.getSessionReplay(sessionId).map((item) => [item.attempt.id, item.inReview]),
     [[attemptId, true]]
   );
-  service.removeReview(context, "2026-07-18T00:00:00.000Z");
+  service.removeReview(context, "2026-07-18T00:03:00.000Z");
   assert.deepEqual(service.getSessionReplay(sessionId), []);
 });
 
