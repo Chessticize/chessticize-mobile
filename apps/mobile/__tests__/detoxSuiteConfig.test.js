@@ -920,6 +920,7 @@ describe('Detox suite configuration', () => {
     const helperStart = helpers.indexOf('async function completeFirstUseSessionGuides');
     const helperEnd = helpers.indexOf('async function detoxElementExists', helperStart);
     const helper = helpers.slice(helperStart, helperEnd);
+    const raceProtectedActionStart = helper.indexOf('try {');
     const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
     const requireVisible = helper.indexOf('.toBeVisible()');
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
@@ -935,7 +936,8 @@ describe('Detox suite configuration', () => {
     );
     const preserveUnexpectedFailure = helper.indexOf('throw error', handleRemountRace);
 
-    expect(restoreTop).toBeGreaterThan(0);
+    expect(raceProtectedActionStart).toBeGreaterThan(0);
+    expect(restoreTop).toBeGreaterThan(raceProtectedActionStart);
     expect(requireVisible).toBeGreaterThan(restoreTop);
     expect(scrollDown).toBeGreaterThan(requireVisible);
     expect(tapGuideAction).toBeGreaterThan(scrollDown);
