@@ -92,6 +92,26 @@ describe("mobile Back contract", () => {
       label: "Practice",
       testID: "tab-practice"
     });
+
+    const historyProgressState: MobileBackState = {
+      ...rootState,
+      detail: { kind: "history-progress", owner: "history" },
+      tab: "history"
+    };
+    const historyProgressIntent = resolveMobileBackIntent(
+      historyProgressState,
+      "button"
+    );
+    expect(historyProgressIntent).toEqual({
+      kind: "return-to-owner",
+      owner: "history"
+    });
+    expect(
+      mobileBackDestination(historyProgressIntent, historyProgressState)
+    ).toEqual({
+      label: "History",
+      testID: "tab-history"
+    });
   });
 
   it("guards active practice, returns non-root tabs to Practice, and delegates only at root", () => {

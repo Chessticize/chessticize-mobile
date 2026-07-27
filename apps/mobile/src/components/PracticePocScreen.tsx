@@ -221,6 +221,9 @@ import {
 import type {
   HistoryProgressPresentation
 } from "./historyProgressPresentation.ts";
+import {
+  useHistoryProgressPresentation
+} from "./useHistoryProgressPresentation.ts";
 
 export type {
   PracticeRunDraft,
@@ -757,6 +760,14 @@ export function PracticePocScreen({
     onControlledSelectionChange: customThemeSelection?.onChange
   });
   const historyThemeChoices = useThemeChoiceSelection();
+  const resolvedHistoryProgressPresentation = useHistoryProgressPresentation({
+    enabled: tab === "history" || historyProgressOpen,
+    service,
+    ...(historyProgressPresentation === undefined
+      ? {}
+      : { injectedPresentation: historyProgressPresentation }),
+    refreshKey: aggregateRevision
+  });
   const resolvedTacticalProfilePresentation = useTacticalProfilePresentation({
     service,
     ...(tacticalProfilePresentation === undefined
@@ -1140,6 +1151,7 @@ export function PracticePocScreen({
   function navigateToTab(nextTab: Tab): void {
     if (nextTab !== "history") {
       setHistoryFiltersExpanded(false);
+      setHistoryProgressOpen(false);
     }
     if (nextTab !== "review") {
       setReviewFiltersExpanded(false);
@@ -2810,6 +2822,7 @@ export function PracticePocScreen({
   // and re-scanned a history that grows with every solved puzzle.
   const historyPanelVisible =
     tab === "history" &&
+    !historyProgressOpen &&
     historyReviewEntries.length === 0 &&
     historyUnavailableAttempt === null;
   const historyView = historyPanelVisible
@@ -2869,22 +2882,25 @@ export function PracticePocScreen({
             kind: "review-session",
             owner: tab === "review" && reviewSessionSource === "session" ? "practice" : tab
           }
-        : tab === "analysis"
-          ? { kind: "stockfish-diagnostics", owner: "settings" }
-          : isFinished
-            ? { kind: "sprint-result", owner: "practice" }
-            : tab === "practice" && state === null
+        : tab === "history" && historyProgressOpen
+          ? { kind: "history-progress", owner: "history" }
+          : tab === "analysis"
+            ? { kind: "stockfish-diagnostics", owner: "settings" }
+            : isFinished
+              ? { kind: "sprint-result", owner: "practice" }
+              : tab === "practice" && state === null
                 && resolvedTacticalProfilePresentation?.screen !== undefined
                 && resolvedTacticalProfilePresentation.screen !== "home"
-              ? { kind: "tactical-profile", owner: "practice" }
-            : tab === "practice" && state === null && activeRunManagementScreen !== undefined
+                ? { kind: "tactical-profile", owner: "practice" }
+              : tab === "practice" && state === null && activeRunManagementScreen !== undefined
                 && activeRunManagementScreen !== "home"
-              ? { kind: "practice-run-editor", owner: "practice" }
-            : tab === "practice" && state === null && mode === "custom"
-              ? { kind: "custom-practice", owner: "practice" }
-              : null,
+                ? { kind: "practice-run-editor", owner: "practice" }
+              : tab === "practice" && state === null && mode === "custom"
+                ? { kind: "custom-practice", owner: "practice" }
+                : null,
     [
       activeRunManagementScreen,
+      historyProgressOpen,
       isFinished,
       mode,
       resolvedTacticalProfilePresentation?.screen,
@@ -2948,6 +2964,8 @@ export function PracticePocScreen({
           }
         } else if (resolvedState.detail?.kind === "stockfish-diagnostics") {
           navigateToTab("settings");
+        } else if (resolvedState.detail?.kind === "history-progress") {
+          setHistoryProgressOpen(false);
         } else if (resolvedState.detail?.kind === "practice-run-editor") {
           activeRunManagementPresentation?.onIntent({ type: "cancel-edit" });
         } else if (resolvedState.detail?.kind === "tactical-profile") {
@@ -3787,7 +3805,7 @@ export function PracticePocScreen({
                   reviewScheduleControlVisible
                   stockfish={stockfish}
                 />
-              ) : historyProgressPresentation && historyProgressOpen ? (
+              ) : resolvedHistoryProgressPresentation && historyProgressOpen ? (
                 <View
                   style={[
                     styles.historyPanel,
@@ -3795,7 +3813,7 @@ export function PracticePocScreen({
                   ]}
                 >
                   <HistoryProgressScreen
-                    presentation={historyProgressPresentation}
+                    presentation={resolvedHistoryProgressPresentation}
                     onBack={() => setHistoryProgressOpen(false)}
                   />
                 </View>
@@ -3871,8 +3889,11 @@ export function PracticePocScreen({
                   }}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
-                  onOpenProgress={historyProgressPresentation
-                    ? () => setHistoryProgressOpen(true)
+                  onOpenProgress={resolvedHistoryProgressPresentation
+                    ? () => {
+                        setHistoryFiltersExpanded(false);
+                        setHistoryProgressOpen(true);
+                      }
                     : undefined}
                   onResetFilters={() => {
                     setHistoryTimeRange("7d");

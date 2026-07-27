@@ -314,6 +314,7 @@ export const navigationCoverage = {
   details: {
     "review-analysis": coveredBy("review-feedback-analysis"),
     "review-session": coveredBy("review-session"),
+    "history-progress": coveredBy("history-progress"),
     "tactical-profile": coveredBy("practice-tactical-profile-ranked"),
     "practice-run-editor": coveredBy("practice-run-name-validation"),
     "custom-practice": coveredBy("practice-custom-setup"),

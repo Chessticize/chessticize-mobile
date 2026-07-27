@@ -43,6 +43,7 @@ export type HistoryProgressPresentation = {
   assurance?: TacticalProfileCalibrationAssurance;
   periodLabel: string;
   sampleLabel: string;
+  sampleUnitLabel: string;
   initialSeriesId: string;
   strengths: readonly HistoryStrengthSeries[];
   weakness?: HistoryProgressWeakness;

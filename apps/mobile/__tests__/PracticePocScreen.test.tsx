@@ -2509,6 +2509,7 @@ describe("PracticePocScreen", () => {
     await flushMicrotasks();
 
     press(renderer, "history-tab");
+    await flushMicrotasks();
     expect(findByTestId(renderer, "history-progress-button")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-progress-screen")).toThrow();
 
@@ -2546,6 +2547,7 @@ describe("PracticePocScreen", () => {
     await flushMicrotasks();
 
     press(renderer, "history-tab");
+    await flushMicrotasks();
     press(renderer, "history-progress-button");
 
     const weakness = findByTestId(renderer, "history-clear-weakness");
@@ -2591,13 +2593,88 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("keeps the History Progress entry absent without an injected design presentation", () => {
+  it("opens production History Progress with an honest empty model state", async () => {
     const renderer = renderScreen();
+    await flushMicrotasks();
 
     press(renderer, "history-tab");
+    expect(findByTestId(renderer, "history-progress-button")).toBeTruthy();
 
-    expect(() => findByTestId(renderer, "history-progress-button")).toThrow();
+    press(renderer, "history-progress-button");
+    expect(findByTestId(renderer, "history-progress-screen")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "No progress data is available yet."
+    );
+    expect(findByTestId(renderer, "history-no-clear-weakness")).toBeTruthy();
+  });
+
+  it("returns from History Progress through Android Predictive Back", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({ systemBack });
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    await flushMicrotasks();
+    press(renderer, "history-progress-button");
+
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+    expect(
+      collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))
+    ).toBe("History");
+    expect(
+      collectText(findByTestId(renderer, "mobile-back-destination-preview-id"))
+    ).toBe("tab-history");
+
+    systemBack.cancelPredictive();
+    expect(findByTestId(renderer, "history-progress-screen")).toBeTruthy();
+
+    systemBack.startPredictive("right");
+    expect(systemBack.commitPredictive()).toBe(true);
     expect(() => findByTestId(renderer, "history-progress-screen")).toThrow();
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+  });
+
+  it("stops hidden History queries and closes Progress when leaving its tab", async () => {
+    const service = createArrowFocusedPracticeService();
+    const historyViewSpy = jest.spyOn(service, "getHistoryView");
+    const renderer = renderScreen({ practiceService: service });
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    await flushMicrotasks();
+    const visibleHistoryQueryCount = historyViewSpy.mock.calls.length;
+    expect(visibleHistoryQueryCount).toBeGreaterThan(0);
+
+    press(renderer, "history-progress-button");
+    expect(findByTestId(renderer, "history-progress-screen")).toBeTruthy();
+    expect(historyViewSpy).toHaveBeenCalledTimes(visibleHistoryQueryCount);
+
+    press(renderer, "settings-tab");
+    press(renderer, "history-tab");
+    expect(() => findByTestId(renderer, "history-progress-screen")).toThrow();
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+  });
+
+  it("renders the current model weakness and weekly evidence in production History", async () => {
+    const renderer = renderScreen({
+      practiceService: createArrowFocusedPracticeService()
+    });
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    press(renderer, "history-progress-button");
+
+    const progress = findByTestId(renderer, "history-progress-screen");
+    const weakness = findByTestId(renderer, "history-clear-weakness");
+    expect(collectText(progress)).toContain("Pin · Arrow Duel");
+    expect(collectText(progress)).toContain("model-weighted observations");
+    expect(collectText(weakness)).toContain("Solve reliability");
+    expect(collectText(weakness)).toContain("extra misses");
+    expect(collectText(weakness)).toContain("12 different puzzles · 3 sessions");
+    expect(collectText(weakness)).toContain(
+      "Wrong moves and timeouts count once as solve failures"
+    );
   });
 
   it("reveals all seven curated puzzle tags only when replay Analysis opens", async () => {
