@@ -190,15 +190,15 @@ async function selectPracticeRunByName(runName) {
 }
 
 async function openFirstCorrectHistoryAttempt() {
-  await waitFor(element(by.text('Correct')).atIndex(0))
-    .toBeVisible()
-    .whileElement(by.id('practice-main-scroll'))
-    .scroll(100, 'down');
-  const attributes = await element(by.text('Correct')).atIndex(0).getAttributes();
+  const correctResult = element(by.text('Correct')).atIndex(0);
+  await waitFor(correctResult).toExist().withTimeout(10000);
+  const attributes = await correctResult.getAttributes();
   const identifier = (Array.isArray(attributes) ? attributes[0] : attributes).identifier;
   if (typeof identifier !== 'string' || !identifier.endsWith('-result')) {
     throw new Error(`Could not resolve Custom history attempt row from ${String(identifier)}`);
   }
-  await element(by.id(identifier.replace(/-result$/, ''))).tap();
+  const rowTestID = identifier.replace(/-result$/, '');
+  await waitForVisibleInPracticeScroll(rowTestID);
+  await element(by.id(rowTestID)).tap();
   await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
 }
