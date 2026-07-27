@@ -216,6 +216,12 @@ export interface SessionMistakeReviewItem {
   attempt: AttemptEvent;
 }
 
+export interface SessionReplayItem {
+  puzzle: Puzzle;
+  attempt: AttemptEvent;
+  inReview: boolean;
+}
+
 export interface SprintCommandResult {
   state: SprintState;
   feedback?: PuzzleFeedback;

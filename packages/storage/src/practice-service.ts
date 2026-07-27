@@ -5,6 +5,7 @@ import {
   archivePracticeRun,
   assertValidManualRating,
   assertValidPracticeRunRating,
+  buildSessionReplay,
   buildSprintConfig,
   buildSprintResultSummary,
   clonePracticeRun,
@@ -44,6 +45,7 @@ import type {
   ReviewQueueState,
   ReviewScheduleRemoval,
   SessionMistakeReviewItem,
+  SessionReplayItem,
   SprintConfig,
   SprintMode,
   SprintResultSummary,
@@ -478,6 +480,19 @@ export class PracticeService {
 
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[] {
     return this.store.getSessionMistakeReview(sessionId);
+  }
+
+  getSessionReplay(sessionId: string): SessionReplayItem[] {
+    const attempts = this.store.listAttempts({ sessionId });
+    const puzzles = attempts
+      .map((attempt) => this.store.getPuzzle(attempt.puzzleId))
+      .filter((puzzle): puzzle is Puzzle => Boolean(puzzle));
+    return buildSessionReplay({
+      sessionId,
+      attempts,
+      puzzles,
+      reviewQueue: this.store.listReviewQueue()
+    });
   }
 
   getPuzzle(id: string): Puzzle | undefined {

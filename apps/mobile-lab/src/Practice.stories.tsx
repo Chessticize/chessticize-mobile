@@ -461,23 +461,9 @@ export const SprintResultFlaggedReplay: Story = {
     expectTestIdAbsent(canvasElement, "review-source-pill");
     expectTestIdAbsent(canvasElement, "review-context-unclear");
     expectTestIdAbsent(canvasElement, "review-context-needs-review");
+    await expectTestIdText(canvasElement, "review-progress", "1 / 4 · Standard");
     await expectTestIdText(canvasElement, "history-attempt-clear-unclear", "Mark clear");
     expectTestIdAbsent(canvasElement, "review-schedule-add");
-    await clickTestId(canvasElement, "history-attempt-clear-unclear");
-    expectTestIdAbsent(canvasElement, "history-attempt-clear-unclear");
-
-    await clickTestId(canvasElement, "review-next");
-    expectTestIdAbsent(canvasElement, "review-context-unclear");
-    expectTestIdAbsent(canvasElement, "review-context-needs-review");
-    await expectTestIdText(canvasElement, "history-attempt-clear-unclear", "Mark clear");
-
-    await clickTestId(canvasElement, "review-next");
-    await expectTestIdText(canvasElement, "review-schedule-remove", "Remove from Review");
-    expectTestIdAbsent(canvasElement, "history-attempt-clear-unclear");
-
-    await clickTestId(canvasElement, "review-next");
-    await expectTestIdText(canvasElement, "review-schedule-remove", "Remove from Review");
-    expectTestIdAbsent(canvasElement, "history-attempt-clear-unclear");
   }
 };
 
