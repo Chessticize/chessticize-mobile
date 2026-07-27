@@ -15,7 +15,7 @@ const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000);
 const CUSTOM_RUN_NAME = `${practiceFixture.customRunTheme.label} Focus`;
 const CUSTOM_RUN_THEME_TEST_ID = `custom-theme-${practiceFixture.customRunTheme.id}`;
 const EXPECTED_AUTO_REPLY_MOVE = practiceFixture.puzzle.solutionMoves[2];
-const EXPECTED_RATING_DELTA = practiceFixture.expectedRatingAfter - practiceFixture.puzzle.rating;
+const EXPECTED_RATING_DELTA = practiceFixture.expectedRatingAfter - practiceFixture.expectedRatingBefore;
 
 describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, () => {
   beforeAll(async () => {
@@ -143,8 +143,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
 
       await openTab('history-tab', 'history-action-header');
       await showAllHistoryAttempts();
-      await waitFor(element(by.text(`${CUSTOM_RUN_NAME} · 30s pace`))).toExist().withTimeout(10000);
-      await element(by.text(`${CUSTOM_RUN_NAME} · 30s pace`)).tap();
+      await selectCustomHistoryRating();
       await waitForElementTextContaining('history-chart-value', String(practiceFixture.expectedRatingAfter), 10000);
       await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
       await waitFor(element(by.text(CUSTOM_RUN_NAME)).atIndex(0)).toExist().withTimeout(10000);
@@ -152,12 +151,11 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
 
       await openTab('practice-tab', 'practice-action-header');
       await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
-      await waitFor(element(by.text(`Rating ${practiceFixture.expectedRatingAfter}`))).toExist().withTimeout(10000);
       await selectPracticeRunByName(CUSTOM_RUN_NAME);
       await waitForVisibleInPracticeScroll('practice-progress-summary');
       await waitForElementAccessibilityLabelContaining(
         'practice-progress-summary',
-        `Rating ${practiceFixture.expectedRatingAfter}`,
+        `rating ${practiceFixture.expectedRatingAfter}`,
         10000,
         50
       );
@@ -209,4 +207,15 @@ async function showAllHistoryAttempts() {
   await waitFor(element(by.id('history-attention-all'))).toBeVisible().withTimeout(10000);
   await element(by.id('history-attention-all')).tap();
   await waitFor(element(by.id('history-attention-explanation'))).not.toExist().withTimeout(10000);
+}
+
+async function selectCustomHistoryRating() {
+  await element(by.id('history-filter-toggle')).tap();
+  await waitFor(element(by.id('history-advanced-filters'))).toExist().withTimeout(10000);
+  const customRatingFilter = element(by.text(`${CUSTOM_RUN_NAME} · 30s pace`));
+  await waitFor(customRatingFilter)
+    .toBeVisible()
+    .whileElement(by.id('history-rating-filters'))
+    .scroll(120, 'right');
+  await customRatingFilter.tap();
 }
