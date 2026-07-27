@@ -2,9 +2,11 @@
 #import <React/RCTBridgeModule.h>
 #import <UIKit/UIKit.h>
 
-@interface MoveFeedback : NSObject <RCTBridgeModule>
+@interface MoveFeedback : NSObject <RCTBridgeModule, AVAudioPlayerDelegate>
 @property (nonatomic, strong, nullable) AVAudioPlayer *movePlayer;
 @property (nonatomic, strong, nullable) AVAudioPlayer *capturePlayer;
+@property (nonatomic, strong, nullable) AVAudioPlayer *activePlayer;
+@property (nonatomic, strong) NSMutableArray<NSString *> *pendingSoundCues;
 @property (nonatomic, strong) UIImpactFeedbackGenerator *impactGenerator;
 @property (nonatomic, strong) dispatch_queue_t audioQueue;
 @end
@@ -26,6 +28,7 @@ RCT_EXPORT_MODULE();
       "com.chessticize.movefeedback.audio",
       DISPATCH_QUEUE_SERIAL
     );
+    self.pendingSoundCues = [NSMutableArray array];
     AVAudioSession *session = [AVAudioSession sharedInstance];
     NSError *sessionError = nil;
     [session setCategory:AVAudioSessionCategoryAmbient
@@ -39,6 +42,8 @@ RCT_EXPORT_MODULE();
     self.capturePlayer = [self playerForResource:@"freesound-546120-piece-capture"];
     self.movePlayer.volume = 1.0;
     self.capturePlayer.volume = 0.3;
+    self.movePlayer.delegate = self;
+    self.capturePlayer.delegate = self;
     [self.movePlayer prepareToPlay];
     [self.capturePlayer prepareToPlay];
     self.impactGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
@@ -66,16 +71,60 @@ RCT_EXPORT_METHOD(play:(NSString *)cue
   }
 
   if (playSound) {
-    AVAudioPlayer *player = [cue isEqualToString:@"capture"]
-      ? self.capturePlayer
-      : self.movePlayer;
     dispatch_async(self.audioQueue, ^{
-      player.currentTime = 0;
-      [player play];
+      [self.pendingSoundCues addObject:cue];
+      [self playNextQueuedSound];
     });
   }
 
   resolve(nil);
+}
+
+- (void)playNextQueuedSound
+{
+  if (self.activePlayer != nil || self.pendingSoundCues.count == 0) {
+    return;
+  }
+
+  NSString *cue = self.pendingSoundCues.firstObject;
+  [self.pendingSoundCues removeObjectAtIndex:0];
+  AVAudioPlayer *player = [cue isEqualToString:@"capture"]
+    ? self.capturePlayer
+    : self.movePlayer;
+  if (player == nil) {
+    [self playNextQueuedSound];
+    return;
+  }
+
+  player.currentTime = 0;
+  self.activePlayer = player;
+  if (![player play]) {
+    self.activePlayer = nil;
+    [self playNextQueuedSound];
+  }
+}
+
+- (void)completePlaybackForPlayer:(AVAudioPlayer *)player
+{
+  dispatch_async(self.audioQueue, ^{
+    if (player != self.activePlayer || player.isPlaying) {
+      return;
+    }
+    self.activePlayer = nil;
+    [self playNextQueuedSound];
+  });
+}
+
+- (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player
+                       successfully:(BOOL)flag
+{
+  [self completePlaybackForPlayer:player];
+}
+
+- (void)audioPlayerDecodeErrorDidOccur:(AVAudioPlayer *)player
+                                 error:(nullable NSError *)error
+{
+  [self completePlaybackForPlayer:player];
 }
 
 - (nullable AVAudioPlayer *)playerForResource:(NSString *)resource

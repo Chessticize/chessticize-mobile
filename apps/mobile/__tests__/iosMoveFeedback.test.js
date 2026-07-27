@@ -30,7 +30,33 @@ describe("iOS move feedback", () => {
     expect(mainQueueBlock?.[1]).toContain("[self.impactGenerator impactOccurred]");
     expect(mainQueueBlock?.[1]).not.toContain("[player play]");
     expect(playMethod).toMatch(
-      /if \(playSound\) \{[\s\S]*dispatch_async\(self\.audioQueue, \^\{[\s\S]*player\.currentTime = 0;[\s\S]*\[player play\];\s*\}\);\s*\}\s*resolve\(nil\);/
+      /if \(playSound\) \{\s*dispatch_async\(self\.audioQueue, \^\{\s*\[self\.pendingSoundCues addObject:cue\];\s*\[self playNextQueuedSound\];\s*\}\);\s*\}\s*resolve\(nil\);/
+    );
+  });
+
+  it("waits for each sound to finish before starting the next queued cue", () => {
+    expect(source).toContain(
+      "@interface MoveFeedback : NSObject <RCTBridgeModule, AVAudioPlayerDelegate>"
+    );
+    expect(source).toContain(
+      "@property (nonatomic, strong) NSMutableArray<NSString *> *pendingSoundCues;"
+    );
+    expect(source).toContain(
+      "@property (nonatomic, strong, nullable) AVAudioPlayer *activePlayer;"
+    );
+    expect(source).toContain("self.movePlayer.delegate = self;");
+    expect(source).toContain("self.capturePlayer.delegate = self;");
+    expect(source).toMatch(
+      /- \(void\)playNextQueuedSound[\s\S]*self\.activePlayer != nil[\s\S]*self\.pendingSoundCues\.count == 0[\s\S]*removeObjectAtIndex:0[\s\S]*player\.currentTime = 0;[\s\S]*self\.activePlayer = player;[\s\S]*\[player play\]/
+    );
+    expect(source).toMatch(
+      /- \(void\)completePlaybackForPlayer:[\s\S]*dispatch_async\(self\.audioQueue, \^\{[\s\S]*player != self\.activePlayer \|\| player\.isPlaying[\s\S]*self\.activePlayer = nil;[\s\S]*\[self playNextQueuedSound\]/
+    );
+    expect(source).toMatch(
+      /audioPlayerDidFinishPlaying:[\s\S]*\[self completePlaybackForPlayer:player\]/
+    );
+    expect(source).toMatch(
+      /audioPlayerDecodeErrorDidOccur:[\s\S]*\[self completePlaybackForPlayer:player\]/
     );
   });
 
