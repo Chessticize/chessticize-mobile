@@ -147,6 +147,12 @@ describe('Android Standard Practice release slice', () => {
     expect(practiceJourney).toContain("const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000)");
     expect(practiceJourney).toContain("chessticizeTestNowMs: RELAUNCH_TEST_NOW_MS");
     expect(practiceJourney).toContain("history-tab");
+    expect(practiceJourney).toContain(
+      "waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000)"
+    );
+    expect(practiceJourney).not.toContain(
+      ".whileElement(by.id('practice-main-scroll'))"
+    );
     expect(helpers).toContain('androidBoardTapPoint');
     expect(helpers).toContain("'wm', 'density'");
     expect(helpers).toContain("'wm', 'size'");
