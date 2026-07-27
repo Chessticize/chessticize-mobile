@@ -166,24 +166,16 @@ test("Issue #250 owns the complete Tactical Profile design state set", () => {
   );
 });
 
-test("Issue #363 owns model-aligned History progress and weakness states", () => {
+test("the closed Issue #363 scenarios keep their stable URLs without new markers", () => {
   assert.deepEqual(
     newScenarios
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 363))
       .map((scenario) => scenario.id),
-    [
-      "history-populated",
-      "history-progress",
-      "history-progress-weakness",
-      "history-progress-speed-weakness"
-    ]
+    []
   );
-  assert.deepEqual(storyTagsForScenario("history-progress"), ["new"]);
-  assert.deepEqual(storyTagsForScenario("history-progress-weakness"), ["new"]);
-  assert.deepEqual(
-    storyTagsForScenario("history-progress-speed-weakness"),
-    ["new"]
-  );
+  assert.deepEqual(storyTagsForScenario("history-progress"), []);
+  assert.deepEqual(storyTagsForScenario("history-progress-weakness"), []);
+  assert.deepEqual(storyTagsForScenario("history-progress-speed-weakness"), []);
   assert.ok(
     scenarioRegistry["history-progress"].scope.includes.includes(
       "Progress over time"
