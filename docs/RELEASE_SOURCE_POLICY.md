@@ -30,6 +30,31 @@ The public repository is:
 
 https://github.com/Chessticize/chessticize-mobile
 
+## Release Integration Branch
+
+Prepare each coordinated mobile release on
+`codex/mobile-<version>-release`, created from current `main`, with one draft
+release PR targeting `main`.
+
+Each contributor or agent works on a separate branch and opens a PR targeting
+the release branch. A contributor PR must be complete, reviewed, and green
+before it is rebased into the release branch. Rebase merge must remain enabled
+in the GitHub repository, and these integration PRs use
+`gh pr merge --rebase --delete-branch` to keep the release history linear.
+
+After integration, run the cross-change QA, release build, and selected native
+validation from a clean exact release-branch head. Do not treat a passing
+contributor branch as exact integrated release evidence. Reuse earlier evidence
+only when the repository's validation-relevant-input comparison proves it is
+still valid.
+
+Keep the release PR draft until the exact identity, approved build-specific
+customer notes, fast checks, selected native evidence, and release review are
+complete. Then merge that single release PR to `main` using the repository's
+normal squash convention. Create immutable platform tags and source Releases
+only from the final approved release commit; never tag an intermediate
+contributor branch or a partially integrated release branch.
+
 ## Pre-Retry Convergence Sweep
 
 Do not immediately restart a complete release matrix after its first failure.

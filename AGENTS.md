@@ -94,6 +94,26 @@ ADR is not itself a defect.
 ## Branch And PR Workflow
 
 - Prefer one feature-scoped PR per coherent goal (for example, one screen or one flow brought to design parity), not a separate PR per small polish tweak. Batch related polish into the active feature PR.
+- Prepare every coordinated mobile release on a dedicated integration branch
+  created from current `main`, named `codex/mobile-<version>-release`. Open its
+  release PR to `main` as a draft immediately so the branch, intended release
+  identity, accumulated checks, and remaining gates stay visible.
+- During release preparation, each contributor or agent works on its own
+  branch and opens a PR whose base is the dedicated release branch. Do not push
+  another contributor's work directly to the release branch and do not route
+  release-preparation PRs through `main`. Merge a complete, reviewed, green
+  contributor PR into the release branch with rebase merge
+  (`gh pr merge --rebase --delete-branch`) so the integration history remains
+  linear. GitHub repository settings must keep rebase merge enabled.
+- Run final cross-change QA, release builds, and release validation from a
+  clean exact head of the integrated release branch. Contributor-branch
+  evidence is supporting evidence only; rerun or document valid evidence reuse
+  after integration according to the validation-relevant-input rules.
+- Keep the release PR draft until its complete release identity, approved
+  build-specific notes, required fast checks, selected native evidence, and
+  release review are recorded. Merge the one completed release PR to `main`
+  using the repository's normal squash convention; never merge a partially
+  integrated release branch to `main`.
 - Use a draft PR only while its stated goal is still incomplete, and push to it frequently. Draft pushes run only path-scoped fast checks. The agent is authorized to `git push` to open PR branches in this repository without asking for per-push confirmation.
 - If the PR's stated goal is already complete when it is opened or first pushed, open it as ready for review rather than as a draft. If an existing draft becomes complete, mark it ready for review (`gh pr ready`) proactively, without waiting to be asked. Ready PRs run the Mobile JS checks; iOS native builds and Detox run locally under the risk-scoped validation policy.
 - For a Storybook-only PR, the coherent issue-scoped design increment is the stated goal. It may merge while the linked product issue remains open; the absent product wiring is deliberately out of scope until explicit design approval.
