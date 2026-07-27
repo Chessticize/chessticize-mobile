@@ -82,7 +82,7 @@ async function setStoreAssetRatings({ standard, arrowDuel }) {
     await waitFor(element(by.id('practice-run-elo-input')))
       .toHaveText(String(targetRating))
       .withTimeout(10000);
-    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitForVisibleInPracticeScroll('practice-run-save');
     await element(by.id('practice-run-save')).tap();
   }
   await element(by.id('practice-main-scroll')).scrollTo('top');
@@ -155,6 +155,7 @@ async function completeOneWrongReview() {
   );
   await playBoardMove('review-board', fixture.wrongMove, fixture.flipped);
   await waitFor(element(by.id('review-reminder-permission-prompt'))).toExist().withTimeout(10000);
+  await waitForVisibleInPracticeScroll('review-reminder-permission-dismiss');
   await element(by.id('review-reminder-permission-dismiss')).tap();
   await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Arrow Duel').withTimeout(10000);
   await expect(element(by.id('review-line-continue'))).not.toExist();
