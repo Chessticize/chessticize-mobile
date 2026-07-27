@@ -46,7 +46,7 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 1').withTimeout(10000);
       await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(15000);
 
-      await element(by.id('session-abandon')).tap();
+      await device.pressBack();
       await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
       await element(by.id('session-abandon-confirm')).tap();
       await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(30000);
@@ -91,14 +91,14 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
       await waitForElementTextContaining('practice-progress-rating-delta', '+175 this week', 10000);
 
       await openArrowDuelHistory();
-      const result = element(by.text('Correct')).atIndex(0);
-      await waitFor(result).toBeVisible().whileElement(by.id('practice-main-scroll')).scroll(100, 'down');
-      const resultAttributes = await result.getAttributes();
-      const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-      if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-        throw new Error(`Could not resolve persisted Arrow Duel history row from ${String(resultIdentifier)}`);
-      }
-      await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+      const resultRow = element(
+        by.label(/^Open Arrow Duel puzzle history, Correct/)
+      ).atIndex(0);
+      await waitFor(resultRow)
+        .toBeVisible()
+        .whileElement(by.id('practice-main-scroll'))
+        .scroll(100, 'down');
+      await resultRow.tap();
 
       await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
       await waitForVisibleInPracticeScroll('review-board');
