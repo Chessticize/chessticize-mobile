@@ -6,6 +6,7 @@
 @property (nonatomic, strong, nullable) AVAudioPlayer *movePlayer;
 @property (nonatomic, strong, nullable) AVAudioPlayer *capturePlayer;
 @property (nonatomic, strong) UIImpactFeedbackGenerator *impactGenerator;
+@property (nonatomic, strong) dispatch_queue_t audioQueue;
 @end
 
 @implementation MoveFeedback
@@ -21,6 +22,10 @@ RCT_EXPORT_MODULE();
 {
   self = [super init];
   if (self) {
+    self.audioQueue = dispatch_queue_create(
+      "com.chessticize.movefeedback.audio",
+      DISPATCH_QUEUE_SERIAL
+    );
     AVAudioSession *session = [AVAudioSession sharedInstance];
     NSError *sessionError = nil;
     [session setCategory:AVAudioSessionCategoryAmbient
@@ -36,7 +41,7 @@ RCT_EXPORT_MODULE();
     self.capturePlayer.volume = 0.3;
     [self.movePlayer prepareToPlay];
     [self.capturePlayer prepareToPlay];
-    self.impactGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+    self.impactGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
     [self.impactGenerator prepare];
   }
   return self;
@@ -53,21 +58,24 @@ RCT_EXPORT_METHOD(play:(NSString *)cue
     return;
   }
 
-  dispatch_async(dispatch_get_main_queue(), ^{
-    if (playHaptic) {
+  if (playHaptic) {
+    dispatch_async(dispatch_get_main_queue(), ^{
       [self.impactGenerator impactOccurred];
       [self.impactGenerator prepare];
-    }
+    });
+  }
 
-    if (playSound) {
-      AVAudioPlayer *player = [cue isEqualToString:@"capture"]
-        ? self.capturePlayer
-        : self.movePlayer;
+  if (playSound) {
+    AVAudioPlayer *player = [cue isEqualToString:@"capture"]
+      ? self.capturePlayer
+      : self.movePlayer;
+    dispatch_async(self.audioQueue, ^{
       player.currentTime = 0;
       [player play];
-    }
-    resolve(nil);
-  });
+    });
+  }
+
+  resolve(nil);
 }
 
 - (nullable AVAudioPlayer *)playerForResource:(NSString *)resource
