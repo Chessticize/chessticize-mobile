@@ -9345,7 +9345,14 @@ describe("PracticePocScreen", () => {
 
     const reviewStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
     const solvedReviewFen = mustFenAfterMove(reviewStartFen, firstPuzzle.correctMove);
+    const unsolvedPromptHeight = flattenTestStyle(
+      findByTestId(renderer, "practice-prompt").props.style
+    ).height;
+    expect(unsolvedPromptHeight).toBe(72);
     await boardMove(renderer, firstPuzzle.correctMove);
+    expectText(renderer, "Solved");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-prompt").props.style).height)
+      .toBe(unsolvedPromptHeight);
     press(renderer, "review-analysis-button");
 
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(solvedReviewFen);
