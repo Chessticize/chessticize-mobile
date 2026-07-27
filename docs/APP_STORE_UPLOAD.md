@@ -1,6 +1,6 @@
 # App Store Upload Runbook
 
-This runbook covers the owner-executed upload step for the 1.2.1 App Store
+This runbook covers the owner-executed upload step for the 1.3 App Store
 release path. Recheck Apple's live documentation before executing it:
 
 - Upload builds:
@@ -11,7 +11,7 @@ release path. Recheck Apple's live documentation before executing it:
   https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases
 
 Apple currently supports uploading builds with Xcode, Swift Playground,
-`altool`, or Transporter. This repository standardizes the 1.2.1 path on
+`altool`, or Transporter. This repository standardizes the 1.3 path on
 `xcodebuild archive` plus `xcodebuild -exportArchive` using the checked-in
 `apps/mobile/ios/ExportOptions.app-store-connect.plist`.
 
@@ -92,11 +92,11 @@ unchanged store metadata and screenshots does not regenerate that bundle.
 ## Public Source Tag
 
 Create and publish the source tag before or at the same time as the App Store
-Connect upload. The current iOS 1.2.1 build-1 tag is:
+Connect upload. The current iOS 1.3 build-1 tag is:
 
 ```sh
-git tag -a ios-v1.2.1-build-1 -m "iOS 1.2.1 build 1"
-git push origin ios-v1.2.1-build-1
+git tag -a ios-v1.3.0-build-1 -m "iOS 1.3 build 1"
+git push origin ios-v1.3.0-build-1
 ```
 
 Then publish a GitHub release for that tag and attach or copy the
@@ -205,7 +205,7 @@ valid while this signing-account gate is still incomplete.
 ## After Upload
 
 1. Wait for App Store Connect processing to complete.
-2. Confirm the uploaded build number is `1` for version `1.2.1`.
+2. Confirm the uploaded build number is `1` for version `1.3`.
 3. Confirm export compliance is accepted for
    `ITSAppUsesNonExemptEncryption = false`.
 4. Optionally configure an internal TestFlight group or run the diagnostic

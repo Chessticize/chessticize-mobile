@@ -14,7 +14,8 @@ the current Play track: corresponding source, Play delivery, owner
 physical-device smoke under the former policy, and the Play-signed GitHub APK
 mirror are complete. Version code 7 is the Android 1.2.1 ordinary-delta release
 currently in Play review with corresponding source and the Play-signed GitHub
-binary release published.
+binary release published. Version code 8 is the proposed Android 1.3
+full-scope release candidate.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -186,15 +187,31 @@ Build 7 is the Android 1.2.1 ordinary-delta GitHub binary release:
   `7 (1.2.1)` was last observed in Play review; track review continues
   independently and must not be reported as published until the Console says so.
 
+Build 8 is the proposed Android 1.3 full-scope release candidate:
+
+- proposed annotated tag: `android-v1.3.0-build-8`;
+- primary user-visible changes: Tactical Profiles and focused Practice Runs,
+  configurable puzzle timing with clearer Sprint guidance and outcomes, and
+  optional move sound and haptic feedback;
+- validation scope: exact-head fast checks, the complete shared `flows` and
+  `practice` suites, the applicable released-fixture migration and Android
+  compatibility matrix, and the protected signed-candidate/source job;
+- current state: release integration and validation; annotated tag, signed
+  candidate, source Release, Play upload, and APK mirror pending.
+
+Do not create or publish the build-8 tag until the release PR is complete, the
+approved Android release-note file is present, and the clean candidate commit
+has the required exact-head validation evidence.
+
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.2.1`)
-- Android version code: `apps/mobile/release-version.json` (`7`)
+- Public version: `apps/mobile/release-version.json` (`1.3`)
+- Android version code: `apps/mobile/release-version.json` (`8`)
 - iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.2.1-build-7`
+- Required source tag before any Play track upload: `android-v1.3.0-build-8`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and

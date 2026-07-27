@@ -20,10 +20,10 @@ function tableValue(field) {
 
 describe("App Store assets document", () => {
   it("tracks the current public release and its customer-facing additions", () => {
-    expect(storeAssetsDoc).toContain("1.2 source of truth");
-    expect(storeAssetsDoc).toContain("Customizable Home screen Practice Runs");
-    expect(storeAssetsDoc).toContain("Curated puzzle themes with multi-theme selection");
-    expect(storeAssetsDoc).toContain("Clear side-to-move");
+    expect(storeAssetsDoc).toContain("1.3 source of truth");
+    expect(storeAssetsDoc).toContain("Tactical Profiles");
+    expect(storeAssetsDoc).toContain("Focused Practice Runs");
+    expect(storeAssetsDoc).toContain("Configurable puzzle timing");
   });
 
   it("keeps required metadata inside App Store Connect limits", () => {

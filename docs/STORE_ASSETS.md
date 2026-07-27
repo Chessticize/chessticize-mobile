@@ -1,8 +1,7 @@
 # App Store Assets
 
-This document is the 1.2 source of truth for App Store Connect metadata and
-store screenshot capture, and remains the approved baseline for the 1.2.1
-patch. Recheck Apple's live documentation before upload:
+This document is the 1.3 source of truth for App Store Connect metadata and
+store screenshot capture. Recheck Apple's live documentation before upload:
 
 - Screenshot specifications:
   https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications
@@ -34,8 +33,12 @@ mistakes with spaced repetition, and analyze positions with on-device
 Stockfish. Your puzzle progress, ratings, history, and review queue stay on
 your device, so practice works without an account or network connection.
 
-Included in 1.2:
+Included in 1.3:
 
+- Tactical Profiles that summarize strengths, weaknesses, and progress
+- Focused Practice Runs created from tactical weaknesses
+- Configurable puzzle timing and clearer Sprint guidance and outcomes
+- Optional move sounds and haptic feedback
 - Customizable Home screen Practice Runs with independent ELO ratings
 - Curated puzzle themes with multi-theme selection
 - Clear side-to-move and previous-move puzzle context
@@ -48,7 +51,7 @@ Chessticize Mobile is free and open source.
 
 ## Screenshot Requirements
 
-The app targets iPhone and iPad for 1.2. The current automated capture plan
+The app targets iPhone and iPad for 1.3. The current automated capture plan
 covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
 The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
 Apple's current screenshot reference, rechecked on 2026-07-10, lists 6.9" as
@@ -70,10 +73,10 @@ Release rule:
 5. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
 
-The 1.2.1 patch release adds no feature, navigation, copy, or store-scene
-change. Reuse the approved 1.2 screenshot set after confirming the files still
-pass `pnpm app-store:screenshot-audit`; a fresh capture is not required for
-this patch.
+The 1.3 release changes Practice, History, Settings, Sprint guidance, and
+result presentation. Capture and inspect a fresh exact-head Release set with
+the maintained fifteen-scene, twenty-six-image calibration workflow before
+upload; do not reuse the 1.2 screenshot set as final 1.3 evidence.
 
 ## Bundled Puzzle Pack Measurement
 
@@ -90,7 +93,7 @@ per-bucket/theme counts. The artifact is published as the immutable
 ## Screenshot Set
 
 Use a release or production-like build, not a Metro debug screenshot. Capture
-the same eight scenes for each required display group:
+the same fifteen scenes for each required display group:
 
 1. Practice tab with local ratings and the bundled offline pack.
 2. Review tab showing the local review queue state.
@@ -100,6 +103,14 @@ the same eight scenes for each required display group:
 6. Arrow Duel with both candidate arrows visible.
 7. Custom Sprint setup with the complete compact configuration surface.
 8. Review session with the board and scheduled puzzle context.
+9. Sprint rules guidance before a Sprint starts.
+10. Active-session guidance for the Sprint header.
+11. Active-session guidance for the Slow timing state.
+12. Active-session guidance for the Timed Out state.
+13. Active-session guidance for the Unclear action.
+14. Arrow Duel guidance with both candidate arrows visible.
+15. Sprint result with reason, accuracy, rating, mistakes, Review impact, and
+    History action.
 
 Save local raw captures under `scratch/store-assets/raw/`. The `scratch/`
 folder is ignored and may contain private iteration artifacts. Only commit
