@@ -77,14 +77,14 @@ test("the issue #272 preview hands the board to White after the blunder", () => 
   assert.equal(chess.fen(), "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2");
 });
 
-test("Issue #247 stays on the existing Settings product clone with its approved scope", () => {
+test("the closed Issue #247 clone keeps its approved Settings scope without a new marker", () => {
   assert.deepEqual(
     newScenarios
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 247))
       .map((scenario) => scenario.id),
-    ["settings-ios-sync"]
+    []
   );
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), []);
   assert.deepEqual(scenarioRegistry["settings-ios-sync"].scope.includes, [
     "iCloud Sync",
     "Notifications",
@@ -132,29 +132,29 @@ test("the closed Issue #353 scenarios keep their stable URLs without new markers
   );
 });
 
-test("Issue #250 owns the complete Tactical Profile design state set", () => {
-  assert.deepEqual(
-    newScenarios
-      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 250))
-      .map((scenario) => scenario.id),
-    [
-      "practice-tactical-profile-building",
-      "practice-tactical-profile-collecting",
-      "practice-tactical-profile-balanced",
-      "practice-tactical-profile-solve-rate",
-      "practice-tactical-profile-speed",
-      "practice-tactical-profile-ranked",
-      "practice-tactical-profile-task-families-home",
-      "practice-tactical-profile-task-families",
-      "practice-tactical-profile-limited-inventory",
-      "practice-tactical-profile-explanation",
-      "practice-tactical-profile-focused-run",
-      "practice-tactical-profile-suppressed",
-      "practice-tactical-focus-guide",
-      "practice-tactical-focus-active",
-      "practice-tactical-focus-result"
-    ]
-  );
+test("the closed Issue #250 state set stays complete without new markers", () => {
+  const tacticalScenarioIds = [
+    "practice-tactical-profile-building",
+    "practice-tactical-profile-collecting",
+    "practice-tactical-profile-balanced",
+    "practice-tactical-profile-solve-rate",
+    "practice-tactical-profile-speed",
+    "practice-tactical-profile-ranked",
+    "practice-tactical-profile-task-families-home",
+    "practice-tactical-profile-task-families",
+    "practice-tactical-profile-limited-inventory",
+    "practice-tactical-profile-explanation",
+    "practice-tactical-profile-focused-run",
+    "practice-tactical-profile-suppressed",
+    "practice-tactical-focus-guide",
+    "practice-tactical-focus-active",
+    "practice-tactical-focus-result"
+  ] satisfies LabScenarioId[];
+
+  for (const scenarioId of tacticalScenarioIds) {
+    assert.ok(scenarioRegistry[scenarioId]);
+    assert.deepEqual(storyTagsForScenario(scenarioId), []);
+  }
   assert.equal(
     scenarioRegistry["practice-tactical-profile-focused-run"].scope.includes
       .includes("Mixed-practice allocation"),
@@ -173,6 +173,7 @@ test("the closed Issue #363 scenarios keep their stable URLs without new markers
       .map((scenario) => scenario.id),
     []
   );
+  assert.deepEqual(storyTagsForScenario("history-populated"), []);
   assert.deepEqual(storyTagsForScenario("history-progress"), []);
   assert.deepEqual(storyTagsForScenario("history-progress-weakness"), []);
   assert.deepEqual(storyTagsForScenario("history-progress-speed-weakness"), []);
@@ -248,12 +249,8 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
     `${activeSessionGuide.description} ${arrowDuelGuide.description}`,
     /\b(?:step|tour)\b/i
   );
-  assert.ok(firstSprintGuide.issues?.some(
-    (issue) => issue.issueNumber === 337 && issue.changeNote.includes("Top-align")
-  ));
-  assert.ok(settingsGuidance.issues?.some(
-    (issue) => issue.issueNumber === 337 && issue.changeNote.includes("immediately before Feedback")
-  ));
+  assert.deepEqual(storyTagsForScenario(firstSprintGuide.id), []);
+  assert.deepEqual(storyTagsForScenario(settingsGuidance.id), []);
 });
 
 test("Practice home keeps its merged value polish in the baseline scenario", () => {
@@ -262,9 +259,7 @@ test("Practice home keeps its merged value polish in the baseline scenario", () 
   assert.ok(home.scope.includes.includes("Numeric trailing Ratings"));
   assert.ok(home.scope.includes.includes("Single Review status label"));
   assert.ok(home.scope.includes.includes("Centered Review workload count"));
-  assert.ok(home.issues?.some((issue) => issue.issueNumber === 328));
-  assert.equal(home.issues?.some((issue) => issue.issueNumber === 344), false);
-  assert.deepEqual(storyTagsForScenario("practice-home"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("practice-home"), []);
 });
 
 test("post-attempt handoffs explain Timeout, Wrong, and Slow-correct results", () => {
