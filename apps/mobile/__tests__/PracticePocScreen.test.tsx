@@ -2402,6 +2402,78 @@ describe("PracticePocScreen", () => {
     )).toThrow();
   });
 
+  it.each([
+    {
+      height: 874,
+      insets: { top: 62, right: 0, bottom: 34, left: 0 },
+      label: "iPhone portrait",
+      scale: 3,
+      width: 402
+    },
+    {
+      height: 402,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 },
+      label: "iPhone landscape",
+      scale: 3,
+      width: 874
+    },
+    {
+      height: 1180,
+      insets: { top: 24, right: 0, bottom: 20, left: 0 },
+      label: "iPad portrait",
+      scale: 2,
+      width: 820
+    },
+    {
+      height: 820,
+      insets: { top: 0, right: 0, bottom: 20, left: 0 },
+      label: "iPad landscape",
+      scale: 2,
+      width: 1180
+    }
+  ])("aligns the Arrow Duel guide prompt in $label", ({
+    height,
+    insets,
+    scale,
+    width
+  }: {
+    height: number;
+    insets: PracticeSafeAreaInsets;
+    label: string;
+    scale: number;
+    width: number;
+  }) => {
+    setPracticeViewport({ width, height, scale, insets });
+
+    const renderer = renderLabScenario("practice-arrow-duel-guide-only");
+    const promptStyle = flattenTestStyle(findByTestId(
+      renderer,
+      "practice-session-guide-prompt"
+    ).props.style);
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height,
+      insets,
+      width
+    });
+
+    expect(promptStyle.alignSelf).toBe("center");
+    if (layout.usesSessionRail) {
+      const railStyle = flattenTestStyle(findByTestId(
+        renderer,
+        "active-session-control-rail-content"
+      ).props.style);
+      expect(promptStyle.width).toBe(railStyle.width);
+      return;
+    }
+
+    const boardStyle = flattenTestStyle(findByTestId(
+      renderer,
+      "practice-arrow-duel-guide-demo-board"
+    ).props.style);
+    expect(promptStyle.width).toBe(boardStyle.width);
+  });
+
   it("keeps the complete first-use guide operable in the maintained iPhone portrait viewport", () => {
     setPracticeViewport({
       width: 402,
