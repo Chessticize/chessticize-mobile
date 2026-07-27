@@ -1,5 +1,6 @@
 const {
   completeFirstUseSessionGuides,
+  historyAttemptRowTestIDForResult,
   launchWithDisabledSynchronization,
   openTab,
   playBoardMove,
@@ -190,15 +191,8 @@ async function selectPracticeRunByName(runName) {
 }
 
 async function openFirstCorrectHistoryAttempt() {
-  await waitFor(element(by.text('Correct')).atIndex(0))
-    .toBeVisible()
-    .whileElement(by.id('practice-main-scroll'))
-    .scroll(100, 'down');
-  const attributes = await element(by.text('Correct')).atIndex(0).getAttributes();
-  const identifier = (Array.isArray(attributes) ? attributes[0] : attributes).identifier;
-  if (typeof identifier !== 'string' || !identifier.endsWith('-result')) {
-    throw new Error(`Could not resolve Custom history attempt row from ${String(identifier)}`);
-  }
-  await element(by.id(identifier.replace(/-result$/, ''))).tap();
+  const resultRowIdentifier = await historyAttemptRowTestIDForResult('Correct');
+  await waitForVisibleInPracticeScroll(resultRowIdentifier);
+  await element(by.id(resultRowIdentifier)).tap();
   await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
 }
