@@ -713,7 +713,7 @@ export function PracticePocScreen({
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
-  const [historyReplayBoardTouchActive, setHistoryReplayBoardTouchActive] = useState(false);
+  const [reviewBoardTouchActive, setReviewBoardTouchActive] = useState(false);
   const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryUnavailableAttempt | null>(null);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
   const [historyProgressOpen, setHistoryProgressOpen] = useState(false);
@@ -2828,12 +2828,12 @@ export function PracticePocScreen({
   const boardPremoveWindow = boardInputLocked && boardInputLockMode === "premove";
   // Drags aimed at an active board must pan pieces, never the page. Freeze the
   // surrounding Sprint scroll for the whole session and the fixed Review board
-  // in landscape. History replay keeps its portrait actions scrollable, so it
-  // freezes the page only while a touch that started on the board is active.
+  // in landscape. Review and replay keep their portrait actions scrollable, so
+  // they freeze the page only while a touch that started on the board is active.
   const reviewBoardVisible = reviewSessionSource !== null || historyReviewEntries.length > 0;
   const practiceScrollLocked = shouldShowSessionBoard
     || (adaptiveLayout.usesSessionRail && reviewBoardVisible)
-    || historyReplayBoardTouchActive;
+    || reviewBoardTouchActive;
   const boardGestureEnabled = Boolean(
     isActive
       && !isShowingFeedbackSnapshot
@@ -3866,7 +3866,7 @@ export function PracticePocScreen({
                   systemBackCommand={reviewBackCommand}
                   onAnalysisActiveChange={setReviewAnalysisOpen}
                   onAttemptClearUnclear={clearHistoryAttemptUnclear}
-                  onBoardTouchActiveChange={setHistoryReplayBoardTouchActive}
+                  onBoardTouchActiveChange={setReviewBoardTouchActive}
                   onComplete={() => setHistoryReviewEntries([])}
                   onReviewEnrollmentChanged={reviewScheduleChanged}
                   onReturnToOwner={() => setHistoryReviewEntries([])}
@@ -4014,6 +4014,7 @@ export function PracticePocScreen({
                 onScheduleTestReviewReminder={arePracticeTestControlsEnabled() ? scheduleDevReviewReminderNotification : undefined}
                 onSessionSourceChange={setReviewSessionSource}
                 onAnalysisActiveChange={setReviewAnalysisOpen}
+                onBoardTouchActiveChange={setReviewBoardTouchActive}
                 filtersExpanded={reviewFiltersExpanded}
                 onFiltersExpandedChange={setReviewFiltersExpanded}
                 reviewReminderScheduleStatus={arePracticeTestControlsEnabled() ? reviewReminderScheduleStatus : undefined}
@@ -10575,6 +10576,7 @@ function ReviewPanel({
   moveFeedbackClient,
   nowMs,
   onAnalysisActiveChange,
+  onBoardTouchActiveChange,
   onExitSessionReview,
   onFiltersExpandedChange,
   onOpenPractice,
@@ -10600,6 +10602,7 @@ function ReviewPanel({
   moveFeedbackClient: MoveFeedbackClient | null;
   nowMs: number;
   onAnalysisActiveChange?: (active: boolean) => void;
+  onBoardTouchActiveChange?: (active: boolean) => void;
   onExitSessionReview: () => void;
   onFiltersExpandedChange: (expanded: boolean) => void;
   onOpenPractice: () => void;
@@ -10767,6 +10770,7 @@ function ReviewPanel({
         onReviewEnrollmentChanged={onReviewScheduleChanged}
         onAttemptClearUnclear={clearSessionAttemptUnclear}
         onAnalysisActiveChange={onAnalysisActiveChange}
+        onBoardTouchActiveChange={onBoardTouchActiveChange}
         onComplete={(source) => finishActiveReview(source, activeReviewGeneration)}
         onReturnToOwner={returnActiveReviewToOwner}
         replayControlsOnly
