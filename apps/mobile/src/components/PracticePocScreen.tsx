@@ -687,6 +687,7 @@ export function PracticePocScreen({
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
+  const [historyReplayBoardTouchActive, setHistoryReplayBoardTouchActive] = useState(false);
   const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryUnavailableAttempt | null>(null);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
   const [reviewSessionSource, setReviewSessionSource] = useState<ReviewEntry["source"] | null>(null);
@@ -2742,11 +2743,13 @@ export function PracticePocScreen({
   const boardFeedback = feedbackSnapshot?.feedback ?? feedbackForCurrentPuzzle;
   const boardPremoveWindow = boardInputLocked && boardInputLockMode === "premove";
   // Drags aimed at an active board must pan pieces, never the page. Freeze the
-  // surrounding Sprint scroll for the whole session, and freeze it around the
-  // fixed Review board whenever the landscape control rail owns overflow.
+  // surrounding Sprint scroll for the whole session and the fixed Review board
+  // in landscape. History replay keeps its portrait actions scrollable, so it
+  // freezes the page only while a touch that started on the board is active.
   const reviewBoardVisible = reviewSessionSource !== null || historyReviewEntries.length > 0;
   const practiceScrollLocked = shouldShowSessionBoard
-    || (adaptiveLayout.usesSessionRail && reviewBoardVisible);
+    || (adaptiveLayout.usesSessionRail && reviewBoardVisible)
+    || historyReplayBoardTouchActive;
   const boardGestureEnabled = Boolean(
     isActive
       && !isShowingFeedbackSnapshot
@@ -3760,6 +3763,7 @@ export function PracticePocScreen({
                   systemBackCommand={reviewBackCommand}
                   onAnalysisActiveChange={setReviewAnalysisOpen}
                   onAttemptClearUnclear={clearHistoryAttemptUnclear}
+                  onBoardTouchActiveChange={setHistoryReplayBoardTouchActive}
                   onComplete={() => setHistoryReviewEntries([])}
                   onReviewEnrollmentChanged={reviewScheduleChanged}
                   onReturnToOwner={() => setHistoryReviewEntries([])}
@@ -11006,6 +11010,7 @@ function ReviewSession({
   moveFeedbackClient,
   onAnalysisActiveChange,
   onAttemptClearUnclear,
+  onBoardTouchActiveChange,
   onComplete,
   onReviewEnrollmentChanged,
   onReturnToOwner,
@@ -11026,6 +11031,7 @@ function ReviewSession({
   moveFeedbackClient: MoveFeedbackClient | null;
   onAnalysisActiveChange?: (active: boolean) => void;
   onAttemptClearUnclear?: (attemptId: string) => void;
+  onBoardTouchActiveChange?: (active: boolean) => void;
   onComplete: (source: ReviewEntry["source"]) => void;
   onReviewEnrollmentChanged?: (clearedAttemptId?: string) => void;
   onReturnToOwner: (source: ReviewEntry["source"]) => void;
@@ -11077,6 +11083,10 @@ function ReviewSession({
   useEffect(() => {
     return () => onAnalysisActiveChange?.(false);
   }, [onAnalysisActiveChange]);
+
+  useEffect(() => {
+    return () => onBoardTouchActiveChange?.(false);
+  }, [onBoardTouchActiveChange]);
 
   function playReviewMoveFeedback(
     actor: MoveFeedbackActor,
@@ -12046,6 +12056,9 @@ function ReviewSession({
             accessible
             accessibilityLabel={sessionBoardAccessibilityLabel(reviewSideToMove, lastMove)}
             accessibilityRole="image"
+            onTouchCancel={() => onBoardTouchActiveChange?.(false)}
+            onTouchEnd={() => onBoardTouchActiveChange?.(false)}
+            onTouchStart={() => onBoardTouchActiveChange?.(true)}
             testID="review-board"
             style={[styles.boardSurface, { width: boardSize, height: boardSize }]}
           >
