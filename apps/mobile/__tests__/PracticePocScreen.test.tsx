@@ -2284,7 +2284,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("keeps every guide target and connector in the public portrait and landscape flow", () => {
+  it("keeps every guide target and connector in the public portrait and wide-short flow", () => {
     setPracticeViewport({
       width: 402,
       height: 874,
@@ -2400,6 +2400,84 @@ describe("PracticePocScreen", () => {
       arrowDuel,
       "practice-session-guide-coach-pointer-arrow-duel-top-endpoint"
     )).toThrow();
+  });
+
+  it.each([
+    {
+      height: 874,
+      insets: { top: 62, right: 0, bottom: 34, left: 0 },
+      label: "iPhone portrait",
+      scale: 3,
+      width: 402
+    },
+    {
+      height: 402,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 },
+      label: "iPhone landscape",
+      scale: 3,
+      width: 874
+    },
+    {
+      height: 1180,
+      insets: { top: 24, right: 0, bottom: 20, left: 0 },
+      label: "iPad portrait",
+      scale: 2,
+      width: 820
+    },
+    {
+      height: 820,
+      insets: { top: 0, right: 0, bottom: 20, left: 0 },
+      label: "iPad landscape",
+      scale: 2,
+      width: 1180
+    }
+  ])("aligns the Arrow Duel guide prompt in $label", ({
+    height,
+    insets,
+    scale,
+    width
+  }: {
+    height: number;
+    insets: PracticeSafeAreaInsets;
+    label: string;
+    scale: number;
+    width: number;
+  }) => {
+    setPracticeViewport({ width, height, scale, insets });
+
+    const renderer = renderLabScenario("practice-arrow-duel-guide-only");
+    const promptStyle = flattenTestStyle(findByTestId(
+      renderer,
+      "practice-session-guide-prompt"
+    ).props.style);
+    const promptPanelStyle = flattenTestStyle(findByTestId(
+      renderer,
+      "practice-prompt"
+    ).props.style);
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height,
+      insets,
+      width
+    });
+
+    expect(promptStyle.alignSelf).toBe("center");
+    expect(promptPanelStyle.minHeight).toBe(72);
+    expect(promptPanelStyle.height).toBeUndefined();
+    if (layout.usesSessionRail) {
+      const railStyle = flattenTestStyle(findByTestId(
+        renderer,
+        "active-session-control-rail-content"
+      ).props.style);
+      expect(promptStyle.width).toBe(railStyle.width);
+      return;
+    }
+
+    const boardStyle = flattenTestStyle(findByTestId(
+      renderer,
+      "practice-arrow-duel-guide-demo-board"
+    ).props.style);
+    expect(promptStyle.width).toBe(boardStyle.width);
   });
 
   it("keeps the complete first-use guide operable in the maintained iPhone portrait viewport", () => {
@@ -4307,7 +4385,7 @@ describe("PracticePocScreen", () => {
   it.each([
     { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 288, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
     { label: "modern iPhone portrait", width: 430, height: 932, scale: 3, layout: "compactPortrait", boardSize: 398, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
-    { label: "compact iPhone landscape", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, railWidth: 64, sessionRail: true, homeColumns: false },
+    { label: "compact wide-short window", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, railWidth: 64, sessionRail: true, homeColumns: false },
     { label: "iPad A16 portrait", width: 820, height: 1180, scale: 2, layout: "regularPortrait", boardSize: 788, sideRail: true, railWidth: 76, sessionRail: false, homeColumns: false },
     { label: "iPad Pro portrait", width: 1032, height: 1376, scale: 2, layout: "regularPortrait", boardSize: 860, sideRail: true, railWidth: 168, sessionRail: false, homeColumns: true },
     { label: "iPad landscape", width: 1180, height: 820, scale: 2, layout: "regularLandscape", boardSize: 640, sideRail: true, railWidth: 168, sessionRail: true, homeColumns: true },
@@ -4408,7 +4486,7 @@ describe("PracticePocScreen", () => {
       .toThrow();
   });
 
-  it("keeps the complete iPhone Pro Max landscape session chrome publicly reachable", () => {
+  it("keeps the complete compact wide-short session chrome publicly reachable", () => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
     }).__setWindowDimensions?.({ width: 956, height: 440, scale: 3, fontScale: 1 });
@@ -4438,7 +4516,7 @@ describe("PracticePocScreen", () => {
     {
       height: 402,
       insets: { top: 0, right: 62, bottom: 21, left: 62 },
-      label: "iPhone 17 landscape",
+      label: "compact wide-short resizable window",
       scale: 3,
       width: 874
     },
@@ -4473,6 +4551,9 @@ describe("PracticePocScreen", () => {
       practiceService: createMobilePracticeService("familiar15")
     });
     startStandardSprint(sprintRenderer);
+    const sprintPromptStyle = flattenTestStyle(
+      findByTestId(sprintRenderer, "practice-prompt").props.style
+    );
     const sprintBoardSize = Number(
       flattenTestStyle(findByTestId(sprintRenderer, "session-board").props.style).width
     );
@@ -4491,6 +4572,9 @@ describe("PracticePocScreen", () => {
     const layoutStyle = flattenTestStyle(reviewLayout.props.style);
     const boardLaneStyle = flattenTestStyle(boardLane.props.style);
     const controlRailStyle = flattenTestStyle(controlRail.props.style);
+    const reviewPromptStyle = flattenTestStyle(
+      findByTestId(reviewRenderer, "practice-prompt").props.style
+    );
 
     expect(boardStyle.width).toBe(sprintBoardSize);
     expect(boardStyle.height).toBe(sprintBoardSize);
@@ -4499,6 +4583,10 @@ describe("PracticePocScreen", () => {
     expect(boardLaneStyle.width).toBe(sprintBoardSize);
     expect(controlRailStyle.width).toBe(expectedLayout.sessionRailWidth);
     expect(controlRailStyle.height).toBe(sprintBoardSize);
+    expect(sprintPromptStyle.minHeight).toBe(72);
+    expect(sprintPromptStyle.height).toBeUndefined();
+    expect(reviewPromptStyle.minHeight).toBe(72);
+    expect(reviewPromptStyle.height).toBeUndefined();
     expect(sprintBoardSize + 2 * PRACTICE_UI_PADDING)
       .toBeLessThanOrEqual(expectedLayout.contentHeight);
     expect(findByTestId(reviewRenderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
@@ -4511,7 +4599,7 @@ describe("PracticePocScreen", () => {
     expect(boardLane.findByProps({ testID: "review-board" })).toBeTruthy();
   });
 
-  it("keeps the Review board fixed while rotating into its unobstructed landscape lane", () => {
+  it("keeps the Review board fixed while resizing into its unobstructed wide-short lane", () => {
     setPracticeViewport({
       width: 402,
       height: 874,
@@ -4602,7 +4690,7 @@ describe("PracticePocScreen", () => {
 
   it.each([
     { actionContainer: "review-context-actions-bottom", height: 932, label: "phone portrait", width: 430 },
-    { actionContainer: "review-context-actions-rail", height: 390, label: "phone landscape", width: 844 },
+    { actionContainer: "review-context-actions-rail", height: 390, label: "compact wide-short window", width: 844 },
     { actionContainer: "review-context-actions-rail", height: 820, label: "iPad landscape", width: 1180 }
   ])("places History Review actions in the available $label layout", ({ actionContainer, height, width }) => {
     (ReactNative as unknown as {
@@ -4752,7 +4840,7 @@ describe("PracticePocScreen", () => {
 
   it.each([
     { label: "phone portrait", width: 430, height: 932 },
-    { label: "phone landscape", width: 844, height: 390 },
+    { label: "compact wide-short window", width: 844, height: 390 },
     { label: "tablet portrait", width: 820, height: 1180 },
     { label: "tablet landscape", width: 1180, height: 820 }
   ])("keeps Custom, History, Review, reminders, backup, and Settings reachable on $label", ({ width, height }) => {
@@ -9590,14 +9678,18 @@ describe("PracticePocScreen", () => {
 
     const reviewStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
     const solvedReviewFen = mustFenAfterMove(reviewStartFen, firstPuzzle.correctMove);
-    const unsolvedPromptHeight = flattenTestStyle(
+    const unsolvedPromptStyle = flattenTestStyle(
       findByTestId(renderer, "practice-prompt").props.style
-    ).height;
-    expect(unsolvedPromptHeight).toBe(72);
+    );
+    expect(unsolvedPromptStyle.minHeight).toBe(72);
+    expect(unsolvedPromptStyle.height).toBeUndefined();
     await boardMove(renderer, firstPuzzle.correctMove);
     expectText(renderer, "Solved");
-    expect(flattenTestStyle(findByTestId(renderer, "practice-prompt").props.style).height)
-      .toBe(unsolvedPromptHeight);
+    const solvedPromptStyle = flattenTestStyle(
+      findByTestId(renderer, "practice-prompt").props.style
+    );
+    expect(solvedPromptStyle.minHeight).toBe(unsolvedPromptStyle.minHeight);
+    expect(solvedPromptStyle.height).toBeUndefined();
     press(renderer, "review-analysis-button");
 
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(solvedReviewFen);

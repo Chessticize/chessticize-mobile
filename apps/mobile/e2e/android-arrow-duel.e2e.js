@@ -2,7 +2,6 @@ const {
   launchWithDisabledSynchronization,
   openTab,
   playBoardMove,
-  sleep,
   startPracticeMode,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
@@ -45,13 +44,9 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
       await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
       await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 1').withTimeout(10000);
-      await sleep(1800);
 
-      await element(by.id('session-abandon')).tap();
-      await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
-      await element(by.id('session-abandon-confirm')).tap();
-      await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(30000);
-      await waitFor(element(by.id('sprint-result-reason'))).toHaveText('Abandoned').withTimeout(10000);
+      await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
+      await waitFor(element(by.id('sprint-result-reason'))).toHaveText('No more puzzles').withTimeout(10000);
       await expect(element(by.id('review-mistakes-button'))).toBeVisible();
 
       // System Back deliberately skips the optional post-sprint mistake review.
@@ -93,13 +88,11 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
 
       await openArrowDuelHistory();
       const result = element(by.text('Correct')).atIndex(0);
-      await waitFor(result).toBeVisible().whileElement(by.id('practice-main-scroll')).scroll(100, 'down');
-      const resultAttributes = await result.getAttributes();
-      const resultIdentifier = (Array.isArray(resultAttributes) ? resultAttributes[0] : resultAttributes).identifier;
-      if (typeof resultIdentifier !== 'string' || !resultIdentifier.endsWith('-result')) {
-        throw new Error(`Could not resolve persisted Arrow Duel history row from ${String(resultIdentifier)}`);
-      }
-      await element(by.id(resultIdentifier.replace(/-result$/, ''))).tap();
+      await waitFor(result)
+        .toBeVisible()
+        .whileElement(by.id('practice-main-scroll'))
+        .scroll(100, 'down');
+      await result.tap();
 
       await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
       await waitForVisibleInPracticeScroll('review-board');
@@ -129,6 +122,7 @@ async function launchArrowDuelApp({ deleteData, resetAppState, testNowMs }) {
     newInstance: true,
     launchArgs: {
       chessticizeArrowDuelTargetCorrect: String(fixture.targetCorrect),
+      chessticizePuzzleSelectionId: fixture.puzzle.id,
       chessticizePuzzleSelectionSeed: fixture.puzzleSelectionSeed,
       chessticizeTestNowMs: testNowMs,
     },
@@ -151,6 +145,12 @@ async function startArrowDuel() {
 
 async function openArrowDuelHistory() {
   await openTab('history-tab', 'history-action-header');
+  await element(by.id('history-filter-toggle')).tap();
   await waitForVisibleInPracticeScroll('history-rating-arrow_duel 5/30');
   await element(by.id('history-rating-arrow_duel 5/30')).tap();
+  await waitForVisibleInPracticeScroll('history-attention-all');
+  await element(by.id('history-attention-all')).tap();
+  await waitForVisibleInPracticeScroll('history-filter-toggle');
+  await element(by.id('history-filter-toggle')).tap();
+  await waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000);
 }

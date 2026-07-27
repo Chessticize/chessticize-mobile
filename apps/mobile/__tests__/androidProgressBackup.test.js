@@ -335,6 +335,9 @@ describe('Android Progress Backup', () => {
       /['"]released-fixture['"]:\s*['"]1780920000000['"]/,
     );
     expect(restoreJourney).toContain("history-attempt-legacy-attempt-standard-wrong");
+    expect(restoreJourney).toContain("by.id('history-filter-toggle')");
+    expect(restoreJourney).toContain("by.id('history-range-max')");
+    expect(restoreJourney).toContain("by.id('history-source-all')");
     expect(androidDetoxScript).toContain('CHESSTICIZE_DETOX_REUSE_INSTALLED_APP');
     expect(androidDetoxScript).toContain('detox_args+=(--reuse)');
     expect(workflow).toContain('name: Android Progress Backup restore evidence');

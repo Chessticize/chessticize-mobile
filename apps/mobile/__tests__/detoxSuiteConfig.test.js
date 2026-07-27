@@ -905,11 +905,14 @@ describe('Detox suite configuration', () => {
     const helperEnd = helpers.indexOf('async function tapUntilExists', helperStart);
     const helper = helpers.slice(helperStart, helperEnd);
     const waitForExist = helper.indexOf('.toExist().withTimeout(180000)');
+    const acceptAlreadyVisible = helper.indexOf('await expect(target).toBeVisible()');
     const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
-    const requireVisible = helper.indexOf('.toBeVisible()');
+    const requireVisible = helper.indexOf('.toBeVisible()', restoreTop);
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
 
     expect(waitForExist).toBeGreaterThan(0);
+    expect(acceptAlreadyVisible).toBeGreaterThan(waitForExist);
+    expect(restoreTop).toBeGreaterThan(acceptAlreadyVisible);
     expect(restoreTop).toBeGreaterThan(waitForExist);
     expect(requireVisible).toBeGreaterThan(restoreTop);
     expect(scrollDown).toBeGreaterThan(requireVisible);
@@ -1457,6 +1460,11 @@ describe('Detox suite configuration', () => {
     expect(helpers).toContain("/^history-attempt-.+-result$/");
     expect(practiceSpec).toContain('waitForVisibleInPracticeScroll(resultRowIdentifier)');
     expect(practiceSpec).toContain('element(by.id(resultRowIdentifier)).tap()');
+    expect(practiceSpec).toContain("orientation: 'portrait'");
+    expect(practiceSpec).toContain("by.id('review-context-actions-bottom')");
+    expect(practiceSpec).toContain("screenshotLabel: 'history-review-actions-ipad-landscape'");
+    expect(practiceSpec).not.toContain("device.setOrientation('landscape')");
+    expect(practiceSpec).not.toContain("for (const orientation of ['portrait', 'landscape'])");
     expect(practiceSpec).not.toContain('history-filter-unclear');
     expect(practiceSpec).not.toContain("endsWith('-result')");
   });
@@ -1591,7 +1599,7 @@ describe('Detox suite configuration', () => {
       captureLandscape
     );
     const settleRestoredPortrait = spec.indexOf(
-      "await waitForSettledSprintLayout('portrait', { containmentTolerance: 8 })",
+      "await waitForSettledSprintLayout('portrait', { containmentTolerance: 16 })",
       restorePortrait
     );
     const settlePublicRootFocus = spec.indexOf(

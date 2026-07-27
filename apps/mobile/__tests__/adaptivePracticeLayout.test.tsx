@@ -7,7 +7,7 @@ import {
 describe("buildPracticeAdaptiveLayout", () => {
   it.each([
     {
-      label: "iPhone 17 Pro Max landscape",
+      label: "compact wide-short resizable viewport",
       width: 956,
       height: 440,
       insets: { top: 0, right: 62, bottom: 21, left: 62 },

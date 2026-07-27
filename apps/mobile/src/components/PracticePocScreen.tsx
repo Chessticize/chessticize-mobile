@@ -5522,6 +5522,7 @@ function SessionCoachmarkDemo({
           <View
             style={[
               styles.practicePromptStack,
+              styles.sessionGuideCoachPrompt,
               styles.sessionGuideCoachDimmed,
               { width: boardSize }
             ]}
@@ -5770,6 +5771,7 @@ function SessionCoachmarkDemo({
               <View
                 style={[
                   styles.practicePromptStack,
+                  styles.sessionGuideCoachPrompt,
                   styles.sessionGuideCoachDimmed,
                   { width: adaptiveLayout.sessionRailWidth }
                 ]}
@@ -15197,6 +15199,9 @@ const styles = StyleSheet.create({
     position: "relative",
     zIndex: 1
   },
+  sessionGuideCoachPrompt: {
+    alignSelf: "center"
+  },
   sessionGuideCoachDimmed: {
     opacity: 0.34
   },
@@ -16676,7 +16681,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    height: 72,
+    minHeight: 72,
     paddingHorizontal: 12,
     paddingVertical: 9
   },

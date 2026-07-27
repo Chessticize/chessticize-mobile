@@ -604,9 +604,18 @@ async function selectTestPuzzleSource(source) {
 }
 
 async function waitForVisibleInPracticeScroll(testID) {
-  await waitFor(element(by.id(testID))).toExist().withTimeout(180000);
+  const target = element(by.id(testID));
+  await waitFor(target).toExist().withTimeout(180000);
+  try {
+    await expect(target).toBeVisible();
+    return;
+  } catch {
+    // The common case is already visible. Only normalize and search the
+    // scroll view when the target actually needs scrolling; Android's
+    // scrollTo can otherwise wait indefinitely for an already-satisfied edge.
+  }
   await element(by.id('practice-main-scroll')).scrollTo('top');
-  await waitFor(element(by.id(testID)))
+  await waitFor(target)
     .toBeVisible()
     .whileElement(by.id('practice-main-scroll'))
     .scroll(100, 'down', 0.5, 0.5);

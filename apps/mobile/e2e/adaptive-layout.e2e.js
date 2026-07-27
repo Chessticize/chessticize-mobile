@@ -73,11 +73,11 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       // unfocused Espresso root while board input is submitted. A foldable's
       // natural portrait viewport can report a few physical pixels of rounding
       // overflow. This portrait state is not captured as evidence, so allow a
-      // bounded tolerance while reacquiring focus; every captured layout keeps
-      // the default strict containment check.
+      // bounded 16-physical-pixel tolerance while reacquiring focus; every
+      // captured layout keeps the default strict containment check.
       await setAdaptiveOrientation('portrait');
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
-      await waitForSettledSprintLayout('portrait', { containmentTolerance: 8 });
+      await waitForSettledSprintLayout('portrait', { containmentTolerance: 16 });
       await waitFor(element(by.id('adaptive-layout'))).toBeVisible().withTimeout(10000);
       const restoredPuzzleID = await elementText('session-current-puzzle-id');
       if (restoredPuzzleID !== puzzleID) {

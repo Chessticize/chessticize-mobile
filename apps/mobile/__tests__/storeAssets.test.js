@@ -84,6 +84,12 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("describe.skip");
     expect(storeAssetsE2e).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS");
     expect(storeAssetsE2e).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION");
+    expect(storeAssetsE2e).toContain(
+      "Landscape iOS capture requires a dedicated iPad Simulator"
+    );
+    expect(storeAssetsE2e).toContain(
+      "ordinary full-screen iPhone capture is portrait-only"
+    );
     expect(storeAssetsE2e).toContain("chessticizeStoreAssetCapture");
     expect(storeAssetsE2e).toContain("setStoreAssetRatings({ standard: 800, arrowDuel: 850 })");
     expect(storeAssetsE2e).toContain("ratingText === '600'");
@@ -147,7 +153,12 @@ describe("App Store assets document", () => {
     expect(uiCalibrationRunner).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait");
     expect(uiCalibrationRunner).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape");
     expect(uiCalibrationRunner).toContain("set-simulator-orientation.sh");
-    expect(uiCalibrationRunner).toContain('DEVICE_NAME="${DETOX_IOS_DEVICE:-iPhone 17-Detox}"');
+    expect(uiCalibrationRunner).toContain(
+      'DEVICE_NAME="${DETOX_IOS_DEVICE:-iPad Pro 11-inch (M5)}"'
+    );
+    expect(uiCalibrationRunner).toContain(
+      'Full portrait/landscape calibration requires a dedicated iPad Simulator'
+    );
     expect(uiCalibrationRunner).toContain('release-$DEVICE_SLUG');
     expect(fs.existsSync(simulatorOrientationRunnerPath)).toBe(true);
     expect(storeAssetsE2e).toContain("expect(element(by.text('Themes'))).toExist()");
@@ -171,7 +182,7 @@ describe("App Store assets document", () => {
     expect(storeAssetsDoc).toContain("app-store-09-sprint-rules-guide");
     expect(storeAssetsDoc).toContain("app-store-14-arrow-duel-guide");
     expect(storeAssetsDoc).toContain("app-store-15-sprint-result");
-    expect(storeAssetsDoc).toContain("does not install or launch a");
+    expect(storeAssetsDoc).toContain("capture flow does not");
     expect(storeAssetsDoc).toContain("physical-device build");
   });
 
