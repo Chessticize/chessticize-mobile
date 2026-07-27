@@ -101,23 +101,26 @@ ADR is not itself a defect.
 - During release preparation, each contributor or agent works on its own
   branch and opens a PR whose base is the dedicated release branch. Do not push
   another contributor's work directly to the release branch and do not route
-  release-preparation PRs through `main`. Merge a complete, reviewed, green
-  contributor PR into the release branch with rebase merge
-  (`gh pr merge --rebase --delete-branch`) so the integration history remains
-  linear. GitHub repository settings must keep rebase merge enabled.
+  release-preparation PRs through `main`. Merge each complete, reviewed, green
+  contributor PR into the release branch with squash merge
+  (`gh pr merge --squash --delete-branch`) so each work package contributes one
+  intentional integration commit.
 - Run final cross-change QA, release builds, and release validation from a
   clean exact head of the integrated release branch. Contributor-branch
   evidence is supporting evidence only; rerun or document valid evidence reuse
   after integration according to the validation-relevant-input rules.
 - Keep the release PR draft until its complete release identity, approved
   build-specific notes, required fast checks, selected native evidence, and
-  release review are recorded. Merge the one completed release PR to `main`
-  using the repository's normal squash convention; never merge a partially
-  integrated release branch to `main`.
+  release review are recorded. The final release PR is the only rebase-merge
+  exception: merge it to `main` with
+  `gh pr merge --rebase --delete-branch`, preserving the release branch's
+  already-squashed work-package commits without a merge commit. GitHub
+  repository settings must keep rebase merge enabled for this step. Never
+  merge a partially integrated release branch to `main`.
 - Use a draft PR only while its stated goal is still incomplete, and push to it frequently. Draft pushes run only path-scoped fast checks. The agent is authorized to `git push` to open PR branches in this repository without asking for per-push confirmation.
 - If the PR's stated goal is already complete when it is opened or first pushed, open it as ready for review rather than as a draft. If an existing draft becomes complete, mark it ready for review (`gh pr ready`) proactively, without waiting to be asked. Ready PRs run the Mobile JS checks; iOS native builds and Detox run locally under the risk-scoped validation policy.
 - For a Storybook-only PR, the coherent issue-scoped design increment is the stated goal. It may merge while the linked product issue remains open; the absent product wiring is deliberately out of scope until explicit design approval.
-- The agent is authorized to merge a ready-for-review PR (`gh pr merge --squash --delete-branch`, matching this repo's existing squash-merge convention) once it is complete, every required fast check is green, and the risk-scoped validation described below is recorded. Merge to main when the feature PR is complete, not after every increment. Do not create a new branch for each small follow-up while a feature PR is still open — push to the open PR instead.
+- The agent is authorized to merge a ready-for-review PR (`gh pr merge --squash --delete-branch`, matching this repo's required convention for every PR except the final release PR to `main`) once it is complete, every required fast check is green, and the risk-scoped validation described below is recorded. Merge to main when the feature PR is complete, not after every increment. Do not create a new branch for each small follow-up while a feature PR is still open — push to the open PR instead.
 - `main` has no branch protection, so GitHub will not itself enforce this policy. Before merging, inspect the actual required check status (for example `gh pr checks`) and confirm any required local native evidence or documented evidence-reuse comparison. Do not treat an unverified assumption as local evidence.
 - Do not mark a PR ready or merge it while part of its stated goal is unfinished, a required check is red, its selected native-validation scope is incomplete, or the PR description calls out a known unresolved product issue.
 - GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native validation is required only for release candidates and changes to native implementation, native integration/configuration, native dependencies, or native validation infrastructure. Record the tested commit SHA, build result, required suite results, Xcode version, simulator, clean-worktree confirmation, and any later evidence-reuse comparison.
