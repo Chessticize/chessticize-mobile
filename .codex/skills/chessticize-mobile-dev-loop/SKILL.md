@@ -270,9 +270,10 @@ comparison.
 
 ## Screenshot Verification
 
-For repeatable Storybook-to-Release comparison across the maintained eight
-scenes, use `$chessticize-mobile-ui-calibration`. Keep this section's manual
-flow for one-off screenshots outside that baseline.
+For repeatable Storybook-to-Release comparison across the maintained
+fifteen-scene, twenty-six-image baseline, use
+`$chessticize-mobile-ui-calibration`. Keep this section's manual flow for
+one-off screenshots outside that baseline.
 
 Take or inspect screenshots when validating:
 
