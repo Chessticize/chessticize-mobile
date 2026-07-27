@@ -15,7 +15,6 @@ import type {
   TacticalProfilePresentation,
   TacticalProfileSignal
 } from "./tacticalProfilePresentation.ts";
-import { TacticalProfileEvidenceProgressCard } from "./TacticalProfileEvidenceProgressCard.tsx";
 
 export function TacticalProfileHomeCard({
   presentation
@@ -121,8 +120,6 @@ function TacticalProfileScreen({
       presentation.focusedRun === undefined
       || presentation.focusedRun.taskFamily === activeTaskFamily
     );
-  const evidenceProgress =
-    presentation.evidenceProgressByTaskFamily?.[activeTaskFamily];
 
   return (
     <View style={styles.flow} testID="tactical-profile-screen">
@@ -150,10 +147,6 @@ function TacticalProfileScreen({
           {profileContextFor(presentation)}
         </Text>
       </View>
-
-      {evidenceProgress ? (
-        <TacticalProfileEvidenceProgressCard progress={evidenceProgress} />
-      ) : null}
 
       {recommendedSignals.length > 0 ? (
         <View style={styles.signalSection} testID="tactical-profile-recommendations">
@@ -239,8 +232,6 @@ function RecommendationExplanation({
       presentation.focusedRun === undefined
       || presentation.focusedRun.taskFamily === signal.taskFamily
     );
-  const evidenceProgress =
-    presentation.evidenceProgressByTaskFamily?.[signal.taskFamily];
 
   return (
     <View style={styles.flow} testID="tactical-profile-explanation">
@@ -256,9 +247,6 @@ function RecommendationExplanation({
         <Text style={styles.explanationTitle}>{signalSummary(signal)}</Text>
         <EvidenceLine signal={signal} />
       </View>
-      {evidenceProgress ? (
-        <TacticalProfileEvidenceProgressCard progress={evidenceProgress} />
-      ) : null}
       <View style={styles.explanationSection}>
         <Text style={styles.sectionTitle}>What we compared</Text>
         <Text style={styles.body}>

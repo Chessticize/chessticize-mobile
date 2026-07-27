@@ -51,23 +51,6 @@ export type FocusedRunUnavailable = {
   body: string;
 };
 
-export type TacticalProfileEvidenceCheck = {
-  id: "puzzle_variety" | "session_coverage" | "signal_clarity";
-  label: string;
-  value: string;
-  detail: string;
-  status: "ready" | "building" | "watching";
-  statusLabel: string;
-};
-
-export type TacticalProfileEvidenceProgress = {
-  tone: "collecting" | "balanced" | "ready";
-  title: string;
-  body: string;
-  checks: readonly TacticalProfileEvidenceCheck[];
-  footnote: string;
-};
-
 export type TacticalProfileIntent =
   | { type: "open-profile" }
   | { type: "close-profile" }
@@ -89,9 +72,6 @@ export type TacticalProfilePresentation = {
   homeLeadSignalId?: string;
   signals: readonly TacticalProfileSignal[];
   selectedSignalId?: string;
-  evidenceProgressByTaskFamily?: Readonly<
-    Partial<Record<TacticalProfileTaskFamily, TacticalProfileEvidenceProgress>>
-  >;
   focusedRun?: FocusedRunPreview;
   focusedRunUnavailable?: FocusedRunUnavailable;
   onIntent: (intent: TacticalProfileIntent) => void;

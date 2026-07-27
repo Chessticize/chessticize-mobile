@@ -166,27 +166,28 @@ test("Issue #250 owns the complete Tactical Profile design state set", () => {
   );
 });
 
-test("Issue #363 owns the existing Tactical Profile explainability scenarios", () => {
+test("Issue #363 owns the History progress and clear-weakness flow", () => {
   assert.deepEqual(
     newScenarios
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 363))
       .map((scenario) => scenario.id),
-    [
-      "practice-tactical-profile-collecting",
-      "practice-tactical-profile-balanced",
-      "practice-tactical-profile-solve-rate",
-      "practice-tactical-profile-task-families",
-      "practice-tactical-profile-explanation"
-    ]
+    ["history-progress", "history-progress-weakness"]
   );
+  assert.deepEqual(storyTagsForScenario("history-progress"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("history-progress-weakness"), ["new"]);
   assert.ok(
-    scenarioRegistry["practice-tactical-profile-collecting"].scope.includes.includes(
-      "No guaranteed focus"
+    scenarioRegistry["history-progress"].scope.includes.includes(
+      "Strength over time"
     )
   );
   assert.ok(
-    scenarioRegistry["practice-tactical-profile-task-families"].scope.includes.includes(
-      "Independent evidence snapshots"
+    scenarioRegistry["history-progress-weakness"].scope.includes.includes(
+      "Plain-language statistical confidence"
+    )
+  );
+  assert.ok(
+    scenarioRegistry["history-progress"].scope.exits.includes(
+      "Training recommendation"
     )
   );
 });

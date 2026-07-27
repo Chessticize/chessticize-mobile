@@ -212,6 +212,11 @@ import {
   type ICloudSyncErrorDetailsPresentation,
   type ICloudSyncSupportBundlePresentation
 } from "./ICloudSyncErrorDetails.tsx";
+import {
+  HistoryProgressEntryButton,
+  HistoryProgressScreen,
+  type HistoryProgressPresentation
+} from "./HistoryProgressSection.tsx";
 
 export type {
   PracticeRunDraft,
@@ -226,6 +231,12 @@ export type {
   TacticalProfilePresentation,
   TacticalProfileSignal
 } from "./tacticalProfilePresentation.ts";
+export type {
+  HistoryProgressPoint,
+  HistoryProgressPresentation,
+  HistoryProgressWeakness,
+  HistoryStrengthSeries
+} from "./HistoryProgressSection.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -235,6 +246,7 @@ interface Props {
   customTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   feedbackIssuesOpener?: (url: string) => Promise<void>;
+  historyProgressPresentation?: HistoryProgressPresentation;
   iCloudSyncErrorDetails?: ICloudSyncErrorDetailsPresentation;
   iCloudSyncSupportBundle?: ICloudSyncSupportBundlePresentation;
   currentTimeMs?: () => number;
@@ -549,6 +561,7 @@ export function PracticePocScreen({
   customTargetCorrect,
   debugTrace,
   feedbackIssuesOpener = openFeedbackIssuesInBrowser,
+  historyProgressPresentation,
   iCloudSyncErrorDetails,
   iCloudSyncSupportBundle,
   currentTimeMs = Date.now,
@@ -687,6 +700,7 @@ export function PracticePocScreen({
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
   const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryUnavailableAttempt | null>(null);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
+  const [historyProgressOpen, setHistoryProgressOpen] = useState(false);
   const [reviewSessionSource, setReviewSessionSource] = useState<ReviewEntry["source"] | null>(null);
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
@@ -3744,6 +3758,18 @@ export function PracticePocScreen({
                   reviewScheduleControlVisible
                   stockfish={stockfish}
                 />
+              ) : historyProgressPresentation && historyProgressOpen ? (
+                <View
+                  style={[
+                    styles.historyPanel,
+                    adaptiveLayout.usesWideContent ? styles.historyPanelWide : null
+                  ]}
+                >
+                  <HistoryProgressScreen
+                    presentation={historyProgressPresentation}
+                    onBack={() => setHistoryProgressOpen(false)}
+                  />
+                </View>
               ) : historyView ? (
                 <HistoryPanel
                   adaptiveLayout={adaptiveLayout}
@@ -3809,6 +3835,9 @@ export function PracticePocScreen({
                   }}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
+                  onOpenProgress={historyProgressPresentation
+                    ? () => setHistoryProgressOpen(true)
+                    : undefined}
                   onResetFilters={() => {
                     setHistoryTimeRange("7d");
                     setHistorySourceFilter("all");
@@ -9031,6 +9060,7 @@ function HistoryPanel({
   onAttentionReasonChange,
   onPageOffsetChange,
   onOpenAttempt,
+  onOpenProgress,
   onFiltersExpandedChange,
   onResetFilters,
   onAttentionOnlyChange
@@ -9063,6 +9093,7 @@ function HistoryPanel({
   onAttentionReasonChange: (reason: HistoryAttentionReason) => void;
   onPageOffsetChange: (offset: number) => void;
   onOpenAttempt: (attemptId: string) => void;
+  onOpenProgress?: () => void;
   onFiltersExpandedChange: (expanded: boolean) => void;
   onResetFilters: () => void;
   onAttentionOnlyChange: (attentionOnly: boolean) => void;
@@ -9089,6 +9120,9 @@ function HistoryPanel({
       <View style={styles.historyHeaderRow} testID="history-action-header">
         <Text style={styles.screenTitle}>History</Text>
         <View style={styles.historyHeaderActions}>
+          {onOpenProgress ? (
+            <HistoryProgressEntryButton onPress={onOpenProgress} />
+          ) : null}
           {filtersExpanded ? (
             <Pressable
               accessibilityRole="button"

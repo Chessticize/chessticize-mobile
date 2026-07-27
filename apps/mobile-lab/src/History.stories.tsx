@@ -50,6 +50,33 @@ export const FiltersAndActiveFilters: Story = {
   }
 };
 
+export const TacticalProgress: Story = {
+  name: "Tactical progress",
+  args: { scenarioId: "history-progress" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await openHistory(canvasElement);
+    await clickTestId(canvasElement, "history-progress-button");
+    await waitForTestId(canvasElement, "history-progress-screen");
+    await waitForTestId(canvasElement, "history-strength-chart");
+    await waitForTestId(canvasElement, "history-no-clear-weakness");
+    await clickTestId(canvasElement, "history-progress-strength-pins");
+  }
+};
+
+export const TacticalProgressClearWeakness: Story = {
+  name: "Tactical progress · clear weakness",
+  args: { scenarioId: "history-progress-weakness" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await openHistory(canvasElement);
+    await clickTestId(canvasElement, "history-progress-button");
+    await waitForTestId(canvasElement, "history-progress-screen");
+    await waitForTestId(canvasElement, "history-clear-weakness");
+    await waitForTestId(canvasElement, "history-weakness-comparison-skewers");
+  }
+};
+
 export const AttemptDetail: Story = {
   name: "Replay puzzle",
   args: { scenarioId: "history-attempt-detail" },
