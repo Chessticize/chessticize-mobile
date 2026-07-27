@@ -8148,18 +8148,10 @@ function PreviousAttemptNotice({
         </Text>
       </View>
       <View
-        style={[
-          styles.previousAttemptNoticeStatus,
-          reason === "slow" ? styles.previousAttemptNoticeStatusUnclear : null
-        ]}
+        style={styles.readOnlyAttemptStatus}
         testID="sprint-previous-attempt-notice-status"
       >
-        <Text
-          style={[
-            styles.previousAttemptNoticeStatusText,
-            reason === "slow" ? styles.previousAttemptNoticeStatusTextUnclear : null
-          ]}
-        >
+        <Text style={styles.readOnlyAttemptStatusText}>
           {presentation.status}
         </Text>
       </View>
@@ -8196,8 +8188,8 @@ function UnclearAttemptPrompt({
         <Text style={styles.unclearPromptQuestion} testID="sprint-unclear-question">{question}</Text>
       </View>
       {marked ? (
-        <View style={styles.unclearPromptButton} testID="sprint-unclear-marked">
-          <Text style={styles.unclearPromptButtonText}>Marked</Text>
+        <View style={styles.readOnlyAttemptStatus} testID="sprint-unclear-marked">
+          <Text style={styles.readOnlyAttemptStatusText}>Marked</Text>
         </View>
       ) : (
         <Pressable
@@ -16880,7 +16872,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600"
   },
-  previousAttemptNoticeStatus: {
+  readOnlyAttemptStatus: {
     alignItems: "center",
     backgroundColor: "#EFF6FF",
     borderColor: "#93C5FD",
@@ -16890,17 +16882,10 @@ const styles = StyleSheet.create({
     minHeight: 30,
     paddingHorizontal: 8
   },
-  previousAttemptNoticeStatusUnclear: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#F59E0B"
-  },
-  previousAttemptNoticeStatusText: {
+  readOnlyAttemptStatusText: {
     color: "#1D4ED8",
     fontSize: 11,
     fontWeight: "900"
-  },
-  previousAttemptNoticeStatusTextUnclear: {
-    color: "#B45309"
   },
   promptCopy: {
     flex: 1,

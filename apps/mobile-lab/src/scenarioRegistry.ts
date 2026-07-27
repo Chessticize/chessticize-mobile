@@ -193,9 +193,9 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "Practice",
     "Unclear follow-up",
     "practice--unclear-follow-up",
-    "Active Arrow Duel sprint after one correct attempt, showing the shared real previous-attempt Unclear question while the next puzzle remains in progress.",
+    "Active Arrow Duel sprint after one correct attempt, showing the previous attempt marked Unclear with the same blue read-only status styling used by In Review.",
     "practice",
-    ["Previous-attempt clarity question", "Mark as unclear action", "Stable board and score", "Portrait footer and landscape rail placement"],
+    ["Previous-attempt clarity question", "Mark as unclear action", "Blue read-only Marked status", "Stable board and score", "Portrait footer and landscape rail placement"],
     ["Next puzzle", "History"]
   ),
   "practice-arrow-duel-prompt": defineScenario("practice-arrow-duel-prompt", "Practice", "Arrow Duel prompt card", "practice--arrow-duel-prompt", "Active Arrow Duel session with the unchanged prompt copy in a rounded card above the board and a black board-piece King.", "practice", ["Black King prompt icon", "Arrow Duel copy", "Prompt card above board", "Candidate arrows"], ["Sprint result"]),
