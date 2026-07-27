@@ -21,8 +21,10 @@ esac
 
 command -v brew >/dev/null 2>&1 || fail "Homebrew is required."
 RUBY_PREFIX="${CHESSTICIZE_RUBY_PREFIX:-$(brew --prefix ruby@3.3 2>/dev/null || true)}"
+NODE_PREFIX="${CHESSTICIZE_NODE_PREFIX:-$(brew --prefix node@22 2>/dev/null || true)}"
 [[ -n "$RUBY_PREFIX" && -x "$RUBY_PREFIX/bin/ruby" ]] || fail "Install Homebrew ruby@3.3 first."
-export PATH="$REPO_ROOT/apps/mobile/node_modules/.bin:$RUBY_PREFIX/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+[[ -n "$NODE_PREFIX" && -x "$NODE_PREFIX/bin/node" ]] || fail "Install Homebrew node@22 first."
+export PATH="$REPO_ROOT/apps/mobile/node_modules/.bin:$RUBY_PREFIX/bin:$NODE_PREFIX/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 [[ "$(ruby -e 'print RUBY_VERSION.split(".")[0,2].join(".")')" == "3.3" ]] || fail "Ruby 3.3 must be active."
 for required_command in git node pnpm bundle xcodebuild xcrun applesimutils; do
