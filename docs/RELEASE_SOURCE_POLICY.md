@@ -55,9 +55,12 @@ commit per completed work package.
 
 After integration, run the cross-change QA, release build, and selected native
 validation from a clean exact release-branch head. Do not treat a passing
-contributor branch as exact integrated release evidence. Reuse earlier evidence
-only when the repository's validation-relevant-input comparison proves it is
-still valid.
+contributor branch as automatically valid integrated release evidence. Reuse
+its validation App artifact only when the fail-closed App-input comparison
+proves the App source is an ancestor of the release test runner and their
+App-input digests match; rerun any test evidence changed by the integration.
+This does not reuse or relabel a signed distribution candidate: build and bind
+that candidate to the exact final release-branch head.
 
 The exact validated release-branch head is the source for the submitted
 binaries and the immutable iOS and Android platform tags. The later merge
@@ -108,18 +111,21 @@ without another full native run:
    rejected the mismatch before the native matrix.
 6. Recheck the diff, clean tracked worktree, exact PR head, open PRs, and remote
    `main`. Resolve all known blockers before spending the full native retry.
-7. Run the required local iOS evidence once after the last
-   validation-relevant development change and merge once. If the PR head or
-   squash-merged release candidate later differs only in documentation, review
-   metadata, or merge ancestry, record both SHAs and the diff proving that
-   mobile runtime, native/platform, dependency, build/release, and selected
-   native test/fixture inputs are unchanged; reuse the evidence without an
-   exact-head rerun. Android release workflows remain governed by the Android
-   release runbook.
+7. Run the required local iOS evidence once after the last App build input
+   change and merge once. If the PR head or squash-merged release candidate
+   changes only host-side specs, selectors, assertions, evidence collectors, or
+   non-bundled fixtures, verify the App-input digest, reuse the checksummed App
+   bundle, and rerun only the affected scope. Documentation, review metadata,
+   agent guidance, and merge ancestry require no native rerun. Record the App
+   source SHA, test-runner SHA, App-input digest, artifact checksum, and focused
+   results. Android test-only reruns use the retained-APK workflow in
+   `docs/ANDROID_VALIDATION.md`.
 
 If that final run reveals a genuinely new deterministic failure, preserve it,
-extend the fast proving layer that missed it, and repeat this sweep. Never hide
-an unexplained failure with a successful rerun.
+extend the fast proving layer that missed it, and repeat this sweep. A
+test-runner-only correction reruns the affected scope against the verified App
+artifact; an App build input correction rebuilds and reruns the selected native
+scope. Never hide an unexplained failure with a successful rerun.
 
 ## Release Checklist
 

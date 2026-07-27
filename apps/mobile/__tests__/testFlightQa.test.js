@@ -77,10 +77,10 @@ describe("TestFlight QA checklist", () => {
       /Ordinary deltas use exact-head fast checks plus the platform's signed-artifact/
     );
     for (const document of [appStoreUploadDoc, releasePolicy]) {
-      expect(document).toContain("validation-relevant development");
-      expect(document).toMatch(
-        /documentation,\s+review\s+metadata,\s+(?:or|and)\s+merge/i
-      );
+      expect(document).toMatch(/App\s+source SHA/);
+      expect(document).toMatch(/test-runner\s+SHA/);
+      expect(document).toContain("App-input digest");
+      expect(document).toMatch(/documentation,\s+review\s+metadata/i);
     }
   });
 

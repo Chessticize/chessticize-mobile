@@ -119,7 +119,7 @@ ADR is not itself a defect.
 - Run final cross-change QA, release builds, and release validation from a
   clean exact head of the integrated release branch. Contributor-branch
   evidence is supporting evidence only; rerun or document valid evidence reuse
-  after integration according to the validation-relevant-input rules.
+  after integration according to the App-input and test-runner identity rules.
 - The exact validated release-branch head is the binary source and immutable
   platform-tag target. The later merge commit on `main` is a forward-integration
   record whose release-side parent preserves that exact commit and its SHA; it
@@ -139,7 +139,7 @@ ADR is not itself a defect.
 - `main` has no branch protection, so GitHub will not itself enforce this policy. Before merging, inspect the actual required check status (for example `gh pr checks`) and confirm any required local native evidence or documented evidence-reuse comparison. Do not treat an unverified assumption as local evidence.
 - Do not mark a PR ready or merge it while part of its stated goal is unfinished, a required check is red, its selected native-validation scope is incomplete, or the PR description calls out a known unresolved product issue.
 - GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native validation is required only for release candidates and changes to native implementation, native integration/configuration, native dependencies, or native validation infrastructure. Record the tested commit SHA, build result, required suite results, Xcode version, simulator, clean-worktree confirmation, and any later evidence-reuse comparison.
-- Before a release, require exact-head fast checks plus the release scope selected below. An ordinary delta may ship after fast checks and the platform's signed-artifact checks without a physical-device smoke or full Detox rerun. Run the affected simulator/emulator suite for targeted native risk and both suites only for broad native risk. Passing native evidence may be reused after a later commit or squash merge when a documented diff proves that all validation-relevant development inputs are unchanged; a different commit or Git tree alone does not force a rerun. Changes to mobile runtime code, native/platform projects, dependency manifests or patches, build/release configuration, or the selected native specs/fixtures invalidate reuse. Any unresolved automated failure that touches the changed boundary remains a release blocker.
+- Before a release, require exact-head fast checks plus the release scope selected below. An ordinary delta may ship after fast checks and the platform's signed-artifact checks without a physical-device smoke or full Detox rerun. Run the affected simulator/emulator suite for targeted native risk and both suites only for broad native risk. Treat production runtime/domain sources, native/platform projects and native test-APK sources, dependency manifests or patches, build/release configuration, bundled fixtures/resources, and the fail-closed App-input classifier itself as App build inputs. A change to any App build input requires a new validation build and the selected native scope. Host-side E2E specs, selectors, assertions, screenshot/evidence collectors, and non-bundled fixtures are test-runner inputs: when the fail-closed App-input comparison passes, reuse the checksummed validation App artifact and rerun only the affected test scope. Documentation, review metadata, agent guidance, and merge ancestry are record-only inputs. Unknown paths are App build inputs. Record the App source SHA, test-runner SHA, App-input digest, and artifact checksum whenever evidence spans commits. This evidence reuse never relabels or publishes an ancestor's signed candidate: the distributed candidate, platform tag, and source manifest remain bound to the exact final release-branch head. Any unresolved automated failure that touches the changed boundary remains a release blocker.
 - Delete or reuse stale `codex/*` branches after their PR merges.
 
 ### Review Cadence
@@ -176,9 +176,10 @@ ADR is not itself a defect.
   semantic impact meets a full-review trigger. A small native, persistence,
   signing, privacy, or release-identity change may still require full review.
 - Review reuse does not reuse stale validation evidence. Required fast checks
-  must pass on the current head. Native evidence remains reusable only while
-  its validation-relevant development inputs are unchanged; documentation,
-  review metadata, and merge-parent changes alone do not invalidate it.
+  must pass on the current head. Native App evidence remains reusable only
+  while the fail-closed App-input digest is unchanged. A test-runner change
+  invalidates and reruns only the affected test evidence; documentation,
+  review metadata, and merge-parent changes alone invalidate neither.
 
 ### PR Validation Scope
 
@@ -187,7 +188,7 @@ Choose the smallest validation layer that proves the changed boundary. Record th
 - **No mobile Detox**: every non-release PR without a native-impacting change, including ordinary React Native navigation, state, styling, accessibility, service wiring, board presentation, and adaptive layout. Pure core, storage, CLI, documentation, and tooling changes also use their own lower layers.
 - **Targeted native validation**: run the affected Detox spec or one affected suite (`flows` or `practice`) for a bounded native bridge/adapter change, native dependency or platform-project change, native persistence/relaunch integration, or a release candidate with one affected native journey.
 - **Full native validation**: build once and run both `flows` and `practice` only for broad native risk such as app startup, shared native navigation/storage wiring, global native launch fixtures, platform build configuration, Detox infrastructure, or a release candidate whose native risk cannot be bounded to one suite.
-- Required Detox evidence records the tested commit SHA, build result, commands, selected scope, results, and clean-worktree confirmation. It does not have to match the current PR head when a documented diff proves that validation-relevant development inputs are unchanged. Later documentation, review metadata, or merge-only changes do not invalidate it; later runtime, native, dependency, build/release, or selected native test/fixture changes do.
+- Required Detox evidence records the App source SHA, test-runner SHA, App-input digest, artifact checksum, build result, commands, selected scope, results, and clean-worktree confirmation. The two SHAs may differ when `node apps/mobile/scripts/mobile-app-inputs.js compare` proves the App build inputs are unchanged. A host-side spec, selector, assertion, evidence collector, or non-bundled fixture change reruns only its affected test scope against that verified validation App artifact. Runtime, native/platform, native test-APK, dependency, build/release, or bundled fixture/resource changes require a new validation build. Documentation, review metadata, or merge-only changes require neither. Signed production candidates still use the exact final release-branch head.
 - SQLite schema changes still require the released-fixture migration matrix in the PR and an automated simulator/emulator upgrade smoke before release. Real CloudKit, notification delivery, physical-device upgrade, and similar hardware checks are optional diagnostics and do not block App Store or Play submission, or the GitHub APK mirror.
 
 The same three scopes apply to releases. A delta release changes only bounded JavaScript, copy, styling, tests, documentation, or release metadata and uses fast CI plus the platform's signed-artifact checks. Targeted and full release validation are required only when the changed boundary matches the risks above, and use simulators/emulators or deterministic CI. Store-account setup, listing review, screenshot generation, compatibility matrices, physical-device checks, and unchanged manual checklists are not automatic work for every build number.

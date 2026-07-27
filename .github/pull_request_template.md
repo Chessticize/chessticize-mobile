@@ -49,7 +49,7 @@ Rationale:
 
 - [ ] Relevant focused regression test
 - [ ] Required path-scoped CI checks
-- [ ] Native evidence recorded when targeted/full is selected, or reuse documented with unchanged validation-relevant development inputs
+- [ ] Native evidence recorded when targeted/full is selected, or reuse documented with App source SHA, test-runner SHA, App-input comparison, artifact checksum, and the affected test rerun after a test-runner-only change
 
 Commands and results:
 

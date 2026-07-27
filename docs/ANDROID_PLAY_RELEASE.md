@@ -201,7 +201,9 @@ Build 8 is the proposed Android 1.3 full-scope release candidate:
 
 Do not create or publish the build-8 tag until the release PR is complete, the
 approved Android release-note file is present, and the clean candidate commit
-has the required exact-head validation evidence.
+has current-head fast checks plus the required App-source-bound native
+evidence. Test-only reruns may use an earlier checksummed APK when the
+fail-closed App-input digest matches and the evidence records both SHAs.
 
 ## Canonical identity
 
@@ -347,6 +349,14 @@ post-Play mirror. The mirror is a small required publication finalizer, not
 another validation gate. A fresh full Detox matrix, unchanged listing review,
 generated-package size catalog, and repeated account setup are not recurring
 delta gates.
+
+When only a host-side Android spec, selector, assertion, evidence collector, or
+non-bundled fixture changes, use `Mobile Android test-only rerun` with the
+retained source run and App source SHA. The workflow proves the App-input digest
+is unchanged and reruns only the affected target without Gradle. A runtime,
+native/platform, native test-APK, dependency, build/release, or bundled
+fixture/resource change is not test-only and requires a new build plus the
+selected native scope.
 
 ### First launch and change-triggered gates
 

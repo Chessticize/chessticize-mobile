@@ -19,7 +19,10 @@ describe('Android validation documentation', () => {
     expect(validation).toContain('practice');
     expect(validation).toContain('apps/mobile/scripts/android-adaptive-layout-evidence.sh');
     for (const field of [
-      'commit SHA',
+      'App source SHA',
+      'test-runner SHA',
+      'App-input digest',
+      'APK checksums',
       'build result',
       'commands',
       'device matrix',
@@ -31,8 +34,8 @@ describe('Android validation documentation', () => {
     expect(validation).toContain('production SQLite');
     expect(validation).toContain('public UI');
     expect(validation).toContain('small deterministic fixture');
-    expect(validation).toContain('validation-relevant development inputs');
-    expect(validation).toContain('documentation, review metadata, and merge ancestry');
+    expect(validation).toContain('Mobile Android test-only rerun');
+    expect(validation).toContain('never invokes Gradle');
   });
 
   it('keeps physical ARM64 work optional and outside the release gate', () => {
@@ -64,8 +67,11 @@ describe('Android validation documentation', () => {
     expect(devLoop).toContain('Targeted Android validation');
     expect(devLoop).toContain('Full Android validation');
     expect(devLoop).toContain('pnpm mobile:validate:android:matrix');
+    expect(devLoop).toContain('node apps/mobile/scripts/mobile-app-inputs.js compare');
+    expect(devLoop).toContain('Mobile Android test-only rerun');
     expect(architecture).toContain('manual-only full diagnostic matrix');
     expect(architecture).toContain('bounded API 24 smoke');
+    expect(architecture).toContain('Validation identity and test-only reruns');
     expect(architecture).toContain('Physical-device checks are optional');
   });
 });

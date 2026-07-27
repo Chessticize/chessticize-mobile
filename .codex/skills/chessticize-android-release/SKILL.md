@@ -140,11 +140,18 @@ state; report `APK mirror pending` whenever mirroring is still open.
   Console screenshots out of commits and public comments.
 - Do not weaken Google requirements, GPL disclosure, artifact identity, or the
   selected automated changed-boundary tests.
+- Keep exact-head fast checks and exact signed-artifact/source identity. When
+  only a host-side test-runner input changes, authenticate the retained E2E App
+  artifact, prove the fail-closed App-input digest is unchanged, and rerun only
+  the affected Android target without rebuilding. Never relabel that E2E
+  artifact or an earlier signed candidate as the final release artifact.
 
 ## Recover without broadening the protocol
 
 - Add regression coverage for repository defects and rerun only invalidated
-  exact-head gates.
+  gates. An App build input change rebuilds and reruns the selected native
+  scope; a test-runner-only change reuses the checksummed E2E App artifact and
+  reruns only the affected test evidence.
 - For a source-publication failure, use the recovery workflow with the original
   candidate artifact ID. It can recover an artifact retained before the normal
   workflow's later source step failed.

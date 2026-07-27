@@ -113,7 +113,9 @@ for (const policy of [agents, testingArchitecture, devLoopSkill, localE2eSkill])
   assert.match(policy, /Full native validation/);
   assert.match(policy, /local iOS native\s+validation/i);
   assert.match(policy, /only for (?:releases|release candidates) and native-impacting changes|only for a release candidate or a change to native/i);
-  assert.match(policy, /validation-relevant development inputs/);
+  assert.match(policy, /App source SHA/i);
+  assert.match(policy, /test-runner SHA/i);
+  assert.match(policy, /App-input digest/i);
 }
 
 assert.doesNotMatch(agents, /Any required Detox evidence must come from the exact PR head/);
@@ -413,7 +415,8 @@ for (const option of [
   assert.match(prTemplate, new RegExp(option.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 }
 assert.match(prTemplate, /only for releases and native-impacting changes/i);
-assert.match(prTemplate, /unchanged validation-relevant development inputs/i);
+assert.match(prTemplate, /App-input comparison/i);
+assert.match(prTemplate, /test-runner-only change/i);
 
 for (const releaseDoc of releaseDocs) {
   assert.match(releaseDoc, /exact/);

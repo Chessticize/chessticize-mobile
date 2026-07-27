@@ -79,15 +79,50 @@ PR author selects one native-validation scope based on that boundary:
 
 GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
 validation is required only for releases and native-impacting changes. Record
-the selected scope, tested commit SHA, build result, commands, results, and
-clean-worktree confirmation. Native evidence may be reused on a later PR head
-or squash-merged commit when a documented diff proves that every
-validation-relevant development input is unchanged. Those inputs include
-mobile runtime sources, native/platform projects, dependency manifests,
-lockfiles and patches, build/release configuration, and the selected native
-specs and fixtures. Documentation, review metadata, and merge-parent changes
-alone do not invalidate evidence. A failed required fast check, failed selected
-native scope, or known product failure remains a merge blocker.
+the selected scope, App source SHA, test-runner SHA, App-input digest, artifact
+checksum, build result, commands, results, and clean-worktree confirmation.
+A failed required fast check, failed selected native scope, or known product
+failure remains a merge blocker.
+
+### Validation identity and test-only reruns
+
+Validation-relevant inputs have three separate identities:
+
+1. **App build inputs** are production runtime and domain sources,
+   native/platform projects and native test-APK sources, dependency manifests,
+   lockfiles and patches, build/release configuration, and every fixture,
+   puzzle pack, engine, network, or resource compiled or bundled into the App.
+   The fail-closed classifier itself is also a trust-anchor input: changing it
+   requires one fresh validation build before later evidence can use the new
+   policy.
+2. **Test-runner inputs** are host-side Detox specs, selectors, waits,
+   assertions, screenshot/evidence collectors, non-bundled deterministic
+   fixtures, and the dedicated test-only rerun workflow.
+3. **Record-only inputs** are documentation, review metadata, agent guidance,
+   and merge ancestry that cannot change the built App or execute a product
+   test.
+
+Unknown or unclassified paths are App build inputs and fail closed. The
+repository classifier is
+`node apps/mobile/scripts/mobile-app-inputs.js compare --app-source-sha <sha>
+--test-runner-sha <sha> --output <path>`. It computes the App-input digest from
+both Git trees and permits reuse only when the App source is an ancestor of the
+test runner and both digests are identical.
+
+An App build input change requires a new validation App build and the selected
+native scope. A test-runner change invalidates only the affected test evidence:
+reuse the checksummed validation App artifact, reinstall or reset its sandbox,
+and rerun the smallest affected spec, suite, screenshot set, or device job. A
+record-only change requires current-head fast/static checks but neither a
+native rebuild nor a native rerun. Never change an expected result merely to
+convert a product failure into a test-only failure.
+
+Passing evidence may therefore span two commits. It records `appSourceSha`,
+`testRunnerSha`, `appInputDigest`, and the App artifact checksum, plus the
+selected test result. Exact-head fast checks still run on the final candidate,
+and the distributed signed artifact, tag, and corresponding source still bind
+to one exact release commit. Validation reuse never authorizes relabeling an
+ancestor's signed candidate as that final artifact.
 
 Android native validation runs on the Android build machine at the risk-scoped
 layer selected for the change. The hosted `Mobile Android` workflow is a
@@ -99,19 +134,24 @@ captures the representative tablet, foldable/resizable, and backup contracts.
 Use it only for full-scope changes or hosted-environment diagnosis. The
 fail-closed runner is `pnpm mobile:validate:android:matrix`, and
 `docs/ANDROID_VALIDATION.md` defines its evidence schema and commands.
+When only a host-side Android test-runner input changes, dispatch
+`Mobile Android test-only rerun` with the retained source run, its App source
+SHA, and one affected target. That workflow authenticates the successful source
+build, proves the App-input digest is unchanged, downloads the retained APKs,
+and does not run Gradle.
 
 Before any release, run exact-head fast checks and select the same no-native,
 targeted, or full scope used for PRs. An ordinary delta does not rerun complete
 Detox and does not require physical-device installation. Run one
 affected simulator/emulator suite for targeted risk and both suites only for
 broad native risk. Passing native evidence may be reused after a later commit
-or squash merge when a documented diff confirms that the
-validation-relevant development inputs listed above are unchanged; the commit
-SHA and full Git tree may differ. Record the tested and candidate SHAs plus the
-comparison. Real CloudKit, notification delivery, TestFlight upgrade,
-schema-upgrade, compatibility-matrix, and App Store screenshot checks remain
-conditional platform checks when that boundary changed or the store reports a
-problem.
+or squash merge when the App-input comparison above passes; the commit SHA and
+full Git tree may differ. Test-runner changes rerun only their affected scope
+against the retained validation App artifact. Record the App source and
+test-runner SHAs plus the comparison. Real CloudKit, notification delivery,
+TestFlight upgrade, schema-upgrade, compatibility-matrix, and App Store
+screenshot checks remain conditional platform checks when that boundary
+changed or the store reports a problem.
 
 Physical-device checks are optional diagnostic evidence, not a feature-PR or
 release gate. They may help diagnose install, real board input, Stockfish
@@ -434,7 +474,8 @@ test both compatibility contracts deliberately.
 | React Native copy, state, styling, accessibility, or wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck`; no mobile Detox by default | Exact-head fast release checks |
 | JavaScript/TypeScript navigation or cross-component journey | Component coverage plus applicable integration tests; no mobile Detox | Targeted simulator/emulator suite only if the release has native risk |
 | JavaScript/TypeScript chessboard presentation, animation, or adaptive layout | Focused component/Interaction Lab coverage; optional simulator inspection, not a native gate | Risk-scoped simulator/emulator evidence |
-| Native bridge/adapter, native dependency, platform project, or native persistence integration | Targeted native spec or suite | Reuse while validation-relevant development inputs are unchanged; otherwise rerun the targeted scope |
+| Host-side E2E spec, selector, wait, assertion, or non-bundled fixture | Focused test-runner checks | Reuse the verified validation App artifact and rerun only the affected native spec/suite |
+| Native bridge/adapter, native dependency, platform project, or native persistence integration | Targeted native spec or suite | Rebuild for changed App inputs; otherwise reuse the validation App artifact and rerun only changed test evidence |
 | App startup, shared native wiring, native launch fixtures, platform build configuration, or Detox infrastructure | Full `flows` and `practice` | Full release scope while that risk is present |
 | CloudKit behavior | Fake transport integration; targeted native validation only when adapter wiring changed | Signed staging/manual release validation |
 | Notification scheduling/routing | Fake/native fixture tests; targeted native validation only when routing changed | Optional physical-device diagnosis after automated validation |
