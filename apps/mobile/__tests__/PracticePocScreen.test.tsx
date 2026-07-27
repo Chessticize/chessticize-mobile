@@ -2501,6 +2501,103 @@ describe("PracticePocScreen", () => {
     );
     expect(railTestIDs.size).toBe(7);
     expect(railTestIDs).toContain("history-attempt-history-unclear-themes-matein3");
+    expect(findByTestId(renderer, "history-progress-button")).toBeTruthy();
+  });
+
+  it("opens the Storybook-only tactical progress page from History", async () => {
+    const renderer = renderLabScenario("history-progress");
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    expect(findByTestId(renderer, "history-progress-button")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-progress-screen")).toThrow();
+
+    press(renderer, "history-progress-button");
+    expect(collectText(findByTestId(renderer, "history-progress-screen"))).toContain(
+      "Tactical progress"
+    );
+    expect(findByTestId(renderer, "history-progress-early-estimate")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "13 fewer / 100"
+    );
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "Extra misses per 100 comparable puzzles"
+    );
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "n=71"
+    );
+    expect(findByTestId(renderer, "history-no-clear-weakness")).toBeTruthy();
+
+    press(renderer, "history-progress-strength-pins");
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "24% less overhead"
+    );
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "1.06×"
+    );
+
+    press(renderer, "history-progress-back");
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-progress-screen")).toThrow();
+  });
+
+  it("highlights a clear weakness separately from training recommendations", async () => {
+    const renderer = renderLabScenario("history-progress-weakness");
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    press(renderer, "history-progress-button");
+
+    const weakness = findByTestId(renderer, "history-clear-weakness");
+    expect(collectText(weakness)).toContain("Skewers");
+    expect(collectText(weakness)).toContain("Solve reliability");
+    expect(collectText(weakness)).toContain("14 extra misses");
+    expect(collectText(weakness)).toContain("per 100 comparable puzzles");
+    expect(collectText(weakness)).toContain(
+      "Other well-sampled themes remain closer"
+    );
+    expect(collectText(weakness)).toContain(
+      "evidence, practical-impact, and diversity checks"
+    );
+    expect(collectText(weakness)).toContain("26 different puzzles · 6 sessions");
+    expect(collectText(findByTestId(renderer, "history-progress-screen"))).not.toContain(
+      "recommend"
+    );
+  });
+
+  it("shows completed-puzzle time as a distinct weakness head", async () => {
+    const renderer = renderLabScenario("history-progress-speed-weakness");
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    press(renderer, "history-progress-button");
+
+    const weakness = findByTestId(renderer, "history-clear-weakness");
+    expect(collectText(weakness)).toContain("Pins");
+    expect(collectText(weakness)).toContain("Completed-puzzle speed");
+    expect(collectText(weakness)).toContain("1.34× expected time");
+    expect(collectText(weakness)).toContain("about 34% longer");
+    expect(collectText(weakness)).toContain(
+      "Other well-sampled themes remain closer"
+    );
+    expect(collectText(weakness)).toContain(
+      "Only correct, before-timeout attempts with reliable elapsed time"
+    );
+    expect(collectText(weakness)).toContain(
+      "Slow and Unclear labels do not decide it"
+    );
+    expect(collectText(findByTestId(renderer, "history-progress-screen"))).not.toContain(
+      "recommend"
+    );
+  });
+
+  it("keeps the History Progress entry absent without an injected design presentation", () => {
+    const renderer = renderScreen();
+
+    press(renderer, "history-tab");
+
+    expect(() => findByTestId(renderer, "history-progress-button")).toThrow();
+    expect(() => findByTestId(renderer, "history-progress-screen")).toThrow();
   });
 
   it("reveals all seven curated puzzle tags only when replay Analysis opens", async () => {

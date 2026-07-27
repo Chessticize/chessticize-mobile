@@ -28,6 +28,7 @@ export const PopulatedHistory: Story = {
     await waitForTestId(canvasElement, "history-attempt-history-unclear");
     await waitForTestId(canvasElement, "history-attention-filter");
     await waitForTestId(canvasElement, "history-active-filter-summary");
+    await waitForTestId(canvasElement, "history-progress-button");
     (canvasElement.querySelector('[data-testid="history-attention-needs-attention"]') as HTMLElement | null)?.blur();
   }
 };
@@ -47,6 +48,46 @@ export const FiltersAndActiveFilters: Story = {
     await clickTestId(canvasElement, "history-theme-disclosure");
     await waitForTestId(canvasElement, "history-theme-selection-detail");
     (canvasElement.querySelector('[data-testid="history-theme-disclosure"]') as HTMLElement | null)?.blur();
+  }
+};
+
+export const TacticalProgress: Story = {
+  name: "Tactical progress",
+  args: { scenarioId: "history-progress" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await openHistory(canvasElement);
+    await clickTestId(canvasElement, "history-progress-button");
+    await waitForTestId(canvasElement, "history-progress-screen");
+    await waitForTestId(canvasElement, "history-strength-chart");
+    await waitForTestId(canvasElement, "history-no-clear-weakness");
+    await clickTestId(canvasElement, "history-progress-strength-pins");
+  }
+};
+
+export const TacticalProgressClearWeakness: Story = {
+  name: "Tactical progress · reliability weakness",
+  args: { scenarioId: "history-progress-weakness" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await openHistory(canvasElement);
+    await clickTestId(canvasElement, "history-progress-button");
+    await waitForTestId(canvasElement, "history-progress-screen");
+    await waitForTestId(canvasElement, "history-clear-weakness");
+    await waitForTestId(canvasElement, "history-weakness-effect-solve_rate");
+  }
+};
+
+export const TacticalProgressCompletedSpeedWeakness: Story = {
+  name: "Tactical progress · completed-speed weakness",
+  args: { scenarioId: "history-progress-speed-weakness" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await openHistory(canvasElement);
+    await clickTestId(canvasElement, "history-progress-button");
+    await waitForTestId(canvasElement, "history-progress-screen");
+    await waitForTestId(canvasElement, "history-clear-weakness");
+    await waitForTestId(canvasElement, "history-weakness-effect-completed_speed");
   }
 };
 
