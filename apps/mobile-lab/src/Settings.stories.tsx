@@ -19,7 +19,6 @@ type Story = StoryObj<typeof meta>;
 export const IosSync: Story = {
   name: "iOS sync",
   args: { scenarioId: "settings-ios-sync" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-sync-section");

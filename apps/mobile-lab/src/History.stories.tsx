@@ -22,7 +22,6 @@ export const EmptyHistory: Story = {
 export const PopulatedHistory: Story = {
   name: "Populated history",
   args: { scenarioId: "history-populated" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);
     await waitForTestId(canvasElement, "history-attempt-history-unclear");
@@ -54,7 +53,6 @@ export const FiltersAndActiveFilters: Story = {
 export const TacticalProgress: Story = {
   name: "Tactical progress",
   args: { scenarioId: "history-progress" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-progress-button");
@@ -68,7 +66,6 @@ export const TacticalProgress: Story = {
 export const TacticalProgressClearWeakness: Story = {
   name: "Tactical progress · reliability weakness",
   args: { scenarioId: "history-progress-weakness" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-progress-button");
@@ -81,7 +78,6 @@ export const TacticalProgressClearWeakness: Story = {
 export const TacticalProgressCompletedSpeedWeakness: Story = {
   name: "Tactical progress · completed-speed weakness",
   args: { scenarioId: "history-progress-speed-weakness" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-progress-button");

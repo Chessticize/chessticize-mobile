@@ -28,7 +28,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Home: Story = {
   args: { scenarioId: "practice-home" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await expectTestIdText(canvasElement, "practice-mode-standard-rating", "925");
     await expectTestIdText(canvasElement, "practice-mode-arrow-duel-rating", "875");
@@ -38,134 +37,6 @@ export const Home: Story = {
       "practice-progress-weekly-metric",
       "practice-review-due-count"
     );
-  }
-};
-
-export const TacticalProfileBuilding: Story = {
-  name: "Tactical profile · building",
-  args: { scenarioId: "practice-tactical-profile-building" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "training-focus-building-indicator");
-    await waitForText(canvasElement, "Finding stable patterns");
-  }
-};
-
-export const TacticalProfileCollectingEvidence: Story = {
-  name: "Tactical profile · collecting evidence",
-  args: { scenarioId: "practice-tactical-profile-collecting" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "training-focus-card");
-    await waitForText(canvasElement, "More information needed");
-  }
-};
-
-export const TacticalProfileBalanced: Story = {
-  name: "Tactical profile · no clear focus yet",
-  args: { scenarioId: "practice-tactical-profile-balanced" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForText(canvasElement, "No clear focus yet");
-  }
-};
-
-export const TacticalProfileSolveRate: Story = {
-  name: "Tactical profile · solve reliability",
-  args: { scenarioId: "practice-tactical-profile-solve-rate" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "tactical-profile-signal-fork");
-    await waitForText(canvasElement, "You complete these less reliably than comparable puzzles.");
-  }
-};
-
-export const TacticalProfileCompletedSpeed: Story = {
-  name: "Tactical profile · completed-puzzle speed",
-  args: { scenarioId: "practice-tactical-profile-speed" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "tactical-profile-signal-pin-speed");
-    await waitForText(canvasElement, "You solve these correctly, but more slowly than comparable puzzles.");
-  }
-};
-
-export const TacticalProfileRanked: Story = {
-  name: "Tactical profile · ranked weaknesses",
-  args: { scenarioId: "practice-tactical-profile-ranked" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForText(canvasElement, "4 recommendations");
-    await waitForText(canvasElement, "Forks is your clearest focus");
-    await waitForText(canvasElement, "There are 3 more themes worth reviewing.");
-  }
-};
-
-export const TacticalProfileTaskFamiliesHome: Story = {
-  name: "Tactical profile · two-mode Home summary",
-  args: { scenarioId: "practice-tactical-profile-task-families-home" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForText(canvasElement, "2 modes with recommendations");
-    await waitForText(canvasElement, "Arrow Duel also has 2 recommendations.");
-    await waitForTestId(canvasElement, "training-focus-primary-mode");
-  }
-};
-
-export const TacticalProfileTaskFamilies: Story = {
-  name: "Tactical profile · Puzzle solving and Arrow Duel",
-  args: { scenarioId: "practice-tactical-profile-task-families" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "tactical-profile-task-family-selector");
-    await waitForTestId(canvasElement, "tactical-profile-signal-arrow-pin");
-    await waitForTestId(canvasElement, "tactical-profile-signal-arrow-deflection-speed");
-    await waitForText(
-      canvasElement,
-      "This is an early estimate based on ordinary mixed Arrow Duel Runs. It may change as the model is validated with more players. Review and focused Runs do not shape discovery."
-    );
-  }
-};
-
-export const TacticalProfileLimitedInventory: Story = {
-  name: "Tactical profile · limited nearby puzzles",
-  args: { scenarioId: "practice-tactical-profile-limited-inventory" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "focused-run-unavailable");
-    await waitForText(canvasElement, "Not enough new puzzles nearby");
-  }
-};
-
-export const TacticalProfileExplanation: Story = {
-  name: "Tactical profile · recommendation explanation",
-  args: { scenarioId: "practice-tactical-profile-explanation" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "tactical-profile-explanation");
-    await waitForText(canvasElement, "What does not decide this");
-  }
-};
-
-export const TacticalProfileFocusedRun: Story = {
-  name: "Tactical profile · focused Run preview",
-  args: { scenarioId: "practice-tactical-profile-focused-run" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "focused-run-allocation-bar");
-    await waitForText(canvasElement, "Mixed practice");
-    await waitForTestId(canvasElement, "focused-run-start");
-  }
-};
-
-export const TacticalProfileSuppressed: Story = {
-  name: "Tactical profile · focus hidden",
-  args: { scenarioId: "practice-tactical-profile-suppressed" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "tactical-profile-suppressed");
-    await waitForText(canvasElement, "Focus hidden for now");
-    await waitForTestId(canvasElement, "tactical-profile-early-estimate");
   }
 };
 
@@ -240,7 +111,6 @@ export const RunNameValidation: Story = {
 export const BuiltInRunEditor: Story = {
   name: "Built-in Run editor",
   args: { scenarioId: "practice-run-standard-editor" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-run-home-edit");
     await clickTestId(canvasElement, "practice-run-edit-standard");
@@ -255,7 +125,6 @@ export const BuiltInRunEditor: Story = {
 export const CustomRatingEditor: Story = {
   name: "Custom Run editor and validation",
   args: { scenarioId: "practice-custom-rating-editor" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-run-home-edit");
     await clickTestId(canvasElement, "practice-run-edit-tactics-focus");
@@ -305,7 +174,6 @@ export const Preparing: Story = {
 export const ActiveSession: Story = {
   name: "Active session",
   args: { scenarioId: "practice-active" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
@@ -438,7 +306,6 @@ export const ArrowDuelGuideOnlyExit: Story = {
 export const SlowWarning: Story = {
   name: "Active session · Slow",
   args: { scenarioId: "practice-timing-warning" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
@@ -449,7 +316,6 @@ export const SlowWarning: Story = {
 export const PuzzleTimeout: Story = {
   name: "Active session · Timed out handoff",
   args: { scenarioId: "practice-timing-timeout" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
@@ -461,7 +327,6 @@ export const PuzzleTimeout: Story = {
 export const TimeoutReviewNotice: Story = {
   name: "Active session · after timeout",
   args: { scenarioId: "practice-timeout-review-notice" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "sprint-previous-attempt-notice");
@@ -478,7 +343,6 @@ export const TimeoutReviewNotice: Story = {
 export const WrongReviewNotice: Story = {
   name: "Active session · after wrong answer",
   args: { scenarioId: "practice-wrong-review-notice" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "active-session-shell");
     await waitForTestId(canvasElement, "sprint-previous-attempt-notice");
@@ -495,7 +359,6 @@ export const WrongReviewNotice: Story = {
 export const SlowUnclearNotice: Story = {
   name: "Active session · after Slow correct answer",
   args: { scenarioId: "practice-slow-unclear-notice" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "active-session-shell");
     await waitForTestId(canvasElement, "sprint-previous-attempt-notice");
@@ -591,41 +454,6 @@ export const SprintResultExtraAttempt: Story = {
     await waitForTestId(canvasElement, "sprint-result-solved");
     await waitForTestId(canvasElement, "sprint-result-unclear-count-column");
     await waitForTestId(canvasElement, "sprint-result-mistakes-count-column");
-  }
-};
-
-export const TacticalFocusActive: Story = {
-  name: "Tactical Focus · active run",
-  args: { scenarioId: "practice-tactical-focus-active" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForText(canvasElement, "Focused Run");
-    await waitForText(canvasElement, "Unrated");
-    await waitForText(canvasElement, "Completed");
-    await waitForText(canvasElement, "Left");
-  }
-};
-
-export const TacticalFocusGuide: Story = {
-  name: "Tactical Focus · first-use guide",
-  args: { scenarioId: "practice-tactical-focus-guide" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForText(canvasElement, "Track the fixed Run");
-    await waitForText(canvasElement, "Your Rating will not change.");
-    await waitForText(canvasElement, "Unrated");
-  }
-};
-
-export const TacticalFocusResult: Story = {
-  name: "Tactical Focus · result",
-  args: { scenarioId: "practice-tactical-focus-result" },
-  tags: ["new"],
-  play: async ({ canvasElement }) => {
-    await waitForText(canvasElement, "Focused Run complete");
-    await waitForText(canvasElement, "Planned puzzles complete");
-    await waitForText(canvasElement, "Unrated");
-    await waitForText(canvasElement, "Back to Practice");
   }
 };
 
