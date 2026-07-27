@@ -172,6 +172,7 @@ test("Issue #363 owns model-aligned History progress and weakness states", () =>
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 363))
       .map((scenario) => scenario.id),
     [
+      "history-populated",
       "history-progress",
       "history-progress-weakness",
       "history-progress-speed-weakness"

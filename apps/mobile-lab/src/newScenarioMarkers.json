@@ -344,6 +344,10 @@
       {
         "issueNumber": 249,
         "changeNote": "Treat Timed out as a mistake added to Review without also marking it Unclear."
+      },
+      {
+        "issueNumber": 363,
+        "changeNote": "Add the approved Progress entry to the existing populated History product clone."
       }
     ]
   },
