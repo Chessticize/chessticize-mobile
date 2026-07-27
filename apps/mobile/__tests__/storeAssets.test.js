@@ -218,7 +218,7 @@ describe("App Store assets document", () => {
     );
   });
 
-  it("scrolls clipped landscape journey actions into view before tapping them", () => {
+  it("dismisses the rating popover and restores the editor top before saving", () => {
     const ratingHelperStart = storeAssetsE2e.indexOf(
       "async function setStoreAssetRatings"
     );
@@ -228,12 +228,16 @@ describe("App Store assets document", () => {
     );
     const ratingHelper = storeAssetsE2e.slice(ratingHelperStart, ratingHelperEnd);
     expect(ratingHelper).toContain(
-      "await waitForVisibleInPracticeScroll('practice-run-save');\n"
+      "await element(by.id('practice-run-editor-title')).tap();\n"
+      + "    await sleep(500);\n"
+      + "    await element(by.id('practice-main-scroll')).scrollTo('top');\n"
+      + "    await waitFor(element(by.id('practice-run-save')))\n"
+      + "      .toBeVisible()\n"
+      + "      .withTimeout(10000);\n"
       + "    await element(by.id('practice-run-save')).tap();"
     );
     expect(ratingHelper).not.toContain(
-      "await element(by.id('practice-main-scroll')).scrollTo('top');\n"
-      + "    await element(by.id('practice-run-save')).tap();"
+      "await waitForVisibleInPracticeScroll('practice-run-save');"
     );
 
     const reviewHelperStart = storeAssetsE2e.indexOf(
