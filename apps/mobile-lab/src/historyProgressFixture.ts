@@ -1,7 +1,7 @@
 import type {
   HistoryProgressPresentation,
   HistoryStrengthSeries
-} from "../../mobile/src/components/HistoryProgressSection.tsx";
+} from "../../mobile/src/components/historyProgressPresentation.ts";
 import type { LabScenarioId } from "./scenarioRegistry.ts";
 
 export type HistoryProgressScenarioId =

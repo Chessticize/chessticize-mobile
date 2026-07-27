@@ -216,9 +216,11 @@ import {
 } from "./ICloudSyncErrorDetails.tsx";
 import {
   HistoryProgressEntryButton,
-  HistoryProgressScreen,
-  type HistoryProgressPresentation
+  HistoryProgressScreen
 } from "./HistoryProgressSection.tsx";
+import type {
+  HistoryProgressPresentation
+} from "./historyProgressPresentation.ts";
 
 export type {
   PracticeRunDraft,
@@ -239,7 +241,7 @@ export type {
   HistoryProgressWeakness,
   HistoryWeaknessEffect,
   HistoryStrengthSeries
-} from "./HistoryProgressSection.tsx";
+} from "./historyProgressPresentation.ts";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
