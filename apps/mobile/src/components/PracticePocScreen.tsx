@@ -27,6 +27,7 @@ import {
   buildArrowDuelLandscapeGuideGeometry,
   buildPortraitGuideCalloutTop,
   buildPortraitGuidePointerLeft,
+  buildPortraitTimeoutGuideGeometry,
   buildSessionGuideLandscapeAlignment,
   buildSessionGuideRailConnectorGeometry
 } from "./sessionGuideGeometry.ts";
@@ -94,11 +95,16 @@ import type {
   SprintGuideKey,
   SprintMode,
   SprintResultSummary,
+  TacticalProfileTaskFamily,
   ThemeChoiceIntent,
   SprintState,
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
-import type { CompletedReviewItem, PracticeService } from "../../../../packages/storage/src/practice-service.ts";
+import {
+  FocusedRunUnavailableError,
+  type CompletedReviewItem,
+  type PracticeService
+} from "../../../../packages/storage/src/practice-service.ts";
 import type {
   ReviewQueueDuePromotionResult,
   ReviewReminderPreference
@@ -119,6 +125,15 @@ import {
   type ReviewReminderScheduleResult
 } from "../platform/reviewReminderScheduler.ts";
 import type { ICloudAccountStatus } from "../platform/iCloudProgressSync.ts";
+import {
+  captureICloudSyncFailure,
+  formatAndroidSupportOverviewDiagnostic,
+  formatICloudSyncFailureDiagnostic,
+  formatICloudSyncOverviewDiagnostic,
+  iCloudSyncAttemptLabel,
+  type ICloudSyncFailureDiagnostic,
+  type SupportDiagnosticMetadata
+} from "../platform/iCloudSyncDiagnostics.ts";
 import type {
   MobileApplicationMetadata,
   MobilePlatformCapabilities,
@@ -192,6 +207,23 @@ import {
   TacticalProfileHomeCard
 } from "./TacticalProfileSection.tsx";
 import type { TacticalProfilePresentation } from "./tacticalProfilePresentation.ts";
+import { useTacticalProfilePresentation } from "./useTacticalProfilePresentation.ts";
+import {
+  ICloudSyncErrorDetails,
+  ICloudSyncSupportDiagnosticsEntry,
+  type ICloudSyncErrorDetailsPresentation,
+  type ICloudSyncSupportBundlePresentation
+} from "./ICloudSyncErrorDetails.tsx";
+import {
+  HistoryProgressEntryButton,
+  HistoryProgressScreen
+} from "./HistoryProgressSection.tsx";
+import type {
+  HistoryProgressPresentation
+} from "./historyProgressPresentation.ts";
+import {
+  useHistoryProgressPresentation
+} from "./useHistoryProgressPresentation.ts";
 
 export type {
   PracticeRunDraft,
@@ -206,6 +238,13 @@ export type {
   TacticalProfilePresentation,
   TacticalProfileSignal
 } from "./tacticalProfilePresentation.ts";
+export type {
+  HistoryProgressPoint,
+  HistoryProgressPresentation,
+  HistoryProgressWeakness,
+  HistoryWeaknessEffect,
+  HistoryStrengthSeries
+} from "./historyProgressPresentation.ts";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -215,6 +254,9 @@ interface Props {
   customTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   feedbackIssuesOpener?: (url: string) => Promise<void>;
+  historyProgressPresentation?: HistoryProgressPresentation;
+  iCloudSyncErrorDetails?: ICloudSyncErrorDetailsPresentation;
+  iCloudSyncSupportBundle?: ICloudSyncSupportBundlePresentation;
   currentTimeMs?: () => number;
   sprintGuidanceEnabled?: boolean;
   moveFeedbackSettings?: {
@@ -240,6 +282,9 @@ export type SprintRulesGuidePresentation = {
 };
 
 export type SprintSessionGuidePresentation = SprintRulesGuidePresentation & {
+  focusedRun?: boolean;
+  guideKey?: Exclude<SprintGuideKey, "rules">;
+  maxAttempts?: number;
   mode: "standard" | "arrow_duel";
 };
 
@@ -257,6 +302,7 @@ export type SprintResultUnclearPromptPresentation = {
 export type SprintRulesDesignPreview = {
   firstRunGuide?: SprintRulesGuidePresentation;
   firstRunGuideInitiallyVisible?: boolean;
+  initialActiveState?: SprintState;
   initialSessionGuides?: readonly SprintSessionGuidePresentation[];
   initialPreviousAttemptNotice?: "slow" | "timed_out" | "wrong";
   initialResultUnclearPrompt?: SprintResultUnclearPromptPresentation;
@@ -389,10 +435,22 @@ function previousAttemptNoticeFor(
     : null;
 }
 
-type PendingGuidedStart = {
-  nextMode: SprintMode;
-  practiceRunId?: string;
-  useCustomTiming: boolean;
+type PendingGuidedStart =
+  | {
+      kind: "sprint";
+      nextMode: SprintMode;
+      practiceRunId?: string;
+      useCustomTiming: boolean;
+    }
+  | {
+      kind: "focused";
+      taskFamily: TacticalProfileTaskFamily;
+      onUnavailable: (error: unknown) => void;
+    };
+
+type StartingFocusedRun = {
+  taskFamily: TacticalProfileTaskFamily;
+  onUnavailable: (error: unknown) => void;
 };
 
 const SPRINT_RULES_PREVIEW_UNCLEAR_ATTEMPT_ID = "sprint-rules-preview-final-attempt";
@@ -511,6 +569,9 @@ export function PracticePocScreen({
   customTargetCorrect,
   debugTrace,
   feedbackIssuesOpener = openFeedbackIssuesInBrowser,
+  historyProgressPresentation,
+  iCloudSyncErrorDetails,
+  iCloudSyncSupportBundle,
   currentTimeMs = Date.now,
   sprintGuidanceEnabled = false,
   moveFeedbackSettings,
@@ -536,6 +597,7 @@ export function PracticePocScreen({
   const moveFeedbackClient = platformCapabilities.moveFeedback.client;
   const progressProtection = platformCapabilities.progressProtection;
   const iCloudSyncClient = platformCapabilities.progressSync.client;
+  const iCloudSyncDiagnosticsClient = platformCapabilities.progressSync.diagnostics;
   const boardRef = useRef<ChessboardRef | null>(null);
   const sessionBoardHandlersRef = useRef<{
     onIllegalMove: (from: Square, to: Square) => void;
@@ -562,6 +624,7 @@ export function PracticePocScreen({
   const pendingGuidedStartRef = useRef<PendingGuidedStart | null>(null);
   const startingModeRef = useRef<SprintMode | null>(null);
   const startingPracticeRunIdRef = useRef<string | null>(null);
+  const startingFocusedRunRef = useRef<StartingFocusedRun | null>(null);
   const deferredBackTransitionsRef = useRef(new Map<string, () => void>());
   const resumeDeferredBackTransitionsRef = useRef<(() => void) | null>(null);
   const predictiveBackIntentRef = useRef<MobileBackIntent | null>(null);
@@ -584,11 +647,17 @@ export function PracticePocScreen({
   const { fontScale, height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  const [mode, setMode] = useState<SprintMode>("standard");
+  const [mode, setMode] = useState<SprintMode>(
+    () => sprintRulesDesignPreview?.initialResultState?.config.mode
+      ?? sprintRulesDesignPreview?.initialActiveState?.config.mode
+      ?? "standard"
+  );
   const [startingMode, setStartingMode] = useState<SprintMode | null>(null);
   const [tab, setTab] = useState<Tab>(initialTab);
   const [state, setState] = useState<SprintState | null>(
-    () => sprintRulesDesignPreview?.initialResultState ?? null
+    () => sprintRulesDesignPreview?.initialResultState
+      ?? sprintRulesDesignPreview?.initialActiveState
+      ?? null
   );
   const [feedback, setFeedback] = useState<SessionFeedback>(null);
   const [aggregateRevision, setAggregateRevision] = useState(0);
@@ -627,7 +696,7 @@ export function PracticePocScreen({
   const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
-  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("all");
+  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
   const [historyResultFilter, setHistoryResultFilter] = useState<"all" | "correct" | "wrong">("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
@@ -637,8 +706,10 @@ export function PracticePocScreen({
   const [historyPageOffset, setHistoryPageOffset] = useState(0);
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
+  const [historyReplayBoardTouchActive, setHistoryReplayBoardTouchActive] = useState(false);
   const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryUnavailableAttempt | null>(null);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
+  const [historyProgressOpen, setHistoryProgressOpen] = useState(false);
   const [reviewSessionSource, setReviewSessionSource] = useState<ReviewEntry["source"] | null>(null);
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
@@ -669,6 +740,10 @@ export function PracticePocScreen({
   const [mobileBackPreview, setMobileBackPreview] = useState<MobileBackPreview | null>(null);
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
+  const iCloudAccountStatusRef =
+    useRef<ICloudAccountStatus | "not_checked">("not_checked");
+  const [lastICloudSyncFailure, setLastICloudSyncFailure] =
+    useState<ICloudSyncFailureDiagnostic | undefined>();
   const [moveFeedbackPreferences, setMoveFeedbackPreferences] = useState<MoveFeedbackPreferences>(
     () => service.getSettings().moveFeedback
   );
@@ -685,12 +760,102 @@ export function PracticePocScreen({
     onControlledSelectionChange: customThemeSelection?.onChange
   });
   const historyThemeChoices = useThemeChoiceSelection();
+  const resolvedHistoryProgressPresentation = useHistoryProgressPresentation({
+    enabled: tab === "history" || historyProgressOpen,
+    service,
+    ...(historyProgressPresentation === undefined
+      ? {}
+      : { injectedPresentation: historyProgressPresentation }),
+    refreshKey: aggregateRevision
+  });
+  const resolvedTacticalProfilePresentation = useTacticalProfilePresentation({
+    service,
+    ...(tacticalProfilePresentation === undefined
+      ? {}
+      : { injectedPresentation: tacticalProfilePresentation }),
+    onStartRequested: requestFocusedRunStart,
+    refreshKey: aggregateRevision
+  });
 
   const adaptiveLayout = useMemo(
     () => buildPracticeAdaptiveLayout({ fontScale, height, insets, width }),
     [fontScale, height, insets, width]
   );
   const boardSize = adaptiveLayout.boardSize;
+  const syncDiagnosticMetadata = {
+    appVersion: platformCapabilities.applicationMetadata.versionName,
+    ...(platformCapabilities.applicationMetadata.buildNumber
+      ? { buildNumber: platformCapabilities.applicationMetadata.buildNumber }
+      : {}),
+    iCloudAccountStatus: iCloudAccountStatusRef.current,
+    iCloudSyncEnabled,
+    latestSyncStatus: iCloudSyncStatus
+  };
+  const supportDiagnosticMetadata: SupportDiagnosticMetadata =
+    progressProtection.kind === "android_managed_backup"
+      ? {
+          appVersion: platformCapabilities.applicationMetadata.versionName,
+          ...(platformCapabilities.applicationMetadata.buildNumber
+            ? { buildNumber: platformCapabilities.applicationMetadata.buildNumber }
+            : {}),
+          platform: "android",
+          progressProtection: "android_managed_backup"
+        }
+      : syncDiagnosticMetadata;
+  const generatedSupportBundle = iCloudSyncDiagnosticsClient
+    ? {
+        onDiscard: async (result) => {
+          if (result.bundleUrl) {
+            await iCloudSyncDiagnosticsClient.discardSupportBundle(result.bundleUrl);
+          }
+        },
+        onPrepare: async () => {
+          const createdAt = new Date(currentTimeMs()).toISOString();
+          const prepared = await iCloudSyncDiagnosticsClient.prepareSupportBundle({
+            diagnosticText: progressProtection.kind === "android_managed_backup"
+              ? formatAndroidSupportOverviewDiagnostic(
+                  supportDiagnosticMetadata,
+                  createdAt
+                )
+              : formatICloudSyncOverviewDiagnostic(
+                  syncDiagnosticMetadata,
+                  createdAt,
+                  lastICloudSyncFailure
+                ),
+            metadata: supportDiagnosticMetadata
+          });
+          return prepared;
+        },
+        onShare: async (result) => {
+          if (!result.bundleUrl) {
+            throw new Error("The prepared support bundle is unavailable.");
+          }
+          await iCloudSyncDiagnosticsClient.shareSupportBundle(result.bundleUrl);
+        },
+        platform: progressProtection.kind === "android_managed_backup"
+          ? "android"
+          : "ios"
+      } satisfies ICloudSyncSupportBundlePresentation
+    : undefined;
+  const effectiveSupportBundle = iCloudSyncSupportBundle ?? generatedSupportBundle;
+  const generatedErrorDetails = lastICloudSyncFailure && iCloudSyncStatus === "iCloud sync failed"
+    ? {
+        copyText: formatICloudSyncFailureDiagnostic(
+          lastICloudSyncFailure,
+          syncDiagnosticMetadata
+        ),
+        message: lastICloudSyncFailure.message,
+        occurredAtLabel: new Date(lastICloudSyncFailure.occurredAt).toLocaleString(),
+        onCopy: async (text: string) => {
+          if (!iCloudSyncDiagnosticsClient) {
+            throw new Error("Clipboard access is unavailable.");
+          }
+          await iCloudSyncDiagnosticsClient.copyText(text);
+        },
+        supportBundle: effectiveSupportBundle
+      } satisfies ICloudSyncErrorDetailsPresentation
+    : undefined;
+  const effectiveErrorDetails = iCloudSyncErrorDetails ?? generatedErrorDetails;
 
   const isActive = state?.status === "active";
   const isPaused = state?.status === "paused";
@@ -972,6 +1137,7 @@ export function PracticePocScreen({
       }
       startingModeRef.current = null;
       startingPracticeRunIdRef.current = null;
+      startingFocusedRunRef.current = null;
       deferredBackTransitions.clear();
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG__ = undefined;
       globals.__CHESSTICIZE_CHESSBOARD_DEBUG_SINK__ = undefined;
@@ -985,6 +1151,7 @@ export function PracticePocScreen({
   function navigateToTab(nextTab: Tab): void {
     if (nextTab !== "history") {
       setHistoryFiltersExpanded(false);
+      setHistoryProgressOpen(false);
     }
     if (nextTab !== "review") {
       setReviewFiltersExpanded(false);
@@ -1131,6 +1298,7 @@ export function PracticePocScreen({
       setICloudSyncStatus("Syncing");
       try {
         const accountStatus = await iCloudSyncClient.getAccountStatus();
+        iCloudAccountStatusRef.current = accountStatus;
         if (accountStatus !== "available") {
           const message = iCloudAccountStatusMessage(accountStatus);
           setICloudSyncStatus(message);
@@ -1148,6 +1316,10 @@ export function PracticePocScreen({
         return message;
       } catch (caught) {
         const message = "iCloud sync failed";
+        setLastICloudSyncFailure(captureICloudSyncFailure(caught, {
+          attempt: iCloudSyncAttemptLabel(reason),
+          occurredAt: new Date(currentTimeMs()).toISOString()
+        }));
         setICloudSyncStatus(message);
         emitTrace({
           type: "move-ignored",
@@ -1365,30 +1537,38 @@ export function PracticePocScreen({
   function beginFirstUseSessionGuides(
     nextMode: SprintMode,
     useCustomTiming: boolean,
-    practiceRunId?: string
+    practiceRunId?: string,
+    pendingStart?: PendingGuidedStart,
+    presentationOverride?: SprintRulesGuidePresentation & {
+      focusedRun?: boolean;
+      maxAttempts?: number;
+    }
   ): boolean {
     if (!sprintGuidanceEnabled || pendingGuidedStartRef.current) {
       return false;
     }
     const guideKeys = sprintSessionGuidesFor(
       service.getSettings().sprintGuides,
-      nextMode
+      nextMode,
+      { focusedRun: presentationOverride?.focusedRun === true }
     );
     if (guideKeys.length === 0) {
       return false;
     }
-    const presentation = sprintGuidePresentationFor(
+    const presentation = presentationOverride ?? sprintGuidePresentationFor(
       nextMode,
       useCustomTiming,
       practiceRunId
     );
-    pendingGuidedStartRef.current = {
+    pendingGuidedStartRef.current = pendingStart ?? {
+      kind: "sprint",
       nextMode,
       useCustomTiming,
       ...(practiceRunId === undefined ? {} : { practiceRunId })
     };
     setSessionGuidePresentations(guideKeys.map((guide) => ({
       ...presentation,
+      guideKey: guide,
       mode: guide === "arrow_duel" ? "arrow_duel" : "standard"
     })));
     setSessionGuideCoachStep(0);
@@ -1420,6 +1600,92 @@ export function PracticePocScreen({
     performStartSprint(nextMode, useCustomTiming, practiceRunId);
   }
 
+  function requestFocusedRunStart(
+    taskFamily: TacticalProfileTaskFamily,
+    onUnavailable: (error: unknown) => void
+  ): void {
+    if (startingModeRef.current !== null) {
+      return;
+    }
+    const nextMode = taskFamily === "arrow_duel" ? "arrow_duel" : "standard";
+    const pendingStart: PendingGuidedStart = {
+      kind: "focused",
+      taskFamily,
+      onUnavailable
+    };
+    const guideKeys = sprintGuidanceEnabled
+      ? sprintSessionGuidesFor(
+          service.getSettings().sprintGuides,
+          nextMode,
+          { focusedRun: true }
+        )
+      : [];
+    if (guideKeys.length > 0) {
+      const prepared = service.prepareFocusedRun(taskFamily, captureLiveNowIso());
+      if (prepared.status !== "ready") {
+        onUnavailable(new FocusedRunUnavailableError(prepared.reason));
+        return;
+      }
+      if (beginFirstUseSessionGuides(
+        nextMode,
+        false,
+        undefined,
+        pendingStart,
+        {
+          durationLabel: formatSprintDurationLabel(
+            prepared.prepared.config.durationSeconds
+          ),
+          focusedRun: true,
+          maxAttempts: prepared.prepared.config.maxAttempts,
+          maxMistakes: prepared.prepared.config.maxMistakes,
+          targetCorrect: prepared.prepared.config.targetCorrect
+        }
+      )) {
+        return;
+      }
+    }
+    if (nextMode === "arrow_duel") {
+      startingModeRef.current = nextMode;
+      startingPracticeRunIdRef.current = null;
+      startingFocusedRunRef.current = { taskFamily, onUnavailable };
+      setStartingMode(nextMode);
+      sprintStartTimerRef.current = setTimeout(() => {
+        finishDelayedFocusedRunStart(taskFamily, onUnavailable);
+      }, sprintStartDelayMs);
+      return;
+    }
+    performStartFocusedRun(taskFamily, onUnavailable);
+  }
+
+  function finishDelayedFocusedRunStart(
+    taskFamily: TacticalProfileTaskFamily,
+    onUnavailable: (error: unknown) => void
+  ): void {
+    sprintStartTimerRef.current = null;
+    const expectedMode = taskFamily === "arrow_duel" ? "arrow_duel" : "standard";
+    const startingFocus = startingFocusedRunRef.current;
+    if (
+      startingModeRef.current !== expectedMode ||
+      startingFocus?.taskFamily !== taskFamily ||
+      startingFocus.onUnavailable !== onUnavailable
+    ) {
+      return;
+    }
+    if (deferBackRelevantTransition("delayed-sprint-start", () => {
+      const resumedFocus = startingFocusedRunRef.current;
+      if (
+        startingModeRef.current === expectedMode &&
+        resumedFocus?.taskFamily === taskFamily &&
+        resumedFocus.onUnavailable === onUnavailable
+      ) {
+        performStartFocusedRun(taskFamily, onUnavailable);
+      }
+    })) {
+      return;
+    }
+    performStartFocusedRun(taskFamily, onUnavailable);
+  }
+
   function finishDelayedSprintStart(
     nextMode: SprintMode,
     useCustomTiming: boolean,
@@ -1443,6 +1709,26 @@ export function PracticePocScreen({
       return;
     }
     performStartSprint(nextMode, useCustomTiming, practiceRunId);
+  }
+
+  function performStartFocusedRun(
+    taskFamily: TacticalProfileTaskFamily,
+    onUnavailable: (error: unknown) => void
+  ): void {
+    setError(null);
+    try {
+      adoptStartedSprint(service.startFocusedRun(
+        taskFamily,
+        captureLiveNowIso()
+      ));
+    } catch (caught) {
+      onUnavailable(caught);
+    } finally {
+      startingModeRef.current = null;
+      startingPracticeRunIdRef.current = null;
+      startingFocusedRunRef.current = null;
+      setStartingMode(null);
+    }
   }
 
   function deferBackRelevantTransition(key: string, resumeAfterCancel: () => void): boolean {
@@ -1474,6 +1760,7 @@ export function PracticePocScreen({
     deferredBackTransitionsRef.current.delete("delayed-sprint-start");
     startingModeRef.current = null;
     startingPracticeRunIdRef.current = null;
+    startingFocusedRunRef.current = null;
     setStartingMode(null);
   }
 
@@ -1533,31 +1820,36 @@ export function PracticePocScreen({
             },
         captureLiveNowIso()
       );
-      setMode(nextMode);
-      setSessionMistakeReviewItems([]);
-      commitState(started);
-      setResumableSprint(null);
-      commitBoardFen(started.currentPuzzle?.currentFen ?? null);
-      setLastBoardMove(null);
-      setFeedback(null);
-      setFeedbackPuzzleId(null);
-      setUnclearPrompt(null);
-      setPreviousAttemptNotice(null);
-      pendingPremoveRef.current = null;
-      commitBoardInputLocked(false, "start", started.currentPuzzle?.puzzle.id ?? null);
-      clearFeedbackSnapshot();
-      navigateToTab("practice");
-      // Starting a run changes the managed-run presentation but not History or
-      // Review aggregates. Avoid pulling every persisted attempt/session back
-      // into the UI at this latency-sensitive boundary.
-      internalRunManagement.refresh();
+      adoptStartedSprint(started);
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
       startingModeRef.current = null;
       startingPracticeRunIdRef.current = null;
+      startingFocusedRunRef.current = null;
       setStartingMode(null);
     }
+  }
+
+  function adoptStartedSprint(started: SprintState): void {
+    setMode(started.config.mode);
+    setSessionMistakeReviewItems([]);
+    commitState(started);
+    setResumableSprint(null);
+    commitBoardFen(started.currentPuzzle?.currentFen ?? null);
+    setLastBoardMove(null);
+    setFeedback(null);
+    setFeedbackPuzzleId(null);
+    setUnclearPrompt(null);
+    setPreviousAttemptNotice(null);
+    pendingPremoveRef.current = null;
+    commitBoardInputLocked(false, "start", started.currentPuzzle?.puzzle.id ?? null);
+    clearFeedbackSnapshot();
+    navigateToTab("practice");
+    // Starting a run changes the managed-run presentation but not History or
+    // Review aggregates. Avoid pulling every persisted attempt/session back
+    // into the UI at this latency-sensitive boundary.
+    internalRunManagement.refresh();
   }
 
   function changePuzzleSource(nextSource: MobilePuzzleSource): void {
@@ -2480,11 +2772,13 @@ export function PracticePocScreen({
   const boardFeedback = feedbackSnapshot?.feedback ?? feedbackForCurrentPuzzle;
   const boardPremoveWindow = boardInputLocked && boardInputLockMode === "premove";
   // Drags aimed at an active board must pan pieces, never the page. Freeze the
-  // surrounding Sprint scroll for the whole session, and freeze it around the
-  // fixed Review board whenever the landscape control rail owns overflow.
+  // surrounding Sprint scroll for the whole session and the fixed Review board
+  // in landscape. History replay keeps its portrait actions scrollable, so it
+  // freezes the page only while a touch that started on the board is active.
   const reviewBoardVisible = reviewSessionSource !== null || historyReviewEntries.length > 0;
   const practiceScrollLocked = shouldShowSessionBoard
-    || (adaptiveLayout.usesSessionRail && reviewBoardVisible);
+    || (adaptiveLayout.usesSessionRail && reviewBoardVisible)
+    || historyReplayBoardTouchActive;
   const boardGestureEnabled = Boolean(
     isActive
       && !isShowingFeedbackSnapshot
@@ -2528,6 +2822,7 @@ export function PracticePocScreen({
   // and re-scanned a history that grows with every solved puzzle.
   const historyPanelVisible =
     tab === "history" &&
+    !historyProgressOpen &&
     historyReviewEntries.length === 0 &&
     historyUnavailableAttempt === null;
   const historyView = historyPanelVisible
@@ -2587,17 +2882,34 @@ export function PracticePocScreen({
             kind: "review-session",
             owner: tab === "review" && reviewSessionSource === "session" ? "practice" : tab
           }
-        : tab === "analysis"
-          ? { kind: "stockfish-diagnostics", owner: "settings" }
-          : isFinished
-            ? { kind: "sprint-result", owner: "practice" }
-            : tab === "practice" && state === null && activeRunManagementScreen !== undefined
+        : tab === "history" && historyProgressOpen
+          ? { kind: "history-progress", owner: "history" }
+          : tab === "analysis"
+            ? { kind: "stockfish-diagnostics", owner: "settings" }
+            : isFinished
+              ? { kind: "sprint-result", owner: "practice" }
+              : tab === "practice" && state === null
+                && resolvedTacticalProfilePresentation?.screen !== undefined
+                && resolvedTacticalProfilePresentation.screen !== "home"
+                ? { kind: "tactical-profile", owner: "practice" }
+              : tab === "practice" && state === null && activeRunManagementScreen !== undefined
                 && activeRunManagementScreen !== "home"
-              ? { kind: "practice-run-editor", owner: "practice" }
-            : tab === "practice" && state === null && mode === "custom"
-              ? { kind: "custom-practice", owner: "practice" }
-              : null,
-    [activeRunManagementScreen, isFinished, mode, reviewAnalysisOpen, reviewSessionSource, reviewSurfaceOpen, state, tab]
+                ? { kind: "practice-run-editor", owner: "practice" }
+              : tab === "practice" && state === null && mode === "custom"
+                ? { kind: "custom-practice", owner: "practice" }
+                : null,
+    [
+      activeRunManagementScreen,
+      historyProgressOpen,
+      isFinished,
+      mode,
+      resolvedTacticalProfilePresentation?.screen,
+      reviewAnalysisOpen,
+      reviewSessionSource,
+      reviewSurfaceOpen,
+      state,
+      tab
+    ]
   );
   const mobileBackState: MobileBackState = {
     activePractice: isOpenSession,
@@ -2606,6 +2918,13 @@ export function PracticePocScreen({
     topTransient: topBackTransient
   };
   const predictiveBackEnabled = resolveMobileBackIntent(mobileBackState, "button").kind !== "delegate-platform";
+
+  function dismissSessionGuide(): void {
+    pendingGuidedStartRef.current = null;
+    setSessionGuidePresentations([]);
+    setSessionGuideIndex(null);
+    setSessionGuideCoachStep(0);
+  }
 
   function executeMobileBackIntent(
     intent: MobileBackIntent,
@@ -2628,10 +2947,7 @@ export function PracticePocScreen({
         } else if (intent.transient === "starting-practice") {
           cancelStartingSprint();
         } else if (intent.transient === "sprint-session-guide") {
-          pendingGuidedStartRef.current = null;
-          setSessionGuidePresentations([]);
-          setSessionGuideIndex(null);
-          setSessionGuideCoachStep(0);
+          dismissSessionGuide();
         }
         return true;
       case "close-analysis":
@@ -2648,8 +2964,12 @@ export function PracticePocScreen({
           }
         } else if (resolvedState.detail?.kind === "stockfish-diagnostics") {
           navigateToTab("settings");
+        } else if (resolvedState.detail?.kind === "history-progress") {
+          setHistoryProgressOpen(false);
         } else if (resolvedState.detail?.kind === "practice-run-editor") {
           activeRunManagementPresentation?.onIntent({ type: "cancel-edit" });
+        } else if (resolvedState.detail?.kind === "tactical-profile") {
+          resolvedTacticalProfilePresentation?.onIntent({ type: "close-profile" });
         } else if (resolvedState.detail?.kind === "custom-practice") {
           setCustomRatingEditorOpen(false);
           setMode("standard");
@@ -2876,7 +3196,7 @@ export function PracticePocScreen({
     />
   ) : null;
   const sessionScoreNode = state?.status === "active" ? (
-    <SessionScoreStrip state={state} />
+    <SessionScoreStrip compact={sessionUsesRail} state={state} />
   ) : null;
   const pausedSessionNode = isPaused && state ? (
     <PausedSessionPanel
@@ -3048,7 +3368,11 @@ export function PracticePocScreen({
   const practiceAnnouncement = error
     ? `Error. ${error}`
     : isSessionGuideVisible
-      ? `${sessionGuidePresentation?.mode === "arrow_duel" ? "Arrow Duel" : "Sprint"} first-session guide. The timer has not started.`
+      ? `${sessionGuidePresentation?.focusedRun
+        ? "Focused Run"
+        : sessionGuidePresentation?.mode === "arrow_duel"
+          ? "Arrow Duel"
+          : "Sprint"} first-session guide. The timer has not started.`
     : boardFeedback
       ? `${boardFeedback.result === "correct" ? "Correct move" : "Wrong move"}. ${boardFeedback.puzzleSolved ? "Puzzle complete." : "Continue the puzzle."}`
       : isActive && displayedSideToMove
@@ -3167,6 +3491,7 @@ export function PracticePocScreen({
                     presentation={sessionGuidePresentation}
                     stepNumber={sessionGuideIndex + 1}
                     totalSteps={sessionGuidePresentations.length}
+                    onExit={dismissSessionGuide}
                     onBack={() => {
                       if (sessionGuideCoachStep > 0) {
                         setSessionGuideCoachStep((current) => Math.max(current - 1, 0));
@@ -3190,9 +3515,10 @@ export function PracticePocScreen({
                       if (sessionGuidePresentations[nextIndex]) {
                         if (sprintGuidanceEnabled) {
                           saveSprintGuideSeen(
-                            sessionGuidePresentation.mode === "arrow_duel"
-                              ? "arrow_duel"
-                              : "active_session"
+                            sessionGuidePresentation.guideKey
+                              ?? (sessionGuidePresentation.mode === "arrow_duel"
+                                ? "arrow_duel"
+                                : "active_session")
                           );
                         }
                         setSessionGuideIndex(nextIndex);
@@ -3202,9 +3528,10 @@ export function PracticePocScreen({
 
                       if (sprintGuidanceEnabled) {
                         saveSprintGuideSeen(
-                          sessionGuidePresentation.mode === "arrow_duel"
-                            ? "arrow_duel"
-                            : "active_session"
+                          sessionGuidePresentation.guideKey
+                            ?? (sessionGuidePresentation.mode === "arrow_duel"
+                              ? "arrow_duel"
+                              : "active_session")
                         );
                       }
                       setSessionGuideIndex(null);
@@ -3212,11 +3539,21 @@ export function PracticePocScreen({
                       const pendingStart = pendingGuidedStartRef.current;
                       pendingGuidedStartRef.current = null;
                       if (pendingStart) {
+                        if (pendingStart.kind === "focused") {
+                          requestFocusedRunStart(
+                            pendingStart.taskFamily,
+                            pendingStart.onUnavailable
+                          );
+                          return;
+                        }
                         startSprint(
                           pendingStart.nextMode,
                           pendingStart.useCustomTiming,
                           pendingStart.practiceRunId
                         );
+                        return;
+                      }
+                      if (sessionGuidePresentation.focusedRun) {
                         return;
                       }
                       startSprint(sessionGuidePresentation.mode);
@@ -3296,14 +3633,14 @@ export function PracticePocScreen({
                 ) : null}
 
                 {!isSessionGuideVisible && !isOpenSession && state === null && (
-                  tacticalProfilePresentation?.screen !== undefined
-                  && tacticalProfilePresentation.screen !== "home"
+                  resolvedTacticalProfilePresentation?.screen !== undefined
+                  && resolvedTacticalProfilePresentation.screen !== "home"
                 ) ? (
-                  <TacticalProfileFlow presentation={tacticalProfilePresentation} />
+                  <TacticalProfileFlow presentation={resolvedTacticalProfilePresentation} />
                 ) : null}
 
                 {!isSessionGuideVisible && !isOpenSession && state === null
-                && (tacticalProfilePresentation?.screen ?? "home") === "home" && (
+                && (resolvedTacticalProfilePresentation?.screen ?? "home") === "home" && (
                   activeRunManagementPresentation?.screen === "home"
                   || (!activeRunManagementPresentation && mode !== "custom")
                 ) ? (
@@ -3320,7 +3657,7 @@ export function PracticePocScreen({
                     runManagement={activeRunManagementPresentation}
                     sprintRulesGuide={sprintRulesGuidePresentation}
                     sprintRulesGuideVisible={sprintRulesGuideVisible}
-                    tacticalProfile={tacticalProfilePresentation}
+                    tacticalProfile={resolvedTacticalProfilePresentation}
                     resumableSprint={resumableSprint}
                     onDismissSprintRulesGuide={() => {
                       setSprintRulesGuideVisible(false);
@@ -3408,7 +3745,13 @@ export function PracticePocScreen({
                         sprintRulesDesignPreview?.initialResultUnclearPrompt !== undefined
                       }
                       onToggleUnclear={toggleUnclearPrompt}
-                      onReplay={() => startSprint(mode)}
+                      onReplay={() => {
+                        if (state.config.tacticalFocus) {
+                          resetToIdle();
+                          return;
+                        }
+                        startSprint(mode);
+                      }}
                       onBack={resetToIdle}
                       onOpenHistory={() => {
                         setHistoryRatingKey(state.config.ratingKey);
@@ -3455,12 +3798,25 @@ export function PracticePocScreen({
                   systemBackCommand={reviewBackCommand}
                   onAnalysisActiveChange={setReviewAnalysisOpen}
                   onAttemptClearUnclear={clearHistoryAttemptUnclear}
+                  onBoardTouchActiveChange={setHistoryReplayBoardTouchActive}
                   onComplete={() => setHistoryReviewEntries([])}
                   onReviewEnrollmentChanged={reviewScheduleChanged}
                   onReturnToOwner={() => setHistoryReviewEntries([])}
                   reviewScheduleControlVisible
                   stockfish={stockfish}
                 />
+              ) : resolvedHistoryProgressPresentation && historyProgressOpen ? (
+                <View
+                  style={[
+                    styles.historyPanel,
+                    adaptiveLayout.usesWideContent ? styles.historyPanelWide : null
+                  ]}
+                >
+                  <HistoryProgressScreen
+                    presentation={resolvedHistoryProgressPresentation}
+                    onBack={() => setHistoryProgressOpen(false)}
+                  />
+                </View>
               ) : historyView ? (
                 <HistoryPanel
                   adaptiveLayout={adaptiveLayout}
@@ -3492,6 +3848,9 @@ export function PracticePocScreen({
                   }}
                   onSourceFilterChange={(source) => {
                     setHistorySourceFilter(source);
+                    if (source !== "sprint") {
+                      setHistoryAttentionReasons([]);
+                    }
                     setHistoryPageOffset(0);
                   }}
                   onResultFilterChange={(result) => {
@@ -3511,6 +3870,7 @@ export function PracticePocScreen({
                     setHistoryPageOffset(0);
                   }}
                   onAttentionReasonChange={(reason) => {
+                    setHistorySourceFilter("sprint");
                     setHistoryAttentionReasons((current) => current.includes(reason)
                       ? current.filter((candidate) => candidate !== reason)
                       : [...current, reason]);
@@ -3518,6 +3878,9 @@ export function PracticePocScreen({
                   }}
                   onAttentionOnlyChange={(attentionOnly) => {
                     setHistoryPageOffset(0);
+                    if (attentionOnly) {
+                      setHistorySourceFilter("sprint");
+                    }
                     setHistoryAttentionReasons((current) => attentionOnly
                       ? current.length > 0
                         ? current
@@ -3526,9 +3889,15 @@ export function PracticePocScreen({
                   }}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
+                  onOpenProgress={resolvedHistoryProgressPresentation
+                    ? () => {
+                        setHistoryFiltersExpanded(false);
+                        setHistoryProgressOpen(true);
+                      }
+                    : undefined}
                   onResetFilters={() => {
                     setHistoryTimeRange("7d");
-                    setHistorySourceFilter("all");
+                    setHistorySourceFilter("sprint");
                     setHistoryResultFilter("all");
                     setHistorySideFilter("all");
                     historyThemeChoices.dispatch({ type: "select-all-themes" });
@@ -3605,7 +3974,9 @@ export function PracticePocScreen({
                 reviewReminderPreference={reviewReminderPreference}
                 showRatingControls={!ratingEditingMovedToHome}
                 iCloudSyncEnabled={iCloudSyncEnabled}
-                iCloudSyncStatus={iCloudSyncStatus}
+                iCloudSyncErrorDetails={effectiveErrorDetails}
+                iCloudSyncStatus={iCloudSyncErrorDetails ? "iCloud sync failed" : iCloudSyncStatus}
+                iCloudSyncSupportBundle={effectiveSupportBundle}
                 moveFeedbackPreferences={moveFeedbackPreferences}
                 moveFeedbackPreviewer={moveFeedbackSettings?.preview}
                 showSprintGuideReset={
@@ -4343,6 +4714,8 @@ type SessionGuideMeasuredLayout = {
 type SessionGuideMeasuredLayoutKey =
   | "slow-callout"
   | "slow-target"
+  | "timeout-callout"
+  | "timeout-target"
   | "unclear-callout"
   | "unclear-target";
 
@@ -4358,7 +4731,8 @@ function sameSessionGuideMeasuredLayout(
 
 function sessionGuideCallout(
   mode: "standard" | "arrow_duel",
-  coachStep: number
+  coachStep: number,
+  focusedRun = false
 ): SessionGuideCallout {
   if (mode === "arrow_duel") {
     return {
@@ -4371,10 +4745,12 @@ function sessionGuideCallout(
   }
   if (coachStep === 0) {
     return {
-      badge: "SPRINT HEADER",
-      detail: "The top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide.",
+      badge: focusedRun ? "FOCUSED RUN" : "SPRINT HEADER",
+      detail: focusedRun
+        ? "The top row shows puzzles completed, time left, and Unrated status. Your Rating will not change."
+        : "The top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide.",
       id: "overview",
-      title: "Track your Sprint",
+      title: focusedRun ? "Track the fixed Run" : "Track your Sprint",
       tone: "info"
     };
   }
@@ -4390,7 +4766,9 @@ function sessionGuideCallout(
   if (coachStep === 2) {
     return {
       badge: "TIMED OUT",
-      detail: "It is added to Review. Mistakes are not marked Unclear. The Sprint then shows the next puzzle.",
+      detail: focusedRun
+        ? "It is added to Review and counts as one completed puzzle. The Focused Run then moves on."
+        : "It is added to Review. Mistakes are not marked Unclear. The Sprint then shows the next puzzle.",
       id: "timeout",
       title: "This puzzle counts as a mistake",
       tone: "danger"
@@ -4411,6 +4789,7 @@ function ActiveSessionGuide({
   coachStep,
   onBack,
   onContinue,
+  onExit,
   presentation,
   stepNumber,
   totalSteps
@@ -4420,11 +4799,13 @@ function ActiveSessionGuide({
   coachStep: number;
   onBack: () => void;
   onContinue: () => void;
+  onExit: () => void;
   presentation: SprintSessionGuidePresentation;
   stepNumber: number;
   totalSteps: number;
 }): React.JSX.Element {
   const isArrowDuel = presentation.mode === "arrow_duel";
+  const isFocusedRun = presentation.focusedRun === true;
   const guideBoardSize = adaptiveLayout.usesSessionRail
     ? boardSize
     : Math.min(
@@ -4450,10 +4831,16 @@ function ActiveSessionGuide({
     : undefined;
   const continueLabel = !isArrowDuel && (coachStep < 3 || hasNextGuide)
     ? "Next"
+    : isFocusedRun
+      ? "Start Focused Run"
     : isArrowDuel
       ? "Start Arrow Duel"
       : "Start Sprint";
-  const callout = sessionGuideCallout(presentation.mode, coachStep);
+  const callout = sessionGuideCallout(
+    presentation.mode,
+    coachStep,
+    isFocusedRun
+  );
 
   return (
     <View
@@ -4467,7 +4854,7 @@ function ActiveSessionGuide({
         style={FABRIC_SAFE_HIDDEN_TEXT_STYLE}
         testID="practice-session-guide-progress"
       >
-        GUIDE {unifiedCoachStep} OF {unifiedCoachTotal} · YOUR FIRST {isArrowDuel ? "ARROW DUEL" : "ACTIVE SPRINT"}
+        GUIDE {unifiedCoachStep} OF {unifiedCoachTotal} · YOUR FIRST {isFocusedRun ? "FOCUSED RUN" : isArrowDuel ? "ARROW DUEL" : "ACTIVE SPRINT"}
       </Text>
       <SessionCoachmarkDemo
         adaptiveLayout={adaptiveLayout}
@@ -4475,6 +4862,7 @@ function ActiveSessionGuide({
         coachStep={coachStep}
         guideNumber={unifiedCoachStep}
         mode={presentation.mode}
+        onExit={onExit}
         presentation={presentation}
       />
 
@@ -4625,6 +5013,7 @@ function SessionCoachmarkDemo({
   coachStep,
   guideNumber,
   mode,
+  onExit,
   presentation
 }: {
   adaptiveLayout: AdaptiveLayout;
@@ -4632,6 +5021,7 @@ function SessionCoachmarkDemo({
   coachStep: number;
   guideNumber: number;
   mode: "standard" | "arrow_duel";
+  onExit: () => void;
   presentation: SprintSessionGuidePresentation;
 }): React.JSX.Element {
   const isArrowDuel = mode === "arrow_duel";
@@ -4641,6 +5031,7 @@ function SessionCoachmarkDemo({
   const guideFrameRef = useRef<View>(null);
   const guideRowRef = useRef<View>(null);
   const slowTargetRef = useRef<View>(null);
+  const timeoutTargetRef = useRef<View>(null);
   const unclearTargetRef = useRef<View>(null);
   const rememberMeasuredLayout = useCallback((
     key: SessionGuideMeasuredLayoutKey,
@@ -4651,14 +5042,14 @@ function SessionCoachmarkDemo({
       : { ...current, [key]: next });
   }, []);
   const rememberCalloutLayout = useCallback((
-    key: "slow-callout" | "unclear-callout",
+    key: "slow-callout" | "timeout-callout" | "unclear-callout",
     event: LayoutChangeEvent
   ) => {
     const { height, width, x, y } = event.nativeEvent.layout;
     rememberMeasuredLayout(key, { height, width, x, y });
   }, [rememberMeasuredLayout]);
   const measureTargetInGuideFrame = useCallback((
-    key: "slow-target" | "unclear-target",
+    key: "slow-target" | "timeout-target" | "unclear-target",
     target: View | null
   ) => {
     const measurementFrame = adaptiveLayout.usesSessionRail
@@ -4694,7 +5085,21 @@ function SessionCoachmarkDemo({
     config: {
       ...defaultSprintConfig(mode),
       maxMistakes: presentation.maxMistakes,
-      targetCorrect: presentation.targetCorrect
+      targetCorrect: presentation.targetCorrect,
+      ...(presentation.focusedRun
+        ? {
+            maxAttempts: presentation.maxAttempts ?? presentation.targetCorrect,
+            ratingPolicy: "unrated" as const,
+            tacticalFocus: {
+              taskFamily: mode === "arrow_duel" ? "arrow_duel" as const : "line" as const,
+              themes: ["fork"],
+              mixedControlCount: 5,
+              ratingAnchor: 1087,
+              minRating: 987,
+              maxRating: 1187
+            }
+          }
+        : {})
     },
     correctCount: 0,
     currentPuzzle,
@@ -4723,15 +5128,21 @@ function SessionCoachmarkDemo({
         : coachStep === 3
           ? 24
           : 0;
-  const callout = sessionGuideCallout(mode, coachStep);
+  const callout = sessionGuideCallout(
+    mode,
+    coachStep,
+    presentation.focusedRun === true
+  );
   const calloutUsesBoard = adaptiveLayout.usesSessionRail
     && !isArrowDuel
     && (coachStep === 1 || coachStep === 3);
   const measuredCallout = callout.id === "slow"
     ? measuredLayouts["slow-callout"]
-    : callout.id === "unclear"
-      ? measuredLayouts["unclear-callout"]
-      : undefined;
+    : callout.id === "timeout"
+      ? measuredLayouts["timeout-callout"]
+      : callout.id === "unclear"
+        ? measuredLayouts["unclear-callout"]
+        : undefined;
   const fallbackRailTarget = callout.id === "slow"
     ? {
         height: 0,
@@ -4774,6 +5185,16 @@ function SessionCoachmarkDemo({
         target: measuredLayouts["slow-target"]
       })
     : undefined;
+  const portraitTimeoutGeometry = !adaptiveLayout.usesSessionRail
+    && callout.id === "timeout"
+    && measuredCallout
+    && measuredLayouts["timeout-target"]
+    ? buildPortraitTimeoutGuideGeometry({
+        boardTop: measuredLayouts["timeout-target"].y,
+        calloutHeight: measuredCallout.height
+      })
+    : undefined;
+  const portraitTimeoutPointerReach = portraitTimeoutGeometry?.pointerReach ?? 12;
   const arrowDuelLandscapeGeometry = isArrowDuel && adaptiveLayout.usesSessionRail
     ? buildArrowDuelLandscapeGuideGeometry(boardSize)
     : undefined;
@@ -4834,7 +5255,7 @@ function SessionCoachmarkDemo({
             : coachStep === 1
               ? portraitSlowCalloutTop ?? boardSize + 71
               : coachStep === 2
-                ? 92
+                ? portraitTimeoutGeometry?.calloutTop ?? 82
                 : boardSize + 150
             })
       };
@@ -4868,6 +5289,8 @@ function SessionCoachmarkDemo({
     : callout.tone === "danger"
       ? "#DC2626"
       : "#2563EB";
+  const usesPortraitTimeoutPointer = !adaptiveLayout.usesSessionRail
+    && callout.id === "timeout";
   const pointerTestId = `practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`;
   const pointerNode = isArrowDuel
     && adaptiveLayout.usesSessionRail
@@ -4972,6 +5395,12 @@ function SessionCoachmarkDemo({
       accessibilityElementsHidden
       style={[
         styles.sessionGuideCoachPointerBottomShape,
+        usesPortraitTimeoutPointer
+          ? {
+              bottom: -portraitTimeoutPointerReach,
+              height: portraitTimeoutPointerReach
+            }
+          : null,
         callout.id === "unclear" && !adaptiveLayout.usesSessionRail
           ? {
               left: portraitUnclearPointerLeft ?? "76%"
@@ -5036,6 +5465,8 @@ function SessionCoachmarkDemo({
         : `practice-session-guide-coach-${callout.id}`}
       onLayout={callout.id === "slow"
         ? (event) => rememberCalloutLayout("slow-callout", event)
+        : callout.id === "timeout"
+          ? (event) => rememberCalloutLayout("timeout-callout", event)
         : callout.id === "unclear"
           ? (event) => rememberCalloutLayout("unclear-callout", event)
           : undefined}
@@ -5073,18 +5504,17 @@ function SessionCoachmarkDemo({
       {!adaptiveLayout.usesSessionRail ? (
         <>
           <View
-            style={[
-              styles.sessionGuideCoachLayer,
-              !isArrowDuel && coachStep === 0 ? null : styles.sessionGuideCoachDimmed
-            ]}
+            style={styles.sessionGuideCoachLayer}
             testID="practice-session-guide-metrics"
           >
             <SessionStatusBar
+              closeAccessibilityLabel="Exit guide"
               confirmAbandon={false}
+              dimmedExceptClose={isArrowDuel || coachStep !== 0}
               mode={mode}
               state={guideState}
               timerText={presentation.durationLabel}
-              onAbandon={() => undefined}
+              onClose={onExit}
               onConfirmAbandonChange={() => undefined}
               onPause={() => undefined}
             />
@@ -5133,6 +5563,9 @@ function SessionCoachmarkDemo({
               ? "Fixed example Arrow Duel puzzle, White to move, two candidate arrows, not interactive"
               : "Fixed example chess puzzle, White to move, not interactive"}
             accessibilityRole="image"
+            ref={!isArrowDuel && !adaptiveLayout.usesSessionRail
+              ? timeoutTargetRef
+              : undefined}
             style={[
               styles.boardSurface,
               styles.sessionGuideCoachBoardSurface,
@@ -5143,6 +5576,12 @@ function SessionCoachmarkDemo({
             testID={isArrowDuel
               ? "practice-arrow-duel-guide-demo-board"
               : "practice-session-guide-demo-board"}
+            onLayout={!isArrowDuel && !adaptiveLayout.usesSessionRail
+              ? () => measureTargetInGuideFrame(
+                  "timeout-target",
+                  timeoutTargetRef.current
+                )
+              : undefined}
           >
             <View
               style={[
@@ -5251,7 +5690,10 @@ function SessionCoachmarkDemo({
                 style={styles.sessionGuideCoachDimmed}
                 testID="practice-session-guide-score"
               >
-                <SessionScoreStrip state={guideState} />
+                <SessionScoreStrip
+                  compact={adaptiveLayout.usesSessionRail}
+                  state={guideState}
+                />
               </View>
             </View>
           ) : null}
@@ -5309,19 +5751,18 @@ function SessionCoachmarkDemo({
               testID="active-session-control-rail-content"
             >
               <View
-                style={[
-                  styles.sessionGuideCoachLayer,
-                  !isArrowDuel && coachStep === 0 ? null : styles.sessionGuideCoachDimmed
-                ]}
+                style={styles.sessionGuideCoachLayer}
                 testID="practice-session-guide-metrics"
               >
                 <SessionStatusBar
+                  closeAccessibilityLabel="Exit guide"
                   compactMetrics
                   confirmAbandon={false}
+                  dimmedExceptClose={isArrowDuel || coachStep !== 0}
                   mode={mode}
                   state={guideState}
                   timerText={presentation.durationLabel}
-                  onAbandon={() => undefined}
+                  onClose={onExit}
                   onConfirmAbandonChange={() => undefined}
                   onPause={() => undefined}
                 />
@@ -5364,7 +5805,7 @@ function SessionCoachmarkDemo({
                 style={styles.sessionGuideCoachDimmed}
                 testID="practice-session-guide-score"
               >
-                <SessionScoreStrip state={guideState} />
+                <SessionScoreStrip compact state={guideState} />
               </View>
               {!isArrowDuel && coachStep === 3 ? (
                 <View
@@ -7360,44 +7801,67 @@ function PuzzleTimingIndicator({
 }
 
 function SessionStatusBar({
+  closeAccessibilityLabel = "Abandon sprint",
   compactMetrics = false,
   confirmAbandon,
+  dimmedExceptClose = false,
   mode,
   state,
   timerText,
   onAbandon,
+  onClose,
   onConfirmAbandonChange,
   onPause,
   onResume
 }: {
+  closeAccessibilityLabel?: string;
   compactMetrics?: boolean;
   confirmAbandon: boolean;
+  dimmedExceptClose?: boolean;
   mode: SprintMode;
   state: SprintState;
   timerText: string;
   onAbandon?: () => void;
+  onClose?: () => void;
   onConfirmAbandonChange: (visible: boolean) => void;
   onPause?: () => void;
   onResume?: () => void;
 }): React.JSX.Element {
+  const isTacticalFocus = state.config.tacticalFocus !== undefined;
+  const completedAttempts = state.correctCount + state.mistakeCount;
+  const plannedAttempts = state.config.maxAttempts ?? state.config.targetCorrect;
   return (
     <View style={styles.activeSessionShell} testID="active-session-shell">
       <View style={styles.sessionNavRow} testID="session-shell-nav">
-        {onAbandon ? (
+        {onClose || onAbandon ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Abandon sprint"
+            accessibilityLabel={closeAccessibilityLabel}
             testID="session-abandon"
             style={styles.sessionNavButton}
-            onPress={() => onConfirmAbandonChange(true)}
+            onPress={onClose ?? (() => onConfirmAbandonChange(true))}
           >
             <CloseGlyph />
           </Pressable>
         ) : (
           <View style={styles.sessionNavButton} />
         )}
-        <Text numberOfLines={1} style={styles.sessionNavTitle}>{modeLabel(mode)}</Text>
-        <View style={styles.sessionNavActions} testID="session-nav-actions">
+        <Text
+          numberOfLines={1}
+          style={[
+            styles.sessionNavTitle,
+            dimmedExceptClose ? styles.sessionGuideCoachDimmed : null
+          ]}
+        >
+          {isTacticalFocus ? "Focused Run" : modeLabel(mode)}
+        </Text>
+        <View
+          style={[
+            styles.sessionNavActions,
+            dimmedExceptClose ? styles.sessionGuideCoachDimmed : null
+          ]}
+          testID="session-nav-actions"
+        >
           {onPause ? (
             <Pressable
               accessibilityRole="button"
@@ -7429,17 +7893,31 @@ function SessionStatusBar({
       <View
         style={[
           styles.sessionActiveMetricRow,
-          compactMetrics ? styles.sessionActiveMetricRowCompact : null
+          compactMetrics ? styles.sessionActiveMetricRowCompact : null,
+          dimmedExceptClose ? styles.sessionGuideCoachDimmed : null
         ]}
         testID="session-status-metrics"
       >
         <View
-          accessibilityLabel={`Progress ${state.correctCount} of ${state.config.targetCorrect}`}
+          accessibilityLabel={isTacticalFocus
+            ? `Puzzles ${completedAttempts} of ${plannedAttempts}`
+            : `Progress ${state.correctCount} of ${state.config.targetCorrect}`}
           style={styles.sessionMetricBlock}
           testID="session-progress-block"
         >
-          <Text numberOfLines={1} testID="session-progress" style={styles.sessionProgressValue}>
-            {state.correctCount} / {state.config.targetCorrect}
+          <Text
+            adjustsFontSizeToFit={compactMetrics}
+            minimumFontScale={0.75}
+            numberOfLines={1}
+            testID="session-progress"
+            style={[
+              styles.sessionProgressValue,
+              compactMetrics ? styles.sessionMetricTextCompact : null
+            ]}
+          >
+            {isTacticalFocus
+              ? `${completedAttempts} / ${plannedAttempts}`
+              : `${state.correctCount} / ${state.config.targetCorrect}`}
           </Text>
         </View>
         <View
@@ -7447,25 +7925,62 @@ function SessionStatusBar({
           style={styles.sessionMetricBlock}
           testID="session-timer-block"
         >
-          <Text numberOfLines={1} testID="session-timer" style={styles.timerText}>{timerText}</Text>
+          <Text
+            adjustsFontSizeToFit={compactMetrics}
+            minimumFontScale={0.75}
+            numberOfLines={1}
+            testID="session-timer"
+            style={[
+              styles.timerText,
+              compactMetrics ? styles.sessionMetricTextCompact : null
+            ]}
+          >
+            {timerText}
+          </Text>
         </View>
-        <View
-          accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
-          style={styles.sessionMetricBlock}
-          testID="session-mistakes-block"
-        >
-          <ActiveMistakeIndicator
-            count={state.mistakeCount}
-            max={state.config.maxMistakes}
-          />
-        </View>
+        {isTacticalFocus ? (
+          <View
+            accessibilityLabel="Rating unchanged"
+            style={styles.sessionMetricBlock}
+            testID="session-rating-policy"
+          >
+            <Text
+              adjustsFontSizeToFit={compactMetrics}
+              minimumFontScale={0.75}
+              numberOfLines={1}
+              style={[
+                styles.timerText,
+                compactMetrics ? styles.sessionMetricTextCompact : null
+              ]}
+            >
+              Unrated
+            </Text>
+          </View>
+        ) : (
+          <View
+            accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
+            style={styles.sessionMetricBlock}
+            testID="session-mistakes-block"
+          >
+            <ActiveMistakeIndicator
+              count={state.mistakeCount}
+              max={state.config.maxMistakes}
+            />
+          </View>
+        )}
       </View>
 
       {confirmAbandon ? (
         <View style={styles.sessionAbandonConfirm} testID="session-abandon-confirmation">
           <View style={styles.sessionAbandonCopy}>
-            <Text style={styles.listText}>Abandon sprint?</Text>
-            <Text style={styles.helperText}>This ends the run and records a failed sprint.</Text>
+            <Text style={styles.listText}>
+              {isTacticalFocus ? "Abandon focused Run?" : "Abandon sprint?"}
+            </Text>
+            <Text style={styles.helperText}>
+              {isTacticalFocus
+                ? "This ends the focused Run. Completed puzzles stay in History and your Rating stays unchanged."
+                : "This ends the run and records a failed sprint."}
+            </Text>
           </View>
           <View style={styles.sessionAbandonActions}>
             <Pressable
@@ -7657,6 +8172,8 @@ function SprintSummary({
   onReview?: () => void;
 }): React.JSX.Element {
   const delta = (state.ratingAfter ?? state.ratingBefore) - state.ratingBefore;
+  const isTacticalFocus = state.config.tacticalFocus !== undefined;
+  const showGoalClarification = clarifyGoal && !isTacticalFocus;
   const reason = formatEndReason(state.endReason);
   const shouldPrioritizeReview = Boolean(onReview);
   const attemptCount = resultSummary?.attemptCount
@@ -7708,20 +8225,26 @@ function SprintSummary({
         >
           <ChevronGlyph direction="left" />
         </Pressable>
-        <Text style={styles.resultTopBarTitle}>Sprint Result</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="View history trends"
-          testID="sprint-result-history-button"
-          style={styles.resultTopBarIconButton}
-          onPress={onOpenHistory}
-        >
-          <ResultTrendGlyph />
-        </Pressable>
+        <Text style={styles.resultTopBarTitle}>
+          {isTacticalFocus ? "Focused Run Result" : "Sprint Result"}
+        </Text>
+        {isTacticalFocus ? (
+          <View style={styles.resultTopBarIconButton} />
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="View history trends"
+            testID="sprint-result-history-button"
+            style={styles.resultTopBarIconButton}
+            onPress={onOpenHistory}
+          >
+            <ResultTrendGlyph />
+          </Pressable>
+        )}
       </View>
 
       <View
-        style={[styles.resultHero, clarifyGoal ? styles.resultHeroClarified : null]}
+        style={[styles.resultHero, showGoalClarification ? styles.resultHeroClarified : null]}
         testID="sprint-result-hero"
       >
         <View style={styles.resultStatusBlock}>
@@ -7729,7 +8252,11 @@ function SprintSummary({
             <SprintResultStatusGlyph status={state.status === "won" ? "won" : "failed"} />
           </View>
           <View style={styles.resultTitleBlock}>
-            <Text style={styles.summaryTitle}>{state.status === "won" ? "Sprint complete" : "Sprint failed"}</Text>
+            <Text style={styles.summaryTitle}>
+              {isTacticalFocus
+                ? state.status === "won" ? "Focused Run complete" : "Focused Run ended"
+                : state.status === "won" ? "Sprint complete" : "Sprint failed"}
+            </Text>
             <Text
               accessibilityLabel={`Result: ${reason}`}
               style={styles.summaryText}
@@ -7741,14 +8268,14 @@ function SprintSummary({
         </View>
         <View style={[
           styles.resultScoreBlock,
-          clarifyGoal ? styles.resultGoalScoreBlock : null
+          showGoalClarification ? styles.resultGoalScoreBlock : null
         ]}>
-          {clarifyGoal ? (
+          {showGoalClarification ? (
             <Text style={styles.resultGoalLabel} testID="sprint-result-goal-label">
               Solve {state.config.targetCorrect} to pass
             </Text>
           ) : null}
-          {clarifyGoal ? (
+          {showGoalClarification ? (
             <Text
               accessibilityLabel={`Solved ${state.correctCount}`}
               style={styles.resultSolvedCount}
@@ -7766,7 +8293,7 @@ function SprintSummary({
             </Text>
           )}
           <Text style={styles.resultAccuracy} testID="sprint-result-accuracy">
-            {clarifyGoal ? `${attemptCount} attempted · ` : ""}
+            {showGoalClarification ? `${attemptCount} attempted · ` : ""}
             {accuracy}% Accuracy
           </Text>
         </View>
@@ -7780,21 +8307,29 @@ function SprintSummary({
         />
       ) : null}
 
-      <ResultHistoryShortcut
-        delta={delta}
-        ratingAfter={ratingAfter}
-        ratingBefore={state.ratingBefore}
-        onPress={onOpenHistory}
-      />
+      {!isTacticalFocus ? (
+        <ResultHistoryShortcut
+          delta={delta}
+          ratingAfter={ratingAfter}
+          ratingBefore={state.ratingBefore}
+          onPress={onOpenHistory}
+        />
+      ) : null}
 
       <View style={styles.resultMetricGrid}>
         <View style={styles.resultMetric} testID="sprint-result-rating-change">
-          <Text style={styles.resultMetricLabel}>Rating Change</Text>
-          <Text style={[styles.resultMetricValue, delta >= 0 ? styles.positive : styles.errorText]}>
-            {delta >= 0 ? "+" : ""}
-            {delta}
+          <Text style={styles.resultMetricLabel}>
+            {isTacticalFocus ? "Rating" : "Rating Change"}
           </Text>
-          <Text testID="sprint-result-rating-range" style={styles.resultMetricSubtext}>{`${state.ratingBefore} -> ${ratingAfter}`}</Text>
+          <Text style={[
+            styles.resultMetricValue,
+            isTacticalFocus ? styles.positive : delta >= 0 ? styles.positive : styles.errorText
+          ]}>
+            {isTacticalFocus ? "Unrated" : `${delta >= 0 ? "+" : ""}${delta}`}
+          </Text>
+          <Text testID="sprint-result-rating-range" style={styles.resultMetricSubtext}>
+            {isTacticalFocus ? `${state.ratingBefore} unchanged` : `${state.ratingBefore} -> ${ratingAfter}`}
+          </Text>
         </View>
         <View style={styles.resultMetric} testID="sprint-result-time">
           <Text style={styles.resultMetricLabel}>Time</Text>
@@ -7865,12 +8400,14 @@ function SprintSummary({
       <View style={styles.summaryRow}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Play again"
+          accessibilityLabel={isTacticalFocus ? "Back to Practice" : "Play again"}
           testID="play-again-button"
           style={shouldPrioritizeReview ? styles.secondaryButton : styles.primaryButton}
           onPress={onReplay}
         >
-          <Text style={shouldPrioritizeReview ? styles.secondaryButtonText : styles.primaryButtonText}>Play again</Text>
+          <Text style={shouldPrioritizeReview ? styles.secondaryButtonText : styles.primaryButtonText}>
+            {isTacticalFocus ? "Back to Practice" : "Play again"}
+          </Text>
         </Pressable>
       </View>
       {onReview && !shouldPrioritizeReview ? (
@@ -8100,29 +8637,73 @@ function PracticeModeGlyph({
   );
 }
 
-function SessionScoreStrip({ state }: { state: SprintState }): React.JSX.Element {
-  const leftCount = Math.max(0, state.config.targetCorrect - state.correctCount);
+function SessionScoreStrip({
+  compact = false,
+  state
+}: {
+  compact?: boolean;
+  state: SprintState;
+}): React.JSX.Element {
+  const isTacticalFocus = state.config.tacticalFocus !== undefined;
+  const completedCount = state.correctCount + state.mistakeCount;
+  const leftCount = Math.max(
+    0,
+    (isTacticalFocus
+      ? state.config.maxAttempts ?? state.config.targetCorrect
+      : state.config.targetCorrect) -
+      (isTacticalFocus ? completedCount : state.correctCount)
+  );
   return (
     <View
-      accessibilityLabel={`Session score: solved ${state.correctCount}, mistakes ${state.mistakeCount}, left ${leftCount}`}
-      style={styles.sessionScoreStrip}
+      accessibilityLabel={isTacticalFocus
+        ? `Focused Run: completed ${completedCount}, correct ${state.correctCount}, left ${leftCount}`
+        : `Session score: solved ${state.correctCount}, mistakes ${state.mistakeCount}, left ${leftCount}`}
+      style={[
+        styles.sessionScoreStrip,
+        compact ? styles.sessionScoreStripCompact : null
+      ]}
       testID="session-score-strip"
     >
-      <SessionScoreMetric label="Solved" metricTestID="session-score-solved" tone="positive" value={state.correctCount} />
-      <SessionScoreMetric label="Mistakes" metricTestID="session-score-mistakes" tone="negative" value={state.mistakeCount} />
-      <SessionScoreMetric label="Left" metricTestID="session-score-left" tone="neutral" value={leftCount} />
+      <SessionScoreMetric
+        label={isTacticalFocus ? "Completed" : "Solved"}
+        metricTestID={isTacticalFocus ? "session-score-completed" : "session-score-solved"}
+        compact={compact}
+        showLabel={isTacticalFocus}
+        tone="positive"
+        value={isTacticalFocus ? completedCount : state.correctCount}
+      />
+      <SessionScoreMetric
+        label={isTacticalFocus ? "Correct" : "Mistakes"}
+        metricTestID={isTacticalFocus ? "session-score-correct" : "session-score-mistakes"}
+        compact={compact}
+        showLabel={isTacticalFocus}
+        tone={isTacticalFocus ? "positive" : "negative"}
+        value={isTacticalFocus ? state.correctCount : state.mistakeCount}
+      />
+      <SessionScoreMetric
+        label="Left"
+        metricTestID="session-score-left"
+        compact={compact}
+        showLabel={isTacticalFocus}
+        tone="neutral"
+        value={leftCount}
+      />
     </View>
   );
 }
 
 function SessionScoreMetric({
+  compact = false,
   label,
   metricTestID,
+  showLabel = false,
   tone,
   value
 }: {
+  compact?: boolean;
   label: string;
   metricTestID: string;
+  showLabel?: boolean;
   tone: "positive" | "negative" | "neutral";
   value: number;
 }): React.JSX.Element {
@@ -8130,10 +8711,28 @@ function SessionScoreMetric({
     <View
       accessible
       accessibilityLabel={`${label} ${value}`}
-      style={styles.sessionScoreMetric}
+      style={[
+        styles.sessionScoreMetric,
+        showLabel ? styles.sessionScoreMetricLabeled : null,
+        compact ? styles.sessionScoreMetricCompact : null
+      ]}
       testID={metricTestID}
     >
-      <SessionScoreGlyph tone={tone} />
+      {showLabel ? (
+        <Text
+          adjustsFontSizeToFit={compact}
+          minimumFontScale={0.75}
+          numberOfLines={1}
+          style={[
+            styles.sessionScoreLabel,
+            compact ? styles.sessionScoreLabelCompact : null
+          ]}
+        >
+          {label}
+        </Text>
+      ) : (
+        <SessionScoreGlyph tone={tone} />
+      )}
       <Text style={styles.sessionScoreValue} testID={`${metricTestID}-value`}>{value}</Text>
     </View>
   );
@@ -8518,6 +9117,7 @@ function HistoryPanel({
   onAttentionReasonChange,
   onPageOffsetChange,
   onOpenAttempt,
+  onOpenProgress,
   onFiltersExpandedChange,
   onResetFilters,
   onAttentionOnlyChange
@@ -8550,6 +9150,7 @@ function HistoryPanel({
   onAttentionReasonChange: (reason: HistoryAttentionReason) => void;
   onPageOffsetChange: (offset: number) => void;
   onOpenAttempt: (attemptId: string) => void;
+  onOpenProgress?: () => void;
   onFiltersExpandedChange: (expanded: boolean) => void;
   onResetFilters: () => void;
   onAttentionOnlyChange: (attentionOnly: boolean) => void;
@@ -8576,6 +9177,9 @@ function HistoryPanel({
       <View style={styles.historyHeaderRow} testID="history-action-header">
         <Text style={styles.screenTitle}>History</Text>
         <View style={styles.historyHeaderActions}>
+          {onOpenProgress ? (
+            <HistoryProgressEntryButton onPress={onOpenProgress} />
+          ) : null}
           {filtersExpanded ? (
             <Pressable
               accessibilityRole="button"
@@ -8689,6 +9293,11 @@ function HistoryPanel({
           attentionOnly={attentionOnly}
           onChange={onAttentionOnlyChange}
         />
+        {attentionOnly ? (
+          <Text style={styles.helperText} testID="history-attention-explanation">
+            Needs attention shows original Sprint attempts only.
+          </Text>
+        ) : null}
       </View>
 
       {selectedRatingKey ? (
@@ -9334,7 +9943,7 @@ function HistoryAttentionFilter({
       testID="history-attention-filter"
     >
       <Pressable
-        accessibilityLabel="Needs attention: unclear or in Review"
+        accessibilityLabel="Needs attention: Sprint attempts that are unclear or in Review"
         accessibilityRole="radio"
         accessibilityState={{ checked: attentionOnly }}
         aria-checked={attentionOnly}
@@ -10459,6 +11068,7 @@ function ReviewSession({
   moveFeedbackClient,
   onAnalysisActiveChange,
   onAttemptClearUnclear,
+  onBoardTouchActiveChange,
   onComplete,
   onReviewEnrollmentChanged,
   onReturnToOwner,
@@ -10479,6 +11089,7 @@ function ReviewSession({
   moveFeedbackClient: MoveFeedbackClient | null;
   onAnalysisActiveChange?: (active: boolean) => void;
   onAttemptClearUnclear?: (attemptId: string) => void;
+  onBoardTouchActiveChange?: (active: boolean) => void;
   onComplete: (source: ReviewEntry["source"]) => void;
   onReviewEnrollmentChanged?: (clearedAttemptId?: string) => void;
   onReturnToOwner: (source: ReviewEntry["source"]) => void;
@@ -10530,6 +11141,10 @@ function ReviewSession({
   useEffect(() => {
     return () => onAnalysisActiveChange?.(false);
   }, [onAnalysisActiveChange]);
+
+  useEffect(() => {
+    return () => onBoardTouchActiveChange?.(false);
+  }, [onBoardTouchActiveChange]);
 
   function playReviewMoveFeedback(
     actor: MoveFeedbackActor,
@@ -10642,7 +11257,7 @@ function ReviewSession({
   const reviewPerPuzzleSeconds = perPuzzleSecondsForReviewEntry(currentEntry);
   const reviewCuratedThemes = currentEntry.curatedThemes;
   const reviewRemainingSeconds =
-    currentEntry.source === "due" && (!reviewResultRecorded || reviewTimedOut)
+    currentEntry.source === "due"
       ? Math.max(0, reviewPerPuzzleSeconds - Math.floor((reviewNowMs - reviewStartedAtMs) / 1000))
       : null;
   const analysisEngineLabel =
@@ -11305,7 +11920,10 @@ function ReviewSession({
           </View>
         ) : null}
         {reviewRemainingSeconds !== null ? (
-          <View style={[styles.reviewContextPill, styles.reviewTimerPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}>
+          <View
+            style={[styles.reviewContextPill, styles.reviewTimerPill, reviewRemainingSeconds === 0 ? styles.reviewContextPillDanger : null]}
+            testID="review-timer-slot"
+          >
             <Text
               numberOfLines={1}
               testID="review-timer"
@@ -11496,6 +12114,9 @@ function ReviewSession({
             accessible
             accessibilityLabel={sessionBoardAccessibilityLabel(reviewSideToMove, lastMove)}
             accessibilityRole="image"
+            onTouchCancel={() => onBoardTouchActiveChange?.(false)}
+            onTouchEnd={() => onBoardTouchActiveChange?.(false)}
+            onTouchStart={() => onBoardTouchActiveChange?.(true)}
             testID="review-board"
             style={[styles.boardSurface, { width: boardSize, height: boardSize }]}
           >
@@ -12161,7 +12782,9 @@ function SettingsPanel({
   onSaveReviewReminderPreference,
   onSyncICloudNow,
   iCloudSyncEnabled,
+  iCloudSyncErrorDetails,
   iCloudSyncStatus,
+  iCloudSyncSupportBundle,
   moveFeedbackPreferences,
   moveFeedbackPreviewer,
   notificationPermissionStatus,
@@ -12189,7 +12812,9 @@ function SettingsPanel({
   onSaveReviewReminderPreference: (preference: ReviewReminderPreference) => void;
   onSyncICloudNow: () => Promise<string>;
   iCloudSyncEnabled: boolean;
+  iCloudSyncErrorDetails?: ICloudSyncErrorDetailsPresentation;
   iCloudSyncStatus: string;
+  iCloudSyncSupportBundle?: ICloudSyncSupportBundlePresentation;
   moveFeedbackPreferences: MoveFeedbackPreferences;
   moveFeedbackPreviewer?: MoveFeedbackPreviewer;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
@@ -12238,16 +12863,21 @@ function SettingsPanel({
             />
           </View>
           {iCloudSyncEnabled ? (
-            <SettingsActionRow
-              label="Sync Now"
-              detail="Merge ratings, history, and review queue with your private iCloud."
-              testID="settings-sync-now"
-              onPress={() => {
-                void onSyncICloudNow().then((message) => {
-                  setStatusMessage(message);
-                });
-              }}
-            />
+            <>
+              <SettingsActionRow
+                label="Sync Now"
+                detail="Merge ratings, history, and review queue with your private iCloud."
+                testID="settings-sync-now"
+                onPress={() => {
+                  void onSyncICloudNow().then((message) => {
+                    setStatusMessage(message);
+                  });
+                }}
+              />
+              {iCloudSyncErrorDetails ? (
+                <ICloudSyncErrorDetails presentation={iCloudSyncErrorDetails} />
+              ) : null}
+            </>
           ) : null}
         </SettingsSection>
       ) : (
@@ -12420,6 +13050,9 @@ function SettingsPanel({
       <FeedbackSupportCard
         feedbackIssuesUrl={applicationMetadata.feedbackIssuesUrl}
         openFeedbackIssues={feedbackIssuesOpener}
+        supportBundle={iCloudSyncSupportBundle}
+        supportEmail={applicationMetadata.supportEmail}
+        supportEmailUrl={applicationMetadata.supportEmailUrl}
         wide={adaptiveLayout.usesWideContent}
       />
 
@@ -12483,16 +13116,6 @@ function SettingsPanel({
             void Linking.openURL(LICHESS_PUZZLE_DATABASE_URL);
           }}
         />
-        <SettingsExternalLinkRow
-          label="Support"
-          value="Email"
-          detail="Private questions and account support"
-          linkLabel={applicationMetadata.supportEmail}
-          testID="settings-support-email"
-          onPress={() => {
-            void Linking.openURL(applicationMetadata.supportEmailUrl);
-          }}
-        />
       </SettingsSection>
 
       {statusMessage ? <Text style={styles.settingsStatusText} testID="settings-status-message">{statusMessage}</Text> : null}
@@ -12514,10 +13137,16 @@ function SettingsPanel({
 function FeedbackSupportCard({
   feedbackIssuesUrl,
   openFeedbackIssues,
+  supportBundle,
+  supportEmail,
+  supportEmailUrl,
   wide
 }: {
   feedbackIssuesUrl: string;
   openFeedbackIssues: (url: string) => Promise<void>;
+  supportBundle?: ICloudSyncSupportBundlePresentation;
+  supportEmail: string;
+  supportEmailUrl: string;
   wide: boolean;
 }): React.JSX.Element {
   const [confirmationVisible, setConfirmationVisible] = useState(false);
@@ -12583,6 +13212,19 @@ function FeedbackSupportCard({
           You will review and submit your issue on GitHub.
         </Text>
       </View>
+      {supportBundle ? (
+        <ICloudSyncSupportDiagnosticsEntry presentation={supportBundle} />
+      ) : null}
+      <SettingsExternalLinkRow
+        label="Email Support"
+        value="Email"
+        detail="Private questions and account support"
+        linkLabel={supportEmail}
+        testID="settings-support-email"
+        onPress={() => {
+          void Linking.openURL(supportEmailUrl);
+        }}
+      />
       {confirmationVisible ? (
         <Modal
           animationType="fade"
@@ -13900,6 +14542,9 @@ function formatEndReason(reason: SprintState["endReason"]): string {
   if (reason === "target_reached") {
     return "Target reached";
   }
+  if (reason === "attempt_limit") {
+    return "Planned puzzles complete";
+  }
   if (reason === "max_mistakes") {
     return "Three mistakes";
   }
@@ -14540,7 +15185,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     gap: 12,
     overflow: "hidden",
-    pointerEvents: "none",
+    pointerEvents: "box-none",
     position: "relative",
     width: "100%"
   },
@@ -15901,6 +16546,10 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
     letterSpacing: 0.2
   },
+  sessionMetricTextCompact: {
+    fontSize: 16,
+    letterSpacing: 0
+  },
   puzzleTimingIndicator: {
     alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, 0.94)",
@@ -16023,7 +16672,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    minHeight: 72,
+    height: 72,
     paddingHorizontal: 12,
     paddingVertical: 9
   },
@@ -16144,12 +16793,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7
   },
+  sessionScoreStripCompact: {
+    paddingHorizontal: 4
+  },
   sessionScoreMetric: {
     alignItems: "center",
     flex: 1,
     flexDirection: "row",
     gap: 8,
     justifyContent: "center"
+  },
+  sessionScoreMetricLabeled: {
+    flexDirection: "column",
+    gap: 1
+  },
+  sessionScoreMetricCompact: {
+    gap: 2,
+    minWidth: 0
+  },
+  sessionScoreLabel: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.25,
+    lineHeight: 12,
+    textTransform: "uppercase"
+  },
+  sessionScoreLabelCompact: {
+    fontSize: 9,
+    letterSpacing: 0
   },
   sessionScoreIcon: {
     alignItems: "center",

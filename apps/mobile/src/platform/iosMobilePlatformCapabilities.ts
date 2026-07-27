@@ -1,10 +1,12 @@
 // Mobile platform composition belongs outside the backend/domain seam.
 import type { PracticeService } from '../../../../packages/storage/src/practice-service.ts';
 import { createNativeICloudProgressSyncClient } from './iCloudProgressSync.ts';
+import { createNativeICloudSyncDiagnosticsClient } from './iCloudSyncDiagnostics.ts';
 import {
   configureMobilePracticePuzzleSource,
   createPersistentMobilePracticeService,
   createPersistentMobilePracticeServiceSync,
+  getPersistentMobileProgressDatabasePath,
 } from './mobilePractice.ts';
 import {
   type MobileApplicationMetadata,
@@ -49,6 +51,9 @@ export function composeIOSMobilePlatformCapabilities(
     },
     progressSync: {
       client: createNativeICloudProgressSyncClient(),
+      diagnostics: createNativeICloudSyncDiagnosticsClient(
+        getPersistentMobileProgressDatabasePath(),
+      ),
     },
     stockfish: {
       createTransport: createNativeStockfishTransport,

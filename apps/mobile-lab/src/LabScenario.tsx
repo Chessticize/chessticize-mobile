@@ -1,8 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
-import type { AttemptEvent, SprintMode, SprintState } from "../../../packages/core/src/index.ts";
-import { defaultSprintConfig } from "../../../packages/core/src/index.ts";
+import type {
+  AttemptEvent,
+  Puzzle,
+  SprintMode,
+  SprintState,
+  TacticalProfileCalibrationArtifact,
+  TacticalProfileTaskFamily
+} from "../../../packages/core/src/index.ts";
+import {
+  beginArrowDuelPuzzle,
+  defaultSprintConfig,
+  startSprint
+} from "../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../packages/storage/src/memory-store.ts";
 import { PracticeService } from "../../../packages/storage/src/practice-service.ts";
+import { MemoryTacticalProfileRepository } from "../../../packages/storage/src/tactical-profile-repository.ts";
+import { TacticalProfileService } from "../../../packages/storage/src/tactical-profile-service.ts";
 import { PracticePocScreen } from "../../mobile/src/components/PracticePocScreen.tsx";
 import type { MobilePlatformCapabilities } from "../../mobile/src/platform/mobilePlatformCapabilities.ts";
 import type {
@@ -22,6 +35,10 @@ import {
 import { previewBrowserMoveFeedback } from "./browserMoveFeedbackPreview.ts";
 import { clearLabPracticeService, setLabPracticeService } from "./boardController.ts";
 import { ISSUE_272_LAB_PUZZLE, LAB_PUZZLES, PRIMARY_LAB_PUZZLE } from "./labPuzzles.ts";
+import {
+  createLabICloudSyncDiagnosticsClient,
+  labMobilePlatformForScenario
+} from "./labICloudSyncDiagnostics.ts";
 import { scenarioRegistry, type LabScenarioId } from "./scenarioRegistry.ts";
 import {
   SERVER_CURATED_THEME_PRESENTATION,
@@ -33,6 +50,10 @@ import {
   reduceTacticalProfileFixtureState,
   tacticalProfilePresentationFor
 } from "./tacticalProfileFixture.ts";
+import {
+  historyProgressPresentationFor,
+  isHistoryProgressScenario
+} from "./historyProgressFixture.ts";
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
 
@@ -63,8 +84,11 @@ function LabScenarioContent({
       ? initialTacticalProfileFixtureState(scenarioId)
       : { screen: "home" as const, selectedTaskFamily: "line" as const }
   );
-  const showsThemeCatalogPrototype = isRunManagementScenario(scenarioId) || [
-    "history-populated",
+  const [startedFocusedRun, setStartedFocusedRun] = useState<SprintState | null>(null);
+  const showsThemeCatalogPrototype =
+    isRunManagementScenario(scenarioId)
+    || isHistoryProgressScenario(scenarioId)
+    || [
     "history-filters",
     "history-attempt-detail"
   ].includes(scenarioId);
@@ -80,33 +104,58 @@ function LabScenarioContent({
   useEffect(() => {
     if (isTacticalProfileScenario(scenarioId)) {
       setTacticalProfileState(initialTacticalProfileFixtureState(scenarioId));
+      setStartedFocusedRun(null);
     }
   }, [scenarioId]);
 
   const tacticalProfilePresentation = isTacticalProfileScenario(scenarioId)
+    && startedFocusedRun === null
     ? tacticalProfilePresentationFor(
         scenarioId,
         tacticalProfileState,
-        (intent) => setTacticalProfileState((current) =>
-          reduceTacticalProfileFixtureState(current, intent)
-        )
+        (intent) => {
+          if (intent.type === "start-focused-run") {
+            setStartedFocusedRun(runtime.service.startFocusedRun(
+              tacticalProfileState.selectedTaskFamily,
+              new Date(LAB_NOW_MS).toISOString(),
+              `interaction-lab-focused-run-${tacticalProfileState.selectedTaskFamily}`
+            ));
+          }
+          setTacticalProfileState((current) =>
+            reduceTacticalProfileFixtureState(current, intent)
+          );
+        }
       )
     : undefined;
+  const screenProps = startedFocusedRun === null
+    ? runtime.screenProps
+    : {
+        ...runtime.screenProps,
+        sprintRulesDesignPreview: {
+          initialActiveState: startedFocusedRun
+        }
+      };
 
   return (
     <LabScenarioShell scenarioId={scenarioId}>
       <PracticePocScreen
+        key={startedFocusedRun === null
+          ? `scenario-${scenarioId}`
+          : `tactical-focus-active-${startedFocusedRun.id}`}
         customThemeSelection={{
           selectedThemes: selectedCustomThemes,
           onChange: setSelectedCustomThemes
         }}
+        historyProgressPresentation={isHistoryProgressScenario(scenarioId)
+          ? historyProgressPresentationFor(scenarioId)
+          : undefined}
         platformCapabilities={runtime.platformCapabilities}
         themeCatalogPresentation={showsThemeCatalogPrototype
           ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
         runEloEditingMovedToHome
         tacticalProfilePresentation={tacticalProfilePresentation}
-        {...runtime.screenProps}
+        {...screenProps}
       />
     </LabScenarioShell>
   );
@@ -159,18 +208,34 @@ function sprintRulesDesignPreviewFor(
   ) {
     const sharedGuide = {
       durationLabel: "5:00",
+      guideKey: "active_session" as const,
       maxMistakes: 3,
       mode: "standard" as const,
       targetCorrect: 15
     };
     const arrowDuelGuide = {
       ...sharedGuide,
+      guideKey: "arrow_duel" as const,
       mode: "arrow_duel" as const
     };
     return {
       initialSessionGuides: scenarioId === "practice-arrow-duel-guide"
         ? [sharedGuide, arrowDuelGuide]
         : [scenarioId === "practice-arrow-duel-guide-only" ? arrowDuelGuide : sharedGuide],
+      timeoutCountsAsMistake: true
+    };
+  }
+  if (scenarioId === "practice-tactical-focus-guide") {
+    return {
+      initialSessionGuides: [{
+        durationLabel: "5:00",
+        focusedRun: true,
+        guideKey: "focused_run",
+        maxAttempts: 15,
+        maxMistakes: 15,
+        mode: "standard",
+        targetCorrect: 15
+      }],
       timeoutCountsAsMistake: true
     };
   }
@@ -210,6 +275,40 @@ function sprintRulesDesignPreviewFor(
       }
     };
   }
+  if (scenarioId === "practice-tactical-focus-active") {
+    return {
+      initialActiveState: tacticalFocusActiveState()
+    };
+  }
+  if (scenarioId === "practice-tactical-focus-result") {
+    const initialResultState = sprintRulesResultState({
+      correctCount: 13,
+      endReason: "attempt_limit",
+      mistakeCount: 2,
+      ratingAfter: 1087,
+      status: "won"
+    });
+    return {
+      initialResultState: {
+        ...initialResultState,
+        config: {
+          ...initialResultState.config,
+          targetCorrect: 15,
+          maxMistakes: 15,
+          maxAttempts: 15,
+          ratingPolicy: "unrated",
+          tacticalFocus: {
+            taskFamily: "line",
+            themes: ["fork"],
+            mixedControlCount: 5,
+            ratingAnchor: 1087,
+            minRating: 987,
+            maxRating: 1187
+          }
+        }
+      }
+    };
+  }
   if (scenarioId === "settings-sprint-guidance") {
     return { showSettingsReset: true };
   }
@@ -217,6 +316,64 @@ function sprintRulesDesignPreviewFor(
     return { firstRunGuide, timeoutCountsAsMistake: true };
   }
   return undefined;
+}
+
+function tacticalFocusActiveState(
+  taskFamily: TacticalProfileTaskFamily = "line"
+): SprintState {
+  const startedAt = new Date(LAB_NOW_MS - 2 * 60 * 1000).toISOString();
+  const deadlineAt = new Date(LAB_NOW_MS + 3 * 60 * 1000).toISOString();
+  const puzzles = Array.from({ length: 15 }, (_, index) => {
+    const puzzle = LAB_PUZZLES[index % LAB_PUZZLES.length]!;
+    return {
+      ...puzzle,
+      id: `tactical-focus-${index + 1}-${puzzle.id}`
+    };
+  });
+  const activePuzzle = puzzles[10]!;
+  const isArrowDuel = taskFamily === "arrow_duel";
+  const currentPuzzle = isArrowDuel
+    ? beginArrowDuelPuzzle(activePuzzle, "tactical-focus-active")
+    : {
+        autoPlayedMoves: [activePuzzle.solutionMoves[0]!],
+        currentFen: "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2",
+        cursor: 1,
+        kind: "line" as const,
+        playedMoves: [],
+        puzzle: activePuzzle,
+        solved: false
+      };
+  const ratingAnchor = isArrowDuel ? 875 : 1087;
+  return {
+    bestStreak: 4,
+    config: {
+      ...defaultSprintConfig(isArrowDuel ? "arrow_duel" : "standard"),
+      maxAttempts: 15,
+      maxMistakes: 15,
+      ratingPolicy: "unrated",
+      tacticalFocus: {
+        taskFamily,
+        themes: [isArrowDuel ? "pin" : "fork"],
+        mixedControlCount: 5,
+        ratingAnchor,
+        minRating: ratingAnchor - 100,
+        maxRating: ratingAnchor + 100
+      },
+      targetCorrect: 15
+    },
+    correctCount: 8,
+    currentPuzzle,
+    currentPuzzleIndex: 10,
+    currentStreak: 2,
+    deadlineAt,
+    hasUserSubmittedMove: false,
+    id: "tactical-focus-active",
+    mistakeCount: 2,
+    puzzles,
+    ratingBefore: ratingAnchor,
+    startedAt,
+    status: "active"
+  };
 }
 
 function sprintRulesResultState({
@@ -227,7 +384,7 @@ function sprintRulesResultState({
   status
 }: {
   correctCount: number;
-  endReason: "target_reached" | "time_expired";
+  endReason: "attempt_limit" | "target_reached" | "time_expired";
   mistakeCount: number;
   ratingAfter: number;
   status: "failed" | "won";
@@ -298,12 +455,58 @@ export function LabScenarioShell({
   );
 }
 
+function iCloudSyncErrorDetailsPresentation(
+  bundleKind: "complete" | "partial"
+): NonNullable<ScreenProps["iCloudSyncErrorDetails"]> {
+  return {
+    copyText: [
+      "Chessticize iCloud Sync Diagnostic",
+      "App: 1.2.2 (38)",
+      "Failed at: 2026-07-26T16:42:00.000Z",
+      "Sync attempt: Manual",
+      "Phase: Fetch from iCloud",
+      "Code: icloud_fetch_failed",
+      "Domain: CKErrorDomain",
+      "Message: The request was rate limited. Please try again later.",
+      "Retry after: 12 seconds"
+    ].join("\n"),
+    message: "The request was rate limited. Please try again later.",
+    occurredAtLabel: "Jul 26, 2026 at 9:42 AM",
+    onCopy: async () => {},
+    supportBundle: {
+      onPrepare: async () => bundleKind === "complete"
+        ? {
+            kind: "complete",
+            files: [
+              "local-progress.sqlite",
+              "icloud-progress-snapshot.json",
+              "diagnostic.txt",
+              "manifest.json"
+            ]
+          }
+        : {
+            kind: "partial",
+            files: [
+              "local-progress.sqlite",
+              "diagnostic.txt",
+              "manifest.json"
+            ],
+            unavailableReason: "CloudKit snapshot unavailable: The request was rate limited."
+          },
+      onShare: async () => {}
+    }
+  };
+}
+
 function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
   let service = createSeededService();
   let configurePuzzleSource = true;
   let notificationStatus: ReviewReminderPermissionStatus = "authorized";
-  let reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"] = "ios";
-  let progressProtection: MobilePlatformCapabilities["progressProtection"] = { kind: "icloud_sync" };
+  const reminderPlatform = labMobilePlatformForScenario(scenarioId);
+  const progressProtection: MobilePlatformCapabilities["progressProtection"] =
+    reminderPlatform === "ios"
+      ? { kind: "icloud_sync" }
+      : { kind: "android_managed_backup" };
   const screenProps: ScreenProps = {
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
@@ -314,10 +517,12 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     customTargetCorrect: 1
   };
   if (isRunManagementScenario(scenarioId)) {
-    service = createRunManagementService(
-      scenarioId === "practice-runs-empty",
-      scenarioId === "practice-home" ? 28 : 0
-    );
+    service = isTacticalProfileScenario(scenarioId)
+      ? createTacticalProfileLabService()
+      : createRunManagementService(
+          scenarioId === "practice-runs-empty",
+          scenarioId === "practice-home" ? 28 : 0
+        );
     screenProps.runManagementEnabled = true;
   }
 
@@ -364,21 +569,30 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "history-populated":
     case "history-filters":
     case "history-attempt-detail":
+    case "history-progress":
+    case "history-progress-weakness":
+    case "history-progress-speed-weakness":
       service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
       configurePuzzleSource = false;
       break;
     case "history-replay-unavailable":
       service = createHistoryService(true);
       break;
-    case "settings-android-backup":
-      reminderPlatform = "android";
-      progressProtection = { kind: "android_managed_backup" };
-      break;
     case "settings-ios-sync":
       notificationStatus = "not_determined";
       screenProps.moveFeedbackSettings = {
         preview: previewBrowserMoveFeedback
       };
+      break;
+    case "settings-ios-sync-error-details":
+      screenProps.iCloudSyncErrorDetails = iCloudSyncErrorDetailsPresentation("complete");
+      break;
+    case "settings-ios-sync-support-bundle":
+      screenProps.iCloudSyncSupportBundle =
+        iCloudSyncErrorDetailsPresentation("complete").supportBundle;
+      break;
+    case "settings-ios-sync-support-bundle-partial":
+      screenProps.iCloudSyncErrorDetails = iCloudSyncErrorDetailsPresentation("partial");
       break;
     case "settings-notifications-denied":
       notificationStatus = "denied";
@@ -433,8 +647,19 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     progressProtection,
     iCloudProgressSyncClient: reminderPlatform === "ios"
       ? new FakeICloudProgressSyncClient(undefined, "no_account")
-      : null
+      : null,
+    iCloudSyncDiagnosticsClient: createLabICloudSyncDiagnosticsClient(reminderPlatform)
   };
+  if (
+    scenarioId === "settings-ios-sync-error-details"
+    || scenarioId === "settings-ios-sync-support-bundle"
+    || scenarioId === "settings-ios-sync-support-bundle-partial"
+  ) {
+    capabilityOverrides.applicationMetadata = {
+      versionName: "1.2.2",
+      buildNumber: "38"
+    };
+  }
   if (configurePuzzleSource) {
     capabilityOverrides.configurePuzzleSource = (
       currentService: PracticeService,
@@ -537,6 +762,11 @@ function createRunManagementService(empty: boolean, dueReviewCount = 0): Practic
     }, "2026-07-17T12:00:00.000Z");
   }
   const service = new PracticeService(store);
+  seedRunManagementCatalog(service, empty);
+  return service;
+}
+
+function seedRunManagementCatalog(service: PracticeService, empty: boolean): void {
   service.setPracticeRunRating("standard", 925);
   service.setPracticeRunRating("arrow-duel", 875);
   service.createPracticeRun({
@@ -562,7 +792,224 @@ function createRunManagementService(empty: boolean, dueReviewCount = 0): Practic
       service.archivePracticeRun(run.id, new Date(LAB_NOW_MS + index).toISOString());
     }
   }
+}
+
+function createTacticalProfileLabService(): PracticeService {
+  const store = new MemoryStore();
+  const linePuzzles = tacticalProfileLabPuzzles("line", 925);
+  const arrowDuelPuzzles = tacticalProfileLabPuzzles("arrow_duel", 875);
+  store.seedPuzzles([...LAB_PUZZLES, ...linePuzzles, ...arrowDuelPuzzles]);
+  seedTacticalProfileRating(store, "line", 925);
+  seedTacticalProfileRating(store, "arrow_duel", 875);
+  seedTacticalProfileHistory(store, "line", linePuzzles, 925);
+  seedTacticalProfileHistory(store, "arrow_duel", arrowDuelPuzzles, 875);
+
+  const service = new PracticeService(
+    store,
+    new TacticalProfileService({
+      progressStore: store,
+      puzzleSource: store,
+      repository: new MemoryTacticalProfileRepository(),
+      calibration: LAB_TACTICAL_PROFILE_CALIBRATION,
+      naturalFrequency: {
+        line: { fork: 0.12, sacrifice: 0.12 },
+        arrow_duel: { pin: 0.12, deflection: 0.12 }
+      },
+      focusedRunPolicy: {
+        runSize: 15,
+        recentPuzzleDays: 30,
+        ratingBandHalfWidths: [100, 200]
+      }
+    })
+  );
+  seedRunManagementCatalog(service, false);
   return service;
+}
+
+function tacticalProfileLabPuzzles(
+  taskFamily: TacticalProfileTaskFamily,
+  rating: number
+): Puzzle[] {
+  const prefix = taskFamily === "line" ? "line" : "arrow";
+  const focusTheme = taskFamily === "line" ? "fork" : "pin";
+  const mixedTheme = taskFamily === "line" ? "sacrifice" : "deflection";
+  return Array.from({ length: 36 }, (_, index) => ({
+    id: `tactical-profile-${prefix}-${index + 1}`,
+    initialFen: tacticalProfileLabFen(index),
+    solutionMoves: ["e8d7", "e2e4"],
+    rating,
+    ratingDeviation: 80,
+    themes: [index < 24 ? focusTheme : mixedTheme],
+    source: "synthetic",
+    stockfishEval: 180,
+    stockfishBestMove: "e8f7",
+    stockfishEvalAfterFirstMove: -220
+  }));
+}
+
+function tacticalProfileLabFen(index: number): string {
+  const optionalPawnFiles = [0, 1, 2, 6, 7];
+  const rank = Array.from({ length: 8 }, () => "");
+  for (const [bit, file] of optionalPawnFiles.entries()) {
+    if ((index % 32) & (1 << bit)) {
+      rank[file] = "p";
+    }
+  }
+  let compressedRank = "";
+  let emptyCount = 0;
+  for (const square of rank) {
+    if (square === "") {
+      emptyCount += 1;
+      continue;
+    }
+    if (emptyCount > 0) {
+      compressedRank += String(emptyCount);
+      emptyCount = 0;
+    }
+    compressedRank += square;
+  }
+  if (emptyCount > 0) {
+    compressedRank += String(emptyCount);
+  }
+  return `4k3/${compressedRank}/8/8/8/8/4P3/4K3 b - - 0 1`;
+}
+
+function seedTacticalProfileRating(
+  store: MemoryStore,
+  taskFamily: TacticalProfileTaskFamily,
+  rating: number
+): void {
+  const config = defaultSprintConfig(taskFamily === "line" ? "standard" : "arrow_duel");
+  store.saveRating({
+    key: config.ratingKey,
+    generation: 0,
+    rating,
+    ratingDeviation: 80,
+    volatility: 0.06,
+    games: 12
+  });
+}
+
+function seedTacticalProfileHistory(
+  store: MemoryStore,
+  taskFamily: TacticalProfileTaskFamily,
+  puzzles: readonly Puzzle[],
+  rating: number
+): void {
+  const mode = taskFamily === "line" ? "standard" : "arrow_duel";
+  const config = defaultSprintConfig(mode);
+  for (let sessionIndex = 0; sessionIndex < 3; sessionIndex += 1) {
+    const day = 1 + sessionIndex * 4;
+    const startedAt = `2026-07-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+    const completedAt = `2026-07-${String(day).padStart(2, "0")}T00:04:00.000Z`;
+    const sessionPuzzles = puzzles.slice(sessionIndex * 4, sessionIndex * 4 + 4);
+    const session = startSprint({
+      id: `tactical-profile-${taskFamily}-session-${sessionIndex}`,
+      config,
+      puzzles: [...sessionPuzzles],
+      ratingBefore: rating,
+      now: startedAt
+    });
+    store.createSprintSession({
+      ...session,
+      status: "failed",
+      completedAt,
+      endReason: "max_mistakes",
+      correctCount: 0,
+      mistakeCount: 4,
+      ratingAfter: rating
+    });
+    for (const [offset, puzzle] of sessionPuzzles.entries()) {
+      store.recordAttempt({
+        id: `tactical-profile-${taskFamily}-attempt-${sessionIndex}-${offset}`,
+        source: "sprint",
+        sessionId: session.id,
+        puzzleId: puzzle.id,
+        mode,
+        ratingKey: config.ratingKey,
+        result: "wrong",
+        submittedMove: taskFamily === "line" ? "e2e3" : puzzle.solutionMoves[0]!,
+        expectedMove: taskFamily === "line"
+          ? puzzle.solutionMoves[1]!
+          : puzzle.stockfishBestMove!,
+        ...(taskFamily === "line"
+          ? {}
+          : {
+              arrowDuelCandidateOrder: [
+                puzzle.stockfishBestMove!,
+                puzzle.solutionMoves[0]!
+              ]
+            }),
+        startedAt: completedAt,
+        completedAt,
+        elapsedMs: 10_000,
+        ratingBefore: rating
+      });
+    }
+  }
+}
+
+const LAB_TACTICAL_PROFILE_CALIBRATION = {
+  schemaVersion: 1,
+  modelVersion: "interaction-lab-tactical-profile-v1",
+  calibrationId: "interaction-lab-tactical-profile",
+  packFeatureHash: "interaction-lab-pack-rd",
+  createdAt: "2026-07-01T00:00:00.000Z",
+  provenance: {
+    inputSchemaVersion: 1,
+    policyId: "interaction-lab-policy",
+    policyHash: `sha256:${"1".repeat(64)}`,
+    corpusHash: `sha256:${"2".repeat(64)}`,
+    reportHash: `sha256:${"3".repeat(64)}`,
+    decisionEvidenceId: "interaction-lab-decisions",
+    representativeOwnerApproved: true,
+    familyReadiness: {
+      line: { ready: true, reasons: [] },
+      arrow_duel: { ready: true, reasons: [] }
+    }
+  },
+  recencyHalfLifeDays: 90,
+  evidence: {
+    watchProbability: 0.75,
+    recommendationExitProbability: 0.85,
+    recommendationProbability: 0.9,
+    strongProbability: 0.97,
+    minDistinctPuzzles: 4,
+    minDistinctSessions: 2
+  },
+  opportunity: {
+    minimumWeight: 0.25,
+    exponent: 0.5
+  },
+  families: {
+    line: tacticalProfileCalibratedFamily(),
+    arrow_duel: tacticalProfileCalibratedFamily()
+  }
+} as const satisfies TacticalProfileCalibrationArtifact;
+
+function tacticalProfileCalibratedFamily() {
+  return {
+    status: "calibrated",
+    solve: {
+      intercept: 0,
+      ratingGapSlope: 1,
+      timeoutLogCoefficient: 0,
+      timeoutReferenceSeconds: 60,
+      themePriorSdRating: 100,
+      practicalDeficitRating: 20,
+      minExpectedFailuresPer100: 2
+    },
+    speed: {
+      interceptLogSeconds: Math.log(30),
+      relativeDifficultyCoefficient: 0,
+      decisionCountCoefficient: 0,
+      paceLogCoefficient: 0,
+      slowPolicyLogCoefficient: 0,
+      residualSd: 0.25,
+      themePriorSdLogSeconds: 0.5,
+      practicalTimeMultiplier: 1.2
+    }
+  } as const;
 }
 
 function createIssue272Service(withDueReview: boolean): PracticeService {

@@ -107,7 +107,10 @@ export function createNativeICloudProgressSyncClient(): ICloudProgressSyncClient
         }
       } catch (error) {
         if (isNativeConflictError(error)) {
-          throw new ProgressSyncConflictError();
+          throw Object.assign(new ProgressSyncConflictError(), {
+            code: "icloud_save_conflict",
+            domain: "CloudKit"
+          });
         }
         throw error;
       }

@@ -31,10 +31,10 @@ function tableValue(field) {
 
 describe("App Store assets document", () => {
   it("tracks the current public release and its customer-facing additions", () => {
-    expect(storeAssetsDoc).toContain("1.2 source of truth");
-    expect(storeAssetsDoc).toContain("Customizable Home screen Practice Runs");
-    expect(storeAssetsDoc).toContain("Curated puzzle themes with multi-theme selection");
-    expect(storeAssetsDoc).toContain("Clear side-to-move");
+    expect(storeAssetsDoc).toContain("1.3 source of truth");
+    expect(storeAssetsDoc).toContain("Tactical Profiles");
+    expect(storeAssetsDoc).toContain("Focused Practice Runs");
+    expect(storeAssetsDoc).toContain("Configurable puzzle timing");
   });
 
   it("keeps required metadata inside App Store Connect limits", () => {
@@ -96,7 +96,8 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("by.id('practice-run-theme-row')");
     expect(storeAssetsE2e).not.toContain("by.id('custom-theme-row')");
     expect(storeAssetsE2e).toContain("toHaveText('1 / 3')");
-    expect(storeAssetsE2e).toContain("by.text('1-4 of 4')");
+    expect(storeAssetsE2e).toContain("openTab('history-tab', 'history-filter-toggle')");
+    expect(storeAssetsE2e).toContain("by.id('history-page-next')");
     expect(storeAssetsE2e).toContain("app-store-01-practice-tab");
     expect(storeAssetsE2e).toContain("app-store-06-arrow-duel");
     expect(storeAssetsE2e).toContain("app-store-07-custom-setup");

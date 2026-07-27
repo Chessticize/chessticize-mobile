@@ -77,14 +77,14 @@ test("the issue #272 preview hands the board to White after the blunder", () => 
   assert.equal(chess.fen(), "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2");
 });
 
-test("Issue #247 stays on the existing Settings product clone with its approved scope", () => {
+test("the closed Issue #247 clone keeps its approved Settings scope without a new marker", () => {
   assert.deepEqual(
     newScenarios
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 247))
       .map((scenario) => scenario.id),
-    ["settings-ios-sync"]
+    []
   );
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), []);
   assert.deepEqual(scenarioRegistry["settings-ios-sync"].scope.includes, [
     "iCloud Sync",
     "Notifications",
@@ -98,26 +98,63 @@ test("Issue #247 stays on the existing Settings product clone with its approved 
   );
 });
 
-test("Issue #250 owns the complete Tactical Profile design state set", () => {
+test("the closed Issue #353 scenarios keep their stable URLs without new markers", () => {
   assert.deepEqual(
     newScenarios
-      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 250))
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 353))
       .map((scenario) => scenario.id),
-    [
-      "practice-tactical-profile-building",
-      "practice-tactical-profile-collecting",
-      "practice-tactical-profile-balanced",
-      "practice-tactical-profile-solve-rate",
-      "practice-tactical-profile-speed",
-      "practice-tactical-profile-ranked",
-      "practice-tactical-profile-task-families-home",
-      "practice-tactical-profile-task-families",
-      "practice-tactical-profile-limited-inventory",
-      "practice-tactical-profile-explanation",
-      "practice-tactical-profile-focused-run",
-      "practice-tactical-profile-suppressed"
-    ]
+    []
   );
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-error-details"), []);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle"), []);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle-partial"), []);
+  assert.equal(
+    scenarioRegistry["settings-ios-sync-error-details"].storyId,
+    "settings--i-cloud-sync-error-details"
+  );
+  assert.equal(
+    scenarioRegistry["settings-ios-sync-support-bundle"].storyId,
+    "settings--i-cloud-sync-support-bundle"
+  );
+  assert.equal(
+    scenarioRegistry["settings-ios-sync-support-bundle-partial"].storyId,
+    "settings--i-cloud-sync-support-bundle-partial"
+  );
+  assert.ok(
+    scenarioRegistry["settings-ios-sync-support-bundle"].scope.includes.includes(
+      "Help & Feedback placement"
+    )
+  );
+  assert.ok(
+    scenarioRegistry["settings-ios-sync-support-bundle-partial"].scope.includes.includes(
+      "Explicit partial-bundle warning"
+    )
+  );
+});
+
+test("the closed Issue #250 state set stays complete without new markers", () => {
+  const tacticalScenarioIds = [
+    "practice-tactical-profile-building",
+    "practice-tactical-profile-collecting",
+    "practice-tactical-profile-balanced",
+    "practice-tactical-profile-solve-rate",
+    "practice-tactical-profile-speed",
+    "practice-tactical-profile-ranked",
+    "practice-tactical-profile-task-families-home",
+    "practice-tactical-profile-task-families",
+    "practice-tactical-profile-limited-inventory",
+    "practice-tactical-profile-explanation",
+    "practice-tactical-profile-focused-run",
+    "practice-tactical-profile-suppressed",
+    "practice-tactical-focus-guide",
+    "practice-tactical-focus-active",
+    "practice-tactical-focus-result"
+  ] satisfies LabScenarioId[];
+
+  for (const scenarioId of tacticalScenarioIds) {
+    assert.ok(scenarioRegistry[scenarioId]);
+    assert.deepEqual(storyTagsForScenario(scenarioId), []);
+  }
   assert.equal(
     scenarioRegistry["practice-tactical-profile-focused-run"].scope.includes
       .includes("Mixed-practice allocation"),
@@ -126,6 +163,39 @@ test("Issue #250 owns the complete Tactical Profile design state set", () => {
   assert.equal(
     scenarioRegistry["history-populated"].issues?.some((issue) => issue.issueNumber === 250) ?? false,
     false
+  );
+});
+
+test("the closed Issue #363 scenarios keep their stable URLs without new markers", () => {
+  assert.deepEqual(
+    newScenarios
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 363))
+      .map((scenario) => scenario.id),
+    []
+  );
+  assert.deepEqual(storyTagsForScenario("history-populated"), []);
+  assert.deepEqual(storyTagsForScenario("history-progress"), []);
+  assert.deepEqual(storyTagsForScenario("history-progress-weakness"), []);
+  assert.deepEqual(storyTagsForScenario("history-progress-speed-weakness"), []);
+  assert.ok(
+    scenarioRegistry["history-progress"].scope.includes.includes(
+      "Progress over time"
+    )
+  );
+  assert.ok(
+    scenarioRegistry["history-progress-weakness"].scope.includes.includes(
+      "Solve reliability effect"
+    )
+  );
+  assert.ok(
+    scenarioRegistry["history-progress-speed-weakness"].scope.includes.includes(
+      "Reliable elapsed-time eligibility"
+    )
+  );
+  assert.ok(
+    scenarioRegistry["history-progress"].scope.exits.includes(
+      "Training recommendation"
+    )
   );
 });
 
@@ -150,26 +220,37 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.ok(activeSessionGuide.scope.includes.includes(
     "Fixed-shape downward portrait arrows outside callout borders with target clearance"
   ));
-  assert.match(activeSessionGuide.description, /route around copy and stop short/);
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Always-available direct guide exit without completion"
+  ));
+  assert.ok(activeSessionGuide.scope.includes.includes(
+    "Raised portrait Timed Out callout with full pointer and board clearance"
+  ));
+  assert.match(activeSessionGuide.description, /full red pointer above that board/);
   assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
   assert.ok(arrowDuelGuide.scope.includes.includes("The arrows show your two choices"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Portrait callout below the board"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Landscape callout in the empty board lane"));
   assert.ok(arrowDuelGuide.scope.includes.includes(
-    "Landscape dot endpoint stops clear of the candidate piece"
+    "Straight upward landscape connector stops clear of the candidate origin"
+  ));
+  assert.ok(arrowDuelGuide.scope.includes.includes(
+    "Always-available direct guide exit without completion"
   ));
   assert.match(arrowDuelGuide.description, /two arrows are the user's two choices/);
+  assert.match(arrowDuelGuide.description, /straight upward connector/);
   assert.match(arrowDuelGuide.description, /cannot read as a third move arrow/);
+  const arrowDuelGuideOnly = scenarioRegistry["practice-arrow-duel-guide-only"];
+  assert.ok(arrowDuelGuideOnly.scope.includes.includes(
+    "Always-available direct guide exit without completion"
+  ));
+  assert.match(arrowDuelGuideOnly.description, /eligible for the next Arrow Duel/);
   assert.doesNotMatch(
     `${activeSessionGuide.description} ${arrowDuelGuide.description}`,
     /\b(?:step|tour)\b/i
   );
-  assert.ok(firstSprintGuide.issues?.some(
-    (issue) => issue.issueNumber === 337 && issue.changeNote.includes("Top-align")
-  ));
-  assert.ok(settingsGuidance.issues?.some(
-    (issue) => issue.issueNumber === 337 && issue.changeNote.includes("immediately before Feedback")
-  ));
+  assert.deepEqual(storyTagsForScenario(firstSprintGuide.id), []);
+  assert.deepEqual(storyTagsForScenario(settingsGuidance.id), []);
 });
 
 test("Practice home keeps its merged value polish in the baseline scenario", () => {
@@ -178,9 +259,7 @@ test("Practice home keeps its merged value polish in the baseline scenario", () 
   assert.ok(home.scope.includes.includes("Numeric trailing Ratings"));
   assert.ok(home.scope.includes.includes("Single Review status label"));
   assert.ok(home.scope.includes.includes("Centered Review workload count"));
-  assert.ok(home.issues?.some((issue) => issue.issueNumber === 328));
-  assert.equal(home.issues?.some((issue) => issue.issueNumber === 344), false);
-  assert.deepEqual(storyTagsForScenario("practice-home"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("practice-home"), []);
 });
 
 test("post-attempt handoffs explain Timeout, Wrong, and Slow-correct results", () => {

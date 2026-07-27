@@ -1,6 +1,9 @@
-import type { TacticalProfileTaskFamily } from "../../../../packages/core/src/index.ts";
+import type {
+  TacticalProfileCalibrationAssurance,
+  TacticalProfileTaskFamily
+} from "../../../../packages/core/src/index.ts";
 
-export type TacticalProfileSignalKind = "solve_rate" | "speed";
+export type TacticalProfileSignalKind = "solve_rate" | "speed" | "both";
 
 export type TacticalProfileSignal = {
   id: string;
@@ -60,8 +63,12 @@ export type TacticalProfileIntent =
 
 export type TacticalProfilePresentation = {
   phase: TacticalProfilePhase;
+  assurance?: TacticalProfileCalibrationAssurance;
   screen: TacticalProfileScreen;
   activeTaskFamily?: TacticalProfileTaskFamily;
+  unavailableFamilies?: Readonly<
+    Partial<Record<TacticalProfileTaskFamily, string>>
+  >;
   homeLeadSignalId?: string;
   signals: readonly TacticalProfileSignal[];
   selectedSignalId?: string;

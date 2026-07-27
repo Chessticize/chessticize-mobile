@@ -222,6 +222,59 @@ test("buildSprintConfig rejects invalid timing and target inputs", () => {
       mode: "standard",
       durationSeconds: 300,
       perPuzzleSeconds: 20,
+      maxAttempts: 15,
+      tacticalFocus: {
+        taskFamily: "line",
+        themes: ["fork"],
+        mixedControlCount: 5,
+        ratingAnchor: 900,
+        minRating: 800,
+        maxRating: 1000
+      }
+    }),
+    /must be unrated/
+  );
+  assert.throws(
+    () => buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      maxAttempts: 15,
+      ratingPolicy: "unrated",
+      tacticalFocus: {
+        taskFamily: "arrow_duel",
+        themes: ["fork"],
+        mixedControlCount: 5,
+        ratingAnchor: 900,
+        minRating: 800,
+        maxRating: 1000
+      }
+    }),
+    /task family must match/
+  );
+  assert.throws(
+    () => buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      maxAttempts: 15,
+      ratingPolicy: "unrated",
+      tacticalFocus: {
+        taskFamily: "line",
+        themes: ["fork", "pin", "skewer"],
+        mixedControlCount: 5,
+        ratingAnchor: 900,
+        minRating: 800,
+        maxRating: 1000
+      }
+    }),
+    /one or two distinct themes/
+  );
+  assert.throws(
+    () => buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
       puzzleTiming: { slowAfterSeconds: 40, timeoutAfterSeconds: 40 }
     }),
     /at least 5 seconds/

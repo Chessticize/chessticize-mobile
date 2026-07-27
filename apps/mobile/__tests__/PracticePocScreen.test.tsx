@@ -26,7 +26,9 @@ import {
 } from "../src/platform/mobilePractice";
 import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/src/practice-service";
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
-import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, type ArrowDuelState, type AttemptEvent, type Puzzle, type PuzzleTimingPolicy, type SprintState, type UciEngineTransport } from "../../../packages/core/src/index";
+import { MemoryTacticalProfileRepository } from "../../../packages/storage/src/tactical-profile-repository";
+import { TacticalProfileService } from "../../../packages/storage/src/tactical-profile-service";
+import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, isServerCompatibleArrowDuelPuzzle, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, startSprint, type ArrowDuelState, type AttemptEvent, type Puzzle, type PuzzleTimingPolicy, type SprintState, type TacticalProfileCalibrationArtifact, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/platform/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/platform/iCloudProgressSync";
 import { FakeMoveFeedbackClient } from "../src/platform/moveFeedback";
@@ -42,6 +44,8 @@ import {
   expectNoRenderedTextHasNonPositiveFontSize,
   flattenTestStyle
 } from "../test-support/testRendererSupport";
+
+const tacticalProfilePuzzleFixture = require("../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];
 
 const renderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -1038,6 +1042,7 @@ describe("PracticePocScreen", () => {
     const onIntent = jest.fn();
     const presentation: TacticalProfilePresentation = {
       phase: "ready",
+      assurance: "validated",
       screen: "home",
       signals: [
         {
@@ -1075,6 +1080,383 @@ describe("PracticePocScreen", () => {
     );
     press(renderer, "training-focus-open-profile");
     expect(onIntent).toHaveBeenCalledWith({ type: "open-profile" });
+  });
+
+  it("does not show provisional disclosure on validated profile detail screens", () => {
+    const presentation: TacticalProfilePresentation = {
+      phase: "ready",
+      assurance: "validated",
+      screen: "explanation",
+      selectedSignalId: "fork",
+      signals: [
+        {
+          id: "fork",
+          taskFamily: "line",
+          themeKey: "fork",
+          themeLabel: "Forks",
+          kind: "solve_rate",
+          distinctPuzzleCount: 7,
+          distinctSessionCount: 3,
+          priorityLabel: "Recommended",
+          status: "recommended"
+        }
+      ],
+      focusedRun: {
+        taskFamily: "line",
+        title: "Fork repair",
+        ratingLabel: "Puzzle-solving Rating 925",
+        durationLabel: "5 min",
+        totalPuzzleCount: 15,
+        allocations: [
+          { id: "fork", label: "Forks", puzzleCount: 10, tone: "primary" },
+          { id: "mixed", label: "Mixed practice", puzzleCount: 5, tone: "mixed" }
+        ]
+      },
+      onIntent: jest.fn()
+    };
+
+    for (const screen of ["explanation", "focused_run", "suppressed"] as const) {
+      const renderer = renderScreen({
+        runManagementEnabled: true,
+        tacticalProfilePresentation: { ...presentation, screen }
+      });
+      expect(() =>
+        findByTestId(renderer, "tactical-profile-early-estimate")
+      ).toThrow();
+    }
+  });
+
+  it("labels the production Tactical Profile as an early estimate", async () => {
+    const renderer = renderScreen({
+      practiceService: createMobilePracticeService("familiar15")
+    });
+    await flushMicrotasks();
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Early estimate"
+    );
+    expect(
+      findByTestId(renderer, "training-focus-card").props.accessibilityLabel
+    ).toContain("Early estimate");
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).not.toContain(
+      "Personalized training is not enabled"
+    );
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
+      "This is an early estimate"
+    );
+  });
+
+  it("explains provisional balanced results without claiming no weakness exists", () => {
+    const renderer = renderLabScenario("practice-tactical-profile-balanced");
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "No clear focus yet"
+    );
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).not.toContain(
+      "No focus needed"
+    );
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
+      "has not found a repeated pattern strong enough to emphasize"
+    );
+  });
+
+  it("keeps Practice available and automatically retries a failed Tactical Profile cache", async () => {
+    const store = new MemoryStore();
+    const repository = new RecoveringTacticalProfileRepository();
+    repository.failReads(2);
+    const renderer = renderScreen({
+      practiceService: new PracticeService(
+        store,
+        new TacticalProfileService({
+          progressStore: store,
+          puzzleSource: store,
+          repository,
+          calibration: COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+          naturalFrequency: { line: {}, arrow_duel: {} }
+        })
+      )
+    });
+    await flushMicrotasks();
+
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Building profile"
+    );
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+
+    await act(async () => {
+      jest.advanceTimersByTime(1_000);
+      await Promise.resolve();
+    });
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "Building profile"
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(2_000);
+      await Promise.resolve();
+    });
+    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
+      "More information needed"
+    );
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it("uses the only recommended Arrow Duel family and shows returning users the dedicated Focused Run guide", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const service = createArrowFocusedPracticeService();
+    service.saveSettings({
+      ...service.getSettings(),
+      sprintGuides: {
+        rulesSeen: true,
+        activeSessionSeen: true,
+        arrowDuelSeen: false,
+        focusedRunSeen: false
+      }
+    });
+
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true,
+      sprintGuidanceEnabled: true
+    });
+
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
+      "Arrow Duel"
+    );
+    press(renderer, "tactical-profile-preview-run");
+    expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
+      "Arrow Duel Rating 1800"
+    );
+    press(renderer, "focused-run-start");
+    expect(findByTestId(renderer, "practice-active-session-guide")).toBeTruthy();
+    expectText(renderer, "Track the fixed Run");
+    expect(service.getSettings().sprintGuides.focusedRunSeen).toBe(false);
+
+    for (let step = 0; step < 4; step += 1) {
+      press(renderer, "practice-session-guide-start");
+    }
+
+    expect(service.getSettings().sprintGuides.focusedRunSeen).toBe(true);
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
+    expect(service.getSettings().sprintGuides.arrowDuelSeen).toBe(false);
+
+    press(renderer, "practice-session-guide-start");
+    expect(service.getSettings().sprintGuides.arrowDuelSeen).toBe(true);
+    expect(service.getActiveSprint()).toBeUndefined();
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+
+    expect(service.getActiveSprint()).toMatchObject({
+      status: "active",
+      config: {
+        mode: "arrow_duel",
+        ratingPolicy: "unrated",
+        maxAttempts: 15,
+        tacticalFocus: {
+          taskFamily: "arrow_duel",
+          mixedControlCount: 5,
+          ratingAnchor: 1800
+        }
+      }
+    });
+  });
+
+  it("maps two production task-family recommendations to one explicit Home lead", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const practiceService = createDualFamilyFocusedPracticeService();
+    expect(
+      practiceService.getTacticalProfileSnapshot()?.homeLeadSignalId
+    ).toBe("arrow_duel:pin");
+    const renderer = renderScreen({
+      practiceService
+    });
+
+    const card = collectText(findByTestId(renderer, "training-focus-card"));
+    expect(card).toContain("2 modes with recommendations");
+    expect(card).toContain("Pin is your clearest focus");
+    expect(card).toContain("Puzzle solving also has 1 recommendation.");
+    expect(collectText(findByTestId(renderer, "training-focus-primary-mode"))).toContain(
+      "Arrow Duel"
+    );
+
+    press(renderer, "training-focus-open-profile");
+    expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
+      "Arrow Duel"
+    );
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+    expect(() => findByTestId(renderer, "tactical-profile-signal-line:fork")).toThrow();
+
+    press(renderer, "tactical-profile-task-family-line");
+    press(renderer, "tactical-profile-explain-line:fork");
+    press(renderer, "tactical-profile-back");
+    expect(collectText(findByTestId(renderer, "tactical-profile-active-mode"))).toContain(
+      "Puzzle solving"
+    );
+  });
+
+  it("keeps watch-only evidence visible in both task-family lanes", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const watchOnlyCalibration = {
+      ...COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+      evidence: {
+        ...COMPONENT_TACTICAL_PROFILE_CALIBRATION.evidence,
+        minDistinctPuzzles: 13
+      }
+    } satisfies TacticalProfileCalibrationArtifact;
+    const practiceService = createDualFamilyFocusedPracticeService(
+      watchOnlyCalibration
+    );
+    expect(
+      practiceService.getTacticalProfileSnapshot()?.evaluation.signals.map(
+        (signal) => signal.status
+      )
+    ).toEqual(["watch", "watch"]);
+
+    const renderer = renderScreen({ practiceService });
+    press(renderer, "training-focus-open-profile");
+
+    expect(findByTestId(renderer, "tactical-profile-task-family-selector")).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-signal-line:fork")).toBeTruthy();
+    press(renderer, "tactical-profile-task-family-arrow_duel");
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+  });
+
+  it("keeps an explicitly selected watch lane visible beside a recommendation", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const mixedStatusCalibration = {
+      ...COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+      evidence: {
+        ...COMPONENT_TACTICAL_PROFILE_CALIBRATION.evidence,
+        minDistinctPuzzles: 9
+      }
+    } satisfies TacticalProfileCalibrationArtifact;
+    const practiceService = createDualFamilyFocusedPracticeService(
+      mixedStatusCalibration,
+      2
+    );
+    expect(
+      practiceService.getTacticalProfileSnapshot()?.evaluation.signals.map(
+        (signal) => [signal.taskFamily, signal.status]
+      )
+    ).toEqual([
+      ["line", "recommended"],
+      ["arrow_duel", "watch"]
+    ]);
+
+    const renderer = renderScreen({ practiceService });
+    press(renderer, "training-focus-open-profile");
+    expect(findByTestId(renderer, "tactical-profile-signal-line:fork")).toBeTruthy();
+
+    press(renderer, "tactical-profile-task-family-arrow_duel");
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+  });
+
+  it("opens a cached production Tactical Profile without reading full history or exact inventory", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    let store: MemoryStore | undefined;
+    const practiceService = createArrowFocusedPracticeService(
+      true,
+      (createdStore) => {
+        store = createdStore;
+      }
+    );
+    practiceService.getTacticalProfileSnapshot();
+    if (!store) {
+      throw new Error("expected the production component store");
+    }
+    store.listSprintSessions = () => {
+      throw new Error("Profile open must not scan all sessions");
+    };
+    store.listLatestTerminalFocusedSprintSessions = () => {
+      throw new Error("Profile open must not run cache-recovery session queries");
+    };
+    store.listAttempts = () => {
+      throw new Error("Profile open must not scan canonical attempts");
+    };
+    store.selectPuzzles = () => {
+      throw new Error("Profile open must not run an exact puzzle query");
+    };
+    store.selectPuzzlesForRatingBands = () => {
+      throw new Error("Profile open must not run an exact rating-band query");
+    };
+    const originalListReviewQueue = store.listReviewQueue.bind(store);
+    let reviewExclusionReads = 0;
+    store.listReviewQueue = () => {
+      reviewExclusionReads += 1;
+      return originalListReviewQueue();
+    };
+    const renderer = renderScreen({ practiceService });
+    reviewExclusionReads = 0;
+
+    press(renderer, "training-focus-open-profile");
+
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+    expect(findByTestId(renderer, "tactical-profile-preview-run")).toBeTruthy();
+    expect(reviewExclusionReads).toBe(0);
+  });
+
+  it("withholds the public Preview CTA after a Focused Run until newer mixed evidence", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    let store: MemoryStore | undefined;
+    const practiceService = createArrowFocusedPracticeService(
+      true,
+      (createdStore) => {
+        store = createdStore;
+      }
+    );
+    practiceService.startFocusedRun(
+      "arrow_duel",
+      "2026-07-25T00:01:00.000Z",
+      "public-freshness"
+    );
+    practiceService.abandonSprint("2026-07-25T00:02:00.000Z");
+    if (!store) {
+      throw new Error("expected the production component store");
+    }
+    const restartedPracticeService = new PracticeService(
+      store,
+      createArrowTacticalProfileService(store)
+    );
+    const renderer = renderScreen({
+      practiceService: restartedPracticeService
+    });
+
+    press(renderer, "training-focus-open-profile");
+
+    expect(collectText(findByTestId(renderer, "focused-run-unavailable"))).toContain(
+      "Play another mixed Run first"
+    );
+    expect(() => findByTestId(renderer, "tactical-profile-preview-run")).toThrow();
+  });
+
+  it("keeps a production-service focus visible while withholding an inventory-blocked Run", () => {
+    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    const renderer = renderScreen({
+      practiceService: createArrowFocusedPracticeService(false)
+    });
+
+    press(renderer, "training-focus-open-profile");
+
+    expect(
+      findByTestId(renderer, "tactical-profile-signal-arrow_duel:pin")
+    ).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
+      "Not enough new puzzles nearby"
+    );
+    expect(() => findByTestId(renderer, "tactical-profile-preview-run")).toThrow();
   });
 
   it("keeps solve reliability and completed-puzzle speed as plain-language profile signals", () => {
@@ -1131,7 +1513,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("keeps Puzzle solving and Arrow Duel focus lanes separate inside one profile", () => {
+  it("keeps Puzzle solving and Arrow Duel focus lanes separate inside one profile", async () => {
     const renderer = renderLabScenario("practice-tactical-profile-task-families-home");
 
     expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
@@ -1168,6 +1550,22 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
       "Mixed Arrow Duel"
     );
+
+    press(renderer, "focused-run-start");
+    expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+    expect(findByTestId(renderer, "session-rating-policy")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain(
+      "Choose the best move"
+    );
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toContain(
+      "Arrow Duel sprint"
+    );
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 15");
+
+    await boardMove(renderer, "e8f7");
+
+    expect(() => findByTestId(renderer, "error-panel")).toThrow();
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 / 15");
   });
 
   it("uses an explicit cross-mode Home lead and blocks mismatched Focused Runs", () => {
@@ -1268,6 +1666,9 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "tactical-profile-explanation"))).toContain(
       "Slow and Unclear labels, or whether a puzzle is in Review, do not count as proof"
     );
+    expect(collectText(findByTestId(renderer, "tactical-profile-early-estimate"))).toContain(
+      "Use this as a training suggestion"
+    );
 
     press(renderer, "tactical-profile-explanation-preview");
     expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
@@ -1282,9 +1683,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "focused-run-preview"))).toContain(
       "Later ordinary mixed Runs decide whether this focus still applies."
     );
+    expect(collectText(findByTestId(renderer, "tactical-profile-early-estimate"))).toContain(
+      "Use this as a training suggestion"
+    );
 
     press(renderer, "focused-run-not-now");
     expect(findByTestId(renderer, "tactical-profile-suppressed")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "tactical-profile-early-estimate"))).toContain(
+      "Use this as a training suggestion"
+    );
 
     press(renderer, "tactical-profile-restore");
     expect(findByTestId(renderer, "tactical-profile-recommendations")).toBeTruthy();
@@ -1435,6 +1842,38 @@ describe("PracticePocScreen", () => {
     expect(service.getSettings().sprintGuides.activeSessionSeen).toBe(false);
   });
 
+  it("keeps the guide close control available without starting or completing the guide", () => {
+    for (let coachStep = 0; coachStep < 4; coachStep += 1) {
+      const service = createMobilePracticeService("random1000");
+      const renderer = renderScreen({
+        sprintGuidanceEnabled: true,
+        practiceService: service,
+        runManagementEnabled: true
+      });
+
+      press(renderer, "practice-run-start");
+      for (let step = 0; step < coachStep; step += 1) {
+        press(renderer, "practice-session-guide-start");
+      }
+
+      expect(findByTestId(renderer, "session-abandon").props.accessibilityLabel).toBe(
+        "Exit guide"
+      );
+      press(renderer, "session-abandon");
+
+      expect(() => findByTestId(renderer, "practice-active-session-guide")).toThrow();
+      expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+      expect(service.getActiveSprint()).toBeUndefined();
+      expect(service.getSettings().sprintGuides.activeSessionSeen).toBe(false);
+
+      press(renderer, "practice-run-start");
+      expect(findByTestId(renderer, "practice-active-session-guide")).toBeTruthy();
+      expect(service.getSettings().sprintGuides.activeSessionSeen).toBe(false);
+
+      act(() => renderer.unmount());
+    }
+  });
+
   it("shows both guides for a first Arrow Duel, then only its own guide after shared guidance", () => {
     const freshService = createMobilePracticeService("random1000");
     const firstArrowDuel = renderScreen({
@@ -1486,6 +1925,56 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(returningArrowDuel, "practice-session-guide-coach-progress"))).toBe("1 of 1");
   });
 
+  it("lets Arrow Duel leave either guide without completing its own guidance", () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({
+      sprintGuidanceEnabled: true,
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "practice-run-select-arrow-duel");
+    press(renderer, "practice-run-start");
+    for (let step = 0; step < 4; step += 1) {
+      press(renderer, "practice-session-guide-start");
+    }
+
+    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
+      "5 of 5"
+    );
+    expect(findByTestId(renderer, "session-abandon").props.accessibilityLabel).toBe(
+      "Exit guide"
+    );
+    press(renderer, "session-abandon");
+
+    expect(() => findByTestId(renderer, "practice-arrow-duel-guide")).toThrow();
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(service.getSettings().sprintGuides).toMatchObject({
+      activeSessionSeen: true,
+      arrowDuelSeen: false
+    });
+
+    press(renderer, "practice-run-start");
+    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
+    expect(() => findByTestId(renderer, "practice-active-session-guide")).toThrow();
+    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
+      "1 of 1"
+    );
+    press(renderer, "session-abandon");
+
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+    expect(service.getSettings().sprintGuides.arrowDuelSeen).toBe(false);
+    press(renderer, "practice-run-start");
+    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
+      "1 of 1"
+    );
+
+    act(() => renderer.unmount());
+  });
+
   it("resets all production guide eligibility immediately from Settings", () => {
     const service = createMobilePracticeService("random1000");
     service.saveSettings({
@@ -1508,7 +1997,8 @@ describe("PracticePocScreen", () => {
     expect(service.getSettings().sprintGuides).toEqual({
       rulesSeen: false,
       activeSessionSeen: false,
-      arrowDuelSeen: false
+      arrowDuelSeen: false,
+      focusedRunSeen: false
     });
     expect(collectText(findByTestId(renderer, "settings-show-sprint-guide"))).toBe("Guides reset");
     expect(collectText(findByTestId(renderer, "settings-sprint-guide-ready"))).toContain(
@@ -2011,6 +2501,180 @@ describe("PracticePocScreen", () => {
     );
     expect(railTestIDs.size).toBe(7);
     expect(railTestIDs).toContain("history-attempt-history-unclear-themes-matein3");
+    expect(findByTestId(renderer, "history-progress-button")).toBeTruthy();
+  });
+
+  it("opens the Storybook-only tactical progress page from History", async () => {
+    const renderer = renderLabScenario("history-progress");
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    await flushMicrotasks();
+    expect(findByTestId(renderer, "history-progress-button")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-progress-screen")).toThrow();
+
+    press(renderer, "history-progress-button");
+    expect(collectText(findByTestId(renderer, "history-progress-screen"))).toContain(
+      "Tactical progress"
+    );
+    expect(findByTestId(renderer, "history-progress-early-estimate")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "13 fewer / 100"
+    );
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "Extra misses per 100 comparable puzzles"
+    );
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "n=71"
+    );
+    expect(findByTestId(renderer, "history-no-clear-weakness")).toBeTruthy();
+
+    press(renderer, "history-progress-strength-pins");
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "24% less overhead"
+    );
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "1.06×"
+    );
+
+    press(renderer, "history-progress-back");
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-progress-screen")).toThrow();
+  });
+
+  it("highlights a clear weakness separately from training recommendations", async () => {
+    const renderer = renderLabScenario("history-progress-weakness");
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    await flushMicrotasks();
+    press(renderer, "history-progress-button");
+
+    const weakness = findByTestId(renderer, "history-clear-weakness");
+    expect(collectText(weakness)).toContain("Skewers");
+    expect(collectText(weakness)).toContain("Solve reliability");
+    expect(collectText(weakness)).toContain("14 extra misses");
+    expect(collectText(weakness)).toContain("per 100 comparable puzzles");
+    expect(collectText(weakness)).toContain(
+      "Other well-sampled themes remain closer"
+    );
+    expect(collectText(weakness)).toContain(
+      "evidence, practical-impact, and diversity checks"
+    );
+    expect(collectText(weakness)).toContain("26 different puzzles · 6 sessions");
+    expect(collectText(findByTestId(renderer, "history-progress-screen"))).not.toContain(
+      "recommend"
+    );
+  });
+
+  it("shows completed-puzzle time as a distinct weakness head", async () => {
+    const renderer = renderLabScenario("history-progress-speed-weakness");
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    press(renderer, "history-progress-button");
+
+    const weakness = findByTestId(renderer, "history-clear-weakness");
+    expect(collectText(weakness)).toContain("Pins");
+    expect(collectText(weakness)).toContain("Completed-puzzle speed");
+    expect(collectText(weakness)).toContain("1.34× expected time");
+    expect(collectText(weakness)).toContain("about 34% longer");
+    expect(collectText(weakness)).toContain(
+      "Other well-sampled themes remain closer"
+    );
+    expect(collectText(weakness)).toContain(
+      "Only correct, before-timeout attempts with reliable elapsed time"
+    );
+    expect(collectText(weakness)).toContain(
+      "Slow and Unclear labels do not decide it"
+    );
+    expect(collectText(findByTestId(renderer, "history-progress-screen"))).not.toContain(
+      "recommend"
+    );
+  });
+
+  it("opens production History Progress with an honest empty model state", async () => {
+    const renderer = renderScreen();
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    expect(findByTestId(renderer, "history-progress-button")).toBeTruthy();
+
+    press(renderer, "history-progress-button");
+    expect(findByTestId(renderer, "history-progress-screen")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "No progress data is available yet."
+    );
+    expect(findByTestId(renderer, "history-no-clear-weakness")).toBeTruthy();
+  });
+
+  it("returns from History Progress through Android Predictive Back", async () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({ systemBack });
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    await flushMicrotasks();
+    press(renderer, "history-progress-button");
+
+    systemBack.startPredictive("left");
+    systemBack.progressPredictive(0.6, "left");
+    expect(
+      collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))
+    ).toBe("History");
+    expect(
+      collectText(findByTestId(renderer, "mobile-back-destination-preview-id"))
+    ).toBe("tab-history");
+
+    systemBack.cancelPredictive();
+    expect(findByTestId(renderer, "history-progress-screen")).toBeTruthy();
+
+    systemBack.startPredictive("right");
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "history-progress-screen")).toThrow();
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+  });
+
+  it("stops hidden History queries and closes Progress when leaving its tab", async () => {
+    const service = createArrowFocusedPracticeService();
+    const historyViewSpy = jest.spyOn(service, "getHistoryView");
+    const renderer = renderScreen({ practiceService: service });
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    await flushMicrotasks();
+    const visibleHistoryQueryCount = historyViewSpy.mock.calls.length;
+    expect(visibleHistoryQueryCount).toBeGreaterThan(0);
+
+    press(renderer, "history-progress-button");
+    expect(findByTestId(renderer, "history-progress-screen")).toBeTruthy();
+    expect(historyViewSpy).toHaveBeenCalledTimes(visibleHistoryQueryCount);
+
+    press(renderer, "settings-tab");
+    press(renderer, "history-tab");
+    expect(() => findByTestId(renderer, "history-progress-screen")).toThrow();
+    expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+  });
+
+  it("renders the current model weakness and weekly evidence in production History", async () => {
+    const renderer = renderScreen({
+      practiceService: createArrowFocusedPracticeService()
+    });
+    await flushMicrotasks();
+
+    press(renderer, "history-tab");
+    press(renderer, "history-progress-button");
+
+    const progress = findByTestId(renderer, "history-progress-screen");
+    const weakness = findByTestId(renderer, "history-clear-weakness");
+    expect(collectText(progress)).toContain("Pin · Arrow Duel");
+    expect(collectText(progress)).toContain("model-weighted observations");
+    expect(collectText(weakness)).toContain("Solve reliability");
+    expect(collectText(weakness)).toContain("extra misses");
+    expect(collectText(weakness)).toContain("12 different puzzles · 3 sessions");
+    expect(collectText(weakness)).toContain(
+      "Wrong moves and timeouts count once as solve failures"
+    );
   });
 
   it("reveals all seven curated puzzle tags only when replay Analysis opens", async () => {
@@ -2656,7 +3320,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-filter-timed-out-only")).toThrow();
     expect(() => findByTestId(renderer, "history-rating-filters")).toThrow();
     expect(() => findByTestId(renderer, "history-range-filters")).toThrow();
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Sprint");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Source: Sprint");
     expect(collectText(findByTestId(renderer, "history-attempt-history-correct-slow"))).toBe("Slow");
     expect(collectText(findByTestId(renderer, "history-attempt-history-wrong-result"))).toBe(
       "Wrong move"
@@ -2678,10 +3342,13 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityLabel).toBe(
-      "Needs attention: unclear or in Review"
+      "Needs attention: Sprint attempts that are unclear or in Review"
+    );
+    expect(collectText(findByTestId(renderer, "history-attention-explanation"))).toBe(
+      "Needs attention shows original Sprint attempts only."
     );
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
-      "7 days·All puzzles"
+      "7 days·All puzzles·Source: Sprint"
     );
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
@@ -2714,7 +3381,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-rating-filters")).toBeTruthy();
     expect(findByTestId(renderer, "history-range-filters")).toBeTruthy();
     expect(hasStyleEntry(
-      findByTestId(renderer, "history-source-all"),
+      findByTestId(renderer, "history-source-sprint"),
       "backgroundColor",
       "#2563EB"
     )).toBe(true);
@@ -2813,13 +3480,13 @@ describe("PracticePocScreen", () => {
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
-      "7 days·All puzzles"
+      "7 days·All puzzles·Source: Sprint"
     );
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
     expect(hasStyleEntry(
-      findByTestId(renderer, "history-source-all"),
+      findByTestId(renderer, "history-source-sprint"),
       "backgroundColor",
       "#2563EB"
     )).toBe(true);
@@ -2839,6 +3506,93 @@ describe("PracticePocScreen", () => {
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
+  });
+
+  it("keeps Needs attention Sprint-only and makes Review attempts an explicit All-history choice", () => {
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.recordAttempt({
+      id: "original-sprint-mistake",
+      source: "sprint",
+      sessionId: "original-sprint-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "wrong",
+      submittedMove: "e2e3",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-17T11:59:55.000Z",
+      completedAt: "2026-07-17T12:00:00.000Z",
+      ratingBefore: 600
+    });
+    store.recordAttempt({
+      id: "correct-review-attempt",
+      source: "scheduled_review",
+      sessionId: "correct-review-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-17T12:01:55.000Z",
+      completedAt: "2026-07-17T12:02:00.000Z",
+      ratingBefore: 600
+    });
+    store.scheduleMistakeReview({
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20"
+    }, "2026-07-17T12:02:00.000Z");
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-17T12:03:00.000Z"),
+      practiceService: new PracticeService(store)
+    });
+
+    press(renderer, "history-tab");
+
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-attention-explanation"))).toBe(
+      "Needs attention shows original Sprint attempts only."
+    );
+
+    press(renderer, "history-filter-toggle");
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
+    press(renderer, "history-source-all");
+
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(() => findByTestId(renderer, "history-attention-explanation")).toThrow();
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-correct-review-attempt")).toBeTruthy();
+
+    press(renderer, "history-attention-needs-attention");
+
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
+
+    press(renderer, "history-source-review");
+
+    expect(findByTestId(renderer, "history-attention-all").props.accessibilityState).toEqual({
+      checked: true
+    });
+    expect(findByTestId(renderer, "history-attempt-correct-review-attempt")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-original-sprint-mistake")).toThrow();
+
+    press(renderer, "history-attention-needs-attention");
+
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
+
+    press(renderer, "history-attention-all");
+
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
+    expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
   });
 
   it("includes Timed out attempts in the History Wrong filter while preserving their label", async () => {
@@ -4144,6 +4898,13 @@ describe("PracticePocScreen", () => {
 
   it("locks Standard input on the first rendered frame until the blunder animation completes", async () => {
     const service = createMobilePracticeService("familiar15");
+    service.saveSettings({
+      ...service.getSettings(),
+      moveFeedback: {
+        soundEnabled: true,
+        hapticsEnabled: true
+      }
+    });
     const moveFeedbackClient = new FakeMoveFeedbackClient();
     const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
 
@@ -4177,7 +4938,7 @@ describe("PracticePocScreen", () => {
     expect(moveFeedbackClient.requests).toEqual([{
       cue: "move",
       playSound: true,
-      playHaptic: false
+      playHaptic: true
     }]);
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(activePuzzle.currentFen);
@@ -4688,6 +5449,85 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-accuracy"))).toBe(
       "2 attempted · 50% Accuracy"
     );
+  });
+
+  it("explains a completed Tactical Focus Run as fixed, unrated training", () => {
+    const renderer = renderLabScenario("practice-tactical-focus-result");
+
+    expectText(renderer, "Focused Run complete");
+    expect(collectText(findByTestId(renderer, "sprint-result-top-bar"))).toContain(
+      "Focused Run Result"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe(
+      "Planned puzzles complete"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-rating-change"))).toContain(
+      "Unrated"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-rating-range"))).toBe(
+      "1087 unchanged"
+    );
+    expect(() => findByTestId(renderer, "sprint-result-history-trend")).toThrow();
+    expect(() => findByTestId(renderer, "sprint-result-history-button")).toThrow();
+    expect(() => findByTestId(renderer, "sprint-result-goal-label")).toThrow();
+    expect(collectText(findByTestId(renderer, "play-again-button"))).toContain(
+      "Back to Practice"
+    );
+    press(renderer, "play-again-button");
+    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
+  });
+
+  it("shows fixed progress and no Rating pressure during an active Tactical Focus Run", () => {
+    const renderer = renderLabScenario("practice-tactical-focus-active");
+
+    expect(collectText(findByTestId(renderer, "active-session-shell"))).toContain(
+      "Focused Run"
+    );
+    expect(collectText(findByTestId(renderer, "session-status-metrics"))).toContain(
+      "Unrated"
+    );
+    expect(findByTestId(renderer, "session-score-completed").props.accessibilityLabel)
+      .toBe("Completed 10");
+    expect(findByTestId(renderer, "session-score-left").props.accessibilityLabel)
+      .toBe("Left 5");
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("10 / 15");
+  });
+
+  it("keeps Focused Run metric labels readable in the maintained landscape rail", () => {
+    setPracticeViewport({
+      width: 874,
+      height: 402,
+      scale: 3,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 }
+    });
+    const renderer = renderLabScenario("practice-tactical-focus-active");
+    const unratedText = findByTestId(renderer, "session-rating-policy")
+      .findAllByType(ReactNative.Text)
+      .find((node) => collectText(node) === "Unrated");
+    const completedText = findByTestId(renderer, "session-score-completed")
+      .findAllByType(ReactNative.Text)
+      .find((node) => collectText(node) === "Completed");
+
+    expect(flattenTestStyle(unratedText?.props.style).fontSize).toBe(16);
+    expect(completedText?.props.adjustsFontSizeToFit).toBe(true);
+  });
+
+  it("explains fixed and unrated semantics before a first Focused Run", () => {
+    const renderer = renderLabScenario("practice-tactical-focus-guide");
+
+    expectText(renderer, "Track the fixed Run");
+    expectText(renderer, "Your Rating will not change.");
+    expectText(renderer, "Unrated");
+    expect(
+      collectText(findByTestId(renderer, "practice-session-guide-start"))
+    ).toBe("Next");
+    press(renderer, "practice-session-guide-start");
+    press(renderer, "practice-session-guide-start");
+    expectText(renderer, "It is added to Review and counts as one completed puzzle.");
+    press(renderer, "practice-session-guide-start");
+    expect(
+      collectText(findByTestId(renderer, "practice-session-guide-start"))
+    ).toBe("Start Focused Run");
   });
 
   it("separates the fixed pass goal from actual attempts in the Storybook result designs", () => {
@@ -6084,12 +6924,12 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-active-filter-summary")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Sprint");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Source: Sprint");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Result: Wrong");
     expectHistoryRowAccessibility(renderer, "Played g6g5 · Best f4g3");
     expectHistoryRowAccessibility(renderer, "Move e6f7");
     press(renderer, "history-filter-toggle");
-    expect(historyFilterSelected(renderer, "history-source-all")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(false);
     press(renderer, "history-result-wrong");
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(true);
@@ -6599,7 +7439,7 @@ describe("PracticePocScreen", () => {
     expect(scheduler.calls.length).toBeGreaterThan(0);
   });
 
-  it("resets history filters to the default all-sources view", () => {
+  it("resets history filters to the default Sprint Needs attention view", () => {
     const renderer = renderStandardSequenceScreen();
 
     startStandardSprint(renderer);
@@ -6623,17 +7463,17 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-filter-reset");
 
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(false);
-    expect(historyFilterSelected(renderer, "history-source-all")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: true
     });
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("All puzzles");
-    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Sprint");
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Source: Sprint");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Result: Wrong");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("All Time");
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain("Black");
-    expect(renderer.root.findAllByProps({ testID: "history-source-all" }).some(
+    expect(renderer.root.findAllByProps({ testID: "history-source-sprint" }).some(
       (node) => node.props.accessibilityState?.selected === true
     )).toBe(true);
     expect(renderer.root.findAllByProps({ testID: "history-result-all" }).some(
@@ -7159,7 +7999,45 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(secondRenderer, "history-result-wrong")).toThrow();
     expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("7 days");
     expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("All puzzles");
-    expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).not.toContain("Sprint");
+    expect(collectText(findByTestId(secondRenderer, "history-active-filter-summary"))).toContain("Source: Sprint");
+  });
+
+  it("keeps a multi-move History replay fixed while a board drag is active", async () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service });
+
+    startStandardSprint(renderer);
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "e6f7");
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, "g6g5");
+    abandonSprint(renderer);
+
+    press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
+    const correctAttemptRow = historyAttemptRows(renderer)
+      .find((row) => collectText(row).includes("Correct"));
+    expect(correctAttemptRow).toBeTruthy();
+    press(renderer, correctAttemptRow!.props.testID);
+
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+
+    act(() => {
+      findByTestId(renderer, "review-board").props.onTouchStart();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+
+    act(() => {
+      findByTestId(renderer, "review-board").props.onTouchEnd();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+
+    act(() => {
+      findByTestId(renderer, "review-board").props.onTouchStart();
+      findByTestId(renderer, "review-board").props.onTouchCancel();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
   });
 
   it("keeps history analysis review on the current puzzle after a retry is solved", async () => {
@@ -7964,6 +8842,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-reset-puzzle")).toThrow();
     expect(() => findByTestId(renderer, "review-side-to-move")).toThrow();
     expect(styleEntryMatches(findByTestId(renderer, "review-context-strip").props.style, "justifyContent", "center")).toBe(true);
+    expect(findByTestId(renderer, "review-timer-slot")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e2e6");
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("locked");
     await settleEntryPreview();
@@ -7978,9 +8857,15 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e6f7");
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
 
+    const timerBeforeSolvedFeedback = collectText(findByTestId(renderer, "review-timer"));
     await boardMove(renderer, "e6f7");
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+    });
 
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
+    expect(collectText(findByTestId(renderer, "review-timer"))).toBe(timerBeforeSolvedFeedback);
     expect(promptKingTestIDs(renderer)).toEqual(initialPromptKingTestIDs);
     await settleFeedbackSnapshot();
 
@@ -8672,7 +9557,14 @@ describe("PracticePocScreen", () => {
 
     const reviewStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
     const solvedReviewFen = mustFenAfterMove(reviewStartFen, firstPuzzle.correctMove);
+    const unsolvedPromptHeight = flattenTestStyle(
+      findByTestId(renderer, "practice-prompt").props.style
+    ).height;
+    expect(unsolvedPromptHeight).toBe(72);
     await boardMove(renderer, firstPuzzle.correctMove);
+    expectText(renderer, "Solved");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-prompt").props.style).height)
+      .toBe(unsolvedPromptHeight);
     press(renderer, "review-analysis-button");
 
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(solvedReviewFen);
@@ -9014,7 +9906,16 @@ describe("PracticePocScreen", () => {
       )
     ).toBeLessThan(0);
     expect(() => findByTestId(renderer, "settings-move-feedback-previews")).toThrow();
+    expect(service.getSettings().moveFeedback).toEqual({
+      soundEnabled: false,
+      hapticsEnabled: true
+    });
 
+    press(renderer, "settings-move-sound-toggle");
+    expect(service.getSettings().moveFeedback).toEqual({
+      soundEnabled: true,
+      hapticsEnabled: true
+    });
     press(renderer, "settings-move-sound-toggle");
     expect(service.getSettings().moveFeedback).toEqual({
       soundEnabled: false,
@@ -9037,11 +9938,14 @@ describe("PracticePocScreen", () => {
     const moveFeedbackClient = new FakeMoveFeedbackClient();
     const renderer = renderStandardSequenceScreen({ moveFeedbackClient });
 
+    press(renderer, "settings-tab");
+    press(renderer, "settings-move-sound-toggle");
+    press(renderer, "practice-tab");
     startStandardSprint(renderer);
     expect(moveFeedbackClient.requests).toEqual([{
       cue: "capture",
       playSound: true,
-      playHaptic: false
+      playHaptic: true
     }]);
     await boardMove(renderer, "d8a8");
     expect(moveFeedbackClient.requests).toHaveLength(1);
@@ -9051,7 +9955,7 @@ describe("PracticePocScreen", () => {
       {
         cue: "capture",
         playSound: true,
-        playHaptic: false
+        playHaptic: true
       },
       {
         cue: "capture",
@@ -9066,7 +9970,7 @@ describe("PracticePocScreen", () => {
       {
         cue: "capture",
         playSound: true,
-        playHaptic: false
+        playHaptic: true
       },
       {
         cue: "capture",
@@ -9076,7 +9980,7 @@ describe("PracticePocScreen", () => {
       {
         cue: "move",
         playSound: true,
-        playHaptic: false
+        playHaptic: true
       }
     ]);
   });
@@ -9167,6 +10071,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(feedbackSection)).toContain("Your data stays in the app");
     expect(collectText(feedbackSection)).toContain("Ratings, history, and puzzle data are not attached");
     expect(collectText(feedbackSection)).toContain("You will review and submit your issue on GitHub");
+    expect(collectText(feedbackSection)).toContain("Email Support");
+    expect(collectText(feedbackSection)).toContain("support@chessticize.com");
+    expect(collectText(findByTestId(renderer, "settings-about-section")))
+      .not.toContain("support@chessticize.com");
     expect(findByTestId(renderer, "settings-feedback-open-github").props.accessibilityRole).toBe("button");
     expect(testIdOrder(renderer, "settings-profile-section", "settings-feedback-section")).toBeLessThan(0);
     expect(testIdOrder(renderer, "settings-feedback-section", "settings-about-section")).toBeLessThan(0);
@@ -9198,12 +10106,30 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "settings-feedback-handoff-confirmation")))
       .toContain("Couldn't open GitHub Issues. Try again.");
     press(renderer, "settings-feedback-handoff-cancel");
+    press(renderer, "settings-support-email");
+    expect(openURLSpy).toHaveBeenLastCalledWith("mailto:support@chessticize.com");
     openURLSpy.mockRestore();
   });
 
-  it("shows Android-managed restore protection without exposing iCloud controls", () => {
+  it("shows Android-managed restore protection and exports local diagnostics without iCloud claims", async () => {
+    const prepareSupportBundle = jest.fn(async (_input: {
+      diagnosticText: string;
+      metadata: unknown;
+    }) => ({
+      bundleUrl: "file:///cache/Chessticize-Support.zip",
+      files: ["local-progress.sqlite", "diagnostic.txt", "manifest.json"],
+      kind: "complete" as const
+    }));
+    const shareSupportBundle = jest.fn(async () => undefined);
     const renderer = renderScreen({
-      progressProtection: { kind: "android_managed_backup" }
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      iCloudSyncDiagnosticsClient: {
+        copyText: jest.fn(async () => undefined),
+        discardSupportBundle: jest.fn(async () => undefined),
+        prepareSupportBundle,
+        shareSupportBundle
+      }
     });
 
     press(renderer, "settings-tab");
@@ -9220,7 +10146,71 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-sync-section")).toThrow();
     expect(() => findByTestId(renderer, "settings-icloud-sync-controls")).toThrow();
     expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
+    expect(collectText(findByTestId(renderer, "settings-feedback-section")))
+      .toContain("Export Support Diagnostics");
+    expect(collectText(findByTestId(renderer, "settings-feedback-section")))
+      .toContain("Share a local SQLite snapshot");
+    expect(testIdOrder(
+      renderer,
+      "settings-sync-support-bundle-entry",
+      "settings-support-email"
+    )).toBeLessThan(0);
+
+    press(renderer, "settings-sync-support-bundle-entry");
+    const modal = findByTestId(renderer, "settings-sync-support-bundle-modal");
+    expect(collectText(modal)).toContain("Android lets you choose where to send the bundle");
+    expect(collectText(modal)).toContain("local-progress.sqlite");
+    expect(collectText(modal)).not.toContain("icloud-progress-snapshot.json");
+    await pressAsyncWithin(modal, "settings-sync-support-bundle-prepare");
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-complete")))
+      .toContain("Android diagnostics bundle ready");
+    expect(prepareSupportBundle).toHaveBeenCalledTimes(1);
+    expect(prepareSupportBundle.mock.calls[0]![0].diagnosticText)
+      .toContain("Progress protection: Android-managed backup");
+    expect(prepareSupportBundle.mock.calls[0]![0].metadata).toMatchObject({
+      platform: "android",
+      progressProtection: "android_managed_backup"
+    });
+    await pressAsync(renderer, "settings-sync-support-bundle-share");
+    expect(shareSupportBundle).toHaveBeenCalledWith(
+      "file:///cache/Chessticize-Support.zip"
+    );
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-shared")))
+      .toContain("expires automatically");
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-share")))
+      .toContain("Share Options Opened");
     expect(collectText(renderer.root)).not.toContain("iCloud");
+  });
+
+  it("uses Android copy when a partial support bundle lacks the local SQLite snapshot", async () => {
+    const renderer = renderScreen({
+      progressProtection: { kind: "android_managed_backup" },
+      reminderPlatform: "android",
+      iCloudSyncDiagnosticsClient: {
+        copyText: jest.fn(async () => undefined),
+        discardSupportBundle: jest.fn(async () => undefined),
+        prepareSupportBundle: jest.fn(async () => ({
+          bundleUrl: "file:///cache/Chessticize-Support.zip",
+          files: ["diagnostic.txt", "manifest.json"],
+          kind: "partial" as const,
+          unavailableReason: "The local SQLite snapshot could not be created."
+        })),
+        shareSupportBundle: jest.fn(async () => undefined)
+      }
+    });
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-sync-support-bundle-entry");
+    await pressAsync(renderer, "settings-sync-support-bundle-prepare");
+
+    const partial = findByTestId(renderer, "settings-sync-support-bundle-partial");
+    expect(collectText(partial)).toContain("Local SQLite snapshot couldn't be included");
+    expect(collectText(partial)).toContain("The local SQLite snapshot could not be created.");
+    expect(collectText(partial)).toContain(
+      "does not include the local progress database needed for reproduction"
+    );
+    expect(collectText(renderer.root)).not.toContain("iCloud");
+    expect(collectText(renderer.root)).not.toContain("CloudKit");
   });
 
   it("opens the official Android GitHub Releases page only after a user gesture", () => {
@@ -9292,6 +10282,220 @@ describe("PracticePocScreen", () => {
       expect(client.fetchCount).toBe(2);
       expect(client.saveCount).toBe(2);
     });
+  });
+
+  it("captures a real sync failure and copies only the bounded diagnostic", async () => {
+    const nativeFailure = Object.assign(new Error("Request rate limited"), {
+      code: "icloud_fetch_failed",
+      domain: "CKErrorDomain",
+      userInfo: {
+        cloudKitCode: 7,
+        CKErrorRetryAfterKey: 12,
+        credential: "must-not-be-copied"
+      }
+    });
+    const copyText = jest.fn(async (_text: string) => undefined);
+    const renderer = renderScreen({
+      iCloudProgressSyncClient: {
+        getAccountStatus: jest.fn(async () => "available"),
+        fetchSnapshot: jest.fn(async () => Promise.reject(nativeFailure)),
+        saveSnapshot: jest.fn(async () => undefined)
+      },
+      iCloudSyncDiagnosticsClient: {
+        copyText,
+        discardSupportBundle: jest.fn(async () => undefined),
+        prepareSupportBundle: jest.fn(async () => ({
+          bundleUrl: "file:///tmp/support.zip",
+          files: ["local-progress.sqlite", "diagnostic.txt", "manifest.json"],
+          kind: "partial" as const
+        })),
+        shareSupportBundle: jest.fn(async () => undefined)
+      }
+    });
+
+    press(renderer, "settings-tab");
+    await waitForAssertion(() => {
+      expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain(
+        "iCloud sync failed"
+      );
+    });
+    press(renderer, "settings-sync-error-details");
+    await pressAsync(renderer, "settings-sync-error-copy");
+
+    expect(copyText).toHaveBeenCalledTimes(1);
+    const copiedDiagnostic = copyText.mock.calls[0]![0];
+    expect(copiedDiagnostic).toContain("Code: icloud_fetch_failed");
+    expect(copiedDiagnostic).toContain("Native code: 7");
+    expect(copiedDiagnostic).not.toContain("must-not-be-copied");
+  });
+
+  it("keeps support diagnostics reachable when iCloud sync is off", async () => {
+    const service = createMobilePracticeService("random1000");
+    service.saveSettings({
+      ...service.getSettings(),
+      sync: {
+        iCloudEnabled: false
+      }
+    });
+    const prepareSupportBundle = jest.fn(async (_input: {
+      diagnosticText: string;
+      metadata: unknown;
+    }) => ({
+      bundleUrl: "file:///tmp/chessticize-support.zip",
+      files: [
+        "local-progress.sqlite",
+        "icloud-progress-snapshot.json",
+        "diagnostic.txt",
+        "manifest.json"
+      ],
+      kind: "complete" as const
+    }));
+    const shareSupportBundle = jest.fn(async () => undefined);
+    const discardSupportBundle = jest.fn(async () => undefined);
+    const renderer = renderScreen({
+      practiceService: service,
+      iCloudSyncDiagnosticsClient: {
+        copyText: jest.fn(async () => undefined),
+        discardSupportBundle,
+        prepareSupportBundle,
+        shareSupportBundle
+      }
+    });
+
+    press(renderer, "settings-tab");
+    expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
+    expect(collectText(findByTestId(renderer, "settings-sync-section")))
+      .not.toContain("Export Support Diagnostics");
+    const feedbackSection = findByTestId(renderer, "settings-feedback-section");
+    expect(collectText(feedbackSection)).toContain("Email Support");
+    expect(collectText(feedbackSection)).toContain("Export Support Diagnostics");
+    expect(testIdOrder(
+      renderer,
+      "settings-sync-support-bundle-entry",
+      "settings-support-email"
+    )).toBeLessThan(0);
+    press(renderer, "settings-sync-support-bundle-entry");
+    await pressAsync(renderer, "settings-sync-support-bundle-prepare");
+
+    expect(prepareSupportBundle).toHaveBeenCalledTimes(1);
+    expect(prepareSupportBundle.mock.calls[0]![0].diagnosticText).toContain(
+      "iCloud sync setting: Off"
+    );
+    await pressAsync(renderer, "settings-sync-support-bundle-share");
+    expect(shareSupportBundle).toHaveBeenCalledWith(
+      "file:///tmp/chessticize-support.zip"
+    );
+    press(renderer, "settings-sync-support-bundle-details");
+    await flushMicrotasks();
+    expect(discardSupportBundle).not.toHaveBeenCalled();
+  });
+
+  it("discards a support bundle that finishes after its diagnostics window closes", async () => {
+    let finishPreparation: ((result: {
+      bundleUrl: string;
+      files: string[];
+      kind: "partial";
+    }) => void) | undefined;
+    const prepareSupportBundle = jest.fn(() => new Promise<{
+      bundleUrl: string;
+      files: string[];
+      kind: "partial";
+    }>((resolve) => {
+      finishPreparation = resolve;
+    }));
+    const discardSupportBundle = jest.fn(async () => undefined);
+    const renderer = renderScreen({
+      iCloudSyncDiagnosticsClient: {
+        copyText: jest.fn(async () => undefined),
+        discardSupportBundle,
+        prepareSupportBundle,
+        shareSupportBundle: jest.fn(async () => undefined)
+      }
+    });
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-sync-support-bundle-entry");
+    press(renderer, "settings-sync-support-bundle-prepare");
+    expect(findByTestId(renderer, "settings-sync-support-bundle-preparing")).toBeTruthy();
+    press(renderer, "settings-sync-error-details-close-icon");
+
+    await act(async () => {
+      finishPreparation?.({
+        bundleUrl: "file:///tmp/late-support.zip",
+        files: ["local-progress.sqlite", "diagnostic.txt", "manifest.json"],
+        kind: "partial"
+      });
+      await Promise.resolve();
+    });
+
+    expect(discardSupportBundle).toHaveBeenCalledWith("file:///tmp/late-support.zip");
+  });
+
+  it("shows and copies the issue #353 local iCloud sync diagnostic design", async () => {
+    const renderer = renderLabScenario("settings-ios-sync-error-details");
+
+    press(renderer, "settings-tab");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain(
+      "iCloud sync failed"
+    );
+    press(renderer, "settings-sync-error-details");
+
+    const modal = findByTestId(renderer, "settings-sync-error-details-modal");
+    expect(collectText(modal)).toContain("The request was rate limited. Please try again later.");
+    expect(collectText(modal)).toContain("Your progress stays private");
+    expect(collectText(findByTestId(renderer, "settings-sync-error-diagnostic-text"))).toContain(
+      "Phase: Fetch from iCloud"
+    );
+    expect(() => findByTestId(renderer, "settings-sync-error-copy-success")).toThrow();
+
+    await pressAsync(renderer, "settings-sync-error-copy");
+
+    expect(collectText(findByTestId(renderer, "settings-sync-error-copy-success"))).toContain(
+      "Copied"
+    );
+
+    press(renderer, "settings-sync-support-bundle-open");
+    expect(collectText(modal)).toContain("This bundle contains progress data");
+    expect(collectText(modal)).toContain("local-progress.sqlite");
+    expect(collectText(modal)).toContain("icloud-progress-snapshot.json");
+
+    await pressAsyncWithin(modal, "settings-sync-support-bundle-prepare");
+
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-complete"))).toContain(
+      "Complete reproduction bundle"
+    );
+    expect(collectText(modal)).toContain("manifest.json");
+    await pressAsync(renderer, "settings-sync-support-bundle-share");
+    expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-shared"))).toContain(
+      "temporary bundle was removed"
+    );
+
+    press(renderer, "settings-sync-support-bundle-details");
+    press(renderer, "settings-sync-error-details-close");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain(
+      "iCloud sync failed"
+    );
+  });
+
+  it("marks the issue #353 support bundle partial when CloudKit export is unavailable", async () => {
+    const renderer = renderLabScenario("settings-ios-sync-support-bundle-partial");
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-sync-error-details");
+    const modal = findByTestId(renderer, "settings-sync-error-details-modal");
+    press(renderer, "settings-sync-support-bundle-open");
+    await pressAsyncWithin(modal, "settings-sync-support-bundle-prepare");
+
+    const partial = findByTestId(renderer, "settings-sync-support-bundle-partial");
+    expect(collectText(partial)).toContain("iCloud snapshot couldn't be included");
+    expect(collectText(partial)).toContain(
+      "CloudKit snapshot unavailable: The request was rate limited."
+    );
+    expect(collectText(partial)).toContain("not a complete reproduction");
+    expect(collectText(findByTestId(renderer, "settings-sync-error-details-modal"))).not.toContain(
+      "icloud-progress-snapshot.json"
+    );
+    expect(findByTestId(renderer, "settings-sync-support-bundle-share")).toBeTruthy();
   });
 
   it("does not sync while iCloud is off and syncs once when it is enabled", async () => {
@@ -10015,6 +11219,238 @@ function firstArrowDuelPuzzleForTest(): ArrowDuelState {
   return requireArrowDuelState(state);
 }
 
+function createArrowFocusedPracticeService(
+  inventoryAvailable = true,
+  exposeStore?: (store: MemoryStore) => void
+): PracticeService {
+  const candidates = tacticalProfilePuzzleFixture
+    .filter((puzzle) =>
+      puzzle.rating >= 1700
+      && puzzle.rating <= 1900
+      && isServerCompatibleArrowDuelPuzzle(puzzle)
+    )
+    .slice(0, 44);
+  if (candidates.length < 44) {
+    throw new Error("Tactical Profile component fixture needs 44 Arrow Duel puzzles");
+  }
+  const evidence = candidates.slice(0, 12).map((puzzle) => ({
+    ...puzzle,
+    ratingDeviation: 80,
+    themes: ["pin"]
+  }));
+  const focused = candidates.slice(12, 24).map((puzzle) => ({
+    ...puzzle,
+    ratingDeviation: 80,
+    themes: ["pin"]
+  }));
+  const mixed = candidates.slice(24).map((puzzle) => ({
+    ...puzzle,
+    ratingDeviation: 80,
+    themes: ["fork"]
+  }));
+  const store = new MemoryStore();
+  store.seedPuzzles([...evidence, ...focused, ...mixed]);
+  const config = defaultSprintConfig("arrow_duel");
+  store.saveRating({
+    key: config.ratingKey,
+    generation: 0,
+    rating: 1800,
+    ratingDeviation: 80,
+    volatility: 0.06,
+    games: 12
+  });
+
+  for (let sessionIndex = 0; sessionIndex < 3; sessionIndex += 1) {
+    const day = 10 + sessionIndex * 4;
+    const startedAt = `2026-07-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+    const completedAt = `2026-07-${String(day).padStart(2, "0")}T00:04:00.000Z`;
+    const sessionPuzzles = evidence.slice(sessionIndex * 4, sessionIndex * 4 + 4);
+    const session = startSprint({
+      id: `arrow-profile-session-${sessionIndex}`,
+      config,
+      puzzles: sessionPuzzles,
+      ratingBefore: 1800,
+      now: startedAt
+    });
+    store.createSprintSession({
+      ...session,
+      status: "failed",
+      completedAt,
+      endReason: "max_mistakes",
+      correctCount: 0,
+      mistakeCount: 4,
+      ratingAfter: 1800
+    });
+    for (const [offset, puzzle] of sessionPuzzles.entries()) {
+      store.recordAttempt({
+        id: `arrow-profile-attempt-${sessionIndex}-${offset}`,
+        source: "sprint",
+        sessionId: session.id,
+        puzzleId: puzzle.id,
+        mode: "arrow_duel",
+        ratingKey: config.ratingKey,
+        result: "wrong",
+        submittedMove: puzzle.solutionMoves[0],
+        expectedMove: puzzle.stockfishBestMove as string,
+        arrowDuelCandidateOrder: [
+          puzzle.stockfishBestMove as string,
+          puzzle.solutionMoves[0] as string
+        ],
+        startedAt: completedAt,
+        completedAt,
+        elapsedMs: 10_000,
+        ratingBefore: 1800
+      });
+    }
+  }
+  exposeStore?.(store);
+
+  return new PracticeService(
+    store,
+    createArrowTacticalProfileService(store, inventoryAvailable)
+  );
+}
+
+function createArrowTacticalProfileService(
+  store: MemoryStore,
+  inventoryAvailable = true
+): TacticalProfileService {
+  return new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository: new MemoryTacticalProfileRepository(),
+    calibration: COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+    naturalFrequency: {
+      line: {},
+      arrow_duel: { pin: 0.12, fork: 0.12 }
+    },
+    naturalFrequencyForRating: (
+      taskFamily
+    ): Readonly<Record<string, number>> =>
+      taskFamily === "arrow_duel"
+        ? { pin: 0.12, fork: 0.12 }
+        : {},
+    ...(inventoryAvailable
+      ? {}
+      : { inventoryUpperBound: () => ({ pin: 0 }) }),
+    focusedRunPolicy: {
+      runSize: 15,
+      recentPuzzleDays: 30,
+      ratingBandHalfWidths: [100, 200]
+    }
+  });
+}
+
+function createDualFamilyFocusedPracticeService(
+  calibration: TacticalProfileCalibrationArtifact =
+    COMPONENT_TACTICAL_PROFILE_CALIBRATION,
+  arrowSessionCount = 3
+): PracticeService {
+  const candidates = tacticalProfilePuzzleFixture
+    .filter(isServerCompatibleArrowDuelPuzzle)
+    .slice(0, 24);
+  if (candidates.length < 24) {
+    throw new Error("Dual-family Tactical Profile fixture needs 24 puzzles");
+  }
+  const linePuzzles = candidates.slice(0, 12).map((puzzle) => ({
+    ...puzzle,
+    rating: 900,
+    ratingDeviation: 80,
+    themes: ["fork"]
+  }));
+  const arrowPuzzles = candidates.slice(12, 24).map((puzzle) => ({
+    ...puzzle,
+    rating: 900,
+    ratingDeviation: 80,
+    themes: ["pin"]
+  }));
+  const store = new MemoryStore();
+  store.seedPuzzles([...linePuzzles, ...arrowPuzzles]);
+  const lineConfig = defaultSprintConfig("standard");
+  const arrowConfig = defaultSprintConfig("arrow_duel");
+  for (const config of [lineConfig, arrowConfig]) {
+    store.saveRating({
+      key: config.ratingKey,
+      generation: 0,
+      rating: 900,
+      ratingDeviation: 80,
+      volatility: 0.06,
+      games: 12
+    });
+  }
+  for (const [taskFamily, config, puzzles] of [
+    ["line", lineConfig, linePuzzles],
+    ["arrow_duel", arrowConfig, arrowPuzzles]
+  ] as const) {
+    const sessionCount = taskFamily === "arrow_duel" ? arrowSessionCount : 3;
+    for (let sessionIndex = 0; sessionIndex < sessionCount; sessionIndex += 1) {
+      const day = 10 + sessionIndex * 4;
+      const startedAt = `2026-07-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+      const completedAt = `2026-07-${String(day).padStart(2, "0")}T00:04:00.000Z`;
+      const sessionPuzzles = puzzles.slice(
+        sessionIndex * 4,
+        sessionIndex * 4 + 4
+      );
+      const session = startSprint({
+        id: `${taskFamily}-dual-profile-session-${sessionIndex}`,
+        config,
+        puzzles: sessionPuzzles,
+        ratingBefore: 900,
+        now: startedAt
+      });
+      store.createSprintSession({
+        ...session,
+        status: "failed",
+        completedAt,
+        endReason: "max_mistakes",
+        correctCount: 0,
+        mistakeCount: 4,
+        ratingAfter: 900
+      });
+      for (const [offset, puzzle] of sessionPuzzles.entries()) {
+        store.recordAttempt({
+          id: `${taskFamily}-dual-profile-attempt-${sessionIndex}-${offset}`,
+          source: "sprint",
+          sessionId: session.id,
+          puzzleId: puzzle.id,
+          mode: config.mode,
+          ratingKey: config.ratingKey,
+          result: "wrong",
+          submittedMove: puzzle.solutionMoves[0],
+          expectedMove: taskFamily === "arrow_duel"
+            ? puzzle.stockfishBestMove as string
+            : puzzle.solutionMoves[1] ?? puzzle.solutionMoves[0],
+          ...(taskFamily === "arrow_duel"
+            ? {
+                arrowDuelCandidateOrder: [
+                  puzzle.stockfishBestMove as string,
+                  puzzle.solutionMoves[0]
+                ] as [string, string]
+              }
+            : {}),
+          startedAt: completedAt,
+          completedAt,
+          elapsedMs: 10_000,
+          ratingBefore: 900
+        });
+      }
+    }
+  }
+  return new PracticeService(
+    store,
+    new TacticalProfileService({
+      progressStore: store,
+      puzzleSource: store,
+      repository: new MemoryTacticalProfileRepository(),
+      calibration,
+      naturalFrequency: {
+        line: { fork: 0.12 },
+        arrow_duel: { pin: 0.12 }
+      }
+    })
+  );
+}
+
 function sharedHistoryPuzzle(): Puzzle {
   return {
     id: "shared-history",
@@ -10025,6 +11461,87 @@ function sharedHistoryPuzzle(): Puzzle {
     source: "lichess",
     stockfishBestMove: "e2e3"
   };
+}
+
+const COMPONENT_TACTICAL_PROFILE_CALIBRATION = {
+  schemaVersion: 1,
+  modelVersion: "component-test-v1",
+  calibrationId: "component-test-calibration",
+  packFeatureHash: "component-test-pack-rd",
+  createdAt: "2026-07-01T00:00:00.000Z",
+  provenance: {
+    inputSchemaVersion: 1,
+    policyId: "component-test-policy",
+    policyHash: `sha256:${"1".repeat(64)}`,
+    corpusHash: `sha256:${"2".repeat(64)}`,
+    reportHash: `sha256:${"3".repeat(64)}`,
+    decisionEvidenceId: "component-test-decisions",
+    representativeOwnerApproved: true,
+    familyReadiness: {
+      line: { ready: true, reasons: [] },
+      arrow_duel: { ready: true, reasons: [] }
+    }
+  },
+  recencyHalfLifeDays: 90,
+  evidence: {
+    watchProbability: 0.75,
+    recommendationExitProbability: 0.85,
+    recommendationProbability: 0.9,
+    strongProbability: 0.97,
+    minDistinctPuzzles: 4,
+    minDistinctSessions: 2
+  },
+  opportunity: {
+    minimumWeight: 0.25,
+    exponent: 0.5
+  },
+  families: {
+    line: componentTacticalProfileCalibratedFamily(),
+    arrow_duel: componentTacticalProfileCalibratedFamily()
+  }
+} as const satisfies TacticalProfileCalibrationArtifact;
+
+function componentTacticalProfileCalibratedFamily() {
+  return {
+    status: "calibrated",
+    solve: {
+      intercept: 0,
+      ratingGapSlope: 1,
+      timeoutLogCoefficient: 0,
+      timeoutReferenceSeconds: 60,
+      themePriorSdRating: 100,
+      practicalDeficitRating: 20,
+      minExpectedFailuresPer100: 2
+    },
+    speed: {
+      interceptLogSeconds: Math.log(30),
+      relativeDifficultyCoefficient: 0,
+      decisionCountCoefficient: 0,
+      paceLogCoefficient: 0,
+      slowPolicyLogCoefficient: 0,
+      residualSd: 0.25,
+      themePriorSdLogSeconds: 0.5,
+      practicalTimeMultiplier: 1.2
+    }
+  } as const;
+}
+
+class RecoveringTacticalProfileRepository extends MemoryTacticalProfileRepository {
+  private remainingFailedReads = 0;
+
+  failReads(count: number): void {
+    this.remainingFailedReads = count;
+  }
+
+  override listDirtyDays(
+    ...args: Parameters<MemoryTacticalProfileRepository["listDirtyDays"]>
+  ): string[] {
+    if (this.remainingFailedReads > 0) {
+      this.remainingFailedReads -= 1;
+      throw new Error("simulated Tactical Profile cache read failure");
+    }
+    return super.listDirtyDays(...args);
+  }
 }
 
 function createUnclearHistoryReviewService(): PracticeService {
@@ -10156,6 +11673,20 @@ function press(renderer: TestRenderer.ReactTestRenderer, testID: string): void {
 async function pressAsync(renderer: TestRenderer.ReactTestRenderer, testID: string): Promise<void> {
   await act(async () => {
     const target = findByTestId(renderer, testID);
+    if (target.props.disabled) {
+      throw new Error(`${testID} is disabled`);
+    }
+    target.props.onPress();
+    await Promise.resolve();
+  });
+}
+
+async function pressAsyncWithin(
+  root: TestRenderer.ReactTestInstance,
+  testID: string
+): Promise<void> {
+  await act(async () => {
+    const target = root.findByProps({ testID });
     if (target.props.disabled) {
       throw new Error(`${testID} is disabled`);
     }

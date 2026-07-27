@@ -25,10 +25,13 @@ if (!Number.isInteger(iterations) || iterations < 1) {
 const database = new DatabaseSync(packPath, { readOnly: true });
 try {
   const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(database), {
-    allPuzzlesArrowDuelEligible: true
+    arrowDuelEligibility: "all"
   });
   const results = cases.map((benchmarkCase) => benchmarkSelection(source, benchmarkCase));
   const focusedQuotaPlan = benchmarkFocusedQuotaPlan(source);
+  const nestedRatingBandSelections =
+    benchmarkNestedRatingBandSelections(source);
+  const largeRecentExclusion = benchmarkLargeRecentExclusion(source);
   const oneTheme = results[0];
   const fiveThemes = results[1];
   const allThemes = results[2];
@@ -56,12 +59,199 @@ try {
     input: { limit, rating },
     results,
     focusedQuotaPlan,
+    nestedRatingBandSelections,
+    largeRecentExclusion,
     fiveToOneMedianRatio: round(fiveThemes.selection.medianMs / oneTheme.selection.medianMs),
     fiveToAllMedianRatio: round(fiveThemes.selection.medianMs / allThemes.selection.medianMs),
     queryPlans
   }, null, 2)}\n`);
 } finally {
   database.close();
+}
+
+function benchmarkNestedRatingBandSelections(source) {
+  const run = (randomSeed) => {
+    let selectionCount = 0;
+    const select = (input) => {
+      selectionCount += 1;
+      return source.selectPuzzlesForRatingBands(input);
+    };
+    const input = {
+      ratingAnchor: rating,
+      halfWidths: [100, 200]
+    };
+    const primary = select({
+      ...input,
+      filter: {
+        mode: "custom",
+        limit: 15,
+        themes: ["fork"],
+        randomSeed: `${randomSeed}:primary`
+      }
+    });
+    const secondary = select({
+      ...input,
+      filter: {
+        mode: "custom",
+        limit: 15,
+        themes: ["pin"],
+        randomSeed: `${randomSeed}:secondary`
+      }
+    });
+    const mixed = select({
+      ...input,
+      filter: {
+        mode: "custom",
+        limit: 15,
+        randomSeed: `${randomSeed}:mixed`
+      },
+      excludedThemes: ["fork", "pin"]
+    });
+    if (selectionCount !== 3) {
+      throw new Error(
+        `nested-rating-band selection used ${selectionCount} selections; expected 3`
+      );
+    }
+    const allocations = Object.fromEntries(
+      input.halfWidths.map((halfWidth) => [
+        halfWidth,
+        allocateNestedBand({
+          halfWidth,
+          primary: puzzlesForBand(primary, halfWidth, "primary"),
+          secondary: puzzlesForBand(
+            secondary,
+            halfWidth,
+            "secondary"
+          ),
+          mixed: puzzlesForBand(mixed, halfWidth, "mixed")
+        })
+      ])
+    );
+    return {
+      primary,
+      secondary,
+      mixed,
+      selectionCount,
+      allocations
+    };
+  };
+  for (let index = 0; index < 5; index += 1) {
+    run(`warm-${index}`);
+  }
+  const samples = [];
+  let latest;
+  for (let index = 0; index < iterations; index += 1) {
+    const startedAt = performance.now();
+    latest = run(`sample-${index}`);
+    samples.push(performance.now() - startedAt);
+  }
+  samples.sort((left, right) => left - right);
+  return {
+    indexedSelectionCount: latest.selectionCount,
+    ratingBandHalfWidths: [100, 200],
+    returnedByBand: Object.fromEntries(
+      [100, 200].map((halfWidth) => [
+        halfWidth,
+        {
+          primary: latest.allocations[halfWidth].primary.length,
+          secondary: latest.allocations[halfWidth].secondary.length,
+          mixed: latest.allocations[halfWidth].mixed.length,
+          uniquePuzzleCount:
+            latest.allocations[halfWidth].all.length
+        }
+      ])
+    ),
+    selection: {
+      medianMs: round(percentile(samples, 0.5)),
+      p95Ms: round(percentile(samples, 0.95)),
+      minMs: round(samples[0]),
+      maxMs: round(samples.at(-1))
+    }
+  };
+}
+
+function puzzlesForBand(selections, halfWidth, quota) {
+  const band = selections.find(
+    (selection) => selection.halfWidth === halfWidth
+  );
+  if (!band) {
+    throw new Error(
+      `nested-rating-band selection omitted ${quota} ±${halfWidth}`
+    );
+  }
+  if (
+    new Set(band.puzzles.map((puzzle) => puzzle.id)).size !==
+    band.puzzles.length
+  ) {
+    throw new Error(
+      `nested-rating-band ${quota} ±${halfWidth} returned duplicate ids`
+    );
+  }
+  return band.puzzles;
+}
+
+function allocateNestedBand(input) {
+  const primaryIds = new Set(input.primary.map((puzzle) => puzzle.id));
+  const secondaryIds = new Set(
+    input.secondary.map((puzzle) => puzzle.id)
+  );
+  const primaryOnly = input.primary.filter(
+    (puzzle) => !secondaryIds.has(puzzle.id)
+  );
+  const secondaryOnly = input.secondary.filter(
+    (puzzle) => !primaryIds.has(puzzle.id)
+  );
+  const overlap = input.primary.filter((puzzle) =>
+    secondaryIds.has(puzzle.id)
+  );
+  const primaryOverlapCount = Math.max(0, 9 - primaryOnly.length);
+  const secondaryOverlapCount = Math.max(0, 3 - secondaryOnly.length);
+  if (
+    input.primary.length < 9 ||
+    input.secondary.length < 3 ||
+    primaryOverlapCount + secondaryOverlapCount > overlap.length
+  ) {
+    throw new Error(
+      `nested-rating-band ±${input.halfWidth} cannot satisfy 9 / 3 focused quotas`
+    );
+  }
+  const primary = [
+    ...primaryOnly.slice(0, 9),
+    ...overlap.slice(0, primaryOverlapCount)
+  ].slice(0, 9);
+  const usedPrimaryIds = new Set(
+    primary.map((puzzle) => puzzle.id)
+  );
+  const secondary = [
+    ...secondaryOnly.slice(0, 3),
+    ...overlap.filter(
+      (puzzle) => !usedPrimaryIds.has(puzzle.id)
+    )
+  ].slice(0, 3);
+  const usedFocusedIds = new Set([
+    ...usedPrimaryIds,
+    ...secondary.map((puzzle) => puzzle.id)
+  ]);
+  const mixed = input.mixed
+    .filter(
+      (puzzle) =>
+        !usedFocusedIds.has(puzzle.id) &&
+        !puzzle.themes.includes("fork") &&
+        !puzzle.themes.includes("pin")
+    )
+    .slice(0, 3);
+  const all = [...primary, ...secondary, ...mixed];
+  if (
+    primary.length !== 9 ||
+    secondary.length !== 3 ||
+    mixed.length !== 3 ||
+    new Set(all.map((puzzle) => puzzle.id)).size !== 15
+  ) {
+    throw new Error(
+      `nested-rating-band ±${input.halfWidth} failed exact 9 / 3 / 3 allocation`
+    );
+  }
+  return { primary, secondary, mixed, all };
 }
 
 function benchmarkFocusedQuotaPlan(source) {
@@ -122,24 +312,67 @@ function selectFocusedQuotaPlan(source, randomSeed) {
     ...primaryIds,
     ...secondary.map((puzzle) => puzzle.id)
   ]);
-  const mixedCandidates = source.selectPuzzles({
+  const mixed = source.selectPuzzlesExcludingThemes({
     mode: "custom",
-    limit: 30,
+    limit: 3,
     minRating: rating - 100,
     maxRating: rating + 100,
-    themes: [],
     excludeIds: [...focusedIds],
     randomSeed: `${randomSeed}:mixed`
-  });
-  const mixed = mixedCandidates
-    .filter((puzzle) => !puzzle.themes.includes("fork") && !puzzle.themes.includes("pin"))
-    .slice(0, 3);
+  }, ["fork", "pin"]);
   if (primary.length !== 9 || secondary.length !== 3 || mixed.length !== 3) {
     throw new Error(
       `focused-quota-plan incomplete: ${primary.length} primary, ${secondary.length} secondary, ${mixed.length} mixed`
     );
   }
   return [...primary, ...secondary, ...mixed];
+}
+
+function benchmarkLargeRecentExclusion(source) {
+  const recentPuzzleIds = source.selectPuzzles({
+    mode: "custom",
+    limit: 1_200,
+    minRating: rating - 100,
+    maxRating: rating + 100
+  }).map((puzzle) => puzzle.id);
+  const samples = [];
+  const benchmarkIterations = Math.min(iterations, 20);
+  for (let index = 0; index < benchmarkIterations; index += 1) {
+    const startedAt = performance.now();
+    const selected = source.selectPuzzlesExcludingThemes({
+      mode: "custom",
+      limit: 3,
+      minRating: rating - 100,
+      maxRating: rating + 100,
+      excludeIds: recentPuzzleIds,
+      randomSeed: `large-recent-${index}`
+    }, ["fork", "pin"]);
+    samples.push(performance.now() - startedAt);
+    if (selected.length !== 3) {
+      throw new Error(`large-recent-exclusion returned ${selected.length} puzzles; expected 3`);
+    }
+    if (selected.some((puzzle) => recentPuzzleIds.includes(puzzle.id))) {
+      throw new Error("large-recent-exclusion returned a recently seen puzzle");
+    }
+    if (selected.some((puzzle) =>
+      puzzle.themes.includes("fork") || puzzle.themes.includes("pin")
+    )) {
+      throw new Error("large-recent-exclusion returned a focused-theme puzzle");
+    }
+  }
+  samples.sort((left, right) => left - right);
+  return {
+    recentPuzzleCount: recentPuzzleIds.length,
+    iterations: benchmarkIterations,
+    returnedPuzzleCount: 3,
+    failures: 0,
+    selection: {
+      medianMs: round(percentile(samples, 0.5)),
+      p95Ms: round(percentile(samples, 0.95)),
+      minMs: round(samples[0]),
+      maxMs: round(samples.at(-1))
+    }
+  };
 }
 
 function benchmarkSelection(source, benchmarkCase) {

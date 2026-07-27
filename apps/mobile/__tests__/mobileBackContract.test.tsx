@@ -81,6 +81,37 @@ describe("mobile Back contract", () => {
       label: "Practice",
       testID: "tab-practice"
     });
+
+    const tacticalProfileState: MobileBackState = {
+      ...rootState,
+      detail: { kind: "tactical-profile", owner: "practice" }
+    };
+    const tacticalProfileIntent = resolveMobileBackIntent(tacticalProfileState, "button");
+    expect(tacticalProfileIntent).toEqual({ kind: "return-to-owner", owner: "practice" });
+    expect(mobileBackDestination(tacticalProfileIntent, tacticalProfileState)).toEqual({
+      label: "Practice",
+      testID: "tab-practice"
+    });
+
+    const historyProgressState: MobileBackState = {
+      ...rootState,
+      detail: { kind: "history-progress", owner: "history" },
+      tab: "history"
+    };
+    const historyProgressIntent = resolveMobileBackIntent(
+      historyProgressState,
+      "button"
+    );
+    expect(historyProgressIntent).toEqual({
+      kind: "return-to-owner",
+      owner: "history"
+    });
+    expect(
+      mobileBackDestination(historyProgressIntent, historyProgressState)
+    ).toEqual({
+      label: "History",
+      testID: "tab-history"
+    });
   });
 
   it("guards active practice, returns non-root tabs to Practice, and delegates only at root", () => {

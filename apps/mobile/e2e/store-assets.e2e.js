@@ -196,8 +196,8 @@ async function captureMainTabScenes() {
   await waitFor(element(by.id('review-today-history'))).toExist().withTimeout(10000);
   await takePortraitScreenshotAtTop('app-store-02-review-tab');
 
-  await openTab('history-tab', 'history-action-header');
-  await waitFor(element(by.text('1-4 of 4'))).toExist().withTimeout(10000);
+  await openTab('history-tab', 'history-filter-toggle');
+  await waitFor(element(by.id('history-page-next'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await takePortraitScreenshotAtTop('app-store-03-history-tab');
 

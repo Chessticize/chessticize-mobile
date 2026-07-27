@@ -19,7 +19,6 @@ type Story = StoryObj<typeof meta>;
 export const IosSync: Story = {
   name: "iOS sync",
   args: { scenarioId: "settings-ios-sync" },
-  tags: ["new"],
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-sync-section");
@@ -36,6 +35,66 @@ export const IosSync: Story = {
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-success");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-mistake");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-device-note");
+  }
+};
+
+export const ICloudSyncErrorDetails: Story = {
+  name: "iCloud sync error details",
+  args: { scenarioId: "settings-ios-sync-error-details" },
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await waitForText(canvasElement, "iCloud sync failed");
+    await clickTestId(canvasElement, "settings-sync-error-details");
+    await waitForTestId(canvasElement, "settings-sync-error-details-modal");
+    await waitForText(canvasElement, "The request was rate limited. Please try again later.");
+    await waitForText(canvasElement, "Your progress stays private");
+    await clickTestId(canvasElement, "settings-sync-error-copy");
+    await waitForTestId(canvasElement, "settings-sync-error-copy-success");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-open");
+    await waitForText(canvasElement, "This bundle contains progress data");
+    await waitForText(canvasElement, "local-progress.sqlite");
+    await waitForText(canvasElement, "icloud-progress-snapshot.json");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-prepare");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-complete");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-share");
+  }
+};
+
+export const ICloudSyncSupportBundle: Story = {
+  name: "iCloud support diagnostics",
+  args: { scenarioId: "settings-ios-sync-support-bundle" },
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await waitForTestId(canvasElement, "settings-feedback-section");
+    await waitForText(canvasElement, "Email Support");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-entry");
+    await waitForText(canvasElement, "This bundle contains progress data");
+    await waitForText(canvasElement, "local-progress.sqlite");
+    await waitForText(canvasElement, "icloud-progress-snapshot.json");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-prepare");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-complete");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-share");
+  }
+};
+
+export const ICloudSyncSupportBundlePartial: Story = {
+  name: "iCloud sync support bundle · partial",
+  args: { scenarioId: "settings-ios-sync-support-bundle-partial" },
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await clickTestId(canvasElement, "settings-sync-error-details");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-open");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-prepare");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-partial");
+    await waitForText(
+      canvasElement,
+      "CloudKit snapshot unavailable: The request was rate limited."
+    );
+    await waitForText(
+      canvasElement,
+      "The local database and diagnostic can still help, but this bundle is not a complete reproduction."
+    );
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-share");
   }
 };
 
@@ -57,6 +116,13 @@ export const AndroidBackup: Story = {
     await waitForTestId(canvasElement, "settings-android-backup-section");
     await waitForTestId(canvasElement, "settings-move-feedback-section");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-previews");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-entry");
+    await waitForText(canvasElement, "local-progress.sqlite");
+    await waitForText(canvasElement, "App, Android, database, and progress-protection details.");
+    await clickTestId(canvasElement, "settings-sync-support-bundle-prepare");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-complete");
+    await waitForText(canvasElement, "Android diagnostics bundle ready");
+    await waitForTestId(canvasElement, "settings-sync-support-bundle-share");
   }
 };
 
@@ -94,6 +160,8 @@ export const FeedbackEntryDesign: Story = {
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-feedback-section");
+    await waitForText(canvasElement, "Email Support");
+    await waitForText(canvasElement, "support@chessticize.com");
     await clickTestId(canvasElement, "settings-feedback-open-github");
     await waitForTestId(canvasElement, "settings-feedback-handoff-confirmation");
   }

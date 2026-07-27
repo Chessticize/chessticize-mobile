@@ -102,6 +102,31 @@ test("Arrow Duel eligibility mirrors server eval thresholds and requires same-si
   );
 });
 
+test("Arrow Duel eligibility excludes promotion candidates that its arrows cannot distinguish", () => {
+  assert.equal(
+    isServerCompatibleArrowDuelPuzzle(arrowPuzzle({
+      id: "best-move-underpromotion",
+      initialFen: "4k3/R3P3/1p3Kpp/2p5/2P5/1r6/4p1P1/8 b - - 0 1",
+      solutionMoves: ["b3e3"],
+      stockfishBestMove: "e2e1r",
+      stockfishEval: -483,
+      stockfishEvalAfterFirstMove: 654
+    })),
+    false
+  );
+  assert.equal(
+    isServerCompatibleArrowDuelPuzzle(arrowPuzzle({
+      id: "same-arrow-different-promotions",
+      initialFen: "4r3/7R/k1p5/p7/1pP3P1/1Pb5/P3pBKP/8 b - - 0 1",
+      solutionMoves: ["e2e1q"],
+      stockfishBestMove: "e2e1n",
+      stockfishEval: -72,
+      stockfishEvalAfterFirstMove: 10000
+    })),
+    false
+  );
+});
+
 function arrowPuzzle(overrides: Partial<Puzzle> & Pick<Puzzle, "id" | "initialFen" | "solutionMoves">): Puzzle {
   const puzzle: Puzzle = {
     id: overrides.id,

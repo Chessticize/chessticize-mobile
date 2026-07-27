@@ -16,6 +16,8 @@ export type MobileBackOwner = MobileBackPrimaryTab;
 export type MobileBackDetail =
   | { kind: "review-analysis"; owner: "history" | "review" }
   | { kind: "review-session"; owner: MobileBackOwner }
+  | { kind: "history-progress"; owner: "history" }
+  | { kind: "tactical-profile"; owner: "practice" }
   | { kind: "practice-run-editor"; owner: "practice" }
   | { kind: "custom-practice"; owner: "practice" }
   | { kind: "sprint-result"; owner: "practice" }

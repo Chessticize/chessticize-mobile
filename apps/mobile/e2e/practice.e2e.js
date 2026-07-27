@@ -31,7 +31,7 @@ const {
 // The visual assertion measures absolute painted arrow area. Pin the public
 // service's packaged-core selection to two long candidate vectors so random
 // move geometry cannot turn that rendering check into a pixel-count lottery.
-const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v2:54824';
+const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v4:23';
 
 describe('Practice POC', () => {
   beforeEach(async () => {
@@ -122,8 +122,9 @@ describe('Practice POC', () => {
 
     await device.terminateApp();
     await launchWithDisabledSynchronization({ newInstance: true, delete: false });
-    await waitFor(element(by.text('Calculation Focus'))).toExist().withTimeout(180000);
-    await waitFor(element(by.text('1000'))).toExist().withTimeout(10000);
+    await waitFor(
+      element(by.label('Select Calculation Focus, rating 1000, All · 5 min · 20s pace'))
+    ).toExist().withTimeout(180000);
   });
 
   it('persists first-use Sprint guidance and replays it after Settings reset', async () => {
@@ -149,6 +150,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(15000);
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('sprint-result-top-bar'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
     await element(by.id('back-practice-button')).tap();
 
     await openTab('settings-tab', 'settings-show-sprint-guide');
@@ -158,6 +160,18 @@ describe('Practice POC', () => {
     await device.terminateApp();
     await launchWithDisabledSynchronization({ newInstance: true, delete: false });
     await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(180000);
+  });
+
+  it('opens the real local Tactical Profile and returns to Practice', async () => {
+    await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(180000);
+    await element(by.id('practice-sprint-rules-dismiss')).tap();
+    await waitForVisibleInPracticeScroll('training-focus-open-profile');
+    await element(by.id('training-focus-open-profile')).tap();
+
+    await waitFor(element(by.id('tactical-profile-screen'))).toExist().withTimeout(10000);
+    await waitFor(element(by.text('Still collecting evidence'))).toExist().withTimeout(10000);
+    await element(by.id('tactical-profile-back')).tap();
+    await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
   });
 
   it('renders the standard sprint board', async () => {
@@ -174,10 +188,10 @@ describe('Practice POC', () => {
     await startPracticeMode('arrow-duel');
     await waitForVisibleInPracticeScroll('session-board');
     // The default 5/30 Arrow Duel config and pinned seed select packaged puzzle
-    // 03wH4 through PracticeService's rating fallback. Candidate order is
+    // bfPfS through PracticeService's rating fallback. Candidate order is
     // session-seeded, so wait for both long vectors without assuming order.
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'c3e4', 10000);
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h4f6', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f8', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f7', 10000);
 
     const boardFrame = await frameFor(element(by.id('session-board')));
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');
@@ -267,16 +281,18 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
+    // Needs Attention starts with both reasons selected. Remove In review so
+    // this journey proves the persisted Unclear marker specifically.
     await waitForVisibleInPracticeScroll('history-attention-flag-in-review');
     await element(by.id('history-attention-flag-in-review')).tap();
-    await waitFor(element(
-      by.text('Attention: Unclear').withAncestor(by.id('history-active-filter-summary'))
-    )).toExist().withTimeout(10000);
+    await element(by.id('history-filter-toggle')).tap();
+    await waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000);
+    await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
     const resultRowIdentifier = await historyAttemptRowTestIDForResult('Correct');
     await waitForVisibleInPracticeScroll(resultRowIdentifier);
     await element(by.id(resultRowIdentifier)).tap();
     await waitForVisibleInPracticeScroll('review-schedule-add');
-    await waitForVisibleInPracticeScroll('history-attempt-unclear');
+    await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
     await expect(element(by.id('history-attempt-detail'))).not.toExist();
     await expect(element(by.id('bookmark-glyph'))).not.toExist();
 
@@ -330,7 +346,7 @@ describe('Practice POC', () => {
 
     await element(by.id('review-schedule-add')).tap();
     await waitFor(element(by.id('review-schedule-state'))).toHaveText('Due tomorrow').withTimeout(10000);
-    await waitFor(element(by.id('history-attempt-unclear'))).not.toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-attempt-clear-unclear'))).not.toExist().withTimeout(10000);
 
     await element(by.id('review-schedule-remove')).tap();
     await waitFor(element(by.id('review-schedule-removal-confirmation'))).toBeVisible().withTimeout(10000);
@@ -347,11 +363,10 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
+    // Isolate Unclear again after relaunch; the empty state proves enrollment
+    // cleared that marker and later Review removal did not restore it.
     await waitForVisibleInPracticeScroll('history-attention-flag-in-review');
     await element(by.id('history-attention-flag-in-review')).tap();
-    await waitFor(element(
-      by.text('Attention: Unclear').withAncestor(by.id('history-active-filter-summary'))
-    )).toExist().withTimeout(10000);
     await waitFor(element(by.id('history-empty-state'))).toExist().withTimeout(10000);
   });
 

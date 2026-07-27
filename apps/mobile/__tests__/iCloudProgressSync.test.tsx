@@ -5,7 +5,16 @@ import {
   parseProgressSyncSnapshot
 } from "../src/platform/iCloudProgressSync";
 import type { ProgressSyncSnapshot } from "../../../packages/storage/src/progress-sync";
-import { ProgressSyncConflictError } from "../../../packages/storage/src/progress-sync";
+import {
+  ProgressSyncConflictError,
+  syncPracticeProgress,
+  type ProgressSyncStore
+} from "../../../packages/storage/src/progress-sync";
+import type { LocalDataExport } from "../../../packages/storage/src/practice-store";
+import {
+  captureICloudSyncFailure,
+  formatICloudSyncFailureDiagnostic
+} from "../src/platform/iCloudSyncDiagnostics";
 
 describe("iCloud progress sync bridge", () => {
   afterEach(() => {
@@ -53,7 +62,62 @@ describe("iCloud progress sync bridge", () => {
 
     await client?.fetchSnapshot();
 
-    await expect(client?.saveSnapshot(snapshot)).rejects.toBeInstanceOf(ProgressSyncConflictError);
+    await expect(client?.saveSnapshot(snapshot)).rejects.toMatchObject({
+      code: "icloud_save_conflict",
+      domain: "CloudKit"
+    });
+  });
+
+  it("preserves the bounded save-conflict diagnostic after retry exhaustion", async () => {
+    const snapshot = sampleSnapshot();
+    const conflict = Object.assign(new Error("private@example.com changed the record"), {
+      code: "icloud_save_conflict"
+    });
+    const saveSnapshot = jest.fn(async () => Promise.reject(conflict));
+    (NativeModules as Record<string, unknown>).ICloudProgressSync = {
+      getAccountStatus: jest.fn(async () => "available"),
+      fetchSnapshot: jest.fn(async () => null),
+      saveSnapshot
+    };
+    const client = createNativeICloudProgressSyncClient();
+    if (!client) {
+      throw new Error("Expected the native iCloud sync client.");
+    }
+    const localData: LocalDataExport = {
+      ...snapshot.data,
+      practiceRuns: [],
+      reviewQueue: []
+    };
+    const store: ProgressSyncStore = {
+      getSettings: () => snapshot.data.settings,
+      exportLocalData: () => localData,
+      importLocalData: jest.fn()
+    };
+
+    let exhaustedError: unknown;
+    try {
+      await syncPracticeProgress(store, client, {
+        deviceId: "ios-test",
+        now: () => "2026-07-26T16:42:00.000Z"
+      });
+    } catch (error) {
+      exhaustedError = error;
+    }
+    const diagnostic = captureICloudSyncFailure(exhaustedError, {
+      attempt: "Manual",
+      occurredAt: "2026-07-26T16:42:00.000Z"
+    });
+
+    expect(exhaustedError).toBeInstanceOf(ProgressSyncConflictError);
+    expect(saveSnapshot).toHaveBeenCalledTimes(3);
+    expect(diagnostic).toMatchObject({
+      code: "icloud_save_conflict",
+      domain: "CloudKit",
+      message: "The iCloud progress snapshot changed during sync.",
+      phase: "Save to iCloud"
+    });
+    expect(formatICloudSyncFailureDiagnostic(diagnostic, { appVersion: "1.2.3" }))
+      .not.toContain("private@example.com");
   });
 
   it("normalizes unavailable status and treats empty native payloads as no snapshot", async () => {

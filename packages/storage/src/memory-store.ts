@@ -9,6 +9,7 @@ import {
   filterHistoryAttemptsForQuery,
   normalizeRatingRecord,
   mergePracticeRunCatalogs,
+  namedThemesForSelection,
   orderReviewQueue,
   preferredReviewScheduleChange,
   removeReviewContext,
@@ -47,6 +48,7 @@ import type {
   ClearLocalHistoryResult,
   ExportedSprintSession,
   LocalDataImport,
+  LocalDataImportObserver,
   LocalDataImportResult,
   LocalDataExport,
   PracticeRatingActivity,
@@ -59,7 +61,14 @@ import { buildPracticeProgressSummary } from "./rating-history.ts";
 import { clonePracticeSettings, defaultPracticeSettings, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
-import { selectUniquePuzzles } from "./puzzle-selection.ts";
+import {
+  selectUniquePuzzles,
+  selectUniquePuzzlesForRatingBands
+} from "./puzzle-selection.ts";
+import type {
+  RatingBandPuzzleSelection,
+  RatingBandPuzzleSelectionInput
+} from "./puzzle-source.ts";
 import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync.ts";
 import { cloneAttemptHistoryRow, preferredAttemptHistoryRow, sameAttemptHistoryRow } from "./attempt-sync.ts";
 import {
@@ -79,6 +88,7 @@ export class MemoryStore implements PracticeStore {
   private readonly reviewQueue = new Map<string, ReviewQueueState>();
   private readonly reviewRemovals = new Map<string, ReviewScheduleRemoval>();
   private settings = defaultPracticeSettings();
+  private tacticalProfileSourceRevision = 0;
 
   seedPuzzles(puzzles: Puzzle[]): void {
     for (const puzzle of puzzles) {
@@ -98,7 +108,13 @@ export class MemoryStore implements PracticeStore {
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
     return selectUniquePuzzles({
-      puzzles: [...this.puzzles.values()].sort((left, right) => left.rating - right.rating || left.id.localeCompare(right.id)),
+      puzzles: [...this.puzzles.values()].sort((left, right) =>
+        filter.preferredRating === undefined
+          ? left.rating - right.rating || left.id.localeCompare(right.id)
+          : Math.abs(left.rating - filter.preferredRating) -
+              Math.abs(right.rating - filter.preferredRating) ||
+            left.id.localeCompare(right.id)
+      ),
       mode: filter.mode,
       limit: filter.limit,
       ...(filter.rating === undefined ? {} : { rating: filter.rating }),
@@ -109,6 +125,15 @@ export class MemoryStore implements PracticeStore {
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
     });
+  }
+
+  selectPuzzlesForRatingBands(
+    input: RatingBandPuzzleSelectionInput
+  ): RatingBandPuzzleSelection[] {
+    return selectUniquePuzzlesForRatingBands(
+      [...this.puzzles.values()],
+      input
+    );
   }
 
   getRating(key: string): RatingRecord {
@@ -208,11 +233,31 @@ export class MemoryStore implements PracticeStore {
   }
 
   updateSprintSession(state: SprintState): void {
+    const previous = this.sessions.get(state.id);
+    const previouslyEligible =
+      isTacticalProfileEvidenceSession(previous) &&
+      this.attempts.some((attempt) =>
+        attempt.source === "sprint" && attempt.sessionId === state.id
+      );
     this.sessions.set(state.id, state);
+    const isNowEligible =
+      isTacticalProfileEvidenceSession(state) &&
+      this.attempts.some((attempt) =>
+        attempt.source === "sprint" && attempt.sessionId === state.id
+      );
+    if (!previouslyEligible && isNowEligible) {
+      this.tacticalProfileSourceRevision += 1;
+    }
   }
 
   recordAttempt(attempt: AttemptEvent): void {
     this.attempts.push(cloneAttemptHistoryRow(attempt));
+    if (
+      attempt.source === "sprint" &&
+      isTacticalProfileEvidenceSession(this.sessions.get(attempt.sessionId))
+    ) {
+      this.tacticalProfileSourceRevision += 1;
+    }
   }
 
   setAttemptUnclear(attemptId: string, unclear: boolean, updatedAt: string): AttemptHistoryRow {
@@ -304,7 +349,70 @@ export class MemoryStore implements PracticeStore {
       .sort((left, right) => right.startedAt.localeCompare(left.startedAt) || right.id.localeCompare(left.id));
   }
 
-  importLocalData(data: LocalDataImport): LocalDataImportResult {
+  getSprintSessions(ids: readonly string[]): ExportedSprintSession[] {
+    return [...new Set(ids)].flatMap((id) => {
+      const session = this.sessions.get(id);
+      return session ? [exportedSprintSessionFromState(session)] : [];
+    });
+  }
+
+  listLatestTerminalFocusedSprintSessions(): ExportedSprintSession[] {
+    const latest = new Map<
+      NonNullable<SprintState["config"]["tacticalFocus"]>["taskFamily"],
+      ExportedSprintSession
+    >();
+    for (const state of this.sessions.values()) {
+      const taskFamily = state.config.tacticalFocus?.taskFamily;
+      if (!taskFamily || !state.completedAt) {
+        continue;
+      }
+      const session = exportedSprintSessionFromState(state);
+      const current = latest.get(taskFamily);
+      const currentCompletedAt = current?.completedAt;
+      if (
+        !current ||
+        !currentCompletedAt ||
+        state.completedAt > currentCompletedAt ||
+        (
+          state.completedAt === currentCompletedAt &&
+          session.id > current.id
+        )
+      ) {
+        latest.set(taskFamily, session);
+      }
+    }
+    return (["line", "arrow_duel"] as const).flatMap((taskFamily) => {
+      const session = latest.get(taskFamily);
+      return session ? [session] : [];
+    });
+  }
+
+  listSprintAttemptUtcDays(sessionIds: readonly string[]): string[] {
+    const includedSessionIds = new Set(sessionIds);
+    return [...new Set(
+      this.attempts
+        .filter((attempt) =>
+          attempt.source === "sprint" &&
+          includedSessionIds.has(attempt.sessionId)
+        )
+        .map((attempt) => utcDay(attempt.completedAt))
+        .filter((day): day is string => day !== undefined)
+    )].sort();
+  }
+
+  getTacticalProfileSourceRevision(): number {
+    return this.tacticalProfileSourceRevision;
+  }
+
+  importLocalData(
+    data: LocalDataImport,
+    observer?: LocalDataImportObserver
+  ): LocalDataImportResult {
+    const changedProfileSessions: Array<{
+      previous: ExportedSprintSession | undefined;
+      next: ExportedSprintSession;
+    }> = [];
+    let eligibleAttemptChanged = false;
     const result: LocalDataImportResult = {
       ratings: 0,
       attempts: 0,
@@ -381,6 +489,8 @@ export class MemoryStore implements PracticeStore {
         ratingBefore: next.ratingBefore,
         ...(next.ratingAfter === undefined ? {} : { ratingAfter: next.ratingAfter })
       });
+      observer?.onSprintSessionChanged(previous, next);
+      changedProfileSessions.push({ previous, next });
       result.sprintSessions += 1;
     }
     for (const attempt of data.attempts) {
@@ -398,6 +508,15 @@ export class MemoryStore implements PracticeStore {
       } else {
         this.attempts[existingIndex] = next;
       }
+      observer?.onAttemptChanged(previous, next);
+      eligibleAttemptChanged ||= [previous, next].some((candidate) => {
+        if (candidate?.source !== "sprint") {
+          return false;
+        }
+        return isTacticalProfileEvidenceSession(
+          this.sessions.get(candidate.sessionId)
+        );
+      });
       result.attempts += 1;
     }
     const importedReviewChanges: ReviewScheduleChange[] = [
@@ -415,10 +534,33 @@ export class MemoryStore implements PracticeStore {
         result.reviewQueue += 1;
       }
     }
+    const eligibleSessionChanged = changedProfileSessions.some(
+      ({ previous, next }) =>
+        (
+          isTacticalProfileEvidenceSession(previous) ||
+          isTacticalProfileEvidenceSession(next)
+        ) &&
+        this.attempts.some((attempt) =>
+          attempt.source === "sprint" && attempt.sessionId === next.id
+        )
+    );
+    if (eligibleSessionChanged || eligibleAttemptChanged) {
+      this.tacticalProfileSourceRevision += 1;
+    }
     return result;
   }
 
   clearLocalHistory(): ClearLocalHistoryResult {
+    const evidenceSessionIds = new Set(
+      [...this.sessions.values()]
+        .filter(isTacticalProfileEvidenceSession)
+        .map((session) => session.id)
+    );
+    const hadTacticalProfileEvidence = this.attempts.some(
+      (attempt) =>
+        attempt.source === "sprint" &&
+        evidenceSessionIds.has(attempt.sessionId)
+    );
     const result: ClearLocalHistoryResult = {
       attempts: this.attempts.length,
       reviewEvents: 0,
@@ -432,6 +574,9 @@ export class MemoryStore implements PracticeStore {
       if (!isOpenSprint(session)) {
         this.sessions.delete(id);
       }
+    }
+    if (hadTacticalProfileEvidence) {
+      this.tacticalProfileSourceRevision += 1;
     }
     return result;
   }
@@ -759,6 +904,20 @@ function exportedSprintSessionFromState(session: SprintState): ExportedSprintSes
   };
 }
 
+function isTacticalProfileEvidenceSession(
+  session:
+    | Pick<SprintState, "completedAt" | "config">
+    | Pick<ExportedSprintSession, "completedAt" | "config">
+    | undefined
+): boolean {
+  return Boolean(
+    session?.completedAt &&
+    session.config &&
+    session.config.tacticalFocus === undefined &&
+    namedThemesForSelection(session.config.themes).length === 0
+  );
+}
+
 function normalizedImportedSprintSession(session: ExportedSprintSession): ExportedSprintSession {
   if (session.status !== "active" && session.status !== "paused") {
     return { ...session };
@@ -775,8 +934,16 @@ function attemptMatchesHistoryFilter(attempt: AttemptEvent, filter: HistoryFilte
     && (!filter.result || attempt.result === filter.result)
     && (!filter.mode || attempt.mode === filter.mode)
     && (!filter.since || attempt.completedAt >= filter.since)
+    && (!filter.until || attempt.completedAt < filter.until)
     && (!filter.puzzleId || attempt.puzzleId === filter.puzzleId)
     && (!filter.sessionId || attempt.sessionId === filter.sessionId);
+}
+
+function utcDay(timestamp: string): string | undefined {
+  const date = new Date(timestamp);
+  return Number.isFinite(date.getTime())
+    ? date.toISOString().slice(0, 10)
+    : undefined;
 }
 
 function reviewQueueKey(context: ReviewContext): string {

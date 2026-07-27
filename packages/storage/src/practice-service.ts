@@ -13,6 +13,7 @@ import {
   DEFAULT_RATING_DEVIATION,
   DEFAULT_VOLATILITY,
   isAttemptMistake,
+  namedThemesForSelection,
   normalizeThemeSelection,
   practiceRunSprintConfig,
   renamePracticeRun,
@@ -62,6 +63,14 @@ import type {
 } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
 import { reconcileRatingWithSprintSessions } from "./rating-history.ts";
+import {
+  TacticalProfileService,
+  type FocusedRunPreflightResult,
+  type PrepareFocusedRunResult,
+  type TacticalProfileProgress,
+  type TacticalProfileSnapshot
+} from "./tactical-profile-service.ts";
+import type { TacticalProfileTaskFamily } from "../../core/src/index.ts";
 
 const MANUAL_RATING_DEVIATION_CAP = 100;
 
@@ -107,6 +116,16 @@ export class PracticeRunAvailabilityError extends Error {
   }
 }
 
+export class FocusedRunUnavailableError extends Error {
+  readonly reason: Exclude<PrepareFocusedRunResult, { status: "ready" }>["reason"];
+
+  constructor(reason: Exclude<PrepareFocusedRunResult, { status: "ready" }>["reason"]) {
+    super(`Focused Run is unavailable: ${reason}`);
+    this.name = "FocusedRunUnavailableError";
+    this.reason = reason;
+  }
+}
+
 export interface RecordReviewAttemptCommand extends ReviewContext {
   result: AttemptResult;
   submittedMove: string;
@@ -124,9 +143,11 @@ export class PracticeService {
   private activeSprint: SprintState | undefined;
   private puzzleSelectionScopeIds: string[] | undefined;
   private readonly store: PracticeStore;
+  private readonly tacticalProfile: TacticalProfileService | undefined;
 
-  constructor(store: PracticeStore) {
+  constructor(store: PracticeStore, tacticalProfile?: TacticalProfileService) {
     this.store = store;
+    this.tacticalProfile = tacticalProfile;
     this.reconcilePersistedRatings();
   }
 
@@ -208,6 +229,7 @@ export class PracticeService {
       this.activeSprint = result.state;
     } else {
       this.activeSprint = undefined;
+      this.markTacticalProfileForCompletedSprint(result.state);
     }
 
     const response: {
@@ -247,6 +269,9 @@ export class PracticeService {
       }
     });
     this.activeSprint = isOpenSprint(result.state) ? result.state : undefined;
+    if (!isOpenSprint(result.state)) {
+      this.markTacticalProfileForCompletedSprint(result.state);
+    }
     return {
       state: result.state,
       ...(result.attempt === undefined ? {} : { attempt: result.attempt })
@@ -262,6 +287,7 @@ export class PracticeService {
       this.persistCompletedSprint(completed);
     });
     this.activeSprint = undefined;
+    this.markTacticalProfileForCompletedSprint(completed);
     return completed;
   }
 
@@ -281,6 +307,9 @@ export class PracticeService {
       }
     });
     this.activeSprint = isOpenSprint(result.state) ? result.state : undefined;
+    if (!isOpenSprint(result.state)) {
+      this.markTacticalProfileForCompletedSprint(result.state);
+    }
     return result.state;
   }
 
@@ -357,15 +386,74 @@ export class PracticeService {
   }
 
   importLocalData(data: LocalDataImport): LocalDataImportResult {
-    const result = this.store.importLocalData(data);
+    const tacticalProfileImport =
+      this.tacticalProfile?.beginCanonicalImport();
+    const result = this.store.importLocalData(
+      data,
+      tacticalProfileImport?.observer
+    );
+    tacticalProfileImport?.finish();
+    const repairedRatings = this.reconcilePersistedRatings();
     return {
       ...result,
-      ratings: result.ratings + this.reconcilePersistedRatings()
+      ratings: result.ratings + repairedRatings
     };
   }
 
   clearLocalHistory(): ClearLocalHistoryResult {
-    return this.store.transaction(() => this.store.clearLocalHistory());
+    const result = this.store.transaction(() => this.store.clearLocalHistory());
+    this.tacticalProfile?.markCanonicalImportChanged();
+    return result;
+  }
+
+  getTacticalProfileSnapshot(now = new Date().toISOString()): TacticalProfileSnapshot | undefined {
+    return this.tacticalProfile?.getSnapshot(now);
+  }
+
+  getTacticalProfileProgress(now = new Date().toISOString()): TacticalProfileProgress | undefined {
+    return this.tacticalProfile?.getProgress(now);
+  }
+
+  preflightFocusedRun(
+    taskFamily: TacticalProfileTaskFamily,
+    snapshot?: TacticalProfileSnapshot
+  ): FocusedRunPreflightResult {
+    return this.tacticalProfile?.preflightFocusedRun(taskFamily, snapshot) ??
+      { status: "unavailable", reason: "policy_unavailable" };
+  }
+
+  prepareFocusedRun(
+    taskFamily: TacticalProfileTaskFamily,
+    now = new Date().toISOString(),
+    randomSeed: string | number = now
+  ): PrepareFocusedRunResult {
+    return this.tacticalProfile?.prepareFocusedRun(taskFamily, now, randomSeed) ??
+      { status: "unavailable", reason: "policy_unavailable" };
+  }
+
+  startFocusedRun(
+    taskFamily: TacticalProfileTaskFamily,
+    now = new Date().toISOString(),
+    randomSeed: string | number = now
+  ): SprintState {
+    if (this.activeSprint && isOpenSprint(this.activeSprint)) {
+      throw new Error("Cannot start a new sprint while another sprint is active");
+    }
+    const result = this.prepareFocusedRun(taskFamily, now, randomSeed);
+    if (result.status !== "ready") {
+      throw new FocusedRunUnavailableError(result.reason);
+    }
+    const rating = this.store.getRating(result.prepared.config.ratingKey);
+    const sprint = startSprint({
+      config: result.prepared.config,
+      puzzles: [...result.prepared.puzzles],
+      ratingBefore: rating.rating,
+      ratingBeforeRecord: rating,
+      now
+    });
+    this.activeSprint = sprint;
+    this.store.createSprintSession(sprint);
+    return sprint;
   }
 
   getDueReviews(now = new Date().toISOString()): ReviewQueueState[] {
@@ -779,6 +867,33 @@ export class PracticeService {
         volatilityBefore: state.volatilityBefore ?? rating.volatility ?? DEFAULT_VOLATILITY,
         volatilityAfter: state.volatilityAfter ?? rating.volatility ?? DEFAULT_VOLATILITY
       }));
+    }
+  }
+
+  private markTacticalProfileForCompletedSprint(state: SprintState): void {
+    if (
+      !this.tacticalProfile ||
+      state.completedAt === undefined
+    ) {
+      return;
+    }
+    if (state.config.tacticalFocus !== undefined) {
+      this.tacticalProfile.markFocusedRunCompleted(
+        state.config.tacticalFocus.taskFamily,
+        state.id,
+        state.completedAt
+      );
+      return;
+    }
+    if (namedThemesForSelection(state.config.themes).length > 0) {
+      return;
+    }
+    const attempts = this.store.listAttempts({
+      source: "sprint",
+      sessionId: state.id
+    });
+    for (const attempt of attempts) {
+      this.tacticalProfile.markAttemptDayDirty(attempt.completedAt);
     }
   }
 

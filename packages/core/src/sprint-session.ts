@@ -110,15 +110,21 @@ export function advanceSprintTime(state: SprintState, now: string): SprintComman
     mistakeCount: sprintTimedState.mistakeCount + 1,
     currentStreak: 0
   };
+  if (reachedAttemptLimit(afterTimeout)) {
+    return {
+      state: completeSprintForPolicy(afterTimeout, "won", "attempt_limit", now),
+      attempt
+    };
+  }
   if (afterTimeout.mistakeCount >= afterTimeout.config.maxMistakes) {
     return {
-      state: completeSprintWithRating(afterTimeout, "failed", "max_mistakes", now),
+      state: completeSprintForPolicy(afterTimeout, "failed", "max_mistakes", now),
       attempt
     };
   }
   if (nextPuzzleIndex >= sprintTimedState.puzzles.length) {
     return {
-      state: completeSprintWithRating(afterTimeout, "failed", "puzzles_exhausted", now),
+      state: completeSprintForPolicy(afterTimeout, "failed", "puzzles_exhausted", now),
       attempt
     };
   }
@@ -170,7 +176,7 @@ export function abandonSprint(state: SprintState, now: string): SprintState {
   if (!state.hasUserSubmittedMove && state.mistakeCount === 0) {
     return completeSprint(state, "abandoned", "abandoned", now);
   }
-  return completeSprintWithRating(state, "failed", "abandoned", now);
+  return completeSprintForPolicy(state, "failed", "abandoned", now);
 }
 
 export function serializeSprintView(state: SprintState): unknown {
@@ -251,9 +257,17 @@ function applyPuzzleFeedback(state: SprintState, feedback: PuzzleFeedback, now: 
     bestStreak: nextBestStreak
   };
 
+  if (reachedAttemptLimit(updated)) {
+    return {
+      state: completeSprintForPolicy(updated, "won", "attempt_limit", now),
+      feedback,
+      attempt
+    };
+  }
+
   if (nextCorrectCount >= state.config.targetCorrect) {
     return {
-      state: completeSprintWithRating(updated, "won", "target_reached", now),
+      state: completeSprintForPolicy(updated, "won", "target_reached", now),
       feedback,
       attempt
     };
@@ -261,7 +275,7 @@ function applyPuzzleFeedback(state: SprintState, feedback: PuzzleFeedback, now: 
 
   if (nextMistakeCount >= state.config.maxMistakes) {
     return {
-      state: completeSprintWithRating(updated, "failed", "max_mistakes", now),
+      state: completeSprintForPolicy(updated, "failed", "max_mistakes", now),
       feedback,
       attempt
     };
@@ -270,7 +284,7 @@ function applyPuzzleFeedback(state: SprintState, feedback: PuzzleFeedback, now: 
   const nextPuzzleIndex = state.currentPuzzleIndex + 1;
   if (nextPuzzleIndex >= state.puzzles.length) {
     return {
-      state: completeSprintWithRating(updated, "won", "puzzles_exhausted", now),
+      state: completeSprintForPolicy(updated, "won", "puzzles_exhausted", now),
       feedback,
       attempt
     };
@@ -353,7 +367,7 @@ function failIfExpired(state: SprintState, now: string): SprintState {
   if (new Date(now).getTime() < new Date(state.deadlineAt).getTime()) {
     return state;
   }
-  return completeSprintWithRating(state, "failed", "time_expired", now);
+  return completeSprintForPolicy(state, "failed", "time_expired", now);
 }
 
 function beginCurrentPuzzle(
@@ -422,6 +436,22 @@ function completeSprintWithRating(
     ratingDeviationAfter: ratingChange.ratingDeviationAfter,
     volatilityAfter: ratingChange.volatilityAfter
   }, status, reason, now);
+}
+
+function completeSprintForPolicy(
+  state: SprintState,
+  status: "won" | "failed",
+  reason: SprintEndReason,
+  now: string
+): SprintState {
+  return state.config.ratingPolicy === "unrated"
+    ? completeSprint(state, status, reason, now)
+    : completeSprintWithRating(state, status, reason, now);
+}
+
+function reachedAttemptLimit(state: SprintState): boolean {
+  return state.config.maxAttempts !== undefined &&
+    state.correctCount + state.mistakeCount >= state.config.maxAttempts;
 }
 
 function completeSprint(

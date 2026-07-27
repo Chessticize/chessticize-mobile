@@ -22,6 +22,20 @@ test("first Standard and Arrow Duel sessions receive the applicable guide sequen
 
   const allSeen = markSprintGuideSeen(sharedSeen, "arrow_duel");
   assert.deepEqual(sprintSessionGuidesFor(allSeen, "arrow_duel"), []);
+
+  assert.deepEqual(
+    sprintSessionGuidesFor(allSeen, "standard", { focusedRun: true }),
+    ["focused_run"]
+  );
+  assert.deepEqual(
+    sprintSessionGuidesFor(sharedSeen, "arrow_duel", { focusedRun: true }),
+    ["focused_run", "arrow_duel"]
+  );
+  const focusSeen = markSprintGuideSeen(allSeen, "focused_run");
+  assert.deepEqual(
+    sprintSessionGuidesFor(focusSeen, "arrow_duel", { focusedRun: true }),
+    []
+  );
 });
 
 test("guide progress is immutable and reset restores every guide independently", () => {
@@ -31,12 +45,14 @@ test("guide progress is immutable and reset restores every guide independently",
   assert.deepEqual(fresh, {
     rulesSeen: false,
     activeSessionSeen: false,
-    arrowDuelSeen: false
+    arrowDuelSeen: false,
+    focusedRunSeen: false
   });
   assert.deepEqual(rulesSeen, {
     rulesSeen: true,
     activeSessionSeen: false,
-    arrowDuelSeen: false
+    arrowDuelSeen: false,
+    focusedRunSeen: false
   });
   assert.deepEqual(resetSprintGuideProgress(), fresh);
 });

@@ -154,9 +154,11 @@ SQLite database before atomically replacing the pack and manifest.
 This is intentionally not a full renewal: it never adds or resamples puzzle
 IDs and does not backfill rows removed by the depth-20 eligibility check. The
 result may therefore contain fewer puzzles than `targetPuzzleCount`.
-`core-pack-v2` is the corrected artifact produced by this workflow. Publish
-future updates under new immutable release tags; never overwrite an existing
-Core Pack release.
+`core-pack-v2` is the historical corrected artifact produced by this workflow.
+The current `core-pack-v3` rebuild retains those corrected positions while
+adding the immutable Puzzle Rating Deviation feature required by Tactical
+Profile. Publish future updates under new immutable release tags; never
+overwrite an existing Core Pack release.
 
 ### Depth-20 correction result (2026-07-10)
 
@@ -171,6 +173,17 @@ Core Pack release.
 - SQLite integrity: `ok`; artifact size: 513,323,008 bytes; artifact SHA-256:
   `0256e4386b9d3c17287782beae81f06fd02c1687fa8081825835e418faa9e187`.
 - Published release: `core-pack-v2`; the fetch script references its immutable
+  `bundled-core-pack.sqlite` asset at commits that still use the v2 manifest.
+
+### Tactical Profile feature result (2026-07-26)
+
+- Final rows: 1,400,000; fully validated Arrow Duel rows: 1,400,000.
+- Every row has a positive immutable `rating_deviation`; Tactical Profile
+  feature hash:
+  `sha256:9a4a1613713cfd72da6eb718c717c762b08aa361ec23d88b43e5e029d20fb295`.
+- SQLite integrity: `ok`; artifact size: 520,278,016 bytes; artifact SHA-256:
+  `0b29bc9672300370484d226ede587a19ed03ab2fa1cbaf2b0eae36b43070b6f0`.
+- Published release: `core-pack-v3`; the fetch script references its immutable
   `bundled-core-pack.sqlite` asset.
 
 ## Regenerating And Publishing The Pack
