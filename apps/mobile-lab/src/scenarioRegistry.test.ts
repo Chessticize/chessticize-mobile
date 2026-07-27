@@ -166,23 +166,36 @@ test("Issue #250 owns the complete Tactical Profile design state set", () => {
   );
 });
 
-test("Issue #363 owns the History progress and clear-weakness flow", () => {
+test("Issue #363 owns model-aligned History progress and weakness states", () => {
   assert.deepEqual(
     newScenarios
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 363))
       .map((scenario) => scenario.id),
-    ["history-progress", "history-progress-weakness"]
+    [
+      "history-progress",
+      "history-progress-weakness",
+      "history-progress-speed-weakness"
+    ]
   );
   assert.deepEqual(storyTagsForScenario("history-progress"), ["new"]);
   assert.deepEqual(storyTagsForScenario("history-progress-weakness"), ["new"]);
+  assert.deepEqual(
+    storyTagsForScenario("history-progress-speed-weakness"),
+    ["new"]
+  );
   assert.ok(
     scenarioRegistry["history-progress"].scope.includes.includes(
-      "Strength over time"
+      "Progress over time"
     )
   );
   assert.ok(
     scenarioRegistry["history-progress-weakness"].scope.includes.includes(
-      "Plain-language statistical confidence"
+      "Solve reliability effect"
+    )
+  );
+  assert.ok(
+    scenarioRegistry["history-progress-speed-weakness"].scope.includes.includes(
+      "Reliable elapsed-time eligibility"
     )
   );
   assert.ok(

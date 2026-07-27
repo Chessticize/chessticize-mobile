@@ -235,6 +235,7 @@ export type {
   HistoryProgressPoint,
   HistoryProgressPresentation,
   HistoryProgressWeakness,
+  HistoryWeaknessEffect,
   HistoryStrengthSeries
 } from "./HistoryProgressSection.tsx";
 

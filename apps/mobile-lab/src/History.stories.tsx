@@ -65,7 +65,7 @@ export const TacticalProgress: Story = {
 };
 
 export const TacticalProgressClearWeakness: Story = {
-  name: "Tactical progress · clear weakness",
+  name: "Tactical progress · reliability weakness",
   args: { scenarioId: "history-progress-weakness" },
   tags: ["new"],
   play: async ({ canvasElement }) => {
@@ -73,7 +73,20 @@ export const TacticalProgressClearWeakness: Story = {
     await clickTestId(canvasElement, "history-progress-button");
     await waitForTestId(canvasElement, "history-progress-screen");
     await waitForTestId(canvasElement, "history-clear-weakness");
-    await waitForTestId(canvasElement, "history-weakness-comparison-skewers");
+    await waitForTestId(canvasElement, "history-weakness-effect-solve_rate");
+  }
+};
+
+export const TacticalProgressCompletedSpeedWeakness: Story = {
+  name: "Tactical progress · completed-speed weakness",
+  args: { scenarioId: "history-progress-speed-weakness" },
+  tags: ["new"],
+  play: async ({ canvasElement }) => {
+    await openHistory(canvasElement);
+    await clickTestId(canvasElement, "history-progress-button");
+    await waitForTestId(canvasElement, "history-progress-screen");
+    await waitForTestId(canvasElement, "history-clear-weakness");
+    await waitForTestId(canvasElement, "history-weakness-effect-completed_speed");
   }
 };
 

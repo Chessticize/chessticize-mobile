@@ -351,7 +351,7 @@
     "issues": [
       {
         "issueNumber": 363,
-        "changeNote": "Add a History entry and separate page showing one tactical strength changing over time."
+        "changeNote": "Add a History entry and separate page showing model-estimated tactical progress over time."
       }
     ]
   },
@@ -359,7 +359,15 @@
     "issues": [
       {
         "issueNumber": 363,
-        "changeNote": "Highlight one well-sampled weakness only when it is clearly behind comparable themes."
+        "changeNote": "Show a solve-reliability weakness only after the model's evidence, impact, and diversity checks pass."
+      }
+    ]
+  },
+  "history-progress-speed-weakness": {
+    "issues": [
+      {
+        "issueNumber": 363,
+        "changeNote": "Show a completed-puzzle speed weakness using reliable elapsed time and a matched model baseline."
       }
     ]
   },

@@ -90,7 +90,8 @@ function LabScenarioContent({
     "history-filters",
     "history-attempt-detail",
     "history-progress",
-    "history-progress-weakness"
+    "history-progress-weakness",
+    "history-progress-speed-weakness"
   ].includes(scenarioId);
   const entryPreviewEnabled = isPuzzleEntryPreviewScenario(scenarioId);
 
@@ -571,6 +572,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "history-attempt-detail":
     case "history-progress":
     case "history-progress-weakness":
+    case "history-progress-speed-weakness":
       service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
       configurePuzzleSource = false;
       break;

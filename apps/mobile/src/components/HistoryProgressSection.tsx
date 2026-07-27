@@ -6,41 +6,49 @@ import {
   Text,
   View
 } from "react-native";
+import type {
+  TacticalFocusReason,
+  TacticalProfileCalibrationAssurance
+} from "../../../../packages/core/src/index.ts";
 
 export type HistoryProgressPoint = {
   label: string;
   value: number;
+  valueLabel: string;
   sampleSize: number;
 };
 
 export type HistoryStrengthSeries = {
   id: string;
   label: string;
+  kind: Exclude<TacticalFocusReason, "both">;
   metricLabel: string;
+  baselineLabel: string;
+  scaleMax: number;
   changeLabel: string;
+  changeTone: "improved" | "steady" | "worsened";
   summary: string;
   points: readonly HistoryProgressPoint[];
 };
 
-export type HistoryWeaknessComparison = {
-  id: string;
-  label: string;
-  value: number;
-  isWeakness?: boolean;
+export type HistoryWeaknessEffect = {
+  kind: Exclude<TacticalFocusReason, "both">;
+  valueLabel: string;
+  metricLabel: string;
+  comparisonLabel: string;
 };
 
 export type HistoryProgressWeakness = {
   label: string;
-  metricLabel: string;
-  valueLabel: string;
-  comparisonLabel: string;
-  gapLabel: string;
+  reason: TacticalFocusReason;
+  effects: readonly HistoryWeaknessEffect[];
   evidenceLabel: string;
   explanation: string;
-  comparisons: readonly HistoryWeaknessComparison[];
+  eligibilityLabel: string;
 };
 
 export type HistoryProgressPresentation = {
+  assurance?: TacticalProfileCalibrationAssurance;
   periodLabel: string;
   sampleLabel: string;
   initialSeriesId: string;
@@ -106,25 +114,52 @@ export function HistoryProgressScreen({
           <Text style={styles.subtitle}>
             {presentation.periodLabel} · {presentation.sampleLabel}
           </Text>
+          {presentation.assurance === "provisional" ? (
+            <Text
+              style={styles.earlyEstimate}
+              testID="history-progress-early-estimate"
+            >
+              Early estimate
+            </Text>
+          ) : null}
         </View>
       </View>
 
       <View style={styles.section} testID="history-strength-over-time">
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleCopy}>
-            <Text style={styles.eyebrow}>Strength over time</Text>
+            <Text style={styles.eyebrow}>Progress over time</Text>
             <Text style={styles.sectionTitle}>
               {selectedSeries?.label ?? "No theme selected"}
             </Text>
           </View>
           {selectedSeries ? (
-            <View
-              accessibilityLabel={selectedSeries.changeLabel}
-              style={styles.changePill}
-            >
-              <Text style={styles.changePillText}>
-                {selectedSeries.changeLabel}
-              </Text>
+            <View style={styles.progressBadges}>
+              <ModelSignalPill kind={selectedSeries.kind} />
+              <View
+                accessibilityLabel={selectedSeries.changeLabel}
+                style={[
+                  styles.changePill,
+                  selectedSeries.changeTone === "steady"
+                    ? styles.changePillSteady
+                    : selectedSeries.changeTone === "worsened"
+                      ? styles.changePillWorsened
+                      : null
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.changePillText,
+                    selectedSeries.changeTone === "steady"
+                      ? styles.changePillTextSteady
+                      : selectedSeries.changeTone === "worsened"
+                        ? styles.changePillTextWorsened
+                        : null
+                  ]}
+                >
+                  {selectedSeries.changeLabel}
+                </Text>
+              </View>
             </View>
           ) : null}
         </View>
@@ -168,6 +203,9 @@ export function HistoryProgressScreen({
           <>
             <Text style={styles.metricLabel}>{selectedSeries.metricLabel}</Text>
             <StrengthTrendChart series={selectedSeries} />
+            <Text style={styles.baselineLabel}>
+              {selectedSeries.baselineLabel}
+            </Text>
             <Text style={styles.summary}>{selectedSeries.summary}</Text>
           </>
         ) : (
@@ -206,7 +244,7 @@ function StrengthTrendChart({
   return (
     <View
       accessibilityLabel={`${series.label} ${series.metricLabel}. ${series.points
-        .map((point) => `${point.label}: ${point.value} percent from ${point.sampleSize} puzzles`)
+        .map((point) => `${point.label}: ${point.valueLabel} from ${point.sampleSize} eligible puzzles`)
         .join(". ")}`}
       style={styles.chart}
       testID="history-strength-chart"
@@ -216,12 +254,17 @@ function StrengthTrendChart({
       <View style={styles.chartColumns}>
         {series.points.map((point, index) => (
           <View key={`${point.label}-${index}`} style={styles.chartColumn}>
-            <Text style={styles.chartValue}>{point.value}%</Text>
+            <Text style={styles.chartValue}>{point.valueLabel}</Text>
             <View style={styles.chartBarTrack}>
               <View
                 style={[
                   styles.chartBar,
-                  { height: `${Math.max(8, Math.min(100, point.value))}%` }
+                  {
+                    height: `${Math.max(
+                      8,
+                      Math.min(100, (point.value / series.scaleMax) * 100)
+                    )}%`
+                  }
                 ]}
               />
             </View>
@@ -247,54 +290,23 @@ function WeaknessCard({
           <Text style={styles.weaknessEyebrow}>Clear weakness</Text>
           <Text style={styles.sectionTitle}>{weakness.label}</Text>
         </View>
-        <View
-          accessibilityLabel={weakness.gapLabel}
-          style={styles.weaknessPill}
-        >
-          <Text style={styles.weaknessPillText}>{weakness.gapLabel}</Text>
-        </View>
+        <ModelSignalPill kind={weakness.reason} weakness />
       </View>
-      <View style={styles.weaknessMetricRow}>
-        <Text style={styles.weaknessValue}>{weakness.valueLabel}</Text>
-        <Text style={styles.weaknessMetric}>{weakness.metricLabel}</Text>
-      </View>
-      <Text style={styles.comparisonLabel}>{weakness.comparisonLabel}</Text>
-      <View style={styles.comparisonList}>
-        {weakness.comparisons.map((comparison) => (
+      <View style={styles.weaknessEffects}>
+        {weakness.effects.map((effect) => (
           <View
-            accessibilityLabel={`${comparison.label}: ${comparison.value} percent${
-              comparison.isWeakness ? ", clear weakness" : ""
-            }`}
-            key={comparison.id}
-            style={styles.comparisonRow}
-            testID={`history-weakness-comparison-${comparison.id}`}
+            key={effect.kind}
+            style={styles.weaknessEffect}
+            testID={`history-weakness-effect-${effect.kind}`}
           >
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.comparisonName,
-                comparison.isWeakness ? styles.comparisonNameWeak : null
-              ]}
-            >
-              {comparison.label}
+            <Text style={styles.effectKindLabel}>
+              {modelSignalLabel(effect.kind)}
             </Text>
-            <View style={styles.comparisonTrack}>
-              <View
-                style={[
-                  styles.comparisonBar,
-                  comparison.isWeakness ? styles.comparisonBarWeak : null,
-                  { width: `${Math.max(4, Math.min(100, comparison.value))}%` }
-                ]}
-              />
+            <View style={styles.weaknessMetricRow}>
+              <Text style={styles.weaknessValue}>{effect.valueLabel}</Text>
+              <Text style={styles.weaknessMetric}>{effect.metricLabel}</Text>
             </View>
-            <Text
-              style={[
-                styles.comparisonValue,
-                comparison.isWeakness ? styles.comparisonValueWeak : null
-              ]}
-            >
-              {comparison.value}%
-            </Text>
+            <Text style={styles.comparisonLabel}>{effect.comparisonLabel}</Text>
           </View>
         ))}
       </View>
@@ -303,8 +315,44 @@ function WeaknessCard({
         <Text style={styles.evidenceBody}>{weakness.explanation}</Text>
         <Text style={styles.evidenceMeta}>{weakness.evidenceLabel}</Text>
       </View>
+      <View style={styles.modelNote}>
+        <Text style={styles.modelNoteTitle}>How this is measured</Text>
+        <Text style={styles.modelNoteBody}>{weakness.eligibilityLabel}</Text>
+      </View>
     </View>
   );
+}
+
+function ModelSignalPill({
+  kind,
+  weakness = false
+}: {
+  kind: TacticalFocusReason;
+  weakness?: boolean;
+}): React.JSX.Element {
+  return (
+    <View style={[styles.signalPill, weakness ? styles.signalPillWeakness : null]}>
+      <Text
+        numberOfLines={2}
+        style={[
+          styles.signalPillText,
+          weakness ? styles.signalPillTextWeakness : null
+        ]}
+      >
+        {modelSignalLabel(kind)}
+      </Text>
+    </View>
+  );
+}
+
+function modelSignalLabel(kind: TacticalFocusReason): string {
+  if (kind === "completed_speed") {
+    return "Completed-puzzle speed";
+  }
+  if (kind === "both") {
+    return "Reliability & speed";
+  }
+  return "Solve reliability";
 }
 
 function ProgressGlyph(): React.JSX.Element {
@@ -358,6 +406,18 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 13,
     lineHeight: 19
+  },
+  earlyEstimate: {
+    alignSelf: "flex-start",
+    backgroundColor: "#FEF3C7",
+    borderRadius: 999,
+    color: "#92400E",
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    textTransform: "uppercase"
   },
   entryButton: {
     alignItems: "center",
@@ -437,6 +497,36 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     lineHeight: 25
   },
+  progressBadges: {
+    alignItems: "flex-end",
+    gap: 6,
+    maxWidth: 142
+  },
+  signalPill: {
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    borderColor: "#BFDBFE",
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: "center",
+    paddingHorizontal: 9,
+    paddingVertical: 5
+  },
+  signalPillWeakness: {
+    backgroundColor: "#FEF3C7",
+    borderColor: "#FCD34D",
+    maxWidth: 142
+  },
+  signalPillText: {
+    color: "#1D4ED8",
+    fontSize: 10,
+    fontWeight: "800",
+    lineHeight: 13,
+    textAlign: "center"
+  },
+  signalPillTextWeakness: {
+    color: "#92400E"
+  },
   changePill: {
     backgroundColor: "#DCFCE7",
     borderRadius: 999,
@@ -447,6 +537,18 @@ const styles = StyleSheet.create({
     color: "#15803D",
     fontSize: 11,
     fontWeight: "800"
+  },
+  changePillSteady: {
+    backgroundColor: "#F1F5F9"
+  },
+  changePillWorsened: {
+    backgroundColor: "#FEE2E2"
+  },
+  changePillTextSteady: {
+    color: "#475569"
+  },
+  changePillTextWorsened: {
+    color: "#B91C1C"
   },
   selectorRow: {
     flexDirection: "row",
@@ -476,6 +578,13 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 12,
     fontWeight: "700"
+  },
+  baselineLabel: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: -5,
+    textAlign: "right"
   },
   chart: {
     height: 176,
@@ -551,16 +660,23 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 16
   },
-  weaknessPill: {
-    backgroundColor: "#FEF3C7",
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 5
+  weaknessEffects: {
+    gap: 10
   },
-  weaknessPillText: {
+  weaknessEffect: {
+    backgroundColor: "rgba(255, 255, 255, 0.66)",
+    borderColor: "rgba(245, 158, 11, 0.28)",
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+    padding: 12
+  },
+  effectKindLabel: {
     color: "#92400E",
-    fontSize: 11,
-    fontWeight: "800"
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    textTransform: "uppercase"
   },
   weaknessMetricRow: {
     alignItems: "baseline",
@@ -583,48 +699,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19
   },
-  comparisonList: {
-    gap: 9
-  },
-  comparisonRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8
-  },
-  comparisonName: {
-    color: "#475569",
-    fontSize: 11,
-    fontWeight: "700",
-    width: 64
-  },
-  comparisonNameWeak: {
-    color: "#92400E"
-  },
-  comparisonTrack: {
-    backgroundColor: "rgba(253, 230, 138, 0.55)",
-    borderRadius: 999,
-    flex: 1,
-    height: 8,
-    overflow: "hidden"
-  },
-  comparisonBar: {
-    backgroundColor: "#94A3B8",
-    borderRadius: 999,
-    height: "100%"
-  },
-  comparisonBarWeak: {
-    backgroundColor: "#F59E0B"
-  },
-  comparisonValue: {
-    color: "#475569",
-    fontSize: 11,
-    fontWeight: "800",
-    textAlign: "right",
-    width: 34
-  },
-  comparisonValueWeak: {
-    color: "#92400E"
-  },
   evidenceNote: {
     backgroundColor: "rgba(255, 255, 255, 0.66)",
     borderRadius: 12,
@@ -645,6 +719,22 @@ const styles = StyleSheet.create({
     color: "#92400E",
     fontSize: 11,
     lineHeight: 16
+  },
+  modelNote: {
+    borderTopColor: "rgba(180, 83, 9, 0.22)",
+    borderTopWidth: 1,
+    gap: 4,
+    paddingTop: 12
+  },
+  modelNoteTitle: {
+    color: "#78350F",
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  modelNoteBody: {
+    color: "#92400E",
+    fontSize: 11,
+    lineHeight: 17
   },
   noWeaknessCard: {
     alignItems: "flex-start",
