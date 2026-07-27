@@ -673,6 +673,39 @@ describe("PracticePocScreen", () => {
     expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(0);
   });
 
+  it("restores Review and primary navigation in the same visible commit when X exits", () => {
+    const commits: Array<{
+      primaryNavigationVisible: boolean;
+      reviewPanelVisible: boolean;
+    }> = [];
+    let recordCommits = false;
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    renderer = renderScreen({
+      practiceService: createDueReviewService(2),
+      onRenderCommit: () => {
+        if (!recordCommits || !renderer) {
+          return;
+        }
+        commits.push({
+          primaryNavigationVisible: renderer.root.findAllByProps({ testID: "review-tab" }).length > 0,
+          reviewPanelVisible: renderer.root.findAllByProps({ testID: "review-panel" }).length > 0
+        });
+      }
+    });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    recordCommits = true;
+    press(renderer, "review-exit");
+
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(findByTestId(renderer, "review-tab")).toBeTruthy();
+    expect(commits).not.toContainEqual({
+      primaryNavigationVisible: false,
+      reviewPanelVisible: true
+    });
+  });
+
   it("commits the Review owner when a multi-context due review times out during Predictive Back", () => {
     const systemBack = createTestSystemBackSource("android");
     const service = createMultiContextDueReviewService();
@@ -10888,6 +10921,7 @@ function createScriptedStockfishTransport(
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
   Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
+    onRenderCommit?: () => void;
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -11000,6 +11034,7 @@ function renderScreen({
   sprintGuidanceEnabled,
   initialTab,
   moveFeedbackSettings,
+  onRenderCommit,
   puzzleSelectionId,
   puzzleSelectionSeed,
   runEloEditingMovedToHome,
@@ -11015,7 +11050,7 @@ function renderScreen({
 }: RenderScreenOptions = {}): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   act(() => {
-    renderer = TestRenderer.create(
+    const screen = (
       <PracticePocScreen
         platformCapabilities={platformCapabilities ?? createTestMobilePlatformCapabilities(capabilityOverrides)}
         arrowDuelTargetCorrect={arrowDuelTargetCorrect}
@@ -11038,6 +11073,13 @@ function renderScreen({
         themeCatalogPresentation={themeCatalogPresentation}
       />
     );
+    renderer = TestRenderer.create(onRenderCommit
+      ? (
+          <React.Profiler id="practice-poc-screen" onRender={onRenderCommit}>
+            {screen}
+          </React.Profiler>
+        )
+      : screen);
   });
   if (!renderer) {
     throw new Error("PracticePocScreen did not render");

@@ -10626,13 +10626,18 @@ function ReviewPanel({
     setActiveEntries(completedReviewEntries);
   }
 
+  function clearActiveReview(): void {
+    setActiveEntryInitialIndex(0);
+    setActiveEntries([]);
+    onSessionSourceChange?.(null);
+  }
+
   function finishActiveReview(source: ReviewEntry["source"], generation: number): void {
     if (generation !== activeReviewGenerationRef.current) {
       return;
     }
     activeReviewGenerationRef.current += 1;
-    setActiveEntryInitialIndex(0);
-    setActiveEntries([]);
+    clearActiveReview();
     if (source === "session") {
       onExitSessionReview();
     }
@@ -10640,8 +10645,7 @@ function ReviewPanel({
 
   function returnActiveReviewToOwner(source: ReviewEntry["source"]): void {
     activeReviewGenerationRef.current += 1;
-    setActiveEntryInitialIndex(0);
-    setActiveEntries([]);
+    clearActiveReview();
     if (source === "session") {
       onExitSessionReview();
     }
