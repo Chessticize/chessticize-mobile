@@ -7983,7 +7983,11 @@ describe("PracticePocScreen", () => {
       arrowDuelCandidateOrder: ["a1a2", "a2a3"]
     });
     const systemBack = createTestSystemBackSource("android");
-    const renderer = renderScreen({ practiceService: new PracticeService(store), systemBack });
+    const renderer = renderScreen({
+      practiceService: new PracticeService(store),
+      replayTerminologyDesignPreview: true,
+      systemBack
+    });
 
     press(renderer, "history-tab");
     press(renderer, "history-attention-all");
@@ -8018,6 +8022,9 @@ describe("PracticePocScreen", () => {
     );
     press(renderer, "history-attempt-malformed-context-attempt");
     expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe("Replay screen");
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+    expect(findByTestId(renderer, "review-exit").props.accessibilityLabel).toBe("Exit replay");
     expect(collectText(findByTestId(renderer, "history-replay-unavailable"))).toBe(
       "The saved mode or rating context is invalid, so this attempt cannot be replayed safely."
     );
@@ -11081,7 +11088,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "replayTerminologyDesignPreview" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
     onRenderCommit?: () => void;
     platformCapabilities?: MobilePlatformCapabilities;
   };
@@ -11198,6 +11205,7 @@ function renderScreen({
   onRenderCommit,
   puzzleSelectionId,
   puzzleSelectionSeed,
+  replayTerminologyDesignPreview,
   runEloEditingMovedToHome,
   runManagementEnabled,
   runManagementPresentation,
@@ -11223,6 +11231,7 @@ function renderScreen({
         moveFeedbackSettings={moveFeedbackSettings}
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
+        replayTerminologyDesignPreview={replayTerminologyDesignPreview}
         runEloEditingMovedToHome={runEloEditingMovedToHome}
         runManagementEnabled={runManagementEnabled}
         runManagementPresentation={runManagementPresentation}

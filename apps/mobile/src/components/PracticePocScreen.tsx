@@ -3113,7 +3113,10 @@ export function PracticePocScreen({
   const screenTitle = replayTerminologyDesignPreview
     && (
       (tab === "review" && reviewSessionSource === "session")
-      || (tab === "history" && historyReviewEntries.length > 0)
+      || (
+        tab === "history"
+        && (historyReviewEntries.length > 0 || historyUnavailableAttempt !== null)
+      )
     )
     ? "Replay"
     : screenTitleFor(tab);
@@ -3821,6 +3824,7 @@ export function PracticePocScreen({
                   onClearUnclear={() => clearHistoryAttemptUnclear(historyUnavailableAttempt.attempt.id)}
                   onReviewChanged={reviewScheduleChanged}
                   onReturn={() => setHistoryUnavailableAttempt(null)}
+                  replayTerminology={replayTerminologyDesignPreview}
                   service={service}
                 />
               ) : historyReviewEntries.length > 0 ? (
@@ -12523,6 +12527,7 @@ function HistoryAttemptReplayUnavailable({
   onClearUnclear,
   onReviewChanged,
   onReturn,
+  replayTerminology,
   replayAvailability,
   service
 }: {
@@ -12532,6 +12537,7 @@ function HistoryAttemptReplayUnavailable({
   onClearUnclear: () => void;
   onReviewChanged: (clearedAttemptId?: string) => void;
   onReturn: () => void;
+  replayTerminology: boolean;
   replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
   service: PracticeService;
 }): React.JSX.Element {
@@ -12545,7 +12551,7 @@ function HistoryAttemptReplayUnavailable({
         <View style={styles.reviewTopNav}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Exit review"
+            accessibilityLabel={replayTerminology ? "Exit replay" : "Exit review"}
             testID="review-exit"
             style={styles.iconButton}
             onPress={onReturn}
@@ -12553,7 +12559,9 @@ function HistoryAttemptReplayUnavailable({
             <CloseGlyph />
           </Pressable>
           <View style={styles.reviewTitleBlock}>
-            <Text style={styles.panelTitle}>History</Text>
+            <Text style={styles.panelTitle} testID="review-title">
+              {replayTerminology ? "Replay" : "History"}
+            </Text>
             <Text style={styles.helperText}>Replay unavailable</Text>
           </View>
         </View>

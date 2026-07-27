@@ -336,13 +336,13 @@ Developer/test-build controls:
 Arrow Duel Replay behavior:
 
 - The colored candidate arrows render in Analysis mode at the puzzle's initial position: correct Stockfish best move is green, the blunder or inferior candidate is red.
-- The review surface does not show separate color-legend or "You chose" chips. The board arrows and guided punishment-line state carry the context.
+- The Replay surface does not show separate color-legend or "You chose" chips. The board arrows and guided punishment-line state carry the context.
 - If the user chose wrong, automatically play the opponent response or punishment line.
 - Prefer stored puzzle solution lines for explanation; fall back to local Stockfish when the stored line is not enough.
 - While the punishment line is being replayed, show the current-position evaluation, not the original candidate evals.
 - If the punishment line reaches checkmate, show the game result (`1-0` or `0-1`) and "Checkmate".
 - The user can switch to analysis at any point. Analysis mode uses Stockfish, shows candidate lines, and does not mutate official review history.
-- A wrong Arrow Duel review stays on the same puzzle after the punishment line. It must not auto-advance to the next review puzzle.
+- A wrong Arrow Duel Replay stays on the same puzzle after the punishment line. It must not auto-advance to the next puzzle.
 
 Arrow Duel active-session rules:
 
@@ -355,8 +355,8 @@ Arrow Duel Replay and Review rules:
 - Replay and Review reconstruction must reuse the candidate order stored on the original attempt. Neither may generate a fresh default order for History, post-Sprint Replay, or Review.
 - Green always means the best move.
 - Red always means the inferior candidate.
-- The review should avoid redundant legend or choice-marker chips; use board arrows, feedback highlights, and the guided line to explain the state.
-- After a wrong answer, the opponent's refutation reply plays automatically, then the punishment line continues as a guided interaction: the user plays each expected move themselves by following the guide arrow, so no pause/step transport controls are needed. Replay is available by resetting the puzzle. Throughout the line, show the live Stockfish evaluation of the current position. The current implementation uses the compact review toolbar and guided arrows rather than a playback transport bar.
+- Replay should avoid redundant legend or choice-marker chips; use board arrows, feedback highlights, and the guided line to explain the state.
+- After a wrong answer, the opponent's refutation reply plays automatically, then the punishment line continues as a guided interaction: the user plays each expected move themselves by following the guide arrow, so no pause/step transport controls are needed. Replay is available by resetting the puzzle. Throughout the line, show the live Stockfish evaluation of the current position. The current implementation uses the compact Replay toolbar and guided arrows rather than a playback transport bar.
 - If the stored punishment line requires the user's next move, show that expected move with an arrow, wait for the user to make it, then play the next reply. Continue until the line ends, then stop.
 - Review copy should explain the tactical reason only when the data supports it; otherwise show engine line and evaluation shift.
 - In Review, selecting the wrong Arrow Duel candidate records a failed Review attempt and resets or contracts that puzzle's schedule. The user may then enter Replay to inspect the line without creating additional history.
@@ -385,11 +385,11 @@ Engine line list:
 - Rows are tappable. Tapping a row makes that move on the analysis board, adds the previous position to the back stack, clears the forward stack, and starts fresh analysis from the new position.
 - The row order and eval values may change as Stockfish searches deeper. The UI should stream updates rather than wait for final depth.
 - Back, forward, and reset affect only the analysis board and never create History rows, review attempts, rating changes, or review schedule updates.
-- Reset returns to the puzzle's initial review position, not the current Stockfish line's start if the user has navigated away.
+- Reset returns to the puzzle's initial Replay position, not the current Stockfish line's start if the user has navigated away.
 
 Terminal and guided-line states:
 
-- If the current analysis/review position is checkmate, show the game result (`1-0` or `0-1`) instead of misleading candidate rows.
+- If the current Analysis or Replay position is checkmate, show the game result (`1-0` or `0-1`) instead of misleading candidate rows.
 - During Arrow Duel wrong-line playback, any eval shown under the board describes the current position. It must not reuse the original two candidate scores after the board has advanced.
 
 ### New Run Setup

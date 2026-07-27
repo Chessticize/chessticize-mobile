@@ -416,8 +416,10 @@ function sprintRulesResultState({
 }
 
 function sprintResultReplayDesignItems(): NonNullable<
-  React.ComponentProps<typeof PracticePocScreen>["sprintRulesDesignPreview"]
->["resultReplayItems"] {
+  NonNullable<
+    React.ComponentProps<typeof PracticePocScreen>["sprintRulesDesignPreview"]
+  >["resultReplayItems"]
+> {
   const completedAt = "2026-07-18T18:00:00.000Z";
   return [
     {
@@ -1119,7 +1121,7 @@ function createReviewService(kind: "due" | "overdue"): PracticeService {
 function createSprintResultReplayService(): PracticeService {
   const store = new MemoryStore();
   store.seedPuzzles(LAB_PUZZLES);
-  for (const puzzle of LAB_PUZZLES.slice(2, 4)) {
+  for (const { puzzle } of sprintResultReplayDesignItems().filter((item) => item.inReview)) {
     store.scheduleMistakeReview({
       puzzleId: puzzle.id,
       mode: "standard",
@@ -1149,8 +1151,9 @@ function createHistoryService(
       startedAt: "2026-07-17T16:00:00.000Z",
       completedAt: "2026-07-17T16:00:08.000Z",
       ratingBefore: 880,
-      ratingAfter: 860
-    });
+      ratingAfter: 860,
+      arrowDuelCandidateOrderStatus: "corrupt"
+    } as unknown as AttemptEvent);
     return new PracticeService(store);
   }
 

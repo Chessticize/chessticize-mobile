@@ -117,6 +117,7 @@ export const ReplayUnavailable: Story = {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-attention-all");
     await clickTestId(canvasElement, "history-attempt-history-arrow-legacy");
-    await waitForTestId(canvasElement, "history-attempt-detail-replay-unavailable");
+    await waitForTestId(canvasElement, "history-replay-unavailable");
+    await expectTestIdText(canvasElement, "review-title", "Replay");
   }
 };
