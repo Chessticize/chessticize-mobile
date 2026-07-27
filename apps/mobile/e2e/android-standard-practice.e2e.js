@@ -89,6 +89,9 @@ describe(`Android Standard Practice offline persistence (${standardFixture.puzzl
     await waitForElementTextContaining('practice-progress-rating-delta', '+175 this week', 10000);
 
     await openTab('history-tab', 'history-action-header');
+    await element(by.id('history-filter-toggle')).tap();
+    await element(by.id('history-range-max')).tap();
+    await element(by.id('history-source-all')).tap();
     await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
   });
 });
