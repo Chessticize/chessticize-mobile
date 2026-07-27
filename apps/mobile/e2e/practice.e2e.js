@@ -1,6 +1,7 @@
 const fs = require('fs');
 const zlib = require('zlib');
 const {
+  dismissRunNameKeyboard,
   elementText,
   sleep,
   frameFor,
@@ -59,7 +60,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
     await expect(element(by.id('custom-theme-mixed').and(by.traits(['selected'])))).toExist();
     await element(by.id('practice-run-name-input')).replaceText('Calculation Lab');
-    await element(by.id('practice-run-name-input')).tapReturnKey();
+    await dismissRunNameKeyboard();
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await tapUntilExists('practice-run-save', 'practice-run-home-edit', 3);
 
@@ -107,7 +108,7 @@ describe('Practice POC', () => {
     await element(by.text('Calculation Lab')).tap();
     await waitFor(element(by.id('practice-run-name-input'))).toHaveText('Calculation Lab').withTimeout(10000);
     await element(by.id('practice-run-name-input')).replaceText('Calculation Focus');
-    await element(by.id('practice-run-name-input')).tapReturnKey();
+    await dismissRunNameKeyboard();
     await element(by.id('practice-run-elo-input')).replaceText('1000');
     await element(by.id('practice-run-save')).tap();
     await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
@@ -442,7 +443,6 @@ describe('Practice POC', () => {
       delete: false
     });
     await openStandardHistoryTrend();
-    await waitFor(element(by.text('Wrong move')).atIndex(0)).toExist().withTimeout(10000);
     const resultRowIdentifier = await historyAttemptRowTestIDForResult('Wrong move');
     await waitForVisibleInPracticeScroll(resultRowIdentifier);
     await element(by.id(resultRowIdentifier)).tap();

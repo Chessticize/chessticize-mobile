@@ -48,6 +48,15 @@ async function playBoardMove(testID, move, flipped = false) {
   await board.tapAtPoint(pointForSquare(move.slice(0, 2)));
   await sleep(250);
   await board.tapAtPoint(pointForSquare(move.slice(2, 4)));
+  const promotion = move.slice(4, 5).toLowerCase();
+  if (promotion) {
+    if (!/^[qrbn]$/.test(promotion)) {
+      throw new Error(`Unsupported promotion piece in move "${move}"`);
+    }
+    const promotionChoice = element(by.id(`promotion-choice-${promotion}`));
+    await waitFor(promotionChoice).toExist().withTimeout(10000);
+    await promotionChoice.tap();
+  }
 }
 
 async function startPracticeMode(mode) {
@@ -68,17 +77,17 @@ async function completeFirstUseSessionGuides() {
     }
     if (await detoxElementExists('practice-session-guide-start')) {
       try {
+        await element(by.id('practice-main-scroll')).scrollTo('top');
         await waitFor(element(by.id('practice-session-guide-start')))
           .toBeVisible()
           .whileElement(by.id('practice-main-scroll'))
           .scroll(100, 'down', 0.5, 0.5);
         await element(by.id('practice-session-guide-start')).tap();
       } catch (error) {
-        // The guide can disappear after the existence check or a successful
-        // press can replace it before Detox resolves the native action. Accept
-        // a public successor state, and retry the known native visibility/null
-        // race while the responsive guide remounts. The bounded loop still
-        // fails closed if no public session state appears.
+        // The guide can remount while Detox resolves its scroll, visibility, or
+        // press action. Retry a known native visibility/null race while the
+        // public action remains available, accept a public successor state,
+        // and preserve every unrelated failure.
         await sleep(250);
         const guideStillAvailable = await detoxElementExists('practice-session-guide-start');
         const sessionStarted = await detoxElementExists('session-board');
@@ -102,6 +111,14 @@ async function completeFirstUseSessionGuides() {
     await sleep(250);
   }
   await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+}
+
+async function dismissRunNameKeyboard() {
+  await element(by.id('practice-run-name-input')).tapReturnKey();
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await waitFor(element(by.id('practice-run-editor-title'))).toBeVisible().withTimeout(5000);
+  await element(by.id('practice-run-editor-title')).tap();
+  await sleep(500);
 }
 
 function isTransientGuideInteractionError(error) {
@@ -873,7 +890,10 @@ async function openStandardHistoryTrend() {
     await element(by.id('history-filter-toggle')).tap();
     await waitFor(element(by.id('history-advanced-filters'))).toExist().withTimeout(10000);
   }
-  await waitForVisibleInPracticeScroll('history-rating-standard 5/20');
+  await waitFor(element(by.id('history-rating-standard 5/20')))
+    .toBeVisible()
+    .whileElement(by.id('history-rating-filters'))
+    .scroll(120, 'right');
   await element(by.id('history-rating-standard 5/20')).tap();
   await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
   await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
@@ -921,6 +941,7 @@ module.exports = {
   bringAndroidAppToForeground,
   collectAndroidUiDiagnostics,
   completeFirstUseSessionGuides,
+  dismissRunNameKeyboard,
   elementText,
   historyAttemptRowTestIDForResult,
   openTab,

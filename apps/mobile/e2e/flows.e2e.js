@@ -1,5 +1,6 @@
 const {
   completeFirstUseSessionGuides,
+  dismissRunNameKeyboard,
   openTab,
   openStandardHistoryTrend,
   historyAttemptRowTestIDForResult,
@@ -243,7 +244,14 @@ describe('Key user flows', () => {
 
     await openStandardHistoryTrend();
 
+    await waitForVisibleInPracticeScroll('history-result-wrong');
     await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(
+      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+    )).not.toExist().withTimeout(10000);
+    await waitFor(element(
+      by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
     await element(by.id('history-result-wrong')).tap();
     await waitFor(element(
       by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
@@ -254,8 +262,13 @@ describe('Key user flows', () => {
       by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
     )).not.toExist().withTimeout(10000);
 
-    // Replay round trip must preserve the current non-default filters.
+    // Replay round trip must preserve the non-default result and theme filters
+    // while retaining the default Sprint source.
     await element(by.id('history-result-wrong')).tap();
+    await waitFor(element(
+      by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('history-source-sprint');
     await element(by.id('history-source-sprint')).tap();
     await waitFor(element(
       by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
@@ -281,21 +294,28 @@ describe('Key user flows', () => {
     await element(by.id('review-analysis-button')).tap();
     await waitFor(element(by.id('review-theme-rail'))).toExist().withTimeout(10000);
     await expect(element(by.text('Themes'))).not.toExist();
+    await waitForVisibleInPracticeScroll('review-close-analysis');
+    await element(by.id('review-close-analysis')).tap();
+    await waitFor(element(by.id('review-theme-rail'))).not.toExist().withTimeout(10000);
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('review-exit'))).toBeVisible().withTimeout(10000);
     await element(by.id('review-exit')).tap();
+    await waitFor(element(by.id('history-panel'))).toExist().withTimeout(10000);
     await waitFor(element(
       by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
     )).toExist().withTimeout(10000);
-    await expect(element(
+    await waitFor(element(
       by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))
-    )).toExist();
-    await expect(element(
+    )).toExist().withTimeout(10000);
+    await waitFor(element(
       by.text('2 themes selected').withAncestor(by.id('history-active-filter-summary'))
-    )).toExist();
+    )).toExist().withTimeout(10000);
     await waitFor(element(by.id('history-filter-reset'))).toBeVisible().withTimeout(10000);
     await expect(element(by.text('Reset filters'))).toExist();
     await element(by.id('history-filter-reset')).tap();
+    await waitFor(element(
+      by.text('All puzzles').withAncestor(by.id('history-active-filter-summary'))
+    )).toExist().withTimeout(10000);
     await waitFor(element(
       by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))
     )).not.toExist().withTimeout(10000);
@@ -350,7 +370,7 @@ describe('Key user flows', () => {
     await element(by.id('practice-run-edit-standard')).tap();
     await waitFor(element(by.id('practice-run-name-input'))).toBeVisible().withTimeout(10000);
     await element(by.id('practice-run-name-input')).replaceText('Daily Standard');
-    await element(by.id('practice-run-name-input')).tapReturnKey();
+    await dismissRunNameKeyboard();
     await element(by.id('practice-run-elo-input')).replaceText('700');
     await element(by.id('practice-run-save')).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
@@ -388,7 +408,7 @@ async function createSavedCustomRun(name, { shorterDuration = false, themes = []
   await element(by.id('practice-add-run')).tap();
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-run-name-input')).replaceText(name);
-  await element(by.id('practice-run-name-input')).tapReturnKey();
+  await dismissRunNameKeyboard();
   if (shorterDuration) {
     await waitForVisibleInPracticeScroll('practice-run-duration-stepper-decrease');
     await element(by.id('practice-run-duration-stepper-decrease')).tap();

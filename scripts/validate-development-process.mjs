@@ -52,6 +52,18 @@ const uiCalibrationRunner = path.join(
   repoRoot,
   ".codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh"
 );
+const simulatorOrientationRunner = path.join(
+  repoRoot,
+  ".codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
+);
+const simulatorTargetResolver = path.join(
+  repoRoot,
+  "apps/mobile/scripts/resolve-ios-simulator-target.js"
+);
+const pngOrientationValidator = path.join(
+  repoRoot,
+  "apps/mobile/scripts/assert-png-orientation.js"
+);
 const prTemplate = read(".github/pull_request_template.md");
 const releaseNotes = read("docs/RELEASE_NOTES.md");
 const releaseNotesTemplate = read("docs/releases/RELEASE_NOTES_TEMPLATE.md");
@@ -355,6 +367,29 @@ assert.match(uiCalibrationRunnerSource, /pnpm mobile:e2e:build:ios:release/);
 assert.match(uiCalibrationRunnerSource, /pnpm mobile:e2e:store-assets:ios:release/);
 assert.match(uiCalibrationRunnerSource, /git status --porcelain --untracked-files=normal/);
 assert.match(uiCalibrationRunnerSource, /brew --prefix ruby@3\.3/);
+assert.match(uiCalibrationRunnerSource, /CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait/);
+assert.match(uiCalibrationRunnerSource, /CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape/);
+assert.match(uiCalibrationRunnerSource, /set-simulator-orientation\.sh/);
+assert.match(uiCalibrationRunnerSource, /resolve-ios-simulator-target\.js/);
+assert.match(uiCalibrationRunnerSource, /assert-png-orientation\.js/);
+assert.match(uiCalibrationRunnerSource, /export DETOX_IOS_DEVICE_UDID="\$SIMULATOR_UDID"/);
+assert.match(
+  uiCalibrationRunnerSource,
+  /release-\$DEVICE_SLUG-\$RUNTIME_SLUG-\$UDID_SLUG/
+);
+assert.ok(
+  uiCalibrationRunnerSource.indexOf("\nRESTORE_PORTRAIT=1\n")
+    < uiCalibrationRunnerSource.indexOf(
+      '"$ORIENTATION_RUNNER" "$SIMULATOR_UDID" "$DEVICE_NAME" landscape'
+    )
+);
+
+const simulatorOrientationRunnerSource = read(
+  ".codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
+);
+assert.match(simulatorOrientationRunnerSource, /tell application "Simulator" to activate/);
+assert.match(simulatorOrientationRunnerSource, /simctl io "\$SIMULATOR_UDID" screenshot/);
+assert.match(simulatorOrientationRunnerSource, /Could not rotate the exact Simulator window/);
 
 const localE2eRunnerSource = read(
   ".codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh"
@@ -441,6 +476,14 @@ const syntaxCheck = spawnSync("bash", ["-n", localE2eRunner], { encoding: "utf8"
 assert.equal(syntaxCheck.status, 0, syntaxCheck.stderr);
 const uiCalibrationSyntaxCheck = spawnSync("bash", ["-n", uiCalibrationRunner], { encoding: "utf8" });
 assert.equal(uiCalibrationSyntaxCheck.status, 0, uiCalibrationSyntaxCheck.stderr);
+const simulatorOrientationSyntaxCheck = spawnSync("bash", ["-n", simulatorOrientationRunner], {
+  encoding: "utf8"
+});
+assert.equal(simulatorOrientationSyntaxCheck.status, 0, simulatorOrientationSyntaxCheck.stderr);
+for (const scriptPath of [simulatorTargetResolver, pngOrientationValidator]) {
+  const nodeSyntaxCheck = spawnSync(process.execPath, ["--check", scriptPath], { encoding: "utf8" });
+  assert.equal(nodeSyntaxCheck.status, 0, nodeSyntaxCheck.stderr);
+}
 
 const invalidScope = spawnSync(localE2eRunner, [], {
   encoding: "utf8",
