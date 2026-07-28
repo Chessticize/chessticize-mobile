@@ -8,6 +8,16 @@ store screenshot capture. Recheck Apple's live documentation before upload:
 - Platform version metadata fields:
   https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information
 
+The canonical six-frame marketing sequence, final frame copy, and coherent
+fictional-user contract are defined in
+[`docs/marketing/APP_STORE_SCREENSHOT_STORY.md`](marketing/APP_STORE_SCREENSHOT_STORY.md)
+and
+[`config/app-store-marketing-story-v1.json`](../config/app-store-marketing-story-v1.json).
+That sequence is separate from the maintained fifteen-scene release-QA capture
+below. Until issues #411 and #412 implement the new capture and composition
+stages, the existing commands and export audit in this document remain the
+operational release-validation path.
+
 ## Metadata Draft
 
 | Field | Value | Release rule |
@@ -90,7 +100,7 @@ records the exact file hash, Tactical Profile feature hash, and
 per-bucket/theme counts. The artifact is published as the immutable
 `core-pack-v3` GitHub Release asset.
 
-## Screenshot Set
+## Release-QA Screenshot Set
 
 Use a release or production-like build, not a Metro debug screenshot. Capture
 the same fifteen scenes for each required display group:

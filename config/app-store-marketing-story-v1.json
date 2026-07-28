@@ -1,0 +1,403 @@
+{
+  "schemaVersion": 1,
+  "storyId": "app-store-marketing-en-us-v1",
+  "issue": 410,
+  "contractStatus": "review-candidate",
+  "locale": "en-US",
+  "captureClock": {
+    "instant": "2026-07-28T18:00:00.000Z",
+    "timeZone": "America/Los_Angeles"
+  },
+  "copyLimits": {
+    "headlineCharacters": 36,
+    "supportingCharacters": 90
+  },
+  "sourceBuild": {
+    "kind": "release-like",
+    "puzzlePack": {
+      "id": "core",
+      "manifestHash": "sha256:be689ea75d3155edeefe38a94027f341bc37046d7203b99d68e85182e10470ab"
+    }
+  },
+  "fictionalUser": {
+    "personaId": "steady-improver-v1",
+    "visibleName": null,
+    "ratings": {
+      "standard": 925,
+      "arrowDuel": 875
+    },
+    "practiceActivity": {
+      "completedRunsLastEightWeeks": 18,
+      "correctThisWeek": 52,
+      "correctPreviousWeek": 41
+    },
+    "activeSnapshots": {
+      "standard": {
+        "runId": "standard",
+        "rating": 925,
+        "correct": 8,
+        "targetCorrect": 15,
+        "mistakes": 0,
+        "maxMistakes": 3,
+        "sprintRemainingSeconds": 162,
+        "puzzleElapsedSeconds": 12,
+        "feedbackState": "neutral"
+      },
+      "arrowDuel": {
+        "runId": "arrow-duel",
+        "rating": 875,
+        "correct": 4,
+        "targetCorrect": 10,
+        "mistakes": 0,
+        "maxMistakes": 3,
+        "sprintRemainingSeconds": 198,
+        "puzzleElapsedSeconds": 11,
+        "candidateCount": 2,
+        "feedbackState": "neutral"
+      }
+    },
+    "tacticalProfile": {
+      "assurance": "provisional",
+      "taskFamily": "line",
+      "primaryFocus": {
+        "themeKey": "fork",
+        "themeLabel": "Forks",
+        "reason": "solve_rate",
+        "distinctPuzzleCount": 7,
+        "distinctSessionCount": 3
+      },
+      "focusedRun": {
+        "title": "Fork repair",
+        "ratingAnchor": 925,
+        "ratingPolicy": "unrated",
+        "durationSeconds": 300,
+        "puzzleCount": 15,
+        "allocations": [
+          {
+            "key": "fork",
+            "label": "Forks",
+            "puzzleCount": 10
+          },
+          {
+            "key": "mixed",
+            "label": "Mixed practice",
+            "puzzleCount": 5
+          }
+        ]
+      }
+    },
+    "reviewQueue": {
+      "scheduledToday": 6,
+      "completedToday": 2,
+      "remainingToday": 4,
+      "overdue": 0,
+      "tomorrow": 3,
+      "nextSevenDays": 8,
+      "totalScheduled": 12,
+      "remainingModes": {
+        "standard": 3,
+        "arrowDuel": 1
+      }
+    },
+    "tacticalProgress": {
+      "assurance": "provisional",
+      "periodLabel": "Last 8 weeks",
+      "selectedThemeKey": "pin",
+      "selectedThemeLabel": "Pins",
+      "kind": "completed_speed",
+      "changeLabel": "24% less overhead",
+      "points": [
+        {
+          "label": "May 24",
+          "valueLabel": "1.30×",
+          "sampleSize": 18
+        },
+        {
+          "label": "Jun 7",
+          "valueLabel": "1.27×",
+          "sampleSize": 25
+        },
+        {
+          "label": "Jun 21",
+          "valueLabel": "1.22×",
+          "sampleSize": 33
+        },
+        {
+          "label": "Jul 5",
+          "valueLabel": "1.17×",
+          "sampleSize": 42
+        },
+        {
+          "label": "Jul 19",
+          "valueLabel": "1.11×",
+          "sampleSize": 50
+        },
+        {
+          "label": "Jul 26",
+          "valueLabel": "1.06×",
+          "sampleSize": 57
+        }
+      ]
+    }
+  },
+  "claimEvidence": [
+    {
+      "claim": "No developer data collection",
+      "source": "docs/APP_PRIVACY_DISCLOSURE.md"
+    },
+    {
+      "claim": "No Chessticize account or ads",
+      "source": "docs/APP_PRIVACY_DISCLOSURE.md"
+    },
+    {
+      "claim": "Bundled puzzles work offline",
+      "source": "docs/STORE_ASSETS.md"
+    },
+    {
+      "claim": "App source is public under GPL-3.0-or-later",
+      "source": "README.md"
+    }
+  ],
+  "frames": [
+    {
+      "order": 1,
+      "id": "build-tactical-intuition",
+      "captureId": "marketing-01-standard-sprint",
+      "copyKey": "build-tactical-intuition",
+      "headline": "Build Tactical Intuition",
+      "supporting": "Short, rating-matched Sprints build fast pattern recognition.",
+      "benefit": "Successful Standard practice under bounded time pressure",
+      "source": {
+        "screen": "active-standard-sprint",
+        "component": "apps/mobile/src/components/PracticePocScreen.tsx",
+        "entryTestIds": [
+          "practice-tab",
+          "practice-run-standard",
+          "practice-run-start"
+        ],
+        "requiredVisibleTestIds": [
+          "active-session-shell",
+          "session-progress",
+          "session-timer",
+          "session-mistakes",
+          "session-puzzle-timing",
+          "session-board"
+        ],
+        "stableText": {
+          "session-progress": "8 / 15",
+          "session-timer": "2:42",
+          "session-puzzle-timing": "Puzzle 0:12"
+        },
+        "forbiddenStates": [
+          "wrong-feedback",
+          "timed-out",
+          "slow",
+          "unclear",
+          "paused",
+          "abandon-confirmation",
+          "guide"
+        ]
+      }
+    },
+    {
+      "order": 2,
+      "id": "choose-the-best-move",
+      "captureId": "marketing-02-arrow-duel",
+      "copyKey": "choose-the-best-move",
+      "headline": "Choose the Best Move",
+      "supporting": "Arrow Duel trains you to reject a tempting blunder before you play it.",
+      "benefit": "Distinctive two-choice blunder-recognition practice",
+      "source": {
+        "screen": "active-arrow-duel",
+        "component": "apps/mobile/src/components/PracticePocScreen.tsx",
+        "entryTestIds": [
+          "practice-tab",
+          "practice-run-arrow-duel",
+          "practice-run-start"
+        ],
+        "requiredVisibleTestIds": [
+          "active-session-shell",
+          "session-progress",
+          "session-timer",
+          "session-mistakes",
+          "session-puzzle-timing",
+          "session-board",
+          "arrow-duel-candidate-overlay"
+        ],
+        "stableText": {
+          "session-progress": "4 / 10",
+          "session-timer": "3:18",
+          "session-puzzle-timing": "Puzzle 0:11"
+        },
+        "forbiddenStates": [
+          "selected-candidate",
+          "correct-feedback",
+          "wrong-feedback",
+          "timed-out",
+          "guide"
+        ]
+      }
+    },
+    {
+      "order": 3,
+      "id": "train-your-weaknesses",
+      "captureId": "marketing-03-focused-run",
+      "copyKey": "train-your-weaknesses",
+      "headline": "Train Your Weaknesses",
+      "supporting": "Tactical Profiles turn repeated patterns into a focused Practice Run.",
+      "benefit": "A measured weakness connected to an actionable training plan",
+      "source": {
+        "screen": "focused-run-preview",
+        "component": "apps/mobile/src/components/TacticalProfileSection.tsx",
+        "entryTestIds": [
+          "practice-tab",
+          "training-focus-open-profile",
+          "tactical-profile-preview-run"
+        ],
+        "requiredVisibleTestIds": [
+          "focused-run-preview",
+          "tactical-profile-early-estimate",
+          "focused-run-rating-anchor",
+          "focused-run-allocation-bar",
+          "focused-run-start"
+        ],
+        "stableText": {
+          "title": "Fork repair",
+          "summary": "15 puzzles · 5 min",
+          "focused-run-rating-anchor": "Puzzle-solving Rating 925",
+          "primary-allocation-label": "Forks",
+          "primary-allocation-count": "10 · 67%",
+          "mixed-allocation-label": "Mixed practice",
+          "mixed-allocation-count": "5 · 33%"
+        },
+        "forbiddenStates": [
+          "focused-run-unavailable",
+          "suppressed-recommendation",
+          "loading"
+        ]
+      }
+    },
+    {
+      "order": 4,
+      "id": "turn-mistakes-into-memory",
+      "captureId": "marketing-04-review-queue",
+      "copyKey": "turn-mistakes-into-memory",
+      "headline": "Turn Mistakes Into Memory",
+      "supporting": "Scheduled Review brings missed and unclear puzzles back when they are due.",
+      "benefit": "A calm, manageable spaced-review loop",
+      "source": {
+        "screen": "review-queue",
+        "component": "apps/mobile/src/components/PracticePocScreen.tsx",
+        "entryTestIds": [
+          "review-tab"
+        ],
+        "requiredVisibleTestIds": [
+          "review-due-card",
+          "review-due-count",
+          "review-forecast",
+          "review-start-due"
+        ],
+        "stableText": {
+          "review-due-count": "2 / 6",
+          "review-start-due": "Review 4",
+          "review-tomorrow-count": "3",
+          "review-next-seven-days-count": "8",
+          "review-total-count": "12"
+        },
+        "forbiddenStates": [
+          "overdue",
+          "empty-queue",
+          "permission-prompt",
+          "developer-controls"
+        ]
+      }
+    },
+    {
+      "order": 5,
+      "id": "see-what-is-improving",
+      "captureId": "marketing-05-tactical-progress",
+      "copyKey": "see-what-is-improving",
+      "headline": "See What Is Improving",
+      "supporting": "Track theme-by-theme progress across weeks, not just one score.",
+      "benefit": "Credible improvement with theme-level context",
+      "source": {
+        "screen": "tactical-progress",
+        "component": "apps/mobile/src/components/HistoryProgressSection.tsx",
+        "entryTestIds": [
+          "history-tab",
+          "history-progress-button",
+          "history-progress-strength-pins"
+        ],
+        "requiredVisibleTestIds": [
+          "history-progress-screen",
+          "history-progress-early-estimate",
+          "history-strength-over-time",
+          "history-strength-chart"
+        ],
+        "stableText": {
+          "title": "Tactical progress",
+          "period": "Last 8 weeks",
+          "theme": "Pins",
+          "change": "24% less overhead"
+        },
+        "forbiddenStates": [
+          "clear-weakness",
+          "worsened",
+          "empty-progress"
+        ]
+      }
+    },
+    {
+      "order": 6,
+      "id": "private-offline-open-source",
+      "captureId": "marketing-06-trust",
+      "copyKey": "private-offline-open-source",
+      "headline": "Private. Offline. Open Source.",
+      "supporting": "No ads. No Chessticize account. No developer data collection.",
+      "benefit": "Trust through verifiable product and source signals",
+      "source": {
+        "screen": "settings-about",
+        "component": "apps/mobile/src/components/PracticePocScreen.tsx",
+        "entryTestIds": [
+          "settings-tab"
+        ],
+        "requiredVisibleTestIds": [
+          "settings-about-section",
+          "settings-license",
+          "settings-source",
+          "settings-stockfish-source",
+          "settings-puzzle-data-license"
+        ],
+        "stableText": {
+          "settings-license": "GPL-3.0-or-later",
+          "settings-source": "GitHub",
+          "settings-stockfish-source": "Embedded"
+        },
+        "crop": {
+          "startTestId": "settings-license",
+          "endTestId": "settings-puzzle-data-license",
+          "excludeTestIds": [
+            "settings-app-version"
+          ]
+        },
+        "forbiddenStates": [
+          "development-puzzle-source",
+          "diagnostics",
+          "real-user-data",
+          "stale-version-copy"
+        ]
+      }
+    }
+  ],
+  "globalForbiddenStates": [
+    "real-user-data",
+    "qa-only-controls",
+    "debug-overlays",
+    "empty-primary-state",
+    "fatal-error",
+    "warning-heavy-state",
+    "onboarding",
+    "timeout",
+    "abandon-confirmation"
+  ]
+}
