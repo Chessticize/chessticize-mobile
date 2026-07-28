@@ -7228,7 +7228,7 @@ describe("PracticePocScreen", () => {
     expect(historyAttemptThemes).toMatch(/^[A-Z]/);
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-pace`))).toContain("20s pace");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toMatch(
-      /Sprint · \d+s · (Today|Yesterday|\d+ days ago|\d+w ago|\d+mo ago|\d+y ago|Scheduled) · [A-Z][a-z]{2} \d{1,2}, \d{4}/
+      /Sprint · \d+s · (Today|Yesterday|Scheduled|[A-Z][a-z]{2} \d{1,2}(, \d{4})?)$/
     );
     expect(() => findByTestId(renderer, `history-attempt-${historyAttemptId}-status`)).toThrow();
     expect(findByTestId(renderer, `history-attempt-${historyAttemptId}-chevron`)).toBeTruthy();
@@ -7879,6 +7879,44 @@ describe("PracticePocScreen", () => {
       "ID shared-history · Rating 900"
     );
     expect(() => findByTestId(renderer, "history-attempt-standard-attempt-difficulty")).toThrow();
+  });
+
+  it("refreshes one concise calendar-correct date label when History opens", () => {
+    let nowMs = new Date(2026, 6, 27, 23, 50).getTime();
+    const completedAtMs = new Date(2026, 6, 27, 23, 45).getTime();
+    const completedAt = new Date(completedAtMs).toISOString();
+    const store = new MemoryStore();
+    store.seedPuzzles([sharedHistoryPuzzle()]);
+    store.recordAttempt({
+      id: "same-day-attempt",
+      source: "sprint",
+      sessionId: "same-day-session",
+      puzzleId: "shared-history",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: new Date(completedAtMs - 5_000).toISOString(),
+      completedAt,
+      ratingBefore: 600
+    });
+    const renderer = renderScreen({
+      currentTimeMs: () => nowMs,
+      practiceService: new PracticeService(store)
+    });
+
+    nowMs = new Date(2026, 6, 28, 0, 10).getTime();
+    jest.setSystemTime(nowMs);
+    press(renderer, "history-tab");
+    press(renderer, "history-attention-all");
+
+    expect(collectText(findByTestId(renderer, "history-attempt-same-day-attempt-meta"))).toBe(
+      "Sprint · 5s · Yesterday"
+    );
+    expect(findByTestId(renderer, "history-attempt-same-day-attempt").props.accessibilityLabel).toContain(
+      formatLocalCalendarDate(completedAt)
+    );
   });
 
   it("keeps an archived Run name in History rows without exposing an archived Run filter", () => {
