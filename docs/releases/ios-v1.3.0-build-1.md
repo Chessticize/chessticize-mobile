@@ -10,26 +10,27 @@
 
 ## Customer-facing changes
 
-- Explore Tactical Profiles built from your history, then create focused Practice Runs for tactical weaknesses.
-- Configure puzzle timing, understand Sprint outcomes, and replay Unclear or In Review attempts together.
-- Add optional move sounds and haptic feedback while keeping practice offline and local-first.
+- Follow clearer first-use guidance for Sprint goals, timing, Slow warnings, timeouts, mistakes, and Replay.
+- Explore Tactical Profiles, with focused Practice Runs presented as an experimental way to train from your history.
+- Replay Unclear or In Review attempts together, and optionally enable move sounds and haptic feedback.
 
 ## Store copy (`en-US`)
 
 ```text
-• Turn tactical strengths and weaknesses into focused Practice Runs.
-• Understand Sprint outcomes, then replay Unclear and In Review attempts.
-• Add optional move sounds and haptic feedback.
+• First-use guides explain Sprint, timing, mistakes, and Replay.
+• Try experimental focused Practice Runs from Tactical Profiles.
+• Replay Unclear and In Review attempts; add sound and haptics.
 
 Details and source: https://github.com/Chessticize/chessticize-mobile/releases/tag/ios-v1.3.0-build-1
 ```
 
 ## GitHub customer summary
 
-Chessticize 1.3 adds Tactical Profiles that turn practice history into visible
-strengths, weaknesses, and focused Practice Runs. It also adds configurable
-puzzle timing, clearer Sprint outcomes, post-Sprint Replay, and optional move
-sound and haptic feedback.
+Chessticize 1.3 makes its expanded practice system easier to learn with
+first-use guidance for Sprint goals, timing, Slow warnings, timeouts, mistakes,
+and Replay. Tactical Profiles show strengths and weaknesses, with focused
+Practice Runs presented as an experimental way to train. The release also adds
+post-Sprint Replay plus optional move sound and haptic feedback.
 
 ## Release-note review
 
