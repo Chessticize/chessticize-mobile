@@ -44,6 +44,7 @@ import {
   currentExpectedMove,
   defaultSprintConfig,
   formatLocalCalendarDate,
+  formatLocalCalendarDateLabel,
   formatReviewDay,
   formatWhitePerspectiveScore,
   historyAttemptReplayAvailability,
@@ -1169,6 +1170,9 @@ export function PracticePocScreen({
   }
 
   function navigateToTab(nextTab: Tab): void {
+    if (nextTab === "history") {
+      captureLiveNowIso();
+    }
     if (nextTab !== "history") {
       setHistoryFiltersExpanded(false);
       setHistoryProgressOpen(false);
@@ -3890,6 +3894,7 @@ export function PracticePocScreen({
                 <HistoryPanel
                   adaptiveLayout={adaptiveLayout}
                   attempts={visibleHistoryAttempts}
+                  nowMs={nowMs}
                   performance={historyPerformanceView?.performance ?? emptyHistoryPerformance()}
                   ratingKeys={historyRatingKeys}
                   runsByRatingKey={historyRunsByRatingKey}
@@ -9173,6 +9178,7 @@ function HistoryPanel({
   adaptiveLayout,
   attempts,
   filtersExpanded,
+  nowMs,
   performance,
   ratingKeys,
   runsByRatingKey,
@@ -9206,6 +9212,7 @@ function HistoryPanel({
   adaptiveLayout: AdaptiveLayout;
   attempts: HistoryAttemptView[];
   filtersExpanded: boolean;
+  nowMs: number;
   performance: HistoryPerformance;
   ratingKeys: string[];
   runsByRatingKey: ReadonlyMap<string, { name: string; perPuzzleSeconds: number }>;
@@ -9443,6 +9450,7 @@ function HistoryPanel({
         <HistoryAttemptRow
           key={attempt.id}
           attempt={attempt}
+          nowMs={nowMs}
           onOpen={() => onOpenAttempt(attempt.id)}
         />
       ))}
@@ -10071,9 +10079,11 @@ function HistoryAttentionFilter({
 
 function HistoryAttemptRow({
   attempt,
+  nowMs,
   onOpen
 }: {
   attempt: HistoryAttemptView;
+  nowMs: number;
   onOpen: () => void;
 }): React.JSX.Element {
   const detail = normalizeHistoryAttemptDetail(attempt);
@@ -10082,10 +10092,13 @@ function HistoryAttemptRow({
   const isTimedOut = timingStatus === "timed_out" || detail.result === "timed_out";
   const isWrong = detail.result === "wrong" && !isTimedOut;
   const isCorrect = detail.result === "correct";
-  const completedAtMs = detail.completedAt === null ? null : new Date(detail.completedAt).getTime();
-  const dateLabel = completedAtMs === null || detail.completedAt === null
+  const dateLabel = detail.completedAt === null
     ? "Date unavailable"
-    : `${historyAttemptRecencyLabel(completedAtMs)} · ${formatLocalCalendarDate(detail.completedAt)}`;
+    : formatLocalCalendarDateLabel(detail.completedAt, { now: nowMs });
+  const exactDateLabel = detail.completedAt === null ? null : formatLocalCalendarDate(detail.completedAt);
+  const accessibleDateLabel = exactDateLabel === null || dateLabel === exactDateLabel
+    ? dateLabel
+    : `${dateLabel}, ${exactDateLabel}`;
   const visibleThemes = attempt.curatedThemes;
   const pace = historyAttemptSpeedSeconds(attempt);
   const paceLabel = pace === null ? null : `${pace}s pace`;
@@ -10103,6 +10116,7 @@ function HistoryAttemptRow({
   const puzzleIdentity = `ID ${attempt.puzzleId} · Rating ${attempt.puzzleRating}`;
   const durationLabel = detail.elapsedSeconds === null ? "Duration unavailable" : `${detail.elapsedSeconds}s`;
   const compactMeta = `${sourceLabel} · ${durationLabel} · ${dateLabel}`;
+  const accessibleMeta = `${sourceLabel} · ${durationLabel} · ${accessibleDateLabel}`;
   const rowAccessibilityLabel = [
     `Replay ${historyAttemptModeLabel(detail.mode)} puzzle`,
     resultLabel,
@@ -10111,7 +10125,7 @@ function HistoryAttemptRow({
     timingStatus === "slow" ? "Slow" : isTimedOut ? "Timed out" : null,
     puzzleIdentity,
     compactContext,
-    compactMeta
+    accessibleMeta
   ].filter(Boolean).join(", ");
 
   return (
@@ -10232,33 +10246,6 @@ function historyAttemptModeLabel(mode: SprintMode | null): string {
 
 function historyAttemptSourceLabel(source: AttemptSource | null): string {
   return source === "scheduled_review" ? "Review" : source === "sprint" ? "Sprint" : "Unknown source";
-}
-
-function historyAttemptRecencyLabel(completedAtMs: number): string {
-  const nowMs = Date.now();
-  if (!Number.isFinite(completedAtMs) || completedAtMs > nowMs) {
-    return "Scheduled";
-  }
-  const elapsedDays = Math.floor((nowMs - completedAtMs) / (24 * 60 * 60 * 1000));
-  if (elapsedDays === 0) {
-    return "Today";
-  }
-  if (elapsedDays === 1) {
-    return "Yesterday";
-  }
-  if (elapsedDays < 7) {
-    return `${elapsedDays} days ago`;
-  }
-  if (elapsedDays < 30) {
-    const weeks = Math.floor(elapsedDays / 7);
-    return `${weeks}w ago`;
-  }
-  if (elapsedDays < 365) {
-    const months = Math.floor(elapsedDays / 30);
-    return `${months}mo ago`;
-  }
-  const years = Math.floor(elapsedDays / 365);
-  return `${years}y ago`;
 }
 
 function FilterButton({
