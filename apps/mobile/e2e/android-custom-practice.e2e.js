@@ -15,7 +15,7 @@ const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000);
 const CUSTOM_RUN_NAME = `${practiceFixture.customRunTheme.label} Focus`;
 const CUSTOM_RUN_THEME_TEST_ID = `custom-theme-${practiceFixture.customRunTheme.id}`;
 const EXPECTED_AUTO_REPLY_MOVE = practiceFixture.puzzle.solutionMoves[2];
-const EXPECTED_RATING_DELTA = practiceFixture.expectedRatingAfter - practiceFixture.puzzle.rating;
+const EXPECTED_RATING_DELTA = practiceFixture.expectedRatingAfter - practiceFixture.expectedRatingBefore;
 
 describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, () => {
   beforeAll(async () => {
@@ -69,7 +69,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await element(by.id('practice-run-save')).tap();
       await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
       await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
-      await element(by.text(CUSTOM_RUN_NAME)).tap();
+      await selectPracticeRunByName(CUSTOM_RUN_NAME);
       await element(by.id('practice-main-scroll')).scrollTo('top');
       await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
       await element(by.id('practice-run-start')).tap();
@@ -110,6 +110,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       // saved attempt and its Android Stockfish analysis.
       await element(by.id('sprint-result-history-button')).tap();
       await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
+      await showAllHistoryAttempts();
       await openFirstCorrectHistoryAttempt();
       await waitForVisibleInPracticeScroll('review-board');
       await expect(element(by.id('history-attempt-detail'))).not.toExist();
@@ -141,8 +142,8 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
 
       await openTab('history-tab', 'history-action-header');
-      await waitFor(element(by.text(`${CUSTOM_RUN_NAME} · 30s pace`))).toExist().withTimeout(10000);
-      await element(by.text(`${CUSTOM_RUN_NAME} · 30s pace`)).tap();
+      await showAllHistoryAttempts();
+      await selectCustomHistoryRating();
       await waitForElementTextContaining('history-chart-value', String(practiceFixture.expectedRatingAfter), 10000);
       await waitFor(element(by.id('history-chart-line'))).toExist().withTimeout(10000);
       await waitFor(element(by.text(CUSTOM_RUN_NAME)).atIndex(0)).toExist().withTimeout(10000);
@@ -150,12 +151,11 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
 
       await openTab('practice-tab', 'practice-action-header');
       await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
-      await waitFor(element(by.text(`Rating ${practiceFixture.expectedRatingAfter}`))).toExist().withTimeout(10000);
-      await element(by.text(CUSTOM_RUN_NAME)).tap();
+      await selectPracticeRunByName(CUSTOM_RUN_NAME);
       await waitForVisibleInPracticeScroll('practice-progress-summary');
       await waitForElementAccessibilityLabelContaining(
         'practice-progress-summary',
-        `Rating ${practiceFixture.expectedRatingAfter}`,
+        `rating ${practiceFixture.expectedRatingAfter}`,
         10000,
         50
       );
@@ -178,16 +178,44 @@ async function openNewRunEditor() {
   await waitFor(element(by.id('custom-mode-regular'))).toBeVisible().withTimeout(10000);
 }
 
+async function selectPracticeRunByName(runName) {
+  const nameAttributes = await element(by.text(runName)).getAttributes();
+  const identifier = (Array.isArray(nameAttributes) ? nameAttributes[0] : nameAttributes).identifier;
+  if (typeof identifier !== 'string' || !identifier.startsWith('practice-run-name-')) {
+    throw new Error(`Could not resolve saved Run selection from ${String(identifier)}`);
+  }
+  const selectTestID = identifier.replace(/^practice-run-name-/, 'practice-run-select-');
+  await waitForVisibleInPracticeScroll(selectTestID);
+  await element(by.id(selectTestID)).tap();
+}
+
 async function openFirstCorrectHistoryAttempt() {
-  await waitFor(element(by.text('Correct')).atIndex(0))
-    .toBeVisible()
-    .whileElement(by.id('practice-main-scroll'))
-    .scroll(100, 'down');
-  const attributes = await element(by.text('Correct')).atIndex(0).getAttributes();
+  const correctResult = element(by.text('Correct')).atIndex(0);
+  await waitFor(correctResult).toExist().withTimeout(10000);
+  const attributes = await correctResult.getAttributes();
   const identifier = (Array.isArray(attributes) ? attributes[0] : attributes).identifier;
   if (typeof identifier !== 'string' || !identifier.endsWith('-result')) {
     throw new Error(`Could not resolve Custom history attempt row from ${String(identifier)}`);
   }
-  await element(by.id(identifier.replace(/-result$/, ''))).tap();
+  const rowTestID = identifier.replace(/-result$/, '');
+  await waitForVisibleInPracticeScroll(rowTestID);
+  await element(by.id(rowTestID)).tap();
   await waitFor(element(by.id('review-session'))).toExist().withTimeout(10000);
+}
+
+async function showAllHistoryAttempts() {
+  await waitFor(element(by.id('history-attention-all'))).toBeVisible().withTimeout(10000);
+  await element(by.id('history-attention-all')).tap();
+  await waitFor(element(by.id('history-attention-explanation'))).not.toExist().withTimeout(10000);
+}
+
+async function selectCustomHistoryRating() {
+  await element(by.id('history-filter-toggle')).tap();
+  await waitFor(element(by.id('history-advanced-filters'))).toExist().withTimeout(10000);
+  const customRatingFilter = element(by.text(`${CUSTOM_RUN_NAME} · 30s pace`));
+  await waitFor(customRatingFilter)
+    .toBeVisible()
+    .whileElement(by.id('history-rating-filters'))
+    .scroll(120, 'right');
+  await customRatingFilter.tap();
 }

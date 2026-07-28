@@ -30,6 +30,114 @@ The public repository is:
 
 https://github.com/Chessticize/chessticize-mobile
 
+## Release Integration Branch
+
+Prepare each coordinated mobile release on
+`codex/mobile-<version>-release`, created from current `main`, with one draft
+release PR targeting `main`.
+
+After that cut, `main` remains open for the next version's feature work. Do not
+merge or rebase advancing `main` back into the release branch by default.
+Selectively backport only changes approved for the current release through
+reviewed PRs targeting the release branch.
+
+Release-branch history is append-only. Never rebase the release branch, amend
+or replace an already-pushed release commit, force-push the branch, or squash
+the release branch into `main`. Make every correction as a new commit. Protect
+each active release branch against force pushes and deletion, require linear
+history, and enforce those protections for administrators.
+
+Each contributor or agent works on a separate branch and opens a PR targeting
+the release branch. A contributor PR must be complete, reviewed, and green
+before it is squash-merged into the release branch. These integration PRs use
+`gh pr merge --squash --delete-branch`, leaving one intentional release-branch
+commit per completed work package.
+
+After integration, run the cross-change QA, release build, and selected native
+validation from a clean exact release-branch head. Do not treat a passing
+contributor branch as automatically valid integrated release evidence. Reuse
+its validation App artifact only when the fail-closed App-input comparison
+proves the App source is an ancestor of the release test runner and their
+App-input digests match; rerun any test evidence changed by the integration.
+This does not reuse or relabel a signed distribution candidate: build and bind
+that candidate to the exact final release-branch head.
+
+The exact validated release-branch head is the source for the submitted
+binaries and the immutable iOS and Android platform tags. The later merge
+commit on `main` records forward integration with concurrently developed
+next-version work. Its release-side parent preserves the exact release commit
+and SHA; the merge commit is not the released source tag target and must never
+move or replace that tag.
+
+Keep the release PR draft until the exact identity, approved build-specific
+customer notes, fast checks, selected native evidence, and release review are
+complete. The final release PR to `main` is the only merge-commit exception.
+Keep merge commits enabled in the GitHub repository and merge that PR with
+`gh pr merge --merge --delete-branch`, preserving the release branch's
+already-squashed work-package commits under one explicit release merge commit.
+Every other PR uses squash merge. Create immutable platform tags and source
+Releases only from the final approved release commit; never tag an intermediate
+contributor branch or a partially integrated release branch.
+
+## Release Candidate Freeze
+
+Use an explicit release-candidate generation instead of treating the release
+branch as permanently frozen:
+
+1. **Integration open:** approved work for the release may enter through
+   contributor PRs. Do not spend final release-build or native-validation time
+   while known product PRs are still pending.
+2. **RC frozen:** after the convergence sweep and final integration, record
+   `RC-Generation`, `RC-State: frozen`, the exact 40-character release-branch
+   head, freeze time, intended validation scope, App-input digest, and known
+   blockers in a comment on the draft release PR. The comment is the durable
+   freeze record; do not commit a marker that would move the head it records.
+   Only one generation is active.
+3. **RC accepted:** required current-head fast checks, selected native evidence,
+   release review, notes, and identity gates pass for that generation. Only the
+   latest accepted generation may be tagged, signed, submitted, or published.
+4. **Remediation:** a required App or release-identity correction invalidates
+   the active generation before the release branch moves. Record
+   `RC-State: invalidated`, the blocking finding, and the invalidated evidence.
+   Open the branch only to focused blocker-fix PRs, perform another convergence
+   sweep, then freeze the new exact head as `RC-<n+1>`. Never edit, reuse, or
+   relabel the old generation.
+
+An RC freeze rejects planned development, features, opportunistic refactors,
+and non-blocking polish. Defer those changes to the next version on `main`.
+Validation findings use these exception paths:
+
+- **Transient infrastructure failure on unchanged inputs:** preserve the
+  failure and rerun the specific failed job once. Repeated or deterministic
+  failure requires classification rather than more retries.
+- **Host-side test-runner defect:** keep the release branch and frozen App
+  source unchanged. Fix the spec, selector, wait, assertion, evidence collector,
+  or non-bundled fixture on a separate evidence branch based on the frozen App
+  source. After the fail-closed App-input comparison and artifact checksum pass,
+  rerun only the affected scope against the retained App artifact. Record the
+  App source SHA, test-runner SHA, digest, checksum, finding, and result on the
+  release PR. Do not merge the evidence-only correction into the frozen release
+  branch; integrate it into `main` later through an ordinary squash PR.
+- **Product, App-input, or required release-identity defect:** invalidate the
+  current generation and enter remediation. Add the lowest reliable regression
+  test, merge the reviewed focused fix into the release branch with squash,
+  batch all other known blockers, and freeze the resulting head as the next
+  generation. Run exact-head fast checks, rebuild affected App or signed
+  artifacts, and rerun only the validation gates invalidated by the changed
+  boundary. Full native validation is required only when the resulting risk is
+  broad.
+- **Record-only correction:** queue non-blocking documentation, review
+  metadata, or agent-guidance changes until after release so the frozen head
+  stays stable. If the correction is required for this release, use remediation
+  and a new generation; native App evidence may still be reused when the
+  fail-closed comparison passes, but current-head fast and exact identity checks
+  remain required.
+
+If a frozen generation already has an immutable platform tag, signed candidate,
+or store-consumed build identity, follow the platform replacement rules. Never
+move the tag or reuse the consumed build number or Android version code.
+Retain invalidated generations and their artifacts as audit evidence.
+
 ## Pre-Retry Convergence Sweep
 
 Do not immediately restart a complete release matrix after its first failure.
@@ -62,18 +170,21 @@ without another full native run:
    rejected the mismatch before the native matrix.
 6. Recheck the diff, clean tracked worktree, exact PR head, open PRs, and remote
    `main`. Resolve all known blockers before spending the full native retry.
-7. Run the required local iOS evidence once after the last
-   validation-relevant development change and merge once. If the PR head or
-   squash-merged release candidate later differs only in documentation, review
-   metadata, or merge ancestry, record both SHAs and the diff proving that
-   mobile runtime, native/platform, dependency, build/release, and selected
-   native test/fixture inputs are unchanged; reuse the evidence without an
-   exact-head rerun. Android release workflows remain governed by the Android
-   release runbook.
+7. Run the required local iOS evidence once after the last App build input
+   change and merge once. If the PR head or squash-merged release candidate
+   changes only host-side specs, selectors, assertions, evidence collectors, or
+   non-bundled fixtures, verify the App-input digest, reuse the checksummed App
+   bundle, and rerun only the affected scope. Documentation, review metadata,
+   agent guidance, and merge ancestry require no native rerun. Record the App
+   source SHA, test-runner SHA, App-input digest, artifact checksum, and focused
+   results. Android test-only reruns use the retained-APK workflow in
+   `docs/ANDROID_VALIDATION.md`.
 
 If that final run reveals a genuinely new deterministic failure, preserve it,
-extend the fast proving layer that missed it, and repeat this sweep. Never hide
-an unexplained failure with a successful rerun.
+extend the fast proving layer that missed it, and repeat this sweep. A
+test-runner-only correction reruns the affected scope against the verified App
+artifact; an App build input correction rebuilds and reruns the selected native
+scope. Never hide an unexplained failure with a successful rerun.
 
 ## Release Checklist
 

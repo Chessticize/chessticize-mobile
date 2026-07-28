@@ -16,6 +16,13 @@ const scenes = [
   "app-store-08-review-session"
 ];
 
+const releaseVersion = JSON.parse(
+  readFileSync(resolve("apps/mobile/release-version.json"), "utf8")
+) as {
+  iosPublicVersion: string;
+  iosBuildNumber: number;
+};
+
 function pngFixture(width: number, height: number) {
   const buffer = Buffer.alloc(33);
   buffer.write("89504e470d0a1a0a", 0, "hex");
@@ -136,9 +143,12 @@ test("TestFlight evidence CLI writes validator outputs and a release summary", (
     assert.equal(JSON.parse(readFileSync(join(output, "third-party-audit.json"), "utf8")).status, "pass");
     assert.equal(JSON.parse(readFileSync(join(output, "signing-readiness.json"), "utf8")).status, "pass");
     assert.equal(JSON.parse(readFileSync(join(output, "screenshot-audit.json"), "utf8")).status, "pass");
+    const tagVersion = releaseVersion.iosPublicVersion.split(".").length === 2
+      ? `${releaseVersion.iosPublicVersion}.0`
+      : releaseVersion.iosPublicVersion;
     assert.equal(
       JSON.parse(readFileSync(join(output, "release-manifest.json"), "utf8")).releaseTagSuggestion,
-      "ios-v1.2.1-build-1"
+      `ios-v${tagVersion}-build-${releaseVersion.iosBuildNumber}`
     );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });

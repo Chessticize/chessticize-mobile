@@ -14,7 +14,8 @@ the current Play track: corresponding source, Play delivery, owner
 physical-device smoke under the former policy, and the Play-signed GitHub APK
 mirror are complete. Version code 7 is the Android 1.2.1 ordinary-delta release
 currently in Play review with corresponding source and the Play-signed GitHub
-binary release published.
+binary release published. Version code 8 is the proposed Android 1.3
+full-scope release candidate.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -186,15 +187,33 @@ Build 7 is the Android 1.2.1 ordinary-delta GitHub binary release:
   `7 (1.2.1)` was last observed in Play review; track review continues
   independently and must not be reported as published until the Console says so.
 
+Build 8 is the proposed Android 1.3 full-scope release candidate:
+
+- proposed annotated tag: `android-v1.3.0-build-8`;
+- primary user-visible changes: Tactical Profiles and focused Practice Runs,
+  configurable puzzle timing with clearer Sprint guidance and outcomes, and
+  optional move sound and haptic feedback;
+- validation scope: exact-head fast checks, the complete shared `flows` and
+  `practice` suites, the applicable released-fixture migration and Android
+  compatibility matrix, and the protected signed-candidate/source job;
+- current state: release integration and validation; annotated tag, signed
+  candidate, source Release, Play upload, and APK mirror pending.
+
+Do not create or publish the build-8 tag until the release PR is complete, the
+approved Android release-note file is present, and the clean candidate commit
+has current-head fast checks plus the required App-source-bound native
+evidence. Test-only reruns may use an earlier checksummed APK when the
+fail-closed App-input digest matches and the evidence records both SHAs.
+
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.2.1`)
-- Android version code: `apps/mobile/release-version.json` (`7`)
+- Public version: `apps/mobile/release-version.json` (`1.3`)
+- Android version code: `apps/mobile/release-version.json` (`8`)
 - iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.2.1-build-7`
+- Required source tag before any Play track upload: `android-v1.3.0-build-8`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -297,8 +316,8 @@ the mirror and Play track states independently until both are complete.
 
 For a bounded follow-up release:
 
-For Android version `1.2.1` build `7`, release notes and this support document must
-name the canonical source tag `android-v1.2.1-build-7` and the public source
+For Android version `1.3` build `8`, release notes and this support document must
+name the canonical source tag `android-v1.3.0-build-8` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 must bind the annotated tag, commit, application ID, version, version code, and
 AAB SHA-256 before Play distribution. A missing or lightweight public tag, a
@@ -330,6 +349,14 @@ post-Play mirror. The mirror is a small required publication finalizer, not
 another validation gate. A fresh full Detox matrix, unchanged listing review,
 generated-package size catalog, and repeated account setup are not recurring
 delta gates.
+
+When only a host-side Android spec, selector, assertion, evidence collector, or
+non-bundled fixture changes, use `Mobile Android test-only rerun` with the
+retained source run and App source SHA. The workflow proves the App-input digest
+is unchanged and reruns only the affected target without Gradle. A runtime,
+native/platform, native test-APK, dependency, build/release, or bundled
+fixture/resource change is not test-only and requires a new build plus the
+selected native scope.
 
 ### First launch and change-triggered gates
 

@@ -1,8 +1,7 @@
 # App Store Assets
 
-This document is the 1.2 source of truth for App Store Connect metadata and
-store screenshot capture, and remains the approved baseline for the 1.2.1
-patch. Recheck Apple's live documentation before upload:
+This document is the 1.3 source of truth for App Store Connect metadata and
+store screenshot capture. Recheck Apple's live documentation before upload:
 
 - Screenshot specifications:
   https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications
@@ -34,8 +33,12 @@ mistakes with spaced repetition, and analyze positions with on-device
 Stockfish. Your puzzle progress, ratings, history, and review queue stay on
 your device, so practice works without an account or network connection.
 
-Included in 1.2:
+Included in 1.3:
 
+- Tactical Profiles that summarize strengths, weaknesses, and progress
+- Focused Practice Runs created from tactical weaknesses
+- Configurable puzzle timing and clearer Sprint guidance and outcomes
+- Optional move sounds and haptic feedback
 - Customizable Home screen Practice Runs with independent ELO ratings
 - Curated puzzle themes with multi-theme selection
 - Clear side-to-move and previous-move puzzle context
@@ -48,7 +51,7 @@ Chessticize Mobile is free and open source.
 
 ## Screenshot Requirements
 
-The app targets iPhone and iPad for 1.2. The current automated capture plan
+The app targets iPhone and iPad for 1.3. The current automated capture plan
 covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
 The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
 Apple's current screenshot reference, rechecked on 2026-07-10, lists 6.9" as
@@ -70,10 +73,10 @@ Release rule:
 5. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
 
-The 1.2.1 patch release adds no feature, navigation, copy, or store-scene
-change. Reuse the approved 1.2 screenshot set after confirming the files still
-pass `pnpm app-store:screenshot-audit`; a fresh capture is not required for
-this patch.
+The 1.3 release changes Practice, History, Settings, Sprint guidance, and
+result presentation. Capture and inspect a fresh exact-head Release set with
+the maintained fifteen-scene, twenty-six-image calibration workflow before
+upload; do not reuse the 1.2 screenshot set as final 1.3 evidence.
 
 ## Bundled Puzzle Pack Measurement
 
@@ -90,7 +93,7 @@ per-bucket/theme counts. The artifact is published as the immutable
 ## Screenshot Set
 
 Use a release or production-like build, not a Metro debug screenshot. Capture
-the same eight scenes for each required display group:
+the same fifteen scenes for each required display group:
 
 1. Practice tab with local ratings and the bundled offline pack.
 2. Review tab showing the local review queue state.
@@ -100,6 +103,14 @@ the same eight scenes for each required display group:
 6. Arrow Duel with both candidate arrows visible.
 7. Custom Sprint setup with the complete compact configuration surface.
 8. Review session with the board and scheduled puzzle context.
+9. Sprint rules guidance before a Sprint starts.
+10. Active-session guidance for the Sprint header.
+11. Active-session guidance for the Slow timing state.
+12. Active-session guidance for the Timed Out state.
+13. Active-session guidance for the Unclear action.
+14. Arrow Duel guidance with both candidate arrows visible.
+15. Sprint result with reason, accuracy, rating, mistakes, Review impact, and
+    History action.
 
 Save local raw captures under `scratch/store-assets/raw/`. The `scratch/`
 folder is ignored and may contain private iteration artifacts. Only commit
@@ -110,26 +121,32 @@ and named by display group.
 
 The Detox capture spec is opt-in so normal Mobile JS CI does not spend time on
 store-asset screenshots. Release screenshot capture must use the Release
-simulator app so development-only controls stay out of App Store assets. Build
-the Release app bundle, then run the capture flow for the simulator size you
-are validating:
+simulator app so development-only controls stay out of App Store assets. For an
+exact-head visual baseline, run the calibration wrapper for the exact simulator
+name and UDID you are validating:
 
 ```sh
-DETOX_IOS_DEVICE="iPhone 17 Pro Max" pnpm mobile:e2e:build:ios:release
-DETOX_IOS_DEVICE="iPhone 17 Pro Max" pnpm mobile:e2e:store-assets:ios:release
-DETOX_IOS_DEVICE="iPhone 17e" pnpm mobile:e2e:store-assets:ios:release
-DETOX_IOS_DEVICE="iPad Pro 13-inch (M5)" pnpm mobile:e2e:store-assets:ios:release
+DETOX_IOS_DEVICE="iPad Pro 11-inch (M5)" \
+DETOX_IOS_DEVICE_UDID="<exact-simulator-udid>" \
+DETOX_MAX_WORKERS=1 \
+  .codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh
 ```
 
 Set `CHESSTICIZE_IOS_PREPARE=1` when the local CocoaPods workspace or bundled
 gems need to be refreshed before building the Release simulator app.
 
-The script sets `CHESSTICIZE_CAPTURE_STORE_ASSETS=1` and captures the eight
-store-candidate scenes plus seven visual-QA scenes. Setting
-`CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS=1` also captures the four
-layout-sensitive product scenes and all seven visual-QA scenes in landscape.
-These are simulator artifacts; the capture flow does not install or launch a
-physical-device build.
+The full calibration wrapper requires a dedicated iPad simulator. It builds
+once, runs separate portrait and landscape journeys through the host Simulator
+rotation controls, and collects fifteen portrait plus eleven landscape PNGs.
+Internally it runs `pnpm mobile:e2e:build:ios:release`, then sets
+`CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait` and
+`CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape` for the two opt-in Detox runs.
+Ordinary full-screen iPhones are portrait-only; capture their required store
+sets by running the portrait journey directly. When diagnosing an already-built
+Release app directly, set exactly one of those values yourself before
+`pnpm mobile:e2e:store-assets:ios:release`; one direct run captures only its
+selected orientation. These are simulator artifacts; the capture flow does not
+install or launch a physical-device build.
 
 | Screenshot name | Store scene |
 | --- | --- |
@@ -235,8 +252,10 @@ inspection.
 ## Capture Checklist
 
 - Use portrait orientation for the required App Store scene set audited here.
-- Capture separate landscape/iPad QA evidence for the adaptive orientation pass
-  before release sign-off.
+- Keep native iPhone QA in portrait. Capture the maintained landscape journey
+  on iPad before release sign-off.
+- Keep compact wide-short, live-resize, and foldable-sized component or
+  Interaction Lab evidence even though ordinary iPhones do not rotate.
 - Use the clean release palette and current app icon.
 - Keep all screenshots in English.
 - Prefer deterministic fixture data so ratings, history, and review states are

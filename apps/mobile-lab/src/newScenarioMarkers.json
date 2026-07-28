@@ -1,1 +1,50 @@
-{}
+{
+  "practice-slow-unclear-notice": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "Automatic Marked Unclear uses the blue read-only In Review status style"
+      }
+    ]
+  },
+  "practice-unclear-follow-up": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "Manual Marked confirmation replaces the yellow action with a blue read-only status"
+      }
+    ]
+  },
+  "practice-sprint-result-goal": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "Four-entry post-Sprint Replay for two Unclear and two In Review attempts"
+      }
+    ]
+  },
+  "practice-sprint-result-replay": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "Replay terminology with Mark clear and Remove from Review actions"
+      }
+    ]
+  },
+  "history-attempt-detail": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "History rows open Replay with Replay and Review kept distinct"
+      }
+    ]
+  },
+  "history-replay-unavailable": {
+    "issues": [
+      {
+        "issueNumber": 390,
+        "changeNote": "Unavailable History entries keep Replay terminology"
+      }
+    ]
+  }
+}

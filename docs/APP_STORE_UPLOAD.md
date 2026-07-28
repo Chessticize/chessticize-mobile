@@ -1,6 +1,6 @@
 # App Store Upload Runbook
 
-This runbook covers the owner-executed upload step for the 1.2.1 App Store
+This runbook covers the owner-executed upload step for the 1.3 App Store
 release path. Recheck Apple's live documentation before executing it:
 
 - Upload builds:
@@ -11,7 +11,7 @@ release path. Recheck Apple's live documentation before executing it:
   https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases
 
 Apple currently supports uploading builds with Xcode, Swift Playground,
-`altool`, or Transporter. This repository standardizes the 1.2.1 path on
+`altool`, or Transporter. This repository standardizes the 1.3 path on
 `xcodebuild archive` plus `xcodebuild -exportArchive` using the checked-in
 `apps/mobile/ios/ExportOptions.app-store-connect.plist`.
 
@@ -42,18 +42,25 @@ active Ruby is unsupported.
 
 GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
 validation is the only iOS native release gate. Select delta, targeted, or full
-scope under `docs/TESTING_ARCHITECTURE.md`, then record the tested commit SHA
-and Git tree, Xcode version, dedicated simulator, build result, suite results,
-and clean-worktree confirmation. A squash-merged candidate may reuse passing
-PR-head evidence when a documented diff from `<tested-sha>` to the candidate
-shows no changes to validation-relevant development inputs. Compare both SHAs
-and review the changed paths; mobile runtime sources, native/platform projects,
-dependency manifests, lockfiles and patches, build/release configuration, and
-the selected native specs and fixtures must be unchanged. Documentation,
-review metadata, and merge ancestry may differ without forcing a native rerun.
+scope under `docs/TESTING_ARCHITECTURE.md`, then record the App source SHA,
+test-runner SHA, App-input digest, App-bundle checksum, Xcode version, dedicated
+simulator, build result, suite results, and clean-worktree confirmation. A
+squash-merged candidate may reuse the passing PR-head App bundle when
+`node apps/mobile/scripts/mobile-app-inputs.js compare` proves that its App
+source is an ancestor and the App-input digest is unchanged.
 
-Any validation-relevant development-input difference requires a new local
-build and the selected local Detox scope. React Native's Hermes compiler
+Mobile runtime/domain sources, native/platform projects and native test-bundle
+sources, dependency manifests, lockfiles and patches, build/release
+configuration, and bundled fixtures/resources are App build inputs; a change
+requires a new local build and the selected local Detox scope. Host-side specs,
+selectors, assertions, screenshot/evidence collectors, and non-bundled
+fixtures invalidate only their affected test evidence. Use
+`CHESSTICIZE_E2E_REUSE_APP_SOURCE_SHA=<app-source-sha>` with the local E2E
+runner to verify the existing bundle and rerun that scope without rebuilding.
+Documentation, review metadata, agent guidance, and merge ancestry require
+neither.
+
+React Native's Hermes compiler
 setting is intentionally patched to use a stable `PODS_ROOT`-based path; an
 absolute checkout path in an evaluated podspec makes `Podfile.lock`
 non-portable and is a release blocker, regardless of whether the dependency
@@ -92,11 +99,11 @@ unchanged store metadata and screenshots does not regenerate that bundle.
 ## Public Source Tag
 
 Create and publish the source tag before or at the same time as the App Store
-Connect upload. The current iOS 1.2.1 build-1 tag is:
+Connect upload. The current iOS 1.3 build-1 tag is:
 
 ```sh
-git tag -a ios-v1.2.1-build-1 -m "iOS 1.2.1 build 1"
-git push origin ios-v1.2.1-build-1
+git tag -a ios-v1.3.0-build-1 -m "iOS 1.3 build 1"
+git push origin ios-v1.3.0-build-1
 ```
 
 Then publish a GitHub release for that tag and attach or copy the
@@ -205,7 +212,7 @@ valid while this signing-account gate is still incomplete.
 ## After Upload
 
 1. Wait for App Store Connect processing to complete.
-2. Confirm the uploaded build number is `1` for version `1.2.1`.
+2. Confirm the uploaded build number is `1` for version `1.3`.
 3. Confirm export compliance is accepted for
    `ITSAppUsesNonExemptEncryption = false`.
 4. Optionally configure an internal TestFlight group or run the diagnostic

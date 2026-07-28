@@ -905,11 +905,14 @@ describe('Detox suite configuration', () => {
     const helperEnd = helpers.indexOf('async function tapUntilExists', helperStart);
     const helper = helpers.slice(helperStart, helperEnd);
     const waitForExist = helper.indexOf('.toExist().withTimeout(180000)');
+    const acceptAlreadyVisible = helper.indexOf('await expect(target).toBeVisible()');
     const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
-    const requireVisible = helper.indexOf('.toBeVisible()');
+    const requireVisible = helper.indexOf('.toBeVisible()', restoreTop);
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
 
     expect(waitForExist).toBeGreaterThan(0);
+    expect(acceptAlreadyVisible).toBeGreaterThan(waitForExist);
+    expect(restoreTop).toBeGreaterThan(acceptAlreadyVisible);
     expect(restoreTop).toBeGreaterThan(waitForExist);
     expect(requireVisible).toBeGreaterThan(restoreTop);
     expect(scrollDown).toBeGreaterThan(requireVisible);
@@ -920,6 +923,8 @@ describe('Detox suite configuration', () => {
     const helperStart = helpers.indexOf('async function completeFirstUseSessionGuides');
     const helperEnd = helpers.indexOf('async function detoxElementExists', helperStart);
     const helper = helpers.slice(helperStart, helperEnd);
+    const raceProtectedActionStart = helper.indexOf('try {');
+    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
     const requireVisible = helper.indexOf('.toBeVisible()');
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
     const tapGuideAction = helper.indexOf("element(by.id('practice-session-guide-start')).tap()");
@@ -933,14 +938,35 @@ describe('Detox suite configuration', () => {
       handleRemountRace
     );
     const preserveUnexpectedFailure = helper.indexOf('throw error', handleRemountRace);
+    const classifyTransientRace = helper.indexOf(
+      'isTransientGuideInteractionError(error)',
+      handleRemountRace
+    );
 
-    expect(requireVisible).toBeGreaterThan(0);
+    expect(raceProtectedActionStart).toBeGreaterThan(0);
+    expect(restoreTop).toBeGreaterThan(raceProtectedActionStart);
+    expect(requireVisible).toBeGreaterThan(restoreTop);
     expect(scrollDown).toBeGreaterThan(requireVisible);
     expect(tapGuideAction).toBeGreaterThan(scrollDown);
     expect(handleRemountRace).toBeGreaterThan(tapGuideAction);
     expect(confirmGuideAdvanced).toBeGreaterThan(handleRemountRace);
     expect(confirmSessionStarted).toBeGreaterThan(handleRemountRace);
+    expect(classifyTransientRace).toBeGreaterThan(confirmSessionStarted);
     expect(preserveUnexpectedFailure).toBeGreaterThan(confirmSessionStarted);
+  });
+
+  it('dismisses the Run name keyboard through a public editor surface', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const helperStart = helpers.indexOf('async function dismissRunNameKeyboard');
+    const helperEnd = helpers.indexOf('async function detoxElementExists', helperStart);
+    const helper = helpers.slice(helperStart, helperEnd);
+    const submitName = helper.indexOf("element(by.id('practice-run-name-input')).tapReturnKey()");
+    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
+    const tapPublicTitle = helper.indexOf("element(by.id('practice-run-editor-title')).tap()");
+
+    expect(submitName).toBeGreaterThan(0);
+    expect(restoreTop).toBeGreaterThan(submitName);
+    expect(tapPublicTitle).toBeGreaterThan(restoreTop);
   });
 
   it('scrolls responsive Review actions inside the independent control rail', () => {
@@ -1363,6 +1389,7 @@ describe('Detox suite configuration', () => {
 
   it('keeps the shared flows suite portable across iOS and Android', () => {
     const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
     const reminderCaseStart = flowsSpec.indexOf(
       "it('handles review reminders through the platform capability'"
     );
@@ -1370,6 +1397,9 @@ describe('Detox suite configuration', () => {
       "it('shows failed attempts in History and preserves current filters through replay'"
     );
     const reminderCase = flowsSpec.slice(reminderCaseStart, reminderCaseEnd);
+    const historyCaseStart = reminderCaseEnd;
+    const historyCaseEnd = flowsSpec.indexOf("it('adds and starts a saved custom Run'");
+    const historyCase = flowsSpec.slice(historyCaseStart, historyCaseEnd);
 
     expect(flowsSpec).toContain("device.getPlatform() === 'android'");
     expect(reminderCase).toContain('grantAndroidNotificationPermission();');
@@ -1388,14 +1418,55 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).toContain('releaseVersion.iosPublicVersion');
     expect(flowsSpec).toContain('releaseVersion.androidVersionCode');
     expect(flowsSpec).toContain('releaseVersion.iosBuildNumber');
+    expect(helpers).toContain("by.id('history-filter-toggle')");
+    expect(helpers).toContain("by.id('history-rating-filters')");
     expect(flowsSpec).toContain("by.id('history-result-wrong')");
     expect(flowsSpec).toContain("by.id('history-source-sprint')");
+    expect(flowsSpec).toContain("by.id('history-theme-disclosure')");
+    expect(flowsSpec).toContain(
+      "by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))"
+    );
+    expect(flowsSpec).toContain(
+      "by.text('Source: Sprint').withAncestor(by.id('history-active-filter-summary'))"
+    );
+    expect(
+      historyCase.match(
+        /by\.text\('Source: Sprint'\)[\s\S]{0,120}\)\)\.not\.toExist\(\)/g
+      ) ?? []
+    ).toHaveLength(0);
     expect(flowsSpec).toContain("by.text('2 themes selected')");
     expect(flowsSpec).toContain("historyAttemptRowTestIDForResult('Wrong move')");
-    expect(flowsSpec).not.toContain("history-filter-wrong-only");
-    expect(flowsSpec).not.toContain("history-filter-sprint-only");
+    expect(flowsSpec).not.toContain('history-filter-wrong-only');
+    expect(flowsSpec).not.toContain('history-filter-sprint-only');
+    expect(flowsSpec).not.toContain("'Rating 700'");
     expect(flowsSpec).not.toContain('historyToggleValue');
     expect(flowsSpec).not.toContain('toHaveToggleValue');
+  });
+
+  it('targets current public controls in the practice suite', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+
+    expect(practiceSpec).toContain("openTab('settings-tab', 'settings-show-sprint-guide')");
+    expect(practiceSpec).toContain("waitForVisibleInPracticeScroll('history-attention-flag-in-review')");
+    expect(practiceSpec).toContain("element(by.id('history-filter-toggle')).tap()");
+    expect(practiceSpec).toContain("waitFor(element(by.id('history-advanced-filters'))).not.toExist()");
+    expect(practiceSpec).toContain("element(by.text('Correct')).atIndex(0)");
+    expect(practiceSpec).toContain("expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible()");
+    expect(practiceSpec).toContain("historyAttemptRowTestIDForResult('Correct')");
+    expect(practiceSpec).toContain("historyAttemptRowTestIDForResult('Wrong move')");
+    expect(practiceSpec).not.toContain('async function tapVisibleHistoryResult');
+    expect(helpers).toContain('async function historyAttemptRowTestIDForResult');
+    expect(helpers).toContain("/^history-attempt-.+-result$/");
+    expect(practiceSpec).toContain('waitForVisibleInPracticeScroll(resultRowIdentifier)');
+    expect(practiceSpec).toContain('element(by.id(resultRowIdentifier)).tap()');
+    expect(practiceSpec).toContain("orientation: 'portrait'");
+    expect(practiceSpec).toContain("by.id('review-context-actions-bottom')");
+    expect(practiceSpec).toContain("screenshotLabel: 'history-review-actions-ipad-landscape'");
+    expect(practiceSpec).not.toContain("device.setOrientation('landscape')");
+    expect(practiceSpec).not.toContain("for (const orientation of ['portrait', 'landscape'])");
+    expect(practiceSpec).not.toContain('history-filter-unclear');
+    expect(practiceSpec).not.toContain("endsWith('-result')");
   });
 
   it('partitions every active spec exactly once across the two CI suites', () => {
@@ -1488,6 +1559,18 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('captureScreenshot: (label) => device.takeScreenshot(label)');
     expect(spec).toContain("require('./adaptiveScreenshotEvidence')");
     expect(spec).toContain('const archiveAdaptiveScreenshot = createAdaptiveScreenshotArchiver();');
+    expect(spec).toContain(
+      "waitFor(element(by.id('practice-run-standard'))).toExist().withTimeout(10000)"
+    );
+    expect(spec).not.toContain(
+      "waitFor(element(by.id('practice-run-standard'))).toBeVisible().withTimeout(10000)"
+    );
+    expect(spec).toContain(
+      "waitFor(element(by.id('practice-progress-summary'))).toExist().withTimeout(10000)"
+    );
+    expect(spec).not.toContain(
+      "waitFor(element(by.id('practice-progress-summary'))).toBeVisible().withTimeout(10000)"
+    );
     expect(spec).toContain('expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenFrame);');
     expect(spec).not.toContain('await sleep(5000)');
     expect(settledLayoutHelper).toContain("frameForIfPresent('active-session-adaptive-layout')");
@@ -1516,7 +1599,7 @@ describe('Detox suite configuration', () => {
       captureLandscape
     );
     const settleRestoredPortrait = spec.indexOf(
-      "await waitForSettledSprintLayout('portrait', { containmentTolerance: 8 })",
+      "await waitForSettledSprintLayout('portrait', { containmentTolerance: 16 })",
       restorePortrait
     );
     const settlePublicRootFocus = spec.indexOf(

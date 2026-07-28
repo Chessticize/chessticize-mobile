@@ -8,6 +8,17 @@ const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
 const rootPackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const mobilePackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "apps/mobile/package.json"), "utf8"));
 const storeAssetsE2e = fs.readFileSync(path.join(repoRoot, "apps/mobile/e2e/store-assets.e2e.js"), "utf8");
+const uiCalibrationRunner = fs.readFileSync(
+  path.join(
+    repoRoot,
+    ".codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh"
+  ),
+  "utf8"
+);
+const simulatorOrientationRunnerPath = path.join(
+  repoRoot,
+  ".codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
+);
 
 function tableValue(field) {
   const escapedField = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -20,10 +31,10 @@ function tableValue(field) {
 
 describe("App Store assets document", () => {
   it("tracks the current public release and its customer-facing additions", () => {
-    expect(storeAssetsDoc).toContain("1.2 source of truth");
-    expect(storeAssetsDoc).toContain("Customizable Home screen Practice Runs");
-    expect(storeAssetsDoc).toContain("Curated puzzle themes with multi-theme selection");
-    expect(storeAssetsDoc).toContain("Clear side-to-move");
+    expect(storeAssetsDoc).toContain("1.3 source of truth");
+    expect(storeAssetsDoc).toContain("Tactical Profiles");
+    expect(storeAssetsDoc).toContain("Focused Practice Runs");
+    expect(storeAssetsDoc).toContain("Configurable puzzle timing");
   });
 
   it("keeps required metadata inside App Store Connect limits", () => {
@@ -72,9 +83,17 @@ describe("App Store assets document", () => {
     expect(mobilePackage.scripts["e2e:store-assets:ios"]).toContain("artifacts/store-assets");
     expect(storeAssetsE2e).toContain("describe.skip");
     expect(storeAssetsE2e).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS");
-    expect(storeAssetsE2e).toContain("CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS");
+    expect(storeAssetsE2e).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION");
+    expect(storeAssetsE2e).toContain(
+      "Landscape iOS capture requires a dedicated iPad Simulator"
+    );
+    expect(storeAssetsE2e).toContain(
+      "ordinary full-screen iPhone capture is portrait-only"
+    );
     expect(storeAssetsE2e).toContain("chessticizeStoreAssetCapture");
     expect(storeAssetsE2e).toContain("setStoreAssetRatings({ standard: 800, arrowDuel: 850 })");
+    expect(storeAssetsE2e).toContain("ratingText === '600'");
+    expect(storeAssetsE2e).not.toContain("ratingText === 'Rating 600'");
     expect(storeAssetsE2e).toContain("openTab('practice-tab', 'practice-run-home-edit')");
     expect(storeAssetsE2e).not.toContain("openTab('practice-tab', 'practice-run-management')");
     expect(storeAssetsE2e).toContain(
@@ -116,22 +135,39 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-05-standard-sprint')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-06-arrow-duel')");
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop('app-store-08-review-session')");
+    expect(storeAssetsE2e).not.toContain("device.setOrientation(");
     expect(storeAssetsE2e).toContain("by.id('practice-sprint-rules-dismiss')");
     expect(storeAssetsE2e).toContain("by.id('practice-active-session-guide')");
     expect(storeAssetsE2e).toContain("by.id('practice-arrow-duel-guide')");
     expect(storeAssetsE2e).toContain("by.id('practice-session-guide-start')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-15-sprint-result')");
-    expect(storeAssetsE2e).toContain("device.setOrientation('landscape')");
-    expect(storeAssetsE2e).toContain("device.setOrientation('portrait')");
     expect(storeAssetsE2e).toContain("waitForScreenOrientation('landscape')");
     expect(storeAssetsE2e).toContain("waitForScreenOrientation('portrait')");
+    expect(storeAssetsE2e).toContain("accessibilityLabelFromAttributes");
+    expect(storeAssetsE2e).toContain("expectedLayoutClassSuffix");
+    expect(storeAssetsE2e).toContain("lastLayoutLabel.endsWith(expectedLayoutClassSuffix)");
     expect(storeAssetsE2e).toContain("last observed frame=${JSON.stringify(lastFrame)}");
+    expect(storeAssetsE2e).toContain("last observed layout label=${JSON.stringify(lastLayoutLabel)}");
     expect(storeAssetsE2e).toContain("stableFrameCount >= 3");
-    expect(storeAssetsE2e).toContain("Portrait restoration failed after ${name}");
     expect(storeAssetsE2e).toContain("last frame error=${lastFrameError");
+    expect(uiCalibrationRunner).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait");
+    expect(uiCalibrationRunner).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape");
+    expect(uiCalibrationRunner).toContain("set-simulator-orientation.sh");
+    expect(uiCalibrationRunner).toContain(
+      'DEVICE_NAME="${DETOX_IOS_DEVICE:-iPad Pro 11-inch (M5)}"'
+    );
+    expect(uiCalibrationRunner).toContain(
+      'Full portrait/landscape calibration requires a dedicated iPad Simulator'
+    );
+    expect(uiCalibrationRunner).toContain('release-$DEVICE_SLUG');
+    expect(fs.existsSync(simulatorOrientationRunnerPath)).toBe(true);
     expect(storeAssetsE2e).toContain("expect(element(by.text('Themes'))).toExist()");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:build:ios:release");
     expect(storeAssetsDoc).toContain("pnpm mobile:e2e:store-assets:ios:release");
+    expect(storeAssetsDoc).toContain("capture-release-baseline.sh");
+    expect(storeAssetsDoc).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait");
+    expect(storeAssetsDoc).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape");
+    expect(storeAssetsDoc).not.toContain("CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS");
     expect(storeAssetsDoc).toContain("pnpm app-store:screenshot-audit");
     expect(storeAssetsDoc).toContain("deterministic active-player profile");
     expect(storeAssetsDoc).toContain("two reviews still due plus one completed-today result");
@@ -146,32 +182,92 @@ describe("App Store assets document", () => {
     expect(storeAssetsDoc).toContain("app-store-09-sprint-rules-guide");
     expect(storeAssetsDoc).toContain("app-store-14-arrow-duel-guide");
     expect(storeAssetsDoc).toContain("app-store-15-sprint-result");
-    expect(storeAssetsDoc).toContain("does not install or launch a");
+    expect(storeAssetsDoc).toContain("capture flow does not");
     expect(storeAssetsDoc).toContain("physical-device build");
   });
 
   it("verifies portrait orientation before every portrait store-asset screenshot", () => {
-    const portraitHelperStart = storeAssetsE2e.indexOf(
+    const portraitAtTopHelperStart = storeAssetsE2e.indexOf(
       "async function takePortraitScreenshotAtTop(name)"
     );
-    const portraitHelperEnd = storeAssetsE2e.indexOf(
-      "\n}\n\nasync function takeLandscapeScreenshot",
+    const portraitHelperStart = storeAssetsE2e.indexOf(
+      "async function takePortraitScreenshot(name)",
+      portraitAtTopHelperStart
+    );
+    const landscapeHelperStart = storeAssetsE2e.indexOf(
+      "async function takeLandscapeScreenshot",
       portraitHelperStart
     );
-    const portraitHelper = storeAssetsE2e.slice(portraitHelperStart, portraitHelperEnd);
-    const setPortrait = "await device.setOrientation('portrait')";
+    const portraitAtTopHelper = storeAssetsE2e.slice(
+      portraitAtTopHelperStart,
+      portraitHelperStart
+    );
+    const portraitHelper = storeAssetsE2e.slice(portraitHelperStart, landscapeHelperStart);
+    const captureGuard = "if (!capturePortraitAssets)";
+    const restoreTop = "await element(by.id('practice-main-scroll')).scrollTo('top')";
+    const delegateScreenshot = "await takePortraitScreenshot(name)";
     const waitForPortrait = "await waitForScreenOrientation('portrait')";
     const takeScreenshot = "await device.takeScreenshot(name)";
 
     expect(storeAssetsE2e.match(/takePortraitScreenshotAtTop\('app-store-/g)).toHaveLength(11);
     expect(storeAssetsE2e).toContain("takePortraitScreenshotAtTop(scene)");
     expect(storeAssetsE2e).not.toMatch(/device\.takeScreenshot\('app-store-/);
-    expect(portraitHelper.indexOf(setPortrait)).toBeGreaterThan(-1);
+    expect(storeAssetsE2e).not.toContain("device.setOrientation(");
+    expect(portraitAtTopHelper.indexOf(captureGuard)).toBeGreaterThan(-1);
+    expect(portraitAtTopHelper.indexOf(restoreTop)).toBeGreaterThan(
+      portraitAtTopHelper.indexOf(captureGuard)
+    );
+    expect(portraitAtTopHelper.indexOf(delegateScreenshot)).toBeGreaterThan(
+      portraitAtTopHelper.indexOf(restoreTop)
+    );
+    expect(portraitHelper.indexOf(captureGuard)).toBeGreaterThan(-1);
     expect(portraitHelper.indexOf(waitForPortrait)).toBeGreaterThan(
-      portraitHelper.indexOf(setPortrait)
+      portraitHelper.indexOf(captureGuard)
     );
     expect(portraitHelper.indexOf(takeScreenshot)).toBeGreaterThan(
       portraitHelper.indexOf(waitForPortrait)
+    );
+  });
+
+  it("settles the landscape editor after dismissing the number pad before saving", () => {
+    const ratingHelperStart = storeAssetsE2e.indexOf(
+      "async function setStoreAssetRatings"
+    );
+    const ratingHelperEnd = storeAssetsE2e.indexOf(
+      "async function failArrowDuelSprint",
+      ratingHelperStart
+    );
+    const ratingHelper = storeAssetsE2e.slice(ratingHelperStart, ratingHelperEnd);
+    expect(ratingHelper).toContain(
+      "await element(by.id('practice-main-scroll')).scrollTo('top');\n"
+      + "    await sleep(500);\n"
+      + "    await element(by.id('practice-main-scroll')).scrollTo('top');\n"
+      + "    await waitFor(element(by.id('practice-run-editor-title')))\n"
+      + "      .toBeVisible()\n"
+      + "      .withTimeout(5000);\n"
+      + "    await element(by.id('practice-run-save')).tap();"
+    );
+    expect(ratingHelper).not.toContain(
+      "await element(by.id('practice-run-name-input')).tap();"
+    );
+    expect(ratingHelper).not.toContain(
+      "await dismissRunNameKeyboard();"
+    );
+    expect(ratingHelper).not.toContain(
+      "await waitFor(element(by.id('practice-run-save')))"
+    );
+
+    const reviewHelperStart = storeAssetsE2e.indexOf(
+      "async function completeOneWrongReview"
+    );
+    const reviewHelperEnd = storeAssetsE2e.indexOf(
+      "async function captureMainTabScenes",
+      reviewHelperStart
+    );
+    const reviewHelper = storeAssetsE2e.slice(reviewHelperStart, reviewHelperEnd);
+    expect(reviewHelper).toContain(
+      "await waitForVisibleInPracticeScroll('review-reminder-permission-dismiss');\n"
+      + "  await element(by.id('review-reminder-permission-dismiss')).tap();"
     );
   });
 

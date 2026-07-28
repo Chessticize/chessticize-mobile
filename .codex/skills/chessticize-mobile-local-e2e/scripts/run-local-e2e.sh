@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 DEVICE_NAME="${DETOX_IOS_DEVICE:-iPhone 17-Detox}"
 E2E_SCOPE="${CHESSTICIZE_E2E_SCOPE:-}"
+REUSE_APP_SOURCE_SHA="${CHESSTICIZE_E2E_REUSE_APP_SOURCE_SHA:-}"
 
 fail() {
   echo "Local E2E evidence failed: $*" >&2
@@ -21,8 +22,10 @@ esac
 
 command -v brew >/dev/null 2>&1 || fail "Homebrew is required."
 RUBY_PREFIX="${CHESSTICIZE_RUBY_PREFIX:-$(brew --prefix ruby@3.3 2>/dev/null || true)}"
+NODE_PREFIX="${CHESSTICIZE_NODE_PREFIX:-$(brew --prefix node@22 2>/dev/null || true)}"
 [[ -n "$RUBY_PREFIX" && -x "$RUBY_PREFIX/bin/ruby" ]] || fail "Install Homebrew ruby@3.3 first."
-export PATH="$REPO_ROOT/apps/mobile/node_modules/.bin:$RUBY_PREFIX/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+[[ -n "$NODE_PREFIX" && -x "$NODE_PREFIX/bin/node" ]] || fail "Install Homebrew node@22 first."
+export PATH="$REPO_ROOT/apps/mobile/node_modules/.bin:$RUBY_PREFIX/bin:$NODE_PREFIX/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 [[ "$(ruby -e 'print RUBY_VERSION.split(".")[0,2].join(".")')" == "3.3" ]] || fail "Ruby 3.3 must be active."
 for required_command in git node pnpm bundle xcodebuild xcrun applesimutils; do
@@ -30,8 +33,11 @@ for required_command in git node pnpm bundle xcodebuild xcrun applesimutils; do
 done
 
 cd "$REPO_ROOT"
-[[ -z "$(git status --porcelain --untracked-files=all)" ]] || fail "Commit or remove all worktree changes before recording exact-head evidence."
+[[ -z "$(git status --porcelain --untracked-files=all)" ]] || fail "Commit or remove all worktree changes before recording release evidence."
 HEAD_BEFORE="$(git rev-parse HEAD)"
+APP_BUNDLE="apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/Chessticize.app"
+APP_MANIFEST="apps/mobile/ios/build/chessticize-e2e-app-manifest.json"
+REUSE_COMPARISON="apps/mobile/ios/build/chessticize-e2e-reuse.json"
 
 verify_nnue_asset() {
   local asset_path="$1"
@@ -66,7 +72,7 @@ run_doctor() {
 
 run_build() {
   DETOX_IOS_DEVICE="$DEVICE_NAME" pnpm mobile:e2e:build:ios
-  test -f apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/Chessticize.app/main.jsbundle
+  test -f "$APP_BUNDLE/main.jsbundle"
 }
 
 normalize_worktree_cocoapods_checksum() {
@@ -110,9 +116,38 @@ run_doctor
 DOCTOR_SECONDS=$((SECONDS - DOCTOR_STARTED))
 
 BUILD_STARTED=$SECONDS
-run_build
+if [[ -n "$REUSE_APP_SOURCE_SHA" ]]; then
+  [[ -d "$APP_BUNDLE" ]] || fail "The reusable iOS App bundle is missing; run one normal build first."
+  [[ -f "$APP_MANIFEST" ]] || fail "The reusable iOS App manifest is missing; run one normal build first."
+  node apps/mobile/scripts/mobile-app-inputs.js verify-artifact \
+    --app-source-sha "$REUSE_APP_SOURCE_SHA" \
+    --test-runner-sha "$HEAD_BEFORE" \
+    --artifact "$APP_BUNDLE" \
+    --manifest "$APP_MANIFEST" \
+    --output "$REUSE_COMPARISON"
+  APP_SOURCE_SHA="$REUSE_APP_SOURCE_SHA"
+  BUILD_RESULT="REUSED"
+  IDENTITY_RECORD="$REUSE_COMPARISON"
+else
+  run_build
+  normalize_worktree_cocoapods_checksum
+  node apps/mobile/scripts/mobile-app-inputs.js record-artifact \
+    --app-source-sha "$HEAD_BEFORE" \
+    --artifact "$APP_BUNDLE" \
+    --output "$APP_MANIFEST"
+  APP_SOURCE_SHA="$HEAD_BEFORE"
+  BUILD_RESULT="PASS"
+  IDENTITY_RECORD="$APP_MANIFEST"
+fi
 BUILD_SECONDS=$((SECONDS - BUILD_STARTED))
-normalize_worktree_cocoapods_checksum
+APP_INPUT_DIGEST="$(
+  node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).appInputDigest);' \
+    "$IDENTITY_RECORD"
+)"
+APP_ARTIFACT_SHA256="$(
+  node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).artifactSha256);' \
+    "$IDENTITY_RECORD"
+)"
 
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || fail "The build changed tracked or untracked files before the selected suites ran."
 
@@ -138,13 +173,17 @@ HEAD_AFTER="$(git rev-parse HEAD)"
 
 echo
 echo "Local Detox evidence"
-echo "Exact head: $HEAD_BEFORE"
+echo "App source: $APP_SOURCE_SHA"
+echo "Test runner: $HEAD_BEFORE"
 echo "Scope: $E2E_SCOPE"
 echo "Device: $DEVICE_NAME"
 echo "Xcode: $(xcodebuild -version | tr '\n' ' ')"
 echo "Ruby: $(ruby --version)"
 echo "Doctor: PASS (${DOCTOR_SECONDS}s)"
-echo "Build: PASS (${BUILD_SECONDS}s)"
+echo "Build: $BUILD_RESULT (${BUILD_SECONDS}s)"
+echo "App manifest: $APP_MANIFEST"
+echo "App input digest: $APP_INPUT_DIGEST"
+echo "App artifact SHA-256: $APP_ARTIFACT_SHA256"
 if [[ -n "$FLOWS_SECONDS" ]]; then
   echo "Flows: PASS (${FLOWS_SECONDS}s)"
 fi

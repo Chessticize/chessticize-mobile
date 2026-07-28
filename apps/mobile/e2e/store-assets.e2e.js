@@ -1,6 +1,7 @@
 const { execFileSync } = require('node:child_process');
 const { resolve } = require('node:path');
 const {
+  accessibilityLabelFromAttributes,
   frameFor,
   launchWithDisabledSynchronization,
   openTab,
@@ -13,7 +14,21 @@ const {
 const { expectFrameContained } = require('./screenshotAssertions');
 
 const describeStoreAssets = process.env.CHESSTICIZE_CAPTURE_STORE_ASSETS === '1' ? describe : describe.skip;
-const captureLandscapeAssets = process.env.CHESSTICIZE_CAPTURE_LANDSCAPE_ASSETS === '1';
+const captureOrientation = process.env.CHESSTICIZE_STORE_ASSET_ORIENTATION ?? 'portrait';
+if (!['portrait', 'landscape'].includes(captureOrientation)) {
+  throw new Error(
+    `CHESSTICIZE_STORE_ASSET_ORIENTATION must be portrait or landscape, received ${captureOrientation}`
+  );
+}
+const capturePortraitAssets = captureOrientation === 'portrait';
+const captureLandscapeAssets = captureOrientation === 'landscape';
+const captureDeviceName = process.env.DETOX_IOS_DEVICE || 'iPhone 17-Detox';
+if (captureLandscapeAssets && !captureDeviceName.includes('iPad')) {
+  throw new Error(
+    'Landscape iOS capture requires a dedicated iPad Simulator; '
+    + 'ordinary full-screen iPhone capture is portrait-only'
+  );
+}
 const puzzlePackPath = resolve(__dirname, '../../../fixtures/puzzles/bundled-core-pack.sqlite');
 const sprintNowMs = Date.parse('2026-07-08T18:00:00.000Z');
 const reviewNowMs = Date.parse('2026-07-09T18:00:00.000Z');
@@ -53,6 +68,7 @@ async function launchStoreAssetApp(nowMs, deleteData) {
       chessticizeTestNowMs: String(nowMs)
     }
   });
+  await waitForScreenOrientation(captureOrientation);
 }
 
 async function setStoreAssetRatings({ standard, arrowDuel }) {
@@ -74,6 +90,11 @@ async function setStoreAssetRatings({ standard, arrowDuel }) {
       .toHaveText(String(targetRating))
       .withTimeout(10000);
     await element(by.id('practice-main-scroll')).scrollTo('top');
+    await sleep(500);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await waitFor(element(by.id('practice-run-editor-title')))
+      .toBeVisible()
+      .withTimeout(5000);
     await element(by.id('practice-run-save')).tap();
   }
   await element(by.id('practice-main-scroll')).scrollTo('top');
@@ -146,6 +167,7 @@ async function completeOneWrongReview() {
   );
   await playBoardMove('review-board', fixture.wrongMove, fixture.flipped);
   await waitFor(element(by.id('review-reminder-permission-prompt'))).toExist().withTimeout(10000);
+  await waitForVisibleInPracticeScroll('review-reminder-permission-dismiss');
   await element(by.id('review-reminder-permission-dismiss')).tap();
   await waitFor(element(by.id('review-progress'))).toHaveText('2 / 3 · Arrow Duel').withTimeout(10000);
   await expect(element(by.id('review-line-continue'))).not.toExist();
@@ -160,11 +182,15 @@ async function captureMainTabScenes() {
   await element(by.id('practice-run-select-arrow-duel')).tap();
   await waitForVisibleInPracticeScroll('practice-review-due-count');
   const ratingText = textFromAttributes(await element(by.id('practice-mode-arrow-duel-rating')).getAttributes());
-  if (ratingText === 'Rating 600') {
+  if (ratingText === '600') {
     throw new Error('Expected the Practice screenshot to show a populated Arrow Duel rating');
   }
   await takePortraitScreenshotAtTop('app-store-01-practice-tab');
   await takeLandscapeScreenshot('app-store-01-practice-tab');
+
+  if (captureLandscapeAssets) {
+    return;
+  }
 
   await waitForVisibleInPracticeScroll('practice-add-run');
   await element(by.id('practice-add-run')).tap();
@@ -215,9 +241,20 @@ async function captureSprintScenes() {
 }
 
 async function takePortraitScreenshotAtTop(name) {
-  await device.setOrientation('portrait');
-  await waitForScreenOrientation('portrait');
+  if (!capturePortraitAssets) {
+    return;
+  }
+
   await element(by.id('practice-main-scroll')).scrollTo('top');
+  await takePortraitScreenshot(name);
+}
+
+async function takePortraitScreenshot(name) {
+  if (!capturePortraitAssets) {
+    return;
+  }
+
+  await waitForScreenOrientation('portrait');
   await sleep(500);
   await device.takeScreenshot(name);
 }
@@ -227,52 +264,47 @@ async function takeLandscapeScreenshot(name, assertLayout) {
     return;
   }
 
-  let captureError = null;
-  await device.setOrientation('landscape');
-  try {
-    await waitForScreenOrientation('landscape');
-    await assertLayout?.();
-    await device.takeScreenshot(`${name}-landscape`);
-  } catch (error) {
-    captureError = error;
-    throw error;
-  } finally {
-    try {
-      await device.setOrientation('portrait');
-      await waitForScreenOrientation('portrait');
-    } catch (restoreError) {
-      if (!captureError) {
-        throw restoreError;
-      }
-      console.error(
-        `[store-assets] Portrait restoration failed after ${name}: ${errorMessage(restoreError)}`
-      );
-    }
-  }
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await waitForScreenOrientation('landscape');
+  await assertLayout?.();
+  await sleep(500);
+  await device.takeScreenshot(`${name}-landscape`);
 }
 
 async function waitForScreenOrientation(orientation) {
+  const expectedLayoutClassSuffix = orientation === 'landscape' ? 'Landscape' : 'Portrait';
   let lastFrame = null;
   let lastFrameError = null;
+  let lastLayoutLabel = '';
   let previousExpectedFrame = null;
   let stableFrameCount = 0;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
-      lastFrame = await frameFor(element(by.id('adaptive-layout')));
+      const adaptiveLayoutElement = element(by.id('adaptive-layout'));
+      lastFrame = await frameFor(adaptiveLayoutElement);
+      lastLayoutLabel = accessibilityLabelFromAttributes(
+        await adaptiveLayoutElement.getAttributes()
+      );
       lastFrameError = null;
       const hasExpectedOrientation = orientation === 'landscape'
         ? lastFrame.width > lastFrame.height
         : lastFrame.height > lastFrame.width;
+      // After the host Simulator rotates, UIKit can publish the new root
+      // bounds before React Native has recomputed its adaptive layout class.
+      // A portrait PNG taken during that gap can contain a stale landscape
+      // board and rail, so require both public signals to agree.
+      const hasExpectedLayoutClass = lastLayoutLabel.endsWith(expectedLayoutClassSuffix);
       const matchesPreviousFrame = previousExpectedFrame !== null
         && ['x', 'y', 'width', 'height'].every(
           (key) => Math.abs(lastFrame[key] - previousExpectedFrame[key]) <= 1
         );
-      stableFrameCount = hasExpectedOrientation
+      const hasExpectedLayout = hasExpectedOrientation && hasExpectedLayoutClass;
+      stableFrameCount = hasExpectedLayout
         ? matchesPreviousFrame
           ? stableFrameCount + 1
           : 1
         : 0;
-      previousExpectedFrame = hasExpectedOrientation ? lastFrame : null;
+      previousExpectedFrame = hasExpectedLayout ? lastFrame : null;
       if (stableFrameCount >= 3) {
         return;
       }
@@ -286,6 +318,7 @@ async function waitForScreenOrientation(orientation) {
   throw new Error(
     `Timed out waiting for ${orientation} store-asset layout; `
     + `last observed frame=${JSON.stringify(lastFrame)}; `
+    + `last observed layout label=${JSON.stringify(lastLayoutLabel)}; `
     + `last frame error=${lastFrameError === null ? 'none' : errorMessage(lastFrameError)}`
   );
 }

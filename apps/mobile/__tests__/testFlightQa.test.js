@@ -15,8 +15,8 @@ const exportOptions = fs.readFileSync(
 describe("TestFlight QA checklist", () => {
   it("keeps TestFlight physical-device diagnostics explicitly optional", () => {
     expect(testFlightDoc).toContain("Optional TestFlight Diagnostics");
-    expect(testFlightDoc).toContain("Internal 1.2.1 QA");
-    expect(testFlightDoc).toContain("ios-v1.2.1-build-1");
+    expect(testFlightDoc).toContain("Internal 1.3 QA");
+    expect(testFlightDoc).toContain("ios-v1.3.0-build-1");
     expect(testFlightDoc).toContain("App Store Connect build");
     expect(testFlightDoc).toContain("not an App Store release gate");
     expect(testFlightDoc).toContain("not required");
@@ -77,10 +77,10 @@ describe("TestFlight QA checklist", () => {
       /Ordinary deltas use exact-head fast checks plus the platform's signed-artifact/
     );
     for (const document of [appStoreUploadDoc, releasePolicy]) {
-      expect(document).toContain("validation-relevant development");
-      expect(document).toMatch(
-        /documentation,\s+review\s+metadata,\s+(?:or|and)\s+merge/i
-      );
+      expect(document).toMatch(/App\s+source SHA/);
+      expect(document).toMatch(/test-runner\s+SHA/);
+      expect(document).toContain("App-input digest");
+      expect(document).toMatch(/documentation,\s+review\s+metadata/i);
     }
   });
 

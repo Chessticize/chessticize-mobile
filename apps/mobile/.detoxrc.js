@@ -1,3 +1,15 @@
+function iosSimulatorDeviceQuery() {
+  const name = process.env.DETOX_IOS_DEVICE;
+  const id = process.env.DETOX_IOS_DEVICE_UDID;
+  if (id && !name) {
+    throw new Error('DETOX_IOS_DEVICE_UDID requires DETOX_IOS_DEVICE');
+  }
+  if (id) {
+    return {id, name};
+  }
+  return name ? {name} : {type: 'iPhone 16'};
+}
+
 module.exports = {
   testRunner: {
     args: {
@@ -34,9 +46,7 @@ module.exports = {
   devices: {
     simulator: {
       type: 'ios.simulator',
-      device: process.env.DETOX_IOS_DEVICE
-        ? {name: process.env.DETOX_IOS_DEVICE}
-        : {type: 'iPhone 16'},
+      device: iosSimulatorDeviceQuery(),
     },
     'android.attached': {
       type: 'android.attached',

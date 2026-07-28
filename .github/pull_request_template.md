@@ -49,7 +49,7 @@ Rationale:
 
 - [ ] Relevant focused regression test
 - [ ] Required path-scoped CI checks
-- [ ] Native evidence recorded when targeted/full is selected, or reuse documented with unchanged validation-relevant development inputs
+- [ ] Native evidence recorded when targeted/full is selected, or reuse documented with App source SHA, test-runner SHA, App-input comparison, artifact checksum, and the affected test rerun after a test-runner-only change
 
 Commands and results:
 
@@ -86,3 +86,20 @@ Check any conditional release gates created or changed by this PR.
 - [ ] TestFlight upgrade or App Store screenshot validation
 
 Notes:
+
+## RC freeze (release PRs and release-blocker PRs only)
+
+- [ ] Not applicable
+- [ ] Integration open; no RC generation is frozen
+- [ ] Evidence-only test-runner correction; frozen App head is unchanged
+- [ ] Product/App-input/release-identity remediation; prior RC was invalidated
+
+RC generation and state:
+
+Frozen or invalidated release-branch SHA:
+
+Finding classification and affected boundary:
+
+App source SHA / test-runner SHA / App-input digest / artifact checksum:
+
+Invalidated gates and smallest required rerun:

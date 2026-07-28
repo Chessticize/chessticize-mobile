@@ -5,6 +5,10 @@ Release simulator scenes with an explicit device and orientation; supporting
 automation may use separate rows. Keep release-only and documentation-only work
 in the inventory but out of the interaction matrix.
 
+Keep full-screen iPhone simulator rows in portrait. Use iPad rows for native
+landscape and resizable-window evidence, and add component or Interaction Lab
+rows for compact wide-short and foldable-sized viewports.
+
 | ID | Surface/state | Final visual or behavior contract | Simulator/device | Orientation | Storybook or design reference | Supporting automation | Priority | Functional result | Copy result | Presentation result | Classification | Screenshot, observation, or disposition |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | VIS-01 | Practice Home |  | iPhone 17-Detox | portrait |  |  |  | pending | pending | pending | pending |  |

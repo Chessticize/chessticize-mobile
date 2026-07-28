@@ -195,12 +195,19 @@ pnpm mobile:validate:android:matrix -- --api-level 36 \
 ```
 
 API 24 is a bounded launch/storage/practice/native-engine smoke. API 36 owns the
-complete shared suites. Required evidence records its tested commit, build
-result, commands, device matrix, suite results, and clean tracked worktree
-confirmation. It may be reused on a later head when a documented diff proves
-that validation-relevant development inputs are unchanged. Physical ARM64
-execution is optional diagnostic evidence at #200/#188 and is not a release or
-feature-PR blocker.
+complete shared suites. Required evidence records its App source SHA,
+test-runner SHA, App-input digest, artifact checksum, build result, commands,
+device matrix, suite results, and clean tracked worktree confirmation. It may
+be reused on a later head when
+`node apps/mobile/scripts/mobile-app-inputs.js compare` proves that App build
+inputs are unchanged. When only a host-side spec, selector, assertion,
+evidence collector, or non-bundled fixture changes, reuse the App artifact and
+rerun only the affected suite. Use `Mobile Android test-only rerun` after that
+workflow exists on the default branch; while it first lives only on an active
+release branch, use the retained-APK local command in
+`docs/ANDROID_VALIDATION.md`.
+Physical ARM64 execution is optional diagnostic evidence at #200/#188 and is
+not a release or feature-PR blocker.
 
 ## PR, Local Native, And Release Gates
 
@@ -220,15 +227,19 @@ CHESSTICIZE_E2E_SCOPE=practice \
   .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
 ```
 
-Replace `practice` with `flows` or `full` as required. Record the scope, tested
-commit SHA, build result, commands, results, and clean-worktree confirmation in
-the PR. The evidence does not have to match the current PR head when a
-documented diff proves that validation-relevant development inputs are
-unchanged. Those inputs include mobile runtime sources, native/platform
-projects, dependency manifests, lockfiles and patches, build/release
-configuration, and the selected native specs and fixtures. Documentation,
-review metadata, and merge-parent changes alone do not invalidate evidence.
-All relevant fast CI checks must still pass on the current head.
+Replace `practice` with `flows` or `full` as required. Record the scope, App
+source SHA, test-runner SHA, App-input digest, artifact checksum, build result,
+commands, results, and clean-worktree confirmation in the PR. The two SHAs may
+differ when `node apps/mobile/scripts/mobile-app-inputs.js compare` proves that
+App build inputs are unchanged. Those inputs include mobile runtime/domain
+sources, native/platform
+projects and native test-APK sources, dependency manifests, lockfiles and
+patches, build/release configuration, and bundled fixtures/resources.
+Host-side native specs, selectors, assertions, evidence collectors, and
+non-bundled fixtures invalidate only their affected test evidence: reuse the
+App artifact and rerun that scope. Documentation, review metadata, and
+merge-parent changes invalidate neither. All relevant fast CI checks must still
+pass on the current head.
 
 GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
 validation is required only for releases and native-impacting changes. Release
@@ -237,9 +248,30 @@ the platform's signed-artifact checks, targeted native risk needs the affected
 simulator/emulator suite, and only broad native risk requires both suites.
 Physical-device testing is optional and does not block App Store or Play
 submission, or the post-Play APK mirror. After a later commit or squash merge,
-reuse passing native evidence when a documented diff confirms that the
-validation-relevant development inputs are unchanged; record both SHAs and the
-comparison rather than requiring identical full Git trees.
+reuse passing native App evidence when the fail-closed App-input comparison
+passes. Record both SHAs, the App-input digest, and artifact checksum rather
+than requiring identical full Git trees. Rerun an affected test scope after a
+test-runner-only change without rebuilding the App.
+
+### Validation findings after RC freeze
+
+RC freeze stops planned development, not blocker remediation. Follow the state
+machine in `docs/RELEASE_SOURCE_POLICY.md`:
+
+- a transient failure on unchanged inputs gets one specific-job retry;
+- a host-side spec, selector, wait, assertion, collector, or non-bundled
+  fixture fix stays on a separate evidence branch, keeps the frozen App source
+  unchanged, and reruns only its affected scope after the App-input and
+  artifact checks pass; and
+- a product, App-input, or required release-identity fix invalidates the
+  generation before merge, enters remediation, and creates a new frozen
+  generation after the focused fix and convergence sweep.
+
+For a new generation, always rerun current-head fast checks. Rebuild affected
+App artifacts and rerun the smallest scope that proves the changed boundary;
+do not select Full native validation solely because the RC number advanced.
+Queue record-only work until after release unless it is required for the
+release.
 
 ### Prefer Incremental Review
 
@@ -264,15 +296,16 @@ launch/test infrastructure changes, a serious finding invalidates earlier
 assumptions, or accumulated follow-ups no longer have a bounded semantic impact.
 Use semantic blast radius rather than line count. Reusing review does not make
 native evidence automatically reusable: required fast checks must pass on the
-current head, and any native evidence must either cover the current
-validation-relevant development inputs or include a documented unchanged-input
-comparison.
+current head, and any native evidence must either cover the current App build
+inputs or include the fail-closed App-input comparison plus any focused rerun
+required by test-runner changes.
 
 ## Screenshot Verification
 
-For repeatable Storybook-to-Release comparison across the maintained eight
-scenes, use `$chessticize-mobile-ui-calibration`. Keep this section's manual
-flow for one-off screenshots outside that baseline.
+For repeatable Storybook-to-Release comparison across the maintained
+fifteen-scene, twenty-six-image baseline, use
+`$chessticize-mobile-ui-calibration`. Keep this section's manual flow for
+one-off screenshots outside that baseline.
 
 Take or inspect screenshots when validating:
 
@@ -302,8 +335,8 @@ Before finalizing:
 - Run broader tests when touching shared core, storage, CLI, or native boundaries.
 - Record whether native validation is required and the rationale in the PR.
 - When targeted or full native validation is required, record passing evidence
-  for the current validation-relevant development inputs or a documented reuse
-  comparison.
+  for the current App build inputs or a fail-closed reuse comparison;
+  test-runner-only changes rerun only their affected evidence.
 - Keep iOS native validation local; GitHub CI runs only the fast non-native jobs.
 - Before release, require the selected local native scope or an identical-tree
   PR-head result recorded against the release candidate.

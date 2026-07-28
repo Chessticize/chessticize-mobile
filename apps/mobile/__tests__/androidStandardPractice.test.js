@@ -116,10 +116,17 @@ describe('Android Standard Practice release slice', () => {
     ]);
     expect(practiceJourney).toContain('android-standard-practice.fixture.json');
     expect(practiceJourney).toContain('standardFixture.puzzleSelectionSeed');
+    expect(practiceJourney).toContain(
+      'chessticizePuzzleSelectionId: standardFixture.puzzle.id'
+    );
     expect(practiceJourney).toContain('chessticizeStandardTargetCorrect');
+    expect(practiceJourney).toContain('standardFixture.puzzle.solutionMoves[0]');
     expect(practiceJourney).toContain('standardFixture.puzzle.solutionMoves[2]');
     expect(practiceJourney).toContain(
       "waitForVisibleInPracticeScroll('practice-prompt')"
+    );
+    expect(practiceJourney).toContain(
+      '`Last move ${EXPECTED_ENTRY_MOVE.slice(0, 2)} to ${EXPECTED_ENTRY_MOVE.slice(2, 4)}`'
     );
     expect(practiceJourney.match(
       /waitFor\(element\(by\.text\('For black\.'\)\)\)\.toExist\(\)\.withTimeout\(10000\)/g
@@ -140,6 +147,15 @@ describe('Android Standard Practice release slice', () => {
     expect(practiceJourney).toContain("const RELAUNCH_TEST_NOW_MS = String(Number(TEST_NOW_MS) + 5 * 60_000)");
     expect(practiceJourney).toContain("chessticizeTestNowMs: RELAUNCH_TEST_NOW_MS");
     expect(practiceJourney).toContain("history-tab");
+    expect(practiceJourney).toContain("by.id('history-filter-toggle')");
+    expect(practiceJourney).toContain("by.id('history-range-max')");
+    expect(practiceJourney).toContain("by.id('history-source-all')");
+    expect(practiceJourney).toContain(
+      "waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000)"
+    );
+    expect(practiceJourney).not.toContain(
+      ".whileElement(by.id('practice-main-scroll'))"
+    );
     expect(helpers).toContain('androidBoardTapPoint');
     expect(helpers).toContain("'wm', 'density'");
     expect(helpers).toContain("'wm', 'size'");

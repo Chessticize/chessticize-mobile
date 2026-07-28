@@ -1,19 +1,27 @@
 ---
 name: chessticize-mobile-ui-calibration
-description: Capture and visually calibrate Chessticize Mobile's Storybook Interaction Lab against an exact-head iOS Release simulator build across the maintained portrait and landscape baseline scenes, judge functional rendering, copy quality, and presentation quality including hierarchy, alignment, typography, spacing, balance, and polish, archive local screenshots, enforce production-only UI, and record PR evidence. Use when UI work needs native screenshot parity, copy review, or aesthetic and layout review, when Storybook may differ from the real app, when Custom Setup or Review controls need verification, when refreshing the project's foundational UI screenshots, or before preparing App Store screenshot sets.
+description: Capture and visually calibrate Chessticize Mobile's Storybook Interaction Lab against exact-head iPhone portrait and iPad portrait/landscape Release simulator builds, judge functional rendering, copy quality, and presentation quality including hierarchy, alignment, typography, spacing, balance, and polish, archive local screenshots, enforce production-only UI, and record PR evidence. Use when UI work needs native screenshot parity, copy review, or aesthetic and layout review, when Storybook may differ from the real app, when Custom Setup or Review controls need verification, when refreshing the project's foundational UI screenshots, or before preparing App Store screenshot sets.
 ---
 
 # Chessticize Mobile UI Calibration
 
 Compare the Storybook presentation contract with product-accurate Release
 simulator rendering. Use the maintained fifteen-scene Detox journey plus its
-eleven adaptive-layout landscape captures so future calibration stays
-repeatable instead of depending on manually seeded app data.
+eleven iPad landscape captures so future calibration stays repeatable instead
+of depending on manually seeded app data. Keep compact wide-short and
+foldable-sized component/Interaction Lab coverage separate from physical
+full-screen iPhone rotation.
 
 ## Safety And Scope
 
-- Use a dedicated simulator such as `iPhone 17-Detox`. Never use a simulator
-  that contains manual-test data; Detox launches with `delete: true`.
+- Use a dedicated iPad simulator such as `iPad Pro 11-inch (M5)` for the full
+  portrait/landscape wrapper. Never use a simulator that contains manual-test
+  data; Detox launches with `delete: true`.
+- Keep the Mac unlocked and the exact target device window open in Simulator.
+  The calibration script uses Simulator's host Rotate control because current
+  iPadOS windowing modes can reject programmatic app orientation requests.
+  Never add product lifecycle or native geometry code only to make calibration
+  rotate.
 - Do not install or launch this workflow's build on a physical device. Real
   device checks are a separate, explicitly requested workflow and are never
   accepted as substitutes for the named simulator evidence.
@@ -52,20 +60,34 @@ changing the product UI.
 Run from the repository root:
 
 ```sh
-DETOX_IOS_DEVICE="iPhone 17-Detox" \
+DETOX_IOS_DEVICE="iPad Pro 11-inch (M5)" \
   .codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh
 ```
+
+If more than one available runtime has the same device name, also set the exact
+`DETOX_IOS_DEVICE_UDID`. The resolver rejects duplicate name-only matches and
+name/UDID mismatches. The resolved UDID is then shared by Xcode, Detox, host
+rotation, and artifact identity so the workflow cannot build one runtime and
+capture another.
 
 The script:
 
 1. Requires macOS, a clean worktree, and a fixed Git `HEAD`.
 2. Runs `pnpm mobile:doctor:ios`.
 3. Builds the Release simulator app with bundled JavaScript.
-4. Runs the deterministic fifteen-scene store-assets journey with one worker,
-   capturing eleven layout-sensitive scenes in both orientations.
+4. Runs the deterministic portrait journey on the dedicated iPad, rotates the
+   exact host Simulator window, then runs the separate iPad landscape journey
+   with one worker.
 5. Copies the fifteen portrait and eleven landscape PNGs to
-   `scratch/rendering-checks/<short-sha>/release/`.
-6. Confirms that `HEAD` and the tracked worktree did not change.
+   `scratch/rendering-checks/<short-sha>/release-<device>-<runtime>-<udid>/`.
+6. Requires the React Native adaptive-layout frame to remain in the requested
+   orientation for three observations before each capture. A stale portrait
+   framebuffer fails instead of being relabeled as landscape.
+7. Independently reads every copied PNG header and requires portrait
+   `height > width` or landscape `width > height`.
+8. Arms portrait restoration before the landscape rotation attempt, then
+   restores the Simulator to portrait and confirms that `HEAD` and the tracked
+   worktree did not change.
 
 Set `CHESSTICIZE_IOS_PREPARE=1` only when the CocoaPods workspace or locked
 bundle genuinely needs preparation. Environment preparation must not update
@@ -93,8 +115,8 @@ Open every PNG, not only the flow that originally changed:
 | `app-store-14-arrow-duel-guide` | The Arrow Duel guide shows both candidate arrows, bounded copy, and the delayed timer start. |
 | `app-store-15-sprint-result` | The failed result clearly reports reason, solved/attempted accuracy, rating, mistakes, Review impact, and history action. |
 
-The `practice-tab`, `standard-sprint`, `arrow-duel`, and `review-session`
-landscape variants, plus every first-use guide and Sprint-result landscape
+The `practice-tab`, `standard-sprint`, `arrow-duel`, and `review-session` iPad
+landscape variants, plus every first-use guide and Sprint-result iPad landscape
 variant, must preserve the native Safe Area, adaptive board/rail geometry,
 readable controls, and unclipped content at the same simulator size.
 
@@ -148,16 +170,21 @@ assertions automatic and visual judgment explicit.
 
 ## Other Device Families
 
-Change only `DETOX_IOS_DEVICE` to reuse the same journey on another dedicated
-simulator. Before App Store upload, capture and inspect the required 6.9-inch
-iPhone, 6.1-inch iPhone, and 13-inch iPad sets, then run:
+The full portrait/landscape wrapper rejects non-iPad targets. For iPhone store
+assets, build the Release app for the exact portrait simulator and run the
+portrait-only store-assets journey directly. Captures remain isolated by
+device, runtime, and full UDID so evidence from different frames cannot
+overwrite or masquerade as another device. Before App Store upload, capture
+and inspect the required portrait 6.9-inch iPhone, portrait 6.1-inch iPhone,
+and 13-inch iPad sets, then run:
 
 ```sh
 pnpm app-store:screenshot-audit
 ```
 
-An `iPhone 17-Detox` capture is suitable for layout calibration but its raw
-dimensions are not an accepted App Store upload size.
+An `iPhone 17-Detox` portrait capture is suitable for focused layout acceptance,
+but its raw dimensions are not an accepted App Store upload size. Compact
+wide-short and foldable-sized windows remain required below the native layer.
 
 ## Diagnose Failures
 
@@ -170,6 +197,12 @@ dimensions are not an accepted App Store upload size.
   unrelated `Podfile.lock` rewrite to make calibration pass.
 - If the screenshot command passes but fewer than twenty-six PNGs are found, inspect
   the Detox artifact directory and the first failing scene before rerunning.
+- If a copied PNG fails its orientation check, reject the entire capture. Do
+  not rename or manually move it into the claimed orientation set.
+- If host rotation fails, unlock the Mac, open exactly one Simulator window
+  whose title starts with the configured device name, and grant Accessibility
+  control to the invoking terminal. Treat a frame-orientation timeout as a
+  blocked calibration, not acceptable visual evidence.
 - If Debug controls appear, confirm the build configuration is
   `ios.sim.release`; do not accept the images as a production baseline.
 

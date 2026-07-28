@@ -393,7 +393,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
   });
 
-  it("binds Unclear to the completed attempt and replaces the yellow action with a yellow confirmation", async () => {
+  it("binds Unclear to the completed attempt and replaces the yellow action with a blue read-only status", async () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service, standardTargetCorrect: 1 });
 
@@ -415,8 +415,11 @@ describe("PracticePocScreen", () => {
     expect(attemptId).toBeTruthy();
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
     expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
-    expect(styleContains(findByTestId(renderer, "sprint-unclear-marked").props.style, "#FFFBEB")).toBe(true);
-    expect(styleContains(findByTestId(renderer, "sprint-unclear-marked").props.style, "#F59E0B")).toBe(true);
+    expect(flattenTestStyle(findByTestId(renderer, "sprint-unclear-marked").props.style))
+      .toMatchObject({ backgroundColor: "#EFF6FF", borderColor: "#93C5FD" });
+    expect(flattenTestStyle(
+      findByTestId(renderer, "sprint-unclear-marked").findByType(ReactNative.Text).props.style
+    ).color).toBe("#1D4ED8");
     expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
     expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
     expect(findByTestId(renderer, "sprint-unclear-prompt").props.style).toEqual(promptStyle);
@@ -429,6 +432,28 @@ describe("PracticePocScreen", () => {
       unclear: true
     });
     expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
+    expect(collectText(findByTestId(renderer, "sprint-result-unclear-summary"))).toContain(
+      "Included in replay"
+    );
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
+      "Replay 1 attempt"
+    );
+
+    const historyCountBeforeReplay = service.listHistory().length;
+    const ratingBeforeReplay = service.getRating("standard 5/20");
+    press(renderer, "review-mistakes-button");
+
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+    expect(collectText(findByTestId(renderer, "history-attempt-clear-unclear"))).toBe(
+      "Mark clear"
+    );
+    expect(() => findByTestId(renderer, "review-schedule-add")).toThrow();
+    expect(service.listHistory()).toHaveLength(historyCountBeforeReplay);
+    expect(service.getRating("standard 5/20")).toEqual(ratingBeforeReplay);
+
+    press(renderer, "history-attempt-clear-unclear");
+    expect(service.getHistoryAttempt(attemptId ?? "")).toMatchObject({ unclear: false });
+    expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
   });
 
   it.each([
@@ -671,6 +696,39 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-session")).toThrow();
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     expect(service.listHistory({ source: "scheduled_review" })).toHaveLength(0);
+  });
+
+  it("restores Review and primary navigation in the same visible commit when X exits", () => {
+    const commits: Array<{
+      primaryNavigationVisible: boolean;
+      reviewPanelVisible: boolean;
+    }> = [];
+    let recordCommits = false;
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    renderer = renderScreen({
+      practiceService: createDueReviewService(2),
+      onRenderCommit: () => {
+        if (!recordCommits || !renderer) {
+          return;
+        }
+        commits.push({
+          primaryNavigationVisible: renderer.root.findAllByProps({ testID: "review-tab" }).length > 0,
+          reviewPanelVisible: renderer.root.findAllByProps({ testID: "review-panel" }).length > 0
+        });
+      }
+    });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    recordCommits = true;
+    press(renderer, "review-exit");
+
+    expect(findByTestId(renderer, "review-panel")).toBeTruthy();
+    expect(findByTestId(renderer, "review-tab")).toBeTruthy();
+    expect(commits).not.toContainEqual({
+      primaryNavigationVisible: false,
+      reviewPanelVisible: true
+    });
   });
 
   it("commits the Review owner when a multi-context due review times out during Predictive Back", () => {
@@ -2251,7 +2309,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("keeps every guide target and connector in the public portrait and landscape flow", () => {
+  it("keeps every guide target and connector in the public portrait and wide-short flow", () => {
     setPracticeViewport({
       width: 402,
       height: 874,
@@ -2367,6 +2425,84 @@ describe("PracticePocScreen", () => {
       arrowDuel,
       "practice-session-guide-coach-pointer-arrow-duel-top-endpoint"
     )).toThrow();
+  });
+
+  it.each([
+    {
+      height: 874,
+      insets: { top: 62, right: 0, bottom: 34, left: 0 },
+      label: "iPhone portrait",
+      scale: 3,
+      width: 402
+    },
+    {
+      height: 402,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 },
+      label: "iPhone landscape",
+      scale: 3,
+      width: 874
+    },
+    {
+      height: 1180,
+      insets: { top: 24, right: 0, bottom: 20, left: 0 },
+      label: "iPad portrait",
+      scale: 2,
+      width: 820
+    },
+    {
+      height: 820,
+      insets: { top: 0, right: 0, bottom: 20, left: 0 },
+      label: "iPad landscape",
+      scale: 2,
+      width: 1180
+    }
+  ])("aligns the Arrow Duel guide prompt in $label", ({
+    height,
+    insets,
+    scale,
+    width
+  }: {
+    height: number;
+    insets: PracticeSafeAreaInsets;
+    label: string;
+    scale: number;
+    width: number;
+  }) => {
+    setPracticeViewport({ width, height, scale, insets });
+
+    const renderer = renderLabScenario("practice-arrow-duel-guide-only");
+    const promptStyle = flattenTestStyle(findByTestId(
+      renderer,
+      "practice-session-guide-prompt"
+    ).props.style);
+    const promptPanelStyle = flattenTestStyle(findByTestId(
+      renderer,
+      "practice-prompt"
+    ).props.style);
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height,
+      insets,
+      width
+    });
+
+    expect(promptStyle.alignSelf).toBe("center");
+    expect(promptPanelStyle.minHeight).toBe(72);
+    expect(promptPanelStyle.height).toBeUndefined();
+    if (layout.usesSessionRail) {
+      const railStyle = flattenTestStyle(findByTestId(
+        renderer,
+        "active-session-control-rail-content"
+      ).props.style);
+      expect(promptStyle.width).toBe(railStyle.width);
+      return;
+    }
+
+    const boardStyle = flattenTestStyle(findByTestId(
+      renderer,
+      "practice-arrow-duel-guide-demo-board"
+    ).props.style);
+    expect(promptStyle.width).toBe(boardStyle.width);
   });
 
   it("keeps the complete first-use guide operable in the maintained iPhone portrait viewport", () => {
@@ -2683,6 +2819,13 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-tab");
     press(renderer, "history-attempt-history-unclear");
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe(
+      "Replay screen"
+    );
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+    expect(collectText(findByTestId(renderer, "history-attempt-clear-unclear"))).toBe(
+      "Mark clear"
+    );
     expect(() => findByTestId(renderer, "review-theme-rail")).toThrow();
 
     press(renderer, "review-analysis-button");
@@ -3102,6 +3245,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-previous-attempt-notice"))).toBe(
       "Previous puzzle took too longIt was automatically marked Unclear and added to Review.Marked Unclear"
     );
+    expect(flattenTestStyle(
+      findByTestId(renderer, "sprint-previous-attempt-notice-status").props.style
+    )).toMatchObject({ backgroundColor: "#EFF6FF", borderColor: "#93C5FD" });
+    expect(flattenTestStyle(
+      findByTestId(renderer, "sprint-previous-attempt-notice-status")
+        .findByType(ReactNative.Text).props.style
+    ).color).toBe("#1D4ED8");
     expect(() => findByTestId(renderer, "sprint-unclear-prompt")).toThrow();
     expect(() => findByTestId(renderer, "sprint-unclear-marked")).toThrow();
     expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
@@ -3141,7 +3291,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("reports timeout as one Mistake and one Review item", () => {
+  it("reports a timeout as one in-Review Replay attempt without marking it Unclear", () => {
     const service = createMobilePracticeService("random1000");
     service.saveSettings({
       ...service.getSettings(),
@@ -3169,10 +3319,7 @@ describe("PracticePocScreen", () => {
 
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
     expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "1 timed out added to Review"
-    );
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "Mistakes are not marked Unclear"
+      "1 attempt · Included in replay"
     );
     expect(() => findByTestId(renderer, "sprint-result-unclear-summary")).toThrow();
     expect(service.listReviewQueue()).toHaveLength(1);
@@ -3211,10 +3358,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "sprint-previous-attempt-notice")).toThrow();
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
     expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "1 timed out added to Review"
-    );
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "Mistakes are not marked Unclear"
+      "1 attempt · Included in replay"
     );
   });
 
@@ -4274,7 +4418,7 @@ describe("PracticePocScreen", () => {
   it.each([
     { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 288, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
     { label: "modern iPhone portrait", width: 430, height: 932, scale: 3, layout: "compactPortrait", boardSize: 398, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
-    { label: "compact iPhone landscape", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, railWidth: 64, sessionRail: true, homeColumns: false },
+    { label: "compact wide-short window", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, railWidth: 64, sessionRail: true, homeColumns: false },
     { label: "iPad A16 portrait", width: 820, height: 1180, scale: 2, layout: "regularPortrait", boardSize: 788, sideRail: true, railWidth: 76, sessionRail: false, homeColumns: false },
     { label: "iPad Pro portrait", width: 1032, height: 1376, scale: 2, layout: "regularPortrait", boardSize: 860, sideRail: true, railWidth: 168, sessionRail: false, homeColumns: true },
     { label: "iPad landscape", width: 1180, height: 820, scale: 2, layout: "regularLandscape", boardSize: 640, sideRail: true, railWidth: 168, sessionRail: true, homeColumns: true },
@@ -4375,7 +4519,7 @@ describe("PracticePocScreen", () => {
       .toThrow();
   });
 
-  it("keeps the complete iPhone Pro Max landscape session chrome publicly reachable", () => {
+  it("keeps the complete compact wide-short session chrome publicly reachable", () => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
     }).__setWindowDimensions?.({ width: 956, height: 440, scale: 3, fontScale: 1 });
@@ -4405,7 +4549,7 @@ describe("PracticePocScreen", () => {
     {
       height: 402,
       insets: { top: 0, right: 62, bottom: 21, left: 62 },
-      label: "iPhone 17 landscape",
+      label: "compact wide-short resizable window",
       scale: 3,
       width: 874
     },
@@ -4440,6 +4584,9 @@ describe("PracticePocScreen", () => {
       practiceService: createMobilePracticeService("familiar15")
     });
     startStandardSprint(sprintRenderer);
+    const sprintPromptStyle = flattenTestStyle(
+      findByTestId(sprintRenderer, "practice-prompt").props.style
+    );
     const sprintBoardSize = Number(
       flattenTestStyle(findByTestId(sprintRenderer, "session-board").props.style).width
     );
@@ -4458,6 +4605,9 @@ describe("PracticePocScreen", () => {
     const layoutStyle = flattenTestStyle(reviewLayout.props.style);
     const boardLaneStyle = flattenTestStyle(boardLane.props.style);
     const controlRailStyle = flattenTestStyle(controlRail.props.style);
+    const reviewPromptStyle = flattenTestStyle(
+      findByTestId(reviewRenderer, "practice-prompt").props.style
+    );
 
     expect(boardStyle.width).toBe(sprintBoardSize);
     expect(boardStyle.height).toBe(sprintBoardSize);
@@ -4466,6 +4616,10 @@ describe("PracticePocScreen", () => {
     expect(boardLaneStyle.width).toBe(sprintBoardSize);
     expect(controlRailStyle.width).toBe(expectedLayout.sessionRailWidth);
     expect(controlRailStyle.height).toBe(sprintBoardSize);
+    expect(sprintPromptStyle.minHeight).toBe(72);
+    expect(sprintPromptStyle.height).toBeUndefined();
+    expect(reviewPromptStyle.minHeight).toBe(72);
+    expect(reviewPromptStyle.height).toBeUndefined();
     expect(sprintBoardSize + 2 * PRACTICE_UI_PADDING)
       .toBeLessThanOrEqual(expectedLayout.contentHeight);
     expect(findByTestId(reviewRenderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
@@ -4478,7 +4632,7 @@ describe("PracticePocScreen", () => {
     expect(boardLane.findByProps({ testID: "review-board" })).toBeTruthy();
   });
 
-  it("keeps the Review board fixed while rotating into its unobstructed landscape lane", () => {
+  it("keeps the Review board fixed while resizing into its unobstructed wide-short lane", () => {
     setPracticeViewport({
       width: 402,
       height: 874,
@@ -4569,7 +4723,7 @@ describe("PracticePocScreen", () => {
 
   it.each([
     { actionContainer: "review-context-actions-bottom", height: 932, label: "phone portrait", width: 430 },
-    { actionContainer: "review-context-actions-rail", height: 390, label: "phone landscape", width: 844 },
+    { actionContainer: "review-context-actions-rail", height: 390, label: "compact wide-short window", width: 844 },
     { actionContainer: "review-context-actions-rail", height: 820, label: "iPad landscape", width: 1180 }
   ])("places History Review actions in the available $label layout", ({ actionContainer, height, width }) => {
     (ReactNative as unknown as {
@@ -4719,7 +4873,7 @@ describe("PracticePocScreen", () => {
 
   it.each([
     { label: "phone portrait", width: 430, height: 932 },
-    { label: "phone landscape", width: 844, height: 390 },
+    { label: "compact wide-short window", width: 844, height: 390 },
     { label: "tablet portrait", width: 820, height: 1180 },
     { label: "tablet landscape", width: 1180, height: 820 }
   ])("keeps Custom, History, Review, reminders, backup, and Settings reachable on $label", ({ width, height }) => {
@@ -6772,8 +6926,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-rating-range"))).toContain("600");
     expect(collectText(findByTestId(renderer, "sprint-result-rating-change"))).toContain("600 -> 600");
     expect(findByTestId(renderer, "sprint-result-review-impact")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("Mistakes");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("No new review items");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("In Review");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("0 attempts");
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("0");
     expect(() => findByTestId(renderer, "sprint-result-rating-snapshot")).toThrow();
     expect(findByTestId(renderer, "sprint-result-history-trend")).toBeTruthy();
@@ -6785,7 +6939,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "sprint-result-history-trend").props.accessibilityLabel).toContain("rating 600 to 600");
     expect(collectText(findByTestId(renderer, "sprint-result-trend-start"))).toBe("600");
     expect(collectText(findByTestId(renderer, "sprint-result-trend-current"))).toBe("600");
-    expectText(renderer, "Mistakes");
+    expectText(renderer, "In Review");
     expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "sprint-result-history-button"))).toBe("");
     expect(findByTestId(renderer, "sprint-result-history-button").props.accessibilityLabel).toBe("View history trends");
@@ -7064,6 +7218,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-result`))).toBe("Wrong move");
     expect(() => findByTestId(renderer, `history-attempt-${historyAttemptId}-move`)).toThrow();
     expect(historyAttemptRow.props.accessibilityLabel).toContain("Played g6g5 · Best f4g3");
+    expect(historyAttemptRow.props.accessibilityLabel).toContain("Replay Standard puzzle");
     expect(historyAttemptRow.props.accessibilityLabel).not.toContain("Review due");
     expect(collectText(historyAttemptRow)).not.toContain("Played g6g5 · Best f4g3");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-identity`))).toMatch(
@@ -7855,7 +8010,10 @@ describe("PracticePocScreen", () => {
       arrowDuelCandidateOrder: ["a1a2", "a2a3"]
     });
     const systemBack = createTestSystemBackSource("android");
-    const renderer = renderScreen({ practiceService: new PracticeService(store), systemBack });
+    const renderer = renderScreen({
+      practiceService: new PracticeService(store),
+      systemBack
+    });
 
     press(renderer, "history-tab");
     press(renderer, "history-attention-all");
@@ -7888,8 +8046,14 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-attempt-malformed-context-attempt-meta"))).toContain(
       "Unknown source"
     );
+    expect(
+      findByTestId(renderer, "history-attempt-malformed-context-attempt").props.accessibilityLabel
+    ).toContain("Replay Unknown mode puzzle");
     press(renderer, "history-attempt-malformed-context-attempt");
     expect(() => findByTestId(renderer, "history-attempt-detail")).toThrow();
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe("Replay screen");
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+    expect(findByTestId(renderer, "review-exit").props.accessibilityLabel).toBe("Exit replay");
     expect(collectText(findByTestId(renderer, "history-replay-unavailable"))).toBe(
       "The saved mode or rating context is invalid, so this attempt cannot be replayed safely."
     );
@@ -8040,6 +8204,44 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
   });
 
+  it("keeps a post-Sprint replay fixed while a board drag is active", () => {
+    const renderer = renderLabScenario("practice-sprint-result-replay");
+
+    press(renderer, "review-mistakes-button");
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+
+    act(() => {
+      findByTestId(renderer, "review-board").props.onTouchStart();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+
+    act(() => {
+      findByTestId(renderer, "review-board").props.onTouchEnd();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+  });
+
+  it("keeps a scheduled Review fixed while a board drag is active", () => {
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
+      practiceService: createDueReviewService(1)
+    });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+
+    act(() => {
+      findByTestId(renderer, "review-board").props.onTouchStart();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+
+    act(() => {
+      findByTestId(renderer, "review-board").props.onTouchEnd();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+  });
+
   it("keeps history analysis review on the current puzzle after a retry is solved", async () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service });
@@ -8135,18 +8337,138 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Sprint failed");
     expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("Three mistakes");
     expect(findByTestId(renderer, "sprint-result-reason").props.accessibilityLabel).toBe("Result: Three mistakes");
-    expectText(renderer, "3 mistakes queued");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("Mistakes");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("Review your mistakes");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("In Review");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "3 attempts · Included in replay"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
+      "0 Unclear + 3 in Review · 3 total"
+    );
     expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("3");
     expect(collectText(renderer.root)).not.toContain("Start new sprint");
     const reviewButton = findByTestId(renderer, "review-mistakes-button");
     const playAgainButton = findByTestId(renderer, "play-again-button");
     expect(reviewButton).toBeTruthy();
     expect(playAgainButton).toBeTruthy();
-    expect(collectText(reviewButton)).toContain("Review Mistakes");
+    expect(collectText(reviewButton)).toContain("Replay 3 attempts");
     expect(hasStyleEntry(reviewButton, "backgroundColor", "#2563EB")).toBe(true);
     expect(hasStyleEntry(playAgainButton, "backgroundColor", "#2563EB")).toBe(false);
+  });
+
+  it("previews two Unclear and two In Review attempts as a four-entry Replay with status actions", async () => {
+    const renderer = renderLabScenario("practice-sprint-result-replay");
+
+    expect(collectText(findByTestId(renderer, "sprint-result-unclear-summary"))).toContain(
+      "Included in replay"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "In Review"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
+      "2 Unclear + 2 in Review"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
+      "4 total"
+    );
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
+      "Replay 4 attempts"
+    );
+
+    press(renderer, "review-mistakes-button");
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe(
+      "Replay screen"
+    );
+    expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("1 / 4");
+    expect(() => findByTestId(renderer, "review-source-pill")).toThrow();
+    expect(() => findByTestId(renderer, "review-context-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "review-context-needs-review")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-attempt-clear-unclear"))).toBe(
+      "Mark clear"
+    );
+    expect(() => findByTestId(renderer, "review-schedule-add")).toThrow();
+    press(renderer, "history-attempt-clear-unclear");
+    expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
+
+    press(renderer, "review-next");
+    await settleEntryPreview();
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("2 / 4");
+    expect(collectText(findByTestId(renderer, "history-attempt-clear-unclear"))).toBe(
+      "Mark clear"
+    );
+    expect(() => findByTestId(renderer, "review-context-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "review-context-needs-review")).toThrow();
+
+    press(renderer, "review-next");
+    await settleEntryPreview();
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("3 / 4");
+    expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe(
+      "Remove from Review"
+    );
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
+
+    press(renderer, "review-next");
+    await settleEntryPreview();
+    expect(collectText(findByTestId(renderer, "review-progress"))).toContain("4 / 4");
+    expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe(
+      "Remove from Review"
+    );
+    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due tomorrow");
+  });
+
+  it("shows an overlapping Unclear and in-Review attempt once in the Replay total", () => {
+    const puzzle = sharedHistoryPuzzle();
+    const replayAttempt = (id: string, unclear: boolean): AttemptEvent => ({
+      id,
+      source: "sprint",
+      sessionId: "overlap-result",
+      puzzleId: puzzle.id,
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-07-18T11:59:55.000Z",
+      completedAt: "2026-07-18T12:00:00.000Z",
+      ratingBefore: 900,
+      ...(unclear ? { unclear: true } : {})
+    });
+    const renderer = renderScreen({
+      sprintRulesDesignPreview: {
+        initialResultState: {
+          ...completedRatingSprintState({
+            id: "overlap-result",
+            mode: "standard",
+            completedAt: "2026-07-18T12:00:00.000Z",
+            ratingBefore: 900,
+            ratingAfter: 900
+          }),
+          correctCount: 3,
+          currentPuzzleIndex: 3
+        },
+        resultReplayItems: [
+          { attempt: replayAttempt("unclear-only", true), inReview: false, puzzle },
+          { attempt: replayAttempt("both", true), inReview: true, puzzle },
+          { attempt: replayAttempt("review-only", false), inReview: true, puzzle }
+        ],
+        resultUnclearSummary: {
+          slowMarkedCount: 0,
+          userMarkedCount: 2
+        }
+      }
+    });
+
+    expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
+      "2 Unclear + 2 in Review · 1 in both · 3 total"
+    );
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
+      "Replay 3 attempts"
+    );
   });
 
   it("opens a one-shot mistake review after a timeout-only sprint failure", async () => {
@@ -8211,8 +8533,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-schedule-remove"))).toBe("Remove from Review");
     press(renderer, "review-schedule-remove");
     press(renderer, "review-schedule-removal-confirm");
-    expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
-    expect(collectText(findByTestId(renderer, "review-schedule-add"))).toBe("Add to Review");
+    expect(() => findByTestId(renderer, "review-schedule-control")).toThrow();
+    expect(() => findByTestId(renderer, "review-schedule-add")).toThrow();
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "review-previous").props.disabled).toBe(true);
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
@@ -9557,14 +9879,18 @@ describe("PracticePocScreen", () => {
 
     const reviewStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
     const solvedReviewFen = mustFenAfterMove(reviewStartFen, firstPuzzle.correctMove);
-    const unsolvedPromptHeight = flattenTestStyle(
+    const unsolvedPromptStyle = flattenTestStyle(
       findByTestId(renderer, "practice-prompt").props.style
-    ).height;
-    expect(unsolvedPromptHeight).toBe(72);
+    );
+    expect(unsolvedPromptStyle.minHeight).toBe(72);
+    expect(unsolvedPromptStyle.height).toBeUndefined();
     await boardMove(renderer, firstPuzzle.correctMove);
     expectText(renderer, "Solved");
-    expect(flattenTestStyle(findByTestId(renderer, "practice-prompt").props.style).height)
-      .toBe(unsolvedPromptHeight);
+    const solvedPromptStyle = flattenTestStyle(
+      findByTestId(renderer, "practice-prompt").props.style
+    );
+    expect(solvedPromptStyle.minHeight).toBe(unsolvedPromptStyle.minHeight);
+    expect(solvedPromptStyle.height).toBeUndefined();
     press(renderer, "review-analysis-button");
 
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(solvedReviewFen);
@@ -10888,6 +11214,7 @@ function createScriptedStockfishTransport(
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
   Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
+    onRenderCommit?: () => void;
     platformCapabilities?: MobilePlatformCapabilities;
   };
 
@@ -11000,6 +11327,7 @@ function renderScreen({
   sprintGuidanceEnabled,
   initialTab,
   moveFeedbackSettings,
+  onRenderCommit,
   puzzleSelectionId,
   puzzleSelectionSeed,
   runEloEditingMovedToHome,
@@ -11015,7 +11343,7 @@ function renderScreen({
 }: RenderScreenOptions = {}): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   act(() => {
-    renderer = TestRenderer.create(
+    const screen = (
       <PracticePocScreen
         platformCapabilities={platformCapabilities ?? createTestMobilePlatformCapabilities(capabilityOverrides)}
         arrowDuelTargetCorrect={arrowDuelTargetCorrect}
@@ -11038,6 +11366,13 @@ function renderScreen({
         themeCatalogPresentation={themeCatalogPresentation}
       />
     );
+    renderer = TestRenderer.create(onRenderCommit
+      ? (
+          <React.Profiler id="practice-poc-screen" onRender={onRenderCommit}>
+            {screen}
+          </React.Profiler>
+        )
+      : screen);
   });
   if (!renderer) {
     throw new Error("PracticePocScreen did not render");

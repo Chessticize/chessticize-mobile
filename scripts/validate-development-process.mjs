@@ -52,10 +52,23 @@ const uiCalibrationRunner = path.join(
   repoRoot,
   ".codex/skills/chessticize-mobile-ui-calibration/scripts/capture-release-baseline.sh"
 );
+const simulatorOrientationRunner = path.join(
+  repoRoot,
+  ".codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
+);
+const simulatorTargetResolver = path.join(
+  repoRoot,
+  "apps/mobile/scripts/resolve-ios-simulator-target.js"
+);
+const pngOrientationValidator = path.join(
+  repoRoot,
+  "apps/mobile/scripts/assert-png-orientation.js"
+);
 const prTemplate = read(".github/pull_request_template.md");
 const releaseNotes = read("docs/RELEASE_NOTES.md");
 const releaseNotesTemplate = read("docs/releases/RELEASE_NOTES_TEMPLATE.md");
 const releaseSourcePolicy = read("docs/RELEASE_SOURCE_POLICY.md");
+const androidValidation = read("docs/ANDROID_VALIDATION.md");
 const appStoreUpload = read("docs/APP_STORE_UPLOAD.md");
 const androidPlayRelease = read("docs/ANDROID_PLAY_RELEASE.md");
 const androidGitHubRelease = read("docs/ANDROID_GITHUB_RELEASE.md");
@@ -101,7 +114,9 @@ for (const policy of [agents, testingArchitecture, devLoopSkill, localE2eSkill])
   assert.match(policy, /Full native validation/);
   assert.match(policy, /local iOS native\s+validation/i);
   assert.match(policy, /only for (?:releases|release candidates) and native-impacting changes|only for a release candidate or a change to native/i);
-  assert.match(policy, /validation-relevant development inputs/);
+  assert.match(policy, /App source SHA/i);
+  assert.match(policy, /test-runner SHA/i);
+  assert.match(policy, /App-input digest/i);
 }
 
 assert.doesNotMatch(agents, /Any required Detox evidence must come from the exact PR head/);
@@ -307,6 +322,9 @@ assert.match(androidReleaseSkill, /Mark unobserved Console gates\s+UNKNOWN/);
 assert.match(androidReleaseSkill, /published annotated canonical tag/);
 assert.match(androidReleaseSkill, /Internal and Closed tracks/);
 assert.match(androidReleaseSkill, /first\s+launch, the boundary changed, or Play reports a problem/);
+assert.match(androidReleaseSkill, /Respect RC freeze generations/);
+assert.match(androidReleaseSkill, /host-side test-runner defect/);
+assert.match(androidReleaseSkill, /invalidate the generation before merging/);
 assert.match(agents, /\.codex\/skills\/chessticize-android-release\/SKILL\.md/);
 assert.match(androidPlayRelease, /successful APK-mirror workflow run/);
 assert.match(androidPlayRelease, /exactly the required source manifest/);
@@ -355,6 +373,34 @@ assert.match(uiCalibrationRunnerSource, /pnpm mobile:e2e:build:ios:release/);
 assert.match(uiCalibrationRunnerSource, /pnpm mobile:e2e:store-assets:ios:release/);
 assert.match(uiCalibrationRunnerSource, /git status --porcelain --untracked-files=normal/);
 assert.match(uiCalibrationRunnerSource, /brew --prefix ruby@3\.3/);
+assert.match(uiCalibrationRunnerSource, /CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait/);
+assert.match(uiCalibrationRunnerSource, /CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape/);
+assert.match(
+  uiCalibrationRunnerSource,
+  /DEVICE_NAME="\$\{DETOX_IOS_DEVICE:-iPad Pro 11-inch \(M5\)\}"/
+);
+assert.match(uiCalibrationRunnerSource, /\[\[ "\$DEVICE_NAME" == \*iPad\* \]\]/);
+assert.match(uiCalibrationRunnerSource, /set-simulator-orientation\.sh/);
+assert.match(uiCalibrationRunnerSource, /resolve-ios-simulator-target\.js/);
+assert.match(uiCalibrationRunnerSource, /assert-png-orientation\.js/);
+assert.match(uiCalibrationRunnerSource, /export DETOX_IOS_DEVICE_UDID="\$SIMULATOR_UDID"/);
+assert.match(
+  uiCalibrationRunnerSource,
+  /release-\$DEVICE_SLUG-\$RUNTIME_SLUG-\$UDID_SLUG/
+);
+assert.ok(
+  uiCalibrationRunnerSource.indexOf("\nRESTORE_PORTRAIT=1\n")
+    < uiCalibrationRunnerSource.indexOf(
+      '"$ORIENTATION_RUNNER" "$SIMULATOR_UDID" "$DEVICE_NAME" landscape'
+    )
+);
+
+const simulatorOrientationRunnerSource = read(
+  ".codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
+);
+assert.match(simulatorOrientationRunnerSource, /tell application "Simulator" to activate/);
+assert.match(simulatorOrientationRunnerSource, /simctl io "\$SIMULATOR_UDID" screenshot/);
+assert.match(simulatorOrientationRunnerSource, /Could not rotate the exact Simulator window/);
 
 const localE2eRunnerSource = read(
   ".codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh"
@@ -373,7 +419,31 @@ for (const option of [
   assert.match(prTemplate, new RegExp(option.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 }
 assert.match(prTemplate, /only for releases and native-impacting changes/i);
-assert.match(prTemplate, /unchanged validation-relevant development inputs/i);
+assert.match(prTemplate, /App-input comparison/i);
+assert.match(prTemplate, /test-runner-only change/i);
+assert.match(prTemplate, /RC freeze \(release PRs and release-blocker PRs only\)/);
+assert.match(prTemplate, /Evidence-only test-runner correction/);
+assert.match(prTemplate, /prior RC was invalidated/);
+assert.match(androidValidation, /During an active RC freeze/);
+assert.match(androidValidation, /invalidates that RC\s+generation/);
+assert.match(androidValidation, /rebuild only the affected artifacts and validation scope/);
+
+for (const rcFreezePolicy of [
+  agents,
+  releaseSourcePolicy,
+  devLoopSkill,
+  androidReleaseSkill
+]) {
+  assert.match(rcFreezePolicy, /RC freeze|RC frozen|frozen RC/i);
+  assert.match(rcFreezePolicy, /planned development/);
+  assert.match(rcFreezePolicy, /test-runner defect|host-side spec/);
+  assert.match(rcFreezePolicy, /invalidat(?:e|es)[\s\S]{0,80}generation/);
+  assert.match(
+    rcFreezePolicy,
+    /next\s+(?:RC\s+)?generation|new frozen\s+generation/
+  );
+  assert.match(rcFreezePolicy, /exact-head fast checks/);
+}
 
 for (const releaseDoc of releaseDocs) {
   assert.match(releaseDoc, /exact/);
@@ -381,8 +451,8 @@ for (const releaseDoc of releaseDocs) {
   assert.match(releaseDoc, /physical/i);
 }
 
-assert.equal(releaseVersion.publicVersion, "1.2.1");
-assert.equal(releaseVersion.androidVersionCode, 7);
+assert.equal(releaseVersion.publicVersion, "1.3");
+assert.equal(releaseVersion.androidVersionCode, 8);
 assert.ok(
   androidPlayRunbook.includes(
     `Android version code: \`apps/mobile/release-version.json\` ` +
@@ -441,6 +511,14 @@ const syntaxCheck = spawnSync("bash", ["-n", localE2eRunner], { encoding: "utf8"
 assert.equal(syntaxCheck.status, 0, syntaxCheck.stderr);
 const uiCalibrationSyntaxCheck = spawnSync("bash", ["-n", uiCalibrationRunner], { encoding: "utf8" });
 assert.equal(uiCalibrationSyntaxCheck.status, 0, uiCalibrationSyntaxCheck.stderr);
+const simulatorOrientationSyntaxCheck = spawnSync("bash", ["-n", simulatorOrientationRunner], {
+  encoding: "utf8"
+});
+assert.equal(simulatorOrientationSyntaxCheck.status, 0, simulatorOrientationSyntaxCheck.stderr);
+for (const scriptPath of [simulatorTargetResolver, pngOrientationValidator]) {
+  const nodeSyntaxCheck = spawnSync(process.execPath, ["--check", scriptPath], { encoding: "utf8" });
+  assert.equal(nodeSyntaxCheck.status, 0, nodeSyntaxCheck.stderr);
+}
 
 const invalidScope = spawnSync(localE2eRunner, [], {
   encoding: "utf8",

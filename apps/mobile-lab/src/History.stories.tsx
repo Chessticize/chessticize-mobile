@@ -1,6 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
-import { clickTestId, openHistory, waitForTestId } from "./storyPlay.ts";
+import {
+  clickTestId,
+  expectTestIdAbsent,
+  expectTestIdText,
+  openHistory,
+  waitForTestId
+} from "./storyPlay.ts";
 
 const meta = {
   title: "History",
@@ -94,6 +100,11 @@ export const AttemptDetail: Story = {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-attempt-history-unclear");
     await waitForTestId(canvasElement, "review-session");
+    await expectTestIdText(canvasElement, "review-title", "Replay");
+    expectTestIdAbsent(canvasElement, "review-source-pill");
+    expectTestIdAbsent(canvasElement, "review-context-unclear");
+    expectTestIdAbsent(canvasElement, "review-context-needs-review");
+    await expectTestIdText(canvasElement, "history-attempt-clear-unclear", "Mark clear");
     await clickTestId(canvasElement, "review-analysis-button");
     await waitForTestId(canvasElement, "review-theme-rail");
   }
@@ -106,6 +117,7 @@ export const ReplayUnavailable: Story = {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-attention-all");
     await clickTestId(canvasElement, "history-attempt-history-arrow-legacy");
-    await waitForTestId(canvasElement, "history-attempt-detail-replay-unavailable");
+    await waitForTestId(canvasElement, "history-replay-unavailable");
+    await expectTestIdText(canvasElement, "review-title", "Replay");
   }
 };

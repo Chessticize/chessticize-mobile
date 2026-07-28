@@ -38,6 +38,9 @@ describe('Android Custom Practice release slice', () => {
     expect(spec).toContain("by.id('practice-add-run')");
     expect(spec).toContain("by.id('practice-run-name-input')");
     expect(spec).toContain("by.id('practice-run-start')");
+    expect(spec).toContain('selectPracticeRunByName(CUSTOM_RUN_NAME)');
+    expect(spec).toContain("'practice-run-select-'");
+    expect(spec).not.toContain("element(by.text(CUSTOM_RUN_NAME)).tap()");
     expect(spec).toContain('android-standard-practice.fixture.json');
     expect(fixture.customRunTheme).toEqual({
       id: 'mate-in-2',
@@ -52,6 +55,8 @@ describe('Android Custom Practice release slice', () => {
     expect(spec).toContain("by.text('For black.')");
     expect(spec).not.toContain('session-side-to-move');
     expect(spec).toContain("by.id('sprint-result-history-button')");
+    expect(spec).toContain("const correctResult = element(by.text('Correct')).atIndex(0)");
+    expect(spec).toContain('waitForVisibleInPracticeScroll(rowTestID)');
     expect(spec).toContain("expect(element(by.id('history-attempt-detail'))).not.toExist()");
     expect(spec).toContain("waitForVisibleInPracticeScroll('review-schedule-control')");
     expect(spec).toContain("by.id('review-analysis-button')");
