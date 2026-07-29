@@ -13,6 +13,7 @@ import {
   createDefaultRating,
   DEFAULT_RATING_DEVIATION,
   DEFAULT_VOLATILITY,
+  evaluateAppReviewRequestEligibility,
   isAttemptMistake,
   namedThemesForSelection,
   normalizeThemeSelection,
@@ -31,6 +32,8 @@ import {
   validatePuzzleTimingPolicy
 } from "../../core/src/index.ts";
 import type {
+  AppReviewRequestAttempt,
+  AppReviewRequestEligibility,
   AttemptEvent,
   AttemptResult,
   CustomSprintConfigRecord,
@@ -666,6 +669,54 @@ export class PracticeService {
 
   getReviewReminderSettings(): ReviewReminderSettings {
     return this.store.getReviewReminderSettings();
+  }
+
+  getAppReviewRequestAttempt(): AppReviewRequestAttempt | undefined {
+    return this.store.getAppReviewRequestAttempt();
+  }
+
+  getAppReviewRequestEligibility(
+    currentSessionId: string,
+    appVersion: string,
+    nowMs: number,
+    timeZone?: string
+  ): AppReviewRequestEligibility {
+    const lastAttempt = this.store.getAppReviewRequestAttempt();
+    return evaluateAppReviewRequestEligibility({
+      appVersion,
+      currentSessionId,
+      nowMs,
+      sessions: this.store.listSprintSessions().map((session) => ({
+        id: session.id,
+        ...(session.completedAt === undefined
+          ? {}
+          : { completedAt: session.completedAt }),
+        focused: session.config?.tacticalFocus !== undefined,
+        rated:
+          session.ratingAfter !== undefined &&
+          session.config?.ratingPolicy !== "unrated",
+        status: session.status
+      })),
+      ...(lastAttempt === undefined ? {} : { lastAttempt }),
+      ...(timeZone === undefined ? {} : { timeZone })
+    });
+  }
+
+  recordAppReviewRequestAttempt(
+    appVersion: string,
+    attemptedAt = new Date().toISOString()
+  ): AppReviewRequestAttempt {
+    const normalizedVersion = appVersion.trim();
+    if (normalizedVersion.length === 0) {
+      throw new Error("App review request app version must not be empty");
+    }
+    if (!Number.isFinite(Date.parse(attemptedAt))) {
+      throw new Error("App review request attempt time must be valid");
+    }
+    return this.store.saveAppReviewRequestAttempt({
+      appVersion: normalizedVersion,
+      attemptedAt
+    });
   }
 
   countEligibleSprintPuzzles(

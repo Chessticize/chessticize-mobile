@@ -25,6 +25,7 @@ import {
   updateAttemptUnclearState
 } from "../../core/src/index.ts";
 import type {
+  AppReviewRequestAttempt,
   AttemptEvent,
   AttemptResult,
   CustomSprintConfigRecord,
@@ -88,6 +89,7 @@ export class MemoryStore implements PracticeStore {
   private readonly reviewQueue = new Map<string, ReviewQueueState>();
   private readonly reviewRemovals = new Map<string, ReviewScheduleRemoval>();
   private settings = defaultPracticeSettings();
+  private appReviewRequestAttempt: AppReviewRequestAttempt | undefined;
   private tacticalProfileSourceRevision = 0;
 
   seedPuzzles(puzzles: Puzzle[]): void {
@@ -226,6 +228,19 @@ export class MemoryStore implements PracticeStore {
 
   getReviewReminderSettings(): ReviewReminderSettings {
     return reviewReminderPreferenceToSettings(this.getReviewReminderPreference());
+  }
+
+  getAppReviewRequestAttempt(): AppReviewRequestAttempt | undefined {
+    return this.appReviewRequestAttempt
+      ? { ...this.appReviewRequestAttempt }
+      : undefined;
+  }
+
+  saveAppReviewRequestAttempt(
+    attempt: AppReviewRequestAttempt
+  ): AppReviewRequestAttempt {
+    this.appReviewRequestAttempt = { ...attempt };
+    return { ...attempt };
   }
 
   createSprintSession(state: SprintState): void {

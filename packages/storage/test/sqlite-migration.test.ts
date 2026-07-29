@@ -28,6 +28,7 @@ const RELEASED_IOS_121_SHA256 = "09ab34a656b6315189a4bc8e75baa64f1226492dce1cf5b
 const GOLDEN_SCHEMA_SNAPSHOTS_DIR = resolve("packages/storage/test/fixtures/schema-snapshots");
 const PUZZLE_FIXTURE = resolve("fixtures/puzzles/presolved-sample.json");
 const SNAPSHOT_TABLES = [
+  "app_review_request_state",
   "app_settings",
   "puzzles",
   "ratings",

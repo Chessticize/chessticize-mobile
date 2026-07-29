@@ -6,6 +6,7 @@ import * as ReactNative from "react-native";
 import * as SafeAreaContext from "react-native-safe-area-context";
 import TestRenderer, { act } from "react-test-renderer";
 import {
+  isAppReviewRequestSurfaceBlocked,
   PracticePocScreen,
   type PracticeDebugTraceEvent,
   type PracticeRunManagementPresentation,
@@ -32,13 +33,17 @@ import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, isServer
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/platform/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/platform/iCloudProgressSync";
 import { FakeMoveFeedbackClient } from "../src/platform/moveFeedback";
+import { FakeAppStoreReviewRequestClient } from "../src/platform/appStoreReviewRequest";
 import type { MobilePlatformCapabilities } from "../src/platform/mobilePlatformCapabilities";
 import type { MobileSystemBackSource } from "../src/navigation/mobileSystemBack";
 import {
   createTestMobilePlatformCapabilities,
   type TestMobilePlatformCapabilityOverrides
 } from "../src/testing/testMobilePlatformCapabilities";
-import { FailingAttemptStore } from "../test-support/FailingAttemptStore";
+import {
+  FailingAppReviewRequestStore,
+  FailingAttemptStore
+} from "../test-support/FailingAttemptStore";
 import { FailingReviewScheduleStore } from "../test-support/FailingReviewScheduleStore";
 import {
   expectNoRenderedTextHasNonPositiveFontSize,
@@ -11253,6 +11258,204 @@ describe("PracticePocScreen", () => {
   });
 });
 
+describe("App Store review request scheduling", () => {
+  it("suppresses active modal, guide, analysis, navigation-preview, and error surfaces", () => {
+    const ready = {
+      hasError: false,
+      hasModalOrGuide: false,
+      hasNavigationPreview: false,
+      isAnalysisOpen: false,
+      isPracticeTab: true
+    };
+    expect(isAppReviewRequestSurfaceBlocked(ready)).toBe(false);
+
+    for (const blocked of [
+      { ...ready, hasModalOrGuide: true },
+      { ...ready, isAnalysisOpen: true },
+      { ...ready, hasNavigationPreview: true },
+      { ...ready, hasError: true },
+      { ...ready, isPracticeTab: false }
+    ]) {
+      expect(isAppReviewRequestSurfaceBlocked(blocked)).toBe(true);
+    }
+  });
+
+  it("requests StoreKit after an eligible puzzle result remains stable for two seconds", async () => {
+    const { current, service } = createAppReviewEligibleService();
+    const appStoreReviewRequestClient = new FakeAppStoreReviewRequestClient();
+    const renderer = renderScreen({
+      appStoreReviewRequestClient,
+      applicationMetadata: { versionName: "1.4.0" },
+      currentTimeMs: () => Date.parse("2026-07-29T12:00:00.000Z"),
+      practiceService: service,
+      sprintRulesDesignPreview: { initialResultState: current }
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(1_999);
+    });
+    expect(appStoreReviewRequestClient.requestCount).toBe(0);
+
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+    await act(async () => {});
+
+    expect(appStoreReviewRequestClient.requestCount).toBe(1);
+    expect(service.getAppReviewRequestAttempt()).toEqual({
+      appVersion: "1.4.0",
+      attemptedAt: "2026-07-29T12:00:00.000Z"
+    });
+    expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
+    expect(findByTestId(renderer, "back-practice-button")).toBeTruthy();
+  });
+
+  it("cancels the result attempt when navigation leaves the result", async () => {
+    const { current, service } = createAppReviewEligibleService();
+    const appStoreReviewRequestClient = new FakeAppStoreReviewRequestClient();
+    const renderer = renderScreen({
+      appStoreReviewRequestClient,
+      applicationMetadata: { versionName: "1.4.0" },
+      currentTimeMs: () => Date.parse("2026-07-29T12:00:00.000Z"),
+      practiceService: service,
+      sprintRulesDesignPreview: { initialResultState: current }
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+    press(renderer, "sprint-result-history-button");
+    press(renderer, "practice-tab");
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+    await act(async () => {});
+
+    expect(appStoreReviewRequestClient.requestCount).toBe(0);
+    expect(service.getAppReviewRequestAttempt()).toBeUndefined();
+  });
+
+  it("cancels the result attempt after backgrounding even if the app returns quickly", async () => {
+    const { current, service } = createAppReviewEligibleService();
+    const appStoreReviewRequestClient = new FakeAppStoreReviewRequestClient();
+    renderScreen({
+      appStoreReviewRequestClient,
+      applicationMetadata: { versionName: "1.4.0" },
+      currentTimeMs: () => Date.parse("2026-07-29T12:00:00.000Z"),
+      practiceService: service,
+      sprintRulesDesignPreview: { initialResultState: current }
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+      (AppState as unknown as { __emit: (nextState: string) => void }).__emit("background");
+      (AppState as unknown as { __emit: (nextState: string) => void }).__emit("active");
+      jest.advanceTimersByTime(5_000);
+    });
+    await act(async () => {});
+
+    expect(appStoreReviewRequestClient.requestCount).toBe(0);
+    expect(service.getAppReviewRequestAttempt()).toBeUndefined();
+  });
+
+  it("cancels the result attempt when another transient surface appears", async () => {
+    const { current, service } = createAppReviewEligibleService();
+    const appStoreReviewRequestClient = new FakeAppStoreReviewRequestClient();
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({
+      appStoreReviewRequestClient,
+      applicationMetadata: { versionName: "1.4.0" },
+      currentTimeMs: () => Date.parse("2026-07-29T12:00:00.000Z"),
+      practiceService: service,
+      sprintRulesDesignPreview: { initialResultState: current },
+      systemBack
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+    systemBack.startPredictive();
+    expect(findByTestId(renderer, "mobile-back-destination-preview")).toBeTruthy();
+    systemBack.cancelPredictive();
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+    await act(async () => {});
+
+    expect(appStoreReviewRequestClient.requestCount).toBe(0);
+    expect(service.getAppReviewRequestAttempt()).toBeUndefined();
+  });
+
+  it("does not consume suppression when the native boundary cannot call StoreKit", async () => {
+    const { current, service } = createAppReviewEligibleService();
+    const requestReview = jest.fn(async () => false);
+    const renderer = renderScreen({
+      appStoreReviewRequestClient: { requestReview },
+      applicationMetadata: { versionName: "1.4.0" },
+      currentTimeMs: () => Date.parse("2026-07-29T12:00:00.000Z"),
+      practiceService: service,
+      sprintRulesDesignPreview: { initialResultState: current }
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(2_000);
+    });
+    await act(async () => {});
+
+    expect(requestReview).toHaveBeenCalledTimes(1);
+    expect(service.getAppReviewRequestAttempt()).toBeUndefined();
+    expect(findByTestId(renderer, "back-practice-button")).toBeTruthy();
+  });
+
+  it("keeps the result usable when local suppression persistence fails", async () => {
+    const { current, service } = createAppReviewEligibleService(
+      new FailingAppReviewRequestStore("SQLite unavailable")
+    );
+    const appStoreReviewRequestClient = new FakeAppStoreReviewRequestClient();
+    const renderer = renderScreen({
+      appStoreReviewRequestClient,
+      applicationMetadata: { versionName: "1.4.0" },
+      currentTimeMs: () => Date.parse("2026-07-29T12:00:00.000Z"),
+      practiceService: service,
+      sprintRulesDesignPreview: { initialResultState: current }
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(2_000);
+    });
+    await act(async () => {});
+
+    expect(appStoreReviewRequestClient.requestCount).toBe(1);
+    expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
+    expect(findByTestId(renderer, "back-practice-button")).toBeTruthy();
+    expect(() => findByTestId(renderer, "error-panel")).toThrow();
+  });
+
+  it("keeps the result usable when StoreKit rejects or shows no sheet", async () => {
+    const { current, service } = createAppReviewEligibleService();
+    const renderer = renderScreen({
+      appStoreReviewRequestClient: {
+        requestReview: jest.fn(async () => {
+          throw new Error("StoreKit unavailable");
+        })
+      },
+      applicationMetadata: { versionName: "1.4.0" },
+      currentTimeMs: () => Date.parse("2026-07-29T12:00:00.000Z"),
+      practiceService: service,
+      sprintRulesDesignPreview: { initialResultState: current }
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(2_000);
+    });
+    await act(async () => {});
+
+    expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
+    expect(findByTestId(renderer, "back-practice-button")).toBeTruthy();
+    expect(() => findByTestId(renderer, "error-panel")).toThrow();
+  });
+});
+
 function createScriptedStockfishTransport(
   onCommand: (command: string, emit: (line: string) => void) => void
 ): { commands: string[]; listenerCount: () => number; transport: UciEngineTransport } {
@@ -12051,6 +12254,49 @@ function completedRatingSprintState({
     puzzles: [],
     ratingBefore,
     ratingAfter
+  };
+}
+
+function createAppReviewEligibleService(store: MemoryStore = new MemoryStore()): {
+  current: SprintState;
+  service: PracticeService;
+} {
+  const sessions = [
+    completedRatingSprintState({
+      id: "app-review-one",
+      mode: "standard",
+      completedAt: "2026-07-27T12:00:00.000Z",
+      ratingBefore: 600,
+      ratingAfter: 610
+    }),
+    completedRatingSprintState({
+      id: "app-review-two",
+      mode: "arrow_duel",
+      completedAt: "2026-07-27T13:00:00.000Z",
+      ratingBefore: 610,
+      ratingAfter: 620
+    }),
+    completedRatingSprintState({
+      id: "app-review-three",
+      mode: "custom",
+      completedAt: "2026-07-28T12:00:00.000Z",
+      ratingBefore: 620,
+      ratingAfter: 630
+    }),
+    completedRatingSprintState({
+      id: "app-review-four",
+      mode: "standard",
+      completedAt: "2026-07-29T12:00:00.000Z",
+      ratingBefore: 630,
+      ratingAfter: 640
+    })
+  ];
+  for (const session of sessions) {
+    store.createSprintSession(session);
+  }
+  return {
+    current: sessions[3] as SprintState,
+    service: new PracticeService(store)
   };
 }
 

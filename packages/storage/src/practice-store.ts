@@ -1,4 +1,5 @@
 import type {
+  AppReviewRequestAttempt,
   AttemptEvent,
   AttemptResult,
   CustomSprintConfigRecord,
@@ -141,6 +142,10 @@ export interface PracticeStore {
   getReviewReminderPreference(): ReviewReminderPreference;
   saveReviewReminderPreference(preference: ReviewReminderPreference): ReviewReminderPreference;
   getReviewReminderSettings(): ReviewReminderSettings;
+  getAppReviewRequestAttempt(): AppReviewRequestAttempt | undefined;
+  saveAppReviewRequestAttempt(
+    attempt: AppReviewRequestAttempt
+  ): AppReviewRequestAttempt;
   createSprintSession(state: SprintState): void;
   updateSprintSession(state: SprintState): void;
   recordAttempt(attempt: AttemptEvent): void;
