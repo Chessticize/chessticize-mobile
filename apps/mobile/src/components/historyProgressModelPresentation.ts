@@ -47,8 +47,7 @@ export function historyProgressPresentationFromModel(
         const series = strengthSeries(
           estimate,
           kind,
-          progress.snapshots,
-          progress.assurance === "provisional"
+          progress.snapshots
         );
         return series ? [series] : [];
       });
@@ -76,12 +75,7 @@ export function historyProgressPresentationFromModel(
     strengths,
     ...(weakness === undefined ? {} : { weakness }),
     ...(progress.phase === "balanced"
-      ? {
-          noWeaknessTone: "balanced",
-          noWeaknessTitle: "Recent play looks balanced",
-          noWeaknessLabel:
-            "No theme currently shows a repeated, meaningful weakness in accuracy or solve time."
-        }
+      ? balancedPresentation(observed)
       : {
           noWeaknessTone: "collecting",
           noWeaknessTitle: "Still collecting evidence",
@@ -94,8 +88,7 @@ export function historyProgressPresentationFromModel(
 function strengthSeries(
   current: TacticalProfileThemeEstimate,
   kind: Exclude<TacticalFocusReason, "both">,
-  snapshots: readonly TacticalProfileProgressSnapshot[],
-  provisional: boolean
+  snapshots: readonly TacticalProfileProgressSnapshot[]
 ): HistoryStrengthSeries | undefined {
   const points = snapshots.flatMap((snapshot) => {
     const estimate = snapshot.estimates.find(
@@ -128,9 +121,7 @@ function strengthSeries(
       ? "Solve time · lower is better"
       : "Accuracy · higher is better",
     baselineLabel: kind === "completed_speed"
-      ? provisional
-        ? "1.00× is the provisional 30-second baseline"
-        : "1.00× is the expected completed-puzzle time"
+      ? "1.00× matches your comparable completed puzzles"
       : "Recent attempts and stronger theme matches contribute more to n",
     scaleMax: kind === "completed_speed"
       ? Math.max(100, Math.ceil(maxValue * 1.15))
@@ -138,7 +129,7 @@ function strengthSeries(
     changeLabel: change.label,
     changeTone: change.tone,
     summary: kind === "completed_speed"
-      ? "n includes weighted, reliable solves completed before timeout."
+      ? "n includes model-weighted correct solves completed before timeout; speed starts after enough personal controls."
       : "Wrong moves and timeouts count as misses.",
     points
   };
@@ -193,7 +184,8 @@ function weaknessPresentation(
   if (signal.reason === "completed_speed" || signal.reason === "both") {
     effects.push({
       kind: "completed_speed",
-      valueLabel: `${signal.completedTimeMultiplier.toFixed(2)}× expected time`,
+      valueLabel:
+        `${signal.completedTimeMultiplier.toFixed(2)}× comparable time`,
       metricLabel: "on correctly completed puzzles",
       comparisonLabel: relativeComparisonLabel(
         signal,
@@ -212,7 +204,7 @@ function weaknessPresentation(
     explanation:
       "This is the highest-confidence current model gap that passes the evidence, practical-impact, and diversity checks. One unusual attempt is not enough.",
     eligibilityLabel:
-      "Correct attempts count once as solve successes. Wrong moves and timeouts count once as solve failures. Completed speed uses only correct, before-timeout attempts with reliable elapsed time. Slow, Unclear, and Review membership do not decide the result."
+      "Correct attempts count once as solve successes. Wrong moves and timeouts count once as solve failures. Completed speed uses only correct, before-timeout attempts with reliable elapsed time and appears only after enough personal controls that exclude the theme being measured. Slow, Unclear, and Review membership do not decide the result."
   };
 }
 
@@ -241,13 +233,67 @@ function relativeComparisonLabel(
         : estimate.completedTimeMultiplier
     ) < currentValue
   );
-  const modelContext = kind === "solve_rate"
-    ? "after matching puzzle difficulty, your Rating, and task family"
-    : "after matching difficulty, pace, timing policy, and decision count";
+  if (kind === "completed_speed") {
+    const slowerPercent = Math.max(
+      0,
+      Math.round(100 * (signal.completedTimeMultiplier - 1))
+    );
+    const comparison =
+      `${humanizeTheme(signal.theme)} takes about ${slowerPercent}% longer than your comparable completed puzzles after accounting for relative Rating difficulty, decision count, Run pace, Slow policy, and Timeout policy`;
+    return peersAreCloser
+      ? `${comparison}; the other well-sampled themes in this task family are closer to their personal baselines.`
+      : `${comparison}. It is the highest-confidence current speed weakness among the well-sampled themes.`;
+  }
+  const modelContext =
+    "after matching puzzle difficulty, your Rating, and task family";
   if (peersAreCloser) {
     return `${humanizeTheme(signal.theme)} stands farther from its matched expectation ${modelContext}; the other well-sampled themes in this task family are closer to theirs.`;
   }
   return `${humanizeTheme(signal.theme)} stands out ${modelContext}. It is the highest-confidence current weakness signal among the well-sampled themes, each measured against its own matched expectation.`;
+}
+
+function balancedPresentation(
+  estimates: readonly TacticalProfileThemeEstimate[]
+): Pick<
+  HistoryProgressPresentation,
+  "noWeaknessTone" | "noWeaknessTitle" | "noWeaknessLabel"
+> {
+  const hasAccuracy = estimates.some(
+    (estimate) => estimate.accuracyEvidenceWeight > 0
+  );
+  const hasSpeed = estimates.some(
+    (estimate) => estimate.speedEvidenceWeight > 0
+  );
+  if (hasAccuracy && hasSpeed) {
+    return {
+      noWeaknessTone: "balanced",
+      noWeaknessTitle: "Recent play looks balanced",
+      noWeaknessLabel:
+        "No theme currently shows a repeated, meaningful weakness in accuracy or solve time."
+    };
+  }
+  if (hasAccuracy) {
+    return {
+      noWeaknessTone: "collecting",
+      noWeaknessTitle: "Accuracy looks balanced",
+      noWeaknessLabel:
+        "No theme currently shows a repeated, meaningful accuracy weakness. Solve time is still collecting comparable completed puzzles."
+    };
+  }
+  if (hasSpeed) {
+    return {
+      noWeaknessTone: "collecting",
+      noWeaknessTitle: "Solve time looks balanced",
+      noWeaknessLabel:
+        "No theme currently shows a repeated, meaningful solve-time weakness. Accuracy is still collecting evidence."
+    };
+  }
+  return {
+    noWeaknessTone: "collecting",
+    noWeaknessTitle: "Still collecting evidence",
+    noWeaknessLabel:
+      "Play more ordinary mixed Runs to build reliable stats across different puzzles and sessions."
+  };
 }
 
 function seriesKinds(

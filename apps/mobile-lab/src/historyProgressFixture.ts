@@ -37,11 +37,12 @@ const FORK_SPEED_PROGRESS: HistoryStrengthSeries = {
   label: "Forks",
   kind: "completed_speed",
   metricLabel: "Solve time · lower is better",
-  baselineLabel: "1.00× is the provisional 30-second baseline",
+  baselineLabel: "1.00× matches your comparable completed puzzles",
   scaleMax: 140,
   changeLabel: "9% less time",
   changeTone: "improved",
-  summary: "n includes weighted, reliable solves completed before timeout.",
+  summary:
+    "n includes model-weighted correct solves completed before timeout; speed starts after enough personal controls.",
   points: [
     { label: "May 24", value: 118, valueLabel: "1.18×", sampleSize: 18 },
     { label: "Jun 7", value: 117, valueLabel: "1.17×", sampleSize: 25 },
@@ -58,11 +59,12 @@ const PIN_SPEED_PROGRESS: HistoryStrengthSeries = {
   label: "Pins",
   kind: "completed_speed",
   metricLabel: "Solve time · lower is better",
-  baselineLabel: "1.00× is the provisional 30-second baseline",
+  baselineLabel: "1.00× matches your comparable completed puzzles",
   scaleMax: 140,
   changeLabel: "24% less time",
   changeTone: "improved",
-  summary: "n includes weighted, reliable solves completed before timeout.",
+  summary:
+    "n includes model-weighted correct solves completed before timeout; speed starts after enough personal controls.",
   points: [
     { label: "May 24", value: 130, valueLabel: "1.30×", sampleSize: 18 },
     { label: "Jun 7", value: 127, valueLabel: "1.27×", sampleSize: 25 },
@@ -100,11 +102,12 @@ const PIN_SPEED_WEAKNESS: HistoryStrengthSeries = {
   label: "Pins",
   kind: "completed_speed",
   metricLabel: "Solve time · lower is better",
-  baselineLabel: "1.00× is the provisional 30-second baseline",
+  baselineLabel: "1.00× matches your comparable completed puzzles",
   scaleMax: 150,
   changeLabel: "15% more time",
   changeTone: "worsened",
-  summary: "n includes weighted, reliable solves completed before timeout.",
+  summary:
+    "n includes model-weighted correct solves completed before timeout; speed starts after enough personal controls.",
   points: [
     { label: "May 24", value: 119, valueLabel: "1.19×", sampleSize: 13 },
     { label: "Jun 7", value: 120, valueLabel: "1.20×", sampleSize: 17 },
@@ -163,17 +166,17 @@ export function historyProgressPresentationFor(
         effects: [
           {
             kind: "completed_speed",
-            valueLabel: "1.34× expected time",
+            valueLabel: "1.34× comparable time",
             metricLabel: "on correctly completed puzzles",
             comparisonLabel:
-              "Completed Pin puzzles take about 34% longer than the matched model expectation after accounting for difficulty, pace, timing policy, and decision count. Other well-sampled themes remain closer to their matched expectations."
+              "Pin puzzles take about 34% longer than your comparable completed puzzles after accounting for relative Rating difficulty, decision count, Run pace, Slow policy, and Timeout policy; other well-sampled themes remain closer to their personal baselines."
           }
         ],
         evidenceLabel: "26 different puzzles · 6 sessions",
         explanation:
           "The completed-time effect is repeated, practically meaningful, and supported by enough different puzzles and sessions. One unusually slow solve would not be enough.",
         eligibilityLabel:
-          "Only correct, before-timeout attempts with reliable elapsed time enter this speed estimate. Slow and Unclear labels do not decide it; wrong moves and timeouts stay in solve reliability."
+          "Only correct, before-timeout attempts with reliable elapsed time enter this speed estimate. It appears only after enough personal controls that exclude the theme being measured. Slow, Unclear, and Review membership do not decide it; wrong moves and timeouts stay in solve reliability."
       }
     };
   }

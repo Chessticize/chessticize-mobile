@@ -2697,7 +2697,7 @@ describe("PracticePocScreen", () => {
       "How solve time is counted"
     );
     expect(collectText(findByTestId(renderer, "history-progress-chart-note"))).toContain(
-      "1.00× is the provisional 30-second baseline."
+      "1.00× matches your comparable completed puzzles."
     );
 
     press(renderer, "history-progress-strength-pins");
@@ -2748,16 +2748,19 @@ describe("PracticePocScreen", () => {
     const weakness = findByTestId(renderer, "history-clear-weakness");
     expect(collectText(weakness)).toContain("Pins");
     expect(collectText(weakness)).toContain("Completed-puzzle speed");
-    expect(collectText(weakness)).toContain("1.34× expected time");
+    expect(collectText(weakness)).toContain("1.34× comparable time");
     expect(collectText(weakness)).toContain("about 34% longer");
     expect(collectText(weakness)).toContain(
-      "Other well-sampled themes remain closer"
+      "other well-sampled themes remain closer"
     );
     expect(collectText(weakness)).toContain(
       "Only correct, before-timeout attempts with reliable elapsed time"
     );
     expect(collectText(weakness)).toContain(
-      "Slow and Unclear labels do not decide it"
+      "personal controls that exclude the theme being measured"
+    );
+    expect(collectText(weakness)).toContain(
+      "Slow, Unclear, and Review membership do not decide it"
     );
     expect(collectText(findByTestId(renderer, "history-progress-screen"))).not.toContain(
       "recommend"

@@ -27,11 +27,11 @@ test("history progress fixture shows accuracy and speed progress", () => {
   assert.equal(forkSpeed.points.at(-1)?.valueLabel, "1.09×");
   assert.equal(
     forkSpeed.baselineLabel,
-    "1.00× is the provisional 30-second baseline"
+    "1.00× matches your comparable completed puzzles"
   );
   assert.equal(
     forkSpeed.summary,
-    "n includes weighted, reliable solves completed before timeout."
+    "n includes model-weighted correct solves completed before timeout; speed starts after enough personal controls."
   );
   assert.equal(pins.kind, "completed_speed");
   assert.equal(pins.points[0]?.valueLabel, "1.30×");
@@ -72,9 +72,13 @@ test("history speed weakness uses reliable completed-puzzle time", () => {
   assert.equal(presentation.initialSeriesId, "pins");
   assert.equal(weakness.label, "Pins");
   assert.equal(weakness.reason, "completed_speed");
-  assert.equal(weakness.effects[0]?.valueLabel, "1.34× expected time");
+  assert.equal(weakness.effects[0]?.valueLabel, "1.34× comparable time");
   assert.match(weakness.effects[0]?.comparisonLabel ?? "", /34% longer/);
-  assert.match(weakness.effects[0]?.comparisonLabel ?? "", /Other well-sampled themes/);
+  assert.match(
+    weakness.effects[0]?.comparisonLabel ?? "",
+    /other well-sampled themes/i
+  );
   assert.match(weakness.eligibilityLabel, /correct, before-timeout/);
-  assert.match(weakness.eligibilityLabel, /Slow and Unclear labels do not decide/);
+  assert.match(weakness.eligibilityLabel, /personal controls/);
+  assert.match(weakness.eligibilityLabel, /Slow, Unclear, and Review/);
 });

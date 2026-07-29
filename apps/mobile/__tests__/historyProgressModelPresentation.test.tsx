@@ -68,11 +68,40 @@ test("builds visible model reliability progress for a well-sampled balanced them
   expect(speedSeries?.themeId).toBe("line:fork");
   expect(speedSeries?.kind).toBe("completed_speed");
   expect(speedSeries?.baselineLabel).toBe(
-    "1.00× is the provisional 30-second baseline"
+    "1.00× matches your comparable completed puzzles"
   );
   expect(speedSeries?.summary).toBe(
-    "n includes weighted, reliable solves completed before timeout."
+    "n includes model-weighted correct solves completed before timeout; speed starts after enough personal controls."
   );
+});
+
+test("keeps solve time collecting when only accuracy has reliable evidence", () => {
+  const progress = tacticalProgress({
+    evaluation: {
+      phase: "balanced",
+      signals: [],
+      rankedFocuses: [],
+      observedThemeCount: 1
+    },
+    snapshots: [{
+      asOf: "2026-07-25T00:00:00.000Z",
+      estimates: [themeEstimate({
+        speedEvidenceWeight: 0,
+        completedTimeMultiplier: 1
+      })]
+    }]
+  });
+
+  const presentation = historyProgressPresentationFromModel(progress);
+
+  expect(presentation?.noWeaknessTone).toBe("collecting");
+  expect(presentation?.noWeaknessTitle).toBe("Accuracy looks balanced");
+  expect(presentation?.noWeaknessLabel).toContain(
+    "Solve time is still collecting comparable completed puzzles."
+  );
+  expect(presentation?.strengths.map((series) => series.kind)).toEqual([
+    "solve_rate"
+  ]);
 });
 
 test("keeps observed balanced stats visible before recommendation diversity is complete", () => {
@@ -201,7 +230,7 @@ test("uses completed-time evidence for a model-selected speed weakness", () => {
   expect(pinSeries?.kind).toBe("completed_speed");
   expect(pinSeries?.points.map((point) => point.sampleSize)).toEqual([6, 12]);
   expect(weakness?.reason).toBe("completed_speed");
-  expect(weakness?.effects[0]?.valueLabel).toBe("1.34× expected time");
+  expect(weakness?.effects[0]?.valueLabel).toBe("1.34× comparable time");
   expect(weakness?.effects[0]?.comparisonLabel).toContain(
     "other well-sampled themes in this task family are closer"
   );
@@ -271,7 +300,7 @@ test("compares weakness copy with well-sampled themes beyond the visible theme l
 
   expect(presentation?.strengths).toHaveLength(16);
   expect(comparison).toContain(
-    "highest-confidence current weakness signal among the well-sampled themes"
+    "highest-confidence current speed weakness among the well-sampled themes"
   );
   expect(comparison).not.toContain(
     "the other well-sampled themes in this task family are closer"
