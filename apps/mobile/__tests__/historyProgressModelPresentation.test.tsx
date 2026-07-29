@@ -104,6 +104,54 @@ test("keeps solve time collecting when only accuracy has reliable evidence", () 
   ]);
 });
 
+test("keeps gray historical slots when a metric was not yet available", () => {
+  const dates = [
+    "2026-05-30T00:00:00.000Z",
+    "2026-06-10T00:00:00.000Z",
+    "2026-06-21T00:00:00.000Z",
+    "2026-07-03T00:00:00.000Z",
+    "2026-07-14T00:00:00.000Z",
+    "2026-07-25T00:00:00.000Z"
+  ];
+  const progress = tacticalProgress({
+    snapshots: dates.map((asOf, index) => ({
+      asOf,
+      estimates: [themeEstimate({
+        accuracyEvidenceWeight: index >= 3 ? index + 1 : 0,
+        observedSolveRate: 0.75 + index * 0.02,
+        solveEvidenceWeight: index >= 3 ? index + 1 : 0,
+        speedEvidenceWeight: index === 5 ? 8 : 0,
+        completedTimeMultiplier: 1.08
+      })]
+    }))
+  });
+
+  const presentation = historyProgressPresentationFromModel(progress);
+  const accuracy = presentation?.strengths.find(
+    (series) => series.kind === "solve_rate"
+  );
+  const speed = presentation?.strengths.find(
+    (series) => series.kind === "completed_speed"
+  );
+
+  expect(accuracy?.points.map((point) => point.valueLabel)).toEqual([
+    "—",
+    "—",
+    "—",
+    "81%",
+    "83%",
+    "85%"
+  ]);
+  expect(speed?.points.map((point) => point.valueLabel)).toEqual([
+    "—",
+    "—",
+    "—",
+    "—",
+    "—",
+    "1.08×"
+  ]);
+});
+
 test("keeps observed balanced stats visible before recommendation diversity is complete", () => {
   const progress = tacticalProgress({
     snapshots: [{

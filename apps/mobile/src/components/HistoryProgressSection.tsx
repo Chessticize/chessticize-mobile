@@ -317,7 +317,9 @@ function StrengthTrendChart({
     <View
       accessibilityLabel={`${series.label} ${series.metricLabel}. ${series.points
         .map((point) =>
-          `${point.label}: ${point.valueLabel} from ${point.sampleSize} ${sampleUnitLabel}`
+          point.unavailable
+            ? `${point.label}: unavailable`
+            : `${point.label}: ${point.valueLabel} from ${point.sampleSize} ${sampleUnitLabel}`
         )
         .join(". ")}`}
       style={styles.chart}
@@ -333,6 +335,7 @@ function StrengthTrendChart({
               <View
                 style={[
                   styles.chartBar,
+                  point.unavailable ? styles.chartBarUnavailable : null,
                   {
                     height: `${Math.max(
                       8,
@@ -340,17 +343,23 @@ function StrengthTrendChart({
                     )}%`
                   }
                 ]}
+                testID={`history-strength-bar-${index}`}
               />
             </View>
             <Text numberOfLines={1} style={styles.chartLabel}>
               {point.label}
             </Text>
             <Text
-              accessibilityLabel={`${point.sampleSize} ${sampleUnitLabel}`}
+              accessibilityLabel={
+                point.unavailable
+                  ? "Unavailable"
+                  : `${point.sampleSize} ${sampleUnitLabel}`
+              }
               numberOfLines={1}
               style={styles.chartSample}
+              testID={`history-strength-sample-${index}`}
             >
-              n={point.sampleSize}
+              {point.unavailable ? "n=—" : `n=${point.sampleSize}`}
             </Text>
           </View>
         ))}
@@ -769,6 +778,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     minHeight: 8,
     width: "100%"
+  },
+  chartBarUnavailable: {
+    backgroundColor: "#CBD5E1"
   },
   chartLabel: {
     color: "#64748B",

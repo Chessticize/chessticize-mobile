@@ -18,13 +18,31 @@ const FORK_RELIABILITY_PROGRESS: HistoryStrengthSeries = {
   metricLabel: "Accuracy · higher is better",
   baselineLabel: "Recent attempts and stronger theme matches contribute more to n",
   scaleMax: 100,
-  changeLabel: "16 points higher",
+  changeLabel: "7 points higher",
   changeTone: "improved",
   summary: "Wrong moves and timeouts count as misses.",
   points: [
-    { label: "May 24", value: 78, valueLabel: "78%", sampleSize: 22 },
-    { label: "Jun 7", value: 81, valueLabel: "81%", sampleSize: 31 },
-    { label: "Jun 21", value: 84, valueLabel: "84%", sampleSize: 41 },
+    {
+      label: "May 24",
+      value: 0,
+      valueLabel: "—",
+      sampleSize: 0,
+      unavailable: true
+    },
+    {
+      label: "Jun 7",
+      value: 0,
+      valueLabel: "—",
+      sampleSize: 0,
+      unavailable: true
+    },
+    {
+      label: "Jun 21",
+      value: 0,
+      valueLabel: "—",
+      sampleSize: 0,
+      unavailable: true
+    },
     { label: "Jul 5", value: 87, valueLabel: "87%", sampleSize: 52 },
     { label: "Jul 19", value: 91, valueLabel: "91%", sampleSize: 63 },
     { label: "Jul 26", value: 94, valueLabel: "94%", sampleSize: 71 }
@@ -39,16 +57,46 @@ const FORK_SPEED_PROGRESS: HistoryStrengthSeries = {
   metricLabel: "Solve time · lower is better",
   baselineLabel: "1.00× matches your comparable completed puzzles",
   scaleMax: 140,
-  changeLabel: "9% less time",
-  changeTone: "improved",
+  changeLabel: "Solve time is steady",
+  changeTone: "steady",
   summary:
     "n includes model-weighted correct solves completed before timeout; speed starts after enough personal controls.",
   points: [
-    { label: "May 24", value: 118, valueLabel: "1.18×", sampleSize: 18 },
-    { label: "Jun 7", value: 117, valueLabel: "1.17×", sampleSize: 25 },
-    { label: "Jun 21", value: 115, valueLabel: "1.15×", sampleSize: 33 },
-    { label: "Jul 5", value: 113, valueLabel: "1.13×", sampleSize: 42 },
-    { label: "Jul 19", value: 111, valueLabel: "1.11×", sampleSize: 50 },
+    {
+      label: "May 24",
+      value: 0,
+      valueLabel: "—",
+      sampleSize: 0,
+      unavailable: true
+    },
+    {
+      label: "Jun 7",
+      value: 0,
+      valueLabel: "—",
+      sampleSize: 0,
+      unavailable: true
+    },
+    {
+      label: "Jun 21",
+      value: 0,
+      valueLabel: "—",
+      sampleSize: 0,
+      unavailable: true
+    },
+    {
+      label: "Jul 5",
+      value: 0,
+      valueLabel: "—",
+      sampleSize: 0,
+      unavailable: true
+    },
+    {
+      label: "Jul 19",
+      value: 0,
+      valueLabel: "—",
+      sampleSize: 0,
+      unavailable: true
+    },
     { label: "Jul 26", value: 109, valueLabel: "1.09×", sampleSize: 57 }
   ]
 };

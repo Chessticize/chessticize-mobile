@@ -2657,7 +2657,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-progress-early-estimate")).toBeTruthy();
     const progressSection = findByTestId(renderer, "history-strength-over-time");
     expect(collectText(progressSection)).toContain(
-      "16 points higher"
+      "7 points higher"
     );
     expect(collectText(progressSection)).toContain(
       "Accuracy · higher is better"

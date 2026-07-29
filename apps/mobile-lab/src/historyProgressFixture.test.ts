@@ -16,15 +16,21 @@ test("history progress fixture shows accuracy and speed progress", () => {
   assert.equal(presentation.assurance, "provisional");
   assert.equal(presentation.initialSeriesId, "forks");
   assert.equal(forks.kind, "solve_rate");
-  assert.equal(forks.points[0]?.valueLabel, "78%");
+  assert.equal(forks.points[0]?.valueLabel, "—");
+  assert.equal(forks.points[0]?.unavailable, true);
   assert.equal(forks.points.at(-1)?.valueLabel, "94%");
-  assert.equal(forks.changeLabel, "16 points higher");
+  assert.equal(forks.changeLabel, "7 points higher");
   assert.equal(
     forks.baselineLabel,
     "Recent attempts and stronger theme matches contribute more to n"
   );
   assert.equal(forkSpeed.kind, "completed_speed");
+  assert.equal(
+    forkSpeed.points.filter((point) => point.unavailable).length,
+    5
+  );
   assert.equal(forkSpeed.points.at(-1)?.valueLabel, "1.09×");
+  assert.equal(forkSpeed.changeLabel, "Solve time is steady");
   assert.equal(
     forkSpeed.baselineLabel,
     "1.00× matches your comparable completed puzzles"

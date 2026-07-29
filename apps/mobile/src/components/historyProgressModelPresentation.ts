@@ -90,27 +90,31 @@ function strengthSeries(
   kind: Exclude<TacticalFocusReason, "both">,
   snapshots: readonly TacticalProfileProgressSnapshot[]
 ): HistoryStrengthSeries | undefined {
-  const points = snapshots.flatMap((snapshot) => {
+  const points = snapshots.map((snapshot) => {
     const estimate = snapshot.estimates.find(
       (candidate) =>
         candidate.taskFamily === current.taskFamily &&
         candidate.theme === current.theme
     );
     if (!estimate) {
-      return [];
+      return unavailableProgressPoint(snapshot.asOf);
     }
     const point = progressPoint(snapshot.asOf, estimate, kind);
-    return point ? [point] : [];
+    return point ?? unavailableProgressPoint(snapshot.asOf);
   });
-  if (points.length === 0) {
+  const availablePoints = points.filter((point) => !point.unavailable);
+  if (availablePoints.length === 0) {
     return undefined;
   }
-  const first = points[0] as HistoryProgressPoint;
-  const latest = points.at(-1) as HistoryProgressPoint;
+  const first = availablePoints[0] as HistoryProgressPoint;
+  const latest = availablePoints.at(-1) as HistoryProgressPoint;
   const themeLabel = humanizeTheme(current.theme);
   const label = `${themeLabel} · ${taskFamilyLabel(current.taskFamily)}`;
   const change = changePresentation(kind, first.value, latest.value);
-  const maxValue = Math.max(...points.map((point) => point.value), 0);
+  const maxValue = Math.max(
+    ...availablePoints.map((point) => point.value),
+    0
+  );
 
   return {
     id: `${signalId(current)}:${kind}`,
@@ -132,6 +136,16 @@ function strengthSeries(
       ? "n includes model-weighted correct solves completed before timeout; speed starts after enough personal controls."
       : "Wrong moves and timeouts count as misses.",
     points
+  };
+}
+
+function unavailableProgressPoint(asOf: string): HistoryProgressPoint {
+  return {
+    label: shortUtcDate(asOf),
+    value: 0,
+    valueLabel: "—",
+    sampleSize: 0,
+    unavailable: true
   };
 }
 

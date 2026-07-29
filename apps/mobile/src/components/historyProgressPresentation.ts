@@ -8,6 +8,7 @@ export type HistoryProgressPoint = {
   value: number;
   valueLabel: string;
   sampleSize: number;
+  unavailable?: true;
 };
 
 export type HistoryStrengthSeries = {
