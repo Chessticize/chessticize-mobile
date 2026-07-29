@@ -78,6 +78,9 @@ const releaseNotesTemplate = readText("docs/releases/RELEASE_NOTES_TEMPLATE.md")
 const appStoreUpload = readText("docs/APP_STORE_UPLOAD.md");
 const storeAssets = readText("docs/STORE_ASSETS.md");
 const appStoreMetadata = readJson("config/app-store-metadata-en-us-v1.json");
+const accessibilityAudit = readText("docs/ACCESSIBILITY_AUDIT.md");
+const appStoreAccessibility = readJson("config/app-store-accessibility-v1.json");
+const accessibilityPage = readText("site/accessibility/index.html");
 const storeAssetsE2e = readText("apps/mobile/e2e/store-assets.e2e.js");
 const testFlightQa = readText("docs/TESTFLIGHT_QA.md");
 const privacyDisclosure = readText("docs/APP_PRIVACY_DISCLOSURE.md");
@@ -246,6 +249,8 @@ check(
     Array.from(appStoreMetadata.description).length <= appStoreMetadata.limits.descriptionCharacters &&
     Buffer.byteLength(appStoreMetadata.keywords, "utf8") <= appStoreMetadata.limits.keywordsBytes &&
     !appStoreMetadata.keywords.includes(", ") &&
+    appStoreMetadata.promotionalText.startsWith("Practice rating-matched chess puzzles") &&
+    appStoreMetadata.description.startsWith("Practice chess puzzles with purpose") &&
     appStoreMetadata.description.includes("chess puzzle trainer") &&
     !appStoreMetadata.description.includes("Tactical Profile") &&
     !appStoreMetadata.description.includes("weakness") &&
@@ -265,10 +270,29 @@ check(
     storeAssets.includes("config/app-store-metadata-en-us-v1.json") &&
     storeAssets.includes("| Support URL | `https://chessticize.github.io/chessticize-mobile/support/` |") &&
     storeAssets.includes("| Marketing URL | `https://chessticize.github.io/chessticize-mobile/` |") &&
+    storeAssets.includes("| Accessibility URL | `https://chessticize.github.io/chessticize-mobile/accessibility/` |") &&
     storeAssets.includes("| Privacy policy URL | `https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md` |") &&
     storeAssets.includes("6.9\"") &&
     storeAssets.includes("6.1\""),
   "STORE_ASSETS.md must include the public metadata URLs and required screenshot display groups."
+);
+
+check(
+  "Accessibility declarations remain evidence-backed and conservative",
+  appStoreAccessibility.issue === 416 &&
+    appStoreAccessibility.publicationDecision?.status === "no-declarations-ready" &&
+    appStoreAccessibility.publicationDecision.iphoneDeclarations?.length === 0 &&
+    appStoreAccessibility.publicationDecision.ipadDeclarations?.length === 0 &&
+    Object.values(appStoreAccessibility.features).every(
+      (feature) => feature.status === "not-declared"
+    ) &&
+    appStoreAccessibility.accessibilityUrl ===
+      "https://chessticize.github.io/chessticize-mobile/accessibility/" &&
+    accessibilityAudit.includes("Declare **no accessibility features**") &&
+    accessibilityAudit.includes("Standard, Arrow Duel, Review, and Replay") &&
+    accessibilityPage.includes("common chess puzzle task") &&
+    accessibilityPage.includes("not declared in the App Store"),
+  "The canonical contract, audit, and public page must leave partial accessibility features undeclared on both iPhone and iPad."
 );
 
 check(
@@ -360,6 +384,10 @@ manualGate(
 manualGate(
   "Capture final sanitized App Store screenshots",
   "Use a release or production-like build for the 6.9-inch, 6.1-inch, and required iPad screenshot sets in docs/STORE_ASSETS.md, then run pnpm app-store:screenshot-audit before upload."
+);
+manualGate(
+  "Record the accessibility metadata decision",
+  "Leave every accessibility feature unselected for iPhone and iPad, save https://chessticize.github.io/chessticize-mobile/accessibility/ as the Accessibility URL after deployment, and retain an App Store Connect screenshot or export in issue #416 or #417."
 );
 const failed = checks.filter((entry) => entry.status === "fail");
 const result = {

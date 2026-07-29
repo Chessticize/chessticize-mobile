@@ -11,6 +11,7 @@ const readBuffer = (relativePath) =>
 const homepage = read("site/index.html");
 const androidPage = read("site/android/index.html");
 const supportPage = read("site/support/index.html");
+const accessibilityPage = read("site/accessibility/index.html");
 const notFoundPage = read("site/404.html");
 const styles = read("site/styles.css");
 const readme = read("README.md");
@@ -24,6 +25,7 @@ const appStoreUrl =
 const websiteUrl = "https://chessticize.github.io/chessticize-mobile/";
 const androidUrl = `${websiteUrl}android/`;
 const supportUrl = `${websiteUrl}support/`;
+const accessibilityUrl = `${websiteUrl}accessibility/`;
 const androidReleaseBase =
   "https://github.com/Chessticize/chessticize-mobile/releases";
 const apkUrl =
@@ -34,7 +36,13 @@ const checksum =
 
 describe("public landing page", () => {
   it("uses concrete puzzle language without unshipped personalization claims", () => {
-    const publicCopy = [homepage, androidPage, supportPage, readme].join("\n");
+    const publicCopy = [
+      homepage,
+      androidPage,
+      supportPage,
+      accessibilityPage,
+      readme
+    ].join("\n");
 
     expect(homepage).toContain("chess puzzle trainer");
     expect(homepage).toContain(
@@ -50,7 +58,7 @@ describe("public landing page", () => {
   });
 
   it("keeps install, support, privacy, license, and source paths prominent", () => {
-    for (const page of [homepage, androidPage, supportPage]) {
+    for (const page of [homepage, androidPage, supportPage, accessibilityPage]) {
       expect(page).toContain(appStoreUrl);
       expect(page).toContain(
         "https://github.com/Chessticize/chessticize-mobile"
@@ -59,6 +67,7 @@ describe("public landing page", () => {
 
     expect(homepage).toContain("./android/");
     expect(homepage).toContain("./support/");
+    expect(homepage).toContain("./accessibility/");
     expect(homepage).toContain("docs/PRIVACY_POLICY.md");
     expect(homepage).toContain("/LICENSE");
     expect(androidPage).toContain(apkUrl);
@@ -67,11 +76,14 @@ describe("public landing page", () => {
     expect(supportPage).toContain("support@chessticize.com");
     expect(supportPage).toContain("/issues/new?title=Bug");
     expect(supportPage).toContain("/issues/new?title=Feature");
+    expect(accessibilityPage).toContain("/issues/new?title=Accessibility");
+    expect(accessibilityPage).toContain("common chess puzzle task");
 
     expect(readme).toContain(appStoreUrl);
     expect(readme).toContain(websiteUrl);
     expect(readme).toContain(androidUrl);
     expect(readme).toContain(supportUrl);
+    expect(readme).toContain(accessibilityUrl);
     expect(readme).toContain("site/assets/screenshots/contact-sheet.webp");
   });
 
@@ -80,6 +92,7 @@ describe("public landing page", () => {
       homepage,
       androidPage,
       supportPage,
+      accessibilityPage,
       notFoundPage,
       styles
     ].join("\n");

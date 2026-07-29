@@ -29,7 +29,9 @@
 - **Keep practice private:** no ads, no Chessticize account, no analytics, and no developer data collection.
 - **Use and inspect it freely:** the app and its bundled Stockfish integration are open source.
 
-Install from the links above, visit the [support page](https://chessticize.github.io/chessticize-mobile/support/),
+Install from the links above, review the current
+[accessibility support](https://chessticize.github.io/chessticize-mobile/accessibility/),
+visit the [support page](https://chessticize.github.io/chessticize-mobile/support/),
 or [report a problem or request a feature](https://github.com/Chessticize/chessticize-mobile/issues).
 
 ## For contributors
@@ -46,6 +48,7 @@ harness (`apps/cli`), and bundled puzzle fixtures (`fixtures/puzzles`).
 - [Testing Architecture](docs/TESTING_ARCHITECTURE.md) — test-layer responsibilities, critical E2E regression scope, and SQLite migration compatibility design
 - [App Store Plan](docs/APP_STORE_PLAN.md) — historical first-release foundation plan
 - [App Store Assets](docs/STORE_ASSETS.md) — current App Store metadata and screenshot capture plan
+- [Accessibility Audit](docs/ACCESSIBILITY_AUDIT.md) — evidence-backed iPhone and iPad accessibility declaration decisions
 - [App Store Screenshot Story](docs/marketing/APP_STORE_SCREENSHOT_STORY.md) — canonical six-frame marketing sequence, copy, and fictional-user contract
 - [Landing Page](docs/LANDING_PAGE.md) — public routes, static deployment, marketing images, and install-link updates
 - [Release Notes](docs/RELEASE_NOTES.md) — per-binary customer-facing notes, review, and publication contract
