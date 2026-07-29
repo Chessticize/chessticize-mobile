@@ -85,6 +85,70 @@ test("TacticalProfileService reconstructs six model-aligned points across eight 
   assert.equal(progress.evaluation.signals[0]?.reason, "solve_rate");
 });
 
+test("TacticalProfileService keeps accuracy when puzzles lack solve-model deviation", () => {
+  const store = seededStore();
+  const correctPuzzle = puzzle("missing-rd-correct", ["hangingPiece"]);
+  const wrongPuzzle = puzzle("missing-rd-wrong", ["hangingPiece"]);
+  delete correctPuzzle.ratingDeviation;
+  delete wrongPuzzle.ratingDeviation;
+  store.seedPuzzles([correctPuzzle, wrongPuzzle]);
+  const config = buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20,
+    maxMistakes: 1
+  });
+  const startedAt = "2026-07-20T00:00:00.000Z";
+  const completedAt = "2026-07-20T00:01:00.000Z";
+  const session = startSprint({
+    id: "missing-rd-session",
+    config,
+    puzzles: [correctPuzzle, wrongPuzzle],
+    ratingBefore: 925,
+    now: startedAt
+  });
+  store.transaction(() => {
+    store.createSprintSession(session);
+    store.recordAttempt({
+      ...attempt({
+        id: "missing-rd-correct-attempt",
+        sessionId: session.id,
+        puzzleId: correctPuzzle.id,
+        completedAt
+      }),
+      result: "correct",
+      submittedMove: "e6e7"
+    });
+    store.recordAttempt(attempt({
+      id: "missing-rd-wrong-attempt",
+      sessionId: session.id,
+      puzzleId: wrongPuzzle.id,
+      completedAt
+    }));
+    store.updateSprintSession({
+      ...session,
+      status: "failed",
+      completedAt,
+      endReason: "max_mistakes",
+      correctCount: 1,
+      mistakeCount: 1,
+      ratingAfter: 925
+    });
+  });
+  const profile = service(store, new MemoryTacticalProfileRepository());
+
+  const estimate = profile
+    .getProgress("2026-07-25T00:00:00.000Z")
+    .snapshots.at(-1)
+    ?.estimates.find((candidate) => candidate.theme === "hangingPiece");
+
+  assert.ok(estimate);
+  assert.ok(estimate.accuracyEvidenceWeight > 0);
+  assert.equal(estimate.solveEvidenceWeight, 0);
+  assert.ok(estimate.speedEvidenceWeight > 0);
+  assert.equal(estimate.observedSolveRate, 0.5);
+});
+
 test("one rare-theme miss enters Review without becoming a Tactical Profile recommendation", () => {
   const store = seededStore();
   store.seedPuzzles([{

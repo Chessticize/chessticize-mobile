@@ -21,6 +21,7 @@ test("builds visible model reliability progress for a well-sampled balanced them
       {
         asOf: "2026-07-18T00:00:00.000Z",
         estimates: [themeEstimate({
+          accuracyEvidenceWeight: 8,
           expectedFailuresPer100: 12,
           observedSolveRate: 0.84,
           solveEvidenceWeight: 8
@@ -29,6 +30,7 @@ test("builds visible model reliability progress for a well-sampled balanced them
       {
         asOf: "2026-07-25T00:00:00.000Z",
         estimates: [themeEstimate({
+          accuracyEvidenceWeight: 14,
           expectedFailuresPer100: 4,
           observedSolveRate: 0.92,
           solveEvidenceWeight: 14
@@ -80,13 +82,15 @@ test("keeps observed balanced stats visible before recommendation diversity is c
   expect(presentation?.strengths[0]?.label).toBe("Fork · Puzzle solving");
 });
 
-test("shows completed-speed stats when a balanced theme has no solve observations", () => {
+test("keeps accuracy beside completed speed without matched solve-model evidence", () => {
   const progress = tacticalProgress({
     snapshots: [{
       asOf: "2026-07-25T00:00:00.000Z",
       estimates: [themeEstimate({
+        accuracyEvidenceWeight: 8,
         solveEvidenceWeight: 0,
         speedEvidenceWeight: 8,
+        observedSolveRate: 0.75,
         completedTimeMultiplier: 1.08
       })]
     }]
@@ -94,9 +98,13 @@ test("shows completed-speed stats when a balanced theme has no solve observation
 
   const presentation = historyProgressPresentationFromModel(progress);
 
-  expect(presentation?.initialSeriesId).toBe("line:fork:completed_speed");
-  expect(presentation?.strengths[0]?.kind).toBe("completed_speed");
-  expect(presentation?.strengths[0]?.points[0]?.valueLabel).toBe("1.08×");
+  expect(presentation?.initialSeriesId).toBe("line:fork:solve_rate");
+  expect(presentation?.strengths.map((series) => series.kind)).toEqual([
+    "solve_rate",
+    "completed_speed"
+  ]);
+  expect(presentation?.strengths[0]?.points[0]?.valueLabel).toBe("75%");
+  expect(presentation?.strengths[1]?.points[0]?.valueLabel).toBe("1.08×");
 });
 
 test("keeps both accuracy and time visible for every displayed theme", () => {
@@ -344,6 +352,7 @@ function themeEstimate(
     theme: "fork",
     distinctPuzzleCount: 12,
     distinctSessionCount: 3,
+    accuracyEvidenceWeight: 12,
     solveEvidenceWeight: 12,
     speedEvidenceWeight: 8,
     solveConfidence: 0.1,

@@ -515,6 +515,8 @@ export type TacticalProfileDailyCell = {
   completedDay: string;
   taskFamily: TacticalProfileTaskFamily;
   theme: string;
+  accuracySuccessWeight: number;
+  accuracyWeight: number;
   solveScore: number;
   solveInformation: number;
   solveExpectedSuccess: number;
@@ -558,6 +560,7 @@ export type TacticalProfileThemeEstimate = {
   theme: string;
   distinctPuzzleCount: number;
   distinctSessionCount: number;
+  accuracyEvidenceWeight: number;
   solveEvidenceWeight: number;
   speedEvidenceWeight: number;
   solveConfidence: number;
@@ -693,10 +696,8 @@ export function buildTacticalProfileDailyCells(
       classification.taskFamily,
       familyCalibration
     );
-    if (!solveObservation && !speedObservation) {
-      continue;
-    }
     const themeWeight = 1 / themes.length;
+    const accuracySuccess = input.attempt.result === "correct" ? 1 : 0;
 
     for (const theme of themes) {
       const key = [
@@ -713,6 +714,8 @@ export function buildTacticalProfileDailyCells(
         taskFamily: classification.taskFamily,
         theme
       });
+      cell.accuracySuccessWeight += themeWeight * accuracySuccess;
+      cell.accuracyWeight += themeWeight;
       if (solveObservation) {
         const weight = themeWeight * solveObservation.weight;
         cell.solveScore += weight * solveObservation.sensitivity *
@@ -732,8 +735,10 @@ export function buildTacticalProfileDailyCells(
         cell.speedPrecision += weight / speedObservation.variance;
         cell.speedWeight += weight;
       }
-      cell.distinctPuzzleIds.add(input.puzzle.id);
-      cell.distinctSessionIds.add(input.attempt.sessionId);
+      if (solveObservation || speedObservation) {
+        cell.distinctPuzzleIds.add(input.puzzle.id);
+        cell.distinctSessionIds.add(input.attempt.sessionId);
+      }
       cells.set(key, cell);
     }
   }
@@ -761,7 +766,8 @@ export function evaluateTacticalProfile(input: {
     input.calibration,
     input.now
   );
-  for (const analysis of analyses) {
+  const modelAnalyses = analyses.filter(hasMatchedModelEvidence);
+  for (const analysis of modelAnalyses) {
     const watchConfidence = Math.max(
       analysis.solveConfidence,
       analysis.speedConfidence
@@ -865,7 +871,7 @@ export function evaluateTacticalProfile(input: {
       theme: signal.theme,
       reason: signal.reason
     }));
-  const hasDiverseEvidence = analyses.some(
+  const hasDiverseEvidence = modelAnalyses.some(
     (analysis) => analysis.diversityPasses
   );
   return {
@@ -876,7 +882,7 @@ export function evaluateTacticalProfile(input: {
         : "balanced",
     signals,
     rankedFocuses,
-    observedThemeCount: analyses.length
+    observedThemeCount: modelAnalyses.length
   };
 }
 
@@ -895,6 +901,7 @@ export function estimateTacticalProfileThemes(input: {
     theme: analysis.theme,
     distinctPuzzleCount: analysis.distinctPuzzleCount,
     distinctSessionCount: analysis.distinctSessionCount,
+    accuracyEvidenceWeight: analysis.accuracyEvidenceWeight,
     solveEvidenceWeight: analysis.solveEvidenceWeight,
     speedEvidenceWeight: analysis.speedEvidenceWeight,
     solveConfidence: analysis.solveConfidence,
@@ -974,6 +981,8 @@ type MutableTacticalProfileDailyCell = Omit<
 type MutableEvaluationAggregate = {
   taskFamily: TacticalProfileTaskFamily;
   theme: string;
+  accuracySuccessWeight: number;
+  accuracyWeight: number;
   solveScore: number;
   solveInformation: number;
   solveExpectedSuccess: number;
@@ -996,6 +1005,12 @@ type TacticalProfileThemeAnalysis = TacticalProfileThemeEstimate & {
   minExpectedFailuresPer100: number;
   practicalTimeMultiplier: number;
 };
+
+function hasMatchedModelEvidence(
+  analysis: TacticalProfileThemeAnalysis
+): boolean {
+  return analysis.solveEvidenceWeight > 0 || analysis.speedEvidenceWeight > 0;
+}
 
 function tacticalProfileThemeAnalyses(
   cells: readonly TacticalProfileDailyCell[],
@@ -1030,6 +1045,8 @@ function tacticalProfileThemeAnalyses(
       cell.taskFamily,
       cell.theme
     );
+    aggregate.accuracySuccessWeight += decay * cell.accuracySuccessWeight;
+    aggregate.accuracyWeight += decay * cell.accuracyWeight;
     aggregate.solveScore += decay * cell.solveScore;
     aggregate.solveInformation += decay * cell.solveInformation;
     aggregate.solveExpectedSuccess += decay * cell.solveExpectedSuccess;
@@ -1111,16 +1128,17 @@ function tacticalProfileThemeAnalyses(
         theme: aggregate.theme,
         distinctPuzzleCount: aggregate.distinctPuzzleIds.size,
         distinctSessionCount: aggregate.distinctSessionIds.size,
+        accuracyEvidenceWeight: aggregate.accuracyWeight,
         solveEvidenceWeight: aggregate.solveWeight,
         speedEvidenceWeight: aggregate.speedWeight,
         solveConfidence,
         speedConfidence,
-        observedSolveRate: aggregate.solveWeight > 0
+        observedSolveRate: aggregate.accuracyWeight > 0
           ? Math.max(
               0,
               Math.min(
                 1,
-                aggregate.solveObservedSuccess / aggregate.solveWeight
+                aggregate.accuracySuccessWeight / aggregate.accuracyWeight
               )
             )
           : 0,
@@ -1161,6 +1179,8 @@ function mutableDailyCell(input: {
     completedDay: input.completedDay,
     taskFamily: input.taskFamily,
     theme: input.theme,
+    accuracySuccessWeight: 0,
+    accuracyWeight: 0,
     solveScore: 0,
     solveInformation: 0,
     solveExpectedSuccess: 0,
@@ -1206,6 +1226,8 @@ function mutableEvaluationAggregate(
   return {
     taskFamily,
     theme,
+    accuracySuccessWeight: 0,
+    accuracyWeight: 0,
     solveScore: 0,
     solveInformation: 0,
     solveExpectedSuccess: 0,

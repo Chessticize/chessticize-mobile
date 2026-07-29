@@ -84,6 +84,8 @@ test("derived Tactical Profile cache cannot enter local export or iCloud sync pa
     completedDay: "2026-07-01",
     taskFamily: "line",
     theme: "private-derived-theme",
+    accuracySuccessWeight: 0,
+    accuracyWeight: 1,
     solveScore: 1,
     solveInformation: 1,
     solveExpectedSuccess: 0,

@@ -151,7 +151,7 @@ function progressPoint(
 ): HistoryProgressPoint | undefined {
   const evidenceWeight = kind === "completed_speed"
     ? estimate.speedEvidenceWeight
-    : estimate.solveEvidenceWeight;
+    : estimate.accuracyEvidenceWeight;
   if (evidenceWeight <= 0) {
     return undefined;
   }
@@ -264,7 +264,7 @@ function seriesKinds(
   ];
   return candidates.filter((kind) =>
     kind === "solve_rate"
-      ? estimate.solveEvidenceWeight > 0
+      ? estimate.accuracyEvidenceWeight > 0
       : estimate.speedEvidenceWeight > 0
   );
 }
@@ -283,13 +283,13 @@ function preferredSeriesKind(
   ) {
     return "completed_speed";
   }
-  return estimate.solveEvidenceWeight > 0
+  return estimate.accuracyEvidenceWeight > 0
     ? "solve_rate"
     : "completed_speed";
 }
 
 function hasProgressEvidence(estimate: TacticalProfileThemeEstimate): boolean {
-  return estimate.solveEvidenceWeight > 0 || estimate.speedEvidenceWeight > 0;
+  return estimate.accuracyEvidenceWeight > 0 || estimate.speedEvidenceWeight > 0;
 }
 
 function isWellSampled(

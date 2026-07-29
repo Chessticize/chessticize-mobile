@@ -79,11 +79,13 @@ for (const fixture of repositoryFixtures()) {
         entry.completedDay,
         entry.theme,
         entry.solveScore,
+        entry.accuracySuccessWeight,
+        entry.accuracyWeight,
         entry.distinctPuzzleIds
       ]),
       [
-        ["2026-07-01", "fork", 1, ["p-fork"]],
-        ["2026-07-02", "pin", 2, ["p-pin"]]
+        ["2026-07-01", "fork", 1, 1, 1, ["p-fork"]],
+        ["2026-07-02", "pin", 2, 1, 1, ["p-pin"]]
       ]
     );
 
@@ -150,7 +152,7 @@ test("SQLite Tactical Profile cache owns only derived weakness tables", () => {
   ]);
 });
 
-test("SQLite Tactical Profile cache migrates schema v1 build state", () => {
+test("SQLite Tactical Profile cache migrates schema v1 and invalidates derived state", () => {
   const native = new DatabaseSync(":memory:");
   native.exec(`
     CREATE TABLE weakness_build_state (
@@ -188,18 +190,12 @@ test("SQLite Tactical Profile cache migrates schema v1 build state", () => {
 
   assert.equal(
     (native.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
-    5
+    6
   );
-  assert.deepEqual(repository.getBuildState(), {
-    ...IDENTITY,
-    status: "ready",
-    dirtyDayCount: 0,
-    sourceRevision: -1,
-    watermarkDay: "2026-07-01"
-  });
+  assert.equal(repository.getBuildState(), undefined);
 });
 
-test("SQLite Tactical Profile cache migrates schema v3 build state through v5", () => {
+test("SQLite Tactical Profile cache migrates schema v3 and invalidates derived state", () => {
   const native = new DatabaseSync(":memory:");
   native.exec(`
     CREATE TABLE weakness_build_state (
@@ -249,20 +245,12 @@ test("SQLite Tactical Profile cache migrates schema v3 build state through v5", 
   assert.equal(
     (native.prepare("PRAGMA user_version").get() as { user_version: number })
       .user_version,
-    5
+    6
   );
-  assert.deepEqual(repository.getBuildState(), {
-    ...IDENTITY,
-    status: "ready",
-    dirtyDayCount: 0,
-    sourceRevision: 9,
-    watermarkDay: "2026-07-03",
-    evaluatedAt: "2026-07-04T00:00:00.000Z",
-    recommendedSignalIds: ["line:fork"]
-  });
+  assert.equal(repository.getBuildState(), undefined);
 });
 
-test("SQLite Tactical Profile cache migrates schema v4 state to focused Run watermarks", () => {
+test("SQLite Tactical Profile cache migrates schema v4 and invalidates derived state", () => {
   const native = new DatabaseSync(":memory:");
   native.exec(`
     CREATE TABLE weakness_build_state (
@@ -309,21 +297,142 @@ test("SQLite Tactical Profile cache migrates schema v4 state to focused Run wate
   assert.equal(
     (native.prepare("PRAGMA user_version").get() as { user_version: number })
       .user_version,
-    5
+    6
   );
-  assert.deepEqual(repository.getBuildState(), {
-    ...IDENTITY,
-    status: "ready",
-    dirtyDayCount: 0,
-    sourceRevision: 10,
-    ratingAnchors: {
-      line: {
-        sessionId: "mixed-1",
-        ratingKey: "standard 5/20",
-        completedAt: "2026-07-04T00:00:00.000Z"
-      }
-    }
-  });
+  assert.equal(repository.getBuildState(), undefined);
+});
+
+test("SQLite Tactical Profile cache v6 invalidates v5 derived data for rebuild", () => {
+  const native = new DatabaseSync(":memory:");
+  native.exec(`
+    CREATE TABLE weakness_daily_stats (
+      model_version TEXT NOT NULL,
+      pack_feature_hash TEXT NOT NULL,
+      calibration_id TEXT NOT NULL,
+      completed_day TEXT NOT NULL,
+      task_family TEXT NOT NULL,
+      theme TEXT NOT NULL,
+      solve_score REAL NOT NULL,
+      solve_information REAL NOT NULL,
+      solve_expected_success REAL NOT NULL,
+      solve_observed_success REAL NOT NULL,
+      solve_sensitivity REAL NOT NULL,
+      solve_weight REAL NOT NULL,
+      speed_weighted_residual REAL NOT NULL,
+      speed_precision REAL NOT NULL,
+      speed_weight REAL NOT NULL,
+      distinct_puzzle_ids_json TEXT NOT NULL,
+      distinct_session_ids_json TEXT NOT NULL,
+      PRIMARY KEY (
+        model_version,
+        pack_feature_hash,
+        calibration_id,
+        completed_day,
+        task_family,
+        theme
+      )
+    );
+    CREATE TABLE weakness_dirty_days (
+      model_version TEXT NOT NULL,
+      pack_feature_hash TEXT NOT NULL,
+      calibration_id TEXT NOT NULL,
+      completed_day TEXT NOT NULL,
+      PRIMARY KEY (
+        model_version,
+        pack_feature_hash,
+        calibration_id,
+        completed_day
+      )
+    );
+    CREATE TABLE weakness_build_state (
+      singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+      model_version TEXT NOT NULL,
+      pack_feature_hash TEXT NOT NULL,
+      calibration_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      dirty_day_count INTEGER NOT NULL,
+      source_revision INTEGER NOT NULL,
+      watermark_day TEXT,
+      last_error TEXT,
+      evaluated_at TEXT,
+      recommended_signal_ids_json TEXT,
+      rating_anchors_json TEXT,
+      focused_run_watermarks_json TEXT
+    );
+    INSERT INTO weakness_daily_stats VALUES (
+      'model-v1',
+      'sha256:pack',
+      'calibration-v1',
+      '2026-07-01',
+      'line',
+      'fork',
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      '["p1"]',
+      '["s1"]'
+    );
+    INSERT INTO weakness_dirty_days VALUES (
+      'model-v1',
+      'sha256:pack',
+      'calibration-v1',
+      '2026-07-02'
+    );
+    INSERT INTO weakness_build_state (
+      singleton_id,
+      model_version,
+      pack_feature_hash,
+      calibration_id,
+      status,
+      dirty_day_count,
+      source_revision
+    ) VALUES (
+      1,
+      'model-v1',
+      'sha256:pack',
+      'calibration-v1',
+      'ready',
+      0,
+      11
+    );
+    PRAGMA user_version = 5;
+  `);
+  const repository = new SQLiteTacticalProfileRepository(
+    new NodeSqliteDatabase(native)
+  );
+
+  repository.migrate();
+  repository.migrate();
+
+  assert.equal(
+    (native.prepare("PRAGMA user_version").get() as { user_version: number })
+      .user_version,
+    6
+  );
+  assert.equal(repository.getBuildState(), undefined);
+  assert.equal(
+    (native.prepare("SELECT COUNT(*) AS count FROM weakness_daily_stats").get() as {
+      count: number;
+    }).count,
+    0
+  );
+  assert.equal(
+    (native.prepare("SELECT COUNT(*) AS count FROM weakness_dirty_days").get() as {
+      count: number;
+    }).count,
+    0
+  );
+  const columns = native.prepare("PRAGMA table_info(weakness_daily_stats)")
+    .all()
+    .map((row) => (row as { name: string }).name);
+  assert.ok(columns.includes("accuracy_success_weight"));
+  assert.ok(columns.includes("accuracy_weight"));
 });
 
 test("SQLite Tactical Profile cache fails closed on malformed rating anchors", () => {
@@ -403,6 +512,8 @@ function cell(
     completedDay,
     taskFamily: "line",
     theme,
+    accuracySuccessWeight: 1,
+    accuracyWeight: 1,
     solveScore,
     solveInformation: 0.25,
     solveExpectedSuccess: 0.5,

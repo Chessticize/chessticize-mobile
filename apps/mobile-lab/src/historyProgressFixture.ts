@@ -125,7 +125,7 @@ const BASE_PRESENTATION: Omit<
   assurance: "provisional",
   periodLabel: "Last 8 weeks",
   sampleLabel: "ordinary mixed Runs",
-  sampleUnitLabel: "eligible puzzles",
+  sampleUnitLabel: "model-weighted observations",
   noWeaknessTone: "balanced",
   noWeaknessTitle: "Recent play looks balanced",
   noWeaknessLabel:

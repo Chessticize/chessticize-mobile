@@ -5,7 +5,7 @@ import type {
 } from "../../core/src/index.ts";
 import type { SyncSqliteDatabase } from "./sync-sqlite-store.ts";
 
-export const TACTICAL_PROFILE_CACHE_SCHEMA_VERSION = 5;
+export const TACTICAL_PROFILE_CACHE_SCHEMA_VERSION = 6;
 
 export type TacticalProfileCacheIdentity = Pick<
   TacticalProfileCalibrationArtifact,
@@ -213,13 +213,18 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
     this.transaction(() => {
       if (current === 0) {
         this.db.exec(`
-        CREATE TABLE IF NOT EXISTS weakness_daily_stats (
+        DROP TABLE IF EXISTS weakness_daily_stats;
+        DROP TABLE IF EXISTS weakness_dirty_days;
+        DROP TABLE IF EXISTS weakness_build_state;
+        CREATE TABLE weakness_daily_stats (
           model_version TEXT NOT NULL,
           pack_feature_hash TEXT NOT NULL,
           calibration_id TEXT NOT NULL,
           completed_day TEXT NOT NULL,
           task_family TEXT NOT NULL,
           theme TEXT NOT NULL,
+          accuracy_success_weight REAL NOT NULL,
+          accuracy_weight REAL NOT NULL,
           solve_score REAL NOT NULL,
           solve_information REAL NOT NULL,
           solve_expected_success REAL NOT NULL,
@@ -240,14 +245,14 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
             theme
           )
         );
-        CREATE INDEX IF NOT EXISTS weakness_daily_stats_identity_day
+        CREATE INDEX weakness_daily_stats_identity_day
           ON weakness_daily_stats (
             model_version,
             pack_feature_hash,
             calibration_id,
             completed_day DESC
           );
-        CREATE TABLE IF NOT EXISTS weakness_dirty_days (
+        CREATE TABLE weakness_dirty_days (
           model_version TEXT NOT NULL,
           pack_feature_hash TEXT NOT NULL,
           calibration_id TEXT NOT NULL,
@@ -259,7 +264,7 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
             completed_day
           )
         );
-        CREATE TABLE IF NOT EXISTS weakness_build_state (
+        CREATE TABLE weakness_build_state (
           singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
           model_version TEXT NOT NULL,
           pack_feature_hash TEXT NOT NULL,
@@ -297,6 +302,61 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           this.db.exec(`
             ALTER TABLE weakness_build_state
             ADD COLUMN focused_run_watermarks_json TEXT;
+          `);
+        }
+        if (current <= 5) {
+          this.db.exec(`
+            DROP TABLE IF EXISTS weakness_daily_stats;
+            DROP TABLE IF EXISTS weakness_dirty_days;
+            CREATE TABLE weakness_daily_stats (
+              model_version TEXT NOT NULL,
+              pack_feature_hash TEXT NOT NULL,
+              calibration_id TEXT NOT NULL,
+              completed_day TEXT NOT NULL,
+              task_family TEXT NOT NULL,
+              theme TEXT NOT NULL,
+              accuracy_success_weight REAL NOT NULL,
+              accuracy_weight REAL NOT NULL,
+              solve_score REAL NOT NULL,
+              solve_information REAL NOT NULL,
+              solve_expected_success REAL NOT NULL,
+              solve_observed_success REAL NOT NULL,
+              solve_sensitivity REAL NOT NULL,
+              solve_weight REAL NOT NULL,
+              speed_weighted_residual REAL NOT NULL,
+              speed_precision REAL NOT NULL,
+              speed_weight REAL NOT NULL,
+              distinct_puzzle_ids_json TEXT NOT NULL,
+              distinct_session_ids_json TEXT NOT NULL,
+              PRIMARY KEY (
+                model_version,
+                pack_feature_hash,
+                calibration_id,
+                completed_day,
+                task_family,
+                theme
+              )
+            );
+            CREATE INDEX weakness_daily_stats_identity_day
+              ON weakness_daily_stats (
+                model_version,
+                pack_feature_hash,
+                calibration_id,
+                completed_day DESC
+              );
+            CREATE TABLE weakness_dirty_days (
+              model_version TEXT NOT NULL,
+              pack_feature_hash TEXT NOT NULL,
+              calibration_id TEXT NOT NULL,
+              completed_day TEXT NOT NULL,
+              PRIMARY KEY (
+                model_version,
+                pack_feature_hash,
+                calibration_id,
+                completed_day
+              )
+            );
+            DELETE FROM weakness_build_state;
           `);
         }
       }
@@ -416,6 +476,8 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           completed_day,
           task_family,
           theme,
+          accuracy_success_weight,
+          accuracy_weight,
           solve_score,
           solve_information,
           solve_expected_success,
@@ -427,7 +489,7 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           speed_weight,
           distinct_puzzle_ids_json,
           distinct_session_ids_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const cell of cells) {
         if (
@@ -443,6 +505,8 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           cell.completedDay,
           cell.taskFamily,
           cell.theme,
+          cell.accuracySuccessWeight,
+          cell.accuracyWeight,
           cell.solveScore,
           cell.solveInformation,
           cell.solveExpectedSuccess,
@@ -476,6 +540,8 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         completed_day AS completedDay,
         task_family AS taskFamily,
         theme,
+        accuracy_success_weight AS accuracySuccessWeight,
+        accuracy_weight AS accuracyWeight,
         solve_score AS solveScore,
         solve_information AS solveInformation,
         solve_expected_success AS solveExpectedSuccess,
@@ -819,6 +885,8 @@ function dailyCellFromRow(row: DailyCellRow): TacticalProfileDailyCell {
     completedDay: row.completedDay,
     taskFamily: row.taskFamily,
     theme: row.theme,
+    accuracySuccessWeight: row.accuracySuccessWeight,
+    accuracyWeight: row.accuracyWeight,
     solveScore: row.solveScore,
     solveInformation: row.solveInformation,
     solveExpectedSuccess: row.solveExpectedSuccess,

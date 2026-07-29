@@ -675,7 +675,7 @@ test("Timeout contributes one solve failure and no completed-speed observation",
   assert.equal(cell.speedPrecision, 0);
 });
 
-test("legacy timing gaps are never reconstructed from timestamps or current defaults", () => {
+test("legacy timing gaps keep accuracy without reconstructing model evidence", () => {
   const missingElapsed = tacticalAttempt();
   delete missingElapsed.attempt.elapsedMs;
   const missingPolicy = tacticalAttempt();
@@ -693,7 +693,46 @@ test("legacy timing gaps are never reconstructed from timestamps or current defa
   assert.ok(elapsedCell);
   assert.equal(elapsedCell.solveObservedSuccess, 1);
   assert.equal(elapsedCell.speedWeight, 0);
-  assert.deepEqual(policyCells, []);
+  assert.equal(policyCells[0]?.accuracySuccessWeight, 1);
+  assert.equal(policyCells[0]?.accuracyWeight, 1);
+  assert.equal(policyCells[0]?.solveWeight, 0);
+  assert.equal(policyCells[0]?.speedWeight, 0);
+});
+
+test("observed accuracy includes attempts without matched solve-model features", () => {
+  const correct = tacticalAttempt({
+    attempt: {
+      id: "missing-rd-correct",
+      puzzleId: "missing-rd-puzzle-correct"
+    },
+    puzzle: { id: "missing-rd-puzzle-correct" }
+  });
+  const wrong = tacticalAttempt({
+    attempt: {
+      id: "missing-rd-wrong",
+      puzzleId: "missing-rd-puzzle-wrong",
+      result: "wrong"
+    },
+    puzzle: { id: "missing-rd-puzzle-wrong" }
+  });
+  delete correct.puzzle.ratingDeviation;
+  delete wrong.puzzle.ratingDeviation;
+  const cells = buildTacticalProfileDailyCells([correct, wrong], CALIBRATION);
+  const [estimate] = estimateTacticalProfileThemes({
+    cells,
+    calibration: CALIBRATION,
+    now: "2026-07-25T00:00:00.000Z"
+  });
+
+  assert.ok(estimate);
+  assert.equal(estimate?.solveEvidenceWeight, 0);
+  assert.ok(estimate.speedEvidenceWeight > 0);
+  assert.ok(
+    Math.abs(
+      estimate.accuracyEvidenceWeight - 2 * estimate.speedEvidenceWeight
+    ) < 1e-12
+  );
+  assert.equal(estimate?.observedSolveRate, 0.5);
 });
 
 test("a puzzle with no curated theme keeps baseline features but contributes no theme posterior cell", () => {
@@ -921,6 +960,8 @@ test("recommendation hysteresis retains a prior focus between entry and exit thr
     completedDay: "2026-07-24",
     taskFamily: "line" as const,
     theme: "pin",
+    accuracySuccessWeight: 4,
+    accuracyWeight: 4,
     solveScore: 0,
     solveInformation: 0,
     solveExpectedSuccess: 0,
