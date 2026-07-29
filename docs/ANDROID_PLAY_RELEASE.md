@@ -228,9 +228,10 @@ reuse version code 8.
 Build 9 is the proposed Android 1.3.1 patch release:
 
 - proposed annotated tag: `android-v1.3.1-build-9`;
-- primary user-visible fixes: restore Stockfish Analysis after Arrow Duel
-  puzzles, keep Rating history consistent after an Android Progress Backup
-  restore, and show History dates in the device's local calendar;
+- primary user-visible changes: improve Training Focus with balanced results,
+  Accuracy trends, and personal solve-time comparisons; fix a crash during
+  deep Stockfish Analysis; and show History dates in the device's local
+  calendar;
 - validation scope: full native validation because the delta since the
   previous public source tag includes a storage migration and Stockfish native
   lifecycle repair;

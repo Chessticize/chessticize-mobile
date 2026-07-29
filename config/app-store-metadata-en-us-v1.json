@@ -50,6 +50,6 @@
   "currentVersionWhatsNew": {
     "sourceTag": "ios-v1.3.1-build-1",
     "status": "release-candidate",
-    "storeCopy": "• Fixed Stockfish Analysis after Arrow Duel puzzles.\n• Fixed Rating history replay across devices.\n• Fixed local calendar dates in History."
+    "storeCopy": "• Improved Training Focus with balanced results, Accuracy trends, and personal solve-time comparisons.\n• Fixed a crash during deep Stockfish Analysis.\n• Fixed Rating history replay across devices and local calendar dates in History."
   }
 }
