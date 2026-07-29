@@ -33,6 +33,7 @@
     "mobile:test": "pnpm --filter ChessticizeMobile test",
     "mobile:typecheck": "pnpm --filter ChessticizeMobile typecheck",
     "mobile:storybook": "pnpm --filter ChessticizeMobileLab storybook",
+    "landing-page:assets": "node scripts/prepare-landing-page-assets.mjs",
     "mobile:storybook:build": "pnpm --filter ChessticizeMobileLab build-storybook",
     "mobile:lab:typecheck": "pnpm --filter ChessticizeMobileLab typecheck",
     "mobile:lab:test": "pnpm --filter ChessticizeMobileLab test",

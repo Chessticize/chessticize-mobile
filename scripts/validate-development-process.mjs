@@ -18,6 +18,7 @@ const count = (text, needle) => text.split(needle).length - 1;
 const coreWorkflow = read(".github/workflows/core.yml");
 const mobileWorkflow = read(".github/workflows/mobile-js.yml");
 const mobileLabWorkflow = read(".github/workflows/mobile-lab.yml");
+const pagesWorkflow = read(".github/workflows/pages.yml");
 const processWorkflow = read(".github/workflows/process.yml");
 const agents = read("AGENTS.md");
 const rootReadme = read("README.md");
@@ -70,6 +71,16 @@ const releaseNotesTemplate = read("docs/releases/RELEASE_NOTES_TEMPLATE.md");
 const releaseSourcePolicy = read("docs/RELEASE_SOURCE_POLICY.md");
 const androidValidation = read("docs/ANDROID_VALIDATION.md");
 const appStoreUpload = read("docs/APP_STORE_UPLOAD.md");
+const landingPageDoc = read("docs/LANDING_PAGE.md");
+const landingPage = read("site/index.html");
+const landingPageAndroid = read("site/android/index.html");
+const landingPageSupport = read("site/support/index.html");
+const landingPageStyles = read("site/styles.css");
+const landingPageTest = read("apps/mobile/__tests__/landingPage.test.js");
+const landingPageAssetGenerator = read("scripts/prepare-landing-page-assets.mjs");
+const landingPageAssetManifest = JSON.parse(
+  read("site/assets/marketing-assets.json")
+);
 const androidPlayRelease = read("docs/ANDROID_PLAY_RELEASE.md");
 const androidGitHubRelease = read("docs/ANDROID_GITHUB_RELEASE.md");
 const releaseDocs = [
@@ -159,6 +170,58 @@ assert.equal(count(processWorkflow, '- "README.md"'), 2);
 assert.equal(count(processWorkflow, '- "apps/mobile-lab/README.md"'), 2);
 assert.equal(count(processWorkflow, '- "docs/RELEASE_NOTES.md"'), 2);
 assert.equal(count(processWorkflow, '- "docs/releases/**"'), 2);
+assert.equal(count(processWorkflow, '- "docs/LANDING_PAGE.md"'), 2);
+assert.equal(count(processWorkflow, '- "site/**"'), 2);
+assert.equal(
+  count(processWorkflow, '- "apps/mobile/__tests__/landingPage.test.js"'),
+  2
+);
+assert.equal(
+  count(processWorkflow, '- "scripts/prepare-landing-page-assets.mjs"'),
+  2
+);
+
+for (const action of [
+  "actions/checkout@v6",
+  "actions/configure-pages@v5",
+  "actions/upload-pages-artifact@v4",
+  "actions/deploy-pages@v4"
+]) {
+  assert.match(pagesWorkflow, new RegExp(action.replace("/", "\\/")));
+}
+assert.match(pagesWorkflow, /run: node scripts\/validate-development-process\.mjs/);
+assert.match(pagesWorkflow, /path: site/);
+assert.match(pagesWorkflow, /pages: write/);
+assert.match(pagesWorkflow, /id-token: write/);
+assert.match(pagesWorkflow, /name: github-pages/);
+
+const publicLandingCopy = [
+  landingPage,
+  landingPageAndroid,
+  landingPageSupport,
+  rootReadme
+].join("\n");
+assert.match(landingPage, /chess puzzle trainer/i);
+assert.match(landingPage, /rating-matched puzzle Sprints/);
+assert.match(landingPage, /Custom Runs/);
+assert.match(landingPage, /scheduled Review/);
+assert.doesNotMatch(publicLandingCopy, /Tactical Profile/i);
+assert.doesNotMatch(publicLandingCopy, /\badaptive practice\b/i);
+assert.doesNotMatch(publicLandingCopy, /\bweakness(?:es)?\b/i);
+assert.doesNotMatch(publicLandingCopy, /<script\b/i);
+assert.doesNotMatch(
+  publicLandingCopy,
+  /google-analytics|googletagmanager|segment\.com|mixpanel|plausible|fathom/i
+);
+assert.doesNotMatch(landingPageStyles, /@import|url\(\s*["']?https?:\/\//i);
+assert.match(rootReadme, /https:\/\/apps\.apple\.com\/us\/app\/chessticize\/id6788610123/);
+assert.match(rootReadme, /https:\/\/chessticize\.github\.io\/chessticize-mobile\/android\//);
+assert.match(rootReadme, /site\/assets\/screenshots\/contact-sheet\.webp/);
+assert.match(landingPageDoc, /pnpm landing-page:assets/);
+assert.match(landingPageAssetGenerator, /--source-root/);
+assert.equal(landingPageAssetManifest.schemaVersion, 1);
+assert.equal(landingPageAssetManifest.assets.length, 11);
+assert.match(landingPageTest, /ships optimized, reproducible marketing images/);
 
 for (const policy of [agents, devLoopSkill, labReadme]) {
   assert.match(policy, /Storybook-first UI flow gate/i);

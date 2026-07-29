@@ -1,0 +1,63 @@
+# Landing Page
+
+The public Chessticize website is a zero-cost static GitHub Pages site served
+from [`site/`](../site/). It uses no analytics, database, CDN, remote fonts, or
+runtime JavaScript. The deployment workflow publishes that directory after a
+change reaches `main`.
+
+Public routes:
+
+- Developer website: `https://chessticize.github.io/chessticize-mobile/`
+- Support: `https://chessticize.github.io/chessticize-mobile/support/`
+- Android install guide: `https://chessticize.github.io/chessticize-mobile/android/`
+
+## Updating the marketing images
+
+The committed website images are web-sized derivatives of the approved,
+sanitized App Store compositions. The App Store originals remain under the
+ignored `scratch/` workspace and are not committed.
+
+After generating and approving a new marketing set:
+
+```sh
+pnpm landing-page:assets -- \
+  --source-root /absolute/path/to/marketing-hybrid-a-original-bg-v1
+```
+
+The source directory must contain:
+
+- `iphone-6.9-inch-portrait/marketing-01-standard-sprint.png` through
+  `marketing-06-trust.png`;
+- the matching `ipad-13-inch-landscape` images; and
+- `preview-iphone-contact-sheet.png`.
+
+The command rewrites the optimized WebP images, the site icon, and
+`site/assets/marketing-assets.json`. Review the diff and open the landing page
+locally before committing:
+
+```sh
+python3 -m http.server 4173 --directory site
+```
+
+Then open `http://127.0.0.1:4173/`. The local server is only a preview tool; the
+published site remains plain static files.
+
+## Updating install links
+
+- iOS uses the stable App Store product URL
+  `https://apps.apple.com/us/app/chessticize/id6788610123`.
+- Android uses the Pages route `android/` as the stable public entry point.
+  Update that page's APK, checksum, version, size, and source-release links
+  together after the protected Android release workflow publishes a new
+  Play-signed APK mirror.
+- App Store Connect uses the homepage as the Marketing URL and `support/` as
+  the Support URL. The complete privacy policy remains the repository-hosted
+  `docs/PRIVACY_POLICY.md`; the landing page links to that canonical policy.
+
+Run the focused landing-page test and development-process validation after any
+content, asset, route, or deployment change:
+
+```sh
+pnpm --filter ChessticizeMobile test -- landingPage.test.js --runInBand
+pnpm process:validate
+```

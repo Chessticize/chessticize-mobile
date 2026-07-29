@@ -38,8 +38,8 @@ Connect's stricter 100-byte reference.
 | Subtitle | `Build Tactical Intuition` | Result-oriented product promise; 24 / 30 characters. |
 | Promotional text | `Build tactical intuition with rating-matched chess puzzles, Arrow Duel, Custom Runs, and scheduled Review—offline, without ads or an account, and open source.` | 158 / 170 characters. |
 | Keywords | `chess,tactics,puzzle,trainer,offline,blunder,sprint,review,spaced repetition,elo,analysis` | 89 / 100 UTF-8 bytes; no name/subtitle duplication, no spaces after commas, and no category names or competitor terms. |
-| Support URL | `https://github.com/Chessticize/chessticize-mobile` | Must be public and lead users to support/contact information. |
-| Marketing URL | `https://github.com/Chessticize/chessticize-mobile` | Optional; use the public project page for 1.3. |
+| Support URL | `https://chessticize.github.io/chessticize-mobile/support/` | Stable public support, bug-report, feature-request, and private-contact entry point. |
+| Marketing URL | `https://chessticize.github.io/chessticize-mobile/` | Stable public product page with iOS and Android install paths. |
 | Privacy policy URL | `https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md` | Must match `docs/APP_PRIVACY_DISCLOSURE.md`. |
 | Primary category | `Games` | App Store Connect selection. |
 | Secondary category | `Education` | App Store Connect selection. |

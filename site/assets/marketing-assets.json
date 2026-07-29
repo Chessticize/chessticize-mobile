@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "sourceCollection": "scratch/store-assets/marketing-hybrid-a-original-bg-v1",
+  "generator": "scripts/prepare-landing-page-assets.mjs",
+  "assets": [
+    {
+      "source": "scratch/store-assets/marketing-hybrid-a-original-bg-v1/iphone-6.9-inch-portrait/marketing-01-standard-sprint.png",
+      "sourceSha256": "1b082d1a5b7a449c410bfb89aff07cf85f6f2af8cbe5d2f0b6263a0d4b5177ad",
+      "output": "site/assets/screenshots/iphone-01.webp",
+      "outputSha256": "a26df926c2f7d3b7cd350faf227decba21522e07430f2dde37d9a464a0bcefc6",
+      "width": 560,
+      "height": 1217,
+      "bytes": 28314
+    },
+    {
+      "source": "scratch/store-assets/marketing-hybrid-a-original-bg-v1/iphone-6.9-inch-portrait/marketing-02-arrow-duel.png",
+      "sourceSha256": "e3adb78418130eae9157d9ae6d61ae03e9323bdd7df296c94b4ee73884fc804a",
+      "output": "site/assets/screenshots/iphone-02.webp",
+      "outputSha256": "2925703ef1068b332189b83c8886a200341f3ebc1e20514da6c88317270e22cb",
+      "width": 560,
+      "height": 1217,
+      "bytes": 30190
+    },
+    {
+      "source": "scratch/store-assets/marketing-hybrid-a-original-bg-v1/iphone-6.9-inch-portrait/marketing-03-custom-run.png",
+      "sourceSha256": "42386430ce7c92727b3d504c1054e368361f4def237a18ce15041c0e7c9a18c7",
+      "output": "site/assets/screenshots/iphone-03.webp",
+      "outputSha256": "d7708df904ffd6a146c5ff8029ee35d30ea15f2e13b6ac39113daed473bbda31",
+      "width": 560,
+      "height": 1217,
+      "bytes": 35550
+    },
+    {
+      "source": "scratch/store-assets/marketing-hybrid-a-original-bg-v1/iphone-6.9-inch-portrait/marketing-04-review-queue.png",
+      "sourceSha256": "88e5b76234a4f4ef6e8a7cf56e7bbc8858cce640744f1ece5689c69a7ab43691",
+      "output": "site/assets/screenshots/iphone-04.webp",
+      "outputSha256": "6dfa81cdae2f08b71fdfeabc7964b694f3e3b86883008ba0ea74eff83042ffb6",
+      "width": 560,
+      "height": 1217,
+      "bytes": 28764
+    },
+    {
+      "source": "scratch/store-assets/marketing-hybrid-a-original-bg-v1/iphone-6.9-inch-portrait/marketing-05-rating-trend.png",
+      "sourceSha256": "300347992cbf35cff4890fae1930bba541758033e58b5d5c82ceb9b6a2ade197",
+      "output": "site/assets/screenshots/iphone-05.webp",
+      "outputSha256": "b4b990a68dbc1e42950ff1b0d75197a2219276a4d1630fb7f129708d7c3a9f67",
+      "width": 560,
+      "height": 1217,
+      "bytes": 31582
+    },
+    {
+      "source": "scratch/store-assets/marketing-hybrid-a-original-bg-v1/iphone-6.9-inch-portrait/marketing-06-trust.png",
+      "sourceSha256": "c9ffbeecee3b53cf88a8a314cf91f7e6a9cab0160070ba1ae5f6cf2339dc0de6",
+      "output": "site/assets/screenshots/iphone-06.webp",
+      "outputSha256": "bc2a9081312ea81c6d3654f5d1454976b61a8e08d7506e146f033941f1a0d3ef",
+      "width": 560,
+      "height": 1217,
+      "bytes": 32098
+    },
+    {
+      "source": "scratch/store-assets/marketing-hybrid-a-original-bg-v1/ipad-13-inch-landscape/marketing-01-standard-sprint.png",
+      "sourceSha256": "804a5cc5b162670f4b0cc6c7a7571649b832d2b090eb6904edf9bcb39cda8c28",
+      "output": "site/assets/screenshots/ipad-01.webp",
+      "outputSha256": "710836090795bea82aedf95b63d43c732a52003e6c5e2f45915e68007c5194e9",
+      "width": 1280,
+      "height": 960,
+      "bytes": 29894
+    },
+    {
+      "source": "scratch/store-assets/marketing-hybrid-a-original-bg-v1/ipad-13-inch-landscape/marketing-03-custom-run.png",
+      "sourceSha256": "ad43f9f3e0453765e76da3ee795dc20c1832916f9b796e6fd674881a6b81d805",
+      "output": "site/assets/screenshots/ipad-03.webp",
+      "outputSha256": "41c85477475389980ed8d113f005f46f91cb8f4fb3694a20a5e8f23ba20cc47f",
+      "width": 1280,
+      "height": 960,
+      "bytes": 35708
+    },
+    {
+      "source": "scratch/store-assets/marketing-hybrid-a-original-bg-v1/ipad-13-inch-landscape/marketing-06-trust.png",
+      "sourceSha256": "ef6dac87daf7e3ca5f8f4ad3409f2b941305dba4a23cb57f96bdd573053b3160",
+      "output": "site/assets/screenshots/ipad-06.webp",
+      "outputSha256": "82bdadbfc1f700c22b1388928d50f6c1d24d9b9a04d8db2797dd364ef26bd4a1",
+      "width": 1280,
+      "height": 960,
+      "bytes": 38448
+    },
+    {
+      "source": "scratch/store-assets/marketing-hybrid-a-original-bg-v1/preview-iphone-contact-sheet.png",
+      "sourceSha256": "4cfbac53f77edd9c0e7dd0071e218584d72500448f99b8de46a746792489f3db",
+      "output": "site/assets/screenshots/contact-sheet.webp",
+      "outputSha256": "843df949b795439e3f516e25d5bb55af49a52885984f87aeb2f9308a912b7331",
+      "width": 1086,
+      "height": 1602,
+      "bytes": 98998
+    },
+    {
+      "source": "apps/mobile/store-assets/android/play-icon-512.png",
+      "sourceSha256": "02d2067526be79d9fee48fd87657757ef39c390b6115654759b5f4603881c2a8",
+      "output": "site/assets/app-icon-192.png",
+      "outputSha256": "a06a6922a13be1bbf167e266c7a81242dd0c2cd7b9b4cfbaec1c7bbd96ff0f1f",
+      "width": 192,
+      "height": 192,
+      "bytes": 31720
+    }
+  ]
+}
