@@ -22,6 +22,11 @@ import {
   wrapHeadline,
 } from "../.codex/skills/chessticize-app-store-marketing/scripts/compose-marketing-assets.mjs";
 
+const PHOTO_LAYOUT_URL = new URL(
+  "../.codex/skills/chessticize-app-store-marketing/assets/app-store-marketing-layout-v2.json",
+  import.meta.url,
+);
+
 const FAMILY_CONTRACTS = {
   iphone: {
     dimensions: { width: 120, height: 260 },
@@ -46,6 +51,20 @@ async function exists(filePath) {
   } catch {
     return false;
   }
+}
+
+async function rgbAt(input, x, y) {
+  const pixel = await sharp(input)
+    .extract({
+      height: 1,
+      left: Math.round(x),
+      top: Math.round(y),
+      width: 1,
+    })
+    .removeAlpha()
+    .raw()
+    .toBuffer();
+  return [...pixel.subarray(0, 3)];
 }
 
 function testPreset(family) {
@@ -80,12 +99,30 @@ function testPreset(family) {
   };
 }
 
+function testFrameContract(order) {
+  const suffix = `frame-${order}`;
+  const captureId = `marketing-${String(order).padStart(2, "0")}-${suffix}`;
+  return {
+    order,
+    frameId: suffix,
+    captureId,
+    copyKey: suffix,
+    headline:
+      order === 4 ? "Make Every Mistake Count" : `Practice Frame ${order}`,
+    supporting: `Supporting copy for frame ${order}.`,
+    fileName: `${captureId}.png`,
+  };
+}
+
 function testLayoutConfig() {
   return {
     schemaVersion: 1,
     layoutId: "test-cobalt-focus-v1",
     contractStoryId: "test-marketing-story-v1",
     locale: "en-US",
+    frames: Array.from({ length: 6 }, (_, index) =>
+      testFrameContract(index + 1),
+    ),
     visualDirection: {
       name: "Test Cobalt Focus",
       composition: "quiet-focus",
@@ -159,20 +196,19 @@ async function createFixture(root) {
 
   const frames = [];
   for (let order = 1; order <= 6; order += 1) {
-    const suffix = `frame-${order}`;
+    const contractFrame = config.frames[order - 1];
     const frame = {
-      order,
-      frameId: suffix,
-      captureId: `marketing-${String(order).padStart(2, "0")}-${suffix}`,
-      copyKey: suffix,
-      headline:
-        order === 4 ? "Make Every Mistake Count" : `Practice Frame ${order}`,
-      supporting: `Supporting copy for frame ${order}.`,
+      order: contractFrame.order,
+      frameId: contractFrame.frameId,
+      captureId: contractFrame.captureId,
+      copyKey: contractFrame.copyKey,
+      headline: contractFrame.headline,
+      supporting: contractFrame.supporting,
       captures: {},
     };
     for (const [family, contract] of Object.entries(FAMILY_CONTRACTS)) {
       const directory = `${family}-${contract.displayGroup}-${contract.orientation}`;
-      const fileName = `${frame.captureId}.png`;
+      const fileName = contractFrame.fileName;
       const relativeFile = path.join(directory, fileName);
       const absoluteFile = path.join(captureRoot, relativeFile);
       await mkdir(path.dirname(absoluteFile), { recursive: true });
@@ -241,6 +277,116 @@ async function createFixture(root) {
   };
 }
 
+function photographicScene({ family, openBezel = false, order, widthDelta = 0 }) {
+  const contract = FAMILY_CONTRACTS[family];
+  const dimensions =
+    contract.orientation === "portrait"
+      ? { height: 130, width: 60 }
+      : { height: 105, width: 140 };
+  const baseDevice =
+    family === "iphone"
+      ? {
+          inner: { height: 61, rx: 5, width: 28, x: 16, y: 36 },
+          outer: { height: 74, rx: 7, width: 32, x: 14, y: 32 },
+        }
+      : {
+          inner: { height: 60, rx: 4, width: 80, x: 30, y: 27 },
+          outer: { height: 70, rx: 6, width: 90, x: 25, y: 22 },
+        };
+  const device = {
+    inner: baseDevice.inner,
+    outer: {
+      ...baseDevice.outer,
+      width: baseDevice.outer.width + widthDelta,
+      x: baseDevice.outer.x - Math.floor(widthDelta / 2),
+    },
+  };
+  const background = `rgb(${224 + order},${235 + order},${241 + order})`;
+  const headlineX = family === "iphone" ? 6 : 12;
+  const headlineWidth = family === "iphone" ? 28 : 42;
+  const opening = openBezel
+    ? `<rect x="${device.inner.x}" y="${device.outer.y}" width="${device.inner.width}" height="${device.inner.y - device.outer.y + 2}" fill="${background}"/>`
+    : "";
+  return Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${dimensions.width}" height="${dimensions.height}">
+      <rect width="100%" height="100%" fill="${background}"/>
+      <rect x="${headlineX}" y="6" width="${headlineWidth}" height="8" rx="1" fill="#081221"/>
+      <rect x="${device.outer.x}" y="${device.outer.y}" width="${device.outer.width}" height="${device.outer.height}" rx="${device.outer.rx}" fill="#101214"/>
+      ${opening}
+      <rect x="${device.inner.x}" y="${device.inner.y}" width="${device.inner.width}" height="${device.inner.height}" rx="${device.inner.rx}" fill="#F8FAFC"/>
+    </svg>`,
+  );
+}
+
+async function createPhotographicFixture(root) {
+  const fixture = await createFixture(root);
+  const config = structuredClone(fixture.config);
+  config.layoutId = "test-photo-studio-a-v2";
+  config.compositionMode = "photographic-device";
+  config.visualDirection = {
+    name: "Test Photo Studio A",
+    composition: "product-first-photographic-device",
+    background: "warm-white-icy-blue-chessboard",
+    productProof: "immutable-native-capture-in-exact-generated-device-silhouette",
+  };
+
+  for (const [family, contract] of Object.entries(FAMILY_CONTRACTS)) {
+    config.presets[family].photographicDevice = {
+      darkThreshold: 58,
+      barrierDilation: 1,
+      screenAspectTolerance: 0.04,
+      maskAreaMinRatio: 0.6,
+      maskAreaMaxRatio: 1.08,
+      deviceWidthConsistencyTolerance: 0.02,
+      deviceHeightConsistencyTolerance: 0.02,
+      dynamicIsland: family === "iphone",
+    };
+    for (let order = 1; order <= 6; order += 1) {
+      const frameId = `frame-${order}`;
+      const template =
+        config.presets[family].backgroundTemplates[frameId];
+      const dimensions =
+        contract.orientation === "portrait"
+          ? { height: 130, width: 60 }
+          : { height: 105, width: 140 };
+      const buffer = await sharp(photographicScene({ family, order }))
+        .png({ adaptiveFiltering: false, compressionLevel: 9 })
+        .toBuffer();
+      await writeFile(path.join(root, template.file), buffer);
+      template.pixelDimensions = dimensions;
+      template.sha256 = sha256(buffer);
+    }
+  }
+  await writeFile(
+    fixture.configPath,
+    `${JSON.stringify(config, null, 2)}\n`,
+  );
+  return {
+    ...fixture,
+    config,
+  };
+}
+
+async function replacePhotographicScene(
+  fixture,
+  { family, openBezel = false, order, widthDelta = 0 },
+) {
+  const frameId = `frame-${order}`;
+  const template =
+    fixture.config.presets[family].backgroundTemplates[frameId];
+  const buffer = await sharp(
+    photographicScene({ family, openBezel, order, widthDelta }),
+  )
+    .png({ adaptiveFiltering: false, compressionLevel: 9 })
+    .toBuffer();
+  await writeFile(path.join(path.dirname(fixture.configPath), template.file), buffer);
+  template.sha256 = sha256(buffer);
+  await writeFile(
+    fixture.configPath,
+    `${JSON.stringify(fixture.config, null, 2)}\n`,
+  );
+}
+
 test("headline wrapping and layout keep the approved copy inside safe areas", () => {
   const parsed = parseArgs([
     "--",
@@ -281,6 +427,44 @@ test("headline wrapping and layout keep the approved copy inside safe areas", ()
     assert.ok(layout.frame.x + layout.frame.width <= contract.dimensions.width);
     assert.ok(layout.frame.y + layout.frame.height <= contract.dimensions.height);
   }
+});
+
+test("default Photo Studio A scene templates are immutable and hash-bound", async () => {
+  const config = JSON.parse(await readFile(PHOTO_LAYOUT_URL, "utf8"));
+  assert.equal(config.layoutId, "chessticize-photo-studio-a-v2");
+  assert.equal(config.compositionMode, "photographic-device");
+  assert.equal(config.visualDirection.name, "Photo Studio A");
+  assert.deepEqual(
+    config.frames.map(({ headline }) => headline),
+    [
+      "Build Tactical Intuition",
+      "Choose the Best Move",
+      "Focus Your Practice",
+      "Make Every Mistake Count",
+      "See Your Progress",
+      "Private. Offline. Open Source.",
+    ],
+  );
+
+  const hashes = new Set();
+  for (const preset of Object.values(config.presets)) {
+    assert.equal(
+      Object.keys(preset.backgroundTemplates).length,
+      6,
+    );
+    for (const template of Object.values(preset.backgroundTemplates)) {
+      const templateUrl = new URL(template.file, PHOTO_LAYOUT_URL);
+      const buffer = await readFile(templateUrl);
+      const metadata = await sharp(buffer).metadata();
+      assert.equal(sha256(buffer), template.sha256);
+      assert.deepEqual(
+        { height: metadata.height, width: metadata.width },
+        template.pixelDimensions,
+      );
+      hashes.add(template.sha256);
+    }
+  }
+  assert.equal(hashes.size, 12);
 });
 
 test("full export is deterministic and preserves the six-frame device contracts", async (t) => {
@@ -329,6 +513,247 @@ test("full export is deterministic and preserves the six-frame device contracts"
   }
 });
 
+test("photographic export uses exact bezel masks and enforces device consistency", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "chessticize-photo-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const fixture = await createPhotographicFixture(root);
+  const firstOutput = path.join(root, "output-a");
+  const secondOutput = path.join(root, "output-b");
+  const options = {
+    captureRoot: fixture.captureRoot,
+    layoutConfig: fixture.configPath,
+  };
+  const first = await composeMarketingAssets({
+    ...options,
+    outputDir: firstOutput,
+  });
+  const second = await composeMarketingAssets({
+    ...options,
+    outputDir: secondOutput,
+  });
+
+  assert.deepEqual(first.manifest, second.manifest);
+  assert.equal(first.manifest.layoutId, "test-photo-studio-a-v2");
+  assert.equal(first.manifest.artifacts.length, 12);
+  assert.equal(first.manifest.contactSheets.length, 3);
+  assert.deepEqual(
+    first.manifest.contactSheets.map(({ kind }) => kind),
+    ["overview", "overview", "corner-audit"],
+  );
+  assert.ok(first.manifest.deviceConsistency);
+  for (const artifact of first.manifest.artifacts) {
+    assert.equal(
+      artifact.deviceGeometry.maskStrategy,
+      "closed-bezel-flood-fill",
+    );
+    assert.ok(artifact.deviceGeometry.exactMaskPixelCount > 0);
+    assert.ok(artifact.deviceGeometry.outputScreen.width > 0);
+    assert.ok(artifact.deviceGeometry.outputScreen.height > 0);
+    const outputPath = path.join(firstOutput, artifact.file);
+    assert.equal(await exists(outputPath), true);
+    const sourcePath = path.join(
+      fixture.captureRoot,
+      artifact.sourceFile,
+    );
+    const sourceMetadata = await sharp(sourcePath).metadata();
+    const sourceColor = await rgbAt(
+      sourcePath,
+      sourceMetadata.width / 2,
+      sourceMetadata.height / 2,
+    );
+    const screen = artifact.deviceGeometry.outputScreen;
+    assert.deepEqual(
+      await rgbAt(
+        outputPath,
+        screen.left + screen.width / 2,
+        screen.top + screen.height / 2,
+      ),
+      sourceColor,
+      `${artifact.deviceFamily} ${artifact.frameId} must replace the generated screen with raw capture pixels`,
+    );
+    assert.notDeepEqual(
+      await rgbAt(outputPath, screen.left + 1, screen.top + 1),
+      sourceColor,
+      `${artifact.deviceFamily} ${artifact.frameId} must preserve the rounded bezel corner outside the exact mask`,
+    );
+  }
+  assert.equal(
+    await exists(path.join(firstOutput, "preview-iphone-corners.png")),
+    true,
+  );
+});
+
+test("photographic export rejects a screen opening with the wrong aspect", async (t) => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "chessticize-photo-aspect-"),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const fixture = await createPhotographicFixture(root);
+  fixture.config.presets.iphone.photographicDevice.screenAspectTolerance =
+    0.001;
+  await writeFile(
+    fixture.configPath,
+    `${JSON.stringify(fixture.config, null, 2)}\n`,
+  );
+
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: fixture.captureRoot,
+      deviceFamily: "iphone",
+      layoutConfig: fixture.configPath,
+      outputDir: path.join(root, "output"),
+    }),
+    /photographic screen aspect/,
+  );
+});
+
+test("photographic export enforces headline and product safe areas before writing", async (t) => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "chessticize-photo-safe-area-"),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const headlineFixture = await createPhotographicFixture(
+    path.join(root, "headline"),
+  );
+  headlineFixture.config.presets.iphone.title.leftRatio = 0.2;
+  headlineFixture.config.presets.iphone.title.maxWidthRatio = 0.8;
+  await writeFile(
+    headlineFixture.configPath,
+    `${JSON.stringify(headlineFixture.config, null, 2)}\n`,
+  );
+  const headlineOutput = path.join(root, "headline-output");
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: headlineFixture.captureRoot,
+      deviceFamily: "iphone",
+      layoutConfig: headlineFixture.configPath,
+      outputDir: headlineOutput,
+    }),
+    /headline pixels exceed the configured safe area/,
+  );
+  assert.equal(await exists(headlineOutput), false);
+
+  const deviceFixture = await createPhotographicFixture(
+    path.join(root, "device"),
+  );
+  deviceFixture.config.presets.iphone.product.topRatio = 0.4;
+  deviceFixture.config.presets.iphone.product.maxHeightRatio = 0.6;
+  await writeFile(
+    deviceFixture.configPath,
+    `${JSON.stringify(deviceFixture.config, null, 2)}\n`,
+  );
+  const deviceOutput = path.join(root, "device-output");
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: deviceFixture.captureRoot,
+      deviceFamily: "iphone",
+      layoutConfig: deviceFixture.configPath,
+      outputDir: deviceOutput,
+    }),
+    /device exceeds the configured product safe area/,
+  );
+  assert.equal(await exists(deviceOutput), false);
+});
+
+test("photographic validation rejects open bezels and device drift without partial outputs", async (t) => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "chessticize-photo-fail-closed-"),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+
+  const openFixture = await createPhotographicFixture(path.join(root, "open"));
+  await replacePhotographicScene(openFixture, {
+    family: "iphone",
+    openBezel: true,
+    order: 6,
+  });
+  const openOutput = path.join(root, "open-output");
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: openFixture.captureRoot,
+      deviceFamily: "iphone",
+      layoutConfig: openFixture.configPath,
+      outputDir: openOutput,
+    }),
+    /screen opening|bezel is open/,
+  );
+  assert.equal(await exists(openOutput), false);
+
+  const driftFixture = await createPhotographicFixture(
+    path.join(root, "drift"),
+  );
+  await replacePhotographicScene(driftFixture, {
+    family: "iphone",
+    order: 6,
+    widthDelta: 8,
+  });
+  const driftOutput = path.join(root, "drift-output");
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: driftFixture.captureRoot,
+      deviceFamily: "iphone",
+      layoutConfig: driftFixture.configPath,
+      outputDir: driftOutput,
+    }),
+    /device dimensions exceed their consistency tolerance/,
+  );
+  assert.equal(await exists(driftOutput), false);
+});
+
+test("canonical frame copy, order, and filenames fail closed", async (t) => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "chessticize-frame-contract-"),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const fixture = await createFixture(root);
+  const cases = [
+    {
+      expected: /headline does not match the layout contract/,
+      mutate(manifest) {
+        manifest.frames[1].headline = "Train Your Blunder Radar";
+      },
+      name: "headline",
+    },
+    {
+      expected: /fileName does not match the layout contract/,
+      mutate(manifest) {
+        manifest.frames[1].captures.iphone.fileName =
+          "marketing-02-renamed.png";
+      },
+      name: "filename",
+    },
+    {
+      expected: /frame 1 has order 2/,
+      mutate(manifest) {
+        [manifest.frames[0], manifest.frames[1]] = [
+          manifest.frames[1],
+          manifest.frames[0],
+        ];
+      },
+      name: "order",
+    },
+  ];
+
+  for (const testCase of cases) {
+    const manifest = structuredClone(fixture.manifest);
+    testCase.mutate(manifest);
+    const manifestPath = path.join(root, `${testCase.name}.json`);
+    const outputDir = path.join(root, `output-${testCase.name}`);
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    await assert.rejects(
+      composeMarketingAssets({
+        captureRoot: fixture.captureRoot,
+        layoutConfig: fixture.configPath,
+        manifest: manifestPath,
+        outputDir,
+      }),
+      testCase.expected,
+    );
+    assert.equal(await exists(outputDir), false);
+  }
+});
+
 test("font and rendered-copy contracts fail before unsafe export", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "chessticize-copy-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -369,6 +794,7 @@ test("font and rendered-copy contracts fail before unsafe export", async (t) => 
 
   const unsafeCopyConfig = structuredClone(fixture.config);
   unsafeCopyConfig.presets.iphone.title.maxWidthRatio = 0.12;
+  unsafeCopyConfig.frames[0].headline = "WWWW WWWW";
   const unsafeCopyConfigPath = path.join(root, "unsafe-copy-layout.json");
   await writeFile(
     unsafeCopyConfigPath,
@@ -446,7 +872,7 @@ test("preview-only mode writes contact sheets without final App Store frames", a
   );
 });
 
-test("imagegen background templates are immutable, frame-specific inputs", async (t) => {
+test("imagegen scene templates are immutable, frame-specific inputs", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "chessticize-background-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const fixture = await createFixture(root);
@@ -461,7 +887,7 @@ test("imagegen background templates are immutable, frame-specific inputs", async
       layoutConfig: configPath,
       outputDir: path.join(root, "output"),
     }),
-    /background template SHA-256 does not match/,
+    /scene template SHA-256 does not match/,
   );
 
   const duplicateConfig = structuredClone(fixture.config);

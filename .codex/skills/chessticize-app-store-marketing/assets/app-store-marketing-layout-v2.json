@@ -1,0 +1,309 @@
+{
+  "schemaVersion": 1,
+  "layoutId": "chessticize-photo-studio-a-v2",
+  "compositionMode": "photographic-device",
+  "contractStoryId": "app-store-marketing-en-us-v1",
+  "locale": "en-US",
+  "frames": [
+    {
+      "order": 1,
+      "frameId": "build-tactical-intuition",
+      "captureId": "marketing-01-standard-sprint",
+      "copyKey": "build-tactical-intuition",
+      "headline": "Build Tactical Intuition",
+      "supporting": "Short, rating-matched Sprints build fast pattern recognition.",
+      "fileName": "marketing-01-standard-sprint.png"
+    },
+    {
+      "order": 2,
+      "frameId": "choose-the-best-move",
+      "captureId": "marketing-02-arrow-duel",
+      "copyKey": "choose-the-best-move",
+      "headline": "Choose the Best Move",
+      "supporting": "Arrow Duel trains you to reject a tempting blunder before you play it.",
+      "fileName": "marketing-02-arrow-duel.png"
+    },
+    {
+      "order": 3,
+      "frameId": "focus-your-practice",
+      "captureId": "marketing-03-custom-run",
+      "copyKey": "focus-your-practice",
+      "headline": "Focus Your Practice",
+      "supporting": "Choose themes, pace, and difficulty for the skill you want to train.",
+      "fileName": "marketing-03-custom-run.png"
+    },
+    {
+      "order": 4,
+      "frameId": "make-every-mistake-count",
+      "captureId": "marketing-04-review-queue",
+      "copyKey": "make-every-mistake-count",
+      "headline": "Make Every Mistake Count",
+      "supporting": "Scheduled Review brings missed and unclear puzzles back when they are due.",
+      "fileName": "marketing-04-review-queue.png"
+    },
+    {
+      "order": 5,
+      "frameId": "see-your-progress",
+      "captureId": "marketing-05-rating-trend",
+      "copyKey": "see-your-progress",
+      "headline": "See Your Progress",
+      "supporting": "Follow your Ratings and recent Runs over time.",
+      "fileName": "marketing-05-rating-trend.png"
+    },
+    {
+      "order": 6,
+      "frameId": "private-offline-open-source",
+      "captureId": "marketing-06-trust",
+      "copyKey": "private-offline-open-source",
+      "headline": "Private. Offline. Open Source.",
+      "supporting": "No ads. No Chessticize account. No developer data collection.",
+      "fileName": "marketing-06-trust.png"
+    }
+  ],
+  "visualDirection": {
+    "name": "Photo Studio A",
+    "composition": "product-first-photographic-device",
+    "background": "warm-white-icy-blue-chessboard-v2",
+    "productProof": "immutable-native-capture-in-exact-generated-device-silhouette"
+  },
+  "palette": {
+    "headline": "#071226",
+    "deviceFrame": "#101214",
+    "deviceFrameEdge": "#50545A",
+    "shadow": "#9AAFC0"
+  },
+  "typography": {
+    "fontFamily": "sans-serif",
+    "fontWeight": 760
+  },
+  "presets": {
+    "iphone": {
+      "platform": "app-store",
+      "deviceFamily": "iphone",
+      "displayGroup": "6.9-inch",
+      "orientation": "portrait",
+      "reviewLabel": "iPhone Portrait",
+      "acceptedSourceSizes": [
+        {
+          "width": 1260,
+          "height": 2736
+        },
+        {
+          "width": 1290,
+          "height": 2796
+        },
+        {
+          "width": 1320,
+          "height": 2868
+        }
+      ],
+      "backgroundTemplates": {
+        "build-tactical-intuition": {
+          "file": "photo-studio-frame-01-iphone-portrait-v2.png",
+          "sha256": "f7552c24cc1be7a3f9a6867878b94b43344bc0ae815ac7da828a2bf09428cca0",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "choose-the-best-move": {
+          "file": "photo-studio-frame-02-iphone-portrait-v2.png",
+          "sha256": "6811e1fd62442ef5e55c4352493fe430e223553d3d2836273279b7edd76faa3f",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "focus-your-practice": {
+          "file": "photo-studio-frame-03-iphone-portrait-v2.png",
+          "sha256": "20018886108d040956bc0b1c2db4a139b0bb1e46efb26485a49439d174a71bc5",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "make-every-mistake-count": {
+          "file": "photo-studio-frame-04-iphone-portrait-v2.png",
+          "sha256": "a3daa639ca678171358edd9e716ac6ed51c97d67272ef59c6e50400bb52d79c0",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "see-your-progress": {
+          "file": "photo-studio-frame-05-iphone-portrait-v2.png",
+          "sha256": "715ade2ef5d1693c63b9630611151cd9c6368d4a2f393117f0b0cc7fc4a2e9f2",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "private-offline-open-source": {
+          "file": "photo-studio-frame-06-iphone-portrait-v2.png",
+          "sha256": "975b4654988733e74a4c53958dbe4f54d1a2b21a5582ed5671e8a54def076928",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        }
+      },
+      "photographicDevice": {
+        "darkThreshold": 58,
+        "barrierDilation": 1,
+        "screenAspectTolerance": 0.04,
+        "maskAreaMinRatio": 0.75,
+        "maskAreaMaxRatio": 1.08,
+        "deviceWidthConsistencyTolerance": 0.01,
+        "deviceHeightConsistencyTolerance": 0.01,
+        "dynamicIsland": true
+      },
+      "title": {
+        "leftRatio": 0.075,
+        "topRatio": 0.045,
+        "maxWidthRatio": 0.85,
+        "fontSizeRatio": 0.073,
+        "lineHeightRatio": 0.88,
+        "maxCharactersPerLine": 20,
+        "align": "middle"
+      },
+      "product": {
+        "topRatio": 0.205,
+        "maxWidthRatio": 0.76,
+        "maxHeightRatio": 0.75,
+        "framePaddingRatio": 0.014,
+        "cornerRadiusRatio": 0.037,
+        "edgeWidthRatio": 0.0024,
+        "shadowBlurRatio": 0.017,
+        "shadowOffsetRatio": 0.012
+      }
+    },
+    "ipad": {
+      "platform": "app-store",
+      "deviceFamily": "ipad",
+      "displayGroup": "13-inch",
+      "orientation": "landscape",
+      "reviewLabel": "iPad Landscape",
+      "acceptedSourceSizes": [
+        {
+          "width": 2752,
+          "height": 2064
+        },
+        {
+          "width": 2732,
+          "height": 2048
+        }
+      ],
+      "backgroundTemplates": {
+        "build-tactical-intuition": {
+          "file": "photo-studio-frame-01-ipad-landscape-v2.png",
+          "sha256": "459956072ff6599e519d11011bb721a5153a131bf1f11e0a3f703683146d9d3a",
+          "pixelDimensions": {
+            "width": 1536,
+            "height": 1024
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "choose-the-best-move": {
+          "file": "photo-studio-frame-02-ipad-landscape-v2.png",
+          "sha256": "8b49879518de63ee793f4150ec9a5c1909f4d800f2fcd2a6870c2a155d2000f1",
+          "pixelDimensions": {
+            "width": 1536,
+            "height": 1024
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "focus-your-practice": {
+          "file": "photo-studio-frame-03-ipad-landscape-v2.png",
+          "sha256": "4d1ba217c2b455f176b6347c480b1819d476e4f4477b683b8a7173475845bb2b",
+          "pixelDimensions": {
+            "width": 1536,
+            "height": 1024
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "make-every-mistake-count": {
+          "file": "photo-studio-frame-04-ipad-landscape-v2.png",
+          "sha256": "acdd3a58806cc941509124840dc0bfddd94f921c649b1f0735712f0a0497015a",
+          "pixelDimensions": {
+            "width": 1536,
+            "height": 1024
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "see-your-progress": {
+          "file": "photo-studio-frame-05-ipad-landscape-v2.png",
+          "sha256": "2f5a5dea40a53cbe2e903bd5cb5b0697444f4b958d4b6ef6c6c2711bf11b1e87",
+          "pixelDimensions": {
+            "width": 1536,
+            "height": 1024
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "private-offline-open-source": {
+          "file": "photo-studio-frame-06-ipad-landscape-v2.png",
+          "sha256": "ed01eaee23b4326e83b5275de8e5b9bbf49e0f6f030b3b0b78de65e6af9a4fde",
+          "pixelDimensions": {
+            "width": 1536,
+            "height": 1024
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        }
+      },
+      "photographicDevice": {
+        "darkThreshold": 58,
+        "barrierDilation": 1,
+        "screenAspectTolerance": 0.04,
+        "maskAreaMinRatio": 0.75,
+        "maskAreaMaxRatio": 1.08,
+        "deviceWidthConsistencyTolerance": 0.015,
+        "deviceHeightConsistencyTolerance": 0.015,
+        "dynamicIsland": false
+      },
+      "title": {
+        "leftRatio": 0.075,
+        "topRatio": 0.038,
+        "maxWidthRatio": 0.85,
+        "fontSizeRatio": 0.056,
+        "lineHeightRatio": 0.88,
+        "maxCharactersPerLine": 24,
+        "align": "start"
+      },
+      "product": {
+        "topRatio": 0.2,
+        "maxWidthRatio": 0.82,
+        "maxHeightRatio": 0.76,
+        "framePaddingRatio": 0.011,
+        "cornerRadiusRatio": 0.026,
+        "edgeWidthRatio": 0.0018,
+        "shadowBlurRatio": 0.014,
+        "shadowOffsetRatio": 0.01
+      }
+    }
+  },
+  "preview": {
+    "width": 2400,
+    "background": "#EAF3F8",
+    "label": "#102333",
+    "mutedLabel": "#557084",
+    "gap": 36,
+    "padding": 64
+  }
+}

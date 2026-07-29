@@ -87,7 +87,7 @@ The finalizer fails unless both device sets:
 After the finalizer succeeds, use the reusable
 [App Store marketing composition workflow](APP_STORE_MARKETING_COMPOSITION.md)
 to validate the handoff again, generate the iPhone portrait and iPad landscape
-contact sheets, and export the twelve Cobalt Focus App Store PNGs. Keep the
+contact sheets, and export the twelve Photo Studio A App Store PNGs. Keep the
 raw capture directory immutable; write composed assets to the separate ignored
 `scratch/store-assets/marketing-composed/<full-source-commit>/` directory.
 
