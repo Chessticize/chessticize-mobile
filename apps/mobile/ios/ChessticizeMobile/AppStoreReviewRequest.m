@@ -23,11 +23,14 @@ RCT_EXPORT_METHOD(requestReview:(RCTPromiseResolveBlock)resolve
       UIWindowScene *windowScene = [self foregroundActiveWindowScene];
       if (windowScene != nil) {
         [SKStoreReviewController requestReviewInScene:windowScene];
+        resolve(@YES);
+      } else {
+        resolve(@NO);
       }
     } else {
       [SKStoreReviewController requestReview];
+      resolve(@YES);
     }
-    resolve(nil);
   });
 }
 

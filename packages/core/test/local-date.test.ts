@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import {
   formatLocalCalendarDate,
   formatLocalCalendarDateLabel,
-  formatReviewDay
+  formatReviewDay,
+  localCalendarDateKey
 } from "../src/index.ts";
 
 test("formatLocalCalendarDate formats ISO instants on the requested local calendar day", () => {
@@ -19,6 +20,20 @@ test("formatLocalCalendarDate formats ISO instants on the requested local calend
 
 test("formatLocalCalendarDate keeps invalid values readable", () => {
   assert.equal(formatLocalCalendarDate("not-a-date"), "not-a-date");
+});
+
+test("localCalendarDateKey provides one canonical timezone-aware date key", () => {
+  assert.equal(
+    localCalendarDateKey(
+      "2026-06-22T00:30:00.000Z",
+      "America/Los_Angeles"
+    ),
+    "2026-06-21"
+  );
+  assert.throws(
+    () => localCalendarDateKey("not-a-date"),
+    /valid date/
+  );
 });
 
 test("formatLocalCalendarDateLabel uses one concise label for the current local year", () => {

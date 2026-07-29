@@ -29,6 +29,32 @@ test("the fourth successful rated puzzle Sprint across a second local date is el
   });
 });
 
+test("invalid input and first-launch onboarding history fail closed", () => {
+  assert.equal(ineligibleReason(evaluateAppReviewRequestEligibility({
+    appVersion: "   ",
+    currentSessionId: "current",
+    nowMs: NOW,
+    sessions: []
+  })), "invalid_app_version");
+
+  assert.equal(ineligibleReason(evaluateAppReviewRequestEligibility({
+    appVersion: "1.4.0",
+    currentSessionId: "missing",
+    nowMs: NOW,
+    sessions: []
+  })), "current_sprint_not_successful");
+
+  assert.equal(ineligibleReason(evaluateAppReviewRequestEligibility({
+    appVersion: "1.4.0",
+    currentSessionId: "current",
+    nowMs: NOW,
+    sessions: [{
+      ...successfulSprint("current", "2026-07-29T12:00:00.000Z"),
+      completedAt: "not-a-date"
+    }]
+  })), "current_sprint_not_successful");
+});
+
 test("too few successes or successes on only one local date remain ineligible", () => {
   const threeSessions = [
     successfulSprint("one", "2026-07-28T17:00:00.000Z"),

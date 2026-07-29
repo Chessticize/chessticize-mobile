@@ -6,6 +6,7 @@ import * as ReactNative from "react-native";
 import * as SafeAreaContext from "react-native-safe-area-context";
 import TestRenderer, { act } from "react-test-renderer";
 import {
+  isAppReviewRequestSurfaceBlocked,
   PracticePocScreen,
   type PracticeDebugTraceEvent,
   type PracticeRunManagementPresentation,
@@ -11255,6 +11256,27 @@ describe("PracticePocScreen", () => {
 });
 
 describe("App Store review request scheduling", () => {
+  it("suppresses active modal, guide, analysis, navigation-preview, and error surfaces", () => {
+    const ready = {
+      hasError: false,
+      hasModalOrGuide: false,
+      hasNavigationPreview: false,
+      isAnalysisOpen: false,
+      isPracticeTab: true
+    };
+    expect(isAppReviewRequestSurfaceBlocked(ready)).toBe(false);
+
+    for (const blocked of [
+      { ...ready, hasModalOrGuide: true },
+      { ...ready, isAnalysisOpen: true },
+      { ...ready, hasNavigationPreview: true },
+      { ...ready, hasError: true },
+      { ...ready, isPracticeTab: false }
+    ]) {
+      expect(isAppReviewRequestSurfaceBlocked(blocked)).toBe(true);
+    }
+  });
+
   it("requests StoreKit after an eligible puzzle result remains stable for two seconds", async () => {
     const { current, service } = createAppReviewEligibleService();
     const appStoreReviewRequestClient = new FakeAppStoreReviewRequestClient();
@@ -11331,6 +11353,80 @@ describe("App Store review request scheduling", () => {
 
     expect(appStoreReviewRequestClient.requestCount).toBe(0);
     expect(service.getAppReviewRequestAttempt()).toBeUndefined();
+  });
+
+  it("cancels the result attempt when another transient surface appears", async () => {
+    const { current, service } = createAppReviewEligibleService();
+    const appStoreReviewRequestClient = new FakeAppStoreReviewRequestClient();
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({
+      appStoreReviewRequestClient,
+      applicationMetadata: { versionName: "1.4.0" },
+      currentTimeMs: () => Date.parse("2026-07-29T12:00:00.000Z"),
+      practiceService: service,
+      sprintRulesDesignPreview: { initialResultState: current },
+      systemBack
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+    systemBack.startPredictive();
+    expect(findByTestId(renderer, "mobile-back-destination-preview")).toBeTruthy();
+    systemBack.cancelPredictive();
+    act(() => {
+      jest.advanceTimersByTime(5_000);
+    });
+    await act(async () => {});
+
+    expect(appStoreReviewRequestClient.requestCount).toBe(0);
+    expect(service.getAppReviewRequestAttempt()).toBeUndefined();
+  });
+
+  it("does not consume suppression when the native boundary cannot call StoreKit", async () => {
+    const { current, service } = createAppReviewEligibleService();
+    const requestReview = jest.fn(async () => false);
+    const renderer = renderScreen({
+      appStoreReviewRequestClient: { requestReview },
+      applicationMetadata: { versionName: "1.4.0" },
+      currentTimeMs: () => Date.parse("2026-07-29T12:00:00.000Z"),
+      practiceService: service,
+      sprintRulesDesignPreview: { initialResultState: current }
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(2_000);
+    });
+    await act(async () => {});
+
+    expect(requestReview).toHaveBeenCalledTimes(1);
+    expect(service.getAppReviewRequestAttempt()).toBeUndefined();
+    expect(findByTestId(renderer, "back-practice-button")).toBeTruthy();
+  });
+
+  it("keeps the result usable when local suppression persistence fails", async () => {
+    const { current, service } = createAppReviewEligibleService();
+    const appStoreReviewRequestClient = new FakeAppStoreReviewRequestClient();
+    jest.spyOn(service, "recordAppReviewRequestAttempt").mockImplementation(() => {
+      throw new Error("SQLite unavailable");
+    });
+    const renderer = renderScreen({
+      appStoreReviewRequestClient,
+      applicationMetadata: { versionName: "1.4.0" },
+      currentTimeMs: () => Date.parse("2026-07-29T12:00:00.000Z"),
+      practiceService: service,
+      sprintRulesDesignPreview: { initialResultState: current }
+    });
+
+    act(() => {
+      jest.advanceTimersByTime(2_000);
+    });
+    await act(async () => {});
+
+    expect(appStoreReviewRequestClient.requestCount).toBe(1);
+    expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
+    expect(findByTestId(renderer, "back-practice-button")).toBeTruthy();
+    expect(() => findByTestId(renderer, "error-panel")).toThrow();
   });
 
   it("keeps the result usable when StoreKit rejects or shows no sheet", async () => {

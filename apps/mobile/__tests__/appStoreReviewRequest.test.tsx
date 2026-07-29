@@ -5,12 +5,20 @@ import {
 
 describe("App Store review request boundary", () => {
   it("forwards one request to the native StoreKit module", async () => {
-    const requestReview = jest.fn(async () => undefined);
+    const requestReview = jest.fn(async () => true);
     const client = createNativeAppStoreReviewRequestClient({ requestReview });
 
-    await client?.requestReview();
+    await expect(client?.requestReview()).resolves.toBe(true);
 
     expect(requestReview).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports when the native boundary could not call StoreKit", async () => {
+    const client = createNativeAppStoreReviewRequestClient({
+      requestReview: async () => false
+    });
+
+    await expect(client?.requestReview()).resolves.toBe(false);
   });
 
   it("fails closed when the native module is unavailable", () => {
@@ -21,8 +29,8 @@ describe("App Store review request boundary", () => {
   it("provides a maintained fake for component behavior tests", async () => {
     const client = new FakeAppStoreReviewRequestClient();
 
-    await client.requestReview();
-    await client.requestReview();
+    await expect(client.requestReview()).resolves.toBe(true);
+    await expect(client.requestReview()).resolves.toBe(true);
 
     expect(client.requestCount).toBe(2);
   });

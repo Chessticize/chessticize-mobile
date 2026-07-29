@@ -1,7 +1,8 @@
 import { NativeModules } from "react-native";
 
 export interface AppStoreReviewRequestClient {
-  requestReview(): Promise<void>;
+  /** Resolves true only when the native boundary actually invokes StoreKit. */
+  requestReview(): Promise<boolean>;
 }
 
 type NativeAppStoreReviewRequestModule = {
@@ -12,8 +13,9 @@ export class FakeAppStoreReviewRequestClient
 implements AppStoreReviewRequestClient {
   requestCount = 0;
 
-  async requestReview(): Promise<void> {
+  async requestReview(): Promise<boolean> {
     this.requestCount += 1;
+    return true;
   }
 }
 
@@ -27,8 +29,8 @@ export function createNativeAppStoreReviewRequestClient(
     return null;
   }
   return {
-    async requestReview(): Promise<void> {
-      await nativeModule.requestReview?.();
+    async requestReview(): Promise<boolean> {
+      return await nativeModule.requestReview?.() === true;
     }
   };
 }

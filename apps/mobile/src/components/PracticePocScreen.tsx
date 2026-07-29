@@ -501,6 +501,20 @@ const CUSTOM_INITIAL_RATING_STEP = 100;
 const ARROW_DUEL_LOADING_TRANSITION_MS = 200;
 const APP_REVIEW_REQUEST_IDLE_MS = 2_000;
 
+export function isAppReviewRequestSurfaceBlocked(input: {
+  hasError: boolean;
+  hasModalOrGuide: boolean;
+  hasNavigationPreview: boolean;
+  isAnalysisOpen: boolean;
+  isPracticeTab: boolean;
+}): boolean {
+  return !input.isPracticeTab ||
+    input.hasModalOrGuide ||
+    input.isAnalysisOpen ||
+    input.hasNavigationPreview ||
+    input.hasError;
+}
+
 function openFeedbackIssuesInBrowser(url: string): Promise<void> {
   return Linking.openURL(url);
 }
@@ -2986,12 +3000,13 @@ export function PracticePocScreen({
     topTransient: topBackTransient
   };
   const predictiveBackEnabled = resolveMobileBackIntent(mobileBackState, "button").kind !== "delegate-platform";
-  const appReviewRequestBlocked =
-    tab !== "practice" ||
-    topBackTransient !== null ||
-    reviewAnalysisOpen ||
-    mobileBackPreview !== null ||
-    error !== null;
+  const appReviewRequestBlocked = isAppReviewRequestSurfaceBlocked({
+    hasError: error !== null,
+    hasModalOrGuide: topBackTransient !== null,
+    hasNavigationPreview: mobileBackPreview !== null,
+    isAnalysisOpen: reviewAnalysisOpen,
+    isPracticeTab: tab === "practice"
+  });
 
   useEffect(() => {
     const current = state;
@@ -3018,7 +3033,7 @@ export function PracticePocScreen({
       return undefined;
     }
 
-    let attempted = false;
+    let requestStarted = false;
     const sessionId = current.id;
     const timer = setTimeout(() => {
       const currentState = stateRef.current;
@@ -3038,17 +3053,26 @@ export function PracticePocScreen({
         return;
       }
 
-      attempted = true;
-      service.recordAppReviewRequestAttempt(
-        appVersion,
-        new Date(attemptedAtMs).toISOString()
-      );
-      void appStoreReviewRequestClient.requestReview().catch(() => {});
+      requestStarted = true;
+      void appStoreReviewRequestClient.requestReview().then((requested) => {
+        if (!requested) {
+          return;
+        }
+        try {
+          service.recordAppReviewRequestAttempt(
+            appVersion,
+            new Date(attemptedAtMs).toISOString()
+          );
+        } catch {
+          // The native request already happened. Local suppression failure must
+          // not alter or block the completed puzzle result.
+        }
+      }).catch(() => {});
     }, APP_REVIEW_REQUEST_IDLE_MS);
 
     return () => {
       clearTimeout(timer);
-      if (!attempted) {
+      if (!requestStarted) {
         cancelledSessionIds.add(sessionId);
       }
     };

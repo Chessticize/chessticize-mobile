@@ -24,6 +24,17 @@ export function formatLocalCalendarDate(
   }).format(date);
 }
 
+export function localCalendarDateKey(
+  value: string | number | Date,
+  timeZone?: string
+): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    throw new Error("value must be a valid date");
+  }
+  return localCalendarDatePartsKey(localCalendarDateParts(date, timeZone));
+}
+
 export function formatLocalCalendarDateLabel(
   value: string | number | Date,
   options: LocalCalendarDateLabelOptions
@@ -42,8 +53,8 @@ export function formatLocalCalendarDateLabel(
 
   const dateParts = localCalendarDateParts(date, options.timeZone);
   const nowParts = localCalendarDateParts(now, options.timeZone);
-  const dateKey = localCalendarDateKey(dateParts);
-  const nowKey = localCalendarDateKey(nowParts);
+  const dateKey = localCalendarDatePartsKey(dateParts);
+  const nowKey = localCalendarDatePartsKey(nowParts);
   if (dateKey === nowKey) {
     return "Today";
   }
@@ -112,14 +123,14 @@ function localCalendarDatePart(
   return value;
 }
 
-function localCalendarDateKey(parts: LocalCalendarDateParts): string {
+function localCalendarDatePartsKey(parts: LocalCalendarDateParts): string {
   return `${String(parts.year).padStart(4, "0")}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 }
 
 function offsetLocalCalendarDateKey(parts: LocalCalendarDateParts, days: number): string {
   const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
   date.setUTCDate(date.getUTCDate() + days);
-  return localCalendarDateKey({
+  return localCalendarDatePartsKey({
     year: date.getUTCFullYear(),
     month: date.getUTCMonth() + 1,
     day: date.getUTCDate()

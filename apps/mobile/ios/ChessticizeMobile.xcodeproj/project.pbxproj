@@ -22,10 +22,10 @@
 		A24700032E70000100A00001 /* freesound-546119-piece-placement.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */; };
 		A24700052E70000100A00001 /* freesound-546120-piece-capture.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */; };
 		A24700072E70000100A00001 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A24700082E70000100A00001 /* AVFoundation.framework */; };
-		C41500012E80000100A00001 /* AppStoreReviewRequest.m in Sources */ = {isa = PBXBuildFile; fileRef = C41500022E80000100A00001 /* AppStoreReviewRequest.m */; };
-		C41500032E80000100A00001 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C41500042E80000100A00001 /* StoreKit.framework */; };
 		B35300012E70000100A00001 /* ICloudSyncDiagnostics.m in Sources */ = {isa = PBXBuildFile; fileRef = B35300022E70000100A00001 /* ICloudSyncDiagnostics.m */; };
 		B35300032E70000100A00001 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = B35300042E70000100A00001 /* libsqlite3.tbd */; };
+		C41500012E80000100A00001 /* AppStoreReviewRequest.m in Sources */ = {isa = PBXBuildFile; fileRef = C41500022E80000100A00001 /* AppStoreReviewRequest.m */; };
+		C41500032E80000100A00001 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C41500042E80000100A00001 /* StoreKit.framework */; };
 		D3C7E4DB20DDEF6FD16890C3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
@@ -53,10 +53,10 @@
 		A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = "freesound-546119-piece-placement.mp3"; path = "../../mobile-lab/public/audio/issue-247/freesound-546119-piece-placement.mp3"; sourceTree = SOURCE_ROOT; };
 		A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = "freesound-546120-piece-capture.mp3"; path = "../../mobile-lab/public/audio/issue-247/freesound-546120-piece-capture.mp3"; sourceTree = SOURCE_ROOT; };
 		A24700082E70000100A00001 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
-		C41500022E80000100A00001 /* AppStoreReviewRequest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AppStoreReviewRequest.m; path = ChessticizeMobile/AppStoreReviewRequest.m; sourceTree = "<group>"; };
-		C41500042E80000100A00001 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		B35300022E70000100A00001 /* ICloudSyncDiagnostics.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ICloudSyncDiagnostics.m; path = ChessticizeMobile/ICloudSyncDiagnostics.m; sourceTree = "<group>"; };
 		B35300042E70000100A00001 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		C41500022E80000100A00001 /* AppStoreReviewRequest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AppStoreReviewRequest.m; path = ChessticizeMobile/AppStoreReviewRequest.m; sourceTree = "<group>"; };
+		C41500042E80000100A00001 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 

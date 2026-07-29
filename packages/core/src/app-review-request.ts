@@ -1,4 +1,5 @@
 import type { SprintEndReason, SprintStatus } from "./types.ts";
+import { localCalendarDateKey } from "./local-date.ts";
 
 export const APP_REVIEW_REQUEST_COOLDOWN_MS = 120 * 24 * 60 * 60 * 1000;
 
@@ -85,10 +86,7 @@ export function evaluateAppReviewRequestEligibility(
   const successfulSprintCount = successfulSessions.length;
   const successfulLocalDateCount = new Set(
     successfulSessions.map((session) =>
-      localCalendarDateKey(
-        new Date(session.completedAt as string),
-        input.timeZone
-      )
+      localCalendarDateKey(session.completedAt, input.timeZone)
     )
   ).size;
   const counts = { successfulSprintCount, successfulLocalDateCount };
@@ -130,25 +128,6 @@ function isSuccessfulRatedPuzzleSprint(
     !session.focused &&
     typeof session.completedAt === "string" &&
     Number.isFinite(Date.parse(session.completedAt));
-}
-
-function localCalendarDateKey(date: Date, timeZone?: string): string {
-  if (!timeZone) {
-    return [
-      String(date.getFullYear()).padStart(4, "0"),
-      String(date.getMonth() + 1).padStart(2, "0"),
-      String(date.getDate()).padStart(2, "0")
-    ].join("-");
-  }
-  const parts = new Intl.DateTimeFormat("en-CA-u-ca-gregory-nu-latn", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(date);
-  return ["year", "month", "day"]
-    .map((type) => parts.find((part) => part.type === type)?.value ?? "")
-    .join("-");
 }
 
 function ineligible(
