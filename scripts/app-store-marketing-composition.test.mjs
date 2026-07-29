@@ -503,12 +503,15 @@ test("full export is deterministic and preserves the six-frame device contracts"
     const secondBytes = await readFile(path.join(secondOutput, artifact.file));
     assert.equal(sha256(firstBytes), artifact.sha256);
     assert.equal(sha256(secondBytes), artifact.sha256);
+    const metadata = await sharp(firstBytes).metadata();
     assert.deepEqual(
-      await sharp(firstBytes).metadata().then(({ width, height }) => ({
-        width,
-        height,
-      })),
+      { height: metadata.height, width: metadata.width },
       artifact.dimensions,
+    );
+    assert.equal(
+      metadata.hasAlpha,
+      false,
+      `${artifact.file} must not contain transparency`,
     );
   }
 });
@@ -551,6 +554,11 @@ test("photographic export uses exact bezel masks and enforces device consistency
     assert.ok(artifact.deviceGeometry.outputScreen.height > 0);
     const outputPath = path.join(firstOutput, artifact.file);
     assert.equal(await exists(outputPath), true);
+    assert.equal(
+      (await sharp(outputPath).metadata()).hasAlpha,
+      false,
+      `${artifact.file} must not contain transparency`,
+    );
     const sourcePath = path.join(
       fixture.captureRoot,
       artifact.sourceFile,

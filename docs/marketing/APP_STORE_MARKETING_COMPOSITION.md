@@ -117,7 +117,8 @@ scratch/store-assets/marketing-composed/<source-commit>/
   composition-manifest.json
 ```
 
-The final PNG dimensions exactly match each accepted raw source dimension.
+The final PNG dimensions exactly match each accepted raw source dimension, and
+every upload asset is encoded without an alpha channel.
 The compositor uniformly scales the raw UI into the detected screen opening
 and clips it with the exact bezel-derived silhouette. It does not retouch or
 generate pixels inside the app screen.
