@@ -19,8 +19,9 @@ host Rotate control because current iPadOS windowing can reject an in-app
 orientation request. It verifies the framebuffer before starting the iPad
 capture and restores that Simulator to portrait when the command finishes or
 fails. After the iPhone capture, the wrapper restarts only the Mac Simulator
-host UI before opening the exact iPad window; it does not shut down or erase
-either simulated device.
+host UI before opening the exact iPad window. If that UI becomes windowless
+without exiting, the wrapper verifies the executable path and terminates only
+that host process. It does not shut down or erase either simulated device.
 
 Different names may be supplied with
 `CHESSTICIZE_MARKETING_IPHONE_DEVICE` and

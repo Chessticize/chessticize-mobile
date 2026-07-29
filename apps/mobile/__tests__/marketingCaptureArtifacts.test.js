@@ -234,6 +234,8 @@ describe('App Store marketing capture artifacts', () => {
     expect(wrapper).toContain('set-simulator-orientation.sh');
     expect(wrapper).toContain('/usr/bin/open -a Simulator --args -CurrentDeviceUDID');
     expect(wrapper).toContain('tell application "Simulator" to quit');
+    expect(wrapper).toContain('/bin/kill -TERM "$simulator_pid"');
+    expect(wrapper).toContain('/Simulator.app/Contents/MacOS/Simulator');
     expect(wrapper).toContain('every window whose name starts with deviceName');
     expect(wrapper).not.toContain(
       'prepare_simulator_orientation "$IPHONE_UDID" "$IPHONE_DEVICE_NAME"'

@@ -61,6 +61,23 @@ prepare_simulator_orientation() {
   xcrun simctl boot "$device_udid" 2>/dev/null || true
   xcrun simctl bootstatus "$device_udid" -b
   /usr/bin/osascript -e 'tell application "Simulator" to quit'
+  for _ in {1..8}; do
+    if ! /usr/bin/pgrep -x Simulator >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.25
+  done
+  local simulator_pid
+  local simulator_process
+  while IFS= read -r simulator_pid; do
+    [[ -n "$simulator_pid" ]] || continue
+    simulator_process="$(/bin/ps -p "$simulator_pid" -o command=)"
+    if [[ "$simulator_process" != *"/Simulator.app/Contents/MacOS/Simulator"* ]]; then
+      echo "Refusing to terminate unexpected Simulator process: $simulator_process" >&2
+      exit 69
+    fi
+    /bin/kill -TERM "$simulator_pid"
+  done < <(/usr/bin/pgrep -x Simulator || true)
   for _ in {1..40}; do
     if ! /usr/bin/pgrep -x Simulator >/dev/null 2>&1; then
       break
