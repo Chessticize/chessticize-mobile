@@ -106,6 +106,15 @@ class StockfishRunner::Impl {
   std::function<void(std::string)> emit;
 
   void configureCallbacks() {
+    engine.set_on_iter([this](const Engine::InfoIter& info) {
+      std::stringstream output;
+      output << "info"
+             << " depth " << info.depth
+             << " currmove " << info.currmove
+             << " currmovenumber " << info.currmovenumber;
+      emit(output.str());
+    });
+
     engine.set_on_update_no_moves([this](const Engine::InfoShort& info) {
       std::stringstream output;
       output << "info depth " << info.depth << " score " << UCIEngine::format_score(info.score);

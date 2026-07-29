@@ -48,6 +48,7 @@ describe("release source configuration", () => {
     expect(podspec).toContain('stockfish.fetch("bridge")');
     expect(podspec).toContain('stockfish.fetch("nnue")');
     expect(podspec).toContain('"ios/StockfishEngine/Native/**/*.{h,mm}"');
+    expect(podspec).toContain('File.join(stockfish_bridge, "tests/**/*")');
   });
 
   it("keeps one platform-neutral UCI runner behind thin native wrappers", () => {

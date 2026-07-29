@@ -63,3 +63,6 @@ jobs:
 
       - name: Mobile component tests
         run: pnpm mobile:test
+
+      - name: Native Stockfish lifecycle regression
+        run: pnpm mobile:test:native-stockfish
