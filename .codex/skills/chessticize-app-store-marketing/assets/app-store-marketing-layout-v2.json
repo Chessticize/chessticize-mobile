@@ -4,6 +4,62 @@
   "compositionMode": "photographic-device",
   "contractStoryId": "app-store-marketing-en-us-v1",
   "locale": "en-US",
+  "frames": [
+    {
+      "order": 1,
+      "frameId": "build-tactical-intuition",
+      "captureId": "marketing-01-standard-sprint",
+      "copyKey": "build-tactical-intuition",
+      "headline": "Build Tactical Intuition",
+      "supporting": "Short, rating-matched Sprints build fast pattern recognition.",
+      "fileName": "marketing-01-standard-sprint.png"
+    },
+    {
+      "order": 2,
+      "frameId": "choose-the-best-move",
+      "captureId": "marketing-02-arrow-duel",
+      "copyKey": "choose-the-best-move",
+      "headline": "Choose the Best Move",
+      "supporting": "Arrow Duel trains you to reject a tempting blunder before you play it.",
+      "fileName": "marketing-02-arrow-duel.png"
+    },
+    {
+      "order": 3,
+      "frameId": "focus-your-practice",
+      "captureId": "marketing-03-custom-run",
+      "copyKey": "focus-your-practice",
+      "headline": "Focus Your Practice",
+      "supporting": "Choose themes, pace, and difficulty for the skill you want to train.",
+      "fileName": "marketing-03-custom-run.png"
+    },
+    {
+      "order": 4,
+      "frameId": "make-every-mistake-count",
+      "captureId": "marketing-04-review-queue",
+      "copyKey": "make-every-mistake-count",
+      "headline": "Make Every Mistake Count",
+      "supporting": "Scheduled Review brings missed and unclear puzzles back when they are due.",
+      "fileName": "marketing-04-review-queue.png"
+    },
+    {
+      "order": 5,
+      "frameId": "see-your-progress",
+      "captureId": "marketing-05-rating-trend",
+      "copyKey": "see-your-progress",
+      "headline": "See Your Progress",
+      "supporting": "Follow your Ratings and recent Runs over time.",
+      "fileName": "marketing-05-rating-trend.png"
+    },
+    {
+      "order": 6,
+      "frameId": "private-offline-open-source",
+      "captureId": "marketing-06-trust",
+      "copyKey": "private-offline-open-source",
+      "headline": "Private. Offline. Open Source.",
+      "supporting": "No ads. No Chessticize account. No developer data collection.",
+      "fileName": "marketing-06-trust.png"
+    }
+  ],
   "visualDirection": {
     "name": "Photo Studio A",
     "composition": "product-first-photographic-device",

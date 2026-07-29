@@ -126,17 +126,25 @@ generate pixels inside the app screen.
 
 Before writing an output, the command validates:
 
-- story ID, locale, six-frame order, IDs, and copy keys;
+- story ID and locale;
+- six canonical frame records covering order, IDs, English headline and
+  supporting copy, and exact output filenames;
 - platform, device-family, and orientation selection against config-defined
   presets;
 - device family, display group, orientation, and accepted pixel dimensions;
 - the recorded PNG dimensions and SHA-256 for every selected source;
 - the frame ID, dimensions, orientation, and SHA-256 of all twelve frozen
   Imagegen scene templates;
+- the actual headline-pixel and photographic-device bounds against their
+  configured title and product safe areas;
 - screen-opening aspect compatibility with the raw device capture;
 - closed-bezel mask area and per-family device-size consistency;
 - relative PNG paths, symlink containment, and stable output filenames; and
 - separation between the immutable raw handoff and composed output.
+
+All selected frames and review sheets are composed and validated in memory
+before the output directory is created or changed. A late mask, safe-area, or
+device-consistency failure therefore cannot leave a partial final set.
 
 Photo Studio A's reviewed headlines are part of the frozen scene templates.
 The canonical text remains in the story contract, and any copy change requires

@@ -95,6 +95,11 @@ creating a new visual revision:
   secondary marketing paragraph.
 - Keep the scene headline identical to the canonical contract. A copy change
   requires a new reviewed scene hash; do not edit text during export.
+- Treat the layout's six canonical frame records as authoritative for order,
+  IDs, English copy, and output filenames. Do not accept a self-consistent
+  capture manifest that changes those values.
+- Detect the actual dark headline pixels and photographic device bounds in
+  every frozen scene, then reject either one outside its configured safe area.
 - Reject a screen opening with the wrong source aspect, an implausible mask
   area, or device-size drift beyond the configured family tolerance.
 - Keep generated PNGs and contact sheets under ignored `scratch/` paths unless
@@ -104,10 +109,12 @@ creating a new visual revision:
 
 ## Failure Behavior
 
-The command validates the complete selected family before writing outputs. It
+The command composes and validates the complete selected family in memory
+before creating or changing the output directory. It
 fails on a story or locale mismatch, missing or duplicate frames, wrong order,
-wrong device/orientation/display group, unsupported dimensions, changed
-SHA-256, missing raw or scene PNG, a missing frame-specific scene, wrong screen
+canonical copy or filename drift, wrong device/orientation/display group,
+unsupported dimensions, changed SHA-256, missing raw or scene PNG, a missing
+frame-specific scene, headline or device safe-area overflow, wrong screen
 aspect, invalid closed-bezel mask, inconsistent device size, path traversal,
 escaping symlinks, unsafe output names, or an output directory inside the raw
 handoff.

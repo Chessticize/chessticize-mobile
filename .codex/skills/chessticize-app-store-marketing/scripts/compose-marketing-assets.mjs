@@ -26,6 +26,13 @@ const COMPOSITION_MODES = new Set([
   "flat-device-frame",
   "photographic-device",
 ]);
+const FRAME_CONTRACT_KEYS = [
+  "frameId",
+  "captureId",
+  "copyKey",
+  "headline",
+  "supporting",
+];
 
 function fail(message) {
   throw new Error(`[marketing-composition] ${message}`);
@@ -220,6 +227,44 @@ function isHexColor(value) {
   );
 }
 
+function validateCanonicalFrames(config, compositionMode) {
+  if (config.frames === undefined) {
+    if (compositionMode === "photographic-device") {
+      fail("photographic layout config must define its canonical frames");
+    }
+    return;
+  }
+  if (
+    !Array.isArray(config.frames) ||
+    config.frames.length !== EXPECTED_FRAME_COUNT
+  ) {
+    fail(`layout config must define exactly ${EXPECTED_FRAME_COUNT} frames`);
+  }
+  const seenFrameIds = new Set();
+  for (let index = 0; index < config.frames.length; index += 1) {
+    const frame = config.frames[index];
+    const expectedOrder = index + 1;
+    if (frame.order !== expectedOrder) {
+      fail(`layout frame ${expectedOrder} has order ${frame.order}`);
+    }
+    for (const key of [...FRAME_CONTRACT_KEYS, "fileName"]) {
+      if (typeof frame[key] !== "string" || frame[key].trim() === "") {
+        fail(`layout frame ${expectedOrder} is missing ${key}`);
+      }
+    }
+    if (
+      frame.fileName !== path.basename(frame.fileName) ||
+      frame.fileName !== `${frame.captureId}.png`
+    ) {
+      fail(`layout frame ${expectedOrder} has an unsafe canonical filename`);
+    }
+    if (seenFrameIds.has(frame.frameId)) {
+      fail(`layout config has duplicate frameId: ${frame.frameId}`);
+    }
+    seenFrameIds.add(frame.frameId);
+  }
+}
+
 function validateLayoutConfig(config) {
   if (config.schemaVersion !== 1) {
     fail(`unsupported layout schema version: ${config.schemaVersion}`);
@@ -231,6 +276,7 @@ function validateLayoutConfig(config) {
   if (!config.layoutId || !config.contractStoryId || !config.locale) {
     fail("layout config must define layoutId, contractStoryId, and locale");
   }
+  validateCanonicalFrames(config, compositionMode);
   for (const section of [
     "palette",
     "typography",
@@ -295,6 +341,16 @@ function validateLayoutConfig(config) {
     }
     if (!/^[a-z0-9][a-z0-9.-]*$/u.test(preset.displayGroup)) {
       fail(`${family} preset must use a safe display group`);
+    }
+    const templateFrameIds = Object.keys(preset.backgroundTemplates);
+    if (
+      config.frames &&
+      (templateFrameIds.length !== config.frames.length ||
+        config.frames.some(
+          ({ frameId }) => !preset.backgroundTemplates[frameId],
+        ))
+    ) {
+      fail(`${family} scene templates do not match the canonical frames`);
     }
     if (
       !preset.acceptedSourceSizes.every(
@@ -387,13 +443,7 @@ function validateFrameContract(frame, expectedOrder) {
   if (frame.order !== expectedOrder) {
     fail(`frame ${expectedOrder} has order ${frame.order}`);
   }
-  for (const key of [
-    "frameId",
-    "captureId",
-    "copyKey",
-    "headline",
-    "supporting",
-  ]) {
+  for (const key of FRAME_CONTRACT_KEYS) {
     if (typeof frame[key] !== "string" || frame[key].trim() === "") {
       fail(`frame ${expectedOrder} is missing ${key}`);
     }
@@ -537,6 +587,16 @@ export async function validateManifest({
     const frame = manifest.frames[index];
     const expectedOrder = index + 1;
     validateFrameContract(frame, expectedOrder);
+    const canonicalFrame = config.frames?.[index];
+    if (canonicalFrame) {
+      for (const key of FRAME_CONTRACT_KEYS) {
+        if (frame[key] !== canonicalFrame[key]) {
+          fail(
+            `frame ${expectedOrder} ${key} does not match the layout contract`,
+          );
+        }
+      }
+    }
     if (seenFrameIds.has(frame.frameId)) {
       fail(`duplicate frameId: ${frame.frameId}`);
     }
@@ -570,6 +630,14 @@ export async function validateManifest({
       }
       if (capture.locale !== locale) {
         fail(`frame ${expectedOrder} ${family} locale is ${capture.locale}`);
+      }
+      if (
+        canonicalFrame &&
+        capture.fileName !== canonicalFrame.fileName
+      ) {
+        fail(
+          `frame ${expectedOrder} ${family} fileName does not match the layout contract`,
+        );
       }
       if (capture.sourceCommit !== sourceCommit) {
         fail(
@@ -911,6 +979,42 @@ async function largestDarkComponent(scenePath, threshold) {
   return { ...largest, height, width };
 }
 
+async function headlineDarkBounds(scenePath, threshold, bandBottomRatio) {
+  const { data, info } = await sharp(scenePath)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { channels, height, width } = info;
+  const bottom = Math.min(
+    height,
+    Math.max(1, Math.round(height * bandBottomRatio)),
+  );
+  let minX = width;
+  let maxX = -1;
+  let minY = bottom;
+  let maxY = -1;
+  for (let y = 0; y < bottom; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (!isDarkPixel(data, (y * width + x) * channels, threshold)) {
+        continue;
+      }
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  if (maxX < minX || maxY < minY) {
+    fail(`no headline pixels found in ${scenePath}`);
+  }
+  return {
+    height: maxY - minY + 1,
+    left: minX,
+    top: minY,
+    width: maxX - minX + 1,
+  };
+}
+
 function findScreenRect(component) {
   const member = new Uint8Array(component.width * component.height);
   for (const pixel of component.pixels) {
@@ -1018,6 +1122,60 @@ function transformRect(rect, crop, target) {
   };
 }
 
+function rectInside(inner, outer) {
+  return (
+    inner.left >= outer.left &&
+    inner.top >= outer.top &&
+    inner.left + inner.width <= outer.left + outer.width &&
+    inner.top + inner.height <= outer.top + outer.height
+  );
+}
+
+function validatePhotographicSafeAreas({
+  component,
+  crop,
+  headlineBounds,
+  preset,
+  target,
+}) {
+  const outputHeadline = transformRect(headlineBounds, crop, target);
+  const componentRect = {
+    height: component.bounds.maxY - component.bounds.minY + 1,
+    left: component.bounds.minX,
+    top: component.bounds.minY,
+    width: component.bounds.maxX - component.bounds.minX + 1,
+  };
+  const outputDevice = transformRect(componentRect, crop, target);
+  const titleSafeArea = {
+    height: Math.round(
+      (preset.product.topRatio - preset.title.topRatio) * target.height,
+    ),
+    left: Math.round(preset.title.leftRatio * target.width),
+    top: Math.round(preset.title.topRatio * target.height),
+    width: Math.round(preset.title.maxWidthRatio * target.width),
+  };
+  if (
+    titleSafeArea.height <= 0 ||
+    !rectInside(outputHeadline, titleSafeArea)
+  ) {
+    fail("photographic headline pixels exceed the configured safe area");
+  }
+  const productTop = Math.round(preset.product.topRatio * target.height);
+  if (
+    outputDevice.left < 0 ||
+    outputDevice.top < productTop ||
+    outputDevice.left + outputDevice.width > target.width ||
+    outputDevice.top + outputDevice.height > target.height ||
+    outputDevice.width >
+      Math.round(preset.product.maxWidthRatio * target.width) ||
+    outputDevice.height >
+      Math.round(preset.product.maxHeightRatio * target.height)
+  ) {
+    fail("photographic device exceeds the configured product safe area");
+  }
+  return { outputDevice, outputHeadline, titleSafeArea };
+}
+
 function normalizeScreenAspect(rect, source, tolerance) {
   const expected = source.width / source.height;
   const actual = rect.width / rect.height;
@@ -1072,6 +1230,15 @@ function buildExactScreenMask(component, screenRect, contract) {
   const seedX = Math.round(screenRect.left + screenRect.width / 2);
   const seedY = Math.round(screenRect.top + screenRect.height / 2);
   const seed = seedY * width + seedX;
+  if (
+    seedX < 0 ||
+    seedX >= width ||
+    seedY < 0 ||
+    seedY >= height ||
+    barrier[seed]
+  ) {
+    fail("photographic screen mask has no valid interior seed");
+  }
   queue[tail] = seed;
   tail += 1;
   filled[seed] = 1;
@@ -1093,6 +1260,15 @@ function buildExactScreenMask(component, screenRect, contract) {
         queue[tail] = neighbor;
         tail += 1;
       }
+    }
+  }
+
+  for (let index = 0; index < tail; index += 1) {
+    const pixel = queue[index];
+    const x = pixel % width;
+    const y = Math.floor(pixel / width);
+    if (x === minX || x === maxX || y === minY || y === maxY) {
+      fail("photographic device bezel is open");
     }
   }
 
@@ -1193,23 +1369,32 @@ function dynamicIsland(outputScreen) {
 async function composePhotographicFrame(item, backgroundTemplate) {
   const target = item.capture.pixelDimensions;
   const contract = item.preset.photographicDevice;
-  const [sceneMetadata, sourceMetadata, component] = await Promise.all([
-    sharp(backgroundTemplate.path).metadata(),
-    sharp(item.inputPath).metadata(),
-    largestDarkComponent(backgroundTemplate.path, contract.darkThreshold),
-  ]);
+  const [sceneMetadata, sourceMetadata, component, headlineBounds] =
+    await Promise.all([
+      sharp(backgroundTemplate.path).metadata(),
+      sharp(item.inputPath).metadata(),
+      largestDarkComponent(backgroundTemplate.path, contract.darkThreshold),
+      headlineDarkBounds(
+        backgroundTemplate.path,
+        contract.darkThreshold,
+        item.preset.product.topRatio,
+      ),
+    ]);
   const detectedScreen = findScreenRect(component);
   const normalizedScreen = normalizeScreenAspect(
     detectedScreen,
     sourceMetadata,
     contract.screenAspectTolerance,
   );
-  const exactMask = buildExactScreenMask(
-    component,
-    detectedScreen,
-    contract,
-  );
+  const exactMask = buildExactScreenMask(component, detectedScreen, contract);
   const crop = cropForAspect(sceneMetadata, target);
+  const safeAreas = validatePhotographicSafeAreas({
+    component,
+    crop,
+    headlineBounds,
+    preset: item.preset,
+    target,
+  });
   const outputScreen = transformRect(normalizedScreen, crop, target);
   const [scene, screenshot] = await Promise.all([
     sharp(backgroundTemplate.path)
@@ -1249,7 +1434,10 @@ async function composePhotographicFrame(item, backgroundTemplate) {
       exactMaskPixelCount: exactMask.pixelCount,
       maskStrategy: "closed-bezel-flood-fill",
       normalizedScreen,
+      outputDevice: safeAreas.outputDevice,
+      outputHeadline: safeAreas.outputHeadline,
       outputScreen,
+      titleSafeArea: safeAreas.titleSafeArea,
     },
     dimensions: target,
   };
@@ -1635,12 +1823,8 @@ export async function composeMarketingAssets(rawOptions) {
     fail("every selected frame and device family must use a distinct background");
   }
 
-  await mkdir(path.resolve(options.outputDir), { recursive: true });
-  assertOutputSeparated(
-    resolvedCaptureRoot,
-    await realpath(path.resolve(options.outputDir)),
-  );
   const artifacts = [];
+  const pendingWrites = [];
   const composedByFamily = new Map(
     deviceFamilies.map((family) => [family, []]),
   );
@@ -1654,9 +1838,6 @@ export async function composeMarketingAssets(rawOptions) {
       outputFileName(item),
     );
     if (!options.previewOnly) {
-      const outputPath = path.join(path.resolve(options.outputDir), relativeFile);
-      await mkdir(path.dirname(outputPath), { recursive: true });
-      await writeFile(outputPath, composed.buffer);
       artifacts.push({
         deviceFamily: item.family,
         ...(composed.deviceGeometry
@@ -1675,6 +1856,10 @@ export async function composeMarketingAssets(rawOptions) {
         sha256: sha256Buffer(composed.buffer),
         sourceFile: item.capture.file,
         sourceSha256: item.capture.sha256,
+      });
+      pendingWrites.push({
+        buffer: composed.buffer,
+        relativeFile,
       });
     }
     composedByFamily.get(item.family).push({
@@ -1696,16 +1881,16 @@ export async function composeMarketingAssets(rawOptions) {
       config,
     );
     const relativeFile = `preview-${family}-contact-sheet.png`;
-    await writeFile(
-      path.join(path.resolve(options.outputDir), relativeFile),
-      contactSheet.buffer,
-    );
     contactSheets.push({
       deviceFamily: family,
       dimensions: contactSheet.dimensions,
       file: relativeFile,
       kind: "overview",
       sha256: sha256Buffer(contactSheet.buffer),
+    });
+    pendingWrites.push({
+      buffer: contactSheet.buffer,
+      relativeFile,
     });
   }
   if (
@@ -1717,16 +1902,16 @@ export async function composeMarketingAssets(rawOptions) {
       config,
     );
     const relativeFile = "preview-iphone-corners.png";
-    await writeFile(
-      path.join(path.resolve(options.outputDir), relativeFile),
-      cornerSheet.buffer,
-    );
     contactSheets.push({
       deviceFamily: "iphone",
       dimensions: cornerSheet.dimensions,
       file: relativeFile,
       kind: "corner-audit",
       sha256: sha256Buffer(cornerSheet.buffer),
+    });
+    pendingWrites.push({
+      buffer: cornerSheet.buffer,
+      relativeFile,
     });
   }
 
@@ -1767,10 +1952,18 @@ export async function composeMarketingAssets(rawOptions) {
     artifacts,
     contactSheets,
   };
-  const outputManifestPath = path.join(
-    path.resolve(options.outputDir),
-    "composition-manifest.json",
+  const outputRoot = path.resolve(options.outputDir);
+  const outputManifestPath = path.join(outputRoot, "composition-manifest.json");
+  await mkdir(outputRoot, { recursive: true });
+  assertOutputSeparated(
+    resolvedCaptureRoot,
+    await realpath(outputRoot),
   );
+  for (const pending of pendingWrites) {
+    const outputPath = path.join(outputRoot, pending.relativeFile);
+    await mkdir(path.dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, pending.buffer);
+  }
   await writeFile(outputManifestPath, stableJson(outputManifest));
   return {
     manifest: outputManifest,
