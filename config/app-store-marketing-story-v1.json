@@ -279,10 +279,10 @@
     },
     {
       "order": 4,
-      "id": "turn-mistakes-into-memory",
+      "id": "make-every-mistake-count",
       "captureId": "marketing-04-review-queue",
-      "copyKey": "turn-mistakes-into-memory",
-      "headline": "Turn Mistakes Into Memory",
+      "copyKey": "make-every-mistake-count",
+      "headline": "Make Every Mistake Count",
       "supporting": "Scheduled Review brings missed and unclear puzzles back when they are due.",
       "benefit": "A calm, manageable spaced-review loop",
       "source": {

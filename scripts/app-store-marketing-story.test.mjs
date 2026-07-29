@@ -22,7 +22,7 @@ test("App Store marketing story defines the canonical six-frame order and copy",
     "build-tactical-intuition",
     "choose-the-best-move",
     "train-your-weaknesses",
-    "turn-mistakes-into-memory",
+    "make-every-mistake-count",
     "see-what-is-improving",
     "private-offline-open-source"
   ];

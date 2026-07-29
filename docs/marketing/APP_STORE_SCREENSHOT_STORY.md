@@ -16,7 +16,7 @@ separate visual regression and release-validation workflow. Issues #411 and
 | 1 | **Build Tactical Intuition** | Short, rating-matched Sprints build fast pattern recognition. | A healthy Standard Sprint at 8 / 15, 2:42 remaining, and no mistakes. |
 | 2 | **Choose the Best Move** | Arrow Duel trains you to reject a tempting blunder before you play it. | An untouched Arrow Duel position with exactly two neutral candidate arrows. |
 | 3 | **Train Your Weaknesses** | Tactical Profiles turn repeated patterns into a focused Practice Run. | The real Focused Run preview for a Fork reliability recommendation, including the current-Rating anchor and training mix. |
-| 4 | **Turn Mistakes Into Memory** | Scheduled Review brings missed and unclear puzzles back when they are due. | Two of six reviews completed today, four remaining, no overdue warning, and a small forward workload. |
+| 4 | **Make Every Mistake Count** | Scheduled Review brings missed and unclear puzzles back when they are due. | Two of six reviews completed today, four remaining, no overdue warning, and a small forward workload. |
 | 5 | **See What Is Improving** | Track theme-by-theme progress across weeks, not just one score. | The Pins completed-speed series improving from 1.30× to 1.06× matched time across eight weeks. |
 | 6 | **Private. Offline. Open Source.** | No ads. No Chessticize account. No developer data collection. | The real Settings About rows for the GPL license, public source, embedded Stockfish, and puzzle-data attribution. |
 
