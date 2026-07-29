@@ -122,6 +122,15 @@ test("fictional-user values stay coherent across the six frames", async () => {
   );
   assert.equal(user.reviewQueue.overdue, 0);
 
+  assert.equal(
+    story.frames[0].source.stableText["session-timer"],
+    formatTimer(user.activeSnapshots.standard.sprintRemainingSeconds)
+  );
+  assert.equal(
+    story.frames[1].source.stableText["session-timer"],
+    formatTimer(user.activeSnapshots.arrowDuel.sprintRemainingSeconds)
+  );
+
   assert.equal(user.ratingHistory.latestRating, user.ratings.standard);
   assert.equal(
     user.ratingHistory.points.at(-1)?.rating,
@@ -163,6 +172,12 @@ test("fictional-user values stay coherent across the six frames", async () => {
     assert.equal(attempt.submittedMove, attempt.expectedMove);
   }
 });
+
+function formatTimer(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
 
 test("story source identity and claim evidence match version-controlled files", async () => {
   const [story, packManifest, bundledPuzzles] = await Promise.all([
