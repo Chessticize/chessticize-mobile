@@ -1504,6 +1504,18 @@ describe('Detox suite configuration', () => {
       '<rootDir>/e2e/marketing-assets.e2e.js'
     ]);
     expect(MARKETING_ASSETS_TEST_MATCH).not.toEqual(STORE_ASSETS_TEST_MATCH);
+
+    const spec = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/marketing-assets.e2e.js'),
+      'utf8'
+    );
+    const launchHelperStart = spec.indexOf('async function launchMarketingFrame');
+    const launchHelperEnd = spec.indexOf('async function prepareFrame', launchHelperStart);
+    const launchHelper = spec.slice(launchHelperStart, launchHelperEnd);
+    expect(launchHelper.indexOf('launchWithDisabledSynchronization'))
+      .toBeGreaterThan(0);
+    expect(launchHelper.indexOf('setMarketingOrientationBeforeNavigation'))
+      .toBeGreaterThan(launchHelper.indexOf('launchWithDisabledSynchronization'));
   });
 
   it('keeps the adaptive layout screenshot spec available through its opt-in command', () => {

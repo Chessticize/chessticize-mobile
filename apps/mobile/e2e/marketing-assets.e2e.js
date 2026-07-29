@@ -42,7 +42,6 @@ describeMarketingAssets('App Store marketing screenshot capture', () => {
     }
     const records = [];
     for (const frame of story.frames.slice().sort((left, right) => left.order - right.order)) {
-      await setMarketingOrientationBeforeNavigation();
       await launchMarketingFrame(frame);
       await prepareFrame(frame);
       await assertFrameContract(frame);
@@ -76,6 +75,7 @@ async function launchMarketingFrame(frame) {
       chessticizeTestNowMs: String(Date.parse(story.captureClock.instant)),
     },
   });
+  await setMarketingOrientationBeforeNavigation();
   await waitFor(element(by.id('adaptive-layout'))).toExist().withTimeout(180000);
   await waitForStableOrientation(target.orientation);
 }
