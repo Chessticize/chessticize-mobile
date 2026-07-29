@@ -1,6 +1,6 @@
 # App Store Screenshot Story
 
-This document defines the issue #410 review candidate for Chessticize's
+This document defines the approved issue #410 contract for Chessticize's
 English App Store screenshot sequence. The machine-readable contract is
 [`config/app-store-marketing-story-v1.json`](../../config/app-store-marketing-story-v1.json).
 
@@ -17,7 +17,7 @@ separate visual regression and release-validation workflow. Issues #411 and
 | 2 | **Choose the Best Move** | Arrow Duel trains you to reject a tempting blunder before you play it. | An untouched Arrow Duel position with exactly two neutral candidate arrows. |
 | 3 | **Focus Your Practice** | Choose themes, pace, and difficulty for the skill you want to train. | The real Custom Run editor with Fork and Pin selected, a five-minute duration, a 30-second pace, and a starting Rating of 925. |
 | 4 | **Make Every Mistake Count** | Scheduled Review brings missed and unclear puzzles back when they are due. | Two of six reviews completed today, four remaining, no overdue warning, and a small forward workload. |
-| 5 | **See Your Progress** | Follow your Ratings and recent Runs over time. | The real History Rating Trend for Standard at a 20-second pace over 90 days, ending at Rating 925 above recent Run rows. |
+| 5 | **See Your Progress** | Follow your Ratings and recent Runs over time. | The real History Rating Trend for Standard at a 20-second pace over 90 days, ending at Rating 925 above recent attempt rows from Standard Runs. |
 | 6 | **Private. Offline. Open Source.** | No ads. No Chessticize account. No developer data collection. | The real Settings About rows for the GPL license, public source, embedded Stockfish, and puzzle-data attribution. |
 
 The first three frames must remain in this order. Together they explain the
@@ -66,6 +66,8 @@ rating, date, device name, or practice history may enter the capture.
   3 tomorrow, 8 in the next seven days, and 12 total
 - Rating history: Standard at a 20-second pace over 90 days, with six
   non-monotonic checkpoints from `884` to the current Rating of `925`
+- Recent History rows: three correct attempts from two Standard Runs, using
+  bundled puzzles `01NVd`, `00ouR`, and `019YE`
 
 The active Standard and Arrow Duel frames are deterministic snapshots. They
 must not be committed as completed sessions or allowed to change the History,
@@ -111,7 +113,9 @@ loop without becoming a backlog.
 
 Open the real History screen, switch from Needs attention to All, expand the
 filters, select `Standard · 20s pace`, and choose `90 days`. The visible Rating
-Trend ends at `925`, and ordinary recent Run rows remain visible beneath it.
+Trend ends at `925`, and three ordinary attempt rows from the two most recent
+Standard Runs remain visible beneath it. The latest row is puzzle `01NVd` at
+Rating `918`, solved correctly at a 20-second pace in 12 seconds.
 
 The history points include a small mid-period dip; do not manufacture a
 perfect upward line. This frame must not use Tactical Progress, theme-strength

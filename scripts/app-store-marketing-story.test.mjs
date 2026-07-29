@@ -10,6 +10,10 @@ const packManifestUrl = new URL(
   "../fixtures/puzzles/bundled-core-pack.manifest.json",
   import.meta.url
 );
+const bundledPackUrl = new URL(
+  "../fixtures/puzzles/bundled-core-pack.json",
+  import.meta.url
+);
 const repositoryRoot = new URL("../", import.meta.url);
 
 async function readJson(url) {
@@ -29,6 +33,7 @@ test("App Store marketing story defines the canonical six-frame order and copy",
 
   assert.equal(story.schemaVersion, 1);
   assert.equal(story.issue, 410);
+  assert.equal(story.contractStatus, "approved");
   assert.equal(story.locale, "en-US");
   assert.deepEqual(story.deviceTargets, {
     iphone: {
@@ -134,12 +139,36 @@ test("fictional-user values stay coherent across the six frames", async () => {
     ),
     "Expected a believable non-monotonic Rating trend"
   );
+
+  const recentAttempts = user.ratingHistory.recentAttempts;
+  assert.equal(recentAttempts.length, 3);
+  assert.equal(new Set(recentAttempts.map((attempt) => attempt.id)).size, 3);
+  assert.equal(
+    new Set(recentAttempts.map((attempt) => attempt.sessionId)).size,
+    2
+  );
+  assert.deepEqual(
+    recentAttempts.map((attempt) => attempt.completedAt),
+    [...recentAttempts]
+      .map((attempt) => attempt.completedAt)
+      .sort()
+      .reverse()
+  );
+  for (const attempt of recentAttempts) {
+    assert.equal(attempt.mode, "standard");
+    assert.equal(attempt.ratingKey, user.ratingHistory.ratingKey);
+    assert.equal(attempt.runId, user.ratingHistory.runId);
+    assert.equal(attempt.runName, user.ratingHistory.runLabel);
+    assert.equal(attempt.result, "correct");
+    assert.equal(attempt.submittedMove, attempt.expectedMove);
+  }
 });
 
 test("story source identity and claim evidence match version-controlled files", async () => {
-  const [story, packManifest] = await Promise.all([
+  const [story, packManifest, bundledPuzzles] = await Promise.all([
     readJson(storyUrl),
-    readJson(packManifestUrl)
+    readJson(packManifestUrl),
+    readJson(bundledPackUrl)
   ]);
 
   assert.equal(story.sourceBuild.puzzlePack.id, packManifest.id);
@@ -147,6 +176,18 @@ test("story source identity and claim evidence match version-controlled files", 
     story.sourceBuild.puzzlePack.manifestHash,
     packManifest.manifestHash
   );
+
+  const puzzlesById = new Map(
+    bundledPuzzles.map((puzzle) => [puzzle.id, puzzle])
+  );
+  for (const attempt of story.fictionalUser.ratingHistory.recentAttempts) {
+    const puzzle = puzzlesById.get(attempt.puzzleId);
+    assert.ok(puzzle, `Expected bundled puzzle ${attempt.puzzleId}`);
+    assert.ok(
+      puzzle.solutionMoves.includes(attempt.expectedMove),
+      `Expected ${attempt.expectedMove} in ${attempt.puzzleId}`
+    );
+  }
 
   for (const evidence of story.claimEvidence) {
     const contents = await readFile(new URL(evidence.source, repositoryRoot), "utf8");
@@ -162,9 +203,13 @@ test("story source identity and claim evidence match version-controlled files", 
       "utf8"
     );
     for (const testId of frame.source.requiredVisibleTestIds) {
-      assert.match(
-        componentSource,
-        new RegExp(`testID=["']${testId}["']`),
+      const literalTestId = new RegExp(`testID=["']${testId}["']`);
+      const dynamicHistoryAttemptId = testId.startsWith("history-attempt-")
+        && componentSource.includes(
+          "testID={`history-attempt-${attempt.id}`}"
+        );
+      assert.ok(
+        literalTestId.test(componentSource) || dynamicHistoryAttemptId,
         `Expected ${testId} in ${frame.source.component}`
       );
     }

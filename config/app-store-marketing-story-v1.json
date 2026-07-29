@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "storyId": "app-store-marketing-en-us-v1",
   "issue": 410,
-  "contractStatus": "review-candidate",
+  "contractStatus": "approved",
   "locale": "en-US",
   "captureClock": {
     "instant": "2026-07-28T18:00:00.000Z",
@@ -135,12 +135,67 @@
           "rating": 910
         },
         {
-          "completedAt": "2026-07-19T18:00:00.000Z",
+          "completedAt": "2026-07-26T18:00:00.000Z",
           "rating": 918
         },
         {
-          "completedAt": "2026-07-26T18:00:00.000Z",
+          "completedAt": "2026-07-28T17:52:00.000Z",
           "rating": 925
+        }
+      ],
+      "recentAttempts": [
+        {
+          "id": "marketing-standard-attempt-03",
+          "source": "sprint",
+          "sessionId": "marketing-standard-run-18",
+          "puzzleId": "01NVd",
+          "mode": "standard",
+          "ratingKey": "standard 5/20",
+          "runId": "standard",
+          "runName": "Standard",
+          "result": "correct",
+          "submittedMove": "f7g5",
+          "expectedMove": "f7g5",
+          "startedAt": "2026-07-28T17:51:48.000Z",
+          "completedAt": "2026-07-28T17:52:00.000Z",
+          "elapsedMs": 12000,
+          "ratingBefore": 918,
+          "ratingAfter": 925
+        },
+        {
+          "id": "marketing-standard-attempt-02",
+          "source": "sprint",
+          "sessionId": "marketing-standard-run-18",
+          "puzzleId": "00ouR",
+          "mode": "standard",
+          "ratingKey": "standard 5/20",
+          "runId": "standard",
+          "runName": "Standard",
+          "result": "correct",
+          "submittedMove": "a3c5",
+          "expectedMove": "a3c5",
+          "startedAt": "2026-07-28T17:51:24.000Z",
+          "completedAt": "2026-07-28T17:51:35.000Z",
+          "elapsedMs": 11000,
+          "ratingBefore": 918
+        },
+        {
+          "id": "marketing-standard-attempt-01",
+          "source": "sprint",
+          "sessionId": "marketing-standard-run-17",
+          "puzzleId": "019YE",
+          "mode": "standard",
+          "ratingKey": "standard 5/20",
+          "runId": "standard",
+          "runName": "Standard",
+          "result": "correct",
+          "submittedMove": "e4f2",
+          "expectedMove": "e4f2",
+          "startedAt": "2026-07-26T18:13:49.000Z",
+          "completedAt": "2026-07-26T18:14:02.000Z",
+          "elapsedMs": 13000,
+          "ratingBefore": 910,
+          "ratingAfter": 918
         }
       ]
     }
@@ -350,13 +405,21 @@
           "history-chart-value",
           "history-chart-label",
           "history-performance-chart",
-          "history-chart-line"
+          "history-chart-line",
+          "history-attempt-marketing-standard-attempt-03",
+          "history-attempt-marketing-standard-attempt-02",
+          "history-attempt-marketing-standard-attempt-01"
         ],
         "stableText": {
           "title": "Rating Trend",
           "history-performance-context": "Standard · 20s pace · 90 days",
           "history-chart-value": "925",
-          "history-chart-label": "Rating"
+          "history-chart-label": "Rating",
+          "latest-attempt-run": "Standard",
+          "latest-attempt-result": "Correct",
+          "latest-attempt-identity": "ID 01NVd · Rating 918",
+          "latest-attempt-pace": "20s pace",
+          "latest-attempt-meta": "Sprint · 12s · Today"
         },
         "forbiddenStates": [
           "history-empty-state",
