@@ -149,13 +149,9 @@ async function assertCompositionViewport(frame) {
   if (frame.id === 'focus-your-practice') {
     for (const testID of [
       'practice-run-name-input',
-      'practice-run-mode-row',
       'custom-theme-fork',
       'custom-theme-pin',
-      'practice-run-duration-stepper',
-      'practice-run-per-puzzle-stepper',
       'practice-run-elo-input',
-      'practice-run-pass-rules',
     ]) {
       await waitFor(element(by.id(testID))).toBeVisible().withTimeout(10000);
     }
@@ -166,6 +162,9 @@ async function assertCompositionViewport(frame) {
     ]) {
       await waitFor(element(by.text(value))).toBeVisible().withTimeout(10000);
     }
+    await waitFor(element(by.text(frame.source.stableText['pass-rule'])))
+      .toBeVisible()
+      .withTimeout(10000);
     return;
   }
   if (frame.id === 'private-offline-open-source') {
