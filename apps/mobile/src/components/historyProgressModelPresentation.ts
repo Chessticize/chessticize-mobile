@@ -29,18 +29,21 @@ export function historyProgressPresentationFromModel(
   const currentSignals = new Map(
     progress.evaluation.signals.map((signal) => [signal.id, signal])
   );
-  const wellSampled = (latest?.estimates ?? [])
-    .filter((estimate) => isWellSampled(estimate, progress))
+  const observed = (latest?.estimates ?? [])
+    .filter(hasProgressEvidence)
     .sort((left, right) => compareCurrentEstimates(
       left,
       right,
       currentSignals
     ));
-  const strengths = wellSampled
+  const wellSampled = observed.filter((estimate) =>
+    isWellSampled(estimate, progress)
+  );
+  const strengths = observed
     .slice(0, MAX_VISIBLE_PROGRESS_SERIES)
     .flatMap((estimate) => {
       const signal = currentSignals.get(signalId(estimate));
-      const kind = seriesKind(signal);
+      const kind = seriesKind(signal, estimate);
       const series = strengthSeries(
         estimate,
         kind,
@@ -70,8 +73,17 @@ export function historyProgressPresentationFromModel(
     initialSeriesId,
     strengths,
     ...(weakness === undefined ? {} : { weakness }),
-    noWeaknessLabel:
-      "No theme currently passes the Tactical Profile evidence, practical-impact, and diversity checks for either solve reliability or completed-puzzle speed."
+    ...(progress.phase === "balanced"
+      ? {
+          noWeaknessTitle: "Recent play looks balanced",
+          noWeaknessLabel:
+            "No theme currently shows a repeated, meaningful weakness in solve reliability or completed-puzzle speed."
+        }
+      : {
+          noWeaknessTitle: "Still collecting evidence",
+          noWeaknessLabel:
+            "Play more ordinary mixed Runs to build reliable stats across different puzzles and sessions."
+        })
   };
 }
 
@@ -232,7 +244,8 @@ function relativeComparisonLabel(
 }
 
 function seriesKind(
-  signal: TacticalProfileModelSignal | undefined
+  signal: TacticalProfileModelSignal | undefined,
+  estimate: TacticalProfileThemeEstimate
 ): Exclude<TacticalFocusReason, "both"> {
   if (signal?.reason === "completed_speed") {
     return "completed_speed";
@@ -240,7 +253,13 @@ function seriesKind(
   if (signal?.reason === "both" && signal.speedConfidence > signal.solveConfidence) {
     return "completed_speed";
   }
-  return "solve_rate";
+  return estimate.solveEvidenceWeight > 0
+    ? "solve_rate"
+    : "completed_speed";
+}
+
+function hasProgressEvidence(estimate: TacticalProfileThemeEstimate): boolean {
+  return estimate.solveEvidenceWeight > 0 || estimate.speedEvidenceWeight > 0;
 }
 
 function isWellSampled(
@@ -252,7 +271,7 @@ function isWellSampled(
 ): boolean {
   return estimate.distinctPuzzleCount >= progress.minDistinctPuzzles &&
     estimate.distinctSessionCount >= progress.minDistinctSessions &&
-    estimate.solveEvidenceWeight > 0;
+    hasProgressEvidence(estimate);
 }
 
 function compareCurrentEstimates(

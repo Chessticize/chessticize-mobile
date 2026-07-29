@@ -32,11 +32,11 @@ export const TacticalProfileCollectingEvidence: Story = {
 };
 
 export const TacticalProfileBalanced: Story = {
-  name: "No clear focus yet",
+  name: "Balanced",
   args: { scenarioId: "practice-tactical-profile-balanced" },
   parameters: { __id: "practice--tactical-profile-balanced" },
   play: async ({ canvasElement }) => {
-    await waitForText(canvasElement, "No clear focus yet");
+    await waitForText(canvasElement, "Recent play looks balanced");
   }
 };
 

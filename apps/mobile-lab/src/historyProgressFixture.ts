@@ -106,8 +106,9 @@ const BASE_PRESENTATION: Omit<
   periodLabel: "Last 8 weeks",
   sampleLabel: "ordinary mixed Runs",
   sampleUnitLabel: "eligible puzzles",
+  noWeaknessTitle: "Recent play looks balanced",
   noWeaknessLabel:
-    "No theme currently passes the evidence, practical-impact, and diversity checks for either solve reliability or completed-puzzle speed."
+    "No theme currently shows a repeated, meaningful weakness in solve reliability or completed-puzzle speed."
 };
 
 export function isHistoryProgressScenario(

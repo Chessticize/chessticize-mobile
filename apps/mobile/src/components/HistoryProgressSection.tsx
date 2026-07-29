@@ -96,7 +96,7 @@ export function HistoryProgressScreen({
           <View style={styles.sectionTitleCopy}>
             <Text style={styles.eyebrow}>Progress over time</Text>
             <Text style={styles.sectionTitle}>
-              {selectedSeries?.label ?? "No theme selected"}
+              {selectedSeries?.label ?? "No progress data yet"}
             </Text>
           </View>
           {selectedSeries ? (
@@ -189,7 +189,7 @@ export function HistoryProgressScreen({
         <WeaknessCard weakness={presentation.weakness} />
       ) : (
         <View
-          accessibilityLabel={`No clear weakness. ${presentation.noWeaknessLabel}`}
+          accessibilityLabel={`${presentation.noWeaknessTitle}. ${presentation.noWeaknessLabel}`}
           style={styles.noWeaknessCard}
           testID="history-no-clear-weakness"
         >
@@ -197,7 +197,9 @@ export function HistoryProgressScreen({
             <Text style={styles.noWeaknessIconText}>—</Text>
           </View>
           <View style={styles.noWeaknessCopy}>
-            <Text style={styles.noWeaknessTitle}>No clear weakness</Text>
+            <Text style={styles.noWeaknessTitle}>
+              {presentation.noWeaknessTitle}
+            </Text>
             <Text style={styles.noWeaknessBody}>
               {presentation.noWeaknessLabel}
             </Text>

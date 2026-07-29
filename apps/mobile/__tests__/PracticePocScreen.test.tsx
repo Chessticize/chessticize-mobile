@@ -1205,19 +1205,20 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("explains provisional balanced results without claiming no weakness exists", () => {
+  it("presents provisional balanced results clearly while retaining the early estimate", () => {
     const renderer = renderLabScenario("practice-tactical-profile-balanced");
 
-    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
-      "No clear focus yet"
-    );
-    expect(collectText(findByTestId(renderer, "training-focus-card"))).not.toContain(
-      "No focus needed"
-    );
+    const card = collectText(findByTestId(renderer, "training-focus-card"));
+    expect(card).toContain("Balanced");
+    expect(card).toContain("Recent play looks balanced");
+    expect(card).toContain("Early estimate");
     press(renderer, "training-focus-open-profile");
-    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
-      "has not found a repeated pattern strong enough to emphasize"
+    const profile = collectText(findByTestId(renderer, "tactical-profile-screen"));
+    expect(profile).toContain("Recent play looks balanced");
+    expect(profile).toContain(
+      "Your recent completed puzzles look balanced after accounting for difficulty and Run settings."
     );
+    expect(profile).toContain("This is an early estimate");
   });
 
   it("keeps Practice available and automatically retries a failed Tactical Profile cache", async () => {
@@ -2663,7 +2664,11 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
       "n=71"
     );
-    expect(findByTestId(renderer, "history-no-clear-weakness")).toBeTruthy();
+    const balanced = findByTestId(renderer, "history-no-clear-weakness");
+    expect(collectText(balanced)).toContain("Recent play looks balanced");
+    expect(collectText(balanced)).toContain(
+      "No theme currently shows a repeated, meaningful weakness in solve reliability or completed-puzzle speed."
+    );
 
     press(renderer, "history-progress-strength-pins");
     expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(

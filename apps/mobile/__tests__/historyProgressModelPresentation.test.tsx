@@ -40,11 +40,52 @@ test("builds visible model reliability progress for a well-sampled balanced them
 
   expect(presentation?.weakness).toBeUndefined();
   expect(presentation?.sampleUnitLabel).toBe("model-weighted observations");
+  expect(presentation?.noWeaknessLabel).toBe(
+    "No theme currently shows a repeated, meaningful weakness in solve reliability or completed-puzzle speed."
+  );
   expect(series?.label).toBe("Fork · Puzzle solving");
   expect(series?.kind).toBe("solve_rate");
   expect(series?.changeLabel).toBe("8 fewer / 100");
   expect(series?.points.map((point) => point.sampleSize)).toEqual([8, 14]);
   expect(series?.points.map((point) => point.valueLabel)).toEqual(["+12", "+4"]);
+});
+
+test("keeps observed balanced stats visible before recommendation diversity is complete", () => {
+  const progress = tacticalProgress({
+    snapshots: [{
+      asOf: "2026-07-25T00:00:00.000Z",
+      estimates: [themeEstimate({
+        distinctPuzzleCount: 2,
+        distinctSessionCount: 1,
+        solveEvidenceWeight: 2
+      })]
+    }]
+  });
+
+  const presentation = historyProgressPresentationFromModel(progress);
+
+  expect(presentation?.initialSeriesId).toBe("line:fork:solve_rate");
+  expect(presentation?.strengths).toHaveLength(1);
+  expect(presentation?.strengths[0]?.label).toBe("Fork · Puzzle solving");
+});
+
+test("shows completed-speed stats when a balanced theme has no solve observations", () => {
+  const progress = tacticalProgress({
+    snapshots: [{
+      asOf: "2026-07-25T00:00:00.000Z",
+      estimates: [themeEstimate({
+        solveEvidenceWeight: 0,
+        speedEvidenceWeight: 8,
+        completedTimeMultiplier: 1.08
+      })]
+    }]
+  });
+
+  const presentation = historyProgressPresentationFromModel(progress);
+
+  expect(presentation?.initialSeriesId).toBe("line:fork:completed_speed");
+  expect(presentation?.strengths[0]?.kind).toBe("completed_speed");
+  expect(presentation?.strengths[0]?.points[0]?.valueLabel).toBe("1.08×");
 });
 
 test("uses completed-time evidence for a model-selected speed weakness", () => {

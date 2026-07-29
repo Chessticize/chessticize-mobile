@@ -47,5 +47,6 @@ export type HistoryProgressPresentation = {
   initialSeriesId: string;
   strengths: readonly HistoryStrengthSeries[];
   weakness?: HistoryProgressWeakness;
+  noWeaknessTitle: string;
   noWeaknessLabel: string;
 };
