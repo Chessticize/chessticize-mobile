@@ -16,7 +16,6 @@ const captureHistoryProgress =
   process.env.CHESSTICIZE_CAPTURE_HISTORY_PROGRESS === '1'
     ? describe
     : describe.skip;
-const baseNowMs = Date.parse('2026-07-29T17:00:00.000Z');
 const runSeeds = Array.from(
   { length: 10 },
   (_, index) => `history-progress-release-${index + 1}`
@@ -26,7 +25,6 @@ captureHistoryProgress('History Progress Release parity', () => {
   it('matches the approved dual-metric balanced presentation in the real app', async () => {
     await launchReleaseCapture({
       deleteData: true,
-      nowMs: baseNowMs,
       seed: runSeeds[0],
       targetCorrect: runSeeds.length
     });
@@ -79,14 +77,13 @@ captureHistoryProgress('History Progress Release parity', () => {
   });
 });
 
-async function launchReleaseCapture({ deleteData, nowMs, seed, targetCorrect }) {
+async function launchReleaseCapture({ deleteData, seed, targetCorrect }) {
   await launchWithDisabledSynchronization({
     delete: deleteData,
     launchArgs: {
       chessticizePuzzleSelectionSeed: seed,
       chessticizeStandardTargetCorrect: String(targetCorrect),
-      chessticizeStoreAssetCapture: '1',
-      chessticizeTestNowMs: String(nowMs)
+      chessticizeStoreAssetCapture: '1'
     },
     newInstance: true
   });
