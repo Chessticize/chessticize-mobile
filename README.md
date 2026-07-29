@@ -11,6 +11,7 @@ The repository contains the React Native app shell (`apps/mobile`), the browser-
 - [Testing Architecture](docs/TESTING_ARCHITECTURE.md) — test-layer responsibilities, critical E2E regression scope, and SQLite migration compatibility design
 - [App Store Plan](docs/APP_STORE_PLAN.md) — historical first-release foundation plan
 - [App Store Assets](docs/STORE_ASSETS.md) — current App Store metadata and screenshot capture plan
+- [App Store Screenshot Story](docs/marketing/APP_STORE_SCREENSHOT_STORY.md) — canonical six-frame marketing sequence, copy, and fictional-user contract
 - [Release Notes](docs/RELEASE_NOTES.md) — per-binary customer-facing notes, review, and publication contract
 - [App Store Upload](docs/APP_STORE_UPLOAD.md) — owner-executed archive and App Store Connect upload runbook
 - [TestFlight Diagnostics](docs/TESTFLIGHT_QA.md) — optional post-build device diagnostics and evidence log
