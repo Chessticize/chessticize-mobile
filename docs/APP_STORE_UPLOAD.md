@@ -82,9 +82,17 @@ pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/fin
 Before creating the source tag or archive, create and approve
 `docs/releases/ios-v<normalized-version>-build-<build>.md` from the template in
 `docs/RELEASE_NOTES.md`. Verify the exact `Store copy` against this candidate,
-including its two-or-three-bullet, 300-character limit and direct link to the
-exact iOS GitHub Release. The approved file must be present in the clean commit
-that is tagged and archived.
+including its two-or-three-bullet, 300-character limit, benefit-first wording,
+and absence of raw URLs. Verify the file's separate release-details link opens
+the exact iOS GitHub Release. The approved file must be present in the clean
+commit that is tagged and archived.
+
+For the already published `ios-v1.3.0-build-1` source tag,
+`config/app-store-metadata-en-us-v1.json` records a reviewed post-tag metadata
+correction under `currentVersionWhatsNew`. Use that corrected store copy in App
+Store Connect while preserving the immutable tagged customer note and GitHub
+Release. Retain the submitted metadata evidence required by
+`docs/STORE_ASSETS.md`; do not move or rewrite the source tag.
 
 Before archiving, record whether this is a delta, targeted, or full native
 release under `docs/TESTING_ARCHITECTURE.md`. A delta requires the exact-head
@@ -219,8 +227,10 @@ valid while this signing-account gate is still incomplete.
    checklist in `docs/TESTFLIGHT_QA.md`; neither is a release prerequisite.
 5. For an App Store version update, copy the approved `Store copy` from the
    exact build-specific release-note file into **What’s New in this Version**.
-   App Store Connect does not expose that field for the first App Store version;
-   keep the checked-in and GitHub notes in that case.
+   When the canonical metadata contract records an explicit post-tag correction
+   for that exact source tag, use the corrected copy instead and retain
+   submission evidence. App Store Connect does not expose that field for the
+   first App Store version; keep the checked-in and GitHub notes in that case.
 6. Before submission, recheck Apple’s live character limit, compare the saved
     text byte-for-byte with the approved file, and retain a screenshot or
     exported metadata record with the release evidence.

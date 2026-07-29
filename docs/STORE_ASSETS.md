@@ -13,6 +13,8 @@ fictional-user contract are defined in
 [`docs/marketing/APP_STORE_SCREENSHOT_STORY.md`](marketing/APP_STORE_SCREENSHOT_STORY.md)
 and
 [`config/app-store-marketing-story-v1.json`](../config/app-store-marketing-story-v1.json).
+The canonical English metadata contract is
+[`config/app-store-metadata-en-us-v1.json`](../config/app-store-metadata-en-us-v1.json).
 That sequence is separate from the maintained fifteen-scene release-QA capture
 below. Its deterministic raw-capture and Cobalt Focus composition stages are
 documented in
@@ -22,46 +24,111 @@ and
 The existing commands and export audit in this document remain the operational
 release-validation path.
 
-## Metadata Draft
+## English Metadata (`en-US`)
+
+The paste-ready values below mirror the machine-readable contract. The limits
+were rechecked against Apple's official App Store Connect references on
+2026-07-29. Count Unicode characters for the name, subtitle, promotional text,
+description, and What's New. Count the UTF-8 keyword field against App Store
+Connect's stricter 100-byte reference.
 
 | Field | Value | Release rule |
 | --- | --- | --- |
-| App name | `Chessticize` | Final App Store display name. |
-| Subtitle | `Offline chess tactics` | Must stay at or below 30 characters. |
-| Promotional text | `Practice chess tactics offline with Puzzle Sprint, Arrow Duel, mistake review, local ratings, and on-device Stockfish analysis.` | Must stay at or below 170 characters. |
-| Keywords | `chess,tactics,puzzles,offline,stockfish,sprint,review,training,elo,analysis` | Must stay at or below 100 bytes, and must not duplicate the app name or use other app/company names. |
+| App name | `Chessticize` | Keep the distinctive cross-platform brand; 11 / 30 characters. |
+| Subtitle | `Build Tactical Intuition` | Result-oriented product promise; 24 / 30 characters. |
+| Promotional text | `Build tactical intuition with rating-matched chess puzzles, Arrow Duel, Custom Runs, and scheduled Review—offline, without ads or an account, and open source.` | 158 / 170 characters. |
+| Keywords | `chess,tactics,puzzle,trainer,offline,blunder,sprint,review,spaced repetition,elo,analysis` | 89 / 100 UTF-8 bytes; no name/subtitle duplication, no spaces after commas, and no category names or competitor terms. |
 | Support URL | `https://github.com/Chessticize/chessticize-mobile` | Must be public and lead users to support/contact information. |
-| Marketing URL | `https://github.com/Chessticize/chessticize-mobile` | Optional; use the public project page for 1.2. |
+| Marketing URL | `https://github.com/Chessticize/chessticize-mobile` | Optional; use the public project page for 1.3. |
 | Privacy policy URL | `https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md` | Must match `docs/APP_PRIVACY_DISCLOSURE.md`. |
 | Primary category | `Games` | App Store Connect selection. |
 | Secondary category | `Education` | App Store Connect selection. |
 | Copyright | `2026 Chessticize` | Confirm the exact legal owner in App Store Connect before submission. |
 
-## Description Draft
+### App name decision
 
-Chessticize is an offline chess tactics trainer built for short, focused
-practice.
+Keep `Chessticize`. The evaluated alternative,
+`Chessticize: Chess Tactics`, is within Apple's 30-character limit, but it
+turns the installed cross-platform brand into a generic keyword-bearing name.
+Apple indexes the app name, subtitle, keywords, and company name. The keyword
+field can therefore carry `chess`, `puzzle`, and `tactics`, while the subtitle
+carries the clear user outcome, without forcing a version-bound rename. Revisit
+the name only with localized search evidence or a product-page test that
+justifies the brand cost. If an expanded name is tested later, prefer the more
+concrete `Chessticize: Chess Puzzles` over
+`Chessticize: Chess Tactics`.
 
-Train with Puzzle Sprint, compare tactical choices in Arrow Duel, review your
-mistakes with spaced repetition, and analyze positions with on-device
-Stockfish. Your puzzle progress, ratings, history, and review queue stay on
-your device, so practice works without an account or network connection.
+### Description
 
-Included in 1.3:
+Copy the complete plain-text block below into App Store Connect:
 
-- Tactical Profiles that summarize strengths, weaknesses, and progress
-- Focused Practice Runs created from tactical weaknesses
-- Configurable puzzle timing and clearer Sprint guidance and outcomes
-- Optional move sounds and haptic feedback
-- Customizable Home screen Practice Runs with independent ELO ratings
-- Curated puzzle themes with multi-theme selection
-- Clear side-to-move and previous-move puzzle context
-- Standard Puzzle Sprint and Arrow Duel
-- Mistake history and a scheduled review queue
-- Bundled offline puzzles and on-device Stockfish analysis
-- Local-first progress with optional private iCloud Sync
+```text
+Build tactical intuition one chess puzzle at a time—without ads or an account.
 
-Chessticize Mobile is free and open source.
+Chessticize is a free, open-source chess puzzle trainer designed to work offline. Solve short, rating-matched puzzle Sprints to build pattern recognition. Arrow Duel turns each puzzle into a choice between two candidate moves, helping you notice and reject the tempting blunder before you play it.
+
+SOLVE PUZZLES WITH INTENT
+
+• Puzzle Sprint: solve a compact set of rating-matched chess puzzles against the clock.
+• Arrow Duel: compare two candidate moves in the same position and choose the better one.
+• Custom Runs: choose puzzle themes, pace, and difficulty for what you want to practice.
+
+MAKE EVERY MISTAKE COUNT
+
+Missed and unclear puzzles enter scheduled Review, bringing them back when they are due. Replay lets you revisit completed puzzles and explore positions with on-device Stockfish analysis—without changing your Rating or Review schedule.
+
+SEE YOUR PUZZLE PRACTICE
+
+Follow separate Ratings for Standard and Arrow Duel, review recent Runs, and filter History to revisit individual puzzles.
+
+PRIVATE BY DESIGN
+
+• Solve bundled puzzles without a network connection.
+• No ads and no Chessticize account.
+• No analytics or tracking, and no puzzle activity sent to Chessticize.
+• Progress starts on your device. Private iCloud Sync can merge progress across your Apple devices and can be turned off; Chessticize does not operate a sync server or receive that data.
+• Review reminders use local notifications.
+
+OPEN SOURCE
+
+Chessticize is published under GPL-3.0-or-later. The app includes bundled puzzle data and Stockfish for on-device analysis, with source and licenses available from the app's Settings screen and public project page.
+
+ALSO INCLUDED
+
+• Curated puzzle themes
+• Adjustable pace, duration, and difficulty
+• Optional move sounds and haptic feedback
+• iPhone and iPad layouts
+```
+
+The description is 1,881 / 4,000 Unicode characters, including line breaks.
+It deliberately presents user-controlled Custom Runs and ordinary
+History/Ratings. It does not market Tactical Profile, inferred weaknesses, or
+model-derived improvement.
+
+### What's New
+
+For iOS 1.3, use this ready-to-paste draft:
+
+```text
+• Create Custom Runs for the puzzle themes, pace, and difficulty you choose.
+• Understand puzzle Sprint timing, mistakes, and Replay with clearer first-use guidance.
+• Replay Unclear and In Review puzzles together; add sound and haptics.
+```
+
+This draft is 237 / 300 Unicode characters, including line breaks. Future
+versions must use the reusable template in
+[`docs/releases/RELEASE_NOTES_TEMPLATE.md`](releases/RELEASE_NOTES_TEMPLATE.md):
+lead with user benefits, use two or three short bullets, omit raw URLs, and do
+not call stable features experimental unless that qualification is an
+intentional product promise.
+
+This is a post-tag App Store metadata correction for
+`ios-v1.3.0-build-1`. It supersedes only the store-facing What's New text. The
+published source tag, GitHub Release, and customer note remain immutable
+evidence of what was approved at tag time. Issue #417 must retain a screenshot
+or exported metadata record showing the corrected text submitted to App Store
+Connect.
 
 ## Screenshot Requirements
 

@@ -20,14 +20,22 @@ with one direct sentence saying that the release experience is unchanged.
 ## Store copy (`en-US`)
 
 ```text
-• <Most important platform-specific change>
-• <One or two additional platform-specific changes>
-
-Details and source: https://github.com/Chessticize/chessticize-mobile/releases/tag/<ios|android>-v<normalized-version>-build-<build>
+• <Most important user-visible benefit>
+• <Second user-visible benefit>
+• <Specific user-visible improvement or fix, when applicable>
 ```
 
 Keep the complete block to two or three bullets and at most 300 Unicode
-characters, including the details link.
+characters. Lead with user benefits, include no raw URLs, and do not call a
+stable user-facing feature `experimental` unless that qualification is an
+intentional product promise.
+
+## Release details
+
+- [GitHub Release](https://github.com/Chessticize/chessticize-mobile/releases/tag/<ios|android>-v<normalized-version>-build-<build>)
+
+Keep this exact source-and-artifact link in the checked-in record. Do not copy
+it into App Store or Google Play release-note text.
 
 ## GitHub customer summary
 
@@ -43,10 +51,11 @@ notes.>
   wording is truthful for this platform.
 - [ ] Every store bullet applies to this platform and the block contains no more
   than three bullets.
-- [ ] The details link opens the exact platform GitHub Release and identifies
-  the source tag and public repository.
+- [ ] The separate release-details link opens the exact platform GitHub Release
+  and identifies the source tag and public repository.
 - [ ] The complete store copy is at most 300 Unicode characters and also fits
-  the destination’s current limit.
+  the destination’s current limit, contains no raw URL, and leads with user
+  benefits.
 - [ ] No issue numbers, internal code names, implementation details, or private
   evidence are included.
 - [ ] The release owner approved the copy before the source tag was created.

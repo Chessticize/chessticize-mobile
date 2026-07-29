@@ -77,6 +77,7 @@ const releaseNotes = readText("docs/RELEASE_NOTES.md");
 const releaseNotesTemplate = readText("docs/releases/RELEASE_NOTES_TEMPLATE.md");
 const appStoreUpload = readText("docs/APP_STORE_UPLOAD.md");
 const storeAssets = readText("docs/STORE_ASSETS.md");
+const appStoreMetadata = readJson("config/app-store-metadata-en-us-v1.json");
 const storeAssetsE2e = readText("apps/mobile/e2e/store-assets.e2e.js");
 const testFlightQa = readText("docs/TESTFLIGHT_QA.md");
 const privacyDisclosure = readText("docs/APP_PRIVACY_DISCLOSURE.md");
@@ -185,8 +186,10 @@ check(
     releaseNotes.includes("before its source tag is created") &&
     /What’s New in this\s+Version/u.test(releaseNotes) &&
     /at or below 300\s+Unicode characters/u.test(releaseNotes) &&
-    releaseNotes.includes("Details and source:") &&
+    /Do\s+not include a raw release URL/u.test(releaseNotes) &&
     releaseNotesTemplate.includes("## Store copy (`en-US`)") &&
+    releaseNotesTemplate.includes("## Release details") &&
+    releaseNotesTemplate.includes("contains no raw URL") &&
     /at most 300 Unicode\s+characters/u.test(releaseNotesTemplate) &&
     releaseNotesTemplate.includes("## Release-note review"),
   "README, source policy, upload runbook, release-note contract, and template must require approved build-specific customer copy before tagging."
@@ -233,8 +236,33 @@ check(
 );
 
 check(
+  "English App Store metadata fits the current field limits",
+  appStoreMetadata.appName?.value === "Chessticize" &&
+    appStoreMetadata.appName?.decision === "keep" &&
+    appStoreMetadata.subtitle === "Build Tactical Intuition" &&
+    Array.from(appStoreMetadata.appName.value).length <= appStoreMetadata.limits.appNameCharacters &&
+    Array.from(appStoreMetadata.subtitle).length <= appStoreMetadata.limits.subtitleCharacters &&
+    Array.from(appStoreMetadata.promotionalText).length <= appStoreMetadata.limits.promotionalTextCharacters &&
+    Array.from(appStoreMetadata.description).length <= appStoreMetadata.limits.descriptionCharacters &&
+    Buffer.byteLength(appStoreMetadata.keywords, "utf8") <= appStoreMetadata.limits.keywordsBytes &&
+    !appStoreMetadata.keywords.includes(", ") &&
+    appStoreMetadata.description.includes("chess puzzle trainer") &&
+    !appStoreMetadata.description.includes("Tactical Profile") &&
+    !appStoreMetadata.description.includes("weakness") &&
+    appStoreMetadata.currentVersionWhatsNew?.sourceTag === "ios-v1.3.0-build-1" &&
+    appStoreMetadata.currentVersionWhatsNew?.status === "post-tag-metadata-correction" &&
+    Array.from(appStoreMetadata.currentVersionWhatsNew.storeCopy).length <=
+      appStoreMetadata.limits.chessticizeWhatsNewCharacters &&
+    !/https?:\/\//u.test(appStoreMetadata.currentVersionWhatsNew.storeCopy) &&
+    !appStoreMetadata.currentVersionWhatsNew.storeCopy.includes("experimental"),
+  "The canonical en-US metadata must stay paste-ready, puzzle-led, within Apple's limits, and independent of weakness detection."
+);
+
+check(
   "Store metadata document contains upload-ready public fields",
   storeAssets.includes("| App name | `Chessticize` |") &&
+    storeAssets.includes("| Subtitle | `Build Tactical Intuition` |") &&
+    storeAssets.includes("config/app-store-metadata-en-us-v1.json") &&
     storeAssets.includes("| Support URL | `https://github.com/Chessticize/chessticize-mobile` |") &&
     storeAssets.includes("| Privacy policy URL | `https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md` |") &&
     storeAssets.includes("6.9\"") &&

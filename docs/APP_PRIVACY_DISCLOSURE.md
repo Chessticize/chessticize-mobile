@@ -1,13 +1,13 @@
 # App Store Privacy Disclosure
 
 This document records the App Store Connect privacy answers for Chessticize
-Mobile 1.2. Re-audit these answers before every App Store submission, especially
+Mobile 1.3. Re-audit these answers before every App Store submission, especially
 after changing sync, accounts, telemetry, crash reporting, remote packs, or
 cloud analysis.
 
 ## App Privacy Questionnaire
 
-Recommended App Store Connect answer for 1.2:
+Recommended App Store Connect answer for 1.3:
 
 - Data collection: **Data Not Collected**
 - Tracking: **No**

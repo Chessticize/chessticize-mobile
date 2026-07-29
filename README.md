@@ -76,9 +76,8 @@ Use the simulator only for native behavior or final GUI checks: real gesture ren
 ## Support
 
 For app issues, general feedback, or feature requests, use
-https://github.com/Chessticize/chessticize-mobile/issues. If you need to reach
-the project maintainers privately before a dedicated support address is added,
-open a GitHub issue requesting a private contact path.
+https://github.com/Chessticize/chessticize-mobile/issues. For private support,
+email support@chessticize.com.
 
 ## Product Direction
 
