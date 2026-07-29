@@ -63,6 +63,14 @@ html {
   margin: 8px 0;
 }
 
+.lab-native-boundary {
+  background: rgba(30, 64, 175, 0.38);
+  border: 1px solid #60a5fa;
+  border-radius: 8px;
+  color: #dbeafe;
+  padding: 2px 9px;
+}
+
 .lab-containment-note {
   color: #fcd34d;
 }
