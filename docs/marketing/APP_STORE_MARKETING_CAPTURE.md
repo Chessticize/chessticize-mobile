@@ -82,7 +82,22 @@ The finalizer fails unless both device sets:
   and
 - still match every PNG's recorded dimensions and SHA-256.
 
-The launch profile freezes the approved clock and loads a maintained in-memory
-practice service. It does not enable developer controls, persist the active
-Sprint snapshots, or add Tactical Profile data. The separate release-QA
-capture remains unchanged.
+The launch profile freezes the approved clock and imports the deterministic
+fixture through the normal persistent mobile practice service backed by the
+app's writable SQLite path. Detox deletes the dedicated simulator app sandbox
+before every frame, so fixture state cannot leak between frames or into a
+normal first run. The profile does not enable developer controls, persist the
+active Sprint snapshots, or navigate to or render Tactical Profile,
+Tactical Progress, inferred weaknesses, or model recommendations. The separate
+release-QA capture remains unchanged.
+
+## CI and release integration
+
+This dual-device workflow remains an explicit local pre-submission task rather
+than a hosted CI job. It depends on named 6.9-inch and 13-inch simulators, exact
+host-window rotation for iPad, and produces large ignored PNG artifacts that
+are consumed only when preparing an App Store version. The focused fixture,
+artifact, story-contract, typecheck, and lint tests remain suitable for normal
+PR CI. Run the full capture at the exact source commit selected for the next
+App Store submission; a non-blocking hosted capture job is intentionally not
+added at this stage.

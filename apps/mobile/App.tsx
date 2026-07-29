@@ -15,9 +15,9 @@ import {
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
   resolveTestStandardTargetCorrectFromLaunchConfig
 } from "./src/platform/testLaunchConfig";
-import { composeIOSMobilePlatformCapabilities } from "./src/platform/iosMobilePlatformCapabilities";
 import {
-  createAppStoreMarketingCaptureFixture
+  type AppStoreMarketingCaptureFixture,
+  loadAppStoreMarketingCaptureFixture
 } from "./src/testing/appStoreMarketingCapture";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
 import { createMobileSystemBackSource } from "./src/navigation/mobileSystemBack";
@@ -30,22 +30,18 @@ if (shouldSuppressLogBoxWarnings()) {
 
 function App() {
   const marketingCaptureFrame = resolveMarketingCaptureFrameFromLaunchConfig();
-  const marketingCaptureFixture = React.useMemo(
-    () => marketingCaptureFrame === undefined
-      ? undefined
-      : createAppStoreMarketingCaptureFixture(marketingCaptureFrame),
-    [marketingCaptureFrame]
-  );
   const platformFactory = mobilePlatformCapabilityFactoryFor(Platform.OS as "android" | "ios");
   const systemBack = React.useMemo(
     () => createMobileSystemBackSource(Platform.OS as "android" | "ios"),
     []
   );
-  const [platformCapabilities, setPlatformCapabilities] = React.useState<MobilePlatformCapabilities | undefined>(
-    () => marketingCaptureFixture
-      ? composeIOSMobilePlatformCapabilities(marketingCaptureFixture.practiceService)
-      : platformFactory.createSync()
+  const [platformState, setPlatformState] = React.useState<AppPlatformState>(
+    () => preparePlatformState(
+      platformFactory.createSync(),
+      marketingCaptureFrame
+    )
   );
+  const { marketingCaptureFixture, platformCapabilities } = platformState;
   const [loadError, setLoadError] = React.useState<string | undefined>(undefined);
   const testNowMs = resolveTestNowMsFromLaunchConfig();
   const arrowDuelTargetCorrect = resolveTestArrowDuelTargetCorrectFromLaunchConfig();
@@ -60,14 +56,17 @@ function App() {
     [marketingCaptureFixture, testNowMs]
   );
   React.useEffect(() => {
-    if (platformCapabilities || marketingCaptureFixture) {
+    if (platformCapabilities) {
       return;
     }
     let cancelled = false;
     platformFactory.create()
       .then((nextCapabilities) => {
         if (!cancelled) {
-          setPlatformCapabilities(nextCapabilities);
+          setPlatformState(preparePlatformState(
+            nextCapabilities,
+            marketingCaptureFrame
+          ));
         }
       })
       .catch((error: unknown) => {
@@ -78,7 +77,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [marketingCaptureFixture, platformCapabilities, platformFactory]);
+  }, [marketingCaptureFrame, platformCapabilities, platformFactory]);
 
   return (
     <SafeAreaProvider>
@@ -97,6 +96,7 @@ function App() {
             : undefined}
           standardTargetCorrect={standardTargetCorrect}
           systemBack={systemBack}
+          themeCatalogPresentation={marketingCaptureFixture?.themeCatalogPresentation}
         />
       ) : (
         <View style={styles.loadingRoot}>
@@ -108,6 +108,31 @@ function App() {
       )}
     </SafeAreaProvider>
   );
+}
+
+type AppPlatformState = {
+  marketingCaptureFixture?: AppStoreMarketingCaptureFixture;
+  platformCapabilities?: MobilePlatformCapabilities;
+};
+
+function preparePlatformState(
+  platformCapabilities: MobilePlatformCapabilities | undefined,
+  marketingCaptureFrame: string | undefined
+): AppPlatformState {
+  if (!platformCapabilities) {
+    return {};
+  }
+  return {
+    platformCapabilities,
+    ...(marketingCaptureFrame === undefined
+      ? {}
+      : {
+          marketingCaptureFixture: loadAppStoreMarketingCaptureFixture(
+            marketingCaptureFrame,
+            platformCapabilities.storage.practiceService
+          )
+        })
+  };
 }
 
 const styles = StyleSheet.create({

@@ -1,5 +1,6 @@
 import {
   addReviewDays,
+  createCustomPracticeRun,
   defaultPracticeRuns,
   defaultSprintConfig,
   reviewQueueForecast,
@@ -11,8 +12,7 @@ import {
   type SprintMode,
   type SprintState
 } from "../../../../packages/core/src/index.ts";
-import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
-import { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
+import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import type {
   ExportedSprintSession,
   LocalDataImport
@@ -53,6 +53,19 @@ type AppStoreMarketingStory = {
     activeSnapshots: {
       arrowDuel: ActiveSnapshotContract;
       standard: ActiveSnapshotContract;
+    };
+    customRun: {
+      durationSeconds: number;
+      id: string;
+      maxMistakes: number;
+      mode: "custom";
+      modeLabel: string;
+      name: string;
+      perPuzzleSeconds: number;
+      startingRating: number;
+      targetCorrect: number;
+      themeLabels: string[];
+      themes: string[];
     };
     practiceActivity: {
       completedRunsLastEightWeeks: number;
@@ -101,7 +114,12 @@ export type AppStoreMarketingCaptureFixture = {
   captureInstantMs: number;
   frameId: string;
   initialActiveState?: SprintState;
-  practiceService: PracticeService;
+  themeCatalogPresentation?: {
+    groups: ReadonlyArray<{
+      label: string;
+      themes: readonly string[];
+    }>;
+  };
 };
 
 const STANDARD_RUN_SNAPSHOT = {
@@ -123,18 +141,18 @@ export function appStoreMarketingCaptureFrameIds(): string[] {
     .map((frame) => frame.id);
 }
 
-export function createAppStoreMarketingCaptureFixture(
-  frameId: string
+export function loadAppStoreMarketingCaptureFixture(
+  frameId: string,
+  practiceService: PracticeService
 ): AppStoreMarketingCaptureFixture {
   assertStoryContract();
   if (!appStoreMarketingCaptureFrameIds().includes(frameId)) {
     throw new Error(`Unknown App Store marketing capture frame "${frameId}"`);
   }
 
-  const store = new MemoryStore();
-  store.seedPuzzles(bundledPuzzles);
-  const practiceService = new PracticeService(store);
-  practiceService.importLocalData(marketingLocalData());
+  practiceService.importLocalData(marketingLocalData({
+    includeSavedCustomRun: frameId !== "focus-your-practice"
+  }));
   practiceService.saveSettings({
     sync: {
       iCloudEnabled: false
@@ -165,7 +183,16 @@ export function createAppStoreMarketingCaptureFixture(
   return {
     captureInstantMs: Date.parse(marketingStory.captureClock.instant),
     frameId,
-    practiceService,
+    ...(frameId === "focus-your-practice"
+      ? {
+          themeCatalogPresentation: {
+            groups: [{
+              label: "Piece tactics",
+              themes: ["fork", "pin", "skewer", "discoveredAttack"]
+            }]
+          }
+        }
+      : {}),
     ...(activeSnapshot === undefined
       ? {}
       : {
@@ -182,13 +209,18 @@ export function appStoreMarketingCaptureStory(): Readonly<AppStoreMarketingStory
   return marketingStory;
 }
 
-function marketingLocalData(): LocalDataImport {
+function marketingLocalData({
+  includeSavedCustomRun
+}: {
+  includeSavedCustomRun: boolean;
+}): LocalDataImport {
   const standardSessions = standardRatingSessions();
   const arrowDuelSessions = arrowDuelActivitySessions(
     marketingStory.fictionalUser.practiceActivity.completedRunsLastEightWeeks
       - standardSessions.length
   );
   const sessions = [...standardSessions, ...arrowDuelSessions];
+  assertPracticeActivity(sessions);
   const recentAttempts = marketingStory.fictionalUser.ratingHistory.recentAttempts
     .map(({ runId: _runId, runName: _runName, ...attempt }) => ({ ...attempt }));
   const completedReviews = completedReviewAttempts();
@@ -215,20 +247,25 @@ function marketingLocalData(): LocalDataImport {
         focusedRunSeen: true
       }
     },
-    ratings: ratingRecords(standardSessions.length, arrowDuelSessions.length),
+    ratings: ratingRecords(
+      standardSessions.length,
+      arrowDuelSessions.length,
+      includeSavedCustomRun
+    ),
     attempts: [...recentAttempts, ...completedReviews],
     reviewQueue: reviewQueue(),
     reviewRemovals: [],
     sprintSessions: sessions,
-    practiceRuns: defaultPracticeRuns()
+    practiceRuns: marketingPracticeRuns(includeSavedCustomRun)
   };
 }
 
 function ratingRecords(
   standardGames: number,
-  arrowDuelGames: number
+  arrowDuelGames: number,
+  includeSavedCustomRun: boolean
 ): RatingRecord[] {
-  return [
+  const ratings: RatingRecord[] = [
     {
       key: marketingStory.fictionalUser.ratingHistory.ratingKey,
       generation: 0,
@@ -245,6 +282,41 @@ function ratingRecords(
       volatility: 0.06,
       games: arrowDuelGames
     }
+  ];
+  if (includeSavedCustomRun) {
+    ratings.push({
+      key: `run:${marketingStory.fictionalUser.customRun.id}`,
+      generation: 0,
+      rating: marketingStory.fictionalUser.customRun.startingRating,
+      ratingDeviation: 350,
+      volatility: 0.06,
+      games: 0
+    });
+  }
+  return ratings;
+}
+
+function marketingPracticeRuns(includeSavedCustomRun: boolean) {
+  const builtIns = defaultPracticeRuns();
+  if (!includeSavedCustomRun) {
+    return builtIns;
+  }
+  const contract = marketingStory.fictionalUser.customRun;
+  return [
+    ...builtIns,
+    createCustomPracticeRun({
+      id: contract.id,
+      name: contract.name,
+      mode: contract.mode,
+      durationSeconds: contract.durationSeconds,
+      perPuzzleSeconds: contract.perPuzzleSeconds,
+      targetCorrect: contract.targetCorrect,
+      maxMistakes: contract.maxMistakes,
+      themes: contract.themes,
+      homeOrder: builtIns.length,
+      updatedAt: marketingStory.captureClock.instant,
+      existingRuns: builtIns
+    })
   ];
 }
 
@@ -279,20 +351,29 @@ function standardRatingSessions(): ExportedSprintSession[] {
 }
 
 function arrowDuelActivitySessions(count: number): ExportedSprintSession[] {
-  if (count < 0) {
-    throw new Error("Marketing completed Run count cannot be smaller than Rating checkpoints");
+  const schedule = [
+    ["2026-06-03T18:00:00.000Z", 7],
+    ["2026-06-20T18:00:00.000Z", 7],
+    ["2026-07-10T18:00:00.000Z", 7],
+    ["2026-07-15T18:00:00.000Z", 8],
+    ["2026-07-16T18:00:00.000Z", 8],
+    ["2026-07-18T18:00:00.000Z", 8],
+    ["2026-07-19T18:00:00.000Z", 8],
+    ["2026-07-20T18:00:00.000Z", 9],
+    ["2026-07-22T18:00:00.000Z", 8],
+    ["2026-07-24T18:00:00.000Z", 8],
+    ["2026-07-25T18:00:00.000Z", 9],
+    ["2026-07-27T18:00:00.000Z", 9]
+  ] as const;
+  if (count !== schedule.length) {
+    throw new Error("Marketing activity contract requires twelve Arrow Duel Runs");
   }
-  const firstCompletedAtMs = Date.parse(marketingStory.captureClock.instant)
-    - 55 * 24 * 60 * 60 * 1000;
   let ratingBefore = 800;
-  return Array.from({ length: count }, (_, index) => {
+  return schedule.map(([completedAt, correctCount], index) => {
     const isLast = index === count - 1;
     const ratingAfter = isLast
       ? marketingStory.fictionalUser.ratings.arrowDuel
       : 800 + Math.round(((index + 1) * 75) / Math.max(1, count));
-    const completedAt = new Date(
-      firstCompletedAtMs + index * 4 * 24 * 60 * 60 * 1000
-    ).toISOString();
     const session: ExportedSprintSession = {
       id: `marketing-arrow-duel-run-${String(index + 1).padStart(2, "0")}`,
       mode: "arrow_duel",
@@ -301,7 +382,7 @@ function arrowDuelActivitySessions(count: number): ExportedSprintSession[] {
       startedAt: shiftIso(completedAt, -5 * 60 * 1000),
       completedAt,
       status: "won",
-      correctCount: 6 + (index % 4),
+      correctCount,
       mistakeCount: index % 3 === 0 ? 1 : 0,
       ratingBefore,
       ratingAfter,
@@ -311,6 +392,25 @@ function arrowDuelActivitySessions(count: number): ExportedSprintSession[] {
     ratingBefore = ratingAfter;
     return session;
   });
+}
+
+function assertPracticeActivity(sessions: ExportedSprintSession[]): void {
+  const activity = marketingStory.fictionalUser.practiceActivity;
+  const nowMs = Date.parse(marketingStory.captureClock.instant);
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const correctBetween = (startMs: number, endMs: number) => sessions
+    .filter((session) => {
+      const completedAtMs = Date.parse(session.completedAt ?? "");
+      return completedAtMs >= startMs && completedAtMs < endMs;
+    })
+    .reduce((total, session) => total + session.correctCount, 0);
+  if (
+    sessions.length !== activity.completedRunsLastEightWeeks
+    || correctBetween(nowMs - weekMs, nowMs + 1) !== activity.correctThisWeek
+    || correctBetween(nowMs - 2 * weekMs, nowMs - weekMs) !== activity.correctPreviousWeek
+  ) {
+    throw new Error("Marketing practice activity does not match the approved totals");
+  }
 }
 
 function completedReviewAttempts(): AttemptEvent[] {

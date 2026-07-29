@@ -46,6 +46,7 @@ describeMarketingAssets('App Store marketing screenshot capture', () => {
       await prepareFrame(frame);
       await assertFrameContract(frame);
       await assertNativeResponsiveLayout(frame);
+      await assertCompositionViewport(frame);
       const screenshotPath = await takeReadyScreenshot(frame);
       records.push(captureMarketingScreenshot({
         frame,
@@ -103,7 +104,7 @@ async function prepareFrame(frame) {
       return;
     case 'private-offline-open-source':
       await openTab('settings-tab', 'settings-license');
-      await waitForVisibleInPracticeScroll('settings-stockfish-source');
+      await waitForVisibleInPracticeScroll('settings-puzzle-data-license');
       return;
     default:
       throw new Error(`Unhandled marketing frame ${frame.id}`);
@@ -141,8 +142,38 @@ async function prepareCustomRun() {
     .withTimeout(5000);
   await element(by.id('practice-run-editor-title')).tap();
   await sleep(500);
-  await waitForVisibleInPracticeScroll('practice-run-pass-rules');
   await element(by.id('practice-main-scroll')).scrollTo('top');
+}
+
+async function assertCompositionViewport(frame) {
+  if (frame.id === 'focus-your-practice') {
+    for (const testID of frame.source.requiredVisibleTestIds) {
+      await waitFor(element(by.id(testID))).toBeVisible().withTimeout(10000);
+    }
+    for (const value of [
+      frame.source.stableText.mode,
+      frame.source.stableText.duration,
+      frame.source.stableText.pace,
+    ]) {
+      await waitFor(element(by.text(value))).toBeVisible().withTimeout(10000);
+    }
+    await waitFor(element(by.id('custom-theme-fork'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('custom-theme-pin'))).toBeVisible().withTimeout(10000);
+    return;
+  }
+  if (frame.id === 'private-offline-open-source') {
+    for (const testID of [
+      frame.source.crop.startTestId,
+      'settings-source',
+      'settings-stockfish-source',
+      frame.source.crop.endTestId,
+    ]) {
+      await waitFor(element(by.id(testID))).toBeVisible().withTimeout(10000);
+    }
+    for (const testID of frame.source.crop.excludeTestIds) {
+      await expect(element(by.id(testID))).not.toBeVisible();
+    }
+  }
 }
 
 async function prepareRatingTrend() {

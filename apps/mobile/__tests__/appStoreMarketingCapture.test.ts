@@ -1,8 +1,17 @@
 import {
   appStoreMarketingCaptureFrameIds,
   appStoreMarketingCaptureStory,
-  createAppStoreMarketingCaptureFixture
+  loadAppStoreMarketingCaptureFixture
 } from "../src/testing/appStoreMarketingCapture.ts";
+import { createMobilePracticeService } from "../src/platform/mobilePractice.ts";
+
+function loadFixture(frameId: string) {
+  const practiceService = createMobilePracticeService();
+  return {
+    fixture: loadAppStoreMarketingCaptureFixture(frameId, practiceService),
+    practiceService
+  };
+}
 
 describe("App Store marketing capture fixture", () => {
   it("accepts only the approved six-frame story", () => {
@@ -14,14 +23,14 @@ describe("App Store marketing capture fixture", () => {
       "see-your-progress",
       "private-offline-open-source"
     ]);
-    expect(() => createAppStoreMarketingCaptureFixture("unknown-frame"))
+    expect(() => loadFixture("unknown-frame"))
       .toThrow('Unknown App Store marketing capture frame "unknown-frame"');
   });
 
-  it("loads one deterministic fictional user without Tactical Profile data", () => {
+  it("loads one deterministic fictional user without weakness recommendations", () => {
     const story = appStoreMarketingCaptureStory();
-    const first = createAppStoreMarketingCaptureFixture("make-every-mistake-count");
-    const second = createAppStoreMarketingCaptureFixture("see-your-progress");
+    const first = loadFixture("make-every-mistake-count");
+    const second = loadFixture("see-your-progress");
     const firstExport = first.practiceService.exportLocalData();
     const secondExport = second.practiceService.exportLocalData();
 
@@ -30,9 +39,14 @@ describe("App Store marketing capture fixture", () => {
       story.fictionalUser.practiceActivity.completedRunsLastEightWeeks
     );
     expect(first.practiceService.getTacticalProfileSnapshot(story.captureClock.instant))
-      .toBeUndefined();
+      .toMatchObject({
+        buildState: { recommendedSignalIds: [] },
+        evaluation: { rankedFocuses: [], signals: [] }
+      });
     expect(first.practiceService.getTacticalProfileProgress(story.captureClock.instant))
-      .toBeUndefined();
+      .toMatchObject({
+        evaluation: { rankedFocuses: [], signals: [] }
+      });
     expect(first.practiceService.getSettings()).toMatchObject({
       sync: { iCloudEnabled: false },
       notifications: { reviewReminder: { mode: "off" } },
@@ -43,18 +57,79 @@ describe("App Store marketing capture fixture", () => {
         focusedRunSeen: true
       }
     });
+    expect(firstExport.practiceRuns).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: story.fictionalUser.customRun.id,
+        name: story.fictionalUser.customRun.name,
+        mode: story.fictionalUser.customRun.mode,
+        themes: story.fictionalUser.customRun.themes,
+        durationSeconds: story.fictionalUser.customRun.durationSeconds,
+        perPuzzleSeconds: story.fictionalUser.customRun.perPuzzleSeconds,
+        targetCorrect: story.fictionalUser.customRun.targetCorrect,
+        maxMistakes: story.fictionalUser.customRun.maxMistakes
+      })
+    ]));
+    expect(firstExport.ratings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: `run:${story.fictionalUser.customRun.id}`,
+        rating: story.fictionalUser.customRun.startingRating
+      })
+    ]));
+  });
+
+  it("keeps the New Run capture editable while later frames retain the saved Custom Run", () => {
+    const story = appStoreMarketingCaptureStory();
+    const editor = loadFixture("focus-your-practice");
+    const laterFrame = loadFixture("make-every-mistake-count");
+
+    expect(editor.fixture.themeCatalogPresentation).toEqual({
+      groups: [{
+        label: "Piece tactics",
+        themes: ["fork", "pin", "skewer", "discoveredAttack"]
+      }]
+    });
+    expect(editor.practiceService.listPracticeRuns())
+      .not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: story.fictionalUser.customRun.id })
+      ]));
+    expect(laterFrame.practiceService.listPracticeRuns())
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: story.fictionalUser.customRun.id })
+      ]));
+  });
+
+  it("reproduces the approved Run and weekly correctness totals", () => {
+    const story = appStoreMarketingCaptureStory();
+    const { practiceService } = loadFixture("see-your-progress");
+    const sessions = practiceService.exportLocalData().sprintSessions;
+    const nowMs = Date.parse(story.captureClock.instant);
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const correctBetween = (startMs: number, endMs: number) => sessions
+      .filter((session) => {
+        const completedAtMs = Date.parse(session.completedAt ?? "");
+        return completedAtMs >= startMs && completedAtMs < endMs;
+      })
+      .reduce((total, session) => total + session.correctCount, 0);
+
+    expect(sessions).toHaveLength(
+      story.fictionalUser.practiceActivity.completedRunsLastEightWeeks
+    );
+    expect(correctBetween(nowMs - weekMs, nowMs + 1))
+      .toBe(story.fictionalUser.practiceActivity.correctThisWeek);
+    expect(correctBetween(nowMs - 2 * weekMs, nowMs - weekMs))
+      .toBe(story.fictionalUser.practiceActivity.correctPreviousWeek);
   });
 
   it("keeps active Standard and Arrow Duel snapshots out of persisted progress", () => {
     const story = appStoreMarketingCaptureStory();
-    const standard = createAppStoreMarketingCaptureFixture("build-tactical-intuition");
-    const duel = createAppStoreMarketingCaptureFixture("choose-the-best-move");
+    const standard = loadFixture("build-tactical-intuition");
+    const duel = loadFixture("choose-the-best-move");
     const standardContract = story.fictionalUser.activeSnapshots.standard;
     const duelContract = story.fictionalUser.activeSnapshots.arrowDuel;
 
     expect(standard.practiceService.getActiveSprint()).toBeUndefined();
     expect(duel.practiceService.getActiveSprint()).toBeUndefined();
-    expect(standard.initialActiveState).toMatchObject({
+    expect(standard.fixture.initialActiveState).toMatchObject({
       status: "active",
       correctCount: standardContract.correct,
       mistakeCount: standardContract.mistakes,
@@ -65,15 +140,15 @@ describe("App Store marketing capture fixture", () => {
       }
     });
     expect(
-      Date.parse(standard.initialActiveState!.deadlineAt)
-      - standard.captureInstantMs
+      Date.parse(standard.fixture.initialActiveState!.deadlineAt)
+      - standard.fixture.captureInstantMs
     ).toBe(standardContract.sprintRemainingSeconds * 1000);
     expect(
-      standard.captureInstantMs
-      - Date.parse(standard.initialActiveState!.currentPuzzleStartedAt!)
+      standard.fixture.captureInstantMs
+      - Date.parse(standard.fixture.initialActiveState!.currentPuzzleStartedAt!)
     ).toBe(standardContract.puzzleElapsedSeconds * 1000);
 
-    expect(duel.initialActiveState).toMatchObject({
+    expect(duel.fixture.initialActiveState).toMatchObject({
       status: "active",
       correctCount: duelContract.correct,
       mistakeCount: duelContract.mistakes,
@@ -83,12 +158,12 @@ describe("App Store marketing capture fixture", () => {
         solved: false
       }
     });
-    expect(duel.initialActiveState?.currentPuzzle?.kind).toBe("arrow_duel");
-    if (duel.initialActiveState?.currentPuzzle?.kind === "arrow_duel") {
-      expect(duel.initialActiveState.currentPuzzle.candidates).toHaveLength(
+    expect(duel.fixture.initialActiveState?.currentPuzzle?.kind).toBe("arrow_duel");
+    if (duel.fixture.initialActiveState?.currentPuzzle?.kind === "arrow_duel") {
+      expect(duel.fixture.initialActiveState.currentPuzzle.candidates).toHaveLength(
         duelContract.candidateCount!
       );
-      expect(duel.initialActiveState.currentPuzzle.selectedMove).toBeUndefined();
+      expect(duel.fixture.initialActiveState.currentPuzzle.selectedMove).toBeUndefined();
     }
     expect(standard.practiceService.exportLocalData())
       .toEqual(duel.practiceService.exportLocalData());
@@ -96,8 +171,7 @@ describe("App Store marketing capture fixture", () => {
 
   it("reproduces the approved Review workload", () => {
     const story = appStoreMarketingCaptureStory();
-    const fixture = createAppStoreMarketingCaptureFixture("make-every-mistake-count");
-    const service = fixture.practiceService;
+    const { practiceService: service } = loadFixture("make-every-mistake-count");
     const review = story.fictionalUser.reviewQueue;
 
     expect(service.listCompletedReviewsForDay(story.captureClock.instant))
@@ -117,9 +191,9 @@ describe("App Store marketing capture fixture", () => {
 
   it("reproduces the approved Rating Trend and exact recent Standard attempts", () => {
     const story = appStoreMarketingCaptureStory();
-    const fixture = createAppStoreMarketingCaptureFixture("see-your-progress");
+    const { practiceService } = loadFixture("see-your-progress");
     const contract = story.fictionalUser.ratingHistory;
-    const history = fixture.practiceService.getHistoryView({
+    const history = practiceService.getHistoryView({
       now: story.captureClock.instant,
       ratingKey: contract.ratingKey,
       timeRange: "90d"
