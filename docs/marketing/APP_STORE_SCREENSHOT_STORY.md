@@ -15,15 +15,15 @@ separate visual regression and release-validation workflow. Issues #411 and
 | --- | --- | --- | --- |
 | 1 | **Build Tactical Intuition** | Short, rating-matched Sprints build fast pattern recognition. | A healthy Standard Sprint at 8 / 15, 2:42 remaining, and no mistakes. |
 | 2 | **Choose the Best Move** | Arrow Duel trains you to reject a tempting blunder before you play it. | An untouched Arrow Duel position with exactly two neutral candidate arrows. |
-| 3 | **Train Your Weaknesses** | Tactical Profiles turn repeated patterns into a focused Practice Run. | The real Focused Run preview for a Fork reliability recommendation, including the current-Rating anchor and training mix. |
+| 3 | **Focus Your Practice** | Choose themes, pace, and difficulty for the skill you want to train. | The real Custom Run editor with Fork and Pin selected, a five-minute duration, a 30-second pace, and a starting Rating of 925. |
 | 4 | **Make Every Mistake Count** | Scheduled Review brings missed and unclear puzzles back when they are due. | Two of six reviews completed today, four remaining, no overdue warning, and a small forward workload. |
-| 5 | **See What Is Improving** | Track theme-by-theme progress across weeks, not just one score. | The Pins completed-speed series improving from 1.30× to 1.06× matched time across eight weeks. |
+| 5 | **See Your Progress** | Follow your Ratings and recent Runs over time. | The real History Rating Trend for Standard at a 20-second pace over 90 days, ending at Rating 925 above recent Run rows. |
 | 6 | **Private. Offline. Open Source.** | No ads. No Chessticize account. No developer data collection. | The real Settings About rows for the GPL license, public source, embedded Stockfish, and puzzle-data attribution. |
 
 The first three frames must remain in this order. Together they explain the
 core product loop without relying on the App Store description: solve,
-recognize the tempting alternative, then focus training where repeated play
-shows an opportunity.
+recognize the tempting alternative, then choose the themes, pace, and
+difficulty you want to practice.
 
 ## Fictional User
 
@@ -37,18 +37,17 @@ rating, date, device name, or practice history may enter the capture.
 - Arrow Duel Rating: `875`
 - Recent activity: 18 completed Runs in eight weeks, 52 correct this week,
   and 41 correct in the previous week
-- Tactical focus: Fork solve reliability, supported by seven different
-  puzzles across three ordinary mixed sessions
-- Focused Run: 15 puzzles in five minutes, with 10 Fork puzzles and 5 mixed
-  controls, unrated and anchored to the current Standard Rating
+- Custom Run: `Fork & Pin Focus`, using Regular Puzzles with Fork and Pin
+  selected, a five-minute duration, 30 seconds per puzzle, and a starting
+  Rating of `925`
 - Review workload: 6 scheduled today, 2 completed, 4 remaining, 0 overdue,
   3 tomorrow, 8 in the next seven days, and 12 total
-- Progress highlight: completed Pin puzzles improve from `1.30×` to `1.06×`
-  matched expected time, with sample size increasing from 18 to 57
+- Rating history: Standard at a 20-second pace over 90 days, with six
+  non-monotonic checkpoints from `884` to the current Rating of `925`
 
 The active Standard and Arrow Duel frames are deterministic snapshots. They
 must not be committed as completed sessions or allowed to change the History,
-Review, Rating, or Tactical Profile state used by later frames.
+Review, Rating, or saved Custom Run state used by later frames.
 
 ## Product-State Contract
 
@@ -67,16 +66,16 @@ candidate arrows are visible and neutral. No candidate has been selected and
 there is no red/green answer feedback. The current puzzle timer remains below
 its Slow threshold.
 
-### 3. Tactical Profile and Focused Run
+### 3. Custom Run
 
-Use the Puzzle solving lane and the real Focused Run preview reached from the
-Tactical Profile. The title `Fork repair`, Rating `925`, and allocation
-`10 Forks / 5 Mixed practice` connect the recommendation to an action without
-inventing a new screen.
+Use the real New Run editor reached from Practice. Set the name to
+`Fork & Pin Focus`, choose Regular Puzzles, select Fork and Pin, set a
+five-minute duration, 30 seconds per puzzle, and starting Rating `925`. The
+visible pass rule is `Solve 10 before 5 min ends`.
 
-The current model is provisional. The product's `Early estimate` disclosure
-must remain visible; the capture must not imply that the model has been
-validated or hide an unavailable-inventory result.
+This frame demonstrates deliberate user control. It must not show or imply a
+model recommendation, inferred weakness, Tactical Profile, or automatic
+personalization.
 
 ### 4. Scheduled Review
 
@@ -86,14 +85,15 @@ There are no overdue items. The four remaining reviews include three Standard
 items and one Arrow Duel item, so the queue reinforces the shared learning
 loop without becoming a backlog.
 
-### 5. Tactical Progress
+### 5. Rating and Run History
 
-Open the real History Progress destination and select Pins. The visible
-eight-week series shows completed-puzzle speed improving at every checkpoint,
-ending at `1.06×` matched expected time with `24% less overhead`.
+Open the real History screen, switch from Needs attention to All, expand the
+filters, select `Standard · 20s pace`, and choose `90 days`. The visible Rating
+Trend ends at `925`, and ordinary recent Run rows remain visible beneath it.
 
-The product's `Early estimate` disclosure remains visible. Do not pair this
-positive frame with the clear-weakness or worsened variants.
+The history points include a small mid-period dip; do not manufacture a
+perfect upward line. This frame must not use Tactical Progress, theme-strength
+inference, or any model-derived improvement claim.
 
 ### 6. Trust
 
@@ -132,8 +132,10 @@ arrows, or manufacture a state that the submitted build cannot render.
 
 - Each frame communicates one benefit and uses the final copy above.
 - The first three frames work as a standalone product explanation.
-- Ratings, dates, Review counts, Profile evidence, and Progress samples belong
+- Ratings, dates, Review counts, Custom Run settings, and Rating history belong
   to the same fictional user.
+- No frame depends on Tactical Profile, inferred weaknesses, or model-derived
+  progress.
 - Mistakes explain Review but do not dominate any raw frame.
 - No real personal data, QA-only controls, debug UI, or stale version details
   appear.

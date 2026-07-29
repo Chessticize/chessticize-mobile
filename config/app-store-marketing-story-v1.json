@@ -56,35 +56,24 @@
         "feedbackState": "neutral"
       }
     },
-    "tacticalProfile": {
-      "assurance": "provisional",
-      "taskFamily": "line",
-      "primaryFocus": {
-        "themeKey": "fork",
-        "themeLabel": "Forks",
-        "reason": "solve_rate",
-        "distinctPuzzleCount": 7,
-        "distinctSessionCount": 3
-      },
-      "focusedRun": {
-        "title": "Fork repair",
-        "ratingAnchor": 925,
-        "ratingPolicy": "unrated",
-        "durationSeconds": 300,
-        "puzzleCount": 15,
-        "allocations": [
-          {
-            "key": "fork",
-            "label": "Forks",
-            "puzzleCount": 10
-          },
-          {
-            "key": "mixed",
-            "label": "Mixed practice",
-            "puzzleCount": 5
-          }
-        ]
-      }
+    "customRun": {
+      "id": "fork-and-pin-focus",
+      "name": "Fork & Pin Focus",
+      "mode": "custom",
+      "modeLabel": "Regular Puzzles",
+      "themes": [
+        "fork",
+        "pin"
+      ],
+      "themeLabels": [
+        "Fork",
+        "Pin"
+      ],
+      "durationSeconds": 300,
+      "perPuzzleSeconds": 30,
+      "startingRating": 925,
+      "targetCorrect": 10,
+      "maxMistakes": 3
     },
     "reviewQueue": {
       "scheduledToday": 6,
@@ -99,43 +88,37 @@
         "arrowDuel": 1
       }
     },
-    "tacticalProgress": {
-      "assurance": "provisional",
-      "periodLabel": "Last 8 weeks",
-      "selectedThemeKey": "pin",
-      "selectedThemeLabel": "Pins",
-      "kind": "completed_speed",
-      "changeLabel": "24% less overhead",
+    "ratingHistory": {
+      "ratingKey": "standard 5/20",
+      "runId": "standard",
+      "runLabel": "Standard",
+      "perPuzzleSeconds": 20,
+      "timeRange": "90d",
+      "latestRating": 925,
       "points": [
         {
-          "label": "May 24",
-          "valueLabel": "1.30×",
-          "sampleSize": 18
+          "completedAt": "2026-05-24T18:00:00.000Z",
+          "rating": 884
         },
         {
-          "label": "Jun 7",
-          "valueLabel": "1.27×",
-          "sampleSize": 25
+          "completedAt": "2026-06-07T18:00:00.000Z",
+          "rating": 900
         },
         {
-          "label": "Jun 21",
-          "valueLabel": "1.22×",
-          "sampleSize": 33
+          "completedAt": "2026-06-21T18:00:00.000Z",
+          "rating": 892
         },
         {
-          "label": "Jul 5",
-          "valueLabel": "1.17×",
-          "sampleSize": 42
+          "completedAt": "2026-07-05T18:00:00.000Z",
+          "rating": 910
         },
         {
-          "label": "Jul 19",
-          "valueLabel": "1.11×",
-          "sampleSize": 50
+          "completedAt": "2026-07-19T18:00:00.000Z",
+          "rating": 918
         },
         {
-          "label": "Jul 26",
-          "valueLabel": "1.06×",
-          "sampleSize": 57
+          "completedAt": "2026-07-26T18:00:00.000Z",
+          "rating": 925
         }
       ]
     }
@@ -240,39 +223,47 @@
     },
     {
       "order": 3,
-      "id": "train-your-weaknesses",
-      "captureId": "marketing-03-focused-run",
-      "copyKey": "train-your-weaknesses",
-      "headline": "Train Your Weaknesses",
-      "supporting": "Tactical Profiles turn repeated patterns into a focused Practice Run.",
-      "benefit": "A measured weakness connected to an actionable training plan",
+      "id": "focus-your-practice",
+      "captureId": "marketing-03-custom-run",
+      "copyKey": "focus-your-practice",
+      "headline": "Focus Your Practice",
+      "supporting": "Choose themes, pace, and difficulty for the skill you want to train.",
+      "benefit": "User-controlled focused practice without model inference",
       "source": {
-        "screen": "focused-run-preview",
-        "component": "apps/mobile/src/components/TacticalProfileSection.tsx",
+        "screen": "custom-run-editor",
+        "component": "apps/mobile/src/components/PracticePocScreen.tsx",
         "entryTestIds": [
           "practice-tab",
-          "training-focus-open-profile",
-          "tactical-profile-preview-run"
+          "practice-add-run",
+          "custom-mode-regular",
+          "custom-theme-fork",
+          "custom-theme-pin",
+          "practice-run-duration-300",
+          "practice-run-per-puzzle-30"
         ],
         "requiredVisibleTestIds": [
-          "focused-run-preview",
-          "tactical-profile-early-estimate",
-          "focused-run-rating-anchor",
-          "focused-run-allocation-bar",
-          "focused-run-start"
+          "practice-run-editor",
+          "practice-run-name-input",
+          "practice-run-mode-row",
+          "practice-run-theme-row",
+          "practice-run-editor-fields",
+          "practice-run-elo-input",
+          "practice-run-pass-rules"
         ],
         "stableText": {
-          "title": "Fork repair",
-          "summary": "15 puzzles · 5 min",
-          "focused-run-rating-anchor": "Puzzle-solving Rating 925",
-          "primary-allocation-label": "Forks",
-          "primary-allocation-count": "10 · 67%",
-          "mixed-allocation-label": "Mixed practice",
-          "mixed-allocation-count": "5 · 33%"
+          "practice-run-name-input": "Fork & Pin Focus",
+          "mode": "Regular Puzzles",
+          "themes": "Fork, Pin",
+          "duration": "5m",
+          "pace": "30 sec",
+          "rating": "925",
+          "pass-rule": "Solve 10 before 5 min ends"
         },
         "forbiddenStates": [
-          "focused-run-unavailable",
-          "suppressed-recommendation",
+          "practice-run-availability-error",
+          "practice-run-name-error",
+          "model-recommendation",
+          "tactical-profile",
           "loading"
         ]
       }
@@ -314,36 +305,42 @@
     },
     {
       "order": 5,
-      "id": "see-what-is-improving",
-      "captureId": "marketing-05-tactical-progress",
-      "copyKey": "see-what-is-improving",
-      "headline": "See What Is Improving",
-      "supporting": "Track theme-by-theme progress across weeks, not just one score.",
-      "benefit": "Credible improvement with theme-level context",
+      "id": "see-your-progress",
+      "captureId": "marketing-05-rating-trend",
+      "copyKey": "see-your-progress",
+      "headline": "See Your Progress",
+      "supporting": "Follow your Ratings and recent Runs over time.",
+      "benefit": "Saved Rating and Run history without model inference",
       "source": {
-        "screen": "tactical-progress",
-        "component": "apps/mobile/src/components/HistoryProgressSection.tsx",
+        "screen": "history-rating-trend",
+        "component": "apps/mobile/src/components/PracticePocScreen.tsx",
         "entryTestIds": [
           "history-tab",
-          "history-progress-button",
-          "history-progress-strength-pins"
+          "history-attention-all",
+          "history-filter-toggle",
+          "history-rating-standard 5/20",
+          "history-range-90d"
         ],
         "requiredVisibleTestIds": [
-          "history-progress-screen",
-          "history-progress-early-estimate",
-          "history-strength-over-time",
-          "history-strength-chart"
+          "history-panel",
+          "history-performance-card",
+          "history-performance-context",
+          "history-chart-value",
+          "history-chart-label",
+          "history-performance-chart",
+          "history-chart-line"
         ],
         "stableText": {
-          "title": "Tactical progress",
-          "period": "Last 8 weeks",
-          "theme": "Pins",
-          "change": "24% less overhead"
+          "title": "Rating Trend",
+          "history-performance-context": "Standard · 20s pace · 90 days",
+          "history-chart-value": "925",
+          "history-chart-label": "Rating"
         },
         "forbiddenStates": [
-          "clear-weakness",
-          "worsened",
-          "empty-progress"
+          "history-empty-state",
+          "tactical-progress",
+          "model-recommendation",
+          "error"
         ]
       }
     },

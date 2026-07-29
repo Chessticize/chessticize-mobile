@@ -21,9 +21,9 @@ test("App Store marketing story defines the canonical six-frame order and copy",
   const expectedFrameIds = [
     "build-tactical-intuition",
     "choose-the-best-move",
-    "train-your-weaknesses",
+    "focus-your-practice",
     "make-every-mistake-count",
-    "see-what-is-improving",
+    "see-your-progress",
     "private-offline-open-source"
   ];
 
@@ -40,6 +40,20 @@ test("App Store marketing story defines the canonical six-frame order and copy",
   );
   assert.equal(new Set(story.frames.map((frame) => frame.captureId)).size, 6);
   assert.equal(new Set(story.frames.map((frame) => frame.copyKey)).size, 6);
+  assert.equal("tacticalProfile" in story.fictionalUser, false);
+  assert.equal("tacticalProgress" in story.fictionalUser, false);
+
+  for (const order of [3, 5]) {
+    const frame = story.frames[order - 1];
+    assert.equal(
+      frame.source.component,
+      "apps/mobile/src/components/PracticePocScreen.tsx"
+    );
+    assert.ok(frame.benefit.includes("without model inference"));
+    assert.ok(
+      frame.source.forbiddenStates.includes("model-recommendation")
+    );
+  }
 
   for (const frame of story.frames) {
     assert.ok(frame.headline.length > 0);
@@ -66,16 +80,16 @@ test("fictional-user values stay coherent across the six frames", async () => {
     user.ratings.arrowDuel
   );
   assert.equal(
-    user.tacticalProfile.focusedRun.ratingAnchor,
+    user.customRun.startingRating,
     user.ratings.standard
   );
   assert.equal(
-    user.tacticalProfile.focusedRun.allocations.reduce(
-      (total, allocation) => total + allocation.puzzleCount,
-      0
-    ),
-    user.tacticalProfile.focusedRun.puzzleCount
+    user.customRun.targetCorrect,
+    Math.floor(
+      user.customRun.durationSeconds / user.customRun.perPuzzleSeconds
+    )
   );
+  assert.equal(user.customRun.themes.length, user.customRun.themeLabels.length);
   assert.equal(
     user.reviewQueue.completedToday + user.reviewQueue.remainingToday,
     user.reviewQueue.scheduledToday
@@ -87,11 +101,23 @@ test("fictional-user values stay coherent across the six frames", async () => {
   );
   assert.equal(user.reviewQueue.overdue, 0);
 
-  const sampleSizes = user.tacticalProgress.points.map(
-    (point) => point.sampleSize
+  assert.equal(user.ratingHistory.latestRating, user.ratings.standard);
+  assert.equal(
+    user.ratingHistory.points.at(-1)?.rating,
+    user.ratingHistory.latestRating
   );
-  assert.deepEqual(sampleSizes, [...sampleSizes].sort((left, right) => left - right));
-  assert.equal(new Set(sampleSizes).size, sampleSizes.length);
+
+  const completedAt = user.ratingHistory.points.map(
+    (point) => point.completedAt
+  );
+  assert.deepEqual(completedAt, [...completedAt].sort());
+  assert.ok(
+    user.ratingHistory.points.some(
+      (point, index, points) =>
+        index > 0 && point.rating < points[index - 1].rating
+    ),
+    "Expected a believable non-monotonic Rating trend"
+  );
 });
 
 test("story source identity and claim evidence match version-controlled files", async () => {
