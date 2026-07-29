@@ -1,6 +1,6 @@
 # Chessticize iOS 1.3.1 (build 1)
 
-- Status: Ready for owner approval
+- Status: Approved
 - Locale: `en-US`
 - Platform: `iOS`
 - Public version: `1.3.1`
@@ -10,16 +10,18 @@
 
 ## Customer-facing changes
 
-- Fix Stockfish Analysis after Arrow Duel puzzles.
+- Improve Training Focus with balanced results, Accuracy trends, and personal
+  solve-time comparisons.
+- Fix a crash during deep Stockfish Analysis.
 - Fix Rating history replay across Apple devices.
 - Show History dates in the device's local calendar correctly.
 
 ## Store copy (`en-US`)
 
 ```text
-• Fixed Stockfish Analysis after Arrow Duel puzzles.
-• Fixed Rating history replay across devices.
-• Fixed local calendar dates in History.
+• Improved Training Focus with balanced results, Accuracy trends, and personal solve-time comparisons.
+• Fixed a crash during deep Stockfish Analysis.
+• Fixed Rating history replay across devices and local calendar dates in History.
 ```
 
 ## Release details
@@ -28,9 +30,10 @@
 
 ## GitHub customer summary
 
-Chessticize 1.3.1 fixes Stockfish Analysis after Arrow Duel puzzles, keeps
-Rating history replay consistent across Apple devices, and displays History
-dates using the device's local calendar.
+Chessticize 1.3.1 improves Training Focus with balanced results, Accuracy
+trends, and personal solve-time comparisons. It also fixes a crash during deep
+Stockfish Analysis, keeps Rating history replay consistent across Apple
+devices, and displays History dates using the device's local calendar.
 
 ## Release-note review
 
@@ -47,4 +50,4 @@ dates using the device's local calendar.
   benefits.
 - [x] No issue numbers, internal code names, implementation details, or private
   evidence are included.
-- [ ] The release owner approved the copy before the source tag was created.
+- [x] The release owner approved the copy before the source tag was created.

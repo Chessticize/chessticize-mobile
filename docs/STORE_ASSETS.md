@@ -115,15 +115,15 @@ model-derived improvement.
 
 ### What's New
 
-For iOS 1.3.1, use this ready-to-paste release-candidate copy:
+For iOS 1.3.1, use this approved ready-to-paste copy:
 
 ```text
-• Fixed Stockfish Analysis after Arrow Duel puzzles.
-• Fixed Rating history replay across devices.
-• Fixed local calendar dates in History.
+• Improved Training Focus with balanced results, Accuracy trends, and personal solve-time comparisons.
+• Fixed a crash during deep Stockfish Analysis.
+• Fixed Rating history replay across devices and local calendar dates in History.
 ```
 
-This draft is 139 / 300 Unicode characters, including line breaks. Future
+This approved copy is 232 / 300 Unicode characters, including line breaks. Future
 versions must use the reusable template in
 [`docs/releases/RELEASE_NOTES_TEMPLATE.md`](releases/RELEASE_NOTES_TEMPLATE.md):
 lead with user benefits, use two or three short bullets, omit raw URLs, and do

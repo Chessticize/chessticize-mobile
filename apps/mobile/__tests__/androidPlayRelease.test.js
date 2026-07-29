@@ -632,7 +632,11 @@ describe('Android Play release contract', () => {
     expect(storeCopy).toBeDefined();
     expect(Array.from(storeCopy).length).toBeLessThanOrEqual(300);
     expect(storeCopy).not.toMatch(/https?:\/\//u);
-    expect(storeCopy).toContain('Progress Backup');
+    expect(storeCopy).toContain('Training Focus');
+    expect(storeCopy).toContain('deep Stockfish Analysis');
+    expect(storeCopy).not.toContain('Arrow Duel');
+    expect(storeCopy).not.toContain('Progress Backup');
+    expect(releaseNote).not.toMatch(/Rating history/i);
     expect(storeCopy).not.toMatch(/across devices|cross-platform sync/i);
     expect(releaseNote).not.toMatch(/across Android devices/i);
     for (const value of [
