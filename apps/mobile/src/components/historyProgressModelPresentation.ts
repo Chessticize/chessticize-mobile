@@ -129,16 +129,16 @@ function strengthSeries(
       : "Accuracy · higher is better",
     baselineLabel: kind === "completed_speed"
       ? provisional
-        ? "1.00× = provisional 30-second baseline"
-        : "1.00× = expected completed-puzzle time"
-      : "Eligible ordinary mixed Runs",
+        ? "1.00× is the provisional 30-second baseline"
+        : "1.00× is the expected completed-puzzle time"
+      : "Recent attempts and stronger theme matches contribute more to n",
     scaleMax: kind === "completed_speed"
       ? Math.max(100, Math.ceil(maxValue * 1.15))
       : 100,
     changeLabel: change.label,
     changeTone: change.tone,
     summary: kind === "completed_speed"
-      ? "Only correct, before-timeout solves with reliable timing are included."
+      ? "n includes weighted, reliable solves completed before timeout."
       : "Wrong moves and timeouts count as misses.",
     points
   };

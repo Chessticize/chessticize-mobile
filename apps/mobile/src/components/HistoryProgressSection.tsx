@@ -185,13 +185,17 @@ export function HistoryProgressScreen({
               sampleUnitLabel={presentation.sampleUnitLabel}
               series={selectedSeries}
             />
-            <Text style={styles.sampleKey}>
-              n = {presentation.sampleUnitLabel}
-            </Text>
-            <Text style={styles.baselineLabel}>
-              {selectedSeries.baselineLabel}
-            </Text>
-            <Text style={styles.summary}>{selectedSeries.summary}</Text>
+            <View
+              style={styles.chartNote}
+              testID="history-progress-chart-note"
+            >
+              <Text style={styles.chartNoteTitle}>
+                {progressMetricNoteTitle(selectedSeries.kind)}
+              </Text>
+              <Text style={styles.chartNoteBody}>
+                {selectedSeries.baselineLabel}. {selectedSeries.summary}
+              </Text>
+            </View>
           </>
         ) : (
           <Text style={styles.summary}>No progress data is available yet.</Text>
@@ -436,6 +440,14 @@ function progressMetricLabel(
   kind: Exclude<TacticalFocusReason, "both">
 ): string {
   return kind === "completed_speed" ? "Solve time" : "Accuracy";
+}
+
+function progressMetricNoteTitle(
+  kind: Exclude<TacticalFocusReason, "both">
+): string {
+  return kind === "completed_speed"
+    ? "How solve time is counted"
+    : "How accuracy is counted";
 }
 
 function ProgressGlyph(): React.JSX.Element {
@@ -703,13 +715,6 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: "space-between"
   },
-  baselineLabel: {
-    color: "#64748B",
-    fontSize: 10,
-    fontWeight: "700",
-    marginTop: -5,
-    textAlign: "right"
-  },
   chart: {
     height: 192,
     justifyContent: "flex-end",
@@ -777,9 +782,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
     width: "100%"
   },
-  sampleKey: {
+  chartNote: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    gap: 3,
+    paddingHorizontal: 11,
+    paddingVertical: 9
+  },
+  chartNoteTitle: {
+    color: "#475569",
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  chartNoteBody: {
     color: "#64748B",
-    fontSize: 10
+    fontSize: 11,
+    lineHeight: 16
   },
   summary: {
     color: "#475569",

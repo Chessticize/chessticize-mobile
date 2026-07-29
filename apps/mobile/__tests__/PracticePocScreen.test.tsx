@@ -2655,14 +2655,28 @@ describe("PracticePocScreen", () => {
       "Tactical progress"
     );
     expect(findByTestId(renderer, "history-progress-early-estimate")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+    const progressSection = findByTestId(renderer, "history-strength-over-time");
+    expect(collectText(progressSection)).toContain(
       "16 points higher"
     );
-    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+    expect(collectText(progressSection)).toContain(
       "Accuracy · higher is better"
     );
-    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+    expect(collectText(progressSection)).toContain(
       "n=71"
+    );
+    expect(collectText(progressSection)).toContain("How accuracy is counted");
+    expect(collectText(progressSection)).toContain(
+      "Recent attempts and stronger theme matches contribute more to n."
+    );
+    expect(collectText(progressSection)).toContain(
+      "Wrong moves and timeouts count as misses."
+    );
+    expect(collectText(progressSection)).not.toContain(
+      "model-weighted observations"
+    );
+    expect(collectText(progressSection)).not.toContain(
+      "Eligible ordinary mixed Runs"
     );
     const balanced = findByTestId(renderer, "history-no-clear-weakness");
     expect(collectText(balanced)).toContain("Recent play looks balanced");
@@ -2678,6 +2692,12 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-progress-metric-completed_speed");
     expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
       "1.09×"
+    );
+    expect(collectText(findByTestId(renderer, "history-progress-chart-note"))).toContain(
+      "How solve time is counted"
+    );
+    expect(collectText(findByTestId(renderer, "history-progress-chart-note"))).toContain(
+      "1.00× is the provisional 30-second baseline."
     );
 
     press(renderer, "history-progress-strength-pins");
@@ -2819,7 +2839,8 @@ describe("PracticePocScreen", () => {
     const progress = findByTestId(renderer, "history-progress-screen");
     const weakness = findByTestId(renderer, "history-clear-weakness");
     expect(collectText(progress)).toContain("Pin · Arrow Duel");
-    expect(collectText(progress)).toContain("model-weighted observations");
+    expect(collectText(progress)).toContain("How accuracy is counted");
+    expect(collectText(progress)).not.toContain("model-weighted observations");
     expect(collectText(weakness)).toContain("Solve reliability");
     expect(collectText(weakness)).toContain("extra misses");
     expect(collectText(weakness)).toContain("12 different puzzles · 3 sessions");
