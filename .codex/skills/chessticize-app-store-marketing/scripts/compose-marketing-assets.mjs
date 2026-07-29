@@ -1419,6 +1419,7 @@ async function composePhotographicFrame(item, backgroundTemplate) {
   }
   const buffer = await sharp(scene)
     .composite(composites)
+    .removeAlpha()
     .png({ adaptiveFiltering: false, compressionLevel: 9 })
     .toBuffer();
   return {
@@ -1489,6 +1490,7 @@ async function composeFrame(item, config, backgroundTemplate) {
         top: 0,
       },
     ])
+    .removeAlpha()
     .png({ adaptiveFiltering: false, compressionLevel: 9 })
     .toBuffer();
   return {

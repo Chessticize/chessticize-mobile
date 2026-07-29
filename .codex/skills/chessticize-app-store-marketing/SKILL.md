@@ -104,6 +104,8 @@ creating a new visual revision:
   area, or device-size drift beyond the configured family tolerance.
 - Keep generated PNGs and contact sheets under ignored `scratch/` paths unless
   a human explicitly selects sanitized final assets for publication.
+- Export every final App Store PNG without an alpha channel. A visually opaque
+  image that still carries PNG transparency metadata is not upload-ready.
 - Before App Store upload, recheck Apple's current accepted dimensions and run
   the release asset audit required by issue #417.
 
