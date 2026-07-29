@@ -499,6 +499,7 @@ const CUSTOM_INITIAL_RATING_MIN = 600;
 const CUSTOM_INITIAL_RATING_MAX = 2200;
 const CUSTOM_INITIAL_RATING_STEP = 100;
 const ARROW_DUEL_LOADING_TRANSITION_MS = 200;
+const APP_REVIEW_REQUEST_IDLE_MS = 2_000;
 
 function openFeedbackIssuesInBrowser(url: string): Promise<void> {
   return Linking.openURL(url);
@@ -602,6 +603,7 @@ export function PracticePocScreen({
   const notificationClient = platformCapabilities.reminders.notificationClient;
   const reminderPlatform = platformCapabilities.reminders.platform;
   const moveFeedbackClient = platformCapabilities.moveFeedback.client;
+  const appStoreReviewRequestClient = platformCapabilities.appReview.client;
   const progressProtection = platformCapabilities.progressProtection;
   const iCloudSyncClient = platformCapabilities.progressSync.client;
   const iCloudSyncDiagnosticsClient = platformCapabilities.progressSync.diagnostics;
@@ -641,6 +643,7 @@ export function PracticePocScreen({
     (intent: MobileBackIntent, resolvedState: MobileBackState) => boolean
   ) | null>(null);
   const reminderScheduleKeyRef = useRef<string | null>(null);
+  const appReviewCancelledSessionIdsRef = useRef(new Set<string>());
   // Initialized once the service effect runs. Keeping this out of the useRef
   // argument matters because React evaluates that argument on every render.
   const scheduledReviewAttemptCountRef = useRef<number | null>(null);
@@ -1020,6 +1023,10 @@ export function PracticePocScreen({
         pauseActiveSprint("app-state");
       }
       if (nextState === "background" || nextState === "inactive") {
+        const currentSessionId = stateRef.current?.id;
+        if (currentSessionId) {
+          appReviewCancelledSessionIdsRef.current.add(currentSessionId);
+        }
         refreshReviewReminder("app-background", true);
         if (service.getSettings().sync.iCloudEnabled) {
           void runICloudProgressSync("app-background");
@@ -2979,6 +2986,82 @@ export function PracticePocScreen({
     topTransient: topBackTransient
   };
   const predictiveBackEnabled = resolveMobileBackIntent(mobileBackState, "button").kind !== "delegate-platform";
+  const appReviewRequestBlocked =
+    tab !== "practice" ||
+    topBackTransient !== null ||
+    reviewAnalysisOpen ||
+    mobileBackPreview !== null ||
+    error !== null;
+
+  useEffect(() => {
+    const current = state;
+    const cancelledSessionIds = appReviewCancelledSessionIdsRef.current;
+    if (
+      !appStoreReviewRequestClient ||
+      !current ||
+      current.status !== "won" ||
+      !isFinished ||
+      isShowingFeedbackSnapshot ||
+      appReviewRequestBlocked ||
+      cancelledSessionIds.has(current.id)
+    ) {
+      return undefined;
+    }
+
+    const appVersion =
+      platformCapabilities.applicationMetadata.versionName;
+    if (!service.getAppReviewRequestEligibility(
+      current.id,
+      appVersion,
+      currentTimeMs()
+    ).eligible) {
+      return undefined;
+    }
+
+    let attempted = false;
+    const sessionId = current.id;
+    const timer = setTimeout(() => {
+      const currentState = stateRef.current;
+      if (
+        cancelledSessionIds.has(sessionId) ||
+        currentState?.id !== sessionId ||
+        currentState.status !== "won"
+      ) {
+        return;
+      }
+      const attemptedAtMs = currentTimeMs();
+      if (!service.getAppReviewRequestEligibility(
+        sessionId,
+        appVersion,
+        attemptedAtMs
+      ).eligible) {
+        return;
+      }
+
+      attempted = true;
+      service.recordAppReviewRequestAttempt(
+        appVersion,
+        new Date(attemptedAtMs).toISOString()
+      );
+      void appStoreReviewRequestClient.requestReview().catch(() => {});
+    }, APP_REVIEW_REQUEST_IDLE_MS);
+
+    return () => {
+      clearTimeout(timer);
+      if (!attempted) {
+        cancelledSessionIds.add(sessionId);
+      }
+    };
+  }, [
+    appReviewRequestBlocked,
+    appStoreReviewRequestClient,
+    currentTimeMs,
+    isFinished,
+    isShowingFeedbackSnapshot,
+    platformCapabilities.applicationMetadata.versionName,
+    service,
+    state
+  ]);
 
   function dismissSessionGuide(): void {
     pendingGuidedStartRef.current = null;

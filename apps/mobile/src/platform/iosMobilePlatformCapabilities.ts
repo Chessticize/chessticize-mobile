@@ -22,6 +22,7 @@ import {
   createNativeReviewReminderScheduler,
 } from './reviewReminderScheduler.ts';
 import { createNativeMoveFeedbackClient } from './moveFeedback.ts';
+import { createNativeAppStoreReviewRequestClient } from './appStoreReviewRequest.ts';
 
 export function createIOSMobilePlatformCapabilitiesSync():
   | MobilePlatformCapabilities
@@ -66,6 +67,9 @@ export function composeIOSMobilePlatformCapabilities(
     },
     moveFeedback: {
       client: createNativeMoveFeedbackClient(),
+    },
+    appReview: {
+      client: createNativeAppStoreReviewRequestClient(),
     },
     applicationMetadata,
   };

@@ -22,6 +22,8 @@
 		A24700032E70000100A00001 /* freesound-546119-piece-placement.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */; };
 		A24700052E70000100A00001 /* freesound-546120-piece-capture.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */; };
 		A24700072E70000100A00001 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A24700082E70000100A00001 /* AVFoundation.framework */; };
+		C41500012E80000100A00001 /* AppStoreReviewRequest.m in Sources */ = {isa = PBXBuildFile; fileRef = C41500022E80000100A00001 /* AppStoreReviewRequest.m */; };
+		C41500032E80000100A00001 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C41500042E80000100A00001 /* StoreKit.framework */; };
 		B35300012E70000100A00001 /* ICloudSyncDiagnostics.m in Sources */ = {isa = PBXBuildFile; fileRef = B35300022E70000100A00001 /* ICloudSyncDiagnostics.m */; };
 		B35300032E70000100A00001 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = B35300042E70000100A00001 /* libsqlite3.tbd */; };
 		D3C7E4DB20DDEF6FD16890C3 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
@@ -51,6 +53,8 @@
 		A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = "freesound-546119-piece-placement.mp3"; path = "../../mobile-lab/public/audio/issue-247/freesound-546119-piece-placement.mp3"; sourceTree = SOURCE_ROOT; };
 		A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = "freesound-546120-piece-capture.mp3"; path = "../../mobile-lab/public/audio/issue-247/freesound-546120-piece-capture.mp3"; sourceTree = SOURCE_ROOT; };
 		A24700082E70000100A00001 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		C41500022E80000100A00001 /* AppStoreReviewRequest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AppStoreReviewRequest.m; path = ChessticizeMobile/AppStoreReviewRequest.m; sourceTree = "<group>"; };
+		C41500042E80000100A00001 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		B35300022E70000100A00001 /* ICloudSyncDiagnostics.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = ICloudSyncDiagnostics.m; path = ChessticizeMobile/ICloudSyncDiagnostics.m; sourceTree = "<group>"; };
 		B35300042E70000100A00001 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -62,6 +66,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A24700072E70000100A00001 /* AVFoundation.framework in Frameworks */,
+				C41500032E80000100A00001 /* StoreKit.framework in Frameworks */,
 				9D2E4F5B2D2C400100A00001 /* CloudKit.framework in Frameworks */,
 				B35300032E70000100A00001 /* libsqlite3.tbd in Frameworks */,
 				0C80B921A6F3F58F76C31292 /* libPods-ChessticizeMobile.a in Frameworks */,
@@ -76,6 +81,7 @@
 			children = (
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				2A7D186A2E50000100A00001 /* ApplicationMetadata.m */,
+				C41500022E80000100A00001 /* AppStoreReviewRequest.m */,
 				A24700022E70000100A00001 /* MoveFeedback.m */,
 				A24700042E70000100A00001 /* freesound-546119-piece-placement.mp3 */,
 				A24700062E70000100A00001 /* freesound-546120-piece-capture.mp3 */,
@@ -98,6 +104,7 @@
 			isa = PBXGroup;
 			children = (
 				A24700082E70000100A00001 /* AVFoundation.framework */,
+				C41500042E80000100A00001 /* StoreKit.framework */,
 				9D2E4F5E2D2C400100A00001 /* CloudKit.framework */,
 				B35300042E70000100A00001 /* libsqlite3.tbd */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
@@ -303,6 +310,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2A7D186B2E50000100A00001 /* ApplicationMetadata.m in Sources */,
+				C41500012E80000100A00001 /* AppStoreReviewRequest.m in Sources */,
 				A24700012E70000100A00001 /* MoveFeedback.m in Sources */,
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				761780EF2CA45674006654EE /* SceneDelegate.swift in Sources */,

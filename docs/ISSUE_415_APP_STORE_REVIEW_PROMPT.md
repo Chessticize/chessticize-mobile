@@ -1,8 +1,9 @@
 # Issue 415 App Store Review Request
 
-This document records the approved-for-design proposal for issue
-[#415](https://github.com/Chessticize/chessticize-mobile/issues/415). It is a
-Storybook design contract, not production review-request wiring.
+This document records the approved product contract for issue
+[#415](https://github.com/Chessticize/chessticize-mobile/issues/415). The
+Interaction Lab scenario remains the reviewable design reference for the
+production review-request wiring.
 
 ## Product decision
 
@@ -45,9 +46,9 @@ Stable story:
 
 ## Local eligibility and cooldown
 
-Production implementation should derive successful Sprint counts and distinct
-local dates from existing on-device history. It should add only the local
-suppression state needed for respectful request attempts:
+Production derives successful Sprint counts and distinct local dates from
+existing on-device history. It adds only the local suppression state needed
+for respectful request attempts:
 
 - the app version for the last StoreKit request attempt;
 - the local timestamp of that attempt.

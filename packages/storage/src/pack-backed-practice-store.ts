@@ -1,5 +1,6 @@
 import { buildSessionMistakeReview } from "../../core/src/index.ts";
 import type {
+  AppReviewRequestAttempt,
   AttemptEvent,
   AttemptResult,
   CustomSprintConfigRecord,
@@ -122,6 +123,16 @@ export class PackBackedPracticeStore implements PracticeStore {
 
   getReviewReminderSettings(): ReviewReminderSettings {
     return this.userStore.getReviewReminderSettings();
+  }
+
+  getAppReviewRequestAttempt(): AppReviewRequestAttempt | undefined {
+    return this.userStore.getAppReviewRequestAttempt();
+  }
+
+  saveAppReviewRequestAttempt(
+    attempt: AppReviewRequestAttempt
+  ): AppReviewRequestAttempt {
+    return this.userStore.saveAppReviewRequestAttempt(attempt);
   }
 
   createSprintSession(state: SprintState): void {

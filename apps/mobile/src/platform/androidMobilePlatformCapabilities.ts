@@ -66,6 +66,9 @@ export function composeAndroidMobilePlatformCapabilities(
     moveFeedback: {
       client: createNativeMoveFeedbackClient(),
     },
+    appReview: {
+      client: null,
+    },
     applicationMetadata: {
       ...applicationMetadata,
       releasePageUrl: MOBILE_ANDROID_RELEASES_URL,

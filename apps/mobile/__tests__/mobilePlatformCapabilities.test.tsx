@@ -15,6 +15,7 @@ import {
   createNativeStockfishTransport,
   prewarmNativeStockfishTransport,
 } from '../src/platform/nativeStockfishTransport';
+import { FakeAppStoreReviewRequestClient } from '../src/platform/appStoreReviewRequest';
 
 describe('mobile platform capabilities', () => {
   const installedApplicationMetadata = {
@@ -39,6 +40,7 @@ describe('mobile platform capabilities', () => {
     await expect(capabilities.stockfish.prewarm()).resolves.toBe(false);
     expect(capabilities.reminders.scheduler).toBeNull();
     expect(capabilities.reminders.notificationClient).toBeNull();
+    expect(capabilities.appReview.client).toBeNull();
     expect(capabilities.applicationMetadata).toBe(installedApplicationMetadata);
   });
 
@@ -77,6 +79,7 @@ describe('mobile platform capabilities', () => {
     expect(capabilities.reminders.platform).toBe('android');
     expect(capabilities.reminders.scheduler).not.toBeNull();
     expect(capabilities.reminders.notificationClient).not.toBeNull();
+    expect(capabilities.appReview.client).toBeNull();
     expect(capabilities.applicationMetadata).toEqual({
       ...installedApplicationMetadata,
       releasePageUrl: 'https://github.com/Chessticize/chessticize-mobile/releases',
@@ -139,11 +142,13 @@ describe('mobile platform capabilities', () => {
     const progressSyncClient = new FakeICloudProgressSyncClient();
     const scheduler = new FakeReviewReminderScheduler();
     const notificationClient = new FakeReviewReminderNotificationClient();
+    const appStoreReviewRequestClient = new FakeAppStoreReviewRequestClient();
     const capabilities = createTestMobilePlatformCapabilities({
       practiceServiceFactory: () => service,
       iCloudProgressSyncClient: progressSyncClient,
       reviewReminderScheduler: scheduler,
       reviewReminderNotificationClient: notificationClient,
+      appStoreReviewRequestClient,
       applicationMetadata: {
         versionName: 'test-version',
         buildNumber: 'test-build',
@@ -173,6 +178,7 @@ describe('mobile platform capabilities', () => {
     expect(capabilities.progressSync.diagnostics).toBeNull();
     expect(capabilities.reminders.scheduler).toBe(scheduler);
     expect(capabilities.reminders.notificationClient).toBe(notificationClient);
+    expect(capabilities.appReview.client).toBe(appStoreReviewRequestClient);
     expect(capabilities.applicationMetadata).toMatchObject({
       versionName: 'test-version',
       buildNumber: 'test-build',

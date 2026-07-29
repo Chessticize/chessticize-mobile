@@ -28,6 +28,7 @@ import {
   updateAttemptUnclearState
 } from "../../core/src/index.ts";
 import type {
+  AppReviewRequestAttempt,
   AttemptEvent,
   AttemptOutcome,
   AttemptResult,
@@ -242,6 +243,11 @@ interface AppSettingsRow {
   sprint_focused_run_guide_seen: number;
 }
 
+interface AppReviewRequestStateRow {
+  app_version: string;
+  attempted_at: string;
+}
+
 interface SprintSessionExportRow {
   id: string;
   mode: SprintMode;
@@ -277,7 +283,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 14;
+export const CURRENT_SCHEMA_VERSION = 15;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -300,7 +306,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 10, to: 11, apply: migrateV10ToV11 },
   { from: 11, to: 12, apply: migrateV11ToV12 },
   { from: 12, to: 13, apply: migrateV12ToV13 },
-  { from: 13, to: 14, apply: migrateV13ToV14 }
+  { from: 13, to: 14, apply: migrateV13ToV14 },
+  { from: 14, to: 15, apply: migrateV14ToV15 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -684,6 +691,40 @@ export class SyncSQLiteStore implements PracticeStore {
 
   getReviewReminderSettings(): ReviewReminderSettings {
     return reviewReminderPreferenceToSettings(this.getReviewReminderPreference());
+  }
+
+  getAppReviewRequestAttempt(): AppReviewRequestAttempt | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT app_version, attempted_at
+         FROM app_review_request_state
+         WHERE singleton_id = 1`
+      )
+      .get() as AppReviewRequestStateRow | undefined;
+    return row
+      ? {
+          appVersion: row.app_version,
+          attemptedAt: row.attempted_at
+        }
+      : undefined;
+  }
+
+  saveAppReviewRequestAttempt(
+    attempt: AppReviewRequestAttempt
+  ): AppReviewRequestAttempt {
+    this.db
+      .prepare(
+        `INSERT INTO app_review_request_state (
+          singleton_id,
+          app_version,
+          attempted_at
+        ) VALUES (1, ?, ?)
+        ON CONFLICT(singleton_id) DO UPDATE SET
+          app_version = excluded.app_version,
+          attempted_at = excluded.attempted_at`
+      )
+      .run(attempt.appVersion, attempt.attemptedAt);
+    return { ...attempt };
   }
 
   createSprintSession(state: SprintState): void {
@@ -2293,6 +2334,15 @@ function hasColumn(db: SyncSqliteDatabase, table: string, column: string): boole
   return columns.some((candidate) => candidate.name === column);
 }
 
+function hasTable(db: SyncSqliteDatabase, table: string): boolean {
+  const row = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?"
+    )
+    .get(table) as { name?: unknown } | undefined;
+  return row?.name === table;
+}
+
 function migrateV4ToV5(db: SyncSqliteDatabase): void {
   db.exec(`
     ALTER TABLE attempts
@@ -2469,6 +2519,7 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   }
   migrateV10ToV11(db);
   migrateV11ToV12(db);
+  migrateV14ToV15(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -2477,7 +2528,8 @@ function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
     hasColumn(db, "app_settings", "sprint_rules_guide_seen") &&
     hasColumn(db, "app_settings", "sprint_active_session_guide_seen") &&
     hasColumn(db, "app_settings", "sprint_arrow_duel_guide_seen") &&
-    hasColumn(db, "app_settings", "sprint_focused_run_guide_seen");
+    hasColumn(db, "app_settings", "sprint_focused_run_guide_seen") &&
+    hasTable(db, "app_review_request_state");
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -2688,6 +2740,16 @@ function migrateV13ToV14(db: SyncSqliteDatabase): void {
   // migration cannot run again after user_version reaches 14.
   ensureMoveFeedbackColumns(db);
   db.exec("UPDATE app_settings SET move_feedback_sound_enabled = 0");
+}
+
+function migrateV14ToV15(db: SyncSqliteDatabase): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_review_request_state (
+      singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+      app_version TEXT NOT NULL CHECK (length(trim(app_version)) > 0),
+      attempted_at TEXT NOT NULL
+    );
+  `);
 }
 
 function readSchemaVersion(db: SyncSqliteDatabase): number {
