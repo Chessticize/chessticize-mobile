@@ -9,6 +9,7 @@ import {
 import { clonePracticeSettings } from "./practice-settings.ts";
 import {
   assignLegacyRatingGenerations,
+  indexSprintSessionsByRatingKey,
   mergeRatingWithSprintSessions,
   reconcileRatingWithSprintSessions
 } from "./rating-history.ts";
@@ -120,6 +121,8 @@ export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataI
   );
   const localSessions = assignLegacyRatingGenerations(local.ratings, local.sprintSessions);
   const remoteSessions = assignLegacyRatingGenerations(remote.ratings, remote.sprintSessions);
+  const localSessionsByRatingKey = indexSprintSessionsByRatingKey(localSessions);
+  const remoteSessionsByRatingKey = indexSprintSessionsByRatingKey(remoteSessions);
   const attempts = new Map<string, AttemptHistoryRow>();
   for (const attempt of local.attempts) {
     attempts.set(attempt.id, cloneAttemptHistoryRow(attempt));
@@ -140,15 +143,23 @@ export function mergeLocalDataExports(local: LocalDataExport, remote: LocalDataI
 
   const ratings = new Map<string, RatingRecord>();
   for (const rating of local.ratings) {
-    ratings.set(rating.key, reconcileRatingWithSprintSessions(rating, localSessions));
+    ratings.set(
+      rating.key,
+      reconcileRatingWithSprintSessions(
+        rating,
+        localSessionsByRatingKey.get(rating.key) ?? []
+      )
+    );
   }
   for (const rating of remote.ratings) {
     const previous = ratings.get(rating.key);
+    const localRatingSessions = localSessionsByRatingKey.get(rating.key) ?? [];
+    const remoteRatingSessions = remoteSessionsByRatingKey.get(rating.key) ?? [];
     ratings.set(
       rating.key,
       previous
-        ? mergeRatingWithSprintSessions(previous, rating, localSessions, remoteSessions)
-        : reconcileRatingWithSprintSessions(rating, remoteSessions)
+        ? mergeRatingWithSprintSessions(previous, rating, localRatingSessions, remoteRatingSessions)
+        : reconcileRatingWithSprintSessions(rating, remoteRatingSessions)
     );
   }
 

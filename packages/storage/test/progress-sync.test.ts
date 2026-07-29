@@ -15,9 +15,13 @@ import {
   syncPracticeProgress
 } from "../src/index.ts";
 import type { ProgressSyncSnapshot, ProgressSyncTransport } from "../src/index.ts";
-import type { LocalDataImport } from "../src/index.ts";
-import { defaultSprintConfig } from "../../core/src/index.ts";
-import type { Puzzle, SprintState } from "../../core/src/index.ts";
+import type { ExportedSprintSession, LocalDataImport } from "../src/index.ts";
+import {
+  calculateSprintRatingChange,
+  createDefaultRating,
+  defaultSprintConfig
+} from "../../core/src/index.ts";
+import type { Puzzle, RatingRecord, SprintState } from "../../core/src/index.ts";
 
 test("syncPracticeProgress does not touch transport while iCloud sync is disabled", async () => {
   const store = await seededMemoryStore();
@@ -180,6 +184,42 @@ test("new sprint sessions capture the active rating generation for sync", async 
   );
 
   assert.equal(service.exportLocalData().sprintSessions[0]?.ratingGeneration, 2);
+});
+
+test("new sprint sessions persist their rating replay anchor through SQLite sync exports", async () => {
+  const ratingKey = defaultSprintConfig("arrow_duel").ratingKey;
+  const source = new SQLiteStore(":memory:");
+  const restored = new SQLiteStore(":memory:");
+  source.migrate();
+  restored.migrate();
+  try {
+    source.seedPuzzles(await loadFixturePuzzles());
+    const sourceService = new PracticeService(source);
+    const anchored = sourceService.setRating(ratingKey, 900);
+    sourceService.startSprint(
+      {
+        mode: "arrow_duel",
+        durationSeconds: 300,
+        perPuzzleSeconds: 30,
+        targetCorrect: 1,
+        maxMistakes: 3
+      },
+      "2026-07-01T00:00:00.000Z"
+    );
+
+    const exported = sourceService.exportLocalData();
+    restored.importLocalData(exported);
+    const restoredSession = restored.listSprintSessions()[0];
+
+    assert.equal(restoredSession?.ratingGeneration, anchored.generation);
+    assert.equal(restoredSession?.ratingBefore, 900);
+    assert.equal(restoredSession?.ratingGamesBefore, 0);
+    assert.equal(restoredSession?.ratingDeviationBefore, 100);
+    assert.equal(restoredSession?.volatilityBefore, anchored.volatility);
+  } finally {
+    source.close();
+    restored.close();
+  }
 });
 
 test("syncPracticeProgress imports another device snapshot before uploading the merged snapshot", async () => {
@@ -393,16 +433,16 @@ test("pack-backed SQLite sync makes remote progress readable when referenced puz
   }
 });
 
-test("mergeLocalDataExports merges same-generation rating deltas without increasing converged RD", async () => {
+test("mergeLocalDataExports replays same-generation outcomes chronologically across devices", async () => {
   const localService = new PracticeService(await seededMemoryStore());
   enableSync(localService);
   const local = localService.exportLocalData();
   local.ratings = [{
     key: "standard 5/20",
     generation: 0,
-    rating: 700,
-    ratingDeviation: 70,
-    volatility: 0.05,
+    rating: 775,
+    ratingDeviation: 248.17054151409985,
+    volatility: 0.06,
     games: 1
   }];
   local.attempts = [{
@@ -424,7 +464,7 @@ test("mergeLocalDataExports merges same-generation rating deltas without increas
     id: "local-session",
     completedAt: "2026-06-20T00:00:05.000Z",
     ratingBefore: 600,
-    ratingAfter: 700
+    ratingAfter: 775
   })];
 
   const remoteService = new PracticeService(await seededMemoryStore());
@@ -433,9 +473,9 @@ test("mergeLocalDataExports merges same-generation rating deltas without increas
   remote.ratings = [{
     key: "standard 5/20",
     generation: 0,
-    rating: 550,
-    ratingDeviation: 90,
-    volatility: 0.07,
+    rating: 600,
+    ratingDeviation: 248.17054151409985,
+    volatility: 0.06,
     games: 1
   }];
   remote.attempts = [{
@@ -457,17 +497,417 @@ test("mergeLocalDataExports merges same-generation rating deltas without increas
     id: "remote-session",
     completedAt: "2026-06-21T00:00:05.000Z",
     ratingBefore: 600,
-    ratingAfter: 550
+    ratingAfter: 600
   })];
 
   const merged = mergeLocalDataExports(local, remote);
   const rating = merged.ratings.find((record) => record.key === "standard 5/20");
 
-  assert.equal(rating?.rating, 650);
+  assert.equal(rating?.rating, 658);
   assert.equal(rating?.games, 2);
-  assert.equal(rating?.ratingDeviation, 70);
-  assert.equal(rating?.volatility, 0.07);
+  assert.equal(rating?.ratingDeviation, 202.90651031904767);
+  assert.equal(rating?.volatility, 0.06);
   assert.deepEqual(merged.attempts.map((attempt) => attempt.id).sort(), ["local-win", "remote-loss"]);
+});
+
+test("mergeLocalDataExports replays divergent Arrow Duel results instead of adding stale rating deltas", async () => {
+  const ratingKey = defaultSprintConfig("arrow_duel").ratingKey;
+  const iphone = new PracticeService(await seededMemoryStore()).exportLocalData();
+  const iphoneProgress = completedArrowDuelWinSeries({
+    device: "iphone",
+    firstCompletedAt: "2026-07-01T00:00:00.000Z",
+    ratingKey,
+    wins: 15
+  });
+  iphone.ratings = [iphoneProgress.rating];
+  iphone.sprintSessions = iphoneProgress.sessions;
+
+  const ipad = new PracticeService(await seededMemoryStore()).exportLocalData();
+  const ipadProgress = completedArrowDuelWinSeries({
+    device: "ipad",
+    firstCompletedAt: "2026-06-30T00:00:00.000Z",
+    ratingKey,
+    wins: 1
+  });
+  ipad.ratings = [ipadProgress.rating];
+  ipad.sprintSessions = ipadProgress.sessions;
+
+  const merged = mergeLocalDataExports(ipad, iphone);
+  const mergedAgain = mergeLocalDataExports(merged, merged);
+
+  assert.equal(iphone.ratings[0]?.rating, 1_447);
+  assert.equal(ipad.ratings[0]?.rating, 775);
+  assert.equal(merged.ratings[0]?.rating, 1_469);
+  assert.equal(merged.ratings[0]?.games, 16);
+  assert.deepEqual(mergedAgain.ratings, merged.ratings);
+});
+
+test("mergeLocalDataExports replays divergent manually anchored rating results", async () => {
+  const ratingKey = defaultSprintConfig("arrow_duel").ratingKey;
+  const manualAnchor = {
+    rating: 900,
+    ratingDeviation: 100,
+    volatility: 0.06,
+    games: 0
+  };
+  const iphoneWin = calculateSprintRatingChange({ rating: manualAnchor, won: true });
+  const ipadLoss = calculateSprintRatingChange({ rating: manualAnchor, won: false });
+  const iphone = new PracticeService(await seededMemoryStore()).exportLocalData();
+  iphone.ratings = [{
+    key: ratingKey,
+    generation: 1,
+    rating: iphoneWin.ratingAfter,
+    ratingDeviation: iphoneWin.ratingDeviationAfter,
+    volatility: iphoneWin.volatilityAfter,
+    games: 1
+  }];
+  iphone.sprintSessions = [{
+    ...completedRatingSprint({
+      id: "iphone-manual-win",
+      completedAt: "2026-07-01T00:00:00.000Z",
+      ratingBefore: iphoneWin.ratingBefore,
+      ratingAfter: iphoneWin.ratingAfter,
+      ratingGeneration: 1
+    }),
+    mode: "arrow_duel",
+    ratingKey,
+    ratingGamesBefore: 0,
+    ratingDeviationBefore: 100,
+    volatilityBefore: 0.06
+  }];
+
+  const ipad = new PracticeService(await seededMemoryStore()).exportLocalData();
+  ipad.ratings = [{
+    key: ratingKey,
+    generation: 1,
+    rating: ipadLoss.ratingAfter,
+    ratingDeviation: ipadLoss.ratingDeviationAfter,
+    volatility: ipadLoss.volatilityAfter,
+    games: 1
+  }];
+  ipad.sprintSessions = [{
+    ...completedRatingSprint({
+      id: "ipad-manual-loss",
+      completedAt: "2026-07-02T00:00:00.000Z",
+      ratingBefore: ipadLoss.ratingBefore,
+      ratingAfter: ipadLoss.ratingAfter,
+      ratingGeneration: 1
+    }),
+    mode: "arrow_duel",
+    ratingKey,
+    ratingGamesBefore: 0,
+    ratingDeviationBefore: 100,
+    volatilityBefore: 0.06
+  }];
+
+  const merged = mergeLocalDataExports(iphone, ipad);
+  const mergedAgain = mergeLocalDataExports(merged, merged);
+
+  assert.equal(merged.ratings[0]?.rating, 902);
+  assert.equal(merged.ratings[0]?.ratingDeviation, 93.71734158656803);
+  assert.equal(merged.ratings[0]?.games, 2);
+  assert.deepEqual(mergedAgain.ratings, merged.ratings);
+});
+
+test("mergeLocalDataExports preserves a new-client replay anchor from an old-client duplicate", async () => {
+  const ratingKey = defaultSprintConfig("arrow_duel").ratingKey;
+  const manualAnchor = {
+    rating: 900,
+    ratingDeviation: 100,
+    volatility: 0.06,
+    games: 0
+  };
+  const first = calculateSprintRatingChange({ rating: manualAnchor, won: true });
+  const afterFirst = {
+    rating: first.ratingAfter,
+    ratingDeviation: first.ratingDeviationAfter,
+    volatility: first.volatilityAfter,
+    games: 1
+  };
+  const localWin = calculateSprintRatingChange({ rating: afterFirst, won: true });
+  const remoteLoss = calculateSprintRatingChange({ rating: afterFirst, won: false });
+  const afterLocalWin = {
+    rating: localWin.ratingAfter,
+    ratingDeviation: localWin.ratingDeviationAfter,
+    volatility: localWin.volatilityAfter,
+    games: 2
+  };
+  const replayedRemoteLoss = calculateSprintRatingChange({
+    rating: afterLocalWin,
+    won: false
+  });
+  const sharedSession = {
+    ...completedRatingSprint({
+      id: "shared-manual-win",
+      completedAt: "2026-01-01T00:00:00.000Z",
+      ratingBefore: first.ratingBefore,
+      ratingAfter: first.ratingAfter,
+      ratingGeneration: 1
+    }),
+    mode: "arrow_duel" as const,
+    ratingKey,
+    ratingGamesBefore: 0,
+    ratingDeviationBefore: manualAnchor.ratingDeviation,
+    volatilityBefore: manualAnchor.volatility
+  };
+  const local = new PracticeService(await seededMemoryStore()).exportLocalData();
+  local.ratings = [{
+    key: ratingKey,
+    generation: 1,
+    rating: localWin.ratingAfter,
+    ratingDeviation: localWin.ratingDeviationAfter,
+    volatility: localWin.volatilityAfter,
+    games: 2
+  }];
+  local.sprintSessions = [
+    sharedSession,
+    {
+      ...completedRatingSprint({
+        id: "local-manual-win",
+        completedAt: "2026-01-02T00:00:00.000Z",
+        ratingBefore: localWin.ratingBefore,
+        ratingAfter: localWin.ratingAfter,
+        ratingGeneration: 1
+      }),
+      mode: "arrow_duel",
+      ratingKey,
+      ratingGamesBefore: 1,
+      ratingDeviationBefore: afterFirst.ratingDeviation,
+      volatilityBefore: afterFirst.volatility
+    }
+  ];
+  const remote = new PracticeService(await seededMemoryStore()).exportLocalData();
+  remote.ratings = [{
+    key: ratingKey,
+    generation: 1,
+    rating: remoteLoss.ratingAfter,
+    ratingDeviation: remoteLoss.ratingDeviationAfter,
+    volatility: remoteLoss.volatilityAfter,
+    games: 2
+  }];
+  const {
+    ratingGamesBefore: _ratingGamesBefore,
+    ratingDeviationBefore: _ratingDeviationBefore,
+    volatilityBefore: _volatilityBefore,
+    ...oldClientSharedSession
+  } = sharedSession;
+  remote.sprintSessions = [
+    oldClientSharedSession,
+    {
+      ...completedRatingSprint({
+        id: "remote-manual-loss",
+        completedAt: "2026-01-03T00:00:00.000Z",
+        ratingBefore: remoteLoss.ratingBefore,
+        ratingAfter: remoteLoss.ratingAfter,
+        ratingGeneration: 1
+      }),
+      mode: "arrow_duel",
+      ratingKey
+    }
+  ];
+
+  const localFirst = mergeLocalDataExports(local, remote);
+  const remoteFirst = mergeLocalDataExports(remote, local);
+  const mergedAgain = mergeLocalDataExports(localFirst, localFirst);
+  const expected = [{
+    key: ratingKey,
+    generation: 1,
+    rating: replayedRemoteLoss.ratingAfter,
+    ratingDeviation: replayedRemoteLoss.ratingDeviationAfter,
+    volatility: replayedRemoteLoss.volatilityAfter,
+    games: 3
+  }];
+
+  assert.deepEqual(localFirst.ratings, expected);
+  assert.deepEqual(remoteFirst.ratings, expected);
+  assert.deepEqual(mergedAgain.ratings, expected);
+});
+
+test("PracticeService automatically repairs an already-inflated Arrow Duel rating without a reset", async () => {
+  const ratingKey = defaultSprintConfig("arrow_duel").ratingKey;
+  const iphoneProgress = completedArrowDuelWinSeries({
+    device: "iphone",
+    firstCompletedAt: "2026-07-01T00:00:00.000Z",
+    ratingKey,
+    wins: 15
+  });
+  const ipadProgress = completedArrowDuelWinSeries({
+    device: "ipad",
+    firstCompletedAt: "2026-06-30T00:00:00.000Z",
+    ratingKey,
+    wins: 1
+  });
+  const store = new SQLiteStore(":memory:");
+  store.migrate();
+  try {
+    const imported = new PracticeService(store).exportLocalData();
+    imported.ratings = [{
+      ...iphoneProgress.rating,
+      rating: 1_622,
+      games: 16
+    }];
+    imported.sprintSessions = [
+      ...ipadProgress.sessions,
+      ...iphoneProgress.sessions
+    ];
+    store.importLocalData(imported);
+
+    const repaired = new PracticeService(store).getRating(ratingKey);
+    const reopened = new PracticeService(store).getRating(ratingKey);
+
+    assert.equal(repaired.generation, 0);
+    assert.equal(repaired.rating, 1_469);
+    assert.equal(repaired.games, 16);
+    assert.deepEqual(reopened, repaired);
+  } finally {
+    store.close();
+  }
+});
+
+test("syncPracticeProgress uploads the automatically repaired Arrow Duel rating", async () => {
+  const ratingKey = defaultSprintConfig("arrow_duel").ratingKey;
+  const iphoneProgress = completedArrowDuelWinSeries({
+    device: "iphone",
+    firstCompletedAt: "2026-07-01T00:00:00.000Z",
+    ratingKey,
+    wins: 15
+  });
+  const ipadProgress = completedArrowDuelWinSeries({
+    device: "ipad",
+    firstCompletedAt: "2026-06-30T00:00:00.000Z",
+    ratingKey,
+    wins: 1
+  });
+  const localStore = await seededMemoryStore();
+  const localService = new PracticeService(localStore);
+  enableSync(localService);
+  localService.importLocalData({
+    ...localService.exportLocalData(),
+    ratings: [iphoneProgress.rating],
+    sprintSessions: iphoneProgress.sessions
+  });
+  const remoteData = structuredClone(localService.exportLocalData());
+  remoteData.ratings = [{
+    ...iphoneProgress.rating,
+    rating: 1_622,
+    games: 16
+  }];
+  remoteData.sprintSessions = [
+    ...ipadProgress.sessions,
+    ...iphoneProgress.sessions
+  ];
+  const transport = new RecordingTransport({
+    schemaVersion: 1,
+    deviceId: "ipad",
+    updatedAt: "2026-07-02T00:00:00.000Z",
+    data: remoteData
+  });
+
+  await syncPracticeProgress(localService, transport, {
+    deviceId: "iphone",
+    now: () => "2026-07-03T00:00:00.000Z"
+  });
+
+  assert.equal(localService.getRating(ratingKey).rating, 1_469);
+  assert.equal(transport.saved[0]?.data.ratings[0]?.rating, 1_469);
+  assert.equal(transport.saved[0]?.data.ratings[0]?.games, 16);
+});
+
+test("PracticeService preserves an isolated rating when cleared history leaves no repair evidence", async () => {
+  const ratingKey = defaultSprintConfig("arrow_duel").ratingKey;
+  const store = new SQLiteStore(":memory:");
+  store.migrate();
+  try {
+    store.saveRating({
+      key: ratingKey,
+      generation: 0,
+      rating: 1_622,
+      ratingDeviation: 90,
+      volatility: 0.06,
+      games: 16
+    });
+
+    const preserved = new PracticeService(store).getRating(ratingKey);
+
+    assert.equal(preserved.rating, 1_622);
+    assert.equal(preserved.games, 16);
+  } finally {
+    store.close();
+  }
+});
+
+test("PracticeService preserves a legacy rating when its first recorded result is not replayable", async () => {
+  const store = await seededMemoryStore();
+  store.saveRating({
+    key: "standard 5/20",
+    generation: 0,
+    rating: 900,
+    ratingDeviation: 180,
+    volatility: 0.05,
+    games: 1
+  });
+  store.createSprintSession(completedSprintState({
+    id: "legacy-manual-result",
+    completedAt: "2026-07-09T00:00:00.000Z",
+    ratingBefore: 600,
+    ratingAfter: 900
+  }));
+
+  const preserved = new PracticeService(store).getRating("standard 5/20");
+
+  assert.equal(preserved.rating, 900);
+  assert.equal(preserved.games, 1);
+  assert.equal(preserved.ratingDeviation, 180);
+  assert.equal(preserved.volatility, 0.05);
+});
+
+test("PracticeService preserves a rating when its replay anchor is untrusted", async () => {
+  const store = await seededMemoryStore();
+  store.saveRating({
+    key: "standard 5/20",
+    generation: 0,
+    rating: 925,
+    ratingDeviation: 80,
+    volatility: 0.06,
+    games: 12
+  });
+  for (let index = 0; index < 3; index += 1) {
+    store.createSprintSession({
+      ...completedSprintState({
+        id: `incomplete-anchor-${index}`,
+        completedAt: `2026-07-${String(10 + index).padStart(2, "0")}T00:00:00.000Z`,
+        ratingBefore: 925,
+        ratingAfter: 900
+      }),
+      ratingGamesBefore: 0,
+      ratingDeviationBefore: 350,
+      volatilityBefore: 0.06
+    });
+  }
+
+  const reconciled = new PracticeService(store).getRating("standard 5/20");
+
+  assert.equal(reconciled.rating, 925);
+  assert.equal(reconciled.games, 12);
+});
+
+test("mergeLocalDataExports preserves a rating when merged replay history is incomplete", async () => {
+  const ratingKey = defaultSprintConfig("arrow_duel").ratingKey;
+  const progress = completedArrowDuelWinSeries({
+    device: "iphone",
+    firstCompletedAt: "2026-07-01T00:00:00.000Z",
+    ratingKey,
+    wins: 15
+  });
+  const local = new PracticeService(await seededMemoryStore()).exportLocalData();
+  local.ratings = [progress.rating];
+  local.sprintSessions = [progress.sessions[0]!];
+  const remote = structuredClone(local);
+  remote.sprintSessions = [progress.sessions[1]!];
+
+  const merged = mergeLocalDataExports(local, remote);
+
+  assert.deepEqual(merged.ratings, [progress.rating]);
 });
 
 test("mergeLocalDataExports preserves converged RD when the remote snapshot has fewer games", async () => {
@@ -522,13 +962,13 @@ test("mergeLocalDataExports repairs inflated ratings and stays idempotent", asyn
       id: "local-win",
       completedAt: "2026-06-20T00:00:05.000Z",
       ratingBefore: 600,
-      ratingAfter: 700
+      ratingAfter: 775
     }),
     completedRatingSprint({
       id: "remote-loss",
       completedAt: "2026-06-21T00:00:05.000Z",
       ratingBefore: 600,
-      ratingAfter: 550
+      ratingAfter: 600
     })
   ];
 
@@ -543,9 +983,9 @@ test("mergeLocalDataExports repairs inflated ratings and stays idempotent", asyn
   const merged = mergeLocalDataExports(local, remote);
   const mergedAgain = mergeLocalDataExports(merged, merged);
 
-  assert.equal(merged.ratings[0]?.rating, 650);
+  assert.equal(merged.ratings[0]?.rating, 658);
   assert.equal(merged.ratings[0]?.games, 2);
-  assert.equal(mergedAgain.ratings[0]?.rating, 650);
+  assert.equal(mergedAgain.ratings[0]?.rating, 658);
   assert.equal(mergedAgain.ratings[0]?.games, 2);
 });
 
@@ -563,18 +1003,18 @@ test("PracticeService repairs a persisted rating from completed sprint sessions"
     id: "local-win",
     completedAt: "2026-06-20T00:00:05.000Z",
     ratingBefore: 600,
-    ratingAfter: 700
+    ratingAfter: 775
   }));
   store.createSprintSession(completedSprintState({
     id: "remote-loss",
     completedAt: "2026-06-21T00:00:05.000Z",
     ratingBefore: 600,
-    ratingAfter: 550
+    ratingAfter: 600
   }));
 
   const service = new PracticeService(store);
 
-  assert.equal(service.getRating("standard 5/20").rating, 650);
+  assert.equal(service.getRating("standard 5/20").rating, 658);
   assert.equal(service.getRating("standard 5/20").games, 2);
 });
 
@@ -689,8 +1129,8 @@ test("mergeLocalDataExports never reclassifies a stale-device session into a new
   remote.ratings = [{
     key: "standard 5/20",
     generation: 1,
-    rating: 650,
-    ratingDeviation: 250,
+    rating: 775,
+    ratingDeviation: 248.17054151409985,
     volatility: 0.06,
     games: 1
   }];
@@ -698,7 +1138,7 @@ test("mergeLocalDataExports never reclassifies a stale-device session into a new
     id: "new-generation",
     completedAt: "2026-07-02T00:00:00.000Z",
     ratingBefore: 600,
-    ratingAfter: 650,
+    ratingAfter: 775,
     ratingGeneration: 1
   })];
 
@@ -707,7 +1147,7 @@ test("mergeLocalDataExports never reclassifies a stale-device session into a new
 
   assert.deepEqual(mergedAgain.ratings, merged.ratings);
   assert.equal(mergedAgain.ratings[0]?.generation, 1);
-  assert.equal(mergedAgain.ratings[0]?.rating, 650);
+  assert.equal(mergedAgain.ratings[0]?.rating, 775);
   assert.equal(mergedAgain.ratings[0]?.games, 1);
 });
 
@@ -726,8 +1166,8 @@ test("mergeLocalDataExports upgrades untagged sessions from a legacy post-reset 
   legacyRemote.ratings = [{
     key: "standard 5/20",
     generation: 1,
-    rating: 650,
-    ratingDeviation: 250,
+    rating: 775,
+    ratingDeviation: 248.17054151409985,
     volatility: 0.06,
     games: 1
   }];
@@ -738,7 +1178,7 @@ test("mergeLocalDataExports upgrades untagged sessions from a legacy post-reset 
     id: "legacy-current-generation",
     completedAt: "2026-07-01T00:00:00.000Z",
     ratingBefore: 600,
-    ratingAfter: 650
+    ratingAfter: 775
   });
   const {
     ratingGeneration: _staleRatingGeneration,
@@ -753,7 +1193,7 @@ test("mergeLocalDataExports upgrades untagged sessions from a legacy post-reset 
 
   const restored = mergeLocalDataExports(local, legacyRemote);
 
-  assert.equal(restored.ratings[0]?.rating, 650);
+  assert.equal(restored.ratings[0]?.rating, 775);
   assert.equal(restored.ratings[0]?.games, 1);
   assert.equal(
     restored.sprintSessions.find((session) => session.id === "legacy-current-generation")?.ratingGeneration,
@@ -767,20 +1207,21 @@ test("mergeLocalDataExports upgrades untagged sessions from a legacy post-reset 
   const afterAnotherGame = structuredClone(restored);
   afterAnotherGame.ratings[0] = {
     ...afterAnotherGame.ratings[0]!,
-    rating: 700,
+    rating: 892,
+    ratingDeviation: 202.90651031904767,
     games: 2
   };
   afterAnotherGame.sprintSessions.push(completedRatingSprint({
     id: "new-current-generation",
     completedAt: "2026-07-03T00:00:00.000Z",
-    ratingBefore: 650,
-    ratingAfter: 700,
+    ratingBefore: 775,
+    ratingAfter: 892,
     ratingGeneration: 1
   }));
 
   const reconciled = mergeLocalDataExports(afterAnotherGame, afterAnotherGame);
 
-  assert.equal(reconciled.ratings[0]?.rating, 700);
+  assert.equal(reconciled.ratings[0]?.rating, 892);
   assert.equal(reconciled.ratings[0]?.games, 2);
 });
 
@@ -1031,12 +1472,52 @@ function completedRatingSprint({
     ratingGeneration,
     startedAt: completedAt,
     completedAt,
-    status: "won" as const,
+    status: ratingAfter > ratingBefore ? "won" as const : "failed" as const,
     correctCount: 1,
     mistakeCount: 0,
     ratingBefore,
     ratingAfter
   };
+}
+
+function completedArrowDuelWinSeries({
+  device,
+  firstCompletedAt,
+  ratingKey,
+  wins
+}: {
+  device: string;
+  firstCompletedAt: string;
+  ratingKey: string;
+  wins: number;
+}): {
+  rating: RatingRecord;
+  sessions: ExportedSprintSession[];
+} {
+  let rating = createDefaultRating(ratingKey);
+  const firstCompletedAtMs = new Date(firstCompletedAt).getTime();
+  const sessions: ExportedSprintSession[] = [];
+  for (let index = 0; index < wins; index += 1) {
+    const change = calculateSprintRatingChange({ rating, won: true });
+    sessions.push({
+      ...completedRatingSprint({
+        id: `${device}-win-${index + 1}`,
+        completedAt: new Date(firstCompletedAtMs + index * 60_000).toISOString(),
+        ratingBefore: change.ratingBefore,
+        ratingAfter: change.ratingAfter
+      }),
+      mode: "arrow_duel",
+      ratingKey
+    });
+    rating = {
+      ...rating,
+      rating: change.ratingAfter,
+      ratingDeviation: change.ratingDeviationAfter,
+      volatility: change.volatilityAfter,
+      games: rating.games + 1
+    };
+  }
+  return { rating, sessions };
 }
 
 function activeSprintState(id: string): SprintState {
@@ -1072,11 +1553,11 @@ function completedSprintState({
   return {
     id,
     config: defaultSprintConfig("standard"),
-    status: "won",
+    status: ratingAfter > ratingBefore ? "won" : "failed",
     startedAt: completedAt,
     deadlineAt: completedAt,
     completedAt,
-    endReason: "target_reached",
+    endReason: ratingAfter > ratingBefore ? "target_reached" : "max_mistakes",
     correctCount: 1,
     mistakeCount: 0,
     currentStreak: 1,

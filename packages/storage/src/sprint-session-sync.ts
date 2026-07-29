@@ -8,11 +8,17 @@ export function preferredSprintSession(
   const preferred = comparison >= 0 ? left : right;
   const other = comparison >= 0 ? right : left;
   const ratingGeneration = knownRatingGeneration(preferred, other);
+  const ratingGamesBefore = preferred.ratingGamesBefore ?? other.ratingGamesBefore;
+  const ratingDeviationBefore = preferred.ratingDeviationBefore ?? other.ratingDeviationBefore;
+  const volatilityBefore = preferred.volatilityBefore ?? other.volatilityBefore;
   const run = preferred.run ?? other.run;
   const config = preferred.config ?? other.config;
   return {
     ...preferred,
     ...(ratingGeneration === undefined ? {} : { ratingGeneration }),
+    ...(ratingGamesBefore === undefined ? {} : { ratingGamesBefore }),
+    ...(ratingDeviationBefore === undefined ? {} : { ratingDeviationBefore }),
+    ...(volatilityBefore === undefined ? {} : { volatilityBefore }),
     ...(run === undefined ? {} : { run: { ...run } }),
     ...(config === undefined
       ? {}
@@ -36,6 +42,9 @@ export function sameSprintSession(
     left.mistakeCount === right.mistakeCount &&
     left.ratingBefore === right.ratingBefore &&
     left.ratingAfter === right.ratingAfter &&
+    left.ratingGamesBefore === right.ratingGamesBefore &&
+    left.ratingDeviationBefore === right.ratingDeviationBefore &&
+    left.volatilityBefore === right.volatilityBefore &&
     left.run?.id === right.run?.id &&
     left.run?.kind === right.run?.kind &&
     left.run?.name === right.run?.name &&
@@ -115,6 +124,9 @@ function stableSessionKey(session: ExportedSprintSession): string {
     session.ratingBefore,
     session.ratingAfter ?? null,
     session.ratingGeneration ?? null,
+    session.ratingGamesBefore ?? null,
+    session.ratingDeviationBefore ?? null,
+    session.volatilityBefore ?? null,
     session.run?.id ?? null,
     session.run?.kind ?? null,
     session.run?.name ?? null,

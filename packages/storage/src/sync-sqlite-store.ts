@@ -714,7 +714,11 @@ export class SyncSQLiteStore implements PracticeStore {
         state.run?.id ?? null,
         state.run?.kind ?? null,
         state.run?.name ?? null,
-        JSON.stringify(state.config),
+        sprintSessionConfigJson(state.config, {
+          ...(state.ratingGamesBefore === undefined ? {} : { ratingGamesBefore: state.ratingGamesBefore }),
+          ...(state.ratingDeviationBefore === undefined ? {} : { ratingDeviationBefore: state.ratingDeviationBefore }),
+          ...(state.volatilityBefore === undefined ? {} : { volatilityBefore: state.volatilityBefore })
+        }),
         state.startedAt,
         state.deadlineAt,
         state.status,
@@ -1858,7 +1862,7 @@ export class SyncSQLiteStore implements PracticeStore {
           next.mode,
           next.ratingKey,
           next.ratingGeneration ?? null,
-          JSON.stringify(next.config ?? { source: "icloud_sync", mode: next.mode, ratingKey: next.ratingKey }),
+          sprintSessionConfigJson(next.config ?? existingRow.configJson, next),
           next.run?.id ?? null,
           next.run?.kind ?? null,
           next.run?.name ?? null,
@@ -1904,7 +1908,10 @@ export class SyncSQLiteStore implements PracticeStore {
         next.run?.id ?? null,
         next.run?.kind ?? null,
         next.run?.name ?? null,
-        JSON.stringify(next.config ?? { source: "icloud_sync", mode: next.mode, ratingKey: next.ratingKey }),
+        sprintSessionConfigJson(
+          next.config ?? { source: "icloud_sync", mode: next.mode, ratingKey: next.ratingKey },
+          next
+        ),
         next.startedAt,
         completedAt,
         completedAt,
@@ -2160,6 +2167,7 @@ function migrateV2ToV3(db: SyncSqliteDatabase): void {
           mode,
           rating_key AS ratingKey,
           rating_generation AS ratingGeneration,
+          config_json AS configJson,
           started_at AS startedAt,
           completed_at AS completedAt,
           status,
@@ -2982,9 +2990,8 @@ function countRows(db: SyncSqliteDatabase, table: string, where?: string): numbe
 }
 
 function exportedSprintSessionFromRow(row: SprintSessionExportRow): ExportedSprintSession {
-  const config = row.configJson === undefined
-    ? undefined
-    : JSON.parse(row.configJson) as ExportedSprintSession["config"];
+  const config = sprintSessionConfigFromConfigJson(row.configJson);
+  const ratingAnchor = sprintSessionRatingAnchorFromConfigJson(row.configJson);
   return {
     id: row.id,
     mode: row.mode,
@@ -2996,6 +3003,7 @@ function exportedSprintSessionFromRow(row: SprintSessionExportRow): ExportedSpri
     correctCount: row.correctCount,
     mistakeCount: row.mistakeCount,
     ratingBefore: row.ratingBefore,
+    ...ratingAnchor,
     ...(row.ratingAfter === null ? {} : { ratingAfter: row.ratingAfter }),
     ...(row.runId == null || row.runKind == null || row.runName == null
       ? {}
@@ -3056,6 +3064,97 @@ function isTacticalProfileEvidenceSession(
     session.config.tacticalFocus === undefined &&
     namedThemesForSelection(session.config.themes).length === 0
   );
+}
+
+function sprintSessionConfigJson(
+  existingConfig: unknown,
+  ratingAnchor: Pick<
+    ExportedSprintSession,
+    "ratingGamesBefore" | "ratingDeviationBefore" | "volatilityBefore"
+  >
+): string {
+  const parsed = typeof existingConfig === "string"
+    ? parseJsonObject(existingConfig)
+    : isJsonObject(existingConfig)
+      ? existingConfig
+      : {};
+  const hasCompleteAnchor =
+    ratingAnchor.ratingGamesBefore !== undefined &&
+    ratingAnchor.ratingDeviationBefore !== undefined &&
+    ratingAnchor.volatilityBefore !== undefined;
+  return JSON.stringify({
+    ...parsed,
+    ...(hasCompleteAnchor
+      ? {
+          ratingStateBefore: {
+            games: ratingAnchor.ratingGamesBefore,
+            ratingDeviation: ratingAnchor.ratingDeviationBefore,
+            volatility: ratingAnchor.volatilityBefore
+          }
+        }
+      : {})
+  });
+}
+
+function sprintSessionRatingAnchorFromConfigJson(
+  configJson: string | undefined
+): Pick<
+  ExportedSprintSession,
+  "ratingGamesBefore" | "ratingDeviationBefore" | "volatilityBefore"
+> {
+  if (configJson === undefined) {
+    return {};
+  }
+  const parsed = parseJsonObject(configJson);
+  const anchor = isJsonObject(parsed.ratingStateBefore) ? parsed.ratingStateBefore : undefined;
+  if (
+    !anchor ||
+    !isNonNegativeInteger(anchor.games) ||
+    !isPositiveFiniteNumber(anchor.ratingDeviation) ||
+    !isPositiveFiniteNumber(anchor.volatility)
+  ) {
+    return {};
+  }
+  return {
+    ratingGamesBefore: anchor.games,
+    ratingDeviationBefore: anchor.ratingDeviation,
+    volatilityBefore: anchor.volatility
+  };
+}
+
+function sprintSessionConfigFromConfigJson(
+  configJson: string | undefined
+): ExportedSprintSession["config"] | undefined {
+  if (configJson === undefined) {
+    return undefined;
+  }
+  const parsed = JSON.parse(configJson) as unknown;
+  if (!isJsonObject(parsed)) {
+    return parsed as ExportedSprintSession["config"];
+  }
+  const { ratingStateBefore: _ratingStateBefore, ...config } = parsed;
+  return config as unknown as ExportedSprintSession["config"];
+}
+
+function parseJsonObject(value: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return isJsonObject(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isPositiveFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 function normalizedImportedSprintSession(session: ExportedSprintSession): ExportedSprintSession {

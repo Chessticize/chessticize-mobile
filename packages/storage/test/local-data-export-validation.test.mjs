@@ -16,6 +16,9 @@ test("accepts documented optional legacy fields", () => {
   delete snapshot.data.settings.sprintGuides.focusedRunSeen;
   delete snapshot.data.reviewRemovals;
   delete snapshot.data.sprintSessions[0].config.puzzleTiming;
+  delete snapshot.data.sprintSessions[0].ratingGamesBefore;
+  delete snapshot.data.sprintSessions[0].ratingDeviationBefore;
+  delete snapshot.data.sprintSessions[0].volatilityBefore;
   delete snapshot.data.practiceRuns[0].puzzleTiming;
   assert.equal(isCanonicalProgressSyncSnapshot(snapshot), true);
 });
@@ -39,6 +42,12 @@ test("rejects malformed nested progress records", () => {
     ["review", (value) => { value.data.reviewQueue[0].lastResult = "timed_out"; }],
     ["removal", (value) => { value.data.reviewRemovals[0].removedAt = "not-a-date"; }],
     ["session", (value) => { value.data.sprintSessions[0].config.durationSeconds = 0; }],
+    ["session rating games", (value) => { value.data.sprintSessions[0].ratingGamesBefore = 0.5; }],
+    ["session rating deviation", (value) => { value.data.sprintSessions[0].ratingDeviationBefore = 0; }],
+    ["session volatility", (value) => { value.data.sprintSessions[0].volatilityBefore = -0.06; }],
+    ["partial session rating anchor", (value) => {
+      delete value.data.sprintSessions[0].volatilityBefore;
+    }],
     ["run", (value) => { value.data.practiceRuns[0].archived = "no"; }]
   ];
   for (const [label, mutate] of cases) {
@@ -127,6 +136,9 @@ function canonicalSnapshot() {
         mistakeCount: 0,
         ratingBefore: 1200,
         ratingAfter: 1210,
+        ratingGamesBefore: 0,
+        ratingDeviationBefore: 100,
+        volatilityBefore: 0.06,
         run: { id: "standard", kind: "standard", name: "Standard" },
         config: {
           mode: "standard",

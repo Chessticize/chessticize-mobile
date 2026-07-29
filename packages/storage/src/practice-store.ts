@@ -40,6 +40,9 @@ export interface ExportedSprintSession {
   mistakeCount: number;
   ratingBefore: number;
   ratingAfter?: number;
+  ratingGamesBefore?: number;
+  ratingDeviationBefore?: number;
+  volatilityBefore?: number;
   run?: PracticeRunSnapshot;
   config?: SprintConfig;
 }
