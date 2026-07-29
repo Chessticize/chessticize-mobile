@@ -87,6 +87,7 @@ describe('Key user flows', () => {
       await expect(element(by.id('sprint-result-review-impact'))).toBeVisible();
       await expect(element(by.id('review-mistakes-button'))).toBeVisible();
 
+      await waitForVisibleInPracticeScroll('play-again-button');
       await element(by.id('play-again-button')).tap();
       await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
 
@@ -404,7 +405,7 @@ describe('Key user flows', () => {
 });
 
 async function createSavedCustomRun(name, { shorterDuration = false, themes = [] } = {}) {
-  await waitFor(element(by.id('practice-add-run'))).toBeVisible().withTimeout(10000);
+  await waitForVisibleInPracticeScroll('practice-add-run');
   await element(by.id('practice-add-run')).tap();
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-run-name-input')).replaceText(name);

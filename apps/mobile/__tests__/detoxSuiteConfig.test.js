@@ -1425,6 +1425,12 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).toContain("by.id('history-source-sprint')");
     expect(flowsSpec).toContain("by.id('history-theme-disclosure')");
     expect(flowsSpec).toContain(
+      "waitForVisibleInPracticeScroll('play-again-button')"
+    );
+    expect(flowsSpec).toContain(
+      "waitForVisibleInPracticeScroll('practice-add-run')"
+    );
+    expect(flowsSpec).toContain(
       "by.text('Result: Wrong').withAncestor(by.id('history-active-filter-summary'))"
     );
     expect(flowsSpec).toContain(
