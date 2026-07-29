@@ -29,6 +29,7 @@ int main(int argc, char** argv) {
   std::mutex mutex;
   std::condition_variable changed;
   int bestmoves = 0;
+  int iterationUpdates = 0;
   int maxDepth = 0;
 
   StockfishRunner runner(
@@ -40,6 +41,9 @@ int main(int argc, char** argv) {
                 std::string_view("info depth ").size();
             maxDepth =
                 std::max(maxDepth, std::atoi(line.c_str() + DepthPrefixLength));
+            if (line.find(" currmove ") != std::string::npos) {
+              ++iterationUpdates;
+            }
           } else if (line.rfind("bestmove ", 0) == 0) {
             ++bestmoves;
           }
@@ -81,6 +85,10 @@ int main(int argc, char** argv) {
             [&] { return bestmoves >= 3; })) {
       std::cerr << "xBqI8 replacement searches did not complete.\n";
       return 3;
+    }
+    if (iterationUpdates == 0) {
+      std::cerr << "xBqI8 search never exercised the iteration callback.\n";
+      return 4;
     }
   }
 
