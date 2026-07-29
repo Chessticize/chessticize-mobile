@@ -19,7 +19,6 @@
     "e2e:resource-soak:ios": "CHESSTICIZE_RUN_RESOURCE_SOAK=1 detox test --configuration ios.sim.debug --artifacts-location artifacts/resource-soak e2e/resource-soak.e2e.js",
     "e2e:store-assets:ios": "CHESSTICIZE_CAPTURE_STORE_ASSETS=1 detox test --configuration ios.sim.debug --artifacts-location artifacts/store-assets e2e/store-assets.e2e.js",
     "e2e:store-assets:ios:release": "CHESSTICIZE_CAPTURE_STORE_ASSETS=1 detox test --configuration ios.sim.release --artifacts-location artifacts/store-assets e2e/store-assets.e2e.js",
-    "e2e:history-progress:ios:release": "CHESSTICIZE_CAPTURE_HISTORY_PROGRESS=1 detox test --configuration ios.sim.release --artifacts-location artifacts/history-progress e2e/history-progress.e2e.js",
     "e2e:marketing-assets:ios": "CHESSTICIZE_CAPTURE_MARKETING_ASSETS=1 detox test --configuration ios.sim.debug --artifacts-location artifacts/marketing-assets e2e/marketing-assets.e2e.js",
     "e2e:marketing-assets:ios:release": "CHESSTICIZE_CAPTURE_MARKETING_ASSETS=1 detox test --configuration ios.sim.release --artifacts-location artifacts/marketing-assets e2e/marketing-assets.e2e.js",
     "capture:marketing-assets:ios": "bash scripts/capture-app-store-marketing-assets.sh",

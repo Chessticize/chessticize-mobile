@@ -75,7 +75,7 @@ test("builds visible model reliability progress for a well-sampled balanced them
   );
 });
 
-test("keeps solve time collecting when only accuracy has reliable evidence", () => {
+test("keeps unavailable solve time visible when only accuracy has evidence", () => {
   const progress = tacticalProgress({
     evaluation: {
       phase: "balanced",
@@ -100,8 +100,17 @@ test("keeps solve time collecting when only accuracy has reliable evidence", () 
     "Solve time is still collecting comparable completed puzzles."
   );
   expect(presentation?.strengths.map((series) => series.kind)).toEqual([
-    "solve_rate"
+    "solve_rate",
+    "completed_speed"
   ]);
+  expect(presentation?.strengths[1]?.changeLabel).toBe("No comparison yet");
+  expect(presentation?.strengths[1]?.points).toEqual([{
+    label: "Jul 25",
+    value: 0,
+    valueLabel: "—",
+    sampleSize: 0,
+    unavailable: true
+  }]);
 });
 
 test("keeps gray historical slots when a metric was not yet available", () => {

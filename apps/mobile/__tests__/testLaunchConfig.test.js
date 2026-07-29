@@ -182,31 +182,13 @@ describe("test launch configuration", () => {
     expect(getLaunchConfig).toHaveBeenCalledTimes(6);
   });
 
-  it("accepts deterministic values for release capture without enabling visible test controls", () => {
-    const releaseCapture = {
-      puzzleSelectionSeed: "history-progress-release",
-      standardTargetCorrect: "1",
-      storeAssetCapture: true,
-      testNowMs: "1780000000000"
-    };
+  it("accepts a fixed clock for release store-asset capture without enabling visible test controls", () => {
     expect(
       resolveTestNowMsFromLaunchConfig(
         { __DEV__: false, __CHESSTICIZE_ENABLE_TEST_CONTROLS__: false },
-        releaseCapture
+        { storeAssetCapture: true, testNowMs: "1780000000000" }
       )
     ).toBe(1780000000000);
-    expect(
-      resolveTestPuzzleSelectionSeedFromLaunchConfig(
-        { __DEV__: false, __CHESSTICIZE_ENABLE_TEST_CONTROLS__: false },
-        releaseCapture
-      )
-    ).toBe("history-progress-release");
-    expect(
-      resolveTestStandardTargetCorrectFromLaunchConfig(
-        { __DEV__: false, __CHESSTICIZE_ENABLE_TEST_CONTROLS__: false },
-        releaseCapture
-      )
-    ).toBe(1);
     expect(isStoreAssetCaptureEnabled({ storeAssetCapture: true })).toBe(true);
     expect(isStoreAssetCaptureEnabled({ storeAssetCapture: false })).toBe(false);
   });

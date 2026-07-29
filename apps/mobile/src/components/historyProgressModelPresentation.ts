@@ -43,14 +43,13 @@ export function historyProgressPresentationFromModel(
     .slice(0, MAX_VISIBLE_PROGRESS_THEMES)
     .flatMap((estimate) => {
       const signal = currentSignals.get(signalId(estimate));
-      return seriesKinds(signal, estimate).flatMap((kind) => {
-        const series = strengthSeries(
+      return seriesKinds(signal, estimate).map((kind) =>
+        strengthSeries(
           estimate,
           kind,
           progress.snapshots
-        );
-        return series ? [series] : [];
-      });
+        )
+      );
     });
   const weaknessSignal = progress.evaluation.signals
     .filter((signal) => signal.status === "recommended")
@@ -89,7 +88,7 @@ function strengthSeries(
   current: TacticalProfileThemeEstimate,
   kind: Exclude<TacticalFocusReason, "both">,
   snapshots: readonly TacticalProfileProgressSnapshot[]
-): HistoryStrengthSeries | undefined {
+): HistoryStrengthSeries {
   const points = snapshots.map((snapshot) => {
     const estimate = snapshot.estimates.find(
       (candidate) =>
@@ -103,14 +102,16 @@ function strengthSeries(
     return point ?? unavailableProgressPoint(snapshot.asOf);
   });
   const availablePoints = points.filter((point) => !point.unavailable);
-  if (availablePoints.length === 0) {
-    return undefined;
-  }
-  const first = availablePoints[0] as HistoryProgressPoint;
-  const latest = availablePoints.at(-1) as HistoryProgressPoint;
+  const first = availablePoints[0];
+  const latest = availablePoints.at(-1);
   const themeLabel = humanizeTheme(current.theme);
   const label = `${themeLabel} · ${taskFamilyLabel(current.taskFamily)}`;
-  const change = changePresentation(kind, first.value, latest.value);
+  const change = first && latest
+    ? changePresentation(kind, first.value, latest.value)
+    : {
+        label: "No comparison yet",
+        tone: "steady" as const
+      };
   const maxValue = Math.max(
     ...availablePoints.map((point) => point.value),
     0
@@ -322,11 +323,7 @@ function seriesKinds(
     preferred,
     other
   ];
-  return candidates.filter((kind) =>
-    kind === "solve_rate"
-      ? estimate.accuracyEvidenceWeight > 0
-      : estimate.speedEvidenceWeight > 0
-  );
+  return candidates;
 }
 
 function preferredSeriesKind(

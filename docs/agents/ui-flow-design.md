@@ -69,6 +69,12 @@ catalog and every branch-owned site, is public and must not require
 authentication. Set the Sites access mode to public and verify that an
 unauthenticated request to `/storybook/` returns HTTP 200 before handoff. Record
 the branch, exact source commit, and branch-owned URL in the issue and PR.
+If publication is unavailable after a concrete deployment attempt, an explicit
+repository-owner authorization may waive this gate for that PR. Record the
+failed publication result, the site's resulting access state, the owner's
+authorization, and the follow-up needed before handoff or merge. Keep any
+usable owner-only deployment in place; never substitute or overwrite another
+branch's review site.
 Do not commit generated Storybook bundles, copied preview files, Sites project
 metadata, or hosting result files to the application branch. A Sites deployment
 is a production URL, but it remains a design artifact: it does not count as approval

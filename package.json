@@ -48,7 +48,6 @@
     "mobile:e2e:resource-soak:ios": "pnpm --filter ChessticizeMobile e2e:resource-soak:ios",
     "mobile:e2e:store-assets:ios": "pnpm --filter ChessticizeMobile e2e:store-assets:ios",
     "mobile:e2e:store-assets:ios:release": "pnpm --filter ChessticizeMobile e2e:store-assets:ios:release",
-    "mobile:e2e:history-progress:ios:release": "pnpm --filter ChessticizeMobile e2e:history-progress:ios:release",
     "mobile:e2e:marketing-assets:ios": "pnpm --filter ChessticizeMobile e2e:marketing-assets:ios",
     "mobile:e2e:marketing-assets:ios:release": "pnpm --filter ChessticizeMobile e2e:marketing-assets:ios:release",
     "mobile:capture:marketing-assets:ios": "pnpm --filter ChessticizeMobile capture:marketing-assets:ios",
