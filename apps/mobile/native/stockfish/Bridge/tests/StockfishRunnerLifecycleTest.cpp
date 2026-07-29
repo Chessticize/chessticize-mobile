@@ -7,6 +7,7 @@
 #include <iostream>
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <thread>
 
 using Chessticize::StockfishBridge::StockfishRunner;

@@ -21,6 +21,7 @@ Pod::Spec.new do |s|
     File.join(stockfish_source, "**/*.{h,cpp}")
   ]
   s.exclude_files = [
+    File.join(stockfish_bridge, "tests/**/*"),
     File.join(stockfish_source, "Makefile"),
     File.join(stockfish_source, "main.cpp")
   ]
