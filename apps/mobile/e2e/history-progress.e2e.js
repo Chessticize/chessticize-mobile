@@ -4,6 +4,7 @@ const {
   launchWithDisabledSynchronization,
   openTab,
   playBoardMove,
+  sleep,
   startPracticeMode,
   textFromAttributes
 } = require('./helpers');
@@ -16,40 +17,51 @@ const captureHistoryProgress =
   process.env.CHESSTICIZE_CAPTURE_HISTORY_PROGRESS === '1'
     ? describe
     : describe.skip;
-const runSeeds = Array.from(
-  { length: 10 },
-  (_, index) => `history-progress-release-${index + 1}`
-);
+const runCount = 4;
+const puzzlesPerRun = 5;
+const expectedPuzzleCount = runCount * puzzlesPerRun;
 
 captureHistoryProgress('History Progress Release parity', () => {
   it('matches the approved dual-metric balanced presentation in the real app', async () => {
-    await launchReleaseCapture({
-      deleteData: true,
-      seed: runSeeds[0],
-      targetCorrect: runSeeds.length
-    });
-    await dismissFirstUseRules();
-    await startPracticeMode('standard');
-
     const puzzleIDs = new Set();
-    for (const index of runSeeds.keys()) {
-      const fixture = await resolveDisplayedStandardFixture();
-      puzzleIDs.add(fixture.puzzleID);
-      await playBoardMove('session-board', fixture.correctMove, fixture.flipped);
-      if (index === runSeeds.length - 1) {
+    for (let runIndex = 0; runIndex < runCount; runIndex += 1) {
+      await launchReleaseCapture({
+        deleteData: runIndex === 0,
+        seed: `history-progress-release-${runIndex + 1}`,
+        targetCorrect: puzzlesPerRun
+      });
+      if (runIndex === 0) {
+        await dismissFirstUseRules();
+      }
+      await startPracticeMode('standard');
+
+      for (let puzzleIndex = 0; puzzleIndex < puzzlesPerRun; puzzleIndex += 1) {
+        const fixture = await resolveDisplayedStandardFixture();
+        console.log(
+          `[history-progress-fixture] ${JSON.stringify(fixture)}`
+        );
+        puzzleIDs.add(fixture.puzzleID);
+        for (const turn of fixture.turns) {
+          await waitForBoardLabel(turn.readyBoardLabel);
+          await playBoardMove('session-board', turn.correctMove, fixture.flipped);
+        }
+        if (puzzleIndex < puzzlesPerRun - 1) {
+          await waitFor(element(by.id('session-progress')))
+            .toHaveText(`${puzzleIndex + 1} / ${puzzlesPerRun}`)
+            .withTimeout(15000);
+          await waitForPuzzleIDChange(fixture.puzzleID);
+          continue;
+        }
+
         await waitFor(element(by.text('Sprint complete')))
           .toBeVisible()
           .withTimeout(30000);
-      } else {
-        await waitFor(element(by.id('session-progress')))
-          .toHaveText(`${index + 1} / ${runSeeds.length}`)
-          .withTimeout(15000);
       }
     }
 
-    if (puzzleIDs.size !== runSeeds.length) {
+    if (puzzleIDs.size !== expectedPuzzleCount) {
       throw new Error(
-        `Expected ${runSeeds.length} distinct release puzzles, received ${puzzleIDs.size}`
+        `Expected ${expectedPuzzleCount} distinct release puzzles, received ${puzzleIDs.size}`
       );
     }
 
@@ -74,6 +86,9 @@ captureHistoryProgress('History Progress Release parity', () => {
     await expect(element(by.text(/\d+\.\d{2}×/)).atIndex(0)).toExist();
 
     await device.takeScreenshot('history-progress-balanced-dual-metric-release');
+    await element(by.id('practice-main-scroll')).scrollTo('bottom');
+    await expect(element(by.id('history-balanced-check'))).toBeVisible();
+    await device.takeScreenshot('history-progress-balanced-check-release');
   });
 });
 
@@ -124,17 +139,62 @@ async function resolveDisplayedStandardFixture() {
   }
   const [initialFen, solutionMoves] = rows[0].split('\t');
   const moves = solutionMoves?.trim().split(/\s+/) ?? [];
-  const correctMove = moves[1];
+  const correctMoves = moves.filter((_, index) => index % 2 === 1);
   const initialSideToMove = initialFen?.trim().split(/\s+/)[1];
   if (
-    !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(correctMove ?? '')
+    correctMoves.length === 0
+    || moves.some(
+      (move) => !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)
+    )
     || (initialSideToMove !== 'w' && initialSideToMove !== 'b')
   ) {
     throw new Error(`Invalid Standard fixture metadata for ${puzzleID}`);
   }
+  const userSideLabel = initialSideToMove === 'w' ? 'Black' : 'White';
+  const turns = correctMoves.map((correctMove, index) => {
+    const precedingAutoMove = moves[index * 2];
+    return {
+      correctMove,
+      readyBoardLabel: `Chess board. ${userSideLabel} to move. Last move ${precedingAutoMove.slice(0, 2)} to ${precedingAutoMove.slice(2, 4)}`
+    };
+  });
   return {
-    correctMove,
     flipped: initialSideToMove === 'w',
-    puzzleID
+    puzzleID,
+    turns
   };
+}
+
+async function waitForBoardLabel(expectedLabel, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  let actualLabel = '';
+  while (Date.now() < deadline) {
+    actualLabel = textFromAttributes(
+      await element(by.id('session-board')).getAttributes()
+    );
+    if (actualLabel === expectedLabel) {
+      return;
+    }
+    await sleep(100);
+  }
+  throw new Error(
+    `Expected session board label "${expectedLabel}", received "${actualLabel}"`
+  );
+}
+
+async function waitForPuzzleIDChange(previousPuzzleID, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  let currentPuzzleID = previousPuzzleID;
+  while (Date.now() < deadline) {
+    currentPuzzleID = textFromAttributes(
+      await element(by.id('session-current-puzzle-id')).getAttributes()
+    );
+    if (currentPuzzleID && currentPuzzleID !== previousPuzzleID) {
+      return;
+    }
+    await sleep(100);
+  }
+  throw new Error(
+    `Expected puzzle ID to change from "${previousPuzzleID}", received "${currentPuzzleID}"`
+  );
 }
