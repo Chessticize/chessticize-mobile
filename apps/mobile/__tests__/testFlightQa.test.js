@@ -15,8 +15,8 @@ const exportOptions = fs.readFileSync(
 describe("TestFlight QA checklist", () => {
   it("keeps TestFlight physical-device diagnostics explicitly optional", () => {
     expect(testFlightDoc).toContain("Optional TestFlight Diagnostics");
-    expect(testFlightDoc).toContain("Internal 1.3 QA");
-    expect(testFlightDoc).toContain("ios-v1.3.0-build-1");
+    expect(testFlightDoc).toContain("Internal 1.3.1 QA");
+    expect(testFlightDoc).toContain("ios-v1.3.1-build-1");
     expect(testFlightDoc).toContain("App Store Connect build");
     expect(testFlightDoc).toContain("not an App Store release gate");
     expect(testFlightDoc).toContain("not required");
@@ -111,6 +111,29 @@ describe("TestFlight QA checklist", () => {
     expect(appStoreUploadDoc).toContain("Signing Troubleshooting");
     expect(appStoreUploadDoc).toContain("requires a development team");
     expect(appStoreUploadDoc).toContain("missing Xcode-Username");
+    expect(appStoreUploadDoc).toContain("xcodebuild -version");
+    expect(appStoreUploadDoc).toContain("xcrun --sdk iphoneos --show-sdk-version");
+    expect(appStoreUploadDoc).toContain("Xcode 26 or later");
+    expect(appStoreUploadDoc).toMatch(/iOS\s+and iPadOS 26 SDK or later/);
+    expect(appStoreUploadDoc).toContain(
+      "the Mac that prepared this branch is explicitly excluded"
+    );
+    expect(appStoreUploadDoc).toMatch(
+      /Passing the numeric minimum above\s+does not override/
+    );
+    expect(appStoreUploadDoc).toContain(
+      "App Store Connect release notes"
+    );
+    expect(appStoreUploadDoc).toContain(
+      "The 1.3.1 candidate is explicitly **Full native validation**"
+    );
+    expect(appStoreUploadDoc).toContain("CHESSTICIZE_E2E_SCOPE=full");
+    expect(appStoreUploadDoc).toContain(
+      ".codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh"
+    );
+    expect(appStoreUploadDoc).toMatch(
+      /Do not downgrade this\s+release to delta or targeted scope/
+    );
     expect(appStoreUploadDoc).toContain("brew --prefix ruby@3.3");
     expect(appStoreUploadDoc).toContain("requires Homebrew Ruby 3.3");
   });

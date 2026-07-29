@@ -14,8 +14,9 @@ the current Play track: corresponding source, Play delivery, owner
 physical-device smoke under the former policy, and the Play-signed GitHub APK
 mirror are complete. Version code 7 is the Android 1.2.1 ordinary-delta release
 currently in Play review with corresponding source and the Play-signed GitHub
-binary release published. Version code 8 is the proposed Android 1.3
-full-scope release candidate.
+binary release published. Version code 8 completed the Android 1.3 source,
+signed-candidate, Play-generated APK, and GitHub mirror path. Version code 9 is
+the proposed Android 1.3.1 patch release.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -187,33 +188,69 @@ Build 7 is the Android 1.2.1 ordinary-delta GitHub binary release:
   `7 (1.2.1)` was last observed in Play review; track review continues
   independently and must not be reported as published until the Console says so.
 
-Build 8 is the proposed Android 1.3 full-scope release candidate:
+Build 8 is the immutable Android 1.3 GitHub binary release:
 
-- proposed annotated tag: `android-v1.3.0-build-8`;
+- annotated tag: `android-v1.3.0-build-8`, targeting
+  `ef01d57dfb56507e664ca3d30ca02caf7ee9a4c2`;
 - primary user-visible changes: Tactical Profiles and focused Practice Runs,
   configurable puzzle timing with clearer Sprint guidance and outcomes, and
   optional move sound and haptic feedback;
 - validation scope: exact-head fast checks, the complete shared `flows` and
   `practice` suites, the applicable released-fixture migration and Android
   compatibility matrix, and the protected signed-candidate/source job;
-- current state: release integration and validation; annotated tag, signed
-  candidate, source Release, Play upload, and APK mirror pending.
+- protected candidate workflow run:
+  [`30327113087`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30327113087);
+- retained signed-candidate artifact: ID `8676306128`;
+- signed AAB: 443,830,745 bytes, SHA-256
+  `1dd6cc41fb16f264745853de5548920ec257c4033e9415b2c92b354e12bc0dff`;
+- public corresponding-source release:
+  [`android-v1.3.0-build-8`](https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.3.0-build-8);
+- public source-manifest SHA-256:
+  `7d20cd235ef0f13e119c855e432036264ec4cca059b70e03bd8f139ce27f48c0`;
+- successful APK-mirror workflow run:
+  [`30329668716`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30329668716);
+- Play-signed universal APK: 363,340,916 bytes, SHA-256
+  `29cbfb529a38e215cd7fc6763284618288031c624cbf65cce0e381eafe3bbea0`,
+  asset ID `492299790`;
+- Play app-signing certificate SHA-256:
+  `318a4453d4052c90364d3abfe376dce9c06a04ab70db7ce1d5d43ba995cff900`;
+- checksum asset ID `492299783`, SHA-256
+  `6f13cf54459af94262bc8a6b7cfd94418c3f1491832227a738c2288bbbeb7cb6`;
+- retained mirror receipt artifact: ID `8676909725`, named
+  `android-apk-mirror-ef01d57dfb56507e664ca3d30ca02caf7ee9a4c2`;
+- current state: corresponding source and GitHub binary publication are
+  complete. Recheck the live Play track before reporting review or publication
+  state.
 
-Do not create or publish the build-8 tag until the release PR is complete, the
+Do not move the build-8 tag, rebuild its AAB, replace its public assets, or
+reuse version code 8.
+
+Build 9 is the proposed Android 1.3.1 patch release:
+
+- proposed annotated tag: `android-v1.3.1-build-9`;
+- primary user-visible fixes: restore Stockfish Analysis after Arrow Duel
+  puzzles, keep Rating history consistent after an Android Progress Backup
+  restore, and show History dates in the device's local calendar;
+- validation scope: full native validation because the delta since the
+  previous public source tag includes a storage migration and Stockfish native
+  lifecycle repair;
+- current state: release integration; annotated tag, signed candidate, source
+  Release, Play upload, and APK mirror pending.
+
+Do not create or publish the build-9 tag until the release PR is complete, the
 approved Android release-note file is present, and the clean candidate commit
 has current-head fast checks plus the required App-source-bound native
-evidence. Test-only reruns may use an earlier checksummed APK when the
-fail-closed App-input digest matches and the evidence records both SHAs.
+evidence.
 
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.3`)
-- Android version code: `apps/mobile/release-version.json` (`8`)
+- Public version: `apps/mobile/release-version.json` (`1.3.1`)
+- Android version code: `apps/mobile/release-version.json` (`9`)
 - iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.3.0-build-8`
+- Required source tag before any Play track upload: `android-v1.3.1-build-9`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -316,8 +353,8 @@ the mirror and Play track states independently until both are complete.
 
 For a bounded follow-up release:
 
-For Android version `1.3` build `8`, release notes and this support document must
-name the canonical source tag `android-v1.3.0-build-8` and the public source
+For Android version `1.3.1` build `9`, release notes and this support document must
+name the canonical source tag `android-v1.3.1-build-9` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 must bind the annotated tag, commit, application ID, version, version code, and
 AAB SHA-256 before Play distribution. A missing or lightweight public tag, a

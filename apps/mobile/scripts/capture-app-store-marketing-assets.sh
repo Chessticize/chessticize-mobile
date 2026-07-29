@@ -9,7 +9,13 @@ IPHONE_DEVICE_NAME="${CHESSTICIZE_MARKETING_IPHONE_DEVICE:-Chessticize Marketing
 IPHONE_DEVICE_UDID="${CHESSTICIZE_MARKETING_IPHONE_DEVICE_UDID:-}"
 IPAD_DEVICE_NAME="${CHESSTICIZE_MARKETING_IPAD_DEVICE:-Chessticize Marketing iPad Pro 13-inch (M5)}"
 IPAD_DEVICE_UDID="${CHESSTICIZE_MARKETING_IPAD_DEVICE_UDID:-}"
+SIMULATOR_WINDOW_WAIT_ATTEMPTS="${CHESSTICIZE_SIMULATOR_WINDOW_WAIT_ATTEMPTS:-240}"
 IPAD_PORTRAIT_RESTORE_REQUIRED=0
+
+if [[ ! "$SIMULATOR_WINDOW_WAIT_ATTEMPTS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "CHESSTICIZE_SIMULATOR_WINDOW_WAIT_ATTEMPTS must be a positive integer." >&2
+  exit 64
+fi
 
 cleanup() {
   if [[ "$IPAD_PORTRAIT_RESTORE_REQUIRED" == "1" ]]; then
@@ -91,7 +97,8 @@ prepare_simulator_orientation() {
 
   /usr/bin/open -a Simulator --args -CurrentDeviceUDID "$device_udid"
   local matching_window_count
-  for _ in {1..40}; do
+  local attempt
+  for ((attempt = 1; attempt <= SIMULATOR_WINDOW_WAIT_ATTEMPTS; attempt += 1)); do
     matching_window_count="$(
       /usr/bin/osascript \
         -e 'on run argv' \

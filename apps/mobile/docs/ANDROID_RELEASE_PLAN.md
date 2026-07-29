@@ -524,7 +524,7 @@ states once the Generated APKs API exposes the artifact.
 
 **Depends on:** ANDROID-11 plus the validation scope selected from ANDROID-10
 
-- Current release tag: `android-v1.3.0-build-8`
+- Current release tag: `android-v1.3.1-build-9`
 
 **Outcome:** One exact commit is distributed through Play with its matching
 source published on GitHub and proportionate evidence.
