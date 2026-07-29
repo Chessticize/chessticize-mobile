@@ -316,3 +316,24 @@ test("Issue #390 owns a four-entry Replay whose status is shown by existing acti
   assert.deepEqual(storyTagsForScenario(result.id), ["new"]);
   assert.deepEqual(storyTagsForScenario(replay.id), ["new"]);
 });
+
+test("Issue #415 uses a concrete puzzle milestone and an explicit native boundary", () => {
+  const scenario = scenarioRegistry["practice-app-store-review-request"];
+
+  assert.equal(
+    scenario.storyId,
+    "practice--app-store-review-request-eligible-puzzle-milestone"
+  );
+  assert.equal(scenario.isNew, true);
+  assert.deepEqual(storyTagsForScenario(scenario.id), ["new"]);
+  assert.ok(scenario.scope.includes.includes("Four successful puzzle Sprints"));
+  assert.ok(scenario.scope.includes.includes("At least two local dates"));
+  assert.ok(scenario.scope.includes.includes("No custom pre-prompt"));
+  assert.ok(scenario.scope.exits.includes("Apple StoreKit review sheet"));
+  assert.match(scenario.description, /successful puzzle Sprint Result/);
+  assert.match(scenario.nativeBoundary?.detail ?? "", /puzzle result remains usable/);
+  assert.doesNotMatch(
+    `${scenario.title} ${scenario.description} ${scenario.nativeBoundary?.detail ?? ""}`,
+    /\btactics?\b/i
+  );
+});

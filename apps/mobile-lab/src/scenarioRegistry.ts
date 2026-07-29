@@ -47,6 +47,7 @@ export type LabScenarioId =
   | "practice-sprint-result-goal"
   | "practice-sprint-result-replay"
   | "practice-sprint-result-extra-attempt"
+  | "practice-app-store-review-request"
   | "practice-tactical-focus-guide"
   | "practice-tactical-focus-active"
   | "practice-tactical-focus-result"
@@ -90,6 +91,10 @@ type LabScenarioMetadata = {
   title: string;
   description: string;
   storyId: string;
+  nativeBoundary?: {
+    title: string;
+    detail: string;
+  };
   scope: {
     owner: MobileBackPrimaryTab | "system";
     includes: readonly string[];
@@ -206,6 +211,30 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "practice-sprint-result-goal": defineScenario("practice-sprint-result-goal", "Practice", "Sprint result · Goal clarity", "practice--sprint-result-goal-clarity", "Failed Sprint Result that reports two Unclear and two In Review attempts as four Replay entries while keeping Replay separate from Review scheduling.", "practice", ["Solved 11", "Solve 15 to pass", "12 attempted", "Unclear count", "In Review count", "Neutral replay entry", "Replay and Review terminology"], ["Production result wiring", "History", "Review"], "contained"),
   "practice-sprint-result-replay": defineScenario("practice-sprint-result-replay", "Practice", "Sprint result · Flagged replay", "practice--sprint-result-flagged-replay", "A four-attempt Replay reached from Sprint Result: two Unclear attempts expose Mark clear and two In Review attempts expose Remove from Review, using the existing actions instead of new status badges.", "practice", ["Sprint Result entry", "Four-attempt Replay", "Mark clear", "Remove from Review", "No replay status badges", "Previous and next navigation"], ["Production replay selection", "New replay status badges", "Practice home"], "contained"),
   "practice-sprint-result-extra-attempt": defineScenario("practice-sprint-result-extra-attempt", "Practice", "Sprint result · Extra attempt", "practice--sprint-result-extra-attempt", "Passed Sprint Result that shows Solved 15 beside the fixed pass target while explicitly reporting the user's 16 actual attempts.", "practice", ["Solved 15", "Solve 15 to pass", "16 attempted", "Accuracy", "Aligned summary counts", "Existing result actions"], ["Production result wiring", "History", "Review"], "contained"),
+  "practice-app-store-review-request": {
+    ...defineScenario(
+      "practice-app-store-review-request",
+      "Practice",
+      "App Store review request · eligible puzzle milestone",
+      "practice--app-store-review-request-eligible-puzzle-milestone",
+      "The unchanged successful puzzle Sprint Result at the native StoreKit boundary. After four successful puzzle Sprints across at least two local dates, the production app may request Apple's standard review sheet after this result has remained stable for two seconds. StoreKit may show nothing, and the result remains fully usable.",
+      "practice",
+      [
+        "Successful puzzle Sprint Result",
+        "Four successful puzzle Sprints",
+        "At least two local dates",
+        "Two-second idle handoff",
+        "No custom pre-prompt",
+        "Unchanged result when StoreKit shows nothing"
+      ],
+      ["Apple StoreKit review sheet", "Practice home", "Play again"],
+      "contained"
+    ),
+    nativeBoundary: {
+      title: "Apple system review sheet",
+      detail: "Chessticize only requests Apple's standard StoreKit sheet. The browser does not recreate it, and the puzzle result remains usable whether or not iOS chooses to show it."
+    }
+  },
   "practice-tactical-focus-guide": defineScenario("practice-tactical-focus-guide", "Practice", "Tactical Focus · first-use guide", "practice--tactical-focus-guide", "The shared active-session guide adapts its header, timeout, score, and start language to a fixed Unrated Focused Run before its clock starts.", "practice", ["Focused Run header guidance", "Fixed-puzzle progress", "Unrated status", "Timeout counts as a completed puzzle", "Start Focused Run"], ["Production onboarding persistence", "Active Focused Run"], "contained"),
   "practice-tactical-focus-active": defineScenario("practice-tactical-focus-active", "Practice", "Tactical Focus · active run", "practice--tactical-focus-active", "Active fixed Tactical Focus Run that replaces pass and mistake-limit language with completed, remaining, and Unrated status while preserving the familiar board session.", "practice", ["Focused Run header", "Fixed 15-puzzle progress", "Completed and remaining counts", "Unrated status", "Rating unchanged exit copy"], ["Focused Run result", "Review"], "contained"),
   "practice-tactical-focus-result": defineScenario("practice-tactical-focus-result", "Practice", "Tactical Focus · result", "practice--tactical-focus-result", "Completed fixed Tactical Focus Run that clearly stays unrated, reports the planned-puzzle ending, and returns to Practice instead of immediately replaying stale focus.", "practice", ["Focused Run complete", "Planned puzzles complete", "Unrated Rating", "Back to Practice"], ["Practice home", "Review"], "contained"),

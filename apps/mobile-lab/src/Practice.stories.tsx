@@ -480,6 +480,17 @@ export const SprintResultExtraAttempt: Story = {
   }
 };
 
+export const AppStoreReviewRequestEligiblePuzzleMilestone: Story = {
+  name: "App Store review request · eligible puzzle milestone",
+  args: { scenarioId: "practice-app-store-review-request" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "sprint-summary-panel");
+    await expectTestIdText(canvasElement, "sprint-result-solved", "Solved 15");
+    await expectTestIdText(canvasElement, "play-again-button", "Play again");
+    await waitForTestId(canvasElement, "app-store-review-native-boundary");
+  }
+};
+
 export const ReviewReminderPrompt: Story = {
   name: "Review reminder prompt",
   args: { scenarioId: "practice-reminder-prompt" },

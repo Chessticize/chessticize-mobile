@@ -279,6 +279,17 @@ function sprintRulesDesignPreviewFor(
       }
     };
   }
+  if (scenarioId === "practice-app-store-review-request") {
+    return {
+      initialResultState: sprintRulesResultState({
+        correctCount: 15,
+        endReason: "target_reached",
+        mistakeCount: 0,
+        ratingAfter: 1112,
+        status: "won"
+      })
+    };
+  }
   if (scenarioId === "practice-tactical-focus-active") {
     return {
       initialActiveState: tacticalFocusActiveState()
@@ -492,11 +503,24 @@ export function LabScenarioShell({
     <div className="lab-scenario-shell">
       <aside className="lab-toolbar" aria-label="Interaction Lab scenario controls">
         <details>
-          <summary>{definition.group} · {definition.title}</summary>
+          <summary>
+            {definition.nativeBoundary
+              ? `${definition.group} · Native boundary`
+              : `${definition.group} · ${definition.title}`}
+          </summary>
           <div className="lab-toolbar-body">
             <p>{definition.description}</p>
             <p><strong>Scenario Scope:</strong> {definition.scope.includes.join(" · ")}</p>
             <p><strong>Boundary exits:</strong> {definition.scope.exits.join(" · ")}</p>
+            {definition.nativeBoundary ? (
+              <div
+                className="lab-native-boundary"
+                data-testid="app-store-review-native-boundary"
+              >
+                <p><strong>{definition.nativeBoundary.title}</strong></p>
+                <p>{definition.nativeBoundary.detail}</p>
+              </div>
+            ) : null}
             <p className="lab-containment-note">
               {definition.scope.containment === "contained"
                 ? "Contained design slice: actions remain inside deterministic prototype state."
