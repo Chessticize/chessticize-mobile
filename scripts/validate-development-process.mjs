@@ -463,7 +463,7 @@ const simulatorOrientationRunnerSource = read(
   ".codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
 );
 assert.match(simulatorOrientationRunnerSource, /tell application "Simulator" to activate/);
-assert.match(simulatorOrientationRunnerSource, /simctl io "\$SIMULATOR_UDID" screenshot/);
+assert.match(simulatorOrientationRunnerSource, /return size of deviceWindow/);
 assert.match(simulatorOrientationRunnerSource, /Could not rotate the exact Simulator window/);
 
 const localE2eRunnerSource = read(

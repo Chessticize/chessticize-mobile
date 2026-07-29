@@ -69,6 +69,7 @@ function captureMarketingScreenshot({
   sourceCommit,
   story,
   target,
+  verifiedLayoutOrientation = false,
 }) {
   const sourcePath = screenshotPath ?? captureScreenshot(frame.captureId);
   if (sourcePath && typeof sourcePath.then === 'function') {
@@ -79,15 +80,29 @@ function captureMarketingScreenshot({
       sourceCommit,
       story,
       target,
+      verifiedLayoutOrientation,
     }));
   }
-  const png = PNG.sync.read(readFileSync(sourcePath));
+  const sourceBuffer = readFileSync(sourcePath);
+  const rawPng = PNG.sync.read(sourceBuffer);
+  const {
+    normalization,
+    png,
+  } = normalizeVerifiedScreenshotOrientation({
+    png: rawPng,
+    targetOrientation: target.orientation,
+    verifiedLayoutOrientation,
+  });
   assertCaptureDimensions(png, target);
 
   const familyDirectory = resolve(outputRoot, target.outputDirectoryName);
   mkdirSync(familyDirectory, { recursive: true });
   const destination = resolve(familyDirectory, `${frame.captureId}.png`);
-  copyFileSync(sourcePath, destination);
+  if (normalization === 'none') {
+    copyFileSync(sourcePath, destination);
+  } else {
+    writeFileSync(destination, PNG.sync.write(png));
+  }
   const fileBuffer = readFileSync(destination);
   return {
     order: frame.order,
@@ -99,6 +114,11 @@ function captureMarketingScreenshot({
     deviceName: target.deviceName,
     displayGroup: target.displayGroup,
     orientation: target.orientation,
+    rawPixelDimensions: {
+      width: rawPng.width,
+      height: rawPng.height,
+    },
+    captureNormalization: normalization,
     pixelDimensions: {
       width: png.width,
       height: png.height,
@@ -110,8 +130,59 @@ function captureMarketingScreenshot({
     },
     file: relative(outputRoot, destination),
     fileName: basename(destination),
+    rawSha256: createHash('sha256').update(sourceBuffer).digest('hex'),
     sha256: createHash('sha256').update(fileBuffer).digest('hex'),
   };
+}
+
+function normalizeVerifiedScreenshotOrientation({
+  png,
+  targetOrientation,
+  verifiedLayoutOrientation = false,
+}) {
+  const orientationMatches = targetOrientation === 'portrait'
+    ? png.height > png.width
+    : png.width > png.height;
+  if (orientationMatches) {
+    return {
+      normalization: 'none',
+      png,
+    };
+  }
+  if (!verifiedLayoutOrientation) {
+    return {
+      normalization: 'none',
+      png,
+    };
+  }
+  return {
+    normalization: 'rotate-clockwise-90',
+    png: rotatePngClockwise(png),
+  };
+}
+
+function rotatePngClockwise(png) {
+  const rotated = new PNG({
+    height: png.width,
+    width: png.height,
+  });
+  for (let y = 0; y < png.height; y += 1) {
+    for (let x = 0; x < png.width; x += 1) {
+      const sourceOffset = ((y * png.width) + x) * 4;
+      const destinationX = png.height - 1 - y;
+      const destinationY = x;
+      const destinationOffset = (
+        (destinationY * rotated.width) + destinationX
+      ) * 4;
+      png.data.copy(
+        rotated.data,
+        destinationOffset,
+        sourceOffset,
+        sourceOffset + 4
+      );
+    }
+  }
+  return rotated;
 }
 
 function writeDeviceCaptureManifest({
@@ -391,7 +462,9 @@ module.exports = {
   IPHONE_6_9_PORTRAIT_SIZES,
   assertCaptureDimensions,
   captureMarketingScreenshot,
+  normalizeVerifiedScreenshotOrientation,
   resolveMarketingCaptureTarget,
+  rotatePngClockwise,
   sourceCommitForCapture,
   writeCombinedCaptureManifest,
   writeDeviceCaptureManifest,

@@ -6,6 +6,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 ORIENTATION_RUNNER="$SCRIPT_DIR/set-simulator-orientation.sh"
 SIMULATOR_TARGET_RESOLVER="$REPO_ROOT/apps/mobile/scripts/resolve-ios-simulator-target.js"
 PNG_ORIENTATION_VALIDATOR="$REPO_ROOT/apps/mobile/scripts/assert-png-orientation.js"
+PNG_ORIENTATION_NORMALIZER="$REPO_ROOT/apps/mobile/e2e/normalizeVerifiedScreenshotOrientation.js"
 DEVICE_NAME="${DETOX_IOS_DEVICE:-iPad Pro 11-inch (M5)}"
 WORKER_COUNT="${DETOX_MAX_WORKERS:-1}"
 PORTRAIT_SCENES=(
@@ -58,6 +59,8 @@ command -v xcrun >/dev/null 2>&1 || fail "Xcode command-line tools are required.
   fail "Missing executable Simulator target resolver: $SIMULATOR_TARGET_RESOLVER"
 [[ -x "$PNG_ORIENTATION_VALIDATOR" ]] || \
   fail "Missing executable PNG orientation validator: $PNG_ORIENTATION_VALIDATOR"
+[[ -f "$PNG_ORIENTATION_NORMALIZER" ]] || \
+  fail "Missing PNG orientation normalizer: $PNG_ORIENTATION_NORMALIZER"
 
 RUBY_PREFIX="$(brew --prefix ruby@3.3 2>/dev/null)" || \
   fail "Install Homebrew ruby@3.3 before running UI calibration."
@@ -142,6 +145,7 @@ copy_capture() {
     local source_path="$source_dir/$scene.png"
     [[ -f "$source_path" ]] || fail "Missing expected $orientation screenshot: $scene.png"
     cp "$source_path" "$DESTINATION/$scene.png"
+    node "$PNG_ORIENTATION_NORMALIZER" "$DESTINATION/$scene.png" "$orientation"
     "$PNG_ORIENTATION_VALIDATOR" "$DESTINATION/$scene.png" "$orientation"
   done
 }
