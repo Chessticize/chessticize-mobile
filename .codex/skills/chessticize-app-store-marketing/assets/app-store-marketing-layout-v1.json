@@ -1,0 +1,232 @@
+{
+  "schemaVersion": 1,
+  "layoutId": "chessticize-cobalt-focus-v1",
+  "contractStoryId": "app-store-marketing-en-us-v1",
+  "locale": "en-US",
+  "visualDirection": {
+    "name": "Cobalt Focus",
+    "composition": "quiet-focus",
+    "background": "six-frame-imagegen-boards-v1",
+    "productProof": "immutable-native-capture"
+  },
+  "palette": {
+    "headline": "#FFFFFF",
+    "deviceFrame": "#0F172A",
+    "deviceFrameEdge": "#475569",
+    "shadow": "#082F7A"
+  },
+  "typography": {
+    "fontFamily": "sans-serif",
+    "fontWeight": 760
+  },
+  "presets": {
+    "iphone": {
+      "platform": "app-store",
+      "deviceFamily": "iphone",
+      "displayGroup": "6.9-inch",
+      "orientation": "portrait",
+      "reviewLabel": "iPhone Portrait",
+      "acceptedSourceSizes": [
+        {
+          "width": 1260,
+          "height": 2736
+        },
+        {
+          "width": 1290,
+          "height": 2796
+        },
+        {
+          "width": 1320,
+          "height": 2868
+        }
+      ],
+      "backgroundTemplates": {
+        "build-tactical-intuition": {
+          "file": "cobalt-focus-frame-01-iphone-portrait-v1.png",
+          "sha256": "3dca83eb3f0aa8ff7a8752eaaedf1fb87be74f5acf904d80bddda165802d8290",
+          "pixelDimensions": {
+            "width": 852,
+            "height": 1846
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "choose-the-best-move": {
+          "file": "cobalt-focus-frame-02-iphone-portrait-v1.png",
+          "sha256": "d43fd69ae8b52487703d0275b9c605f61d5e303b088b312b48dbd446edd4477c",
+          "pixelDimensions": {
+            "width": 852,
+            "height": 1846
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "focus-your-practice": {
+          "file": "cobalt-focus-frame-03-iphone-portrait-v1.png",
+          "sha256": "d32cf06dc48d8b1c9a16942598c5c50da343e9d6b5796147a285ecd5494cd613",
+          "pixelDimensions": {
+            "width": 852,
+            "height": 1846
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "make-every-mistake-count": {
+          "file": "cobalt-focus-frame-04-iphone-portrait-v1.png",
+          "sha256": "68ca970e513965de95e2beafba4e62b6dd859209f5a9ae9e35f2b106c925ef58",
+          "pixelDimensions": {
+            "width": 852,
+            "height": 1847
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "see-your-progress": {
+          "file": "cobalt-focus-frame-05-iphone-portrait-v1.png",
+          "sha256": "f7c4f169b49d7e8c0df128a3153e71d3eb258b168c87c786dc0a26a0d7fdc2c5",
+          "pixelDimensions": {
+            "width": 852,
+            "height": 1846
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "private-offline-open-source": {
+          "file": "cobalt-focus-frame-06-iphone-portrait-v1.png",
+          "sha256": "66c6fb3aad76dd6416be11b96a169d37a2018be1f29fc6655731761b2a52df53",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        }
+      },
+      "title": {
+        "leftRatio": 0.075,
+        "topRatio": 0.045,
+        "maxWidthRatio": 0.85,
+        "fontSizeRatio": 0.073,
+        "lineHeightRatio": 0.88,
+        "maxCharactersPerLine": 20,
+        "align": "middle"
+      },
+      "product": {
+        "topRatio": 0.205,
+        "maxWidthRatio": 0.76,
+        "maxHeightRatio": 0.75,
+        "framePaddingRatio": 0.014,
+        "cornerRadiusRatio": 0.037,
+        "edgeWidthRatio": 0.0024,
+        "shadowBlurRatio": 0.017,
+        "shadowOffsetRatio": 0.012
+      }
+    },
+    "ipad": {
+      "platform": "app-store",
+      "deviceFamily": "ipad",
+      "displayGroup": "13-inch",
+      "orientation": "landscape",
+      "reviewLabel": "iPad Landscape",
+      "acceptedSourceSizes": [
+        {
+          "width": 2752,
+          "height": 2064
+        },
+        {
+          "width": 2732,
+          "height": 2048
+        }
+      ],
+      "backgroundTemplates": {
+        "build-tactical-intuition": {
+          "file": "cobalt-focus-frame-01-ipad-landscape-v1.png",
+          "sha256": "b08701f48ebb817823a2316a280138f7eed9221006c5277933f9601e6f12789f",
+          "pixelDimensions": {
+            "width": 1448,
+            "height": 1086
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "choose-the-best-move": {
+          "file": "cobalt-focus-frame-02-ipad-landscape-v1.png",
+          "sha256": "2661cef53cf6fd41711736953e3a74954a8aa87cd7d41b20695b8e449aac3f72",
+          "pixelDimensions": {
+            "width": 1448,
+            "height": 1086
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "focus-your-practice": {
+          "file": "cobalt-focus-frame-03-ipad-landscape-v1.png",
+          "sha256": "0d07141b059a2eca857c151f228a682f4a1183238b2ab4d21924a0dcd1cd3f0c",
+          "pixelDimensions": {
+            "width": 1448,
+            "height": 1086
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "make-every-mistake-count": {
+          "file": "cobalt-focus-frame-04-ipad-landscape-v1.png",
+          "sha256": "77403b207cd04ab5550621210b28fad16ea1e4b55bd91c77482dd71b8f6b9cd3",
+          "pixelDimensions": {
+            "width": 1448,
+            "height": 1086
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "see-your-progress": {
+          "file": "cobalt-focus-frame-05-ipad-landscape-v1.png",
+          "sha256": "a79dc1173cc2490d995c1fac3a7bbd853e6947699abc8645097dd76498301f46",
+          "pixelDimensions": {
+            "width": 1448,
+            "height": 1086
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "private-offline-open-source": {
+          "file": "cobalt-focus-frame-06-ipad-landscape-v1.png",
+          "sha256": "9b015b855b54f8e800a7d73570fdc64ac86338de24df3919ab853e8dddc8468c",
+          "pixelDimensions": {
+            "width": 1448,
+            "height": 1086
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        }
+      },
+      "title": {
+        "leftRatio": 0.075,
+        "topRatio": 0.038,
+        "maxWidthRatio": 0.85,
+        "fontSizeRatio": 0.056,
+        "lineHeightRatio": 0.88,
+        "maxCharactersPerLine": 24,
+        "align": "start"
+      },
+      "product": {
+        "topRatio": 0.2,
+        "maxWidthRatio": 0.82,
+        "maxHeightRatio": 0.76,
+        "framePaddingRatio": 0.011,
+        "cornerRadiusRatio": 0.026,
+        "edgeWidthRatio": 0.0018,
+        "shadowBlurRatio": 0.014,
+        "shadowOffsetRatio": 0.01
+      }
+    }
+  },
+  "preview": {
+    "width": 2400,
+    "background": "#0F172A",
+    "label": "#FFFFFF",
+    "mutedLabel": "#CBD5E1",
+    "gap": 36,
+    "padding": 64
+  }
+}

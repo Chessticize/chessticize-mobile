@@ -82,6 +82,15 @@ The finalizer fails unless both device sets:
   and
 - still match every PNG's recorded dimensions and SHA-256.
 
+## Composition handoff
+
+After the finalizer succeeds, use the reusable
+[App Store marketing composition workflow](APP_STORE_MARKETING_COMPOSITION.md)
+to validate the handoff again, generate the iPhone portrait and iPad landscape
+contact sheets, and export the twelve Cobalt Focus App Store PNGs. Keep the
+raw capture directory immutable; write composed assets to the separate ignored
+`scratch/store-assets/marketing-composed/<full-source-commit>/` directory.
+
 The launch profile freezes the approved clock and imports the deterministic
 fixture through the normal persistent mobile practice service backed by the
 app's writable SQLite path. Detox deletes the dedicated simulator app sandbox
