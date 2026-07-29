@@ -195,7 +195,7 @@ test("TacticalProfileService rebuilds personal speed controls from canonical mix
       });
       store.updateSprintSession({
         ...session,
-        status: "completed",
+        status: "won",
         completedAt,
         endReason: "target_reached",
         correctCount: sessionPuzzles.length,

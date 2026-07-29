@@ -1049,6 +1049,7 @@ type MutableEvaluationAggregate = {
 
 type PersonalSpeedBaseline = {
   coefficients: readonly number[];
+  coefficientPrecision: readonly number[];
   residualVariance: number;
 };
 
@@ -1601,6 +1602,7 @@ function fitPersonalSpeedBaseline(
   );
   return {
     coefficients,
+    coefficientPrecision: matrix,
     residualVariance
   };
 }
@@ -1617,9 +1619,31 @@ function personalSpeedThemePosterior(
   const residualSum =
     (theme.responseFeatureSums[0] as number) -
     dot(baseline.coefficients, featureSums);
+  const meanFeatures = featureSums.map(
+    (sum) => sum / theme.weight
+  );
+  const predictionDirection = solveLinearSystem(
+    baseline.coefficientPrecision,
+    meanFeatures,
+    TACTICAL_PROFILE_SPEED_FEATURE_COUNT
+  );
+  const baselineLeverage = Math.max(
+    0,
+    predictionDirection
+      ? dot(meanFeatures, predictionDirection)
+      : Number.POSITIVE_INFINITY
+  );
+  const meanResidual = residualSum / theme.weight;
+  const residualMeanVariance =
+    baseline.residualVariance *
+    (1 / theme.weight + baselineLeverage);
+  const likelihoodPrecision = Number.isFinite(residualMeanVariance) &&
+      residualMeanVariance > 0
+    ? 1 / residualMeanVariance
+    : 0;
   return posteriorFromWeightedNormal(
-    residualSum / baseline.residualVariance,
-    theme.weight / baseline.residualVariance,
+    meanResidual * likelihoodPrecision,
+    likelihoodPrecision,
     priorSd
   );
 }

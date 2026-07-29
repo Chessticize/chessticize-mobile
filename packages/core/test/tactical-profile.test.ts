@@ -1117,7 +1117,7 @@ test("recommendation hysteresis retains a prior focus between entry and exit thr
         id: `hysteresis-target-${index}`,
         sessionId: `hysteresis-target-session-${index % 2}`,
         puzzleId: `hysteresis-target-puzzle-${index}`,
-        elapsedMs: 39_200
+        elapsedMs: 40_100
       },
       puzzle: {
         id: `hysteresis-target-puzzle-${index}`,
