@@ -53,6 +53,9 @@ Use the full source commit recorded by the raw handoff:
 pnpm app-store:compose-marketing -- \
   --capture-root scratch/store-assets/marketing/<source-commit> \
   --output-dir scratch/store-assets/marketing-composed/<source-commit> \
+  --platform app-store \
+  --device-family all \
+  --orientation all \
   --preview-only
 ```
 
@@ -75,7 +78,10 @@ After the contact sheets are approved, omit `--preview-only`:
 ```sh
 pnpm app-store:compose-marketing -- \
   --capture-root scratch/store-assets/marketing/<source-commit> \
-  --output-dir scratch/store-assets/marketing-composed/<source-commit>
+  --output-dir scratch/store-assets/marketing-composed/<source-commit> \
+  --platform app-store \
+  --device-family all \
+  --orientation all
 ```
 
 The output keeps the raw handoff's stable filenames under device-specific
@@ -105,6 +111,8 @@ does not crop, retouch, or generate pixels inside the app screen.
 Before writing an output, the command validates:
 
 - story ID, locale, six-frame order, IDs, and copy keys;
+- platform, device-family, and orientation selection against config-defined
+  presets;
 - device family, display group, orientation, and accepted pixel dimensions;
 - the recorded PNG dimensions and SHA-256 for every selected source;
 - the frame ID, dimensions, orientation, and SHA-256 of all twelve frozen
@@ -112,11 +120,25 @@ Before writing an output, the command validates:
 - relative PNG paths, symlink containment, and stable output filenames; and
 - separation between the immutable raw handoff and composed output.
 
+The typography contract uses the renderer's guaranteed generic `sans-serif`
+family instead of silently substituting an unavailable named font. Each
+headline is rasterized before export and its actual non-transparent pixel
+bounds must remain inside the configured safe area. A copy or layout update
+that overflows fails before final screenshots are written.
+
 The export receipt records the layout ID, capture-manifest SHA-256, source
-commit, background provenance and hashes, source and final image hashes,
-dimensions, and contact-sheet hashes. Imagegen is not called during export.
-There are no timestamps or random export inputs, so identical raw captures,
-frozen boards, code, and config produce identical output bytes.
+commit, renderer and font-library versions, background provenance and hashes,
+source and final image hashes, dimensions, and contact-sheet hashes. Imagegen
+is not called during export. There are no timestamps or random export inputs,
+so identical raw captures, frozen boards, code, config, and renderer runtime
+produce identical output bytes. A different pinned renderer can remain
+predictably equivalent while its receipt makes that environment difference
+explicit.
+
+Platform, family, and orientation are data-selected from the layout config.
+The v1 contract supplies App Store iPhone and iPad presets; a future store
+target can use a separate reviewed layout config without changing compositor
+selection logic.
 
 To change one board, use Imagegen to create background-only art for that exact
 frame and orientation, replace its versioned PNG, and update the corresponding

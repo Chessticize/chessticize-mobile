@@ -51,9 +51,11 @@ async function exists(filePath) {
 function testPreset(family) {
   const contract = FAMILY_CONTRACTS[family];
   return {
+    platform: "app-store",
     deviceFamily: family,
     displayGroup: contract.displayGroup,
     orientation: contract.orientation,
+    reviewLabel: family === "iphone" ? "iPhone Portrait" : "iPad Landscape",
     acceptedSourceSizes: [contract.dimensions],
     backgroundTemplates: {},
     title: {
@@ -75,17 +77,6 @@ function testPreset(family) {
       shadowBlurRatio: 0.01,
       shadowOffsetRatio: 0.01,
     },
-    decoration: {
-      spotlightCenterXRatio: 0.55,
-      spotlightCenterYRatio: 0.58,
-      spotlightRadiusRatio: 0.45,
-      ringCenterXRatio: 0.55,
-      ringCenterYRatio: 0.58,
-      ringRadiusRatios: [0.2, 0.36],
-      arrowStart: [0.08, 0.66],
-      arrowControl: [0.42, 0.34],
-      arrowEnd: [0.92, 0.31],
-    },
   };
 }
 
@@ -102,17 +93,13 @@ function testLayoutConfig() {
       productProof: "immutable-native-capture",
     },
     palette: {
-      backgroundStart: "#0B4DD8",
-      backgroundEnd: "#2563EB",
-      spotlight: "#93C5FD",
       headline: "#FFFFFF",
-      decoration: "#FFFFFF",
       deviceFrame: "#0F172A",
       deviceFrameEdge: "#475569",
       shadow: "#082F7A",
     },
     typography: {
-      fontFamily: "Arial, sans-serif",
+      fontFamily: "sans-serif",
       fontWeight: 700,
     },
     presets: {
@@ -255,16 +242,20 @@ async function createFixture(root) {
 }
 
 test("headline wrapping and layout keep the approved copy inside safe areas", () => {
-  assert.equal(
-    parseArgs([
-      "--",
-      "--capture-root",
-      "/tmp/raw",
-      "--output-dir",
-      "/tmp/composed",
-    ]).captureRoot,
+  const parsed = parseArgs([
+    "--",
+    "--capture-root",
     "/tmp/raw",
-  );
+    "--output-dir",
+    "/tmp/composed",
+    "--platform",
+    "app-store",
+    "--orientation",
+    "landscape",
+  ]);
+  assert.equal(parsed.captureRoot, "/tmp/raw");
+  assert.equal(parsed.platform, "app-store");
+  assert.equal(parsed.orientation, "landscape");
   assert.deepEqual(wrapHeadline("Build Tactical Intuition", 20), [
     "Build Tactical",
     "Intuition",
@@ -314,6 +305,7 @@ test("full export is deterministic and preserves the six-frame device contracts"
   });
 
   assert.equal(first.manifest.mode, "full-export");
+  assert.equal(first.manifest.platform, "app-store");
   assert.equal(first.manifest.artifacts.length, 12);
   assert.equal(first.manifest.backgroundTemplates.length, 12);
   assert.equal(first.manifest.contactSheets.length, 2);
@@ -335,6 +327,98 @@ test("full export is deterministic and preserves the six-frame device contracts"
       artifact.dimensions,
     );
   }
+});
+
+test("font and rendered-copy contracts fail before unsafe export", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "chessticize-copy-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const fixture = await createFixture(root);
+
+  const invalidFontConfig = structuredClone(fixture.config);
+  invalidFontConfig.typography.fontFamily = "Missing Marketing Font";
+  const invalidFontConfigPath = path.join(root, "invalid-font-layout.json");
+  await writeFile(
+    invalidFontConfigPath,
+    `${JSON.stringify(invalidFontConfig, null, 2)}\n`,
+  );
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: fixture.captureRoot,
+      layoutConfig: invalidFontConfigPath,
+      outputDir: path.join(root, "invalid-font-output"),
+    }),
+    /typography fontFamily must be sans-serif/,
+  );
+
+  const invalidMarginConfig = structuredClone(fixture.config);
+  invalidMarginConfig.presets.iphone.title.leftRatio = 0.9;
+  invalidMarginConfig.presets.iphone.title.maxWidthRatio = 0.2;
+  const invalidMarginConfigPath = path.join(root, "invalid-margin-layout.json");
+  await writeFile(
+    invalidMarginConfigPath,
+    `${JSON.stringify(invalidMarginConfig, null, 2)}\n`,
+  );
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: fixture.captureRoot,
+      layoutConfig: invalidMarginConfigPath,
+      outputDir: path.join(root, "invalid-margin-output"),
+    }),
+    /invalid safe-area or product layout/,
+  );
+
+  const unsafeCopyConfig = structuredClone(fixture.config);
+  unsafeCopyConfig.presets.iphone.title.maxWidthRatio = 0.12;
+  const unsafeCopyConfigPath = path.join(root, "unsafe-copy-layout.json");
+  await writeFile(
+    unsafeCopyConfigPath,
+    `${JSON.stringify(unsafeCopyConfig, null, 2)}\n`,
+  );
+  const unsafeCopyManifest = structuredClone(fixture.manifest);
+  unsafeCopyManifest.frames[0].headline = "WWWW WWWW";
+  const unsafeCopyManifestPath = path.join(root, "unsafe-copy-manifest.json");
+  await writeFile(
+    unsafeCopyManifestPath,
+    `${JSON.stringify(unsafeCopyManifest, null, 2)}\n`,
+  );
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: fixture.captureRoot,
+      deviceFamily: "iphone",
+      layoutConfig: unsafeCopyConfigPath,
+      manifest: unsafeCopyManifestPath,
+      outputDir: path.join(root, "unsafe-copy-output"),
+    }),
+    /headline exceeds the rendered safe area/,
+  );
+});
+
+test("platform and orientation select config-defined presets", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "chessticize-preset-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const fixture = await createFixture(root);
+  const result = await composeMarketingAssets({
+    captureRoot: fixture.captureRoot,
+    deviceFamily: "all",
+    layoutConfig: fixture.configPath,
+    orientation: "landscape",
+    outputDir: path.join(root, "ipad-output"),
+    platform: "app-store",
+  });
+
+  assert.deepEqual(result.manifest.deviceFamilies, ["ipad"]);
+  assert.equal(result.manifest.artifacts.length, 6);
+  assert.equal(result.manifest.contactSheets.length, 1);
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: fixture.captureRoot,
+      layoutConfig: fixture.configPath,
+      orientation: "portrait",
+      outputDir: path.join(root, "no-match"),
+      platform: "google-play",
+    }),
+    /no layout preset matches platform=google-play/,
+  );
 });
 
 test("preview-only mode writes contact sheets without final App Store frames", async (t) => {

@@ -19,7 +19,8 @@ const DEFAULT_LAYOUT_CONFIG = path.join(
   "assets",
   "app-store-marketing-layout-v1.json",
 );
-const DEVICE_FAMILIES = ["iphone", "ipad"];
+const DEFAULT_PLATFORM = "app-store";
+const SUPPORTED_FONT_FAMILY = "sans-serif";
 const EXPECTED_FRAME_COUNT = 6;
 
 function fail(message) {
@@ -39,6 +40,8 @@ export function parseArgs(argv) {
     deviceFamily: "all",
     layoutConfig: DEFAULT_LAYOUT_CONFIG,
     locale: "en-US",
+    orientation: "all",
+    platform: DEFAULT_PLATFORM,
     previewOnly: false,
   };
 
@@ -67,8 +70,16 @@ export function parseArgs(argv) {
         options.locale = parseOptionValue(argv, index, option);
         index += 1;
         break;
+      case "--platform":
+        options.platform = parseOptionValue(argv, index, option);
+        index += 1;
+        break;
       case "--device-family":
         options.deviceFamily = parseOptionValue(argv, index, option);
+        index += 1;
+        break;
+      case "--orientation":
+        options.orientation = parseOptionValue(argv, index, option);
         index += 1;
         break;
       case "--preview-only":
@@ -92,8 +103,11 @@ export function parseArgs(argv) {
   if (!options.outputDir) {
     fail("--output-dir is required");
   }
-  if (!["all", ...DEVICE_FAMILIES].includes(options.deviceFamily)) {
-    fail("--device-family must be one of: all, iphone, ipad");
+  if (!/^[a-z0-9][a-z0-9.-]*$/u.test(options.platform)) {
+    fail("--platform must be a safe platform identifier");
+  }
+  if (!["all", "portrait", "landscape"].includes(options.orientation)) {
+    fail("--orientation must be one of: all, portrait, landscape");
   }
   options.manifest ??= path.join(options.captureRoot, "manifest.json");
   return options;
@@ -107,7 +121,9 @@ function printUsage() {
     [--manifest <manifest.json>] \\
     [--layout-config <layout.json>] \\
     [--locale en-US] \\
+    [--platform app-store] \\
     [--device-family all|iphone|ipad] \\
+    [--orientation all|portrait|landscape] \\
     [--preview-only]
 
 The command validates all selected raw captures before writing deterministic
@@ -185,6 +201,21 @@ function acceptedSize(preset, dimensions) {
   );
 }
 
+function isFiniteRatio(value, { allowZero = false, max = 1 } = {}) {
+  return (
+    Number.isFinite(value) &&
+    (allowZero ? value >= 0 : value > 0) &&
+    value <= max
+  );
+}
+
+function isHexColor(value) {
+  return (
+    typeof value === "string" &&
+    /^#[a-f0-9]{6}(?:[a-f0-9]{2})?$/iu.test(value)
+  );
+}
+
 function validateLayoutConfig(config) {
   if (config.schemaVersion !== 1) {
     fail(`unsupported layout schema version: ${config.schemaVersion}`);
@@ -203,23 +234,47 @@ function validateLayoutConfig(config) {
       fail(`layout config is missing its ${section} section`);
     }
   }
+  if (config.typography.fontFamily !== SUPPORTED_FONT_FAMILY) {
+    fail(
+      `typography fontFamily must be ${SUPPORTED_FONT_FAMILY}; named fonts can silently substitute`,
+    );
+  }
   if (
-    typeof config.typography.fontFamily !== "string" ||
     !Number.isFinite(config.typography.fontWeight) ||
+    config.typography.fontWeight < 100 ||
+    config.typography.fontWeight > 900 ||
     !Number.isInteger(config.preview.width) ||
     config.preview.width <= 0
   ) {
     fail("layout config has an invalid typography or preview contract");
   }
-  for (const family of DEVICE_FAMILIES) {
-    const preset = config.presets?.[family];
-    if (!preset) {
-      fail(`layout config is missing the ${family} preset`);
-    }
+  if (
+    !["headline", "deviceFrame", "deviceFrameEdge", "shadow"].every((key) =>
+      isHexColor(config.palette[key]),
+    ) ||
+    !["background", "label", "mutedLabel"].every((key) =>
+      isHexColor(config.preview[key]),
+    ) ||
+    !Number.isInteger(config.preview.gap) ||
+    config.preview.gap < 0 ||
+    !Number.isInteger(config.preview.padding) ||
+    config.preview.padding < 0
+  ) {
+    fail("layout config has an invalid color or preview spacing contract");
+  }
+  const presets = Object.entries(config.presets ?? {});
+  if (presets.length === 0) {
+    fail("layout config must define at least one platform preset");
+  }
+  for (const [family, preset] of presets) {
     if (
+      !/^[a-z0-9][a-z0-9.-]*$/u.test(family) ||
       preset.deviceFamily !== family ||
+      !/^[a-z0-9][a-z0-9.-]*$/u.test(preset.platform ?? "") ||
       !preset.displayGroup ||
-      !preset.orientation ||
+      !["portrait", "landscape"].includes(preset.orientation) ||
+      typeof preset.reviewLabel !== "string" ||
+      preset.reviewLabel.trim() === "" ||
       !preset.backgroundTemplates ||
       typeof preset.backgroundTemplates !== "object" ||
       Object.keys(preset.backgroundTemplates).length !== EXPECTED_FRAME_COUNT ||
@@ -230,12 +285,8 @@ function validateLayoutConfig(config) {
     ) {
       fail(`${family} preset has an invalid target contract`);
     }
-    const expectedOrientation = family === "iphone" ? "portrait" : "landscape";
-    if (
-      preset.orientation !== expectedOrientation ||
-      !/^[a-z0-9][a-z0-9.-]*$/u.test(preset.displayGroup)
-    ) {
-      fail(`${family} preset must use a safe ${expectedOrientation} target`);
+    if (!/^[a-z0-9][a-z0-9.-]*$/u.test(preset.displayGroup)) {
+      fail(`${family} preset must use a safe display group`);
     }
     if (
       !preset.acceptedSourceSizes.every(
@@ -248,7 +299,52 @@ function validateLayoutConfig(config) {
     ) {
       fail(`${family} preset contains an invalid accepted source size`);
     }
+    const title = preset.title;
+    const product = preset.product;
+    if (
+      !isFiniteRatio(title.leftRatio, { allowZero: true }) ||
+      !isFiniteRatio(title.topRatio, { allowZero: true }) ||
+      !isFiniteRatio(title.maxWidthRatio) ||
+      title.leftRatio + title.maxWidthRatio > 1 ||
+      !isFiniteRatio(title.fontSizeRatio, { max: 0.25 }) ||
+      !isFiniteRatio(title.lineHeightRatio, { max: 2 }) ||
+      !Number.isInteger(title.maxCharactersPerLine) ||
+      title.maxCharactersPerLine <= 0 ||
+      !["start", "middle"].includes(title.align) ||
+      !isFiniteRatio(product.topRatio, { allowZero: true }) ||
+      !isFiniteRatio(product.maxWidthRatio) ||
+      !isFiniteRatio(product.maxHeightRatio) ||
+      product.topRatio + product.maxHeightRatio > 1 ||
+      !isFiniteRatio(product.framePaddingRatio, { allowZero: true, max: 0.1 }) ||
+      !isFiniteRatio(product.cornerRadiusRatio, { allowZero: true, max: 0.2 }) ||
+      !isFiniteRatio(product.edgeWidthRatio, { max: 0.05 }) ||
+      !isFiniteRatio(product.shadowBlurRatio, { allowZero: true, max: 0.2 }) ||
+      !isFiniteRatio(product.shadowOffsetRatio, { allowZero: true, max: 0.2 })
+    ) {
+      fail(`${family} preset has an invalid safe-area or product layout`);
+    }
   }
+}
+
+function selectDeviceFamilies(config, options) {
+  const matches = Object.entries(config.presets)
+    .filter(([, preset]) => preset.platform === options.platform)
+    .filter(
+      ([family]) =>
+        options.deviceFamily === "all" || family === options.deviceFamily,
+    )
+    .filter(
+      ([, preset]) =>
+        options.orientation === "all" ||
+        preset.orientation === options.orientation,
+    )
+    .map(([family]) => family);
+  if (matches.length === 0) {
+    fail(
+      `no layout preset matches platform=${options.platform}, deviceFamily=${options.deviceFamily}, orientation=${options.orientation}`,
+    );
+  }
+  return matches;
 }
 
 function validateFrameContract(frame, expectedOrder) {
@@ -601,33 +697,75 @@ function escapeXml(value) {
     .replaceAll("'", "&apos;");
 }
 
-function foregroundSvg({ config, headline, layout, preset }) {
-  const { canvas, frame, title } = layout;
-  const palette = config.palette;
-  const lines = wrapHeadline(
-    headline,
-    preset.title.maxCharactersPerLine,
+function screenCornerRadius(layout) {
+  return Math.max(
+    1,
+    layout.frame.cornerRadius - Math.round(layout.frame.padding * 0.55),
   );
+}
+
+function headlineSvg({ config, headline, layout, preset }) {
+  const { canvas, title } = layout;
+  const lines = wrapHeadline(headline, preset.title.maxCharactersPerLine);
   const titleX =
     preset.title.align === "middle"
       ? Math.round(canvas.width / 2)
       : title.left;
   const textAnchor = preset.title.align === "middle" ? "middle" : "start";
-  const lineHeight = Math.round(
-    title.fontSize * preset.title.lineHeightRatio,
-  );
+  const lineHeight = Math.round(title.fontSize * preset.title.lineHeightRatio);
   const text = lines
     .map(
       (line, index) =>
         `<tspan x="${titleX}" y="${title.top + title.fontSize + index * lineHeight}">${escapeXml(line)}</tspan>`,
     )
     .join("");
+
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}">
+  <text fill="${config.palette.headline}" font-family="${SUPPORTED_FONT_FAMILY}" font-size="${title.fontSize}" font-weight="${config.typography.fontWeight}" letter-spacing="${Math.round(title.fontSize * -0.035)}" text-anchor="${textAnchor}">${text}</text>
+</svg>`);
+}
+
+async function renderValidatedHeadline({ config, headline, layout, preset }) {
+  const buffer = await sharp(
+    headlineSvg({ config, headline, layout, preset }),
+  )
+    .png({ adaptiveFiltering: false, compressionLevel: 9 })
+    .toBuffer();
+  const { info } = await sharp(buffer)
+    .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png({ adaptiveFiltering: false, compressionLevel: 9 })
+    .toBuffer({ resolveWithObject: true });
+  const bounds = {
+    bottom: -info.trimOffsetTop + info.height,
+    left: -info.trimOffsetLeft,
+    right: -info.trimOffsetLeft + info.width,
+    top: -info.trimOffsetTop,
+  };
+  const safeArea = {
+    bottom: layout.frame.y,
+    left: layout.title.left,
+    right: layout.title.left + layout.title.maxWidth,
+    top: layout.title.top,
+  };
+  if (
+    bounds.left < safeArea.left ||
+    bounds.right > safeArea.right ||
+    bounds.top < safeArea.top ||
+    bounds.bottom >= safeArea.bottom
+  ) {
+    fail(
+      `headline exceeds the rendered safe area for ${preset.deviceFamily}: ${headline}`,
+    );
+  }
+  return buffer;
+}
+
+function frameSvg({ config, layout, preset }) {
+  const { canvas, frame } = layout;
+  const palette = config.palette;
   const shadowBlur = Math.round(canvas.width * preset.product.shadowBlurRatio);
   const shadowOffset = Math.round(canvas.width * preset.product.shadowOffsetRatio);
-  const screenRadius = Math.max(
-    1,
-    frame.cornerRadius - Math.round(frame.padding * 0.55),
-  );
+  const screenRadius = screenCornerRadius(layout);
 
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}">
   <defs>
@@ -639,15 +777,11 @@ function foregroundSvg({ config, headline, layout, preset }) {
   <rect x="${frame.x}" y="${frame.y}" width="${frame.width}" height="${frame.height}" rx="${frame.cornerRadius}" fill="${palette.deviceFrameEdge}"/>
   <rect x="${frame.x + frame.edgeWidth}" y="${frame.y + frame.edgeWidth}" width="${frame.width - frame.edgeWidth * 2}" height="${frame.height - frame.edgeWidth * 2}" rx="${Math.max(1, frame.cornerRadius - frame.edgeWidth)}" fill="${palette.deviceFrame}"/>
   <rect x="${layout.screenshot.x}" y="${layout.screenshot.y}" width="${layout.screenshot.width}" height="${layout.screenshot.height}" rx="${screenRadius}" fill="${palette.deviceFrame}"/>
-  <text fill="${palette.headline}" font-family="${escapeXml(config.typography.fontFamily)}" font-size="${title.fontSize}" font-weight="${config.typography.fontWeight}" letter-spacing="${Math.round(title.fontSize * -0.035)}" text-anchor="${textAnchor}">${text}</text>
 </svg>`);
 }
 
 async function roundedScreenshot(inputPath, layout) {
-  const radius = Math.max(
-    1,
-    layout.frame.cornerRadius - Math.round(layout.frame.padding * 0.55),
-  );
+  const radius = screenCornerRadius(layout);
   const mask = Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.screenshot.width}" height="${layout.screenshot.height}"><rect width="100%" height="100%" rx="${radius}" fill="#fff"/></svg>`,
   );
@@ -668,7 +802,7 @@ async function composeFrame(item, config, backgroundTemplate) {
     preset: item.preset,
     source: item.capture.pixelDimensions,
   });
-  const [background, foreground, screenshot] = await Promise.all([
+  const [background, frame, headline, screenshot] = await Promise.all([
     sharp(backgroundTemplate.path)
       .resize(canvas.width, canvas.height, {
         fit: "cover",
@@ -677,20 +811,19 @@ async function composeFrame(item, config, backgroundTemplate) {
       })
       .png({ adaptiveFiltering: false, compressionLevel: 9 })
       .toBuffer(),
-    Promise.resolve(
-      foregroundSvg({
-        config,
-        headline: item.frame.headline,
-        layout,
-        preset: item.preset,
-      }),
-    ),
+    Promise.resolve(frameSvg({ config, layout, preset: item.preset })),
+    renderValidatedHeadline({
+      config,
+      headline: item.frame.headline,
+      layout,
+      preset: item.preset,
+    }),
     roundedScreenshot(item.inputPath, layout),
   ]);
   const buffer = await sharp(background)
     .composite([
       {
-        input: foreground,
+        input: frame,
         left: 0,
         top: 0,
       },
@@ -698,6 +831,11 @@ async function composeFrame(item, config, backgroundTemplate) {
         input: screenshot,
         left: layout.screenshot.x,
         top: layout.screenshot.y,
+      },
+      {
+        input: headline,
+        left: 0,
+        top: 0,
       },
     ])
     .png({ adaptiveFiltering: false, compressionLevel: 9 })
@@ -745,6 +883,7 @@ function contactSheetLabelSvg({
 
 async function buildContactSheet(family, composedItems, config) {
   const preview = config.preview;
+  const preset = config.presets[family];
   const columns = Math.min(3, composedItems.length);
   const rows = Math.ceil(composedItems.length / columns);
   const contentWidth =
@@ -766,7 +905,7 @@ async function buildContactSheet(family, composedItems, config) {
   const subtitleSize = Math.round(preview.width * 0.012);
   const base = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${preview.width}" height="${sheetHeight}">
   <rect width="100%" height="100%" fill="${preview.background}"/>
-  <text x="${preview.padding}" y="${preview.padding + titleSize}" fill="${preview.label}" font-family="${escapeXml(config.typography.fontFamily)}" font-size="${titleSize}" font-weight="750">${family === "iphone" ? "iPhone Portrait" : "iPad Landscape"} · Cobalt Focus</text>
+  <text x="${preview.padding}" y="${preview.padding + titleSize}" fill="${preview.label}" font-family="${escapeXml(config.typography.fontFamily)}" font-size="${titleSize}" font-weight="750">${escapeXml(preset.reviewLabel)} · Cobalt Focus</text>
   <text x="${preview.padding}" y="${preview.padding + titleSize + subtitleSize + 16}" fill="${preview.mutedLabel}" font-family="${escapeXml(config.typography.fontFamily)}" font-size="${subtitleSize}" font-weight="500">Six deterministic App Store frames · native UI preserved</text>
 </svg>`);
   const composites = [];
@@ -813,6 +952,8 @@ export async function composeMarketingAssets(rawOptions) {
     deviceFamily: "all",
     layoutConfig: DEFAULT_LAYOUT_CONFIG,
     locale: "en-US",
+    orientation: "all",
+    platform: DEFAULT_PLATFORM,
     previewOnly: false,
     ...rawOptions,
   };
@@ -826,14 +967,6 @@ export async function composeMarketingAssets(rawOptions) {
     resolveProspectiveRealPath(options.outputDir),
   ]);
   assertOutputSeparated(resolvedCaptureRoot, prospectiveOutputDir);
-  const deviceFamilies =
-    options.deviceFamily === "all"
-      ? DEVICE_FAMILIES
-      : [options.deviceFamily];
-  if (!deviceFamilies.every((family) => DEVICE_FAMILIES.includes(family))) {
-    fail("deviceFamily must be one of: all, iphone, ipad");
-  }
-
   const manifestPath =
     options.manifest ?? path.join(options.captureRoot, "manifest.json");
   const layoutConfigPath = path.resolve(options.layoutConfig);
@@ -842,6 +975,8 @@ export async function composeMarketingAssets(rawOptions) {
     readJson(path.resolve(manifestPath), "capture manifest"),
     sha256File(path.resolve(manifestPath)),
   ]);
+  validateLayoutConfig(config);
+  const deviceFamilies = selectDeviceFamilies(config, options);
   const validated = await validateManifest({
     captureRoot: resolvedCaptureRoot,
     config,
@@ -940,6 +1075,16 @@ export async function composeMarketingAssets(rawOptions) {
     layoutId: config.layoutId,
     locale: options.locale,
     mode: options.previewOnly ? "preview-only" : "full-export",
+    platform: options.platform,
+    renderer: {
+      fontFamily: config.typography.fontFamily,
+      fontconfig: sharp.versions.fontconfig,
+      freetype: sharp.versions.freetype,
+      pango: sharp.versions.pango,
+      rsvg: sharp.versions.rsvg,
+      sharp: sharp.versions.sharp,
+      vips: sharp.versions.vips,
+    },
     visualDirection: config.visualDirection,
     source: {
       captureManifest: path.basename(manifestPath),

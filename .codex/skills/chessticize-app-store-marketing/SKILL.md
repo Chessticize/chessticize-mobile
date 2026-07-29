@@ -24,6 +24,9 @@ landscape.
    pnpm app-store:compose-marketing -- \
      --capture-root scratch/store-assets/marketing/<source-commit> \
      --output-dir scratch/store-assets/marketing-composed/<source-commit> \
+     --platform app-store \
+     --device-family all \
+     --orientation all \
      --preview-only
    ```
 
@@ -35,17 +38,21 @@ landscape.
    ```sh
    pnpm app-store:compose-marketing -- \
      --capture-root scratch/store-assets/marketing/<source-commit> \
-     --output-dir scratch/store-assets/marketing-composed/<source-commit>
+     --output-dir scratch/store-assets/marketing-composed/<source-commit> \
+     --platform app-store \
+     --device-family all \
+     --orientation all
    ```
 
 5. Treat `composition-manifest.json` as the export receipt. It records the
    source manifest hash, source commit, layout ID, output dimensions, source
-   hashes, all twelve background-template hashes, final hashes, and
-   contact-sheet hashes.
+   hashes, renderer versions, all twelve background-template hashes, final
+   hashes, and contact-sheet hashes.
 
 Use `--device-family iphone` or `--device-family ipad` only for a focused
-preview. Use `--manifest` for a non-default handoff path and `--layout-config`
-only for an intentionally reviewed layout revision.
+preview. `--platform` and `--orientation` select config-defined presets rather
+than changing renderer code. Use `--manifest` for a non-default handoff path
+and `--layout-config` only for an intentionally reviewed layout revision.
 
 ## Refreshing a Background Board
 
@@ -84,6 +91,9 @@ manual focus, review recurrence, measured progress, and local/open trust.
 - Keep the approved six-frame order and English copy from the capture manifest.
   The selected direction intentionally uses the final headline without a
   secondary marketing paragraph.
+- Keep typography on the validated generic `sans-serif` contract. The
+  compositor measures actual rendered headline pixels and must reject copy
+  outside the configured safe area.
 - Keep generated PNGs and contact sheets under ignored `scratch/` paths unless
   a human explicitly selects sanitized final assets for publication.
 - Before App Store upload, recheck Apple's current accepted dimensions and run

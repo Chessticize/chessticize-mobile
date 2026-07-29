@@ -10,24 +10,22 @@
     "productProof": "immutable-native-capture"
   },
   "palette": {
-    "backgroundStart": "#0B4DD8",
-    "backgroundEnd": "#2563EB",
-    "spotlight": "#93C5FD",
     "headline": "#FFFFFF",
-    "decoration": "#FFFFFF",
     "deviceFrame": "#0F172A",
     "deviceFrameEdge": "#475569",
     "shadow": "#082F7A"
   },
   "typography": {
-    "fontFamily": "-apple-system, BlinkMacSystemFont, Helvetica Neue, Arial, sans-serif",
+    "fontFamily": "sans-serif",
     "fontWeight": 760
   },
   "presets": {
     "iphone": {
+      "platform": "app-store",
       "deviceFamily": "iphone",
       "displayGroup": "6.9-inch",
       "orientation": "portrait",
+      "reviewLabel": "iPhone Portrait",
       "acceptedSourceSizes": [
         {
           "width": 1260,
@@ -125,9 +123,11 @@
       }
     },
     "ipad": {
+      "platform": "app-store",
       "deviceFamily": "ipad",
       "displayGroup": "13-inch",
       "orientation": "landscape",
+      "reviewLabel": "iPad Landscape",
       "acceptedSourceSizes": [
         {
           "width": 2752,
