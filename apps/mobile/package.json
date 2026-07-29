@@ -8,6 +8,7 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
+    "test:native-stockfish": "node scripts/test-stockfish-runner-lifecycle.mjs",
     "typecheck": "tsc --noEmit",
     "doctor:ios": "scripts/ios-doctor.sh",
     "doctor:android": "node scripts/android-doctor.js",

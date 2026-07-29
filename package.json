@@ -31,6 +31,7 @@
     "mobile:ios": "pnpm --filter ChessticizeMobile ios",
     "mobile:lint": "pnpm --filter ChessticizeMobile lint",
     "mobile:test": "pnpm --filter ChessticizeMobile test",
+    "mobile:test:native-stockfish": "pnpm --filter ChessticizeMobile test:native-stockfish",
     "mobile:typecheck": "pnpm --filter ChessticizeMobile typecheck",
     "mobile:storybook": "pnpm --filter ChessticizeMobileLab storybook",
     "landing-page:assets": "node scripts/prepare-landing-page-assets.mjs",
