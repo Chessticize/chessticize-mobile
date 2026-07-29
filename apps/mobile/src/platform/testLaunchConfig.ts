@@ -35,6 +35,14 @@ function areNativeTestControlsEnabled(
   return arePracticeTestControlsEnabled(globals) || nativeModule?.testControlsEnabled === true;
 }
 
+function acceptsDeterministicReleaseCaptureValues(
+  globals: TestLaunchConfigGlobals,
+  launchConfig: NativeTestLaunchConfigValues | undefined
+): boolean {
+  return areNativeTestControlsEnabled(globals, launchConfig)
+    || launchConfig?.storeAssetCapture === true;
+}
+
 export function enableTestControlsFromLaunchConfig(
   globals: TestLaunchConfigGlobals = globalThis,
   nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
@@ -75,7 +83,7 @@ export function resolveTestPuzzleSelectionSeedFromLaunchConfig(
   nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
 ): string | undefined {
   const launchConfig = readNativeTestLaunchConfig(nativeModule);
-  if (!areNativeTestControlsEnabled(globals, launchConfig)) {
+  if (!acceptsDeterministicReleaseCaptureValues(globals, launchConfig)) {
     return undefined;
   }
   const seed = launchConfig?.puzzleSelectionSeed?.trim();
@@ -99,7 +107,7 @@ export function resolveTestStandardTargetCorrectFromLaunchConfig(
   nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
 ): number | undefined {
   const launchConfig = readNativeTestLaunchConfig(nativeModule);
-  if (!areNativeTestControlsEnabled(globals, launchConfig)) {
+  if (!acceptsDeterministicReleaseCaptureValues(globals, launchConfig)) {
     return undefined;
   }
   const rawValue = launchConfig?.standardTargetCorrect;

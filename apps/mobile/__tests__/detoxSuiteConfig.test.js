@@ -6,6 +6,7 @@ const {
   ACTIVE_E2E_TEST_MATCH_BY_SUITE,
   ACTIVE_E2E_TEST_MATCH,
   STORE_ASSETS_TEST_MATCH,
+  HISTORY_PROGRESS_TEST_MATCH,
   ADAPTIVE_LAYOUT_TEST_MATCH,
   ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH,
   ANDROID_LAUNCH_TEST_MATCH,
@@ -1494,6 +1495,12 @@ describe('Detox suite configuration', () => {
   it('keeps the App Store screenshot spec available through its opt-in command', () => {
     expect(resolveDetoxTestMatch({ CHESSTICIZE_CAPTURE_STORE_ASSETS: '1' }))
       .toEqual(STORE_ASSETS_TEST_MATCH);
+  });
+
+  it('keeps the real History Progress screenshot spec behind its opt-in command', () => {
+    expect(resolveDetoxTestMatch({ CHESSTICIZE_CAPTURE_HISTORY_PROGRESS: '1' }))
+      .toEqual(HISTORY_PROGRESS_TEST_MATCH);
+    expect(ACTIVE_E2E_TEST_MATCH).not.toContain(HISTORY_PROGRESS_TEST_MATCH[0]);
   });
 
   it('keeps the adaptive layout screenshot spec available through its opt-in command', () => {
