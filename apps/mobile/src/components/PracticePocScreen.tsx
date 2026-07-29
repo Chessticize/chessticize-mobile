@@ -269,6 +269,7 @@ interface Props {
   runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
   runEloEditingMovedToHome?: boolean;
+  settingsCaptureBottomInset?: number;
   initialTab?: MobileBackPrimaryTab;
   sprintRulesDesignPreview?: SprintRulesDesignPreview;
   sprintStartDelayMs?: number;
@@ -585,6 +586,7 @@ export function PracticePocScreen({
   runManagementEnabled = false,
   runManagementPresentation,
   runEloEditingMovedToHome = false,
+  settingsCaptureBottomInset,
   initialTab = "practice",
   sprintRulesDesignPreview,
   sprintStartDelayMs = ARROW_DUEL_LOADING_TRANSITION_MS,
@@ -4049,6 +4051,7 @@ export function PracticePocScreen({
                 reviewReminderScheduleStatus={reviewReminderScheduleStatus}
                 reviewReminderPreference={reviewReminderPreference}
                 showRatingControls={!ratingEditingMovedToHome}
+                captureBottomInset={settingsCaptureBottomInset}
                 iCloudSyncEnabled={iCloudSyncEnabled}
                 iCloudSyncErrorDetails={effectiveErrorDetails}
                 iCloudSyncStatus={iCloudSyncErrorDetails ? "iCloud sync failed" : iCloudSyncStatus}
@@ -12891,6 +12894,7 @@ function SettingsPanel({
   advancedRatingsOpen,
   adaptiveLayout,
   applicationMetadata,
+  captureBottomInset,
   feedbackIssuesOpener,
   progressProtection,
   onOpenDiagnostics,
@@ -12921,6 +12925,7 @@ function SettingsPanel({
   advancedRatingsOpen: boolean;
   adaptiveLayout: AdaptiveLayout;
   applicationMetadata: MobileApplicationMetadata;
+  captureBottomInset?: number;
   feedbackIssuesOpener: (url: string) => Promise<void>;
   progressProtection: MobilePlatformCapabilities["progressProtection"];
   onOpenDiagnostics?: () => void;
@@ -12954,7 +12959,14 @@ function SettingsPanel({
   const releasePageUrl = applicationMetadata.releasePageUrl;
 
   return (
-    <View style={[styles.settingsPanel, adaptiveLayout.usesWideContent ? styles.settingsPanelWide : null]} testID="settings-panel">
+    <View
+      style={[
+        styles.settingsPanel,
+        adaptiveLayout.usesWideContent ? styles.settingsPanelWide : null,
+        captureBottomInset === undefined ? null : { paddingBottom: captureBottomInset }
+      ]}
+      testID="settings-panel"
+    >
       {progressProtection.kind === "icloud_sync" ? (
         <SettingsSection title="iCloud Sync" testID="settings-sync-section" wide={adaptiveLayout.usesWideContent}>
           <SettingsRow

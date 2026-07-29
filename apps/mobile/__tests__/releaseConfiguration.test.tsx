@@ -16,7 +16,7 @@ type TestGlobal = typeof globalThis & {
 
 const testGlobal = globalThis as TestGlobal;
 
-function renderScreen(): TestRenderer.ReactTestRenderer {
+function renderScreen(settingsCaptureBottomInset?: number): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   act(() => {
     renderer = TestRenderer.create(
@@ -24,6 +24,7 @@ function renderScreen(): TestRenderer.ReactTestRenderer {
         platformCapabilities={createTestMobilePlatformCapabilities({
           practiceServiceFactory: () => createMobilePracticeService("random1000")
         })}
+        settingsCaptureBottomInset={settingsCaptureBottomInset}
       />
     );
   });
@@ -98,6 +99,22 @@ describe("release configuration integration", () => {
       width: 0
     });
     expectNoRenderedTextHasNonPositiveFontSize(renderer);
+  });
+
+  it("adds capture-only Settings scroll room without exposing release QA controls", () => {
+    testGlobal.__DEV__ = false;
+    testGlobal.__CHESSTICIZE_ENABLE_TEST_CONTROLS__ = false;
+    enableTestControlsFromLaunchConfig(testGlobal, { testControlsEnabled: false });
+
+    const renderer = renderScreen(420);
+
+    press(renderer, "settings-tab");
+    const settingsPanel = findAllByTestId(renderer, "settings-panel")[0];
+    expect(settingsPanel).toBeDefined();
+    expect(flattenTestStyle(settingsPanel?.props.style)).toMatchObject({
+      paddingBottom: 420
+    });
+    expect(findAllByTestId(renderer, "settings-stockfish-diagnostics")).toEqual([]);
   });
 
   it("does not suppress LogBox warnings when App loads under a release-like global", () => {

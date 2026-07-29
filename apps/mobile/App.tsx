@@ -91,6 +91,9 @@ function App() {
           puzzleSelectionId={puzzleSelectionId}
           puzzleSelectionSeed={puzzleSelectionSeed}
           runManagementEnabled
+          settingsCaptureBottomInset={marketingCaptureFixture?.frameId === "private-offline-open-source"
+            ? 420
+            : undefined}
           sprintRulesDesignPreview={marketingCaptureFixture?.initialActiveState
             ? { initialActiveState: marketingCaptureFixture.initialActiveState }
             : undefined}
