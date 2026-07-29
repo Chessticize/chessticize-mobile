@@ -263,7 +263,8 @@ check(
   storeAssets.includes("| App name | `Chessticize` |") &&
     storeAssets.includes("| Subtitle | `Build Tactical Intuition` |") &&
     storeAssets.includes("config/app-store-metadata-en-us-v1.json") &&
-    storeAssets.includes("| Support URL | `https://github.com/Chessticize/chessticize-mobile` |") &&
+    storeAssets.includes("| Support URL | `https://chessticize.github.io/chessticize-mobile/support/` |") &&
+    storeAssets.includes("| Marketing URL | `https://chessticize.github.io/chessticize-mobile/` |") &&
     storeAssets.includes("| Privacy policy URL | `https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md` |") &&
     storeAssets.includes("6.9\"") &&
     storeAssets.includes("6.1\""),

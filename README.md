@@ -1,8 +1,43 @@
-# Chessticize Mobile
+<p align="center">
+  <img src="site/assets/app-icon-192.png" width="112" height="112" alt="Chessticize app icon">
+</p>
 
-Chessticize Mobile is an offline-first, open-source iOS and Android training app for Puzzle Sprint and Arrow Duel: timed tactics sprints, per-mode ELO, and spaced-repetition review of mistakes, all computed on device from a bundled puzzle pack.
+<h1 align="center">Chessticize</h1>
 
-The repository contains the React Native app shell (`apps/mobile`), the browser-based Interaction Lab (`apps/mobile-lab`), a pure TypeScript domain core (`packages/core`), storage services (`packages/storage`), a stdio CLI harness (`apps/cli`), and bundled puzzle fixtures (`fixtures/puzzles`).
+<p align="center">
+  <strong>A private, offline-first chess puzzle trainer for iPhone, iPad, and Android.</strong><br>
+  Solve rating-matched puzzle Sprints, compare moves in Arrow Duel, build your own
+  Custom Runs, and bring missed puzzles back through scheduled Review.
+</p>
+
+<p align="center">
+  <a href="https://apps.apple.com/us/app/chessticize/id6788610123">Download on the App Store</a>
+  ·
+  <a href="https://chessticize.github.io/chessticize-mobile/">Visit the website</a>
+  ·
+  <a href="https://chessticize.github.io/chessticize-mobile/android/">Get the Android app</a>
+</p>
+
+![Six Chessticize screens showing Puzzle Sprint, Arrow Duel, Custom Runs, Review, Ratings, and privacy](site/assets/screenshots/contact-sheet.webp)
+
+## For chess players
+
+- **Practice concrete puzzles:** short, rating-matched Puzzle Sprints keep each session focused.
+- **Choose deliberately:** Arrow Duel asks you to compare the best move with a tempting alternative.
+- **Control the next Run:** choose puzzle themes, pace, duration, and difficulty yourself.
+- **Revisit the right puzzles:** missed and unclear puzzles return through scheduled Review.
+- **Keep practice private:** no ads, no Chessticize account, no analytics, and no developer data collection.
+- **Use and inspect it freely:** the app and its bundled Stockfish integration are open source.
+
+Install from the links above, visit the [support page](https://chessticize.github.io/chessticize-mobile/support/),
+or [report a problem or request a feature](https://github.com/Chessticize/chessticize-mobile/issues).
+
+## For contributors
+
+The repository contains the React Native app shell (`apps/mobile`), the
+browser-based Interaction Lab (`apps/mobile-lab`), a pure TypeScript domain
+core (`packages/core`), storage services (`packages/storage`), a stdio CLI
+harness (`apps/cli`), and bundled puzzle fixtures (`fixtures/puzzles`).
 
 ## Documents
 
@@ -12,6 +47,7 @@ The repository contains the React Native app shell (`apps/mobile`), the browser-
 - [App Store Plan](docs/APP_STORE_PLAN.md) — historical first-release foundation plan
 - [App Store Assets](docs/STORE_ASSETS.md) — current App Store metadata and screenshot capture plan
 - [App Store Screenshot Story](docs/marketing/APP_STORE_SCREENSHOT_STORY.md) — canonical six-frame marketing sequence, copy, and fictional-user contract
+- [Landing Page](docs/LANDING_PAGE.md) — public routes, static deployment, marketing images, and install-link updates
 - [Release Notes](docs/RELEASE_NOTES.md) — per-binary customer-facing notes, review, and publication contract
 - [App Store Upload](docs/APP_STORE_UPLOAD.md) — owner-executed archive and App Store Connect upload runbook
 - [TestFlight Diagnostics](docs/TESTFLIGHT_QA.md) — optional post-build device diagnostics and evidence log

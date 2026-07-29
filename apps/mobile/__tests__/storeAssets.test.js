@@ -138,8 +138,12 @@ describe("App Store assets document", () => {
   });
 
   it("points required public URLs at the public repository artifacts", () => {
-    expect(tableValue("Support URL")).toBe("https://github.com/Chessticize/chessticize-mobile");
-    expect(tableValue("Marketing URL")).toBe("https://github.com/Chessticize/chessticize-mobile");
+    expect(tableValue("Support URL")).toBe(
+      "https://chessticize.github.io/chessticize-mobile/support/"
+    );
+    expect(tableValue("Marketing URL")).toBe(
+      "https://chessticize.github.io/chessticize-mobile/"
+    );
     expect(tableValue("Privacy policy URL")).toBe(
       "https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md"
     );
