@@ -40,7 +40,10 @@ import {
   createTestMobilePlatformCapabilities,
   type TestMobilePlatformCapabilityOverrides
 } from "../src/testing/testMobilePlatformCapabilities";
-import { FailingAttemptStore } from "../test-support/FailingAttemptStore";
+import {
+  FailingAppReviewRequestStore,
+  FailingAttemptStore
+} from "../test-support/FailingAttemptStore";
 import { FailingReviewScheduleStore } from "../test-support/FailingReviewScheduleStore";
 import {
   expectNoRenderedTextHasNonPositiveFontSize,
@@ -11405,11 +11408,10 @@ describe("App Store review request scheduling", () => {
   });
 
   it("keeps the result usable when local suppression persistence fails", async () => {
-    const { current, service } = createAppReviewEligibleService();
+    const { current, service } = createAppReviewEligibleService(
+      new FailingAppReviewRequestStore("SQLite unavailable")
+    );
     const appStoreReviewRequestClient = new FakeAppStoreReviewRequestClient();
-    jest.spyOn(service, "recordAppReviewRequestAttempt").mockImplementation(() => {
-      throw new Error("SQLite unavailable");
-    });
     const renderer = renderScreen({
       appStoreReviewRequestClient,
       applicationMetadata: { versionName: "1.4.0" },
@@ -12255,11 +12257,10 @@ function completedRatingSprintState({
   };
 }
 
-function createAppReviewEligibleService(): {
+function createAppReviewEligibleService(store: MemoryStore = new MemoryStore()): {
   current: SprintState;
   service: PracticeService;
 } {
-  const store = new MemoryStore();
   const sessions = [
     completedRatingSprintState({
       id: "app-review-one",

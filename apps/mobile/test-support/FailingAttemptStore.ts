@@ -1,4 +1,7 @@
-import type { AttemptEvent } from "../../../packages/core/src/index.ts";
+import type {
+  AppReviewRequestAttempt,
+  AttemptEvent
+} from "../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../packages/storage/src/memory-store.ts";
 
 /** A reusable store-boundary fake for deterministic attempt persistence failures. */
@@ -11,6 +14,22 @@ export class FailingAttemptStore extends MemoryStore {
   }
 
   override recordAttempt(_attempt: AttemptEvent): void {
+    throw this.failure;
+  }
+}
+
+/** A reusable store-boundary fake for deterministic App Store review state failures. */
+export class FailingAppReviewRequestStore extends MemoryStore {
+  private readonly failure: Error;
+
+  constructor(message: string) {
+    super();
+    this.failure = new Error(message);
+  }
+
+  override saveAppReviewRequestAttempt(
+    _attempt: AppReviewRequestAttempt
+  ): AppReviewRequestAttempt {
     throw this.failure;
   }
 }
