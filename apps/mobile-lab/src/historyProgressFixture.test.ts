@@ -5,9 +5,13 @@ import { historyProgressPresentationFor } from "./historyProgressFixture.ts";
 test("history progress fixture shows model-aligned reliability and speed progress", () => {
   const presentation = historyProgressPresentationFor("history-progress");
   const forks = presentation.strengths.find((strength) => strength.id === "forks");
+  const forkSpeed = presentation.strengths.find(
+    (strength) => strength.id === "forks-speed"
+  );
   const pins = presentation.strengths.find((strength) => strength.id === "pins");
 
   assert.ok(forks);
+  assert.ok(forkSpeed);
   assert.ok(pins);
   assert.equal(presentation.assurance, "provisional");
   assert.equal(presentation.initialSeriesId, "forks");
@@ -15,6 +19,8 @@ test("history progress fixture shows model-aligned reliability and speed progres
   assert.equal(forks.points[0]?.valueLabel, "+16");
   assert.equal(forks.points.at(-1)?.valueLabel, "+3");
   assert.equal(forks.changeLabel, "13 fewer / 100");
+  assert.equal(forkSpeed.kind, "completed_speed");
+  assert.equal(forkSpeed.points.at(-1)?.valueLabel, "1.09×");
   assert.equal(pins.kind, "completed_speed");
   assert.equal(pins.points[0]?.valueLabel, "1.30×");
   assert.equal(pins.points.at(-1)?.valueLabel, "1.06×");
@@ -25,7 +31,7 @@ test("existing populated History clone exposes the approved progress entry", () 
   const presentation = historyProgressPresentationFor("history-populated");
 
   assert.equal(presentation.initialSeriesId, "forks");
-  assert.equal(presentation.strengths.length, 2);
+  assert.equal(presentation.strengths.length, 3);
 });
 
 test("history solve-rate weakness fixture mirrors the model effect", () => {

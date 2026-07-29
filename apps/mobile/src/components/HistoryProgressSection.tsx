@@ -58,6 +58,17 @@ export function HistoryProgressScreen({
   const selectedSeries =
     presentation.strengths.find((series) => series.id === selectedSeriesId)
     ?? presentation.strengths[0];
+  const selectedThemeSeries = selectedSeries
+    ? presentation.strengths.filter(
+        (series) => series.themeId === selectedSeries.themeId
+      )
+    : [];
+  const themeOptions = presentation.strengths.filter(
+    (series, index, strengths) =>
+      strengths.findIndex(
+        (candidate) => candidate.themeId === series.themeId
+      ) === index
+  );
 
   return (
     <View style={styles.screen} testID="history-progress-screen">
@@ -101,7 +112,11 @@ export function HistoryProgressScreen({
           </View>
           {selectedSeries ? (
             <View style={styles.progressBadges}>
-              <ModelSignalPill kind={selectedSeries.kind} />
+              <ProgressMetricSelector
+                onSelect={setSelectedSeriesId}
+                selectedSeriesId={selectedSeries.id}
+                series={selectedThemeSeries}
+              />
               <View
                 accessibilityLabel={selectedSeries.changeLabel}
                 style={[
@@ -136,8 +151,8 @@ export function HistoryProgressScreen({
           testID="history-strength-selector"
         >
           <View style={styles.selectorRow}>
-            {presentation.strengths.map((series) => {
-              const selected = series.id === selectedSeries?.id;
+            {themeOptions.map((series) => {
+              const selected = series.themeId === selectedSeries?.themeId;
               return (
                 <Pressable
                   accessibilityLabel={`Show ${series.label} progress`}
@@ -190,11 +205,36 @@ export function HistoryProgressScreen({
       ) : (
         <View
           accessibilityLabel={`${presentation.noWeaknessTitle}. ${presentation.noWeaknessLabel}`}
-          style={styles.noWeaknessCard}
+          style={[
+            styles.noWeaknessCard,
+            presentation.noWeaknessTone === "balanced"
+              ? styles.noWeaknessCardBalanced
+              : null
+          ]}
           testID="history-no-clear-weakness"
         >
-          <View style={styles.noWeaknessIcon}>
-            <Text style={styles.noWeaknessIconText}>—</Text>
+          <View
+            accessibilityElementsHidden
+            style={[
+              styles.noWeaknessIcon,
+              presentation.noWeaknessTone === "balanced"
+                ? styles.noWeaknessIconBalanced
+                : null
+            ]}
+            testID={presentation.noWeaknessTone === "balanced"
+              ? "history-balanced-check"
+              : "history-collecting-icon"}
+          >
+            <Text
+              style={[
+                styles.noWeaknessIconText,
+                presentation.noWeaknessTone === "balanced"
+                  ? styles.noWeaknessIconTextBalanced
+                  : null
+              ]}
+            >
+              {presentation.noWeaknessTone === "balanced" ? "✓" : "—"}
+            </Text>
           </View>
           <View style={styles.noWeaknessCopy}>
             <Text style={styles.noWeaknessTitle}>
@@ -206,6 +246,55 @@ export function HistoryProgressScreen({
           </View>
         </View>
       )}
+    </View>
+  );
+}
+
+function ProgressMetricSelector({
+  onSelect,
+  selectedSeriesId,
+  series
+}: {
+  onSelect: (seriesId: string) => void;
+  selectedSeriesId: string;
+  series: readonly HistoryStrengthSeries[];
+}): React.JSX.Element {
+  if (series.length === 1) {
+    return <ModelSignalPill kind={series[0]!.kind} />;
+  }
+  return (
+    <View
+      accessibilityLabel="Progress metric"
+      style={styles.progressMetricSelector}
+      testID="history-progress-metric-selector"
+    >
+      {series.map((candidate) => {
+        const selected = candidate.id === selectedSeriesId;
+        return (
+          <Pressable
+            accessibilityLabel={`Show ${modelSignalLabel(candidate.kind)} progress`}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            key={candidate.id}
+            onPress={() => onSelect(candidate.id)}
+            style={[
+              styles.signalPill,
+              selected ? null : styles.signalPillUnselected
+            ]}
+            testID={`history-progress-metric-${candidate.kind}`}
+          >
+            <Text
+              numberOfLines={2}
+              style={[
+                styles.signalPillText,
+                selected ? null : styles.signalPillTextUnselected
+              ]}
+            >
+              {modelSignalLabel(candidate.kind)}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -487,6 +576,10 @@ const styles = StyleSheet.create({
     gap: 6,
     maxWidth: 142
   },
+  progressMetricSelector: {
+    alignItems: "flex-end",
+    gap: 5
+  },
   signalPill: {
     alignItems: "center",
     backgroundColor: "#EFF6FF",
@@ -496,6 +589,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 9,
     paddingVertical: 5
+  },
+  signalPillUnselected: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1"
   },
   signalPillWeakness: {
     backgroundColor: "#FEF3C7",
@@ -508,6 +605,9 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     lineHeight: 13,
     textAlign: "center"
+  },
+  signalPillTextUnselected: {
+    color: "#64748B"
   },
   signalPillTextWeakness: {
     color: "#92400E"
@@ -741,6 +841,10 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16
   },
+  noWeaknessCardBalanced: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#A7F3D0"
+  },
   noWeaknessIcon: {
     alignItems: "center",
     backgroundColor: "#E2E8F0",
@@ -749,10 +853,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 32
   },
+  noWeaknessIconBalanced: {
+    backgroundColor: "#D1FAE5"
+  },
   noWeaknessIconText: {
     color: "#64748B",
     fontSize: 18,
     fontWeight: "800"
+  },
+  noWeaknessIconTextBalanced: {
+    color: "#047857"
   },
   noWeaknessCopy: {
     flex: 1,

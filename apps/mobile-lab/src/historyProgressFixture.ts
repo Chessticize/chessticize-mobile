@@ -12,6 +12,7 @@ export type HistoryProgressScenarioId =
 
 const FORK_RELIABILITY_PROGRESS: HistoryStrengthSeries = {
   id: "forks",
+  themeId: "forks",
   label: "Forks",
   kind: "solve_rate",
   metricLabel:
@@ -32,8 +33,32 @@ const FORK_RELIABILITY_PROGRESS: HistoryStrengthSeries = {
   ]
 };
 
+const FORK_SPEED_PROGRESS: HistoryStrengthSeries = {
+  id: "forks-speed",
+  themeId: "forks",
+  label: "Forks",
+  kind: "completed_speed",
+  metricLabel:
+    "Completed time above matched expectation · lower is better",
+  baselineLabel: "1.00× = matched completed-puzzle time",
+  scaleMax: 24,
+  changeLabel: "9% less overhead",
+  changeTone: "improved",
+  summary:
+    "Reliable, correctly completed Fork puzzles now take about 1.09× the matched expectation, compared with 1.18× at the first visible point. Wrong moves and timeouts stay in solve reliability instead of this speed estimate.",
+  points: [
+    { label: "May 24", value: 18, valueLabel: "1.18×", sampleSize: 18 },
+    { label: "Jun 7", value: 17, valueLabel: "1.17×", sampleSize: 25 },
+    { label: "Jun 21", value: 15, valueLabel: "1.15×", sampleSize: 33 },
+    { label: "Jul 5", value: 13, valueLabel: "1.13×", sampleSize: 42 },
+    { label: "Jul 19", value: 11, valueLabel: "1.11×", sampleSize: 50 },
+    { label: "Jul 26", value: 9, valueLabel: "1.09×", sampleSize: 57 }
+  ]
+};
+
 const PIN_SPEED_PROGRESS: HistoryStrengthSeries = {
   id: "pins",
+  themeId: "pins",
   label: "Pins",
   kind: "completed_speed",
   metricLabel:
@@ -56,6 +81,7 @@ const PIN_SPEED_PROGRESS: HistoryStrengthSeries = {
 
 const SKEWER_RELIABILITY_WEAKNESS: HistoryStrengthSeries = {
   id: "skewers",
+  themeId: "skewers",
   label: "Skewers",
   kind: "solve_rate",
   metricLabel:
@@ -78,6 +104,7 @@ const SKEWER_RELIABILITY_WEAKNESS: HistoryStrengthSeries = {
 
 const PIN_SPEED_WEAKNESS: HistoryStrengthSeries = {
   id: "pins",
+  themeId: "pins",
   label: "Pins",
   kind: "completed_speed",
   metricLabel:
@@ -106,6 +133,7 @@ const BASE_PRESENTATION: Omit<
   periodLabel: "Last 8 weeks",
   sampleLabel: "ordinary mixed Runs",
   sampleUnitLabel: "eligible puzzles",
+  noWeaknessTone: "balanced",
   noWeaknessTitle: "Recent play looks balanced",
   noWeaknessLabel:
     "No theme currently shows a repeated, meaningful weakness in solve reliability or completed-puzzle speed."
@@ -127,7 +155,11 @@ export function historyProgressPresentationFor(
     return {
       ...BASE_PRESENTATION,
       initialSeriesId: "forks",
-      strengths: [FORK_RELIABILITY_PROGRESS, PIN_SPEED_PROGRESS]
+      strengths: [
+        FORK_RELIABILITY_PROGRESS,
+        FORK_SPEED_PROGRESS,
+        PIN_SPEED_PROGRESS
+      ]
     };
   }
   if (scenarioId === "history-progress-speed-weakness") {

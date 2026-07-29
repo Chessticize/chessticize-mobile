@@ -40,17 +40,18 @@ export function historyProgressPresentationFromModel(
     isWellSampled(estimate, progress)
   );
   const strengths = observed
-    .slice(0, MAX_VISIBLE_PROGRESS_SERIES)
     .flatMap((estimate) => {
       const signal = currentSignals.get(signalId(estimate));
-      const kind = seriesKind(signal, estimate);
-      const series = strengthSeries(
-        estimate,
-        kind,
-        progress.snapshots
-      );
-      return series ? [series] : [];
-    });
+      return seriesKinds(signal, estimate).flatMap((kind) => {
+        const series = strengthSeries(
+          estimate,
+          kind,
+          progress.snapshots
+        );
+        return series ? [series] : [];
+      });
+    })
+    .slice(0, MAX_VISIBLE_PROGRESS_SERIES);
   const weaknessSignal = progress.evaluation.signals
     .filter((signal) => signal.status === "recommended")
     .sort(compareWeaknessSignals)[0];
@@ -75,11 +76,13 @@ export function historyProgressPresentationFromModel(
     ...(weakness === undefined ? {} : { weakness }),
     ...(progress.phase === "balanced"
       ? {
+          noWeaknessTone: "balanced",
           noWeaknessTitle: "Recent play looks balanced",
           noWeaknessLabel:
             "No theme currently shows a repeated, meaningful weakness in solve reliability or completed-puzzle speed."
         }
       : {
+          noWeaknessTone: "collecting",
           noWeaknessTitle: "Still collecting evidence",
           noWeaknessLabel:
             "Play more ordinary mixed Runs to build reliable stats across different puzzles and sessions."
@@ -116,6 +119,7 @@ function strengthSeries(
 
   return {
     id: `${signalId(current)}:${kind}`,
+    themeId: signalId(current),
     label,
     kind,
     metricLabel: kind === "completed_speed"
@@ -243,7 +247,26 @@ function relativeComparisonLabel(
   return `${humanizeTheme(signal.theme)} stands out ${modelContext}. It is the highest-confidence current weakness signal among the well-sampled themes, each measured against its own matched expectation.`;
 }
 
-function seriesKind(
+function seriesKinds(
+  signal: TacticalProfileModelSignal | undefined,
+  estimate: TacticalProfileThemeEstimate
+): readonly Exclude<TacticalFocusReason, "both">[] {
+  const preferred = preferredSeriesKind(signal, estimate);
+  const other: Exclude<TacticalFocusReason, "both"> = preferred === "solve_rate"
+    ? "completed_speed"
+    : "solve_rate";
+  const candidates: Exclude<TacticalFocusReason, "both">[] = [
+    preferred,
+    other
+  ];
+  return candidates.filter((kind) =>
+    kind === "solve_rate"
+      ? estimate.solveEvidenceWeight > 0
+      : estimate.speedEvidenceWeight > 0
+  );
+}
+
+function preferredSeriesKind(
   signal: TacticalProfileModelSignal | undefined,
   estimate: TacticalProfileThemeEstimate
 ): Exclude<TacticalFocusReason, "both"> {

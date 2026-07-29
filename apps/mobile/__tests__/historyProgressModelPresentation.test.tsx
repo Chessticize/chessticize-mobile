@@ -36,18 +36,27 @@ test("builds visible model reliability progress for a well-sampled balanced them
   });
 
   const presentation = historyProgressPresentationFromModel(progress);
-  const series = presentation?.strengths[0];
+  const reliabilitySeries = presentation?.strengths[0];
+  const speedSeries = presentation?.strengths[1];
 
   expect(presentation?.weakness).toBeUndefined();
   expect(presentation?.sampleUnitLabel).toBe("model-weighted observations");
+  expect(presentation?.noWeaknessTone).toBe("balanced");
   expect(presentation?.noWeaknessLabel).toBe(
     "No theme currently shows a repeated, meaningful weakness in solve reliability or completed-puzzle speed."
   );
-  expect(series?.label).toBe("Fork · Puzzle solving");
-  expect(series?.kind).toBe("solve_rate");
-  expect(series?.changeLabel).toBe("8 fewer / 100");
-  expect(series?.points.map((point) => point.sampleSize)).toEqual([8, 14]);
-  expect(series?.points.map((point) => point.valueLabel)).toEqual(["+12", "+4"]);
+  expect(presentation?.strengths.map((series) => series.kind)).toEqual([
+    "solve_rate",
+    "completed_speed"
+  ]);
+  expect(reliabilitySeries?.themeId).toBe("line:fork");
+  expect(reliabilitySeries?.label).toBe("Fork · Puzzle solving");
+  expect(reliabilitySeries?.kind).toBe("solve_rate");
+  expect(reliabilitySeries?.changeLabel).toBe("8 fewer / 100");
+  expect(reliabilitySeries?.points.map((point) => point.sampleSize)).toEqual([8, 14]);
+  expect(reliabilitySeries?.points.map((point) => point.valueLabel)).toEqual(["+12", "+4"]);
+  expect(speedSeries?.themeId).toBe("line:fork");
+  expect(speedSeries?.kind).toBe("completed_speed");
 });
 
 test("keeps observed balanced stats visible before recommendation diversity is complete", () => {
@@ -65,7 +74,7 @@ test("keeps observed balanced stats visible before recommendation diversity is c
   const presentation = historyProgressPresentationFromModel(progress);
 
   expect(presentation?.initialSeriesId).toBe("line:fork:solve_rate");
-  expect(presentation?.strengths).toHaveLength(1);
+  expect(presentation?.strengths).toHaveLength(2);
   expect(presentation?.strengths[0]?.label).toBe("Fork · Puzzle solving");
 });
 

@@ -2666,8 +2666,16 @@ describe("PracticePocScreen", () => {
     );
     const balanced = findByTestId(renderer, "history-no-clear-weakness");
     expect(collectText(balanced)).toContain("Recent play looks balanced");
+    expect(collectText(findByTestId(renderer, "history-balanced-check"))).toBe("✓");
     expect(collectText(balanced)).toContain(
       "No theme currently shows a repeated, meaningful weakness in solve reliability or completed-puzzle speed."
+    );
+    const metricSelector = findByTestId(renderer, "history-progress-metric-selector");
+    expect(collectText(metricSelector)).toContain("Solve reliability");
+    expect(collectText(metricSelector)).toContain("Completed-puzzle speed");
+    press(renderer, "history-progress-metric-completed_speed");
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "1.09×"
     );
 
     press(renderer, "history-progress-strength-pins");
