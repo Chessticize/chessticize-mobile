@@ -1,0 +1,4 @@
+interface:
+  display_name: "Chessticize App Store Marketing"
+  short_description: "Compose deterministic App Store screenshot assets"
+  default_prompt: "Use $chessticize-app-store-marketing to compose approved raw captures into App Store-ready screenshots."
