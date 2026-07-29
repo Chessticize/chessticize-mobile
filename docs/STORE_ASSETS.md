@@ -64,19 +64,24 @@ Chessticize Mobile is free and open source.
 The app targets iPhone and iPad for 1.3. The current automated capture plan
 covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
 The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
-Apple's current screenshot reference, rechecked on 2026-07-10, lists 6.9" as
+Apple's current screenshot reference, rechecked on 2026-07-28, lists 6.9" as
 the required iPhone display group when the app runs on iPhone, with accepted
 portrait sizes `1260 x 2736`, `1290 x 2796`, and `1320 x 2868` pixels. The
 current 6.1" group accepts portrait sizes including `1170 x 2532`,
 `1125 x 2436`, and `1080 x 2340` pixels. Because the app runs on iPad, also
-capture a 13" iPad set; the accepted portrait sizes include `2064 x 2752` and
-`2048 x 2732` pixels.
+capture a 13" iPad set. The maintained release-QA set uses accepted portrait
+sizes including `2064 x 2752` and `2048 x 2732` pixels. The six-frame marketing
+set defined in
+[`docs/marketing/APP_STORE_SCREENSHOT_STORY.md`](marketing/APP_STORE_SCREENSHOT_STORY.md)
+is landscape-first on iPad, using accepted sizes `2752 x 2064` or
+`2732 x 2048` pixels.
 
 Release rule:
 
 1. Capture or export a complete 6.9" iPhone set first.
 2. Capture or export a 6.1" iPhone set as the compact verification set.
-3. Capture or export a 13" iPad set because Chessticize ships as an iPad app.
+3. Capture or export a 13" iPad set because Chessticize ships as an iPad app;
+   use native landscape captures for the six-frame marketing set.
 4. If App Store Connect accepts scaled screenshots for intermediate iPhone
    groups, rely on Apple's scaling only after confirming the uploaded 6.9" and
    6.1" assets preview correctly.
@@ -261,9 +266,11 @@ inspection.
 
 ## Capture Checklist
 
-- Use portrait orientation for the required App Store scene set audited here.
+- Use portrait orientation for the maintained fifteen-scene release-QA set
+  audited here. This does not override the six-frame marketing contract.
 - Keep native iPhone QA in portrait. Capture the maintained landscape journey
-  on iPad before release sign-off.
+  on iPad before release sign-off, and use native iPad landscape captures as
+  the primary six-frame marketing set.
 - Keep compact wide-short, live-resize, and foldable-sized component or
   Interaction Lab evidence even though ordinary iPhones do not rotate.
 - Use the clean release palette and current app icon.

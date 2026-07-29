@@ -25,6 +25,28 @@ core product loop without relying on the App Store description: solve,
 recognize the tempting alternative, then choose the themes, pace, and
 difficulty you want to practice.
 
+## Device and Orientation Contract
+
+The same six-frame story ships for both device families, with layouts composed
+for the device rather than mechanically reused:
+
+- iPhone uses a 6.9-inch portrait presentation as its primary marketing set.
+- iPad uses a 13-inch landscape presentation as its primary marketing set.
+- Every iPad raw capture must be taken while the real app is rendering its
+  native responsive landscape layout. Do not rotate or crop a portrait capture,
+  stretch it, or place a portrait phone-shaped UI inside a landscape canvas.
+- Preserve the product's actual landscape information hierarchy, safe areas,
+  board geometry, side panels, and visible controls. Composition may crop or
+  position the raw image but may not invent a different app layout.
+- The raw-capture manifest records device family, display group, orientation,
+  pixel dimensions, source commit, and capture ID for every image.
+
+Apple's screenshot specification, rechecked on 2026-07-28, accepts
+`2752 x 2064` and `2732 x 2048` landscape images for the required 13-inch iPad
+group. Issue #417 must recheck the
+[live Apple specification](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications)
+before upload.
+
 ## Fictional User
 
 All six frames represent one fictional, unnamed user. No real account,
@@ -119,14 +141,18 @@ Issue #411 should:
 3. keep active-session snapshots from mutating the shared persisted story;
 4. fail if a prohibited state is visible;
 5. emit one raw full-resolution image per `captureId`, plus a manifest that
-   preserves `order`, `copyKey`, locale, device family, source commit, and
-   puzzle-pack identity; and
-6. leave the existing negative-path and fifteen-scene QA suites unchanged.
+   preserves `order`, `copyKey`, locale, device family, display group,
+   orientation, pixel dimensions, source commit, and puzzle-pack identity;
+6. capture the iPhone set in portrait and the iPad set in the real native
+   landscape layout; and
+7. leave the existing negative-path and fifteen-scene QA suites unchanged.
 
 Issue #412 should treat each headline and supporting line as final input, not
 copy embedded in the raw capture. It may crop and position the product UI but
 must not hide a material product disclosure, cover the board or candidate
-arrows, or manufacture a state that the submitted build cannot render.
+arrows, or manufacture a state that the submitted build cannot render. Its
+iPad templates are landscape-first and must not embed a portrait capture as
+the main product proof.
 
 ## Review Checklist
 
@@ -140,4 +166,5 @@ arrows, or manufacture a state that the submitted build cannot render.
 - No real personal data, QA-only controls, debug UI, or stale version details
   appear.
 - All visible product states are reachable in the current production UI.
+- The iPad set uses the real 13-inch landscape layout for all six frames.
 - Marketing generation remains separate from release QA.

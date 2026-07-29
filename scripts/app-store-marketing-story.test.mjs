@@ -30,6 +30,22 @@ test("App Store marketing story defines the canonical six-frame order and copy",
   assert.equal(story.schemaVersion, 1);
   assert.equal(story.issue, 410);
   assert.equal(story.locale, "en-US");
+  assert.deepEqual(story.deviceTargets, {
+    iphone: {
+      displayGroup: "6.9-inch",
+      primaryOrientation: "portrait",
+      captureLayout: "native-responsive"
+    },
+    ipad: {
+      displayGroup: "13-inch",
+      primaryOrientation: "landscape",
+      captureLayout: "native-responsive-landscape",
+      acceptedExportSizes: [
+        { width: 2752, height: 2064 },
+        { width: 2732, height: 2048 }
+      ]
+    }
+  });
   assert.deepEqual(
     story.frames.map((frame) => frame.order),
     [1, 2, 3, 4, 5, 6]

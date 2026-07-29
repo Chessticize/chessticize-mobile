@@ -12,6 +12,28 @@
     "headlineCharacters": 36,
     "supportingCharacters": 90
   },
+  "deviceTargets": {
+    "iphone": {
+      "displayGroup": "6.9-inch",
+      "primaryOrientation": "portrait",
+      "captureLayout": "native-responsive"
+    },
+    "ipad": {
+      "displayGroup": "13-inch",
+      "primaryOrientation": "landscape",
+      "captureLayout": "native-responsive-landscape",
+      "acceptedExportSizes": [
+        {
+          "width": 2752,
+          "height": 2064
+        },
+        {
+          "width": 2732,
+          "height": 2048
+        }
+      ]
+    }
+  },
   "sourceBuild": {
     "kind": "release-like",
     "puzzlePack": {
