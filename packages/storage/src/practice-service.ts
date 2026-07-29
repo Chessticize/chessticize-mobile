@@ -64,7 +64,10 @@ import type {
   ReviewReminderPreference
 } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
-import { reconcileRatingWithSprintSessions } from "./rating-history.ts";
+import {
+  indexSprintSessionsByRatingKey,
+  reconcileRatingWithSprintSessions
+} from "./rating-history.ts";
 import {
   TacticalProfileService,
   type FocusedRunPreflightResult,
@@ -913,11 +916,14 @@ export class PracticeService {
   }
 
   private reconcilePersistedRatings(): number {
-    const sprintSessions = this.store.listSprintSessions();
+    const sprintSessionsByRatingKey = indexSprintSessionsByRatingKey(this.store.listSprintSessions());
     let repaired = 0;
     this.store.transaction(() => {
       for (const rating of this.store.listRatings()) {
-        const next = reconcileRatingWithSprintSessions(rating, sprintSessions);
+        const next = reconcileRatingWithSprintSessions(
+          rating,
+          sprintSessionsByRatingKey.get(rating.key) ?? []
+        );
         if (!sameRatingRecord(rating, next)) {
           this.store.saveRating(next);
           repaired += 1;

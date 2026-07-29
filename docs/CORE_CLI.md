@@ -55,6 +55,18 @@ date promotion remain user-store state.
 
 Sprint ratings use the same server-compatible Glicko-2 shape as `chessticize-server`: a new rating bucket starts at 600 with rating deviation 350 and volatility 0.06, and ratings are floored at 600. A completed sprint is one rated game against a system opponent at the user's current rating. Winning the first sprint from a fresh 600 bucket moves the rating to about 775, so cold-start calibration is intentionally much faster than a fixed-K Elo update. Failing at the floor keeps the rating at 600 while still reducing rating deviation.
 
+Cross-device sync deduplicates completed sprint sessions by ID and replays their
+won/failed outcomes in completion order from the normal or reset 600-point
+generation anchor. It must not add rating deltas that separate devices already
+calculated against different rating deviations. Opening the practice service or
+importing a merged snapshot automatically repairs an inflated stored rating
+when the retained completed-session history provides that anchor. If history
+was cleared and no completed sessions remain, the isolated rating is preserved
+because there is not enough evidence for a safe automatic correction.
+New sessions also retain their starting game count, rating deviation, and
+volatility in existing session configuration metadata so manually anchored ELO
+generations can be replayed without a database-schema migration.
+
 ## Replay, Review, And History Semantics
 
 The product uses two distinct terms:

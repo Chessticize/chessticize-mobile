@@ -487,6 +487,9 @@ export class MemoryStore implements PracticeStore {
         currentPuzzleIndex: next.correctCount + next.mistakeCount,
         puzzles: existing?.puzzles ?? [],
         ratingBefore: next.ratingBefore,
+        ...(next.ratingGamesBefore === undefined ? {} : { ratingGamesBefore: next.ratingGamesBefore }),
+        ...(next.ratingDeviationBefore === undefined ? {} : { ratingDeviationBefore: next.ratingDeviationBefore }),
+        ...(next.volatilityBefore === undefined ? {} : { volatilityBefore: next.volatilityBefore }),
         ...(next.ratingAfter === undefined ? {} : { ratingAfter: next.ratingAfter })
       });
       observer?.onSprintSessionChanged(previous, next);
@@ -892,6 +895,9 @@ function exportedSprintSessionFromState(session: SprintState): ExportedSprintSes
     correctCount: session.correctCount,
     mistakeCount: session.mistakeCount,
     ratingBefore: session.ratingBefore,
+    ...(session.ratingGamesBefore === undefined ? {} : { ratingGamesBefore: session.ratingGamesBefore }),
+    ...(session.ratingDeviationBefore === undefined ? {} : { ratingDeviationBefore: session.ratingDeviationBefore }),
+    ...(session.volatilityBefore === undefined ? {} : { volatilityBefore: session.volatilityBefore }),
     ...(session.ratingAfter === undefined ? {} : { ratingAfter: session.ratingAfter }),
     ...(session.run === undefined ? {} : { run: { ...session.run } }),
     config: {

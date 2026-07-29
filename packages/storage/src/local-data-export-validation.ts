@@ -152,8 +152,21 @@ function isExportedSprintSession(
     isNonNegativeInteger(value.mistakeCount) &&
     isFiniteNumber(value.ratingBefore) &&
     isOptional(value.ratingAfter, isFiniteNumber) &&
+    isOptionalRatingReplayAnchor(value) &&
     isOptional(value.run, isPracticeRunSnapshot) &&
     isOptional(value.config, isStoredSprintSessionConfig);
+}
+
+function isOptionalRatingReplayAnchor(value: Record<string, unknown>): boolean {
+  const anchor = [
+    value.ratingGamesBefore,
+    value.ratingDeviationBefore,
+    value.volatilityBefore
+  ];
+  if (anchor.every((field) => field === undefined)) return true;
+  return isNonNegativeInteger(value.ratingGamesBefore) &&
+    isPositiveFiniteNumber(value.ratingDeviationBefore) &&
+    isPositiveFiniteNumber(value.volatilityBefore);
 }
 
 function isPracticeRunSnapshot(value: unknown): boolean {

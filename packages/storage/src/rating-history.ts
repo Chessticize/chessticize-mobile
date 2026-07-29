@@ -1,5 +1,7 @@
 import {
+  calculateSprintRatingChange,
   DEFAULT_RATING_DEVIATION,
+  DEFAULT_VOLATILITY,
   isAttemptMistake,
   normalizeRatingRecord,
   RATING_FLOOR
@@ -7,6 +9,7 @@ import {
 import type { RatingRecord } from "../../core/src/index.ts";
 import type { AttemptHistoryRow } from "./query-types.ts";
 import type { ExportedSprintSession } from "./practice-store.ts";
+import { preferredSprintSession } from "./sprint-session-sync.ts";
 
 export interface PracticeProgressSummary {
   correctThisWeek: number;
@@ -14,6 +17,21 @@ export interface PracticeProgressSummary {
   ratingDeltaThisWeek: number | null;
   wrongThisWeek: number;
   netThisWeek: number;
+}
+
+export function indexSprintSessionsByRatingKey(
+  sprintSessions: ExportedSprintSession[]
+): ReadonlyMap<string, ExportedSprintSession[]> {
+  const indexed = new Map<string, ExportedSprintSession[]>();
+  for (const session of sprintSessions) {
+    const sessions = indexed.get(session.ratingKey);
+    if (sessions) {
+      sessions.push(session);
+    } else {
+      indexed.set(session.ratingKey, [session]);
+    }
+  }
+  return indexed;
 }
 
 export function buildPracticeProgressSummary(
@@ -95,7 +113,10 @@ export function mergeRatingWithSprintSessions(
   }
   for (const session of currentGenerationSessions(normalizedIncoming, incomingSessions)) {
     const previous = sessions.get(session.id);
-    sessions.set(session.id, previous ? preferredSession(previous, session) : { ...session });
+    sessions.set(
+      session.id,
+      previous ? preferredSprintSession(previous, session) : { ...session }
+    );
   }
 
   return rebuildRatingFromSessions(
@@ -106,7 +127,8 @@ export function mergeRatingWithSprintSessions(
         normalizedIncoming.ratingDeviation ?? DEFAULT_RATING_DEVIATION
       )
     },
-    [...sessions.values()]
+    [...sessions.values()],
+    "merged"
   );
 }
 
@@ -115,8 +137,12 @@ export function assignLegacyRatingGenerations(
   sprintSessions: ExportedSprintSession[]
 ): ExportedSprintSession[] {
   const assigned = new Map(sprintSessions.map((session) => [session.id, { ...session }]));
+  const sessionsByRatingKey = indexSprintSessionsByRatingKey([...assigned.values()]);
   for (const rating of ratings) {
-    for (const session of currentGenerationSessions(normalizeRatingRecord(rating), [...assigned.values()])) {
+    for (const session of currentGenerationSessions(
+      normalizeRatingRecord(rating),
+      sessionsByRatingKey.get(rating.key) ?? []
+    )) {
       if (session.ratingGeneration === undefined) {
         assigned.set(session.id, {
           ...session,
@@ -200,21 +226,122 @@ function ratingReconstructionError(
 
 function rebuildRatingFromSessions(
   base: RatingRecord,
-  sprintSessions: ExportedSprintSession[]
+  sprintSessions: ExportedSprintSession[],
+  coverageMode: "exact" | "merged" = "exact"
 ): RatingRecord {
   if (sprintSessions.length === 0) {
     return base;
   }
   const ordered = [...sprintSessions].sort(compareSessionsOldestFirst);
-  const initialRating = ordered[0]!.ratingBefore;
-  const delta = ordered.reduce(
-    (total, session) => total + (session.ratingAfter as number) - session.ratingBefore,
-    0
-  );
+  const replayAnchor = ratingReplayAnchor(ordered[0]!);
+  if (replayAnchor) {
+    const replayedGames = replayAnchor.games + ordered.length;
+    const hasSufficientCoverage = coverageMode === "merged"
+      ? replayedGames >= base.games
+      : replayedGames === base.games;
+    return hasSufficientCoverage
+      ? replayRatingFromAnchor(base, ordered, replayAnchor)
+      : base;
+  }
+  return base;
+}
+
+function ratingReplayAnchor(
+  firstSession: ExportedSprintSession
+): {
+  games: number;
+  rating: number;
+  ratingDeviation: number;
+  volatility: number;
+} | undefined {
+  const hasReplayAnchor =
+    firstSession.ratingGamesBefore !== undefined ||
+    firstSession.ratingDeviationBefore !== undefined ||
+    firstSession.volatilityBefore !== undefined;
+  if (hasReplayAnchor) {
+    if (
+      !isNonNegativeInteger(firstSession.ratingGamesBefore) ||
+      !isPositiveFiniteNumber(firstSession.ratingDeviationBefore) ||
+      !isPositiveFiniteNumber(firstSession.volatilityBefore)
+    ) {
+      return undefined;
+    }
+    const anchor = {
+      games: firstSession.ratingGamesBefore,
+      rating: firstSession.ratingBefore,
+      ratingDeviation: firstSession.ratingDeviationBefore,
+      volatility: firstSession.volatilityBefore
+    };
+    return sessionMatchesReplayAnchor(firstSession, anchor) ? anchor : undefined;
+  }
+  if (firstSession.ratingBefore !== RATING_FLOOR) {
+    return undefined;
+  }
+  const anchor = {
+    games: 0,
+    rating: RATING_FLOOR,
+    ratingDeviation: DEFAULT_RATING_DEVIATION,
+    volatility: DEFAULT_VOLATILITY
+  };
+  return sessionMatchesReplayAnchor(firstSession, anchor) ? anchor : undefined;
+}
+
+function sessionMatchesReplayAnchor(
+  session: ExportedSprintSession,
+  anchor: {
+    games: number;
+    rating: number;
+    ratingDeviation: number;
+    volatility: number;
+  }
+): boolean {
+  const recordedChange = calculateSprintRatingChange({
+    rating: anchor,
+    won: session.status === "won"
+  });
+  return recordedChange.ratingAfter === session.ratingAfter;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function isPositiveFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function replayRatingFromAnchor(
+  base: RatingRecord,
+  sprintSessions: ExportedSprintSession[],
+  anchor: {
+    games: number;
+    rating: number;
+    ratingDeviation: number;
+    volatility: number;
+  }
+): RatingRecord {
+  let { games, rating, ratingDeviation, volatility } = anchor;
+  for (const session of sprintSessions) {
+    const change = calculateSprintRatingChange({
+      rating: {
+        rating,
+        ratingDeviation,
+        volatility,
+        games
+      },
+      won: session.status === "won"
+    });
+    rating = change.ratingAfter;
+    ratingDeviation = change.ratingDeviationAfter;
+    volatility = change.volatilityAfter;
+    games += 1;
+  }
   return {
     ...base,
-    rating: Math.max(RATING_FLOOR, initialRating + delta),
-    games: ordered.length
+    rating,
+    ratingDeviation,
+    volatility,
+    games
   };
 }
 
@@ -224,17 +351,6 @@ function compareSessionsNewestFirst(left: ExportedSprintSession, right: Exported
 
 function compareSessionsOldestFirst(left: ExportedSprintSession, right: ExportedSprintSession): number {
   return (left.completedAt as string).localeCompare(right.completedAt as string) || left.id.localeCompare(right.id);
-}
-
-function preferredSession(
-  local: ExportedSprintSession,
-  incoming: ExportedSprintSession
-): ExportedSprintSession {
-  const completedComparison = (incoming.completedAt as string).localeCompare(local.completedAt as string);
-  if (completedComparison !== 0) {
-    return completedComparison > 0 ? { ...incoming } : { ...local };
-  }
-  return incoming.startedAt >= local.startedAt ? { ...incoming } : { ...local };
 }
 
 function isWithinRange(value: string, startMs: number, endMs: number): boolean {
