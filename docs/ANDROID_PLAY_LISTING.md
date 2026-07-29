@@ -91,6 +91,7 @@ Candidate listing assets are checked in at:
 
 - `apps/mobile/store-assets/android/play-icon-512.png`
 - `apps/mobile/store-assets/android/feature-graphic-1024x500.png`
+- `apps/mobile/store-assets/android/feature-graphic-source.png` (approved high-resolution source)
 - `apps/mobile/store-assets/android/render-feature-graphic.swift` (reproducible source)
 
 Regenerate the feature graphic with:
@@ -100,12 +101,13 @@ Regenerate the feature graphic with:
   apps/mobile/store-assets/android/feature-graphic-1024x500.png
 ```
 
-The renderer directly emits the required 1024 x 500, 8-bit RGB PNG without an
-alpha channel. The release regression executes the renderer, checks its IHDR,
+The renderer center-crops and scales the approved high-resolution source, then
+emits the required 1024 x 500, 8-bit RGB PNG without an alpha channel. The
+release regression executes the renderer, checks the source and output IHDRs,
 and compares decoded RGB output with the checked-in candidate. The comparison
-allows only a tightly bounded amount of system-font antialiasing drift so that
-macOS rendering-stack updates do not require replacing a visually unchanged
-approved asset; broader pixel changes still fail the release contract.
+allows only a tightly bounded amount of image-rasterization drift so that macOS
+rendering-stack updates do not require replacing a visually unchanged approved
+asset; broader pixel changes still fail the release contract.
 
 The release owner must approve these assets in the same review that approves
 the exact-build screenshots; file presence alone is not approval evidence.

@@ -758,6 +758,10 @@ describe('Android Play release contract', () => {
       mobileRoot,
       'store-assets/android/feature-graphic-1024x500.png',
     ))).toBe(true);
+    expect(fs.existsSync(path.join(
+      mobileRoot,
+      'store-assets/android/feature-graphic-source.png',
+    ))).toBe(true);
     expect(pngMetadata('apps/mobile/store-assets/android/play-icon-512.png')).toEqual({
       width: 512,
       height: 512,
@@ -772,6 +776,16 @@ describe('Android Play release contract', () => {
       bitDepth: 8,
       colorType: 2,
     });
+    expect(pngMetadata(
+      'apps/mobile/store-assets/android/feature-graphic-source.png',
+    )).toEqual({
+      width: 1794,
+      height: 877,
+      bitDepth: 8,
+      colorType: 2,
+    });
+    expect(featureRenderer).toContain('feature-graphic-source.png');
+    expect(featureRenderer).toContain('sourceImage.draw(');
     expect(featureRenderer).toContain('let rgbBitmap = NSBitmapImageRep(');
     expect(featureRenderer).toContain('samplesPerPixel: 3');
     expect(featureRenderer).toContain('hasAlpha: false');
@@ -779,7 +793,7 @@ describe('Android Play release contract', () => {
   });
 
   (process.platform === 'darwin' ? it : it.skip)(
-    'renders the Play feature graphic as RGB with only bounded font rasterization drift',
+    'renders the Play feature graphic as RGB with only bounded image rasterization drift',
     () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chessticize-feature-render-'));
     const renderedPng = path.join(directory, 'rendered.png');
