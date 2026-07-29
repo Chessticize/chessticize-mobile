@@ -487,7 +487,7 @@ export const AppStoreReviewRequestEligiblePuzzleMilestone: Story = {
     await waitForTestId(canvasElement, "sprint-summary-panel");
     await expectTestIdText(canvasElement, "sprint-result-solved", "Solved 15");
     await expectTestIdText(canvasElement, "play-again-button", "Play again");
-    await waitForTestId(canvasElement, "app-store-review-native-boundary");
+    await waitForTestId(canvasElement, "lab-native-boundary");
   }
 };
 

@@ -515,7 +515,7 @@ export function LabScenarioShell({
             {definition.nativeBoundary ? (
               <div
                 className="lab-native-boundary"
-                data-testid="app-store-review-native-boundary"
+                data-testid="lab-native-boundary"
               >
                 <p><strong>{definition.nativeBoundary.title}</strong></p>
                 <p>{definition.nativeBoundary.detail}</p>
