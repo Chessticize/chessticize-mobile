@@ -56,11 +56,23 @@ test("builds visible model reliability progress for a well-sampled balanced them
   expect(reliabilitySeries?.themeId).toBe("line:fork");
   expect(reliabilitySeries?.label).toBe("Fork · Puzzle solving");
   expect(reliabilitySeries?.kind).toBe("solve_rate");
+  expect(reliabilitySeries?.baselineLabel).toBe(
+    "Recent attempts and stronger theme matches contribute more to n"
+  );
+  expect(reliabilitySeries?.summary).toBe(
+    "Wrong moves and timeouts count as misses."
+  );
   expect(reliabilitySeries?.changeLabel).toBe("8 points higher");
   expect(reliabilitySeries?.points.map((point) => point.sampleSize)).toEqual([8, 14]);
   expect(reliabilitySeries?.points.map((point) => point.valueLabel)).toEqual(["84%", "92%"]);
   expect(speedSeries?.themeId).toBe("line:fork");
   expect(speedSeries?.kind).toBe("completed_speed");
+  expect(speedSeries?.baselineLabel).toBe(
+    "1.00× is the provisional 30-second baseline"
+  );
+  expect(speedSeries?.summary).toBe(
+    "n includes weighted, reliable solves completed before timeout."
+  );
 });
 
 test("keeps observed balanced stats visible before recommendation diversity is complete", () => {

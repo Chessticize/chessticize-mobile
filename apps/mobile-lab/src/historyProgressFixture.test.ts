@@ -19,8 +19,20 @@ test("history progress fixture shows accuracy and speed progress", () => {
   assert.equal(forks.points[0]?.valueLabel, "78%");
   assert.equal(forks.points.at(-1)?.valueLabel, "94%");
   assert.equal(forks.changeLabel, "16 points higher");
+  assert.equal(
+    forks.baselineLabel,
+    "Recent attempts and stronger theme matches contribute more to n"
+  );
   assert.equal(forkSpeed.kind, "completed_speed");
   assert.equal(forkSpeed.points.at(-1)?.valueLabel, "1.09×");
+  assert.equal(
+    forkSpeed.baselineLabel,
+    "1.00× is the provisional 30-second baseline"
+  );
+  assert.equal(
+    forkSpeed.summary,
+    "n includes weighted, reliable solves completed before timeout."
+  );
   assert.equal(pins.kind, "completed_speed");
   assert.equal(pins.points[0]?.valueLabel, "1.30×");
   assert.equal(pins.points.at(-1)?.valueLabel, "1.06×");
