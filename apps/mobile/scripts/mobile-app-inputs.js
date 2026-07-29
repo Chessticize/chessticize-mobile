@@ -14,6 +14,7 @@ const TEST_RUNNER_PREFIXES = [
   'apps/cli/test/',
   'apps/mobile/__tests__/',
   'apps/mobile/e2e/',
+  'apps/mobile/native/stockfish/Bridge/tests/',
   'apps/mobile-lab/',
 ];
 

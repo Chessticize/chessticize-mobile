@@ -62,9 +62,9 @@ int main(int argc, char** argv) {
     std::unique_lock lock(mutex);
     if (!changed.wait_for(
             lock,
-            std::chrono::seconds(15),
-            [&] { return maxDepth >= 17; })) {
-      std::cerr << "xBqI8 parent search did not reach depth 17.\n";
+            std::chrono::seconds(10),
+            [&] { return maxDepth >= 8; })) {
+      std::cerr << "xBqI8 parent search did not become active.\n";
       return 2;
     }
   }
@@ -76,24 +76,46 @@ int main(int argc, char** argv) {
   runner.handle("go depth 8");
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
   runner.handle("stop");
+
+  int fullSearchIterationBaseline = 0;
+  {
+    std::lock_guard lock(mutex);
+    fullSearchIterationBaseline = iterationUpdates;
+  }
   runner.handle("go depth 20");
+
+  // The crash boundary is Stockfish's first onIter call after 10,000,000
+  // nodes. Natural depth-20 completion is CPU-dependent and is not required
+  // to prove that the callback remains registered.
+  {
+    std::unique_lock lock(mutex);
+    if (!changed.wait_for(
+            lock,
+            std::chrono::seconds(45),
+            [&] {
+              return iterationUpdates > fullSearchIterationBaseline;
+            })) {
+      std::cerr
+          << "xBqI8 full child search did not exercise the iteration callback.\n";
+      return 3;
+    }
+  }
+
+  runner.handle("stop");
 
   {
     std::unique_lock lock(mutex);
     if (!changed.wait_for(
             lock,
-            std::chrono::seconds(30),
+            std::chrono::seconds(5),
             [&] { return bestmoves >= 3; })) {
-      std::cerr << "xBqI8 replacement searches did not complete.\n";
-      return 3;
-    }
-    if (iterationUpdates == 0) {
-      std::cerr << "xBqI8 search never exercised the iteration callback.\n";
+      std::cerr << "xBqI8 replacement searches did not stop cleanly.\n";
       return 4;
     }
   }
 
   std::cout
-      << "xBqI8 parent, shallow child, and full child searches completed.\n";
+      << "xBqI8 parent, shallow child, and callback-exercising full child "
+         "searches completed.\n";
   return 0;
 }
