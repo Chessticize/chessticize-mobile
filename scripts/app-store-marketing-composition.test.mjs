@@ -22,6 +22,11 @@ import {
   wrapHeadline,
 } from "../.codex/skills/chessticize-app-store-marketing/scripts/compose-marketing-assets.mjs";
 
+const PHOTO_LAYOUT_URL = new URL(
+  "../.codex/skills/chessticize-app-store-marketing/assets/app-store-marketing-layout-v2.json",
+  import.meta.url,
+);
+
 const FAMILY_CONTRACTS = {
   iphone: {
     dimensions: { width: 120, height: 260 },
@@ -241,6 +246,73 @@ async function createFixture(root) {
   };
 }
 
+async function createPhotographicFixture(root) {
+  const fixture = await createFixture(root);
+  const config = structuredClone(fixture.config);
+  config.layoutId = "test-photo-studio-a-v2";
+  config.compositionMode = "photographic-device";
+  config.visualDirection = {
+    name: "Test Photo Studio A",
+    composition: "product-first-photographic-device",
+    background: "warm-white-icy-blue-chessboard",
+    productProof: "immutable-native-capture-in-exact-generated-device-silhouette",
+  };
+
+  for (const [family, contract] of Object.entries(FAMILY_CONTRACTS)) {
+    config.presets[family].photographicDevice = {
+      darkThreshold: 58,
+      barrierDilation: 1,
+      screenAspectTolerance: 0.04,
+      maskAreaMinRatio: 0.6,
+      maskAreaMaxRatio: 1.08,
+      deviceWidthConsistencyTolerance: 0.02,
+      deviceHeightConsistencyTolerance: 0.02,
+      dynamicIsland: family === "iphone",
+    };
+    for (let order = 1; order <= 6; order += 1) {
+      const frameId = `frame-${order}`;
+      const template =
+        config.presets[family].backgroundTemplates[frameId];
+      const dimensions =
+        contract.orientation === "portrait"
+          ? { height: 130, width: 60 }
+          : { height: 105, width: 140 };
+      const device =
+        family === "iphone"
+          ? {
+              inner: { height: 61, rx: 5, width: 28, x: 16, y: 36 },
+              outer: { height: 74, rx: 7, width: 32, x: 14, y: 32 },
+            }
+          : {
+              inner: { height: 60, rx: 4, width: 80, x: 30, y: 25 },
+              outer: { height: 70, rx: 6, width: 90, x: 25, y: 20 },
+            };
+      const scene = Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${dimensions.width}" height="${dimensions.height}">
+          <rect width="100%" height="100%" fill="rgb(${224 + order},${235 + order},${241 + order})"/>
+          <text x="3" y="8" font-size="4" font-family="sans-serif" fill="#081221">Frame ${order}</text>
+          <rect x="${device.outer.x}" y="${device.outer.y}" width="${device.outer.width}" height="${device.outer.height}" rx="${device.outer.rx}" fill="#101214"/>
+          <rect x="${device.inner.x}" y="${device.inner.y}" width="${device.inner.width}" height="${device.inner.height}" rx="${device.inner.rx}" fill="#F8FAFC"/>
+        </svg>`,
+      );
+      const buffer = await sharp(scene)
+        .png({ adaptiveFiltering: false, compressionLevel: 9 })
+        .toBuffer();
+      await writeFile(path.join(root, template.file), buffer);
+      template.pixelDimensions = dimensions;
+      template.sha256 = sha256(buffer);
+    }
+  }
+  await writeFile(
+    fixture.configPath,
+    `${JSON.stringify(config, null, 2)}\n`,
+  );
+  return {
+    ...fixture,
+    config,
+  };
+}
+
 test("headline wrapping and layout keep the approved copy inside safe areas", () => {
   const parsed = parseArgs([
     "--",
@@ -281,6 +353,33 @@ test("headline wrapping and layout keep the approved copy inside safe areas", ()
     assert.ok(layout.frame.x + layout.frame.width <= contract.dimensions.width);
     assert.ok(layout.frame.y + layout.frame.height <= contract.dimensions.height);
   }
+});
+
+test("default Photo Studio A scene templates are immutable and hash-bound", async () => {
+  const config = JSON.parse(await readFile(PHOTO_LAYOUT_URL, "utf8"));
+  assert.equal(config.layoutId, "chessticize-photo-studio-a-v2");
+  assert.equal(config.compositionMode, "photographic-device");
+  assert.equal(config.visualDirection.name, "Photo Studio A");
+
+  const hashes = new Set();
+  for (const preset of Object.values(config.presets)) {
+    assert.equal(
+      Object.keys(preset.backgroundTemplates).length,
+      6,
+    );
+    for (const template of Object.values(preset.backgroundTemplates)) {
+      const templateUrl = new URL(template.file, PHOTO_LAYOUT_URL);
+      const buffer = await readFile(templateUrl);
+      const metadata = await sharp(buffer).metadata();
+      assert.equal(sha256(buffer), template.sha256);
+      assert.deepEqual(
+        { height: metadata.height, width: metadata.width },
+        template.pixelDimensions,
+      );
+      hashes.add(template.sha256);
+    }
+  }
+  assert.equal(hashes.size, 12);
 });
 
 test("full export is deterministic and preserves the six-frame device contracts", async (t) => {
@@ -327,6 +426,77 @@ test("full export is deterministic and preserves the six-frame device contracts"
       artifact.dimensions,
     );
   }
+});
+
+test("photographic export uses exact bezel masks and enforces device consistency", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "chessticize-photo-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const fixture = await createPhotographicFixture(root);
+  const firstOutput = path.join(root, "output-a");
+  const secondOutput = path.join(root, "output-b");
+  const options = {
+    captureRoot: fixture.captureRoot,
+    layoutConfig: fixture.configPath,
+  };
+  const first = await composeMarketingAssets({
+    ...options,
+    outputDir: firstOutput,
+  });
+  const second = await composeMarketingAssets({
+    ...options,
+    outputDir: secondOutput,
+  });
+
+  assert.deepEqual(first.manifest, second.manifest);
+  assert.equal(first.manifest.layoutId, "test-photo-studio-a-v2");
+  assert.equal(first.manifest.artifacts.length, 12);
+  assert.equal(first.manifest.contactSheets.length, 3);
+  assert.deepEqual(
+    first.manifest.contactSheets.map(({ kind }) => kind),
+    ["overview", "overview", "corner-audit"],
+  );
+  assert.ok(first.manifest.deviceConsistency);
+  for (const artifact of first.manifest.artifacts) {
+    assert.equal(
+      artifact.deviceGeometry.maskStrategy,
+      "closed-bezel-flood-fill",
+    );
+    assert.ok(artifact.deviceGeometry.exactMaskPixelCount > 0);
+    assert.ok(artifact.deviceGeometry.outputScreen.width > 0);
+    assert.ok(artifact.deviceGeometry.outputScreen.height > 0);
+    assert.equal(
+      await exists(path.join(firstOutput, artifact.file)),
+      true,
+    );
+  }
+  assert.equal(
+    await exists(path.join(firstOutput, "preview-iphone-corners.png")),
+    true,
+  );
+});
+
+test("photographic export rejects a screen opening with the wrong aspect", async (t) => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "chessticize-photo-aspect-"),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const fixture = await createPhotographicFixture(root);
+  fixture.config.presets.iphone.photographicDevice.screenAspectTolerance =
+    0.001;
+  await writeFile(
+    fixture.configPath,
+    `${JSON.stringify(fixture.config, null, 2)}\n`,
+  );
+
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: fixture.captureRoot,
+      deviceFamily: "iphone",
+      layoutConfig: fixture.configPath,
+      outputDir: path.join(root, "output"),
+    }),
+    /photographic screen aspect/,
+  );
 });
 
 test("font and rendered-copy contracts fail before unsafe export", async (t) => {
@@ -446,7 +616,7 @@ test("preview-only mode writes contact sheets without final App Store frames", a
   );
 });
 
-test("imagegen background templates are immutable, frame-specific inputs", async (t) => {
+test("imagegen scene templates are immutable, frame-specific inputs", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "chessticize-background-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const fixture = await createFixture(root);
@@ -461,7 +631,7 @@ test("imagegen background templates are immutable, frame-specific inputs", async
       layoutConfig: configPath,
       outputDir: path.join(root, "output"),
     }),
-    /background template SHA-256 does not match/,
+    /scene template SHA-256 does not match/,
   );
 
   const duplicateConfig = structuredClone(fixture.config);

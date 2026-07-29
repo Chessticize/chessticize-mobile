@@ -22,7 +22,7 @@ The evidence-backed accessibility declaration contract is
 with the full audit in
 [`docs/ACCESSIBILITY_AUDIT.md`](ACCESSIBILITY_AUDIT.md).
 That sequence is separate from the maintained fifteen-scene release-QA capture
-below. Its deterministic raw-capture and Cobalt Focus composition stages are
+below. Its deterministic raw-capture and Photo Studio A composition stages are
 documented in
 [`docs/marketing/APP_STORE_MARKETING_CAPTURE.md`](marketing/APP_STORE_MARKETING_CAPTURE.md)
 and

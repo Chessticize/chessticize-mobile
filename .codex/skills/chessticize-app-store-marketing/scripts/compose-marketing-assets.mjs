@@ -17,11 +17,15 @@ const SKILL_ROOT = path.resolve(path.dirname(SCRIPT_PATH), "..");
 const DEFAULT_LAYOUT_CONFIG = path.join(
   SKILL_ROOT,
   "assets",
-  "app-store-marketing-layout-v1.json",
+  "app-store-marketing-layout-v2.json",
 );
 const DEFAULT_PLATFORM = "app-store";
 const SUPPORTED_FONT_FAMILY = "sans-serif";
 const EXPECTED_FRAME_COUNT = 6;
+const COMPOSITION_MODES = new Set([
+  "flat-device-frame",
+  "photographic-device",
+]);
 
 function fail(message) {
   throw new Error(`[marketing-composition] ${message}`);
@@ -220,6 +224,10 @@ function validateLayoutConfig(config) {
   if (config.schemaVersion !== 1) {
     fail(`unsupported layout schema version: ${config.schemaVersion}`);
   }
+  const compositionMode = config.compositionMode ?? "flat-device-frame";
+  if (!COMPOSITION_MODES.has(compositionMode)) {
+    fail(`unsupported composition mode: ${compositionMode}`);
+  }
   if (!config.layoutId || !config.contractStoryId || !config.locale) {
     fail("layout config must define layoutId, contractStoryId, and locale");
   }
@@ -323,6 +331,34 @@ function validateLayoutConfig(config) {
     ) {
       fail(`${family} preset has an invalid safe-area or product layout`);
     }
+    if (compositionMode === "photographic-device") {
+      const photographicDevice = preset.photographicDevice;
+      if (
+        !photographicDevice ||
+        !Number.isInteger(photographicDevice.darkThreshold) ||
+        photographicDevice.darkThreshold <= 0 ||
+        photographicDevice.darkThreshold >= 255 ||
+        !Number.isInteger(photographicDevice.barrierDilation) ||
+        photographicDevice.barrierDilation < 0 ||
+        photographicDevice.barrierDilation > 4 ||
+        !isFiniteRatio(photographicDevice.screenAspectTolerance, {
+          max: 0.1,
+        }) ||
+        !isFiniteRatio(photographicDevice.maskAreaMinRatio) ||
+        !isFiniteRatio(photographicDevice.maskAreaMaxRatio, { max: 1.5 }) ||
+        photographicDevice.maskAreaMinRatio >=
+          photographicDevice.maskAreaMaxRatio ||
+        !isFiniteRatio(photographicDevice.deviceWidthConsistencyTolerance, {
+          max: 0.1,
+        }) ||
+        !isFiniteRatio(photographicDevice.deviceHeightConsistencyTolerance, {
+          max: 0.1,
+        }) ||
+        typeof photographicDevice.dynamicIsland !== "boolean"
+      ) {
+        fail(`${family} preset has an invalid photographic device contract`);
+      }
+    }
   }
 }
 
@@ -406,7 +442,7 @@ async function validateBackgroundTemplate(configRoot, preset, frameId) {
     !/^[a-f0-9]{64}$/u.test(template.sha256 ?? "")
   ) {
     fail(
-      `${preset.deviceFamily} ${frameId} has an invalid imagegen background contract`,
+      `${preset.deviceFamily} ${frameId} has an invalid imagegen scene template contract`,
     );
   }
   const resolvedRoot = await realpath(configRoot);
@@ -421,7 +457,7 @@ async function validateBackgroundTemplate(configRoot, preset, frameId) {
     templatePath = await realpath(candidate);
   } catch (error) {
     fail(
-      `${preset.deviceFamily} background template is unavailable: ${error.message}`,
+      `${preset.deviceFamily} scene template is unavailable: ${error.message}`,
     );
   }
   if (!isPathInside(resolvedRoot, templatePath)) {
@@ -436,7 +472,7 @@ async function validateBackgroundTemplate(configRoot, preset, frameId) {
     metadata.height !== template.pixelDimensions?.height
   ) {
     fail(
-      `${preset.deviceFamily} background template does not match its PNG dimensions`,
+      `${preset.deviceFamily} scene template does not match its PNG dimensions`,
     );
   }
   const orientationMatches =
@@ -445,12 +481,12 @@ async function validateBackgroundTemplate(configRoot, preset, frameId) {
       : metadata.width > metadata.height;
   if (!orientationMatches) {
     fail(
-      `${preset.deviceFamily} background template has the wrong orientation`,
+      `${preset.deviceFamily} scene template has the wrong orientation`,
     );
   }
   const actualSha256 = await sha256File(templatePath);
   if (actualSha256 !== template.sha256) {
-    fail(`${preset.deviceFamily} background template SHA-256 does not match`);
+    fail(`${preset.deviceFamily} scene template SHA-256 does not match`);
   }
   return {
     deviceFamily: preset.deviceFamily,
@@ -795,7 +831,434 @@ async function roundedScreenshot(inputPath, layout) {
     .toBuffer();
 }
 
+function median(values) {
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
+function isDarkPixel(data, offset, threshold) {
+  return (
+    data[offset] < threshold &&
+    data[offset + 1] < threshold &&
+    data[offset + 2] < threshold
+  );
+}
+
+async function largestDarkComponent(scenePath, threshold) {
+  const { data, info } = await sharp(scenePath)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const { channels, height, width } = info;
+  const visited = new Uint8Array(width * height);
+  let largest = null;
+
+  for (let pixel = 0; pixel < width * height; pixel += 1) {
+    if (
+      visited[pixel] ||
+      !isDarkPixel(data, pixel * channels, threshold)
+    ) {
+      continue;
+    }
+    const queue = [pixel];
+    const pixels = [];
+    visited[pixel] = 1;
+    let cursor = 0;
+    let minX = width;
+    let maxX = 0;
+    let minY = height;
+    let maxY = 0;
+
+    while (cursor < queue.length) {
+      const current = queue[cursor];
+      cursor += 1;
+      pixels.push(current);
+      const x = current % width;
+      const y = Math.floor(current / width);
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+
+      const neighbors = [];
+      if (x > 0) neighbors.push(current - 1);
+      if (x + 1 < width) neighbors.push(current + 1);
+      if (y > 0) neighbors.push(current - width);
+      if (y + 1 < height) neighbors.push(current + width);
+      for (const neighbor of neighbors) {
+        if (
+          !visited[neighbor] &&
+          isDarkPixel(data, neighbor * channels, threshold)
+        ) {
+          visited[neighbor] = 1;
+          queue.push(neighbor);
+        }
+      }
+    }
+
+    const component = {
+      bounds: { maxX, maxY, minX, minY },
+      pixels,
+    };
+    if (!largest || component.pixels.length > largest.pixels.length) {
+      largest = component;
+    }
+  }
+
+  if (!largest) {
+    fail(`no dark photographic device boundary found in ${scenePath}`);
+  }
+  return { ...largest, height, width };
+}
+
+function findScreenRect(component) {
+  const member = new Uint8Array(component.width * component.height);
+  for (const pixel of component.pixels) {
+    member[pixel] = 1;
+  }
+  const { maxX, maxY, minX, minY } = component.bounds;
+  const innerLefts = [];
+  const innerRights = [];
+  const innerTops = [];
+  const innerBottoms = [];
+
+  const rowStart = Math.round(minY + (maxY - minY) * 0.32);
+  const rowEnd = Math.round(minY + (maxY - minY) * 0.68);
+  for (let y = rowStart; y <= rowEnd; y += 3) {
+    const midpoint = (minX + maxX) / 2;
+    let innerLeft = null;
+    let innerRight = null;
+    for (let x = minX; x <= maxX; x += 1) {
+      if (!member[y * component.width + x]) {
+        continue;
+      }
+      if (x < midpoint) {
+        innerLeft = x + 1;
+      } else if (innerRight === null) {
+        innerRight = x - 1;
+      }
+    }
+    if (innerLeft !== null && innerRight !== null) {
+      innerLefts.push(innerLeft);
+      innerRights.push(innerRight);
+    }
+  }
+
+  const columnStart = Math.round(minX + (maxX - minX) * 0.32);
+  const columnEnd = Math.round(minX + (maxX - minX) * 0.68);
+  for (let x = columnStart; x <= columnEnd; x += 3) {
+    const midpoint = (minY + maxY) / 2;
+    let innerTop = null;
+    let innerBottom = null;
+    for (let y = minY; y <= maxY; y += 1) {
+      if (!member[y * component.width + x]) {
+        continue;
+      }
+      if (y < midpoint) {
+        innerTop = y + 1;
+      } else if (innerBottom === null) {
+        innerBottom = y - 1;
+      }
+    }
+    if (innerTop !== null && innerBottom !== null) {
+      innerTops.push(innerTop);
+      innerBottoms.push(innerBottom);
+    }
+  }
+
+  if (
+    innerLefts.length === 0 ||
+    innerRights.length === 0 ||
+    innerTops.length === 0 ||
+    innerBottoms.length === 0
+  ) {
+    fail("could not infer the photographic device screen opening");
+  }
+  const left = median(innerLefts);
+  const right = median(innerRights);
+  const top = median(innerTops);
+  const bottom = median(innerBottoms);
+  return {
+    height: bottom - top + 1,
+    left,
+    top,
+    width: right - left + 1,
+  };
+}
+
+function cropForAspect(source, target) {
+  const sourceRatio = source.width / source.height;
+  const targetRatio = target.width / target.height;
+  if (sourceRatio > targetRatio) {
+    const width = Math.round(source.height * targetRatio);
+    return {
+      height: source.height,
+      left: Math.round((source.width - width) / 2),
+      top: 0,
+      width,
+    };
+  }
+  const height = Math.round(source.width / targetRatio);
+  return {
+    height,
+    left: 0,
+    top: Math.round((source.height - height) / 2),
+    width: source.width,
+  };
+}
+
+function transformRect(rect, crop, target) {
+  const scaleX = target.width / crop.width;
+  const scaleY = target.height / crop.height;
+  return {
+    height: Math.round(rect.height * scaleY),
+    left: Math.round((rect.left - crop.left) * scaleX),
+    top: Math.round((rect.top - crop.top) * scaleY),
+    width: Math.round(rect.width * scaleX),
+  };
+}
+
+function normalizeScreenAspect(rect, source, tolerance) {
+  const expected = source.width / source.height;
+  const actual = rect.width / rect.height;
+  const relativeError = Math.abs(actual - expected) / expected;
+  if (relativeError > tolerance) {
+    fail(
+      `photographic screen aspect ${actual.toFixed(4)} differs from source aspect ${expected.toFixed(4)} by ${(relativeError * 100).toFixed(2)}%`,
+    );
+  }
+  const width = Math.round(rect.height * expected);
+  return {
+    ...rect,
+    left: Math.round(rect.left + (rect.width - width) / 2),
+    width,
+  };
+}
+
+function buildExactScreenMask(component, screenRect, contract) {
+  const { height, width } = component;
+  const barrier = new Uint8Array(width * height);
+  for (const pixel of component.pixels) {
+    const x = pixel % width;
+    const y = Math.floor(pixel / width);
+    for (
+      let offsetY = -contract.barrierDilation;
+      offsetY <= contract.barrierDilation;
+      offsetY += 1
+    ) {
+      for (
+        let offsetX = -contract.barrierDilation;
+        offsetX <= contract.barrierDilation;
+        offsetX += 1
+      ) {
+        const nextX = x + offsetX;
+        const nextY = y + offsetY;
+        if (
+          nextX >= 0 &&
+          nextX < width &&
+          nextY >= 0 &&
+          nextY < height
+        ) {
+          barrier[nextY * width + nextX] = 1;
+        }
+      }
+    }
+  }
+
+  const filled = new Uint8Array(width * height);
+  const queue = new Int32Array(width * height);
+  let head = 0;
+  let tail = 0;
+  const seedX = Math.round(screenRect.left + screenRect.width / 2);
+  const seedY = Math.round(screenRect.top + screenRect.height / 2);
+  const seed = seedY * width + seedX;
+  queue[tail] = seed;
+  tail += 1;
+  filled[seed] = 1;
+  const { maxX, maxY, minX, minY } = component.bounds;
+
+  while (head < tail) {
+    const current = queue[head];
+    head += 1;
+    const x = current % width;
+    const y = Math.floor(current / width);
+    const neighbors = [];
+    if (x > minX) neighbors.push(current - 1);
+    if (x < maxX) neighbors.push(current + 1);
+    if (y > minY) neighbors.push(current - width);
+    if (y < maxY) neighbors.push(current + width);
+    for (const neighbor of neighbors) {
+      if (!filled[neighbor] && !barrier[neighbor]) {
+        filled[neighbor] = 1;
+        queue[tail] = neighbor;
+        tail += 1;
+      }
+    }
+  }
+
+  const expectedArea = screenRect.width * screenRect.height;
+  if (
+    tail < expectedArea * contract.maskAreaMinRatio ||
+    tail > expectedArea * contract.maskAreaMaxRatio
+  ) {
+    fail(
+      `photographic screen silhouette area ${tail} is incompatible with expected area ${expectedArea}`,
+    );
+  }
+
+  const rgba = Buffer.alloc(width * height * 4, 255);
+  for (let pixel = 0; pixel < width * height; pixel += 1) {
+    rgba[pixel * 4 + 3] = filled[pixel] ? 255 : 0;
+  }
+  return {
+    buffer: rgba,
+    channels: 4,
+    height,
+    pixelCount: tail,
+    width,
+  };
+}
+
+async function exactScreenOverlay({
+  crop,
+  mask,
+  outputScreen,
+  sourcePath,
+  target,
+}) {
+  const [screen, resizedMask] = await Promise.all([
+    sharp(sourcePath)
+      .resize(outputScreen.width, outputScreen.height, {
+        fit: "fill",
+        kernel: sharp.kernel.lanczos3,
+      })
+      .png({ adaptiveFiltering: false, compressionLevel: 9 })
+      .toBuffer(),
+    sharp(mask.buffer, {
+      raw: {
+        channels: mask.channels,
+        height: mask.height,
+        width: mask.width,
+      },
+    })
+      .extract(crop)
+      .resize(target.width, target.height, {
+        fit: "fill",
+        kernel: sharp.kernel.lanczos3,
+      })
+      .png({ adaptiveFiltering: false, compressionLevel: 9 })
+      .toBuffer(),
+  ]);
+  const layer = await sharp({
+    create: {
+      channels: 4,
+      height: target.height,
+      width: target.width,
+      background: { alpha: 0, b: 0, g: 0, r: 0 },
+    },
+  })
+    .composite([
+      {
+        input: screen,
+        left: outputScreen.left,
+        top: outputScreen.top,
+      },
+    ])
+    .png({ adaptiveFiltering: false, compressionLevel: 9 })
+    .toBuffer();
+  return sharp(layer)
+    .composite([{ blend: "dest-in", input: resizedMask }])
+    .png({ adaptiveFiltering: false, compressionLevel: 9 })
+    .toBuffer();
+}
+
+function dynamicIsland(outputScreen) {
+  const width = Math.round(outputScreen.width * 0.29);
+  const height = Math.round(outputScreen.width * 0.078);
+  const left = Math.round(
+    outputScreen.left + (outputScreen.width - width) / 2,
+  );
+  const top = Math.round(
+    outputScreen.top + outputScreen.width * 0.04,
+  );
+  return {
+    input: Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" rx="${Math.round(height / 2)}" fill="#020202"/></svg>`,
+    ),
+    left,
+    top,
+  };
+}
+
+async function composePhotographicFrame(item, backgroundTemplate) {
+  const target = item.capture.pixelDimensions;
+  const contract = item.preset.photographicDevice;
+  const [sceneMetadata, sourceMetadata, component] = await Promise.all([
+    sharp(backgroundTemplate.path).metadata(),
+    sharp(item.inputPath).metadata(),
+    largestDarkComponent(backgroundTemplate.path, contract.darkThreshold),
+  ]);
+  const detectedScreen = findScreenRect(component);
+  const normalizedScreen = normalizeScreenAspect(
+    detectedScreen,
+    sourceMetadata,
+    contract.screenAspectTolerance,
+  );
+  const exactMask = buildExactScreenMask(
+    component,
+    detectedScreen,
+    contract,
+  );
+  const crop = cropForAspect(sceneMetadata, target);
+  const outputScreen = transformRect(normalizedScreen, crop, target);
+  const [scene, screenshot] = await Promise.all([
+    sharp(backgroundTemplate.path)
+      .extract(crop)
+      .resize(target.width, target.height, {
+        fit: "fill",
+        kernel: sharp.kernel.lanczos3,
+      })
+      .png({ adaptiveFiltering: false, compressionLevel: 9 })
+      .toBuffer(),
+    exactScreenOverlay({
+      crop,
+      mask: exactMask,
+      outputScreen,
+      sourcePath: item.inputPath,
+      target,
+    }),
+  ]);
+  const composites = [{ input: screenshot, left: 0, top: 0 }];
+  if (contract.dynamicIsland) {
+    composites.push(dynamicIsland(outputScreen));
+  }
+  const buffer = await sharp(scene)
+    .composite(composites)
+    .png({ adaptiveFiltering: false, compressionLevel: 9 })
+    .toBuffer();
+  return {
+    buffer,
+    deviceGeometry: {
+      componentBounds: component.bounds,
+      componentDimensions: {
+        height: component.bounds.maxY - component.bounds.minY + 1,
+        width: component.bounds.maxX - component.bounds.minX + 1,
+      },
+      crop,
+      detectedScreen,
+      exactMaskPixelCount: exactMask.pixelCount,
+      maskStrategy: "closed-bezel-flood-fill",
+      normalizedScreen,
+      outputScreen,
+    },
+    dimensions: target,
+  };
+}
+
 async function composeFrame(item, config, backgroundTemplate) {
+  if (config.compositionMode === "photographic-device") {
+    return composePhotographicFrame(item, backgroundTemplate);
+  }
   const canvas = item.capture.pixelDimensions;
   const layout = calculateLayout({
     canvas,
@@ -905,7 +1368,7 @@ async function buildContactSheet(family, composedItems, config) {
   const subtitleSize = Math.round(preview.width * 0.012);
   const base = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${preview.width}" height="${sheetHeight}">
   <rect width="100%" height="100%" fill="${preview.background}"/>
-  <text x="${preview.padding}" y="${preview.padding + titleSize}" fill="${preview.label}" font-family="${escapeXml(config.typography.fontFamily)}" font-size="${titleSize}" font-weight="750">${escapeXml(preset.reviewLabel)} · Cobalt Focus</text>
+  <text x="${preview.padding}" y="${preview.padding + titleSize}" fill="${preview.label}" font-family="${escapeXml(config.typography.fontFamily)}" font-size="${titleSize}" font-weight="750">${escapeXml(preset.reviewLabel)} · ${escapeXml(config.visualDirection.name)}</text>
   <text x="${preview.padding}" y="${preview.padding + titleSize + subtitleSize + 16}" fill="${preview.mutedLabel}" font-family="${escapeXml(config.typography.fontFamily)}" font-size="${subtitleSize}" font-weight="500">Six deterministic App Store frames · native UI preserved</text>
 </svg>`);
   const composites = [];
@@ -945,6 +1408,173 @@ async function buildContactSheet(family, composedItems, config) {
       height: sheetHeight,
     },
   };
+}
+
+function boundedExtract({ height, left, top, width }, image) {
+  return {
+    height,
+    left: Math.max(0, Math.min(left, image.width - width)),
+    top: Math.max(0, Math.min(top, image.height - height)),
+    width,
+  };
+}
+
+async function buildIphoneCornerSheet(composedItems, config) {
+  const source = composedItems[0].dimensions;
+  const sourceCornerSize = Math.round(source.width * 0.167);
+  const tileSize = 300;
+  const gap = 18;
+  const labelWidth = 190;
+  const rowHeight = tileSize;
+  const width = labelWidth + 4 * tileSize + 6 * gap;
+  const height =
+    composedItems.length * rowHeight + (composedItems.length + 1) * gap;
+  const composites = [];
+
+  for (let index = 0; index < composedItems.length; index += 1) {
+    const item = composedItems[index];
+    const top = gap + index * (rowHeight + gap);
+    const screen = item.deviceGeometry.outputScreen;
+    const edgeOffset = Math.round(sourceCornerSize * 0.16);
+    const corners = [
+      {
+        left: screen.left - edgeOffset,
+        top: screen.top - edgeOffset,
+      },
+      {
+        left:
+          screen.left +
+          screen.width -
+          sourceCornerSize +
+          edgeOffset,
+        top: screen.top - edgeOffset,
+      },
+      {
+        left: screen.left - edgeOffset,
+        top:
+          screen.top +
+          screen.height -
+          sourceCornerSize +
+          edgeOffset,
+      },
+      {
+        left:
+          screen.left +
+          screen.width -
+          sourceCornerSize +
+          edgeOffset,
+        top:
+          screen.top +
+          screen.height -
+          sourceCornerSize +
+          edgeOffset,
+      },
+    ];
+    const label = Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${labelWidth}" height="${rowHeight}">
+        <rect width="100%" height="100%" fill="${config.preview.label}"/>
+        <text x="50%" y="132" text-anchor="middle" font-family="${escapeXml(config.typography.fontFamily)}" font-size="28" font-weight="700" fill="${config.preview.background}">iPhone ${item.frame.order}</text>
+        <text x="50%" y="170" text-anchor="middle" font-family="${escapeXml(config.typography.fontFamily)}" font-size="18" fill="${config.preview.mutedLabel}">exact mask</text>
+      </svg>`,
+    );
+    composites.push({ input: label, left: gap, top });
+
+    for (
+      let cornerIndex = 0;
+      cornerIndex < corners.length;
+      cornerIndex += 1
+    ) {
+      const crop = boundedExtract(
+        {
+          ...corners[cornerIndex],
+          height: sourceCornerSize,
+          width: sourceCornerSize,
+        },
+        source,
+      );
+      const corner = await sharp(item.buffer)
+        .extract(crop)
+        .resize(tileSize, tileSize, {
+          fit: "fill",
+          kernel: sharp.kernel.nearest,
+        })
+        .png({ adaptiveFiltering: false, compressionLevel: 9 })
+        .toBuffer();
+      composites.push({
+        input: corner,
+        left:
+          labelWidth +
+          2 * gap +
+          cornerIndex * (tileSize + gap),
+        top,
+      });
+    }
+  }
+
+  const buffer = await sharp({
+    create: {
+      channels: 4,
+      height,
+      width,
+      background: config.preview.background,
+    },
+  })
+    .composite(composites)
+    .png({ adaptiveFiltering: false, compressionLevel: 9 })
+    .toBuffer();
+  return {
+    buffer,
+    dimensions: { height, width },
+  };
+}
+
+function photographicDeviceConsistency(deviceFamilies, composedByFamily, config) {
+  if (config.compositionMode !== "photographic-device") {
+    return null;
+  }
+  return Object.fromEntries(
+    deviceFamilies.map((family) => {
+      const items = composedByFamily.get(family);
+      const widths = items.map(
+        (item) => item.deviceGeometry.componentDimensions.width,
+      );
+      const heights = items.map(
+        (item) => item.deviceGeometry.componentDimensions.height,
+      );
+      const widthMedian = median(widths);
+      const heightMedian = median(heights);
+      const maximumWidthDeviation = Math.max(
+        ...widths.map(
+          (value) => Math.abs(value - widthMedian) / widthMedian,
+        ),
+      );
+      const maximumHeightDeviation = Math.max(
+        ...heights.map(
+          (value) => Math.abs(value - heightMedian) / heightMedian,
+        ),
+      );
+      const contract = config.presets[family].photographicDevice;
+      if (
+        maximumWidthDeviation >
+          contract.deviceWidthConsistencyTolerance ||
+        maximumHeightDeviation >
+          contract.deviceHeightConsistencyTolerance
+      ) {
+        fail(
+          `${family} photographic device dimensions exceed their consistency tolerance`,
+        );
+      }
+      return [
+        family,
+        {
+          heightMedian,
+          maximumHeightDeviation,
+          maximumWidthDeviation,
+          widthMedian,
+        },
+      ];
+    }),
+  );
 }
 
 export async function composeMarketingAssets(rawOptions) {
@@ -1029,6 +1659,9 @@ export async function composeMarketingAssets(rawOptions) {
       await writeFile(outputPath, composed.buffer);
       artifacts.push({
         deviceFamily: item.family,
+        ...(composed.deviceGeometry
+          ? { deviceGeometry: composed.deviceGeometry }
+          : {}),
         dimensions: composed.dimensions,
         file: relativeFile,
         frameId: item.frame.frameId,
@@ -1050,6 +1683,11 @@ export async function composeMarketingAssets(rawOptions) {
     });
   }
 
+  const deviceConsistency = photographicDeviceConsistency(
+    deviceFamilies,
+    composedByFamily,
+    config,
+  );
   const contactSheets = [];
   for (const family of deviceFamilies) {
     const contactSheet = await buildContactSheet(
@@ -1066,7 +1704,29 @@ export async function composeMarketingAssets(rawOptions) {
       deviceFamily: family,
       dimensions: contactSheet.dimensions,
       file: relativeFile,
+      kind: "overview",
       sha256: sha256Buffer(contactSheet.buffer),
+    });
+  }
+  if (
+    config.compositionMode === "photographic-device" &&
+    deviceFamilies.includes("iphone")
+  ) {
+    const cornerSheet = await buildIphoneCornerSheet(
+      composedByFamily.get("iphone"),
+      config,
+    );
+    const relativeFile = "preview-iphone-corners.png";
+    await writeFile(
+      path.join(path.resolve(options.outputDir), relativeFile),
+      cornerSheet.buffer,
+    );
+    contactSheets.push({
+      deviceFamily: "iphone",
+      dimensions: cornerSheet.dimensions,
+      file: relativeFile,
+      kind: "corner-audit",
+      sha256: sha256Buffer(cornerSheet.buffer),
     });
   }
 
@@ -1086,6 +1746,7 @@ export async function composeMarketingAssets(rawOptions) {
       vips: sharp.versions.vips,
     },
     visualDirection: config.visualDirection,
+    ...(deviceConsistency ? { deviceConsistency } : {}),
     source: {
       captureManifest: path.basename(manifestPath),
       captureManifestSha256: manifestSha256,
