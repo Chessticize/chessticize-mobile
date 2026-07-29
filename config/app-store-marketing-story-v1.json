@@ -315,8 +315,8 @@
           "custom-mode-regular",
           "custom-theme-fork",
           "custom-theme-pin",
-          "practice-run-duration-300",
-          "practice-run-per-puzzle-30"
+          "practice-run-duration-stepper",
+          "practice-run-per-puzzle-stepper-increase"
         ],
         "requiredVisibleTestIds": [
           "practice-run-editor",

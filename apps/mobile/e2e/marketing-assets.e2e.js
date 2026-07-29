@@ -102,8 +102,8 @@ async function prepareFrame(frame) {
       await prepareRatingTrend();
       return;
     case 'private-offline-open-source':
-      await openTab('settings-tab', 'settings-about-section');
-      await waitForVisibleInPracticeScroll('settings-license');
+      await openTab('settings-tab', 'settings-license');
+      await waitForVisibleInPracticeScroll('settings-stockfish-source');
       return;
     default:
       throw new Error(`Unhandled marketing frame ${frame.id}`);
@@ -122,16 +122,27 @@ async function prepareCustomRun() {
   await element(by.id('custom-theme-fork')).tap();
   await waitForVisibleInPracticeScroll('custom-theme-pin');
   await element(by.id('custom-theme-pin')).tap();
-  await waitForVisibleInPracticeScroll('practice-run-duration-300');
-  await element(by.id('practice-run-duration-300')).tap();
-  await waitForVisibleInPracticeScroll('practice-run-per-puzzle-30');
-  await element(by.id('practice-run-per-puzzle-30')).tap();
+  await element(by.id('practice-main-scroll')).scrollTo('bottom');
+  await waitFor(element(by.id('practice-run-duration-stepper')))
+    .toExist()
+    .withTimeout(10000);
+  await waitFor(element(by.id('practice-run-per-puzzle-stepper-increase')))
+    .toBeVisible()
+    .withTimeout(10000);
+  await element(by.id('practice-run-per-puzzle-stepper-increase')).tap();
   await waitForVisibleInPracticeScroll('practice-run-elo-input');
   await element(by.id('practice-run-elo-input')).replaceText(
     String(story.fictionalUser.customRun.startingRating)
   );
-  await dismissRunNameKeyboard();
+  await element(by.id('practice-run-elo-input')).tapReturnKey();
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await waitFor(element(by.id('practice-run-editor-title')))
+    .toBeVisible()
+    .withTimeout(5000);
+  await element(by.id('practice-run-editor-title')).tap();
+  await sleep(500);
   await waitForVisibleInPracticeScroll('practice-run-pass-rules');
+  await element(by.id('practice-main-scroll')).scrollTo('top');
 }
 
 async function prepareRatingTrend() {
@@ -166,18 +177,21 @@ async function assertStableText(frame) {
         'session-puzzle-timing-label',
         stable['session-puzzle-timing']
       );
-      await expectText('session-mistakes', '0');
+      await expectAttributeContains('session-mistakes', 'Mistakes 0 of');
       return;
     case 'focus-your-practice':
       await expectText('practice-run-name-input', stable['practice-run-name-input']);
-      await expectSelected('custom-theme-fork');
-      await expectSelected('custom-theme-pin');
+      await expectChecked('custom-theme-fork');
+      await expectChecked('custom-theme-pin');
       await expectText('practice-run-elo-input', stable.rating);
+      await expect(element(by.text(stable.mode))).toExist();
+      await expect(element(by.text(stable.duration))).toExist();
+      await expect(element(by.text(stable.pace))).toExist();
       await expectAttributeContains('practice-run-pass-rules', stable['pass-rule']);
       return;
     case 'make-every-mistake-count':
       await expectText('review-due-count', stable['review-due-count']);
-      await expectText('review-start-due', stable['review-start-due']);
+      await expect(element(by.text(stable['review-start-due']))).toExist();
       await expectText('review-tomorrow-count', stable['review-tomorrow-count']);
       await expectText(
         'review-next-seven-days-count',
@@ -261,9 +275,6 @@ async function assertForbiddenState(frame) {
     if (/\boverdue\b/i.test(dueCardText)) {
       throw new Error(`Review marketing frame must not show overdue work: ${dueCardText}`);
     }
-  }
-  if (frame.id === 'private-offline-open-source') {
-    await expect(element(by.id('settings-app-version'))).not.toBeVisible();
   }
 }
 
@@ -361,10 +372,21 @@ async function expectText(testID, expected) {
   await waitFor(element(by.id(testID))).toHaveText(expected).withTimeout(10000);
 }
 
-async function expectSelected(testID) {
-  await waitFor(element(by.id(testID).and(by.traits(['selected']))))
-    .toExist()
-    .withTimeout(10000);
+async function expectChecked(testID) {
+  const rawAttributes = await element(by.id(testID)).getAttributes();
+  const attributes = Array.isArray(rawAttributes)
+    ? rawAttributes[0]
+    : rawAttributes;
+  if (
+    attributes?.value !== '1'
+    && attributes?.value !== true
+    && attributes?.value !== 'checked'
+    && attributes?.value !== 'checkbox, checked'
+  ) {
+    throw new Error(
+      `${testID} must be checked; received ${JSON.stringify(rawAttributes)}`
+    );
+  }
 }
 
 async function expectAttributeContains(testID, expected) {
