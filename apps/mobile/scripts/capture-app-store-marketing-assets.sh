@@ -60,8 +60,41 @@ prepare_simulator_orientation() {
   local orientation="$3"
   xcrun simctl boot "$device_udid" 2>/dev/null || true
   xcrun simctl bootstatus "$device_udid" -b
+  /usr/bin/osascript -e 'tell application "Simulator" to quit'
+  for _ in {1..40}; do
+    if ! /usr/bin/pgrep -x Simulator >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.25
+  done
+  if /usr/bin/pgrep -x Simulator >/dev/null 2>&1; then
+    echo "Simulator did not close before opening $device_name." >&2
+    exit 69
+  fi
+
   /usr/bin/open -a Simulator --args -CurrentDeviceUDID "$device_udid"
-  "$ORIENTATION_RUNNER" "$device_udid" "$device_name" "$orientation"
+  local matching_window_count
+  for _ in {1..40}; do
+    matching_window_count="$(
+      /usr/bin/osascript \
+        -e 'on run argv' \
+        -e 'set deviceName to item 1 of argv' \
+        -e 'tell application "System Events"' \
+        -e 'tell process "Simulator"' \
+        -e 'return count of (every window whose name starts with deviceName)' \
+        -e 'end tell' \
+        -e 'end tell' \
+        -e 'end run' \
+        "$device_name" 2>/dev/null || true
+    )"
+    if [[ "$matching_window_count" == "1" ]]; then
+      "$ORIENTATION_RUNNER" "$device_udid" "$device_name" "$orientation"
+      return
+    fi
+    sleep 0.25
+  done
+  echo "Could not open the exact Simulator window for $device_name." >&2
+  exit 69
 }
 
 capture_device_family() {

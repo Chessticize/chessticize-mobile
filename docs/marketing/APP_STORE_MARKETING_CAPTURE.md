@@ -18,7 +18,9 @@ portrait. For iPad, the wrapper opens the exact Simulator window and uses the
 host Rotate control because current iPadOS windowing can reject an in-app
 orientation request. It verifies the framebuffer before starting the iPad
 capture and restores that Simulator to portrait when the command finishes or
-fails.
+fails. After the iPhone capture, the wrapper restarts only the Mac Simulator
+host UI before opening the exact iPad window; it does not shut down or erase
+either simulated device.
 
 Different names may be supplied with
 `CHESSTICIZE_MARKETING_IPHONE_DEVICE` and
