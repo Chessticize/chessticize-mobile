@@ -7,6 +7,7 @@ import type { MobilePlatformCapabilities } from "./src/platform/mobilePlatformCa
 import {
   createAdvancingTestClock,
   enableTestControlsFromLaunchConfig,
+  resolveMarketingCaptureFrameFromLaunchConfig,
   resolveTestArrowDuelTargetCorrectFromLaunchConfig,
   resolveTestCustomTargetCorrectFromLaunchConfig,
   resolveTestNowMsFromLaunchConfig,
@@ -14,6 +15,10 @@ import {
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
   resolveTestStandardTargetCorrectFromLaunchConfig
 } from "./src/platform/testLaunchConfig";
+import { composeIOSMobilePlatformCapabilities } from "./src/platform/iosMobilePlatformCapabilities";
+import {
+  createAppStoreMarketingCaptureFixture
+} from "./src/testing/appStoreMarketingCapture";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
 import { createMobileSystemBackSource } from "./src/navigation/mobileSystemBack";
 
@@ -24,13 +29,22 @@ if (shouldSuppressLogBoxWarnings()) {
 }
 
 function App() {
+  const marketingCaptureFrame = resolveMarketingCaptureFrameFromLaunchConfig();
+  const marketingCaptureFixture = React.useMemo(
+    () => marketingCaptureFrame === undefined
+      ? undefined
+      : createAppStoreMarketingCaptureFixture(marketingCaptureFrame),
+    [marketingCaptureFrame]
+  );
   const platformFactory = mobilePlatformCapabilityFactoryFor(Platform.OS as "android" | "ios");
   const systemBack = React.useMemo(
     () => createMobileSystemBackSource(Platform.OS as "android" | "ios"),
     []
   );
   const [platformCapabilities, setPlatformCapabilities] = React.useState<MobilePlatformCapabilities | undefined>(
-    () => platformFactory.createSync()
+    () => marketingCaptureFixture
+      ? composeIOSMobilePlatformCapabilities(marketingCaptureFixture.practiceService)
+      : platformFactory.createSync()
   );
   const [loadError, setLoadError] = React.useState<string | undefined>(undefined);
   const testNowMs = resolveTestNowMsFromLaunchConfig();
@@ -40,11 +54,13 @@ function App() {
   const puzzleSelectionSeed = resolveTestPuzzleSelectionSeedFromLaunchConfig();
   const standardTargetCorrect = resolveTestStandardTargetCorrectFromLaunchConfig();
   const currentTimeMs = React.useMemo(
-    () => testNowMs === undefined ? undefined : createAdvancingTestClock(testNowMs),
-    [testNowMs]
+    () => marketingCaptureFixture
+      ? () => marketingCaptureFixture.captureInstantMs
+      : testNowMs === undefined ? undefined : createAdvancingTestClock(testNowMs),
+    [marketingCaptureFixture, testNowMs]
   );
   React.useEffect(() => {
-    if (platformCapabilities) {
+    if (platformCapabilities || marketingCaptureFixture) {
       return;
     }
     let cancelled = false;
@@ -62,7 +78,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [platformCapabilities, platformFactory]);
+  }, [marketingCaptureFixture, platformCapabilities, platformFactory]);
 
   return (
     <SafeAreaProvider>
@@ -76,6 +92,9 @@ function App() {
           puzzleSelectionId={puzzleSelectionId}
           puzzleSelectionSeed={puzzleSelectionSeed}
           runManagementEnabled
+          sprintRulesDesignPreview={marketingCaptureFixture?.initialActiveState
+            ? { initialActiveState: marketingCaptureFixture.initialActiveState }
+            : undefined}
           standardTargetCorrect={standardTargetCorrect}
           systemBack={systemBack}
         />

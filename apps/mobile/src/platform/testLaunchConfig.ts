@@ -10,6 +10,7 @@ type TestLaunchConfigGlobals = typeof globalThis & {
 type NativeTestLaunchConfigValues = {
   arrowDuelTargetCorrect?: string | number;
   customTargetCorrect?: string | number;
+  marketingCaptureFrame?: string;
   puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
   standardTargetCorrect?: string | number;
@@ -52,12 +53,23 @@ export function isStoreAssetCaptureEnabled(
   return readNativeTestLaunchConfig(nativeModule)?.storeAssetCapture === true;
 }
 
+export function resolveMarketingCaptureFrameFromLaunchConfig(
+  nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
+): string | undefined {
+  const frame = readNativeTestLaunchConfig(nativeModule)?.marketingCaptureFrame?.trim();
+  return frame ? frame : undefined;
+}
+
 export function resolveTestNowMsFromLaunchConfig(
   globals: TestLaunchConfigGlobals = globalThis,
   nativeModule: NativeTestLaunchConfigModule | undefined = NativeModules?.ChessticizeTestLaunchConfig as NativeTestLaunchConfigModule | undefined
 ): number | undefined {
   const launchConfig = readNativeTestLaunchConfig(nativeModule);
-  if (!areNativeTestControlsEnabled(globals, launchConfig) && launchConfig?.storeAssetCapture !== true) {
+  if (
+    !areNativeTestControlsEnabled(globals, launchConfig)
+    && launchConfig?.storeAssetCapture !== true
+    && !launchConfig?.marketingCaptureFrame
+  ) {
     return undefined;
   }
 

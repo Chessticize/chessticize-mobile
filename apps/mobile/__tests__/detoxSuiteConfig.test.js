@@ -6,6 +6,7 @@ const {
   ACTIVE_E2E_TEST_MATCH_BY_SUITE,
   ACTIVE_E2E_TEST_MATCH,
   STORE_ASSETS_TEST_MATCH,
+  MARKETING_ASSETS_TEST_MATCH,
   ADAPTIVE_LAYOUT_TEST_MATCH,
   ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH,
   ANDROID_LAUNCH_TEST_MATCH,
@@ -1496,6 +1497,15 @@ describe('Detox suite configuration', () => {
       .toEqual(STORE_ASSETS_TEST_MATCH);
   });
 
+  it('keeps marketing capture separate from the release-QA screenshot suite', () => {
+    expect(resolveDetoxTestMatch({ CHESSTICIZE_CAPTURE_MARKETING_ASSETS: '1' }))
+      .toEqual(MARKETING_ASSETS_TEST_MATCH);
+    expect(MARKETING_ASSETS_TEST_MATCH).toEqual([
+      '<rootDir>/e2e/marketing-assets.e2e.js'
+    ]);
+    expect(MARKETING_ASSETS_TEST_MATCH).not.toEqual(STORE_ASSETS_TEST_MATCH);
+  });
+
   it('keeps the adaptive layout screenshot spec available through its opt-in command', () => {
     expect(resolveDetoxTestMatch({ CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT: '1' }))
       .toEqual(ADAPTIVE_LAYOUT_TEST_MATCH);
@@ -2003,6 +2013,13 @@ describe('Detox suite configuration', () => {
     expect(() => resolveDetoxTestMatch({
       CHESSTICIZE_CAPTURE_STORE_ASSETS: '1',
       CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT: '1'
+    })).toThrow('Active and opt-in E2E suites must run separately.');
+  });
+
+  it('rejects mixing marketing capture with release-QA capture', () => {
+    expect(() => resolveDetoxTestMatch({
+      CHESSTICIZE_CAPTURE_MARKETING_ASSETS: '1',
+      CHESSTICIZE_CAPTURE_STORE_ASSETS: '1'
     })).toThrow('Active and opt-in E2E suites must run separately.');
   });
 
