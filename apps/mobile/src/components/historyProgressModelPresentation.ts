@@ -16,7 +16,7 @@ import type {
   HistoryWeaknessEffect
 } from "./historyProgressPresentation.ts";
 
-const MAX_VISIBLE_PROGRESS_SERIES = 8;
+const MAX_VISIBLE_PROGRESS_THEMES = 8;
 
 export function historyProgressPresentationFromModel(
   progress: TacticalProfileProgress
@@ -40,18 +40,19 @@ export function historyProgressPresentationFromModel(
     isWellSampled(estimate, progress)
   );
   const strengths = observed
+    .slice(0, MAX_VISIBLE_PROGRESS_THEMES)
     .flatMap((estimate) => {
       const signal = currentSignals.get(signalId(estimate));
       return seriesKinds(signal, estimate).flatMap((kind) => {
         const series = strengthSeries(
           estimate,
           kind,
-          progress.snapshots
+          progress.snapshots,
+          progress.assurance === "provisional"
         );
         return series ? [series] : [];
       });
-    })
-    .slice(0, MAX_VISIBLE_PROGRESS_SERIES);
+    });
   const weaknessSignal = progress.evaluation.signals
     .filter((signal) => signal.status === "recommended")
     .sort(compareWeaknessSignals)[0];
@@ -79,7 +80,7 @@ export function historyProgressPresentationFromModel(
           noWeaknessTone: "balanced",
           noWeaknessTitle: "Recent play looks balanced",
           noWeaknessLabel:
-            "No theme currently shows a repeated, meaningful weakness in solve reliability or completed-puzzle speed."
+            "No theme currently shows a repeated, meaningful weakness in accuracy or solve time."
         }
       : {
           noWeaknessTone: "collecting",
@@ -93,7 +94,8 @@ export function historyProgressPresentationFromModel(
 function strengthSeries(
   current: TacticalProfileThemeEstimate,
   kind: Exclude<TacticalFocusReason, "both">,
-  snapshots: readonly TacticalProfileProgressSnapshot[]
+  snapshots: readonly TacticalProfileProgressSnapshot[],
+  provisional: boolean
 ): HistoryStrengthSeries | undefined {
   const points = snapshots.flatMap((snapshot) => {
     const estimate = snapshot.estimates.find(
@@ -123,19 +125,21 @@ function strengthSeries(
     label,
     kind,
     metricLabel: kind === "completed_speed"
-      ? "Completed time above matched expectation · lower is better"
-      : "Extra misses per 100 comparable puzzles · lower is better",
+      ? "Solve time · lower is better"
+      : "Accuracy · higher is better",
     baselineLabel: kind === "completed_speed"
-      ? "1.00× = matched completed-puzzle time"
-      : "0 = matched solve expectation",
+      ? provisional
+        ? "1.00× = provisional 30-second baseline"
+        : "1.00× = expected completed-puzzle time"
+      : "Eligible ordinary mixed Runs",
     scaleMax: kind === "completed_speed"
-      ? Math.max(20, Math.ceil(maxValue * 1.15))
-      : Math.max(10, Math.ceil(maxValue * 1.15)),
+      ? Math.max(100, Math.ceil(maxValue * 1.15))
+      : 100,
     changeLabel: change.label,
     changeTone: change.tone,
     summary: kind === "completed_speed"
-      ? `Reliable, correctly completed ${themeLabel} puzzles now take about ${latest.valueLabel} the matched expectation, compared with ${first.valueLabel} at the first visible point. Wrong moves and timeouts stay in solve reliability instead of this speed estimate.`
-      : `${themeLabel} solve reliability is now estimated at ${latest.valueLabel} extra misses per 100 comparable puzzles, compared with ${first.valueLabel} at the first visible point. Puzzle difficulty, your Rating, and task family are matched before estimating the gap.`,
+      ? "Only correct, before-timeout solves with reliable timing are included."
+      : "Wrong moves and timeouts count as misses.",
     points
   };
 }
@@ -154,17 +158,16 @@ function progressPoint(
   if (kind === "completed_speed") {
     return {
       label: shortUtcDate(asOf),
-      value: Math.max(0, 100 * (estimate.completedTimeMultiplier - 1)),
+      value: 100 * estimate.completedTimeMultiplier,
       valueLabel: `${estimate.completedTimeMultiplier.toFixed(2)}×`,
       sampleSize: Math.max(1, Math.round(evidenceWeight))
     };
   }
+  const accuracyPercent = 100 * estimate.observedSolveRate;
   return {
     label: shortUtcDate(asOf),
-    value: estimate.expectedFailuresPer100,
-    valueLabel: estimate.expectedFailuresPer100 < 0.5
-      ? "0"
-      : `+${Math.round(estimate.expectedFailuresPer100)}`,
+    value: accuracyPercent,
+    valueLabel: `${Math.round(accuracyPercent)}%`,
     sampleSize: Math.max(1, Math.round(evidenceWeight))
   };
 }
@@ -270,10 +273,14 @@ function preferredSeriesKind(
   signal: TacticalProfileModelSignal | undefined,
   estimate: TacticalProfileThemeEstimate
 ): Exclude<TacticalFocusReason, "both"> {
-  if (signal?.reason === "completed_speed") {
+  if (signal?.status === "recommended" && signal.reason === "completed_speed") {
     return "completed_speed";
   }
-  if (signal?.reason === "both" && signal.speedConfidence > signal.solveConfidence) {
+  if (
+    signal?.status === "recommended" &&
+    signal.reason === "both" &&
+    signal.speedConfidence > signal.solveConfidence
+  ) {
     return "completed_speed";
   }
   return estimate.solveEvidenceWeight > 0
@@ -351,23 +358,23 @@ function changePresentation(
   if (delta <= -meaningfulDelta) {
     return {
       label: kind === "completed_speed"
-        ? `${Math.round(Math.abs(delta))}% less overhead`
-        : `${Math.round(Math.abs(delta))} fewer / 100`,
-      tone: "improved"
+        ? `${Math.round(Math.abs(delta))}% less time`
+        : `${Math.round(Math.abs(delta))} points lower`,
+      tone: kind === "completed_speed" ? "improved" : "worsened"
     };
   }
   if (delta >= meaningfulDelta) {
     return {
       label: kind === "completed_speed"
-        ? `${Math.round(delta)}% more overhead`
-        : `${Math.round(delta)} more / 100`,
-      tone: "worsened"
+        ? `${Math.round(delta)}% more time`
+        : `${Math.round(delta)} points higher`,
+      tone: kind === "completed_speed" ? "worsened" : "improved"
     };
   }
   return {
     label: kind === "completed_speed"
-      ? "Completed time is steady"
-      : "Reliability gap is steady",
+      ? "Time is steady"
+      : "Accuracy is steady",
     tone: "steady"
   };
 }

@@ -22,6 +22,7 @@ test("builds visible model reliability progress for a well-sampled balanced them
         asOf: "2026-07-18T00:00:00.000Z",
         estimates: [themeEstimate({
           expectedFailuresPer100: 12,
+          observedSolveRate: 0.84,
           solveEvidenceWeight: 8
         })]
       },
@@ -29,6 +30,7 @@ test("builds visible model reliability progress for a well-sampled balanced them
         asOf: "2026-07-25T00:00:00.000Z",
         estimates: [themeEstimate({
           expectedFailuresPer100: 4,
+          observedSolveRate: 0.92,
           solveEvidenceWeight: 14
         })]
       }
@@ -43,7 +45,7 @@ test("builds visible model reliability progress for a well-sampled balanced them
   expect(presentation?.sampleUnitLabel).toBe("model-weighted observations");
   expect(presentation?.noWeaknessTone).toBe("balanced");
   expect(presentation?.noWeaknessLabel).toBe(
-    "No theme currently shows a repeated, meaningful weakness in solve reliability or completed-puzzle speed."
+    "No theme currently shows a repeated, meaningful weakness in accuracy or solve time."
   );
   expect(presentation?.strengths.map((series) => series.kind)).toEqual([
     "solve_rate",
@@ -52,9 +54,9 @@ test("builds visible model reliability progress for a well-sampled balanced them
   expect(reliabilitySeries?.themeId).toBe("line:fork");
   expect(reliabilitySeries?.label).toBe("Fork · Puzzle solving");
   expect(reliabilitySeries?.kind).toBe("solve_rate");
-  expect(reliabilitySeries?.changeLabel).toBe("8 fewer / 100");
+  expect(reliabilitySeries?.changeLabel).toBe("8 points higher");
   expect(reliabilitySeries?.points.map((point) => point.sampleSize)).toEqual([8, 14]);
-  expect(reliabilitySeries?.points.map((point) => point.valueLabel)).toEqual(["+12", "+4"]);
+  expect(reliabilitySeries?.points.map((point) => point.valueLabel)).toEqual(["84%", "92%"]);
   expect(speedSeries?.themeId).toBe("line:fork");
   expect(speedSeries?.kind).toBe("completed_speed");
 });
@@ -95,6 +97,27 @@ test("shows completed-speed stats when a balanced theme has no solve observation
   expect(presentation?.initialSeriesId).toBe("line:fork:completed_speed");
   expect(presentation?.strengths[0]?.kind).toBe("completed_speed");
   expect(presentation?.strengths[0]?.points[0]?.valueLabel).toBe("1.08×");
+});
+
+test("keeps both accuracy and time visible for every displayed theme", () => {
+  const themes = ["fork", "pin", "skewer", "promotion", "mateIn1"];
+  const progress = tacticalProgress({
+    snapshots: [{
+      asOf: "2026-07-25T00:00:00.000Z",
+      estimates: themes.map((theme) => themeEstimate({ theme }))
+    }]
+  });
+
+  const presentation = historyProgressPresentationFromModel(progress);
+  const mateSeries = presentation?.strengths.filter(
+    (series) => series.themeId === "line:mateIn1"
+  );
+
+  expect(presentation?.strengths).toHaveLength(10);
+  expect(mateSeries?.map((series) => series.kind)).toEqual([
+    "solve_rate",
+    "completed_speed"
+  ]);
 });
 
 test("uses completed-time evidence for a model-selected speed weakness", () => {
@@ -170,7 +193,7 @@ test("uses completed-time evidence for a model-selected speed weakness", () => {
   );
 });
 
-test("compares weakness copy with well-sampled themes beyond the visible series limit", () => {
+test("compares weakness copy with well-sampled themes beyond the visible theme limit", () => {
   const pin = themeEstimate({
     theme: "pin",
     completedTimeMultiplier: 1.34,
@@ -226,7 +249,7 @@ test("compares weakness copy with well-sampled themes beyond the visible series 
   const presentation = historyProgressPresentationFromModel(progress);
   const comparison = presentation?.weakness?.effects[0]?.comparisonLabel;
 
-  expect(presentation?.strengths).toHaveLength(8);
+  expect(presentation?.strengths).toHaveLength(16);
   expect(comparison).toContain(
     "highest-confidence current weakness signal among the well-sampled themes"
   );
@@ -325,6 +348,7 @@ function themeEstimate(
     speedEvidenceWeight: 8,
     solveConfidence: 0.1,
     speedConfidence: 0.1,
+    observedSolveRate: 0.92,
     expectedFailuresPer100: 2,
     completedTimeMultiplier: 1.02,
     ...overrides

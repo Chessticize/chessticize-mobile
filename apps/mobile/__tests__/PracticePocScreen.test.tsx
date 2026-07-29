@@ -2656,10 +2656,10 @@ describe("PracticePocScreen", () => {
     );
     expect(findByTestId(renderer, "history-progress-early-estimate")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
-      "13 fewer / 100"
+      "16 points higher"
     );
     expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
-      "Extra misses per 100 comparable puzzles"
+      "Accuracy · higher is better"
     );
     expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
       "n=71"
@@ -2668,11 +2668,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(balanced)).toContain("Recent play looks balanced");
     expect(collectText(findByTestId(renderer, "history-balanced-check"))).toBe("✓");
     expect(collectText(balanced)).toContain(
-      "No theme currently shows a repeated, meaningful weakness in solve reliability or completed-puzzle speed."
+      "No theme currently shows a repeated, meaningful weakness in accuracy or solve time."
     );
     const metricSelector = findByTestId(renderer, "history-progress-metric-selector");
-    expect(collectText(metricSelector)).toContain("Solve reliability");
-    expect(collectText(metricSelector)).toContain("Completed-puzzle speed");
+    expect(collectText(metricSelector)).toContain("Accuracy");
+    expect(collectText(metricSelector)).toContain("94%");
+    expect(collectText(metricSelector)).toContain("Solve time");
+    expect(collectText(metricSelector)).toContain("1.09×");
     press(renderer, "history-progress-metric-completed_speed");
     expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
       "1.09×"
@@ -2680,7 +2682,7 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "history-progress-strength-pins");
     expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
-      "24% less overhead"
+      "24% less time"
     );
     expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
       "1.06×"

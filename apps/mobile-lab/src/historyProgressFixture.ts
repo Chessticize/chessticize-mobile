@@ -15,21 +15,19 @@ const FORK_RELIABILITY_PROGRESS: HistoryStrengthSeries = {
   themeId: "forks",
   label: "Forks",
   kind: "solve_rate",
-  metricLabel:
-    "Extra misses per 100 comparable puzzles · lower is better",
-  baselineLabel: "0 = matched solve expectation",
-  scaleMax: 20,
-  changeLabel: "13 fewer / 100",
+  metricLabel: "Accuracy · higher is better",
+  baselineLabel: "Eligible ordinary mixed Runs",
+  scaleMax: 100,
+  changeLabel: "16 points higher",
   changeTone: "improved",
-  summary:
-    "The Fork reliability gap has narrowed from 16 extra misses per 100 comparable puzzles to 3. The model matches puzzle difficulty, your Rating, and task family before estimating the gap.",
+  summary: "Wrong moves and timeouts count as misses.",
   points: [
-    { label: "May 24", value: 16, valueLabel: "+16", sampleSize: 22 },
-    { label: "Jun 7", value: 14, valueLabel: "+14", sampleSize: 31 },
-    { label: "Jun 21", value: 11, valueLabel: "+11", sampleSize: 41 },
-    { label: "Jul 5", value: 8, valueLabel: "+8", sampleSize: 52 },
-    { label: "Jul 19", value: 5, valueLabel: "+5", sampleSize: 63 },
-    { label: "Jul 26", value: 3, valueLabel: "+3", sampleSize: 71 }
+    { label: "May 24", value: 78, valueLabel: "78%", sampleSize: 22 },
+    { label: "Jun 7", value: 81, valueLabel: "81%", sampleSize: 31 },
+    { label: "Jun 21", value: 84, valueLabel: "84%", sampleSize: 41 },
+    { label: "Jul 5", value: 87, valueLabel: "87%", sampleSize: 52 },
+    { label: "Jul 19", value: 91, valueLabel: "91%", sampleSize: 63 },
+    { label: "Jul 26", value: 94, valueLabel: "94%", sampleSize: 71 }
   ]
 };
 
@@ -38,21 +36,20 @@ const FORK_SPEED_PROGRESS: HistoryStrengthSeries = {
   themeId: "forks",
   label: "Forks",
   kind: "completed_speed",
-  metricLabel:
-    "Completed time above matched expectation · lower is better",
-  baselineLabel: "1.00× = matched completed-puzzle time",
-  scaleMax: 24,
-  changeLabel: "9% less overhead",
+  metricLabel: "Solve time · lower is better",
+  baselineLabel: "1.00× = provisional 30-second baseline",
+  scaleMax: 140,
+  changeLabel: "9% less time",
   changeTone: "improved",
   summary:
-    "Reliable, correctly completed Fork puzzles now take about 1.09× the matched expectation, compared with 1.18× at the first visible point. Wrong moves and timeouts stay in solve reliability instead of this speed estimate.",
+    "Only correct, before-timeout solves with reliable timing are included.",
   points: [
-    { label: "May 24", value: 18, valueLabel: "1.18×", sampleSize: 18 },
-    { label: "Jun 7", value: 17, valueLabel: "1.17×", sampleSize: 25 },
-    { label: "Jun 21", value: 15, valueLabel: "1.15×", sampleSize: 33 },
-    { label: "Jul 5", value: 13, valueLabel: "1.13×", sampleSize: 42 },
-    { label: "Jul 19", value: 11, valueLabel: "1.11×", sampleSize: 50 },
-    { label: "Jul 26", value: 9, valueLabel: "1.09×", sampleSize: 57 }
+    { label: "May 24", value: 118, valueLabel: "1.18×", sampleSize: 18 },
+    { label: "Jun 7", value: 117, valueLabel: "1.17×", sampleSize: 25 },
+    { label: "Jun 21", value: 115, valueLabel: "1.15×", sampleSize: 33 },
+    { label: "Jul 5", value: 113, valueLabel: "1.13×", sampleSize: 42 },
+    { label: "Jul 19", value: 111, valueLabel: "1.11×", sampleSize: 50 },
+    { label: "Jul 26", value: 109, valueLabel: "1.09×", sampleSize: 57 }
   ]
 };
 
@@ -61,21 +58,20 @@ const PIN_SPEED_PROGRESS: HistoryStrengthSeries = {
   themeId: "pins",
   label: "Pins",
   kind: "completed_speed",
-  metricLabel:
-    "Completed time above matched expectation · lower is better",
-  baselineLabel: "1.00× = matched completed-puzzle time",
-  scaleMax: 35,
-  changeLabel: "24% less overhead",
+  metricLabel: "Solve time · lower is better",
+  baselineLabel: "1.00× = provisional 30-second baseline",
+  scaleMax: 140,
+  changeLabel: "24% less time",
   changeTone: "improved",
   summary:
-    "Correctly completed Pin puzzles now take about 1.06× the matched expectation, down from 1.30×. Wrong moves and timeouts are excluded from this speed estimate.",
+    "Only correct, before-timeout solves with reliable timing are included.",
   points: [
-    { label: "May 24", value: 30, valueLabel: "1.30×", sampleSize: 18 },
-    { label: "Jun 7", value: 27, valueLabel: "1.27×", sampleSize: 25 },
-    { label: "Jun 21", value: 22, valueLabel: "1.22×", sampleSize: 33 },
-    { label: "Jul 5", value: 17, valueLabel: "1.17×", sampleSize: 42 },
-    { label: "Jul 19", value: 11, valueLabel: "1.11×", sampleSize: 50 },
-    { label: "Jul 26", value: 6, valueLabel: "1.06×", sampleSize: 57 }
+    { label: "May 24", value: 130, valueLabel: "1.30×", sampleSize: 18 },
+    { label: "Jun 7", value: 127, valueLabel: "1.27×", sampleSize: 25 },
+    { label: "Jun 21", value: 122, valueLabel: "1.22×", sampleSize: 33 },
+    { label: "Jul 5", value: 117, valueLabel: "1.17×", sampleSize: 42 },
+    { label: "Jul 19", value: 111, valueLabel: "1.11×", sampleSize: 50 },
+    { label: "Jul 26", value: 106, valueLabel: "1.06×", sampleSize: 57 }
   ]
 };
 
@@ -84,21 +80,19 @@ const SKEWER_RELIABILITY_WEAKNESS: HistoryStrengthSeries = {
   themeId: "skewers",
   label: "Skewers",
   kind: "solve_rate",
-  metricLabel:
-    "Extra misses per 100 comparable puzzles · lower is better",
-  baselineLabel: "0 = matched solve expectation",
-  scaleMax: 24,
-  changeLabel: "Gap remains +14",
-  changeTone: "steady",
-  summary:
-    "Skewer reliability has improved slightly, but the current model estimate still shows 14 extra misses per 100 comparable puzzles.",
+  metricLabel: "Accuracy · higher is better",
+  baselineLabel: "Eligible ordinary mixed Runs",
+  scaleMax: 100,
+  changeLabel: "7 points higher",
+  changeTone: "improved",
+  summary: "Wrong moves and timeouts count as misses.",
   points: [
-    { label: "May 24", value: 20, valueLabel: "+20", sampleSize: 12 },
-    { label: "Jun 7", value: 19, valueLabel: "+19", sampleSize: 16 },
-    { label: "Jun 21", value: 18, valueLabel: "+18", sampleSize: 19 },
-    { label: "Jul 5", value: 17, valueLabel: "+17", sampleSize: 22 },
-    { label: "Jul 19", value: 15, valueLabel: "+15", sampleSize: 25 },
-    { label: "Jul 26", value: 14, valueLabel: "+14", sampleSize: 26 }
+    { label: "May 24", value: 72, valueLabel: "72%", sampleSize: 12 },
+    { label: "Jun 7", value: 73, valueLabel: "73%", sampleSize: 16 },
+    { label: "Jun 21", value: 74, valueLabel: "74%", sampleSize: 19 },
+    { label: "Jul 5", value: 76, valueLabel: "76%", sampleSize: 22 },
+    { label: "Jul 19", value: 77, valueLabel: "77%", sampleSize: 25 },
+    { label: "Jul 26", value: 79, valueLabel: "79%", sampleSize: 26 }
   ]
 };
 
@@ -107,21 +101,20 @@ const PIN_SPEED_WEAKNESS: HistoryStrengthSeries = {
   themeId: "pins",
   label: "Pins",
   kind: "completed_speed",
-  metricLabel:
-    "Completed time above matched expectation · lower is better",
-  baselineLabel: "1.00× = matched completed-puzzle time",
-  scaleMax: 40,
-  changeLabel: "15% more overhead",
+  metricLabel: "Solve time · lower is better",
+  baselineLabel: "1.00× = provisional 30-second baseline",
+  scaleMax: 150,
+  changeLabel: "15% more time",
   changeTone: "worsened",
   summary:
-    "Reliable, correctly completed Pin puzzles now take about 1.34× the matched expectation. The repeated completed-time gap is the weakness; a Slow label by itself is not.",
+    "Only correct, before-timeout solves with reliable timing are included.",
   points: [
-    { label: "May 24", value: 19, valueLabel: "1.19×", sampleSize: 13 },
-    { label: "Jun 7", value: 20, valueLabel: "1.20×", sampleSize: 17 },
-    { label: "Jun 21", value: 23, valueLabel: "1.23×", sampleSize: 20 },
-    { label: "Jul 5", value: 26, valueLabel: "1.26×", sampleSize: 23 },
-    { label: "Jul 19", value: 31, valueLabel: "1.31×", sampleSize: 25 },
-    { label: "Jul 26", value: 34, valueLabel: "1.34×", sampleSize: 26 }
+    { label: "May 24", value: 119, valueLabel: "1.19×", sampleSize: 13 },
+    { label: "Jun 7", value: 120, valueLabel: "1.20×", sampleSize: 17 },
+    { label: "Jun 21", value: 123, valueLabel: "1.23×", sampleSize: 20 },
+    { label: "Jul 5", value: 126, valueLabel: "1.26×", sampleSize: 23 },
+    { label: "Jul 19", value: 131, valueLabel: "1.31×", sampleSize: 25 },
+    { label: "Jul 26", value: 134, valueLabel: "1.34×", sampleSize: 26 }
   ]
 };
 
@@ -136,7 +129,7 @@ const BASE_PRESENTATION: Omit<
   noWeaknessTone: "balanced",
   noWeaknessTitle: "Recent play looks balanced",
   noWeaknessLabel:
-    "No theme currently shows a repeated, meaningful weakness in solve reliability or completed-puzzle speed."
+    "No theme currently shows a repeated, meaningful weakness in accuracy or solve time."
 };
 
 export function isHistoryProgressScenario(

@@ -69,6 +69,10 @@ export const TacticalProgress: Story = {
     (canvasElement.querySelector(
       '[data-testid="history-progress-metric-completed_speed"]'
     ) as HTMLElement | null)?.blur();
+    await clickTestId(canvasElement, "history-progress-metric-solve_rate");
+    (canvasElement.querySelector(
+      '[data-testid="history-progress-metric-solve_rate"]'
+    ) as HTMLElement | null)?.blur();
   }
 };
 

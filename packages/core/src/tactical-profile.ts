@@ -562,6 +562,7 @@ export type TacticalProfileThemeEstimate = {
   speedEvidenceWeight: number;
   solveConfidence: number;
   speedConfidence: number;
+  observedSolveRate: number;
   expectedFailuresPer100: number;
   completedTimeMultiplier: number;
 };
@@ -898,6 +899,7 @@ export function estimateTacticalProfileThemes(input: {
     speedEvidenceWeight: analysis.speedEvidenceWeight,
     solveConfidence: analysis.solveConfidence,
     speedConfidence: analysis.speedConfidence,
+    observedSolveRate: analysis.observedSolveRate,
     expectedFailuresPer100: analysis.expectedFailuresPer100,
     completedTimeMultiplier: analysis.completedTimeMultiplier
   }));
@@ -1113,6 +1115,15 @@ function tacticalProfileThemeAnalyses(
         speedEvidenceWeight: aggregate.speedWeight,
         solveConfidence,
         speedConfidence,
+        observedSolveRate: aggregate.solveWeight > 0
+          ? Math.max(
+              0,
+              Math.min(
+                1,
+                aggregate.solveObservedSuccess / aggregate.solveWeight
+              )
+            )
+          : 0,
         expectedFailuresPer100,
         completedTimeMultiplier,
         diversityPasses:

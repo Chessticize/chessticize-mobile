@@ -110,39 +110,6 @@ export function HistoryProgressScreen({
               {selectedSeries?.label ?? "No progress data yet"}
             </Text>
           </View>
-          {selectedSeries ? (
-            <View style={styles.progressBadges}>
-              <ProgressMetricSelector
-                onSelect={setSelectedSeriesId}
-                selectedSeriesId={selectedSeries.id}
-                series={selectedThemeSeries}
-              />
-              <View
-                accessibilityLabel={selectedSeries.changeLabel}
-                style={[
-                  styles.changePill,
-                  selectedSeries.changeTone === "steady"
-                    ? styles.changePillSteady
-                    : selectedSeries.changeTone === "worsened"
-                      ? styles.changePillWorsened
-                      : null
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.changePillText,
-                    selectedSeries.changeTone === "steady"
-                      ? styles.changePillTextSteady
-                      : selectedSeries.changeTone === "worsened"
-                        ? styles.changePillTextWorsened
-                        : null
-                  ]}
-                >
-                  {selectedSeries.changeLabel}
-                </Text>
-              </View>
-            </View>
-          ) : null}
         </View>
 
         <ScrollView
@@ -182,7 +149,38 @@ export function HistoryProgressScreen({
 
         {selectedSeries ? (
           <>
-            <Text style={styles.metricLabel}>{selectedSeries.metricLabel}</Text>
+            <ProgressMetricSelector
+              onSelect={setSelectedSeriesId}
+              selectedSeriesId={selectedSeries.id}
+              series={selectedThemeSeries}
+            />
+            <View style={styles.metricContextRow}>
+              <Text style={styles.metricLabel}>{selectedSeries.metricLabel}</Text>
+              <View
+                accessibilityLabel={selectedSeries.changeLabel}
+                style={[
+                  styles.changePill,
+                  selectedSeries.changeTone === "steady"
+                    ? styles.changePillSteady
+                    : selectedSeries.changeTone === "worsened"
+                      ? styles.changePillWorsened
+                      : null
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.changePillText,
+                    selectedSeries.changeTone === "steady"
+                      ? styles.changePillTextSteady
+                      : selectedSeries.changeTone === "worsened"
+                        ? styles.changePillTextWorsened
+                        : null
+                  ]}
+                >
+                  {selectedSeries.changeLabel}
+                </Text>
+              </View>
+            </View>
             <StrengthTrendChart
               sampleUnitLabel={presentation.sampleUnitLabel}
               series={selectedSeries}
@@ -259,9 +257,6 @@ function ProgressMetricSelector({
   selectedSeriesId: string;
   series: readonly HistoryStrengthSeries[];
 }): React.JSX.Element {
-  if (series.length === 1) {
-    return <ModelSignalPill kind={series[0]!.kind} />;
-  }
   return (
     <View
       accessibilityLabel="Progress metric"
@@ -270,27 +265,35 @@ function ProgressMetricSelector({
     >
       {series.map((candidate) => {
         const selected = candidate.id === selectedSeriesId;
+        const latest = candidate.points.at(-1);
         return (
           <Pressable
-            accessibilityLabel={`Show ${modelSignalLabel(candidate.kind)} progress`}
+            accessibilityLabel={`Show ${progressMetricLabel(candidate.kind)} progress, ${latest?.valueLabel ?? "no data"}`}
             accessibilityRole="button"
             accessibilityState={{ selected }}
             key={candidate.id}
             onPress={() => onSelect(candidate.id)}
             style={[
-              styles.signalPill,
-              selected ? null : styles.signalPillUnselected
+              styles.progressMetricCard,
+              selected ? styles.progressMetricCardSelected : null
             ]}
             testID={`history-progress-metric-${candidate.kind}`}
           >
             <Text
-              numberOfLines={2}
               style={[
-                styles.signalPillText,
-                selected ? null : styles.signalPillTextUnselected
+                styles.progressMetricCardLabel,
+                selected ? styles.progressMetricCardLabelSelected : null
               ]}
             >
-              {modelSignalLabel(candidate.kind)}
+              {progressMetricLabel(candidate.kind)}
+            </Text>
+            <Text
+              style={[
+                styles.progressMetricCardValue,
+                selected ? styles.progressMetricCardValueSelected : null
+              ]}
+            >
+              {latest?.valueLabel ?? "—"}
             </Text>
           </Pressable>
         );
@@ -427,6 +430,12 @@ function modelSignalLabel(kind: TacticalFocusReason): string {
     return "Reliability & speed";
   }
   return "Solve reliability";
+}
+
+function progressMetricLabel(
+  kind: Exclude<TacticalFocusReason, "both">
+): string {
+  return kind === "completed_speed" ? "Solve time" : "Accuracy";
 }
 
 function ProgressGlyph(): React.JSX.Element {
@@ -571,14 +580,41 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     lineHeight: 25
   },
-  progressBadges: {
-    alignItems: "flex-end",
-    gap: 6,
-    maxWidth: 142
-  },
   progressMetricSelector: {
-    alignItems: "flex-end",
-    gap: 5
+    flexDirection: "row",
+    gap: 10
+  },
+  progressMetricCard: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
+    gap: 3,
+    minHeight: 66,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  progressMetricCardSelected: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#60A5FA"
+  },
+  progressMetricCardLabel: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  progressMetricCardLabelSelected: {
+    color: "#1D4ED8"
+  },
+  progressMetricCardValue: {
+    color: "#334155",
+    fontSize: 20,
+    fontWeight: "800",
+    lineHeight: 24
+  },
+  progressMetricCardValueSelected: {
+    color: "#1D4ED8"
   },
   signalPill: {
     alignItems: "center",
@@ -589,10 +625,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 9,
     paddingVertical: 5
-  },
-  signalPillUnselected: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1"
   },
   signalPillWeakness: {
     backgroundColor: "#FEF3C7",
@@ -661,8 +693,15 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     color: "#64748B",
+    flex: 1,
     fontSize: 12,
     fontWeight: "700"
+  },
+  metricContextRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between"
   },
   baselineLabel: {
     color: "#64748B",

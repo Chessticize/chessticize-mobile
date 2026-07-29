@@ -743,6 +743,7 @@ test("theme estimates expose both model heads for balanced progress", () => {
     Array.from({ length: 8 }, (_, index) => tacticalAttempt({
       attempt: {
         id: `estimate-${index}`,
+        result: index < 2 ? "wrong" : "correct",
         sessionId: `estimate-session-${index % 2}`,
         completedAt: `2026-07-${String(10 + index).padStart(2, "0")}T00:00:20.000Z`,
         elapsedMs: 24_000
@@ -767,6 +768,8 @@ test("theme estimates expose both model heads for balanced progress", () => {
   assert.equal(estimate.distinctSessionCount, 2);
   assert.ok(estimate.solveEvidenceWeight > 0);
   assert.ok(estimate.speedEvidenceWeight > 0);
+  assert.ok(estimate.observedSolveRate > 0.75);
+  assert.ok(estimate.observedSolveRate < 0.8);
   assert.ok(Number.isFinite(estimate.expectedFailuresPer100));
   assert.ok(Number.isFinite(estimate.completedTimeMultiplier));
 });
