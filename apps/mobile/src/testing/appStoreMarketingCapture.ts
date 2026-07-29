@@ -150,6 +150,7 @@ export function loadAppStoreMarketingCaptureFixture(
     throw new Error(`Unknown App Store marketing capture frame "${frameId}"`);
   }
 
+  practiceService.loadFixturePuzzles(bundledPuzzles);
   practiceService.importLocalData(marketingLocalData({
     includeSavedCustomRun: frameId !== "focus-your-practice"
   }));
