@@ -1516,6 +1516,17 @@ describe('Detox suite configuration', () => {
       .toBeGreaterThan(0);
     expect(launchHelper.indexOf('setMarketingOrientationBeforeNavigation'))
       .toBeGreaterThan(launchHelper.indexOf('launchWithDisabledSynchronization'));
+
+    const responsiveHelperStart = spec.indexOf('async function assertNativeResponsiveLayout');
+    const responsiveHelperEnd = spec.indexOf(
+      'async function takeReadyScreenshot',
+      responsiveHelperStart
+    );
+    const responsiveHelper = spec.slice(responsiveHelperStart, responsiveHelperEnd);
+    expect(responsiveHelper).toContain("by.id('active-session-control-rail')");
+    expect(responsiveHelper).toContain("by.id('navigation-rail')");
+    expect(responsiveHelper.indexOf("by.id('active-session-control-rail')"))
+      .toBeLessThan(responsiveHelper.indexOf("by.id('navigation-rail')"));
   });
 
   it('keeps the adaptive layout screenshot spec available through its opt-in command', () => {

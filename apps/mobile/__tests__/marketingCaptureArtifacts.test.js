@@ -216,13 +216,10 @@ describe('App Store marketing capture artifacts', () => {
     })).toThrow();
   });
 
-  it('rotates each exact host Simulator before capture and restores the iPad', () => {
+  it('rotates the exact iPad host Simulator before capture and restores it', () => {
     const wrapper = readFileSync(
       join(__dirname, '../scripts/capture-app-store-marketing-assets.sh'),
       'utf8'
-    );
-    const iphoneOrientation = wrapper.indexOf(
-      'prepare_simulator_orientation "$IPHONE_UDID" "$IPHONE_DEVICE_NAME" portrait'
     );
     const iphoneCapture = wrapper.indexOf(
       'capture_device_family iphone "$IPHONE_DEVICE_NAME" "$IPHONE_UDID"'
@@ -236,8 +233,10 @@ describe('App Store marketing capture artifacts', () => {
 
     expect(wrapper).toContain('set-simulator-orientation.sh');
     expect(wrapper).toContain('/usr/bin/open -a Simulator --args -CurrentDeviceUDID');
-    expect(iphoneOrientation).toBeGreaterThan(0);
-    expect(iphoneCapture).toBeGreaterThan(iphoneOrientation);
+    expect(wrapper).not.toContain(
+      'prepare_simulator_orientation "$IPHONE_UDID" "$IPHONE_DEVICE_NAME"'
+    );
+    expect(iphoneCapture).toBeGreaterThan(0);
     expect(ipadOrientation).toBeGreaterThan(iphoneCapture);
     expect(ipadCapture).toBeGreaterThan(ipadOrientation);
     expect(wrapper).toContain(

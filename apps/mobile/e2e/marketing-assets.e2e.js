@@ -288,11 +288,11 @@ async function assertNativeResponsiveLayout(frame) {
     );
   }
   if (target.deviceFamily === 'ipad') {
-    await expect(element(by.id('navigation-rail'))).toExist();
-    if (
+    const isActiveSessionFrame = (
       frame.id === 'build-tactical-intuition'
       || frame.id === 'choose-the-best-move'
-    ) {
+    );
+    if (isActiveSessionFrame) {
       const layoutFrame = await frameFor(element(by.id('active-session-adaptive-layout')));
       const boardLaneFrame = await frameFor(element(by.id('active-session-board-lane')));
       const boardFrame = await frameFor(element(by.id('session-board')));
@@ -306,6 +306,8 @@ async function assertNativeResponsiveLayout(frame) {
           `Marketing iPad ${frame.id} board must stay left of its control rail.`
         );
       }
+    } else {
+      await expect(element(by.id('navigation-rail'))).toExist();
     }
   }
 }

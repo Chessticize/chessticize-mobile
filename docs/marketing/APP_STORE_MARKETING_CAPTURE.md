@@ -13,11 +13,12 @@ The workflow requires two dedicated, available iOS Simulators:
 - `Chessticize Marketing iPhone 17 Pro Max`, used in portrait
 - `Chessticize Marketing iPad Pro 13-inch (M5)`, used in landscape
 
-Keep the Mac unlocked during capture. The wrapper opens each exact Simulator
-window and uses the host Rotate control because current iPadOS windowing can
-reject an in-app orientation request. It verifies the framebuffer before
-starting Detox and restores the iPad Simulator to portrait when the command
-finishes or fails.
+Keep the Mac unlocked during capture. Detox keeps the iPhone capture in
+portrait. For iPad, the wrapper opens the exact Simulator window and uses the
+host Rotate control because current iPadOS windowing can reject an in-app
+orientation request. It verifies the framebuffer before starting the iPad
+capture and restores that Simulator to portrait when the command finishes or
+fails.
 
 Different names may be supplied with
 `CHESSTICIZE_MARKETING_IPHONE_DEVICE` and

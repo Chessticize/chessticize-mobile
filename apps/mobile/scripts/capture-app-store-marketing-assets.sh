@@ -114,7 +114,6 @@ IPAD_UDID="$(resolve_simulator_udid "$IPAD_DEVICE_NAME" "$IPAD_DEVICE_UDID")"
     pnpm mobile:e2e:build:ios:release
 )
 
-prepare_simulator_orientation "$IPHONE_UDID" "$IPHONE_DEVICE_NAME" portrait
 capture_device_family iphone "$IPHONE_DEVICE_NAME" "$IPHONE_UDID"
 IPAD_PORTRAIT_RESTORE_REQUIRED=1
 prepare_simulator_orientation "$IPAD_UDID" "$IPAD_DEVICE_NAME" landscape
