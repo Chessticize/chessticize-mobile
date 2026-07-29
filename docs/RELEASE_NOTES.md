@@ -48,14 +48,11 @@ The checked-in file contains the approved English (`en-US`) source copy for:
 Chessticize store copy has a stricter product limit than either store: use two
 or three short bullets and keep the entire `Store copy` block at or below 300
 Unicode characters. Include only changes that apply to the released platform.
-End with a direct link to the exact GitHub Release so a user can choose to read
-the detailed customer note, source disclosure, and artifact information. The
-URL names both the public repository and exact platform source tag, and counts
-toward the 300-character limit:
-
-```text
-Details and source: https://github.com/Chessticize/chessticize-mobile/releases/tag/<platform>-v<version>-build-<build>
-```
+Lead with what users can now do or understand, not implementation details. Do
+not include a raw release URL in App Store or Google Play release-note copy.
+Record the exact GitHub Release separately under `Release details` in the
+checked-in file so source and artifact identity remain auditable without making
+the store body read like a release manifest.
 
 If a new locale is added, create and review a separate localized section in the
 same file. English remains the only required release-note locale until a
@@ -78,17 +75,20 @@ localization task explicitly adds another one.
    users cannot observe.
 4. **Write store-ready copy.** Use plain English, concrete outcomes, and short
    sentences. Use two or three bullets, stay within 300 Unicode characters, and
-   name only changes available on that platform. Do not use generic “bug fixes
-   and improvements” as the entire note. Do not promise exact reminder delivery,
-   cross-platform sync, telemetry, or another capability that the exact
-   artifact does not provide. For a replacement build with no user-visible
-   difference, say so explicitly rather than inventing a change.
+   name only changes available on that platform. Lead with user benefits and
+   omit raw URLs. Do not call a stable user-facing feature `experimental`
+   unless that qualification is an intentional product promise. Do not use
+   generic “bug fixes and improvements” as the entire note. Do not promise
+   exact reminder delivery, cross-platform sync, telemetry, or another
+   capability that the exact artifact does not provide. For a replacement
+   build with no user-visible difference, say so explicitly rather than
+   inventing a change.
 5. **Review against the exact candidate.** Verify every statement against
    product behavior and validation evidence. Recheck privacy, offline, sync or
    backup, Stockfish, device-support, and source-disclosure claims. Confirm the
-   details link resolves to the exact platform GitHub Release. Count the final
-   store text, including that URL, against the 300-character product limit and
-   the destination’s current limit.
+   separate release-details link resolves to the exact platform GitHub Release.
+   Count only the exact store-copy block against the 300-character product limit
+   and the destination’s current limit, and confirm that block contains no URL.
 6. **Approve and freeze before tagging.** Change the file status to `Approved`,
    complete its review checklist, and include it in the clean candidate commit.
    Create the platform source tag only after this point.

@@ -4,7 +4,14 @@ const path = require("path");
 const repoRoot = path.resolve(__dirname, "../../..");
 const storeAssetsDoc = fs.readFileSync(path.join(repoRoot, "docs/STORE_ASSETS.md"), "utf8");
 const appStorePlan = fs.readFileSync(path.join(repoRoot, "docs/APP_STORE_PLAN.md"), "utf8");
+const appStoreMetadata = JSON.parse(
+  fs.readFileSync(path.join(repoRoot, "config/app-store-metadata-en-us-v1.json"), "utf8")
+);
 const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+const releaseNotesTemplate = fs.readFileSync(
+  path.join(repoRoot, "docs/releases/RELEASE_NOTES_TEMPLATE.md"),
+  "utf8"
+);
 const rootPackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const mobilePackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "apps/mobile/package.json"), "utf8"));
 const storeAssetsE2e = fs.readFileSync(path.join(repoRoot, "apps/mobile/e2e/store-assets.e2e.js"), "utf8");
@@ -29,19 +36,105 @@ function tableValue(field) {
   return match[1];
 }
 
+function descriptionBlock() {
+  const match = storeAssetsDoc.match(
+    /Copy the complete plain-text block below into App Store Connect:\n\n```text\n([\s\S]+?)\n```\n\nThe description/
+  );
+  if (!match) {
+    throw new Error("Missing paste-ready App Store description");
+  }
+  return match[1];
+}
+
+function storeCopyTemplateBlock() {
+  const match = releaseNotesTemplate.match(
+    /## Store copy \(`en-US`\)\n\n```text\n([\s\S]+?)\n```/
+  );
+  if (!match) {
+    throw new Error("Missing release-note store-copy template");
+  }
+  return match[1];
+}
+
 describe("App Store assets document", () => {
-  it("tracks the current public release and its customer-facing additions", () => {
+  it("tracks the current release without marketing inferred weaknesses", () => {
     expect(storeAssetsDoc).toContain("1.3 source of truth");
-    expect(storeAssetsDoc).toContain("Tactical Profiles");
-    expect(storeAssetsDoc).toContain("Focused Practice Runs");
-    expect(storeAssetsDoc).toContain("Configurable puzzle timing");
+    expect(appStoreMetadata.issue).toBe(413);
+    expect(appStoreMetadata.description).toContain("chess puzzle trainer");
+    expect(appStoreMetadata.description).toContain("SOLVE PUZZLES WITH INTENT");
+    expect(appStoreMetadata.description).toContain("Custom Runs");
+    expect(appStoreMetadata.description).not.toContain("Tactical Profile");
+    expect(appStoreMetadata.description).not.toContain("weakness");
+    expect(appStoreMetadata.promotionalText).not.toContain("Tactical Profile");
+    expect(appStoreMetadata.promotionalText).not.toContain("weakness");
   });
 
-  it("keeps required metadata inside App Store Connect limits", () => {
-    expect(tableValue("App name")).toBe("Chessticize");
-    expect(tableValue("Subtitle").length).toBeLessThanOrEqual(30);
-    expect(tableValue("Promotional text").length).toBeLessThanOrEqual(170);
-    expect(Buffer.byteLength(tableValue("Keywords"), "utf8")).toBeLessThanOrEqual(100);
+  it("keeps canonical metadata and paste-ready copy inside App Store Connect limits", () => {
+    const {
+      appName,
+      subtitle,
+      promotionalText,
+      keywords,
+      description,
+      limits
+    } = appStoreMetadata;
+
+    expect(appName.decision).toBe("keep");
+    expect(appName.value).toBe("Chessticize");
+    expect(appName.evaluatedCandidates).toContain("Chessticize: Chess Tactics");
+    expect(appName.evaluatedCandidates).toContain("Chessticize: Chess Puzzles");
+    expect(Array.from(appName.value)).toHaveLength(11);
+    expect(Array.from(appName.value).length).toBeLessThanOrEqual(limits.appNameCharacters);
+    expect(subtitle).toBe("Build Tactical Intuition");
+    expect(Array.from(subtitle).length).toBeLessThanOrEqual(limits.subtitleCharacters);
+    expect(Array.from(promotionalText).length).toBeLessThanOrEqual(
+      limits.promotionalTextCharacters
+    );
+    expect(Array.from(description).length).toBeLessThanOrEqual(limits.descriptionCharacters);
+    expect(Buffer.byteLength(keywords, "utf8")).toBeLessThanOrEqual(limits.keywordsBytes);
+
+    expect(tableValue("App name")).toBe(appName.value);
+    expect(tableValue("Subtitle")).toBe(subtitle);
+    expect(tableValue("Promotional text")).toBe(promotionalText);
+    expect(tableValue("Keywords")).toBe(keywords);
+    expect(descriptionBlock()).toBe(description);
+  });
+
+  it("uses concrete puzzle language and a clean keyword field", () => {
+    const metadataWords = new Set(
+      `${appStoreMetadata.appName.value} ${appStoreMetadata.subtitle}`
+        .toLowerCase()
+        .split(/\s+/u)
+    );
+    const keywords = appStoreMetadata.keywords.split(",");
+
+    expect(appStoreMetadata.promotionalText).toContain("chess puzzles");
+    expect(appStoreMetadata.description).toContain("chess puzzle trainer");
+    expect(keywords).toContain("puzzle");
+    expect(keywords).toContain("chess");
+    expect(keywords).toContain("tactics");
+    expect(new Set(keywords).size).toBe(keywords.length);
+    expect(keywords.every((keyword) => keyword.length > 2)).toBe(true);
+    expect(keywords.some((keyword) => metadataWords.has(keyword))).toBe(false);
+    expect(appStoreMetadata.keywords).not.toMatch(/,\s/u);
+  });
+
+  it("keeps reusable What's New copy benefit-first and free of raw URLs", () => {
+    const template = appStoreMetadata.whatsNewTemplate;
+    const currentVersion = appStoreMetadata.currentVersionWhatsNew;
+    const draft = currentVersion.storeCopy;
+
+    expect(template.storeCopy).toBe(storeCopyTemplateBlock());
+    expect(template.rules).toContain("Use two or three short bullets and no raw URLs.");
+    expect(currentVersion.sourceTag).toBe("ios-v1.3.0-build-1");
+    expect(currentVersion.status).toBe("post-tag-metadata-correction");
+    expect(template.storeCopy).not.toMatch(/https?:\/\//u);
+    expect(draft).not.toMatch(/https?:\/\//u);
+    expect(draft).not.toContain("experimental");
+    expect(draft).not.toContain("Tactical Profile");
+    expect(Array.from(draft).length).toBeLessThanOrEqual(
+      appStoreMetadata.limits.chessticizeWhatsNewCharacters
+    );
   });
 
   it("points required public URLs at the public repository artifacts", () => {
@@ -52,6 +145,7 @@ describe("App Store assets document", () => {
     );
     expect(readme).toContain("## Support");
     expect(readme).toContain("https://github.com/Chessticize/chessticize-mobile/issues");
+    expect(readme).toContain("support@chessticize.com");
   });
 
   it("documents the required screenshot groups and screenshot scenes", () => {

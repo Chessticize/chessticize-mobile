@@ -348,13 +348,14 @@ assert.match(releaseNotes, /up to 4,000 characters/);
 assert.match(releaseNotes, /up to 500 Unicode characters per language/);
 assert.match(releaseNotes, /at or below 300\s+Unicode characters/);
 assert.match(releaseNotes, /two\s+or three short bullets/);
-assert.match(releaseNotes, /Details and source:/);
-assert.match(releaseNotes, /https:\/\/github\.com\/Chessticize\/chessticize-mobile/);
+assert.match(releaseNotes, /Do\s+not include a raw release URL/);
 assert.match(releaseNotesTemplate, /- Status: Draft/);
 assert.match(releaseNotesTemplate, /## Store copy \(`en-US`\)/);
+assert.match(releaseNotesTemplate, /## Release details/);
 assert.match(releaseNotesTemplate, /## GitHub customer summary/);
 assert.match(releaseNotesTemplate, /## Release-note review/);
 assert.match(releaseNotesTemplate, /at most 300 Unicode\s+characters/);
+assert.match(releaseNotesTemplate, /contains no raw URL/);
 assert.match(releaseNotesTemplate, /releases\/tag\/<ios\|android>/);
 assert.match(releaseNotesTemplate, /release owner approved the copy before the source tag was created/i);
 

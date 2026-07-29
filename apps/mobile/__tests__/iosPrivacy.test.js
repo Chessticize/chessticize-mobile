@@ -47,7 +47,7 @@ describe("iOS App Store privacy artifacts", () => {
     const readme = readText(join(repoRoot, "README.md"));
 
     expect(disclosure).toContain("Data Not Collected");
-    expect(disclosure).toContain("Mobile 1.2");
+    expect(disclosure).toContain("Mobile 1.3");
     expect(disclosure).toContain("Tracking: **No**");
     expect(disclosure).toContain(
       "https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md"
