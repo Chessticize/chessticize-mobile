@@ -24,23 +24,29 @@ const runSeeds = Array.from(
 
 captureHistoryProgress('History Progress Release parity', () => {
   it('matches the approved dual-metric balanced presentation in the real app', async () => {
+    await launchReleaseCapture({
+      deleteData: true,
+      nowMs: baseNowMs,
+      seed: runSeeds[0],
+      targetCorrect: runSeeds.length
+    });
+    await dismissFirstUseRules();
+    await startPracticeMode('standard');
+
     const puzzleIDs = new Set();
-    for (const [index, seed] of runSeeds.entries()) {
-      await launchReleaseCapture({
-        deleteData: index === 0,
-        nowMs: baseNowMs + index * 60_000,
-        seed
-      });
-      if (index === 0) {
-        await dismissFirstUseRules();
-      }
-      await startPracticeMode('standard');
+    for (const index of runSeeds.keys()) {
       const fixture = await resolveDisplayedStandardFixture();
       puzzleIDs.add(fixture.puzzleID);
       await playBoardMove('session-board', fixture.correctMove, fixture.flipped);
-      await waitFor(element(by.text('Sprint complete')))
-        .toBeVisible()
-        .withTimeout(30000);
+      if (index === runSeeds.length - 1) {
+        await waitFor(element(by.text('Sprint complete')))
+          .toBeVisible()
+          .withTimeout(30000);
+      } else {
+        await waitFor(element(by.id('session-progress')))
+          .toHaveText(`${index + 1} / ${runSeeds.length}`)
+          .withTimeout(15000);
+      }
     }
 
     if (puzzleIDs.size !== runSeeds.length) {
@@ -73,12 +79,12 @@ captureHistoryProgress('History Progress Release parity', () => {
   });
 });
 
-async function launchReleaseCapture({ deleteData, nowMs, seed }) {
+async function launchReleaseCapture({ deleteData, nowMs, seed, targetCorrect }) {
   await launchWithDisabledSynchronization({
     delete: deleteData,
     launchArgs: {
       chessticizePuzzleSelectionSeed: seed,
-      chessticizeStandardTargetCorrect: '1',
+      chessticizeStandardTargetCorrect: String(targetCorrect),
       chessticizeStoreAssetCapture: '1',
       chessticizeTestNowMs: String(nowMs)
     },
