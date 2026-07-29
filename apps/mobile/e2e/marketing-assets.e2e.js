@@ -162,7 +162,10 @@ async function assertStableText(frame) {
     case 'choose-the-best-move':
       await expectText('session-progress', stable['session-progress']);
       await expectText('session-timer', stable['session-timer']);
-      await expectText('session-puzzle-timing', stable['session-puzzle-timing']);
+      await expectText(
+        'session-puzzle-timing-label',
+        stable['session-puzzle-timing']
+      );
       await expectText('session-mistakes', '0');
       return;
     case 'focus-your-practice':
