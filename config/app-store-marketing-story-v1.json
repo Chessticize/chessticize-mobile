@@ -245,7 +245,7 @@
         ],
         "stableText": {
           "session-progress": "8 / 15",
-          "session-timer": "2:42",
+          "session-timer": "02:42",
           "session-puzzle-timing": "Puzzle 0:12"
         },
         "forbiddenStates": [
@@ -286,7 +286,7 @@
         ],
         "stableText": {
           "session-progress": "4 / 10",
-          "session-timer": "3:18",
+          "session-timer": "03:18",
           "session-puzzle-timing": "Puzzle 0:11"
         },
         "forbiddenStates": [
@@ -315,8 +315,8 @@
           "custom-mode-regular",
           "custom-theme-fork",
           "custom-theme-pin",
-          "practice-run-duration-300",
-          "practice-run-per-puzzle-30"
+          "practice-run-duration-stepper",
+          "practice-run-per-puzzle-stepper-increase"
         ],
         "requiredVisibleTestIds": [
           "practice-run-editor",

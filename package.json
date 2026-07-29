@@ -16,6 +16,7 @@
     "app-store:third-party-audit": "node scripts/app-store-third-party-audit.mjs",
     "mobile:data-egress-audit": "node scripts/mobile-data-egress-audit.mjs",
     "app-store:screenshot-audit": "node scripts/app-store-screenshot-audit.mjs",
+    "app-store:compose-marketing": "node .codex/skills/chessticize-app-store-marketing/scripts/compose-marketing-assets.mjs",
     "app-store:release-manifest": "node scripts/app-store-release-manifest.mjs",
     "app-store:testflight-evidence": "node scripts/app-store-testflight-evidence.mjs",
     "support:inspect-icloud": "node scripts/inspect-icloud-support-bundle.mjs",
@@ -48,6 +49,10 @@
     "mobile:e2e:store-assets:ios": "pnpm --filter ChessticizeMobile e2e:store-assets:ios",
     "mobile:e2e:store-assets:ios:release": "pnpm --filter ChessticizeMobile e2e:store-assets:ios:release",
     "mobile:e2e:history-progress:ios:release": "pnpm --filter ChessticizeMobile e2e:history-progress:ios:release",
+    "mobile:e2e:marketing-assets:ios": "pnpm --filter ChessticizeMobile e2e:marketing-assets:ios",
+    "mobile:e2e:marketing-assets:ios:release": "pnpm --filter ChessticizeMobile e2e:marketing-assets:ios:release",
+    "mobile:capture:marketing-assets:ios": "pnpm --filter ChessticizeMobile capture:marketing-assets:ios",
+    "mobile:finalize:marketing-assets": "pnpm --filter ChessticizeMobile finalize:marketing-assets",
     "mobile:e2e:adaptive-layout:ios": "pnpm --filter ChessticizeMobile e2e:adaptive-layout:ios",
     "mobile:e2e:adaptive-layout:android": "pnpm --filter ChessticizeMobile e2e:adaptive-layout:android",
     "mobile:e2e:build:android": "pnpm --filter ChessticizeMobile e2e:build:android",
@@ -65,6 +70,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
+    "sharp": "^0.35.3",
     "typescript": "^5.9.0"
   }
 }

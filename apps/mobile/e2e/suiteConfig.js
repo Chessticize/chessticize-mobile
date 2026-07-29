@@ -6,6 +6,7 @@ const ACTIVE_E2E_TEST_MATCH = Object.values(ACTIVE_E2E_TEST_MATCH_BY_SUITE).flat
 
 const STORE_ASSETS_TEST_MATCH = ['<rootDir>/e2e/store-assets.e2e.js'];
 const HISTORY_PROGRESS_TEST_MATCH = ['<rootDir>/e2e/history-progress.e2e.js'];
+const MARKETING_ASSETS_TEST_MATCH = ['<rootDir>/e2e/marketing-assets.e2e.js'];
 const ADAPTIVE_LAYOUT_TEST_MATCH = ['<rootDir>/e2e/adaptive-layout.e2e.js'];
 const ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH = ADAPTIVE_LAYOUT_TEST_MATCH;
 const ANDROID_LAUNCH_TEST_MATCH = ['<rootDir>/e2e/android-launch.e2e.js'];
@@ -43,6 +44,7 @@ function resolveDetoxTestMatch(environment = process.env) {
   const captureStoreAssets = environment.CHESSTICIZE_CAPTURE_STORE_ASSETS === '1';
   const captureHistoryProgress =
     environment.CHESSTICIZE_CAPTURE_HISTORY_PROGRESS === '1';
+  const captureMarketingAssets = environment.CHESSTICIZE_CAPTURE_MARKETING_ASSETS === '1';
   const captureAdaptiveLayout = environment.CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT === '1';
   const runResourceSoak = environment.CHESSTICIZE_RUN_RESOURCE_SOAK === '1';
   const activeSuite = environment.DETOX_ACTIVE_SUITE;
@@ -50,6 +52,7 @@ function resolveDetoxTestMatch(environment = process.env) {
   if ([
     captureStoreAssets,
     captureHistoryProgress,
+    captureMarketingAssets,
     captureAdaptiveLayout,
     runResourceSoak,
     Boolean(activeSuite)
@@ -63,6 +66,10 @@ function resolveDetoxTestMatch(environment = process.env) {
 
   if (captureHistoryProgress) {
     return HISTORY_PROGRESS_TEST_MATCH;
+  }
+
+  if (captureMarketingAssets) {
+    return MARKETING_ASSETS_TEST_MATCH;
   }
 
   if (captureAdaptiveLayout) {
@@ -163,6 +170,7 @@ module.exports = {
   ACTIVE_E2E_TEST_MATCH,
   STORE_ASSETS_TEST_MATCH,
   HISTORY_PROGRESS_TEST_MATCH,
+  MARKETING_ASSETS_TEST_MATCH,
   ADAPTIVE_LAYOUT_TEST_MATCH,
   ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH,
   ANDROID_LAUNCH_TEST_MATCH,

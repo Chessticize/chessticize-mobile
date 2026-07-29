@@ -14,9 +14,13 @@ fictional-user contract are defined in
 and
 [`config/app-store-marketing-story-v1.json`](../config/app-store-marketing-story-v1.json).
 That sequence is separate from the maintained fifteen-scene release-QA capture
-below. Until issues #411 and #412 implement the new capture and composition
-stages, the existing commands and export audit in this document remain the
-operational release-validation path.
+below. Its deterministic raw-capture and Cobalt Focus composition stages are
+documented in
+[`docs/marketing/APP_STORE_MARKETING_CAPTURE.md`](marketing/APP_STORE_MARKETING_CAPTURE.md)
+and
+[`docs/marketing/APP_STORE_MARKETING_COMPOSITION.md`](marketing/APP_STORE_MARKETING_COMPOSITION.md).
+The existing commands and export audit in this document remain the operational
+release-validation path.
 
 ## Metadata Draft
 

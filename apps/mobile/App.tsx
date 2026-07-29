@@ -7,6 +7,7 @@ import type { MobilePlatformCapabilities } from "./src/platform/mobilePlatformCa
 import {
   createAdvancingTestClock,
   enableTestControlsFromLaunchConfig,
+  resolveMarketingCaptureFrameFromLaunchConfig,
   resolveTestArrowDuelTargetCorrectFromLaunchConfig,
   resolveTestCustomTargetCorrectFromLaunchConfig,
   resolveTestNowMsFromLaunchConfig,
@@ -14,6 +15,10 @@ import {
   resolveTestPuzzleSelectionSeedFromLaunchConfig,
   resolveTestStandardTargetCorrectFromLaunchConfig
 } from "./src/platform/testLaunchConfig";
+import {
+  type AppStoreMarketingCaptureFixture,
+  loadAppStoreMarketingCaptureFixture
+} from "./src/testing/appStoreMarketingCapture";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
 import { createMobileSystemBackSource } from "./src/navigation/mobileSystemBack";
 
@@ -24,14 +29,19 @@ if (shouldSuppressLogBoxWarnings()) {
 }
 
 function App() {
+  const marketingCaptureFrame = resolveMarketingCaptureFrameFromLaunchConfig();
   const platformFactory = mobilePlatformCapabilityFactoryFor(Platform.OS as "android" | "ios");
   const systemBack = React.useMemo(
     () => createMobileSystemBackSource(Platform.OS as "android" | "ios"),
     []
   );
-  const [platformCapabilities, setPlatformCapabilities] = React.useState<MobilePlatformCapabilities | undefined>(
-    () => platformFactory.createSync()
+  const [platformState, setPlatformState] = React.useState<AppPlatformState>(
+    () => preparePlatformState(
+      platformFactory.createSync(),
+      marketingCaptureFrame
+    )
   );
+  const { marketingCaptureFixture, platformCapabilities } = platformState;
   const [loadError, setLoadError] = React.useState<string | undefined>(undefined);
   const testNowMs = resolveTestNowMsFromLaunchConfig();
   const arrowDuelTargetCorrect = resolveTestArrowDuelTargetCorrectFromLaunchConfig();
@@ -40,8 +50,10 @@ function App() {
   const puzzleSelectionSeed = resolveTestPuzzleSelectionSeedFromLaunchConfig();
   const standardTargetCorrect = resolveTestStandardTargetCorrectFromLaunchConfig();
   const currentTimeMs = React.useMemo(
-    () => testNowMs === undefined ? undefined : createAdvancingTestClock(testNowMs),
-    [testNowMs]
+    () => marketingCaptureFixture
+      ? () => marketingCaptureFixture.captureInstantMs
+      : testNowMs === undefined ? undefined : createAdvancingTestClock(testNowMs),
+    [marketingCaptureFixture, testNowMs]
   );
   React.useEffect(() => {
     if (platformCapabilities) {
@@ -51,7 +63,10 @@ function App() {
     platformFactory.create()
       .then((nextCapabilities) => {
         if (!cancelled) {
-          setPlatformCapabilities(nextCapabilities);
+          setPlatformState(preparePlatformState(
+            nextCapabilities,
+            marketingCaptureFrame
+          ));
         }
       })
       .catch((error: unknown) => {
@@ -62,7 +77,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [platformCapabilities, platformFactory]);
+  }, [marketingCaptureFrame, platformCapabilities, platformFactory]);
 
   return (
     <SafeAreaProvider>
@@ -76,8 +91,15 @@ function App() {
           puzzleSelectionId={puzzleSelectionId}
           puzzleSelectionSeed={puzzleSelectionSeed}
           runManagementEnabled
+          settingsCaptureBottomInset={marketingCaptureFixture?.frameId === "private-offline-open-source"
+            ? 420
+            : undefined}
+          sprintRulesDesignPreview={marketingCaptureFixture?.initialActiveState
+            ? { initialActiveState: marketingCaptureFixture.initialActiveState }
+            : undefined}
           standardTargetCorrect={standardTargetCorrect}
           systemBack={systemBack}
+          themeCatalogPresentation={marketingCaptureFixture?.themeCatalogPresentation}
         />
       ) : (
         <View style={styles.loadingRoot}>
@@ -89,6 +111,31 @@ function App() {
       )}
     </SafeAreaProvider>
   );
+}
+
+type AppPlatformState = {
+  marketingCaptureFixture?: AppStoreMarketingCaptureFixture;
+  platformCapabilities?: MobilePlatformCapabilities;
+};
+
+function preparePlatformState(
+  platformCapabilities: MobilePlatformCapabilities | undefined,
+  marketingCaptureFrame: string | undefined
+): AppPlatformState {
+  if (!platformCapabilities) {
+    return {};
+  }
+  return {
+    platformCapabilities,
+    ...(marketingCaptureFrame === undefined
+      ? {}
+      : {
+          marketingCaptureFixture: loadAppStoreMarketingCaptureFixture(
+            marketingCaptureFrame,
+            platformCapabilities.storage.practiceService
+          )
+        })
+  };
 }
 
 const styles = StyleSheet.create({

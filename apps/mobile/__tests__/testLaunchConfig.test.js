@@ -4,6 +4,7 @@ const path = require("node:path");
 const {
   createAdvancingTestClock,
   isStoreAssetCaptureEnabled,
+  resolveMarketingCaptureFrameFromLaunchConfig,
   resolveTestArrowDuelTargetCorrectFromLaunchConfig,
   resolveTestCustomTargetCorrectFromLaunchConfig,
   resolveTestNowMsFromLaunchConfig,
@@ -36,6 +37,12 @@ describe("test launch configuration", () => {
     );
     expect(iosModule).toContain(
       'constants[@"arrowDuelTargetCorrect"] = arrowDuelTargetCorrect;'
+    );
+    expect(iosModule).toContain(
+      'processArgumentValueForName:@"chessticizeMarketingCaptureFrame"'
+    );
+    expect(iosModule).toContain(
+      'constants[@"marketingCaptureFrame"] = marketingCaptureFrame;'
     );
   });
 
@@ -202,6 +209,24 @@ describe("test launch configuration", () => {
     ).toBe(1);
     expect(isStoreAssetCaptureEnabled({ storeAssetCapture: true })).toBe(true);
     expect(isStoreAssetCaptureEnabled({ storeAssetCapture: false })).toBe(false);
+  });
+
+  it("accepts a fixed clock and frame only for the explicit marketing capture profile", () => {
+    const nativeModule = {
+      marketingCaptureFrame: "  see-your-progress  ",
+      testNowMs: "1785261600000"
+    };
+    expect(
+      resolveTestNowMsFromLaunchConfig(
+        { __DEV__: false, __CHESSTICIZE_ENABLE_TEST_CONTROLS__: false },
+        nativeModule
+      )
+    ).toBe(1785261600000);
+    expect(resolveMarketingCaptureFrameFromLaunchConfig(nativeModule))
+      .toBe("see-your-progress");
+    expect(resolveMarketingCaptureFrameFromLaunchConfig({
+      marketingCaptureFrame: "   "
+    })).toBeUndefined();
   });
 
   it("rejects invalid native test clock values", () => {
