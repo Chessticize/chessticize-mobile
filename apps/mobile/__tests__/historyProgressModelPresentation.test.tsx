@@ -21,14 +21,18 @@ test("builds visible model reliability progress for a well-sampled balanced them
       {
         asOf: "2026-07-18T00:00:00.000Z",
         estimates: [themeEstimate({
+          accuracyEvidenceWeight: 8,
           expectedFailuresPer100: 12,
+          observedSolveRate: 0.84,
           solveEvidenceWeight: 8
         })]
       },
       {
         asOf: "2026-07-25T00:00:00.000Z",
         estimates: [themeEstimate({
+          accuracyEvidenceWeight: 14,
           expectedFailuresPer100: 4,
+          observedSolveRate: 0.92,
           solveEvidenceWeight: 14
         })]
       }
@@ -36,15 +40,190 @@ test("builds visible model reliability progress for a well-sampled balanced them
   });
 
   const presentation = historyProgressPresentationFromModel(progress);
-  const series = presentation?.strengths[0];
+  const reliabilitySeries = presentation?.strengths[0];
+  const speedSeries = presentation?.strengths[1];
 
   expect(presentation?.weakness).toBeUndefined();
   expect(presentation?.sampleUnitLabel).toBe("model-weighted observations");
-  expect(series?.label).toBe("Fork · Puzzle solving");
-  expect(series?.kind).toBe("solve_rate");
-  expect(series?.changeLabel).toBe("8 fewer / 100");
-  expect(series?.points.map((point) => point.sampleSize)).toEqual([8, 14]);
-  expect(series?.points.map((point) => point.valueLabel)).toEqual(["+12", "+4"]);
+  expect(presentation?.noWeaknessTone).toBe("balanced");
+  expect(presentation?.noWeaknessLabel).toBe(
+    "No theme currently shows a repeated, meaningful weakness in accuracy or solve time."
+  );
+  expect(presentation?.strengths.map((series) => series.kind)).toEqual([
+    "solve_rate",
+    "completed_speed"
+  ]);
+  expect(reliabilitySeries?.themeId).toBe("line:fork");
+  expect(reliabilitySeries?.label).toBe("Fork · Puzzle solving");
+  expect(reliabilitySeries?.kind).toBe("solve_rate");
+  expect(reliabilitySeries?.baselineLabel).toBe(
+    "Recent attempts and stronger theme matches contribute more to n"
+  );
+  expect(reliabilitySeries?.summary).toBe(
+    "Wrong moves and timeouts count as misses."
+  );
+  expect(reliabilitySeries?.changeLabel).toBe("8 points higher");
+  expect(reliabilitySeries?.points.map((point) => point.sampleSize)).toEqual([8, 14]);
+  expect(reliabilitySeries?.points.map((point) => point.valueLabel)).toEqual(["84%", "92%"]);
+  expect(speedSeries?.themeId).toBe("line:fork");
+  expect(speedSeries?.kind).toBe("completed_speed");
+  expect(speedSeries?.baselineLabel).toBe(
+    "1.00× matches your comparable completed puzzles"
+  );
+  expect(speedSeries?.summary).toBe(
+    "n includes model-weighted correct solves completed before timeout; speed starts after enough personal controls."
+  );
+});
+
+test("keeps unavailable solve time visible when only accuracy has evidence", () => {
+  const progress = tacticalProgress({
+    evaluation: {
+      phase: "balanced",
+      signals: [],
+      rankedFocuses: [],
+      observedThemeCount: 1
+    },
+    snapshots: [{
+      asOf: "2026-07-25T00:00:00.000Z",
+      estimates: [themeEstimate({
+        speedEvidenceWeight: 0,
+        completedTimeMultiplier: 1
+      })]
+    }]
+  });
+
+  const presentation = historyProgressPresentationFromModel(progress);
+
+  expect(presentation?.noWeaknessTone).toBe("balanced");
+  expect(presentation?.noWeaknessTitle).toBe("Recent play looks balanced");
+  expect(presentation?.noWeaknessLabel).toContain(
+    "Solve time is unavailable until there are enough comparable completed puzzles."
+  );
+  expect(presentation?.strengths.map((series) => series.kind)).toEqual([
+    "solve_rate",
+    "completed_speed"
+  ]);
+  expect(presentation?.strengths[1]?.changeLabel).toBe("No comparison yet");
+  expect(presentation?.strengths[1]?.points).toEqual([{
+    label: "Jul 25",
+    value: 0,
+    valueLabel: "—",
+    sampleSize: 0,
+    unavailable: true
+  }]);
+});
+
+test("keeps gray historical slots when a metric was not yet available", () => {
+  const dates = [
+    "2026-05-30T00:00:00.000Z",
+    "2026-06-10T00:00:00.000Z",
+    "2026-06-21T00:00:00.000Z",
+    "2026-07-03T00:00:00.000Z",
+    "2026-07-14T00:00:00.000Z",
+    "2026-07-25T00:00:00.000Z"
+  ];
+  const progress = tacticalProgress({
+    snapshots: dates.map((asOf, index) => ({
+      asOf,
+      estimates: [themeEstimate({
+        accuracyEvidenceWeight: index >= 3 ? index + 1 : 0,
+        observedSolveRate: 0.75 + index * 0.02,
+        solveEvidenceWeight: index >= 3 ? index + 1 : 0,
+        speedEvidenceWeight: index === 5 ? 8 : 0,
+        completedTimeMultiplier: 1.08
+      })]
+    }))
+  });
+
+  const presentation = historyProgressPresentationFromModel(progress);
+  const accuracy = presentation?.strengths.find(
+    (series) => series.kind === "solve_rate"
+  );
+  const speed = presentation?.strengths.find(
+    (series) => series.kind === "completed_speed"
+  );
+
+  expect(accuracy?.points.map((point) => point.valueLabel)).toEqual([
+    "—",
+    "—",
+    "—",
+    "81%",
+    "83%",
+    "85%"
+  ]);
+  expect(speed?.points.map((point) => point.valueLabel)).toEqual([
+    "—",
+    "—",
+    "—",
+    "—",
+    "—",
+    "1.08×"
+  ]);
+});
+
+test("keeps observed balanced stats visible before recommendation diversity is complete", () => {
+  const progress = tacticalProgress({
+    snapshots: [{
+      asOf: "2026-07-25T00:00:00.000Z",
+      estimates: [themeEstimate({
+        distinctPuzzleCount: 2,
+        distinctSessionCount: 1,
+        solveEvidenceWeight: 2
+      })]
+    }]
+  });
+
+  const presentation = historyProgressPresentationFromModel(progress);
+
+  expect(presentation?.initialSeriesId).toBe("line:fork:solve_rate");
+  expect(presentation?.strengths).toHaveLength(2);
+  expect(presentation?.strengths[0]?.label).toBe("Fork · Puzzle solving");
+});
+
+test("keeps accuracy beside completed speed without matched solve-model evidence", () => {
+  const progress = tacticalProgress({
+    snapshots: [{
+      asOf: "2026-07-25T00:00:00.000Z",
+      estimates: [themeEstimate({
+        accuracyEvidenceWeight: 8,
+        solveEvidenceWeight: 0,
+        speedEvidenceWeight: 8,
+        observedSolveRate: 0.75,
+        completedTimeMultiplier: 1.08
+      })]
+    }]
+  });
+
+  const presentation = historyProgressPresentationFromModel(progress);
+
+  expect(presentation?.initialSeriesId).toBe("line:fork:solve_rate");
+  expect(presentation?.strengths.map((series) => series.kind)).toEqual([
+    "solve_rate",
+    "completed_speed"
+  ]);
+  expect(presentation?.strengths[0]?.points[0]?.valueLabel).toBe("75%");
+  expect(presentation?.strengths[1]?.points[0]?.valueLabel).toBe("1.08×");
+});
+
+test("keeps both accuracy and time visible for every displayed theme", () => {
+  const themes = ["fork", "pin", "skewer", "promotion", "mateIn1"];
+  const progress = tacticalProgress({
+    snapshots: [{
+      asOf: "2026-07-25T00:00:00.000Z",
+      estimates: themes.map((theme) => themeEstimate({ theme }))
+    }]
+  });
+
+  const presentation = historyProgressPresentationFromModel(progress);
+  const mateSeries = presentation?.strengths.filter(
+    (series) => series.themeId === "line:mateIn1"
+  );
+
+  expect(presentation?.strengths).toHaveLength(10);
+  expect(mateSeries?.map((series) => series.kind)).toEqual([
+    "solve_rate",
+    "completed_speed"
+  ]);
 });
 
 test("uses completed-time evidence for a model-selected speed weakness", () => {
@@ -108,7 +287,7 @@ test("uses completed-time evidence for a model-selected speed weakness", () => {
   expect(pinSeries?.kind).toBe("completed_speed");
   expect(pinSeries?.points.map((point) => point.sampleSize)).toEqual([6, 12]);
   expect(weakness?.reason).toBe("completed_speed");
-  expect(weakness?.effects[0]?.valueLabel).toBe("1.34× expected time");
+  expect(weakness?.effects[0]?.valueLabel).toBe("1.34× comparable time");
   expect(weakness?.effects[0]?.comparisonLabel).toContain(
     "other well-sampled themes in this task family are closer"
   );
@@ -120,7 +299,7 @@ test("uses completed-time evidence for a model-selected speed weakness", () => {
   );
 });
 
-test("compares weakness copy with well-sampled themes beyond the visible series limit", () => {
+test("compares weakness copy with well-sampled themes beyond the visible theme limit", () => {
   const pin = themeEstimate({
     theme: "pin",
     completedTimeMultiplier: 1.34,
@@ -176,9 +355,9 @@ test("compares weakness copy with well-sampled themes beyond the visible series 
   const presentation = historyProgressPresentationFromModel(progress);
   const comparison = presentation?.weakness?.effects[0]?.comparisonLabel;
 
-  expect(presentation?.strengths).toHaveLength(8);
+  expect(presentation?.strengths).toHaveLength(16);
   expect(comparison).toContain(
-    "highest-confidence current weakness signal among the well-sampled themes"
+    "highest-confidence current speed weakness among the well-sampled themes"
   );
   expect(comparison).not.toContain(
     "the other well-sampled themes in this task family are closer"
@@ -271,10 +450,12 @@ function themeEstimate(
     theme: "fork",
     distinctPuzzleCount: 12,
     distinctSessionCount: 3,
+    accuracyEvidenceWeight: 12,
     solveEvidenceWeight: 12,
     speedEvidenceWeight: 8,
     solveConfidence: 0.1,
     speedConfidence: 0.1,
+    observedSolveRate: 0.92,
     expectedFailuresPer100: 2,
     completedTimeMultiplier: 1.02,
     ...overrides

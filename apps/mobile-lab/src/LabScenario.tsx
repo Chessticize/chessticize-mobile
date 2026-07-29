@@ -1073,12 +1073,9 @@ function tacticalProfileCalibratedFamily() {
       minExpectedFailuresPer100: 2
     },
     speed: {
-      interceptLogSeconds: Math.log(30),
-      relativeDifficultyCoefficient: 0,
-      decisionCountCoefficient: 0,
-      paceLogCoefficient: 0,
-      slowPolicyLogCoefficient: 0,
-      residualSd: 0.25,
+      minimumControlWeight: 8,
+      slopePriorPrecision: 1,
+      minimumResidualSd: 0.15,
       themePriorSdLogSeconds: 0.5,
       practicalTimeMultiplier: 1.2
     }

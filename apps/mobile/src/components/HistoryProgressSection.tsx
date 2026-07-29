@@ -58,6 +58,17 @@ export function HistoryProgressScreen({
   const selectedSeries =
     presentation.strengths.find((series) => series.id === selectedSeriesId)
     ?? presentation.strengths[0];
+  const selectedThemeSeries = selectedSeries
+    ? presentation.strengths.filter(
+        (series) => series.themeId === selectedSeries.themeId
+      )
+    : [];
+  const themeOptions = presentation.strengths.filter(
+    (series, index, strengths) =>
+      strengths.findIndex(
+        (candidate) => candidate.themeId === series.themeId
+      ) === index
+  );
 
   return (
     <View style={styles.screen} testID="history-progress-screen">
@@ -96,38 +107,9 @@ export function HistoryProgressScreen({
           <View style={styles.sectionTitleCopy}>
             <Text style={styles.eyebrow}>Progress over time</Text>
             <Text style={styles.sectionTitle}>
-              {selectedSeries?.label ?? "No theme selected"}
+              {selectedSeries?.label ?? "No progress data yet"}
             </Text>
           </View>
-          {selectedSeries ? (
-            <View style={styles.progressBadges}>
-              <ModelSignalPill kind={selectedSeries.kind} />
-              <View
-                accessibilityLabel={selectedSeries.changeLabel}
-                style={[
-                  styles.changePill,
-                  selectedSeries.changeTone === "steady"
-                    ? styles.changePillSteady
-                    : selectedSeries.changeTone === "worsened"
-                      ? styles.changePillWorsened
-                      : null
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.changePillText,
-                    selectedSeries.changeTone === "steady"
-                      ? styles.changePillTextSteady
-                      : selectedSeries.changeTone === "worsened"
-                        ? styles.changePillTextWorsened
-                        : null
-                  ]}
-                >
-                  {selectedSeries.changeLabel}
-                </Text>
-              </View>
-            </View>
-          ) : null}
         </View>
 
         <ScrollView
@@ -136,8 +118,8 @@ export function HistoryProgressScreen({
           testID="history-strength-selector"
         >
           <View style={styles.selectorRow}>
-            {presentation.strengths.map((series) => {
-              const selected = series.id === selectedSeries?.id;
+            {themeOptions.map((series) => {
+              const selected = series.themeId === selectedSeries?.themeId;
               return (
                 <Pressable
                   accessibilityLabel={`Show ${series.label} progress`}
@@ -167,18 +149,53 @@ export function HistoryProgressScreen({
 
         {selectedSeries ? (
           <>
-            <Text style={styles.metricLabel}>{selectedSeries.metricLabel}</Text>
+            <ProgressMetricSelector
+              onSelect={setSelectedSeriesId}
+              selectedSeriesId={selectedSeries.id}
+              series={selectedThemeSeries}
+            />
+            <View style={styles.metricContextRow}>
+              <Text style={styles.metricLabel}>{selectedSeries.metricLabel}</Text>
+              <View
+                accessibilityLabel={selectedSeries.changeLabel}
+                style={[
+                  styles.changePill,
+                  selectedSeries.changeTone === "steady"
+                    ? styles.changePillSteady
+                    : selectedSeries.changeTone === "worsened"
+                      ? styles.changePillWorsened
+                      : null
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.changePillText,
+                    selectedSeries.changeTone === "steady"
+                      ? styles.changePillTextSteady
+                      : selectedSeries.changeTone === "worsened"
+                        ? styles.changePillTextWorsened
+                        : null
+                  ]}
+                >
+                  {selectedSeries.changeLabel}
+                </Text>
+              </View>
+            </View>
             <StrengthTrendChart
               sampleUnitLabel={presentation.sampleUnitLabel}
               series={selectedSeries}
             />
-            <Text style={styles.sampleKey}>
-              n = {presentation.sampleUnitLabel}
-            </Text>
-            <Text style={styles.baselineLabel}>
-              {selectedSeries.baselineLabel}
-            </Text>
-            <Text style={styles.summary}>{selectedSeries.summary}</Text>
+            <View
+              style={styles.chartNote}
+              testID="history-progress-chart-note"
+            >
+              <Text style={styles.chartNoteTitle}>
+                {progressMetricNoteTitle(selectedSeries.kind)}
+              </Text>
+              <Text style={styles.chartNoteBody}>
+                {selectedSeries.baselineLabel}. {selectedSeries.summary}
+              </Text>
+            </View>
           </>
         ) : (
           <Text style={styles.summary}>No progress data is available yet.</Text>
@@ -189,21 +206,102 @@ export function HistoryProgressScreen({
         <WeaknessCard weakness={presentation.weakness} />
       ) : (
         <View
-          accessibilityLabel={`No clear weakness. ${presentation.noWeaknessLabel}`}
-          style={styles.noWeaknessCard}
+          accessibilityLabel={`${presentation.noWeaknessTitle}. ${presentation.noWeaknessLabel}`}
+          style={[
+            styles.noWeaknessCard,
+            presentation.noWeaknessTone === "balanced"
+              ? styles.noWeaknessCardBalanced
+              : null
+          ]}
           testID="history-no-clear-weakness"
         >
-          <View style={styles.noWeaknessIcon}>
-            <Text style={styles.noWeaknessIconText}>—</Text>
+          <View
+            accessibilityElementsHidden
+            style={[
+              styles.noWeaknessIcon,
+              presentation.noWeaknessTone === "balanced"
+                ? styles.noWeaknessIconBalanced
+                : null
+            ]}
+            testID={presentation.noWeaknessTone === "balanced"
+              ? "history-balanced-check"
+              : "history-collecting-icon"}
+          >
+            <Text
+              style={[
+                styles.noWeaknessIconText,
+                presentation.noWeaknessTone === "balanced"
+                  ? styles.noWeaknessIconTextBalanced
+                  : null
+              ]}
+            >
+              {presentation.noWeaknessTone === "balanced" ? "✓" : "—"}
+            </Text>
           </View>
           <View style={styles.noWeaknessCopy}>
-            <Text style={styles.noWeaknessTitle}>No clear weakness</Text>
+            <Text style={styles.noWeaknessTitle}>
+              {presentation.noWeaknessTitle}
+            </Text>
             <Text style={styles.noWeaknessBody}>
               {presentation.noWeaknessLabel}
             </Text>
           </View>
         </View>
       )}
+    </View>
+  );
+}
+
+function ProgressMetricSelector({
+  onSelect,
+  selectedSeriesId,
+  series
+}: {
+  onSelect: (seriesId: string) => void;
+  selectedSeriesId: string;
+  series: readonly HistoryStrengthSeries[];
+}): React.JSX.Element {
+  return (
+    <View
+      accessibilityLabel="Progress metric"
+      style={styles.progressMetricSelector}
+      testID="history-progress-metric-selector"
+    >
+      {series.map((candidate) => {
+        const selected = candidate.id === selectedSeriesId;
+        const latest = candidate.points.at(-1);
+        return (
+          <Pressable
+            accessibilityLabel={`Show ${progressMetricLabel(candidate.kind)} progress, ${latest?.valueLabel ?? "no data"}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            key={candidate.id}
+            onPress={() => onSelect(candidate.id)}
+            style={[
+              styles.progressMetricCard,
+              selected ? styles.progressMetricCardSelected : null
+            ]}
+            testID={`history-progress-metric-${candidate.kind}`}
+          >
+            <Text
+              style={[
+                styles.progressMetricCardLabel,
+                selected ? styles.progressMetricCardLabelSelected : null
+              ]}
+            >
+              {progressMetricLabel(candidate.kind)}
+            </Text>
+            <Text
+              style={[
+                styles.progressMetricCardValue,
+                selected ? styles.progressMetricCardValueSelected : null
+              ]}
+            >
+              {latest?.valueLabel ?? "—"}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -219,7 +317,9 @@ function StrengthTrendChart({
     <View
       accessibilityLabel={`${series.label} ${series.metricLabel}. ${series.points
         .map((point) =>
-          `${point.label}: ${point.valueLabel} from ${point.sampleSize} ${sampleUnitLabel}`
+          point.unavailable
+            ? `${point.label}: unavailable`
+            : `${point.label}: ${point.valueLabel} from ${point.sampleSize} ${sampleUnitLabel}`
         )
         .join(". ")}`}
       style={styles.chart}
@@ -235,6 +335,7 @@ function StrengthTrendChart({
               <View
                 style={[
                   styles.chartBar,
+                  point.unavailable ? styles.chartBarUnavailable : null,
                   {
                     height: `${Math.max(
                       8,
@@ -242,17 +343,23 @@ function StrengthTrendChart({
                     )}%`
                   }
                 ]}
+                testID={`history-strength-bar-${index}`}
               />
             </View>
             <Text numberOfLines={1} style={styles.chartLabel}>
               {point.label}
             </Text>
             <Text
-              accessibilityLabel={`${point.sampleSize} ${sampleUnitLabel}`}
+              accessibilityLabel={
+                point.unavailable
+                  ? "Unavailable"
+                  : `${point.sampleSize} ${sampleUnitLabel}`
+              }
               numberOfLines={1}
               style={styles.chartSample}
+              testID={`history-strength-sample-${index}`}
             >
-              n={point.sampleSize}
+              {point.unavailable ? "n=—" : `n=${point.sampleSize}`}
             </Text>
           </View>
         ))}
@@ -336,6 +443,20 @@ function modelSignalLabel(kind: TacticalFocusReason): string {
     return "Reliability & speed";
   }
   return "Solve reliability";
+}
+
+function progressMetricLabel(
+  kind: Exclude<TacticalFocusReason, "both">
+): string {
+  return kind === "completed_speed" ? "Solve time" : "Accuracy";
+}
+
+function progressMetricNoteTitle(
+  kind: Exclude<TacticalFocusReason, "both">
+): string {
+  return kind === "completed_speed"
+    ? "How solve time is counted"
+    : "How accuracy is counted";
 }
 
 function ProgressGlyph(): React.JSX.Element {
@@ -480,10 +601,41 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     lineHeight: 25
   },
-  progressBadges: {
-    alignItems: "flex-end",
-    gap: 6,
-    maxWidth: 142
+  progressMetricSelector: {
+    flexDirection: "row",
+    gap: 10
+  },
+  progressMetricCard: {
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
+    gap: 3,
+    minHeight: 66,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  progressMetricCardSelected: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#60A5FA"
+  },
+  progressMetricCardLabel: {
+    color: "#64748B",
+    fontSize: 11,
+    fontWeight: "700"
+  },
+  progressMetricCardLabelSelected: {
+    color: "#1D4ED8"
+  },
+  progressMetricCardValue: {
+    color: "#334155",
+    fontSize: 20,
+    fontWeight: "800",
+    lineHeight: 24
+  },
+  progressMetricCardValueSelected: {
+    color: "#1D4ED8"
   },
   signalPill: {
     alignItems: "center",
@@ -506,6 +658,9 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     lineHeight: 13,
     textAlign: "center"
+  },
+  signalPillTextUnselected: {
+    color: "#64748B"
   },
   signalPillTextWeakness: {
     color: "#92400E"
@@ -559,15 +714,15 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     color: "#64748B",
+    flex: 1,
     fontSize: 12,
     fontWeight: "700"
   },
-  baselineLabel: {
-    color: "#64748B",
-    fontSize: 10,
-    fontWeight: "700",
-    marginTop: -5,
-    textAlign: "right"
+  metricContextRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between"
   },
   chart: {
     height: 192,
@@ -624,6 +779,9 @@ const styles = StyleSheet.create({
     minHeight: 8,
     width: "100%"
   },
+  chartBarUnavailable: {
+    backgroundColor: "#CBD5E1"
+  },
   chartLabel: {
     color: "#64748B",
     fontSize: 9,
@@ -636,9 +794,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
     width: "100%"
   },
-  sampleKey: {
+  chartNote: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    gap: 3,
+    paddingHorizontal: 11,
+    paddingVertical: 9
+  },
+  chartNoteTitle: {
+    color: "#475569",
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  chartNoteBody: {
     color: "#64748B",
-    fontSize: 10
+    fontSize: 11,
+    lineHeight: 16
   },
   summary: {
     color: "#475569",
@@ -739,6 +910,10 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16
   },
+  noWeaknessCardBalanced: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#A7F3D0"
+  },
   noWeaknessIcon: {
     alignItems: "center",
     backgroundColor: "#E2E8F0",
@@ -747,10 +922,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 32
   },
+  noWeaknessIconBalanced: {
+    backgroundColor: "#D1FAE5"
+  },
   noWeaknessIconText: {
     color: "#64748B",
     fontSize: 18,
     fontWeight: "800"
+  },
+  noWeaknessIconTextBalanced: {
+    color: "#047857"
   },
   noWeaknessCopy: {
     flex: 1,

@@ -865,6 +865,9 @@ function calibrationPolicy() {
       solveThemePriorSdRating: 100,
       solvePracticalDeficitRating: 20,
       minimumExpectedFailuresPer100: 2,
+      speedMinimumControlWeight: 8,
+      speedSlopePriorPrecision: 1,
+      speedMinimumResidualSd: 0.15,
       speedThemePriorSdLogSeconds: 0.5,
       practicalTimeMultiplier: 1.2
     }

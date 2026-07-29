@@ -16,7 +16,7 @@ import type {
   HistoryWeaknessEffect
 } from "./historyProgressPresentation.ts";
 
-const MAX_VISIBLE_PROGRESS_SERIES = 8;
+const MAX_VISIBLE_PROGRESS_THEMES = 8;
 
 export function historyProgressPresentationFromModel(
   progress: TacticalProfileProgress
@@ -29,24 +29,27 @@ export function historyProgressPresentationFromModel(
   const currentSignals = new Map(
     progress.evaluation.signals.map((signal) => [signal.id, signal])
   );
-  const wellSampled = (latest?.estimates ?? [])
-    .filter((estimate) => isWellSampled(estimate, progress))
+  const observed = (latest?.estimates ?? [])
+    .filter(hasProgressEvidence)
     .sort((left, right) => compareCurrentEstimates(
       left,
       right,
       currentSignals
     ));
-  const strengths = wellSampled
-    .slice(0, MAX_VISIBLE_PROGRESS_SERIES)
+  const wellSampled = observed.filter((estimate) =>
+    isWellSampled(estimate, progress)
+  );
+  const strengths = observed
+    .slice(0, MAX_VISIBLE_PROGRESS_THEMES)
     .flatMap((estimate) => {
       const signal = currentSignals.get(signalId(estimate));
-      const kind = seriesKind(signal);
-      const series = strengthSeries(
-        estimate,
-        kind,
-        progress.snapshots
+      return seriesKinds(signal, estimate).map((kind) =>
+        strengthSeries(
+          estimate,
+          kind,
+          progress.snapshots
+        )
       );
-      return series ? [series] : [];
     });
   const weaknessSignal = progress.evaluation.signals
     .filter((signal) => signal.status === "recommended")
@@ -70,8 +73,14 @@ export function historyProgressPresentationFromModel(
     initialSeriesId,
     strengths,
     ...(weakness === undefined ? {} : { weakness }),
-    noWeaknessLabel:
-      "No theme currently passes the Tactical Profile evidence, practical-impact, and diversity checks for either solve reliability or completed-puzzle speed."
+    ...(progress.phase === "balanced"
+      ? balancedPresentation(observed)
+      : {
+          noWeaknessTone: "collecting",
+          noWeaknessTitle: "Still collecting evidence",
+          noWeaknessLabel:
+            "Play more ordinary mixed Runs to build reliable stats across different puzzles and sessions."
+        })
   };
 }
 
@@ -79,48 +88,65 @@ function strengthSeries(
   current: TacticalProfileThemeEstimate,
   kind: Exclude<TacticalFocusReason, "both">,
   snapshots: readonly TacticalProfileProgressSnapshot[]
-): HistoryStrengthSeries | undefined {
-  const points = snapshots.flatMap((snapshot) => {
+): HistoryStrengthSeries {
+  const points = snapshots.map((snapshot) => {
     const estimate = snapshot.estimates.find(
       (candidate) =>
         candidate.taskFamily === current.taskFamily &&
         candidate.theme === current.theme
     );
     if (!estimate) {
-      return [];
+      return unavailableProgressPoint(snapshot.asOf);
     }
     const point = progressPoint(snapshot.asOf, estimate, kind);
-    return point ? [point] : [];
+    return point ?? unavailableProgressPoint(snapshot.asOf);
   });
-  if (points.length === 0) {
-    return undefined;
-  }
-  const first = points[0] as HistoryProgressPoint;
-  const latest = points.at(-1) as HistoryProgressPoint;
+  const availablePoints = points.filter((point) => !point.unavailable);
+  const first = availablePoints[0];
+  const latest = availablePoints.at(-1);
   const themeLabel = humanizeTheme(current.theme);
   const label = `${themeLabel} · ${taskFamilyLabel(current.taskFamily)}`;
-  const change = changePresentation(kind, first.value, latest.value);
-  const maxValue = Math.max(...points.map((point) => point.value), 0);
+  const change = first && latest
+    ? changePresentation(kind, first.value, latest.value)
+    : {
+        label: "No comparison yet",
+        tone: "steady" as const
+      };
+  const maxValue = Math.max(
+    ...availablePoints.map((point) => point.value),
+    0
+  );
 
   return {
     id: `${signalId(current)}:${kind}`,
+    themeId: signalId(current),
     label,
     kind,
     metricLabel: kind === "completed_speed"
-      ? "Completed time above matched expectation · lower is better"
-      : "Extra misses per 100 comparable puzzles · lower is better",
+      ? "Solve time · lower is better"
+      : "Accuracy · higher is better",
     baselineLabel: kind === "completed_speed"
-      ? "1.00× = matched completed-puzzle time"
-      : "0 = matched solve expectation",
+      ? "1.00× matches your comparable completed puzzles"
+      : "Recent attempts and stronger theme matches contribute more to n",
     scaleMax: kind === "completed_speed"
-      ? Math.max(20, Math.ceil(maxValue * 1.15))
-      : Math.max(10, Math.ceil(maxValue * 1.15)),
+      ? Math.max(100, Math.ceil(maxValue * 1.15))
+      : 100,
     changeLabel: change.label,
     changeTone: change.tone,
     summary: kind === "completed_speed"
-      ? `Reliable, correctly completed ${themeLabel} puzzles now take about ${latest.valueLabel} the matched expectation, compared with ${first.valueLabel} at the first visible point. Wrong moves and timeouts stay in solve reliability instead of this speed estimate.`
-      : `${themeLabel} solve reliability is now estimated at ${latest.valueLabel} extra misses per 100 comparable puzzles, compared with ${first.valueLabel} at the first visible point. Puzzle difficulty, your Rating, and task family are matched before estimating the gap.`,
+      ? "n includes model-weighted correct solves completed before timeout; speed starts after enough personal controls."
+      : "Wrong moves and timeouts count as misses.",
     points
+  };
+}
+
+function unavailableProgressPoint(asOf: string): HistoryProgressPoint {
+  return {
+    label: shortUtcDate(asOf),
+    value: 0,
+    valueLabel: "—",
+    sampleSize: 0,
+    unavailable: true
   };
 }
 
@@ -131,24 +157,23 @@ function progressPoint(
 ): HistoryProgressPoint | undefined {
   const evidenceWeight = kind === "completed_speed"
     ? estimate.speedEvidenceWeight
-    : estimate.solveEvidenceWeight;
+    : estimate.accuracyEvidenceWeight;
   if (evidenceWeight <= 0) {
     return undefined;
   }
   if (kind === "completed_speed") {
     return {
       label: shortUtcDate(asOf),
-      value: Math.max(0, 100 * (estimate.completedTimeMultiplier - 1)),
+      value: 100 * estimate.completedTimeMultiplier,
       valueLabel: `${estimate.completedTimeMultiplier.toFixed(2)}×`,
       sampleSize: Math.max(1, Math.round(evidenceWeight))
     };
   }
+  const accuracyPercent = 100 * estimate.observedSolveRate;
   return {
     label: shortUtcDate(asOf),
-    value: estimate.expectedFailuresPer100,
-    valueLabel: estimate.expectedFailuresPer100 < 0.5
-      ? "0"
-      : `+${Math.round(estimate.expectedFailuresPer100)}`,
+    value: accuracyPercent,
+    valueLabel: `${Math.round(accuracyPercent)}%`,
     sampleSize: Math.max(1, Math.round(evidenceWeight))
   };
 }
@@ -174,7 +199,8 @@ function weaknessPresentation(
   if (signal.reason === "completed_speed" || signal.reason === "both") {
     effects.push({
       kind: "completed_speed",
-      valueLabel: `${signal.completedTimeMultiplier.toFixed(2)}× expected time`,
+      valueLabel:
+        `${signal.completedTimeMultiplier.toFixed(2)}× comparable time`,
       metricLabel: "on correctly completed puzzles",
       comparisonLabel: relativeComparisonLabel(
         signal,
@@ -193,7 +219,7 @@ function weaknessPresentation(
     explanation:
       "This is the highest-confidence current model gap that passes the evidence, practical-impact, and diversity checks. One unusual attempt is not enough.",
     eligibilityLabel:
-      "Correct attempts count once as solve successes. Wrong moves and timeouts count once as solve failures. Completed speed uses only correct, before-timeout attempts with reliable elapsed time. Slow, Unclear, and Review membership do not decide the result."
+      "Correct attempts count once as solve successes. Wrong moves and timeouts count once as solve failures. Completed speed uses only correct, before-timeout attempts with reliable elapsed time and appears only after enough personal controls that exclude the theme being measured. Slow, Unclear, and Review membership do not decide the result."
   };
 }
 
@@ -222,25 +248,105 @@ function relativeComparisonLabel(
         : estimate.completedTimeMultiplier
     ) < currentValue
   );
-  const modelContext = kind === "solve_rate"
-    ? "after matching puzzle difficulty, your Rating, and task family"
-    : "after matching difficulty, pace, timing policy, and decision count";
+  if (kind === "completed_speed") {
+    const slowerPercent = Math.max(
+      0,
+      Math.round(100 * (signal.completedTimeMultiplier - 1))
+    );
+    const comparison =
+      `${humanizeTheme(signal.theme)} takes about ${slowerPercent}% longer than your comparable completed puzzles after accounting for relative Rating difficulty, decision count, Run pace, Slow policy, and Timeout policy`;
+    return peersAreCloser
+      ? `${comparison}; the other well-sampled themes in this task family are closer to their personal baselines.`
+      : `${comparison}. It is the highest-confidence current speed weakness among the well-sampled themes.`;
+  }
+  const modelContext =
+    "after matching puzzle difficulty, your Rating, and task family";
   if (peersAreCloser) {
     return `${humanizeTheme(signal.theme)} stands farther from its matched expectation ${modelContext}; the other well-sampled themes in this task family are closer to theirs.`;
   }
   return `${humanizeTheme(signal.theme)} stands out ${modelContext}. It is the highest-confidence current weakness signal among the well-sampled themes, each measured against its own matched expectation.`;
 }
 
-function seriesKind(
-  signal: TacticalProfileModelSignal | undefined
+function balancedPresentation(
+  estimates: readonly TacticalProfileThemeEstimate[]
+): Pick<
+  HistoryProgressPresentation,
+  "noWeaknessTone" | "noWeaknessTitle" | "noWeaknessLabel"
+> {
+  const hasAccuracy = estimates.some(
+    (estimate) => estimate.accuracyEvidenceWeight > 0
+  );
+  const hasSpeed = estimates.some(
+    (estimate) => estimate.speedEvidenceWeight > 0
+  );
+  if (hasAccuracy && hasSpeed) {
+    return {
+      noWeaknessTone: "balanced",
+      noWeaknessTitle: "Recent play looks balanced",
+      noWeaknessLabel:
+        "No theme currently shows a repeated, meaningful weakness in accuracy or solve time."
+    };
+  }
+  if (hasAccuracy) {
+    return {
+      noWeaknessTone: "balanced",
+      noWeaknessTitle: "Recent play looks balanced",
+      noWeaknessLabel:
+        "No theme currently shows a repeated, meaningful accuracy weakness. Solve time is unavailable until there are enough comparable completed puzzles."
+    };
+  }
+  if (hasSpeed) {
+    return {
+      noWeaknessTone: "balanced",
+      noWeaknessTitle: "Recent play looks balanced",
+      noWeaknessLabel:
+        "No theme currently shows a repeated, meaningful solve-time weakness. Accuracy is unavailable until there is enough attempt evidence."
+    };
+  }
+  return {
+    noWeaknessTone: "balanced",
+    noWeaknessTitle: "Recent play looks balanced",
+    noWeaknessLabel:
+      "Accuracy and solve time are unavailable until there is enough mixed-practice evidence."
+  };
+}
+
+function seriesKinds(
+  signal: TacticalProfileModelSignal | undefined,
+  estimate: TacticalProfileThemeEstimate
+): readonly Exclude<TacticalFocusReason, "both">[] {
+  const preferred = preferredSeriesKind(signal, estimate);
+  const other: Exclude<TacticalFocusReason, "both"> = preferred === "solve_rate"
+    ? "completed_speed"
+    : "solve_rate";
+  const candidates: Exclude<TacticalFocusReason, "both">[] = [
+    preferred,
+    other
+  ];
+  return candidates;
+}
+
+function preferredSeriesKind(
+  signal: TacticalProfileModelSignal | undefined,
+  estimate: TacticalProfileThemeEstimate
 ): Exclude<TacticalFocusReason, "both"> {
-  if (signal?.reason === "completed_speed") {
+  if (signal?.status === "recommended" && signal.reason === "completed_speed") {
     return "completed_speed";
   }
-  if (signal?.reason === "both" && signal.speedConfidence > signal.solveConfidence) {
+  if (
+    signal?.status === "recommended" &&
+    signal.reason === "both" &&
+    signal.speedConfidence > signal.solveConfidence
+  ) {
     return "completed_speed";
   }
-  return "solve_rate";
+  return estimate.accuracyEvidenceWeight > 0
+    ? "solve_rate"
+    : "completed_speed";
+}
+
+function hasProgressEvidence(estimate: TacticalProfileThemeEstimate): boolean {
+  return estimate.accuracyEvidenceWeight > 0 || estimate.speedEvidenceWeight > 0;
 }
 
 function isWellSampled(
@@ -252,7 +358,7 @@ function isWellSampled(
 ): boolean {
   return estimate.distinctPuzzleCount >= progress.minDistinctPuzzles &&
     estimate.distinctSessionCount >= progress.minDistinctSessions &&
-    estimate.solveEvidenceWeight > 0;
+    hasProgressEvidence(estimate);
 }
 
 function compareCurrentEstimates(
@@ -309,23 +415,23 @@ function changePresentation(
   if (delta <= -meaningfulDelta) {
     return {
       label: kind === "completed_speed"
-        ? `${Math.round(Math.abs(delta))}% less overhead`
-        : `${Math.round(Math.abs(delta))} fewer / 100`,
-      tone: "improved"
+        ? `${Math.round(Math.abs(delta))}% less time`
+        : `${Math.round(Math.abs(delta))} points lower`,
+      tone: kind === "completed_speed" ? "improved" : "worsened"
     };
   }
   if (delta >= meaningfulDelta) {
     return {
       label: kind === "completed_speed"
-        ? `${Math.round(delta)}% more overhead`
-        : `${Math.round(delta)} more / 100`,
-      tone: "worsened"
+        ? `${Math.round(delta)}% more time`
+        : `${Math.round(delta)} points higher`,
+      tone: kind === "completed_speed" ? "worsened" : "improved"
     };
   }
   return {
     label: kind === "completed_speed"
-      ? "Completed time is steady"
-      : "Reliability gap is steady",
+      ? "Time is steady"
+      : "Accuracy is steady",
     tone: "steady"
   };
 }

@@ -88,15 +88,17 @@ test("derived Tactical Profile cache cannot enter local export or iCloud sync pa
     completedDay: "2026-07-01",
     taskFamily: "line",
     theme: "private-derived-theme",
+    accuracySuccessWeight: 0,
+    accuracyWeight: 1,
     solveScore: 1,
     solveInformation: 1,
     solveExpectedSuccess: 0,
     solveObservedSuccess: 0,
     solveSensitivity: 1,
     solveWeight: 1,
-    speedWeightedResidual: 0,
-    speedPrecision: 0,
-    speedWeight: 0,
+    speedBaseline: emptySpeedStatistics(),
+    speedTheme: emptySpeedStatistics(),
+    speedControlExclusion: emptySpeedStatistics(),
     distinctPuzzleIds: ["private-derived-puzzle"],
     distinctSessionIds: ["private-derived-session"]
   }]);
@@ -232,7 +234,7 @@ test("syncPracticeProgress imports another device snapshot before uploading the 
     deviceId: "device-b",
     updatedAt: "2026-07-06T00:00:00.000Z",
     data: remoteService.exportLocalData()
-  };
+};
 
   const localStore = await seededMemoryStore();
   const localService = new PracticeService(localStore);
@@ -1357,6 +1359,15 @@ test("syncPracticeProgress refetches and remerges after a concurrent snapshot co
   assert.equal(transport.saved?.data.attempts.length, 2);
   assert.equal(transport.saved?.data.sprintSessions.length, 2);
 });
+
+function emptySpeedStatistics() {
+  return {
+    weight: 0,
+    gramMatrix: Array(36).fill(0),
+    responseFeatureSums: Array(6).fill(0),
+    responseSquareSum: 0
+  };
+}
 
 class RecordingTransport implements ProgressSyncTransport {
   fetchCount = 0;

@@ -570,9 +570,7 @@ function profileHeadingFor(
     return `${taskFamilyLabel(activeTaskFamilyFor(presentation))} insights aren't ready`;
   }
   if (presentation.phase === "balanced") {
-    return presentation.assurance === "provisional"
-      ? "No clear focus yet"
-      : "No meaningful weakness right now";
+    return "Recent play looks balanced";
   }
   if (presentation.phase === "collecting") {
     return "Still collecting evidence";
@@ -588,9 +586,7 @@ function profileBodyFor(presentation: TacticalProfilePresentation): string {
     return "Playing more mixed Runs won't unlock recommendations yet.";
   }
   if (presentation.phase === "balanced") {
-    return presentation.assurance === "provisional"
-      ? "This early model has not found a repeated pattern strong enough to emphasize."
-      : "Your recent completed puzzles look balanced after accounting for difficulty and Run settings.";
+    return "Your recent completed puzzles look balanced after accounting for difficulty and Run settings.";
   }
   if (presentation.phase === "collecting") {
     return "Keep playing mixed Runs. We need results from more different puzzles and sessions before recommending a focus.";
@@ -642,16 +638,8 @@ function homeContentFor(
     };
   }
   if (presentation.phase === "balanced") {
-    if (presentation.assurance === "provisional") {
-      return {
-        status: "Still learning",
-        title: "No clear focus yet",
-        body: "The early model has not found a repeated pattern strong enough to emphasize.",
-        tone: "neutral"
-      };
-    }
     return {
-      status: "No focus needed",
+      status: "Balanced",
       title: "Recent play looks balanced",
       body: "There is no meaningful weakness to emphasize right now.",
       tone: "green"

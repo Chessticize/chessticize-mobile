@@ -1205,19 +1205,20 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("explains provisional balanced results without claiming no weakness exists", () => {
+  it("presents provisional balanced results clearly while retaining the early estimate", () => {
     const renderer = renderLabScenario("practice-tactical-profile-balanced");
 
-    expect(collectText(findByTestId(renderer, "training-focus-card"))).toContain(
-      "No clear focus yet"
-    );
-    expect(collectText(findByTestId(renderer, "training-focus-card"))).not.toContain(
-      "No focus needed"
-    );
+    const card = collectText(findByTestId(renderer, "training-focus-card"));
+    expect(card).toContain("Balanced");
+    expect(card).toContain("Recent play looks balanced");
+    expect(card).toContain("Early estimate");
     press(renderer, "training-focus-open-profile");
-    expect(collectText(findByTestId(renderer, "tactical-profile-screen"))).toContain(
-      "has not found a repeated pattern strong enough to emphasize"
+    const profile = collectText(findByTestId(renderer, "tactical-profile-screen"));
+    expect(profile).toContain("Recent play looks balanced");
+    expect(profile).toContain(
+      "Your recent completed puzzles look balanced after accounting for difficulty and Run settings."
     );
+    expect(profile).toContain("This is an early estimate");
   });
 
   it("keeps Practice available and automatically retries a failed Tactical Profile cache", async () => {
@@ -2654,20 +2655,54 @@ describe("PracticePocScreen", () => {
       "Tactical progress"
     );
     expect(findByTestId(renderer, "history-progress-early-estimate")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
-      "13 fewer / 100"
+    const progressSection = findByTestId(renderer, "history-strength-over-time");
+    expect(collectText(progressSection)).toContain(
+      "7 points higher"
     );
-    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
-      "Extra misses per 100 comparable puzzles"
+    expect(collectText(progressSection)).toContain(
+      "Accuracy · higher is better"
     );
-    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+    expect(collectText(progressSection)).toContain(
       "n=71"
     );
-    expect(findByTestId(renderer, "history-no-clear-weakness")).toBeTruthy();
+    expect(collectText(progressSection)).toContain("How accuracy is counted");
+    expect(collectText(progressSection)).toContain(
+      "Recent attempts and stronger theme matches contribute more to n."
+    );
+    expect(collectText(progressSection)).toContain(
+      "Wrong moves and timeouts count as misses."
+    );
+    expect(collectText(progressSection)).not.toContain(
+      "model-weighted observations"
+    );
+    expect(collectText(progressSection)).not.toContain(
+      "Eligible ordinary mixed Runs"
+    );
+    const balanced = findByTestId(renderer, "history-no-clear-weakness");
+    expect(collectText(balanced)).toContain("Recent play looks balanced");
+    expect(collectText(findByTestId(renderer, "history-balanced-check"))).toBe("✓");
+    expect(collectText(balanced)).toContain(
+      "No theme currently shows a repeated, meaningful weakness in accuracy or solve time."
+    );
+    const metricSelector = findByTestId(renderer, "history-progress-metric-selector");
+    expect(collectText(metricSelector)).toContain("Accuracy");
+    expect(collectText(metricSelector)).toContain("94%");
+    expect(collectText(metricSelector)).toContain("Solve time");
+    expect(collectText(metricSelector)).toContain("1.09×");
+    press(renderer, "history-progress-metric-completed_speed");
+    expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
+      "1.09×"
+    );
+    expect(collectText(findByTestId(renderer, "history-progress-chart-note"))).toContain(
+      "How solve time is counted"
+    );
+    expect(collectText(findByTestId(renderer, "history-progress-chart-note"))).toContain(
+      "1.00× matches your comparable completed puzzles."
+    );
 
     press(renderer, "history-progress-strength-pins");
     expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
-      "24% less overhead"
+      "24% less time"
     );
     expect(collectText(findByTestId(renderer, "history-strength-over-time"))).toContain(
       "1.06×"
@@ -2713,16 +2748,19 @@ describe("PracticePocScreen", () => {
     const weakness = findByTestId(renderer, "history-clear-weakness");
     expect(collectText(weakness)).toContain("Pins");
     expect(collectText(weakness)).toContain("Completed-puzzle speed");
-    expect(collectText(weakness)).toContain("1.34× expected time");
+    expect(collectText(weakness)).toContain("1.34× comparable time");
     expect(collectText(weakness)).toContain("about 34% longer");
     expect(collectText(weakness)).toContain(
-      "Other well-sampled themes remain closer"
+      "other well-sampled themes remain closer"
     );
     expect(collectText(weakness)).toContain(
       "Only correct, before-timeout attempts with reliable elapsed time"
     );
     expect(collectText(weakness)).toContain(
-      "Slow and Unclear labels do not decide it"
+      "personal controls that exclude the theme being measured"
+    );
+    expect(collectText(weakness)).toContain(
+      "Slow, Unclear, and Review membership do not decide it"
     );
     expect(collectText(findByTestId(renderer, "history-progress-screen"))).not.toContain(
       "recommend"
@@ -2804,7 +2842,8 @@ describe("PracticePocScreen", () => {
     const progress = findByTestId(renderer, "history-progress-screen");
     const weakness = findByTestId(renderer, "history-clear-weakness");
     expect(collectText(progress)).toContain("Pin · Arrow Duel");
-    expect(collectText(progress)).toContain("model-weighted observations");
+    expect(collectText(progress)).toContain("How accuracy is counted");
+    expect(collectText(progress)).not.toContain("model-weighted observations");
     expect(collectText(weakness)).toContain("Solve reliability");
     expect(collectText(weakness)).toContain("extra misses");
     expect(collectText(weakness)).toContain("12 different puzzles · 3 sessions");
@@ -11887,12 +11926,9 @@ function componentTacticalProfileCalibratedFamily() {
       minExpectedFailuresPer100: 2
     },
     speed: {
-      interceptLogSeconds: Math.log(30),
-      relativeDifficultyCoefficient: 0,
-      decisionCountCoefficient: 0,
-      paceLogCoefficient: 0,
-      slowPolicyLogCoefficient: 0,
-      residualSd: 0.25,
+      minimumControlWeight: 8,
+      slopePriorPrecision: 1,
+      minimumResidualSd: 0.15,
       themePriorSdLogSeconds: 0.5,
       practicalTimeMultiplier: 1.2
     }

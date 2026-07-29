@@ -315,11 +315,12 @@ z_i = log(elapsedSeconds_i)
 
 z_i
   ~ Normal(
-      speedFamilyIntercept[taskFamily_i]
+      personalFamilyIntercept[user_i, taskFamily_i]
       + relativePuzzleDifficultyEffect_i
       + decisionCountEffect(log(1 + userDecisionCount_i))
       + paceEffect_i
       + slowPolicyEffect_i
+      + timeoutPolicyEffect_i
       + phi_theme,
       sigma[taskFamily_i]
     )
@@ -329,6 +330,21 @@ For line puzzles, user decision count is the number of solution-line moves the
 user must supply after the app's deterministic opponent auto-moves. Arrow Duel
 has one user decision. The exact transformations, interactions, variance model,
 and retained covariates are calibration-required.
+
+The provisional V1 expectation is personal, not an absolute population clock.
+For each task family, the app fits a regularized log-time regression from the
+user's own eligible ordinary mixed solves. When estimating one theme, every
+attempt carrying that theme is removed from the control fit, including the full
+observation behind a fractionally weighted multi-theme row. Unthemed and
+other-theme eligible solves remain valid controls. This leave-theme-out rule
+prevents a slow theme from teaching its own expected time.
+
+The shipped artifact governs the minimum control weight, slope regularization,
+residual-variance floor, theme prior, and action threshold. It does not ship an
+absolute expected number of seconds. If the user lacks enough leave-theme-out
+controls, the speed head has zero evidence and remains unavailable; production
+MUST NOT fall back to 30 seconds or another population constant. The solve-rate
+head remains independently available.
 
 `phi_theme > 0` means longer completed-puzzle time than the matched baseline;
 `exp(phi_theme)` is the time multiplier. Log time is a proposed V1 model, not an
@@ -392,8 +408,11 @@ shortcut MUST NOT replace them.
 
 ### Completed-puzzle speed theme effect
 
-After the speed baseline and residual variance are frozen by calibration, daily
-cells may retain additive Normal-regression sufficient statistics:
+Daily cells retain additive Normal-regression sufficient statistics for the
+personal task-family baseline, the fractionally weighted theme observations,
+and the full-weight leave-theme-out exclusion set. Recency-weighted query-time
+aggregation first fits the personal baseline and residual variance from the
+remaining controls, then evaluates the theme:
 
 ```text
 residual_i = log(elapsed_i) - predictedLogElapsed_i
@@ -984,38 +1003,45 @@ the model.
    reliable observations can produce a completed-speed weakness.
 4. **One extreme slow solve:** one extreme correct elapsed time does not by
    itself recommend the theme.
-5. **Timeout partition:** one Timeout contributes exactly one solve-rate failure
+5. **Personal-control cold start:** completed theme solves without enough
+   leave-theme-out personal controls expose no speed evidence and never fall
+   back to an absolute clock.
+6. **Personal matched expectation:** a 45-second theme solve is neutral when
+   the user's comparable task-family controls also take about 45 seconds.
+7. **Relative-difficulty adjustment:** a harder puzzle that takes longer in
+   line with the user's Rating-conditioned controls is not classified as slow.
+8. **Timeout partition:** one Timeout contributes exactly one solve-rate failure
    and no V1 speed observation.
-6. **Unclear inclusion:** identical objective attempts yield identical model
+9. **Unclear inclusion:** identical objective attempts yield identical model
    evidence whether `unclear` is true or false.
-7. **Unclear mutation:** toggling Unclear does not dirty daily weakness cells
+10. **Unclear mutation:** toggling Unclear does not dirty daily weakness cells
    and does not change the Tactical Profile result.
-8. **Multi-theme conservation:** a puzzle matching three curated themes
+11. **Multi-theme conservation:** a puzzle matching three curated themes
    contributes `1/3` to each and no more than one total observation.
-9. **Scheduled Review isolation:** repeating a puzzle through scheduled Review
+12. **Scheduled Review isolation:** repeating a puzzle through scheduled Review
    changes recovery data only and does not amplify discovery weakness.
-10. **Focused intervention isolation:** Focused Run data neither washes out nor
+13. **Focused intervention isolation:** Focused Run data neither washes out nor
     rediscovers the original weakness.
-11. **Frequency separation:** common and rare themes with identical user
+14. **Frequency separation:** common and rare themes with identical user
     evidence have equal posterior confidence but different action priority.
-12. **Import convergence:** chronological import, out-of-order import, repeated
+15. **Import convergence:** chronological import, out-of-order import, repeated
     import, and one batched import converge to byte-equivalent daily aggregates;
     every dirty day is recomputed once per batch.
-13. **Version rebuild:** a model-version or pack-feature change followed by full
+16. **Version rebuild:** a model-version or pack-feature change followed by full
     rebuild matches a clean calculation from canonical progress and the pack.
-14. **Large-history query:** after the cache is built, profile query work grows
+17. **Large-history query:** after the cache is built, profile query work grows
     with retained daily/theme cells, not linearly with raw attempt count.
-15. **Rating growth:** a new Focused Run uses the latest applicable ordinary
+18. **Rating growth:** a new Focused Run uses the latest applicable ordinary
     mixed Rating while old evidence remains normalized by its stored
     `ratingBefore`.
-16. **Active-Run immutability:** a Rating or recommendation change during a Run
+19. **Active-Run immutability:** a Rating or recommendation change during a Run
     does not change that Run's puzzle IDs, Rating range, or quotas.
-17. **Focus cutoff:** four eligible themes show one Home lead and at most three
+20. **Focus cutoff:** four eligible themes show one Home lead and at most three
     Profile recommendations; the Run contains at most two theme quotas.
-18. **Sparse current-Rating inventory:** a credible theme remains an insight,
+21. **Sparse current-Rating inventory:** a credible theme remains an insight,
     but no start action appears when exclusions and bounded widening cannot fill
     the complete quota.
-19. **Two task families:** one Home card can summarize recommendations in both
+22. **Two task families:** one Home card can summarize recommendations in both
     modes, but the Profile selector, visible cutoffs, Rating anchor, and Focused
     Run remain specific to Puzzle solving or Arrow Duel.
 

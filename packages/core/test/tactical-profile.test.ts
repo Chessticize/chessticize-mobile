@@ -246,7 +246,8 @@ test("an owner-approved provisional trial remains distinct from validated calibr
     assertValidTacticalProfileCalibrationArtifact(provisional)
   );
   assert.equal(
-    buildTacticalProfileDailyCells([tacticalAttempt()], provisional).length,
+    buildTacticalProfileDailyCells([tacticalAttempt()], provisional)
+      .filter((cell) => !cell.theme.startsWith("~")).length,
     1
   );
   assert.throws(
@@ -565,13 +566,15 @@ test("speed baseline features share calibration references and support disabled 
     perPuzzleSeconds: 40,
     puzzleRating: 1600,
     ratingBefore: 1500,
-    slowAfterSeconds: null
+    slowAfterSeconds: null,
+    timeoutAfterSeconds: 120
   });
 
   assert.ok(Math.abs(features.relativeDifficulty - 100 / (400 / Math.log(10))) < 1e-12);
   assert.ok(Math.abs(features.decisionCountLog - Math.log(3)) < 1e-12);
   assert.ok(Math.abs(features.paceLogRatio - Math.log(2)) < 1e-12);
   assert.ok(Math.abs(features.slowPolicyLogRatio - Math.log(2)) < 1e-12);
+  assert.ok(Math.abs(features.timeoutPolicyLogRatio - Math.log(2)) < 1e-12);
 });
 
 test("completed-puzzle speed remains eligible when the Slow label is disabled", () => {
@@ -591,19 +594,16 @@ test("completed-puzzle speed remains eligible when the Slow label is disabled", 
         ...calibratedFamily(),
         speed: {
           ...calibratedFamily().speed,
-          interceptLogSeconds: 0,
-          paceLogCoefficient: 1,
-          slowPolicyLogCoefficient: 1,
-          residualSd: 1
+          minimumControlWeight: 1
         }
       }
     }
   });
 
-  assert.equal(cells[0]?.speedWeight, 1);
-  assert.ok(
-    Math.abs((cells[0]?.speedWeightedResidual ?? 0) - Math.log(5)) < 1e-12
-  );
+  const baseline = cells.find((cell) => cell.theme.startsWith("~"));
+  const theme = cells.find((cell) => cell.theme === "fork");
+  assert.equal(baseline?.speedBaseline.weight, 1);
+  assert.equal(theme?.speedTheme.weight, 1);
 });
 
 test("correct attempts at or beyond the Timeout boundary do not become speed evidence", () => {
@@ -628,8 +628,7 @@ test("correct attempts at or beyond the Timeout boundary do not become speed evi
 
   assert.equal(cells.length, 1);
   assert.equal(cells[0]?.solveWeight, 2);
-  assert.equal(cells[0]?.speedWeight, 0);
-  assert.equal(cells[0]?.speedPrecision, 0);
+  assert.equal(cells[0]?.speedTheme.weight, 0);
 });
 
 test("one multi-theme attempt conserves one total theme observation", () => {
@@ -640,14 +639,15 @@ test("one multi-theme attempt conserves one total theme observation", () => {
       }
     })
   ], CALIBRATION);
+  const themeCells = cells.filter((cell) => !cell.theme.startsWith("~"));
 
-  assert.equal(cells.length, 3);
+  assert.equal(themeCells.length, 3);
   assert.equal(
-    cells.reduce((sum, cell) => sum + cell.solveWeight, 0),
+    themeCells.reduce((sum, cell) => sum + cell.solveWeight, 0),
     1
   );
   assert.deepEqual(
-    cells.map((cell) => [cell.theme, cell.solveWeight]),
+    themeCells.map((cell) => [cell.theme, cell.solveWeight]),
     [
       ["deflection", 1 / 3],
       ["fork", 1 / 3],
@@ -671,11 +671,10 @@ test("Timeout contributes one solve failure and no completed-speed observation",
   assert.ok(cell);
   assert.equal(cell.solveObservedSuccess, 0);
   assert.equal(cell.solveWeight, 1);
-  assert.equal(cell.speedWeight, 0);
-  assert.equal(cell.speedPrecision, 0);
+  assert.equal(cell.speedTheme.weight, 0);
 });
 
-test("legacy timing gaps are never reconstructed from timestamps or current defaults", () => {
+test("legacy timing gaps keep accuracy without reconstructing model evidence", () => {
   const missingElapsed = tacticalAttempt();
   delete missingElapsed.attempt.elapsedMs;
   const missingPolicy = tacticalAttempt();
@@ -692,11 +691,46 @@ test("legacy timing gaps are never reconstructed from timestamps or current defa
 
   assert.ok(elapsedCell);
   assert.equal(elapsedCell.solveObservedSuccess, 1);
-  assert.equal(elapsedCell.speedWeight, 0);
-  assert.deepEqual(policyCells, []);
+  assert.equal(elapsedCell.speedTheme.weight, 0);
+  assert.equal(policyCells[0]?.accuracySuccessWeight, 1);
+  assert.equal(policyCells[0]?.accuracyWeight, 1);
+  assert.equal(policyCells[0]?.solveWeight, 0);
+  assert.equal(policyCells[0]?.speedTheme.weight, 0);
 });
 
-test("a puzzle with no curated theme keeps baseline features but contributes no theme posterior cell", () => {
+test("observed accuracy includes attempts without matched solve-model features", () => {
+  const correct = tacticalAttempt({
+    attempt: {
+      id: "missing-rd-correct",
+      puzzleId: "missing-rd-puzzle-correct"
+    },
+    puzzle: { id: "missing-rd-puzzle-correct" }
+  });
+  const wrong = tacticalAttempt({
+    attempt: {
+      id: "missing-rd-wrong",
+      puzzleId: "missing-rd-puzzle-wrong",
+      result: "wrong"
+    },
+    puzzle: { id: "missing-rd-puzzle-wrong" }
+  });
+  delete correct.puzzle.ratingDeviation;
+  delete wrong.puzzle.ratingDeviation;
+  const cells = buildTacticalProfileDailyCells([correct, wrong], CALIBRATION);
+  const [estimate] = estimateTacticalProfileThemes({
+    cells,
+    calibration: CALIBRATION,
+    now: "2026-07-25T00:00:00.000Z"
+  });
+
+  assert.ok(estimate);
+  assert.equal(estimate?.solveEvidenceWeight, 0);
+  assert.equal(estimate.speedEvidenceWeight, 0);
+  assert.ok(estimate.accuracyEvidenceWeight > 1.9);
+  assert.equal(estimate?.observedSolveRate, 0.5);
+});
+
+test("a puzzle with no curated theme contributes personal speed controls but no theme posterior", () => {
   const input = tacticalAttempt({
     puzzle: { themes: ["notCurated"] }
   });
@@ -713,8 +747,15 @@ test("a puzzle with no curated theme keeps baseline features but contributes no 
   });
 
   assert.ok(Object.values(baseline).every(Number.isFinite));
+  const cells = buildTacticalProfileDailyCells([input], CALIBRATION);
+  assert.equal(cells.length, 1);
+  assert.equal(cells[0]?.speedBaseline.weight, 1);
   assert.deepEqual(
-    buildTacticalProfileDailyCells([input], CALIBRATION),
+    estimateTacticalProfileThemes({
+      cells,
+      calibration: CALIBRATION,
+      now: "2026-07-25T00:00:00.000Z"
+    }),
     []
   );
 });
@@ -740,9 +781,22 @@ test("Unclear and Slow workflow labels do not change objective model evidence", 
 
 test("theme estimates expose both model heads for balanced progress", () => {
   const cells = buildTacticalProfileDailyCells(
-    Array.from({ length: 8 }, (_, index) => tacticalAttempt({
+    [
+      ...Array.from({ length: 12 }, (_, index) => tacticalAttempt({
+        attempt: {
+          id: `estimate-control-${index}`,
+          puzzleId: `estimate-control-puzzle-${index}`,
+          elapsedMs: 24_000
+        },
+        puzzle: {
+          id: `estimate-control-puzzle-${index}`,
+          themes: ["notCurated"]
+        }
+      })),
+      ...Array.from({ length: 8 }, (_, index) => tacticalAttempt({
       attempt: {
         id: `estimate-${index}`,
+        result: index < 2 ? "wrong" : "correct",
         sessionId: `estimate-session-${index % 2}`,
         completedAt: `2026-07-${String(10 + index).padStart(2, "0")}T00:00:20.000Z`,
         elapsedMs: 24_000
@@ -751,7 +805,8 @@ test("theme estimates expose both model heads for balanced progress", () => {
         id: `estimate-puzzle-${index}`,
         themes: ["fork"]
       }
-    })),
+      }))
+    ],
     CALIBRATION
   );
 
@@ -767,6 +822,8 @@ test("theme estimates expose both model heads for balanced progress", () => {
   assert.equal(estimate.distinctSessionCount, 2);
   assert.ok(estimate.solveEvidenceWeight > 0);
   assert.ok(estimate.speedEvidenceWeight > 0);
+  assert.ok(estimate.observedSolveRate > 0.75);
+  assert.ok(estimate.observedSolveRate < 0.8);
   assert.ok(Number.isFinite(estimate.expectedFailuresPer100));
   assert.ok(Number.isFinite(estimate.completedTimeMultiplier));
 });
@@ -869,8 +926,20 @@ test("one rare-theme miss stays collecting while diverse repeated misses can rec
 });
 
 test("consistent completed-puzzle slowness recommends but one extreme solve does not", () => {
+  const controls = Array.from({ length: 12 }, (_, index) => tacticalAttempt({
+    attempt: {
+      id: `speed-control-${index}`,
+      sessionId: `speed-control-session-${index % 3}`,
+      puzzleId: `speed-control-puzzle-${index}`,
+      elapsedMs: 30_000
+    },
+    puzzle: {
+      id: `speed-control-puzzle-${index}`,
+      themes: ["notCurated"]
+    }
+  }));
   const consistent = buildTacticalProfileDailyCells(
-    Array.from({ length: 8 }, (_, index) => tacticalAttempt({
+    [...controls, ...Array.from({ length: 8 }, (_, index) => tacticalAttempt({
       attempt: {
         id: `slow-${index}`,
         sessionId: `slow-session-${index % 3}`,
@@ -878,10 +947,10 @@ test("consistent completed-puzzle slowness recommends but one extreme solve does
         elapsedMs: 45_000
       },
       puzzle: { id: `pin-${index}`, themes: ["pin"] }
-    })),
+    }))],
     CALIBRATION
   );
-  const extreme = buildTacticalProfileDailyCells([
+  const extreme = buildTacticalProfileDailyCells([...controls,
     tacticalAttempt({
       attempt: { elapsedMs: 179_000 },
       sessionConfig: {
@@ -910,29 +979,155 @@ test("consistent completed-puzzle slowness recommends but one extreme solve does
   assert.equal(extremeEvaluation.signals[0]?.reason, "completed_speed");
 });
 
+test("completed speed stays unavailable until personal matched controls exist", () => {
+  const cells = buildTacticalProfileDailyCells(
+    Array.from({ length: 8 }, (_, index) => tacticalAttempt({
+      attempt: {
+        id: `cold-speed-${index}`,
+        sessionId: `cold-speed-session-${index % 2}`,
+        elapsedMs: 45_000
+      },
+      puzzle: {
+        id: `cold-speed-puzzle-${index}`,
+        themes: ["pin"]
+      }
+    })),
+    CALIBRATION
+  );
+
+  const [estimate] = estimateTacticalProfileThemes({
+    cells,
+    calibration: CALIBRATION,
+    now: "2026-07-25T00:00:00.000Z"
+  });
+
+  assert.ok(estimate);
+  assert.equal(estimate.speedEvidenceWeight, 0);
+  assert.equal(estimate.completedTimeMultiplier, 1);
+});
+
+test("completed speed compares a theme with the user's own comparable solves", () => {
+  const controls = Array.from({ length: 12 }, (_, index) => tacticalAttempt({
+    attempt: {
+      id: `control-${index}`,
+      sessionId: `control-session-${index % 3}`,
+      puzzleId: `control-puzzle-${index}`,
+      elapsedMs: 45_000
+    },
+    puzzle: {
+      id: `control-puzzle-${index}`,
+      themes: ["notCurated"]
+    }
+  }));
+  const targets = Array.from({ length: 8 }, (_, index) => tacticalAttempt({
+    attempt: {
+      id: `matched-${index}`,
+      sessionId: `matched-session-${index % 2}`,
+      puzzleId: `matched-puzzle-${index}`,
+      elapsedMs: 45_000
+    },
+    puzzle: {
+      id: `matched-puzzle-${index}`,
+      themes: ["pin"]
+    }
+  }));
+  const cells = buildTacticalProfileDailyCells(
+    [...controls, ...targets],
+    CALIBRATION
+  );
+
+  const [estimate] = estimateTacticalProfileThemes({
+    cells,
+    calibration: CALIBRATION,
+    now: "2026-07-25T00:00:00.000Z"
+  });
+
+  assert.ok(estimate);
+  assert.ok(estimate.speedEvidenceWeight > 0);
+  assert.ok(estimate.completedTimeMultiplier > 0.95);
+  assert.ok(estimate.completedTimeMultiplier < 1.05);
+});
+
+test("personal speed expectations adjust for puzzle Rating relative to the player", () => {
+  const elapsedForRating = (puzzleRating: number) =>
+    Math.round(
+      20_000 * Math.exp(
+        0.5 * (puzzleRating - 1500) / (400 / Math.log(10))
+      )
+    );
+  const controlRatings = Array.from(
+    { length: 20 },
+    (_, index) => 1300 + (index % 5) * 100
+  );
+  const controls = controlRatings.map((rating, index) => tacticalAttempt({
+    attempt: {
+      id: `rating-control-${index}`,
+      puzzleId: `rating-control-puzzle-${index}`,
+      elapsedMs: elapsedForRating(rating)
+    },
+    puzzle: {
+      id: `rating-control-puzzle-${index}`,
+      rating,
+      themes: ["notCurated"]
+    }
+  }));
+  const targets = Array.from({ length: 8 }, (_, index) => tacticalAttempt({
+    attempt: {
+      id: `rating-target-${index}`,
+      sessionId: `rating-target-session-${index % 2}`,
+      puzzleId: `rating-target-puzzle-${index}`,
+      elapsedMs: elapsedForRating(1700)
+    },
+    puzzle: {
+      id: `rating-target-puzzle-${index}`,
+      rating: 1700,
+      themes: ["pin"]
+    }
+  }));
+  const [estimate] = estimateTacticalProfileThemes({
+    cells: buildTacticalProfileDailyCells(
+      [...controls, ...targets],
+      CALIBRATION
+    ),
+    calibration: CALIBRATION,
+    now: "2026-07-25T00:00:00.000Z"
+  });
+
+  assert.ok(estimate);
+  assert.ok(estimate.speedEvidenceWeight > 0);
+  assert.ok(estimate.completedTimeMultiplier > 0.95);
+  assert.ok(estimate.completedTimeMultiplier < 1.05);
+});
+
 test("recommendation hysteresis retains a prior focus between entry and exit thresholds", () => {
-  const cell = {
-    modelVersion: CALIBRATION.modelVersion,
-    packFeatureHash: CALIBRATION.packFeatureHash,
-    calibrationId: CALIBRATION.calibrationId,
-    completedDay: "2026-07-24",
-    taskFamily: "line" as const,
-    theme: "pin",
-    solveScore: 0,
-    solveInformation: 0,
-    solveExpectedSuccess: 0,
-    solveObservedSuccess: 0,
-    solveSensitivity: 0,
-    solveWeight: 0,
-    speedWeightedResidual: 21.63,
-    speedPrecision: 64,
-    speedWeight: 4,
-    distinctPuzzleIds: ["p1", "p2", "p3", "p4"],
-    distinctSessionIds: ["s1", "s2"]
-  };
+  const cells = buildTacticalProfileDailyCells([
+    ...Array.from({ length: 12 }, (_, index) => tacticalAttempt({
+      attempt: {
+        id: `hysteresis-control-${index}`,
+        puzzleId: `hysteresis-control-puzzle-${index}`,
+        elapsedMs: 30_000
+      },
+      puzzle: {
+        id: `hysteresis-control-puzzle-${index}`,
+        themes: ["notCurated"]
+      }
+    })),
+    ...Array.from({ length: 4 }, (_, index) => tacticalAttempt({
+      attempt: {
+        id: `hysteresis-target-${index}`,
+        sessionId: `hysteresis-target-session-${index % 2}`,
+        puzzleId: `hysteresis-target-puzzle-${index}`,
+        elapsedMs: 40_100
+      },
+      puzzle: {
+        id: `hysteresis-target-puzzle-${index}`,
+        themes: ["pin"]
+      }
+    }))
+  ], CALIBRATION);
   const common = {
     calibration: CALIBRATION,
-    cells: [cell],
+    cells,
     naturalFrequency: { line: { pin: 0.08 }, arrow_duel: {} },
     now: "2026-07-25T00:00:00.000Z"
   };
@@ -959,9 +1154,10 @@ test("daily diversity identifiers are capped at calibrated evidence thresholds",
     })),
     CALIBRATION
   );
+  const fork = cells.find((cell) => cell.theme === "fork");
 
-  assert.equal(cells[0]?.distinctPuzzleIds.length, CALIBRATION.evidence.minDistinctPuzzles);
-  assert.equal(cells[0]?.distinctSessionIds.length, CALIBRATION.evidence.minDistinctSessions);
+  assert.equal(fork?.distinctPuzzleIds.length, CALIBRATION.evidence.minDistinctPuzzles);
+  assert.equal(fork?.distinctSessionIds.length, CALIBRATION.evidence.minDistinctSessions);
 });
 
 test("diverse evidence with no practical weakness reports a balanced profile", () => {
@@ -1173,12 +1369,9 @@ function calibratedFamily() {
       minExpectedFailuresPer100: 2
     },
     speed: {
-      interceptLogSeconds: Math.log(30),
-      relativeDifficultyCoefficient: 0,
-      decisionCountCoefficient: 0,
-      paceLogCoefficient: 0,
-      slowPolicyLogCoefficient: 0,
-      residualSd: 0.25,
+      minimumControlWeight: 8,
+      slopePriorPrecision: 1,
+      minimumResidualSd: 0.15,
       themePriorSdLogSeconds: 0.5,
       practicalTimeMultiplier: 1.2
     }

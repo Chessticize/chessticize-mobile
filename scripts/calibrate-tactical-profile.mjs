@@ -826,8 +826,9 @@ export function buildArtifact(report, familyReports, policy, manifest) {
         minExpectedFailuresPer100: parameters.minimumExpectedFailuresPer100
       },
       speed: {
-        ...result.speed.coefficients,
-        residualSd: result.speed.residualSd,
+        minimumControlWeight: parameters.speedMinimumControlWeight,
+        slopePriorPrecision: parameters.speedSlopePriorPrecision,
+        minimumResidualSd: parameters.speedMinimumResidualSd,
         themePriorSdLogSeconds: parameters.speedThemePriorSdLogSeconds,
         practicalTimeMultiplier: parameters.practicalTimeMultiplier
       }
@@ -912,7 +913,8 @@ function speedFeatures(observation) {
     perPuzzleSeconds: observation.perPuzzleSeconds,
     puzzleRating: observation.puzzleRating,
     ratingBefore: observation.ratingBefore,
-    slowAfterSeconds: observation.slowAfterSeconds
+    slowAfterSeconds: observation.slowAfterSeconds,
+    timeoutAfterSeconds: observation.timeoutAfterSeconds
   });
   return [
     1,

@@ -65,7 +65,14 @@ export const TacticalProgress: Story = {
     await waitForTestId(canvasElement, "history-progress-screen");
     await waitForTestId(canvasElement, "history-strength-chart");
     await waitForTestId(canvasElement, "history-no-clear-weakness");
-    await clickTestId(canvasElement, "history-progress-strength-pins");
+    await clickTestId(canvasElement, "history-progress-metric-completed_speed");
+    (canvasElement.querySelector(
+      '[data-testid="history-progress-metric-completed_speed"]'
+    ) as HTMLElement | null)?.blur();
+    await clickTestId(canvasElement, "history-progress-metric-solve_rate");
+    (canvasElement.querySelector(
+      '[data-testid="history-progress-metric-solve_rate"]'
+    ) as HTMLElement | null)?.blur();
   }
 };
 

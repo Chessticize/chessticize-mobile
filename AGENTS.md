@@ -50,6 +50,12 @@ site even when it continues the same issue. Every Storybook review site,
 including the main-branch catalog and every branch-owned site, is public and
 must not require authentication. Verify that an unauthenticated request to
 `/storybook/` returns HTTP 200 after every deployment or access-policy change.
+If publication is unavailable after a concrete deployment attempt, an explicit
+repository-owner authorization may waive this gate for that PR. Record the
+failed publication result, the site's resulting access state, the owner's
+authorization, and the follow-up needed in the PR before marking it ready or
+merging it. Keep any usable owner-only deployment in place; never substitute or
+overwrite another branch's review site.
 A coherent design increment may merge to `main` before implementation; its
 New Scenario Marker retains one ownership entry per linked issue until that
 issue is closed. A scenario changed by multiple open issues retains every owner.

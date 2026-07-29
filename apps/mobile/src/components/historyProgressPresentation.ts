@@ -8,10 +8,12 @@ export type HistoryProgressPoint = {
   value: number;
   valueLabel: string;
   sampleSize: number;
+  unavailable?: true;
 };
 
 export type HistoryStrengthSeries = {
   id: string;
+  themeId: string;
   label: string;
   kind: Exclude<TacticalFocusReason, "both">;
   metricLabel: string;
@@ -47,5 +49,7 @@ export type HistoryProgressPresentation = {
   initialSeriesId: string;
   strengths: readonly HistoryStrengthSeries[];
   weakness?: HistoryProgressWeakness;
+  noWeaknessTone: "balanced" | "collecting";
+  noWeaknessTitle: string;
   noWeaknessLabel: string;
 };
