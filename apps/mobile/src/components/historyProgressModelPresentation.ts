@@ -289,25 +289,25 @@ function balancedPresentation(
   }
   if (hasAccuracy) {
     return {
-      noWeaknessTone: "collecting",
-      noWeaknessTitle: "Accuracy looks balanced",
+      noWeaknessTone: "balanced",
+      noWeaknessTitle: "Recent play looks balanced",
       noWeaknessLabel:
-        "No theme currently shows a repeated, meaningful accuracy weakness. Solve time is still collecting comparable completed puzzles."
+        "No theme currently shows a repeated, meaningful accuracy weakness. Solve time is unavailable until there are enough comparable completed puzzles."
     };
   }
   if (hasSpeed) {
     return {
-      noWeaknessTone: "collecting",
-      noWeaknessTitle: "Solve time looks balanced",
+      noWeaknessTone: "balanced",
+      noWeaknessTitle: "Recent play looks balanced",
       noWeaknessLabel:
-        "No theme currently shows a repeated, meaningful solve-time weakness. Accuracy is still collecting evidence."
+        "No theme currently shows a repeated, meaningful solve-time weakness. Accuracy is unavailable until there is enough attempt evidence."
     };
   }
   return {
-    noWeaknessTone: "collecting",
-    noWeaknessTitle: "Still collecting evidence",
+    noWeaknessTone: "balanced",
+    noWeaknessTitle: "Recent play looks balanced",
     noWeaknessLabel:
-      "Play more ordinary mixed Runs to build reliable stats across different puzzles and sessions."
+      "Accuracy and solve time are unavailable until there is enough mixed-practice evidence."
   };
 }
 

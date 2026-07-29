@@ -94,10 +94,10 @@ test("keeps unavailable solve time visible when only accuracy has evidence", () 
 
   const presentation = historyProgressPresentationFromModel(progress);
 
-  expect(presentation?.noWeaknessTone).toBe("collecting");
-  expect(presentation?.noWeaknessTitle).toBe("Accuracy looks balanced");
+  expect(presentation?.noWeaknessTone).toBe("balanced");
+  expect(presentation?.noWeaknessTitle).toBe("Recent play looks balanced");
   expect(presentation?.noWeaknessLabel).toContain(
-    "Solve time is still collecting comparable completed puzzles."
+    "Solve time is unavailable until there are enough comparable completed puzzles."
   );
   expect(presentation?.strengths.map((series) => series.kind)).toEqual([
     "solve_rate",
