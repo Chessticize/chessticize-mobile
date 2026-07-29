@@ -3,11 +3,21 @@ set -euo pipefail
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPOSITORY_ROOT="$(cd "$APP_DIR/../.." && pwd)"
+ORIENTATION_RUNNER="$REPOSITORY_ROOT/.codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
 
 IPHONE_DEVICE_NAME="${CHESSTICIZE_MARKETING_IPHONE_DEVICE:-Chessticize Marketing iPhone 17 Pro Max}"
 IPHONE_DEVICE_UDID="${CHESSTICIZE_MARKETING_IPHONE_DEVICE_UDID:-}"
 IPAD_DEVICE_NAME="${CHESSTICIZE_MARKETING_IPAD_DEVICE:-Chessticize Marketing iPad Pro 13-inch (M5)}"
 IPAD_DEVICE_UDID="${CHESSTICIZE_MARKETING_IPAD_DEVICE_UDID:-}"
+IPAD_PORTRAIT_RESTORE_REQUIRED=0
+
+cleanup() {
+  if [[ "$IPAD_PORTRAIT_RESTORE_REQUIRED" == "1" ]]; then
+    "$ORIENTATION_RUNNER" "$IPAD_UDID" "$IPAD_DEVICE_NAME" portrait || \
+      echo "WARNING: Could not restore $IPAD_DEVICE_NAME to portrait." >&2
+  fi
+}
+trap cleanup EXIT
 
 assert_clean_source_state() {
   local expected_commit="$1"
@@ -42,6 +52,16 @@ resolve_simulator_udid() {
   node -e \
     'process.stdout.write(JSON.parse(process.argv[1]).udid)' \
     "$target_json"
+}
+
+prepare_simulator_orientation() {
+  local device_udid="$1"
+  local device_name="$2"
+  local orientation="$3"
+  xcrun simctl boot "$device_udid" 2>/dev/null || true
+  xcrun simctl bootstatus "$device_udid" -b
+  /usr/bin/open -a Simulator --args -CurrentDeviceUDID "$device_udid"
+  "$ORIENTATION_RUNNER" "$device_udid" "$device_name" "$orientation"
 }
 
 capture_device_family() {
@@ -81,6 +101,10 @@ rm -f \
 
 IPHONE_UDID="$(resolve_simulator_udid "$IPHONE_DEVICE_NAME" "$IPHONE_DEVICE_UDID")"
 IPAD_UDID="$(resolve_simulator_udid "$IPAD_DEVICE_NAME" "$IPAD_DEVICE_UDID")"
+[[ -x "$ORIENTATION_RUNNER" ]] || {
+  echo "Missing Simulator orientation runner: $ORIENTATION_RUNNER" >&2
+  exit 69
+}
 
 (
   cd "$REPOSITORY_ROOT"
@@ -90,7 +114,10 @@ IPAD_UDID="$(resolve_simulator_udid "$IPAD_DEVICE_NAME" "$IPAD_DEVICE_UDID")"
     pnpm mobile:e2e:build:ios:release
 )
 
+prepare_simulator_orientation "$IPHONE_UDID" "$IPHONE_DEVICE_NAME" portrait
 capture_device_family iphone "$IPHONE_DEVICE_NAME" "$IPHONE_UDID"
+IPAD_PORTRAIT_RESTORE_REQUIRED=1
+prepare_simulator_orientation "$IPAD_UDID" "$IPAD_DEVICE_NAME" landscape
 capture_device_family ipad "$IPAD_DEVICE_NAME" "$IPAD_UDID"
 assert_clean_source_state "$SOURCE_COMMIT"
 

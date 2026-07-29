@@ -215,4 +215,33 @@ describe('App Store marketing capture artifacts', () => {
       story,
     })).toThrow();
   });
+
+  it('rotates each exact host Simulator before capture and restores the iPad', () => {
+    const wrapper = readFileSync(
+      join(__dirname, '../scripts/capture-app-store-marketing-assets.sh'),
+      'utf8'
+    );
+    const iphoneOrientation = wrapper.indexOf(
+      'prepare_simulator_orientation "$IPHONE_UDID" "$IPHONE_DEVICE_NAME" portrait'
+    );
+    const iphoneCapture = wrapper.indexOf(
+      'capture_device_family iphone "$IPHONE_DEVICE_NAME" "$IPHONE_UDID"'
+    );
+    const ipadOrientation = wrapper.indexOf(
+      'prepare_simulator_orientation "$IPAD_UDID" "$IPAD_DEVICE_NAME" landscape'
+    );
+    const ipadCapture = wrapper.indexOf(
+      'capture_device_family ipad "$IPAD_DEVICE_NAME" "$IPAD_UDID"'
+    );
+
+    expect(wrapper).toContain('set-simulator-orientation.sh');
+    expect(wrapper).toContain('/usr/bin/open -a Simulator --args -CurrentDeviceUDID');
+    expect(iphoneOrientation).toBeGreaterThan(0);
+    expect(iphoneCapture).toBeGreaterThan(iphoneOrientation);
+    expect(ipadOrientation).toBeGreaterThan(iphoneCapture);
+    expect(ipadCapture).toBeGreaterThan(ipadOrientation);
+    expect(wrapper).toContain(
+      '"$ORIENTATION_RUNNER" "$IPAD_UDID" "$IPAD_DEVICE_NAME" portrait'
+    );
+  });
 });
