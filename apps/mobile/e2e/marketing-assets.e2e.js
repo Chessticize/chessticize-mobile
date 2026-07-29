@@ -108,7 +108,12 @@ async function prepareFrame(frame) {
       // Frame 6 starts at License by contract. Normalize the final crop after
       // finding Puzzle Data so the adjacent App Version row is above the
       // visible scroll viewport on every accepted iPhone size.
-      await element(by.id('practice-main-scroll')).scroll(420, 'down', 0.5, 0.5);
+      await element(by.id('practice-main-scroll')).scroll(
+        target.deviceFamily === 'ipad' ? 550 : 420,
+        'down',
+        0.5,
+        0.5
+      );
       return;
     default:
       throw new Error(`Unhandled marketing frame ${frame.id}`);

@@ -12963,7 +12963,12 @@ function SettingsPanel({
       style={[
         styles.settingsPanel,
         adaptiveLayout.usesWideContent ? styles.settingsPanelWide : null,
-        captureBottomInset === undefined ? null : { paddingBottom: captureBottomInset }
+        captureBottomInset === undefined
+          ? null
+          : {
+              paddingBottom: captureBottomInset +
+                (adaptiveLayout.usesWideContent ? 130 : 0)
+            }
       ]}
       testID="settings-panel"
     >
