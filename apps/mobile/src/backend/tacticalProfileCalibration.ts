@@ -12,7 +12,7 @@ const MISSING_PACK_FEATURE_HASH =
   "unavailable:bundled-pack-has-no-tactical-feature-identity";
 const CALIBRATION_POLICY_ID = "tactical-profile-calibration-policy-v1";
 const CALIBRATION_POLICY_HASH =
-  "sha256:5737cc64347b3d5822bb511882837457bca4da16df28342db5e10d1e22a8bff1";
+  "sha256:c851b18635e79299076b0a195b937ec375ef71f8adcd46aaf848bd38f3913869";
 
 /**
  * Loads the checked-in calibration artifact only when both its domain contract

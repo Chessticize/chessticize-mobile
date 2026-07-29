@@ -14,9 +14,13 @@ export const FOCUSED_RUN_THEME_LIMIT = 2;
 export const TACTICAL_PROFILE_GLICKO_LOGIT_SCALE = 400 / Math.log(10);
 export const TACTICAL_PROFILE_PACE_REFERENCE_SECONDS = 20;
 export const TACTICAL_PROFILE_SLOW_REFERENCE_SECONDS = 40;
+export const TACTICAL_PROFILE_TIMEOUT_REFERENCE_SECONDS = 60;
 
 export type TacticalProfileTaskFamily = "line" | "arrow_duel";
 const TACTICAL_PROFILE_TASK_FAMILIES = ["line", "arrow_duel"] as const;
+const TACTICAL_PROFILE_SPEED_BASELINE_THEME =
+  "~tactical-profile-personal-speed-baseline";
+export const TACTICAL_PROFILE_SPEED_FEATURE_COUNT = 6;
 
 export type TacticalFocusReason = "solve_rate" | "completed_speed" | "both";
 
@@ -423,12 +427,9 @@ export type TacticalProfileActiveFamilyCalibration = {
     minExpectedFailuresPer100: number;
   };
   speed?: {
-    interceptLogSeconds: number;
-    relativeDifficultyCoefficient: number;
-    decisionCountCoefficient: number;
-    paceLogCoefficient: number;
-    slowPolicyLogCoefficient: number;
-    residualSd: number;
+    minimumControlWeight: number;
+    slopePriorPrecision: number;
+    minimumResidualSd: number;
     themePriorSdLogSeconds: number;
     practicalTimeMultiplier: number;
   };
@@ -523,11 +524,18 @@ export type TacticalProfileDailyCell = {
   solveObservedSuccess: number;
   solveSensitivity: number;
   solveWeight: number;
-  speedWeightedResidual: number;
-  speedPrecision: number;
-  speedWeight: number;
+  speedBaseline: TacticalProfileSpeedSufficientStatistics;
+  speedTheme: TacticalProfileSpeedSufficientStatistics;
+  speedControlExclusion: TacticalProfileSpeedSufficientStatistics;
   distinctPuzzleIds: readonly string[];
   distinctSessionIds: readonly string[];
+};
+
+export type TacticalProfileSpeedSufficientStatistics = {
+  weight: number;
+  gramMatrix: readonly number[];
+  responseFeatureSums: readonly number[];
+  responseSquareSum: number;
 };
 
 export type TacticalProfileSignalStatus = "watch" | "recommended";
@@ -617,14 +625,17 @@ export function tacticalProfileSpeedBaselineFeatures(input: {
   puzzleRating: number;
   ratingBefore: number;
   slowAfterSeconds?: number | null;
+  timeoutAfterSeconds: number;
 }): {
   decisionCountLog: number;
   paceLogRatio: number;
   relativeDifficulty: number;
   slowPolicyLogRatio: number;
+  timeoutPolicyLogRatio: number;
 } {
   assertPositiveFinite("decision count", input.decisionCount);
   assertPositiveFinite("Run pace", input.perPuzzleSeconds);
+  assertPositiveFinite("Timeout threshold", input.timeoutAfterSeconds);
   if (!Number.isFinite(input.puzzleRating) || !Number.isFinite(input.ratingBefore)) {
     throw new Error("Tactical Profile Ratings must be finite");
   }
@@ -641,6 +652,10 @@ export function tacticalProfileSpeedBaselineFeatures(input: {
     ),
     slowPolicyLogRatio: Math.log(
       slowAfterSeconds / TACTICAL_PROFILE_SLOW_REFERENCE_SECONDS
+    ),
+    timeoutPolicyLogRatio: Math.log(
+      input.timeoutAfterSeconds /
+      TACTICAL_PROFILE_TIMEOUT_REFERENCE_SECONDS
     )
   };
 }
@@ -687,27 +702,45 @@ export function buildTacticalProfileDailyCells(
       continue;
     }
     const themes = curatedPuzzleThemes(input.puzzle.themes);
-    if (themes.length === 0) {
-      continue;
-    }
     const solveObservation = solveObservationFor(input, familyCalibration);
     const speedObservation = speedObservationFor(
       input,
       classification.taskFamily,
       familyCalibration
     );
+    if (speedObservation) {
+      const baselineKey = dailyCellKey({
+        calibration,
+        completedDay,
+        taskFamily: classification.taskFamily,
+        theme: TACTICAL_PROFILE_SPEED_BASELINE_THEME
+      });
+      const baselineCell = cells.get(baselineKey) ?? mutableDailyCell({
+        calibration,
+        completedDay,
+        taskFamily: classification.taskFamily,
+        theme: TACTICAL_PROFILE_SPEED_BASELINE_THEME
+      });
+      addSpeedObservation(
+        baselineCell.speedBaseline,
+        speedObservation,
+        1
+      );
+      cells.set(baselineKey, baselineCell);
+    }
+    if (themes.length === 0) {
+      continue;
+    }
     const themeWeight = 1 / themes.length;
     const accuracySuccess = input.attempt.result === "correct" ? 1 : 0;
 
     for (const theme of themes) {
-      const key = [
-        calibration.modelVersion,
-        calibration.packFeatureHash,
-        calibration.calibrationId,
+      const key = dailyCellKey({
+        calibration,
         completedDay,
-        classification.taskFamily,
+        taskFamily: classification.taskFamily,
         theme
-      ].join("\u0000");
+      });
       const cell = cells.get(key) ?? mutableDailyCell({
         calibration,
         completedDay,
@@ -729,11 +762,16 @@ export function buildTacticalProfileDailyCells(
         cell.solveWeight += weight;
       }
       if (speedObservation) {
-        const weight = themeWeight;
-        cell.speedWeightedResidual +=
-          weight * speedObservation.residual / speedObservation.variance;
-        cell.speedPrecision += weight / speedObservation.variance;
-        cell.speedWeight += weight;
+        addSpeedObservation(
+          cell.speedTheme,
+          speedObservation,
+          themeWeight
+        );
+        addSpeedObservation(
+          cell.speedControlExclusion,
+          speedObservation,
+          1
+        );
       }
       if (solveObservation || speedObservation) {
         cell.distinctPuzzleIds.add(input.puzzle.id);
@@ -972,10 +1010,24 @@ export function exactSolveThemePosterior(
 
 type MutableTacticalProfileDailyCell = Omit<
   TacticalProfileDailyCell,
-  "distinctPuzzleIds" | "distinctSessionIds"
+  | "speedBaseline"
+  | "speedTheme"
+  | "speedControlExclusion"
+  | "distinctPuzzleIds"
+  | "distinctSessionIds"
 > & {
+  speedBaseline: MutableSpeedSufficientStatistics;
+  speedTheme: MutableSpeedSufficientStatistics;
+  speedControlExclusion: MutableSpeedSufficientStatistics;
   distinctPuzzleIds: Set<string>;
   distinctSessionIds: Set<string>;
+};
+
+type MutableSpeedSufficientStatistics = {
+  weight: number;
+  gramMatrix: number[];
+  responseFeatureSums: number[];
+  responseSquareSum: number;
 };
 
 type MutableEvaluationAggregate = {
@@ -989,11 +1041,15 @@ type MutableEvaluationAggregate = {
   solveObservedSuccess: number;
   solveSensitivity: number;
   solveWeight: number;
-  speedWeightedResidual: number;
-  speedPrecision: number;
-  speedWeight: number;
+  speedTheme: MutableSpeedSufficientStatistics;
+  speedControlExclusion: MutableSpeedSufficientStatistics;
   distinctPuzzleIds: Set<string>;
   distinctSessionIds: Set<string>;
+};
+
+type PersonalSpeedBaseline = {
+  coefficients: readonly number[];
+  residualVariance: number;
 };
 
 type TacticalProfileThemeAnalysis = TacticalProfileThemeEstimate & {
@@ -1023,6 +1079,10 @@ function tacticalProfileThemeAnalyses(
   }
   const nowDay = new Date(nowMs).toISOString().slice(0, 10);
   const aggregates = new Map<string, MutableEvaluationAggregate>();
+  const speedBaselines = new Map<
+    TacticalProfileTaskFamily,
+    MutableSpeedSufficientStatistics
+  >();
 
   for (const cell of cells) {
     if (
@@ -1040,6 +1100,13 @@ function tacticalProfileThemeAnalyses(
       nowMs,
       calibration.recencyHalfLifeDays
     );
+    if (cell.theme === TACTICAL_PROFILE_SPEED_BASELINE_THEME) {
+      const baseline = speedBaselines.get(cell.taskFamily) ??
+        mutableSpeedStatistics();
+      addSpeedStatistics(baseline, cell.speedBaseline, decay);
+      speedBaselines.set(cell.taskFamily, baseline);
+      continue;
+    }
     const key = `${cell.taskFamily}\u0000${cell.theme}`;
     const aggregate = aggregates.get(key) ?? mutableEvaluationAggregate(
       cell.taskFamily,
@@ -1053,9 +1120,12 @@ function tacticalProfileThemeAnalyses(
     aggregate.solveObservedSuccess += decay * cell.solveObservedSuccess;
     aggregate.solveSensitivity += decay * cell.solveSensitivity;
     aggregate.solveWeight += decay * cell.solveWeight;
-    aggregate.speedWeightedResidual += decay * cell.speedWeightedResidual;
-    aggregate.speedPrecision += decay * cell.speedPrecision;
-    aggregate.speedWeight += decay * cell.speedWeight;
+    addSpeedStatistics(aggregate.speedTheme, cell.speedTheme, decay);
+    addSpeedStatistics(
+      aggregate.speedControlExclusion,
+      cell.speedControlExclusion,
+      decay
+    );
     cell.distinctPuzzleIds.forEach((id) => aggregate.distinctPuzzleIds.add(id));
     cell.distinctSessionIds.forEach((id) => aggregate.distinctSessionIds.add(id));
     aggregates.set(key, aggregate);
@@ -1102,11 +1172,21 @@ function tacticalProfileThemeAnalyses(
       const solveRecommended =
         solveConfidence >= calibration.evidence.recommendationProbability &&
         solveImpactPasses;
+      const speedBaseline = familyCalibration.speed
+        ? fitPersonalSpeedBaseline(
+            subtractSpeedStatistics(
+              speedBaselines.get(aggregate.taskFamily),
+              aggregate.speedControlExclusion
+            ),
+            familyCalibration.speed
+          )
+        : undefined;
       const speedPosterior =
-        familyCalibration.speed && aggregate.speedPrecision > 0
-          ? posteriorFromWeightedNormal(
-              aggregate.speedWeightedResidual,
-              aggregate.speedPrecision,
+        familyCalibration.speed && speedBaseline &&
+        aggregate.speedTheme.weight > 0
+          ? personalSpeedThemePosterior(
+              aggregate.speedTheme,
+              speedBaseline,
               familyCalibration.speed.themePriorSdLogSeconds
             )
           : undefined;
@@ -1130,7 +1210,9 @@ function tacticalProfileThemeAnalyses(
         distinctSessionCount: aggregate.distinctSessionIds.size,
         accuracyEvidenceWeight: aggregate.accuracyWeight,
         solveEvidenceWeight: aggregate.solveWeight,
-        speedEvidenceWeight: aggregate.speedWeight,
+        speedEvidenceWeight: speedPosterior
+          ? aggregate.speedTheme.weight
+          : 0,
         solveConfidence,
         speedConfidence,
         observedSolveRate: aggregate.accuracyWeight > 0
@@ -1187,9 +1269,9 @@ function mutableDailyCell(input: {
     solveObservedSuccess: 0,
     solveSensitivity: 0,
     solveWeight: 0,
-    speedWeightedResidual: 0,
-    speedPrecision: 0,
-    speedWeight: 0,
+    speedBaseline: mutableSpeedStatistics(),
+    speedTheme: mutableSpeedStatistics(),
+    speedControlExclusion: mutableSpeedStatistics(),
     distinctPuzzleIds: new Set<string>(),
     distinctSessionIds: new Set<string>()
   };
@@ -1201,6 +1283,11 @@ function freezeDailyCell(
 ): TacticalProfileDailyCell {
   return {
     ...cell,
+    speedBaseline: freezeSpeedStatistics(cell.speedBaseline),
+    speedTheme: freezeSpeedStatistics(cell.speedTheme),
+    speedControlExclusion: freezeSpeedStatistics(
+      cell.speedControlExclusion
+    ),
     distinctPuzzleIds: [...cell.distinctPuzzleIds]
       .sort()
       .slice(0, calibration.evidence.minDistinctPuzzles),
@@ -1234,9 +1321,8 @@ function mutableEvaluationAggregate(
     solveObservedSuccess: 0,
     solveSensitivity: 0,
     solveWeight: 0,
-    speedWeightedResidual: 0,
-    speedPrecision: 0,
-    speedWeight: 0,
+    speedTheme: mutableSpeedStatistics(),
+    speedControlExclusion: mutableSpeedStatistics(),
     distinctPuzzleIds: new Set<string>(),
     distinctSessionIds: new Set<string>()
   };
@@ -1283,7 +1369,7 @@ function speedObservationFor(
   input: TacticalProfileAttemptInput,
   taskFamily: TacticalProfileTaskFamily,
   calibration: TacticalProfileActiveFamilyCalibration
-): { residual: number; variance: number } | undefined {
+): { features: readonly number[]; response: number } | undefined {
   const speed = calibration.speed;
   const elapsedMs = input.attempt.elapsedMs;
   const sessionConfig = input.sessionConfig;
@@ -1313,18 +1399,314 @@ function speedObservationFor(
     perPuzzleSeconds: sessionConfig.perPuzzleSeconds,
     puzzleRating: input.puzzle.rating,
     ratingBefore: input.attempt.ratingBefore,
-    slowAfterSeconds: puzzleTiming.slowAfterSeconds
+    slowAfterSeconds: puzzleTiming.slowAfterSeconds,
+    timeoutAfterSeconds: puzzleTiming.timeoutAfterSeconds as number
   });
-  const predictedLogElapsed =
-    speed.interceptLogSeconds +
-    speed.relativeDifficultyCoefficient * features.relativeDifficulty +
-    speed.decisionCountCoefficient * features.decisionCountLog +
-    speed.paceLogCoefficient * features.paceLogRatio +
-    speed.slowPolicyLogCoefficient * features.slowPolicyLogRatio;
   return {
-    residual: Math.log((elapsedMs as number) / 1000) - predictedLogElapsed,
-    variance: speed.residualSd ** 2
+    features: [
+      1,
+      features.relativeDifficulty,
+      features.decisionCountLog,
+      features.paceLogRatio,
+      features.slowPolicyLogRatio,
+      features.timeoutPolicyLogRatio
+    ],
+    response: Math.log((elapsedMs as number) / 1000)
   };
+}
+
+function dailyCellKey(input: {
+  calibration: TacticalProfileCalibrationArtifact;
+  completedDay: string;
+  taskFamily: TacticalProfileTaskFamily;
+  theme: string;
+}): string {
+  return [
+    input.calibration.modelVersion,
+    input.calibration.packFeatureHash,
+    input.calibration.calibrationId,
+    input.completedDay,
+    input.taskFamily,
+    input.theme
+  ].join("\u0000");
+}
+
+function mutableSpeedStatistics(): MutableSpeedSufficientStatistics {
+  return {
+    weight: 0,
+    gramMatrix: Array(TACTICAL_PROFILE_SPEED_FEATURE_COUNT ** 2).fill(0),
+    responseFeatureSums: Array(TACTICAL_PROFILE_SPEED_FEATURE_COUNT).fill(0),
+    responseSquareSum: 0
+  };
+}
+
+function freezeSpeedStatistics(
+  statistics: TacticalProfileSpeedSufficientStatistics
+): TacticalProfileSpeedSufficientStatistics {
+  return {
+    weight: statistics.weight,
+    gramMatrix: [...statistics.gramMatrix],
+    responseFeatureSums: [...statistics.responseFeatureSums],
+    responseSquareSum: statistics.responseSquareSum
+  };
+}
+
+function addSpeedObservation(
+  statistics: MutableSpeedSufficientStatistics,
+  observation: { features: readonly number[]; response: number },
+  weight: number
+): void {
+  if (
+    observation.features.length !== TACTICAL_PROFILE_SPEED_FEATURE_COUNT ||
+    observation.features.some((feature) => !Number.isFinite(feature)) ||
+    !Number.isFinite(observation.response) ||
+    !Number.isFinite(weight) ||
+    weight <= 0
+  ) {
+    throw new Error("Tactical Profile speed observation is invalid");
+  }
+  statistics.weight += weight;
+  statistics.responseSquareSum +=
+    weight * observation.response * observation.response;
+  for (
+    let row = 0;
+    row < TACTICAL_PROFILE_SPEED_FEATURE_COUNT;
+    row += 1
+  ) {
+    const rowFeature = observation.features[row] as number;
+    statistics.responseFeatureSums[row] =
+      (statistics.responseFeatureSums[row] as number) +
+      weight * rowFeature * observation.response;
+    for (
+      let column = 0;
+      column < TACTICAL_PROFILE_SPEED_FEATURE_COUNT;
+      column += 1
+    ) {
+      const index = row * TACTICAL_PROFILE_SPEED_FEATURE_COUNT + column;
+      statistics.gramMatrix[index] =
+        (statistics.gramMatrix[index] as number) +
+        weight * rowFeature * (observation.features[column] as number);
+    }
+  }
+}
+
+function addSpeedStatistics(
+  target: MutableSpeedSufficientStatistics,
+  source: TacticalProfileSpeedSufficientStatistics,
+  scale: number
+): void {
+  if (!validSpeedStatistics(source) || !Number.isFinite(scale) || scale < 0) {
+    throw new Error("Tactical Profile speed statistics are invalid");
+  }
+  target.weight += scale * source.weight;
+  target.responseSquareSum += scale * source.responseSquareSum;
+  for (let index = 0; index < target.gramMatrix.length; index += 1) {
+    target.gramMatrix[index] =
+      (target.gramMatrix[index] as number) +
+      scale * (source.gramMatrix[index] as number);
+  }
+  for (
+    let index = 0;
+    index < target.responseFeatureSums.length;
+    index += 1
+  ) {
+    target.responseFeatureSums[index] =
+      (target.responseFeatureSums[index] as number) +
+      scale * (source.responseFeatureSums[index] as number);
+  }
+}
+
+function subtractSpeedStatistics(
+  total: TacticalProfileSpeedSufficientStatistics | undefined,
+  excluded: TacticalProfileSpeedSufficientStatistics
+): TacticalProfileSpeedSufficientStatistics | undefined {
+  if (!total) {
+    return undefined;
+  }
+  if (!validSpeedStatistics(total) || !validSpeedStatistics(excluded)) {
+    throw new Error("Tactical Profile speed statistics are invalid");
+  }
+  const difference = mutableSpeedStatistics();
+  difference.weight = cleanSubtraction(total.weight - excluded.weight);
+  difference.responseSquareSum = cleanSubtraction(
+    total.responseSquareSum - excluded.responseSquareSum
+  );
+  for (let index = 0; index < difference.gramMatrix.length; index += 1) {
+    difference.gramMatrix[index] = cleanSubtraction(
+      (total.gramMatrix[index] as number) -
+      (excluded.gramMatrix[index] as number)
+    );
+  }
+  for (
+    let index = 0;
+    index < difference.responseFeatureSums.length;
+    index += 1
+  ) {
+    difference.responseFeatureSums[index] = cleanSubtraction(
+      (total.responseFeatureSums[index] as number) -
+      (excluded.responseFeatureSums[index] as number)
+    );
+  }
+  return freezeSpeedStatistics(difference);
+}
+
+function cleanSubtraction(value: number): number {
+  return Math.abs(value) < 1e-10 ? 0 : value;
+}
+
+function fitPersonalSpeedBaseline(
+  controls: TacticalProfileSpeedSufficientStatistics | undefined,
+  calibration: NonNullable<TacticalProfileActiveFamilyCalibration["speed"]>
+): PersonalSpeedBaseline | undefined {
+  if (
+    !controls ||
+    controls.weight + 1e-10 < calibration.minimumControlWeight
+  ) {
+    return undefined;
+  }
+  const matrix = [...controls.gramMatrix];
+  for (
+    let index = 1;
+    index < TACTICAL_PROFILE_SPEED_FEATURE_COUNT;
+    index += 1
+  ) {
+    const diagonal = index * TACTICAL_PROFILE_SPEED_FEATURE_COUNT + index;
+    matrix[diagonal] =
+      (matrix[diagonal] as number) + calibration.slopePriorPrecision;
+  }
+  const coefficients = solveLinearSystem(
+    matrix,
+    controls.responseFeatureSums,
+    TACTICAL_PROFILE_SPEED_FEATURE_COUNT
+  );
+  if (!coefficients) {
+    return undefined;
+  }
+  const fittedCrossProduct = dot(
+    coefficients,
+    controls.responseFeatureSums
+  );
+  const fittedSquare = quadraticForm(
+    coefficients,
+    controls.gramMatrix,
+    TACTICAL_PROFILE_SPEED_FEATURE_COUNT
+  );
+  const residualSquareSum = Math.max(
+    0,
+    controls.responseSquareSum - 2 * fittedCrossProduct + fittedSquare
+  );
+  const residualVariance = Math.max(
+    calibration.minimumResidualSd ** 2,
+    residualSquareSum / Math.max(1, controls.weight - 1)
+  );
+  return {
+    coefficients,
+    residualVariance
+  };
+}
+
+function personalSpeedThemePosterior(
+  theme: TacticalProfileSpeedSufficientStatistics,
+  baseline: PersonalSpeedBaseline,
+  priorSd: number
+): NormalPosterior {
+  const featureSums = theme.gramMatrix.slice(
+    0,
+    TACTICAL_PROFILE_SPEED_FEATURE_COUNT
+  );
+  const residualSum =
+    (theme.responseFeatureSums[0] as number) -
+    dot(baseline.coefficients, featureSums);
+  return posteriorFromWeightedNormal(
+    residualSum / baseline.residualVariance,
+    theme.weight / baseline.residualVariance,
+    priorSd
+  );
+}
+
+function solveLinearSystem(
+  sourceMatrix: readonly number[],
+  sourceVector: readonly number[],
+  size: number
+): number[] | undefined {
+  const matrix = Array.from({ length: size }, (_, row) => [
+    ...sourceMatrix.slice(row * size, (row + 1) * size),
+    sourceVector[row] as number
+  ]);
+  for (let pivot = 0; pivot < size; pivot += 1) {
+    let bestRow = pivot;
+    for (let row = pivot + 1; row < size; row += 1) {
+      if (
+        Math.abs(matrix[row]?.[pivot] as number) >
+        Math.abs(matrix[bestRow]?.[pivot] as number)
+      ) {
+        bestRow = row;
+      }
+    }
+    if (Math.abs(matrix[bestRow]?.[pivot] as number) < 1e-12) {
+      return undefined;
+    }
+    [matrix[pivot], matrix[bestRow]] = [
+      matrix[bestRow] as number[],
+      matrix[pivot] as number[]
+    ];
+    const pivotValue = matrix[pivot]?.[pivot] as number;
+    for (let column = pivot; column <= size; column += 1) {
+      (matrix[pivot] as number[])[column] =
+        (matrix[pivot]?.[column] as number) / pivotValue;
+    }
+    for (let row = 0; row < size; row += 1) {
+      if (row === pivot) {
+        continue;
+      }
+      const factor = matrix[row]?.[pivot] as number;
+      for (let column = pivot; column <= size; column += 1) {
+        (matrix[row] as number[])[column] =
+          (matrix[row]?.[column] as number) -
+          factor * (matrix[pivot]?.[column] as number);
+      }
+    }
+  }
+  return matrix.map((row) => row[size] as number);
+}
+
+function dot(left: readonly number[], right: readonly number[]): number {
+  return left.reduce(
+    (sum, value, index) => sum + value * (right[index] as number),
+    0
+  );
+}
+
+function quadraticForm(
+  vector: readonly number[],
+  matrix: readonly number[],
+  size: number
+): number {
+  let value = 0;
+  for (let row = 0; row < size; row += 1) {
+    for (let column = 0; column < size; column += 1) {
+      value +=
+        (vector[row] as number) *
+        (matrix[row * size + column] as number) *
+        (vector[column] as number);
+    }
+  }
+  return value;
+}
+
+function validSpeedStatistics(
+  statistics: TacticalProfileSpeedSufficientStatistics
+): boolean {
+  return Number.isFinite(statistics.weight) &&
+    statistics.weight >= 0 &&
+    statistics.gramMatrix.length ===
+      TACTICAL_PROFILE_SPEED_FEATURE_COUNT ** 2 &&
+    statistics.gramMatrix.every(Number.isFinite) &&
+    statistics.responseFeatureSums.length ===
+      TACTICAL_PROFILE_SPEED_FEATURE_COUNT &&
+    statistics.responseFeatureSums.every(Number.isFinite) &&
+    Number.isFinite(statistics.responseSquareSum) &&
+    statistics.responseSquareSum >= 0;
 }
 
 function glickoRatingDeviationAttenuation(ratingDeviation: number): number {
@@ -1626,23 +2008,26 @@ export function assertValidTacticalProfileCalibrationArtifact(
       if (!isRecord(family.speed)) {
         throw new Error("Tactical Profile speed calibration is invalid");
       }
-      finiteNumber("speed intercept", family.speed.interceptLogSeconds);
-      finiteNumber(
-        "speed relative-difficulty coefficient",
-        family.speed.relativeDifficultyCoefficient
-      );
-      finiteNumber(
-        "speed decision-count coefficient",
-        family.speed.decisionCountCoefficient
-      );
-      finiteNumber("speed pace coefficient", family.speed.paceLogCoefficient);
-      finiteNumber(
-        "speed Slow-policy coefficient",
-        family.speed.slowPolicyLogCoefficient
+      assertPositiveFinite(
+        "speed minimum control weight",
+        finiteNumber(
+          "speed minimum control weight",
+          family.speed.minimumControlWeight
+        )
       );
       assertPositiveFinite(
-        "speed residual deviation",
-        finiteNumber("speed residual deviation", family.speed.residualSd)
+        "speed slope prior precision",
+        finiteNumber(
+          "speed slope prior precision",
+          family.speed.slopePriorPrecision
+        )
+      );
+      assertPositiveFinite(
+        "speed minimum residual deviation",
+        finiteNumber(
+          "speed minimum residual deviation",
+          family.speed.minimumResidualSd
+        )
       );
       assertPositiveFinite(
         "speed prior standard deviation",

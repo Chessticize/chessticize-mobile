@@ -1,11 +1,64 @@
 import type {
   TacticalProfileCalibrationArtifact,
   TacticalProfileDailyCell,
+  TacticalProfileSpeedSufficientStatistics,
   TacticalProfileTaskFamily
 } from "../../core/src/index.ts";
+import { TACTICAL_PROFILE_SPEED_FEATURE_COUNT } from "../../core/src/index.ts";
 import type { SyncSqliteDatabase } from "./sync-sqlite-store.ts";
 
-export const TACTICAL_PROFILE_CACHE_SCHEMA_VERSION = 6;
+export const TACTICAL_PROFILE_CACHE_SCHEMA_VERSION = 7;
+
+const CREATE_CURRENT_DERIVED_TABLES_SQL = `
+  CREATE TABLE weakness_daily_stats (
+    model_version TEXT NOT NULL,
+    pack_feature_hash TEXT NOT NULL,
+    calibration_id TEXT NOT NULL,
+    completed_day TEXT NOT NULL,
+    task_family TEXT NOT NULL,
+    theme TEXT NOT NULL,
+    accuracy_success_weight REAL NOT NULL,
+    accuracy_weight REAL NOT NULL,
+    solve_score REAL NOT NULL,
+    solve_information REAL NOT NULL,
+    solve_expected_success REAL NOT NULL,
+    solve_observed_success REAL NOT NULL,
+    solve_sensitivity REAL NOT NULL,
+    solve_weight REAL NOT NULL,
+    speed_baseline_json TEXT NOT NULL,
+    speed_theme_json TEXT NOT NULL,
+    speed_control_exclusion_json TEXT NOT NULL,
+    distinct_puzzle_ids_json TEXT NOT NULL,
+    distinct_session_ids_json TEXT NOT NULL,
+    PRIMARY KEY (
+      model_version,
+      pack_feature_hash,
+      calibration_id,
+      completed_day,
+      task_family,
+      theme
+    )
+  );
+  CREATE INDEX weakness_daily_stats_identity_day
+    ON weakness_daily_stats (
+      model_version,
+      pack_feature_hash,
+      calibration_id,
+      completed_day DESC
+    );
+  CREATE TABLE weakness_dirty_days (
+    model_version TEXT NOT NULL,
+    pack_feature_hash TEXT NOT NULL,
+    calibration_id TEXT NOT NULL,
+    completed_day TEXT NOT NULL,
+    PRIMARY KEY (
+      model_version,
+      pack_feature_hash,
+      calibration_id,
+      completed_day
+    )
+  );
+`;
 
 export type TacticalProfileCacheIdentity = Pick<
   TacticalProfileCalibrationArtifact,
@@ -213,73 +266,28 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
     this.transaction(() => {
       if (current === 0) {
         this.db.exec(`
-        DROP TABLE IF EXISTS weakness_daily_stats;
-        DROP TABLE IF EXISTS weakness_dirty_days;
-        DROP TABLE IF EXISTS weakness_build_state;
-        CREATE TABLE weakness_daily_stats (
-          model_version TEXT NOT NULL,
-          pack_feature_hash TEXT NOT NULL,
-          calibration_id TEXT NOT NULL,
-          completed_day TEXT NOT NULL,
-          task_family TEXT NOT NULL,
-          theme TEXT NOT NULL,
-          accuracy_success_weight REAL NOT NULL,
-          accuracy_weight REAL NOT NULL,
-          solve_score REAL NOT NULL,
-          solve_information REAL NOT NULL,
-          solve_expected_success REAL NOT NULL,
-          solve_observed_success REAL NOT NULL,
-          solve_sensitivity REAL NOT NULL,
-          solve_weight REAL NOT NULL,
-          speed_weighted_residual REAL NOT NULL,
-          speed_precision REAL NOT NULL,
-          speed_weight REAL NOT NULL,
-          distinct_puzzle_ids_json TEXT NOT NULL,
-          distinct_session_ids_json TEXT NOT NULL,
-          PRIMARY KEY (
-            model_version,
-            pack_feature_hash,
-            calibration_id,
-            completed_day,
-            task_family,
-            theme
-          )
-        );
-        CREATE INDEX weakness_daily_stats_identity_day
-          ON weakness_daily_stats (
-            model_version,
-            pack_feature_hash,
-            calibration_id,
-            completed_day DESC
+          DROP TABLE IF EXISTS weakness_daily_stats;
+          DROP TABLE IF EXISTS weakness_dirty_days;
+          DROP TABLE IF EXISTS weakness_build_state;
+        `);
+        this.db.exec(CREATE_CURRENT_DERIVED_TABLES_SQL);
+        this.db.exec(`
+          CREATE TABLE weakness_build_state (
+            singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+            model_version TEXT NOT NULL,
+            pack_feature_hash TEXT NOT NULL,
+            calibration_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            dirty_day_count INTEGER NOT NULL,
+            source_revision INTEGER NOT NULL,
+            watermark_day TEXT,
+            last_error TEXT,
+            evaluated_at TEXT,
+            recommended_signal_ids_json TEXT,
+            rating_anchors_json TEXT,
+            focused_run_watermarks_json TEXT
           );
-        CREATE TABLE weakness_dirty_days (
-          model_version TEXT NOT NULL,
-          pack_feature_hash TEXT NOT NULL,
-          calibration_id TEXT NOT NULL,
-          completed_day TEXT NOT NULL,
-          PRIMARY KEY (
-            model_version,
-            pack_feature_hash,
-            calibration_id,
-            completed_day
-          )
-        );
-        CREATE TABLE weakness_build_state (
-          singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
-          model_version TEXT NOT NULL,
-          pack_feature_hash TEXT NOT NULL,
-          calibration_id TEXT NOT NULL,
-          status TEXT NOT NULL,
-          dirty_day_count INTEGER NOT NULL,
-          source_revision INTEGER NOT NULL,
-          watermark_day TEXT,
-          last_error TEXT,
-          evaluated_at TEXT,
-          recommended_signal_ids_json TEXT,
-          rating_anchors_json TEXT,
-          focused_run_watermarks_json TEXT
-        );
-      `);
+        `);
       } else {
         if (current === 1) {
           this.db.exec(`
@@ -304,60 +312,13 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
             ADD COLUMN focused_run_watermarks_json TEXT;
           `);
         }
-        if (current <= 5) {
+        if (current <= 6) {
           this.db.exec(`
             DROP TABLE IF EXISTS weakness_daily_stats;
             DROP TABLE IF EXISTS weakness_dirty_days;
-            CREATE TABLE weakness_daily_stats (
-              model_version TEXT NOT NULL,
-              pack_feature_hash TEXT NOT NULL,
-              calibration_id TEXT NOT NULL,
-              completed_day TEXT NOT NULL,
-              task_family TEXT NOT NULL,
-              theme TEXT NOT NULL,
-              accuracy_success_weight REAL NOT NULL,
-              accuracy_weight REAL NOT NULL,
-              solve_score REAL NOT NULL,
-              solve_information REAL NOT NULL,
-              solve_expected_success REAL NOT NULL,
-              solve_observed_success REAL NOT NULL,
-              solve_sensitivity REAL NOT NULL,
-              solve_weight REAL NOT NULL,
-              speed_weighted_residual REAL NOT NULL,
-              speed_precision REAL NOT NULL,
-              speed_weight REAL NOT NULL,
-              distinct_puzzle_ids_json TEXT NOT NULL,
-              distinct_session_ids_json TEXT NOT NULL,
-              PRIMARY KEY (
-                model_version,
-                pack_feature_hash,
-                calibration_id,
-                completed_day,
-                task_family,
-                theme
-              )
-            );
-            CREATE INDEX weakness_daily_stats_identity_day
-              ON weakness_daily_stats (
-                model_version,
-                pack_feature_hash,
-                calibration_id,
-                completed_day DESC
-              );
-            CREATE TABLE weakness_dirty_days (
-              model_version TEXT NOT NULL,
-              pack_feature_hash TEXT NOT NULL,
-              calibration_id TEXT NOT NULL,
-              completed_day TEXT NOT NULL,
-              PRIMARY KEY (
-                model_version,
-                pack_feature_hash,
-                calibration_id,
-                completed_day
-              )
-            );
-            DELETE FROM weakness_build_state;
           `);
+          this.db.exec(CREATE_CURRENT_DERIVED_TABLES_SQL);
+          this.db.exec("DELETE FROM weakness_build_state");
         }
       }
       this.db.exec(`PRAGMA user_version = ${TACTICAL_PROFILE_CACHE_SCHEMA_VERSION}`);
@@ -484,9 +445,9 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           solve_observed_success,
           solve_sensitivity,
           solve_weight,
-          speed_weighted_residual,
-          speed_precision,
-          speed_weight,
+          speed_baseline_json,
+          speed_theme_json,
+          speed_control_exclusion_json,
           distinct_puzzle_ids_json,
           distinct_session_ids_json
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -513,9 +474,9 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           cell.solveObservedSuccess,
           cell.solveSensitivity,
           cell.solveWeight,
-          cell.speedWeightedResidual,
-          cell.speedPrecision,
-          cell.speedWeight,
+          JSON.stringify(cell.speedBaseline),
+          JSON.stringify(cell.speedTheme),
+          JSON.stringify(cell.speedControlExclusion),
           JSON.stringify([...cell.distinctPuzzleIds].sort()),
           JSON.stringify([...cell.distinctSessionIds].sort())
         );
@@ -548,9 +509,9 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         solve_observed_success AS solveObservedSuccess,
         solve_sensitivity AS solveSensitivity,
         solve_weight AS solveWeight,
-        speed_weighted_residual AS speedWeightedResidual,
-        speed_precision AS speedPrecision,
-        speed_weight AS speedWeight,
+        speed_baseline_json AS speedBaselineJson,
+        speed_theme_json AS speedThemeJson,
+        speed_control_exclusion_json AS speedControlExclusionJson,
         distinct_puzzle_ids_json AS distinctPuzzleIdsJson,
         distinct_session_ids_json AS distinctSessionIdsJson
       FROM weakness_daily_stats
@@ -675,9 +636,17 @@ interface BuildStateRow {
 
 interface DailyCellRow extends Omit<
   TacticalProfileDailyCell,
-  "taskFamily" | "distinctPuzzleIds" | "distinctSessionIds"
+  | "taskFamily"
+  | "speedBaseline"
+  | "speedTheme"
+  | "speedControlExclusion"
+  | "distinctPuzzleIds"
+  | "distinctSessionIds"
 > {
   taskFamily: string;
+  speedBaselineJson: string;
+  speedThemeJson: string;
+  speedControlExclusionJson: string;
   distinctPuzzleIdsJson: string;
   distinctSessionIdsJson: string;
 }
@@ -893,9 +862,11 @@ function dailyCellFromRow(row: DailyCellRow): TacticalProfileDailyCell {
     solveObservedSuccess: row.solveObservedSuccess,
     solveSensitivity: row.solveSensitivity,
     solveWeight: row.solveWeight,
-    speedWeightedResidual: row.speedWeightedResidual,
-    speedPrecision: row.speedPrecision,
-    speedWeight: row.speedWeight,
+    speedBaseline: parseSpeedStatistics(row.speedBaselineJson),
+    speedTheme: parseSpeedStatistics(row.speedThemeJson),
+    speedControlExclusion: parseSpeedStatistics(
+      row.speedControlExclusionJson
+    ),
     distinctPuzzleIds: parseStringArray(row.distinctPuzzleIdsJson),
     distinctSessionIds: parseStringArray(row.distinctSessionIdsJson)
   };
@@ -907,6 +878,60 @@ function parseStringArray(value: string): string[] {
     throw new Error("Invalid Tactical Profile diversity set");
   }
   return [...new Set(parsed)].sort();
+}
+
+function parseSpeedStatistics(
+  value: string
+): TacticalProfileSpeedSufficientStatistics {
+  const parsed = JSON.parse(value) as unknown;
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    Array.isArray(parsed)
+  ) {
+    throw new Error("Invalid Tactical Profile speed statistics");
+  }
+  const record = parsed as Record<string, unknown>;
+  if (
+    Object.keys(record).some(
+      (key) =>
+        key !== "weight" &&
+        key !== "gramMatrix" &&
+        key !== "responseFeatureSums" &&
+        key !== "responseSquareSum"
+    ) ||
+    !isNonNegativeFinite(record.weight) ||
+    !isFiniteNumberArray(
+      record.gramMatrix,
+      TACTICAL_PROFILE_SPEED_FEATURE_COUNT ** 2
+    ) ||
+    !isFiniteNumberArray(
+      record.responseFeatureSums,
+      TACTICAL_PROFILE_SPEED_FEATURE_COUNT
+    ) ||
+    !isNonNegativeFinite(record.responseSquareSum)
+  ) {
+    throw new Error("Invalid Tactical Profile speed statistics");
+  }
+  return {
+    weight: record.weight,
+    gramMatrix: [...record.gramMatrix],
+    responseFeatureSums: [...record.responseFeatureSums],
+    responseSquareSum: record.responseSquareSum
+  };
+}
+
+function isNonNegativeFinite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isFiniteNumberArray(
+  value: unknown,
+  length: number
+): value is number[] {
+  return Array.isArray(value) &&
+    value.length === length &&
+    value.every((entry) => typeof entry === "number" && Number.isFinite(entry));
 }
 
 function uniqueDays(days: readonly string[]): string[] {
@@ -933,8 +958,23 @@ function cellKey(cell: TacticalProfileDailyCell): string {
 function cloneCell(cell: TacticalProfileDailyCell): TacticalProfileDailyCell {
   return {
     ...cell,
+    speedBaseline: cloneSpeedStatistics(cell.speedBaseline),
+    speedTheme: cloneSpeedStatistics(cell.speedTheme),
+    speedControlExclusion: cloneSpeedStatistics(
+      cell.speedControlExclusion
+    ),
     distinctPuzzleIds: [...cell.distinctPuzzleIds],
     distinctSessionIds: [...cell.distinctSessionIds]
+  };
+}
+
+function cloneSpeedStatistics(
+  statistics: TacticalProfileSpeedSufficientStatistics
+): TacticalProfileSpeedSufficientStatistics {
+  return {
+    ...statistics,
+    gramMatrix: [...statistics.gramMatrix],
+    responseFeatureSums: [...statistics.responseFeatureSums]
   };
 }
 

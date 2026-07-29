@@ -145,8 +145,76 @@ test("TacticalProfileService keeps accuracy when puzzles lack solve-model deviat
   assert.ok(estimate);
   assert.ok(estimate.accuracyEvidenceWeight > 0);
   assert.equal(estimate.solveEvidenceWeight, 0);
-  assert.ok(estimate.speedEvidenceWeight > 0);
+  assert.equal(estimate.speedEvidenceWeight, 0);
   assert.equal(estimate.observedSolveRate, 0.5);
+});
+
+test("TacticalProfileService rebuilds personal speed controls from canonical mixed history", () => {
+  const store = seededStore();
+  const controls = Array.from({ length: 12 }, (_, index) =>
+    puzzle(`personal-control-${index}`, ["notCurated"])
+  );
+  const targets = Array.from({ length: 8 }, (_, index) =>
+    puzzle(`personal-target-${index}`, ["pin"])
+  );
+  store.seedPuzzles([...controls, ...targets]);
+  const config = buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20
+  });
+  for (let sessionIndex = 0; sessionIndex < 2; sessionIndex += 1) {
+    const completedAt =
+      `2026-07-${String(20 + sessionIndex).padStart(2, "0")}T00:04:00.000Z`;
+    const session = startSprint({
+      id: `personal-speed-session-${sessionIndex}`,
+      config,
+      puzzles: [controls[sessionIndex] as Puzzle],
+      ratingBefore: 925,
+      now:
+        `2026-07-${String(20 + sessionIndex).padStart(2, "0")}T00:00:00.000Z`
+    });
+    const sessionPuzzles = [
+      ...controls.slice(sessionIndex * 6, sessionIndex * 6 + 6),
+      ...targets.slice(sessionIndex * 4, sessionIndex * 4 + 4)
+    ];
+    store.transaction(() => {
+      store.createSprintSession(session);
+      sessionPuzzles.forEach((candidate, index) => {
+        store.recordAttempt({
+          ...attempt({
+            id: `personal-speed-attempt-${sessionIndex}-${index}`,
+            sessionId: session.id,
+            puzzleId: candidate.id,
+            completedAt
+          }),
+          result: "correct",
+          submittedMove: "e6e7",
+          elapsedMs: 45_000
+        });
+      });
+      store.updateSprintSession({
+        ...session,
+        status: "completed",
+        completedAt,
+        endReason: "target_reached",
+        correctCount: sessionPuzzles.length,
+        mistakeCount: 0,
+        ratingAfter: 925
+      });
+    });
+  }
+  const profile = service(store, new MemoryTacticalProfileRepository());
+
+  const estimate = profile
+    .getProgress("2026-07-25T00:00:00.000Z")
+    .snapshots.at(-1)
+    ?.estimates.find((candidate) => candidate.theme === "pin");
+
+  assert.ok(estimate);
+  assert.ok(estimate.speedEvidenceWeight > 0);
+  assert.ok(estimate.completedTimeMultiplier > 0.95);
+  assert.ok(estimate.completedTimeMultiplier < 1.05);
 });
 
 test("one rare-theme miss enters Review without becoming a Tactical Profile recommendation", () => {
@@ -2475,12 +2543,9 @@ function calibratedFamily() {
       minExpectedFailuresPer100: 2
     },
     speed: {
-      interceptLogSeconds: Math.log(30),
-      relativeDifficultyCoefficient: 0,
-      decisionCountCoefficient: 0,
-      paceLogCoefficient: 0,
-      slowPolicyLogCoefficient: 0,
-      residualSd: 0.25,
+      minimumControlWeight: 8,
+      slopePriorPrecision: 1,
+      minimumResidualSd: 0.15,
       themePriorSdLogSeconds: 0.5,
       practicalTimeMultiplier: 1.2
     }

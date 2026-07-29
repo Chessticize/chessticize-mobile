@@ -7,10 +7,10 @@ workflow. It is not a product API or a user-facing export flow.
 
 ## Current provisional trial
 
-On 2026-07-26 the owner approved trying the model with no additional
-representative corpus available. The checked-in artifact therefore uses
-`provisional` families and the decision identity
-`owner-approved-provisional-trial-2026-07-26`. It deliberately keeps
+On 2026-07-29 the owner approved the personal matched-control V1 with no
+additional representative corpus available. The checked-in artifact therefore
+uses `provisional` families and the decision identity
+`owner-approved-personal-speed-v1-2026-07-29`. It deliberately keeps
 `representativeOwnerApproved: false` and null corpus/report hashes.
 
 The app labels these results as an early estimate. This state is usable for
@@ -18,6 +18,13 @@ local recommendations and Focused Runs, but it is not calibration evidence and
 must not be described as validated. Existing canonical history is rebuilt into
 derived daily cells under the new calibration identity; users do not need to
 re-earn eligible attempts.
+
+The speed head fits each task-family expectation locally from the user's own
+leave-theme-out completed solves. The artifact contains readiness,
+regularization, variance-floor, prior, and action parameters; it does not
+contain a global expected solve time. If a theme lacks enough personal
+controls, that speed head remains unavailable rather than falling back to a
+fixed number of seconds.
 
 ## Required inputs
 
