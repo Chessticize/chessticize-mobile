@@ -55,6 +55,7 @@ describeMarketingAssets('App Store marketing screenshot capture', () => {
         sourceCommit,
         story,
         target,
+        verifiedLayoutOrientation: true,
       }));
     }
     writeDeviceCaptureManifest({

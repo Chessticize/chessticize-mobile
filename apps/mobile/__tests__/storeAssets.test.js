@@ -260,6 +260,7 @@ describe("App Store assets document", () => {
     expect(uiCalibrationRunner).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait");
     expect(uiCalibrationRunner).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION=landscape");
     expect(uiCalibrationRunner).toContain("set-simulator-orientation.sh");
+    expect(uiCalibrationRunner).toContain("normalizeVerifiedScreenshotOrientation.js");
     expect(uiCalibrationRunner).toContain(
       'DEVICE_NAME="${DETOX_IOS_DEVICE:-iPad Pro 11-inch (M5)}"'
     );

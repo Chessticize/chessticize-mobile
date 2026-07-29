@@ -96,6 +96,67 @@ describe('App Store marketing capture artifacts', () => {
     expect(record.sha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('normalizes the transposed iPad framebuffer emitted by Xcode 26', () => {
+    const outputRoot = mkdtempSync(join(tmpdir(), 'marketing-ipad-capture-'));
+    const sourcePath = join(outputRoot, 'source.png');
+    const png = new PNG({ width: 2, height: 3 });
+    const pixels = [
+      [255, 0, 0, 255],
+      [0, 255, 0, 255],
+      [0, 0, 255, 255],
+      [255, 255, 0, 255],
+      [255, 0, 255, 255],
+      [0, 255, 255, 255],
+    ];
+    pixels.forEach((pixel, index) => {
+      png.data.set(pixel, index * 4);
+    });
+    writeFileSync(sourcePath, PNG.sync.write(png));
+    const frame = story.frames[0];
+    const target = {
+      acceptedSizes: [{ width: 3, height: 2 }],
+      deviceFamily: 'ipad',
+      deviceName: 'Unit Test iPad Pro 13-inch',
+      displayGroup: '13-inch',
+      orientation: 'landscape',
+      outputDirectoryName: 'ipad-13-inch-landscape',
+    };
+
+    expect(() => captureMarketingScreenshot({
+      frame,
+      outputRoot,
+      screenshotPath: sourcePath,
+      sourceCommit: '2'.repeat(40),
+      story,
+      target,
+    })).toThrow('must be landscape');
+
+    const record = captureMarketingScreenshot({
+      frame,
+      outputRoot,
+      screenshotPath: sourcePath,
+      sourceCommit: '2'.repeat(40),
+      story,
+      target,
+      verifiedLayoutOrientation: true,
+    });
+    const normalized = PNG.sync.read(
+      readFileSync(join(outputRoot, record.file))
+    );
+
+    expect(record.pixelDimensions).toEqual({ width: 3, height: 2 });
+    expect(record.rawPixelDimensions).toEqual({ width: 2, height: 3 });
+    expect(record.captureNormalization).toBe('rotate-clockwise-90');
+    expect([...normalized.data]).toEqual([
+      255, 0, 255, 255,
+      0, 0, 255, 255,
+      255, 0, 0, 255,
+      0, 255, 255, 255,
+      255, 255, 0, 255,
+      0, 255, 0, 255,
+    ]);
+  });
+
   it('writes one ordered device manifest and requires a full source SHA', () => {
     const outputRoot = mkdtempSync(join(tmpdir(), 'marketing-manifest-'));
     const sourceCommit = 'a'.repeat(40);
