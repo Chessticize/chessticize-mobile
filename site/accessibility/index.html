@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="Current accessibility support and known limitations for Chessticize chess puzzle practice."
+    >
+    <meta name="theme-color" content="#f7fbff">
+    <link
+      rel="canonical"
+      href="https://chessticize.github.io/chessticize-mobile/accessibility/"
+    >
+    <link rel="icon" href="../assets/app-icon-192.png" sizes="192x192">
+    <link rel="stylesheet" href="../styles.css">
+    <title>Chessticize Accessibility</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="../" aria-label="Chessticize home">
+        <img src="../assets/app-icon-192.png" width="42" height="42" alt="">
+        <span>Chessticize</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="../#puzzle-story">How it works</a>
+        <a href="../#privacy">Privacy</a>
+        <a href="../support/">Support</a>
+        <a class="nav-source" href="https://github.com/Chessticize/chessticize-mobile">
+          Source
+        </a>
+      </nav>
+    </header>
+
+    <main id="main" class="simple-page section-shell">
+      <div class="simple-page-header">
+        <p class="eyebrow">Accessibility</p>
+        <h1>What the current app supports</h1>
+        <p>
+          Chessticize includes labeled controls and adaptable iPhone and iPad
+          layouts, but we do not claim complete support for an accessibility
+          feature until every common chess puzzle task passes.
+        </p>
+      </div>
+
+      <div class="info-grid">
+        <section class="info-card">
+          <h2>Screen readers and voice</h2>
+          <p>
+            Menus, tabs, buttons, and many status updates have useful labels.
+            The puzzle board itself does not yet provide a complete
+            VoiceOver or Voice Control move-entry path, so those features are
+            not declared in the App Store.
+          </p>
+        </section>
+
+        <section class="info-card">
+          <h2>Text and appearance</h2>
+          <p>
+            Very large system text can clip or overlap controls, and the app
+            does not yet provide a complete dark interface. Larger Text and
+            Dark Interface are therefore not declared.
+          </p>
+        </section>
+
+        <section class="info-card">
+          <h2>Visual and motion checks</h2>
+          <p>
+            Contrast, grayscale operation, touch targets, and Reduce Motion
+            behavior have open follow-up work. We will publish a feature
+            declaration only after the unchanged live app or a new release
+            passes every required puzzle flow.
+          </p>
+        </section>
+
+        <section class="info-card">
+          <h2>Orientation and iPad</h2>
+          <p>
+            iPhone uses portrait. iPad supports portrait and landscape, with
+            landscape as the primary large-screen layout. Large-text fixes are
+            still required in both size classes.
+          </p>
+        </section>
+      </div>
+
+      <section class="simple-page-header">
+        <h2>Share accessibility feedback</h2>
+        <p>
+          Tell us which puzzle flow, device, and assistive setting you used.
+          Public reports help others follow progress; private questions can go
+          to support.
+        </p>
+        <div class="button-row">
+          <a
+            class="button button-primary"
+            href="https://github.com/Chessticize/chessticize-mobile/issues/new?title=Accessibility%3A%20"
+          >
+            <strong>Open an accessibility report</strong>
+          </a>
+          <a class="button button-secondary" href="../support/">
+            <strong>Contact support</strong>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="section-shell footer-grid">
+        <div>
+          <a class="brand footer-brand" href="../">
+            <img src="../assets/app-icon-192.png" width="36" height="36" alt="">
+            <span>Chessticize</span>
+          </a>
+          <p>Private, offline chess puzzle practice.</p>
+        </div>
+        <nav aria-label="Footer navigation">
+          <a href="https://apps.apple.com/us/app/chessticize/id6788610123">App Store</a>
+          <a href="../android/">Android</a>
+          <a href="../support/">Support</a>
+          <a href="https://github.com/Chessticize/chessticize-mobile">Source</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

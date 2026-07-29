@@ -9,6 +9,7 @@ Public routes:
 
 - Developer website: `https://chessticize.github.io/chessticize-mobile/`
 - Support: `https://chessticize.github.io/chessticize-mobile/support/`
+- Accessibility: `https://chessticize.github.io/chessticize-mobile/accessibility/`
 - Android install guide: `https://chessticize.github.io/chessticize-mobile/android/`
 
 ## Updating the marketing images
@@ -50,9 +51,10 @@ published site remains plain static files.
   Update that page's APK, checksum, version, size, and source-release links
   together after the protected Android release workflow publishes a new
   Play-signed APK mirror.
-- App Store Connect uses the homepage as the Marketing URL and `support/` as
-  the Support URL. The complete privacy policy remains the repository-hosted
-  `docs/PRIVACY_POLICY.md`; the landing page links to that canonical policy.
+- App Store Connect uses the homepage as the Marketing URL, `support/` as the
+  Support URL, and `accessibility/` as the Accessibility URL. The complete
+  privacy policy remains the repository-hosted `docs/PRIVACY_POLICY.md`; the
+  landing page links to that canonical policy.
 
 Run the focused landing-page test and development-process validation after any
 content, asset, route, or deployment change:

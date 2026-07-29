@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "metadataId": "app-store-accessibility-v1",
+  "issue": 416,
+  "auditedOn": "2026-07-29",
+  "appSourceCommit": "211ec0edb2b4b2a877efd429f3cba190225a1501",
+  "accessibilityUrl": "https://chessticize.github.io/chessticize-mobile/accessibility/",
+  "officialReferences": [
+    "https://developer.apple.com/help/app-store-connect/manage-app-accessibility/overview-of-accessibility-nutrition-labels/",
+    "https://developer.apple.com/help/app-store-connect/manage-app-accessibility/manage-accessibility-nutrition-labels/",
+    "https://developer.apple.com/help/app-store-connect/manage-app-accessibility/voiceover-evaluation-criteria/",
+    "https://developer.apple.com/help/app-store-connect/manage-app-accessibility/voice-control-evaluation-criteria/",
+    "https://developer.apple.com/help/app-store-connect/manage-app-accessibility/larger-text-evaluation-criteria",
+    "https://developer.apple.com/help/app-store-connect/manage-app-accessibility/sufficient-contrast-evaluation-criteria",
+    "https://developer.apple.com/help/app-store-connect/manage-app-accessibility/differentiate-without-color-alone-evaluation-criteria",
+    "https://developer.apple.com/help/app-store-connect/manage-app-accessibility/reduced-motion-evaluation-criteria",
+    "https://developer.apple.com/help/app-store-connect/manage-app-accessibility/dark-interface-evaluation-criteria/"
+  ],
+  "publicationDecision": {
+    "iphoneDeclarations": [],
+    "ipadDeclarations": [],
+    "status": "no-declarations-ready",
+    "appStoreConnectAction": "Leave every accessibility feature unselected for iPhone and iPad. Add the public accessibility URL after it is deployed.",
+    "ownerEvidenceRequired": "Retain an App Store Connect screenshot or export showing no feature declarations and the saved accessibility URL."
+  },
+  "features": {
+    "voiceOver": {
+      "status": "not-declared",
+      "reason": "Standard, Arrow Duel, Review, and Replay expose the puzzle board as one image without an accessible move-entry path.",
+      "followUpIssues": [
+        426
+      ]
+    },
+    "voiceControl": {
+      "status": "not-declared",
+      "reason": "Puzzle moves cannot be completed by visible control name or numbered overlay.",
+      "followUpIssues": [
+        426
+      ]
+    },
+    "largerText": {
+      "status": "not-declared",
+      "reason": "The largest accessibility text size clips or overlaps common controls on iPhone and landscape iPad.",
+      "followUpIssues": [
+        427
+      ]
+    },
+    "sufficientContrast": {
+      "status": "not-declared",
+      "reason": "Verified common-task text pairs include 2.15:1 white-on-amber and 3.30:1 green-on-white contrast.",
+      "followUpIssues": [
+        428
+      ]
+    },
+    "differentiateWithoutColorAlone": {
+      "status": "not-declared",
+      "reason": "No confirmed color-only blocker was found, but the complete grayscale common-task walkthrough is still pending.",
+      "followUpIssues": [
+        432
+      ]
+    },
+    "reducedMotion": {
+      "status": "not-declared",
+      "reason": "The app does not observe the system Reduce Motion setting for board, layout, or reordering animations.",
+      "followUpIssues": [
+        430
+      ]
+    },
+    "captions": {
+      "status": "not-declared",
+      "reason": "The app has no timed video or spoken media experience to support with captions.",
+      "followUpIssues": []
+    },
+    "audioDescriptions": {
+      "status": "not-declared",
+      "reason": "The app has no video experience requiring an audio-description track.",
+      "followUpIssues": []
+    },
+    "darkInterface": {
+      "status": "not-declared",
+      "reason": "The common puzzle interface remains light when iOS Dark Mode is enabled.",
+      "followUpIssues": [
+        431
+      ]
+    }
+  },
+  "additionalFindings": {
+    "touchTargets": {
+      "status": "partial",
+      "reason": "Primary session and navigation controls are generally 44pt or larger, but shared Settings preference buttons are 34pt high without hit slop.",
+      "followUpIssues": [
+        429
+      ]
+    },
+    "orientationAndIpad": {
+      "status": "supported-at-standard-text",
+      "reason": "The exact-head Release app renders a usable two-column Practice layout in iPad landscape at the standard text size; Larger Text remains blocked separately.",
+      "followUpIssues": [
+        427
+      ]
+    }
+  }
+}

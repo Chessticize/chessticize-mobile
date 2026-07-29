@@ -7,6 +7,8 @@ store screenshot capture. Recheck Apple's live documentation before upload:
   https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications
 - Platform version metadata fields:
   https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information
+- Accessibility nutrition labels:
+  https://developer.apple.com/help/app-store-connect/manage-app-accessibility/overview-of-accessibility-nutrition-labels/
 
 The canonical six-frame marketing sequence, final frame copy, and coherent
 fictional-user contract are defined in
@@ -15,6 +17,10 @@ and
 [`config/app-store-marketing-story-v1.json`](../config/app-store-marketing-story-v1.json).
 The canonical English metadata contract is
 [`config/app-store-metadata-en-us-v1.json`](../config/app-store-metadata-en-us-v1.json).
+The evidence-backed accessibility declaration contract is
+[`config/app-store-accessibility-v1.json`](../config/app-store-accessibility-v1.json),
+with the full audit in
+[`docs/ACCESSIBILITY_AUDIT.md`](ACCESSIBILITY_AUDIT.md).
 That sequence is separate from the maintained fifteen-scene release-QA capture
 below. Its deterministic raw-capture and Cobalt Focus composition stages are
 documented in
@@ -36,10 +42,11 @@ Connect's stricter 100-byte reference.
 | --- | --- | --- |
 | App name | `Chessticize` | Keep the distinctive cross-platform brand; 11 / 30 characters. |
 | Subtitle | `Build Tactical Intuition` | Result-oriented product promise; 24 / 30 characters. |
-| Promotional text | `Build tactical intuition with rating-matched chess puzzles, Arrow Duel, Custom Runs, and scheduled Review—offline, without ads or an account, and open source.` | 158 / 170 characters. |
+| Promotional text | `Practice rating-matched chess puzzles with Arrow Duel, Custom Runs, and scheduled Review—offline, without ads or an account, and open source.` | 141 / 170 characters. |
 | Keywords | `chess,tactics,puzzle,trainer,offline,blunder,sprint,review,spaced repetition,elo,analysis` | 89 / 100 UTF-8 bytes; no name/subtitle duplication, no spaces after commas, and no category names or competitor terms. |
 | Support URL | `https://chessticize.github.io/chessticize-mobile/support/` | Stable public support, bug-report, feature-request, and private-contact entry point. |
 | Marketing URL | `https://chessticize.github.io/chessticize-mobile/` | Stable public product page with iOS and Android install paths. |
+| Accessibility URL | `https://chessticize.github.io/chessticize-mobile/accessibility/` | Current support and known limitations; do not use this page to imply an undeclared feature. |
 | Privacy policy URL | `https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md` | Must match `docs/APP_PRIVACY_DISCLOSURE.md`. |
 | Primary category | `Games` | App Store Connect selection. |
 | Secondary category | `Education` | App Store Connect selection. |
@@ -63,7 +70,7 @@ concrete `Chessticize: Chess Puzzles` over
 Copy the complete plain-text block below into App Store Connect:
 
 ```text
-Build tactical intuition one chess puzzle at a time—without ads or an account.
+Practice chess puzzles with purpose—without ads or an account.
 
 Chessticize is a free, open-source chess puzzle trainer designed to work offline. Solve short, rating-matched puzzle Sprints to build pattern recognition. Arrow Duel turns each puzzle into a choice between two candidate moves, helping you notice and reject the tempting blunder before you play it.
 
@@ -101,7 +108,7 @@ ALSO INCLUDED
 • iPhone and iPad layouts
 ```
 
-The description is 1,881 / 4,000 Unicode characters, including line breaks.
+The description is 1,865 / 4,000 Unicode characters, including line breaks.
 It deliberately presents user-controlled Custom Runs and ordinary
 History/Ratings. It does not market Tactical Profile, inferred weaknesses, or
 model-derived improvement.
@@ -129,6 +136,25 @@ published source tag, GitHub Release, and customer note remain immutable
 evidence of what was approved at tag time. Issue #417 must retain a screenshot
 or exported metadata record showing the corrected text submitted to App Store
 Connect.
+
+## Accessibility Metadata
+
+The 2026-07-29 audit found no accessibility feature that is ready for an
+iPhone or iPad declaration under Apple's all-common-tasks rule. Leave every
+feature unselected. Add the Accessibility URL above after the public page is
+deployed, then retain an App Store Connect screenshot or export in issue #416
+or the final #417 release evidence.
+
+This no-declaration result is intentional. It must not be replaced by a claim
+based only on labeled surrounding buttons: Standard, Arrow Duel, Review, and
+Replay still expose the puzzle board as a non-operable image to assistive
+technology. Larger Text, contrast, touch targets, Reduce Motion, Dark
+Interface, and the final grayscale pass have focused follow-up issues recorded
+in `docs/ACCESSIBILITY_AUDIT.md`.
+
+Leaving features undeclared and adding the public Accessibility URL do not
+require a new binary. Any UI or behavior fix must ship in a new version before
+the resulting feature is declared.
 
 ## Screenshot Requirements
 
