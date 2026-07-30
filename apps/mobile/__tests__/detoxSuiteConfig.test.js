@@ -1517,6 +1517,21 @@ describe('Detox suite configuration', () => {
     expect(launchHelper.indexOf('setMarketingOrientationBeforeNavigation'))
       .toBeGreaterThan(launchHelper.indexOf('launchWithDisabledSynchronization'));
 
+    const customRunHelperStart = spec.indexOf('async function prepareCustomRun');
+    const customRunHelperEnd = spec.indexOf(
+      'async function assertCompositionViewport',
+      customRunHelperStart
+    );
+    const customRunHelper = spec.slice(customRunHelperStart, customRunHelperEnd);
+    const waitForPaceControl = customRunHelper.indexOf(
+      "waitForVisibleInPracticeScroll('practice-run-per-puzzle-stepper-increase')"
+    );
+    const tapPaceControl = customRunHelper.indexOf(
+      "element(by.id('practice-run-per-puzzle-stepper-increase')).tap()"
+    );
+    expect(waitForPaceControl).toBeGreaterThan(0);
+    expect(tapPaceControl).toBeGreaterThan(waitForPaceControl);
+
     const responsiveHelperStart = spec.indexOf('async function assertNativeResponsiveLayout');
     const responsiveHelperEnd = spec.indexOf(
       'async function takeReadyScreenshot',

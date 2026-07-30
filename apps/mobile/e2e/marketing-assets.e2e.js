@@ -171,9 +171,7 @@ async function prepareCustomRun() {
   await waitFor(element(by.id('practice-run-duration-stepper')))
     .toExist()
     .withTimeout(10000);
-  await waitFor(element(by.id('practice-run-per-puzzle-stepper-increase')))
-    .toBeVisible()
-    .withTimeout(10000);
+  await waitForVisibleInPracticeScroll('practice-run-per-puzzle-stepper-increase');
   await element(by.id('practice-run-per-puzzle-stepper-increase')).tap();
   await waitForVisibleInPracticeScroll('practice-run-elo-input');
   await element(by.id('practice-run-elo-input')).replaceText(
