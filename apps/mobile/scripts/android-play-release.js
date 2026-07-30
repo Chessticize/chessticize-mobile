@@ -6,6 +6,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const {
+  LISTING_ASSET_SET_KIND,
+  LISTING_ASSET_SET_SCHEMA_VERSION,
+  listingAssetSetDigest,
+} = require('../../../scripts/lib/google-play-listing-contract.cjs');
 const { ANDROID_REQUIREMENTS } = require('./android-requirements');
 const stockfishArtifacts = require('../stockfish-artifacts.json');
 const {
@@ -239,6 +244,185 @@ function inspectBundleEntries(entries, { pageAlignment } = {}) {
   return { abis, errors };
 }
 
+function inspectGooglePlayListingAssetSet(assetSet, expected) {
+  const { errors, requireEqual } = createErrorCollector();
+  const requireSha256 = (value, label) => {
+    if (typeof value !== 'string' || !/^[0-9a-f]{64}$/.test(value)) {
+      errors.push(`${label} must be a lowercase SHA-256 digest.`);
+    }
+  };
+  const requireHttps = (value, label) => {
+    let reference;
+    try {
+      reference = new URL(value);
+    } catch {
+      reference = undefined;
+    }
+    if (reference?.protocol !== 'https:' ||
+        !reference.hostname ||
+        reference.username ||
+        reference.password) {
+      errors.push(`${label} must be an auditable HTTPS reference.`);
+    }
+  };
+
+  requireEqual(
+    assetSet?.schemaVersion,
+    LISTING_ASSET_SET_SCHEMA_VERSION,
+    'Google Play listing asset-set schemaVersion',
+  );
+  requireEqual(
+    assetSet?.kind,
+    LISTING_ASSET_SET_KIND,
+    'Google Play listing asset-set kind',
+  );
+  requireEqual(assetSet?.status, 'reviewed', 'Google Play listing asset-set status');
+  for (const [field, label] of [
+    ['commitSha', 'commit SHA'],
+    ['applicationId', 'application ID'],
+    ['versionName', 'version name'],
+    ['versionCode', 'version code'],
+    ['aabSha256', 'AAB SHA-256'],
+  ]) {
+    requireEqual(
+      assetSet?.candidate?.[field],
+      expected[field],
+      `Google Play listing asset-set candidate ${label}`,
+    );
+  }
+  requireSha256(
+    assetSet?.candidate?.apkSha256,
+    'Google Play listing asset-set candidate APK SHA-256',
+  );
+  requireSha256(
+    assetSet?.candidate?.signerCertificateSha256,
+    'Google Play listing asset-set candidate signer SHA-256',
+  );
+
+  requireEqual(
+    assetSet?.metadataContract?.metadataId,
+    'google-play-en-us-v1',
+    'Google Play listing metadata ID',
+  );
+  requireEqual(
+    assetSet?.metadataContract?.locale,
+    'en-US',
+    'Google Play listing locale',
+  );
+  requireEqual(
+    assetSet?.metadataContract?.repositoryFile,
+    'config/google-play-metadata-en-us-v1.json',
+    'Google Play listing metadata repository file',
+  );
+  requireSha256(
+    assetSet?.metadataContract?.sha256,
+    'Google Play listing metadata contract SHA-256',
+  );
+  requireEqual(
+    assetSet?.metadataContract?.sha256,
+    expected.googlePlayListing?.metadataContractSha256,
+    'Google Play listing metadata contract SHA-256',
+  );
+
+  for (const [field, repositoryFile, expectedSha256, expectedAltText, label] of [
+    [
+      'appIcon',
+      'apps/mobile/store-assets/android/play-icon-512.png',
+      expected.googlePlayListing?.appIconSha256,
+      expected.googlePlayListing?.appIconAltText,
+      'Google Play app icon',
+    ],
+    [
+      'featureGraphic',
+      'apps/mobile/store-assets/android/feature-graphic-1024x500.png',
+      expected.googlePlayListing?.featureGraphicSha256,
+      expected.googlePlayListing?.featureGraphicAltText,
+      'Google Play feature graphic',
+    ],
+  ]) {
+    requireEqual(
+      assetSet?.[field]?.repositoryFile,
+      repositoryFile,
+      `${label} repository file`,
+    );
+    requireSha256(assetSet?.[field]?.sha256, `${label} SHA-256`);
+    requireEqual(assetSet?.[field]?.sha256, expectedSha256, `${label} SHA-256`);
+    requireEqual(assetSet?.[field]?.altText, expectedAltText, `${label} alt text`);
+  }
+
+  requireEqual(
+    assetSet?.captureManifest?.fileName,
+    'google-play-capture-manifest.json',
+    'Google Play capture manifest file name',
+  );
+  requireSha256(
+    assetSet?.captureManifest?.sha256,
+    'Google Play capture manifest SHA-256',
+  );
+  requireEqual(
+    assetSet?.compositionManifest?.fileName,
+    'composition-manifest.json',
+    'Google Play composition manifest file name',
+  );
+  requireSha256(
+    assetSet?.compositionManifest?.sha256,
+    'Google Play composition manifest SHA-256',
+  );
+  requireEqual(
+    assetSet?.compositionManifest?.artifactCount,
+    18,
+    'Google Play composition artifact count',
+  );
+  requireSha256(
+    assetSet?.compositionManifest?.artifactsDigest,
+    'Google Play final-image contract SHA-256',
+  );
+  if (
+    JSON.stringify(assetSet?.compositionManifest?.deviceFamilies) !==
+    JSON.stringify(['android-phone', 'android-tablet-7', 'android-tablet-10'])
+  ) {
+    errors.push(
+      'Google Play composition manifest must bind phone, 7-inch, and 10-inch assets.',
+    );
+  }
+
+  requireEqual(
+    assetSet?.consoleReview?.status,
+    'reviewed',
+    'Google Play listing Console review status',
+  );
+  if (typeof assetSet?.consoleReview?.evidenceId !== 'string' ||
+      assetSet.consoleReview.evidenceId.trim().length === 0 ||
+      assetSet.consoleReview.evidenceId.startsWith('REPLACE_')) {
+    errors.push('Google Play listing Console review must include an evidence ID.');
+  }
+  requireHttps(
+    assetSet?.consoleReview?.reference,
+    'Google Play listing Console review',
+  );
+  let consoleReference;
+  try {
+    consoleReference = new URL(assetSet?.consoleReview?.reference);
+  } catch {
+    consoleReference = undefined;
+  }
+  if (consoleReference?.hostname !== 'play.google.com' ||
+      !consoleReference.pathname.startsWith('/console/')) {
+    errors.push('Google Play listing Console review must reference Play Console.');
+  }
+  if (!Number.isFinite(Date.parse(assetSet?.consoleReview?.reviewedAt)) ||
+      new Date(assetSet.consoleReview.reviewedAt).toISOString() !==
+        assetSet.consoleReview.reviewedAt) {
+    errors.push('Google Play listing Console review must include its review time.');
+  }
+
+  requireSha256(assetSet?.assetSetDigest, 'Google Play listing asset-set digest');
+  if (assetSet?.assetSetDigest !== listingAssetSetDigest(assetSet)) {
+    errors.push('Google Play listing asset-set digest does not match its contract.');
+  }
+  return errors;
+}
+
 function inspectOwnerEvidence(evidence, expected) {
   const { errors, requireEqual } = createErrorCollector();
   const candidateFields = [
@@ -274,7 +458,7 @@ function inspectOwnerEvidence(evidence, expected) {
     return record;
   };
 
-  requireEqual(evidence?.schemaVersion, 3, 'Owner evidence schemaVersion');
+  requireEqual(evidence?.schemaVersion, 4, 'Owner evidence schemaVersion');
   requireEqual(evidence?.candidate?.commitSha, expected.commitSha, 'Candidate commit SHA');
   requireEqual(evidence?.candidate?.aabSha256, expected.aabSha256, 'Candidate AAB SHA-256');
   requireEqual(evidence?.candidate?.applicationId, expected.applicationId, 'Candidate application ID');
@@ -415,8 +599,11 @@ function inspectOwnerEvidence(evidence, expected) {
   } catch {
     errors.push('Approved upload certificate SHA-256 is missing or malformed.');
   }
+  let appSigningCertificateSha256;
   try {
-    normalizeFingerprint(evidence?.signing?.appSigningCertificateSha256);
+    appSigningCertificateSha256 = normalizeFingerprint(
+      evidence?.signing?.appSigningCertificateSha256,
+    );
   } catch {
     errors.push('Play app-signing certificate SHA-256 is missing or malformed.');
   }
@@ -465,6 +652,37 @@ function inspectOwnerEvidence(evidence, expected) {
       label,
     );
   }
+  const listingAssetSetRecord = requireEvidenceRecord(
+    evidence?.artifacts?.googlePlayListingAssetSet,
+    'pass',
+    'Google Play listing asset set',
+  );
+  if (listingAssetSetRecord?.evidenceId?.startsWith('REPLACE_')) {
+    errors.push('Google Play listing asset set must include a retained evidence ID.');
+  }
+  errors.push(...inspectGooglePlayListingAssetSet(
+    listingAssetSetRecord?.assetSet,
+    expected,
+  ));
+  try {
+    requireEqual(
+      normalizeFingerprint(
+        listingAssetSetRecord?.assetSet?.candidate
+          ?.signerCertificateSha256,
+      ),
+      appSigningCertificateSha256,
+      'Google Play listing candidate signer certificate SHA-256',
+    );
+  } catch {
+    errors.push(
+      'Google Play listing candidate signer certificate SHA-256 is malformed.',
+    );
+  }
+  requireEqual(
+    evidence?.console?.storeListing?.assetSetDigest,
+    listingAssetSetRecord?.assetSet?.assetSetDigest,
+    'Play store listing asset-set digest',
+  );
   const passingInstallRecords = [
     ['internalInstall', 'internal', 'Internal testing installation'],
     ['closedInstall', 'closed', 'Closed testing installation'],
@@ -1183,6 +1401,27 @@ function inspectAndroidPlayRelease(options, dependencies = {}) {
       aabSha256: result.bundle.sha256,
       ...expectedIdentity,
       uploadCertificateSha256,
+      googlePlayListing: (() => {
+        const metadataPath = path.join(
+          repoRoot,
+          'config/google-play-metadata-en-us-v1.json',
+        );
+        const metadataBytes = fs.readFileSync(metadataPath);
+        const metadata = JSON.parse(metadataBytes);
+        return {
+          metadataContractSha256: sha256Bytes(metadataBytes),
+          appIconSha256: sha256FileContents(path.join(
+            repoRoot,
+            metadata.previewAssets.appIcon.path,
+          )),
+          appIconAltText: metadata.previewAssets.appIcon.altText,
+          featureGraphicSha256: sha256FileContents(path.join(
+            repoRoot,
+            metadata.previewAssets.featureGraphic.path,
+          )),
+          featureGraphicAltText: metadata.previewAssets.featureGraphic.altText,
+        };
+      })(),
     };
     const errors = inspectOwnerEvidence(evidence, expectedOwnerEvidence);
     if (errors.length > 0) {
@@ -1234,6 +1473,7 @@ module.exports = {
   inspectAndroidReleaseDocumentation,
   inspectAndroidPlayRelease,
   inspectBundleEntries,
+  inspectGooglePlayListingAssetSet,
   inspectOwnerEvidence,
   inspectPublishedSourceRelease,
   inspectReleaseManifest,
@@ -1242,6 +1482,7 @@ module.exports = {
   parseManifest,
   parseSignerFingerprint,
   parseZipListing,
+  listingAssetSetDigest,
   requireApprovedSingleSigner,
   resolveRepoPath,
   requireVerifiedJar,

@@ -2,6 +2,7 @@ const fs = require('fs');
 const zlib = require('zlib');
 const {
   dismissRunNameKeyboard,
+  dragAndroidElementToElement,
   elementText,
   sleep,
   frameFor,
@@ -88,16 +89,20 @@ describe('Practice POC', () => {
     if (standardBefore.y >= arrowBefore.y) {
       throw new Error('Expected Standard to begin before Arrow Duel');
     }
-    await element(by.id('practice-run-standard')).longPressAndDrag(
-      300,
-      0.5,
-      0.5,
-      element(by.id('practice-run-arrow-duel')),
-      0.5,
-      0.9,
-      'slow',
-      200
-    );
+    if (device.getPlatform() === 'android') {
+      await dragAndroidElementToElement('practice-run-standard', 'practice-run-arrow-duel');
+    } else {
+      await element(by.id('practice-run-standard')).longPressAndDrag(
+        300,
+        0.5,
+        0.5,
+        element(by.id('practice-run-arrow-duel')),
+        0.5,
+        0.9,
+        'slow',
+        200
+      );
+    }
     await sleep(750);
     const standardAfter = await frameFor(element(by.id('practice-run-standard')));
     const arrowAfter = await frameFor(element(by.id('practice-run-arrow-duel')));

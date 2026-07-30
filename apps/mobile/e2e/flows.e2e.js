@@ -1,5 +1,4 @@
 const {
-  completeFirstUseSessionGuides,
   dismissRunNameKeyboard,
   openTab,
   openStandardHistoryTrend,
@@ -8,7 +7,9 @@ const {
   playBoardMove,
   sleep,
   startPracticeMode,
+  startSelectedPracticeRun,
   selectTestPuzzleSource,
+  tapUntilExists,
   textFromAttributes,
   waitForVisibleInPracticeScroll,
   waitForElementTextContaining,
@@ -331,10 +332,7 @@ describe('Key user flows', () => {
     const flowFocusSelectTestID = await createSavedCustomRun('Flow Focus', { shorterDuration: true });
     await waitForVisibleInPracticeScroll(flowFocusSelectTestID);
     await element(by.id(flowFocusSelectTestID)).tap();
-    await element(by.id('practice-main-scroll')).scrollTo('top');
-    await element(by.id('practice-run-start')).tap();
-    await completeFirstUseSessionGuides();
-    await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+    await startSelectedPracticeRun();
 
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
@@ -353,10 +351,7 @@ describe('Key user flows', () => {
     });
     await waitForVisibleInPracticeScroll(persistentFocusSelectTestID);
     await element(by.id(persistentFocusSelectTestID)).tap();
-    await element(by.id('practice-main-scroll')).scrollTo('top');
-    await element(by.id('practice-run-start')).tap();
-    await completeFirstUseSessionGuides();
-    await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+    await startSelectedPracticeRun();
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
@@ -404,7 +399,7 @@ describe('Key user flows', () => {
 });
 
 async function createSavedCustomRun(name, { shorterDuration = false, themes = [] } = {}) {
-  await waitFor(element(by.id('practice-add-run'))).toBeVisible().withTimeout(10000);
+  await waitForVisibleInPracticeScroll('practice-add-run');
   await element(by.id('practice-add-run')).tap();
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-run-name-input')).replaceText(name);
@@ -418,8 +413,7 @@ async function createSavedCustomRun(name, { shorterDuration = false, themes = []
     await element(by.id(`custom-theme-${theme}`)).tap();
   }
   await element(by.id('practice-main-scroll')).scrollTo('top');
-  await element(by.id('practice-run-save')).tap();
-  await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
+  await tapUntilExists('practice-run-save', 'practice-run-home-edit', 3);
   const runName = element(by.text(name));
   await waitFor(runName).toExist().withTimeout(10000);
   const attributes = await runName.getAttributes();

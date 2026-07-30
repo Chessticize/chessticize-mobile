@@ -956,6 +956,84 @@ describe('Detox suite configuration', () => {
     expect(preserveUnexpectedFailure).toBeGreaterThan(confirmSessionStarted);
   });
 
+  it('dismisses the public Sprint rules guide before starting a selected Run', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const helperStart = helpers.indexOf('async function startSelectedPracticeRun');
+    const helperEnd = helpers.indexOf(
+      'async function startPracticeMode',
+      helperStart
+    );
+    const helper = helpers.slice(helperStart, helperEnd);
+    const findRulesDismiss = helper.indexOf(
+      "detoxElementExists('practice-sprint-rules-dismiss')"
+    );
+    const retryRulesDismiss = helper.indexOf(
+      "tapUntilExists('practice-sprint-rules-dismiss', 'practice-sprint-rules-open', 3)"
+    );
+    const tapStart = helper.indexOf("element(by.id('practice-run-start')).tap()");
+
+    expect(findRulesDismiss).toBeGreaterThan(0);
+    expect(retryRulesDismiss).toBeGreaterThan(findRulesDismiss);
+    expect(tapStart).toBeGreaterThan(retryRulesDismiss);
+  });
+
+  it('shares the selected Run startup helper across Custom Run flows', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+
+    expect(flowsSpec).toContain('startSelectedPracticeRun,');
+    expect(flowsSpec.split('await startSelectedPracticeRun();')).toHaveLength(3);
+    expect(flowsSpec).not.toContain(
+      "await element(by.id('practice-run-start')).tap();\n"
+      + '    await completeFirstUseSessionGuides();'
+    );
+  });
+
+  it('drives Android Run reordering through a black-box system touch stream', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const helperStart = helpers.indexOf('async function dragAndroidElementToElement');
+    const helperEnd = helpers.indexOf('async function startSelectedPracticeRun', helperStart);
+    const helper = helpers.slice(helperStart, helperEnd);
+    const caseStart = practiceSpec.indexOf(
+      "it('creates, reorders, edits, archives, restores, and relaunches a saved Run'"
+    );
+    const caseEnd = practiceSpec.indexOf(
+      "it('persists first-use Sprint guidance",
+      caseStart
+    );
+    const runManagementCase = practiceSpec.slice(caseStart, caseEnd);
+
+    expect(helper).toContain('input touchscreen motionevent DOWN');
+    expect(helper).toContain('input touchscreen motionevent MOVE');
+    expect(helper).toContain('input touchscreen motionevent UP');
+    expect(runManagementCase).toContain("device.getPlatform() === 'android'");
+    expect(runManagementCase).toContain(
+      "dragAndroidElementToElement('practice-run-standard', 'practice-run-arrow-duel')"
+    );
+    expect(runManagementCase).toContain('.longPressAndDrag(');
+  });
+
+  it('retries the public Custom Run save until Home confirms the transition', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const helperStart = flowsSpec.indexOf('async function createSavedCustomRun');
+    const helperEnd = flowsSpec.indexOf(
+      'function durationTextToSeconds',
+      helperStart
+    );
+    const helper = flowsSpec.slice(helperStart, helperEnd);
+
+    expect(helper).toContain("waitForVisibleInPracticeScroll('practice-add-run')");
+    expect(helper).not.toContain(
+      "waitFor(element(by.id('practice-add-run'))).toBeVisible().withTimeout(10000)"
+    );
+    expect(helper).toContain(
+      "tapUntilExists('practice-run-save', 'practice-run-home-edit', 3)"
+    );
+    expect(helper).not.toContain(
+      "waitFor(element(by.id('practice-run-home-edit'))).toBeVisible()"
+    );
+  });
+
   it('dismisses the Run name keyboard through a public editor surface', () => {
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
     const helperStart = helpers.indexOf('async function dismissRunNameKeyboard');
@@ -1516,6 +1594,49 @@ describe('Detox suite configuration', () => {
       .toBeGreaterThan(0);
     expect(launchHelper.indexOf('setMarketingOrientationBeforeNavigation'))
       .toBeGreaterThan(launchHelper.indexOf('launchWithDisabledSynchronization'));
+
+    const customRunHelperStart = spec.indexOf('async function prepareCustomRun');
+    const customRunHelperEnd = spec.indexOf(
+      'async function assertCompositionViewport',
+      customRunHelperStart
+    );
+    const customRunHelper = spec.slice(customRunHelperStart, customRunHelperEnd);
+    const waitForPaceControl = customRunHelper.indexOf(
+      "waitForVisibleInPracticeScroll('practice-run-per-puzzle-stepper-increase')"
+    );
+    const tapPaceControl = customRunHelper.indexOf(
+      "element(by.id('practice-run-per-puzzle-stepper-increase')).tap()"
+    );
+    expect(waitForPaceControl).toBeGreaterThan(0);
+    expect(tapPaceControl).toBeGreaterThan(waitForPaceControl);
+    expect(customRunHelper).toContain(
+      "const expectedPace = story.frames.find((frame) => frame.id === 'focus-your-practice')"
+    );
+    expect(customRunHelper).toContain(
+      'for (let attempt = 0; attempt < 3; attempt += 1)'
+    );
+    expect(customRunHelper).toContain(
+      'waitFor(element(by.text(expectedPace))).toExist().withTimeout(10000)'
+    );
+    expect(customRunHelper).toContain(
+      "if (isGooglePlayCapture && target.deviceFamily === 'android-phone')"
+    );
+    expect(customRunHelper).toContain(
+      "element(by.id('practice-main-scroll')).scroll(80, 'down', 0.5, 0.5)"
+    );
+    expect(spec).toContain(
+      "isGooglePlayCapture && target.deviceFamily === 'android-phone' ? 220"
+    );
+
+    const checkedHelperStart = spec.indexOf('async function expectChecked');
+    const checkedHelperEnd = spec.indexOf(
+      'async function expectAttributeContains',
+      checkedHelperStart
+    );
+    const checkedHelper = spec.slice(checkedHelperStart, checkedHelperEnd);
+    expect(checkedHelper).toContain("device.getPlatform() === 'android'");
+    expect(checkedHelper).toContain('waitForAndroidUiState');
+    expect(checkedHelper).toContain("checked: 'true'");
 
     const responsiveHelperStart = spec.indexOf('async function assertNativeResponsiveLayout');
     const responsiveHelperEnd = spec.indexOf(

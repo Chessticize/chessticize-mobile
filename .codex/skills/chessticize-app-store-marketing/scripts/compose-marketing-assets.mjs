@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 import {
   mkdir,
   readFile,
@@ -14,6 +15,17 @@ import sharp from "sharp";
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(SCRIPT_PATH), "..");
+const REPOSITORY_ROOT = path.resolve(SKILL_ROOT, "../../..");
+const require = createRequire(import.meta.url);
+const googlePlayStory = require(
+  path.join(REPOSITORY_ROOT, "config/app-store-marketing-story-v1.json"),
+);
+const {
+  assertCombinedGooglePlayCaptureManifest,
+} = require(path.join(
+  REPOSITORY_ROOT,
+  "apps/mobile/e2e/googlePlayMarketingCaptureArtifacts.js",
+));
 const DEFAULT_LAYOUT_CONFIG = path.join(
   SKILL_ROOT,
   "assets",
@@ -22,9 +34,11 @@ const DEFAULT_LAYOUT_CONFIG = path.join(
 const DEFAULT_PLATFORM = "app-store";
 const SUPPORTED_FONT_FAMILY = "sans-serif";
 const EXPECTED_FRAME_COUNT = 6;
+const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 const COMPOSITION_MODES = new Set([
   "flat-device-frame",
   "photographic-device",
+  "screen-first",
 ]);
 const FRAME_CONTRACT_KEYS = [
   "frameId",
@@ -132,13 +146,13 @@ function printUsage() {
     [--manifest <manifest.json>] \\
     [--layout-config <layout.json>] \\
     [--locale en-US] \\
-    [--platform app-store] \\
-    [--device-family all|iphone|ipad] \\
+    [--platform app-store|google-play] \\
+    [--device-family all|<config-preset>] \\
     [--orientation all|portrait|landscape] \\
     [--preview-only]
 
 The command validates all selected raw captures before writing deterministic
-App Store PNGs, per-device contact sheets, and composition-manifest.json.
+store PNGs, per-device contact sheets, and composition-manifest.json.
 `);
 }
 
@@ -171,6 +185,74 @@ async function sha256File(filePath) {
 function isPathInside(parentPath, candidatePath) {
   const relative = path.relative(parentPath, candidatePath);
   return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+async function loadCanonicalAltText(config) {
+  if (!config.altTextContract) {
+    return null;
+  }
+  const relativeFile = config.altTextContract.repositoryFile;
+  if (
+    typeof relativeFile !== "string" ||
+    relativeFile === "" ||
+    path.isAbsolute(relativeFile)
+  ) {
+    fail("alt-text contract must use a repository-relative file");
+  }
+  const candidate = path.resolve(REPOSITORY_ROOT, relativeFile);
+  if (!isPathInside(REPOSITORY_ROOT, candidate)) {
+    fail("alt-text contract path escapes the repository");
+  }
+  let resolvedFile;
+  try {
+    resolvedFile = await realpath(candidate);
+  } catch (error) {
+    fail(`alt-text contract is unavailable: ${error.message}`);
+  }
+  if (!isPathInside(REPOSITORY_ROOT, resolvedFile)) {
+    fail("alt-text contract symlink escapes the repository");
+  }
+
+  const [metadata, sha256] = await Promise.all([
+    readJson(resolvedFile, "alt-text contract"),
+    sha256File(resolvedFile),
+  ]);
+  const frames = metadata.previewAssets?.screenshots?.frames;
+  const maximumCharacters = metadata.limits?.graphicAltTextCharacters;
+  if (
+    metadata.locale !== config.locale ||
+    maximumCharacters !== config.storePolicy?.altTextMaximumCharacters ||
+    !Array.isArray(frames) ||
+    frames.length !== config.frames?.length
+  ) {
+    fail("canonical alt-text contract does not match the layout");
+  }
+  const byFrameId = new Map();
+  for (let index = 0; index < frames.length; index += 1) {
+    const frame = frames[index];
+    const canonicalFrame = config.frames[index];
+    if (
+      frame.id !== canonicalFrame.frameId ||
+      frame.headline !== canonicalFrame.headline ||
+      typeof frame.altText !== "string" ||
+      frame.altText.trim() === "" ||
+      [...frame.altText].length > maximumCharacters ||
+      byFrameId.has(frame.id)
+    ) {
+      fail(`canonical alt text does not match layout frame ${index + 1}`);
+    }
+    byFrameId.set(frame.id, frame.altText);
+  }
+  return {
+    byFrameId,
+    receipt: {
+      collection: config.altTextContract.collection,
+      maximumCharacters,
+      metadataId: metadata.metadataId,
+      repositoryFile: relativeFile,
+      sha256,
+    },
+  };
 }
 
 async function resolveProspectiveRealPath(candidatePath) {
@@ -229,8 +311,8 @@ function isHexColor(value) {
 
 function validateCanonicalFrames(config, compositionMode) {
   if (config.frames === undefined) {
-    if (compositionMode === "photographic-device") {
-      fail("photographic layout config must define its canonical frames");
+    if (compositionMode !== "flat-device-frame") {
+      fail(`${compositionMode} layout config must define its canonical frames`);
     }
     return;
   }
@@ -262,6 +344,173 @@ function validateCanonicalFrames(config, compositionMode) {
       fail(`layout config has duplicate frameId: ${frame.frameId}`);
     }
     seenFrameIds.add(frame.frameId);
+  }
+}
+
+function isPositiveDimensions(value) {
+  return (
+    Number.isInteger(value?.width) &&
+    value.width > 0 &&
+    Number.isInteger(value?.height) &&
+    value.height > 0
+  );
+}
+
+function aspectRatioLongToShort(dimensions) {
+  return (
+    Math.max(dimensions.width, dimensions.height) /
+    Math.min(dimensions.width, dimensions.height)
+  );
+}
+
+function validateGooglePlayPolicy(config, compositionMode, presets) {
+  const playPresets = presets.filter(
+    ([, preset]) => preset.platform === "google-play",
+  );
+  if (playPresets.length === 0) {
+    return;
+  }
+  if (compositionMode !== "screen-first") {
+    fail("Google Play presets must use the screen-first composition mode");
+  }
+  const policy = config.storePolicy;
+  if (
+    policy?.platform !== "google-play" ||
+    policy.outputFormat !== "png-24-no-alpha" ||
+    policy.deviceImageryAllowed !== false ||
+    policy.tabletMarketingTextAllowed !== false ||
+    policy.generalScreenshotPixels?.minimum !== 320 ||
+    policy.generalScreenshotPixels?.maximum !== 3840 ||
+    policy.generalScreenshotPixels?.maximumAspectRatio !== 2 ||
+    policy.largeScreenPixels?.minimum !== 1080 ||
+    policy.largeScreenPixels?.maximum !== 7680 ||
+    policy.largeScreenMinimumScreenshotCount !== 4 ||
+    policy.screenshotsPerDeviceTypeMaximum !== 8 ||
+    policy.altTextMaximumCharacters !== 140 ||
+    policy.phoneOverlayMaximumHeightRatio !== 0.2 ||
+    !Array.isArray(policy.largeScreenPreferredAspectRatios) ||
+    !policy.largeScreenPreferredAspectRatios.includes("16:9") ||
+    !policy.largeScreenPreferredAspectRatios.includes("9:16")
+  ) {
+    fail("Google Play layout has an invalid store policy");
+  }
+  if (
+    config.frames.length < policy.largeScreenMinimumScreenshotCount ||
+    config.frames.length > policy.screenshotsPerDeviceTypeMaximum
+  ) {
+    fail("Google Play frame count is outside the store policy");
+  }
+  if (
+    !config.altTextContract ||
+    config.altTextContract.repositoryFile !==
+      "config/google-play-metadata-en-us-v1.json" ||
+    config.altTextContract.collection !==
+      "previewAssets.screenshots.frames"
+  ) {
+    fail("Google Play layout must reference the canonical alt-text contract");
+  }
+
+  for (const [family, preset] of playPresets) {
+    const screenFirst = preset.screenFirst;
+    if (
+      !screenFirst ||
+      screenFirst.frameStyle !== "frameless" ||
+      !isPositiveDimensions(screenFirst.outputDimensions) ||
+      typeof screenFirst.headlineOverlay !== "boolean"
+    ) {
+      fail(`${family} has an invalid screen-first contract`);
+    }
+    const output = screenFirst.outputDimensions;
+    const isTablet = family.includes("tablet");
+    const pixelBounds = isTablet
+      ? policy.largeScreenPixels
+      : policy.generalScreenshotPixels;
+    if (
+      Math.min(output.width, output.height) < pixelBounds.minimum ||
+      Math.max(output.width, output.height) > pixelBounds.maximum ||
+      aspectRatioLongToShort(output) >
+        policy.generalScreenshotPixels.maximumAspectRatio
+    ) {
+      fail(`${family} output dimensions violate the Google Play policy`);
+    }
+    const outputOrientation =
+      output.height > output.width ? "portrait" : "landscape";
+    if (outputOrientation !== preset.orientation) {
+      fail(`${family} output dimensions do not match its orientation`);
+    }
+    if (isTablet) {
+      if (screenFirst.headlineOverlay) {
+        fail(`${family} must not add marketing text to the app screenshot`);
+      }
+      if (aspectRatioLongToShort(output) !== 16 / 9) {
+        fail(`${family} must export at 16:9 landscape or 9:16 portrait`);
+      }
+    } else if (
+      !screenFirst.headlineOverlay ||
+      preset.product.topRatio <= 0 ||
+      preset.product.topRatio > policy.phoneOverlayMaximumHeightRatio
+    ) {
+      fail(`${family} headline overlay must stay within the top 20 percent`);
+    }
+  }
+}
+
+function validateGooglePlayCaptureIdentity(config, manifest) {
+  const hasPlayPreset = Object.values(config.presets).some(
+    (preset) => preset.platform === "google-play",
+  );
+  if (!hasPlayPreset) {
+    return;
+  }
+  const exact = manifest.status === "exact-artifact-capture";
+  if (
+    manifest.platform !== "google-play" ||
+    (!exact && manifest.status !== "preview-only") ||
+    !manifest.artifact ||
+    !SHA256_PATTERN.test(manifest.artifact.sha256 ?? "") ||
+    !Number.isSafeInteger(manifest.artifact.bytes) ||
+    manifest.artifact.bytes < 1 ||
+    typeof manifest.artifact.fileName !== "string" ||
+    manifest.artifact.fileName.trim() === "" ||
+    manifest.artifact.captureMode !==
+      (exact ? "public-ui-exact-artifact" : "deterministic-e2e") ||
+    manifest.artifact.artifactRole !==
+      (exact ? "play-delivered-apk" : "detox-e2e-apk")
+  ) {
+    fail("Google Play capture artifact identity is incomplete");
+  }
+  if (
+    exact &&
+    (
+      manifest.artifact.candidate?.applicationId !== "com.chessticize.mobile" ||
+      !Number.isSafeInteger(manifest.artifact.candidate?.versionCode) ||
+      manifest.artifact.candidate.versionCode < 1 ||
+      typeof manifest.artifact.candidate?.versionName !== "string" ||
+      !SHA256_PATTERN.test(
+        manifest.artifact.candidate?.aabSha256 ?? "",
+      ) ||
+      !SHA256_PATTERN.test(
+        manifest.artifact.candidate?.signerCertificateSha256 ?? "",
+      ) ||
+      !SHA256_PATTERN.test(
+        manifest.artifact.sourceManifest?.sha256 ?? "",
+      ) ||
+      !SHA256_PATTERN.test(
+        manifest.artifact.mirrorEvidence?.sha256 ?? "",
+      )
+    )
+  ) {
+    fail("exact Google Play capture is missing its candidate identity");
+  }
+  if (
+    !exact &&
+    (
+      manifest.artifact.candidate ||
+      manifest.artifact.sourceManifest ||
+      manifest.artifact.mirrorEvidence
+    )
+  ) {
+    fail("preview capture must not claim an exact Google Play candidate");
   }
 }
 
@@ -306,6 +555,10 @@ function validateLayoutConfig(config) {
     !["headline", "deviceFrame", "deviceFrameEdge", "shadow"].every((key) =>
       isHexColor(config.palette[key]),
     ) ||
+    (
+      compositionMode === "screen-first" &&
+      !isHexColor(config.palette.canvasBackground)
+    ) ||
     !["background", "label", "mutedLabel"].every((key) =>
       isHexColor(config.preview[key]),
     ) ||
@@ -329,9 +582,6 @@ function validateLayoutConfig(config) {
       !["portrait", "landscape"].includes(preset.orientation) ||
       typeof preset.reviewLabel !== "string" ||
       preset.reviewLabel.trim() === "" ||
-      !preset.backgroundTemplates ||
-      typeof preset.backgroundTemplates !== "object" ||
-      Object.keys(preset.backgroundTemplates).length !== EXPECTED_FRAME_COUNT ||
       !preset.title ||
       !preset.product ||
       !Array.isArray(preset.acceptedSourceSizes) ||
@@ -342,15 +592,35 @@ function validateLayoutConfig(config) {
     if (!/^[a-z0-9][a-z0-9.-]*$/u.test(preset.displayGroup)) {
       fail(`${family} preset must use a safe display group`);
     }
-    const templateFrameIds = Object.keys(preset.backgroundTemplates);
-    if (
-      config.frames &&
-      (templateFrameIds.length !== config.frames.length ||
-        config.frames.some(
-          ({ frameId }) => !preset.backgroundTemplates[frameId],
-        ))
-    ) {
-      fail(`${family} scene templates do not match the canonical frames`);
+    const backgroundTemplates = preset.backgroundTemplates;
+    if (compositionMode === "screen-first") {
+      if (
+        backgroundTemplates !== undefined &&
+        (
+          typeof backgroundTemplates !== "object" ||
+          Object.keys(backgroundTemplates).length !== 0
+        )
+      ) {
+        fail(`${family} screen-first preset must not use scene templates`);
+      }
+    } else {
+      if (
+        !backgroundTemplates ||
+        typeof backgroundTemplates !== "object" ||
+        Object.keys(backgroundTemplates).length !== EXPECTED_FRAME_COUNT
+      ) {
+        fail(`${family} preset has an invalid scene-template contract`);
+      }
+      const templateFrameIds = Object.keys(backgroundTemplates);
+      if (
+        config.frames &&
+        (templateFrameIds.length !== config.frames.length ||
+          config.frames.some(
+            ({ frameId }) => !backgroundTemplates[frameId],
+          ))
+      ) {
+        fail(`${family} scene templates do not match the canonical frames`);
+      }
     }
     if (
       !preset.acceptedSourceSizes.every(
@@ -416,6 +686,7 @@ function validateLayoutConfig(config) {
       }
     }
   }
+  validateGooglePlayPolicy(config, compositionMode, presets);
 }
 
 function selectDeviceFamilies(config, options) {
@@ -557,6 +828,21 @@ export async function validateManifest({
   manifest,
 }) {
   validateLayoutConfig(config);
+  validateGooglePlayCaptureIdentity(config, manifest);
+  if (
+    manifest.platform === "google-play" &&
+    manifest.status === "exact-artifact-capture"
+  ) {
+    try {
+      assertCombinedGooglePlayCaptureManifest({
+        manifest,
+        outputRoot: captureRoot,
+        story: googlePlayStory,
+      });
+    } catch (error) {
+      fail(`exact Google Play capture provenance failed: ${error.message}`);
+    }
+  }
   if (manifest.schemaVersion !== 1) {
     fail(`unsupported capture manifest schema version: ${manifest.schemaVersion}`);
   }
@@ -621,6 +907,17 @@ export async function validateManifest({
           );
         }
       }
+      if (
+        config.compositionMode === "screen-first" &&
+        (
+          target.rawPixelDimensions?.width !==
+            capture.pixelDimensions?.width ||
+          target.rawPixelDimensions?.height !==
+            capture.pixelDimensions?.height
+        )
+      ) {
+        fail(`${family} target raw dimensions do not match its capture`);
+      }
       for (const key of ["order", "frameId", "captureId", "copyKey"]) {
         if (capture[key] !== frame[key]) {
           fail(
@@ -672,6 +969,17 @@ export async function validateManifest({
       const actualSha256 = await sha256File(inputPath);
       if (actualSha256 !== capture.sha256) {
         fail(`frame ${expectedOrder} ${family} PNG SHA-256 does not match`);
+      }
+      if (config.compositionMode === "screen-first") {
+        const actualOrientation =
+          actualDimensions.height > actualDimensions.width
+            ? "portrait"
+            : "landscape";
+        if (actualOrientation !== preset.orientation) {
+          fail(
+            `frame ${expectedOrder} ${family} PNG has the wrong orientation`,
+          );
+        }
       }
 
       validated.push({
@@ -1444,9 +1752,106 @@ async function composePhotographicFrame(item, backgroundTemplate) {
   };
 }
 
+function calculateScreenFirstLayout({ canvas, preset, source }) {
+  const productTop = Math.round(canvas.height * preset.product.topRatio);
+  const productWidth = Math.round(canvas.width * preset.product.maxWidthRatio);
+  const productHeight = Math.round(canvas.height * preset.product.maxHeightRatio);
+  const scale = Math.min(
+    productWidth / source.width,
+    productHeight / source.height,
+  );
+  const screenshot = {
+    height: Math.round(source.height * scale),
+    width: Math.round(source.width * scale),
+  };
+  const result = {
+    canvas,
+    frame: {
+      y: productTop,
+    },
+    screenshot: {
+      ...screenshot,
+      x: Math.round((canvas.width - screenshot.width) / 2),
+      y: productTop + Math.round((productHeight - screenshot.height) / 2),
+    },
+    title: {
+      fontSize: Math.round(canvas.width * preset.title.fontSizeRatio),
+      left: Math.round(canvas.width * preset.title.leftRatio),
+      maxWidth: Math.round(canvas.width * preset.title.maxWidthRatio),
+      top: Math.round(canvas.height * preset.title.topRatio),
+    },
+  };
+  if (
+    result.screenshot.x < 0 ||
+    result.screenshot.y < productTop ||
+    result.screenshot.x + result.screenshot.width > canvas.width ||
+    result.screenshot.y + result.screenshot.height > canvas.height
+  ) {
+    fail("screen-first product proof exceeds the export canvas");
+  }
+  return result;
+}
+
+async function composeScreenFirstFrame(item, config) {
+  const canvas = item.preset.screenFirst.outputDimensions;
+  const layout = calculateScreenFirstLayout({
+    canvas,
+    preset: item.preset,
+    source: item.capture.pixelDimensions,
+  });
+  const screenshot = await sharp(item.inputPath)
+    .resize(layout.screenshot.width, layout.screenshot.height, {
+      fit: "fill",
+      kernel: sharp.kernel.lanczos3,
+    })
+    .removeAlpha()
+    .png({ adaptiveFiltering: false, compressionLevel: 9 })
+    .toBuffer();
+  const composites = [
+    {
+      input: screenshot,
+      left: layout.screenshot.x,
+      top: layout.screenshot.y,
+    },
+  ];
+  if (item.preset.screenFirst.headlineOverlay) {
+    composites.push({
+      input: await renderValidatedHeadline({
+        config,
+        headline: item.frame.headline,
+        layout,
+        preset: item.preset,
+      }),
+      left: 0,
+      top: 0,
+    });
+  }
+  const background = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}"><rect width="100%" height="100%" fill="${config.palette.canvasBackground}"/></svg>`,
+  );
+  const buffer = await sharp(background)
+    .composite(composites)
+    .removeAlpha()
+    .png({ adaptiveFiltering: false, compressionLevel: 9 })
+    .toBuffer();
+  return {
+    buffer,
+    dimensions: canvas,
+    layout,
+    presentation: {
+      frameStyle: item.preset.screenFirst.frameStyle,
+      headlineRendered: item.preset.screenFirst.headlineOverlay,
+      immutableNativeCapture: true,
+    },
+  };
+}
+
 async function composeFrame(item, config, backgroundTemplate) {
   if (config.compositionMode === "photographic-device") {
     return composePhotographicFrame(item, backgroundTemplate);
+  }
+  if (config.compositionMode === "screen-first") {
+    return composeScreenFirstFrame(item, config);
   }
   const canvas = item.capture.pixelDimensions;
   const layout = calculateLayout({
@@ -1556,10 +1961,12 @@ async function buildContactSheet(family, composedItems, config) {
     (rows - 1) * preview.gap;
   const titleSize = Math.round(preview.width * 0.026);
   const subtitleSize = Math.round(preview.width * 0.012);
+  const platformLabel =
+    preset.platform === "google-play" ? "Google Play" : "App Store";
   const base = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${preview.width}" height="${sheetHeight}">
   <rect width="100%" height="100%" fill="${preview.background}"/>
   <text x="${preview.padding}" y="${preview.padding + titleSize}" fill="${preview.label}" font-family="${escapeXml(config.typography.fontFamily)}" font-size="${titleSize}" font-weight="750">${escapeXml(preset.reviewLabel)} · ${escapeXml(config.visualDirection.name)}</text>
-  <text x="${preview.padding}" y="${preview.padding + titleSize + subtitleSize + 16}" fill="${preview.mutedLabel}" font-family="${escapeXml(config.typography.fontFamily)}" font-size="${subtitleSize}" font-weight="500">Six deterministic App Store frames · native UI preserved</text>
+  <text x="${preview.padding}" y="${preview.padding + titleSize + subtitleSize + 16}" fill="${preview.mutedLabel}" font-family="${escapeXml(config.typography.fontFamily)}" font-size="${subtitleSize}" font-weight="500">Six deterministic ${platformLabel} frames · native UI preserved</text>
 </svg>`);
   const composites = [];
 
@@ -1796,6 +2203,7 @@ export async function composeMarketingAssets(rawOptions) {
     sha256File(path.resolve(manifestPath)),
   ]);
   validateLayoutConfig(config);
+  const canonicalAltText = await loadCanonicalAltText(config);
   const deviceFamilies = selectDeviceFamilies(config, options);
   const validated = await validateManifest({
     captureRoot: resolvedCaptureRoot,
@@ -1805,17 +2213,19 @@ export async function composeMarketingAssets(rawOptions) {
     manifest,
   });
   const backgroundTemplates = new Map();
-  for (const item of validated) {
-    const key = `${item.family}:${item.frame.frameId}`;
-    if (!backgroundTemplates.has(key)) {
-      backgroundTemplates.set(
-        key,
-        await validateBackgroundTemplate(
-          path.dirname(layoutConfigPath),
-          item.preset,
-          item.frame.frameId,
-        ),
-      );
+  if (config.compositionMode !== "screen-first") {
+    for (const item of validated) {
+      const key = `${item.family}:${item.frame.frameId}`;
+      if (!backgroundTemplates.has(key)) {
+        backgroundTemplates.set(
+          key,
+          await validateBackgroundTemplate(
+            path.dirname(layoutConfigPath),
+            item.preset,
+            item.frame.frameId,
+          ),
+        );
+      }
     }
   }
   const backgroundHashes = new Set(
@@ -1841,6 +2251,11 @@ export async function composeMarketingAssets(rawOptions) {
     );
     if (!options.previewOnly) {
       artifacts.push({
+        ...(canonicalAltText
+          ? {
+              altText: canonicalAltText.byFrameId.get(item.frame.frameId),
+            }
+          : {}),
         deviceFamily: item.family,
         ...(composed.deviceGeometry
           ? { deviceGeometry: composed.deviceGeometry }
@@ -1853,8 +2268,13 @@ export async function composeMarketingAssets(rawOptions) {
           supporting: item.frame.supporting,
           supportingRendered: false,
         },
-        backgroundTemplateSha256: backgroundTemplate.sha256,
+        ...(backgroundTemplate
+          ? { backgroundTemplateSha256: backgroundTemplate.sha256 }
+          : {}),
         order: item.frame.order,
+        ...(composed.presentation
+          ? { presentation: composed.presentation }
+          : {}),
         sha256: sha256Buffer(composed.buffer),
         sourceFile: item.capture.file,
         sourceSha256: item.capture.sha256,
@@ -1933,8 +2353,19 @@ export async function composeMarketingAssets(rawOptions) {
       vips: sharp.versions.vips,
     },
     visualDirection: config.visualDirection,
+    ...(config.storePolicy ? { storePolicy: config.storePolicy } : {}),
+    ...(canonicalAltText
+      ? { altTextContract: canonicalAltText.receipt }
+      : {}),
     ...(deviceConsistency ? { deviceConsistency } : {}),
     source: {
+      ...(manifest.platform === "google-play"
+        ? {
+            captureArtifact: manifest.artifact,
+            captureStatus: manifest.status,
+            contractIssue: manifest.contractIssue,
+          }
+        : {}),
       captureManifest: path.basename(manifestPath),
       captureManifestSha256: manifestSha256,
       sourceCommit: manifest.sourceBuild?.sourceCommit,
@@ -1980,8 +2411,10 @@ async function main() {
     return;
   }
   const result = await composeMarketingAssets(options);
+  const platformLabel =
+    result.manifest.platform === "google-play" ? "Google Play" : "App Store";
   process.stdout.write(
-    `[marketing-composition] wrote ${result.manifest.artifacts.length} App Store assets and ${result.manifest.contactSheets.length} contact sheet(s) to ${path.dirname(result.manifestPath)}\n`,
+    `[marketing-composition] wrote ${result.manifest.artifacts.length} ${platformLabel} assets and ${result.manifest.contactSheets.length} contact sheet(s) to ${path.dirname(result.manifestPath)}\n`,
   );
 }
 
