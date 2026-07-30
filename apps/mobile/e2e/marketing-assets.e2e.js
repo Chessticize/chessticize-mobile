@@ -143,9 +143,10 @@ async function prepareFrame(frame) {
       await waitForVisibleInPracticeScroll('settings-puzzle-data-license');
       // Frame 6 starts at License by contract. Normalize the final crop after
       // finding Puzzle Data so the adjacent App Version row is above the
-      // visible scroll viewport on every accepted iPhone size.
+      // visible scroll viewport on each calibrated capture profile.
       await element(by.id('practice-main-scroll')).scroll(
-        isWideTabletTarget() ? 550 : 420,
+        isGooglePlayCapture && target.deviceFamily === 'android-phone' ? 220
+          : isWideTabletTarget() ? 550 : 420,
         'down',
         0.5,
         0.5

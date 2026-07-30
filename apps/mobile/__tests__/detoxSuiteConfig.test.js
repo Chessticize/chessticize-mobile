@@ -1546,6 +1546,9 @@ describe('Detox suite configuration', () => {
     expect(customRunHelper).toContain(
       "element(by.id('practice-main-scroll')).scroll(80, 'down', 0.5, 0.5)"
     );
+    expect(spec).toContain(
+      "isGooglePlayCapture && target.deviceFamily === 'android-phone' ? 220"
+    );
 
     const checkedHelperStart = spec.indexOf('async function expectChecked');
     const checkedHelperEnd = spec.indexOf(
