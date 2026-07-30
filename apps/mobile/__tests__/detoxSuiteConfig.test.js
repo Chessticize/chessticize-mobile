@@ -956,6 +956,54 @@ describe('Detox suite configuration', () => {
     expect(preserveUnexpectedFailure).toBeGreaterThan(confirmSessionStarted);
   });
 
+  it('dismisses the public Sprint rules guide before starting a selected Run', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const helperStart = helpers.indexOf('async function startPracticeMode');
+    const helperEnd = helpers.indexOf(
+      'async function completeFirstUseSessionGuides',
+      helperStart
+    );
+    const helper = helpers.slice(helperStart, helperEnd);
+    const findRulesDismiss = helper.indexOf(
+      "detoxElementExists('practice-sprint-rules-dismiss')"
+    );
+    const tapRulesDismiss = helper.indexOf(
+      "element(by.id('practice-sprint-rules-dismiss')).tap()"
+    );
+    const findRulesGuide = helper.indexOf(
+      "element(by.id('practice-sprint-rules-guide'))",
+      tapRulesDismiss
+    );
+    const waitForRulesToLeave = helper.indexOf(
+      '.not.toExist()',
+      findRulesGuide
+    );
+    const tapStart = helper.indexOf("element(by.id('practice-run-start')).tap()");
+
+    expect(findRulesDismiss).toBeGreaterThan(0);
+    expect(tapRulesDismiss).toBeGreaterThan(findRulesDismiss);
+    expect(findRulesGuide).toBeGreaterThan(tapRulesDismiss);
+    expect(waitForRulesToLeave).toBeGreaterThan(findRulesGuide);
+    expect(tapStart).toBeGreaterThan(waitForRulesToLeave);
+  });
+
+  it('retries the public Custom Run save until Home confirms the transition', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const helperStart = flowsSpec.indexOf('async function createSavedCustomRun');
+    const helperEnd = flowsSpec.indexOf(
+      'function durationTextToSeconds',
+      helperStart
+    );
+    const helper = flowsSpec.slice(helperStart, helperEnd);
+
+    expect(helper).toContain(
+      "tapUntilExists('practice-run-save', 'practice-run-home-edit', 3)"
+    );
+    expect(helper).not.toContain(
+      "waitFor(element(by.id('practice-run-home-edit'))).toBeVisible()"
+    );
+  });
+
   it('dismisses the Run name keyboard through a public editor surface', () => {
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
     const helperStart = helpers.indexOf('async function dismissRunNameKeyboard');

@@ -64,6 +64,16 @@ async function startPracticeMode(mode) {
   await waitForVisibleInPracticeScroll(runCardId);
   await element(by.id(`practice-run-select-${mode}`)).tap();
   await element(by.id('practice-main-scroll')).scrollTo('top');
+  if (await detoxElementExists('practice-sprint-rules-dismiss')) {
+    await waitFor(element(by.id('practice-sprint-rules-dismiss')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await element(by.id('practice-sprint-rules-dismiss')).tap();
+    await waitFor(element(by.id('practice-sprint-rules-guide')))
+      .not.toExist()
+      .withTimeout(10000);
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+  }
   await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
   await element(by.id('practice-run-start')).tap();
   await completeFirstUseSessionGuides();

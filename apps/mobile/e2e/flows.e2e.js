@@ -9,6 +9,7 @@ const {
   sleep,
   startPracticeMode,
   selectTestPuzzleSource,
+  tapUntilExists,
   textFromAttributes,
   waitForVisibleInPracticeScroll,
   waitForElementTextContaining,
@@ -418,8 +419,7 @@ async function createSavedCustomRun(name, { shorterDuration = false, themes = []
     await element(by.id(`custom-theme-${theme}`)).tap();
   }
   await element(by.id('practice-main-scroll')).scrollTo('top');
-  await element(by.id('practice-run-save')).tap();
-  await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
+  await tapUntilExists('practice-run-save', 'practice-run-home-edit', 3);
   const runName = element(by.text(name));
   await waitFor(runName).toExist().withTimeout(10000);
   const attributes = await runName.getAttributes();
