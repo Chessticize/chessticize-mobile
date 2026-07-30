@@ -149,17 +149,41 @@ function createAdbRunner({
       writeFileSync(args.at(-1), 'installed-base-apk');
       return { status: 0, stdout: '1 file pulled\n', stderr: '' };
     }
-    if (isAdb && args.includes('get-install-source')) {
+    if (
+      isAdb
+      && args.includes('pm')
+      && args.includes('list')
+      && args.includes('packages')
+      && args.includes('-i')
+    ) {
+      return {
+        status: 0,
+        stdout:
+          `package:com.chessticize.mobile  installer=${installerPackage}\n`,
+        stderr: '',
+      };
+    }
+    if (
+      isAdb
+      && args.includes('dumpsys')
+      && args.includes('package')
+    ) {
       return {
         status: 0,
         stdout: [
-          `InitiatingPackageName=${installerPackage}`,
-          `InstallingPackageName=${installerPackage}`,
+          `    installerPackageName=${installerPackage}`,
+          `    initiatingPackageName=${installerPackage}`,
+          '    originatingPackageName=null',
+          '    packageSource=2',
         ].join('\n'),
         stderr: '',
       };
     }
-    if (isAdb && args.includes('dumpsys')) {
+    if (
+      isAdb
+      && args.includes('dumpsys')
+      && args.includes('activity')
+    ) {
       return {
         status: 0,
         stdout:
@@ -334,6 +358,19 @@ describe('Google Play marketing capture artifacts', () => {
     expect(commands.every(
       command => command.command === fixture.environment.ADB_PATH
     )).toBe(true);
+    expect(commands.some(({ args }) =>
+      args.join(' ').includes(
+        'shell pm list packages -i com.chessticize.mobile'
+      )
+    )).toBe(true);
+    expect(commands.some(({ args }) =>
+      args.join(' ').includes(
+        'shell dumpsys package com.chessticize.mobile'
+      )
+    )).toBe(true);
+    expect(commands.some(({ args }) =>
+      args.includes('get-install-source')
+    )).toBe(false);
     expect(session).toMatchObject({
       schemaVersion: 1,
       applicationId: 'com.chessticize.mobile',

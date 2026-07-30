@@ -193,7 +193,7 @@ function validGooglePlayListingAssetSet(overrides = {}) {
       versionCode: expectedCandidate.versionCode,
       aabSha256: expectedCandidate.aabSha256,
       apkSha256: '44'.repeat(32),
-      signerCertificateSha256: '55'.repeat(32),
+      signerCertificateSha256: '33'.repeat(32),
     },
     metadataContract: {
       metadataId: 'google-play-en-us-v1',
@@ -1063,6 +1063,23 @@ describe('Android Play release contract', () => {
         expect.stringContaining('Play App Signing'),
         expect.stringContaining('upload certificate'),
         expect.stringContaining('must not be launched'),
+      ]),
+    );
+  });
+
+  it('cross-binds the listing candidate to the Play app-signing certificate', () => {
+    const evidence = validOwnerEvidence();
+    const assetSet =
+      evidence.artifacts.googlePlayListingAssetSet.assetSet;
+    assetSet.candidate.signerCertificateSha256 = '55'.repeat(32);
+    assetSet.assetSetDigest = listingAssetSetDigest(assetSet);
+    evidence.console.storeListing.assetSetDigest = assetSet.assetSetDigest;
+
+    expect(inspectOwnerEvidence(evidence, expectedCandidate)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          'listing candidate signer certificate SHA-256'
+        ),
       ]),
     );
   });

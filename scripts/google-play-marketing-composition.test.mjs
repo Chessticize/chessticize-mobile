@@ -289,6 +289,60 @@ test("Google Play export normalizes three device types and records canonical alt
   }
 });
 
+test("Google Play exact export rejects a top-level exact claim without provenance", async (t) => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "chessticize-google-play-exact-bypass-"),
+  );
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const fixture = await createPlayFixture(root);
+  const manifest = JSON.parse(await readFile(fixture.manifestPath, "utf8"));
+  const story = JSON.parse(await readFile(
+    new URL("../config/app-store-marketing-story-v1.json", import.meta.url),
+    "utf8",
+  ));
+  manifest.status = "exact-artifact-capture";
+  manifest.contractIssue = story.issue;
+  manifest.contractSchemaVersion = story.schemaVersion;
+  manifest.artifact = {
+    captureMode: "public-ui-exact-artifact",
+    artifactRole: "play-delivered-apk",
+    fileName: "Chessticize-Android-1.3.1.apk",
+    bytes: 123,
+    sha256: "a".repeat(64),
+    candidate: {
+      applicationId: "com.chessticize.mobile",
+      versionName: "1.3.1",
+      versionCode: 9,
+      aabSha256: "b".repeat(64),
+      signerCertificateSha256: "c".repeat(64),
+    },
+    sourceManifest: {
+      fileName: "android-source-manifest.json",
+      sha256: "d".repeat(64),
+    },
+    mirrorEvidence: {
+      fileName: "android-apk-mirror-evidence.json",
+      sha256: "e".repeat(64),
+    },
+  };
+  await writeFile(
+    fixture.manifestPath,
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  );
+
+  await assert.rejects(
+    composeMarketingAssets({
+      captureRoot: fixture.captureRoot,
+      deviceFamily: "all",
+      layoutConfig: PLAY_LAYOUT_URL.pathname,
+      manifest: fixture.manifestPath,
+      outputDir: path.join(root, "output"),
+      platform: "google-play",
+    }),
+    /exact Google Play capture provenance failed/u,
+  );
+});
+
 test("Google Play layout rejects tablet text and out-of-policy output before writing", async (t) => {
   const root = await mkdtemp(
     path.join(os.tmpdir(), "chessticize-google-play-policy-"),

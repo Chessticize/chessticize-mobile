@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 import {
   mkdir,
   readFile,
@@ -15,6 +16,16 @@ import sharp from "sharp";
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const SKILL_ROOT = path.resolve(path.dirname(SCRIPT_PATH), "..");
 const REPOSITORY_ROOT = path.resolve(SKILL_ROOT, "../../..");
+const require = createRequire(import.meta.url);
+const googlePlayStory = require(
+  path.join(REPOSITORY_ROOT, "config/app-store-marketing-story-v1.json"),
+);
+const {
+  assertCombinedGooglePlayCaptureManifest,
+} = require(path.join(
+  REPOSITORY_ROOT,
+  "apps/mobile/e2e/googlePlayMarketingCaptureArtifacts.js",
+));
 const DEFAULT_LAYOUT_CONFIG = path.join(
   SKILL_ROOT,
   "assets",
@@ -818,6 +829,20 @@ export async function validateManifest({
 }) {
   validateLayoutConfig(config);
   validateGooglePlayCaptureIdentity(config, manifest);
+  if (
+    manifest.platform === "google-play" &&
+    manifest.status === "exact-artifact-capture"
+  ) {
+    try {
+      assertCombinedGooglePlayCaptureManifest({
+        manifest,
+        outputRoot: captureRoot,
+        story: googlePlayStory,
+      });
+    } catch (error) {
+      fail(`exact Google Play capture provenance failed: ${error.message}`);
+    }
+  }
   if (manifest.schemaVersion !== 1) {
     fail(`unsupported capture manifest schema version: ${manifest.schemaVersion}`);
   }

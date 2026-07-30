@@ -74,7 +74,9 @@ Play-delivered APK plus protected source manifest are available.
    `captureId`. The command pulls and inspects the installed base APK, checks the
    Play installer, version, signer, production flags, foreground package, and
    device identity, then writes the opaque PNG plus a hash-bound
-   `.capture.json` sidecar.
+   `.capture.json` sidecar. Installer proof is read independently from
+   `pm list packages -i` and `dumpsys package`; both must identify
+   `com.android.vending`.
 4. Record one device-family manifest with the public-UI recorder.
 5. Repeat for all three families, then finalize the combined manifest.
 

@@ -9,6 +9,7 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import sharp from "sharp";
 
 const require = createRequire(import.meta.url);
 const {
@@ -18,6 +19,10 @@ const {
   listingAssetSetDigest,
   sha256Bytes,
 } = require("./lib/google-play-listing-contract.cjs");
+const story = require("../config/app-store-marketing-story-v1.json");
+const {
+  assertCombinedGooglePlayCaptureManifest,
+} = require("../apps/mobile/e2e/googlePlayMarketingCaptureArtifacts.js");
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
@@ -29,6 +34,11 @@ const EXPECTED_FAMILIES = [
 const EXPECTED_FRAME_COUNT = 6;
 const EXPECTED_ARTIFACT_COUNT =
   EXPECTED_FAMILIES.length * EXPECTED_FRAME_COUNT;
+const EXPECTED_OUTPUT_DIMENSIONS = {
+  "android-phone": { width: 1080, height: 1920 },
+  "android-tablet-7": { width: 1440, height: 2560 },
+  "android-tablet-10": { width: 2560, height: 1440 },
+};
 
 function fail(message) {
   throw new Error(`Google Play listing handoff: ${message}`);
@@ -151,13 +161,22 @@ async function inspectComposition({
   const artifactContract = [];
   for (const artifact of composition.artifacts) {
     const key = `${artifact.deviceFamily}:${artifact.order}`;
+    const canonicalFrame =
+      metadata.previewAssets?.screenshots?.frames?.[artifact.order - 1];
+    const expectedDimensions =
+      EXPECTED_OUTPUT_DIMENSIONS[artifact.deviceFamily];
     if (
       !EXPECTED_FAMILIES.includes(artifact.deviceFamily) ||
       !Number.isSafeInteger(artifact.order) ||
       artifact.order < 1 ||
       artifact.order > EXPECTED_FRAME_COUNT ||
       seen.has(key) ||
+      artifact.frameId !== canonicalFrame?.id ||
+      artifact.copy?.headline !== canonicalFrame?.headline ||
+      artifact.altText !== canonicalFrame?.altText ||
       artifact.altText !== altTextByFrame.get(artifact.frameId) ||
+      artifact.dimensions?.width !== expectedDimensions?.width ||
+      artifact.dimensions?.height !== expectedDimensions?.height ||
       typeof artifact.file !== "string" ||
       artifact.file.length === 0 ||
       !SHA256_PATTERN.test(artifact.sha256 ?? "")
@@ -181,6 +200,19 @@ async function inspectComposition({
     );
     if (actualSha256 !== artifact.sha256) {
       fail(`composed image hash does not match ${artifact.file}`);
+    }
+    const imageMetadata = await sharp(artifactPath).metadata();
+    if (
+      imageMetadata.format !== "png" ||
+      imageMetadata.width !== expectedDimensions.width ||
+      imageMetadata.height !== expectedDimensions.height ||
+      imageMetadata.hasAlpha ||
+      imageMetadata.channels !== 3 ||
+      imageMetadata.depth !== "uchar"
+    ) {
+      fail(
+        `composed image ${artifact.file} must be its canonical opaque RGB PNG`
+      );
     }
     artifactContract.push({
       deviceFamily: artifact.deviceFamily,
@@ -271,6 +303,15 @@ async function inputContract(options) {
     metadata?.locale !== "en-US"
   ) {
     fail("metadata contract must be the canonical en-US Google Play contract");
+  }
+  try {
+    assertCombinedGooglePlayCaptureManifest({
+      manifest: capture,
+      outputRoot: path.dirname(captureFile.path),
+      story,
+    });
+  } catch (error) {
+    fail(`exact capture provenance failed: ${error.message}`);
   }
   const metadataContractSha256 = sha256Bytes(metadataFile.bytes);
   const captureManifestSha256 = sha256Bytes(captureFile.bytes);

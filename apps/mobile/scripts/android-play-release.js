@@ -599,8 +599,11 @@ function inspectOwnerEvidence(evidence, expected) {
   } catch {
     errors.push('Approved upload certificate SHA-256 is missing or malformed.');
   }
+  let appSigningCertificateSha256;
   try {
-    normalizeFingerprint(evidence?.signing?.appSigningCertificateSha256);
+    appSigningCertificateSha256 = normalizeFingerprint(
+      evidence?.signing?.appSigningCertificateSha256,
+    );
   } catch {
     errors.push('Play app-signing certificate SHA-256 is missing or malformed.');
   }
@@ -661,6 +664,20 @@ function inspectOwnerEvidence(evidence, expected) {
     listingAssetSetRecord?.assetSet,
     expected,
   ));
+  try {
+    requireEqual(
+      normalizeFingerprint(
+        listingAssetSetRecord?.assetSet?.candidate
+          ?.signerCertificateSha256,
+      ),
+      appSigningCertificateSha256,
+      'Google Play listing candidate signer certificate SHA-256',
+    );
+  } catch {
+    errors.push(
+      'Google Play listing candidate signer certificate SHA-256 is malformed.',
+    );
+  }
   requireEqual(
     evidence?.console?.storeListing?.assetSetDigest,
     listingAssetSetRecord?.assetSet?.assetSetDigest,

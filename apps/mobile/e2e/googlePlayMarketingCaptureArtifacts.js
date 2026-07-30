@@ -347,27 +347,56 @@ function inspectGooglePlayInstalledSession({
     rmSync(sessionRoot, { force: true, recursive: true });
   }
 
-  const installSource = runAdbText({
+  const installerListing = runAdbText({
     adb,
     args: [
       'shell',
-      'cmd',
-      'package',
-      'get-install-source',
+      'pm',
+      'list',
+      'packages',
+      '-i',
       GOOGLE_PLAY_APPLICATION_ID,
     ],
-    label: 'Could not inspect the Chessticize install source',
+    label: 'Could not list the Chessticize installer',
     run,
     serial: adbSerial,
   });
-  const installerPackageName = installSource.match(
-    /^InstallingPackageName=(.+)$/m
-  )?.[1]?.trim();
-  const initiatingPackageName = installSource.match(
-    /^InitiatingPackageName=(.+)$/m
-  )?.[1]?.trim();
+  const installerListingMatches = [...installerListing.matchAll(
+    /^package:com\.chessticize\.mobile\s+installer=(\S+)$/gm
+  )];
+  if (installerListingMatches.length !== 1) {
+    throw new Error(
+      'The Android package manager returned an ambiguous Chessticize installer.'
+    );
+  }
+  const listedInstallerPackageName = installerListingMatches[0][1];
+
+  const packageState = runAdbText({
+    adb,
+    args: ['shell', 'dumpsys', 'package', GOOGLE_PLAY_APPLICATION_ID],
+    label: 'Could not inspect the Chessticize package state',
+    run,
+    serial: adbSerial,
+  });
+  const installerPackageNames = [...packageState.matchAll(
+    /^\s*installerPackageName=(\S+)\s*$/gm
+  )].map((match) => match[1]);
+  const initiatingPackageNames = [...packageState.matchAll(
+    /^\s*initiatingPackageName=(\S+)\s*$/gm
+  )].map((match) => match[1]);
   if (
-    installerPackageName !== GOOGLE_PLAY_INSTALLER_PACKAGE
+    installerPackageNames.length !== 1
+    || initiatingPackageNames.length !== 1
+  ) {
+    throw new Error(
+      'The Android package state returned an ambiguous Play install source.'
+    );
+  }
+  const installerPackageName = installerPackageNames[0];
+  const initiatingPackageName = initiatingPackageNames[0];
+  if (
+    listedInstallerPackageName !== GOOGLE_PLAY_INSTALLER_PACKAGE
+    || installerPackageName !== GOOGLE_PLAY_INSTALLER_PACKAGE
     || initiatingPackageName !== GOOGLE_PLAY_INSTALLER_PACKAGE
   ) {
     throw new Error(
@@ -695,12 +724,92 @@ function writeCombinedGooglePlayCaptureManifest({
       ])),
     })),
   };
+  assertCombinedGooglePlayCaptureManifest({
+    manifest: combined,
+    outputRoot,
+    story,
+  });
   const manifestPath = resolve(
     outputRoot,
     'google-play-capture-manifest.json'
   );
   writeFileSync(manifestPath, `${JSON.stringify(combined, null, 2)}\n`);
   return manifestPath;
+}
+
+function assertCombinedGooglePlayCaptureManifest({
+  manifest,
+  outputRoot,
+  story,
+}) {
+  const deviceFamilies = Object.keys(GOOGLE_PLAY_CAPTURE_TARGETS);
+  const expectedFrames = expectedStoryFrames(story);
+  if (
+    manifest?.schemaVersion !== 1
+    || manifest.platform !== 'google-play'
+    || !['preview-only', 'exact-artifact-capture'].includes(manifest.status)
+    || manifest.storyId !== story.storyId
+    || manifest.contractIssue !== story.issue
+    || manifest.contractSchemaVersion !== story.schemaVersion
+    || manifest.locale !== story.locale
+    || !EXACT_SHA_PATTERN.test(manifest.sourceBuild?.sourceCommit ?? '')
+    || JSON.stringify(Object.keys(manifest.targets ?? {}).sort())
+      !== JSON.stringify(deviceFamilies.slice().sort())
+    || !Array.isArray(manifest.frames)
+    || manifest.frames.length !== expectedFrames.length
+  ) {
+    throw new Error(
+      'Combined Google Play capture manifest does not match the contract.'
+    );
+  }
+  assertArtifactIdentity(manifest.artifact, manifest.status);
+
+  for (let index = 0; index < expectedFrames.length; index += 1) {
+    const frame = manifest.frames[index];
+    const expected = expectedFrames[index];
+    if (
+      frame?.order !== expected.order
+      || frame.frameId !== expected.id
+      || frame.captureId !== expected.captureId
+      || frame.copyKey !== expected.copyKey
+      || frame.headline !== expected.headline
+      || frame.supporting !== expected.supporting
+      || JSON.stringify(Object.keys(frame.captures ?? {}).sort())
+        !== JSON.stringify(deviceFamilies.slice().sort())
+    ) {
+      throw new Error(
+        'Combined Google Play capture manifest changed the approved frame order.'
+      );
+    }
+  }
+
+  for (const deviceFamily of deviceFamilies) {
+    const combinedTarget = manifest.targets[deviceFamily];
+    const {
+      installedSession,
+      ...target
+    } = combinedTarget ?? {};
+    assertGooglePlayDeviceManifest({
+      manifest: {
+        schemaVersion: manifest.schemaVersion,
+        platform: manifest.platform,
+        status: manifest.status,
+        storyId: manifest.storyId,
+        contractIssue: manifest.contractIssue,
+        contractSchemaVersion: manifest.contractSchemaVersion,
+        locale: manifest.locale,
+        sourceBuild: manifest.sourceBuild,
+        artifact: manifest.artifact,
+        ...(installedSession ? { installedSession } : {}),
+        target,
+        frames: manifest.frames.map(
+          (frame) => frame.captures[deviceFamily]
+        ),
+      },
+      outputRoot,
+      story,
+    });
+  }
 }
 
 function assertGooglePlayDeviceManifest({
@@ -1196,6 +1305,7 @@ function sha256(value) {
 
 module.exports = {
   GOOGLE_PLAY_CAPTURE_TARGETS,
+  assertCombinedGooglePlayCaptureManifest,
   assertGooglePlayDeviceManifest,
   assertGooglePlayScreenshot,
   captureGooglePlayPublicUiFrame,
