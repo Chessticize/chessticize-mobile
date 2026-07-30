@@ -1,6 +1,6 @@
 # App Store Assets
 
-This document is the 1.3.1 source of truth for App Store Connect metadata and
+This document is the 1.3.2 source of truth for App Store Connect metadata and
 store screenshot capture. Recheck Apple's live documentation before upload:
 
 - Screenshot specifications:
@@ -116,23 +116,22 @@ model-derived improvement.
 
 ### What's New
 
-For iOS 1.3.1, use this approved ready-to-paste copy:
+For iOS 1.3.2, review this proposed ready-to-paste copy:
 
 ```text
-• Improved Training Focus with balanced results, Accuracy trends, and personal solve-time comparisons.
-• Fixed a crash during deep Stockfish Analysis.
-• Fixed Rating history replay across devices and local calendar dates in History.
+• Reduced app size while keeping all 1.4 million bundled puzzles.
+• Simplified the Home Review card by hiding zero and duplicate counts.
 ```
 
-This approved copy is 232 / 300 Unicode characters, including line breaks. Future
-versions must use the reusable template in
+This proposed copy is 136 / 300 Unicode characters, including line breaks.
+Future versions must use the reusable template in
 [`docs/releases/RELEASE_NOTES_TEMPLATE.md`](releases/RELEASE_NOTES_TEMPLATE.md):
 lead with user benefits, use two or three short bullets, omit raw URLs, and do
 not call stable features experimental unless that qualification is an
 intentional product promise.
 
-This copy belongs to the proposed `ios-v1.3.1-build-1` release identity and
-must match `docs/releases/ios-v1.3.1-build-1.md` before the owner marks that
+This copy belongs to the proposed `ios-v1.3.2-build-1` release identity and
+must match `docs/releases/ios-v1.3.2-build-1.md` before the owner marks that
 note Approved. Issue #417 must retain a screenshot or exported metadata record
 showing the exact submitted text.
 
@@ -157,7 +156,7 @@ the resulting feature is declared.
 
 ## Screenshot Requirements
 
-The app targets iPhone and iPad for 1.3.1. The current automated capture plan
+The app targets iPhone and iPad for 1.3.2. The current automated capture plan
 covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
 The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
 Apple's current screenshot reference, rechecked on 2026-07-28, lists 6.9" as
@@ -184,9 +183,9 @@ Release rule:
 5. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
 
-The 1.3.1 presentation update changes the final App Store sequence and
-composition. Capture and inspect a fresh exact-head Release set before upload;
-do not reuse the 1.3 or pre-release validation set as final 1.3.1 evidence.
+The 1.3.2 Home Review presentation change requires a fresh exact-head Release
+capture and inspection before upload. Do not reuse the 1.3.1 set as final
+1.3.2 visual evidence.
 
 ## Bundled Puzzle Pack Measurement
 
