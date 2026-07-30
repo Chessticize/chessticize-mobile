@@ -198,7 +198,7 @@ async function prepareCustomRun() {
   await sleep(500);
   await element(by.id('practice-main-scroll')).scrollTo('top');
   if (isGooglePlayCapture && target.deviceFamily === 'android-phone') {
-    await element(by.id('practice-main-scroll')).scroll(220, 'down', 0.5, 0.5);
+    await element(by.id('practice-main-scroll')).scroll(80, 'down', 0.5, 0.5);
   }
 }
 
