@@ -574,13 +574,14 @@ function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false 
 }
 
 describe('Android Play release contract', () => {
-  it('pins the proposed Play release to public version 1.3 build 8', () => {
+  it('pins the proposed Play release to public version 1.3.1 build 9', () => {
     const sourceTag = canonicalAndroidSourceTag(
       releaseVersion.publicVersion,
       releaseVersion.androidVersionCode,
     );
     const runbook = read('docs/ANDROID_PLAY_RELEASE.md');
     const releasePlan = read('apps/mobile/docs/ANDROID_RELEASE_PLAN.md');
+    const releaseNote = read(`docs/releases/${sourceTag}.md`);
     const expectedIdentityBinding = {
       applicationId: expectedCandidate.applicationId,
       versionName: expectedCandidate.versionName,
@@ -603,11 +604,11 @@ describe('Android Play release contract', () => {
 
     expect(releaseVersion).toEqual(
       expect.objectContaining({
-        publicVersion: '1.3',
-        androidVersionCode: 8,
+        publicVersion: '1.3.1',
+        androidVersionCode: 9,
       }),
     );
-    expect(sourceTag).toBe('android-v1.3.0-build-8');
+    expect(sourceTag).toBe('android-v1.3.1-build-9');
     expect(ownerEvidenceExample.candidate).toEqual(
       expect.objectContaining(expectedIdentityBinding),
     );
@@ -620,8 +621,24 @@ describe('Android Play release contract', () => {
       ownerEvidenceExample.sourceRelease.reference.endsWith(sourceTag),
     ).toBe(true);
     expect(runbook).toContain(
-      'Android version code: `apps/mobile/release-version.json` (`8`)',
+      'Android version code: `apps/mobile/release-version.json` (`9`)',
     );
+    expect(releaseNote).toContain('Public version: `1.3.1`');
+    expect(releaseNote).toContain('Build or version code: `9`');
+    expect(releaseNote).toContain(`Source tag: \`${sourceTag}\``);
+    const storeCopy = releaseNote.match(
+      /## Store copy \(`en-US`\)\n\n```text\n([\s\S]+?)\n```/,
+    )?.[1];
+    expect(storeCopy).toBeDefined();
+    expect(Array.from(storeCopy).length).toBeLessThanOrEqual(300);
+    expect(storeCopy).not.toMatch(/https?:\/\//u);
+    expect(storeCopy).toContain('Training Focus');
+    expect(storeCopy).toContain('deep Stockfish Analysis');
+    expect(storeCopy).not.toContain('Arrow Duel');
+    expect(storeCopy).not.toContain('Progress Backup');
+    expect(releaseNote).not.toMatch(/Rating history/i);
+    expect(storeCopy).not.toMatch(/across devices|cross-platform sync/i);
+    expect(releaseNote).not.toMatch(/across Android devices/i);
     for (const value of [
       'The build-1 source-publication gate is complete.',
       '2c4c17a53773db407dc0f865d912976188235708',
@@ -647,6 +664,14 @@ describe('Android Play release contract', () => {
       'Backup is not allowed',
       '29705926506',
       'No build-3 source release was created and its AAB was not uploaded to Play.',
+      'Build 8 is the immutable Android 1.3 GitHub binary release',
+      'ef01d57dfb56507e664ca3d30ca02caf7ee9a4c2',
+      '30327113087',
+      '8676306128',
+      '1dd6cc41fb16f264745853de5548920ec257c4033e9415b2c92b354e12bc0dff',
+      '30329668716',
+      '29cbfb529a38e215cd7fc6763284618288031c624cbf65cce0e381eafe3bbea0',
+      'Build 9 is the proposed Android 1.3.1 patch release',
     ]) {
       expect(runbook).toContain(value);
     }

@@ -1,6 +1,6 @@
 # App Store Assets
 
-This document is the 1.3 source of truth for App Store Connect metadata and
+This document is the 1.3.1 source of truth for App Store Connect metadata and
 store screenshot capture. Recheck Apple's live documentation before upload:
 
 - Screenshot specifications:
@@ -115,27 +115,25 @@ model-derived improvement.
 
 ### What's New
 
-For iOS 1.3, use this ready-to-paste draft:
+For iOS 1.3.1, use this approved ready-to-paste copy:
 
 ```text
-• Create Custom Runs for the puzzle themes, pace, and difficulty you choose.
-• Understand puzzle Sprint timing, mistakes, and Replay with clearer first-use guidance.
-• Replay Unclear and In Review puzzles together; add sound and haptics.
+• Improved Training Focus with balanced results, Accuracy trends, and personal solve-time comparisons.
+• Fixed a crash during deep Stockfish Analysis.
+• Fixed Rating history replay across devices and local calendar dates in History.
 ```
 
-This draft is 237 / 300 Unicode characters, including line breaks. Future
+This approved copy is 232 / 300 Unicode characters, including line breaks. Future
 versions must use the reusable template in
 [`docs/releases/RELEASE_NOTES_TEMPLATE.md`](releases/RELEASE_NOTES_TEMPLATE.md):
 lead with user benefits, use two or three short bullets, omit raw URLs, and do
 not call stable features experimental unless that qualification is an
 intentional product promise.
 
-This is a post-tag App Store metadata correction for
-`ios-v1.3.0-build-1`. It supersedes only the store-facing What's New text. The
-published source tag, GitHub Release, and customer note remain immutable
-evidence of what was approved at tag time. Issue #417 must retain a screenshot
-or exported metadata record showing the corrected text submitted to App Store
-Connect.
+This copy belongs to the proposed `ios-v1.3.1-build-1` release identity and
+must match `docs/releases/ios-v1.3.1-build-1.md` before the owner marks that
+note Approved. Issue #417 must retain a screenshot or exported metadata record
+showing the exact submitted text.
 
 ## Accessibility Metadata
 
@@ -158,7 +156,7 @@ the resulting feature is declared.
 
 ## Screenshot Requirements
 
-The app targets iPhone and iPad for 1.3. The current automated capture plan
+The app targets iPhone and iPad for 1.3.1. The current automated capture plan
 covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
 The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
 Apple's current screenshot reference, rechecked on 2026-07-28, lists 6.9" as
@@ -185,10 +183,9 @@ Release rule:
 5. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
 
-The 1.3 release changes Practice, History, Settings, Sprint guidance, and
-result presentation. Capture and inspect a fresh exact-head Release set with
-the maintained fifteen-scene, twenty-six-image calibration workflow before
-upload; do not reuse the 1.2 screenshot set as final 1.3 evidence.
+The 1.3.1 presentation update changes the final App Store sequence and
+composition. Capture and inspect a fresh exact-head Release set before upload;
+do not reuse the 1.3 or pre-release validation set as final 1.3.1 evidence.
 
 ## Bundled Puzzle Pack Measurement
 

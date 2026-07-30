@@ -48,8 +48,8 @@
     ]
   },
   "currentVersionWhatsNew": {
-    "sourceTag": "ios-v1.3.0-build-1",
-    "status": "post-tag-metadata-correction",
-    "storeCopy": "• Create Custom Runs for the puzzle themes, pace, and difficulty you choose.\n• Understand puzzle Sprint timing, mistakes, and Replay with clearer first-use guidance.\n• Replay Unclear and In Review puzzles together; add sound and haptics."
+    "sourceTag": "ios-v1.3.1-build-1",
+    "status": "release-candidate",
+    "storeCopy": "• Improved Training Focus with balanced results, Accuracy trends, and personal solve-time comparisons.\n• Fixed a crash during deep Stockfish Analysis.\n• Fixed Rating history replay across devices and local calendar dates in History."
   }
 }
