@@ -298,6 +298,14 @@ function inspectGooglePlayListingAssetSet(assetSet, expected) {
     assetSet?.candidate?.signerCertificateSha256,
     'Google Play listing asset-set candidate signer SHA-256',
   );
+  requireSha256(
+    assetSet?.releaseEvidence?.sourceManifest?.sha256,
+    'Google Play listing source-manifest SHA-256',
+  );
+  requireSha256(
+    assetSet?.releaseEvidence?.mirrorEvidence?.sha256,
+    'Google Play listing mirror-evidence SHA-256',
+  );
 
   requireEqual(
     assetSet?.metadataContract?.metadataId,
@@ -370,7 +378,7 @@ function inspectGooglePlayListingAssetSet(assetSet, expected) {
   );
   requireEqual(
     assetSet?.compositionManifest?.artifactCount,
-    18,
+    6,
     'Google Play composition artifact count',
   );
   requireSha256(
@@ -379,10 +387,10 @@ function inspectGooglePlayListingAssetSet(assetSet, expected) {
   );
   if (
     JSON.stringify(assetSet?.compositionManifest?.deviceFamilies) !==
-    JSON.stringify(['android-phone', 'android-tablet-7', 'android-tablet-10'])
+    JSON.stringify(['android-phone'])
   ) {
     errors.push(
-      'Google Play composition manifest must bind phone, 7-inch, and 10-inch assets.',
+      'Google Play composition manifest must bind the six phone assets.',
     );
   }
 

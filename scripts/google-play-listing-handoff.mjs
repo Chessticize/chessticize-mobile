@@ -28,16 +28,15 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
 const EXPECTED_FAMILIES = [
   "android-phone",
-  "android-tablet-7",
-  "android-tablet-10",
+];
+const EXPECTED_DEVICE_TYPES = [
+  "phone",
 ];
 const EXPECTED_FRAME_COUNT = 6;
 const EXPECTED_ARTIFACT_COUNT =
   EXPECTED_FAMILIES.length * EXPECTED_FRAME_COUNT;
 const EXPECTED_OUTPUT_DIMENSIONS = {
   "android-phone": { width: 1080, height: 1920 },
-  "android-tablet-7": { width: 1440, height: 2560 },
-  "android-tablet-10": { width: 2560, height: 1440 },
 };
 
 function fail(message) {
@@ -92,36 +91,56 @@ function requirePublicHttps(value, label) {
   return url.href;
 }
 
-function candidateFromCapture(capture) {
-  const artifact = capture?.artifact;
-  const candidate = artifact?.candidate;
-  const sourceCommit = capture?.sourceBuild?.sourceCommit;
+function candidateFromReleaseEvidence({
+  mirrorEvidence,
+  mirrorEvidenceSha256,
+  sourceManifest,
+  sourceManifestSha256,
+}) {
   if (
-    capture?.schemaVersion !== 1 ||
-    capture?.platform !== "google-play" ||
-    capture?.status !== "exact-artifact-capture" ||
-    capture?.locale !== "en-US" ||
-    !COMMIT_PATTERN.test(sourceCommit ?? "") ||
-    artifact?.captureMode !== "public-ui-exact-artifact" ||
-    artifact?.artifactRole !== "play-delivered-apk" ||
-    !SHA256_PATTERN.test(artifact?.sha256 ?? "") ||
-    candidate?.applicationId !== "com.chessticize.mobile" ||
-    typeof candidate?.versionName !== "string" ||
-    !Number.isSafeInteger(candidate?.versionCode) ||
-    candidate.versionCode < 1 ||
-    !SHA256_PATTERN.test(candidate?.aabSha256 ?? "") ||
-    !SHA256_PATTERN.test(candidate?.signerCertificateSha256 ?? "")
+    sourceManifest?.schemaVersion !== 1 ||
+    sourceManifest.status !== "artifact-only" ||
+    !COMMIT_PATTERN.test(sourceManifest.commitSha ?? "") ||
+    sourceManifest.worktreeClean !== true ||
+    sourceManifest.bundle?.applicationId !== "com.chessticize.mobile" ||
+    typeof sourceManifest.bundle?.versionName !== "string" ||
+    !Number.isSafeInteger(sourceManifest.bundle?.versionCode) ||
+    sourceManifest.bundle.versionCode < 1 ||
+    !SHA256_PATTERN.test(sourceManifest.bundle?.sha256 ?? "") ||
+    mirrorEvidence?.schemaVersion !== 1 ||
+    mirrorEvidence.phase !== "play-apk-mirrored" ||
+    mirrorEvidence.commitSha !== sourceManifest.commitSha ||
+    mirrorEvidence.applicationId !== sourceManifest.bundle.applicationId ||
+    mirrorEvidence.versionName !== sourceManifest.bundle.versionName ||
+    mirrorEvidence.versionCode !== sourceManifest.bundle.versionCode ||
+    mirrorEvidence.aabSha256 !== sourceManifest.bundle.sha256 ||
+    mirrorEvidence.sourceManifestSha256 !== sourceManifestSha256 ||
+    !SHA256_PATTERN.test(mirrorEvidence.apk?.sha256 ?? "") ||
+    !SHA256_PATTERN.test(
+      mirrorEvidence.apk?.signerCertificateSha256 ?? "",
+    )
   ) {
-    fail("capture manifest must bind one exact Play-delivered candidate");
+    fail("release evidence must bind one exact Play-delivered candidate");
   }
   return {
-    commitSha: sourceCommit,
-    applicationId: candidate.applicationId,
-    versionName: candidate.versionName,
-    versionCode: candidate.versionCode,
-    aabSha256: candidate.aabSha256,
-    apkSha256: artifact.sha256,
-    signerCertificateSha256: candidate.signerCertificateSha256,
+    candidate: {
+      commitSha: sourceManifest.commitSha,
+      applicationId: sourceManifest.bundle.applicationId,
+      versionName: sourceManifest.bundle.versionName,
+      versionCode: sourceManifest.bundle.versionCode,
+      aabSha256: sourceManifest.bundle.sha256,
+      apkSha256: mirrorEvidence.apk.sha256,
+      signerCertificateSha256:
+        mirrorEvidence.apk.signerCertificateSha256,
+    },
+    releaseEvidence: {
+      sourceManifest: {
+        sha256: sourceManifestSha256,
+      },
+      mirrorEvidence: {
+        sha256: mirrorEvidenceSha256,
+      },
+    },
   };
 }
 
@@ -136,6 +155,8 @@ async function inspectComposition({
     composition?.schemaVersion !== 1 ||
     composition?.platform !== "google-play" ||
     composition?.mode !== "full-export" ||
+    composition?.layoutId !==
+      "chessticize-google-play-photo-studio-android-v2" ||
     composition?.locale !== metadata.locale ||
     composition?.source?.captureManifestSha256 !== captureManifestSha256 ||
     composition?.source?.sourceCommit !== capture.sourceBuild.sourceCommit ||
@@ -145,7 +166,7 @@ async function inspectComposition({
     composition.artifacts.length !== EXPECTED_ARTIFACT_COUNT
   ) {
     fail(
-      "composition manifest must be a full exact-capture Google Play export"
+      "composition manifest must be a full approved phone-only Google Play export"
     );
   }
   const altTextByFrame = new Map(
@@ -182,7 +203,7 @@ async function inspectComposition({
       !SHA256_PATTERN.test(artifact.sha256 ?? "")
     ) {
       fail(
-        "composition manifest must bind 18 unique final image hashes and canonical alt texts"
+        "composition manifest must bind six unique final image hashes and canonical alt texts"
       );
     }
     seen.add(key);
@@ -243,6 +264,7 @@ function reviewBinding({
   compositionManifestSha256,
   consoleReview,
   metadataContractSha256,
+  releaseEvidence,
 }) {
   let reviewedAt;
   try {
@@ -265,6 +287,8 @@ function reviewBinding({
     referenceUrl.hostname !== "play.google.com" ||
     !referenceUrl.pathname.startsWith("/console/") ||
     canonicalJson(consoleReview?.candidate) !== canonicalJson(candidate) ||
+    canonicalJson(consoleReview?.releaseEvidence) !==
+      canonicalJson(releaseEvidence) ||
     consoleReview?.metadataContractSha256 !== metadataContractSha256 ||
     consoleReview?.captureManifestSha256 !== captureManifestSha256 ||
     consoleReview?.compositionManifestSha256 !== compositionManifestSha256
@@ -294,13 +318,38 @@ async function inputContract(options) {
     options.composition,
     "composition manifest"
   );
+  const sourceManifestFile = await readJsonFile(
+    options.sourceManifest,
+    "Android source manifest"
+  );
+  const mirrorEvidenceFile = await readJsonFile(
+    options.mirrorEvidence,
+    "Play APK mirror evidence"
+  );
   const metadata = metadataFile.value;
   const capture = captureFile.value;
   const composition = compositionFile.value;
   if (
     metadata?.schemaVersion !== 1 ||
     metadata?.metadataId !== "google-play-en-us-v1" ||
-    metadata?.locale !== "en-US"
+    metadata?.locale !== "en-US" ||
+    canonicalJson(
+      metadata.previewAssets?.screenshots?.deviceTypes,
+    ) !== canonicalJson([
+      {
+        id: "phone",
+        captureCount: EXPECTED_FRAME_COUNT,
+        status: "ready-for-console-upload",
+      },
+    ]) ||
+    canonicalJson(
+      metadata.previewAssets?.screenshots?.capturePolicy
+        ?.requiredDeviceTypes,
+    ) !== canonicalJson(EXPECTED_DEVICE_TYPES) ||
+    metadata.previewAssets?.screenshots?.capturePolicy?.source !==
+      "owner-approved-self-built-android-capture" ||
+    metadata.previewAssets?.screenshots?.capturePolicy?.presentation !==
+      "generic-android-center-punch-hole-no-dynamic-island"
   ) {
     fail("metadata contract must be the canonical en-US Google Play contract");
   }
@@ -311,12 +360,24 @@ async function inputContract(options) {
       story,
     });
   } catch (error) {
-    fail(`exact capture provenance failed: ${error.message}`);
+    fail(`capture provenance failed: ${error.message}`);
   }
   const metadataContractSha256 = sha256Bytes(metadataFile.bytes);
   const captureManifestSha256 = sha256Bytes(captureFile.bytes);
   const compositionManifestSha256 = sha256Bytes(compositionFile.bytes);
-  const candidate = candidateFromCapture(capture);
+  const {
+    candidate,
+    releaseEvidence,
+  } = candidateFromReleaseEvidence({
+    mirrorEvidence: mirrorEvidenceFile.value,
+    mirrorEvidenceSha256: sha256Bytes(mirrorEvidenceFile.bytes),
+    sourceManifest: sourceManifestFile.value,
+    sourceManifestSha256: sha256Bytes(sourceManifestFile.bytes),
+  });
+  releaseEvidence.sourceManifest.fileName =
+    path.basename(sourceManifestFile.path);
+  releaseEvidence.mirrorEvidence.fileName =
+    path.basename(mirrorEvidenceFile.path);
   const compositionBinding = await inspectComposition({
     capture,
     captureManifestSha256,
@@ -345,6 +406,7 @@ async function inputContract(options) {
     metadataContractSha256,
     appIconSha256,
     featureGraphicSha256,
+    releaseEvidence,
   };
 }
 
@@ -357,6 +419,7 @@ export async function prepareConsoleReview(options) {
     reference: "REPLACE_WITH_HTTPS_PLAY_CONSOLE_LISTING_REVIEW_REFERENCE",
     reviewedAt: "REPLACE_WITH_ISO_8601_REVIEW_TIME",
     candidate: input.candidate,
+    releaseEvidence: input.releaseEvidence,
     metadataContractSha256: input.metadataContractSha256,
     captureManifestSha256: input.captureManifestSha256,
     compositionManifestSha256: input.compositionManifestSha256,
@@ -375,12 +438,14 @@ export async function createListingHandoff(options) {
     compositionManifestSha256: input.compositionManifestSha256,
     consoleReview: reviewFile.value,
     metadataContractSha256: input.metadataContractSha256,
+    releaseEvidence: input.releaseEvidence,
   });
   const assetSet = {
     schemaVersion: LISTING_ASSET_SET_SCHEMA_VERSION,
     kind: LISTING_ASSET_SET_KIND,
     status: "reviewed",
     candidate: input.candidate,
+    releaseEvidence: input.releaseEvidence,
     metadataContract: {
       metadataId: input.metadata.metadataId,
       locale: input.metadata.locale,
@@ -436,6 +501,8 @@ function parseArgs(argv) {
         "--metadata",
         "--capture",
         "--composition",
+        "--source-manifest",
+        "--mirror-evidence",
         "--console-review",
         "--handoff",
         "--output",
@@ -468,7 +535,13 @@ async function writeJsonOutput(output, value) {
 
 async function main(argv = process.argv.slice(2)) {
   const { command, options } = parseArgs(argv);
-  requireOptions(options, ["metadata", "capture", "composition"]);
+  requireOptions(options, [
+    "metadata",
+    "capture",
+    "composition",
+    "sourceManifest",
+    "mirrorEvidence",
+  ]);
   let result;
   if (command === "prepare-console-review") {
     requireOptions(options, ["output"]);

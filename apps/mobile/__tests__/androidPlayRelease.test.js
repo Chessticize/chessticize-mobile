@@ -195,6 +195,16 @@ function validGooglePlayListingAssetSet(overrides = {}) {
       apkSha256: '44'.repeat(32),
       signerCertificateSha256: '33'.repeat(32),
     },
+    releaseEvidence: {
+      sourceManifest: {
+        fileName: 'android-source-manifest.json',
+        sha256: '55'.repeat(32),
+      },
+      mirrorEvidence: {
+        fileName: 'android-apk-mirror-evidence.json',
+        sha256: '66'.repeat(32),
+      },
+    },
     metadataContract: {
       metadataId: 'google-play-en-us-v1',
       locale: 'en-US',
@@ -219,12 +229,10 @@ function validGooglePlayListingAssetSet(overrides = {}) {
     compositionManifest: {
       fileName: 'composition-manifest.json',
       sha256: 'aa'.repeat(32),
-      artifactCount: 18,
+      artifactCount: 6,
       artifactsDigest: 'bb'.repeat(32),
       deviceFamilies: [
         'android-phone',
-        'android-tablet-7',
-        'android-tablet-10',
       ],
     },
     consoleReview: {
@@ -1125,11 +1133,9 @@ describe('Android Play release contract', () => {
           status: 'pending',
           kind: 'chessticize.google-play-listing-asset-set',
           compositionManifest: expect.objectContaining({
-            artifactCount: 18,
+            artifactCount: 6,
             deviceFamilies: [
               'android-phone',
-              'android-tablet-7',
-              'android-tablet-10',
             ],
           }),
         }),

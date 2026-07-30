@@ -254,6 +254,16 @@
           "apkSha256": "REPLACE_WITH_EXACT_PLAY_APK_SHA256",
           "signerCertificateSha256": "REPLACE_WITH_PLAY_SIGNER_SHA256"
         },
+        "releaseEvidence": {
+          "sourceManifest": {
+            "fileName": "android-source-manifest.json",
+            "sha256": "REPLACE_WITH_ANDROID_SOURCE_MANIFEST_SHA256"
+          },
+          "mirrorEvidence": {
+            "fileName": "android-apk-mirror-evidence.json",
+            "sha256": "REPLACE_WITH_ANDROID_APK_MIRROR_EVIDENCE_SHA256"
+          }
+        },
         "metadataContract": {
           "metadataId": "google-play-en-us-v1",
           "locale": "en-US",
@@ -277,12 +287,10 @@
         "compositionManifest": {
           "fileName": "composition-manifest.json",
           "sha256": "REPLACE_WITH_EXACT_COMPOSITION_MANIFEST_SHA256",
-          "artifactCount": 18,
+          "artifactCount": 6,
           "artifactsDigest": "REPLACE_WITH_GENERATED_FINAL_IMAGE_CONTRACT_SHA256",
           "deviceFamilies": [
-            "android-phone",
-            "android-tablet-7",
-            "android-tablet-10"
+            "android-phone"
           ]
         },
         "consoleReview": {

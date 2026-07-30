@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 1,
+  "layoutId": "chessticize-google-play-photo-studio-android-v2",
+  "compositionMode": "flat-device-frame",
+  "contractStoryId": "app-store-marketing-en-us-v1",
+  "locale": "en-US",
+  "frames": [
+    {
+      "order": 1,
+      "frameId": "build-tactical-intuition",
+      "captureId": "marketing-01-standard-sprint",
+      "copyKey": "build-tactical-intuition",
+      "headline": "Build Tactical Intuition",
+      "supporting": "Short, rating-matched Sprints build fast pattern recognition.",
+      "fileName": "marketing-01-standard-sprint.png"
+    },
+    {
+      "order": 2,
+      "frameId": "choose-the-best-move",
+      "captureId": "marketing-02-arrow-duel",
+      "copyKey": "choose-the-best-move",
+      "headline": "Choose the Best Move",
+      "supporting": "Arrow Duel trains you to reject a tempting blunder before you play it.",
+      "fileName": "marketing-02-arrow-duel.png"
+    },
+    {
+      "order": 3,
+      "frameId": "focus-your-practice",
+      "captureId": "marketing-03-custom-run",
+      "copyKey": "focus-your-practice",
+      "headline": "Focus Your Practice",
+      "supporting": "Choose themes, pace, and difficulty for the skill you want to train.",
+      "fileName": "marketing-03-custom-run.png"
+    },
+    {
+      "order": 4,
+      "frameId": "make-every-mistake-count",
+      "captureId": "marketing-04-review-queue",
+      "copyKey": "make-every-mistake-count",
+      "headline": "Make Every Mistake Count",
+      "supporting": "Scheduled Review brings missed and unclear puzzles back when they are due.",
+      "fileName": "marketing-04-review-queue.png"
+    },
+    {
+      "order": 5,
+      "frameId": "see-your-progress",
+      "captureId": "marketing-05-rating-trend",
+      "copyKey": "see-your-progress",
+      "headline": "See Your Progress",
+      "supporting": "Follow your Ratings and recent Runs over time.",
+      "fileName": "marketing-05-rating-trend.png"
+    },
+    {
+      "order": 6,
+      "frameId": "private-offline-open-source",
+      "captureId": "marketing-06-trust",
+      "copyKey": "private-offline-open-source",
+      "headline": "Private. Offline. Open Source.",
+      "supporting": "No ads. No Chessticize account. No developer data collection.",
+      "fileName": "marketing-06-trust.png"
+    }
+  ],
+  "altTextContract": {
+    "repositoryFile": "config/google-play-metadata-en-us-v1.json",
+    "collection": "previewAssets.screenshots.frames"
+  },
+  "storePolicy": {
+    "platform": "google-play",
+    "outputFormat": "png-24-no-alpha",
+    "deviceImageryAllowed": true,
+    "tabletMarketingTextAllowed": false,
+    "generalScreenshotPixels": {
+      "minimum": 320,
+      "maximum": 3840,
+      "maximumAspectRatio": 2
+    },
+    "largeScreenPixels": {
+      "minimum": 1080,
+      "maximum": 7680
+    },
+    "largeScreenPreferredAspectRatios": [
+      "16:9",
+      "9:16"
+    ],
+    "largeScreenMinimumScreenshotCount": 4,
+    "screenshotsPerDeviceTypeMaximum": 8,
+    "phoneOverlayMaximumHeightRatio": 0.2,
+    "altTextMaximumCharacters": 140
+  },
+  "visualDirection": {
+    "name": "Android Photo Studio",
+    "composition": "deterministic-generic-android-device",
+    "background": "warm-white-icy-blue-chessboard-v1",
+    "productProof": "approved-self-built-android-capture",
+    "deviceRule": "generic-android-center-punch-hole-no-dynamic-island"
+  },
+  "palette": {
+    "headline": "#071226",
+    "deviceFrame": "#101214",
+    "deviceFrameEdge": "#50545A",
+    "shadow": "#9AAFC0"
+  },
+  "typography": {
+    "fontFamily": "sans-serif",
+    "fontWeight": 760
+  },
+  "presets": {
+    "android-phone": {
+      "platform": "google-play",
+      "deviceFamily": "android-phone",
+      "displayGroup": "phone",
+      "orientation": "portrait",
+      "reviewLabel": "Android Phone Portrait",
+      "acceptedSourceSizes": [
+        {
+          "width": 1080,
+          "height": 1920
+        }
+      ],
+      "backgroundTemplates": {
+        "build-tactical-intuition": {
+          "file": "photo-studio-background-01-android-phone-v1.png",
+          "sha256": "1b035c140d925946404c09740ae069a5cc60f1527d5831b7816fbaec85e2d4ba",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "choose-the-best-move": {
+          "file": "photo-studio-background-02-android-phone-v1.png",
+          "sha256": "98f6a19e0671fe0be844a80e646ceab8de28d2248ca3902602eef7480b26b6c4",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "focus-your-practice": {
+          "file": "photo-studio-background-03-android-phone-v1.png",
+          "sha256": "7b1d9531cd208620acf2dbf1902deb3731b98a6f953c12e98179fa9e2b19b18a",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "make-every-mistake-count": {
+          "file": "photo-studio-background-04-android-phone-v1.png",
+          "sha256": "6bffcf0fd177af59f913e6130ddb222e11a26d2162a4a5925e1dc952c88f8c41",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "see-your-progress": {
+          "file": "photo-studio-background-05-android-phone-v1.png",
+          "sha256": "9683754ee2ddfaa3c8cd7031461ea2a907c2d6a5c8afb783010a9ae02ce418e6",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        },
+        "private-offline-open-source": {
+          "file": "photo-studio-background-06-android-phone-v1.png",
+          "sha256": "14e1b1a0676eb57717fb06231d1ec6111336e66a90b12e2983803bfb491fc80d",
+          "pixelDimensions": {
+            "width": 853,
+            "height": 1844
+          },
+          "fit": "cover",
+          "generatedWith": "openai-imagegen"
+        }
+      },
+      "deviceChrome": {
+        "frontCamera": "center-punch-hole",
+        "punchHoleDiameterRatio": 0.018,
+        "punchHoleTopInsetRatio": 0.012
+      },
+      "title": {
+        "leftRatio": 0.075,
+        "topRatio": 0.04,
+        "maxWidthRatio": 0.85,
+        "fontSizeRatio": 0.073,
+        "lineHeightRatio": 0.88,
+        "maxCharactersPerLine": 20,
+        "align": "middle"
+      },
+      "product": {
+        "topRatio": 0.2,
+        "maxWidthRatio": 0.78,
+        "maxHeightRatio": 0.78,
+        "framePaddingRatio": 0.014,
+        "cornerRadiusRatio": 0.045,
+        "edgeWidthRatio": 0.0024,
+        "shadowBlurRatio": 0.017,
+        "shadowOffsetRatio": 0.012
+      }
+    }
+  },
+  "preview": {
+    "width": 2400,
+    "background": "#EAF3F8",
+    "label": "#102333",
+    "mutedLabel": "#557084",
+    "gap": 36,
+    "padding": 64
+  }
+}

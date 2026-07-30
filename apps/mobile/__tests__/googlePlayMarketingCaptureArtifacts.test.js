@@ -15,6 +15,7 @@ const {
 const {
   captureGooglePlayPublicUiFrame,
   GOOGLE_PLAY_CAPTURE_TARGETS,
+  GOOGLE_PLAY_REQUIRED_CAPTURE_FAMILIES,
   assertGooglePlayScreenshot,
   inspectGooglePlayInstalledSession,
   redactedAndroidDeviceId,
@@ -583,12 +584,12 @@ describe('Google Play marketing capture artifacts', () => {
     })).toThrow('version');
   });
 
-  it('writes and re-verifies one artifact-bound manifest for all Play families', () => {
+  it('writes and re-verifies the required phone-only Play manifest', () => {
     const outputRoot = mkdtempSync(join(tmpdir(), 'play-capture-'));
     const sourceCommit = 'e'.repeat(40);
     const artifact = previewArtifact();
 
-    for (const deviceFamily of Object.keys(GOOGLE_PLAY_CAPTURE_TARGETS)) {
+    for (const deviceFamily of GOOGLE_PLAY_REQUIRED_CAPTURE_FAMILIES) {
       const target = resolveGooglePlayCaptureTarget(
         targetEnvironment(deviceFamily)
       );
@@ -632,8 +633,6 @@ describe('Google Play marketing capture artifacts', () => {
     });
     expect(Object.keys(manifest.targets)).toEqual([
       'android-phone',
-      'android-tablet-7',
-      'android-tablet-10',
     ]);
     expect(manifest.frames).toHaveLength(6);
     expect(manifest.frames[0]).toMatchObject({
@@ -644,23 +643,7 @@ describe('Google Play marketing capture artifacts', () => {
       supporting: story.frames[0].supporting,
     });
 
-    const tabletManifestPath = join(
-      outputRoot,
-      'manifest-android-tablet-7.json'
-    );
-    const tabletManifest = JSON.parse(
-      readFileSync(tabletManifestPath, 'utf8')
-    );
-    tabletManifest.artifact.fileName = 'different-app-e2e.apk';
-    writeFileSync(tabletManifestPath, JSON.stringify(tabletManifest));
-    expect(() => writeCombinedGooglePlayCaptureManifest({
-      outputRoot,
-      story,
-    })).toThrow('must bind one source');
-    tabletManifest.artifact.fileName = artifact.fileName;
-    writeFileSync(tabletManifestPath, JSON.stringify(tabletManifest));
-
-    const firstCapture = manifest.frames[0].captures['android-tablet-10'];
+    const firstCapture = manifest.frames[0].captures['android-phone'];
     writeFileSync(join(outputRoot, firstCapture.file), 'tampered');
     expect(() => writeCombinedGooglePlayCaptureManifest({
       outputRoot,

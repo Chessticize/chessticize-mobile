@@ -27,6 +27,7 @@ function listingAssetSetDigest(assetSet) {
     kind: assetSet?.kind,
     status: assetSet?.status,
     candidate: assetSet?.candidate,
+    releaseEvidence: assetSet?.releaseEvidence,
     metadataContract: assetSet?.metadataContract,
     appIcon: assetSet?.appIcon,
     featureGraphic: assetSet?.featureGraphic,

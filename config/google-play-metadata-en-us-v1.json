@@ -3,7 +3,7 @@
   "metadataId": "google-play-en-us-v1",
   "issue": 444,
   "locale": "en-US",
-  "verifiedOn": "2026-07-29",
+  "verifiedOn": "2026-07-30",
   "officialReferences": [
     "https://support.google.com/googleplay/android-developer/answer/9859152",
     "https://support.google.com/googleplay/android-developer/answer/13393723",
@@ -46,21 +46,19 @@
     },
     "screenshots": {
       "sharedStoryContract": "config/app-store-marketing-story-v1.json",
+      "capturePolicy": {
+        "requiredDeviceTypes": [
+          "phone"
+        ],
+        "source": "owner-approved-self-built-android-capture",
+        "presentation": "generic-android-center-punch-hole-no-dynamic-island",
+        "tabletScreenshots": "optional-and-not-in-this-listing-update"
+      },
       "deviceTypes": [
         {
           "id": "phone",
           "captureCount": 6,
-          "status": "pending-exact-play-artifact"
-        },
-        {
-          "id": "7-inch-tablet",
-          "captureCount": 6,
-          "status": "pending-exact-play-artifact"
-        },
-        {
-          "id": "10-inch-tablet",
-          "captureCount": 6,
-          "status": "pending-exact-play-artifact"
+          "status": "ready-for-console-upload"
         }
       ],
       "frames": [

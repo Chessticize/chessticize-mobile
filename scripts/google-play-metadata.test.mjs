@@ -105,7 +105,7 @@ test("public contact fields and graphic alt text are safe and complete", async (
   }
 });
 
-test("the reusable six-frame story has Play alt text and all Android form factors", async () => {
+test("the reusable six-frame story has Play alt text and one required phone set", async () => {
   const [metadata, sharedStory] = await Promise.all([
     readJson(metadataUrl),
     readJson(sharedStoryUrl)
@@ -115,15 +115,24 @@ test("the reusable six-frame story has Play alt text and all Android form factor
   assert.equal(screenshots.sharedStoryContract, "config/app-store-marketing-story-v1.json");
   assert.deepEqual(
     screenshots.deviceTypes.map((device) => device.id),
-    ["phone", "7-inch-tablet", "10-inch-tablet"]
+    ["phone"]
   );
   for (const device of screenshots.deviceTypes) {
     assert.equal(device.captureCount, screenshots.frames.length);
     assert.ok(
       device.captureCount <= metadata.limits.screenshotsPerDeviceType
     );
-    assert.equal(device.status, "pending-exact-play-artifact");
+    assert.equal(device.status, "ready-for-console-upload");
   }
+  assert.deepEqual(screenshots.capturePolicy.requiredDeviceTypes, ["phone"]);
+  assert.equal(
+    screenshots.capturePolicy.source,
+    "owner-approved-self-built-android-capture",
+  );
+  assert.equal(
+    screenshots.capturePolicy.presentation,
+    "generic-android-center-punch-hole-no-dynamic-island",
+  );
 
   assert.deepEqual(
     screenshots.frames.map(({ id, headline }) => ({ id, headline })),
@@ -200,5 +209,6 @@ test("Android listing documentation mirrors the canonical Play contract", async 
     listingDoc.includes(`- Source: \`${metadata.contact.sourceUrl}\``)
   );
   assert.ok(listingDoc.includes(metadata.fullDescription));
-  assert.ok(listingDoc.includes("pending-exact-play-artifact"));
+  assert.ok(listingDoc.includes("owner-approved self-built deterministic capture"));
+  assert.ok(listingDoc.includes("Dynamic Island"));
 });
