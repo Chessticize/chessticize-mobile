@@ -1532,6 +1532,16 @@ describe('Detox suite configuration', () => {
     expect(waitForPaceControl).toBeGreaterThan(0);
     expect(tapPaceControl).toBeGreaterThan(waitForPaceControl);
 
+    const checkedHelperStart = spec.indexOf('async function expectChecked');
+    const checkedHelperEnd = spec.indexOf(
+      'async function expectAttributeContains',
+      checkedHelperStart
+    );
+    const checkedHelper = spec.slice(checkedHelperStart, checkedHelperEnd);
+    expect(checkedHelper).toContain("device.getPlatform() === 'android'");
+    expect(checkedHelper).toContain('waitForAndroidUiState');
+    expect(checkedHelper).toContain("checked: 'true'");
+
     const responsiveHelperStart = spec.indexOf('async function assertNativeResponsiveLayout');
     const responsiveHelperEnd = spec.indexOf(
       'async function takeReadyScreenshot',

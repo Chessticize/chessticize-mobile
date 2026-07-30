@@ -15,6 +15,7 @@ const {
   expectFrameContained,
   waitForBoardScreenshotContainsPieces,
 } = require('./screenshotAssertions');
+const { waitForAndroidUiState } = require('./androidPublicUiEvidence');
 const {
   captureMarketingScreenshot,
   resolveMarketingCaptureTarget,
@@ -478,6 +479,15 @@ async function expectText(testID, expected) {
 }
 
 async function expectChecked(testID) {
+  if (device.getPlatform() === 'android') {
+    await waitForAndroidUiState({
+      presentResourceIds: [testID],
+      expectedAttributesByResourceId: {
+        [testID]: { checked: 'true' },
+      },
+    });
+    return;
+  }
   const rawAttributes = await element(by.id(testID)).getAttributes();
   const attributes = Array.isArray(rawAttributes)
     ? rawAttributes[0]
