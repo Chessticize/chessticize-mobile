@@ -370,14 +370,20 @@ function validateGooglePlayPolicy(config, compositionMode, presets) {
   if (playPresets.length === 0) {
     return;
   }
-  if (compositionMode !== "screen-first") {
-    fail("Google Play presets must use the screen-first composition mode");
+  if (
+    compositionMode !== "screen-first" &&
+    compositionMode !== "flat-device-frame"
+  ) {
+    fail(
+      "Google Play presets must use the screen-first or flat-device-frame composition mode",
+    );
   }
+  const usesDeviceImagery = compositionMode === "flat-device-frame";
   const policy = config.storePolicy;
   if (
     policy?.platform !== "google-play" ||
     policy.outputFormat !== "png-24-no-alpha" ||
-    policy.deviceImageryAllowed !== false ||
+    policy.deviceImageryAllowed !== usesDeviceImagery ||
     policy.tabletMarketingTextAllowed !== false ||
     policy.generalScreenshotPixels?.minimum !== 320 ||
     policy.generalScreenshotPixels?.maximum !== 3840 ||
@@ -411,42 +417,60 @@ function validateGooglePlayPolicy(config, compositionMode, presets) {
   }
 
   for (const [family, preset] of playPresets) {
+    const isTablet = family.includes("tablet");
+    if (usesDeviceImagery && isTablet) {
+      fail("Google Play Photo Studio presets are phone-only");
+    }
     const screenFirst = preset.screenFirst;
     if (
-      !screenFirst ||
-      screenFirst.frameStyle !== "frameless" ||
-      !isPositiveDimensions(screenFirst.outputDimensions) ||
-      typeof screenFirst.headlineOverlay !== "boolean"
+      !usesDeviceImagery &&
+      (
+        !screenFirst ||
+        screenFirst.frameStyle !== "frameless" ||
+        !isPositiveDimensions(screenFirst.outputDimensions) ||
+        typeof screenFirst.headlineOverlay !== "boolean"
+      )
     ) {
       fail(`${family} has an invalid screen-first contract`);
     }
-    const output = screenFirst.outputDimensions;
-    const isTablet = family.includes("tablet");
+    if (usesDeviceImagery && screenFirst !== undefined) {
+      fail(`${family} Photo Studio preset must not define screen-first output`);
+    }
+    const outputs = usesDeviceImagery
+      ? preset.acceptedSourceSizes
+      : [screenFirst.outputDimensions];
     const pixelBounds = isTablet
       ? policy.largeScreenPixels
       : policy.generalScreenshotPixels;
-    if (
-      Math.min(output.width, output.height) < pixelBounds.minimum ||
-      Math.max(output.width, output.height) > pixelBounds.maximum ||
-      aspectRatioLongToShort(output) >
-        policy.generalScreenshotPixels.maximumAspectRatio
-    ) {
-      fail(`${family} output dimensions violate the Google Play policy`);
-    }
-    const outputOrientation =
-      output.height > output.width ? "portrait" : "landscape";
-    if (outputOrientation !== preset.orientation) {
-      fail(`${family} output dimensions do not match its orientation`);
+    for (const output of outputs) {
+      if (
+        Math.min(output.width, output.height) < pixelBounds.minimum ||
+        Math.max(output.width, output.height) > pixelBounds.maximum ||
+        aspectRatioLongToShort(output) >
+          policy.generalScreenshotPixels.maximumAspectRatio
+      ) {
+        fail(`${family} output dimensions violate the Google Play policy`);
+      }
+      const outputOrientation =
+        output.height > output.width ? "portrait" : "landscape";
+      if (outputOrientation !== preset.orientation) {
+        fail(`${family} output dimensions do not match its orientation`);
+      }
     }
     if (isTablet) {
       if (screenFirst.headlineOverlay) {
         fail(`${family} must not add marketing text to the app screenshot`);
       }
-      if (aspectRatioLongToShort(output) !== 16 / 9) {
+      if (
+        outputs.some(
+          (output) => aspectRatioLongToShort(output) !== 16 / 9,
+        )
+      ) {
         fail(`${family} must export at 16:9 landscape or 9:16 portrait`);
       }
+    } else if (!usesDeviceImagery && !screenFirst.headlineOverlay) {
+      fail(`${family} must render its approved phone headline`);
     } else if (
-      !screenFirst.headlineOverlay ||
       preset.product.topRatio <= 0 ||
       preset.product.topRatio > policy.phoneOverlayMaximumHeightRatio
     ) {
@@ -656,6 +680,21 @@ function validateLayoutConfig(config) {
       !isFiniteRatio(product.shadowOffsetRatio, { allowZero: true, max: 0.2 })
     ) {
       fail(`${family} preset has an invalid safe-area or product layout`);
+    }
+    if (
+      preset.deviceChrome !== undefined &&
+      (
+        preset.deviceChrome?.frontCamera !== "center-punch-hole" ||
+        !isFiniteRatio(preset.deviceChrome.punchHoleDiameterRatio, {
+          max: 0.04,
+        }) ||
+        !isFiniteRatio(preset.deviceChrome.punchHoleTopInsetRatio, {
+          allowZero: true,
+          max: 0.05,
+        })
+      )
+    ) {
+      fail(`${family} preset has an invalid device chrome contract`);
     }
     if (compositionMode === "photographic-device") {
       const photographicDevice = preset.photographicDevice;
@@ -1189,6 +1228,30 @@ function frameSvg({ config, layout, preset }) {
   <rect x="${frame.x}" y="${frame.y}" width="${frame.width}" height="${frame.height}" rx="${frame.cornerRadius}" fill="${palette.deviceFrameEdge}"/>
   <rect x="${frame.x + frame.edgeWidth}" y="${frame.y + frame.edgeWidth}" width="${frame.width - frame.edgeWidth * 2}" height="${frame.height - frame.edgeWidth * 2}" rx="${Math.max(1, frame.cornerRadius - frame.edgeWidth)}" fill="${palette.deviceFrame}"/>
   <rect x="${layout.screenshot.x}" y="${layout.screenshot.y}" width="${layout.screenshot.width}" height="${layout.screenshot.height}" rx="${screenRadius}" fill="${palette.deviceFrame}"/>
+</svg>`);
+}
+
+function deviceChromeSvg({ layout, preset }) {
+  const chrome = preset.deviceChrome;
+  if (!chrome) {
+    return null;
+  }
+  const diameter = Math.max(
+    4,
+    Math.round(layout.canvas.width * chrome.punchHoleDiameterRatio),
+  );
+  const radius = diameter / 2;
+  const centerX = Math.round(
+    layout.screenshot.x + layout.screenshot.width / 2,
+  );
+  const centerY = Math.round(
+    layout.screenshot.y +
+      layout.canvas.width * chrome.punchHoleTopInsetRatio +
+      radius,
+  );
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${layout.canvas.width}" height="${layout.canvas.height}" viewBox="0 0 ${layout.canvas.width} ${layout.canvas.height}">
+  <circle cx="${centerX}" cy="${centerY}" r="${radius}" fill="#050607"/>
+  <circle cx="${centerX}" cy="${centerY}" r="${Math.max(1, radius * 0.42)}" fill="#0D1824"/>
 </svg>`);
 }
 
@@ -1877,24 +1940,33 @@ async function composeFrame(item, config, backgroundTemplate) {
     }),
     roundedScreenshot(item.inputPath, layout),
   ]);
+  const deviceChrome = deviceChromeSvg({ layout, preset: item.preset });
+  const composites = [
+    {
+      input: frame,
+      left: 0,
+      top: 0,
+    },
+    {
+      input: screenshot,
+      left: layout.screenshot.x,
+      top: layout.screenshot.y,
+    },
+  ];
+  if (deviceChrome) {
+    composites.push({
+      input: deviceChrome,
+      left: 0,
+      top: 0,
+    });
+  }
+  composites.push({
+    input: headline,
+    left: 0,
+    top: 0,
+  });
   const buffer = await sharp(background)
-    .composite([
-      {
-        input: frame,
-        left: 0,
-        top: 0,
-      },
-      {
-        input: screenshot,
-        left: layout.screenshot.x,
-        top: layout.screenshot.y,
-      },
-      {
-        input: headline,
-        left: 0,
-        top: 0,
-      },
-    ])
+    .composite(composites)
     .removeAlpha()
     .png({ adaptiveFiltering: false, compressionLevel: 9 })
     .toBuffer();
@@ -1902,6 +1974,12 @@ async function composeFrame(item, config, backgroundTemplate) {
     buffer,
     dimensions: canvas,
     layout,
+    presentation: {
+      deviceFrame: "generic-android",
+      frontCamera: item.preset.deviceChrome?.frontCamera ?? "none",
+      dynamicIsland: false,
+      immutableNativeCapture: true,
+    },
   };
 }
 

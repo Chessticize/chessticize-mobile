@@ -1,6 +1,6 @@
 # Android Play Listing and Declarations
 
-Status date: 2026-07-29
+Status date: 2026-07-30
 
 This is the English source of truth for the Android Play listing. The
 machine-readable contract is
@@ -17,7 +17,7 @@ in the owner evidence described by `docs/ANDROID_PLAY_RELEASE.md`.
 - App or game: Game
 - Category: Board
 - Pricing: Free
-- Short description: `Build tactical intuition with offline chess puzzles and focused practice.`
+- Short description: `Offline chess puzzle trainer with rating-matched Sprints and focused practice.`
 - Full description:
 
 ```text
@@ -138,10 +138,11 @@ local APK alone.
 
 ## Asset contract
 
-Play Console must contain, at minimum, the approved 512 x 512 app icon, 1024 x
-500 feature graphic, and sanitized phone screenshots. Chessticize also requires
-complete 7-inch and 10-inch tablet sets because those form factors are in the
-supported product envelope. The reusable six-frame story comes from
+Play Console must contain the approved 512 x 512 app icon, 1024 x 500 feature
+graphic, and six sanitized phone screenshots. Tablet screenshot sets are
+optional and are not part of this metadata-only listing update. Do not generate
+or upload extra form factors merely because the product supports them. The
+reusable six-frame story comes from
 `config/app-store-marketing-story-v1.json`; its Play-specific form-factor
 targets and canonical alt text come from
 `config/google-play-metadata-en-us-v1.json`.
@@ -155,19 +156,23 @@ Each device type receives the same six-frame order:
 5. See Your Progress
 6. Private. Offline. Open Source.
 
-All three device sets remain `pending-exact-play-artifact` until their final
-captures come from the exact Play-delivered Internal or Closed build. Retain
-the artifact identity, raw capture checksums, composition receipt, final image
-checksums, and Console upload evidence. Do not use debug controls, usernames,
-personal ratings, real dates, or private history. Fictional fixture values are
-allowed only when they match the approved deterministic story contract and are
-produced through the public app flow.
+The phone set may use an owner-approved self-built deterministic capture, as
+the iOS set uses simulator captures. Retain its source and APK identity, raw
+capture checksums, composition receipt, final image checksums, explicit visual
+approval, and Console evidence. Keep the already released 1.3.1 AAB/APK/source
+identity separate; the screenshots do not claim binary equality with that
+candidate. Do not use usernames, personal ratings, real dates, or private
+history. Fictional fixture values must match the approved deterministic story.
 
 Google Play permits up to eight screenshots per supported device type; this
-contract deliberately uses six for each of phone, 7-inch tablet, and 10-inch
-tablet. Every feature graphic and screenshot must use the contract's reviewed
-alt text, at most 140 Unicode characters, without redundant prefixes such as
-“image of” or “photo of.”
+contract deliberately uses six phone screenshots. Every feature graphic and
+screenshot must use the contract's reviewed alt text, at most 140 Unicode
+characters, without redundant prefixes such as “image of” or “photo of.”
+
+The six phone screenshots use the Android Photo Studio layout: warm-white and
+icy-blue chessboard backgrounds, a deterministic unbranded Android handset,
+and one small centered circular punch-hole camera. They must not show a
+Dynamic Island, pill notch, Apple logo, or any Apple-specific device cue.
 
 The checked-in Android launcher icon must match the approved Chessticize brand,
 but a launcher resource is not by itself a Play listing asset. Asset approval
@@ -200,14 +205,17 @@ the exact-build screenshots; file presence alone is not approval evidence.
 
 ### Exact listing handoff
 
-After the exact Play capture has been finalized and the full 18-image
-composition is complete, prepare the Console review receipt from those inputs:
+After the approved phone capture and six-image composition are complete,
+prepare the Console review receipt. Supply the retained release evidence for
+the already published candidate separately:
 
 ```sh
 pnpm google-play:listing:prepare-review -- \
   --metadata config/google-play-metadata-en-us-v1.json \
-  --capture <exact-capture-directory>/google-play-capture-manifest.json \
+  --capture <capture-directory>/google-play-capture-manifest.json \
   --composition <composed-directory>/composition-manifest.json \
+  --source-manifest <release-evidence>/android-source-manifest.json \
+  --mirror-evidence <release-evidence>/android-apk-mirror-evidence.json \
   --output <protected-evidence-directory>/google-play-console-review.json
 ```
 
@@ -221,25 +229,30 @@ Generate and independently re-verify the final repository-to-Console handoff:
 ```sh
 pnpm google-play:listing:handoff -- \
   --metadata config/google-play-metadata-en-us-v1.json \
-  --capture <exact-capture-directory>/google-play-capture-manifest.json \
+  --capture <capture-directory>/google-play-capture-manifest.json \
   --composition <composed-directory>/composition-manifest.json \
+  --source-manifest <release-evidence>/android-source-manifest.json \
+  --mirror-evidence <release-evidence>/android-apk-mirror-evidence.json \
   --console-review <protected-evidence-directory>/google-play-console-review.json \
   --output <protected-evidence-directory>/google-play-listing-asset-set.json
 
 pnpm google-play:listing:verify -- \
   --metadata config/google-play-metadata-en-us-v1.json \
-  --capture <exact-capture-directory>/google-play-capture-manifest.json \
+  --capture <capture-directory>/google-play-capture-manifest.json \
   --composition <composed-directory>/composition-manifest.json \
+  --source-manifest <release-evidence>/android-source-manifest.json \
+  --mirror-evidence <release-evidence>/android-apk-mirror-evidence.json \
   --console-review <protected-evidence-directory>/google-play-console-review.json \
   --handoff <protected-evidence-directory>/google-play-listing-asset-set.json
 ```
 
 This offline, fail-closed contract hashes the canonical locale metadata,
-checked-in icon, checked-in feature graphic, exact capture manifest, and exact
-composition manifest. It also verifies the 18 final PNG bytes, their canonical
-alt text, all three device families, the Play-delivered candidate identity,
-and the Console review binding. The deterministic `assetSetDigest` changes if
-any of those fields or bytes change.
+checked-in icon, checked-in feature graphic, approved capture manifest, exact
+composition manifest, retained release source manifest, and APK mirror
+evidence. It also verifies the six final phone PNG bytes, their canonical alt
+text, the Play-delivered candidate identity, and the Console review binding.
+The deterministic `assetSetDigest` changes if any of those fields or bytes
+change.
 
 ## Current official requirements checked
 

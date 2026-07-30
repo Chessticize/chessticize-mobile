@@ -18,7 +18,7 @@
     "app-store:screenshot-audit": "node scripts/app-store-screenshot-audit.mjs",
     "app-store:compose-marketing": "node .codex/skills/chessticize-app-store-marketing/scripts/compose-marketing-assets.mjs",
     "google-play:metadata:check": "node --test scripts/google-play-metadata.test.mjs",
-    "google-play:compose-marketing": "node .codex/skills/chessticize-app-store-marketing/scripts/compose-marketing-assets.mjs --layout-config .codex/skills/chessticize-app-store-marketing/assets/google-play-marketing-layout-v1.json --platform google-play",
+    "google-play:compose-marketing": "node .codex/skills/chessticize-app-store-marketing/scripts/compose-marketing-assets.mjs --layout-config .codex/skills/chessticize-app-store-marketing/assets/google-play-marketing-layout-v2.json --platform google-play",
     "google-play:listing:prepare-review": "node scripts/google-play-listing-handoff.mjs prepare-console-review",
     "google-play:listing:handoff": "node scripts/google-play-listing-handoff.mjs create",
     "google-play:listing:verify": "node scripts/google-play-listing-handoff.mjs verify",

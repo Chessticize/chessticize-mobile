@@ -3,7 +3,7 @@
   "metadataId": "google-play-en-us-v1",
   "issue": 444,
   "locale": "en-US",
-  "verifiedOn": "2026-07-29",
+  "verifiedOn": "2026-07-30",
   "officialReferences": [
     "https://support.google.com/googleplay/android-developer/answer/9859152",
     "https://support.google.com/googleplay/android-developer/answer/13393723",
@@ -18,7 +18,7 @@
     "screenshotsPerDeviceType": 8
   },
   "appName": "Chessticize",
-  "shortDescription": "Build tactical intuition with offline chess puzzles and focused practice.",
+  "shortDescription": "Offline chess puzzle trainer with rating-matched Sprints and focused practice.",
   "fullDescription": "Practice chess puzzles with purpose—without ads or an account.\n\nChessticize is an open-source chess puzzle trainer designed to work offline. Solve short, rating-matched puzzle Sprints to build pattern recognition. Arrow Duel turns each puzzle into a choice between two candidate moves, helping you notice and reject the tempting blunder before you play it.\n\nSolve puzzles with intent\n\n• Puzzle Sprint: solve a compact set of rating-matched chess puzzles against the clock.\n• Arrow Duel: compare two candidate moves in the same position and choose the better one.\n• Custom Runs: choose puzzle themes, pace, and difficulty for what you want to practice.\n\nMake every mistake count\n\nMissed and unclear puzzles enter scheduled Review, bringing them back when they are due. Replay lets you revisit completed puzzles and explore positions with on-device Stockfish analysis—without changing your Rating or Review schedule.\n\nSee your puzzle practice\n\nFollow separate Ratings for Standard and Arrow Duel, review recent Runs, and filter History to revisit individual puzzles.\n\nPrivate by design\n\n• Solve bundled puzzles without a network connection.\n• No ads and no Chessticize account.\n• No analytics or tracking, and no puzzle activity sent to Chessticize.\n• Progress is stored on your device. Android Progress Backup can restore eligible local progress after reinstall or device transfer when Android backup is enabled; it restores progress rather than keeping multiple devices continuously synchronized.\n• Review reminders use local notifications.\n\nOpen source\n\nChessticize is published under GPL-3.0-or-later. The app includes bundled puzzle data and Stockfish for on-device analysis, with source and licenses available from the app's Settings screen and public project page.\n\nAlso included\n\n• Curated puzzle themes\n• Adjustable pace, duration, and difficulty\n• Optional move sounds and haptic feedback\n• Phone, tablet, foldable, and compatible Chromebook layouts",
   "listingSettings": {
     "defaultLanguage": "English (United States)",
@@ -46,21 +46,19 @@
     },
     "screenshots": {
       "sharedStoryContract": "config/app-store-marketing-story-v1.json",
+      "capturePolicy": {
+        "requiredDeviceTypes": [
+          "phone"
+        ],
+        "source": "owner-approved-self-built-android-capture",
+        "presentation": "generic-android-center-punch-hole-no-dynamic-island",
+        "tabletScreenshots": "optional-and-not-in-this-listing-update"
+      },
       "deviceTypes": [
         {
           "id": "phone",
           "captureCount": 6,
-          "status": "pending-exact-play-artifact"
-        },
-        {
-          "id": "7-inch-tablet",
-          "captureCount": 6,
-          "status": "pending-exact-play-artifact"
-        },
-        {
-          "id": "10-inch-tablet",
-          "captureCount": 6,
-          "status": "pending-exact-play-artifact"
+          "status": "ready-for-console-upload"
         }
       ],
       "frames": [

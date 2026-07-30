@@ -98,10 +98,6 @@ capture_device_family() {
 
 require_environment CHESSTICIZE_MARKETING_ANDROID_PHONE_SERIAL
 require_environment CHESSTICIZE_MARKETING_ANDROID_PHONE_PROFILE
-require_environment CHESSTICIZE_MARKETING_ANDROID_TABLET_7_SERIAL
-require_environment CHESSTICIZE_MARKETING_ANDROID_TABLET_7_PROFILE
-require_environment CHESSTICIZE_MARKETING_ANDROID_TABLET_10_SERIAL
-require_environment CHESSTICIZE_MARKETING_ANDROID_TABLET_10_PROFILE
 
 SOURCE_COMMIT="$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)"
 assert_clean_source_state "$SOURCE_COMMIT"
@@ -115,9 +111,7 @@ fi
 mkdir -p "$OUTPUT_ROOT"
 rm -f \
   "$OUTPUT_ROOT/google-play-capture-manifest.json" \
-  "$OUTPUT_ROOT/manifest-android-phone.json" \
-  "$OUTPUT_ROOT/manifest-android-tablet-7.json" \
-  "$OUTPUT_ROOT/manifest-android-tablet-10.json"
+  "$OUTPUT_ROOT/manifest-android-phone.json"
 
 if [[ "${CHESSTICIZE_ANDROID_MARKETING_SKIP_BUILD:-0}" != "1" ]]; then
   (
@@ -135,20 +129,10 @@ capture_device_family \
   "$CHESSTICIZE_MARKETING_ANDROID_PHONE_SERIAL" \
   "$CHESSTICIZE_MARKETING_ANDROID_PHONE_PROFILE" \
   1080x1920
-capture_device_family \
-  android-tablet-7 \
-  "$CHESSTICIZE_MARKETING_ANDROID_TABLET_7_SERIAL" \
-  "$CHESSTICIZE_MARKETING_ANDROID_TABLET_7_PROFILE" \
-  1200x1920
-capture_device_family \
-  android-tablet-10 \
-  "$CHESSTICIZE_MARKETING_ANDROID_TABLET_10_SERIAL" \
-  "$CHESSTICIZE_MARKETING_ANDROID_TABLET_10_PROFILE" \
-  2560x1600
 
 assert_clean_source_state "$SOURCE_COMMIT"
 CHESSTICIZE_MARKETING_OUTPUT_ROOT="$OUTPUT_ROOT" \
   node "$E2E_DIR/finalize-google-play-marketing-capture.js"
 
-echo "Preview-only raw Google Play captures are ready at $OUTPUT_ROOT"
-echo "Final Play listing evidence must be recaptured through public UI from the accepted Play-delivered APK."
+echo "Phone-only raw Google Play captures are ready at $OUTPUT_ROOT"
+echo "A self-built deterministic capture may be promoted after visual owner approval; do not claim it is a Play-delivered binary."

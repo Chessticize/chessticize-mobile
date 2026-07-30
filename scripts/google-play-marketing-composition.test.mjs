@@ -17,7 +17,7 @@ import sharp from "sharp";
 import { composeMarketingAssets } from "../.codex/skills/chessticize-app-store-marketing/scripts/compose-marketing-assets.mjs";
 
 const PLAY_LAYOUT_URL = new URL(
-  "../.codex/skills/chessticize-app-store-marketing/assets/google-play-marketing-layout-v1.json",
+  "../.codex/skills/chessticize-app-store-marketing/assets/google-play-marketing-layout-v2.json",
   import.meta.url,
 );
 const PLAY_METADATA_URL = new URL(
@@ -137,15 +137,15 @@ async function createPlayFixture(root) {
   return { captureRoot, config, manifestPath };
 }
 
-test("Google Play layout encodes UI-dominant phone and text-free tablet policy", async () => {
+test("Google Play layout encodes the phone-only Android Photo Studio policy", async () => {
   const [layout, metadata] = await Promise.all([
     readFile(PLAY_LAYOUT_URL, "utf8").then(JSON.parse),
     readFile(PLAY_METADATA_URL, "utf8").then(JSON.parse),
   ]);
 
-  assert.equal(layout.compositionMode, "screen-first");
+  assert.equal(layout.compositionMode, "flat-device-frame");
   assert.equal(layout.storePolicy.outputFormat, "png-24-no-alpha");
-  assert.equal(layout.storePolicy.deviceImageryAllowed, false);
+  assert.equal(layout.storePolicy.deviceImageryAllowed, true);
   assert.equal(layout.storePolicy.tabletMarketingTextAllowed, false);
   assert.deepEqual(layout.storePolicy.generalScreenshotPixels, {
     minimum: 320,
@@ -164,43 +164,36 @@ test("Google Play layout encodes UI-dominant phone and text-free tablet policy",
   assert.equal(metadata.previewAssets.screenshots.frames.length, 6);
   assert.deepEqual(
     metadata.previewAssets.screenshots.deviceTypes.map(
-      ({ captureCount, id }) => ({ captureCount, id }),
+      ({ captureCount, id, status }) => ({ captureCount, id, status }),
     ),
     [
-      { id: "phone", captureCount: 6 },
-      { id: "7-inch-tablet", captureCount: 6 },
-      { id: "10-inch-tablet", captureCount: 6 },
+      {
+        id: "phone",
+        captureCount: 6,
+        status: "ready-for-console-upload",
+      },
     ],
   );
 
   assert.deepEqual(
-    Object.fromEntries(
-      Object.entries(layout.presets).map(([family, preset]) => [
-        family,
-        {
-          outputDimensions: preset.screenFirst.outputDimensions,
-          headlineOverlay: preset.screenFirst.headlineOverlay,
-          frameStyle: preset.screenFirst.frameStyle,
-        },
-      ]),
-    ),
+    Object.keys(layout.presets),
+    ["android-phone"],
+  );
+  assert.deepEqual(
+    layout.presets["android-phone"].deviceChrome,
     {
-      "android-phone": {
-        outputDimensions: { width: 1080, height: 1920 },
-        headlineOverlay: true,
-        frameStyle: "frameless",
-      },
-      "android-tablet-7": {
-        outputDimensions: { width: 1440, height: 2560 },
-        headlineOverlay: false,
-        frameStyle: "frameless",
-      },
-      "android-tablet-10": {
-        outputDimensions: { width: 2560, height: 1440 },
-        headlineOverlay: false,
-        frameStyle: "frameless",
-      },
+      frontCamera: "center-punch-hole",
+      punchHoleDiameterRatio: 0.018,
+      punchHoleTopInsetRatio: 0.012,
     },
+  );
+  assert.equal(
+    layout.visualDirection.deviceRule,
+    "generic-android-center-punch-hole-no-dynamic-island",
+  );
+  assert.deepEqual(
+    metadata.previewAssets.screenshots.capturePolicy.requiredDeviceTypes,
+    ["phone"],
   );
   assert.ok(
     layout.presets["android-phone"].product.topRatio <=
@@ -208,7 +201,7 @@ test("Google Play layout encodes UI-dominant phone and text-free tablet policy",
   );
 });
 
-test("Google Play export normalizes three device types and records canonical alt text", async (t) => {
+test("Google Play export writes six phone Photo Studio assets with canonical alt text", async (t) => {
   const root = await mkdtemp(
     path.join(os.tmpdir(), "chessticize-google-play-composition-"),
   );
@@ -233,10 +226,13 @@ test("Google Play export normalizes three device types and records canonical alt
   );
 
   assert.equal(result.manifest.platform, "google-play");
-  assert.equal(result.manifest.layoutId, "chessticize-google-play-screen-first-v1");
-  assert.equal(result.manifest.artifacts.length, 18);
-  assert.equal(result.manifest.contactSheets.length, 3);
-  assert.deepEqual(result.manifest.backgroundTemplates, []);
+  assert.equal(
+    result.manifest.layoutId,
+    "chessticize-google-play-photo-studio-android-v2",
+  );
+  assert.equal(result.manifest.artifacts.length, 6);
+  assert.equal(result.manifest.contactSheets.length, 1);
+  assert.equal(result.manifest.backgroundTemplates.length, 6);
   assert.equal(
     result.manifest.altTextContract.repositoryFile,
     "config/google-play-metadata-en-us-v1.json",
@@ -258,21 +254,19 @@ test("Google Play export normalizes three device types and records canonical alt
       [1, 2, 3, 4, 5, 6],
     );
     for (const artifact of artifacts) {
-      assert.deepEqual(
-        artifact.dimensions,
-        preset.screenFirst.outputDimensions,
-      );
-      assert.equal(artifact.presentation.frameStyle, "frameless");
+      assert.deepEqual(artifact.dimensions, { width: 1080, height: 1920 });
+      assert.equal(artifact.presentation.deviceFrame, "generic-android");
       assert.equal(
-        artifact.presentation.headlineRendered,
-        preset.screenFirst.headlineOverlay,
+        artifact.presentation.frontCamera,
+        "center-punch-hole",
       );
+      assert.equal(artifact.presentation.dynamicIsland, false);
       assert.equal(artifact.presentation.immutableNativeCapture, true);
       assert.equal(artifact.altText, altTextByFrame.get(artifact.frameId));
       assert.ok([...artifact.altText].length <= 140);
       assert.equal(
         Object.hasOwn(artifact, "backgroundTemplateSha256"),
-        false,
+        true,
       );
       const outputPath = path.join(outputDir, artifact.file);
       const outputMetadata = await sharp(outputPath).metadata();
@@ -343,7 +337,7 @@ test("Google Play exact export rejects a top-level exact claim without provenanc
   );
 });
 
-test("Google Play layout rejects tablet text and out-of-policy output before writing", async (t) => {
+test("Google Play layout rejects device and safe-area drift before writing", async (t) => {
   const root = await mkdtemp(
     path.join(os.tmpdir(), "chessticize-google-play-policy-"),
   );
@@ -352,20 +346,18 @@ test("Google Play layout rejects tablet text and out-of-policy output before wri
 
   const cases = [
     {
-      name: "tablet-text",
-      expected: /must not add marketing text/,
+      name: "device-imagery-policy",
+      expected: /invalid store policy/,
       mutate(config) {
-        config.presets["android-tablet-7"].screenFirst.headlineOverlay = true;
+        config.storePolicy.deviceImageryAllowed = false;
       },
     },
     {
-      name: "tablet-aspect",
-      expected: /16:9 landscape or 9:16 portrait/,
+      name: "dynamic-island-shaped-camera",
+      expected: /invalid device chrome contract/,
       mutate(config) {
-        config.presets["android-tablet-10"].screenFirst.outputDimensions = {
-          width: 2560,
-          height: 1600,
-        };
+        config.presets["android-phone"].deviceChrome.frontCamera =
+          "pill-shaped-cutout";
       },
     },
     {

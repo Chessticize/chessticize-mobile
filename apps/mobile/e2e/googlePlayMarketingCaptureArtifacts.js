@@ -41,6 +41,9 @@ const GOOGLE_PLAY_CAPTURE_TARGETS = Object.freeze({
     rawPixelDimensions: Object.freeze({ width: 2560, height: 1600 }),
   }),
 });
+const GOOGLE_PLAY_REQUIRED_CAPTURE_FAMILIES = Object.freeze([
+  'android-phone',
+]);
 
 const EXACT_SHA_PATTERN = /^[0-9a-f]{40}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
@@ -650,7 +653,7 @@ function writeCombinedGooglePlayCaptureManifest({
   outputRoot,
   story,
 }) {
-  const deviceFamilies = Object.keys(GOOGLE_PLAY_CAPTURE_TARGETS);
+  const deviceFamilies = GOOGLE_PLAY_REQUIRED_CAPTURE_FAMILIES;
   const manifests = Object.fromEntries(deviceFamilies.map((deviceFamily) => {
     const manifestPath = resolve(
       outputRoot,
@@ -742,7 +745,7 @@ function assertCombinedGooglePlayCaptureManifest({
   outputRoot,
   story,
 }) {
-  const deviceFamilies = Object.keys(GOOGLE_PLAY_CAPTURE_TARGETS);
+  const deviceFamilies = GOOGLE_PLAY_REQUIRED_CAPTURE_FAMILIES;
   const expectedFrames = expectedStoryFrames(story);
   if (
     manifest?.schemaVersion !== 1
@@ -1305,6 +1308,7 @@ function sha256(value) {
 
 module.exports = {
   GOOGLE_PLAY_CAPTURE_TARGETS,
+  GOOGLE_PLAY_REQUIRED_CAPTURE_FAMILIES,
   assertCombinedGooglePlayCaptureManifest,
   assertGooglePlayDeviceManifest,
   assertGooglePlayScreenshot,

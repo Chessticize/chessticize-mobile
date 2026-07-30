@@ -26,6 +26,7 @@ const {
 } = require("../apps/mobile/e2e/marketingCaptureArtifacts.js");
 const {
   GOOGLE_PLAY_CAPTURE_TARGETS,
+  GOOGLE_PLAY_REQUIRED_CAPTURE_FAMILIES,
   writeCombinedGooglePlayCaptureManifest,
   writeGooglePlayDeviceCaptureManifest,
 } = require("../apps/mobile/e2e/googlePlayMarketingCaptureArtifacts.js");
@@ -56,27 +57,17 @@ async function fixture(t) {
     signerCertificateSha256: "b".repeat(64),
   };
   const artifact = {
-    captureMode: "public-ui-exact-artifact",
-    artifactRole: "play-delivered-apk",
-    fileName: "Chessticize-Android-1.3.1.apk",
+    captureMode: "deterministic-e2e",
+    artifactRole: "detox-e2e-apk",
+    fileName: "app-e2e.apk",
     bytes: 123,
     sha256: "c".repeat(64),
-    candidate,
-    sourceManifest: {
-      fileName: "android-source-manifest.json",
-      sha256: "e".repeat(64),
-    },
-    mirrorEvidence: {
-      fileName: "android-apk-mirror-evidence.json",
-      sha256: "f".repeat(64),
-    },
   };
   const sourceCommit = "d".repeat(40);
   const rawSourceRoot = path.join(root, "raw-source");
   await mkdir(rawSourceRoot, { recursive: true });
-  for (const [family, contract] of Object.entries(
-    GOOGLE_PLAY_CAPTURE_TARGETS
-  )) {
+  for (const family of GOOGLE_PLAY_REQUIRED_CAPTURE_FAMILIES) {
+    const contract = GOOGLE_PLAY_CAPTURE_TARGETS[family];
     const target = {
       platform: "android",
       deviceFamily: family,
@@ -93,23 +84,6 @@ async function fixture(t) {
         contract.displayGroup,
         contract.orientation,
       ].join("-"),
-    };
-    const installedSession = {
-      schemaVersion: 1,
-      applicationId: candidate.applicationId,
-      installerPackageName: "com.android.vending",
-      initiatingPackageName: "com.android.vending",
-      versionName: candidate.versionName,
-      versionCode: candidate.versionCode,
-      signerCertificateSha256: candidate.signerCertificateSha256,
-      debuggable: false,
-      testOnly: false,
-      foregroundPackage: candidate.applicationId,
-      deviceId: target.deviceId,
-      installedBaseApk: {
-        bytes: 456,
-        sha256: sha256(Buffer.from(`installed:${family}`)),
-      },
     };
     const records = [];
     for (const frame of story.frames) {
@@ -138,58 +112,10 @@ async function fixture(t) {
         story,
         target,
       });
-      const sidecar = {
-        schemaVersion: 1,
-        platform: "google-play",
-        captureMode: "public-ui-exact-artifact",
-        order: frame.order,
-        frameId: frame.id,
-        captureId: frame.captureId,
-        sourceCommit,
-        artifact,
-        target: {
-          platform: target.platform,
-          deviceFamily: target.deviceFamily,
-          deviceName: target.deviceName,
-          deviceId: target.deviceId,
-          apiLevel: target.apiLevel,
-          densityDpi: target.densityDpi,
-          displayGroup: target.displayGroup,
-          orientation: target.orientation,
-          rawPixelDimensions: target.rawPixelDimensions,
-        },
-        installedSession,
-        screenshot: {
-          fileName: record.fileName,
-          bytes: sourceBytes.length,
-          sha256: record.sha256,
-          pixelDimensions: record.pixelDimensions,
-        },
-      };
-      const sidecarPath = path.join(
-        root,
-        target.outputDirectoryName,
-        `${frame.captureId}.capture.json`
-      );
-      const sidecarBytes = Buffer.from(
-        `${JSON.stringify(sidecar, null, 2)}\n`
-      );
-      await writeFile(sidecarPath, sidecarBytes);
-      records.push({
-        ...record,
-        captureProvenance: {
-          sidecarFileName: path.basename(sidecarPath),
-          sidecarFile: path.relative(root, sidecarPath),
-          sidecarSha256: sha256(sidecarBytes),
-          installedSessionSha256: sha256(
-            Buffer.from(JSON.stringify(installedSession))
-          ),
-        },
-      });
+      records.push(record);
     }
     writeGooglePlayDeviceCaptureManifest({
       artifact,
-      installedSession,
       outputRoot: root,
       records,
       sourceCommit,
@@ -203,18 +129,51 @@ async function fixture(t) {
   });
   const capture = JSON.parse(await readFile(capturePath, "utf8"));
   const captureSha256 = sha256(await readFile(capturePath));
+  const sourceManifest = {
+    schemaVersion: 1,
+    status: "artifact-only",
+    commitSha: sourceCommit,
+    worktreeClean: true,
+    bundle: {
+      applicationId: candidate.applicationId,
+      versionName: candidate.versionName,
+      versionCode: candidate.versionCode,
+      sha256: candidate.aabSha256,
+    },
+  };
+  const sourceManifestPath = path.join(root, "android-source-manifest.json");
+  const sourceManifestBytes = Buffer.from(
+    `${JSON.stringify(sourceManifest, null, 2)}\n`,
+  );
+  await writeFile(sourceManifestPath, sourceManifestBytes);
+  const mirrorEvidence = {
+    schemaVersion: 1,
+    phase: "play-apk-mirrored",
+    commitSha: sourceCommit,
+    applicationId: candidate.applicationId,
+    versionName: candidate.versionName,
+    versionCode: candidate.versionCode,
+    aabSha256: candidate.aabSha256,
+    sourceManifestSha256: sha256(sourceManifestBytes),
+    apk: {
+      sha256: artifact.sha256,
+      signerCertificateSha256: candidate.signerCertificateSha256,
+    },
+  };
+  const mirrorEvidencePath = path.join(
+    root,
+    "android-apk-mirror-evidence.json",
+  );
+  await writeFile(
+    mirrorEvidencePath,
+    `${JSON.stringify(mirrorEvidence, null, 2)}\n`,
+  );
   const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
   const finalDimensions = {
     "android-phone": { width: 1080, height: 1920 },
-    "android-tablet-7": { width: 1440, height: 2560 },
-    "android-tablet-10": { width: 2560, height: 1440 },
   };
   const artifacts = [];
-  for (const family of [
-    "android-phone",
-    "android-tablet-7",
-    "android-tablet-10",
-  ]) {
+  for (const family of GOOGLE_PLAY_REQUIRED_CAPTURE_FAMILIES) {
     for (let order = 1; order <= 6; order += 1) {
       const frame = metadata.previewAssets.screenshots.frames[order - 1];
       const file = path.join(family, `${order}-${frame.id}.png`);
@@ -251,6 +210,7 @@ async function fixture(t) {
     schemaVersion: 1,
     platform: "google-play",
     mode: "full-export",
+    layoutId: "chessticize-google-play-photo-studio-android-v2",
     locale: "en-US",
     source: {
       captureManifestSha256: captureSha256,
@@ -265,6 +225,8 @@ async function fixture(t) {
     metadata: metadataPath,
     capture: capturePath,
     composition: compositionPath,
+    sourceManifest: sourceManifestPath,
+    mirrorEvidence: mirrorEvidencePath,
   };
   const consoleReview = await prepareConsoleReview(baseOptions);
   Object.assign(consoleReview, {
@@ -287,7 +249,7 @@ async function fixture(t) {
   };
 }
 
-test("creates and re-verifies one deterministic exact listing asset set", async t => {
+test("creates and re-verifies one deterministic approved listing asset set", async t => {
   const options = await fixture(t);
   const first = await createListingHandoff(options);
   const second = await createListingHandoff(options);
@@ -299,7 +261,7 @@ test("creates and re-verifies one deterministic exact listing asset set", async 
   assert.match(first.appIcon.sha256, /^[0-9a-f]{64}$/u);
   assert.match(first.featureGraphic.sha256, /^[0-9a-f]{64}$/u);
   assert.match(first.captureManifest.sha256, /^[0-9a-f]{64}$/u);
-  assert.equal(first.compositionManifest.artifactCount, 18);
+  assert.equal(first.compositionManifest.artifactCount, 6);
   assert.match(first.compositionManifest.sha256, /^[0-9a-f]{64}$/u);
   assert.match(first.compositionManifest.artifactsDigest, /^[0-9a-f]{64}$/u);
   assert.match(first.assetSetDigest, /^[0-9a-f]{64}$/u);
@@ -320,18 +282,17 @@ test("fails closed when a final image changes after composition", async t => {
   );
 });
 
-test("fails closed when exact capture provenance is missing", async t => {
+test("fails closed when an approved capture is missing", async t => {
   const options = await fixture(t);
   const capture = JSON.parse(await readFile(options.capture, "utf8"));
-  const sidecar = capture.frames[0]
+  const screenshot = capture.frames[0]
     .captures["android-phone"]
-    .captureProvenance
-    .sidecarFile;
-  await rm(path.join(options.root, sidecar));
+    .file;
+  await rm(path.join(options.root, screenshot));
 
   await assert.rejects(
     createListingHandoff(options),
-    /exact capture provenance failed.*sidecar/isu
+    /capture provenance failed.*Missing Google Play raw capture/isu
   );
 });
 
@@ -357,7 +318,7 @@ test("fails closed when a family repeats a frame at another order", async t => {
 
   await assert.rejects(
     createListingHandoff(options),
-    /18 unique final image hashes and canonical alt texts/u
+    /six unique final image hashes and canonical alt texts/u
   );
 });
 

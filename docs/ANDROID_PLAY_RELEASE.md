@@ -441,11 +441,13 @@ schema version 4 fails closed unless that deterministic digest binds:
 
 - the canonical `en-US` metadata contract;
 - the checked-in Play icon and feature graphic;
-- the exact Play-delivered capture manifest and candidate;
+- the owner-approved capture manifest and its self-built screenshot identity;
+- the retained release source manifest and Play APK mirror evidence for the
+  immutable candidate;
 - the candidate signer, which must equal
   `signing.appSigningCertificateSha256`;
-- the exact composition manifest, all 18 final PNG hashes, canonical alt text,
-  phone, 7-inch tablet, and 10-inch tablet sets; and
+- the exact composition manifest, all six final phone PNG hashes, and canonical
+  alt text; and
 - the reviewed Play Console receipt and its evidence ID, HTTPS reference, and
   review time.
 

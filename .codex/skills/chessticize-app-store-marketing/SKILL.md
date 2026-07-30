@@ -1,6 +1,6 @@
 ---
 name: chessticize-app-store-marketing
-description: Compose Chessticize's approved deterministic raw mobile captures into App Store Photo Studio A or Google Play Screen First PNGs. Use when preparing, previewing, validating, or regenerating the six-frame English store sequence from a verified capture manifest.
+description: Compose Chessticize's approved deterministic raw mobile captures into App Store Photo Studio A or Android Photo Studio PNGs. Use when preparing, previewing, validating, or regenerating the six-frame English store sequence from a verified capture manifest.
 ---
 
 # Chessticize App Store Marketing
@@ -12,10 +12,11 @@ screenshots without changing the captured product state. The default
 composition remains the approved App Store Photo Studio A direction: warm
 white and icy-blue chessboard scenes, frame-specific frosted chess pieces,
 realistic Imagegen device photography, and the real app UI as the primary
-proof. The separate Google Play Screen First layout reuses the same engine and
-six-frame story with Android-native phone, 7-inch tablet, and 10-inch tablet
-captures. The previous Cobalt Focus layout remains available only as an
-explicit App Store v1 fallback.
+proof. The separate Android Photo Studio layout reuses the same engine and
+six-frame story with one Android-native phone set, Imagegen chess-studio
+background plates, and a deterministic generic Android device frame. The
+previous Cobalt Focus and Google Play Screen First layouts remain available
+only as explicit v1 fallbacks.
 
 ## Workflow
 
@@ -61,75 +62,66 @@ and `--layout-config` only for an intentionally reviewed layout revision.
 
 ## Google Play Workflow
 
-For an exact listing handoff, install the accepted build through Google Play on
-each authorized capture device. Do not side-load the public APK mirror. For
-every public-UI frame, run
-`pnpm mobile:capture:marketing-public-ui-frame:android`
-with the exact artifact/mirror/source environment and the canonical
-`CHESSTICIZE_MARKETING_CAPTURE_ID`. Require its PNG and `.capture.json`
-sidecar. The family recorder re-inspects the live Play-installed session and
-rejects device, installer, package, version, signer, production-flag,
-foreground-app, screenshot, or sidecar drift.
+Use the issue #444 owner-approved self-built capture. Its manifest stays
+`preview-only` so it records screenshot provenance truthfully and never claims
+the images came from the Play-delivered binary. Bind the already released
+candidate separately through its retained source manifest and Play APK mirror
+evidence during listing handoff.
 
-Use the issue #444 Android capture handoff only after its manifest identifies
-all three device families, exact source commit, exact candidate, and installed
-Play sessions. Preview all families:
+Preview the phone set:
 
 ```sh
 pnpm google-play:compose-marketing -- \
   --capture-root scratch/store-assets/google-play/<source-commit> \
   --manifest scratch/store-assets/google-play/<source-commit>/google-play-capture-manifest.json \
   --output-dir scratch/store-assets/google-play-composed/<source-commit> \
-  --device-family all \
-  --orientation all \
+  --device-family android-phone \
+  --orientation portrait \
   --preview-only
 ```
 
-Inspect the three contact sheets, then omit `--preview-only` for the final
-eighteen-image export. The Play layout normalizes its verified raw inputs to:
-
-- phone portrait: 1080 x 1920, with the canonical headline confined to the top
-  20 percent;
-- 7-inch tablet portrait: 1440 x 2560, with no marketing-text overlay; and
-- 10-inch tablet landscape: 2560 x 1440, with no marketing-text overlay.
-
-All three presets are frameless and UI-dominant. They do not draw or retain
-device imagery. The tablet outputs follow Google's preferred 9:16 portrait or
-16:9 landscape ratios and provide six screenshots, exceeding the four-image
-large-screen recommendation. Every final PNG is 24-bit opaque output.
+Inspect the single contact sheet, then omit `--preview-only` for the final
+six-image export. The Play layout preserves 1080 x 1920 output, confines the
+canonical headline to the top 20 percent, places the immutable screenshot in a
+deterministic unbranded Android handset, and draws one small centered circular
+punch-hole camera. It must never render a Dynamic Island, pill notch, Apple
+logo, or Apple-specific device cue. Tablet screenshots are optional and are
+not part of this delivery. Every final PNG is 24-bit opaque output.
 
 The canonical screenshot alt text is owned by
 `config/google-play-metadata-en-us-v1.json`, not the layout. Composition loads
 that contract, checks frame IDs, headlines, order, locale, and the 140-character
 limit, then records the metadata hash and per-artifact alt text in
-`composition-manifest.json`. The same receipt retains the capture status and
-APK/AAB/source/mirror identity supplied by an exact-artifact handoff; a preview
-handoff cannot claim that production identity.
+`composition-manifest.json`. The receipt retains the self-built capture status
+and APK/source identity. Production AAB/APK/source identity is supplied
+separately to the listing handoff and must not be inferred from the capture.
 
-After the full eighteen-image export, use
+After the full six-image export, use
 `google-play:listing:prepare-review`, `google-play:listing:handoff`, and
 `google-play:listing:verify` as documented in
 `docs/ANDROID_PLAY_LISTING.md`. The final asset-set digest binds the locale
-metadata, icon, feature graphic, exact capture and composition manifests,
-eighteen final PNG hashes and alt text, and owner-reviewed Console receipt.
+metadata, icon, feature graphic, approved capture and composition manifests,
+six final PNG hashes and alt text, retained release identity, and the
+owner-reviewed Console receipt.
 
 ## Refreshing a Scene Template
 
-The twelve versioned PNGs under `assets/` are deterministic compositor inputs,
+The versioned PNGs under `assets/` are deterministic compositor inputs,
 not generated during export. Use OpenAI Imagegen only when intentionally
 creating a new visual revision:
 
 1. Select exactly one frame and one device family. Use its paired scene as an
    art-direction reference, but compose natively for the target orientation.
-2. Preserve the approved headline, warm-white and icy-blue studio, perspective
-   board, frosted chess prop, realistic physical device, and unobstructed
-   screen opening. Generated screen content is disposable and must never remain
-   visible in the exported product proof.
+2. For App Store scenes, preserve the approved headline, warm-white and
+   icy-blue studio, perspective board, frosted chess prop, realistic physical
+   device, and unobstructed screen opening. For Google Play, generate a
+   device-free and text-free warm-white/icy-blue background plate; the
+   deterministic renderer owns the Android handset, headline, and app UI.
 3. Keep the iPhone device size within the configured family tolerance. Keep all
    iPad scene templates on the verified true-4:3 device geometry.
 4. Replace the exact versioned asset, then update its dimensions and SHA-256 in
-   `assets/app-store-marketing-layout-v2.json`. Change the layout ID when the
-   approved visual system changes materially.
+   the relevant v2 layout. Change the layout ID when the approved visual system
+   changes materially.
 5. Run the focused tests and regenerate both overview sheets plus the iPhone
    corner audit before accepting the new scene.
 
@@ -149,9 +141,9 @@ creating a new visual revision:
 - Keep the approved six-frame order and English copy from the capture manifest.
   The selected direction intentionally uses the final headline without a
   secondary marketing paragraph.
-- For Google Play, keep phone headline coverage at or below 20 percent. Do not
-  add extra marketing text to 7-inch or 10-inch tablet screenshots, and do not
-  draw device frames around any Android capture.
+- For Google Play, keep phone headline coverage at or below 20 percent. Use
+  only the required phone set. The device frame must be generic Android with a
+  small centered circular punch hole and no Dynamic Island or Apple cues.
 - Keep Google Play screenshot alt text identical to the canonical metadata
   contract. Do not fork alt text into the layout.
 - Keep the scene headline identical to the canonical contract. A copy change
@@ -182,9 +174,9 @@ unsupported dimensions, changed SHA-256, missing raw or scene PNG, a missing
 frame-specific scene, headline or device safe-area overflow, wrong screen
 aspect, invalid closed-bezel mask, inconsistent device size, path traversal,
 escaping symlinks, unsafe output names, or an output directory inside the raw
-handoff. Google Play also fails on device imagery, tablet marketing text,
-non-frameless presentation, an overlay above 20 percent, non-9:16/16:9 tablet
-output, out-of-policy pixel dimensions, or canonical alt-text drift.
+handoff. Google Play also fails on an unapproved device-chrome contract, an
+overlay above 20 percent, out-of-policy pixel dimensions, extra required device
+families, or canonical alt-text drift.
 
 Do not bypass a failure. Regenerate or correct the issue #411 App Store or
 issue #444 Google Play handoff, then run the compositor again.
@@ -194,7 +186,9 @@ issue #444 Google Play handoff, then run the compositor again.
 - Layout contract:
   `assets/app-store-marketing-layout-v2.json`
 - Google Play layout contract:
-  `assets/google-play-marketing-layout-v1.json`
+  `assets/google-play-marketing-layout-v2.json`
+- Six Android Imagegen background plates:
+  `assets/photo-studio-background-*-android-phone-v1.png`
 - Twelve frame-specific Imagegen scene templates:
   `assets/photo-studio-frame-*.png`
 - Retained fallback:
