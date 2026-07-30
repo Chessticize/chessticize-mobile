@@ -1026,6 +1026,15 @@ async function readVerifiedManifestMatePatterns(
       `Verified manifest is missing mate-pattern provenance for rating bucket ${missingBucket}`
     );
   }
+  const packBucketSet = new Set(packBucketMins);
+  const extraBucket = manifestBucketMins.find(
+    (bucketMin) => !packBucketSet.has(bucketMin)
+  );
+  if (extraBucket !== undefined) {
+    throw new Error(
+      `Verified manifest has mate-pattern provenance for unknown rating bucket ${extraBucket}`
+    );
+  }
 
   return {
     totals: { ...manifest.matePatternCounts },
