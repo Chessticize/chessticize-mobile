@@ -5,6 +5,30 @@ import {
 } from "../src/components/adaptivePracticeLayout";
 
 describe("buildPracticeAdaptiveLayout", () => {
+  it("reserves the locked-session controls on a short compact portrait viewport", () => {
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height: 731,
+      insets: { top: 24, right: 0, bottom: 24, left: 0 },
+      width: 411
+    });
+
+    expect(layout.className).toBe("compactPortrait");
+    expect(layout.boardSize).toBe(339);
+  });
+
+  it("keeps a tall compact portrait board width-bound", () => {
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height: 956,
+      insets: { top: 62, right: 0, bottom: 34, left: 0 },
+      width: 440
+    });
+
+    expect(layout.className).toBe("compactPortrait");
+    expect(layout.boardSize).toBe(408);
+  });
+
   it.each([
     {
       label: "compact wide-short resizable viewport",

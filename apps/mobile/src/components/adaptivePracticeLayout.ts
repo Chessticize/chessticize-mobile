@@ -42,6 +42,7 @@ const PHONE_PORTRAIT_BOARD_MAX = 560;
 const REGULAR_LANDSCAPE_BOARD_MAX = 640;
 const REGULAR_PORTRAIT_BOARD_MAX = 860;
 const REGULAR_LANDSCAPE_RESERVED_SESSION_CHROME_HEIGHT = 120;
+const COMPACT_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 312;
 const REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 240;
 
 export function buildPracticeAdaptiveLayout({
@@ -90,12 +91,16 @@ export function buildPracticeAdaptiveLayout({
       : PRACTICE_UI_PADDING * 2)
   );
   const portraitBoardSlotWidth = Math.max(0, sessionContentWidth - PRACTICE_UI_PADDING * 2);
-  const regularPortraitReservedControlsHeight = REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT +
+  const portraitReservedControlsHeight = (
+    isRegularWidth
+      ? REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT
+      : COMPACT_PORTRAIT_RESERVED_CONTROLS_HEIGHT
+  ) +
     (isLargeText ? Math.min(180, Math.round((fontScale - 1) * 120)) : 0);
-  const portraitBoardSlotHeight = isRegularWidth && !isLandscape
+  const portraitBoardSlotHeight = !isLandscape
     ? Math.max(
-        0,
-        contentHeight - PRACTICE_UI_PADDING * 2 - regularPortraitReservedControlsHeight
+      0,
+      contentHeight - PRACTICE_UI_PADDING * 2 - portraitReservedControlsHeight
       )
     : portraitBoardSlotWidth;
   const boardMax = isRegularWidth
