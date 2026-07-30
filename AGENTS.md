@@ -112,9 +112,11 @@ ADR is not itself a defect.
 - Release-branch history is append-only. Never rebase the release branch,
   amend or replace a commit already pushed to it, force-push it, or squash the
   release branch when integrating it to `main`. Correct mistakes with new
-  commits. Protect every active release branch against force pushes and
-  deletion, require linear history on that branch, and apply the protection to
-  administrators.
+  commits. Do not create, require, or depend on GitHub branch protection,
+  rulesets, or administrator-only controls for this workflow. Treat the
+  append-only history, no-force-push, no-deletion, and linear-history rules as
+  operator policy enforced through reviewed PRs and exact-ref checks. Missing
+  GitHub enforcement is not a release blocker.
 - During release preparation, each contributor or agent works on its own
   branch and opens a PR whose base is the dedicated release branch. Do not push
   another contributor's work directly to the release branch and do not route
@@ -164,7 +166,11 @@ ADR is not itself a defect.
 - If the PR's stated goal is already complete when it is opened or first pushed, open it as ready for review rather than as a draft. If an existing draft becomes complete, mark it ready for review (`gh pr ready`) proactively, without waiting to be asked. Ready PRs run the Mobile JS checks; iOS native builds and Detox run locally under the risk-scoped validation policy.
 - For a Storybook-only PR, the coherent issue-scoped design increment is the stated goal. It may merge while the linked product issue remains open; the absent product wiring is deliberately out of scope until explicit design approval.
 - The agent is authorized to merge a ready-for-review PR (`gh pr merge --squash --delete-branch`, matching this repo's required convention for every PR except the final release PR to `main`, which requires a merge commit) once it is complete, every required fast check is green, and the risk-scoped validation described below is recorded. Merge to main when the feature PR is complete, not after every increment. Do not create a new branch for each small follow-up while a feature PR is still open — push to the open PR instead.
-- `main` has no branch protection, so GitHub will not itself enforce this policy. Before merging, inspect the actual required check status (for example `gh pr checks`) and confirm any required local native evidence or documented evidence-reuse comparison. Do not treat an unverified assumption as local evidence.
+- GitHub branch protection and rulesets are not release gates in this
+  repository, so GitHub will not itself enforce this policy. Before merging,
+  inspect the actual required check status (for example `gh pr checks`) and
+  confirm any required local native evidence or documented evidence-reuse
+  comparison. Do not treat an unverified assumption as local evidence.
 - Do not mark a PR ready or merge it while part of its stated goal is unfinished, a required check is red, its selected native-validation scope is incomplete, or the PR description calls out a known unresolved product issue.
 - GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native validation is required only for release candidates and changes to native implementation, native integration/configuration, native dependencies, or native validation infrastructure. Record the tested commit SHA, build result, required suite results, Xcode version, simulator, clean-worktree confirmation, and any later evidence-reuse comparison.
 - Before a release, require exact-head fast checks plus the release scope selected below. An ordinary delta may ship after fast checks and the platform's signed-artifact checks without a physical-device smoke or full Detox rerun. Run the affected simulator/emulator suite for targeted native risk and both suites only for broad native risk. Treat production runtime/domain sources, native/platform projects and native test-APK sources, dependency manifests or patches, build/release configuration, bundled fixtures/resources, and the fail-closed App-input classifier itself as App build inputs. A change to any App build input requires a new validation build and the selected native scope. Host-side E2E specs, selectors, assertions, screenshot/evidence collectors, and non-bundled fixtures are test-runner inputs: when the fail-closed App-input comparison passes, reuse the checksummed validation App artifact and rerun only the affected test scope. Documentation, review metadata, agent guidance, and merge ancestry are record-only inputs. Unknown paths are App build inputs. Record the App source SHA, test-runner SHA, App-input digest, and artifact checksum whenever evidence spans commits. This evidence reuse never relabels or publishes an ancestor's signed candidate: the distributed candidate, platform tag, and source manifest remain bound to the exact final release-branch head. Any unresolved automated failure that touches the changed boundary remains a release blocker.
