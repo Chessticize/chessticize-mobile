@@ -8,12 +8,14 @@ const {
   canonicalAndroidSourceTag,
   inspectAndroidReleaseDocumentation,
   inspectBundleEntries,
+  inspectGooglePlayListingAssetSet,
   inspectOwnerEvidence,
   inspectPublishedSourceRelease,
   inspectReleaseManifest,
   normalizeFingerprint,
   parseArguments,
   parseZipListing,
+  listingAssetSetDigest,
   requireApprovedSingleSigner,
   resolveRepoPath,
   requireVerifiedJar,
@@ -22,6 +24,10 @@ const {
 const mobileRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(mobileRoot, '../..');
 const releaseVersion = JSON.parse(read('apps/mobile/release-version.json'));
+const googlePlayMetadataBytes = Buffer.from(
+  read('config/google-play-metadata-en-us-v1.json'),
+);
+const googlePlayMetadata = JSON.parse(googlePlayMetadataBytes);
 const ownerEvidenceExample = JSON.parse(
   read('docs/android-play-owner-evidence.example.json'),
 );
@@ -33,6 +39,26 @@ const expectedCandidate = {
   versionName: releaseVersion.publicVersion,
   versionCode: releaseVersion.androidVersionCode,
   uploadCertificateSha256: '11'.repeat(32),
+  googlePlayListing: {
+    metadataContractSha256: crypto.createHash('sha256')
+      .update(googlePlayMetadataBytes)
+      .digest('hex'),
+    appIconSha256: crypto.createHash('sha256')
+      .update(fs.readFileSync(path.join(
+        repoRoot,
+        googlePlayMetadata.previewAssets.appIcon.path,
+      )))
+      .digest('hex'),
+    appIconAltText: googlePlayMetadata.previewAssets.appIcon.altText,
+    featureGraphicSha256: crypto.createHash('sha256')
+      .update(fs.readFileSync(path.join(
+        repoRoot,
+        googlePlayMetadata.previewAssets.featureGraphic.path,
+      )))
+      .digest('hex'),
+    featureGraphicAltText:
+      googlePlayMetadata.previewAssets.featureGraphic.altText,
+  },
 };
 const expectedSourceTag = canonicalAndroidSourceTag(
   expectedCandidate.versionName,
@@ -155,6 +181,67 @@ function evidenceRecord(status, evidenceId, overrides = {}) {
   };
 }
 
+function validGooglePlayListingAssetSet(overrides = {}) {
+  const assetSet = {
+    schemaVersion: 1,
+    kind: 'chessticize.google-play-listing-asset-set',
+    status: 'reviewed',
+    candidate: {
+      commitSha: expectedCandidate.commitSha,
+      applicationId: expectedCandidate.applicationId,
+      versionName: expectedCandidate.versionName,
+      versionCode: expectedCandidate.versionCode,
+      aabSha256: expectedCandidate.aabSha256,
+      apkSha256: '44'.repeat(32),
+      signerCertificateSha256: '55'.repeat(32),
+    },
+    metadataContract: {
+      metadataId: 'google-play-en-us-v1',
+      locale: 'en-US',
+      repositoryFile: 'config/google-play-metadata-en-us-v1.json',
+      sha256: expectedCandidate.googlePlayListing.metadataContractSha256,
+    },
+    appIcon: {
+      repositoryFile: 'apps/mobile/store-assets/android/play-icon-512.png',
+      sha256: expectedCandidate.googlePlayListing.appIconSha256,
+      altText: expectedCandidate.googlePlayListing.appIconAltText,
+    },
+    featureGraphic: {
+      repositoryFile:
+        'apps/mobile/store-assets/android/feature-graphic-1024x500.png',
+      sha256: expectedCandidate.googlePlayListing.featureGraphicSha256,
+      altText: expectedCandidate.googlePlayListing.featureGraphicAltText,
+    },
+    captureManifest: {
+      fileName: 'google-play-capture-manifest.json',
+      sha256: '99'.repeat(32),
+    },
+    compositionManifest: {
+      fileName: 'composition-manifest.json',
+      sha256: 'aa'.repeat(32),
+      artifactCount: 18,
+      artifactsDigest: 'bb'.repeat(32),
+      deviceFamilies: [
+        'android-phone',
+        'android-tablet-7',
+        'android-tablet-10',
+      ],
+    },
+    consoleReview: {
+      status: 'reviewed',
+      evidenceId: 'play-listing-review-444',
+      reference:
+        'https://play.google.com/console/evidence/play-listing-review-444',
+      reviewedAt: '2026-07-30T03:04:05.000Z',
+    },
+    ...overrides,
+  };
+  return {
+    ...assetSet,
+    assetSetDigest: listingAssetSetDigest(assetSet),
+  };
+}
+
 function retainedSourceManifest(overrides = {}) {
   return {
     schemaVersion: 1,
@@ -208,8 +295,9 @@ function validOwnerEvidence(overrides = {}) {
   const sourceTag = expectedSourceTag;
   const sourceReleaseUrl =
     `https://github.com/Chessticize/chessticize-mobile/releases/tag/${sourceTag}`;
+  const listingAssetSet = validGooglePlayListingAssetSet();
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     candidate: candidateBinding(),
     sourceRelease: evidenceRecord('published', 'source-release-123', {
       reference: sourceReleaseUrl,
@@ -263,7 +351,9 @@ function validOwnerEvidence(overrides = {}) {
     },
     console: {
       developerVerification: evidenceRecord('verified', 'developer-verification-1'),
-      storeListing: evidenceRecord('reviewed', 'store-listing-2'),
+      storeListing: evidenceRecord('reviewed', 'store-listing-2', {
+        assetSetDigest: listingAssetSet.assetSetDigest,
+      }),
       privacyPolicy: evidenceRecord('reviewed', 'privacy-policy-3'),
       dataSafety: evidenceRecord('reviewed', 'data-safety-4'),
       supportedDevices: evidenceRecord('reviewed', 'device-catalog-5'),
@@ -293,6 +383,11 @@ function validOwnerEvidence(overrides = {}) {
       releaseId: 'production-release-10',
     }),
     artifacts: {
+      googlePlayListingAssetSet: evidenceRecord(
+        'pass',
+        'google-play-listing-asset-set-444',
+        { assetSet: listingAssetSet },
+      ),
       generatedApkSizes: evidenceRecord('pass', 'generated-apk-sizes-11', {
         universalApkBytes: 340_000_000,
         arm64ApkBytes: 310_000_000,
@@ -671,7 +766,7 @@ describe('Android Play release contract', () => {
       '1dd6cc41fb16f264745853de5548920ec257c4033e9415b2c92b354e12bc0dff',
       '30329668716',
       '29cbfb529a38e215cd7fc6763284618288031c624cbf65cce0e381eafe3bbea0',
-      'Build 9 is the proposed Android 1.3.1 patch release',
+      'Build 9 is the immutable Android 1.3.1 release',
     ]) {
       expect(runbook).toContain(value);
     }
@@ -983,8 +1078,8 @@ describe('Android Play release contract', () => {
     );
   });
 
-  it('keeps the blank owner contract on schema v3 with fail-closed source placeholders', () => {
-    expect(ownerEvidenceExample.schemaVersion).toBe(3);
+  it('keeps the blank owner contract on schema v4 with fail-closed source and listing placeholders', () => {
+    expect(ownerEvidenceExample.schemaVersion).toBe(4);
     expect(ownerEvidenceExample.sourceRelease).toEqual(expect.objectContaining({
       status: 'pending',
       repositoryUrl: 'https://github.com/Chessticize/chessticize-mobile',
@@ -1006,6 +1101,46 @@ describe('Android Play release contract', () => {
           expectedSourceTag,
       }),
     }));
+    expect(ownerEvidenceExample.artifacts.googlePlayListingAssetSet)
+      .toEqual(expect.objectContaining({
+        status: 'pending',
+        assetSet: expect.objectContaining({
+          status: 'pending',
+          kind: 'chessticize.google-play-listing-asset-set',
+          compositionManifest: expect.objectContaining({
+            artifactCount: 18,
+            deviceFamilies: [
+              'android-phone',
+              'android-tablet-7',
+              'android-tablet-10',
+            ],
+          }),
+        }),
+      }));
+  });
+
+  it('requires one deterministic, Console-reviewed Google Play listing asset set', () => {
+    const assetSet = validGooglePlayListingAssetSet();
+    expect(inspectGooglePlayListingAssetSet(
+      assetSet,
+      expectedCandidate,
+    )).toEqual([]);
+
+    assetSet.compositionManifest.sha256 = 'cc'.repeat(32);
+    expect(inspectGooglePlayListingAssetSet(
+      assetSet,
+      expectedCandidate,
+    )).toEqual(expect.arrayContaining([
+      expect.stringContaining('asset-set digest does not match'),
+    ]));
+
+    const evidence = validOwnerEvidence();
+    evidence.console.storeListing.assetSetDigest = 'dd'.repeat(32);
+    expect(inspectOwnerEvidence(evidence, expectedCandidate)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Play store listing asset-set digest'),
+      ]),
+    );
   });
 
   it('binds the retained source manifest provenance to the exact candidate', () => {

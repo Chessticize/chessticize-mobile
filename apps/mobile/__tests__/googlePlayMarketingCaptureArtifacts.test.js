@@ -2,6 +2,7 @@ const { createHash } = require('node:crypto');
 const {
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } = require('node:fs');
 const { tmpdir } = require('node:os');
@@ -12,14 +13,19 @@ const {
   captureMarketingScreenshot,
 } = require('../e2e/marketingCaptureArtifacts');
 const {
+  captureGooglePlayPublicUiFrame,
   GOOGLE_PLAY_CAPTURE_TARGETS,
   assertGooglePlayScreenshot,
+  inspectGooglePlayInstalledSession,
   redactedAndroidDeviceId,
   resolveGooglePlayArtifactIdentity,
   resolveGooglePlayCaptureTarget,
   writeCombinedGooglePlayCaptureManifest,
   writeGooglePlayDeviceCaptureManifest,
 } = require('../e2e/googlePlayMarketingCaptureArtifacts');
+const {
+  recordGooglePlayPublicUiCapture,
+} = require('../e2e/record-google-play-public-ui-capture');
 
 function targetEnvironment(deviceFamily, serial = 'emulator-5554') {
   return {
@@ -38,6 +44,133 @@ function previewArtifact() {
     fileName: 'app-e2e.apk',
     bytes: 123,
     sha256: 'a'.repeat(64),
+  };
+}
+
+function createExactArtifactWorkspace() {
+  const workspace = mkdtempSync(join(tmpdir(), 'play-artifact-'));
+  const artifactPath = join(workspace, 'artifact.apk');
+  const sourceManifestPath = join(workspace, 'android-source-manifest.json');
+  const mirrorEvidencePath = join(
+    workspace,
+    'android-apk-mirror-evidence.json'
+  );
+  const sourceCommit = 'b'.repeat(40);
+  writeFileSync(artifactPath, 'apk');
+  const sourceManifestBytes = Buffer.from(JSON.stringify({
+    schemaVersion: 1,
+    status: 'artifact-only',
+    commitSha: sourceCommit,
+    worktreeClean: true,
+    bundle: {
+      applicationId: 'com.chessticize.mobile',
+      versionName: '1.3.1',
+      versionCode: 9,
+      sha256: 'c'.repeat(64),
+    },
+  }));
+  writeFileSync(sourceManifestPath, sourceManifestBytes);
+  writeFileSync(mirrorEvidencePath, JSON.stringify({
+    schemaVersion: 1,
+    phase: 'play-apk-mirrored',
+    commitSha: sourceCommit,
+    applicationId: 'com.chessticize.mobile',
+    versionName: '1.3.1',
+    versionCode: 9,
+    aabSha256: 'c'.repeat(64),
+    sourceManifestSha256: createHash('sha256')
+      .update(sourceManifestBytes)
+      .digest('hex'),
+    playDownloadId: 'download-9',
+    apk: {
+      name: 'artifact.apk',
+      bytes: 3,
+      sha256: createHash('sha256').update('apk').digest('hex'),
+      signerCertificateSha256: 'f'.repeat(64),
+    },
+  }));
+  const environment = {
+    ...targetEnvironment('android-phone'),
+    ADB_PATH: '/sdk/platform-tools/adb',
+    ANDROID_HOME: join(workspace, 'android-sdk'),
+    CHESSTICIZE_ANDROID_MARKETING_CAPTURE_MODE:
+      'public-ui-exact-artifact',
+    CHESSTICIZE_ANDROID_CAPTURE_ARTIFACT_ROLE: 'play-delivered-apk',
+    CHESSTICIZE_ANDROID_CAPTURE_ARTIFACT_PATH: artifactPath,
+    CHESSTICIZE_ANDROID_SOURCE_MANIFEST_PATH: sourceManifestPath,
+    CHESSTICIZE_ANDROID_APK_MIRROR_EVIDENCE_PATH: mirrorEvidencePath,
+  };
+  const artifact = resolveGooglePlayArtifactIdentity({
+    environment,
+    repositoryRoot: workspace,
+    sourceCommit,
+  });
+  return {
+    artifact,
+    artifactPath,
+    environment,
+    mirrorEvidencePath,
+    sourceCommit,
+    sourceManifestPath,
+    workspace,
+  };
+}
+
+function installedApkInspection(overrides = {}) {
+  return {
+    applicationId: 'com.chessticize.mobile',
+    versionName: '1.3.1',
+    versionCode: 9,
+    signerCertificateSha256: 'f'.repeat(64),
+    debuggable: false,
+    testOnly: false,
+    internetPermission: true,
+    ...overrides,
+  };
+}
+
+function createAdbRunner({
+  commands,
+  foregroundPackage = 'com.chessticize.mobile',
+  installerPackage = 'com.android.vending',
+  screenshot,
+} = {}) {
+  return (command, args) => {
+    commands?.push({ command, args });
+    const isAdb = command === 'adb' || command.endsWith('/adb');
+    if (isAdb && args.includes('pm') && args.includes('path')) {
+      return {
+        status: 0,
+        stdout: 'package:/data/app/chessticize/base.apk\n',
+        stderr: '',
+      };
+    }
+    if (isAdb && args.includes('pull')) {
+      writeFileSync(args.at(-1), 'installed-base-apk');
+      return { status: 0, stdout: '1 file pulled\n', stderr: '' };
+    }
+    if (isAdb && args.includes('get-install-source')) {
+      return {
+        status: 0,
+        stdout: [
+          `InitiatingPackageName=${installerPackage}`,
+          `InstallingPackageName=${installerPackage}`,
+        ].join('\n'),
+        stderr: '',
+      };
+    }
+    if (isAdb && args.includes('dumpsys')) {
+      return {
+        status: 0,
+        stdout:
+          `mResumedActivity: ActivityRecord{1 u0 ${foregroundPackage}/.MainActivity t1}`,
+        stderr: '',
+      };
+    }
+    if (isAdb && args.includes('screencap')) {
+      return { status: 0, stdout: screenshot, stderr: Buffer.alloc(0) };
+    }
+    throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
   };
 }
 
@@ -101,47 +234,13 @@ describe('Google Play marketing capture artifacts', () => {
   });
 
   it('separates preview APK identity from exact Play-delivered identity', () => {
-    const workspace = mkdtempSync(join(tmpdir(), 'play-artifact-'));
-    const artifactPath = join(workspace, 'artifact.apk');
-    const sourceManifestPath = join(workspace, 'android-source-manifest.json');
-    const mirrorEvidencePath = join(
+    const {
+      artifactPath,
+      mirrorEvidencePath,
+      sourceCommit,
+      sourceManifestPath,
       workspace,
-      'android-apk-mirror-evidence.json'
-    );
-    const sourceCommit = 'b'.repeat(40);
-    writeFileSync(artifactPath, 'apk');
-    const sourceManifestBytes = Buffer.from(JSON.stringify({
-      schemaVersion: 1,
-      status: 'artifact-only',
-      commitSha: sourceCommit,
-      worktreeClean: true,
-      bundle: {
-        applicationId: 'com.chessticize.mobile',
-        versionName: '1.3.1',
-        versionCode: 9,
-        sha256: 'c'.repeat(64),
-      },
-    }));
-    writeFileSync(sourceManifestPath, sourceManifestBytes);
-    writeFileSync(mirrorEvidencePath, JSON.stringify({
-      schemaVersion: 1,
-      phase: 'play-apk-mirrored',
-      commitSha: sourceCommit,
-      applicationId: 'com.chessticize.mobile',
-      versionName: '1.3.1',
-      versionCode: 9,
-      aabSha256: 'c'.repeat(64),
-      sourceManifestSha256: createHash('sha256')
-        .update(sourceManifestBytes)
-        .digest('hex'),
-      playDownloadId: 'download-9',
-      apk: {
-        name: 'artifact.apk',
-        bytes: 3,
-        sha256: createHash('sha256').update('apk').digest('hex'),
-        signerCertificateSha256: 'f'.repeat(64),
-      },
-    }));
+    } = createExactArtifactWorkspace();
 
     const preview = resolveGooglePlayArtifactIdentity({
       environment: {
@@ -213,6 +312,238 @@ describe('Google Play marketing capture artifacts', () => {
       repositoryRoot: workspace,
       sourceCommit: 'd'.repeat(40),
     })).toThrow('does not bind');
+  });
+
+  it('proves the installed Play session from the pulled base APK', () => {
+    const fixture = createExactArtifactWorkspace();
+    const target = resolveGooglePlayCaptureTarget(fixture.environment);
+    const inspectApk = jest.fn(() => installedApkInspection());
+    const commands = [];
+
+    const session = inspectGooglePlayInstalledSession({
+      artifact: fixture.artifact,
+      environment: fixture.environment,
+      inspectApk,
+      repositoryRoot: fixture.workspace,
+      run: createAdbRunner({ commands }),
+      target,
+    });
+
+    expect(inspectApk).toHaveBeenCalledTimes(2);
+    expect(commands).not.toHaveLength(0);
+    expect(commands.every(
+      command => command.command === fixture.environment.ADB_PATH
+    )).toBe(true);
+    expect(session).toMatchObject({
+      schemaVersion: 1,
+      applicationId: 'com.chessticize.mobile',
+      installerPackageName: 'com.android.vending',
+      versionName: '1.3.1',
+      versionCode: 9,
+      signerCertificateSha256: 'f'.repeat(64),
+      debuggable: false,
+      testOnly: false,
+      foregroundPackage: 'com.chessticize.mobile',
+      deviceId: target.deviceId,
+    });
+    expect(session.installedBaseApk.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it.each([
+    ['installer', { installerPackage: 'adb' }, {}, 'com.android.vending'],
+    ['version', {}, { versionCode: 8 }, 'version'],
+    ['signer', {}, { signerCertificateSha256: 'e'.repeat(64) }, 'signer'],
+    ['debuggable', {}, { debuggable: true }, 'debuggable'],
+    ['test-only', {}, { testOnly: true }, 'testOnly'],
+    [
+      'foreground app',
+      { foregroundPackage: 'com.android.settings' },
+      {},
+      'foreground',
+    ],
+  ])('rejects installed-session drift in %s', (
+    _label,
+    runnerOptions,
+    inspectionOverrides,
+    expectedError
+  ) => {
+    const fixture = createExactArtifactWorkspace();
+    expect(() => inspectGooglePlayInstalledSession({
+      artifact: fixture.artifact,
+      environment: fixture.environment,
+      inspectApk: () => installedApkInspection(inspectionOverrides),
+      repositoryRoot: fixture.workspace,
+      run: createAdbRunner(runnerOptions),
+      target: resolveGooglePlayCaptureTarget(fixture.environment),
+    })).toThrow(expectedError);
+  });
+
+  it('captures a canonical frame through adb and writes a bound sidecar', () => {
+    const fixture = createExactArtifactWorkspace();
+    const captureRoot = join(fixture.workspace, 'input');
+    const frame = story.frames[0];
+    const png = new PNG({ width: 1080, height: 1920 });
+    png.data.fill(255);
+    const screenshot = PNG.sync.write(png);
+
+    const result = captureGooglePlayPublicUiFrame({
+      artifact: fixture.artifact,
+      captureRoot,
+      environment: fixture.environment,
+      frame,
+      inspectApk: () => installedApkInspection(),
+      repositoryRoot: fixture.workspace,
+      run: createAdbRunner({ screenshot }),
+      sourceCommit: fixture.sourceCommit,
+      story,
+      target: resolveGooglePlayCaptureTarget(fixture.environment),
+    });
+
+    expect(result.screenshotPath).toBe(join(
+      captureRoot,
+      `${frame.captureId}.png`
+    ));
+    expect(result.sidecarPath).toBe(join(
+      captureRoot,
+      `${frame.captureId}.capture.json`
+    ));
+    const sidecar = JSON.parse(readFileSync(result.sidecarPath, 'utf8'));
+    expect(sidecar).toMatchObject({
+      schemaVersion: 1,
+      captureId: frame.captureId,
+      frameId: frame.id,
+      sourceCommit: fixture.sourceCommit,
+      artifact: fixture.artifact,
+      target: {
+        deviceFamily: 'android-phone',
+      },
+      installedSession: {
+        installerPackageName: 'com.android.vending',
+        foregroundPackage: 'com.chessticize.mobile',
+      },
+      screenshot: {
+        fileName: `${frame.captureId}.png`,
+        bytes: screenshot.length,
+        sha256: createHash('sha256').update(screenshot).digest('hex'),
+        pixelDimensions: { width: 1080, height: 1920 },
+      },
+    });
+  });
+
+  it('requires six command sidecars and re-verifies the live session', () => {
+    const fixture = createExactArtifactWorkspace();
+    const captureRoot = join(fixture.workspace, 'input');
+    const outputRoot = join(fixture.workspace, 'output');
+    const target = resolveGooglePlayCaptureTarget(fixture.environment);
+    const png = new PNG({ width: 1080, height: 1920 });
+    png.data.fill(255);
+    const screenshot = PNG.sync.write(png);
+    const inspector = () => installedApkInspection();
+
+    for (const frame of story.frames) {
+      captureGooglePlayPublicUiFrame({
+        artifact: fixture.artifact,
+        captureRoot,
+        environment: fixture.environment,
+        frame,
+        inspectApk: inspector,
+        repositoryRoot: fixture.workspace,
+        run: createAdbRunner({ screenshot }),
+        sourceCommit: fixture.sourceCommit,
+        story,
+        target,
+      });
+    }
+
+    const manifestPath = recordGooglePlayPublicUiCapture({
+      environment: {
+        ...fixture.environment,
+        CHESSTICIZE_MARKETING_INPUT_ROOT: captureRoot,
+        CHESSTICIZE_MARKETING_OUTPUT_ROOT: outputRoot,
+      },
+      inspectApk: inspector,
+      repositoryRoot: fixture.workspace,
+      run: createAdbRunner(),
+      sourceCommit: fixture.sourceCommit,
+      story,
+    });
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    expect(manifest.installedSession).toMatchObject({
+      installerPackageName: 'com.android.vending',
+      versionCode: 9,
+    });
+    expect(manifest.frames).toHaveLength(6);
+    expect(manifest.frames[0].captureProvenance).toMatchObject({
+      sidecarFileName: `${story.frames[0].captureId}.capture.json`,
+      sidecarSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      installedSessionSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
+
+    const missingSidecar = join(
+      captureRoot,
+      `${story.frames[5].captureId}.capture.json`
+    );
+    rmSync(missingSidecar);
+    expect(() => recordGooglePlayPublicUiCapture({
+      environment: {
+        ...fixture.environment,
+        CHESSTICIZE_MARKETING_INPUT_ROOT: captureRoot,
+        CHESSTICIZE_MARKETING_OUTPUT_ROOT: outputRoot,
+      },
+      inspectApk: inspector,
+      repositoryRoot: fixture.workspace,
+      run: createAdbRunner(),
+      sourceCommit: fixture.sourceCommit,
+      story,
+    })).toThrow('sidecar');
+  });
+
+  it('rejects an externally replaced PNG and live installed-session drift', () => {
+    const fixture = createExactArtifactWorkspace();
+    const captureRoot = join(fixture.workspace, 'input');
+    const outputRoot = join(fixture.workspace, 'output');
+    const target = resolveGooglePlayCaptureTarget(fixture.environment);
+    const png = new PNG({ width: 1080, height: 1920 });
+    png.data.fill(255);
+    const screenshot = PNG.sync.write(png);
+    for (const frame of story.frames) {
+      captureGooglePlayPublicUiFrame({
+        artifact: fixture.artifact,
+        captureRoot,
+        environment: fixture.environment,
+        frame,
+        inspectApk: () => installedApkInspection(),
+        repositoryRoot: fixture.workspace,
+        run: createAdbRunner({ screenshot }),
+        sourceCommit: fixture.sourceCommit,
+        story,
+        target,
+      });
+    }
+    const firstPath = join(captureRoot, `${story.frames[0].captureId}.png`);
+    writeFileSync(firstPath, Buffer.concat([screenshot, Buffer.from('drift')]));
+    const input = {
+      environment: {
+        ...fixture.environment,
+        CHESSTICIZE_MARKETING_INPUT_ROOT: captureRoot,
+        CHESSTICIZE_MARKETING_OUTPUT_ROOT: outputRoot,
+      },
+      repositoryRoot: fixture.workspace,
+      sourceCommit: fixture.sourceCommit,
+      story,
+    };
+    expect(() => recordGooglePlayPublicUiCapture({
+      ...input,
+      inspectApk: () => installedApkInspection(),
+      run: createAdbRunner(),
+    })).toThrow('screenshot');
+
+    writeFileSync(firstPath, screenshot);
+    expect(() => recordGooglePlayPublicUiCapture({
+      ...input,
+      inspectApk: () => installedApkInspection({ versionCode: 10 }),
+      run: createAdbRunner(),
+    })).toThrow('version');
   });
 
   it('writes and re-verifies one artifact-bound manifest for all Play families', () => {

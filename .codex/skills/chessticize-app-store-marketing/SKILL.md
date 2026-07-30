@@ -61,8 +61,19 @@ and `--layout-config` only for an intentionally reviewed layout revision.
 
 ## Google Play Workflow
 
+For an exact listing handoff, install the accepted build through Google Play on
+each authorized capture device. Do not side-load the public APK mirror. For
+every public-UI frame, run
+`pnpm mobile:capture:marketing-public-ui-frame:android`
+with the exact artifact/mirror/source environment and the canonical
+`CHESSTICIZE_MARKETING_CAPTURE_ID`. Require its PNG and `.capture.json`
+sidecar. The family recorder re-inspects the live Play-installed session and
+rejects device, installer, package, version, signer, production-flag,
+foreground-app, screenshot, or sidecar drift.
+
 Use the issue #444 Android capture handoff only after its manifest identifies
-all three device families and the exact source commit. Preview all families:
+all three device families, exact source commit, exact candidate, and installed
+Play sessions. Preview all families:
 
 ```sh
 pnpm google-play:compose-marketing -- \
@@ -94,6 +105,13 @@ limit, then records the metadata hash and per-artifact alt text in
 `composition-manifest.json`. The same receipt retains the capture status and
 APK/AAB/source/mirror identity supplied by an exact-artifact handoff; a preview
 handoff cannot claim that production identity.
+
+After the full eighteen-image export, use
+`google-play:listing:prepare-review`, `google-play:listing:handoff`, and
+`google-play:listing:verify` as documented in
+`docs/ANDROID_PLAY_LISTING.md`. The final asset-set digest binds the locale
+metadata, icon, feature graphic, exact capture and composition manifests,
+eighteen final PNG hashes and alt text, and owner-reviewed Console receipt.
 
 ## Refreshing a Scene Template
 

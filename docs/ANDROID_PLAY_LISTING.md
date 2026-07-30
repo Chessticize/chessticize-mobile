@@ -67,6 +67,25 @@ Also included
 - Privacy policy: `https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md`
 - Source: `https://github.com/Chessticize/chessticize-mobile`
 
+The version-controlled metadata check validates URL syntax but deliberately
+does not access the network. Before submitting or refreshing the listing, run
+the separately network-gated live check:
+
+```sh
+pnpm google-play:links:check -- \
+  --live \
+  --metadata config/google-play-metadata-en-us-v1.json \
+  --output-dir <protected-evidence-directory>/public-links
+```
+
+The command follows redirects and fails unless the marketing, install,
+support, accessibility, privacy, and source destinations all finish on
+successful public HTTPS responses. When `--output-dir` is present, it writes a
+timestamped receipt that binds every requested and final URL to the SHA-256 of
+the canonical metadata contract. Keep this live receipt separate from the
+offline listing asset-set digest because link availability can change after a
+review.
+
 Do not claim cross-platform sync, exact reminder delivery, accounts, remote
 analysis, telemetry, or automatic updates. Android Progress Backup is
 OS-managed restore protection, not continuous synchronization.
@@ -178,6 +197,49 @@ asset; broader pixel changes still fail the release contract.
 
 The release owner must approve these assets in the same review that approves
 the exact-build screenshots; file presence alone is not approval evidence.
+
+### Exact listing handoff
+
+After the exact Play capture has been finalized and the full 18-image
+composition is complete, prepare the Console review receipt from those inputs:
+
+```sh
+pnpm google-play:listing:prepare-review -- \
+  --metadata config/google-play-metadata-en-us-v1.json \
+  --capture <exact-capture-directory>/google-play-capture-manifest.json \
+  --composition <composed-directory>/composition-manifest.json \
+  --output <protected-evidence-directory>/google-play-console-review.json
+```
+
+The command fills the candidate identity and input digests. The release owner
+then changes only the receipt's review fields after comparing the exact set in
+Play Console: `status` to `reviewed`, a non-placeholder `evidenceId`, the
+auditable HTTPS Console `reference`, and the ISO-8601 `reviewedAt` time.
+
+Generate and independently re-verify the final repository-to-Console handoff:
+
+```sh
+pnpm google-play:listing:handoff -- \
+  --metadata config/google-play-metadata-en-us-v1.json \
+  --capture <exact-capture-directory>/google-play-capture-manifest.json \
+  --composition <composed-directory>/composition-manifest.json \
+  --console-review <protected-evidence-directory>/google-play-console-review.json \
+  --output <protected-evidence-directory>/google-play-listing-asset-set.json
+
+pnpm google-play:listing:verify -- \
+  --metadata config/google-play-metadata-en-us-v1.json \
+  --capture <exact-capture-directory>/google-play-capture-manifest.json \
+  --composition <composed-directory>/composition-manifest.json \
+  --console-review <protected-evidence-directory>/google-play-console-review.json \
+  --handoff <protected-evidence-directory>/google-play-listing-asset-set.json
+```
+
+This offline, fail-closed contract hashes the canonical locale metadata,
+checked-in icon, checked-in feature graphic, exact capture manifest, and exact
+composition manifest. It also verifies the 18 final PNG bytes, their canonical
+alt text, all three device families, the Play-delivered candidate identity,
+and the Console review binding. The deterministic `assetSetDigest` changes if
+any of those fields or bytes change.
 
 ## Current official requirements checked
 

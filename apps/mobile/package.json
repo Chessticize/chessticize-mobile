@@ -25,6 +25,7 @@
     "capture:marketing-assets:ios": "bash scripts/capture-app-store-marketing-assets.sh",
     "finalize:marketing-assets": "node scripts/finalize-marketing-capture.js",
     "capture:marketing-assets:android": "bash e2e/capture-google-play-marketing-assets.sh",
+    "capture:marketing-public-ui-frame:android": "node e2e/capture-google-play-public-ui-frame.js",
     "record:marketing-assets:android": "node e2e/record-google-play-public-ui-capture.js",
     "finalize:marketing-assets:android": "node e2e/finalize-google-play-marketing-capture.js",
     "e2e:adaptive-layout:ios": "CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT=1 detox test --configuration ios.sim.debug --artifacts-location artifacts/adaptive-layout e2e/adaptive-layout.e2e.js",

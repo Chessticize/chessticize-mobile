@@ -64,15 +64,21 @@ move that candidate's source identity.
 Do this only after the Android release candidate is accepted and the
 Play-delivered APK plus protected source manifest are available.
 
-1. Install the accepted Play-delivered APK.
+1. Install the accepted build through Google Play on the authorized capture
+   device. Downloading the Play-signed mirror and side-loading it is not
+   equivalent: the exact workflow requires both the installer and initiating
+   package to be `com.android.vending`.
 2. Reach each approved frame through public UI. Do not use the E2E launch
    argument or a debug build.
-3. Capture the six opaque PNGs into one input directory using the canonical
-   `captureId` filenames from the story contract.
+3. For each visible frame, run the repository capture command with its canonical
+   `captureId`. The command pulls and inspects the installed base APK, checks the
+   Play installer, version, signer, production flags, foreground package, and
+   device identity, then writes the opaque PNG plus a hash-bound
+   `.capture.json` sidecar.
 4. Record one device-family manifest with the public-UI recorder.
 5. Repeat for all three families, then finalize the combined manifest.
 
-Example for one family:
+Set the shared environment for one family:
 
 ```sh
 CHESSTICIZE_SOURCE_COMMIT=<exact-40-character-source-sha> \
@@ -88,6 +94,16 @@ CHESSTICIZE_ANDROID_CAPTURE_ARTIFACT_ROLE=play-delivered-apk \
 CHESSTICIZE_ANDROID_CAPTURE_ARTIFACT_PATH=<play-delivered-apk> \
 CHESSTICIZE_ANDROID_SOURCE_MANIFEST_PATH=<android-source-manifest.json> \
 CHESSTICIZE_ANDROID_APK_MIRROR_EVIDENCE_PATH=<android-apk-mirror-evidence.json> \
+CHESSTICIZE_MARKETING_CAPTURE_ID=marketing-01-standard-sprint \
+  pnpm mobile:capture:marketing-public-ui-frame:android
+```
+
+Navigate through public UI and repeat the final two lines for every `captureId`
+in `config/app-store-marketing-story-v1.json`. Keep the same shared environment
+and input directory. After all six pairs exist, record the family manifest:
+
+```sh
+<same-shared-environment> \
   pnpm mobile:record:marketing-assets:android
 ```
 
@@ -102,9 +118,11 @@ The finalizer fails closed unless all device manifests share the same source
 commit, capture mode, APK hash, six-frame order, locale, copy keys, and
 candidate identity. It reopens every PNG and rechecks its raw dimensions,
 opacity, relative path, and SHA-256 before writing the handoff manifest.
-The public-UI recorder also requires the retained post-Play mirror receipt and
-checks that its APK hash, package/version, Play signer, AAB hash, source
-manifest hash, and exact source commit all match.
+The per-frame command and public-UI recorder both require the retained post-Play
+mirror receipt. The recorder re-inspects the live installed session and rejects
+a missing sidecar, replaced PNG, changed device/session, non-Play install,
+package/version/signer drift, debug/test-only artifact, wrong foreground app,
+or a mismatch in the AAB, source manifest, mirror, or exact source commit.
 
 The capture manifest proves local artifact and screenshot identity. Google Play
 Console upload, listing assignment, and final Console evidence remain separate
@@ -117,6 +135,16 @@ version-controlled claim evidence:
 
 ```sh
 pnpm google-play:metadata:check
+```
+
+Run the separately network-gated public-link check and retain its timestamped
+receipt:
+
+```sh
+pnpm google-play:links:check -- \
+  --live \
+  --metadata config/google-play-metadata-en-us-v1.json \
+  --output-dir <protected-evidence-directory>/public-links
 ```
 
 Then preview all three device families from the finalized capture handoff:
@@ -137,3 +165,7 @@ canonical alt-text contract, raw screenshot hashes, final hashes, capture
 status, and Android candidate identity. A `preview-only` capture remains design
 evidence only; only an `exact-artifact-capture` handoff may be used for the
 final Play Console listing.
+
+After the 18-image full export, generate the exact listing handoff and bind it
+to the owner-reviewed Console receipt using the commands under
+`Exact listing handoff` in `docs/ANDROID_PLAY_LISTING.md`.

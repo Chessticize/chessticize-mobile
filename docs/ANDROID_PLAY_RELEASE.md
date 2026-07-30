@@ -16,7 +16,8 @@ mirror are complete. Version code 7 is the Android 1.2.1 ordinary-delta release
 currently in Play review with corresponding source and the Play-signed GitHub
 binary release published. Version code 8 completed the Android 1.3 source,
 signed-candidate, Play-generated APK, and GitHub mirror path. Version code 9 is
-the proposed Android 1.3.1 patch release.
+the immutable Android 1.3.1 release submitted to Closed testing with its public
+corresponding source and Play-signed GitHub APK mirror complete.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -225,9 +226,10 @@ Build 8 is the immutable Android 1.3 GitHub binary release:
 Do not move the build-8 tag, rebuild its AAB, replace its public assets, or
 reuse version code 8.
 
-Build 9 is the proposed Android 1.3.1 patch release:
+Build 9 is the immutable Android 1.3.1 release:
 
-- proposed annotated tag: `android-v1.3.1-build-9`;
+- annotated tag: `android-v1.3.1-build-9`, targeting
+  `91c617a087716995812365d950ea727268e5a914`;
 - primary user-visible changes: improve Training Focus with balanced results,
   Accuracy trends, and personal solve-time comparisons; fix a crash during
   deep Stockfish Analysis; and show History dates in the device's local
@@ -235,13 +237,27 @@ Build 9 is the proposed Android 1.3.1 patch release:
 - validation scope: full native validation because the delta since the
   previous public source tag includes a storage migration and Stockfish native
   lifecycle repair;
-- current state: release integration; annotated tag, signed candidate, source
-  Release, Play upload, and APK mirror pending.
+- protected candidate workflow run:
+  [`30513359957`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30513359957);
+- signed AAB: 443,868,568 bytes, SHA-256
+  `d73f49e15328c715054119b87e0779a1441074a761d901f9d4be91ed6e72b762`;
+- public source-manifest SHA-256:
+  `00e6b1d2a4446eacd7b68217a083d32977802cc073f382e70a6ae1d027f59886`;
+- public corresponding-source release:
+  [`android-v1.3.1-build-9`](https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.3.1-build-9);
+- Play Closed testing / Alpha accepted the exact retained AAB as version code
+  9 and passed quick checks; the last recorded authoritative state was
+  `Your changes are now in review`;
+- successful APK-mirror workflow run:
+  [`30515227189`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30515227189);
+- Play-signed universal APK: 363,390,068 bytes, SHA-256
+  `8446a2dcef43ab5efe84a03a2bd92d0a5cd59e6568beeda6075af21d26e37bb9`;
+- Play app-signing certificate SHA-256:
+  `318a4453d4052c90364d3abfe376dce9c06a04ab70db7ce1d5d43ba995cff900`.
 
-Do not create or publish the build-9 tag until the release PR is complete, the
-approved Android release-note file is present, and the clean candidate commit
-has current-head fast checks plus the required App-source-bound native
-evidence.
+Do not move the build-9 tag, rebuild its AAB, replace its public source manifest
+or mirrored assets, or reuse version code 9. Refresh the live Play track before
+reporting a later review or publication state.
 
 ## Canonical identity
 
@@ -414,6 +430,26 @@ relevant declaration/configuration changed, or when Play flags a problem:
 Use `docs/android-play-owner-evidence.example.json` and the `play-ready` verifier
 for the first-launch audit or another explicitly full release. It remains a
 strict evidence collector; it is not required for every ordinary delta:
+
+Before invoking the full verifier, generate the exact listing asset-set handoff
+with the commands in `docs/ANDROID_PLAY_LISTING.md`. Copy the generated JSON
+unchanged into
+`artifacts.googlePlayListingAssetSet.assetSet`, add the retained handoff's
+auditable evidence ID and HTTPS reference to its wrapper, and copy its
+`assetSetDigest` into `console.storeListing.assetSetDigest`. Owner-evidence
+schema version 4 fails closed unless that deterministic digest binds:
+
+- the canonical `en-US` metadata contract;
+- the checked-in Play icon and feature graphic;
+- the exact Play-delivered capture manifest and candidate;
+- the exact composition manifest, all 18 final PNG hashes, canonical alt text,
+  phone, 7-inch tablet, and 10-inch tablet sets; and
+- the reviewed Play Console receipt and its evidence ID, HTTPS reference, and
+  review time.
+
+Do not type or reconstruct the digest manually. Re-run
+`pnpm google-play:listing:verify` against the retained inputs before recording
+the generated handoff in owner evidence.
 
 ```sh
 CHESSTICIZE_ANDROID_UPLOAD_CERT_SHA256=<approved-upload-certificate> \

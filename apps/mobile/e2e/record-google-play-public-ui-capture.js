@@ -1,20 +1,28 @@
 #!/usr/bin/env node
 
 const { existsSync, statSync } = require('node:fs');
-const { basename, resolve } = require('node:path');
+const { resolve } = require('node:path');
 const story = require('../../../config/app-store-marketing-story-v1.json');
 const {
   captureMarketingScreenshot,
   sourceCommitForCapture,
 } = require('./marketingCaptureArtifacts');
 const {
+  inspectGooglePlayInstalledSession,
+  readGooglePlayPublicUiFrame,
   resolveGooglePlayArtifactIdentity,
   resolveGooglePlayCaptureTarget,
   writeGooglePlayDeviceCaptureManifest,
 } = require('./googlePlayMarketingCaptureArtifacts');
 
-function main(environment = process.env) {
-  const repositoryRoot = resolve(__dirname, '../../..');
+function recordGooglePlayPublicUiCapture({
+  environment = process.env,
+  inspectApk,
+  repositoryRoot = resolve(__dirname, '../../..'),
+  run,
+  sourceCommit,
+  story: storyContract = story,
+}) {
   const inputRoot = resolveRequiredDirectory(
     environment.CHESSTICIZE_MARKETING_INPUT_ROOT,
     'CHESSTICIZE_MARKETING_INPUT_ROOT'
@@ -23,7 +31,6 @@ function main(environment = process.env) {
     environment.CHESSTICIZE_MARKETING_OUTPUT_ROOT
       ?? resolve(repositoryRoot, 'scratch/store-assets/google-play/raw')
   );
-  const sourceCommit = sourceCommitForCapture(repositoryRoot, environment);
   const target = resolveGooglePlayCaptureTarget(environment);
   const artifact = resolveGooglePlayArtifactIdentity({
     environment,
@@ -37,29 +44,55 @@ function main(environment = process.env) {
     );
   }
 
-  const records = story.frames.map((frame) => {
-    const screenshotPath = resolve(inputRoot, `${frame.captureId}.png`);
-    if (!existsSync(screenshotPath)) {
-      throw new Error(
-        `Missing public-UI capture ${basename(screenshotPath)} in ${inputRoot}.`
-      );
-    }
-    return captureMarketingScreenshot({
+  const installedSession = inspectGooglePlayInstalledSession({
+    artifact,
+    environment,
+    inspectApk,
+    repositoryRoot,
+    run,
+    target,
+  });
+  const records = storyContract.frames.map((frame) => {
+    const exactFrame = readGooglePlayPublicUiFrame({
+      artifact,
       frame,
+      inputRoot,
       outputRoot,
-      screenshotPath,
+      installedSession,
       sourceCommit,
-      story,
+      story: storyContract,
       target,
     });
+    return {
+      ...captureMarketingScreenshot({
+        frame,
+        outputRoot,
+        screenshotPath: exactFrame.screenshotPath,
+        sourceCommit,
+        story: storyContract,
+        target,
+      }),
+      captureProvenance: exactFrame.captureProvenance,
+    };
   });
   const manifestPath = writeGooglePlayDeviceCaptureManifest({
     artifact,
+    installedSession,
     outputRoot,
     records,
     sourceCommit,
-    story,
+    story: storyContract,
     target,
+  });
+  return manifestPath;
+}
+
+function main(environment = process.env) {
+  const repositoryRoot = resolve(__dirname, '../../..');
+  const manifestPath = recordGooglePlayPublicUiCapture({
+    environment,
+    repositoryRoot,
+    sourceCommit: sourceCommitForCapture(repositoryRoot, environment),
   });
   process.stdout.write(
     `Exact-artifact Google Play device manifest: ${manifestPath}\n`
@@ -89,4 +122,7 @@ if (require.main === module) {
   }
 }
 
-module.exports = { main };
+module.exports = {
+  main,
+  recordGooglePlayPublicUiCapture,
+};
