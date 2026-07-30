@@ -73,6 +73,17 @@ function unthemedStrategy(name: string, rating: number, radius: number): EloPuzz
 }
 
 export function isServerCompatibleArrowDuelPuzzle(puzzle: Puzzle): boolean {
+  return isServerCompatiblePuzzle(puzzle, false);
+}
+
+export function isServerCompatibleCorePackPuzzle(puzzle: Puzzle): boolean {
+  return isServerCompatiblePuzzle(puzzle, true);
+}
+
+function isServerCompatiblePuzzle(
+  puzzle: Puzzle,
+  allowPromotionCandidate: boolean
+): boolean {
   const blunderMove = puzzle.solutionMoves[0];
   const bestMove = puzzle.stockfishBestMove;
   const bestEval = puzzle.stockfishEval;
@@ -82,7 +93,10 @@ export function isServerCompatibleArrowDuelPuzzle(puzzle: Puzzle): boolean {
   }
   const normalizedBlunderMove = normalizeMove(blunderMove);
   const normalizedBestMove = normalizeMove(bestMove);
-  if (hasArrowDuelPromotionCandidate(puzzle)) {
+  if (
+    !allowPromotionCandidate &&
+    hasArrowDuelPromotionCandidate(puzzle)
+  ) {
     return false;
   }
   if (normalizedBlunderMove === normalizedBestMove) {

@@ -10,7 +10,9 @@ process.env.TZ = "UTC";
 import {
   CURRENT_SCHEMA_VERSION,
   NodeSqliteDatabase,
+  PackBackedPracticeStore,
   PracticeService,
+  SQLitePuzzlePackSource,
   SQLiteStore
 } from "../src/index.ts";
 import { SyncSQLiteStore, type SyncSqliteDatabase } from "../src/sync-sqlite-store.ts";
@@ -461,6 +463,72 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
     reopened.close();
     assert.deepEqual(databaseSnapshot(databasePath), afterWrite);
   } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("released iOS 1.0.0 History survives when its legacy endgame Run has no indexed puzzles", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-legacy-run-pack-"));
+  const databasePath = join(directory, "practice.sqlite");
+  const packDb = legacyRunCompatibilityPack();
+  try {
+    await copyFile(RELEASED_V0_FIXTURE, databasePath);
+    const userStore = new SQLiteStore(databasePath);
+    userStore.migrate();
+    try {
+      const source = new SQLitePuzzlePackSource(
+        new NodeSqliteDatabase(packDb),
+        { arrowDuelEligibility: "all" }
+      );
+      const service = new PracticeService(
+        new PackBackedPracticeStore(userStore, source)
+      );
+      const endgameRun = service.listPracticeRuns().find(
+        (run) => run.themes?.includes("endgame")
+      );
+      const hangingPieceRun = service.listPracticeRuns().find(
+        (run) => run.themes?.includes("hangingPiece")
+      );
+      assert.ok(endgameRun);
+      assert.ok(hangingPieceRun);
+
+      const historyQuery = {
+        now: "2026-07-30T12:00:00.000Z",
+        timeRange: "max" as const
+      };
+      const historyBefore = service.getHistoryView(historyQuery).attempts
+        .map((attempt) => attempt.id);
+      const sessionIdsBefore = service.listSprintSessions().map(
+        (session) => session.id
+      );
+      assert.throws(
+        () => service.startSprint({
+          mode: "custom",
+          practiceRunId: endgameRun.id
+        }, "2026-07-30T12:00:00.000Z"),
+        /No eligible puzzles/u
+      );
+      assert.deepEqual(
+        service.getHistoryView(historyQuery).attempts.map(
+          (attempt) => attempt.id
+        ),
+        historyBefore
+      );
+      assert.deepEqual(
+        service.listSprintSessions().map((session) => session.id),
+        sessionIdsBefore
+      );
+
+      const sprint = service.startSprint({
+        mode: "custom",
+        practiceRunId: hangingPieceRun.id
+      }, "2026-07-30T12:01:00.000Z");
+      assert.equal(sprint.currentPuzzle?.puzzle.id, "indexed-hanging-piece");
+    } finally {
+      userStore.close();
+    }
+  } finally {
+    packDb.close();
     await rm(directory, { recursive: true, force: true });
   }
 });
@@ -1124,4 +1192,58 @@ function databaseSnapshot(databasePath: string): unknown {
   } finally {
     db.close();
   }
+}
+
+function legacyRunCompatibilityPack(): DatabaseSync {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE puzzles (
+      id TEXT PRIMARY KEY,
+      initial_fen TEXT NOT NULL,
+      solution_moves TEXT NOT NULL,
+      rating INTEGER NOT NULL,
+      rating_deviation INTEGER NOT NULL,
+      stockfish_eval REAL NOT NULL,
+      stockfish_bestmove TEXT NOT NULL,
+      stockfish_eval_after_first_move REAL NOT NULL
+    );
+    CREATE TABLE themes (
+      id INTEGER PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE
+    );
+    CREATE TABLE puzzle_themes (
+      puzzle_id TEXT NOT NULL,
+      theme_id INTEGER NOT NULL,
+      rating INTEGER NOT NULL,
+      PRIMARY KEY (puzzle_id, theme_id)
+    ) WITHOUT ROWID;
+    CREATE INDEX puzzles_rating_idx ON puzzles(rating, id);
+    CREATE INDEX puzzle_themes_theme_rating_idx
+      ON puzzle_themes(theme_id, rating, puzzle_id);
+    INSERT INTO themes (id, name) VALUES
+      (20, 'endgame'),
+      (25, 'hangingPiece');
+    INSERT INTO puzzles (
+      id,
+      initial_fen,
+      solution_moves,
+      rating,
+      rating_deviation,
+      stockfish_eval,
+      stockfish_bestmove,
+      stockfish_eval_after_first_move
+    ) VALUES (
+      'indexed-hanging-piece',
+      'r6k/pp2r2p/4Rp1Q/3p4/8/1N1P2R1/PqP2bPP/7K b - -',
+      'f2g3 e6e7 b2b1 b3c1 b1c1 h6c1',
+      805,
+      77,
+      -450,
+      'b2b1',
+      683
+    );
+    INSERT INTO puzzle_themes (puzzle_id, theme_id, rating)
+    VALUES ('indexed-hanging-piece', 25, 805);
+  `);
+  return db;
 }

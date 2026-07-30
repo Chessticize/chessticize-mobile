@@ -24,7 +24,13 @@ test("updates retained IDs from depth 20 and removes puzzles that stop qualifyin
   const fixture = await createFixture({
     packIds: ["00008", "00009", "0000A"],
     sourceRows: [
-      sourceRow("00008", -453, "b2b1", 693),
+      sourceRow(
+        "00008",
+        -453,
+        "b2b1",
+        693,
+        "crushing anastasiaMate"
+      ),
       sourceRow("00009", -453, "f2g3", 693),
       sourceRow("0000A", -450, "b2b1", 683)
     ]
@@ -75,6 +81,11 @@ test("updates retained IDs from depth 20 and removes puzzles that stop qualifyin
       db.prepare("SELECT COUNT(*) AS count FROM puzzle_themes WHERE puzzle_id = ?").get("00009").count,
       0
     );
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS count FROM themes WHERE name = 'crushing'").get().count,
+      1,
+      "presolve updates must retain stable theme catalog rows even when their final relation is removed"
+    );
     assert.deepEqual({ ...db.prepare("SELECT * FROM puzzles WHERE id = ?").get("0000A") }, {
       id: "0000A",
       initial_fen: PACK_FEN,
@@ -96,6 +107,12 @@ test("updates retained IDs from depth 20 and removes puzzles that stop qualifyin
   assert.equal(manifest.puzzleCount, 2);
   assert.equal(manifest.arrowDuelCount, 2);
   assert.equal(manifest.targetPuzzleCount, 3);
+  assert.deepEqual(manifest.matePatternCounts, { anastasiaMate: 1 });
+  assert.deepEqual(
+    manifest.ratingBuckets.find((bucket) => bucket.minRating === 1700)
+      ?.matePatternCounts,
+    { anastasiaMate: 1 }
+  );
   assert.equal(manifest.packFileHash, `sha256:${await sha256File(fixture.packPath)}`);
   assert.equal(manifest.packFileBytes, (await stat(fixture.packPath)).size);
   assert.equal(
@@ -265,7 +282,13 @@ async function createFixture(input) {
   return { root, sourcePath, packPath, manifestPath };
 }
 
-function sourceRow(id, stockfishEval, stockfishBestMove, stockfishEvalAfterFirstMove) {
+function sourceRow(
+  id,
+  stockfishEval,
+  stockfishBestMove,
+  stockfishEvalAfterFirstMove,
+  themes = "crushing"
+) {
   return [
     id,
     FULL_FEN,
@@ -274,7 +297,7 @@ function sourceRow(id, stockfishEval, stockfishBestMove, stockfishEvalAfterFirst
     77,
     95,
     8020,
-    "crushing",
+    themes,
     `https://lichess.org/${id}`,
     "",
     stockfishEval,

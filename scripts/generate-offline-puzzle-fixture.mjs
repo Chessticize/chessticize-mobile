@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, rm, opendir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, opendir, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { DatabaseSync } from "node:sqlite";
@@ -9,8 +9,19 @@ import { pathToFileURL } from "node:url";
 import {
   MATE_PATTERN_THEMES,
   curatedPuzzleThemes,
-  isServerCompatibleArrowDuelPuzzle
+  isServerCompatibleArrowDuelPuzzle,
+  isServerCompatibleCorePackPuzzle
 } from "../packages/core/src/index.ts";
+import {
+  assertKnownCorePackThemes,
+  CORE_PACK_THEME_CATALOG,
+  corePackThemeId,
+  INDEXED_CORE_PACK_THEMES
+} from "./offline-puzzle-pack-schema.mjs";
+import {
+  ratingBucket,
+  summarizeMatePatterns
+} from "./offline-puzzle-pack-metadata.mjs";
 
 const DEFAULT_SOURCE = "../lichess-presolve/presolved";
 const DEFAULT_OUTPUT = "fixtures/puzzles/bundled-core-pack.sqlite";
@@ -19,17 +30,6 @@ const DEFAULT_TARGET_COUNT = 1_400_000;
 const DEFAULT_MIN_RATING = 600;
 const DEFAULT_MAX_RATING = 2200;
 const DEFAULT_SEED = "chessticize-core-pack-v1-2026-07-04";
-const CUSTOM_SPRINT_THEMES = [
-  "mate",
-  "endgame",
-  "fork",
-  "pin",
-  "skewer",
-  "sacrifice",
-  "promotion",
-  "hangingPiece",
-  "advancedPawn"
-];
 const PACK_METADATA = {
   id: "core",
   title: "Core Pack",
@@ -53,6 +53,13 @@ async function main(argv = process.argv.slice(2)) {
   if (!options.resumeCandidates && !options.manifestOnly) {
     await rm(outputPath, { force: true });
   }
+  let samplingMatePatterns = options.manifestOnly
+    ? await readVerifiedManifestMatePatterns(
+        outputPath,
+        manifestPath,
+        options.maxRating
+      )
+    : undefined;
   const db = new DatabaseSync(outputPath);
   try {
     if (options.manifestOnly) {
@@ -67,6 +74,10 @@ async function main(argv = process.argv.slice(2)) {
     if (!options.manifestOnly) {
       const quotas = computeBucketQuotas(readBucketInventories(db), options.targetCount);
       const selected = selectFinalPuzzles(db, quotas, options.seed);
+      samplingMatePatterns = summarizeMatePatterns(
+        selected,
+        options.maxRating
+      );
       writeSelectedPack(db, selected);
       db.exec("VACUUM");
       db.exec("ANALYZE");
@@ -85,7 +96,11 @@ async function main(argv = process.argv.slice(2)) {
     packFileBytes,
     packFileHash,
     manifestHash: "pending"
-  }, options);
+  }, {
+    ...options,
+    knownMatePatternCounts: samplingMatePatterns?.totals,
+    knownRatingBucketMatePatternCounts: samplingMatePatterns?.buckets
+  });
   manifest.manifestHash = `sha256:${sha256Text(stableJson({ ...manifest, manifestHash: "" }))}`;
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
@@ -196,7 +211,7 @@ function initializeDatabase(db) {
       theme_id INTEGER NOT NULL,
       rating INTEGER NOT NULL,
       PRIMARY KEY (puzzle_id, theme_id)
-    );
+    ) WITHOUT ROWID;
 
     CREATE INDEX candidates_bucket_idx ON candidates(rating_bucket, rating, id);
     CREATE INDEX puzzles_rating_idx ON puzzles(rating, id);
@@ -286,7 +301,7 @@ async function ingestCandidates(db, sourcePath, options) {
     await readCsvFile(filePath, (row) => {
       readRows += 1;
       const puzzle = puzzleFromRow(row, options);
-      if (!puzzle || !isServerCompatibleArrowDuelPuzzle(puzzle)) {
+      if (!puzzle || !isServerCompatibleCorePackPuzzle(puzzle)) {
         return;
       }
       pending.push(puzzle);
@@ -303,7 +318,10 @@ async function ingestCandidates(db, sourcePath, options) {
     insertedRows += pending.length;
   }
   const deduped = db.prepare("SELECT COUNT(*) AS count FROM candidates").get().count;
-  console.log(`Read ${readRows} source rows; accepted ${insertedRows} Arrow Duel eligible rows; deduped to ${deduped}`);
+  console.log(
+    `Read ${readRows} source rows; accepted ${insertedRows} Core Pack ` +
+    `compatible rows; deduped to ${deduped}`
+  );
 }
 
 function readBucketInventories(db) {
@@ -397,7 +415,7 @@ function selectBucketPuzzles(candidates, quota, seed, bucket) {
   const familyCap = Math.max(1, Math.floor(quota * 0.3));
   const themeInventory = countAvailableThemes(candidates);
 
-  for (const theme of CUSTOM_SPRINT_THEMES) {
+  for (const theme of INDEXED_CORE_PACK_THEMES) {
     addThemeMinimum({
       theme,
       required: Math.min(500, themeInventory.get(theme) ?? 0),
@@ -482,17 +500,21 @@ function writeSelectedPack(db, selected) {
       stockfish_eval_after_first_move
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  const insertThemeName = db.prepare("INSERT INTO themes (name) VALUES (?)");
+  const insertThemeName = db.prepare(
+    "INSERT INTO themes (id, name) VALUES (?, ?)"
+  );
   const insertPuzzleTheme = db.prepare("INSERT INTO puzzle_themes (puzzle_id, theme_id, rating) VALUES (?, ?, ?)");
   const writeRows = (puzzles) => {
     db.prepare("DELETE FROM puzzles").run();
     db.prepare("DELETE FROM puzzle_themes").run();
     db.prepare("DELETE FROM themes").run();
-    const themeIds = new Map();
-    for (const theme of [...new Set(puzzles.flatMap((puzzle) => puzzle.themes))].sort((left, right) => left.localeCompare(right))) {
-      const result = insertThemeName.run(theme);
-      themeIds.set(theme, Number(result.lastInsertRowid));
+    assertKnownCorePackThemes(
+      puzzles.flatMap((puzzle) => puzzle.themes)
+    );
+    for (const theme of CORE_PACK_THEME_CATALOG) {
+      insertThemeName.run(theme.id, theme.name);
     }
+    const indexedThemes = new Set(INDEXED_CORE_PACK_THEMES);
     for (const puzzle of puzzles) {
       insertPuzzle.run(
         puzzle.id,
@@ -504,8 +526,15 @@ function writeSelectedPack(db, selected) {
         puzzle.stockfishBestMove,
         puzzle.stockfishEvalAfterFirstMove
       );
-      for (const theme of puzzle.themes) {
-        insertPuzzleTheme.run(puzzle.id, themeIds.get(theme), puzzle.rating);
+      for (const theme of new Set(puzzle.themes)) {
+        if (!indexedThemes.has(theme)) {
+          continue;
+        }
+        insertPuzzleTheme.run(
+          puzzle.id,
+          corePackThemeId(theme),
+          puzzle.rating
+        );
       }
     }
     db.prepare("DROP TABLE candidates").run();
@@ -520,7 +549,10 @@ function buildSqliteManifest(path, input, options) {
     const matePatternCounts = new Map();
     const buckets = new Map();
     let puzzleCount = 0;
-    let arrowDuelCount = 0;
+    let arrowDuelCount =
+      options.knownArrowDuelCount === undefined
+        ? 0
+        : options.knownArrowDuelCount;
     let minRating = Number.POSITIVE_INFINITY;
     let maxRating = Number.NEGATIVE_INFINITY;
     const tacticalFeatureHash = createHash("sha256");
@@ -530,7 +562,10 @@ function buildSqliteManifest(path, input, options) {
         throw new Error(`Pack puzzle ${puzzle.id} is missing Rating Deviation`);
       }
       puzzleCount += 1;
-      if (isServerCompatibleArrowDuelPuzzle(puzzle)) {
+      if (
+        options.knownArrowDuelCount === undefined &&
+        isServerCompatibleArrowDuelPuzzle(puzzle)
+      ) {
         arrowDuelCount += 1;
       }
       if (puzzleCount % 100000 === 0) {
@@ -568,8 +603,14 @@ function buildSqliteManifest(path, input, options) {
     if (puzzleCount === 0) {
       throw new Error("Puzzle pack must contain at least one puzzle");
     }
-    if (arrowDuelCount !== puzzleCount) {
-      throw new Error(`Pack validation failed: ${arrowDuelCount}/${puzzleCount} puzzles are Arrow Duel eligible`);
+    if (
+      !Number.isInteger(arrowDuelCount) ||
+      arrowDuelCount < 0 ||
+      arrowDuelCount > puzzleCount
+    ) {
+      throw new Error(
+        `Pack validation received invalid Arrow Duel count ${arrowDuelCount}/${puzzleCount}`
+      );
     }
     return {
       id: input.id,
@@ -601,9 +642,15 @@ function buildSqliteManifest(path, input, options) {
           maxRating: bucket.maxRating,
           puzzleCount: bucket.puzzleCount,
           themeCounts: mapToSortedObject(bucket.themeCounts),
-          matePatternCounts: mapToSortedObject(bucket.matePatternCounts)
+          matePatternCounts:
+            options.knownRatingBucketMatePatternCounts?.get(
+              bucket.minRating
+            ) ??
+            mapToSortedObject(bucket.matePatternCounts)
         })),
-      matePatternCounts: mapToSortedObject(matePatternCounts),
+      matePatternCounts:
+        options.knownMatePatternCounts ??
+        mapToSortedObject(matePatternCounts),
       tacticalAnalysis: {
         schemaVersion: 1,
         puzzleRatingDeviation: true,
@@ -726,10 +773,10 @@ function* iteratePackPuzzles(db) {
       puzzles.stockfish_bestmove,
       puzzles.stockfish_eval_after_first_move,
       themes.name AS theme
-    FROM puzzle_themes
-    JOIN puzzles ON puzzles.id = puzzle_themes.puzzle_id
-    JOIN themes ON themes.id = puzzle_themes.theme_id
-    ORDER BY puzzle_themes.puzzle_id ASC, puzzle_themes.theme_id ASC
+    FROM puzzles
+    LEFT JOIN puzzle_themes ON puzzle_themes.puzzle_id = puzzles.id
+    LEFT JOIN themes ON themes.id = puzzle_themes.theme_id
+    ORDER BY puzzles.id ASC, puzzle_themes.theme_id ASC
   `).iterate();
   let current;
   for (const row of rows) {
@@ -750,7 +797,9 @@ function* iteratePackPuzzles(db) {
         stockfishEvalAfterFirstMove: row.stockfish_eval_after_first_move
       };
     }
-    current.themes.push(row.theme);
+    if (typeof row.theme === "string") {
+      current.themes.push(row.theme);
+    }
   }
   if (current) {
     yield current;
@@ -842,10 +891,6 @@ function themeFamilies(themes) {
   return families;
 }
 
-function ratingBucket(rating, maxRating) {
-  return Math.min(maxRating - 100, Math.floor(rating / 100) * 100);
-}
-
 function canonicalPositionFen(fen) {
   return fen.trim().split(/\s+/).slice(0, 4).join(" ");
 }
@@ -921,6 +966,100 @@ async function sha256File(path) {
   return hash.digest("hex");
 }
 
+async function readVerifiedManifestMatePatterns(
+  packPath,
+  manifestPath,
+  maxRating
+) {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const computedManifestHash =
+    `sha256:${sha256Text(stableJson({ ...manifest, manifestHash: "" }))}`;
+  if (manifest.manifestHash !== computedManifestHash) {
+    throw new Error(
+      `Manifest hash ${manifest.manifestHash} does not match ${computedManifestHash}`
+    );
+  }
+
+  const packFileBytes = (await stat(packPath)).size;
+  if (manifest.packFileBytes !== packFileBytes) {
+    throw new Error(
+      `Pack size ${packFileBytes} does not match manifest packFileBytes ${manifest.packFileBytes}`
+    );
+  }
+  const packFileHash = `sha256:${await sha256File(packPath)}`;
+  if (manifest.packFileHash !== packFileHash) {
+    throw new Error(
+      `Pack hash ${packFileHash} does not match manifest packFileHash ${manifest.packFileHash}`
+    );
+  }
+
+  if (
+    !manifest.matePatternCounts ||
+    typeof manifest.matePatternCounts !== "object" ||
+    !Array.isArray(manifest.ratingBuckets) ||
+    manifest.ratingBuckets.some(
+      (bucket) =>
+        !Number.isInteger(bucket.minRating) ||
+        !bucket.matePatternCounts ||
+        typeof bucket.matePatternCounts !== "object"
+    )
+  ) {
+    throw new Error(
+      "Verified manifest is missing mate-pattern provenance required by --manifest-only"
+    );
+  }
+
+  const manifestBucketMins =
+    manifest.ratingBuckets.map((bucket) => bucket.minRating);
+  if (new Set(manifestBucketMins).size !== manifestBucketMins.length) {
+    throw new Error(
+      "Verified manifest has duplicate rating buckets required by --manifest-only"
+    );
+  }
+  const packBucketMins = readPackRatingBucketMins(packPath, maxRating);
+  const manifestBucketSet = new Set(manifestBucketMins);
+  const missingBucket = packBucketMins.find(
+    (bucketMin) => !manifestBucketSet.has(bucketMin)
+  );
+  if (missingBucket !== undefined) {
+    throw new Error(
+      `Verified manifest is missing mate-pattern provenance for rating bucket ${missingBucket}`
+    );
+  }
+  const packBucketSet = new Set(packBucketMins);
+  const extraBucket = manifestBucketMins.find(
+    (bucketMin) => !packBucketSet.has(bucketMin)
+  );
+  if (extraBucket !== undefined) {
+    throw new Error(
+      `Verified manifest has mate-pattern provenance for unknown rating bucket ${extraBucket}`
+    );
+  }
+
+  return {
+    totals: { ...manifest.matePatternCounts },
+    buckets: new Map(
+      manifest.ratingBuckets.map((bucket) => [
+        bucket.minRating,
+        { ...bucket.matePatternCounts }
+      ])
+    )
+  };
+}
+
+function readPackRatingBucketMins(packPath, maxRating) {
+  const db = new DatabaseSync(packPath, { readOnly: true });
+  try {
+    const buckets = new Set();
+    for (const row of db.prepare("SELECT DISTINCT rating FROM puzzles").iterate()) {
+      buckets.add(ratingBucket(row.rating, maxRating));
+    }
+    return [...buckets].sort((left, right) => left - right);
+  } finally {
+    db.close();
+  }
+}
+
 function sha256Text(value) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -941,10 +1080,12 @@ function sortObject(value) {
 
 export {
   buildSqliteManifest,
+  initializeDatabase,
   listCsvFiles,
   main,
   readCsvFile,
   sha256File,
   sha256Text,
-  stableJson
+  stableJson,
+  writeSelectedPack
 };

@@ -6,7 +6,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 const DEFAULT_ARTIFACT_URL =
-  "https://github.com/Chessticize/chessticize-mobile/releases/download/core-pack-v3/bundled-core-pack.sqlite";
+  "https://github.com/Chessticize/chessticize-mobile/releases/download/core-pack-v4/bundled-core-pack.sqlite";
 
 const manifestPath = resolve("fixtures/puzzles/bundled-core-pack.manifest.json");
 const artifactPath = resolve("fixtures/puzzles/bundled-core-pack.sqlite");

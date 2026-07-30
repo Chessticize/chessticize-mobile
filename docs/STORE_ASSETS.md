@@ -192,13 +192,24 @@ do not reuse the 1.3 or pre-release validation set as final 1.3.1 evidence.
 
 The release Core Pack is generated as `fixtures/puzzles/bundled-core-pack.sqlite`
 and copied into the native app bundle as a read-only SQLite database asset. The
-2026-07-26 Tactical Profile pack contains 1,400,000 Arrow Duel eligible puzzles
-across the 600-2200 rating range, including immutable Puzzle Rating Deviation
-for every row. Its measured artifact size is `520,278,016` bytes (`496.18 MiB`),
-below the 800 MB hard cap in `docs/PUZZLE_PACK_SAMPLING.md`. The manifest
-records the exact file hash, Tactical Profile feature hash, and
-per-bucket/theme counts. The artifact is published as the immutable
+2026-07-26 Tactical Profile pack contains 1,400,000 Standard puzzles across the
+600-2200 rating range, including immutable Puzzle Rating Deviation for every
+row; 1,392,969 currently satisfy the stricter Arrow Duel rule. Its published
+artifact size is `520,278,016` bytes (`496.18 MiB`), below the 800 MB hard cap
+in `docs/PUZZLE_PACK_SAMPLING.md`. The artifact is published as the immutable
 `core-pack-v3` GitHub Release asset.
+
+The published July 30 `core-pack-v4` theme-index optimization preserves every
+puzzle and the 62 stable theme IDs, stores relations only for the 24 selectable
+themes, and uses `WITHOUT ROWID`. It measures `227,487,744` bytes
+(`216.95 MiB`), a 56.3% reduction, with SHA-256
+`74a81e54729dd1f4f9adee375c728e22ac758d3211e2da81d3b5bd702380083b`.
+The same SQLite file measures `111,379,967` bytes (`106.22 MiB`) in a
+standalone ZIP level-9 test; measure the final signed APK/IPA separately because
+platform packaging and signing add other assets and metadata.
+The App fetches this immutable `core-pack-v4` asset by default; iOS and Android
+builds verify it against the committed manifest before copying it into the
+application bundle.
 
 ## Release-QA Screenshot Set
 
