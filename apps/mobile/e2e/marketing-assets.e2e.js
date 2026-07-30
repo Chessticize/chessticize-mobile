@@ -172,8 +172,19 @@ async function prepareCustomRun() {
   await waitFor(element(by.id('practice-run-duration-stepper')))
     .toExist()
     .withTimeout(10000);
-  await waitForVisibleInPracticeScroll('practice-run-per-puzzle-stepper-increase');
-  await element(by.id('practice-run-per-puzzle-stepper-increase')).tap();
+  const expectedPace = story.frames.find((frame) => frame.id === 'focus-your-practice')
+    .source.stableText.pace;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await expect(element(by.text(expectedPace))).toExist();
+      break;
+    } catch {
+      await waitForVisibleInPracticeScroll('practice-run-per-puzzle-stepper-increase');
+      await element(by.id('practice-run-per-puzzle-stepper-increase')).tap();
+      await sleep(250);
+    }
+  }
+  await waitFor(element(by.text(expectedPace))).toExist().withTimeout(10000);
   await waitForVisibleInPracticeScroll('practice-run-elo-input');
   await element(by.id('practice-run-elo-input')).replaceText(
     String(story.fictionalUser.customRun.startingRating)

@@ -1531,6 +1531,15 @@ describe('Detox suite configuration', () => {
     );
     expect(waitForPaceControl).toBeGreaterThan(0);
     expect(tapPaceControl).toBeGreaterThan(waitForPaceControl);
+    expect(customRunHelper).toContain(
+      "const expectedPace = story.frames.find((frame) => frame.id === 'focus-your-practice')"
+    );
+    expect(customRunHelper).toContain(
+      'for (let attempt = 0; attempt < 3; attempt += 1)'
+    );
+    expect(customRunHelper).toContain(
+      'waitFor(element(by.text(expectedPace))).toExist().withTimeout(10000)'
+    );
 
     const checkedHelperStart = spec.indexOf('async function expectChecked');
     const checkedHelperEnd = spec.indexOf(
