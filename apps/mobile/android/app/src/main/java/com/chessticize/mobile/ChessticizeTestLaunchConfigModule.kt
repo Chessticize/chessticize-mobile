@@ -60,6 +60,9 @@ object ChessticizeTestLaunchArguments {
       testLaunchArgument(intent, launchArgs, "chessticizeTestReminderDelayMs")?.let {
         put("reviewReminderDelayMs", it)
       }
+      testLaunchArgument(intent, launchArgs, "chessticizeMarketingCaptureFrame")?.let {
+        put("marketingCaptureFrame", it)
+      }
     }
   }
 

@@ -1,0 +1,237 @@
+{
+  "schemaVersion": 1,
+  "layoutId": "chessticize-google-play-screen-first-v1",
+  "compositionMode": "screen-first",
+  "contractStoryId": "app-store-marketing-en-us-v1",
+  "locale": "en-US",
+  "frames": [
+    {
+      "order": 1,
+      "frameId": "build-tactical-intuition",
+      "captureId": "marketing-01-standard-sprint",
+      "copyKey": "build-tactical-intuition",
+      "headline": "Build Tactical Intuition",
+      "supporting": "Short, rating-matched Sprints build fast pattern recognition.",
+      "fileName": "marketing-01-standard-sprint.png"
+    },
+    {
+      "order": 2,
+      "frameId": "choose-the-best-move",
+      "captureId": "marketing-02-arrow-duel",
+      "copyKey": "choose-the-best-move",
+      "headline": "Choose the Best Move",
+      "supporting": "Arrow Duel trains you to reject a tempting blunder before you play it.",
+      "fileName": "marketing-02-arrow-duel.png"
+    },
+    {
+      "order": 3,
+      "frameId": "focus-your-practice",
+      "captureId": "marketing-03-custom-run",
+      "copyKey": "focus-your-practice",
+      "headline": "Focus Your Practice",
+      "supporting": "Choose themes, pace, and difficulty for the skill you want to train.",
+      "fileName": "marketing-03-custom-run.png"
+    },
+    {
+      "order": 4,
+      "frameId": "make-every-mistake-count",
+      "captureId": "marketing-04-review-queue",
+      "copyKey": "make-every-mistake-count",
+      "headline": "Make Every Mistake Count",
+      "supporting": "Scheduled Review brings missed and unclear puzzles back when they are due.",
+      "fileName": "marketing-04-review-queue.png"
+    },
+    {
+      "order": 5,
+      "frameId": "see-your-progress",
+      "captureId": "marketing-05-rating-trend",
+      "copyKey": "see-your-progress",
+      "headline": "See Your Progress",
+      "supporting": "Follow your Ratings and recent Runs over time.",
+      "fileName": "marketing-05-rating-trend.png"
+    },
+    {
+      "order": 6,
+      "frameId": "private-offline-open-source",
+      "captureId": "marketing-06-trust",
+      "copyKey": "private-offline-open-source",
+      "headline": "Private. Offline. Open Source.",
+      "supporting": "No ads. No Chessticize account. No developer data collection.",
+      "fileName": "marketing-06-trust.png"
+    }
+  ],
+  "altTextContract": {
+    "repositoryFile": "config/google-play-metadata-en-us-v1.json",
+    "collection": "previewAssets.screenshots.frames"
+  },
+  "storePolicy": {
+    "platform": "google-play",
+    "outputFormat": "png-24-no-alpha",
+    "deviceImageryAllowed": false,
+    "tabletMarketingTextAllowed": false,
+    "generalScreenshotPixels": {
+      "minimum": 320,
+      "maximum": 3840,
+      "maximumAspectRatio": 2
+    },
+    "largeScreenPixels": {
+      "minimum": 1080,
+      "maximum": 7680
+    },
+    "largeScreenPreferredAspectRatios": [
+      "16:9",
+      "9:16"
+    ],
+    "largeScreenMinimumScreenshotCount": 4,
+    "screenshotsPerDeviceTypeMaximum": 8,
+    "phoneOverlayMaximumHeightRatio": 0.2,
+    "altTextMaximumCharacters": 140
+  },
+  "visualDirection": {
+    "name": "Google Play Screen First",
+    "composition": "ui-dominant-frameless",
+    "background": "solid-warm-white",
+    "productProof": "immutable-native-android-capture"
+  },
+  "palette": {
+    "canvasBackground": "#F6F8FA",
+    "headline": "#071226",
+    "deviceFrame": "#F6F8FA",
+    "deviceFrameEdge": "#F6F8FA",
+    "shadow": "#F6F8FA"
+  },
+  "typography": {
+    "fontFamily": "sans-serif",
+    "fontWeight": 760
+  },
+  "presets": {
+    "android-phone": {
+      "platform": "google-play",
+      "deviceFamily": "android-phone",
+      "displayGroup": "phone",
+      "orientation": "portrait",
+      "reviewLabel": "Android Phone Portrait",
+      "acceptedSourceSizes": [
+        {
+          "width": 1080,
+          "height": 1920
+        }
+      ],
+      "screenFirst": {
+        "outputDimensions": {
+          "width": 1080,
+          "height": 1920
+        },
+        "frameStyle": "frameless",
+        "headlineOverlay": true
+      },
+      "title": {
+        "leftRatio": 0.06,
+        "topRatio": 0.025,
+        "maxWidthRatio": 0.88,
+        "fontSizeRatio": 0.06,
+        "lineHeightRatio": 0.9,
+        "maxCharactersPerLine": 20,
+        "align": "middle"
+      },
+      "product": {
+        "topRatio": 0.18,
+        "maxWidthRatio": 1,
+        "maxHeightRatio": 0.82,
+        "framePaddingRatio": 0,
+        "cornerRadiusRatio": 0,
+        "edgeWidthRatio": 0.001,
+        "shadowBlurRatio": 0,
+        "shadowOffsetRatio": 0
+      }
+    },
+    "android-tablet-7": {
+      "platform": "google-play",
+      "deviceFamily": "android-tablet-7",
+      "displayGroup": "7-inch-tablet",
+      "orientation": "portrait",
+      "reviewLabel": "Android 7-inch Tablet Portrait",
+      "acceptedSourceSizes": [
+        {
+          "width": 1200,
+          "height": 1920
+        }
+      ],
+      "screenFirst": {
+        "outputDimensions": {
+          "width": 1440,
+          "height": 2560
+        },
+        "frameStyle": "frameless",
+        "headlineOverlay": false
+      },
+      "title": {
+        "leftRatio": 0,
+        "topRatio": 0,
+        "maxWidthRatio": 1,
+        "fontSizeRatio": 0.04,
+        "lineHeightRatio": 1,
+        "maxCharactersPerLine": 24,
+        "align": "start"
+      },
+      "product": {
+        "topRatio": 0,
+        "maxWidthRatio": 1,
+        "maxHeightRatio": 1,
+        "framePaddingRatio": 0,
+        "cornerRadiusRatio": 0,
+        "edgeWidthRatio": 0.001,
+        "shadowBlurRatio": 0,
+        "shadowOffsetRatio": 0
+      }
+    },
+    "android-tablet-10": {
+      "platform": "google-play",
+      "deviceFamily": "android-tablet-10",
+      "displayGroup": "10-inch-tablet",
+      "orientation": "landscape",
+      "reviewLabel": "Android 10-inch Tablet Landscape",
+      "acceptedSourceSizes": [
+        {
+          "width": 2560,
+          "height": 1600
+        }
+      ],
+      "screenFirst": {
+        "outputDimensions": {
+          "width": 2560,
+          "height": 1440
+        },
+        "frameStyle": "frameless",
+        "headlineOverlay": false
+      },
+      "title": {
+        "leftRatio": 0,
+        "topRatio": 0,
+        "maxWidthRatio": 1,
+        "fontSizeRatio": 0.04,
+        "lineHeightRatio": 1,
+        "maxCharactersPerLine": 24,
+        "align": "start"
+      },
+      "product": {
+        "topRatio": 0,
+        "maxWidthRatio": 1,
+        "maxHeightRatio": 1,
+        "framePaddingRatio": 0,
+        "cornerRadiusRatio": 0,
+        "edgeWidthRatio": 0.001,
+        "shadowBlurRatio": 0,
+        "shadowOffsetRatio": 0
+      }
+    }
+  },
+  "preview": {
+    "width": 2400,
+    "background": "#EAF3F8",
+    "label": "#102333",
+    "mutedLabel": "#557084",
+    "gap": 36,
+    "padding": 64
+  }
+}

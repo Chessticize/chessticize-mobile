@@ -74,6 +74,7 @@ describe('Android Standard Practice release slice', () => {
     expect(testConfigModule).not.toContain('override fun getConstants()');
     expect(testConfigModule).toContain('chessticizePuzzleSelectionSeed');
     expect(testConfigModule).toContain('chessticizeStandardTargetCorrect');
+    expect(testConfigModule).toContain('chessticizeMarketingCaptureFrame');
     expect(testConfigModule).toContain('chessticizeTestNowMs');
     expect(testConfigModule).toContain('getBundleExtra("launchArgs")');
     expect(testConfigModule).toContain('launchArgs?.getString(key)');

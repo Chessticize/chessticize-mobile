@@ -21,8 +21,16 @@ const {
   sourceCommitForCapture,
   writeDeviceCaptureManifest,
 } = require('./marketingCaptureArtifacts');
+const {
+  resolveGooglePlayArtifactIdentity,
+  resolveGooglePlayCaptureTarget,
+  writeGooglePlayDeviceCaptureManifest,
+} = require('./googlePlayMarketingCaptureArtifacts');
 
 const story = require('../../../config/app-store-marketing-story-v1.json');
+const capturePlatform =
+  process.env.CHESSTICIZE_MARKETING_PLATFORM ?? 'app-store';
+const isGooglePlayCapture = capturePlatform === 'google-play';
 const describeMarketingAssets =
   process.env.CHESSTICIZE_CAPTURE_MARKETING_ASSETS === '1'
     ? describe
@@ -32,12 +40,28 @@ const outputRoot = resolve(
   process.env.CHESSTICIZE_MARKETING_OUTPUT_ROOT
     ?? resolve(repositoryRoot, 'scratch/store-assets/marketing/raw')
 );
-const target = resolveMarketingCaptureTarget(process.env, story);
 const sourceCommit = sourceCommitForCapture(repositoryRoot);
+const target = isGooglePlayCapture
+  ? resolveGooglePlayCaptureTarget(process.env)
+  : resolveMarketingCaptureTarget(process.env, story);
+const androidArtifact = isGooglePlayCapture
+  ? resolveGooglePlayArtifactIdentity({
+      environment: process.env,
+      repositoryRoot,
+      sourceCommit,
+    })
+  : undefined;
 
-describeMarketingAssets('App Store marketing screenshot capture', () => {
+describeMarketingAssets('store marketing screenshot capture', () => {
   it('captures the approved six-frame story from deterministic product state', async () => {
-    if (device.getPlatform() !== 'ios') {
+    const expectedPlatform = isGooglePlayCapture ? 'android' : 'ios';
+    if (device.getPlatform() !== expectedPlatform) {
+      if (isGooglePlayCapture) {
+        throw new Error(
+          'Google Play deterministic marketing capture requires an Android '
+          + 'Detox build.'
+        );
+      }
       throw new Error('App Store marketing capture requires an iOS Simulator.');
     }
     const records = [];
@@ -57,13 +81,24 @@ describeMarketingAssets('App Store marketing screenshot capture', () => {
         target,
       }));
     }
-    writeDeviceCaptureManifest({
-      outputRoot,
-      records,
-      sourceCommit,
-      story,
-      target,
-    });
+    if (isGooglePlayCapture) {
+      writeGooglePlayDeviceCaptureManifest({
+        artifact: androidArtifact,
+        outputRoot,
+        records,
+        sourceCommit,
+        story,
+        target,
+      });
+    } else {
+      writeDeviceCaptureManifest({
+        outputRoot,
+        records,
+        sourceCommit,
+        story,
+        target,
+      });
+    }
   });
 });
 
@@ -109,7 +144,7 @@ async function prepareFrame(frame) {
       // finding Puzzle Data so the adjacent App Version row is above the
       // visible scroll viewport on every accepted iPhone size.
       await element(by.id('practice-main-scroll')).scroll(
-        target.deviceFamily === 'ipad' ? 550 : 420,
+        isWideTabletTarget() ? 550 : 420,
         'down',
         0.5,
         0.5
@@ -333,7 +368,7 @@ async function assertNativeResponsiveLayout(frame) {
       + `${target.orientation}: ${JSON.stringify(screenFrame)}`
     );
   }
-  if (target.deviceFamily === 'ipad') {
+  if (isWideTabletTarget()) {
     const isActiveSessionFrame = (
       frame.id === 'build-tactical-intuition'
       || frame.id === 'choose-the-best-move'
@@ -343,19 +378,43 @@ async function assertNativeResponsiveLayout(frame) {
       const boardLaneFrame = await frameFor(element(by.id('active-session-board-lane')));
       const boardFrame = await frameFor(element(by.id('session-board')));
       const railFrame = await frameFor(element(by.id('active-session-control-rail')));
-      expectFrameContained(layoutFrame, screenFrame, `${frame.id} iPad layout`);
-      expectFrameContained(boardLaneFrame, layoutFrame, `${frame.id} iPad board lane`);
-      expectFrameContained(boardFrame, boardLaneFrame, `${frame.id} iPad board`);
-      expectFrameContained(railFrame, layoutFrame, `${frame.id} iPad control rail`);
+      expectFrameContained(
+        layoutFrame,
+        screenFrame,
+        `${frame.id} ${target.deviceFamily} layout`
+      );
+      expectFrameContained(
+        boardLaneFrame,
+        layoutFrame,
+        `${frame.id} ${target.deviceFamily} board lane`
+      );
+      expectFrameContained(
+        boardFrame,
+        boardLaneFrame,
+        `${frame.id} ${target.deviceFamily} board`
+      );
+      expectFrameContained(
+        railFrame,
+        layoutFrame,
+        `${frame.id} ${target.deviceFamily} control rail`
+      );
       if (boardFrame.x + boardFrame.width > railFrame.x + 1) {
         throw new Error(
-          `Marketing iPad ${frame.id} board must stay left of its control rail.`
+          `Marketing ${target.deviceFamily} ${frame.id} board must stay left `
+          + 'of its control rail.'
         );
       }
     } else {
       await expect(element(by.id('navigation-rail'))).toExist();
     }
   }
+}
+
+function isWideTabletTarget() {
+  return (
+    target.deviceFamily === 'ipad'
+    || target.deviceFamily === 'android-tablet-10'
+  );
 }
 
 async function takeReadyScreenshot(frame) {

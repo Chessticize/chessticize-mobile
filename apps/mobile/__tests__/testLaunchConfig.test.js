@@ -46,6 +46,32 @@ describe("test launch configuration", () => {
     );
   });
 
+  it("bridges Android marketing frames only through the debug-gated launch module", () => {
+    const androidModule = fs.readFileSync(
+      path.resolve(
+        __dirname,
+        "../android/app/src/main/java/com/chessticize/mobile/ChessticizeTestLaunchConfigModule.kt"
+      ),
+      "utf8"
+    );
+    const releaseGuard = androidModule.indexOf("if (!BuildConfig.DEBUG)");
+    const emptyReleaseReturn = androidModule.indexOf("return config", releaseGuard);
+    const testControls = androidModule.indexOf(
+      'config.putBoolean("testControlsEnabled", true)',
+      emptyReleaseReturn
+    );
+    const marketingCapture = androidModule.indexOf(
+      '"chessticizeMarketingCaptureFrame"',
+      testControls
+    );
+
+    expect(releaseGuard).toBeGreaterThan(-1);
+    expect(emptyReleaseReturn).toBeGreaterThan(releaseGuard);
+    expect(testControls).toBeGreaterThan(emptyReleaseReturn);
+    expect(marketingCapture).toBeGreaterThan(testControls);
+    expect(androidModule).toContain('put("marketingCaptureFrame", it)');
+  });
+
   it("ignores native test clock values outside development or explicit test harness controls", () => {
     expect(
       resolveTestNowMsFromLaunchConfig(
