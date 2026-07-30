@@ -988,6 +988,31 @@ describe('Detox suite configuration', () => {
     );
   });
 
+  it('drives Android Run reordering through a black-box system touch stream', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const helperStart = helpers.indexOf('async function dragAndroidElementToElement');
+    const helperEnd = helpers.indexOf('async function startSelectedPracticeRun', helperStart);
+    const helper = helpers.slice(helperStart, helperEnd);
+    const caseStart = practiceSpec.indexOf(
+      "it('creates, reorders, edits, archives, restores, and relaunches a saved Run'"
+    );
+    const caseEnd = practiceSpec.indexOf(
+      "it('persists first-use Sprint guidance",
+      caseStart
+    );
+    const runManagementCase = practiceSpec.slice(caseStart, caseEnd);
+
+    expect(helper).toContain('input touchscreen motionevent DOWN');
+    expect(helper).toContain('input touchscreen motionevent MOVE');
+    expect(helper).toContain('input touchscreen motionevent UP');
+    expect(runManagementCase).toContain("device.getPlatform() === 'android'");
+    expect(runManagementCase).toContain(
+      "dragAndroidElementToElement('practice-run-standard', 'practice-run-arrow-duel')"
+    );
+    expect(runManagementCase).toContain('.longPressAndDrag(');
+  });
+
   it('retries the public Custom Run save until Home confirms the transition', () => {
     const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
     const helperStart = flowsSpec.indexOf('async function createSavedCustomRun');

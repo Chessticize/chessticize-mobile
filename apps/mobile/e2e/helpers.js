@@ -59,6 +59,41 @@ async function playBoardMove(testID, move, flipped = false) {
   }
 }
 
+async function dragAndroidElementToElement(
+  sourceTestID,
+  targetTestID,
+  environment = process.env,
+  run = execFileSync
+) {
+  if (device.getPlatform() !== 'android') {
+    throw new Error('Android system drag requires an Android device');
+  }
+  const sourceFrame = await frameFor(element(by.id(sourceTestID)));
+  const targetFrame = await frameFor(element(by.id(targetTestID)));
+  const startX = Math.round(sourceFrame.x + sourceFrame.width * 0.5);
+  const startY = Math.round(sourceFrame.y + sourceFrame.height * 0.5);
+  const endX = Math.round(targetFrame.x + targetFrame.width * 0.5);
+  const endY = Math.round(targetFrame.y + targetFrame.height * 0.9);
+  const moveCommands = Array.from({ length: 24 }, (_, index) => {
+    const progress = (index + 1) / 24;
+    const x = Math.round(startX + (endX - startX) * progress);
+    const y = Math.round(startY + (endY - startY) * progress);
+    return `input touchscreen motionevent MOVE ${x} ${y} && sleep 0.02`;
+  });
+  const gestureScript = [
+    'set -e',
+    `input touchscreen motionevent DOWN ${startX} ${startY}`,
+    'sleep 0.35',
+    ...moveCommands,
+    'sleep 0.2',
+    `input touchscreen motionevent UP ${endX} ${endY}`,
+  ].join(' && ');
+  const adb = androidAdbPath(environment);
+  const serial = environment.DETOX_ANDROID_DEVICE || 'emulator-5554';
+  run(adb, ['-s', serial, 'shell', 'sh', '-c', gestureScript], { encoding: 'utf8' });
+  await sleep(750);
+}
+
 async function startSelectedPracticeRun() {
   await element(by.id('practice-main-scroll')).scrollTo('top');
   if (await detoxElementExists('practice-sprint-rules-dismiss')) {
@@ -962,6 +997,7 @@ module.exports = {
   collectAndroidUiDiagnostics,
   completeFirstUseSessionGuides,
   dismissRunNameKeyboard,
+  dragAndroidElementToElement,
   elementText,
   historyAttemptRowTestIDForResult,
   openTab,
