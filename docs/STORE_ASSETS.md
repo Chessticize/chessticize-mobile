@@ -41,9 +41,9 @@ Connect's stricter 100-byte reference.
 | Field | Value | Release rule |
 | --- | --- | --- |
 | App name | `Chessticize` | Keep the distinctive cross-platform brand; 11 / 30 characters. |
-| Subtitle | `Build Tactical Intuition` | Result-oriented product promise; 24 / 30 characters. |
+| Subtitle | `Offline Chess Puzzle Trainer` | Concrete product description; 28 / 30 characters. |
 | Promotional text | `Practice rating-matched chess puzzles with Arrow Duel, Custom Runs, and scheduled Review—offline, without ads or an account, and open source.` | 141 / 170 characters. |
-| Keywords | `chess,tactics,puzzle,trainer,offline,blunder,sprint,review,spaced repetition,elo,analysis` | 89 / 100 UTF-8 bytes; no name/subtitle duplication, no spaces after commas, and no category names or competitor terms. |
+| Keywords | `tactics,blunder,sprint,review,spaced repetition,elo,analysis,stockfish,checkmate,open source` | 92 / 100 UTF-8 bytes; no name/subtitle duplication, no spaces after commas, and no category names or competitor terms. |
 | Support URL | `https://chessticize.github.io/chessticize-mobile/support/` | Stable public support, bug-report, feature-request, and private-contact entry point. |
 | Marketing URL | `https://chessticize.github.io/chessticize-mobile/` | Stable public product page with iOS and Android install paths. |
 | Accessibility URL | `https://chessticize.github.io/chessticize-mobile/accessibility/` | Current support and known limitations; do not use this page to imply an undeclared feature. |
@@ -57,12 +57,13 @@ Connect's stricter 100-byte reference.
 Keep `Chessticize`. The evaluated alternative,
 `Chessticize: Chess Tactics`, is within Apple's 30-character limit, but it
 turns the installed cross-platform brand into a generic keyword-bearing name.
-Apple indexes the app name, subtitle, keywords, and company name. The keyword
-field can therefore carry `chess`, `puzzle`, and `tactics`, while the subtitle
-carries the clear user outcome, without forcing a version-bound rename. Revisit
-the name only with localized search evidence or a product-page test that
-justifies the brand cost. If an expanded name is tested later, prefer the more
-concrete `Chessticize: Chess Puzzles` over
+Apple indexes the app name, subtitle, keywords, and company name. The subtitle
+therefore identifies the app as an offline chess puzzle trainer, while the
+keyword field carries complementary terms without duplicating `offline`,
+`chess`, `puzzle`, or `trainer`. This avoids a version-bound rename while
+describing the product directly. Revisit the name only with localized search
+evidence or a product-page test that justifies the brand cost. If an expanded
+name is tested later, prefer the more concrete `Chessticize: Chess Puzzles` over
 `Chessticize: Chess Tactics`.
 
 ### Description
