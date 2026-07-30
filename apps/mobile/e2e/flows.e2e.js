@@ -399,7 +399,7 @@ describe('Key user flows', () => {
 });
 
 async function createSavedCustomRun(name, { shorterDuration = false, themes = [] } = {}) {
-  await waitFor(element(by.id('practice-add-run'))).toBeVisible().withTimeout(10000);
+  await waitForVisibleInPracticeScroll('practice-add-run');
   await element(by.id('practice-add-run')).tap();
   await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
   await element(by.id('practice-run-name-input')).replaceText(name);

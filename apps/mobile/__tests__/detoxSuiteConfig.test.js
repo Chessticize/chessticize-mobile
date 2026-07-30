@@ -997,6 +997,10 @@ describe('Detox suite configuration', () => {
     );
     const helper = flowsSpec.slice(helperStart, helperEnd);
 
+    expect(helper).toContain("waitForVisibleInPracticeScroll('practice-add-run')");
+    expect(helper).not.toContain(
+      "waitFor(element(by.id('practice-add-run'))).toBeVisible().withTimeout(10000)"
+    );
     expect(helper).toContain(
       "tapUntilExists('practice-run-save', 'practice-run-home-edit', 3)"
     );
