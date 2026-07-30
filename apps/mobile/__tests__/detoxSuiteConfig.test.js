@@ -1540,6 +1540,12 @@ describe('Detox suite configuration', () => {
     expect(customRunHelper).toContain(
       'waitFor(element(by.text(expectedPace))).toExist().withTimeout(10000)'
     );
+    expect(customRunHelper).toContain(
+      "if (isGooglePlayCapture && target.deviceFamily === 'android-phone')"
+    );
+    expect(customRunHelper).toContain(
+      "element(by.id('practice-main-scroll')).scroll(220, 'down', 0.5, 0.5)"
+    );
 
     const checkedHelperStart = spec.indexOf('async function expectChecked');
     const checkedHelperEnd = spec.indexOf(

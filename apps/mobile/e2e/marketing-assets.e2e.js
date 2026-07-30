@@ -197,6 +197,9 @@ async function prepareCustomRun() {
   await element(by.id('practice-run-editor-title')).tap();
   await sleep(500);
   await element(by.id('practice-main-scroll')).scrollTo('top');
+  if (isGooglePlayCapture && target.deviceFamily === 'android-phone') {
+    await element(by.id('practice-main-scroll')).scroll(220, 'down', 0.5, 0.5);
+  }
 }
 
 async function assertCompositionViewport(frame) {
