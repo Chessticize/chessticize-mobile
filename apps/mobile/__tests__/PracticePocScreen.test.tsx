@@ -4190,8 +4190,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-review-strip"))).toContain("No reviews due");
     expect(collectText(findByTestId(renderer, "practice-review-strip"))).not.toContain("Scheduled mistake reviews");
     expect(findByTestId(renderer, "practice-review-strip").props.accessibilityLabel).toContain("scheduled mistake reviews");
-    expect(flattenTestStyle(findByTestId(renderer, "practice-review-due-count").props.style).alignItems).toBe("center");
-    expect(collectText(findByTestId(renderer, "practice-review-due-count"))).toBe("0");
+    expect(findByTestId(renderer, "practice-review-strip").props.accessibilityLabel).not.toContain("0");
+    expect(() => findByTestId(renderer, "practice-review-due-count")).toThrow();
     expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-action-area").props.style).flex).toBe(1);
     expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-counts").props.style).justifyContent).toBe("center");
     expect(flattenTestStyle(findByTestId(renderer, "practice-review-strip-chevron").props.style).position).toBe("absolute");
@@ -8893,7 +8893,17 @@ describe("PracticePocScreen", () => {
     jest.setSystemTime(new Date("2026-06-22T04:00:00.000Z"));
     const renderer = renderScreen({ practiceService: service });
 
-    expect(collectText(findByTestId(renderer, "practice-review-overdue-count"))).toContain("1");
+    const homeReviewStripText = collectText(findByTestId(renderer, "practice-review-strip"));
+    expect(homeReviewStripText).toContain("Overdue");
+    expect(homeReviewStripText.match(/1/g)).toHaveLength(1);
+    expect(collectText(findByTestId(renderer, "practice-review-due-count"))).toBe("1");
+    expect(() => findByTestId(renderer, "practice-review-overdue-count")).toThrow();
+    expect(findByTestId(renderer, "practice-review-strip").props.accessibilityLabel).toContain(
+      "1 due today, overdue reviews"
+    );
+    expect(findByTestId(renderer, "practice-review-strip").props.accessibilityLabel).not.toContain(
+      "1 overdue"
+    );
 
     press(renderer, "review-tab");
 
