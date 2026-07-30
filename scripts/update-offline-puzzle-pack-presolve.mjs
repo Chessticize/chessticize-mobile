@@ -1,9 +1,12 @@
 #!/usr/bin/env node
-import { copyFile, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import { isServerCompatibleArrowDuelPuzzle } from "../packages/core/src/index.ts";
+import {
+  MATE_PATTERN_THEMES,
+  isServerCompatibleCorePackPuzzle
+} from "../packages/core/src/index.ts";
 import {
   buildSqliteManifest,
   listCsvFiles,
@@ -12,6 +15,9 @@ import {
   sha256Text,
   stableJson
 } from "./generate-offline-puzzle-fixture.mjs";
+import {
+  installArtifactPair
+} from "./offline-puzzle-pack-artifact.mjs";
 
 const DEFAULT_SOURCE = "../lichess-presolve/presolved";
 const DEFAULT_PACK = "fixtures/puzzles/bundled-core-pack.sqlite";
@@ -58,7 +64,13 @@ async function updateOfflinePuzzlePackPresolve(input) {
 
   try {
     await copyFile(packPath, temporaryPackPath);
-    const update = await updatePackDatabase(temporaryPackPath, sourcePath, input.presolveDepth, log);
+    const update = await updatePackDatabase(
+      temporaryPackPath,
+      sourcePath,
+      input.presolveDepth,
+      input.maxRating,
+      log
+    );
     const integrity = readIntegrityCheck(temporaryPackPath);
     if (integrity !== "ok") {
       throw new Error(`Updated pack failed PRAGMA integrity_check: ${integrity}`);
@@ -82,7 +94,12 @@ async function updateOfflinePuzzlePackPresolve(input) {
       packFileBytes,
       packFileHash,
       manifestHash: "pending"
-    }, { maxRating: input.maxRating });
+    }, {
+      maxRating: input.maxRating,
+      knownMatePatternCounts: update.matePatternCounts,
+      knownRatingBucketMatePatternCounts:
+        update.ratingBucketMatePatternCounts
+    });
     manifest.manifestHash = `sha256:${sha256Text(stableJson({ ...manifest, manifestHash: "" }))}`;
     await writeFile(temporaryManifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
@@ -91,7 +108,9 @@ async function updateOfflinePuzzlePackPresolve(input) {
       manifestPath,
       temporaryPackPath,
       temporaryManifestPath,
-      token
+      token,
+      backupLabel: "presolve",
+      fileSystem: input.fileSystem
     });
     installed = true;
 
@@ -135,7 +154,13 @@ async function verifyArtifactMatchesManifest(packPath, manifest) {
   }
 }
 
-async function updatePackDatabase(packPath, sourcePath, presolveDepth, log) {
+async function updatePackDatabase(
+  packPath,
+  sourcePath,
+  presolveDepth,
+  maxRating,
+  log
+) {
   const db = new DatabaseSync(packPath);
   let transactionOpen = false;
   try {
@@ -180,6 +205,8 @@ async function updatePackDatabase(packPath, sourcePath, presolveDepth, log) {
     let unchangedRows = 0;
     let updatedRows = 0;
     let removedRows = 0;
+    const matePatternCounts = new Map();
+    const ratingBucketMatePatternCounts = new Map();
 
     db.exec("BEGIN IMMEDIATE");
     transactionOpen = true;
@@ -235,7 +262,7 @@ async function updatePackDatabase(packPath, sourcePath, presolveDepth, log) {
           stockfishBestMove,
           stockfishEvalAfterFirstMove
         };
-        if (!isServerCompatibleArrowDuelPuzzle(puzzle)) {
+        if (!isServerCompatibleCorePackPuzzle(puzzle)) {
           deletePuzzleThemes.run(id);
           deletePuzzle.run(id);
           removedRows += 1;
@@ -243,6 +270,21 @@ async function updatePackDatabase(packPath, sourcePath, presolveDepth, log) {
             removedPuzzleIdSample.push(id);
           }
           return;
+        }
+
+        const bucketMin = ratingBucket(existing.rating, maxRating);
+        const bucketMatePatternCounts =
+          ratingBucketMatePatternCounts.get(bucketMin) ?? new Map();
+        ratingBucketMatePatternCounts.set(
+          bucketMin,
+          bucketMatePatternCounts
+        );
+        for (const theme of new Set(splitWords(sourceRow.Themes))) {
+          if (!MATE_PATTERN_THEMES.includes(theme)) {
+            continue;
+          }
+          increment(matePatternCounts, theme);
+          increment(bucketMatePatternCounts, theme);
         }
 
         if (changed) {
@@ -278,6 +320,12 @@ async function updatePackDatabase(packPath, sourcePath, presolveDepth, log) {
       unchangedRows,
       updatedRows,
       removedRows,
+      matePatternCounts: mapToSortedObject(matePatternCounts),
+      ratingBucketMatePatternCounts: new Map(
+        [...ratingBucketMatePatternCounts.entries()].map(
+          ([bucket, counts]) => [bucket, mapToSortedObject(counts)]
+        )
+      ),
       changedFields,
       removedPuzzleIdSample
     };
@@ -341,6 +389,22 @@ function parseRequiredNumber(value, label, id) {
   return parsed;
 }
 
+function ratingBucket(rating, maxRating) {
+  return Math.min(maxRating - 100, Math.floor(rating / 100) * 100);
+}
+
+function increment(map, key) {
+  map.set(key, (map.get(key) ?? 0) + 1);
+}
+
+function mapToSortedObject(map) {
+  return Object.fromEntries(
+    [...map.entries()].sort(([left], [right]) =>
+      left.localeCompare(right)
+    )
+  );
+}
+
 function canonicalPositionFen(fen) {
   return fen.trim().split(/\s+/).slice(0, 4).join(" ");
 }
@@ -361,33 +425,6 @@ function readIntegrityCheck(path) {
   } finally {
     db.close();
   }
-}
-
-async function installArtifactPair(input) {
-  const packBackupPath = `${input.packPath}.presolve-backup-${input.token}`;
-  const manifestBackupPath = `${input.manifestPath}.presolve-backup-${input.token}`;
-  let packBackedUp = false;
-  let manifestBackedUp = false;
-  try {
-    await rename(input.packPath, packBackupPath);
-    packBackedUp = true;
-    await rename(input.manifestPath, manifestBackupPath);
-    manifestBackedUp = true;
-    await rename(input.temporaryPackPath, input.packPath);
-    await rename(input.temporaryManifestPath, input.manifestPath);
-  } catch (error) {
-    await rm(input.packPath, { force: true });
-    await rm(input.manifestPath, { force: true });
-    if (packBackedUp) {
-      await rename(packBackupPath, input.packPath);
-    }
-    if (manifestBackedUp) {
-      await rename(manifestBackupPath, input.manifestPath);
-    }
-    throw error;
-  }
-  await rm(packBackupPath, { force: true });
-  await rm(manifestBackupPath, { force: true });
 }
 
 function parseArgs(argv) {

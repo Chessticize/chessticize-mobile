@@ -2,7 +2,6 @@
 import {
   copyFile,
   readFile,
-  rename,
   rm,
   stat,
   writeFile
@@ -16,6 +15,9 @@ import {
   sha256Text,
   stableJson
 } from "./generate-offline-puzzle-fixture.mjs";
+import {
+  installArtifactPair
+} from "./offline-puzzle-pack-artifact.mjs";
 import {
   assertCorePackThemeCatalog,
   CORE_PACK_THEME_CATALOG,
@@ -103,7 +105,14 @@ async function optimizeOfflinePuzzlePack(input) {
       manifestHash: "pending"
     }, {
       maxRating: input.maxRating,
-      knownArrowDuelCount: priorManifest.arrowDuelCount
+      knownArrowDuelCount: priorManifest.arrowDuelCount,
+      knownMatePatternCounts: priorManifest.matePatternCounts,
+      knownRatingBucketMatePatternCounts: new Map(
+        (priorManifest.ratingBuckets ?? []).map((bucket) => [
+          bucket.minRating,
+          bucket.matePatternCounts ?? {}
+        ])
+      )
     });
     manifest.manifestHash =
       `sha256:${sha256Text(stableJson({ ...manifest, manifestHash: "" }))}`;
@@ -117,7 +126,9 @@ async function optimizeOfflinePuzzlePack(input) {
       manifestPath,
       temporaryPackPath,
       temporaryManifestPath,
-      token
+      token,
+      backupLabel: "optimize",
+      fileSystem: input.fileSystem
     });
     installed = true;
 
@@ -368,34 +379,6 @@ function readIntegrityCheck(path) {
 
 function countRows(db, table) {
   return db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count;
-}
-
-async function installArtifactPair(input) {
-  const packBackupPath = `${input.packPath}.optimize-backup-${input.token}`;
-  const manifestBackupPath =
-    `${input.manifestPath}.optimize-backup-${input.token}`;
-  let packBackedUp = false;
-  let manifestBackedUp = false;
-  try {
-    await rename(input.packPath, packBackupPath);
-    packBackedUp = true;
-    await rename(input.manifestPath, manifestBackupPath);
-    manifestBackedUp = true;
-    await rename(input.temporaryPackPath, input.packPath);
-    await rename(input.temporaryManifestPath, input.manifestPath);
-  } catch (error) {
-    await rm(input.packPath, { force: true });
-    await rm(input.manifestPath, { force: true });
-    if (packBackedUp) {
-      await rename(packBackupPath, input.packPath);
-    }
-    if (manifestBackedUp) {
-      await rename(manifestBackupPath, input.manifestPath);
-    }
-    throw error;
-  }
-  await rm(packBackupPath, { force: true });
-  await rm(manifestBackupPath, { force: true });
 }
 
 function parseArgs(argv) {

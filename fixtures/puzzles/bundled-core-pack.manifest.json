@@ -8,7 +8,7 @@
   "presolve": "Chessticize depth-20 Stockfish presolve",
   "presolveDepth": 20,
   "licenseNote": "Derived from Lichess puzzle data with Chessticize presolve metadata.",
-  "manifestHash": "sha256:c930bfc471b6fe24eadced410c096542aa0a7b9394c80b5bc4de04f0ca6ec29d",
+  "manifestHash": "sha256:6315ca04db2a8d2f12974b15d74a1f383d589fd17d4f8f49791eebb8b3a6ab71",
   "packFileHash": "sha256:74a81e54729dd1f4f9adee375c728e22ac758d3211e2da81d3b5bd702380083b",
   "packFileBytes": 227487744,
   "format": "sqlite",
@@ -103,7 +103,14 @@
         "zugzwang": 104
       },
       "matePatternCounts": {
+        "anastasiaMate": 136,
+        "arabianMate": 53,
         "backRankMate": 4885,
+        "bodenMate": 73,
+        "doubleBishopMate": 102,
+        "dovetailMate": 8,
+        "hookMate": 56,
+        "killBoxMate": 18,
         "smotheredMate": 154
       }
     },
@@ -138,7 +145,14 @@
         "zugzwang": 192
       },
       "matePatternCounts": {
+        "anastasiaMate": 144,
+        "arabianMate": 134,
         "backRankMate": 3821,
+        "bodenMate": 95,
+        "doubleBishopMate": 175,
+        "dovetailMate": 52,
+        "hookMate": 134,
+        "killBoxMate": 46,
         "smotheredMate": 155
       }
     },
@@ -173,7 +187,14 @@
         "zugzwang": 268
       },
       "matePatternCounts": {
+        "anastasiaMate": 182,
+        "arabianMate": 224,
         "backRankMate": 4487,
+        "bodenMate": 83,
+        "doubleBishopMate": 272,
+        "dovetailMate": 74,
+        "hookMate": 181,
+        "killBoxMate": 50,
         "smotheredMate": 271
       }
     },
@@ -208,7 +229,14 @@
         "zugzwang": 369
       },
       "matePatternCounts": {
+        "anastasiaMate": 172,
+        "arabianMate": 157,
         "backRankMate": 4063,
+        "bodenMate": 93,
+        "doubleBishopMate": 55,
+        "dovetailMate": 120,
+        "hookMate": 217,
+        "killBoxMate": 50,
         "smotheredMate": 228
       }
     },
@@ -243,7 +271,14 @@
         "zugzwang": 464
       },
       "matePatternCounts": {
+        "anastasiaMate": 105,
+        "arabianMate": 127,
         "backRankMate": 3402,
+        "bodenMate": 62,
+        "doubleBishopMate": 37,
+        "dovetailMate": 88,
+        "hookMate": 227,
+        "killBoxMate": 57,
         "smotheredMate": 183
       }
     },
@@ -278,7 +313,14 @@
         "zugzwang": 584
       },
       "matePatternCounts": {
+        "anastasiaMate": 61,
+        "arabianMate": 126,
         "backRankMate": 2237,
+        "bodenMate": 50,
+        "doubleBishopMate": 13,
+        "dovetailMate": 68,
+        "hookMate": 239,
+        "killBoxMate": 67,
         "smotheredMate": 182
       }
     },
@@ -313,7 +355,14 @@
         "zugzwang": 639
       },
       "matePatternCounts": {
+        "anastasiaMate": 86,
+        "arabianMate": 104,
         "backRankMate": 1327,
+        "bodenMate": 33,
+        "doubleBishopMate": 14,
+        "dovetailMate": 61,
+        "hookMate": 186,
+        "killBoxMate": 63,
         "smotheredMate": 230
       }
     },
@@ -348,7 +397,14 @@
         "zugzwang": 593
       },
       "matePatternCounts": {
+        "anastasiaMate": 189,
+        "arabianMate": 74,
         "backRankMate": 1050,
+        "bodenMate": 41,
+        "doubleBishopMate": 22,
+        "dovetailMate": 55,
+        "hookMate": 146,
+        "killBoxMate": 50,
         "smotheredMate": 411
       }
     },
@@ -383,7 +439,14 @@
         "zugzwang": 549
       },
       "matePatternCounts": {
+        "anastasiaMate": 224,
+        "arabianMate": 86,
         "backRankMate": 895,
+        "bodenMate": 40,
+        "doubleBishopMate": 10,
+        "dovetailMate": 52,
+        "hookMate": 136,
+        "killBoxMate": 54,
         "smotheredMate": 231
       }
     },
@@ -418,7 +481,14 @@
         "zugzwang": 621
       },
       "matePatternCounts": {
+        "anastasiaMate": 159,
+        "arabianMate": 70,
         "backRankMate": 598,
+        "bodenMate": 49,
+        "doubleBishopMate": 15,
+        "dovetailMate": 56,
+        "hookMate": 109,
+        "killBoxMate": 50,
         "smotheredMate": 115
       }
     },
@@ -453,7 +523,14 @@
         "zugzwang": 756
       },
       "matePatternCounts": {
+        "anastasiaMate": 98,
+        "arabianMate": 50,
         "backRankMate": 377,
+        "bodenMate": 34,
+        "doubleBishopMate": 15,
+        "dovetailMate": 50,
+        "hookMate": 107,
+        "killBoxMate": 58,
         "smotheredMate": 58
       }
     },
@@ -488,7 +565,14 @@
         "zugzwang": 810
       },
       "matePatternCounts": {
+        "anastasiaMate": 63,
+        "arabianMate": 50,
         "backRankMate": 294,
+        "bodenMate": 29,
+        "doubleBishopMate": 16,
+        "dovetailMate": 50,
+        "hookMate": 79,
+        "killBoxMate": 77,
         "smotheredMate": 50
       }
     },
@@ -523,7 +607,14 @@
         "zugzwang": 1013
       },
       "matePatternCounts": {
+        "anastasiaMate": 50,
+        "arabianMate": 50,
         "backRankMate": 220,
+        "bodenMate": 21,
+        "doubleBishopMate": 7,
+        "dovetailMate": 41,
+        "hookMate": 72,
+        "killBoxMate": 56,
         "smotheredMate": 40
       }
     },
@@ -558,7 +649,14 @@
         "zugzwang": 1403
       },
       "matePatternCounts": {
+        "anastasiaMate": 26,
+        "arabianMate": 49,
         "backRankMate": 162,
+        "bodenMate": 6,
+        "doubleBishopMate": 8,
+        "dovetailMate": 42,
+        "hookMate": 62,
+        "killBoxMate": 50,
         "smotheredMate": 16
       }
     },
@@ -593,7 +691,14 @@
         "zugzwang": 1629
       },
       "matePatternCounts": {
+        "anastasiaMate": 24,
+        "arabianMate": 39,
         "backRankMate": 109,
+        "bodenMate": 11,
+        "doubleBishopMate": 6,
+        "dovetailMate": 38,
+        "hookMate": 45,
+        "killBoxMate": 50,
         "smotheredMate": 9
       }
     },
@@ -628,13 +733,27 @@
         "zugzwang": 1760
       },
       "matePatternCounts": {
+        "anastasiaMate": 3,
+        "arabianMate": 22,
         "backRankMate": 78,
+        "bodenMate": 6,
+        "doubleBishopMate": 2,
+        "dovetailMate": 24,
+        "hookMate": 46,
+        "killBoxMate": 41,
         "smotheredMate": 5
       }
     }
   ],
   "matePatternCounts": {
+    "anastasiaMate": 1722,
+    "arabianMate": 1415,
     "backRankMate": 28005,
+    "bodenMate": 726,
+    "doubleBishopMate": 769,
+    "dovetailMate": 879,
+    "hookMate": 2042,
+    "killBoxMate": 837,
     "smotheredMate": 2338
   },
   "tacticalAnalysis": {

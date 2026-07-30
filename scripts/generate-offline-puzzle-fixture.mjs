@@ -9,7 +9,8 @@ import { pathToFileURL } from "node:url";
 import {
   MATE_PATTERN_THEMES,
   curatedPuzzleThemes,
-  isServerCompatibleArrowDuelPuzzle
+  isServerCompatibleArrowDuelPuzzle,
+  isServerCompatibleCorePackPuzzle
 } from "../packages/core/src/index.ts";
 import {
   assertKnownCorePackThemes,
@@ -48,6 +49,7 @@ async function main(argv = process.argv.slice(2)) {
   if (!options.resumeCandidates && !options.manifestOnly) {
     await rm(outputPath, { force: true });
   }
+  let samplingMatePatterns;
   const db = new DatabaseSync(outputPath);
   try {
     if (options.manifestOnly) {
@@ -62,6 +64,10 @@ async function main(argv = process.argv.slice(2)) {
     if (!options.manifestOnly) {
       const quotas = computeBucketQuotas(readBucketInventories(db), options.targetCount);
       const selected = selectFinalPuzzles(db, quotas, options.seed);
+      samplingMatePatterns = summarizeMatePatterns(
+        selected,
+        options.maxRating
+      );
       writeSelectedPack(db, selected);
       db.exec("VACUUM");
       db.exec("ANALYZE");
@@ -80,7 +86,11 @@ async function main(argv = process.argv.slice(2)) {
     packFileBytes,
     packFileHash,
     manifestHash: "pending"
-  }, options);
+  }, {
+    ...options,
+    knownMatePatternCounts: samplingMatePatterns?.totals,
+    knownRatingBucketMatePatternCounts: samplingMatePatterns?.buckets
+  });
   manifest.manifestHash = `sha256:${sha256Text(stableJson({ ...manifest, manifestHash: "" }))}`;
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
@@ -281,7 +291,7 @@ async function ingestCandidates(db, sourcePath, options) {
     await readCsvFile(filePath, (row) => {
       readRows += 1;
       const puzzle = puzzleFromRow(row, options);
-      if (!puzzle || !isServerCompatibleArrowDuelPuzzle(puzzle)) {
+      if (!puzzle || !isServerCompatibleCorePackPuzzle(puzzle)) {
         return;
       }
       pending.push(puzzle);
@@ -298,7 +308,10 @@ async function ingestCandidates(db, sourcePath, options) {
     insertedRows += pending.length;
   }
   const deduped = db.prepare("SELECT COUNT(*) AS count FROM candidates").get().count;
-  console.log(`Read ${readRows} source rows; accepted ${insertedRows} Arrow Duel eligible rows; deduped to ${deduped}`);
+  console.log(
+    `Read ${readRows} source rows; accepted ${insertedRows} Core Pack ` +
+    `compatible rows; deduped to ${deduped}`
+  );
 }
 
 function readBucketInventories(db) {
@@ -589,12 +602,6 @@ function buildSqliteManifest(path, input, options) {
         `Pack validation received invalid Arrow Duel count ${arrowDuelCount}/${puzzleCount}`
       );
     }
-    if (
-      options.knownArrowDuelCount === undefined &&
-      arrowDuelCount !== puzzleCount
-    ) {
-      throw new Error(`Pack validation failed: ${arrowDuelCount}/${puzzleCount} puzzles are Arrow Duel eligible`);
-    }
     return {
       id: input.id,
       title: input.title,
@@ -625,9 +632,15 @@ function buildSqliteManifest(path, input, options) {
           maxRating: bucket.maxRating,
           puzzleCount: bucket.puzzleCount,
           themeCounts: mapToSortedObject(bucket.themeCounts),
-          matePatternCounts: mapToSortedObject(bucket.matePatternCounts)
+          matePatternCounts:
+            options.knownRatingBucketMatePatternCounts?.get(
+              bucket.minRating
+            ) ??
+            mapToSortedObject(bucket.matePatternCounts)
         })),
-      matePatternCounts: mapToSortedObject(matePatternCounts),
+      matePatternCounts:
+        options.knownMatePatternCounts ??
+        mapToSortedObject(matePatternCounts),
       tacticalAnalysis: {
         schemaVersion: 1,
         puzzleRatingDeviation: true,
@@ -922,6 +935,32 @@ function increment(map, key) {
 
 function mapToSortedObject(map) {
   return Object.fromEntries([...map.entries()].sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function summarizeMatePatterns(puzzles, maxRating) {
+  const totals = new Map();
+  const buckets = new Map();
+  for (const puzzle of puzzles) {
+    const bucketMin = ratingBucket(puzzle.rating, maxRating);
+    const bucketCounts = buckets.get(bucketMin) ?? new Map();
+    buckets.set(bucketMin, bucketCounts);
+    for (const theme of new Set(puzzle.themes)) {
+      if (!MATE_PATTERN_THEMES.includes(theme)) {
+        continue;
+      }
+      increment(totals, theme);
+      increment(bucketCounts, theme);
+    }
+  }
+  return {
+    totals: mapToSortedObject(totals),
+    buckets: new Map(
+      [...buckets.entries()].map(([bucket, counts]) => [
+        bucket,
+        mapToSortedObject(counts)
+      ])
+    )
+  };
 }
 
 function runInTransaction(db, work) {

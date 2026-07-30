@@ -46,18 +46,17 @@ pack validation and publishing workflow below.
 `core-pack-v1` was the first Core Pack build and used the wrong, lower-quality
 presolve input. It is superseded by `core-pack-v2`, which retains the sampled
 puzzle IDs, refreshes their presolve fields from the canonical depth-20 release,
-and removes puzzles that no longer pass the full Arrow Duel rule. Treat the
-published depth-20 dataset as the only presolve source for current and future
-Core Packs.
+and removes puzzles that no longer pass the then-current pack quality rule.
+Treat the published depth-20 dataset as the only presolve source for current
+and future Core Packs.
 
 ## Owner Decisions (2026-07-04)
 
-1. **Every sampled puzzle must pass the build-time Arrow Duel rule in effect
-   for that pack generation.** Runtime rules may become stricter later. For
-   example, the promotion-candidate guard added after `core-pack-v3` excludes
-   7,031 retained puzzles from Arrow Duel while leaving them valid for Standard.
-   The manifest records the current eligible count, and runtime uses
-   `all_non_promotion` only when that count is below the total.
+1. **Every sampled puzzle must pass the Core Pack quality rule.** It shares
+   Arrow Duel's best-move, legality, and evaluation checks, but retains
+   promotion candidates for Standard. The manifest records the exact Arrow Duel
+   eligible subset, and runtime uses `all_non_promotion` when that count is
+   below the total.
 2. **Install-size budget: about 700 MB, hard cap 800 MB.** Measured density:
    431 bytes/puzzle as minified JSON; plan for ~500 bytes/row in SQLite with
    indexes. Budget therefore targets ≈ 1.4 million puzzles (cap ≈ 1.6M).
@@ -72,9 +71,11 @@ Core Packs.
    `stockfish_eval_after_first_move`.
 2. Quality: `Popularity >= 70`, `NbPlays >= 100`, `RatingDeviation <= 100`.
 3. Rating in [600, 2200].
-4. Arrow Duel eligibility: full `isServerCompatibleArrowDuelPuzzle` from
-   `packages/core/src/puzzle-selection-strategy.ts` (best move differs from the
-   blunder, both legal, |best eval| <= 60cp, eval swing > 200cp).
+4. Core Pack compatibility: `isServerCompatibleCorePackPuzzle` from
+   `packages/core/src/puzzle-selection-strategy.ts` requires the same best-move,
+   legality, and evaluation-quality checks as Arrow Duel. Promotion candidates
+   remain eligible for Standard and are counted but excluded at Arrow Duel
+   runtime because its arrows cannot distinguish promotion pieces.
 5. Position dedupe on the canonical FEN (first four FEN fields), keeping the
    more popular record.
 
@@ -149,6 +150,9 @@ The shipped schema uses a hybrid normalized layout:
 - `puzzle_themes.rating` is a denormalized copy of `puzzles.rating`; rating does
   not vary by theme. Keeping it makes the theme/rating index covering, so the
   hot selection query does not join and sort `puzzles`.
+- The manifest retains all nine mate-pattern sampling counts, including
+  patterns that are not runtime-indexed. These small provenance aggregates do
+  not recreate discarded `puzzle_themes` relations.
 
 A July 30, 2026 local comparison on the 1.4-million-puzzle data set measured:
 
@@ -197,10 +201,10 @@ temporary copy, and requires every shipped `PuzzleId` to exist in the new
 source with the same FEN, solution moves, and rating. It changes only
 `stockfish_eval`, `stockfish_bestmove`, and
 `stockfish_eval_after_first_move`. Each row is rechecked with
-`isServerCompatibleArrowDuelPuzzle`; rows that fail are removed from both the
+`isServerCompatibleCorePackPuzzle`; rows that fail are removed from both the
 puzzle and theme relations. It then runs `PRAGMA integrity_check`, rebuilds the
-manifest, and performs a full second Arrow Duel validation from the resulting
-SQLite database before atomically replacing the pack and manifest.
+manifest, and recounts the Arrow Duel eligible subset from the resulting SQLite
+database before atomically replacing the pack and manifest.
 
 This is intentionally not a full renewal: it never adds or resamples puzzle
 IDs and does not backfill rows removed by the depth-20 eligibility check. The
@@ -296,10 +300,11 @@ the runtime `openReadOnlyPuzzlePack` calls, and the asset test — don't.
 
 ## Acceptance Criteria
 
-- A fresh full generation validates every puzzle against the then-current
-  `isServerCompatibleArrowDuelPuzzle` rule. A relation-only optimization
-  preserves the verified input manifest's exact Arrow Duel count because it
-  cannot change puzzle eligibility.
+- A fresh full generation validates every puzzle with
+  `isServerCompatibleCorePackPuzzle` and records the exact subset that passes
+  `isServerCompatibleArrowDuelPuzzle`; promotion candidates remain available to
+  Standard only. A relation-only optimization preserves the verified input
+  manifest's exact Arrow Duel count because it cannot change puzzle eligibility.
 - Manifest counts match the database contents exactly.
 - For a full regeneration, per-bucket, per-theme, and mate-pattern minimums are
   met or equal the full available inventory. A targeted presolve update instead

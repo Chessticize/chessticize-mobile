@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -81,7 +88,7 @@ test("optimizes the Core Pack relation index without renumbering the theme catal
 
   assert.equal(report.beforePuzzleCount, 3);
   assert.equal(report.afterPuzzleCount, 3);
-  assert.equal(report.beforePuzzleThemeRelationCount, 5);
+  assert.equal(report.beforePuzzleThemeRelationCount, 6);
   assert.equal(report.afterPuzzleThemeRelationCount, 2);
   assert.equal(report.themeCatalogCount, 62);
   assert.equal(report.indexedThemeCount, 24);
@@ -159,6 +166,12 @@ test("optimizes the Core Pack relation index without renumbering the theme catal
   assert.equal(manifest.arrowDuelCount, 3);
   assert.deepEqual(manifest.themes, ["fork", "hangingPiece"]);
   assert.deepEqual(manifest.themeCounts, { fork: 1, hangingPiece: 1 });
+  assert.deepEqual(manifest.matePatternCounts, { anastasiaMate: 1 });
+  assert.deepEqual(
+    manifest.ratingBuckets.find((bucket) => bucket.minRating === 900)
+      ?.matePatternCounts,
+    { anastasiaMate: 1 }
+  );
   assert.equal(manifest.packFileBytes, (await stat(fixture.packPath)).size);
   assert.equal(manifest.packFileHash, `sha256:${await sha256File(fixture.packPath)}`);
   assert.equal(
@@ -178,6 +191,38 @@ test("optimizes the Core Pack relation index without renumbering the theme catal
   assert.equal(repeated.afterPuzzleThemeRelationCount, 2);
   assert.equal(repeated.packFileHash, `sha256:${firstPackHash}`);
   assert.equal(await sha256File(fixture.packPath), firstPackHash);
+});
+
+test("preserves the verified artifact pair when manifest backup fails", async (t) => {
+  const fixture = await createLegacyPackFixture();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const originalPack = await readFile(fixture.packPath);
+  const originalManifest = await readFile(fixture.manifestPath);
+  let renameCallCount = 0;
+
+  await assert.rejects(
+    optimizeOfflinePuzzlePack({
+      packPath: fixture.packPath,
+      manifestPath: fixture.manifestPath,
+      buildDate: "2026-07-30",
+      maxRating: 2200,
+      log: () => {},
+      fileSystem: {
+        rename: async (source, destination) => {
+          renameCallCount += 1;
+          if (renameCallCount === 2) {
+            throw new Error("injected manifest backup failure");
+          }
+          await rename(source, destination);
+        },
+        rm
+      }
+    }),
+    /injected manifest backup failure/u
+  );
+
+  assert.deepEqual(await readFile(fixture.packPath), originalPack);
+  assert.deepEqual(await readFile(fixture.manifestPath), originalManifest);
 });
 
 async function createLegacyPackFixture() {
@@ -241,6 +286,7 @@ async function createLegacyPackFixture() {
     );
     insertRelation.run("with-hanging", themeId("hangingPiece"), 900);
     insertRelation.run("with-hanging", themeId("endgame"), 900);
+    insertRelation.run("with-hanging", themeId("anastasiaMate"), 900);
     insertRelation.run("endgame-only", themeId("endgame"), 1000);
     insertRelation.run("with-fork", themeId("fork"), 1100);
     insertRelation.run("with-fork", themeId("crushing"), 1100);
@@ -268,15 +314,48 @@ async function createLegacyPackFixture() {
     targetPuzzleCount: 3,
     puzzleCount: 3,
     rating: { min: 900, max: 1100 },
-    themes: ["crushing", "endgame", "fork", "hangingPiece"],
+    themes: [
+      "anastasiaMate",
+      "crushing",
+      "endgame",
+      "fork",
+      "hangingPiece"
+    ],
     themeCounts: {
+      anastasiaMate: 1,
       crushing: 1,
       endgame: 2,
       fork: 1,
       hangingPiece: 1
     },
-    ratingBuckets: [],
-    matePatternCounts: {},
+    ratingBuckets: [
+      {
+        minRating: 900,
+        maxRating: 999,
+        puzzleCount: 1,
+        themeCounts: {
+          anastasiaMate: 1,
+          endgame: 1,
+          hangingPiece: 1
+        },
+        matePatternCounts: { anastasiaMate: 1 }
+      },
+      {
+        minRating: 1000,
+        maxRating: 1099,
+        puzzleCount: 1,
+        themeCounts: { endgame: 1 },
+        matePatternCounts: {}
+      },
+      {
+        minRating: 1100,
+        maxRating: 1199,
+        puzzleCount: 1,
+        themeCounts: { crushing: 1, fork: 1 },
+        matePatternCounts: {}
+      }
+    ],
+    matePatternCounts: { anastasiaMate: 1 },
     arrowDuelCount: 3
   };
   manifest.manifestHash =

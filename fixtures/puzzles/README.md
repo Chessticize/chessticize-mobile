@@ -11,12 +11,14 @@ pnpm generate:offline-puzzles
 
 The generator reads the depth-20 `../lichess-presolve/presolved` corpus by
 default, keeps source puzzle IDs, requires Stockfish presolve fields, applies
-the quality and Arrow Duel eligibility filters in
+the Core Pack quality filters in
 `docs/PUZZLE_PACK_SAMPLING.md`, samples the 600-2200 rating range with
 deterministic stratified bucket/theme quotas, removes duplicate board
 positions, and writes a deterministic SQLite pack plus
 `bundled-core-pack.manifest.json`. It does not synthesize puzzles by copying
-existing records.
+existing records. Promotion candidates that pass the remaining quality checks
+stay available to Standard while the manifest and runtime exclude them from
+Arrow Duel.
 
 The presolver is public at
 [Chessticize/lichess-presolver](https://github.com/Chessticize/lichess-presolver),
@@ -33,8 +35,9 @@ pnpm update:offline-puzzle-presolve
 ```
 
 This targeted updater changes only the three Stockfish fields, removes rows
-that no longer satisfy the full Arrow Duel eligibility rule, and performs full
-artifact/manifest validation. It does not replenish removed rows.
+that no longer satisfy the Core Pack quality rule, and performs full
+artifact/manifest validation. It does not replenish removed rows; promotion
+candidates remain available to Standard.
 
 The release SQLite schema is intentionally runtime-only: `puzzles` keeps the
 source puzzle ID, compact FEN, solution moves, rating, and presolved Stockfish
@@ -50,7 +53,8 @@ does not vary by theme. The covering
 `(theme_id, rating, puzzle_id)` index avoids joining and sorting the large
 `puzzles` table during theme-and-rating selection. See
 `docs/PUZZLE_PACK_SAMPLING.md` for the measured size/query tradeoff and legacy
-Run behavior.
+Run behavior. The manifest keeps all nine mate-pattern sampling counts as
+provenance even when a pattern is not runtime-indexed.
 
 Fields used only during generation, such as game URL, opening tags, popularity,
 and play count, are filtered in the candidate table and omitted from the
