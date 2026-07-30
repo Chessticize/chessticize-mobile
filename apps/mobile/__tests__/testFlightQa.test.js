@@ -15,8 +15,8 @@ const exportOptions = fs.readFileSync(
 describe("TestFlight QA checklist", () => {
   it("keeps TestFlight physical-device diagnostics explicitly optional", () => {
     expect(testFlightDoc).toContain("Optional TestFlight Diagnostics");
-    expect(testFlightDoc).toContain("Internal 1.3.1 QA");
-    expect(testFlightDoc).toContain("ios-v1.3.1-build-1");
+    expect(testFlightDoc).toContain("Internal 1.3.2 QA");
+    expect(testFlightDoc).toContain("ios-v1.3.2-build-1");
     expect(testFlightDoc).toContain("App Store Connect build");
     expect(testFlightDoc).toContain("not an App Store release gate");
     expect(testFlightDoc).toContain("not required");
@@ -115,17 +115,15 @@ describe("TestFlight QA checklist", () => {
     expect(appStoreUploadDoc).toContain("xcrun --sdk iphoneos --show-sdk-version");
     expect(appStoreUploadDoc).toContain("Xcode 26 or later");
     expect(appStoreUploadDoc).toMatch(/iOS\s+and iPadOS 26 SDK or later/);
+    expect(appStoreUploadDoc).toContain("on a clean release Mac");
     expect(appStoreUploadDoc).toContain(
-      "the Mac that prepared this branch is explicitly excluded"
-    );
-    expect(appStoreUploadDoc).toMatch(
-      /Passing the numeric minimum above\s+does not override/
+      "Repository preparation on another checkout is not native evidence"
     );
     expect(appStoreUploadDoc).toContain(
       "App Store Connect release notes"
     );
     expect(appStoreUploadDoc).toContain(
-      "The 1.3.1 candidate is explicitly **Full native validation**"
+      "The 1.3.2 candidate is explicitly **Full native validation**"
     );
     expect(appStoreUploadDoc).toContain("CHESSTICIZE_E2E_SCOPE=full");
     expect(appStoreUploadDoc).toContain(
