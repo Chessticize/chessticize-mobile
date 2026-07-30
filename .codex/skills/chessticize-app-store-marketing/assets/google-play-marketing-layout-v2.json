@@ -185,9 +185,9 @@
         "punchHoleTopInsetRatio": 0.012
       },
       "title": {
-        "leftRatio": 0.075,
+        "leftRatio": 0.05,
         "topRatio": 0.04,
-        "maxWidthRatio": 0.85,
+        "maxWidthRatio": 0.9,
         "fontSizeRatio": 0.073,
         "lineHeightRatio": 0.88,
         "maxCharactersPerLine": 20,

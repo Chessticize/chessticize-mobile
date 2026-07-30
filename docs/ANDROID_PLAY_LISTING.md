@@ -17,7 +17,7 @@ in the owner evidence described by `docs/ANDROID_PLAY_RELEASE.md`.
 - App or game: Game
 - Category: Board
 - Pricing: Free
-- Short description: `Build tactical intuition with offline chess puzzles and focused practice.`
+- Short description: `Offline chess puzzle trainer with rating-matched Sprints and focused practice.`
 - Full description:
 
 ```text

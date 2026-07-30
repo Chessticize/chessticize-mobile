@@ -57,7 +57,9 @@ test("Google Play en-US copy is canonical, paste-ready, and within Unicode limit
   );
   assert.notEqual(metadata.shortDescription.trim(), "");
   assert.notEqual(metadata.fullDescription.trim(), "");
-  assert.ok(metadata.shortDescription.startsWith("Build tactical intuition"));
+  assert.ok(
+    metadata.shortDescription.startsWith("Offline chess puzzle trainer"),
+  );
   assert.ok(metadata.fullDescription.startsWith("Practice chess puzzles with purpose"));
   assert.ok(!metadata.fullDescription.includes(metadata.shortDescription));
 
