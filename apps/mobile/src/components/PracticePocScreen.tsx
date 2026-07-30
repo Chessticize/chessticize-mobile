@@ -4424,7 +4424,7 @@ function PracticeHome({
           <Text style={styles.sectionLabel}>Review</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Open scheduled mistake reviews, ${dueReviewCount} due today${overdueReviewCount > 0 ? `, ${overdueReviewCount} overdue` : ""}`}
+            accessibilityLabel={`Open scheduled mistake reviews${dueReviewCount > 0 ? `, ${dueReviewCount} due today` : ""}${overdueReviewCount > 0 ? ", overdue reviews" : ""}`}
             testID="practice-review-strip"
             style={styles.practiceReviewStrip}
             onPress={onOpenReview}
@@ -4444,13 +4444,9 @@ function PracticeHome({
                 style={styles.reviewStripCounts}
                 testID="practice-review-strip-counts"
               >
-                <View style={styles.reviewStripMetric} testID="practice-review-due-count">
-                  <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
-                </View>
-                {overdueReviewCount > 0 ? (
-                  <View style={styles.reviewStripMetric} testID="practice-review-overdue-count">
-                    <Text style={styles.reviewOverdueCount}>{overdueReviewCount}</Text>
-                    <Text style={styles.reviewStripMetricLabel}>Overdue</Text>
+                {dueReviewCount > 0 ? (
+                  <View style={styles.reviewStripMetric} testID="practice-review-due-count">
+                    <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
                   </View>
                 ) : null}
               </View>
@@ -16438,21 +16434,6 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     textAlign: "center",
     width: "100%"
-  },
-  reviewOverdueCount: {
-    color: "#DC2626",
-    fontSize: 17,
-    fontWeight: "800",
-    lineHeight: 21,
-    textAlign: "center",
-    width: "100%"
-  },
-  reviewStripMetricLabel: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "800",
-    lineHeight: 14,
-    textAlign: "center"
   },
   reviewQueuePanel: {
     gap: 12
