@@ -1457,15 +1457,6 @@ describe('Detox suite configuration', () => {
     expect(practiceSpec).toContain(
       "waitForVisibleInPracticeScroll('practice-add-run')"
     );
-    expect(practiceSpec).toContain(
-      "waitForVisibleInPracticeScroll('sprint-unclear-toggle')"
-    );
-    expect(practiceSpec).toContain(
-      "device.getPlatform() === 'android' && !frameIsContained(promptFrame, screenAfter)"
-    );
-    expect(practiceSpec).toContain(
-      "element(by.id('practice-main-scroll')).scroll(100, 'down', 0.5, 0.5)"
-    );
     expect(practiceSpec).toContain("openTab('settings-tab', 'settings-show-sprint-guide')");
     expect(practiceSpec).toContain("waitForVisibleInPracticeScroll('history-attention-flag-in-review')");
     expect(practiceSpec).toContain("element(by.id('history-filter-toggle')).tap()");

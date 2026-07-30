@@ -257,7 +257,7 @@ describe('Practice POC', () => {
     await waitForVisibleInPracticeScroll('session-board');
 
     await playBoardMove('session-board', FIRST_STANDARD_FEEDBACK_MOVES.accepted);
-    await waitForVisibleInPracticeScroll('sprint-unclear-toggle');
+    await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
     await element(by.id('sprint-unclear-toggle')).tap();
     await waitFor(element(by.text('Marked')))
       .toBeVisible()
@@ -519,15 +519,8 @@ async function assertStationaryBoardFeedback({ move, orientation, outcome }) {
     return;
   }
 
-  let promptFrame = await frameFor(element(by.id('sprint-unclear-prompt')));
-  let promptScreenFrame = screenAfter;
-  if (device.getPlatform() === 'android' && !frameIsContained(promptFrame, screenAfter)) {
-    await element(by.id('practice-main-scroll')).scroll(100, 'down', 0.5, 0.5);
-    await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
-    promptFrame = await frameFor(element(by.id('sprint-unclear-prompt')));
-    promptScreenFrame = await frameFor(element(by.id('safe-area-shell')));
-  }
-  expectFrameContained(promptFrame, promptScreenFrame, `${orientation} Unclear action`);
+  const promptFrame = await frameFor(element(by.id('sprint-unclear-prompt')));
+  expectFrameContained(promptFrame, screenAfter, `${orientation} Unclear action`);
   const scoreFrame = await frameFor(element(by.id('session-score-strip')));
   if (promptFrame.y < scoreFrame.y + scoreFrame.height - 1) {
     throw new Error(
