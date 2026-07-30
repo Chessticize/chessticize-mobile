@@ -32,6 +32,7 @@ if (captureLandscapeAssets && !captureDeviceName.includes('iPad')) {
 const puzzlePackPath = resolve(__dirname, '../../../fixtures/puzzles/bundled-core-pack.sqlite');
 const sprintNowMs = Date.parse('2026-07-08T18:00:00.000Z');
 const reviewNowMs = Date.parse('2026-07-09T18:00:00.000Z');
+const STORE_ASSET_CAPTURE_TIMEOUT_MS = 420000;
 
 describeStoreAssets('App Store screenshot capture', () => {
   it('captures a coherent active-player story across all store scenes', async () => {
@@ -48,7 +49,7 @@ describeStoreAssets('App Store screenshot capture', () => {
     await completeOneWrongReview();
     await captureMainTabScenes();
     await captureSprintScenes();
-  });
+  }, STORE_ASSET_CAPTURE_TIMEOUT_MS);
 });
 
 async function captureFirstUseSprintRulesGuide() {

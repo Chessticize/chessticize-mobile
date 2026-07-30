@@ -192,6 +192,12 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("CHESSTICIZE_CAPTURE_STORE_ASSETS");
     expect(storeAssetsE2e).toContain("CHESSTICIZE_STORE_ASSET_ORIENTATION");
     expect(storeAssetsE2e).toContain(
+      "const STORE_ASSET_CAPTURE_TIMEOUT_MS = 420000"
+    );
+    expect(storeAssetsE2e).toContain(
+      "}, STORE_ASSET_CAPTURE_TIMEOUT_MS);"
+    );
+    expect(storeAssetsE2e).toContain(
       "Landscape iOS capture requires a dedicated iPad Simulator"
     );
     expect(storeAssetsE2e).toContain(
