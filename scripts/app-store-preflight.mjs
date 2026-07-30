@@ -100,6 +100,16 @@ const thirdPartyAudit = spawnSync(
   }
 );
 const iosReleaseIdentity = loadIOSReleaseIdentity(repoRoot);
+const normalizedIOSVersion =
+  iosReleaseIdentity.version.split(".").length === 2
+    ? `${iosReleaseIdentity.version}.0`
+    : iosReleaseIdentity.version;
+const iosReleaseTag =
+  `ios-v${normalizedIOSVersion}-build-${iosReleaseIdentity.build}`;
+const iosReleaseNotePath = `docs/releases/${iosReleaseTag}.md`;
+const iosReleaseNote = fileExists(iosReleaseNotePath)
+  ? readText(iosReleaseNotePath)
+  : "";
 let thirdPartyAuditPayload = null;
 try {
   thirdPartyAuditPayload = JSON.parse(thirdPartyAudit.stdout || "{}");
@@ -254,13 +264,22 @@ check(
     appStoreMetadata.description.includes("chess puzzle trainer") &&
     !appStoreMetadata.description.includes("Tactical Profile") &&
     !appStoreMetadata.description.includes("weakness") &&
-    appStoreMetadata.currentVersionWhatsNew?.sourceTag === "ios-v1.3.0-build-1" &&
-    appStoreMetadata.currentVersionWhatsNew?.status === "post-tag-metadata-correction" &&
+    appStoreMetadata.currentVersionWhatsNew?.sourceTag === "ios-v1.3.1-build-1" &&
+    appStoreMetadata.currentVersionWhatsNew?.status === "release-candidate" &&
     Array.from(appStoreMetadata.currentVersionWhatsNew.storeCopy).length <=
       appStoreMetadata.limits.chessticizeWhatsNewCharacters &&
     !/https?:\/\//u.test(appStoreMetadata.currentVersionWhatsNew.storeCopy) &&
     !appStoreMetadata.currentVersionWhatsNew.storeCopy.includes("experimental"),
   "The canonical en-US metadata must stay paste-ready, puzzle-led, within Apple's limits, and independent of weakness detection."
+);
+
+check(
+  "iOS release note matches the canonical release identity and What's New copy",
+  iosReleaseNote.includes(`Public version: \`${iosReleaseIdentity.version}\``) &&
+    iosReleaseNote.includes(`Build or version code: \`${iosReleaseIdentity.build}\``) &&
+    iosReleaseNote.includes(`Source tag: \`${iosReleaseTag}\``) &&
+    iosReleaseNote.includes(appStoreMetadata.currentVersionWhatsNew.storeCopy),
+  `${iosReleaseNotePath} must exist and match iOS ${iosReleaseIdentity.version} build ${iosReleaseIdentity.build}, ${iosReleaseTag}, and the canonical What's New copy.`
 );
 
 check(
@@ -371,11 +390,11 @@ manualGate(
 );
 manualGate(
   "Create the public source release tag",
-  `Tag the exact commit used for the App Store Connect binary as ios-v${iosReleaseIdentity.version.split(".").length === 2 ? `${iosReleaseIdentity.version}.0` : iosReleaseIdentity.version}-build-${iosReleaseIdentity.build} and publish the GitHub release.`
+  `Tag the exact commit used for the App Store Connect binary as ${iosReleaseTag} and publish the GitHub release.`
 );
 manualGate(
   "Approve and publish the exact iOS release notes",
-  `Create docs/releases/ios-v${iosReleaseIdentity.version.split(".").length === 2 ? `${iosReleaseIdentity.version}.0` : iosReleaseIdentity.version}-build-${iosReleaseIdentity.build}.md from the release-note template, approve it before tagging, copy its store text exactly when App Store Connect exposes the field, and retain publication evidence. If the immutable tag predates this contract, use the documented existing-tag transition without moving it.`
+  `Approve ${iosReleaseNotePath} before tagging, copy its store text exactly when App Store Connect exposes the field, and retain publication evidence.`
 );
 manualGate(
   "Configure Apple signing team and Xcode account",

@@ -29,6 +29,36 @@ Different names may be supplied with
 UDID with `CHESSTICIZE_MARKETING_IPHONE_DEVICE_UDID` or
 `CHESSTICIZE_MARKETING_IPAD_DEVICE_UDID`.
 
+On a clean Mac, first discover the device profiles and installed runtimes:
+
+```sh
+xcrun simctl list devicetypes
+xcrun simctl list runtimes
+xcrun simctl list devices available
+```
+
+If the two default names do not already exist, create dedicated devices in
+Xcode's **Window > Devices and Simulators** using an available 6.9-inch iPhone
+17 Pro Max profile and 13-inch iPad Pro (M5) profile, then give them the exact
+default names above. The equivalent `xcrun simctl create` command may be used
+with the device-type and runtime identifiers printed by the first two commands;
+do not copy identifiers from another Mac because installed runtimes can differ.
+When equivalent profiles have different names, use the documented environment
+variable overrides instead.
+
+The host-side iPad rotation uses System Events to control the exact Simulator
+window. Grant the terminal or automation host running this command permission
+under **System Settings > Privacy & Security > Accessibility** and, when macOS
+prompts, **Automation > System Events**. Confirm the Accessibility gate before
+the release capture:
+
+```sh
+osascript -e 'tell application "System Events" to UI elements enabled'
+```
+
+It must print `true`. These are host permissions only; they are never committed
+or copied from the preparation Mac.
+
 The iPhone profile must belong to the 6.9-inch App Store display group. The
 iPad profile must be 13-inch. The capture rejects a wrong profile,
 orientation, or pixel size. Accepted raw sizes are:
@@ -52,6 +82,11 @@ The command performs iOS preflight, builds the Release simulator app once,
 captures all six frames on the iPhone in portrait, captures the same six
 frames on the iPad in its real responsive landscape layout, and verifies one
 combined manifest. It does not require manual tapping.
+
+The wrapper waits up to 60 seconds by default for the exact Simulator window
+to become available on a clean machine. Set
+`CHESSTICIZE_SIMULATOR_WINDOW_WAIT_ATTEMPTS` only when a slower host needs more
+quarter-second attempts; the value must be a positive integer.
 
 By default, output is written below:
 

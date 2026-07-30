@@ -82,6 +82,10 @@ describe('mobile App input identity', () => {
     ],
     ['apps/mobile/__tests__/screen.test.js', 'test-runner'],
     ['apps/mobile/e2e/practice.e2e.js', 'test-runner'],
+    [
+      'apps/mobile/native/stockfish/Bridge/tests/StockfishRunnerLifecycleTest.cpp',
+      'test-runner',
+    ],
     ['apps/mobile-lab/src/Practice.stories.tsx', 'test-runner'],
     ['.github/workflows/mobile-android-test-only-rerun.yml', 'test-runner'],
     ['apps/mobile/scripts/mobile-app-inputs.js', 'app-build'],

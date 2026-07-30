@@ -7,6 +7,10 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { PNG } = require('pngjs');
 const story = require('../../../config/app-store-marketing-story-v1.json');
+const captureRunbook = readFileSync(
+  join(__dirname, '../../../docs/marketing/APP_STORE_MARKETING_CAPTURE.md'),
+  'utf8'
+);
 const {
   assertCaptureDimensions,
   captureMarketingScreenshot,
@@ -233,6 +237,12 @@ describe('App Store marketing capture artifacts', () => {
 
     expect(wrapper).toContain('set-simulator-orientation.sh');
     expect(wrapper).toContain('/usr/bin/open -a Simulator --args -CurrentDeviceUDID');
+    expect(wrapper).toContain(
+      'CHESSTICIZE_SIMULATOR_WINDOW_WAIT_ATTEMPTS:-240'
+    );
+    expect(wrapper).toContain(
+      'attempt <= SIMULATOR_WINDOW_WAIT_ATTEMPTS'
+    );
     expect(wrapper).toContain('tell application "Simulator" to quit');
     expect(wrapper).toContain('/bin/kill -TERM "$simulator_pid"');
     expect(wrapper).toContain('/Simulator.app/Contents/MacOS/Simulator');
@@ -245,6 +255,17 @@ describe('App Store marketing capture artifacts', () => {
     expect(ipadCapture).toBeGreaterThan(ipadOrientation);
     expect(wrapper).toContain(
       '"$ORIENTATION_RUNNER" "$IPAD_UDID" "$IPAD_DEVICE_NAME" portrait'
+    );
+  });
+
+  it('documents clean-host simulator and Accessibility setup', () => {
+    expect(captureRunbook).toContain('xcrun simctl list devicetypes');
+    expect(captureRunbook).toContain('xcrun simctl list runtimes');
+    expect(captureRunbook).toContain('xcrun simctl create');
+    expect(captureRunbook).toContain('Privacy & Security > Accessibility');
+    expect(captureRunbook).toContain('Automation > System Events');
+    expect(captureRunbook).toContain(
+      'tell application "System Events" to UI elements enabled'
     );
   });
 });
