@@ -1,5 +1,4 @@
 const {
-  completeFirstUseSessionGuides,
   dismissRunNameKeyboard,
   openTab,
   openStandardHistoryTrend,
@@ -8,6 +7,7 @@ const {
   playBoardMove,
   sleep,
   startPracticeMode,
+  startSelectedPracticeRun,
   selectTestPuzzleSource,
   tapUntilExists,
   textFromAttributes,
@@ -332,10 +332,7 @@ describe('Key user flows', () => {
     const flowFocusSelectTestID = await createSavedCustomRun('Flow Focus', { shorterDuration: true });
     await waitForVisibleInPracticeScroll(flowFocusSelectTestID);
     await element(by.id(flowFocusSelectTestID)).tap();
-    await element(by.id('practice-main-scroll')).scrollTo('top');
-    await element(by.id('practice-run-start')).tap();
-    await completeFirstUseSessionGuides();
-    await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+    await startSelectedPracticeRun();
 
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
@@ -354,10 +351,7 @@ describe('Key user flows', () => {
     });
     await waitForVisibleInPracticeScroll(persistentFocusSelectTestID);
     await element(by.id(persistentFocusSelectTestID)).tap();
-    await element(by.id('practice-main-scroll')).scrollTo('top');
-    await element(by.id('practice-run-start')).tap();
-    await completeFirstUseSessionGuides();
-    await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+    await startSelectedPracticeRun();
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();

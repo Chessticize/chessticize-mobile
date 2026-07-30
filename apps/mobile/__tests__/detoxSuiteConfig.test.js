@@ -958,33 +958,34 @@ describe('Detox suite configuration', () => {
 
   it('dismisses the public Sprint rules guide before starting a selected Run', () => {
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
-    const helperStart = helpers.indexOf('async function startPracticeMode');
+    const helperStart = helpers.indexOf('async function startSelectedPracticeRun');
     const helperEnd = helpers.indexOf(
-      'async function completeFirstUseSessionGuides',
+      'async function startPracticeMode',
       helperStart
     );
     const helper = helpers.slice(helperStart, helperEnd);
     const findRulesDismiss = helper.indexOf(
       "detoxElementExists('practice-sprint-rules-dismiss')"
     );
-    const tapRulesDismiss = helper.indexOf(
-      "element(by.id('practice-sprint-rules-dismiss')).tap()"
-    );
-    const findRulesGuide = helper.indexOf(
-      "element(by.id('practice-sprint-rules-guide'))",
-      tapRulesDismiss
-    );
-    const waitForRulesToLeave = helper.indexOf(
-      '.not.toExist()',
-      findRulesGuide
+    const retryRulesDismiss = helper.indexOf(
+      "tapUntilExists('practice-sprint-rules-dismiss', 'practice-sprint-rules-open', 3)"
     );
     const tapStart = helper.indexOf("element(by.id('practice-run-start')).tap()");
 
     expect(findRulesDismiss).toBeGreaterThan(0);
-    expect(tapRulesDismiss).toBeGreaterThan(findRulesDismiss);
-    expect(findRulesGuide).toBeGreaterThan(tapRulesDismiss);
-    expect(waitForRulesToLeave).toBeGreaterThan(findRulesGuide);
-    expect(tapStart).toBeGreaterThan(waitForRulesToLeave);
+    expect(retryRulesDismiss).toBeGreaterThan(findRulesDismiss);
+    expect(tapStart).toBeGreaterThan(retryRulesDismiss);
+  });
+
+  it('shares the selected Run startup helper across Custom Run flows', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+
+    expect(flowsSpec).toContain('startSelectedPracticeRun,');
+    expect(flowsSpec.split('await startSelectedPracticeRun();')).toHaveLength(3);
+    expect(flowsSpec).not.toContain(
+      "await element(by.id('practice-run-start')).tap();\n"
+      + '    await completeFirstUseSessionGuides();'
+    );
   });
 
   it('retries the public Custom Run save until Home confirms the transition', () => {

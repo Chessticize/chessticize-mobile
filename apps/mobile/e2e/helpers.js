@@ -59,25 +59,26 @@ async function playBoardMove(testID, move, flipped = false) {
   }
 }
 
-async function startPracticeMode(mode) {
-  const runCardId = `practice-run-${mode}`;
-  await waitForVisibleInPracticeScroll(runCardId);
-  await element(by.id(`practice-run-select-${mode}`)).tap();
+async function startSelectedPracticeRun() {
   await element(by.id('practice-main-scroll')).scrollTo('top');
   if (await detoxElementExists('practice-sprint-rules-dismiss')) {
     await waitFor(element(by.id('practice-sprint-rules-dismiss')))
       .toBeVisible()
       .withTimeout(10000);
-    await element(by.id('practice-sprint-rules-dismiss')).tap();
-    await waitFor(element(by.id('practice-sprint-rules-guide')))
-      .not.toExist()
-      .withTimeout(10000);
+    await tapUntilExists('practice-sprint-rules-dismiss', 'practice-sprint-rules-open', 3);
     await element(by.id('practice-main-scroll')).scrollTo('top');
   }
   await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
   await element(by.id('practice-run-start')).tap();
   await completeFirstUseSessionGuides();
   await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+}
+
+async function startPracticeMode(mode) {
+  const runCardId = `practice-run-${mode}`;
+  await waitForVisibleInPracticeScroll(runCardId);
+  await element(by.id(`practice-run-select-${mode}`)).tap();
+  await startSelectedPracticeRun();
 }
 
 async function completeFirstUseSessionGuides() {
@@ -977,6 +978,7 @@ module.exports = {
   performAndroidPredictiveBackGesture,
   setAndroidDisplayOrientation,
   startPracticeMode,
+  startSelectedPracticeRun,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
   tapUntilExists,
