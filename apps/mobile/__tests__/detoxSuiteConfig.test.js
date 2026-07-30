@@ -1454,6 +1454,18 @@ describe('Detox suite configuration', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
 
+    expect(practiceSpec).toContain(
+      "waitForVisibleInPracticeScroll('practice-add-run')"
+    );
+    expect(practiceSpec).toContain(
+      "waitForVisibleInPracticeScroll('sprint-unclear-toggle')"
+    );
+    expect(practiceSpec).toContain(
+      "device.getPlatform() === 'android' && !frameIsContained(promptFrame, screenAfter)"
+    );
+    expect(practiceSpec).toContain(
+      "element(by.id('practice-main-scroll')).scroll(100, 'down', 0.5, 0.5)"
+    );
     expect(practiceSpec).toContain("openTab('settings-tab', 'settings-show-sprint-guide')");
     expect(practiceSpec).toContain("waitForVisibleInPracticeScroll('history-attention-flag-in-review')");
     expect(practiceSpec).toContain("element(by.id('history-filter-toggle')).tap()");
