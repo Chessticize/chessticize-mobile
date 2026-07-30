@@ -3,6 +3,7 @@ const path = require("node:path");
 
 const {
   createAdvancingTestClock,
+  enableTestControlsFromLaunchConfig,
   isStoreAssetCaptureEnabled,
   resolveMarketingCaptureFrameFromLaunchConfig,
   resolveTestArrowDuelTargetCorrectFromLaunchConfig,
@@ -235,6 +236,20 @@ describe("test launch configuration", () => {
     expect(resolveMarketingCaptureFrameFromLaunchConfig({
       marketingCaptureFrame: "   "
     })).toBeUndefined();
+  });
+
+  it("suppresses visible debug controls during deterministic marketing capture", () => {
+    const globals = { __DEV__: true };
+    const nativeModule = {
+      marketingCaptureFrame: "make-every-mistake-count",
+      testControlsEnabled: true,
+      testNowMs: "1785261600000"
+    };
+
+    expect(enableTestControlsFromLaunchConfig(globals, nativeModule)).toBe(false);
+    expect(globals.__CHESSTICIZE_ENABLE_TEST_CONTROLS__).toBe(false);
+    expect(resolveTestNowMsFromLaunchConfig(globals, nativeModule))
+      .toBe(1785261600000);
   });
 
   it("rejects invalid native test clock values", () => {
