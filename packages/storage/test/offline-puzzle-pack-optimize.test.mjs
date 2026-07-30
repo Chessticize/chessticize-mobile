@@ -20,6 +20,7 @@ import {
 } from "../../../scripts/optimize-offline-puzzle-pack.mjs";
 import {
   initializeDatabase,
+  main as generateOfflinePuzzlePack,
   sha256File,
   sha256Text,
   stableJson,
@@ -191,6 +192,42 @@ test("optimizes the Core Pack relation index without renumbering the theme catal
   assert.equal(repeated.afterPuzzleThemeRelationCount, 2);
   assert.equal(repeated.packFileHash, `sha256:${firstPackHash}`);
   assert.equal(await sha256File(fixture.packPath), firstPackHash);
+});
+
+test("manifest-only rebuild preserves verified mate-pattern provenance", async (t) => {
+  const fixture = await createLegacyPackFixture();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+
+  await optimizeOfflinePuzzlePack({
+    packPath: fixture.packPath,
+    manifestPath: fixture.manifestPath,
+    buildDate: "2026-07-30",
+    maxRating: 2200,
+    log: () => {}
+  });
+  await generateOfflinePuzzlePack([
+    "--output",
+    fixture.packPath,
+    "--manifest",
+    fixture.manifestPath,
+    "--target-count",
+    "3",
+    "--max-rating",
+    "2200",
+    "--manifest-only"
+  ]);
+
+  const manifest = JSON.parse(await readFile(fixture.manifestPath, "utf8"));
+  assert.deepEqual(manifest.matePatternCounts, { anastasiaMate: 1 });
+  assert.deepEqual(
+    manifest.ratingBuckets.find((bucket) => bucket.minRating === 900)
+      ?.matePatternCounts,
+    { anastasiaMate: 1 }
+  );
+  assert.equal(
+    manifest.manifestHash,
+    `sha256:${sha256Text(stableJson({ ...manifest, manifestHash: "" }))}`
+  );
 });
 
 test("preserves the verified artifact pair when manifest backup fails", async (t) => {

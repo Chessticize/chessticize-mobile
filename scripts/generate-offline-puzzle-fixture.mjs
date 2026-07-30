@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, rm, opendir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, opendir, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { DatabaseSync } from "node:sqlite";
@@ -18,6 +18,10 @@ import {
   corePackThemeId,
   INDEXED_CORE_PACK_THEMES
 } from "./offline-puzzle-pack-schema.mjs";
+import {
+  ratingBucket,
+  summarizeMatePatterns
+} from "./offline-puzzle-pack-metadata.mjs";
 
 const DEFAULT_SOURCE = "../lichess-presolve/presolved";
 const DEFAULT_OUTPUT = "fixtures/puzzles/bundled-core-pack.sqlite";
@@ -49,7 +53,9 @@ async function main(argv = process.argv.slice(2)) {
   if (!options.resumeCandidates && !options.manifestOnly) {
     await rm(outputPath, { force: true });
   }
-  let samplingMatePatterns;
+  let samplingMatePatterns = options.manifestOnly
+    ? await readVerifiedManifestMatePatterns(outputPath, manifestPath)
+    : undefined;
   const db = new DatabaseSync(outputPath);
   try {
     if (options.manifestOnly) {
@@ -881,10 +887,6 @@ function themeFamilies(themes) {
   return families;
 }
 
-function ratingBucket(rating, maxRating) {
-  return Math.min(maxRating - 100, Math.floor(rating / 100) * 100);
-}
-
 function canonicalPositionFen(fen) {
   return fen.trim().split(/\s+/).slice(0, 4).join(" ");
 }
@@ -937,32 +939,6 @@ function mapToSortedObject(map) {
   return Object.fromEntries([...map.entries()].sort(([left], [right]) => left.localeCompare(right)));
 }
 
-function summarizeMatePatterns(puzzles, maxRating) {
-  const totals = new Map();
-  const buckets = new Map();
-  for (const puzzle of puzzles) {
-    const bucketMin = ratingBucket(puzzle.rating, maxRating);
-    const bucketCounts = buckets.get(bucketMin) ?? new Map();
-    buckets.set(bucketMin, bucketCounts);
-    for (const theme of new Set(puzzle.themes)) {
-      if (!MATE_PATTERN_THEMES.includes(theme)) {
-        continue;
-      }
-      increment(totals, theme);
-      increment(bucketCounts, theme);
-    }
-  }
-  return {
-    totals: mapToSortedObject(totals),
-    buckets: new Map(
-      [...buckets.entries()].map(([bucket, counts]) => [
-        bucket,
-        mapToSortedObject(counts)
-      ])
-    )
-  };
-}
-
 function runInTransaction(db, work) {
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -984,6 +960,56 @@ async function sha256File(path) {
     stream.on("end", resolvePromise);
   });
   return hash.digest("hex");
+}
+
+async function readVerifiedManifestMatePatterns(packPath, manifestPath) {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const computedManifestHash =
+    `sha256:${sha256Text(stableJson({ ...manifest, manifestHash: "" }))}`;
+  if (manifest.manifestHash !== computedManifestHash) {
+    throw new Error(
+      `Manifest hash ${manifest.manifestHash} does not match ${computedManifestHash}`
+    );
+  }
+
+  const packFileBytes = (await stat(packPath)).size;
+  if (manifest.packFileBytes !== packFileBytes) {
+    throw new Error(
+      `Pack size ${packFileBytes} does not match manifest packFileBytes ${manifest.packFileBytes}`
+    );
+  }
+  const packFileHash = `sha256:${await sha256File(packPath)}`;
+  if (manifest.packFileHash !== packFileHash) {
+    throw new Error(
+      `Pack hash ${packFileHash} does not match manifest packFileHash ${manifest.packFileHash}`
+    );
+  }
+
+  if (
+    !manifest.matePatternCounts ||
+    typeof manifest.matePatternCounts !== "object" ||
+    !Array.isArray(manifest.ratingBuckets) ||
+    manifest.ratingBuckets.some(
+      (bucket) =>
+        !Number.isInteger(bucket.minRating) ||
+        !bucket.matePatternCounts ||
+        typeof bucket.matePatternCounts !== "object"
+    )
+  ) {
+    throw new Error(
+      "Verified manifest is missing mate-pattern provenance required by --manifest-only"
+    );
+  }
+
+  return {
+    totals: { ...manifest.matePatternCounts },
+    buckets: new Map(
+      manifest.ratingBuckets.map((bucket) => [
+        bucket.minRating,
+        { ...bucket.matePatternCounts }
+      ])
+    )
+  };
 }
 
 function sha256Text(value) {

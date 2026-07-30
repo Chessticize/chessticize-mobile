@@ -187,6 +187,13 @@ pack/manifest pair. Because puzzle fields are byte-for-byte unchanged, it
 reuses the input manifest's Arrow Duel count while recomputing all
 theme-dependent manifest data.
 
+`pnpm generate:offline-puzzles -- --manifest-only` is only for refreshing
+metadata around an existing pack. It first verifies the existing pack size,
+pack hash, and manifest hash, then preserves the manifest's full mate-pattern
+sampling provenance rather than trying to reconstruct non-indexed themes from
+the pruned runtime relations. If the artifact pair or provenance is incomplete,
+the command fails without rewriting the manifest.
+
 ## Updating Presolve Data Without Resampling
 
 Use this workflow when the sampled IDs should remain fixed but their presolve

@@ -3,10 +3,7 @@ import { copyFile, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
-import {
-  MATE_PATTERN_THEMES,
-  isServerCompatibleCorePackPuzzle
-} from "../packages/core/src/index.ts";
+import { isServerCompatibleCorePackPuzzle } from "../packages/core/src/index.ts";
 import {
   buildSqliteManifest,
   listCsvFiles,
@@ -18,6 +15,11 @@ import {
 import {
   installArtifactPair
 } from "./offline-puzzle-pack-artifact.mjs";
+import {
+  addPuzzleMatePatterns,
+  createMatePatternSummary,
+  serializeMatePatternSummary
+} from "./offline-puzzle-pack-metadata.mjs";
 
 const DEFAULT_SOURCE = "../lichess-presolve/presolved";
 const DEFAULT_PACK = "fixtures/puzzles/bundled-core-pack.sqlite";
@@ -205,8 +207,7 @@ async function updatePackDatabase(
     let unchangedRows = 0;
     let updatedRows = 0;
     let removedRows = 0;
-    const matePatternCounts = new Map();
-    const ratingBucketMatePatternCounts = new Map();
+    const matePatternSummary = createMatePatternSummary();
 
     db.exec("BEGIN IMMEDIATE");
     transactionOpen = true;
@@ -272,20 +273,14 @@ async function updatePackDatabase(
           return;
         }
 
-        const bucketMin = ratingBucket(existing.rating, maxRating);
-        const bucketMatePatternCounts =
-          ratingBucketMatePatternCounts.get(bucketMin) ?? new Map();
-        ratingBucketMatePatternCounts.set(
-          bucketMin,
-          bucketMatePatternCounts
+        addPuzzleMatePatterns(
+          matePatternSummary,
+          {
+            rating: existing.rating,
+            themes: splitWords(sourceRow.Themes)
+          },
+          maxRating
         );
-        for (const theme of new Set(splitWords(sourceRow.Themes))) {
-          if (!MATE_PATTERN_THEMES.includes(theme)) {
-            continue;
-          }
-          increment(matePatternCounts, theme);
-          increment(bucketMatePatternCounts, theme);
-        }
 
         if (changed) {
           updatePuzzle.run(stockfishEval, stockfishBestMove, stockfishEvalAfterFirstMove, id);
@@ -313,6 +308,8 @@ async function updatePackDatabase(
       db.exec("VACUUM");
     }
 
+    const serializedMatePatterns =
+      serializeMatePatternSummary(matePatternSummary);
     return {
       beforePuzzleCount,
       matchedSourceRows,
@@ -320,12 +317,8 @@ async function updatePackDatabase(
       unchangedRows,
       updatedRows,
       removedRows,
-      matePatternCounts: mapToSortedObject(matePatternCounts),
-      ratingBucketMatePatternCounts: new Map(
-        [...ratingBucketMatePatternCounts.entries()].map(
-          ([bucket, counts]) => [bucket, mapToSortedObject(counts)]
-        )
-      ),
+      matePatternCounts: serializedMatePatterns.totals,
+      ratingBucketMatePatternCounts: serializedMatePatterns.buckets,
       changedFields,
       removedPuzzleIdSample
     };
@@ -387,22 +380,6 @@ function parseRequiredNumber(value, label, id) {
     throw new Error(`Invalid ${label} for ${id}: ${value}`);
   }
   return parsed;
-}
-
-function ratingBucket(rating, maxRating) {
-  return Math.min(maxRating - 100, Math.floor(rating / 100) * 100);
-}
-
-function increment(map, key) {
-  map.set(key, (map.get(key) ?? 0) + 1);
-}
-
-function mapToSortedObject(map) {
-  return Object.fromEntries(
-    [...map.entries()].sort(([left], [right]) =>
-      left.localeCompare(right)
-    )
-  );
 }
 
 function canonicalPositionFen(fen) {
