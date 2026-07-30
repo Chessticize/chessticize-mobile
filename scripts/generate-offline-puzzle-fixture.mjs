@@ -11,6 +11,12 @@ import {
   curatedPuzzleThemes,
   isServerCompatibleArrowDuelPuzzle
 } from "../packages/core/src/index.ts";
+import {
+  assertKnownCorePackThemes,
+  CORE_PACK_THEME_CATALOG,
+  corePackThemeId,
+  INDEXED_CORE_PACK_THEMES
+} from "./offline-puzzle-pack-schema.mjs";
 
 const DEFAULT_SOURCE = "../lichess-presolve/presolved";
 const DEFAULT_OUTPUT = "fixtures/puzzles/bundled-core-pack.sqlite";
@@ -19,17 +25,6 @@ const DEFAULT_TARGET_COUNT = 1_400_000;
 const DEFAULT_MIN_RATING = 600;
 const DEFAULT_MAX_RATING = 2200;
 const DEFAULT_SEED = "chessticize-core-pack-v1-2026-07-04";
-const CUSTOM_SPRINT_THEMES = [
-  "mate",
-  "endgame",
-  "fork",
-  "pin",
-  "skewer",
-  "sacrifice",
-  "promotion",
-  "hangingPiece",
-  "advancedPawn"
-];
 const PACK_METADATA = {
   id: "core",
   title: "Core Pack",
@@ -196,7 +191,7 @@ function initializeDatabase(db) {
       theme_id INTEGER NOT NULL,
       rating INTEGER NOT NULL,
       PRIMARY KEY (puzzle_id, theme_id)
-    );
+    ) WITHOUT ROWID;
 
     CREATE INDEX candidates_bucket_idx ON candidates(rating_bucket, rating, id);
     CREATE INDEX puzzles_rating_idx ON puzzles(rating, id);
@@ -397,7 +392,7 @@ function selectBucketPuzzles(candidates, quota, seed, bucket) {
   const familyCap = Math.max(1, Math.floor(quota * 0.3));
   const themeInventory = countAvailableThemes(candidates);
 
-  for (const theme of CUSTOM_SPRINT_THEMES) {
+  for (const theme of INDEXED_CORE_PACK_THEMES) {
     addThemeMinimum({
       theme,
       required: Math.min(500, themeInventory.get(theme) ?? 0),
@@ -482,17 +477,21 @@ function writeSelectedPack(db, selected) {
       stockfish_eval_after_first_move
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  const insertThemeName = db.prepare("INSERT INTO themes (name) VALUES (?)");
+  const insertThemeName = db.prepare(
+    "INSERT INTO themes (id, name) VALUES (?, ?)"
+  );
   const insertPuzzleTheme = db.prepare("INSERT INTO puzzle_themes (puzzle_id, theme_id, rating) VALUES (?, ?, ?)");
   const writeRows = (puzzles) => {
     db.prepare("DELETE FROM puzzles").run();
     db.prepare("DELETE FROM puzzle_themes").run();
     db.prepare("DELETE FROM themes").run();
-    const themeIds = new Map();
-    for (const theme of [...new Set(puzzles.flatMap((puzzle) => puzzle.themes))].sort((left, right) => left.localeCompare(right))) {
-      const result = insertThemeName.run(theme);
-      themeIds.set(theme, Number(result.lastInsertRowid));
+    assertKnownCorePackThemes(
+      puzzles.flatMap((puzzle) => puzzle.themes)
+    );
+    for (const theme of CORE_PACK_THEME_CATALOG) {
+      insertThemeName.run(theme.id, theme.name);
     }
+    const indexedThemes = new Set(INDEXED_CORE_PACK_THEMES);
     for (const puzzle of puzzles) {
       insertPuzzle.run(
         puzzle.id,
@@ -504,8 +503,15 @@ function writeSelectedPack(db, selected) {
         puzzle.stockfishBestMove,
         puzzle.stockfishEvalAfterFirstMove
       );
-      for (const theme of puzzle.themes) {
-        insertPuzzleTheme.run(puzzle.id, themeIds.get(theme), puzzle.rating);
+      for (const theme of new Set(puzzle.themes)) {
+        if (!indexedThemes.has(theme)) {
+          continue;
+        }
+        insertPuzzleTheme.run(
+          puzzle.id,
+          corePackThemeId(theme),
+          puzzle.rating
+        );
       }
     }
     db.prepare("DROP TABLE candidates").run();
@@ -520,7 +526,10 @@ function buildSqliteManifest(path, input, options) {
     const matePatternCounts = new Map();
     const buckets = new Map();
     let puzzleCount = 0;
-    let arrowDuelCount = 0;
+    let arrowDuelCount =
+      options.knownArrowDuelCount === undefined
+        ? 0
+        : options.knownArrowDuelCount;
     let minRating = Number.POSITIVE_INFINITY;
     let maxRating = Number.NEGATIVE_INFINITY;
     const tacticalFeatureHash = createHash("sha256");
@@ -530,7 +539,10 @@ function buildSqliteManifest(path, input, options) {
         throw new Error(`Pack puzzle ${puzzle.id} is missing Rating Deviation`);
       }
       puzzleCount += 1;
-      if (isServerCompatibleArrowDuelPuzzle(puzzle)) {
+      if (
+        options.knownArrowDuelCount === undefined &&
+        isServerCompatibleArrowDuelPuzzle(puzzle)
+      ) {
         arrowDuelCount += 1;
       }
       if (puzzleCount % 100000 === 0) {
@@ -568,7 +580,19 @@ function buildSqliteManifest(path, input, options) {
     if (puzzleCount === 0) {
       throw new Error("Puzzle pack must contain at least one puzzle");
     }
-    if (arrowDuelCount !== puzzleCount) {
+    if (
+      !Number.isInteger(arrowDuelCount) ||
+      arrowDuelCount < 0 ||
+      arrowDuelCount > puzzleCount
+    ) {
+      throw new Error(
+        `Pack validation received invalid Arrow Duel count ${arrowDuelCount}/${puzzleCount}`
+      );
+    }
+    if (
+      options.knownArrowDuelCount === undefined &&
+      arrowDuelCount !== puzzleCount
+    ) {
       throw new Error(`Pack validation failed: ${arrowDuelCount}/${puzzleCount} puzzles are Arrow Duel eligible`);
     }
     return {
@@ -726,10 +750,10 @@ function* iteratePackPuzzles(db) {
       puzzles.stockfish_bestmove,
       puzzles.stockfish_eval_after_first_move,
       themes.name AS theme
-    FROM puzzle_themes
-    JOIN puzzles ON puzzles.id = puzzle_themes.puzzle_id
-    JOIN themes ON themes.id = puzzle_themes.theme_id
-    ORDER BY puzzle_themes.puzzle_id ASC, puzzle_themes.theme_id ASC
+    FROM puzzles
+    LEFT JOIN puzzle_themes ON puzzle_themes.puzzle_id = puzzles.id
+    LEFT JOIN themes ON themes.id = puzzle_themes.theme_id
+    ORDER BY puzzles.id ASC, puzzle_themes.theme_id ASC
   `).iterate();
   let current;
   for (const row of rows) {
@@ -750,7 +774,9 @@ function* iteratePackPuzzles(db) {
         stockfishEvalAfterFirstMove: row.stockfish_eval_after_first_move
       };
     }
-    current.themes.push(row.theme);
+    if (typeof row.theme === "string") {
+      current.themes.push(row.theme);
+    }
   }
   if (current) {
     yield current;
@@ -941,10 +967,12 @@ function sortObject(value) {
 
 export {
   buildSqliteManifest,
+  initializeDatabase,
   listCsvFiles,
   main,
   readCsvFile,
   sha256File,
   sha256Text,
-  stableJson
+  stableJson,
+  writeSelectedPack
 };

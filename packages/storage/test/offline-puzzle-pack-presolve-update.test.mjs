@@ -75,6 +75,11 @@ test("updates retained IDs from depth 20 and removes puzzles that stop qualifyin
       db.prepare("SELECT COUNT(*) AS count FROM puzzle_themes WHERE puzzle_id = ?").get("00009").count,
       0
     );
+    assert.equal(
+      db.prepare("SELECT COUNT(*) AS count FROM themes WHERE name = 'crushing'").get().count,
+      1,
+      "presolve updates must retain stable theme catalog rows even when their final relation is removed"
+    );
     assert.deepEqual({ ...db.prepare("SELECT * FROM puzzles WHERE id = ?").get("0000A") }, {
       id: "0000A",
       initial_fen: PACK_FEN,

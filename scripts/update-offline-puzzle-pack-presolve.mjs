@@ -265,14 +265,6 @@ async function updatePackDatabase(packPath, sourcePath, presolveDepth, log) {
       );
     }
 
-    if (removedRows > 0) {
-      db.prepare(`
-        DELETE FROM themes
-        WHERE NOT EXISTS (
-          SELECT 1 FROM puzzle_themes WHERE puzzle_themes.theme_id = themes.id
-        )
-      `).run();
-    }
     db.exec("COMMIT");
     transactionOpen = false;
     if (removedRows > 0) {

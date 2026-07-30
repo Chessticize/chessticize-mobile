@@ -1,6 +1,6 @@
 # Bundled Puzzle Pack Sampling Specification
 
-Status date: 2026-07-10. Owner-approved specification for regenerating the
+Status date: 2026-07-30. Owner-approved specification for regenerating the
 release Core Pack. Supersedes the first-3,000-eligible-rows behavior of
 `scripts/generate-offline-puzzle-fixture.mjs`.
 
@@ -52,12 +52,12 @@ Core Packs.
 
 ## Owner Decisions (2026-07-04)
 
-1. **Every shipped puzzle must be Arrow Duel eligible** (the full
-   `isServerCompatibleArrowDuelPuzzle` rule, including the legality checks,
-   evaluated at build time). The filter removes positions where an A/B duel is
-   meaningless and raises Standard-sprint quality too. Every puzzle becomes
-   usable by Standard, legacy Blitz data, and Arrow Duel, and the Custom Sprint
-   mode selector can never select an ineligible puzzle.
+1. **Every sampled puzzle must pass the build-time Arrow Duel rule in effect
+   for that pack generation.** Runtime rules may become stricter later. For
+   example, the promotion-candidate guard added after `core-pack-v3` excludes
+   7,031 retained puzzles from Arrow Duel while leaving them valid for Standard.
+   The manifest records the current eligible count, and runtime uses
+   `all_non_promotion` only when that count is below the total.
 2. **Install-size budget: about 700 MB, hard cap 800 MB.** Measured density:
    431 bytes/puzzle as minified JSON; plan for ~500 bytes/row in SQLite with
    indexes. Budget therefore targets ≈ 1.4 million puzzles (cap ≈ 1.6M).
@@ -123,14 +123,65 @@ input was incorrect.
    database; the runtime queries the pack database by rating band and theme
    instead of seeding fixtures through `loadFixturePuzzles`.
 3. The manifest must record: seed, per-bucket counts, per-theme counts,
-   Arrow Duel count (equal to total by construction), rating range, source
-   snapshot date, presolve depth, and the pack file hash.
+   current Arrow Duel count, rating range, source snapshot date, presolve depth,
+   and the pack file hash.
 4. `familiar15`, `presolved-1000.json`, and `regression-samples.json` remain
    unchanged as deterministic test fixtures behind the dev-only source switch.
 5. Fix the known mismatch while wiring this in: `SERVER_PUZZLE_MIN_RATING`
    (800) exceeds the pack floor (600), so low-rated users' preferred selection
    windows can be empty until fallback. The selection floor must align with the
    shipped pack floor.
+
+## SQLite Storage Layout
+
+The shipped schema uses a hybrid normalized layout:
+
+- `puzzles` retains all 1.4 million selected puzzles. FEN is stored as the
+  canonical first four fields; the halfmove/fullmove fields are restored as
+  `0 1` when a runtime `Puzzle` is materialized.
+- `themes` retains the complete 62-row catalog and its stable IDs. The mapping
+  is defined by `scripts/offline-puzzle-pack-schema.mjs`; existing IDs must
+  never be renumbered. `endgame` is ID 20 and `hangingPiece` is ID 25.
+- `puzzle_themes` stores relations only for the 24 themes currently exposed by
+  `SERVER_CURATED_THEMES`. Its composite primary key is stored
+  `WITHOUT ROWID`, and the selection index is
+  `(theme_id, rating, puzzle_id)`.
+- `puzzle_themes.rating` is a denormalized copy of `puzzles.rating`; rating does
+  not vary by theme. Keeping it makes the theme/rating index covering, so the
+  hot selection query does not join and sort `puzzles`.
+
+A July 30, 2026 local comparison on the 1.4-million-puzzle data set measured:
+
+| Relation layout | SQLite bytes | Median for four representative theme/rating queries |
+| --- | ---: | ---: |
+| `rating` retained in the covering index | 227,749,888 | 0.78 ms |
+| `rating` removed; join `puzzles` at query time | 219,832,320 | 64.78 ms |
+
+Removing the duplicate rating saved only 7,917,568 bytes (3.5% of the
+optimized prototype) while making the representative batch about 83 times
+slower, so the shipping layout retains it.
+
+The relation pruning is intentionally asymmetric. Unsupported names remain
+resolvable in `themes`, but have zero matching relations. A released 1.0
+single-theme `endgame` Custom Run therefore returns `No eligible puzzles`
+without a missing-ID/null path. Its saved Run and all History rows remain in
+the separate writable progress database and are not archived or deleted.
+`hangingPiece` remains indexed and continues to work. The owner may delete an
+obsolete Run manually.
+
+Fresh full generation writes this layout directly. To convert an already
+verified artifact without resampling or modifying any puzzle row, run:
+
+```sh
+pnpm optimize:offline-puzzles
+```
+
+The optimizer verifies the input hash/size, rebuilds the relation table on a
+temporary copy, validates stable catalog IDs and duplicated ratings, runs
+`PRAGMA integrity_check`, rebuilds the manifest, and atomically replaces the
+pack/manifest pair. Because puzzle fields are byte-for-byte unchanged, it
+reuses the input manifest's Arrow Duel count while recomputing all
+theme-dependent manifest data.
 
 ## Updating Presolve Data Without Resampling
 
@@ -177,13 +228,29 @@ overwrite an existing Core Pack release.
 
 ### Tactical Profile feature result (2026-07-26)
 
-- Final rows: 1,400,000; fully validated Arrow Duel rows: 1,400,000.
+- Final rows: 1,400,000; current Arrow Duel eligible rows: 1,392,969 after the
+  later promotion-candidate guard.
 - Every row has a positive immutable `rating_deviation`; Tactical Profile
   feature hash:
   `sha256:9a4a1613713cfd72da6eb718c717c762b08aa361ec23d88b43e5e029d20fb295`.
 - SQLite integrity: `ok`; artifact size: 520,278,016 bytes; artifact SHA-256:
   `0b29bc9672300370484d226ede587a19ed03ab2fa1cbaf2b0eae36b43070b6f0`.
 - Published release: `core-pack-v3`; the fetch script references its immutable
+  `bundled-core-pack.sqlite` asset.
+
+### Theme-index optimization release (2026-07-30)
+
+- Puzzle rows preserved: 1,400,000 / 1,400,000.
+- Theme catalog preserved: 62 rows with unchanged IDs.
+- Indexed themes: 24; relations reduced from 6,163,385 to 1,310,130.
+- SQLite integrity: `ok`; artifact size reduced from 520,278,016 to
+  227,487,744 bytes (56.3% smaller).
+- A standalone ZIP level-9 measurement is 111,379,967 bytes (106.22 MiB,
+  51% DEFLATE reduction). This approximates asset compression but is not a
+  substitute for measuring the final signed APK/IPA.
+- Published SHA-256:
+  `74a81e54729dd1f4f9adee375c728e22ac758d3211e2da81d3b5bd702380083b`.
+- Published release: `core-pack-v4`; the fetch script references its immutable
   `bundled-core-pack.sqlite` asset.
 
 ## Regenerating And Publishing The Pack
@@ -229,8 +296,10 @@ the runtime `openReadOnlyPuzzlePack` calls, and the asset test — don't.
 
 ## Acceptance Criteria
 
-- Every puzzle in the pack passes `isServerCompatibleArrowDuelPuzzle` (verify
-  in a build-time validation pass, not by sampling).
+- A fresh full generation validates every puzzle against the then-current
+  `isServerCompatibleArrowDuelPuzzle` rule. A relation-only optimization
+  preserves the verified input manifest's exact Arrow Duel count because it
+  cannot change puzzle eligibility.
 - Manifest counts match the database contents exactly.
 - For a full regeneration, per-bucket, per-theme, and mate-pattern minimums are
   met or equal the full available inventory. A targeted presolve update instead

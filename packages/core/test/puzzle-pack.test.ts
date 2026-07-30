@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {
   buildPuzzlePackManifest,
+  SERVER_CURATED_THEMES,
   tacticalThemeFrequencyAtRating,
   tacticalThemeInventoryUpperBound
 } from "../src/index.ts";
@@ -33,6 +34,18 @@ test("bundled core puzzle pack manifest matches the shipped puzzle artifact", (t
     assert.equal(manifest.tacticalAnalysis?.puzzleRatingDeviation, true);
     assert.match(manifest.tacticalAnalysis?.featureHash ?? "", /^sha256:[a-f0-9]{64}$/);
     assert.equal(summary.missingRatingDeviationCount, 0);
+    assert.equal(summary.themeCatalogCount, 62);
+    assert.equal(summary.endgameThemeId, 20);
+    assert.equal(summary.hangingPieceThemeId, 25);
+    assert.equal(summary.endgameRelationCount, 0);
+    assert.ok(summary.hangingPieceRelationCount > 0);
+    assert.equal(summary.relationRatingMismatchCount, 0);
+    assert.match(summary.puzzleThemesTableSql, /WITHOUT ROWID$/u);
+    assert.deepEqual(
+      summary.indexedThemes,
+      [...SERVER_CURATED_THEMES].sort()
+    );
+    assert.deepEqual(manifest.themes, [...SERVER_CURATED_THEMES].sort());
     return;
   }
 
@@ -150,6 +163,14 @@ function readSqlitePackSummary(): {
   minRating: number;
   maxRating: number;
   missingRatingDeviationCount: number;
+  themeCatalogCount: number;
+  endgameThemeId: number;
+  hangingPieceThemeId: number;
+  endgameRelationCount: number;
+  hangingPieceRelationCount: number;
+  relationRatingMismatchCount: number;
+  puzzleThemesTableSql: string;
+  indexedThemes: string[];
   bytes: number;
   sha256: string;
 } {
@@ -179,8 +200,48 @@ function readSqlitePackSummary(): {
       missingRatingDeviationCount: number;
     };
     const bytes = readFileSync(path);
+    const themeId = db.prepare(
+      "SELECT id FROM themes WHERE name = ?"
+    );
     return {
       ...row,
+      themeCatalogCount: (db.prepare(
+        "SELECT COUNT(*) AS count FROM themes"
+      ).get() as { count: number }).count,
+      endgameThemeId: (themeId.get("endgame") as { id: number }).id,
+      hangingPieceThemeId:
+        (themeId.get("hangingPiece") as { id: number }).id,
+      endgameRelationCount: (db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM puzzle_themes
+        WHERE theme_id = ?
+      `).get((themeId.get("endgame") as { id: number }).id) as {
+        count: number;
+      }).count,
+      hangingPieceRelationCount: (db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM puzzle_themes
+        WHERE theme_id = ?
+      `).get((themeId.get("hangingPiece") as { id: number }).id) as {
+        count: number;
+      }).count,
+      relationRatingMismatchCount: (db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM puzzle_themes
+        JOIN puzzles ON puzzles.id = puzzle_themes.puzzle_id
+        WHERE puzzle_themes.rating <> puzzles.rating
+      `).get() as { count: number }).count,
+      puzzleThemesTableSql: (db.prepare(`
+        SELECT sql
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'puzzle_themes'
+      `).get() as { sql: string }).sql,
+      indexedThemes: (db.prepare(`
+        SELECT DISTINCT themes.name
+        FROM puzzle_themes
+        JOIN themes ON themes.id = puzzle_themes.theme_id
+        ORDER BY themes.name
+      `).all() as Array<{ name: string }>).map((theme) => theme.name),
       bytes: bytes.length,
       sha256: createHash("sha256").update(bytes).digest("hex")
     };
