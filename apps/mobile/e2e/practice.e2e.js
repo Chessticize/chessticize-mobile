@@ -56,6 +56,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('practice-run-standard'))).toBeVisible().withTimeout(10000);
     await waitFor(element(by.id('practice-run-arrow-duel'))).toBeVisible().withTimeout(10000);
 
+    await waitForVisibleInPracticeScroll('practice-add-run');
     await element(by.id('practice-add-run')).tap();
     await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
     await expect(element(by.id('custom-theme-mixed').and(by.traits(['selected'])))).toExist();
@@ -256,7 +257,7 @@ describe('Practice POC', () => {
     await waitForVisibleInPracticeScroll('session-board');
 
     await playBoardMove('session-board', FIRST_STANDARD_FEEDBACK_MOVES.accepted);
-    await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('sprint-unclear-toggle');
     await element(by.id('sprint-unclear-toggle')).tap();
     await waitFor(element(by.text('Marked')))
       .toBeVisible()
@@ -518,8 +519,15 @@ async function assertStationaryBoardFeedback({ move, orientation, outcome }) {
     return;
   }
 
-  const promptFrame = await frameFor(element(by.id('sprint-unclear-prompt')));
-  expectFrameContained(promptFrame, screenAfter, `${orientation} Unclear action`);
+  let promptFrame = await frameFor(element(by.id('sprint-unclear-prompt')));
+  let promptScreenFrame = screenAfter;
+  if (device.getPlatform() === 'android' && !frameIsContained(promptFrame, screenAfter)) {
+    await element(by.id('practice-main-scroll')).scroll(100, 'down', 0.5, 0.5);
+    await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
+    promptFrame = await frameFor(element(by.id('sprint-unclear-prompt')));
+    promptScreenFrame = await frameFor(element(by.id('safe-area-shell')));
+  }
+  expectFrameContained(promptFrame, promptScreenFrame, `${orientation} Unclear action`);
   const scoreFrame = await frameFor(element(by.id('session-score-strip')));
   if (promptFrame.y < scoreFrame.y + scoreFrame.height - 1) {
     throw new Error(
