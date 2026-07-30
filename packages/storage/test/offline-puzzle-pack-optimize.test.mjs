@@ -230,6 +230,52 @@ test("manifest-only rebuild preserves verified mate-pattern provenance", async (
   );
 });
 
+test("manifest-only rebuild rejects incomplete bucket provenance without rewriting", async (t) => {
+  const fixture = await createLegacyPackFixture();
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+
+  await optimizeOfflinePuzzlePack({
+    packPath: fixture.packPath,
+    manifestPath: fixture.manifestPath,
+    buildDate: "2026-07-30",
+    maxRating: 2200,
+    log: () => {}
+  });
+  const incompleteManifest =
+    JSON.parse(await readFile(fixture.manifestPath, "utf8"));
+  incompleteManifest.ratingBuckets =
+    incompleteManifest.ratingBuckets.filter(
+      (bucket) => bucket.minRating !== 900
+    );
+  incompleteManifest.manifestHash =
+    `sha256:${sha256Text(stableJson({
+      ...incompleteManifest,
+      manifestHash: ""
+    }))}`;
+  const incompleteManifestText =
+    `${JSON.stringify(incompleteManifest, null, 2)}\n`;
+  await writeFile(fixture.manifestPath, incompleteManifestText);
+
+  await assert.rejects(
+    generateOfflinePuzzlePack([
+      "--output",
+      fixture.packPath,
+      "--manifest",
+      fixture.manifestPath,
+      "--target-count",
+      "3",
+      "--max-rating",
+      "2200",
+      "--manifest-only"
+    ]),
+    /missing mate-pattern provenance for rating bucket 900/u
+  );
+  assert.equal(
+    await readFile(fixture.manifestPath, "utf8"),
+    incompleteManifestText
+  );
+});
+
 test("preserves the verified artifact pair when manifest backup fails", async (t) => {
   const fixture = await createLegacyPackFixture();
   t.after(() => rm(fixture.root, { recursive: true, force: true }));

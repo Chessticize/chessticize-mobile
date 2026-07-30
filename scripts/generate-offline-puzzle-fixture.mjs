@@ -54,7 +54,11 @@ async function main(argv = process.argv.slice(2)) {
     await rm(outputPath, { force: true });
   }
   let samplingMatePatterns = options.manifestOnly
-    ? await readVerifiedManifestMatePatterns(outputPath, manifestPath)
+    ? await readVerifiedManifestMatePatterns(
+        outputPath,
+        manifestPath,
+        options.maxRating
+      )
     : undefined;
   const db = new DatabaseSync(outputPath);
   try {
@@ -962,7 +966,11 @@ async function sha256File(path) {
   return hash.digest("hex");
 }
 
-async function readVerifiedManifestMatePatterns(packPath, manifestPath) {
+async function readVerifiedManifestMatePatterns(
+  packPath,
+  manifestPath,
+  maxRating
+) {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const computedManifestHash =
     `sha256:${sha256Text(stableJson({ ...manifest, manifestHash: "" }))}`;
@@ -1001,6 +1009,24 @@ async function readVerifiedManifestMatePatterns(packPath, manifestPath) {
     );
   }
 
+  const manifestBucketMins =
+    manifest.ratingBuckets.map((bucket) => bucket.minRating);
+  if (new Set(manifestBucketMins).size !== manifestBucketMins.length) {
+    throw new Error(
+      "Verified manifest has duplicate rating buckets required by --manifest-only"
+    );
+  }
+  const packBucketMins = readPackRatingBucketMins(packPath, maxRating);
+  const manifestBucketSet = new Set(manifestBucketMins);
+  const missingBucket = packBucketMins.find(
+    (bucketMin) => !manifestBucketSet.has(bucketMin)
+  );
+  if (missingBucket !== undefined) {
+    throw new Error(
+      `Verified manifest is missing mate-pattern provenance for rating bucket ${missingBucket}`
+    );
+  }
+
   return {
     totals: { ...manifest.matePatternCounts },
     buckets: new Map(
@@ -1010,6 +1036,19 @@ async function readVerifiedManifestMatePatterns(packPath, manifestPath) {
       ])
     )
   };
+}
+
+function readPackRatingBucketMins(packPath, maxRating) {
+  const db = new DatabaseSync(packPath, { readOnly: true });
+  try {
+    const buckets = new Set();
+    for (const row of db.prepare("SELECT DISTINCT rating FROM puzzles").iterate()) {
+      buckets.add(ratingBucket(row.rating, maxRating));
+    }
+    return [...buckets].sort((left, right) => left - right);
+  } finally {
+    db.close();
+  }
 }
 
 function sha256Text(value) {
