@@ -93,7 +93,7 @@ describe("App Store assets document", () => {
     expect(appName.evaluatedCandidates).toContain("Chessticize: Chess Puzzles");
     expect(Array.from(appName.value)).toHaveLength(11);
     expect(Array.from(appName.value).length).toBeLessThanOrEqual(limits.appNameCharacters);
-    expect(subtitle).toBe("Build Tactical Intuition");
+    expect(subtitle).toBe("Offline Chess Puzzle Trainer");
     expect(Array.from(subtitle).length).toBeLessThanOrEqual(limits.subtitleCharacters);
     expect(Array.from(promotionalText).length).toBeLessThanOrEqual(
       limits.promotionalTextCharacters
@@ -118,9 +118,14 @@ describe("App Store assets document", () => {
 
     expect(appStoreMetadata.promotionalText).toContain("chess puzzles");
     expect(appStoreMetadata.description).toContain("chess puzzle trainer");
-    expect(keywords).toContain("puzzle");
-    expect(keywords).toContain("chess");
     expect(keywords).toContain("tactics");
+    expect(keywords).toContain("stockfish");
+    expect(keywords).toContain("checkmate");
+    expect(keywords).toContain("open source");
+    expect(keywords).not.toContain("offline");
+    expect(keywords).not.toContain("chess");
+    expect(keywords).not.toContain("puzzle");
+    expect(keywords).not.toContain("trainer");
     expect(new Set(keywords).size).toBe(keywords.length);
     expect(keywords.every((keyword) => keyword.length > 2)).toBe(true);
     expect(keywords.some((keyword) => metadataWords.has(keyword))).toBe(false);
