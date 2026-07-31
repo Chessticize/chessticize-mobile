@@ -154,7 +154,8 @@ DESTINATION="$REPO_ROOT/scratch/rendering-checks/$SHORT_SHA/release-$DEVICE_SLUG
 [[ ! -e "$DESTINATION" ]] || fail "Move or remove the existing capture directory: $DESTINATION"
 mkdir -p "$DESTINATION"
 
-xcrun simctl boot "$SIMULATOR_UDID" 2>/dev/null || true
+xcrun simctl shutdown "$SIMULATOR_UDID" 2>/dev/null || true
+xcrun simctl boot "$SIMULATOR_UDID"
 xcrun simctl bootstatus "$SIMULATOR_UDID" -b
 "/usr/bin/open" -a Simulator --args -CurrentDeviceUDID "$SIMULATOR_UDID"
 

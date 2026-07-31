@@ -15,21 +15,33 @@ fail() {
 [[ -n "$DEVICE_NAME" ]] || fail "Pass the exact Simulator device name as argument 2."
 [[ "$TARGET_ORIENTATION" == "portrait" || "$TARGET_ORIENTATION" == "landscape" ]] || \
   fail "Orientation must be portrait or landscape."
-command -v xcrun >/dev/null 2>&1 || fail "xcrun is required."
-command -v sips >/dev/null 2>&1 || fail "sips is required."
+command -v osascript >/dev/null 2>&1 || fail "osascript is required."
 
-SCREENSHOT_PATH="$(mktemp -t chessticize-simulator-orientation).png"
-trap 'rm -f "$SCREENSHOT_PATH"' EXIT
-
-framebuffer_orientation() {
-  xcrun simctl io "$SIMULATOR_UDID" screenshot "$SCREENSHOT_PATH" >/dev/null 2>&1 || \
-    fail "Could not capture the Simulator framebuffer for $SIMULATOR_UDID."
+# Xcode 26.6 keeps simctl screenshot dimensions fixed to the physical display even
+# while the Simulator rotates. The exact Simulator window dimensions still track
+# the effective device orientation and avoid accepting a stale framebuffer shape.
+simulator_window_orientation() {
+  local dimensions
   local width
   local height
-  width="$(sips -g pixelWidth "$SCREENSHOT_PATH" | awk '/pixelWidth:/ { print $2 }')"
-  height="$(sips -g pixelHeight "$SCREENSHOT_PATH" | awk '/pixelHeight:/ { print $2 }')"
+  dimensions="$(
+    /usr/bin/osascript \
+      -e 'on run argv' \
+      -e 'set deviceName to item 1 of argv' \
+      -e 'tell application "System Events"' \
+      -e 'tell process "Simulator"' \
+      -e 'set matchingWindows to every window whose name starts with deviceName' \
+      -e 'if (count of matchingWindows) is not 1 then error "Expected exactly one open Simulator window starting with " & deviceName' \
+      -e 'set deviceSize to size of item 1 of matchingWindows' \
+      -e 'return (item 1 of deviceSize as text) & " " & (item 2 of deviceSize as text)' \
+      -e 'end tell' \
+      -e 'end tell' \
+      -e 'end run' \
+      "$DEVICE_NAME"
+  )" || fail "Could not read the exact Simulator window dimensions for $DEVICE_NAME ($SIMULATOR_UDID)."
+  read -r width height <<< "$dimensions"
   [[ "$width" =~ ^[0-9]+$ && "$height" =~ ^[0-9]+$ ]] || \
-    fail "Could not read the Simulator framebuffer dimensions."
+    fail "Could not parse the Simulator window dimensions: $dimensions"
   if (( width > height )); then
     echo "landscape"
   else
@@ -37,7 +49,7 @@ framebuffer_orientation() {
   fi
 }
 
-CURRENT_ORIENTATION="$(framebuffer_orientation)"
+CURRENT_ORIENTATION="$(simulator_window_orientation)"
 if [[ "$CURRENT_ORIENTATION" == "$TARGET_ORIENTATION" ]]; then
   echo "Simulator $DEVICE_NAME is already $TARGET_ORIENTATION."
   exit 0
@@ -64,7 +76,7 @@ if ! /usr/bin/osascript \
 fi
 
 for _ in {1..40}; do
-  CURRENT_ORIENTATION="$(framebuffer_orientation)"
+  CURRENT_ORIENTATION="$(simulator_window_orientation)"
   if [[ "$CURRENT_ORIENTATION" == "$TARGET_ORIENTATION" ]]; then
     echo "Rotated Simulator $DEVICE_NAME to $TARGET_ORIENTATION."
     exit 0
@@ -72,4 +84,4 @@ for _ in {1..40}; do
   sleep 0.25
 done
 
-fail "Simulator framebuffer remained $CURRENT_ORIENTATION after requesting $TARGET_ORIENTATION."
+fail "Simulator window remained $CURRENT_ORIENTATION after requesting $TARGET_ORIENTATION."
