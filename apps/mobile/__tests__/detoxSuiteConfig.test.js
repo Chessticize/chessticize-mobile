@@ -2111,6 +2111,7 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('waitForReviewAlarmRebased(alarmBeforeTimezone');
     expect(spec).toContain('assertActiveReviewNotificationCount(1)');
     expect(spec).toContain('assertActiveReviewNotificationCount(0)');
+    expect(spec).toContain("await tapSystemNode(['Settings tab']);");
     expect(spec).not.toContain("ReviewReminderLifecycleReceiver");
     expect(spec).not.toContain("'-n'");
     expect(spec).not.toContain("NativeModules");
