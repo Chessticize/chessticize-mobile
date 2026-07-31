@@ -23,6 +23,10 @@ const releaseBuildRunner = fs.readFileSync(
   path.join(appRoot, "scripts/ios-build-release-for-detox.sh"),
   "utf8"
 );
+const landscapeValidationRunner = fs.readFileSync(
+  path.join(appRoot, "scripts/ios-verify-landscape-layout.sh"),
+  "utf8"
+);
 const debugBuildRunner = fs.readFileSync(
   path.join(appRoot, "scripts/ios-build-for-detox.sh"),
   "utf8"
@@ -161,6 +165,34 @@ describe("iOS Simulator calibration identity", () => {
     expect(calibrationRunner).toContain("resolve-ios-simulator-target.js");
     expect(calibrationRunner).toContain('export DETOX_IOS_DEVICE_UDID="$SIMULATOR_UDID"');
     expect(calibrationRunner).toContain("release-$DEVICE_SLUG-$RUNTIME_SLUG-$UDID_SLUG");
+  });
+
+  it("uses an isolated full-screen build only for screenshot-independent landscape geometry validation", () => {
+    expect(releaseBuildRunner).toContain("CHESSTICIZE_IOS_LANDSCAPE_VALIDATION");
+    expect(releaseBuildRunner).toContain('cp "$APP_DIR/ios/ChessticizeMobile/Info.plist"');
+    expect(releaseBuildRunner).toContain("UISupportedInterfaceOrientations~ipad");
+    expect(releaseBuildRunner).toContain("UIInterfaceOrientationLandscapeRight");
+    expect(releaseBuildRunner).toContain("UIRequiresFullScreen");
+    expect(releaseBuildRunner).toContain('INFOPLIST_FILE="$validation_info_plist"');
+    expect(releaseBuildRunner).toContain("ONLY_ACTIVE_ARCH=YES");
+
+    expect(landscapeValidationRunner).toContain(
+      "CHESSTICIZE_IOS_LANDSCAPE_VALIDATION=1"
+    );
+    expect(landscapeValidationRunner).toContain(
+      "CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT=1"
+    );
+    expect(landscapeValidationRunner).toContain("resolve-ios-simulator-target.js");
+    expect(landscapeValidationRunner).not.toContain("osascript");
+    expect(landscapeValidationRunner).not.toContain("takeScreenshot");
+
+    const productionInfoPlist = fs.readFileSync(
+      path.join(appRoot, "ios/ChessticizeMobile/Info.plist"),
+      "utf8"
+    );
+    expect(productionInfoPlist).not.toContain("UIRequiresFullScreen");
+    expect(productionInfoPlist).toContain("UIInterfaceOrientationPortraitUpsideDown");
+    expect(productionInfoPlist).toContain("UIInterfaceOrientationLandscapeLeft");
   });
 
   it("arms portrait restoration before attempting host landscape rotation", () => {

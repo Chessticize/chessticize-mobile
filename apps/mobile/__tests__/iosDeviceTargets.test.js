@@ -58,6 +58,10 @@ describe("iOS device target configuration", () => {
     expect(deviceTargets).toContain("Orientation: full-screen iPhone portrait only; iPad portrait, upside-down");
     expect(deviceTargets).toContain("portrait, and landscape");
     expect(deviceTargets).toContain("compact wide-short and foldable-sized windows");
+    expect(deviceTargets.replace(/\s+/g, " ")).toContain(
+      "does not inspect or require a landscape PNG"
+    );
+    expect(deviceTargets).toContain("pnpm mobile:verify:ios:landscape-layout");
     expect(deviceTargets).toContain("Minimum iOS version: 15.1");
     expect(adaptiveLayoutTests).toContain("compact wide-short resizable viewport");
     expect(adaptiveLayoutTests).toContain("foldable iPhone unfolded landscape");

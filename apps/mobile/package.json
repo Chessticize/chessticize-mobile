@@ -22,6 +22,8 @@
     "e2e:store-assets:ios:release": "CHESSTICIZE_CAPTURE_STORE_ASSETS=1 detox test --configuration ios.sim.release --artifacts-location artifacts/store-assets e2e/store-assets.e2e.js",
     "e2e:marketing-assets:ios": "CHESSTICIZE_CAPTURE_MARKETING_ASSETS=1 detox test --configuration ios.sim.debug --artifacts-location artifacts/marketing-assets e2e/marketing-assets.e2e.js",
     "e2e:marketing-assets:ios:release": "CHESSTICIZE_CAPTURE_MARKETING_ASSETS=1 detox test --configuration ios.sim.release --artifacts-location artifacts/marketing-assets e2e/marketing-assets.e2e.js",
+    "e2e:verify:ios:landscape-layout": "CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT=1 detox test --configuration ios.sim.release e2e/marketing-assets.e2e.js",
+    "verify:ios:landscape-layout": "bash scripts/ios-verify-landscape-layout.sh",
     "capture:marketing-assets:ios": "bash scripts/capture-app-store-marketing-assets.sh",
     "finalize:marketing-assets": "node scripts/finalize-marketing-capture.js",
     "capture:marketing-assets:android": "bash e2e/capture-google-play-marketing-assets.sh",

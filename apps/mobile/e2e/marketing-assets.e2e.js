@@ -29,11 +29,23 @@ const {
 } = require('./googlePlayMarketingCaptureArtifacts');
 
 const story = require('../../../config/app-store-marketing-story-v1.json');
+const ROOT_CLIPPED_SCROLL_CONTAINERS = new Set([
+  'settings-about-section',
+]);
 const capturePlatform =
   process.env.CHESSTICIZE_MARKETING_PLATFORM ?? 'app-store';
 const isGooglePlayCapture = capturePlatform === 'google-play';
+const captureMarketingAssets =
+  process.env.CHESSTICIZE_CAPTURE_MARKETING_ASSETS === '1';
+const verifyIosLandscapeLayout =
+  process.env.CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT === '1';
+if (captureMarketingAssets && verifyIosLandscapeLayout) {
+  throw new Error(
+    'Marketing capture and iOS landscape layout validation must run separately.'
+  );
+}
 const describeMarketingAssets =
-  process.env.CHESSTICIZE_CAPTURE_MARKETING_ASSETS === '1'
+  captureMarketingAssets || verifyIosLandscapeLayout
     ? describe
     : describe.skip;
 const repositoryRoot = resolve(__dirname, '../../..');
@@ -53,8 +65,11 @@ const androidArtifact = isGooglePlayCapture
     })
   : undefined;
 
-describeMarketingAssets('store marketing screenshot capture', () => {
-  it('captures the approved six-frame story from deterministic product state', async () => {
+describeMarketingAssets('deterministic store marketing journey', () => {
+  it('validates the approved six-frame story from deterministic product state', async () => {
+    if (verifyIosLandscapeLayout && isGooglePlayCapture) {
+      throw new Error('iOS landscape layout validation requires the App Store journey.');
+    }
     const expectedPlatform = isGooglePlayCapture ? 'android' : 'ios';
     if (device.getPlatform() !== expectedPlatform) {
       if (isGooglePlayCapture) {
@@ -72,6 +87,10 @@ describeMarketingAssets('store marketing screenshot capture', () => {
       await assertFrameContract(frame);
       await assertNativeResponsiveLayout(frame);
       await assertCompositionViewport(frame);
+      if (verifyIosLandscapeLayout) {
+        await assertRequiredFrameGeometry(frame);
+        continue;
+      }
       const screenshotPath = await takeReadyScreenshot(frame);
       records.push(captureMarketingScreenshot({
         frame,
@@ -81,6 +100,9 @@ describeMarketingAssets('store marketing screenshot capture', () => {
         story,
         target,
       }));
+    }
+    if (verifyIosLandscapeLayout) {
+      return;
     }
     if (isGooglePlayCapture) {
       writeGooglePlayDeviceCaptureManifest({
@@ -112,7 +134,9 @@ async function launchMarketingFrame(frame) {
       chessticizeTestNowMs: String(Date.parse(story.captureClock.instant)),
     },
   });
-  await setMarketingOrientationBeforeNavigation();
+  if (!verifyIosLandscapeLayout) {
+    await setMarketingOrientationBeforeNavigation();
+  }
   await waitFor(element(by.id('adaptive-layout'))).toExist().withTimeout(180000);
   await waitForStableOrientation(target.orientation);
 }
@@ -429,6 +453,89 @@ function isWideTabletTarget() {
     target.deviceFamily === 'ipad'
     || target.deviceFamily === 'android-tablet-10'
   );
+}
+
+async function assertRequiredFrameGeometry(frame) {
+  const screenFrame = await frameFor(element(by.id('adaptive-layout')));
+  assertPositiveFrame(screenFrame, `${frame.id} app root`);
+
+  const requiredFrames = [];
+  for (const testID of frame.source.requiredVisibleTestIds) {
+    const requiredElement = element(by.id(testID));
+    await waitFor(requiredElement).toExist().withTimeout(10000);
+    const requiredFrame = await frameFor(requiredElement);
+    assertPositiveFrame(requiredFrame, `${frame.id} ${testID}`);
+    if (ROOT_CLIPPED_SCROLL_CONTAINERS.has(testID)) {
+      assertFramesIntersect(
+        requiredFrame,
+        screenFrame,
+        `${frame.id} ${testID}`
+      );
+    } else {
+      expectFrameContained(
+        requiredFrame,
+        screenFrame,
+        `${frame.id} ${testID}`
+      );
+    }
+    requiredFrames.push({testID, frame: requiredFrame});
+  }
+
+  if (!isWideTabletTarget() || [
+    'build-tactical-intuition',
+    'choose-the-best-move',
+  ].includes(frame.id)) {
+    return;
+  }
+
+  const navigationFrame = await frameFor(element(by.id('navigation-rail')));
+  assertPositiveFrame(navigationFrame, `${frame.id} navigation rail`);
+  expectFrameContained(
+    navigationFrame,
+    screenFrame,
+    `${frame.id} navigation rail`
+  );
+  const navigationRight = navigationFrame.x + navigationFrame.width;
+  for (const required of requiredFrames) {
+    if (required.frame.x < navigationRight - 1) {
+      throw new Error(
+        `${frame.id} ${required.testID} overlaps the navigation rail: `
+        + `content=${JSON.stringify(required.frame)}, `
+        + `navigation=${JSON.stringify(navigationFrame)}`
+      );
+    }
+  }
+}
+
+function assertPositiveFrame(frame, label) {
+  if (
+    frame === null
+    || typeof frame !== 'object'
+    || !['x', 'y', 'width', 'height'].every(
+      (key) => Number.isFinite(frame[key])
+    )
+    || frame.width <= 0
+    || frame.height <= 0
+  ) {
+    throw new Error(`${label} has invalid native geometry: ${JSON.stringify(frame)}`);
+  }
+}
+
+function assertFramesIntersect(childFrame, parentFrame, label) {
+  const overlapWidth = Math.min(
+    childFrame.x + childFrame.width,
+    parentFrame.x + parentFrame.width
+  ) - Math.max(childFrame.x, parentFrame.x);
+  const overlapHeight = Math.min(
+    childFrame.y + childFrame.height,
+    parentFrame.y + parentFrame.height
+  ) - Math.max(childFrame.y, parentFrame.y);
+  if (overlapWidth <= 0 || overlapHeight <= 0) {
+    throw new Error(
+      `${label} frame does not intersect its scroll viewport: `
+      + `child=${JSON.stringify(childFrame)}, parent=${JSON.stringify(parentFrame)}`
+    );
+  }
 }
 
 async function takeReadyScreenshot(frame) {

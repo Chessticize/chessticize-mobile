@@ -155,6 +155,11 @@ pnpm --filter ChessticizeMobile exec detox build-framework-cache
   to one suite.
 - A focused simulator screenshot remains optional acceptance evidence for
   non-native visual work; it is not a native-validation gate.
+- When iPad landscape native geometry is part of the selected risk, also run
+  `pnpm mobile:verify:ios:landscape-layout`. This focused Release-app gate uses
+  an ignored full-screen landscape Info.plist copy and checks native element
+  frames without reading a PNG. It does not replace `flows` or `practice` when
+  either suite is required, and it does not change the production iPad mask.
 
 Record the choice and rationale in the PR before running native validation.
 

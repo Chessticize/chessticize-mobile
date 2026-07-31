@@ -7,6 +7,7 @@ const {
   ACTIVE_E2E_TEST_MATCH,
   STORE_ASSETS_TEST_MATCH,
   MARKETING_ASSETS_TEST_MATCH,
+  IOS_LANDSCAPE_LAYOUT_TEST_MATCH,
   ADAPTIVE_LAYOUT_TEST_MATCH,
   ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH,
   ANDROID_LAUNCH_TEST_MATCH,
@@ -1654,6 +1655,43 @@ describe('Detox suite configuration', () => {
       .toBeLessThan(responsiveHelper.indexOf("by.id('navigation-rail')"));
   });
 
+  it('runs the deterministic iPad layout journey without capturing screenshots', () => {
+    expect(resolveDetoxTestMatch({
+      CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT: '1'
+    })).toEqual(IOS_LANDSCAPE_LAYOUT_TEST_MATCH);
+    expect(IOS_LANDSCAPE_LAYOUT_TEST_MATCH).toEqual(MARKETING_ASSETS_TEST_MATCH);
+
+    const spec = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/marketing-assets.e2e.js'),
+      'utf8'
+    );
+    expect(spec).toContain('CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT');
+    expect(spec).toContain('await assertRequiredFrameGeometry(frame)');
+    expect(spec).toContain('waitFor(requiredElement).toExist().withTimeout(10000)');
+    expect(spec).toContain("ROOT_CLIPPED_SCROLL_CONTAINERS.has(testID)");
+    expect(spec).toContain("'settings-about-section'");
+    expect(spec).toContain('assertFramesIntersect(');
+    const launchHelperStart = spec.indexOf('async function launchMarketingFrame');
+    const launchHelperEnd = spec.indexOf('async function prepareFrame', launchHelperStart);
+    const launchHelper = spec.slice(launchHelperStart, launchHelperEnd);
+    expect(launchHelper).toContain('if (!verifyIosLandscapeLayout)');
+    expect(launchHelper.indexOf('if (!verifyIosLandscapeLayout)'))
+      .toBeLessThan(launchHelper.indexOf('await setMarketingOrientationBeforeNavigation()'));
+    expect(spec).toContain('if (verifyIosLandscapeLayout)');
+    expect(spec).toContain('continue;');
+    const frameLoop = spec.indexOf('for (const frame of story.frames');
+    const validationBranch = spec.indexOf(
+      'if (verifyIosLandscapeLayout)',
+      frameLoop
+    );
+    const screenshotCapture = spec.indexOf(
+      'const screenshotPath = await takeReadyScreenshot(frame)',
+      frameLoop
+    );
+    expect(validationBranch).toBeGreaterThan(frameLoop);
+    expect(validationBranch).toBeLessThan(screenshotCapture);
+  });
+
   it('keeps the adaptive layout screenshot spec available through its opt-in command', () => {
     expect(resolveDetoxTestMatch({ CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT: '1' }))
       .toEqual(ADAPTIVE_LAYOUT_TEST_MATCH);
@@ -2162,6 +2200,17 @@ describe('Detox suite configuration', () => {
     expect(() => resolveDetoxTestMatch({
       CHESSTICIZE_CAPTURE_MARKETING_ASSETS: '1',
       CHESSTICIZE_CAPTURE_STORE_ASSETS: '1'
+    })).toThrow('Active and opt-in E2E suites must run separately.');
+  });
+
+  it('rejects mixing landscape geometry validation with capture or active suites', () => {
+    expect(() => resolveDetoxTestMatch({
+      CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT: '1',
+      CHESSTICIZE_CAPTURE_MARKETING_ASSETS: '1'
+    })).toThrow('Active and opt-in E2E suites must run separately.');
+    expect(() => resolveDetoxTestMatch({
+      CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT: '1',
+      DETOX_ACTIVE_SUITE: 'flows'
     })).toThrow('Active and opt-in E2E suites must run separately.');
   });
 

@@ -59,6 +59,7 @@
     "mobile:e2e:store-assets:ios:release": "pnpm --filter ChessticizeMobile e2e:store-assets:ios:release",
     "mobile:e2e:marketing-assets:ios": "pnpm --filter ChessticizeMobile e2e:marketing-assets:ios",
     "mobile:e2e:marketing-assets:ios:release": "pnpm --filter ChessticizeMobile e2e:marketing-assets:ios:release",
+    "mobile:verify:ios:landscape-layout": "pnpm --filter ChessticizeMobile verify:ios:landscape-layout",
     "mobile:capture:marketing-assets:ios": "pnpm --filter ChessticizeMobile capture:marketing-assets:ios",
     "mobile:finalize:marketing-assets": "pnpm --filter ChessticizeMobile finalize:marketing-assets",
     "mobile:capture:marketing-assets:android": "pnpm --filter ChessticizeMobile capture:marketing-assets:android",
