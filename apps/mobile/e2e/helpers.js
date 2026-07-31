@@ -83,7 +83,9 @@ async function dragAndroidElementToElement(
   const gestureScript = [
     'set -e',
     `input touchscreen motionevent DOWN ${startX} ${startY}`,
-    'sleep 0.35',
+    // Leave enough margin for the app's 180 ms JS drag-arm timer even when the
+    // emulator's UI and JS threads are briefly contended.
+    'sleep 0.8',
     ...moveCommands,
     'sleep 0.2',
     `input touchscreen motionevent UP ${endX} ${endY}`,

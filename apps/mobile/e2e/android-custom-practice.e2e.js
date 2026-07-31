@@ -1,13 +1,18 @@
 const {
-  completeFirstUseSessionGuides,
   launchWithDisabledSynchronization,
   openTab,
   playBoardMove,
+  startSelectedPracticeRun,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
   waitForVisibleInPracticeScroll,
   withAndroidUiDiagnostics,
 } = require('./helpers');
+const {
+  findUniqueAndroidUiNodeByLabel,
+  readAndroidUiHierarchy,
+  tapAndroidUiNode,
+} = require('./androidPublicUiEvidence');
 const practiceFixture = require('../../../fixtures/puzzles/android-standard-practice.fixture.json');
 
 const TEST_NOW_MS = '1784030400000';
@@ -70,11 +75,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
       await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
       await selectPracticeRunByName(CUSTOM_RUN_NAME);
-      await element(by.id('practice-main-scroll')).scrollTo('top');
-      await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
-      await element(by.id('practice-run-start')).tap();
-      await completeFirstUseSessionGuides();
-      await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+      await startSelectedPracticeRun();
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 1').withTimeout(10000);
 
       // Active Custom uses the same guarded exit contract as every practice
@@ -212,10 +213,16 @@ async function showAllHistoryAttempts() {
 async function selectCustomHistoryRating() {
   await element(by.id('history-filter-toggle')).tap();
   await waitFor(element(by.id('history-advanced-filters'))).toExist().withTimeout(10000);
-  const customRatingFilter = element(by.text(`${CUSTOM_RUN_NAME} · 30s pace`));
-  await waitFor(customRatingFilter)
+  const customRatingLabel = `${CUSTOM_RUN_NAME} · 30s pace`;
+  const customRatingFilterElement = element(by.label(customRatingLabel));
+  await waitFor(customRatingFilterElement)
     .toBeVisible()
     .whileElement(by.id('history-rating-filters'))
     .scroll(120, 'right');
-  await customRatingFilter.tap();
+  const customRatingFilter = findUniqueAndroidUiNodeByLabel(
+    readAndroidUiHierarchy(),
+    customRatingLabel
+  );
+  tapAndroidUiNode(customRatingFilter);
+  await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
 }

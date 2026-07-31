@@ -46,6 +46,7 @@ const {
 } = require('../e2e/helpers');
 const {
   findUniqueAndroidUiNode,
+  findUniqueAndroidUiNodeByLabel,
   readAndroidUiHierarchy,
   tapAndroidUiNode,
   waitForAndroidUiState,
@@ -178,6 +179,7 @@ describe('Detox suite configuration', () => {
 
     expect(Object.keys(androidPublicUiEvidence).sort()).toEqual([
       'findUniqueAndroidUiNode',
+      'findUniqueAndroidUiNodeByLabel',
       'readAndroidUiHierarchy',
       'tapAndroidUiNode',
       'waitForAndroidUiState',
@@ -654,6 +656,33 @@ describe('Detox suite configuration', () => {
     ]);
   });
 
+  it('resolves an exact clickable Android public label to its dynamic resource ID', () => {
+    const ratingNode = '<node resource-id="com.chessticize.mobile:id/history-rating-run:local-example" content-desc="Mate in 2 Focus · 30s pace" clickable="true" selected="false" bounds="[242,420][652,508]" />';
+    const hierarchy = [
+      '<hierarchy>',
+      '<node resource-id="com.chessticize.mobile:id/history-rating-all" content-desc="All Puzzles" clickable="true" bounds="[16,420][226,508]" />',
+      ratingNode,
+      '</hierarchy>',
+    ].join('');
+
+    expect(findUniqueAndroidUiNodeByLabel(
+      hierarchy,
+      'Mate in 2 Focus · 30s pace'
+    )).toEqual(expect.objectContaining({
+      bounds: { bottom: 508, left: 242, right: 652, top: 420 },
+      resourceId: 'history-rating-run:local-example',
+    }));
+
+    expect(() => findUniqueAndroidUiNodeByLabel(
+      '<hierarchy><node content-desc="Mate in 2 Focus · 30s pace" clickable="false" bounds="[242,420][652,508]" /></hierarchy>',
+      'Mate in 2 Focus · 30s pace'
+    )).toThrow('Missing visible clickable Android UI label');
+    expect(() => findUniqueAndroidUiNodeByLabel(
+      `<hierarchy>${ratingNode}${ratingNode}</hierarchy>`,
+      'Mate in 2 Focus · 30s pace'
+    )).toThrow('Ambiguous visible clickable Android UI label');
+  });
+
   it('rejects a stale hierarchy when a fresh Android UI dump fails', () => {
     const staleHierarchy = '<hierarchy><node resource-id="session-accessible-move-c2b3" /></hierarchy>';
     let remoteHierarchy = staleHierarchy;
@@ -1011,6 +1040,21 @@ describe('Detox suite configuration', () => {
       "dragAndroidElementToElement('practice-run-standard', 'practice-run-arrow-duel')"
     );
     expect(runManagementCase).toContain('.longPressAndDrag(');
+  });
+
+  it('gives the Android Run drag arm timer a safe hold before the first move', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const helperStart = helpers.indexOf('async function dragAndroidElementToElement');
+    const helperEnd = helpers.indexOf('async function startSelectedPracticeRun', helperStart);
+    const helper = helpers.slice(helperStart, helperEnd);
+    const downIndex = helper.indexOf('input touchscreen motionevent DOWN');
+    const moveStreamIndex = helper.indexOf('...moveCommands', downIndex);
+    const holdMatch = helper.slice(downIndex, moveStreamIndex).match(/'sleep ([0-9.]+)'/);
+
+    expect(downIndex).toBeGreaterThan(0);
+    expect(moveStreamIndex).toBeGreaterThan(downIndex);
+    expect(holdMatch).not.toBeNull();
+    expect(Number(holdMatch?.[1])).toBeGreaterThanOrEqual(0.75);
   });
 
   it('retries the public Custom Run save until Home confirms the transition', () => {

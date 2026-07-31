@@ -15,8 +15,8 @@ const exportOptions = fs.readFileSync(
 describe("TestFlight QA checklist", () => {
   it("keeps TestFlight physical-device diagnostics explicitly optional", () => {
     expect(testFlightDoc).toContain("Optional TestFlight Diagnostics");
-    expect(testFlightDoc).toContain("Internal 1.3.2 QA");
-    expect(testFlightDoc).toContain("ios-v1.3.2-build-1");
+    expect(testFlightDoc).toContain("Internal 1.3.3 QA");
+    expect(testFlightDoc).toContain("ios-v1.3.3-build-1");
     expect(testFlightDoc).toContain("App Store Connect build");
     expect(testFlightDoc).toContain("not an App Store release gate");
     expect(testFlightDoc).toContain("not required");
@@ -123,7 +123,7 @@ describe("TestFlight QA checklist", () => {
       "App Store Connect release notes"
     );
     expect(appStoreUploadDoc).toContain(
-      "The 1.3.2 candidate is explicitly **Full native validation**"
+      "The 1.3.3 candidate is explicitly **Full native validation**"
     );
     expect(appStoreUploadDoc).toContain("CHESSTICIZE_E2E_SCOPE=full");
     expect(appStoreUploadDoc).toContain(

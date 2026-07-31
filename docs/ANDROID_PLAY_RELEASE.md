@@ -18,7 +18,9 @@ binary release published. Version code 8 completed the Android 1.3 source,
 signed-candidate, Play-generated APK, and GitHub mirror path. Version code 9 is
 the immutable Android 1.3.1 release submitted to Closed testing with its public
 corresponding source and Play-signed GitHub APK mirror complete. Version code 10
-is reserved for the proposed Android 1.3.2 release.
+is the immutable Android 1.3.2 release submitted to Closed testing with
+corresponding source and the Play-signed GitHub APK mirror complete. Version
+code 11 is reserved for the proposed Android 1.3.3 release.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -260,9 +262,10 @@ Do not move the build-9 tag, rebuild its AAB, replace its public source manifest
 or mirrored assets, or reuse version code 9. Refresh the live Play track before
 reporting a later review or publication state.
 
-Build 10 is the proposed Android 1.3.2 release:
+Build 10 is the immutable Android 1.3.2 release:
 
-- intended annotated tag: `android-v1.3.2-build-10`;
+- annotated tag: `android-v1.3.2-build-10`, targeting
+  `d61999ed4fbc1cd64f1e89eb5302178d8d7d6345`;
 - primary user-visible changes: reduce app size while retaining all 1.4 million
   bundled puzzles, and simplify the Home Review card by hiding zero and
   duplicate counts;
@@ -270,21 +273,54 @@ Build 10 is the proposed Android 1.3.2 release:
   `74a81e54729dd1f4f9adee375c728e22ac758d3211e2da81d3b5bd702380083b`;
 - validation scope: full native validation because the accumulated delta
   includes the new bundled Core Pack plus global Android launch-fixture and
-  shared Detox infrastructure changes.
+  shared Detox infrastructure changes;
+- protected candidate workflow run:
+  [`30597901912`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30597901912);
+- signed AAB: 337,464,192 bytes, SHA-256
+  `f07f024542fcd26b19ee6dfdd355ba62543445823be2886cd272809f91681e81`;
+- public corresponding-source release:
+  [`android-v1.3.2-build-10`](https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.3.2-build-10);
+- public source-manifest SHA-256:
+  `b5cca4eded2364a3629c3bc999b47ba097e098722e4241178f30efb28d6125fc`;
+- Play Closed testing / Alpha accepted `10 (1.3.2)` and made it available to
+  selected testers;
+- successful APK-mirror workflow run:
+  [`30600516055`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30600516055);
+- Play-signed universal APK: 256,975,988 bytes, SHA-256
+  `167a2a1d1bc86737ea2344e934b268c2de7d606567382798ab12f49f09a31f41`;
+- Play app-signing certificate SHA-256:
+  `318a4453d4052c90364d3abfe376dce9c06a04ab70db7ce1d5d43ba995cff900`.
 
-Build 10 is not yet tagged, signed, uploaded, or distributed. Do not report it
+Do not move the build-10 tag, rebuild its AAB, replace its public source
+manifest or mirrored assets, or reuse version code 10. Refresh the live Play
+track before reporting a later review or publication state.
+
+Build 11 is the proposed Android 1.3.3 release:
+
+- intended annotated tag: `android-v1.3.3-build-11`;
+- primary user-visible changes: fix completed-puzzle Replay reset and Analysis
+  exit behavior, clarify Tactical Progress filters, and keep solved prompts
+  stable across Sprint, Review, and Replay;
+- bundled Core Pack: unchanged immutable `core-pack-v4`, 227,487,744 bytes,
+  SHA-256
+  `74a81e54729dd1f4f9adee375c728e22ac758d3211e2da81d3b5bd702380083b`;
+- validation scope: full native validation because the accumulated delta
+  spans multiple user journeys and includes shared Detox infrastructure
+  changes.
+
+Build 11 is not yet tagged, signed, uploaded, or distributed. Do not report it
 as a release candidate until the exact accepted release-branch head has passed
 its required fast, native, review, and release-note gates.
 
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.3.2`)
-- Android version code: `apps/mobile/release-version.json` (`10`)
+- Public version: `apps/mobile/release-version.json` (`1.3.3`)
+- Android version code: `apps/mobile/release-version.json` (`11`)
 - iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.3.2-build-10`
+- Required source tag before any Play track upload: `android-v1.3.3-build-11`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -387,8 +423,8 @@ the mirror and Play track states independently until both are complete.
 
 For a bounded follow-up release:
 
-For Android version `1.3.2` build `10`, release notes and this support document must
-name the canonical source tag `android-v1.3.2-build-10` and the public source
+For Android version `1.3.3` build `11`, release notes and this support document must
+name the canonical source tag `android-v1.3.3-build-11` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 must bind the annotated tag, commit, application ID, version, version code, and
 AAB SHA-256 before Play distribution. A missing or lightweight public tag, a
