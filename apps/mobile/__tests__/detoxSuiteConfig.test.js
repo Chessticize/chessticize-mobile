@@ -1528,6 +1528,9 @@ describe('Detox suite configuration', () => {
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
 
     expect(practiceSpec).toContain("openTab('settings-tab', 'settings-show-sprint-guide')");
+    expect(practiceSpec).toContain(
+      "tapUntilExists('practice-add-run', 'practice-run-editor', 3)"
+    );
     expect(practiceSpec).toContain("waitForVisibleInPracticeScroll('history-attention-flag-in-review')");
     expect(practiceSpec).toContain("element(by.id('history-filter-toggle')).tap()");
     expect(practiceSpec).toContain("waitFor(element(by.id('history-advanced-filters'))).not.toExist()");
