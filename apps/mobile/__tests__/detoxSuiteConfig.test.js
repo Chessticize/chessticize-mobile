@@ -1497,6 +1497,7 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).toContain('releaseVersion.iosPublicVersion');
     expect(flowsSpec).toContain('releaseVersion.androidVersionCode');
     expect(flowsSpec).toContain('releaseVersion.iosBuildNumber');
+    expect(flowsSpec).toContain("waitForVisibleInPracticeScroll('play-again-button')");
     expect(helpers).toContain("by.id('history-filter-toggle')");
     expect(helpers).toContain("by.id('history-rating-filters')");
     expect(flowsSpec).toContain("by.id('history-result-wrong')");
