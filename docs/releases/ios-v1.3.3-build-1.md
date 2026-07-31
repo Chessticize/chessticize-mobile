@@ -1,6 +1,6 @@
 # Chessticize iOS 1.3.3 (build 1)
 
-- Status: Ready for owner approval
+- Status: Approved
 - Locale: `en-US`
 - Platform: `iOS`
 - Public version: `1.3.3`
@@ -48,4 +48,4 @@ Sprint, Review, and Replay.
   benefits.
 - [x] No issue numbers, internal code names, implementation details, or private
   evidence are included.
-- [ ] The release owner approved the copy before the source tag was created.
+- [x] The release owner approved the copy before the source tag was created.
