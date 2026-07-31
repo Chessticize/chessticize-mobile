@@ -8735,8 +8735,8 @@ function PracticePrompt({
           testID="practice-prompt-side-glyph"
         />
       </View>
-      <View style={styles.promptCopy}>
-        <View style={styles.promptTitleSlot} testID="practice-prompt-title-slot">
+      <View style={styles.promptCopy} testID="practice-prompt-copy">
+        <View testID="practice-prompt-title-slot">
           <Text
             accessible={!solved}
             accessibilityElementsHidden={solved}
@@ -8746,14 +8746,6 @@ function PracticePrompt({
           >
             {promptTitle}
           </Text>
-          {solved ? (
-            <Text
-              style={[styles.promptTitle, styles.promptSolvedTitle]}
-              testID="practice-prompt-solved-title"
-            >
-              Solved
-            </Text>
-          ) : null}
         </View>
         {promptContext ? (
           <Text
@@ -8776,6 +8768,17 @@ function PracticePrompt({
           >
             {promptHintCopy}
           </Text>
+        ) : null}
+        {solved ? (
+          <View
+            pointerEvents="none"
+            style={styles.promptSolvedOverlay}
+            testID="practice-prompt-solved-overlay"
+          >
+            <Text style={styles.promptTitle} testID="practice-prompt-solved-title">
+              Solved
+            </Text>
+          </View>
         ) : null}
       </View>
     </View>
@@ -17028,19 +17031,20 @@ const styles = StyleSheet.create({
   promptCopy: {
     flex: 1,
     gap: 2,
-    minWidth: 0
+    minWidth: 0,
+    position: "relative"
   },
   promptTitle: {
     color: "#111827",
     fontSize: 16,
     fontWeight: "800"
   },
-  promptTitleSlot: {
-    position: "relative"
-  },
-  promptSolvedTitle: {
+  promptSolvedOverlay: {
+    bottom: 0,
+    justifyContent: "center",
     left: 0,
     position: "absolute",
+    right: 0,
     top: 0
   },
   promptText: {
