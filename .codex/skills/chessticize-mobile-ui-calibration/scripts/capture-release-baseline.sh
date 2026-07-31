@@ -54,6 +54,7 @@ command -v brew >/dev/null 2>&1 || fail "Homebrew is required to select the lock
 command -v caffeinate >/dev/null 2>&1 || fail "caffeinate is required to keep local visual QA unlocked."
 command -v ioreg >/dev/null 2>&1 || fail "ioreg is required to verify the macOS console state."
 command -v node >/dev/null 2>&1 || fail "Node.js is required to resolve the exact Simulator."
+command -v sips >/dev/null 2>&1 || fail "sips is required to normalize Simulator PNG orientation."
 command -v xcrun >/dev/null 2>&1 || fail "Xcode command-line tools are required."
 [[ -x "$ORIENTATION_RUNNER" ]] || fail "Missing executable orientation runner: $ORIENTATION_RUNNER"
 [[ -x "$SIMULATOR_TARGET_RESOLVER" ]] || \
@@ -152,6 +153,13 @@ copy_capture() {
     local source_path="$source_dir/$scene.png"
     [[ -f "$source_path" ]] || fail "Missing expected $orientation screenshot: $scene.png"
     cp "$source_path" "$DESTINATION/$scene.png"
+    if [[ "$orientation" == "landscape" ]] && \
+      ! "$PNG_ORIENTATION_VALIDATOR" "$DESTINATION/$scene.png" landscape >/dev/null 2>&1; then
+      # Xcode 26.6 can expose the verified landscape UIKit surface inside a
+      # portrait-shaped physical framebuffer. Detox then writes the pixels
+      # counter-clockwise, so normalize that deterministic representation.
+      /usr/bin/sips --rotate 90 "$DESTINATION/$scene.png" >/dev/null
+    fi
     "$PNG_ORIENTATION_VALIDATOR" "$DESTINATION/$scene.png" "$orientation"
   done
 }
