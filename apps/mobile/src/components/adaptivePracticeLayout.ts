@@ -67,15 +67,18 @@ export function buildPracticeAdaptiveLayout({
     : isLandscape ? "compactLandscape" : "compactPortrait";
   const usesSideNavigation = isCompactLandscape || isRegularWidth;
   const sideNavigationExpanded = usesSideNavigation && viewportWidth >= 960 && !isLargeText;
-  const sideNavigationWidth = isRegularWidth
-    ? sideNavigationExpanded ? 168 : 76
-    : 64;
+  const sideNavigationWidth = sideNavigationExpanded
+    ? 168
+    : isRegularWidth ? 76 : 64;
   const contentWidth = Math.max(
     0,
     viewportWidth - (usesSideNavigation ? sideNavigationWidth : 0)
   );
   const sessionContentWidth = viewportWidth;
-  const usesWideContent = contentWidth >= 860 && !isLargeText;
+  const usesWideContent = (
+    contentWidth >= 860
+      || (sideNavigationExpanded && contentWidth >= 820)
+  ) && !isLargeText;
   const usesSessionRail = isCompactLandscape || (isRegularWidth && isLandscape);
   const sessionRailWidth = isRegularWidth
     ? Math.min(REGULAR_RAIL_MAX, Math.max(REGULAR_RAIL_MIN, Math.floor(sessionContentWidth * 0.3)))

@@ -4463,6 +4463,7 @@ describe("PracticePocScreen", () => {
     { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 224, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
     { label: "modern iPhone portrait", width: 430, height: 932, scale: 3, layout: "compactPortrait", boardSize: 398, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
     { label: "compact wide-short window", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, railWidth: 64, sessionRail: true, homeColumns: false },
+    { label: "iPad-on-Mac wide-short window", width: 993, height: 346, scale: 2, layout: "compactLandscape", boardSize: 314, sideRail: true, railWidth: 168, sessionRail: true, homeColumns: true },
     { label: "iPad A16 portrait", width: 820, height: 1180, scale: 2, layout: "regularPortrait", boardSize: 788, sideRail: true, railWidth: 76, sessionRail: false, homeColumns: false },
     { label: "iPad Pro portrait", width: 1032, height: 1376, scale: 2, layout: "regularPortrait", boardSize: 860, sideRail: true, railWidth: 168, sessionRail: false, homeColumns: true },
     { label: "iPad landscape", width: 1180, height: 820, scale: 2, layout: "regularLandscape", boardSize: 640, sideRail: true, railWidth: 168, sessionRail: true, homeColumns: true },
@@ -4510,6 +4511,19 @@ describe("PracticePocScreen", () => {
       expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
     } else {
       expect(() => findByTestId(renderer, "active-session-adaptive-layout")).toThrow();
+    }
+  });
+
+  it("keeps expanded navigation labels on one line in an iPad-on-Mac wide-short window", () => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width: 993, height: 346, scale: 2, fontScale: 1 });
+
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+
+    for (const testID of ["practice-tab", "review-tab", "history-tab", "settings-tab"]) {
+      const label = findByTestId(renderer, `${testID}-label`);
+      expect(label.props.numberOfLines).toBe(1);
     }
   });
 

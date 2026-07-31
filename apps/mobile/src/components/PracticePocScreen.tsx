@@ -14581,7 +14581,13 @@ function TabButton({
         ) : null}
       </View>
       {presentation === "bottom" || expanded ? (
-        <Text style={[styles.tabText, presentation === "rail" ? styles.tabTextRail : null, active ? styles.tabTextActive : null]}>{label}</Text>
+        <Text
+          numberOfLines={1}
+          style={[styles.tabText, presentation === "rail" ? styles.tabTextRail : null, active ? styles.tabTextActive : null]}
+          testID={`${testID}-label`}
+        >
+          {label}
+        </Text>
       ) : null}
     </Pressable>
   );

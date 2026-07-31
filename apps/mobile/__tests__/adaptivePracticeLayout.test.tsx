@@ -29,6 +29,20 @@ describe("buildPracticeAdaptiveLayout", () => {
     expect(layout.boardSize).toBe(408);
   });
 
+  it("keeps an expanded navigation rail readable in a wide, short window", () => {
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height: 346,
+      insets: { top: 0, right: 0, bottom: 0, left: 0 },
+      width: 993
+    });
+
+    expect(layout.className).toBe("compactLandscape");
+    expect(layout.sideNavigationExpanded).toBe(true);
+    expect(layout.sideNavigationWidth).toBe(168);
+    expect(layout.usesWideContent).toBe(true);
+  });
+
   it.each([
     {
       label: "compact wide-short resizable viewport",
@@ -39,10 +53,10 @@ describe("buildPracticeAdaptiveLayout", () => {
     },
     {
       label: "iPad Pro 13-inch landscape",
-      width: 1366,
-      height: 1024,
+      width: 1376,
+      height: 1032,
       insets: { top: 0, right: 0, bottom: 20, left: 0 },
-      expected: { board: 640, gap: 122, rail: 360, row: 1122 }
+      expected: { board: 640, gap: 125, rail: 360, row: 1125 }
     },
     {
       label: "foldable iPhone unfolded landscape",
