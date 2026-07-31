@@ -484,7 +484,8 @@ assert.match(uiCalibrationRunnerSource, /resolve-ios-simulator-target\.js/);
 assert.match(uiCalibrationRunnerSource, /assert-png-orientation\.js/);
 assert.match(uiCalibrationRunnerSource, /export DETOX_IOS_DEVICE_UDID="\$SIMULATOR_UDID"/);
 assert.match(uiCalibrationRunnerSource, /IOConsoleLocked/);
-assert.match(uiCalibrationRunnerSource, /caffeinate -dimsu -w "\$\$"/);
+assert.match(uiCalibrationRunnerSource, /CHESSTICIZE_UI_CALIBRATION_CAFFEINATED/);
+assert.match(uiCalibrationRunnerSource, /exec \/usr\/bin\/caffeinate -dimsu "\$0" "\$@"/);
 assert.match(uiCalibrationRunnerSource, /restart_exact_simulator/);
 assert.match(
   uiCalibrationRunnerSource,

@@ -64,7 +64,10 @@ if ioreg -n Root -d1 | grep '"IOConsoleLocked" = Yes' >/dev/null; then
   fail "Unlock the Mac before local visual QA so Simulator window control remains available."
 fi
 
-/usr/bin/caffeinate -dimsu -w "$$" &
+if [[ "${CHESSTICIZE_UI_CALIBRATION_CAFFEINATED:-0}" != "1" ]]; then
+  export CHESSTICIZE_UI_CALIBRATION_CAFFEINATED=1
+  exec /usr/bin/caffeinate -dimsu "$0" "$@"
+fi
 
 RUBY_PREFIX="$(brew --prefix ruby@3.3 2>/dev/null)" || \
   fail "Install Homebrew ruby@3.3 before running UI calibration."
