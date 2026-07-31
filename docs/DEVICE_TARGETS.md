@@ -28,6 +28,8 @@ multitasking.
 - Device family: iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`)
 - Orientation: full-screen iPhone portrait only; iPad portrait, upside-down
   portrait, and landscape
+- iPad app on Mac window: minimum 820 × 600 points and maximum 1376 × 1376
+  points
 - Minimum iOS version: 15.1
 
 ## Rationale
@@ -46,6 +48,13 @@ orientations as preferences in resizable iOS 27 environments, so layout must
 continue to follow the actual scene size rather than the device idiom or
 orientation mask. See
 [Modernize your UIKit app](https://developer.apple.com/videos/play/wwdc2026/278/).
+
+When the same iPad binary runs directly on Apple silicon Mac, its scene applies
+an 820 × 600 point minimum and a 1376 × 1376 point maximum. The square maximum
+allows both the 13-inch iPad portrait size (1032 × 1376) and landscape size
+(1376 × 1032) without encouraging arbitrarily large desktop layouts. These
+restrictions are guarded by `isiOSAppOnMac`, so they do not alter iPad Split
+View, Stage Manager, or full-screen sizing.
 
 ## Adaptive Window Coverage
 

@@ -41,6 +41,15 @@ describe("iOS device target configuration", () => {
     expect(infoPlist).not.toContain("UIRequiresFullScreen");
   });
 
+  it("limits only the iPad app on Mac to the supported adaptive window envelope", () => {
+    const sceneDelegate = readText(join(iosRoot, "SceneDelegate.swift"));
+
+    expect(sceneDelegate).toContain("ProcessInfo.processInfo.isiOSAppOnMac");
+    expect(sceneDelegate).toContain("windowScene.sizeRestrictions");
+    expect(sceneDelegate).toContain("CGSize(width: 820, height: 600)");
+    expect(sceneDelegate).toContain("CGSize(width: 1376, height: 1376)");
+  });
+
   it("documents the App Store device target decision", () => {
     const deviceTargets = readText(join(repoRoot, "docs", "DEVICE_TARGETS.md"));
     const readme = readText(join(repoRoot, "README.md"));
@@ -63,6 +72,8 @@ describe("iOS device target configuration", () => {
     );
     expect(deviceTargets).toContain("pnpm mobile:verify:ios:landscape-layout");
     expect(deviceTargets).toContain("Minimum iOS version: 15.1");
+    expect(deviceTargets).toContain("820 × 600");
+    expect(deviceTargets).toContain("1376 × 1376");
     expect(adaptiveLayoutTests).toContain("compact wide-short resizable viewport");
     expect(adaptiveLayoutTests).toContain("foldable iPhone unfolded landscape");
     expect(readme).toContain("[iOS Device Targets](docs/DEVICE_TARGETS.md)");
