@@ -7,7 +7,8 @@ import {
   View
 } from "react-native";
 import type {
-  TacticalFocusReason
+  TacticalFocusReason,
+  TacticalProfileTaskFamily
 } from "../../../../packages/core/src/index.ts";
 import type {
   HistoryProgressPresentation,
@@ -63,12 +64,16 @@ export function HistoryProgressScreen({
         (series) => series.themeId === selectedSeries.themeId
       )
     : [];
-  const themeOptions = presentation.strengths.filter(
-    (series, index, strengths) =>
+  const taskFamilies = [...new Set(
+    presentation.strengths.map((series) => series.taskFamily)
+  )];
+  const themeOptions = presentation.strengths
+    .filter((series) => series.taskFamily === selectedSeries?.taskFamily)
+    .filter((series, index, strengths) =>
       strengths.findIndex(
         (candidate) => candidate.themeId === series.themeId
       ) === index
-  );
+    );
 
   return (
     <View style={styles.screen} testID="history-progress-screen">
@@ -102,6 +107,63 @@ export function HistoryProgressScreen({
         </View>
       </View>
 
+      {themeOptions.length > 0 ? (
+        <View
+          style={styles.progressControls}
+          testID="history-progress-controls"
+        >
+          {selectedSeries && taskFamilies.length > 1 ? (
+            <HistoryTaskFamilySelector
+              activeTaskFamily={selectedSeries.taskFamily}
+              onSelect={(taskFamily) => {
+                const firstSeries = presentation.strengths.find(
+                  (series) => series.taskFamily === taskFamily
+                );
+                if (firstSeries) {
+                  setSelectedSeriesId(firstSeries.id);
+                }
+              }}
+              taskFamilies={taskFamilies}
+            />
+          ) : null}
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            testID="history-strength-selector"
+          >
+            <View style={styles.selectorRow}>
+              {themeOptions.map((series) => {
+                const selected = series.themeId === selectedSeries?.themeId;
+                return (
+                  <Pressable
+                    accessibilityLabel={`Show ${series.label} progress`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    key={series.id}
+                    onPress={() => setSelectedSeriesId(series.id)}
+                    style={[
+                      styles.selector,
+                      selected ? styles.selectorSelected : null
+                    ]}
+                    testID={`history-progress-strength-${series.id}`}
+                  >
+                    <Text
+                      style={[
+                        styles.selectorText,
+                        selected ? styles.selectorTextSelected : null
+                      ]}
+                    >
+                      {series.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ScrollView>
+        </View>
+      ) : null}
+
       <View style={styles.section} testID="history-strength-over-time">
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleCopy}>
@@ -111,41 +173,6 @@ export function HistoryProgressScreen({
             </Text>
           </View>
         </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          testID="history-strength-selector"
-        >
-          <View style={styles.selectorRow}>
-            {themeOptions.map((series) => {
-              const selected = series.themeId === selectedSeries?.themeId;
-              return (
-                <Pressable
-                  accessibilityLabel={`Show ${series.label} progress`}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  key={series.id}
-                  onPress={() => setSelectedSeriesId(series.id)}
-                  style={[
-                    styles.selector,
-                    selected ? styles.selectorSelected : null
-                  ]}
-                  testID={`history-progress-strength-${series.id}`}
-                >
-                  <Text
-                    style={[
-                      styles.selectorText,
-                      selected ? styles.selectorTextSelected : null
-                    ]}
-                  >
-                    {series.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </ScrollView>
 
         {selectedSeries ? (
           <>
@@ -248,6 +275,50 @@ export function HistoryProgressScreen({
           </View>
         </View>
       )}
+    </View>
+  );
+}
+
+function HistoryTaskFamilySelector({
+  activeTaskFamily,
+  onSelect,
+  taskFamilies
+}: {
+  activeTaskFamily: TacticalProfileTaskFamily;
+  onSelect: (taskFamily: TacticalProfileTaskFamily) => void;
+  taskFamilies: readonly TacticalProfileTaskFamily[];
+}): React.JSX.Element {
+  return (
+    <View
+      accessibilityLabel="Choose progress mode"
+      style={styles.taskFamilySelector}
+      testID="history-progress-task-family-selector"
+    >
+      {taskFamilies.map((taskFamily) => {
+        const selected = taskFamily === activeTaskFamily;
+        return (
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            key={taskFamily}
+            onPress={() => onSelect(taskFamily)}
+            style={[
+              styles.taskFamilyTab,
+              selected ? styles.taskFamilyTabSelected : null
+            ]}
+            testID={`history-progress-task-family-${taskFamily}`}
+          >
+            <Text
+              style={[
+                styles.taskFamilyTabTitle,
+                selected ? styles.taskFamilyTabTitleSelected : null
+              ]}
+            >
+              {TASK_FAMILY_LABELS[taskFamily]}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -469,6 +540,11 @@ function ProgressGlyph(): React.JSX.Element {
   );
 }
 
+const TASK_FAMILY_LABELS = {
+  line: "Puzzle solving",
+  arrow_duel: "Arrow Duel"
+} satisfies Record<TacticalProfileTaskFamily, string>;
+
 const styles = StyleSheet.create({
   screen: {
     gap: 16,
@@ -600,6 +676,36 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     lineHeight: 25
+  },
+  progressControls: {
+    gap: 10
+  },
+  taskFamilySelector: {
+    backgroundColor: "#E2E8F0",
+    borderRadius: 16,
+    flexDirection: "row",
+    gap: 4,
+    padding: 4
+  },
+  taskFamilyTab: {
+    alignItems: "center",
+    borderRadius: 12,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 42,
+    paddingHorizontal: 12,
+    paddingVertical: 8
+  },
+  taskFamilyTabSelected: {
+    backgroundColor: "#FFFFFF"
+  },
+  taskFamilyTabTitle: {
+    color: "#64748B",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  taskFamilyTabTitleSelected: {
+    color: "#0F172A"
   },
   progressMetricSelector: {
     flexDirection: "row",

@@ -1,6 +1,7 @@
 import type {
   TacticalFocusReason,
-  TacticalProfileCalibrationAssurance
+  TacticalProfileCalibrationAssurance,
+  TacticalProfileTaskFamily
 } from "../../../../packages/core/src/index.ts";
 
 export type HistoryProgressPoint = {
@@ -14,6 +15,7 @@ export type HistoryProgressPoint = {
 export type HistoryStrengthSeries = {
   id: string;
   themeId: string;
+  taskFamily: TacticalProfileTaskFamily;
   label: string;
   kind: Exclude<TacticalFocusReason, "both">;
   metricLabel: string;

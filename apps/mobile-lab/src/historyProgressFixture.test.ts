@@ -43,6 +43,18 @@ test("history progress fixture shows accuracy and speed progress", () => {
   assert.equal(pins.points[0]?.valueLabel, "1.30×");
   assert.equal(pins.points.at(-1)?.valueLabel, "1.06×");
   assert.equal(presentation.weakness, undefined);
+  assert.deepEqual(
+    [...new Set(presentation.strengths.map((series) => series.taskFamily))],
+    ["line", "arrow_duel"]
+  );
+  assert.equal(
+    presentation.strengths.some(
+      (series) =>
+        series.taskFamily === "arrow_duel" &&
+        series.label === "Advanced Pawn"
+    ),
+    true
+  );
 });
 
 test("existing populated History clone exposes the approved progress entry", () => {

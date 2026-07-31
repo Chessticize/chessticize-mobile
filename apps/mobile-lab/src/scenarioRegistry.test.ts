@@ -167,7 +167,7 @@ test("the closed Issue #250 state set stays complete without new markers", () =>
   );
 });
 
-test("the closed Issue #363 scenarios keep their stable URLs without new markers", () => {
+test("the closed Issue #363 scenarios keep their stable URLs without Issue #363 markers", () => {
   assert.deepEqual(
     newScenarios
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 363))
@@ -175,7 +175,7 @@ test("the closed Issue #363 scenarios keep their stable URLs without new markers
     []
   );
   assert.deepEqual(storyTagsForScenario("history-populated"), []);
-  assert.deepEqual(storyTagsForScenario("history-progress"), []);
+  assert.deepEqual(storyTagsForScenario("history-progress"), ["new"]);
   assert.deepEqual(storyTagsForScenario("history-progress-weakness"), []);
   assert.deepEqual(storyTagsForScenario("history-progress-speed-weakness"), []);
   assert.ok(
@@ -196,6 +196,25 @@ test("the closed Issue #363 scenarios keep their stable URLs without new markers
   assert.ok(
     scenarioRegistry["history-progress"].scope.exits.includes(
       "Training recommendation"
+    )
+  );
+});
+
+test("Issue #456 owns the page-level Tactical Progress filters", () => {
+  const scenario = scenarioRegistry["history-progress"];
+
+  assert.equal(
+    scenario.issues?.some((issue) => issue.issueNumber === 456) ?? false,
+    true
+  );
+  assert.equal(scenario.isNew, true);
+  assert.deepEqual(storyTagsForScenario(scenario.id), ["new"]);
+  assert.ok(
+    scenario.scope.includes.includes("Page-level theme selector")
+  );
+  assert.ok(
+    scenario.scope.includes.includes(
+      "Compact Puzzle solving and Arrow Duel selector"
     )
   );
 });
