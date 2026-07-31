@@ -64,7 +64,7 @@ if ioreg -n Root -d1 | grep '"IOConsoleLocked" = Yes' >/dev/null; then
   fail "Unlock the Mac before local visual QA so Simulator window control remains available."
 fi
 
-/usr/bin/caffeinate -di -w "$$" &
+/usr/bin/caffeinate -dimsu -w "$$" &
 
 RUBY_PREFIX="$(brew --prefix ruby@3.3 2>/dev/null)" || \
   fail "Install Homebrew ruby@3.3 before running UI calibration."
@@ -153,6 +153,13 @@ copy_capture() {
   done
 }
 
+restart_exact_simulator() {
+  xcrun simctl shutdown "$SIMULATOR_UDID" 2>/dev/null || true
+  xcrun simctl boot "$SIMULATOR_UDID"
+  xcrun simctl bootstatus "$SIMULATOR_UDID" -b
+  "/usr/bin/open" -a Simulator --args -CurrentDeviceUDID "$SIMULATOR_UDID"
+}
+
 echo "Calibrating commit $HEAD_BEFORE on $DEVICE_NAME ($SIMULATOR_UDID)"
 pnpm mobile:doctor:ios
 pnpm mobile:e2e:build:ios:release
@@ -161,10 +168,7 @@ DESTINATION="$REPO_ROOT/scratch/rendering-checks/$SHORT_SHA/release-$DEVICE_SLUG
 [[ ! -e "$DESTINATION" ]] || fail "Move or remove the existing capture directory: $DESTINATION"
 mkdir -p "$DESTINATION"
 
-xcrun simctl shutdown "$SIMULATOR_UDID" 2>/dev/null || true
-xcrun simctl boot "$SIMULATOR_UDID"
-xcrun simctl bootstatus "$SIMULATOR_UDID" -b
-"/usr/bin/open" -a Simulator --args -CurrentDeviceUDID "$SIMULATOR_UDID"
+restart_exact_simulator
 
 "$ORIENTATION_RUNNER" "$SIMULATOR_UDID" "$DEVICE_NAME" portrait
 PORTRAIT_MARKER="$(mktemp -t chessticize-ui-calibration-portrait)"
@@ -173,6 +177,7 @@ CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait pnpm mobile:e2e:store-assets:ios:re
 copy_capture portrait "$PORTRAIT_MARKER" "${PORTRAIT_SCENES[@]}"
 
 RESTORE_PORTRAIT=1
+restart_exact_simulator
 "$ORIENTATION_RUNNER" "$SIMULATOR_UDID" "$DEVICE_NAME" landscape
 LANDSCAPE_MARKER="$(mktemp -t chessticize-ui-calibration-landscape)"
 touch "$LANDSCAPE_MARKER"
