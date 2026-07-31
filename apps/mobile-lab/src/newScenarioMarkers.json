@@ -39,14 +39,6 @@
       }
     ]
   },
-  "history-progress": {
-    "issues": [
-      {
-        "issueNumber": 456,
-        "changeNote": "Move compact mode and theme filters above the Tactical Progress result card"
-      }
-    ]
-  },
   "history-attempt-detail": {
     "issues": [
       {
