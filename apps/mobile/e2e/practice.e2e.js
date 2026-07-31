@@ -57,8 +57,8 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('practice-run-standard'))).toBeVisible().withTimeout(10000);
     await waitFor(element(by.id('practice-run-arrow-duel'))).toBeVisible().withTimeout(10000);
 
-    await element(by.id('practice-add-run')).tap();
-    await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('practice-add-run'))).toBeVisible().withTimeout(10000);
+    await tapUntilExists('practice-add-run', 'practice-run-editor', 3);
     await expect(element(by.id('custom-theme-mixed').and(by.traits(['selected'])))).toExist();
     await element(by.id('practice-run-name-input')).replaceText('Calculation Lab');
     await dismissRunNameKeyboard();
