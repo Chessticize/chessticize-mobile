@@ -5796,12 +5796,18 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 
     startStandardSprint(renderer);
+    const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
+    expect(unsolvedPromptLayout).toEqual([
+      "practice-prompt-title-layout",
+      "practice-prompt-context"
+    ]);
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Find the best move");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("For white.");
     expectText(renderer, "0 / 15");
 
     await boardMove(renderer, "c2b1");
 
+    expect(promptLayoutSlotTestIDs(renderer)).toEqual(unsolvedPromptLayout);
     expect(() => findByTestId(renderer, "mock-promotion-dialog")).toThrow();
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
@@ -6415,6 +6421,12 @@ describe("PracticePocScreen", () => {
     const arrow = firstArrowDuelPuzzleForTest();
 
     startArrowDuelSprint(renderer);
+    const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
+    expect(unsolvedPromptLayout).toEqual([
+      "practice-prompt-title-layout",
+      "practice-prompt-context",
+      "practice-prompt-hint"
+    ]);
     act(() => {
       findByTestId(renderer, "mock-chessboard").props.onReady();
     });
@@ -6422,6 +6434,7 @@ describe("PracticePocScreen", () => {
 
     await boardMove(renderer, arrow.correctMove);
 
+    expect(promptLayoutSlotTestIDs(renderer)).toEqual(unsolvedPromptLayout);
     expectText(renderer, "1 / 10");
     expect(collectText(renderer.root)).not.toContain("Correct");
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
@@ -8350,12 +8363,17 @@ describe("PracticePocScreen", () => {
 
     const progressBeforeRetry = collectText(findByTestId(renderer, "review-progress"));
     const initialPromptKingTestIDs = promptKingTestIDs(renderer);
+    const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
     expect(initialPromptKingTestIDs).toHaveLength(1);
+    expect(unsolvedPromptLayout).toEqual([
+      "practice-prompt-title-layout",
+      "practice-prompt-context"
+    ]);
     await boardMove(renderer, "e2e6");
     await settleFeedbackSnapshot();
     await boardMove(renderer, "e6f7");
 
-    expect(collectText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
+    expectSolvedPromptReservesLayout(renderer, unsolvedPromptLayout);
     expect(promptKingTestIDs(renderer)).toEqual(initialPromptKingTestIDs);
     await settleFeedbackSnapshot();
 
@@ -8399,9 +8417,15 @@ describe("PracticePocScreen", () => {
     const renderer = renderStoredArrowDuelReplay();
     await settleEntryPreview();
     const initialFen = findByTestId(renderer, "mock-chessboard").props.fen;
+    const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
+    expect(unsolvedPromptLayout).toEqual([
+      "practice-prompt-title-layout",
+      "practice-prompt-context",
+      "practice-prompt-hint"
+    ]);
 
     await boardMove(renderer, "b2b1");
-    expect(collectText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
+    expectSolvedPromptReservesLayout(renderer, unsolvedPromptLayout);
     await settleFeedbackSnapshot();
     expect(findByTestId(renderer, "review-reset-puzzle").props.disabled).toBe(false);
     const resetBoard = findByTestId(renderer, "mock-chessboard").props.mockResetBoard as jest.Mock;
@@ -9311,7 +9335,12 @@ describe("PracticePocScreen", () => {
     await settleEntryPreview();
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("ready");
     const initialPromptKingTestIDs = promptKingTestIDs(renderer);
+    const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
     expect(initialPromptKingTestIDs).toHaveLength(1);
+    expect(unsolvedPromptLayout).toEqual([
+      "practice-prompt-title-layout",
+      "practice-prompt-context"
+    ]);
 
     await boardMove(renderer, "e2e6");
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("locked");
@@ -9327,7 +9356,7 @@ describe("PracticePocScreen", () => {
       await Promise.resolve();
     });
 
-    expect(collectText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
+    expectSolvedPromptReservesLayout(renderer, unsolvedPromptLayout);
     expect(collectText(findByTestId(renderer, "review-timer"))).toBe(timerBeforeSolvedFeedback);
     expect(promptKingTestIDs(renderer)).toEqual(initialPromptKingTestIDs);
     await settleFeedbackSnapshot();
@@ -10183,6 +10212,42 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-exit");
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1 / 3");
     expect(findByTestId(renderer, "review-today-history")).toBeTruthy();
+  });
+
+  it("keeps the Arrow Duel scheduled Review prompt geometry through solved feedback", async () => {
+    const service = createMobilePracticeService("random1000");
+    const sprintState = service.startSprint(
+      {
+        mode: "arrow_duel",
+        durationSeconds: 300,
+        perPuzzleSeconds: 30,
+        targetCorrect: 10,
+        maxMistakes: 3
+      },
+      "2026-06-20T00:00:00.000Z"
+    );
+    const arrowDuel = requireArrowDuelState(sprintState);
+    service.submitMove(
+      currentArrowWrongMove(sprintState),
+      "2026-06-20T00:00:05.000Z"
+    );
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+    const renderer = renderScreen({ practiceService: service });
+
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    await settleEntryPreview();
+
+    const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
+    expect(unsolvedPromptLayout).toEqual([
+      "practice-prompt-title-layout",
+      "practice-prompt-context",
+      "practice-prompt-hint"
+    ]);
+
+    await boardMove(renderer, arrowDuel.correctMove);
+
+    expectSolvedPromptReservesLayout(renderer, unsolvedPromptLayout);
   });
 
   it("ignores stale board callbacks instead of recording a correct visible move as wrong", async () => {
@@ -12745,6 +12810,60 @@ function collectText(node: TestRenderer.ReactTestInstance): string {
     .map((child) => collectText(child))
     .join("");
   return ownText + childText;
+}
+
+function collectVisibleText(node: TestRenderer.ReactTestInstance): string {
+  if (
+    node.props.accessibilityElementsHidden === true
+    || node.props.importantForAccessibility === "no-hide-descendants"
+    || flattenTestStyle(node.props.style).opacity === 0
+  ) {
+    return "";
+  }
+  const ownText = node.children.filter((child): child is string => typeof child === "string").join("");
+  const childText = node.children
+    .filter((child): child is TestRenderer.ReactTestInstance => typeof child !== "string")
+    .map((child) => collectVisibleText(child))
+    .join("");
+  return ownText + childText;
+}
+
+function promptLayoutSlots(
+  renderer: TestRenderer.ReactTestRenderer
+): TestRenderer.ReactTestInstance[] {
+  return [
+    "practice-prompt-title-layout",
+    "practice-prompt-context",
+    "practice-prompt-hint"
+  ].flatMap((testID) => {
+    try {
+      return [findByTestId(renderer, testID)];
+    } catch {
+      return [];
+    }
+  });
+}
+
+function promptLayoutSlotTestIDs(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return promptLayoutSlots(renderer).map((slot) => slot.props.testID as string);
+}
+
+function expectSolvedPromptReservesLayout(
+  renderer: TestRenderer.ReactTestRenderer,
+  expectedTestIDs: string[]
+): void {
+  expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
+  const slots = promptLayoutSlots(renderer);
+  expect(slots.map((slot) => slot.props.testID)).toEqual(expectedTestIDs);
+  expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-title-slot").props.style).position)
+    .toBe("relative");
+  expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-solved-title").props.style).position)
+    .toBe("absolute");
+  for (const slot of slots) {
+    expect(flattenTestStyle(slot.props.style).opacity).toBe(0);
+    expect(slot.props.accessibilityElementsHidden).toBe(true);
+    expect(slot.props.importantForAccessibility).toBe("no-hide-descendants");
+  }
 }
 
 function hasStyleValue(node: TestRenderer.ReactTestInstance, value: string): boolean {

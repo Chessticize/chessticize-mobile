@@ -8715,15 +8715,13 @@ function PracticePrompt({
   const defaultPromptContext = isArrowDuel
     ? `For ${side}, between the two arrows.`
     : `For ${side}.`;
-  const displayedPromptText = solved ? null : promptText === undefined ? defaultPromptContext : promptText;
-  const displayedPromptHint = solved ? null : promptHint === undefined
+  const promptContext = promptText === undefined ? defaultPromptContext : promptText;
+  const promptHintCopy = promptHint === undefined
     ? (isArrowDuel ? "Watch for checks, captures, and attacks!" : null)
     : promptHint;
-  const displayedPromptTitle = solved
-    ? "Solved"
-    : promptText === undefined
-      ? defaultPromptTitle
-      : modeLabel(mode);
+  const promptTitle = promptText === undefined
+    ? defaultPromptTitle
+    : modeLabel(mode);
 
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
@@ -8738,10 +8736,46 @@ function PracticePrompt({
         />
       </View>
       <View style={styles.promptCopy}>
-        <Text style={styles.promptTitle}>{displayedPromptTitle}</Text>
-        {displayedPromptText ? <Text style={styles.promptText}>{displayedPromptText}</Text> : null}
-        {displayedPromptHint ? (
-          <Text style={styles.promptHint}>{displayedPromptHint}</Text>
+        <View style={styles.promptTitleSlot} testID="practice-prompt-title-slot">
+          <Text
+            accessible={!solved}
+            accessibilityElementsHidden={solved}
+            importantForAccessibility={solved ? "no-hide-descendants" : "auto"}
+            style={[styles.promptTitle, solved ? styles.promptSolvedLayoutCopy : null]}
+            testID="practice-prompt-title-layout"
+          >
+            {promptTitle}
+          </Text>
+          {solved ? (
+            <Text
+              style={[styles.promptTitle, styles.promptSolvedTitle]}
+              testID="practice-prompt-solved-title"
+            >
+              Solved
+            </Text>
+          ) : null}
+        </View>
+        {promptContext ? (
+          <Text
+            accessible={!solved}
+            accessibilityElementsHidden={solved}
+            importantForAccessibility={solved ? "no-hide-descendants" : "auto"}
+            style={[styles.promptText, solved ? styles.promptSolvedLayoutCopy : null]}
+            testID="practice-prompt-context"
+          >
+            {promptContext}
+          </Text>
+        ) : null}
+        {promptHintCopy ? (
+          <Text
+            accessible={!solved}
+            accessibilityElementsHidden={solved}
+            importantForAccessibility={solved ? "no-hide-descendants" : "auto"}
+            style={[styles.promptHint, solved ? styles.promptSolvedLayoutCopy : null]}
+            testID="practice-prompt-hint"
+          >
+            {promptHintCopy}
+          </Text>
         ) : null}
       </View>
     </View>
@@ -17001,6 +17035,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800"
   },
+  promptTitleSlot: {
+    position: "relative"
+  },
+  promptSolvedTitle: {
+    left: 0,
+    position: "absolute",
+    top: 0
+  },
   promptText: {
     color: "#334155",
     fontSize: 12,
@@ -17010,6 +17052,9 @@ const styles = StyleSheet.create({
     color: "#2563EB",
     fontSize: 12,
     fontWeight: "800"
+  },
+  promptSolvedLayoutCopy: {
+    opacity: 0
   },
   sessionScoreStrip: {
     alignItems: "center",
