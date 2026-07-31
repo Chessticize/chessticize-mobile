@@ -78,6 +78,8 @@ describe("public landing page", () => {
     expect(supportPage).toContain("/issues/new?title=Feature");
     expect(accessibilityPage).toContain("/issues/new?title=Accessibility");
     expect(accessibilityPage).toContain("common chess puzzle task");
+    expect(accessibilityPage).toContain("demonstrated user demand");
+    expect(accessibilityPage).toContain("does not collect usage analytics");
 
     expect(readme).toContain(appStoreUrl);
     expect(readme).toContain(websiteUrl);

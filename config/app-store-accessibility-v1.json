@@ -23,6 +23,21 @@
     "appStoreConnectAction": "Leave every accessibility feature unselected for iPhone and iPad. Add the public accessibility URL after it is deployed.",
     "ownerEvidenceRequired": "Retain an App Store Connect screenshot or export showing no feature declarations and the saved accessibility URL."
   },
+  "remediationPolicy": {
+    "status": "demand-driven-deferral",
+    "decidedOn": "2026-07-31",
+    "closedIssues": [
+      426,
+      427,
+      428,
+      429,
+      430,
+      431,
+      432
+    ],
+    "summary": "Known accessibility gaps remain present, but broad remediation is not currently scheduled. Reassess when direct accessibility reports or documented user needs justify the implementation and ongoing regression coverage.",
+    "reopenSignal": "A specific user need identifying the affected puzzle flow, device, and assistive setting."
+  },
   "features": {
     "voiceOver": {
       "status": "not-declared",

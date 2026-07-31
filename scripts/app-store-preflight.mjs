@@ -300,6 +300,9 @@ check(
   "Accessibility declarations remain evidence-backed and conservative",
   appStoreAccessibility.issue === 416 &&
     appStoreAccessibility.publicationDecision?.status === "no-declarations-ready" &&
+    appStoreAccessibility.remediationPolicy?.status === "demand-driven-deferral" &&
+    JSON.stringify(appStoreAccessibility.remediationPolicy?.closedIssues) ===
+      JSON.stringify([426, 427, 428, 429, 430, 431, 432]) &&
     appStoreAccessibility.publicationDecision.iphoneDeclarations?.length === 0 &&
     appStoreAccessibility.publicationDecision.ipadDeclarations?.length === 0 &&
     Object.values(appStoreAccessibility.features).every(
@@ -309,9 +312,13 @@ check(
       "https://chessticize.github.io/chessticize-mobile/accessibility/" &&
     accessibilityAudit.includes("Declare **no accessibility features**") &&
     accessibilityAudit.includes("Standard, Arrow Duel, Review, and Replay") &&
+    accessibilityAudit.includes("demand-driven deferral") &&
     accessibilityPage.includes("common chess puzzle task") &&
-    accessibilityPage.includes("not declared in the App Store"),
-  "The canonical contract, audit, and public page must leave partial accessibility features undeclared on both iPhone and iPad."
+    accessibilityPage.includes("not declared in the App Store") &&
+    accessibilityPage.includes("not currently scheduled") &&
+    accessibilityPage.includes("closed as not planned for now") &&
+    accessibilityPage.includes("underlying gaps are not fixed"),
+  "The canonical contract, audit, and public page must preserve the demand-driven deferral and leave partial accessibility features undeclared on both iPhone and iPad."
 );
 
 check(
