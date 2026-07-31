@@ -12855,10 +12855,21 @@ function expectSolvedPromptReservesLayout(
   expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
   const slots = promptLayoutSlots(renderer);
   expect(slots.map((slot) => slot.props.testID)).toEqual(expectedTestIDs);
-  expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-title-slot").props.style).position)
+  expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-copy").props.style).position)
     .toBe("relative");
-  expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-solved-title").props.style).position)
-    .toBe("absolute");
+  const solvedOverlayStyle = flattenTestStyle(
+    findByTestId(renderer, "practice-prompt-solved-overlay").props.style
+  );
+  expect(solvedOverlayStyle).toEqual(expect.objectContaining({
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
+  }));
+  expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-solved-title").props.style).fontSize)
+    .toBe(flattenTestStyle(findByTestId(renderer, "practice-prompt-title-layout").props.style).fontSize);
   for (const slot of slots) {
     expect(flattenTestStyle(slot.props.style).opacity).toBe(0);
     expect(slot.props.accessibilityElementsHidden).toBe(true);
