@@ -17,6 +17,7 @@ on:
         type: choice
         options:
           - api-24
+          - api-24-backup-policy
           - api-36-full
           - android-offline-practice
           - android-arrow-duel
@@ -129,14 +130,22 @@ jobs:
             api-24)
               echo "api-level=24" >> "$GITHUB_OUTPUT"
               echo "suite-args=--suite android-api24-smoke" >> "$GITHUB_OUTPUT"
+              echo "runner=public-ui" >> "$GITHUB_OUTPUT"
+              ;;
+            api-24-backup-policy)
+              echo "api-level=24" >> "$GITHUB_OUTPUT"
+              echo "suite-args=" >> "$GITHUB_OUTPUT"
+              echo "runner=backup-policy" >> "$GITHUB_OUTPUT"
               ;;
             api-36-full)
               echo "api-level=36" >> "$GITHUB_OUTPUT"
               echo "suite-args=" >> "$GITHUB_OUTPUT"
+              echo "runner=public-ui" >> "$GITHUB_OUTPUT"
               ;;
             android-offline-practice|android-arrow-duel|android-custom-practice|android-history|android-stockfish|android-system-back|android-review-reminders|flows|practice)
               echo "api-level=36" >> "$GITHUB_OUTPUT"
               echo "suite-args=--suite $TARGET" >> "$GITHUB_OUTPUT"
+              echo "runner=public-ui" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "Unsupported Android test-only target $TARGET" >&2
@@ -150,6 +159,7 @@ jobs:
           sudo chmod 0666 /dev/kvm
 
       - name: Run only the selected public-UI scope
+        if: steps.target.outputs.runner == 'public-ui'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ steps.target.outputs.api-level }}
@@ -174,13 +184,32 @@ jobs:
           ANDROID_VALIDATION_DEVICE_ABI: x86_64
           ANDROID_VALIDATION_DEVICE_PROFILE: pixel_2
 
+      - name: Run only the API 24 backup-policy scope
+        if: steps.target.outputs.runner == 'backup-policy'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 24
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          ram-size: 4096M
+          disk-size: 8192M
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: apps/mobile/scripts/android-progress-backup-policy-evidence.sh
+        env:
+          DETOX_ANDROID_DEVICE: emulator-5554
+          GITHUB_SHA: ${{ github.sha }}
+
       - name: Upload passing test-only evidence
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: android-test-only-${{ inputs.target }}-${{ github.sha }}
           if-no-files-found: error
-          path: apps/mobile/artifacts/android-validation/
+          path: |
+            apps/mobile/artifacts/android-progress-backup-policy/
+            apps/mobile/artifacts/android-validation/
 
       - name: Upload failure diagnostics
         if: failure()
