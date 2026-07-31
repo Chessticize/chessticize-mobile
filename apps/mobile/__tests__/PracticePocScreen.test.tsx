@@ -4527,6 +4527,16 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it("does not constrain compact bottom-navigation labels to one line", () => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width: 430, height: 932, scale: 3, fontScale: 1 });
+
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+
+    expect(findByTestId(renderer, "practice-tab-label").props.numberOfLines).toBeUndefined();
+  });
+
   it("reserves vertical session chrome inside a foldable landscape viewport", () => {
     const densityScale = 420 / 160;
     const viewportHeight = 1768 / densityScale;

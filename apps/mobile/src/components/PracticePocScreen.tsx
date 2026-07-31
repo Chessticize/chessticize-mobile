@@ -14582,7 +14582,7 @@ function TabButton({
       </View>
       {presentation === "bottom" || expanded ? (
         <Text
-          numberOfLines={1}
+          numberOfLines={presentation === "rail" && expanded ? 1 : undefined}
           style={[styles.tabText, presentation === "rail" ? styles.tabTextRail : null, active ? styles.tabTextActive : null]}
           testID={`${testID}-label`}
         >
