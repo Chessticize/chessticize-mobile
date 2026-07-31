@@ -13,6 +13,9 @@ describe('Android validation documentation', () => {
 
     expect(validation).toContain('pnpm mobile:doctor:android');
     expect(validation).toContain('pnpm mobile:validate:android:matrix');
+    expect(validation).toContain('-gpu swiftshader');
+    expect(validation).toContain('System UI isn\'t responding');
+    expect(validation).toContain('Do not let the matrix retry a suite automatically');
     expect(validation).toContain('API 24');
     expect(validation).toContain('API 36');
     expect(validation).toContain('flows');

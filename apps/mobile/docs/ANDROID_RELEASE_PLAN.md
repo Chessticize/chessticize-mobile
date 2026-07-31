@@ -423,14 +423,15 @@ screenshot inspection.
 
 ### ANDROID-10 — Complete the Android E2E and release-validation matrix
 
-**Status:** Automated in `Mobile Android` and documented in
+**Status:** Automated locally through the maintained matrix and documented in
 `docs/ANDROID_VALIDATION.md`. Physical ARM64 execution remains optional
 diagnostic evidence at #200 and #188.
 
 **Depends on:** ANDROID-04, ANDROID-06, ANDROID-07, ANDROID-08, and ANDROID-09
 
-**Outcome:** Android has auditable native evidence at PR, nightly, and release
-gates without duplicating product-journey intent.
+**Outcome:** Android has auditable local native evidence at PR and release
+gates without duplicating product-journey intent or relying on hosted emulator
+capacity.
 
 **Work:**
 

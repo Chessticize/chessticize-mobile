@@ -68,6 +68,22 @@ AVD only when the changed boundary requires the bounded compatibility smoke.
 On Apple Silicon, use an `arm64-v8a` system image; on Intel hosts use
 `x86_64`. The E2E APK supports both ABIs.
 
+For a deterministic headless API 36 run on Apple Silicon, prefer a cold
+software-GPU boot:
+
+```sh
+emulator -avd Chessticize_API_36_Release \
+  -memory 4096 -partition-size 8192 -cores 4 \
+  -gpu swiftshader \
+  -no-snapshot-load -no-snapshot-save \
+  -no-audio -no-boot-anim -no-window
+```
+
+If a host-GPU run produces `bad color buffer handle`, QEMU I/O-thread spin, or
+a `System UI isn't responding` window, classify and retain that failed run,
+cold-stop the AVD, and make at most one explicit rerun with the software-GPU
+command above. Do not let the matrix retry a suite automatically.
+
 Build the self-contained app and Detox test APK once:
 
 ```sh
