@@ -57,6 +57,29 @@ describe("public landing page", () => {
     expect(publicCopy).not.toMatch(/\bweakness(?:es)?\b/i);
   });
 
+  it("leads with offline, ad-free practice and explains Arrow Duel by benefit", () => {
+    expect(homepage).toContain("Free · Offline · Ad-free · Open source");
+    expect(homepage).toMatch(
+      /Learn to reject tempting\s+blunders in Arrow Duel\./
+    );
+    expect(homepage).toContain(
+      "<strong>Blunder prevention</strong> with Arrow Duel"
+    );
+    expect(homepage).toContain(
+      "<strong>Offline and ad-free</strong> by design"
+    );
+    expect(homepage).toContain("<h3>Works fully offline</h3>");
+    expect(homepage).not.toContain("<strong>Two-move</strong> Arrow Duel");
+    expect(homepage).not.toContain("<strong>On-device</strong> Stockfish");
+    expect(homepage).not.toContain("<h3>On-device analysis</h3>");
+
+    for (const page of [homepage, androidPage, supportPage, accessibilityPage]) {
+      expect(page).toContain(
+        "Private, offline, ad-free chess puzzle practice."
+      );
+    }
+  });
+
   it("keeps install, support, privacy, license, and source paths prominent", () => {
     for (const page of [homepage, androidPage, supportPage, accessibilityPage]) {
       expect(page).toContain(appStoreUrl);
@@ -148,6 +171,33 @@ describe("public landing page", () => {
     }, 0);
 
     expect(totalBytes).toBeLessThan(5_000_000);
+  });
+
+  it("keeps the marketing images responsive at their intrinsic proportions", () => {
+    const globalImageRule = styles.match(/(?:^|\n)img\s*\{([^}]*)\}/)?.[1];
+    expect(globalImageRule).toContain("max-width: 100%");
+    expect(globalImageRule).toContain("height: auto");
+
+    const marketingImageTags = [...homepage.matchAll(/<img\b[\s\S]*?>/g)]
+      .map(([tag]) => tag)
+      .filter((tag) => tag.includes('src="./assets/screenshots/'));
+    expect(marketingImageTags).toHaveLength(9);
+
+    for (const tag of marketingImageTags) {
+      const output = `site/${tag.match(/src="\.\/([^"]+)"/)?.[1]}`;
+      const asset = manifest.assets.find(
+        (candidate) => candidate.output === output
+      );
+      expect(asset).toBeDefined();
+      expect(tag).toContain(`width="${asset.width}"`);
+      expect(tag).toContain(`height="${asset.height}"`);
+    }
+  });
+
+  it("keeps the mobile hero readable without the former ultra-tight display type", () => {
+    expect(styles).toContain("font-weight: 800");
+    expect(styles).toContain("font-size: clamp(3rem, 13.2vw, 3.5rem)");
+    expect(styles).toContain("letter-spacing: -0.035em");
   });
 
   it("deploys only the static site with GitHub Pages permissions", () => {
