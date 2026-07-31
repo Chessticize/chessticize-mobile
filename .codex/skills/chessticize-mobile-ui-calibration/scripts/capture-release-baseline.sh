@@ -51,6 +51,8 @@ cd "$REPO_ROOT"
   fail "Full portrait/landscape calibration requires a dedicated iPad Simulator; run iPhone store capture in portrait only."
 git rev-parse --show-toplevel >/dev/null 2>&1 || fail "Run inside the Chessticize Mobile repository."
 command -v brew >/dev/null 2>&1 || fail "Homebrew is required to select the locked Ruby 3.3 toolchain."
+command -v caffeinate >/dev/null 2>&1 || fail "caffeinate is required to keep local visual QA unlocked."
+command -v ioreg >/dev/null 2>&1 || fail "ioreg is required to verify the macOS console state."
 command -v node >/dev/null 2>&1 || fail "Node.js is required to resolve the exact Simulator."
 command -v xcrun >/dev/null 2>&1 || fail "Xcode command-line tools are required."
 [[ -x "$ORIENTATION_RUNNER" ]] || fail "Missing executable orientation runner: $ORIENTATION_RUNNER"
@@ -58,6 +60,11 @@ command -v xcrun >/dev/null 2>&1 || fail "Xcode command-line tools are required.
   fail "Missing executable Simulator target resolver: $SIMULATOR_TARGET_RESOLVER"
 [[ -x "$PNG_ORIENTATION_VALIDATOR" ]] || \
   fail "Missing executable PNG orientation validator: $PNG_ORIENTATION_VALIDATOR"
+if ioreg -n Root -d1 | grep '"IOConsoleLocked" = Yes' >/dev/null; then
+  fail "Unlock the Mac before local visual QA so Simulator window control remains available."
+fi
+
+/usr/bin/caffeinate -di -w "$$" &
 
 RUBY_PREFIX="$(brew --prefix ruby@3.3 2>/dev/null)" || \
   fail "Install Homebrew ruby@3.3 before running UI calibration."
