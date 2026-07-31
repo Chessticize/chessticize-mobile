@@ -483,6 +483,8 @@ assert.match(uiCalibrationRunnerSource, /set-simulator-orientation\.sh/);
 assert.match(uiCalibrationRunnerSource, /resolve-ios-simulator-target\.js/);
 assert.match(uiCalibrationRunnerSource, /assert-png-orientation\.js/);
 assert.match(uiCalibrationRunnerSource, /export DETOX_IOS_DEVICE_UDID="\$SIMULATOR_UDID"/);
+assert.match(uiCalibrationRunnerSource, /IOConsoleLocked/);
+assert.match(uiCalibrationRunnerSource, /caffeinate -di -w "\$\$"/);
 assert.match(
   uiCalibrationRunnerSource,
   /release-\$DEVICE_SLUG-\$RUNTIME_SLUG-\$UDID_SLUG/
@@ -498,7 +500,12 @@ const simulatorOrientationRunnerSource = read(
   ".codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
 );
 assert.match(simulatorOrientationRunnerSource, /tell application "Simulator" to activate/);
-assert.match(simulatorOrientationRunnerSource, /simctl io "\$SIMULATOR_UDID" screenshot/);
+assert.match(
+  simulatorOrientationRunnerSource,
+  /Expected exactly one open Simulator window starting with /
+);
+assert.match(simulatorOrientationRunnerSource, /set deviceSize to size of item 1 of matchingWindows/);
+assert.doesNotMatch(simulatorOrientationRunnerSource, /simctl io .* screenshot/);
 assert.match(simulatorOrientationRunnerSource, /Could not rotate the exact Simulator window/);
 
 const localE2eRunnerSource = read(
