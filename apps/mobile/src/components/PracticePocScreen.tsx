@@ -8719,11 +8719,9 @@ function PracticePrompt({
   const promptHintCopy = promptHint === undefined
     ? (isArrowDuel ? "Watch for checks, captures, and attacks!" : null)
     : promptHint;
-  const displayedPromptTitle = solved
-    ? "Solved"
-    : promptText === undefined
-      ? defaultPromptTitle
-      : modeLabel(mode);
+  const promptTitle = promptText === undefined
+    ? defaultPromptTitle
+    : modeLabel(mode);
 
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
@@ -8738,7 +8736,25 @@ function PracticePrompt({
         />
       </View>
       <View style={styles.promptCopy}>
-        <Text style={styles.promptTitle}>{displayedPromptTitle}</Text>
+        <View style={styles.promptTitleSlot} testID="practice-prompt-title-slot">
+          <Text
+            accessible={!solved}
+            accessibilityElementsHidden={solved}
+            importantForAccessibility={solved ? "no-hide-descendants" : "auto"}
+            style={[styles.promptTitle, solved ? styles.promptSolvedLayoutCopy : null]}
+            testID="practice-prompt-title-layout"
+          >
+            {promptTitle}
+          </Text>
+          {solved ? (
+            <Text
+              style={[styles.promptTitle, styles.promptSolvedTitle]}
+              testID="practice-prompt-solved-title"
+            >
+              Solved
+            </Text>
+          ) : null}
+        </View>
         {promptContext ? (
           <Text
             accessible={!solved}
@@ -17018,6 +17034,14 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontSize: 16,
     fontWeight: "800"
+  },
+  promptTitleSlot: {
+    position: "relative"
+  },
+  promptSolvedTitle: {
+    left: 0,
+    position: "absolute",
+    top: 0
   },
   promptText: {
     color: "#334155",

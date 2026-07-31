@@ -5797,7 +5797,10 @@ describe("PracticePocScreen", () => {
 
     startStandardSprint(renderer);
     const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
-    expect(unsolvedPromptLayout).toEqual(["practice-prompt-context"]);
+    expect(unsolvedPromptLayout).toEqual([
+      "practice-prompt-title-layout",
+      "practice-prompt-context"
+    ]);
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Find the best move");
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("For white.");
     expectText(renderer, "0 / 15");
@@ -6420,6 +6423,7 @@ describe("PracticePocScreen", () => {
     startArrowDuelSprint(renderer);
     const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
     expect(unsolvedPromptLayout).toEqual([
+      "practice-prompt-title-layout",
       "practice-prompt-context",
       "practice-prompt-hint"
     ]);
@@ -8361,7 +8365,10 @@ describe("PracticePocScreen", () => {
     const initialPromptKingTestIDs = promptKingTestIDs(renderer);
     const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
     expect(initialPromptKingTestIDs).toHaveLength(1);
-    expect(unsolvedPromptLayout).toEqual(["practice-prompt-context"]);
+    expect(unsolvedPromptLayout).toEqual([
+      "practice-prompt-title-layout",
+      "practice-prompt-context"
+    ]);
     await boardMove(renderer, "e2e6");
     await settleFeedbackSnapshot();
     await boardMove(renderer, "e6f7");
@@ -8412,6 +8419,7 @@ describe("PracticePocScreen", () => {
     const initialFen = findByTestId(renderer, "mock-chessboard").props.fen;
     const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
     expect(unsolvedPromptLayout).toEqual([
+      "practice-prompt-title-layout",
       "practice-prompt-context",
       "practice-prompt-hint"
     ]);
@@ -9329,7 +9337,10 @@ describe("PracticePocScreen", () => {
     const initialPromptKingTestIDs = promptKingTestIDs(renderer);
     const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
     expect(initialPromptKingTestIDs).toHaveLength(1);
-    expect(unsolvedPromptLayout).toEqual(["practice-prompt-context"]);
+    expect(unsolvedPromptLayout).toEqual([
+      "practice-prompt-title-layout",
+      "practice-prompt-context"
+    ]);
 
     await boardMove(renderer, "e2e6");
     expect(collectText(findByTestId(renderer, "review-board-state"))).toBe("locked");
@@ -10229,6 +10240,7 @@ describe("PracticePocScreen", () => {
 
     const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
     expect(unsolvedPromptLayout).toEqual([
+      "practice-prompt-title-layout",
       "practice-prompt-context",
       "practice-prompt-hint"
     ]);
@@ -12820,6 +12832,7 @@ function promptLayoutSlots(
   renderer: TestRenderer.ReactTestRenderer
 ): TestRenderer.ReactTestInstance[] {
   return [
+    "practice-prompt-title-layout",
     "practice-prompt-context",
     "practice-prompt-hint"
   ].flatMap((testID) => {
@@ -12842,6 +12855,10 @@ function expectSolvedPromptReservesLayout(
   expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
   const slots = promptLayoutSlots(renderer);
   expect(slots.map((slot) => slot.props.testID)).toEqual(expectedTestIDs);
+  expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-title-slot").props.style).position)
+    .toBe("relative");
+  expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-solved-title").props.style).position)
+    .toBe("absolute");
   for (const slot of slots) {
     expect(flattenTestStyle(slot.props.style).opacity).toBe(0);
     expect(slot.props.accessibilityElementsHidden).toBe(true);
