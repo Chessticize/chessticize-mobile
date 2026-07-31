@@ -39,8 +39,7 @@ export function historyProgressPresentationFromModel(
   const wellSampled = observed.filter((estimate) =>
     isWellSampled(estimate, progress)
   );
-  const strengths = observed
-    .slice(0, MAX_VISIBLE_PROGRESS_THEMES)
+  const strengths = visibleProgressEstimates(observed)
     .flatMap((estimate) => {
       const signal = currentSignals.get(signalId(estimate));
       return seriesKinds(signal, estimate).map((kind) =>
@@ -84,6 +83,22 @@ export function historyProgressPresentationFromModel(
   };
 }
 
+function visibleProgressEstimates(
+  estimates: readonly TacticalProfileThemeEstimate[]
+): TacticalProfileThemeEstimate[] {
+  const counts: Record<TacticalProfileTaskFamily, number> = {
+    line: 0,
+    arrow_duel: 0
+  };
+  return estimates.filter((estimate) => {
+    if (counts[estimate.taskFamily] >= MAX_VISIBLE_PROGRESS_THEMES) {
+      return false;
+    }
+    counts[estimate.taskFamily] += 1;
+    return true;
+  });
+}
+
 function strengthSeries(
   current: TacticalProfileThemeEstimate,
   kind: Exclude<TacticalFocusReason, "both">,
@@ -105,7 +120,7 @@ function strengthSeries(
   const first = availablePoints[0];
   const latest = availablePoints.at(-1);
   const themeLabel = humanizeTheme(current.theme);
-  const label = `${themeLabel} · ${taskFamilyLabel(current.taskFamily)}`;
+  const label = themeLabel;
   const change = first && latest
     ? changePresentation(kind, first.value, latest.value)
     : {
@@ -120,6 +135,7 @@ function strengthSeries(
   return {
     id: `${signalId(current)}:${kind}`,
     themeId: signalId(current),
+    taskFamily: current.taskFamily,
     label,
     kind,
     metricLabel: kind === "completed_speed"

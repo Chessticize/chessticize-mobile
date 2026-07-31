@@ -13,6 +13,7 @@ export type HistoryProgressScenarioId =
 const FORK_RELIABILITY_PROGRESS: HistoryStrengthSeries = {
   id: "forks",
   themeId: "forks",
+  taskFamily: "line",
   label: "Forks",
   kind: "solve_rate",
   metricLabel: "Accuracy · higher is better",
@@ -52,6 +53,7 @@ const FORK_RELIABILITY_PROGRESS: HistoryStrengthSeries = {
 const FORK_SPEED_PROGRESS: HistoryStrengthSeries = {
   id: "forks-speed",
   themeId: "forks",
+  taskFamily: "line",
   label: "Forks",
   kind: "completed_speed",
   metricLabel: "Solve time · lower is better",
@@ -104,6 +106,7 @@ const FORK_SPEED_PROGRESS: HistoryStrengthSeries = {
 const PIN_SPEED_PROGRESS: HistoryStrengthSeries = {
   id: "pins",
   themeId: "pins",
+  taskFamily: "line",
   label: "Pins",
   kind: "completed_speed",
   metricLabel: "Solve time · lower is better",
@@ -126,6 +129,7 @@ const PIN_SPEED_PROGRESS: HistoryStrengthSeries = {
 const SKEWER_RELIABILITY_WEAKNESS: HistoryStrengthSeries = {
   id: "skewers",
   themeId: "skewers",
+  taskFamily: "line",
   label: "Skewers",
   kind: "solve_rate",
   metricLabel: "Accuracy · higher is better",
@@ -147,6 +151,7 @@ const SKEWER_RELIABILITY_WEAKNESS: HistoryStrengthSeries = {
 const PIN_SPEED_WEAKNESS: HistoryStrengthSeries = {
   id: "pins",
   themeId: "pins",
+  taskFamily: "line",
   label: "Pins",
   kind: "completed_speed",
   metricLabel: "Solve time · lower is better",
@@ -163,6 +168,75 @@ const PIN_SPEED_WEAKNESS: HistoryStrengthSeries = {
     { label: "Jul 5", value: 126, valueLabel: "1.26×", sampleSize: 23 },
     { label: "Jul 19", value: 131, valueLabel: "1.31×", sampleSize: 25 },
     { label: "Jul 26", value: 134, valueLabel: "1.34×", sampleSize: 26 }
+  ]
+};
+
+const ADVANCED_PAWN_RELIABILITY_PROGRESS: HistoryStrengthSeries = {
+  id: "arrow-duel-advanced-pawn",
+  themeId: "arrow-duel-advanced-pawn",
+  taskFamily: "arrow_duel",
+  label: "Advanced Pawn",
+  kind: "solve_rate",
+  metricLabel: "Accuracy · higher is better",
+  baselineLabel: "Recent attempts and stronger theme matches contribute more to n",
+  scaleMax: 100,
+  changeLabel: "6 points higher",
+  changeTone: "improved",
+  summary: "Wrong choices and timeouts count as misses.",
+  points: [
+    {
+      label: "May 24",
+      value: 0,
+      valueLabel: "—",
+      sampleSize: 0,
+      unavailable: true
+    },
+    {
+      label: "Jun 7",
+      value: 0,
+      valueLabel: "—",
+      sampleSize: 0,
+      unavailable: true
+    },
+    { label: "Jun 21", value: 84, valueLabel: "84%", sampleSize: 11 },
+    { label: "Jul 5", value: 86, valueLabel: "86%", sampleSize: 18 },
+    { label: "Jul 19", value: 88, valueLabel: "88%", sampleSize: 25 },
+    { label: "Jul 26", value: 90, valueLabel: "90%", sampleSize: 31 }
+  ]
+};
+
+const ADVANCED_PAWN_SPEED_PROGRESS: HistoryStrengthSeries = {
+  id: "arrow-duel-advanced-pawn-speed",
+  themeId: "arrow-duel-advanced-pawn",
+  taskFamily: "arrow_duel",
+  label: "Advanced Pawn",
+  kind: "completed_speed",
+  metricLabel: "Solve time · lower is better",
+  baselineLabel: "1.00× matches your comparable completed puzzles",
+  scaleMax: 120,
+  changeLabel: "6% less time",
+  changeTone: "improved",
+  summary:
+    "n includes model-weighted correct choices completed before timeout; speed starts after enough personal controls.",
+  points: [
+    {
+      label: "May 24",
+      value: 0,
+      valueLabel: "—",
+      sampleSize: 0,
+      unavailable: true
+    },
+    {
+      label: "Jun 7",
+      value: 0,
+      valueLabel: "—",
+      sampleSize: 0,
+      unavailable: true
+    },
+    { label: "Jun 21", value: 110, valueLabel: "1.10×", sampleSize: 9 },
+    { label: "Jul 5", value: 108, valueLabel: "1.08×", sampleSize: 14 },
+    { label: "Jul 19", value: 106, valueLabel: "1.06×", sampleSize: 20 },
+    { label: "Jul 26", value: 104, valueLabel: "1.04×", sampleSize: 26 }
   ]
 };
 
@@ -192,7 +266,7 @@ export function isHistoryProgressScenario(
 export function historyProgressPresentationFor(
   scenarioId: HistoryProgressScenarioId
 ): HistoryProgressPresentation {
-  if (scenarioId === "history-populated" || scenarioId === "history-progress") {
+  if (scenarioId === "history-populated") {
     return {
       ...BASE_PRESENTATION,
       initialSeriesId: "forks",
@@ -200,6 +274,19 @@ export function historyProgressPresentationFor(
         FORK_RELIABILITY_PROGRESS,
         FORK_SPEED_PROGRESS,
         PIN_SPEED_PROGRESS
+      ]
+    };
+  }
+  if (scenarioId === "history-progress") {
+    return {
+      ...BASE_PRESENTATION,
+      initialSeriesId: "forks",
+      strengths: [
+        FORK_RELIABILITY_PROGRESS,
+        FORK_SPEED_PROGRESS,
+        PIN_SPEED_PROGRESS,
+        ADVANCED_PAWN_RELIABILITY_PROGRESS,
+        ADVANCED_PAWN_SPEED_PROGRESS
       ]
     };
   }

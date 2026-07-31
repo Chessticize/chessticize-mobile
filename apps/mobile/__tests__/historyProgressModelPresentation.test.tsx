@@ -54,7 +54,7 @@ test("builds visible model reliability progress for a well-sampled balanced them
     "completed_speed"
   ]);
   expect(reliabilitySeries?.themeId).toBe("line:fork");
-  expect(reliabilitySeries?.label).toBe("Fork · Puzzle solving");
+  expect(reliabilitySeries?.label).toBe("Fork");
   expect(reliabilitySeries?.kind).toBe("solve_rate");
   expect(reliabilitySeries?.baselineLabel).toBe(
     "Recent attempts and stronger theme matches contribute more to n"
@@ -177,7 +177,7 @@ test("keeps observed balanced stats visible before recommendation diversity is c
 
   expect(presentation?.initialSeriesId).toBe("line:fork:solve_rate");
   expect(presentation?.strengths).toHaveLength(2);
-  expect(presentation?.strengths[0]?.label).toBe("Fork · Puzzle solving");
+  expect(presentation?.strengths[0]?.label).toBe("Fork");
 });
 
 test("keeps accuracy beside completed speed without matched solve-model evidence", () => {
@@ -224,6 +224,33 @@ test("keeps both accuracy and time visible for every displayed theme", () => {
     "solve_rate",
     "completed_speed"
   ]);
+});
+
+test("keeps each task family available when one mode has more than eight themes", () => {
+  const progress = tacticalProgress({
+    snapshots: [{
+      asOf: "2026-07-25T00:00:00.000Z",
+      estimates: [
+        ...Array.from({ length: 9 }, (_, index) => themeEstimate({
+          taskFamily: "arrow_duel",
+          theme: `arrowTheme${index}`
+        })),
+        themeEstimate({
+          taskFamily: "line",
+          theme: "fork"
+        })
+      ]
+    }]
+  });
+
+  const presentation = historyProgressPresentationFromModel(progress);
+
+  expect(new Set(
+    presentation?.strengths.map((series) => series.taskFamily)
+  )).toEqual(new Set(["line", "arrow_duel"]));
+  expect(presentation?.strengths.filter(
+    (series) => series.taskFamily === "arrow_duel"
+  )).toHaveLength(16);
 });
 
 test("uses completed-time evidence for a model-selected speed weakness", () => {
