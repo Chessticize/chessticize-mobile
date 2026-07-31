@@ -1,6 +1,6 @@
 # Optional TestFlight Diagnostics
 
-This document preserves an optional 1.3.1 TestFlight diagnostic checklist and
+This document preserves an optional 1.3.2 TestFlight diagnostic checklist and
 evidence log. It is not an App Store release gate. Exact-head fast checks,
 risk-scoped simulator/Detox evidence, the signed archive, and App Store Connect
 processing are sufficient to submit a build.
@@ -32,7 +32,7 @@ under `docs/TESTING_ARCHITECTURE.md`.
 
 | Field | Value |
 | --- | --- |
-| Test group | `Internal 1.3.1 QA` |
+| Test group | `Internal 1.3.2 QA` |
 | Beta app description | `Offline chess tactics trainer for Puzzle Sprint, Arrow Duel, mistake review, local ratings, and on-device Stockfish analysis.` |
 | What to test | `Review Tactical Profiles and create a focused Run, exercise configurable timing and Sprint guidance, run Standard and Arrow Duel, verify History and Review effects, test optional move feedback, export support diagnostics, relaunch the app, and test offline practice in airplane mode.` |
 | Feedback path | `https://github.com/Chessticize/chessticize-mobile/issues` |
@@ -184,9 +184,9 @@ while private; only commit sanitized screenshots or logs intentionally.
 
 Current source release candidate:
 
-- Source commit: the commit pointed to by the `ios-v1.3.1-build-1` tag
+- Source commit: the commit pointed to by the `ios-v1.3.2-build-1` tag
 - Release tag:
-  [`ios-v1.3.1-build-1`](https://github.com/Chessticize/chessticize-mobile/releases/tag/ios-v1.3.1-build-1)
+  [`ios-v1.3.2-build-1`](https://github.com/Chessticize/chessticize-mobile/releases/tag/ios-v1.3.2-build-1)
 - Rule: upload only a binary archived from the exact commit pointed to by this
   tag. If any source, dependency, puzzle, native, or notice file changes before
   upload, regenerate the release manifest and publish a new tag/release for the
@@ -194,8 +194,8 @@ Current source release candidate:
 
 | Field | Value |
 | --- | --- |
-| Source commit | Tag target for `ios-v1.3.1-build-1` |
-| Release tag | `ios-v1.3.1-build-1` |
+| Source commit | Tag target for `ios-v1.3.2-build-1` |
+| Release tag | `ios-v1.3.2-build-1` |
 | App Store Connect build | TBD |
 | TestFlight group | TBD |
 | Optional physical device and iOS version | Not run |
@@ -231,7 +231,7 @@ before submission.
 ## Archive And Upload
 
 Follow `docs/APP_STORE_UPLOAD.md` for the owner-executed archive and upload
-step. The 1.3.1 upload path uses `xcodebuild archive`, then
+step. The 1.3.2 upload path uses `xcodebuild archive`, then
 `xcodebuild -exportArchive` with
 `apps/mobile/ios/ExportOptions.app-store-connect.plist`. Do not count this step
 as complete until App Store Connect finishes processing the uploaded build.

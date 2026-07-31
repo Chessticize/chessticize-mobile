@@ -43,9 +43,12 @@ reviewed PRs targeting the release branch.
 
 Release-branch history is append-only. Never rebase the release branch, amend
 or replace an already-pushed release commit, force-push the branch, or squash
-the release branch into `main`. Make every correction as a new commit. Protect
-each active release branch against force pushes and deletion, require linear
-history, and enforce those protections for administrators.
+the release branch into `main`. Make every correction as a new commit. Do not
+create, require, or depend on GitHub branch protection, rulesets, or
+administrator-only controls for this workflow. Treat append-only history,
+no-force-push, no-deletion, and linear history as operator policy enforced
+through reviewed PRs and exact-ref checks. Missing GitHub enforcement is not a
+release blocker.
 
 Each contributor or agent works on a separate branch and opens a PR targeting
 the release branch. A contributor PR must be complete, reviewed, and green
