@@ -1,8 +1,8 @@
 const {
-  completeFirstUseSessionGuides,
   launchWithDisabledSynchronization,
   openTab,
   playBoardMove,
+  startSelectedPracticeRun,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
   waitForVisibleInPracticeScroll,
@@ -70,11 +70,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
       await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
       await selectPracticeRunByName(CUSTOM_RUN_NAME);
-      await element(by.id('practice-main-scroll')).scrollTo('top');
-      await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
-      await element(by.id('practice-run-start')).tap();
-      await completeFirstUseSessionGuides();
-      await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
+      await startSelectedPracticeRun();
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 1').withTimeout(10000);
 
       // Active Custom uses the same guarded exit contract as every practice
@@ -212,10 +208,16 @@ async function showAllHistoryAttempts() {
 async function selectCustomHistoryRating() {
   await element(by.id('history-filter-toggle')).tap();
   await waitFor(element(by.id('history-advanced-filters'))).toExist().withTimeout(10000);
-  const customRatingFilter = element(by.text(`${CUSTOM_RUN_NAME} · 30s pace`));
+  const customRatingFilter = element(by.label(`${CUSTOM_RUN_NAME} · 30s pace`));
   await waitFor(customRatingFilter)
     .toBeVisible()
     .whileElement(by.id('history-rating-filters'))
     .scroll(120, 'right');
-  await customRatingFilter.tap();
+  const attributes = await customRatingFilter.getAttributes();
+  const identifier = (Array.isArray(attributes) ? attributes[0] : attributes).identifier;
+  if (typeof identifier !== 'string' || !identifier.startsWith('history-rating-run:')) {
+    throw new Error(`Could not resolve Custom history rating filter from ${String(identifier)}`);
+  }
+  await element(by.id(identifier)).tap();
+  await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
 }

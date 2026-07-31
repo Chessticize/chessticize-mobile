@@ -35,10 +35,17 @@ describe('Android Custom Practice release slice', () => {
       .toContainEqual({ kind: 'detox', suite: 'android-custom-practice' });
     expect(spec).toContain("by.id('practice-add-run')");
     expect(spec).toContain("by.id('practice-run-name-input')");
-    expect(spec).toContain("by.id('practice-run-start')");
+    expect(spec).toContain('startSelectedPracticeRun,');
+    expect(spec).toContain('await startSelectedPracticeRun();');
+    expect(spec).not.toContain("await element(by.id('practice-run-start')).tap()");
     expect(spec).toContain('selectPracticeRunByName(CUSTOM_RUN_NAME)');
     expect(spec).toContain("'practice-run-select-'");
     expect(spec).not.toContain("element(by.text(CUSTOM_RUN_NAME)).tap()");
+    expect(spec).toContain("by.label(`${CUSTOM_RUN_NAME} · 30s pace`)");
+    expect(spec).toContain("identifier.startsWith('history-rating-run:')");
+    expect(spec).toContain('await element(by.id(identifier)).tap();');
+    expect(spec).toContain("by.id('history-performance-card')");
+    expect(spec).not.toContain('await customRatingFilter.tap();');
     expect(spec).toContain('android-standard-practice.fixture.json');
     expect(fixture.customRunTheme).toEqual({
       id: 'mate-in-2',
