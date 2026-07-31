@@ -46,6 +46,7 @@ const {
 } = require('../e2e/helpers');
 const {
   findUniqueAndroidUiNode,
+  findUniqueAndroidUiNodeByLabel,
   readAndroidUiHierarchy,
   tapAndroidUiNode,
   waitForAndroidUiState,
@@ -178,6 +179,7 @@ describe('Detox suite configuration', () => {
 
     expect(Object.keys(androidPublicUiEvidence).sort()).toEqual([
       'findUniqueAndroidUiNode',
+      'findUniqueAndroidUiNodeByLabel',
       'readAndroidUiHierarchy',
       'tapAndroidUiNode',
       'waitForAndroidUiState',
@@ -652,6 +654,33 @@ describe('Detox suite configuration', () => {
         '-s', 'emulator-6000', 'shell', 'input', 'tap', '250', '400'
       ], expect.objectContaining({ encoding: 'utf8' })],
     ]);
+  });
+
+  it('resolves an exact clickable Android public label to its dynamic resource ID', () => {
+    const ratingNode = '<node resource-id="com.chessticize.mobile:id/history-rating-run:local-example" content-desc="Mate in 2 Focus · 30s pace" clickable="true" selected="false" bounds="[242,420][652,508]" />';
+    const hierarchy = [
+      '<hierarchy>',
+      '<node resource-id="com.chessticize.mobile:id/history-rating-all" content-desc="All Puzzles" clickable="true" bounds="[16,420][226,508]" />',
+      ratingNode,
+      '</hierarchy>',
+    ].join('');
+
+    expect(findUniqueAndroidUiNodeByLabel(
+      hierarchy,
+      'Mate in 2 Focus · 30s pace'
+    )).toEqual(expect.objectContaining({
+      bounds: { bottom: 508, left: 242, right: 652, top: 420 },
+      resourceId: 'history-rating-run:local-example',
+    }));
+
+    expect(() => findUniqueAndroidUiNodeByLabel(
+      '<hierarchy><node content-desc="Mate in 2 Focus · 30s pace" clickable="false" bounds="[242,420][652,508]" /></hierarchy>',
+      'Mate in 2 Focus · 30s pace'
+    )).toThrow('Missing visible clickable Android UI label');
+    expect(() => findUniqueAndroidUiNodeByLabel(
+      `<hierarchy>${ratingNode}${ratingNode}</hierarchy>`,
+      'Mate in 2 Focus · 30s pace'
+    )).toThrow('Ambiguous visible clickable Android UI label');
   });
 
   it('rejects a stale hierarchy when a fresh Android UI dump fails', () => {

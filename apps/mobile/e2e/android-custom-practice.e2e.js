@@ -8,6 +8,11 @@ const {
   waitForVisibleInPracticeScroll,
   withAndroidUiDiagnostics,
 } = require('./helpers');
+const {
+  findUniqueAndroidUiNodeByLabel,
+  readAndroidUiHierarchy,
+  tapAndroidUiNode,
+} = require('./androidPublicUiEvidence');
 const practiceFixture = require('../../../fixtures/puzzles/android-standard-practice.fixture.json');
 
 const TEST_NOW_MS = '1784030400000';
@@ -208,11 +213,16 @@ async function showAllHistoryAttempts() {
 async function selectCustomHistoryRating() {
   await element(by.id('history-filter-toggle')).tap();
   await waitFor(element(by.id('history-advanced-filters'))).toExist().withTimeout(10000);
-  const customRatingFilter = element(by.label(`${CUSTOM_RUN_NAME} · 30s pace`));
-  await waitFor(customRatingFilter)
+  const customRatingLabel = `${CUSTOM_RUN_NAME} · 30s pace`;
+  const customRatingFilterElement = element(by.label(customRatingLabel));
+  await waitFor(customRatingFilterElement)
     .toBeVisible()
     .whileElement(by.id('history-rating-filters'))
     .scroll(120, 'right');
-  await customRatingFilter.tap();
+  const customRatingFilter = findUniqueAndroidUiNodeByLabel(
+    readAndroidUiHierarchy(),
+    customRatingLabel
+  );
+  tapAndroidUiNode(customRatingFilter);
   await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
 }

@@ -220,6 +220,22 @@ function androidUiAttribute(node, attribute) {
   ))?.[1] ?? '';
 }
 
+function decodeAndroidUiAttribute(value) {
+  return String(value)
+    .replace(XML_NUMERIC_CHARACTER_REFERENCE, (_match, reference) => {
+      const hexadecimal = reference[0] === 'x';
+      return String.fromCodePoint(Number.parseInt(
+        hexadecimal ? reference.slice(1) : reference,
+        hexadecimal ? 16 : 10
+      ));
+    })
+    .replaceAll('&quot;', '"')
+    .replaceAll('&apos;', "'")
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&');
+}
+
 function visibleAndroidUiNodesByResourceId(hierarchy, resourceId) {
   const normalizedResourceId = String(resourceId).toLowerCase();
   const nodes = String(hierarchy).match(ANDROID_UI_NODE) ?? [];
@@ -261,6 +277,39 @@ function findUniqueAndroidUiNode(hierarchy, resourceId) {
   }
   if (matches.length > 1) {
     throw new Error(`Ambiguous visible Android UI node ${resourceId}: ${matches.length} matches`);
+  }
+  return {
+    bounds: parseAndroidUiBounds(matches[0], resourceId),
+    node: matches[0],
+    resourceId,
+  };
+}
+
+function findUniqueAndroidUiNodeByLabel(hierarchy, label) {
+  const nodes = String(hierarchy).match(ANDROID_UI_NODE) ?? [];
+  const matches = nodes.filter((node) => {
+    const explicitlyHidden = androidUiAttribute(node, 'visible-to-user') === 'false'
+      || androidUiAttribute(node, 'displayed') === 'false';
+    return !explicitlyHidden
+      && androidUiAttribute(node, 'clickable') === 'true'
+      && decodeAndroidUiAttribute(androidUiAttribute(node, 'content-desc')) === label;
+  });
+  if (matches.length === 0) {
+    throw new Error(`Missing visible clickable Android UI label ${JSON.stringify(label)}`);
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      `Ambiguous visible clickable Android UI label ${JSON.stringify(label)}: ${matches.length} matches`
+    );
+  }
+  const fullResourceId = decodeAndroidUiAttribute(androidUiAttribute(matches[0], 'resource-id'));
+  const markerIndex = Math.max(
+    fullResourceId.lastIndexOf(':id/'),
+    fullResourceId.lastIndexOf('/id/')
+  );
+  const resourceId = markerIndex >= 0 ? fullResourceId.slice(markerIndex + 4) : fullResourceId;
+  if (!resourceId) {
+    throw new Error(`Android UI label ${JSON.stringify(label)} has no resource ID`);
   }
   return {
     bounds: parseAndroidUiBounds(matches[0], resourceId),
@@ -354,6 +403,7 @@ async function waitForAndroidUiState(
 
 module.exports = {
   findUniqueAndroidUiNode,
+  findUniqueAndroidUiNodeByLabel,
   readAndroidUiHierarchy,
   tapAndroidUiNode,
   waitForAndroidUiState,

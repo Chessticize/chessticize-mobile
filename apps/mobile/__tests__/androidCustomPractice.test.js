@@ -41,8 +41,10 @@ describe('Android Custom Practice release slice', () => {
     expect(spec).toContain('selectPracticeRunByName(CUSTOM_RUN_NAME)');
     expect(spec).toContain("'practice-run-select-'");
     expect(spec).not.toContain("element(by.text(CUSTOM_RUN_NAME)).tap()");
-    expect(spec).toContain("by.label(`${CUSTOM_RUN_NAME} · 30s pace`)");
-    expect(spec).toContain('await customRatingFilter.tap();');
+    expect(spec).toContain("findUniqueAndroidUiNodeByLabel(");
+    expect(spec).toContain("`${CUSTOM_RUN_NAME} · 30s pace`");
+    expect(spec).toContain('tapAndroidUiNode(customRatingFilter);');
+    expect(spec).not.toContain('await customRatingFilter.tap();');
     expect(spec).toContain("by.id('history-performance-card')");
     expect(spec).toContain('android-standard-practice.fixture.json');
     expect(fixture.customRunTheme).toEqual({
