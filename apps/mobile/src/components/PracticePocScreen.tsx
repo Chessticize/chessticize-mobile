@@ -11647,7 +11647,9 @@ function ReviewSession({
     if (reviewBoardLocked) {
       return;
     }
+    const startingFen = reviewStartingFen(currentEntry);
     resetCurrentReview(entryIndex);
+    boardRef.current?.resetBoard(startingFen);
     reviewEntryPreview.replay();
   }
 
@@ -12051,10 +12053,14 @@ function ReviewSession({
       <View style={styles.reviewTopNav}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={isReplay ? "Exit replay" : "Exit review"}
+          accessibilityLabel={analysisEnabled
+            ? "Close analysis"
+            : isReplay ? "Exit replay" : "Exit review"}
           testID="review-exit"
           style={styles.iconButton}
-          onPress={() => onReturnToOwner(currentEntry.source)}
+          onPress={analysisEnabled
+            ? closeAnalysis
+            : () => onReturnToOwner(currentEntry.source)}
         >
           <CloseGlyph />
         </Pressable>
@@ -12114,19 +12120,6 @@ function ReviewSession({
                 <ChevronGlyph direction="right" />
               </Pressable>
             </>
-          ) : null}
-          {currentEntry.source !== "due" ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Reset puzzle"
-              accessibilityState={{ disabled: reviewBoardLocked }}
-              disabled={reviewBoardLocked}
-              testID="review-reset-puzzle"
-              style={[styles.iconButton, reviewBoardLocked ? styles.disabledButton : null]}
-              onPress={resetReviewPuzzle}
-            >
-              <Text style={styles.iconButtonText}>↺</Text>
-            </Pressable>
           ) : null}
         </View>
       </View>
@@ -12225,10 +12218,25 @@ function ReviewSession({
                     </Text>
                   </>
                 ) : (
-                  <Pressable accessibilityRole="button" accessibilityLabel="Analyze position" testID="review-analysis-button" style={styles.analysisPrimaryButton} onPress={openAnalysis}>
-                    <SearchGlyph />
-                    <Text style={styles.analysisPrimaryButtonText}>Analysis</Text>
-                  </Pressable>
+                  <>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Analyze position" testID="review-analysis-button" style={styles.analysisPrimaryButton} onPress={openAnalysis}>
+                      <SearchGlyph />
+                      <Text style={styles.analysisPrimaryButtonText}>Analysis</Text>
+                    </Pressable>
+                    {currentEntry.source !== "due" ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Reset puzzle"
+                        accessibilityState={{ disabled: reviewBoardLocked }}
+                        disabled={reviewBoardLocked}
+                        testID="review-reset-puzzle"
+                        style={[styles.iconButton, reviewBoardLocked ? styles.disabledButton : null]}
+                        onPress={resetReviewPuzzle}
+                      >
+                        <Text style={styles.iconButtonText}>↺</Text>
+                      </Pressable>
+                    ) : null}
+                  </>
                 )}
               </View>
             ) : null}
