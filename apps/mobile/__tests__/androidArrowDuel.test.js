@@ -3,14 +3,8 @@ const { join } = require('node:path');
 const { validationStepsForApiLevel } = require('../scripts/android-validation-matrix');
 
 const appRoot = join(__dirname, '..');
-const repoRoot = join(appRoot, '../..');
-
 function read(relativePath) {
   return readFileSync(join(appRoot, relativePath), 'utf8');
-}
-
-function readRepo(relativePath) {
-  return readFileSync(join(repoRoot, relativePath), 'utf8');
 }
 
 describe('Android Arrow Duel release slice', () => {
@@ -34,7 +28,6 @@ describe('Android Arrow Duel release slice', () => {
     const fixture = require('../../../fixtures/puzzles/android-arrow-duel.fixture.json');
     const journey = read('e2e/android-arrow-duel.e2e.js');
     const suiteConfig = read('e2e/suiteConfig.js');
-    const workflow = readRepo('.github/workflows/mobile-android.yml');
 
     expect(fixture).toEqual(expect.objectContaining({
       puzzleSelectionSeed: 'android-arrow-duel-v2:90087',
@@ -81,6 +74,5 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).not.toContain('run-as');
     expect(validationStepsForApiLevel(36))
       .toContainEqual({ kind: 'detox', suite: 'android-arrow-duel' });
-    expect(workflow).toContain('pnpm mobile:validate:android:matrix');
   });
 });

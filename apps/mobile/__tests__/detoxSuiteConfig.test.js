@@ -1670,10 +1670,6 @@ describe('Detox suite configuration', () => {
       path.resolve(__dirname, '../scripts/android-adaptive-layout-evidence.sh'),
       'utf8'
     );
-    const workflow = fs.readFileSync(
-      path.resolve(__dirname, '../../../.github/workflows/mobile-android.yml'),
-      'utf8'
-    );
 
     const requestLandscape = spec.indexOf("setAdaptiveOrientation('landscape')");
     const waitForSettledLandscape = spec.indexOf(
@@ -1808,11 +1804,8 @@ describe('Detox suite configuration', () => {
     expect(evidence).toContain('original_user_rotation_state');
     expect(evidence).toContain('restore_display_rotation');
     expect(evidence).toContain('git diff --quiet');
-    expect(workflow).toContain('Android adaptive public UI');
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toContain('schedule:');
-    expect(workflow).toContain('apps/mobile/scripts/android-adaptive-layout-evidence.sh');
-    expect(workflow).toContain('android-adaptive-layout-evidence');
+    expect(evidence).toContain('CHESSTICIZE_ANDROID_ADAPTIVE_EVIDENCE_DIR');
+    expect(evidence).toContain('artifacts/android-adaptive-layout');
   });
 
   it('polls physical Android rotation to convergence and fails closed with bounded diagnostics', async () => {

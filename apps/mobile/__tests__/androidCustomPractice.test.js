@@ -28,13 +28,11 @@ describe('Android Custom Practice release slice', () => {
   it('runs one public Android journey through Custom completion, analysis, Back, and relaunch', () => {
     const spec = read('e2e/android-custom-practice.e2e.js');
     const suiteConfig = read('e2e/suiteConfig.js');
-    const workflow = read('../../.github/workflows/mobile-android.yml');
     const fixture = require('../../../fixtures/puzzles/android-standard-practice.fixture.json');
 
     expect(suiteConfig).toContain('android-custom-practice.e2e.js');
     expect(validationStepsForApiLevel(36))
       .toContainEqual({ kind: 'detox', suite: 'android-custom-practice' });
-    expect(workflow).toContain('pnpm mobile:validate:android:matrix');
     expect(spec).toContain("by.id('practice-add-run')");
     expect(spec).toContain("by.id('practice-run-name-input')");
     expect(spec).toContain("by.id('practice-run-start')");

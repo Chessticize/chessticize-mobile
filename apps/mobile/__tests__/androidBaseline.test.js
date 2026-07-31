@@ -337,7 +337,6 @@ describe('Android launch baseline', () => {
     const gradleProperties = read('android/gradle.properties');
     const doctor = read('scripts/android-doctor.js');
     const verifier = read('scripts/verify-android-apk-abis.js');
-    const workflow = read('../../.github/workflows/mobile-android.yml');
 
     expect(gradleProperties).toContain('chessticizeMinSdk=24');
     expect(gradleProperties).toContain('chessticizeCompileSdk=36');
@@ -348,7 +347,6 @@ describe('Android launch baseline', () => {
     expect(appGradle).toContain('findProperty("reactNativeArchitectures")');
     expect(doctor).toContain("require('./android-requirements')");
     expect(verifier).toContain("require('./android-requirements')");
-    expect(workflow).toContain('pnpm mobile:install:android-sdk');
     expect(ANDROID_REQUIREMENTS).toBe(REQUIREMENTS);
     expect(androidSdkPackages(ANDROID_REQUIREMENTS)).toEqual([
       'platform-tools',
@@ -387,7 +385,6 @@ describe('Android launch baseline', () => {
 
   it('keeps debug signing isolated and fails release packaging closed', () => {
     const appGradle = read('android/app/build.gradle');
-    const workflow = read('../../.github/workflows/mobile-android.yml');
     const debugSigningReferences = appGradle.match(/signingConfig signingConfigs\.debug/g) || [];
 
     expect(debugSigningReferences).toHaveLength(1);
@@ -397,8 +394,6 @@ describe('Android launch baseline', () => {
     expect(appGradle).toContain('gradle.taskGraph.whenReady');
     expect(appGradle).toContain('taskGraph.allTasks');
     expect(appGradle).not.toContain('gradle.startParameter.taskNames');
-    expect(workflow).toContain('verify_release_task_fails_closed :app:bundleRelease');
-    expect(workflow).toContain('verify_release_task_fails_closed :app:assemble');
   });
 
   it('keeps Metro cleartext access out of release manifests', () => {
@@ -504,58 +499,33 @@ describe('Android launch baseline', () => {
     });
   });
 
-  it('enables hardware acceleration before booting the Android CI emulators', () => {
-    const workflow = read('../../.github/workflows/mobile-android.yml');
+  it('keeps Android emulator and Detox validation local-only', () => {
+    const validation = read('../../docs/ANDROID_VALIDATION.md');
 
-    expect(workflow).toContain('name: Enable KVM acceleration');
-    expect(workflow).toContain('test -c /dev/kvm');
-    expect(workflow).toContain('sudo chmod 0666 /dev/kvm');
-  });
-
-  it('keeps Android emulator Detox out of routine pull-request CI', () => {
-    const workflow = read('../../.github/workflows/mobile-android.yml');
-
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toContain('schedule:');
-    expect(workflow).not.toMatch(/^\s+pull_request:/m);
-  });
-
-  it('reclaims unrelated hosted-runner toolchains and fails early without Android build headroom', () => {
-    const workflow = read('../../.github/workflows/mobile-android.yml');
-    const cleanup = workflow.indexOf('name: Reclaim hosted runner disk for Android native build');
-    const headroom = workflow.indexOf('name: Require Android native build disk headroom');
-    const nativeBuild = workflow.indexOf('name: Build self-contained E2E app and Detox test APK');
-
-    expect(cleanup).toBeGreaterThan(0);
-    expect(headroom).toBeGreaterThan(cleanup);
-    expect(headroom).toBeLessThan(nativeBuild);
-    expect(workflow).toContain('/opt/hostedtoolcache/CodeQL');
-    expect(workflow).toContain('/usr/local/.ghcup');
-    expect(workflow).toContain('/usr/share/dotnet');
-    expect(workflow).toContain('docker system prune --all --force');
-    expect(workflow).toContain('minimum_kib=$((20 * 1024 * 1024))');
-    expect(workflow).toContain('Insufficient hosted-runner disk for the Android native build');
+    expect(fs.existsSync(path.join(
+      mobileRoot,
+      '../../.github/workflows/mobile-android.yml',
+    ))).toBe(false);
+    expect(fs.existsSync(path.join(
+      mobileRoot,
+      '../../.github/workflows/mobile-android-test-only-rerun.yml',
+    ))).toBe(false);
+    expect(validation).toContain('Android emulator and Detox validation runs only');
+    expect(validation).toContain('GitHub Actions must not boot an Android emulator');
   });
 
   it('gives both Android API emulators enough memory and data capacity for the packaged app', () => {
-    const workflow = read('../../.github/workflows/mobile-android.yml');
+    const validation = read('../../docs/ANDROID_VALIDATION.md');
     const prepareScript = read('scripts/prepare-android-offline-e2e.sh');
-    const launchJob = workflow.slice(
-      workflow.indexOf('  android-launch:'),
-      workflow.indexOf('  android-adaptive-layout:'),
-    );
 
-    expect(launchJob).toContain('api-level: [24, 36]');
-    expect(launchJob).toContain('ram-size: 4096M');
-    expect(launchJob.match(/ram-size: 4096M/g)).toHaveLength(1);
-    expect(launchJob).toContain('disk-size: 8192M');
-    expect(launchJob.match(/disk-size: 8192M/g)).toHaveLength(1);
+    expect(validation).toContain('API 36');
+    expect(validation).toContain('API 24');
+    expect(validation).toContain('4096 MB RAM');
+    expect(validation).toContain('8192 MB data capacity');
     expect(prepareScript).toContain('pm trim-caches');
     expect(prepareScript).toContain('shell df -k /data');
     expect(prepareScript).toContain('required_data_bytes');
     expect(prepareScript).toContain('Android /data capacity is insufficient');
-    expect(launchJob).toContain('name: Upload Android launch failure diagnostics');
-    expect(launchJob).toContain('apps/mobile/artifacts/android-ui/');
   });
 
   it('fails before Detox when Android cannot stage the packaged APKs safely', () => {
@@ -682,7 +652,6 @@ describe('Android launch baseline', () => {
   });
 
   it('keeps the complete API 36 suites in the tested matrix runner', () => {
-    const workflow = read('../../.github/workflows/mobile-android.yml');
     const suites = validationStepsForApiLevel(36)
       .filter((step) => step.kind === 'detox')
       .map((step) => step.suite);
@@ -695,29 +664,21 @@ describe('Android launch baseline', () => {
       'flows',
       'practice',
     ]));
-    expect(workflow).toContain('pnpm mobile:validate:android:matrix');
-    expect(workflow).not.toContain('DETOX_ACTIVE_SUITE=');
-    expect(workflow).toContain('timeout-minutes: 40');
-    expect(workflow).toContain('timeout --signal=TERM --kill-after=30s 30m');
   });
 
-  it('keeps emulator-runner control flow in the tested Node runner', () => {
-    const workflow = read('../../.github/workflows/mobile-android.yml');
-    const launchJob = workflow.slice(
-      workflow.indexOf('  android-launch:'),
-      workflow.indexOf('  android-adaptive-layout:'),
+  it('exposes the tested Node matrix runner through the local root command', () => {
+    const rootPackage = JSON.parse(read('../../package.json'));
+    const mobilePackageJson = JSON.parse(read('package.json'));
+
+    expect(rootPackage.scripts['mobile:validate:android:matrix']).toBe(
+      'pnpm --filter ChessticizeMobile validate:android:matrix',
     );
-    const script = launchJob.slice(
-      launchJob.indexOf('          script: >-'),
-      launchJob.indexOf('        env:'),
+    expect(mobilePackageJson.scripts['validate:android:matrix']).toBe(
+      'node scripts/android-validation-matrix.js',
     );
-    expect(launchJob).toContain('script: >-');
-    expect(launchJob).toContain('pnpm mobile:validate:android:matrix');
-    expect(script).not.toMatch(/\b(?:if|for|while|until|case)\b/);
   });
 
   it('keeps API 24 bounded while API 36 retains complete shared suites', () => {
-    const workflow = read('../../.github/workflows/mobile-android.yml');
     const api24Suites = validationStepsForApiLevel(24)
       .filter((step) => step.kind === 'detox')
       .map((step) => step.suite);
@@ -727,7 +688,6 @@ describe('Android launch baseline', () => {
 
     expect(api24Suites).toEqual(['android-api24-smoke']);
     expect(api36Suites).toEqual(expect.arrayContaining(['flows', 'practice']));
-    expect(workflow.match(/pnpm mobile:validate:android:matrix/g)).toHaveLength(1);
   });
 
   it('uses the doctor-verified SDK with a self-contained offline Android E2E app', () => {

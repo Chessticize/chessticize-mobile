@@ -19,7 +19,6 @@ const TEST_RUNNER_PREFIXES = [
 ];
 
 const TEST_RUNNER_PATHS = new Set([
-  '.github/workflows/mobile-android-test-only-rerun.yml',
   'apps/mobile/scripts/android-adaptive-layout-evidence.sh',
   'apps/mobile/scripts/android-progress-backup-api30-restore-evidence.sh',
   'apps/mobile/scripts/android-progress-backup-evidence.sh',

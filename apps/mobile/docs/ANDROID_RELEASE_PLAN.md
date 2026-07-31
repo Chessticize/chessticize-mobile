@@ -536,8 +536,8 @@ source published on GitHub and proportionate evidence.
 - Run exact-head fast checks and the delta, targeted, or broad native scope for
   the changed boundary. Full Detox, API 24, and adaptive jobs are not automatic
   delta gates.
-- Use CI/simulator/emulator evidence for release approval. Physical-device
-  checks are optional diagnostics and never a recurring gate.
+- Use risk-scoped local simulator/emulator evidence for release approval.
+  Physical-device checks are optional diagnostics and never a recurring gate.
 - Complete Internal/Closed, pre-launch, listing, privacy, and account checks for
   first launch or when Play requires or the corresponding configuration changes.
 - Promote the validated AAB to Production at 100 percent.

@@ -87,11 +87,10 @@ pnpm mobile:verify:android:abis
 
 The Android Detox build is a debug-signed `e2e` variant with its JavaScript and
 bundled Core Pack inside the APK. It does not start Metro or use `adb reverse`,
-so the same artifact proves offline startup. The scheduled/manual Android CI
-workflow installs that APK on representative API 24 and API 36 x86_64
-emulators, runs the launch smoke, completes and relaunches a Standard sprint
-with networking disabled, and migrates the released SQLite fixture through the
-public UI. Routine pull requests continue to use path-scoped fast checks.
+so the same artifact proves offline startup. Android emulator and Detox
+validation is local-only. API 36 owns the selected product journeys; API 24 is
+a bounded compatibility smoke used only when that boundary changes. Routine
+pull requests continue to use path-scoped fast checks.
 
 Release packaging never uses `android/app/debug.keystore`. A release task fails
 before packaging unless all four production values are provided:

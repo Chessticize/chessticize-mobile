@@ -54,17 +54,47 @@ Record the chosen scope and rationale in the PR. App build inputs, test-runner
 inputs, and record-only inputs follow the separate evidence identities in
 `docs/TESTING_ARCHITECTURE.md`.
 
-## Automated matrix
+## Local Android matrix
 
-The `Mobile Android` workflow is a manually dispatched full diagnostic matrix.
-It builds the self-contained app and Detox test APK once, runs complete shared
-`flows` and `practice` on an API 36 x86_64 phone, and also runs the bounded API
-24 compatibility smoke plus the release-oriented backup and adaptive jobs.
-It has no scheduled trigger and is not a recurring release gate. Use it only
-when the selected scope is full or when diagnosing a boundary that needs its
-hosted Linux/Android evidence. Routine releases use exact-head fast checks and
-risk-scoped CI or emulator validation on the Android build machine. A physical
-device is not required for Play submission or the post-Play APK mirror.
+Android emulator and Detox validation runs only on the local Android build
+machine. GitHub Actions must not boot an Android emulator, build the E2E APKs,
+or run Detox. The protected GitHub workflows remain responsible only for the
+production-signed AAB and corresponding source, source-publication recovery,
+and the post-Play APK mirror.
+
+Use an existing compatible AVD when possible. The primary profile is API 36
+with at least 4096 MB RAM and 8192 MB data capacity. Create or boot an API 24
+AVD only when the changed boundary requires the bounded compatibility smoke.
+On Apple Silicon, use an `arm64-v8a` system image; on Intel hosts use
+`x86_64`. The E2E APK supports both ABIs.
+
+Build the self-contained app and Detox test APK once:
+
+```sh
+pnpm mobile:e2e:build:android
+pnpm mobile:verify:android:abis
+```
+
+Then run the selected scope against the attached emulator:
+
+```sh
+export DETOX_ANDROID_DEVICE=emulator-5554
+export ANDROID_VALIDATION_DEVICE_ABI="$(
+  adb -s "$DETOX_ANDROID_DEVICE" shell getprop ro.product.cpu.abi | tr -d '\r'
+)"
+ANDROID_VALIDATION_COMMIT_SHA="$(git rev-parse HEAD)" \
+ANDROID_VALIDATION_BUILD_RESULT=success \
+ANDROID_VALIDATION_DEVICE_ABI="$ANDROID_VALIDATION_DEVICE_ABI" \
+ANDROID_VALIDATION_DEVICE_PROFILE=pixel_2 \
+DETOX_ANDROID_DEVICE="$DETOX_ANDROID_DEVICE" \
+pnpm mobile:validate:android:matrix -- --api-level 36 \
+  --output apps/mobile/artifacts/android-validation/api-36.json
+```
+
+Add `--suite <name>` for targeted validation. A full scope uses API 36 without
+`--suite`, which runs the complete shared `flows` and `practice` suites plus
+the registered Android journeys. Replace `36` with `24` only for the bounded
+compatibility smoke. Do not run API 24 merely because a build number advanced.
 
 The API 24 smoke contains only:
 
@@ -75,38 +105,21 @@ The API 24 smoke contains only:
   surface.
 
 It intentionally does not copy the complete API 36 journeys. The shared suites
-remain the product-journey source of truth on both iOS and Android.
-
-For an attached local emulator or device with the E2E APKs already built, run
-the same fail-closed matrix entry used by CI:
-
-```sh
-ANDROID_VALIDATION_COMMIT_SHA=<exact-40-character-sha> \
-ANDROID_VALIDATION_BUILD_RESULT=success \
-ANDROID_VALIDATION_DEVICE_ABI=x86_64 \
-ANDROID_VALIDATION_DEVICE_PROFILE=pixel_2 \
-DETOX_ANDROID_DEVICE=emulator-5554 \
-pnpm mobile:validate:android:matrix -- --api-level 36 \
-  --output apps/mobile/artifacts/android-validation/api-36.json
-```
-
-Replace `36` with `24` only for the bounded compatibility smoke. The command
+remain the product-journey source of truth on both iOS and Android. The command
 rejects an unsupported API or suite, a missing or mismatched test-runner SHA, a
 dirty tracked worktree, changed App inputs, changed artifact bytes, a
 failed/missing step, or incomplete build/device data. It writes passing
 evidence only after every selected command succeeds and it has rechecked the
-checkout head and clean tracked worktree. Add `--suite <name>` only for a
-focused test-only rerun.
+checkout head and clean tracked worktree.
 
-CI gives the complete matrix command a 30-minute deadline inside a 40-minute
-job. This is deliberately much larger than the normal API 24 and API 36
-runtime, but shorter than an unproductive hosted-runner hang. The runner writes
-`api-<level>.progress.json` before and after every prepare, install, native, and
-Detox step. A failed or timed-out workflow uploads that progress file with any
-Android UI diagnostics, so classify the exact last running step before
-retrying. Only `api-<level>.json`, written after every step passes, is release
-evidence; the progress file is diagnostic evidence and never converts a
-partial run into a pass.
+The runner writes `api-<level>.progress.json` before and after every prepare,
+install, native, and Detox step. If the process fails or is interrupted, keep
+that file with Android UI diagnostics and classify the exact last running step
+before retrying. Only `api-<level>.json`, written after every selected step
+passes, is release evidence; the progress file is diagnostic evidence and
+never converts a partial run into a pass. Do not automatically retry a failed
+API 24 or API 36 run. Fix or classify the failure, then rerun only the affected
+local scope.
 
 ## Test-only reruns with retained APKs
 
@@ -120,66 +133,97 @@ development and non-blocking polish wait for the next version.
 
 When a failure is classified as a host-side spec, selector, wait, assertion,
 evidence collector, or non-bundled fixture defect, do not rebuild the App.
-Commit the test correction, keep current-head fast checks green, then dispatch
-`Mobile Android test-only rerun` with:
-
-- `source_run_id`: the retained `Mobile Android` run whose
-  `Android build baseline` job passed;
-- `app_source_sha`: that run's exact App source SHA; and
-- `target`: `api-24`, `api-36-full`, or the smallest affected API 36 suite.
-
-The workflow checks that the source run used
-`.github/workflows/mobile-android.yml`, its build job passed, the App source is
-an ancestor of the test runner, and the fail-closed App-input digest is
-identical. It downloads the immutable `android-practice-apks` artifact and
-records both APK checksums. It never invokes Gradle.
-
-GitHub can dispatch this workflow only after the workflow file exists on the
-default branch. While the policy first lives on an active release branch,
-download the same retained artifact on the Android build machine and invoke
-the matrix directly:
+Retain the locally built APK pair and record its manifest before changing the
+test runner:
 
 ```sh
-gh run download <source-run-id> \
-  --name android-practice-apks \
-  --dir apps/mobile/android/app/build/outputs/apk
-node apps/mobile/scripts/mobile-app-inputs.js compare \
-  --app-source-sha <app-source-sha> \
-  --test-runner-sha "$(git rev-parse HEAD)" \
-  --output apps/mobile/artifacts/android-validation/app-input-comparison.json
+app_source_sha="$(git rev-parse HEAD)"
+retained_root="scratch/android-validation/$app_source_sha"
+mkdir -p "$retained_root/apks/app" "$retained_root/apks/androidTest"
+cp apps/mobile/android/app/build/outputs/apk/e2e/app-e2e.apk \
+  "$retained_root/apks/app/"
+cp apps/mobile/android/app/build/outputs/apk/androidTest/e2e/app-e2e-androidTest.apk \
+  "$retained_root/apks/androidTest/"
+node apps/mobile/scripts/mobile-app-inputs.js record-artifact \
+  --app-source-sha "$app_source_sha" \
+  --artifact "$retained_root/apks" \
+  --output "$retained_root/apks-manifest.json"
+```
+
+After committing the test correction, keep current-head fast checks green,
+verify both the App inputs and retained bytes, restore the APKs to their
+expected build paths, and run only the smallest affected local scope:
+
+```sh
+app_source_sha=<exact-App-source-sha>
+test_runner_sha="$(git rev-parse HEAD)"
+retained_root="scratch/android-validation/$app_source_sha"
+node apps/mobile/scripts/mobile-app-inputs.js verify-artifact \
+  --app-source-sha "$app_source_sha" \
+  --test-runner-sha "$test_runner_sha" \
+  --artifact "$retained_root/apks" \
+  --manifest "$retained_root/apks-manifest.json" \
+  --output apps/mobile/artifacts/android-validation/artifact-reuse.json
+mkdir -p apps/mobile/android/app/build/outputs/apk/e2e \
+  apps/mobile/android/app/build/outputs/apk/androidTest/e2e
+cp "$retained_root/apks/app/app-e2e.apk" \
+  apps/mobile/android/app/build/outputs/apk/e2e/
+cp "$retained_root/apks/androidTest/app-e2e-androidTest.apk" \
+  apps/mobile/android/app/build/outputs/apk/androidTest/e2e/
+export DETOX_ANDROID_DEVICE=emulator-5554
+export ANDROID_VALIDATION_DEVICE_ABI="$(
+  adb -s "$DETOX_ANDROID_DEVICE" shell getprop ro.product.cpu.abi | tr -d '\r'
+)"
 ANDROID_VALIDATION_COMMIT_SHA="$(git rev-parse HEAD)" \
-ANDROID_VALIDATION_APP_SOURCE_SHA=<app-source-sha> \
+ANDROID_VALIDATION_APP_SOURCE_SHA="$app_source_sha" \
 ANDROID_VALIDATION_BUILD_RESULT=success \
-ANDROID_VALIDATION_DEVICE_ABI=x86_64 \
+ANDROID_VALIDATION_DEVICE_ABI="$ANDROID_VALIDATION_DEVICE_ABI" \
 ANDROID_VALIDATION_DEVICE_PROFILE=pixel_2 \
-DETOX_ANDROID_DEVICE=emulator-5554 \
+DETOX_ANDROID_DEVICE="$DETOX_ANDROID_DEVICE" \
 pnpm mobile:validate:android:matrix -- --api-level 36 \
   --suite android-history \
   --output apps/mobile/artifacts/android-validation/test-only-android-history.json
 ```
 
-Replace `android-history` with the smallest affected suite. This local path
-performs the same App-input comparison and APK checksum recording as the hosted
-workflow; it also never invokes Gradle.
+Replace `android-history` with the smallest affected suite. This path never
+invokes Gradle. If either comparison rejects reuse, stop and create a fresh
+local build.
 
-For a transient failure on the same commit, use GitHub's specific-job rerun
-instead. For a test correction on a new commit, use the test-only workflow so
-the evidence records distinct App source and test-runner SHAs. If the
-classifier reports any App build input change, stop and run a normal build plus
-the selected native scope. Expected-result changes require failure
+For a transient failure on the same commit, rerun only the affected local
+command once after recording the infrastructure cause. For a test correction
+on a new commit, the evidence records distinct App source and test-runner SHAs.
+If the classifier reports any App build input change, stop and run a normal
+build plus the selected native scope. Expected-result changes require failure
 classification and review; they must not normalize an unexplained product
 regression. The classifier is a trust anchor and intentionally invalidates
 reuse when its own implementation changes.
 
 ## Adaptive contract
 
-Manual full-workflow dispatch runs
-`apps/mobile/scripts/android-adaptive-layout-evidence.sh` on API 36. It reaches
-the real sprint through public UI and checks phone rotation plus representative
-tablet, foldable/resizable, ChromeOS-style, and large-text profiles. Retain the
-JSON/text context, display metrics, assertions, and screenshots from the
-`android-adaptive-layout-evidence` artifact and visually inspect representative
-phone, tablet, and foldable captures.
+When adaptive presentation changed, run
+`apps/mobile/scripts/android-adaptive-layout-evidence.sh` locally on API 36.
+It reaches the real sprint through public UI and checks phone rotation plus
+representative tablet, foldable/resizable, ChromeOS-style, and large-text
+profiles. Retain the JSON/text context, display metrics, assertions, and
+screenshots under `apps/mobile/artifacts/android-adaptive-layout/` and visually
+inspect representative phone, tablet, and foldable captures.
+
+When Android Progress Backup changed, run its Gradle policy test and only the
+affected local API profiles:
+
+```sh
+(cd apps/mobile/android && \
+  ./gradlew :app:testDebugUnitTest \
+    --tests com.chessticize.mobile.backup.ProgressBackupPolicyTest --no-daemon)
+DETOX_ANDROID_DEVICE=emulator-5554 \
+  apps/mobile/scripts/android-progress-backup-policy-evidence.sh
+```
+
+The policy script accepts API 24, 30, or 36. The API 30 inherited-framework
+restore consumes the retained API 36 evidence through
+`ANDROID_BACKUP_API36_SOURCE_DIR`; run API 36 first and point API 30 at that
+local directory. These profiles are conditional boundary evidence, not an
+automatic release matrix.
 
 ## Deterministic fixtures
 
@@ -193,7 +237,7 @@ public UI.
 ## Native evidence contract
 
 Every required native result must record the following fields and retain the
-workflow run plus artifacts with the PR or release record:
+local command log plus artifacts with the PR or release record:
 
 - App source SHA, test-runner SHA, App-input digest, APK checksums, and build result;
 - commands and selected validation scope;
@@ -227,7 +271,7 @@ Physical hardware availability is not a feature-PR or release blocker.
 
 Do not run this checklist for an ordinary delta solely because the build number
 advanced. Use it when diagnosing device-specific behavior or when the owner
-wants extra confidence after publication. Automated CI/simulator/emulator
+wants extra confidence after publication. Risk-scoped local simulator/emulator
 evidence remains the release standard.
 
 If the checklist is run, record the exact candidate SHA, AAB/APK identity and

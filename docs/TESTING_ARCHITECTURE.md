@@ -41,7 +41,9 @@ real boundary is part of the risk.
 
 `pnpm test:e2e` runs the CLI process tests. It does not run the mobile GUI
 suite. The mobile GUI suite is built and run with
-`pnpm mobile:e2e:build:ios` and `pnpm mobile:e2e:test:ios`.
+`pnpm mobile:e2e:build:ios` and `pnpm mobile:e2e:test:ios` for iOS, or
+`pnpm mobile:e2e:build:android` and
+`pnpm mobile:validate:android:matrix` for Android.
 
 ## PR, Local Native, And Release Gates
 
@@ -50,8 +52,8 @@ Use distinct gates instead of treating every PR as a release candidate:
 | Gate | Purpose | Required validation |
 | --- | --- | --- |
 | Pull request | Prove the changed behavior at the cheapest reliable layer | Path-scoped fast CI; native validation only for native-impacting changes |
-| Local iOS native | Prove simulator and native behavior without a hosted Xcode build | One local build followed by the selected Detox scope |
-| Release candidate | Prove the exact source tree intended for distribution | Exact-head fast checks, risk-scoped CI/simulator/emulator validation, and signed-artifact checks |
+| Local native | Prove simulator/emulator and native behavior without a hosted native test build | One local build followed by the selected Detox scope |
+| Release candidate | Prove the exact source tree intended for distribution | Exact-head fast checks, risk-scoped local simulator/emulator validation, and signed-artifact checks |
 
 Every PR must pass its relevant unit, integration, CLI E2E, component, and
 typecheck jobs. GitHub workflow path filters select the applicable fast jobs.
@@ -77,12 +79,35 @@ PR author selects one native-validation scope based on that boundary:
   infrastructure, or a release candidate whose native risk cannot be bounded
   to one suite.
 
-GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
-validation is required only for releases and native-impacting changes. Record
-the selected scope, App source SHA, test-runner SHA, App-input digest, artifact
-checksum, build result, commands, results, and clean-worktree confirmation.
-A failed required fast check, failed selected native scope, or known product
-failure remains a merge blocker.
+GitHub Actions does not run Xcode builds, Android E2E APK builds, emulators,
+simulators, or Detox. Native validation on both platforms is local and required
+only for releases and native-impacting changes. Record the App source SHA,
+test-runner SHA, App-input digest, selected scope, artifact checksum, build
+result, commands, results, and clean-worktree confirmation. A failed required
+fast check, failed selected native scope, or known product failure remains a
+merge blocker.
+
+### GitHub Actions boundary
+
+The repository keeps only workflows with a current remote-only or fast
+non-native responsibility:
+
+| Workflow | Retained responsibility |
+| --- | --- |
+| `core.yml` | Path-scoped core, storage, CLI, typecheck, and tooling checks |
+| `mobile-js.yml` | Ready-PR mobile lint, typecheck, component, and native-library host tests |
+| `mobile-lab.yml` | Interaction Lab build and issue-marker validation |
+| `process.yml` | Repository process and release-policy validation |
+| `pages.yml` | Public landing-page deployment |
+| `mobile-android-release-candidate.yml` | Protected production-signed AAB verification and corresponding-source publication |
+| `mobile-android-source-recovery.yml` | Recovery of corresponding-source publication from a retained signed candidate |
+| `mobile-android-github-release.yml` | Post-Play download, identity verification, and mirroring of the Play-signed APK |
+
+The signed-candidate workflow is not native product validation: it owns the
+protected signing boundary and immutable source/artifact identity. The recovery
+and mirror workflows require GitHub or Play credentials and remote release
+state. The other retained workflows are bounded fast checks or publication.
+Android emulator and test-only rerun workflows are intentionally absent.
 
 ### Validation identity and test-only reruns
 
@@ -97,7 +122,7 @@ Validation-relevant inputs have three separate identities:
    policy.
 2. **Test-runner inputs** are host-side Detox specs, selectors, waits,
    assertions, screenshot/evidence collectors, non-bundled deterministic
-   fixtures, and the dedicated test-only rerun workflow.
+   fixtures, and local evidence-runner scripts.
 3. **Record-only inputs** are documentation, review metadata, agent guidance,
    and merge ancestry that cannot change the built App or execute a product
    test.
@@ -124,21 +149,16 @@ and the distributed signed artifact, tag, and corresponding source still bind
 to one exact release commit. Validation reuse never authorizes relabeling an
 ancestor's signed candidate as that final artifact.
 
-Android native validation runs on the Android build machine at the risk-scoped
-layer selected for the change. The hosted `Mobile Android` workflow is a
-manual-only full diagnostic matrix, not a scheduled check or release gate. Its
-explicit dispatch builds the self-contained app and Detox APK once, runs the
-complete API 36 journeys, adds the bounded API 24 smoke for launch, production
-SQLite persistence/migration, Standard practice, and packaged Stockfish, and
-captures the representative tablet, foldable/resizable, and backup contracts.
-Use it only for full-scope changes or hosted-environment diagnosis. The
-fail-closed runner is `pnpm mobile:validate:android:matrix`, and
-`docs/ANDROID_VALIDATION.md` defines its evidence schema and commands.
-When only a host-side Android test-runner input changes, dispatch
-`Mobile Android test-only rerun` with the retained source run, its App source
-SHA, and one affected target. That workflow authenticates the successful source
-build, proves the App-input digest is unchanged, downloads the retained APKs,
-and does not run Gradle.
+Android native validation runs on the local Android build machine at the
+risk-scoped layer selected for the change. The fail-closed runner is
+`pnpm mobile:validate:android:matrix`: API 36 owns complete journeys and API 24
+is a bounded launch, production SQLite persistence/migration, Standard
+practice, and packaged Stockfish compatibility smoke. Adaptive and backup
+profiles run locally only when their boundary changed.
+`docs/ANDROID_VALIDATION.md` defines the evidence schema and exact commands.
+When only a host-side Android test-runner input changes, prove the App-input
+digest and locally retained APK bytes are unchanged, then rerun one affected
+target without invoking Gradle.
 
 Before any release, run exact-head fast checks and select the same no-native,
 targeted, or full scope used for PRs. An ordinary delta does not rerun complete

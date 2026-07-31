@@ -30,6 +30,28 @@ The public repository is:
 
 https://github.com/Chessticize/chessticize-mobile
 
+## GitHub Actions Release Boundary
+
+The release workflow is local-first. GitHub Actions does not run Android
+emulators, Android Detox, iOS simulators, or iOS Detox. Risk-scoped native
+validation runs locally and its evidence is recorded against the exact App and
+test-runner identities.
+
+Keep GitHub Actions only where the boundary is remote or protected:
+
+- fast non-native core, mobile, Interaction Lab, and process checks;
+- public landing-page deployment;
+- the protected production-signed Android AAB and corresponding-source
+  publication;
+- recovery of corresponding-source publication from a retained signed
+  candidate; and
+- post-Play identity verification and mirroring of the Play-signed APK.
+
+Do not add a GitHub-hosted native validation or test-only rerun workflow. A
+host-side test-runner correction reuses a checksummed locally retained App
+artifact only after the fail-closed App-input and artifact-byte comparisons in
+`docs/ANDROID_VALIDATION.md` pass.
+
 ## Release Integration Branch
 
 Prepare each coordinated mobile release on
@@ -180,7 +202,7 @@ without another full native run:
    bundle, and rerun only the affected scope. Documentation, review metadata,
    agent guidance, and merge ancestry require no native rerun. Record the App
    source SHA, test-runner SHA, App-input digest, artifact checksum, and focused
-   results. Android test-only reruns use the retained-APK workflow in
+   results. Android test-only reruns use the local retained-APK procedure in
    `docs/ANDROID_VALIDATION.md`.
 
 If that final run reveals a genuinely new deterministic failure, preserve it,

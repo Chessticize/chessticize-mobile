@@ -8,7 +8,7 @@ function read(relativePath) {
 }
 
 describe('Android validation documentation', () => {
-  it('defines reproducible PR, manual diagnostic, API 24, adaptive, and reusable native evidence commands', () => {
+  it('defines reproducible local, API 24, adaptive, and reusable native evidence commands', () => {
     const validation = read('docs/ANDROID_VALIDATION.md');
 
     expect(validation).toContain('pnpm mobile:doctor:android');
@@ -34,8 +34,11 @@ describe('Android validation documentation', () => {
     expect(validation).toContain('production SQLite');
     expect(validation).toContain('public UI');
     expect(validation).toContain('small deterministic fixture');
-    expect(validation).toContain('Mobile Android test-only rerun');
-    expect(validation).toContain('never invokes Gradle');
+    expect(validation).toContain('retained-APK path');
+    expect(validation).toContain('record-artifact');
+    expect(validation).toContain('verify-artifact');
+    expect(validation).toMatch(/never\s+invokes Gradle/);
+    expect(validation).toContain('Do not automatically retry');
   });
 
   it('keeps physical ARM64 work optional and outside the release gate', () => {
@@ -68,9 +71,11 @@ describe('Android validation documentation', () => {
     expect(devLoop).toContain('Full Android validation');
     expect(devLoop).toContain('pnpm mobile:validate:android:matrix');
     expect(devLoop).toContain('node apps/mobile/scripts/mobile-app-inputs.js compare');
-    expect(devLoop).toContain('Mobile Android test-only rerun');
-    expect(architecture).toContain('manual-only full diagnostic matrix');
-    expect(architecture).toContain('bounded API 24 smoke');
+    expect(devLoop).toContain('locally retained');
+    expect(devLoop).toContain('Do not dispatch or recreate');
+    expect(architecture).toContain('Android emulator and test-only rerun workflows are intentionally absent');
+    expect(architecture).toContain('API 24');
+    expect(architecture).toContain('bounded launch');
     expect(architecture).toContain('Validation identity and test-only reruns');
     expect(architecture).toContain('Physical-device checks are optional');
   });

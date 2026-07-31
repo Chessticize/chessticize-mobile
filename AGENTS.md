@@ -8,7 +8,7 @@ For repeatable Storybook-to-Release simulator calibration across the maintained
 fifteen-scene, twenty-six-image UI baseline, use
 `.codex/skills/chessticize-mobile-ui-calibration/SKILL.md`.
 
-For Android release orchestration, use the repo-local skill at `.codex/skills/chessticize-android-release/SKILL.md`. It governs clean-machine preflight, exact-artifact Play and GitHub publication, protected recovery, risk-scoped CI/emulator validation, and final issue closure.
+For Android release orchestration, use the repo-local skill at `.codex/skills/chessticize-android-release/SKILL.md`. It governs clean-machine preflight, exact-artifact Play and GitHub publication, protected recovery, risk-scoped local emulator validation, and final issue closure.
 
 For audits of all product changes since a released mobile source commit, use
 the repo-local skill at
@@ -128,6 +128,8 @@ ADR is not itself a defect.
   clean exact head of the integrated release branch. Contributor-branch
   evidence is supporting evidence only; rerun or document valid evidence reuse
   after integration according to the App-input and test-runner identity rules.
+  Android emulator builds and Detox run locally on the Android build machine;
+  GitHub Actions must not provide Android emulator or Detox release evidence.
 - Freeze an RC only after known release work has converged. Record the RC
   generation, frozen exact head, scope, App-input digest, and blockers in a
   draft release-PR comment without committing a freeze marker. A frozen RC
@@ -172,8 +174,8 @@ ADR is not itself a defect.
   confirm any required local native evidence or documented evidence-reuse
   comparison. Do not treat an unverified assumption as local evidence.
 - Do not mark a PR ready or merge it while part of its stated goal is unfinished, a required check is red, its selected native-validation scope is incomplete, or the PR description calls out a known unresolved product issue.
-- GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native validation is required only for release candidates and changes to native implementation, native integration/configuration, native dependencies, or native validation infrastructure. Record the tested commit SHA, build result, required suite results, Xcode version, simulator, clean-worktree confirmation, and any later evidence-reuse comparison.
-- Before a release, require exact-head fast checks plus the release scope selected below. An ordinary delta may ship after fast checks and the platform's signed-artifact checks without a physical-device smoke or full Detox rerun. Run the affected simulator/emulator suite for targeted native risk and both suites only for broad native risk. Treat production runtime/domain sources, native/platform projects and native test-APK sources, dependency manifests or patches, build/release configuration, bundled fixtures/resources, and the fail-closed App-input classifier itself as App build inputs. A change to any App build input requires a new validation build and the selected native scope. Host-side E2E specs, selectors, assertions, screenshot/evidence collectors, and non-bundled fixtures are test-runner inputs: when the fail-closed App-input comparison passes, reuse the checksummed validation App artifact and rerun only the affected test scope. Documentation, review metadata, agent guidance, and merge ancestry are record-only inputs. Unknown paths are App build inputs. Record the App source SHA, test-runner SHA, App-input digest, and artifact checksum whenever evidence spans commits. This evidence reuse never relabels or publishes an ancestor's signed candidate: the distributed candidate, platform tag, and source manifest remain bound to the exact final release-branch head. Any unresolved automated failure that touches the changed boundary remains a release blocker.
+- GitHub Actions does not run Android emulators, Android Detox, Xcode builds, or iOS Detox. Local native validation is required only for release candidates and changes to native implementation, native integration/configuration, native dependencies, or native validation infrastructure. Record the tested commit SHA, build result, required suite results, toolchain version, emulator/simulator, clean-worktree confirmation, and any later evidence-reuse comparison. GitHub Actions remains responsible for fast non-native checks, the protected Android signed-AAB/source job, source recovery, and the post-Play APK mirror.
+- Before a release, require exact-head fast checks plus the release scope selected below. An ordinary delta may ship after fast checks and the platform's signed-artifact checks without a physical-device smoke or full Detox rerun. Run the affected local simulator/emulator suite for targeted native risk and both suites locally only for broad native risk. Treat production runtime/domain sources, native/platform projects and native test-APK sources, dependency manifests or patches, build/release configuration, bundled fixtures/resources, and the fail-closed App-input classifier itself as App build inputs. A change to any App build input requires a new validation build and the selected native scope. Host-side E2E specs, selectors, assertions, screenshot/evidence collectors, and non-bundled fixtures are test-runner inputs: when the fail-closed App-input comparison passes, reuse the checksummed validation App artifact and rerun only the affected test scope locally. Documentation, review metadata, agent guidance, and merge ancestry are record-only inputs. Unknown paths are App build inputs. Record the App source SHA, test-runner SHA, App-input digest, and artifact checksum whenever evidence spans commits. This evidence reuse never relabels or publishes an ancestor's signed candidate: the distributed candidate, platform tag, and source manifest remain bound to the exact final release-branch head. Any unresolved automated failure that touches the changed boundary remains a release blocker.
 - Delete or reuse stale `codex/*` branches after their PR merges.
 
 ### Review Cadence
@@ -225,7 +227,7 @@ Choose the smallest validation layer that proves the changed boundary. Record th
 - Required Detox evidence records the App source SHA, test-runner SHA, App-input digest, artifact checksum, build result, commands, selected scope, results, and clean-worktree confirmation. The two SHAs may differ when `node apps/mobile/scripts/mobile-app-inputs.js compare` proves the App build inputs are unchanged. A host-side spec, selector, assertion, evidence collector, or non-bundled fixture change reruns only its affected test scope against that verified validation App artifact. Runtime, native/platform, native test-APK, dependency, build/release, or bundled fixture/resource changes require a new validation build. Documentation, review metadata, or merge-only changes require neither. Signed production candidates still use the exact final release-branch head.
 - SQLite schema changes still require the released-fixture migration matrix in the PR and an automated simulator/emulator upgrade smoke before release. Real CloudKit, notification delivery, physical-device upgrade, and similar hardware checks are optional diagnostics and do not block App Store or Play submission, or the GitHub APK mirror.
 
-The same three scopes apply to releases. A delta release changes only bounded JavaScript, copy, styling, tests, documentation, or release metadata and uses fast CI plus the platform's signed-artifact checks. Targeted and full release validation are required only when the changed boundary matches the risks above, and use simulators/emulators or deterministic CI. Store-account setup, listing review, screenshot generation, compatibility matrices, physical-device checks, and unchanged manual checklists are not automatic work for every build number.
+The same three scopes apply to releases. A delta release changes only bounded JavaScript, copy, styling, tests, documentation, or release metadata and uses fast CI plus the platform's signed-artifact checks. Targeted and full release validation are required only when the changed boundary matches the risks above, and run on local simulators/emulators or through deterministic non-native tests. GitHub-hosted Android emulator workflows are not release gates and must not be reintroduced. Store-account setup, listing review, screenshot generation, compatibility matrices, physical-device checks, and unchanged manual checklists are not automatic work for every build number.
 
 ## Testing Philosophy
 
@@ -268,7 +270,7 @@ storage, sync, database schemas, or release validation.
 - Storage integration tests must use real SQLite databases or deterministic fixture databases.
 - Native engine tests must exercise the real Stockfish bridge for UCI handshake, fixed-position analysis, cancellation, and background handling.
 - Sync tests must use a maintained fake sync transport for deterministic local behavior and a real CloudKit staging/manual suite before release.
-- GUI automation must cover core user journeys on an iOS simulator before release. Android GUI automation is required before Android release.
+- GUI automation must cover core user journeys on an iOS simulator before release. Required Android GUI automation runs on a local emulator before Android release.
 
 ## Definition of Done
 
