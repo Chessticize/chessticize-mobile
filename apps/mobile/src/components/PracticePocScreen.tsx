@@ -8715,8 +8715,8 @@ function PracticePrompt({
   const defaultPromptContext = isArrowDuel
     ? `For ${side}, between the two arrows.`
     : `For ${side}.`;
-  const displayedPromptText = solved ? null : promptText === undefined ? defaultPromptContext : promptText;
-  const displayedPromptHint = solved ? null : promptHint === undefined
+  const promptContext = promptText === undefined ? defaultPromptContext : promptText;
+  const promptHintCopy = promptHint === undefined
     ? (isArrowDuel ? "Watch for checks, captures, and attacks!" : null)
     : promptHint;
   const displayedPromptTitle = solved
@@ -8739,9 +8739,27 @@ function PracticePrompt({
       </View>
       <View style={styles.promptCopy}>
         <Text style={styles.promptTitle}>{displayedPromptTitle}</Text>
-        {displayedPromptText ? <Text style={styles.promptText}>{displayedPromptText}</Text> : null}
-        {displayedPromptHint ? (
-          <Text style={styles.promptHint}>{displayedPromptHint}</Text>
+        {promptContext ? (
+          <Text
+            accessible={!solved}
+            accessibilityElementsHidden={solved}
+            importantForAccessibility={solved ? "no-hide-descendants" : "auto"}
+            style={[styles.promptText, solved ? styles.promptSolvedLayoutCopy : null]}
+            testID="practice-prompt-context"
+          >
+            {promptContext}
+          </Text>
+        ) : null}
+        {promptHintCopy ? (
+          <Text
+            accessible={!solved}
+            accessibilityElementsHidden={solved}
+            importantForAccessibility={solved ? "no-hide-descendants" : "auto"}
+            style={[styles.promptHint, solved ? styles.promptSolvedLayoutCopy : null]}
+            testID="practice-prompt-hint"
+          >
+            {promptHintCopy}
+          </Text>
         ) : null}
       </View>
     </View>
@@ -17010,6 +17028,9 @@ const styles = StyleSheet.create({
     color: "#2563EB",
     fontSize: 12,
     fontWeight: "800"
+  },
+  promptSolvedLayoutCopy: {
+    opacity: 0
   },
   sessionScoreStrip: {
     alignItems: "center",
