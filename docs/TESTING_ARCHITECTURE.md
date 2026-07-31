@@ -36,7 +36,7 @@ real boundary is part of the risk.
 | CLI E2E | Real process and public protocol boundary | Standard sprint, Arrow Duel, serialized history/review/rating state | `pnpm test:e2e` |
 | Mobile component | Rendered public UI behavior with native rendering boundaries replaced | Navigation, timers, filters, settings, injected sync/notification clients, board callback wiring | `pnpm mobile:test` |
 | Interaction Lab | Browser design alignment and living UI documentation using real shared React Native components | Responsive layout, copy, hierarchy, deterministic page/state flows, Board Placeholder callbacks | `pnpm mobile:storybook` |
-| Mobile Detox | Full app, real simulator, real writable SQLite, real native rendering/modules | Critical journeys, relaunch persistence, chessboard gestures, Stockfish, screenshots | `pnpm mobile:e2e:test:ios` |
+| Mobile Detox | Full app, real simulator, real writable SQLite, real native rendering/modules | Critical journeys, relaunch persistence, chessboard gestures, Stockfish, native frame geometry, screenshots | `pnpm mobile:e2e:test:ios` |
 | Release/manual native | Optional external-account or hardware diagnosis | Real iCloud account/container, delivered notification taps, TestFlight upgrade, device-specific behavior | Platform runbook |
 
 `pnpm test:e2e` runs the CLI process tests. It does not run the mobile GUI
@@ -86,6 +86,16 @@ test-runner SHA, App-input digest, selected scope, artifact checksum, build
 result, commands, results, and clean-worktree confirmation. A failed required
 fast check, failed selected native scope, or known product failure remains a
 merge blocker.
+
+When iPad landscape geometry is specifically in scope, run
+`pnpm mobile:verify:ios:landscape-layout` locally in addition to the selected
+native suite. The command builds from an ignored copy of the production
+Info.plist that is restricted to full-screen iPad landscape, then verifies six
+deterministic Release-app states through native element frames. It does not
+read a screenshot, wait for a landscape framebuffer, or alter the production
+iPad orientation and multitasking contract. Marketing screenshot capture and
+visual inspection remain separate optional evidence and do not substitute for
+this functional gate.
 
 ### GitHub Actions boundary
 
@@ -281,7 +291,10 @@ regression suite should include the following minimum journeys:
 11. A Standard board that remains fully contained and frame-stable through
     representative correct and wrong feedback on a native portrait iPhone.
     Component behavior covers the same contract in compact wide-short and
-    regular landscape windows; release visual QA covers native iPad landscape.
+    regular landscape windows. The local screenshot-independent landscape gate
+    covers native iPad root, content, scroll-container, navigation, board-lane,
+    and control-rail geometry across the deterministic six-state product
+    journey.
 
 Do not add separate Detox tests for every timeout, abandon timing, Custom
 theme, History filter, iCloud merge result, illegal move, or review scheduling
@@ -493,7 +506,7 @@ test both compatibility contracts deliberately.
 | CLI command or protocol | `pnpm test:e2e`; no mobile Detox | None unless a mobile boundary also changed |
 | React Native copy, state, styling, accessibility, or wiring | Focused component tests, `pnpm mobile:test`, `pnpm mobile:typecheck`; no mobile Detox by default | Exact-head fast release checks |
 | JavaScript/TypeScript navigation or cross-component journey | Component coverage plus applicable integration tests; no mobile Detox | Targeted simulator/emulator suite only if the release has native risk |
-| JavaScript/TypeScript chessboard presentation, animation, or adaptive layout | Focused component/Interaction Lab coverage; optional simulator inspection, not a native gate | Risk-scoped simulator/emulator evidence |
+| JavaScript/TypeScript chessboard presentation, animation, or adaptive layout | Focused component/Interaction Lab coverage; optional simulator inspection, not a native gate | When iPad landscape geometry is selected, run `pnpm mobile:verify:ios:landscape-layout`; screenshots remain optional visual evidence |
 | Host-side E2E spec, selector, wait, assertion, or non-bundled fixture | Focused test-runner checks | Reuse the verified validation App artifact and rerun only the affected native spec/suite |
 | Native bridge/adapter, native dependency, platform project, or native persistence integration | Targeted native spec or suite | Rebuild for changed App inputs; otherwise reuse the validation App artifact and rerun only changed test evidence |
 | App startup, shared native wiring, native launch fixtures, platform build configuration, or Detox infrastructure | Full `flows` and `practice` | Full release scope while that risk is present |

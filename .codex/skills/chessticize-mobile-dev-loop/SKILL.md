@@ -157,6 +157,20 @@ pnpm mobile:e2e:build:ios
 
 Detox uses the built app bundle. It will not automatically pick up Metro-only edits unless the app is rebuilt.
 
+When iPad landscape native geometry is in scope, run the dedicated functional
+gate from the repository root:
+
+```sh
+pnpm mobile:verify:ios:landscape-layout
+```
+
+This creates an ignored validation-only Info.plist copy, restricts that Release
+simulator build to full-screen iPad landscape, and checks the real native frames
+for six deterministic product states. It does not depend on screenshot pixel
+orientation and does not change the production app's iPad rotation or
+multitasking behavior. Keep screenshot capture as separate optional visual
+evidence; it neither replaces nor blocks this geometry gate.
+
 ## Android Validation
 
 Use `docs/ANDROID_VALIDATION.md` for the reproducible commands, evidence schema,

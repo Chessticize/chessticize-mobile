@@ -65,9 +65,27 @@ iPad landscape, and iPad split-view widths. The current implementation covers:
   split-view dimensions.
 
 Before App Store submission, native simulator QA covers iPhone portrait plus
-iPad portrait and landscape. Component and Interaction Lab QA cover compact
-wide-short, live-resize, and foldable-sized windows. Active Sprint, Arrow Duel,
-Analysis Review, History, and Settings remain represented across that matrix.
+iPad portrait and landscape. The local iPad functional gate is:
+
+```sh
+pnpm mobile:verify:ios:landscape-layout
+```
+
+That command copies the production Info.plist into the ignored build directory,
+restricts only that validation build to full-screen iPad landscape, and runs the
+approved six-state product journey against the real Release app. It checks the
+native root orientation, visible-element containment, navigation/content
+separation, scroll-container intersection, and active-session
+board/control-rail separation. It does not
+inspect or require a landscape PNG. The committed production Info.plist keeps
+all iPad orientations and multitasking support, so this gate cannot change
+rotation behavior in a distributed app.
+
+Component and Interaction Lab QA cover compact wide-short, live-resize, and
+foldable-sized windows. Active Sprint, Arrow Duel, Analysis Review, History,
+and Settings remain represented across that matrix. App Store screenshot
+capture and visual inspection remain separate marketing work, not a functional
+layout gate.
 
 ## Verification
 
@@ -81,6 +99,9 @@ Release readiness for this item is covered by:
 - `apps/mobile/__tests__/PracticePocScreen.test.tsx`, which renders the main app
   shell under compact iPhone SE-sized portrait, modern iPhone portrait, compact
   wide-short, iPad portrait, iPad landscape, and split-width viewports.
+- `pnpm mobile:verify:ios:landscape-layout`, which verifies six deterministic
+  Release-app states through native element geometry without depending on the
+  Simulator framebuffer or host-window rotation.
 - Simulator build checks on the smallest available iPhone simulator, the current
   flagship simulator, and a representative iPad simulator before App Store
   submission.

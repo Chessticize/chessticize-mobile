@@ -17,6 +17,28 @@ fi
 
 export FORCE_BUNDLING=1
 
+landscape_validation="${CHESSTICIZE_IOS_LANDSCAPE_VALIDATION:-0}"
+validation_info_plist=""
+case "$landscape_validation" in
+  ""|0)
+    ;;
+  1)
+    validation_info_directory="$APP_DIR/ios/build-release/validation-info"
+    validation_info_plist="$validation_info_directory/Info-landscape.plist"
+    mkdir -p "$validation_info_directory"
+    cp "$APP_DIR/ios/ChessticizeMobile/Info.plist" "$validation_info_plist"
+    /usr/bin/plutil -replace 'UISupportedInterfaceOrientations~ipad' \
+      -json '["UIInterfaceOrientationLandscapeRight"]' \
+      "$validation_info_plist"
+    /usr/bin/plutil -replace UIRequiresFullScreen -bool YES "$validation_info_plist"
+    /usr/bin/plutil -lint "$validation_info_plist" >/dev/null
+    ;;
+  *)
+    echo "CHESSTICIZE_IOS_LANDSCAPE_VALIDATION must be 0 or 1." >&2
+    exit 64
+    ;;
+esac
+
 destination_args=()
 if [[ -n "${DETOX_IOS_DEVICE_UDID:-}" ]]; then
   [[ -n "${DETOX_IOS_DEVICE:-}" ]] || {
@@ -40,6 +62,13 @@ xcodebuild_args=(
   -derivedDataPath ios/build-release
 )
 
+if [[ -n "$validation_info_plist" ]]; then
+  xcodebuild_args+=(
+    ONLY_ACTIVE_ARCH=YES
+    INFOPLIST_FILE="$validation_info_plist"
+  )
+fi
+
 if [[ ${#destination_args[@]} -gt 0 ]]; then
   xcodebuild_args+=("${destination_args[@]}")
 fi
@@ -61,4 +90,23 @@ js_bundle="$app_bundle/main.jsbundle"
 if [[ ! -f "$js_bundle" ]]; then
   echo "Expected Release Detox build to include $js_bundle, but it was not found." >&2
   exit 70
+fi
+
+if [[ -n "$validation_info_plist" ]]; then
+  built_info_plist="$app_bundle/Info.plist"
+  built_ipad_orientations="$(
+    /usr/bin/plutil -extract 'UISupportedInterfaceOrientations~ipad' \
+      json -o - "$built_info_plist" | tr -d '[:space:]'
+  )"
+  built_requires_full_screen="$(
+    /usr/bin/plutil -extract UIRequiresFullScreen raw -o - "$built_info_plist"
+  )"
+  if [[ "$built_ipad_orientations" != '["UIInterfaceOrientationLandscapeRight"]' ]]; then
+    echo "Landscape validation build has unexpected iPad orientations: $built_ipad_orientations" >&2
+    exit 71
+  fi
+  if [[ "$built_requires_full_screen" != "true" ]]; then
+    echo "Landscape validation build must require full screen." >&2
+    exit 71
+  fi
 fi
