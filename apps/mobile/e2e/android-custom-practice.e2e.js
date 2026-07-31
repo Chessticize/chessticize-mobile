@@ -213,11 +213,6 @@ async function selectCustomHistoryRating() {
     .toBeVisible()
     .whileElement(by.id('history-rating-filters'))
     .scroll(120, 'right');
-  const attributes = await customRatingFilter.getAttributes();
-  const identifier = (Array.isArray(attributes) ? attributes[0] : attributes).identifier;
-  if (typeof identifier !== 'string' || !identifier.startsWith('history-rating-run:')) {
-    throw new Error(`Could not resolve Custom history rating filter from ${String(identifier)}`);
-  }
-  await element(by.id(identifier)).tap();
+  await customRatingFilter.tap();
   await waitFor(element(by.id('history-performance-card'))).toExist().withTimeout(10000);
 }
