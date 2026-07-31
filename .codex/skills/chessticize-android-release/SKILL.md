@@ -114,7 +114,7 @@ and source publication, source recovery, and the post-Play APK mirror.
 | Action | Required postcondition |
 | --- | --- |
 | Prepare identity | Clean exact commit containing the approved build-specific customer note, published annotated canonical tag, and monotonically increasing version code. |
-| Build candidate | One `android-production` approval produces a verified production-signed AAB, retained source manifest, and public matching source-first Release. |
+| Build candidate | One allowed exact-tag dispatch produces a verified production-signed AAB, retained source manifest, and public matching source-first Release without a manual environment approval. |
 | Recover source | The manual recovery workflow authenticates the original candidate artifact and idempotently publishes the same source manifest; no rebuild or token substitution. |
 | Validate | Exact-head fast checks plus the selected delta, targeted, or full scope pass. |
 | Promote | The same retained AAB/version code advances through the selected Play track; applicable live Console errors are resolved. |

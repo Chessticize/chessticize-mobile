@@ -294,7 +294,9 @@ keys on iOS; no user-visible version fallback is hardcoded in JavaScript.
 ## Protected inputs
 
 Create and protect the GitHub Environment `android-production` before running
-the candidate workflow. Require owner approval and limit deployment branches.
+the candidate workflow. Do not configure required reviewers; an allowed exact
+source-tag dispatch should begin immediately. Keep the custom deployment-branch
+policy so unrelated branches and tags cannot use the environment.
 Configure these environment secrets; do not use repository-wide plaintext
 variables and never commit the keystore or passwords:
 
