@@ -1042,6 +1042,21 @@ describe('Detox suite configuration', () => {
     expect(runManagementCase).toContain('.longPressAndDrag(');
   });
 
+  it('gives the Android Run drag arm timer a safe hold before the first move', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const helperStart = helpers.indexOf('async function dragAndroidElementToElement');
+    const helperEnd = helpers.indexOf('async function startSelectedPracticeRun', helperStart);
+    const helper = helpers.slice(helperStart, helperEnd);
+    const downIndex = helper.indexOf('input touchscreen motionevent DOWN');
+    const moveStreamIndex = helper.indexOf('...moveCommands', downIndex);
+    const holdMatch = helper.slice(downIndex, moveStreamIndex).match(/'sleep ([0-9.]+)'/);
+
+    expect(downIndex).toBeGreaterThan(0);
+    expect(moveStreamIndex).toBeGreaterThan(downIndex);
+    expect(holdMatch).not.toBeNull();
+    expect(Number(holdMatch?.[1])).toBeGreaterThanOrEqual(0.75);
+  });
+
   it('retries the public Custom Run save until Home confirms the transition', () => {
     const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
     const helperStart = flowsSpec.indexOf('async function createSavedCustomRun');
