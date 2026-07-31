@@ -42,69 +42,47 @@ function passingEvidenceInput(overrides = {}) {
   };
 }
 
-function workflowJob(workflow, jobName) {
-  const marker = `  ${jobName}:`;
-  const start = workflow.indexOf(marker);
-  if (start < 0) {
-    throw new Error(`Workflow job ${jobName} is missing.`);
-  }
-  const remainder = workflow.slice(start + marker.length);
-  const nextJob = remainder.search(/^ {2}[a-z][a-z0-9-]*:/m);
-  return nextJob < 0
-    ? workflow.slice(start)
-    : workflow.slice(start, start + marker.length + nextJob);
-}
-
 describe('Android validation matrix', () => {
-  it('keeps the hosted full matrix manual and covers API 24 and API 36', () => {
-    const workflow = fs.readFileSync(
-      path.resolve(__dirname, '../../../.github/workflows/mobile-android.yml'),
-      'utf8'
+  it('keeps emulator validation local and covers API 24 and API 36', () => {
+    const validation = fs.readFileSync(
+      path.resolve(__dirname, '../../../docs/ANDROID_VALIDATION.md'),
+      'utf8',
     );
     const rootPackage = require('../../../package.json');
-    const launchJob = workflow.slice(
-      workflow.indexOf('  android-launch:'),
-      workflow.indexOf('  android-adaptive-layout:')
-    );
 
-    expect(workflow).not.toContain('schedule:');
-    expect(workflow).toContain('node-version: 22.x');
-    expect(workflow).not.toContain('node-version: 26.x');
-    expect(workflow.match(/^ {2}android-build:/gm)).toHaveLength(1);
-    expect(launchJob).toContain('needs: android-build');
-    expect(launchJob).toContain('api-level: [24, 36]');
-    expect(launchJob).toContain(
-      'pnpm mobile:validate:android:matrix -- --api-level "${{ matrix.api-level }}"'
-    );
-    expect(launchJob).toContain('ANDROID_VALIDATION_COMMIT_SHA: ${{ github.sha }}');
-    expect(launchJob).toContain('ANDROID_VALIDATION_BUILD_RESULT: success');
-    expect(launchJob).toContain('ANDROID_VALIDATION_DEVICE_ABI: x86_64');
-    expect(launchJob).toContain('ANDROID_VALIDATION_DEVICE_PROFILE: pixel_2');
-    expect(launchJob).toContain('apps/mobile/artifacts/android-validation/');
+    expect(fs.existsSync(
+      path.resolve(__dirname, '../../../.github/workflows/mobile-android.yml'),
+    )).toBe(false);
+    expect(fs.existsSync(
+      path.resolve(
+        __dirname,
+        '../../../.github/workflows/mobile-android-test-only-rerun.yml',
+      ),
+    )).toBe(false);
+    expect(validation).toContain('Android emulator and Detox validation runs only');
+    expect(validation).toContain('pnpm mobile:e2e:build:android');
+    expect(validation).toContain('pnpm mobile:validate:android:matrix -- --api-level 36');
+    expect(validation).toContain('Replace `36` with `24` only');
     expect(rootPackage.scripts['mobile:validate:android:matrix']).toBe(
       'pnpm --filter ChessticizeMobile validate:android:matrix'
     );
   });
 
-  it('keeps full diagnostic jobs available only through the manual workflow', () => {
-    const workflow = fs.readFileSync(
-      path.resolve(__dirname, '../../../.github/workflows/mobile-android.yml'),
-      'utf8'
+  it('keeps conditional diagnostics available through local scripts', () => {
+    const validation = fs.readFileSync(
+      path.resolve(__dirname, '../../../docs/ANDROID_VALIDATION.md'),
+      'utf8',
     );
 
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toMatch(/^\s+schedule:/m);
-    for (const jobName of [
-      'android-adaptive-layout',
-      'android-progress-backup',
-      'android-progress-backup-policy-api24',
-      'android-progress-backup-policy-api36',
-      'android-progress-backup-policy-api30',
+    for (const command of [
+      'apps/mobile/scripts/android-adaptive-layout-evidence.sh',
+      'apps/mobile/scripts/android-progress-backup-policy-evidence.sh',
+      'ANDROID_BACKUP_API36_SOURCE_DIR',
     ]) {
-      expect(workflowJob(workflow, jobName)).not.toContain(
-        "if: github.event_name == 'workflow_dispatch'",
-      );
+      expect(validation).toContain(command);
     }
+    expect(validation).toContain('conditional boundary evidence');
+    expect(validation).toMatch(/not an\s+automatic release matrix/);
   });
 
   it('keeps API 24 bounded to launch, production storage, practice, and native-engine smoke', () => {

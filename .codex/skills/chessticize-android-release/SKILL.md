@@ -1,6 +1,6 @@
 ---
 name: chessticize-android-release
-description: Audit, prepare, advance, recover, and complete Chessticize Mobile Android releases across exact source tags, protected signed AABs, Google Play tracks, post-Play APK mirroring, and risk-scoped CI or emulator validation. Use for release status, local or CI builds, Play readiness, versionCode bumps, source-publication recovery, and launch evidence.
+description: Audit, prepare, advance, recover, and complete Chessticize Mobile Android releases across exact source tags, protected signed AABs, Google Play tracks, post-Play APK mirroring, and risk-scoped local emulator validation. Use for release status, local validation or protected signed builds, Play readiness, versionCode bumps, source-publication recovery, and launch evidence.
 ---
 
 # Chessticize Android Release
@@ -89,18 +89,25 @@ setup during a strict read-only audit.
   metadata changes. Require exact-head fast checks and the protected signed
   AAB/source job. Do not add a physical-device release gate.
 - **Targeted:** navigation, one multi-screen journey, relaunch persistence,
-  board rendering/input, adaptive layout, or one native-module boundary. Add
-  the affected CI simulator/emulator suite or deterministic native check.
+  board rendering/input, adaptive layout, or one native-module boundary. Run
+  the affected suite or deterministic native check on a local emulator.
 - **Full:** startup, shared navigation/storage wiring, schema/migration, global
   fixtures, native build configuration/dependencies, signing/release
   infrastructure, backup, Stockfish, notifications, or unbounded native risk.
-  Run both suites and the applicable automated compatibility matrix.
+  Build once locally, run both suites locally, and run only the local
+  compatibility checks whose boundary changed.
 
 Physical-device execution is optional diagnostic work for this hobby project.
 It is never a recurring release gate, never a prerequisite for the APK mirror,
 and never required solely because a version or build number changed. Do not
 repeat unchanged listing, account, screenshot, closed-test, pre-launch, size,
 backup, or compatibility gates unless this is first launch, the boundary changed, or Play reports a problem.
+
+GitHub Actions must not run Android emulators or Android Detox. Keep Android
+native validation and retained-APK test-only recovery on the local Android
+build machine. GitHub Actions remains required only where protected credentials
+or repository/Play workload identity are part of the boundary: the signed AAB
+and source publication, source recovery, and the post-Play APK mirror.
 
 ## Route the release
 
@@ -135,7 +142,7 @@ During a frozen generation:
 - retry one transient failure only on unchanged inputs;
 - fix a host-side test-runner defect on a separate evidence branch based on the
   frozen App source, authenticate the retained App artifact, and rerun only the
-  affected scope without moving the release branch;
+  affected scope locally without moving the release branch;
 - invalidate the generation before merging any required product, App-input, or
   release-identity fix, enter remediation, batch known blockers, then freeze
   the new head as the next generation; and
@@ -178,7 +185,7 @@ and evidence record.
 - Add regression coverage for repository defects and rerun only invalidated
   gates. An App build input change rebuilds and reruns the selected native
   scope; a test-runner-only change reuses the checksummed E2E App artifact and
-  reruns only the affected test evidence.
+  reruns only the affected local test evidence.
 - For a source-publication failure, use the recovery workflow with the original
   candidate artifact ID. It can recover an artifact retained before the normal
   workflow's later source step failed.

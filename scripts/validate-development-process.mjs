@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -99,6 +99,35 @@ const canonicalAndroidTag = canonicalAndroidSourceTag(
   releaseVersion.publicVersion,
   releaseVersion.androidVersionCode
 );
+const workflowDirectory = path.join(repoRoot, ".github/workflows");
+const workflowFiles = readdirSync(workflowDirectory)
+  .filter((fileName) => fileName.endsWith(".yml"))
+  .sort();
+
+assert.deepEqual(workflowFiles, [
+  "core.yml",
+  "mobile-android-github-release.yml",
+  "mobile-android-release-candidate.yml",
+  "mobile-android-source-recovery.yml",
+  "mobile-js.yml",
+  "mobile-lab.yml",
+  "pages.yml",
+  "process.yml"
+]);
+assert.equal(
+  existsSync(path.join(workflowDirectory, "mobile-android.yml")),
+  false
+);
+assert.equal(
+  existsSync(path.join(workflowDirectory, "mobile-android-test-only-rerun.yml")),
+  false
+);
+assert.match(releaseSourcePolicy, /release workflow is local-first/i);
+assert.match(releaseSourcePolicy, /does not run Android\s+emulators/i);
+assert.match(
+  testingArchitecture,
+  /Android emulator and test-only rerun workflows are intentionally absent/
+);
 
 assert.equal(count(coreWorkflow, "run: pnpm test:unit"), 1);
 assert.equal(count(coreWorkflow, "run: pnpm test:integration"), 1);
@@ -123,8 +152,14 @@ for (const policy of [agents, testingArchitecture, devLoopSkill, localE2eSkill])
   assert.match(policy, /No mobile Detox/);
   assert.match(policy, /Targeted native validation/);
   assert.match(policy, /Full native validation/);
-  assert.match(policy, /local iOS native\s+validation/i);
-  assert.match(policy, /only for (?:releases|release candidates) and native-impacting changes|only for a release candidate or a change to native/i);
+  assert.match(
+    policy,
+    /local (?:iOS )?native\s+validation|native validation on both platforms is local/i
+  );
+  assert.match(
+    policy,
+    /only for (?:releases|release candidates) and native-impacting\s+changes|only for a release candidate or a change to native/i
+  );
   assert.match(policy, /App source SHA/i);
   assert.match(policy, /test-runner SHA/i);
   assert.match(policy, /App-input digest/i);
@@ -506,7 +541,7 @@ for (const rcFreezePolicy of [
     rcFreezePolicy,
     /next\s+(?:RC\s+)?generation|new frozen\s+generation/
   );
-  assert.match(rcFreezePolicy, /exact-head fast checks/);
+  assert.match(rcFreezePolicy, /exact-head\s+fast checks/);
 }
 
 for (const releaseDoc of releaseDocs) {

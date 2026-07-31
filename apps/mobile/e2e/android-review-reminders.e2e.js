@@ -142,7 +142,13 @@ describe('Android Review reminders through public and system surfaces', () => {
       await waitFor(element(by.id('review-panel'))).toExist().withTimeout(30000);
       recordSystemEvidence('foreground-tap-route');
 
-      await openTab('settings-tab', 'settings-review-reminders');
+      // Keep the transition immediately after a system-notification tap on the
+      // same Android public-UI input path. Detox can acknowledge its first tap
+      // while focus returns from SystemUI even when React Native remains on
+      // Review.
+      await tapSystemNode(['Settings tab']);
+      await element(by.id('practice-main-scroll')).scrollTo('top');
+      await waitForVisibleInPracticeScroll('settings-review-reminders');
       await waitForVisibleInPracticeScroll('settings-review-reminder-off');
       await element(by.id('settings-review-reminder-off')).tap();
       await waitForElementTextContaining('settings-review-reminders', 'Reminders are off', 10000);

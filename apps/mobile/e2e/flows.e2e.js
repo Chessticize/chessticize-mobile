@@ -88,6 +88,7 @@ describe('Key user flows', () => {
       await expect(element(by.id('sprint-result-review-impact'))).toBeVisible();
       await expect(element(by.id('review-mistakes-button'))).toBeVisible();
 
+      await waitForVisibleInPracticeScroll('play-again-button');
       await element(by.id('play-again-button')).tap();
       await waitFor(element(by.id('session-board'))).toExist().withTimeout(15000);
 

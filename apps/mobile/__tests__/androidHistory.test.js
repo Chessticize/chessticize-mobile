@@ -3,27 +3,19 @@ const { join } = require('node:path');
 const { validationStepsForApiLevel } = require('../scripts/android-validation-matrix');
 
 const appRoot = join(__dirname, '..');
-const repoRoot = join(appRoot, '../..');
-
 function readFromApp(relativePath) {
   return readFileSync(join(appRoot, relativePath), 'utf8');
-}
-
-function readFromRepo(relativePath) {
-  return readFileSync(join(repoRoot, relativePath), 'utf8');
 }
 
 describe('Android Practice History release slice', () => {
   it('runs persisted History filters, replay, Back, and relaunch through public Android UI', () => {
     const spec = readFromApp('e2e/android-history.e2e.js');
     const suiteConfig = readFromApp('e2e/suiteConfig.js');
-    const workflow = readFromRepo('.github/workflows/mobile-android.yml');
 
     expect(suiteConfig).toContain('android-history.e2e.js');
     expect(suiteConfig).toContain("activeSuite === 'android-history'");
     expect(validationStepsForApiLevel(36))
       .toContainEqual({ kind: 'detox', suite: 'android-history' });
-    expect(workflow).toContain('pnpm mobile:validate:android:matrix');
     expect(spec).toContain('failStandardSprint()');
     expect(spec).toContain("by.id('history-result-wrong')");
     expect(spec).toContain("historyAttemptRowTestIDForResult('Wrong move')");

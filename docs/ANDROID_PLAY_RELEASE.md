@@ -413,7 +413,7 @@ manifest bytes, or incomplete source disclosure fails closed.
 5. Verify that the public Release has exactly the three expected assets and
    retain the workflow receipt described by `docs/ANDROID_GITHUB_RELEASE.md`.
 
-Fast exact-head checks, the selected CI/simulator/emulator scope, and the
+Fast exact-head checks, the selected local simulator/emulator scope, and the
 protected production-signed AAB/source job are the recurring release gates.
 Physical-device testing is optional and never blocks Play submission or the
 post-Play mirror. The mirror is a small required publication finalizer, not
@@ -422,10 +422,10 @@ generated-package size catalog, and repeated account setup are not recurring
 delta gates.
 
 When only a host-side Android spec, selector, assertion, evidence collector, or
-non-bundled fixture changes, use `Mobile Android test-only rerun` with the
-retained source run and App source SHA. The workflow proves the App-input digest
-is unchanged and reruns only the affected target without Gradle. A runtime,
-native/platform, native test-APK, dependency, build/release, or bundled
+non-bundled fixture changes, use the local retained-APK procedure in
+`docs/ANDROID_VALIDATION.md`. It proves the App-input digest and retained APK
+bytes are unchanged and reruns only the affected target without Gradle. A
+runtime, native/platform, native test-APK, dependency, build/release, or bundled
 fixture/resource change is not test-only and requires a new build plus the
 selected native scope.
 

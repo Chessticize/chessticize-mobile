@@ -49,21 +49,24 @@ function createRepository() {
 }
 
 describe('mobile App input identity', () => {
-  it('keeps the cross-run Android rerun fail-closed and scoped to one selected target', () => {
-    const workflow = fs.readFileSync(
-      path.resolve(__dirname, '../../../.github/workflows/mobile-android-test-only-rerun.yml'),
+  it('keeps local retained-APK reruns fail-closed and scoped to one target', () => {
+    const validation = fs.readFileSync(
+      path.resolve(__dirname, '../../../docs/ANDROID_VALIDATION.md'),
       'utf8',
     );
 
-    expect(workflow).toContain('actions: read');
-    expect(workflow).toContain('fetch-depth: 0');
-    expect(workflow).toContain('.path == ".github/workflows/mobile-android.yml"');
-    expect(workflow).toContain('.name == "Android build baseline" and .conclusion == "success"');
-    expect(workflow).toContain('mobile-app-inputs.js compare');
-    expect(workflow).toContain('run-id: ${{ inputs.source_run_id }}');
-    expect(workflow).toContain('ANDROID_VALIDATION_APP_SOURCE_SHA: ${{ inputs.app_source_sha }}');
-    expect(workflow).toContain('${{ steps.target.outputs.suite-args }}');
-    expect(workflow).not.toContain('mobile:e2e:build:android');
+    expect(validation).toContain('mobile-app-inputs.js record-artifact');
+    expect(validation).toContain('mobile-app-inputs.js verify-artifact');
+    expect(validation).toContain('ANDROID_VALIDATION_APP_SOURCE_SHA="$app_source_sha"');
+    expect(validation).toContain('--suite android-history');
+    expect(validation).toContain('This path never');
+    expect(validation).toContain('invokes Gradle');
+    expect(fs.existsSync(
+      path.resolve(
+        __dirname,
+        '../../../.github/workflows/mobile-android-test-only-rerun.yml',
+      ),
+    )).toBe(false);
   });
 
   it.each([
@@ -73,6 +76,8 @@ describe('mobile App input identity', () => {
     ['docs/ui-design/assets/mobile-navigation-flow.png', 'record-only'],
     ['docs/android-play-owner-evidence.example.json', 'record-only'],
     ['docs/release-helper.js', 'app-build'],
+    ['apps/mobile/docs/ANDROID_RELEASE_PLAN.md', 'record-only'],
+    ['apps/mobile/docs/release-helper.js', 'app-build'],
     ['.codex/skills/example/SKILL.md', 'record-only'],
     ['.codex/skills/example/agents/openai.yaml', 'record-only'],
     ['.codex/skills/example/scripts/validate.sh', 'app-build'],
@@ -87,7 +92,7 @@ describe('mobile App input identity', () => {
       'test-runner',
     ],
     ['apps/mobile-lab/src/Practice.stories.tsx', 'test-runner'],
-    ['.github/workflows/mobile-android-test-only-rerun.yml', 'test-runner'],
+    ['apps/mobile/scripts/android-validation-matrix.js', 'test-runner'],
     ['apps/mobile/scripts/mobile-app-inputs.js', 'app-build'],
     ['scripts/validate-development-process.mjs', 'test-runner'],
     ['apps/mobile/src/components/Practice.tsx', 'app-build'],

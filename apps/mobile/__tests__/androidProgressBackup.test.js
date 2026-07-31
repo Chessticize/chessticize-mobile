@@ -284,7 +284,6 @@ describe('Android Progress Backup', () => {
   });
 
   it('records public restore journeys and privacy boundaries without app sync', () => {
-    const workflow = readRepo('.github/workflows/mobile-android.yml');
     const suiteConfig = read('e2e/suiteConfig.js');
     const evidenceScript = read('scripts/android-progress-backup-evidence.sh');
     const restoreEvidenceScript = read('scripts/android-progress-backup-restore-evidence.sh');
@@ -340,21 +339,11 @@ describe('Android Progress Backup', () => {
     expect(restoreJourney).toContain("by.id('history-source-all')");
     expect(androidDetoxScript).toContain('CHESSTICIZE_DETOX_REUSE_INSTALLED_APP');
     expect(androidDetoxScript).toContain('detox_args+=(--reuse)');
-    expect(workflow).toContain('name: Android Progress Backup restore evidence');
     expect(restoreEvidenceScript).toContain('cloud-encrypted');
     expect(restoreEvidenceScript).toContain('device-transfer');
     expect(restoreEvidenceScript).toContain('pnpm mobile:verify:android:backup');
-    expect(workflow).toContain('commit-sha=$GITHUB_SHA');
     expect(restoreEvidenceScript).toContain('tracked-worktree-after.txt');
     expect(restoreEvidenceScript).toContain('result=pass');
-    expect(workflow).toContain(
-      'apps/mobile/scripts/android-progress-backup-restore-evidence.sh',
-    );
-    expect(workflow).toMatch(
-      /script: \|\n {12}apps\/mobile\/scripts\/android-progress-backup-restore-evidence\.sh\n {8}env:/,
-    );
-    expect(workflow).not.toContain('record_restored_install() {');
-    expect(workflow).not.toContain('assert_restored_progress() {');
     expect(() => accessSync(
       join(appRoot, 'scripts/android-progress-backup-restore-evidence.sh'),
       constants.X_OK,
@@ -1657,41 +1646,16 @@ describe('Android Progress Backup', () => {
   });
 
   it('proves the API 30 v28 allowlist through a real inherited framework restore', () => {
-    const workflow = readRepo('.github/workflows/mobile-android.yml');
+    const validation = readRepo('docs/ANDROID_VALIDATION.md');
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
     const restoreParserScript = read(
       'scripts/android-progress-backup-api30-restore-evidence.sh',
     );
     const backupContract = read('docs/ANDROID_PROGRESS_BACKUP.md');
 
-    const api24Job = workflow.slice(
-      workflow.indexOf('  android-progress-backup-policy-api24:'),
-      workflow.indexOf('  android-progress-backup-policy-api36:'),
-    );
-    const api36Job = workflow.slice(
-      workflow.indexOf('  android-progress-backup-policy-api36:'),
-      workflow.indexOf('  android-progress-backup-policy-api30:'),
-    );
-    const api30Job = workflow.slice(
-      workflow.indexOf('  android-progress-backup-policy-api30:'),
-    );
-    expect(api24Job).toContain('api-level: 24');
-    expect(api36Job).toContain('api-level: 36');
-    expect(api36Job).toContain('name: android-progress-backup-policy-api-36');
-    expect(api36Job).toContain(
-      'path: apps/mobile/artifacts/android-progress-backup-policy/api-36',
-    );
-    expect(api30Job).toMatch(
-      /needs:\s+- android-build\s+- android-progress-backup-policy-api36/,
-    );
-    expect(api30Job).toContain('name: android-progress-backup-policy-api-36');
-    expect(api30Job).toContain(
-      'path: apps/mobile/artifacts/android-progress-backup-policy-source/api-36',
-    );
-    expect(api30Job).toContain('api-level: 30');
-    expect(api30Job).toContain(
-      'ANDROID_BACKUP_API36_SOURCE_DIR: apps/mobile/artifacts/android-progress-backup-policy-source/api-36',
-    );
+    expect(validation).toContain('API 24, 30, or 36');
+    expect(validation).toContain('run API 36 first');
+    expect(validation).toContain('ANDROID_BACKUP_API36_SOURCE_DIR');
     expect(policyEvidenceScript).toMatch(
       /elif \(\( SDK_LEVEL == 30 \)\); then\s+run_case no-capability[\s\S]*?android-progress-backup-api30-restore-evidence\.sh/,
     );
@@ -1914,7 +1878,7 @@ describe('Android Progress Backup', () => {
   });
 
   it('runs the real APK through API 24, API 30, and API 36 backup policy selection', () => {
-    const workflow = readRepo('.github/workflows/mobile-android.yml');
+    const validation = readRepo('docs/ANDROID_VALIDATION.md');
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
     const manifest = read('android/app/src/main/AndroidManifest.xml');
     const backupAgent = read(
@@ -1928,19 +1892,14 @@ describe('Android Progress Backup', () => {
     );
     const backupContract = read('docs/ANDROID_PROGRESS_BACKUP.md');
 
-    expect(workflow).toContain('android-progress-backup-policy-api24:');
-    expect(workflow).toContain('android-progress-backup-policy-api36:');
-    expect(workflow).toContain('android-progress-backup-policy-api30:');
-    expect(workflow).toContain('./gradlew :app:testDebugUnitTest');
-    expect(workflow).toContain(
+    expect(validation).toContain('API 24, 30, or 36');
+    expect(validation).toContain('./gradlew :app:testDebugUnitTest');
+    expect(validation).toContain(
       '--tests com.chessticize.mobile.backup.ProgressBackupPolicyTest',
     );
-    expect(workflow).toContain(
-      'script: apps/mobile/scripts/android-progress-backup-policy-evidence.sh',
+    expect(validation).toContain(
+      'apps/mobile/scripts/android-progress-backup-policy-evidence.sh',
     );
-    expect(workflow).toContain('name: android-progress-backup-policy-api-24');
-    expect(workflow).toContain('name: android-progress-backup-policy-api-36');
-    expect(workflow).toContain('name: android-progress-backup-policy-api-30');
     expect(policyEvidenceScript).toContain('set -euo pipefail');
     expect(policyEvidenceScript).toContain('case "$SDK_LEVEL"');
     expect(policyEvidenceScript).toMatch(

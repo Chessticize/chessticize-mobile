@@ -269,7 +269,7 @@ valid while this signing-account gate is still incomplete.
 6. Before submission, recheck Apple’s live character limit, compare the saved
     text byte-for-byte with the approved file, and retain a screenshot or
     exported metadata record with the release evidence.
-7. Submit the processed build after the selected CI/simulator scope and store
+7. Submit the processed build after the selected local simulator scope and store
    metadata checks pass; do not wait for physical-device QA.
 8. After release, compare the live App Store notes with the approved file and
     record the result. A mismatch blocks completion until corrected and

@@ -214,11 +214,11 @@ The following are repository observations, not measured timing results.
 
 ### Android
 
-- A manual [Mobile Android workflow](../.github/workflows/mobile-android.yml)
-  builds the E2E APKs once and fans them out to two API-level launch jobs plus
-  adaptive-layout and backup/restore jobs. This is already the correct
-  build-once/fan-out pattern. A full manual dispatch creates eight jobs in the
-  current DAG, several of which boot separate emulators.
+- At the time of this measurement, the now-removed manual Mobile Android
+  workflow built the E2E APKs once and fanned them out to two API-level launch
+  jobs plus adaptive-layout and backup/restore jobs. That historical dispatch
+  created eight jobs, several of which booted separate emulators. Native
+  Android validation now runs locally.
 - The build job performs hosted-runner disk cleanup, installs emulator runtime
   libraries and pinned Android packages, installs JavaScript dependencies,
   downloads the Core Pack, runs multiple separate Gradle invocations, builds

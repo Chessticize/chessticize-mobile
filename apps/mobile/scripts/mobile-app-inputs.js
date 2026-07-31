@@ -19,7 +19,6 @@ const TEST_RUNNER_PREFIXES = [
 ];
 
 const TEST_RUNNER_PATHS = new Set([
-  '.github/workflows/mobile-android-test-only-rerun.yml',
   'apps/mobile/scripts/android-adaptive-layout-evidence.sh',
   'apps/mobile/scripts/android-progress-backup-api30-restore-evidence.sh',
   'apps/mobile/scripts/android-progress-backup-evidence.sh',
@@ -55,6 +54,8 @@ function classifyMobileInputPath(relativePath) {
       && (relativePath.endsWith('.md')
         || relativePath.endsWith('.png')
         || relativePath.endsWith('.example.json')))
+    || (relativePath.startsWith('apps/mobile/docs/')
+      && relativePath.endsWith('.md'))
     || (relativePath.startsWith('.codex/')
       && (relativePath.endsWith('/SKILL.md')
         || /\/agents\/[^/]+\.yaml$/.test(relativePath)

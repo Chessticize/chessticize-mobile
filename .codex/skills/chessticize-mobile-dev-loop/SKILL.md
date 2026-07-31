@@ -182,7 +182,8 @@ Choose the smallest proving Android layer:
   configuration, Detox infrastructure, or release risk that cannot be bounded.
   Build once, then run complete shared `flows` and `practice`.
 
-For an already built app on an attached emulator, the CI-equivalent runner is:
+For an already built app on an attached emulator, the release-equivalent local
+runner is:
 
 ```sh
 ANDROID_VALIDATION_COMMIT_SHA=<exact-40-character-sha> \
@@ -201,13 +202,12 @@ device matrix, suite results, and clean tracked worktree confirmation. It may
 be reused on a later head when
 `node apps/mobile/scripts/mobile-app-inputs.js compare` proves that App build
 inputs are unchanged. When only a host-side spec, selector, assertion,
-evidence collector, or non-bundled fixture changes, reuse the App artifact and
-rerun only the affected suite. Use `Mobile Android test-only rerun` after that
-workflow exists on the default branch; while it first lives only on an active
-release branch, use the retained-APK local command in
-`docs/ANDROID_VALIDATION.md`.
-Physical ARM64 execution is optional diagnostic evidence at #200/#188 and is
-not a release or feature-PR blocker.
+evidence collector, or non-bundled fixture changes, reuse the locally retained
+App artifact and rerun only the affected suite with the retained-APK commands
+in `docs/ANDROID_VALIDATION.md`.
+Android emulator and Detox execution is local-only. Do not dispatch or recreate
+a GitHub-hosted Android emulator workflow. Physical ARM64 execution is optional
+diagnostic evidence at #200/#188 and is not a release or feature-PR blocker.
 
 ## PR, Local Native, And Release Gates
 
@@ -241,11 +241,12 @@ App artifact and rerun that scope. Documentation, review metadata, and
 merge-parent changes invalidate neither. All relevant fast CI checks must still
 pass on the current head.
 
-GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
-validation is required only for releases and native-impacting changes. Release
-candidates use the same risk scopes: a delta needs exact-head fast checks plus
-the platform's signed-artifact checks, targeted native risk needs the affected
-simulator/emulator suite, and only broad native risk requires both suites.
+GitHub Actions does not run Android emulators, Android Detox, Xcode builds, or
+iOS Detox. Local native validation is required only for releases and native-impacting
+changes. Release candidates use the same risk scopes: a delta needs exact-head
+fast checks plus the platform's signed-artifact checks, targeted native risk
+needs the affected local simulator/emulator suite, and only broad native risk
+requires both suites locally.
 Physical-device testing is optional and does not block App Store or Play
 submission, or the post-Play APK mirror. After a later commit or squash merge,
 reuse passing native App evidence when the fail-closed App-input comparison
@@ -338,6 +339,9 @@ Before finalizing:
   for the current App build inputs or a fail-closed reuse comparison;
   test-runner-only changes rerun only their affected evidence.
 - Keep iOS native validation local; GitHub CI runs only the fast non-native jobs.
+- Keep Android emulator and Detox validation local; GitHub Actions is reserved
+  for protected Android signing/source publication, source recovery, and the
+  post-Play APK mirror.
 - Before release, require the selected local native scope or an identical-tree
   PR-head result recorded against the release candidate.
 - Mention any intentionally skipped layer, with the reason.

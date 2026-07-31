@@ -90,7 +90,6 @@ describe('Android Standard Practice release slice', () => {
     const androidNetwork = read('e2e/androidNetwork.js');
     const offlineSetup = read('scripts/prepare-android-offline-e2e.sh');
     const migrationJourney = read('e2e/android-migration.e2e.js');
-    const workflow = read('../../.github/workflows/mobile-android.yml');
     const standardFixture = require('../../../fixtures/puzzles/android-standard-practice.fixture.json');
     const storageContract = readRepo('packages/storage/test/puzzle-pack-source.test.ts');
     const componentContract = read('__tests__/PracticePocScreen.test.tsx');
@@ -198,13 +197,6 @@ describe('Android Standard Practice release slice', () => {
     expect(api36Steps.filter((step) => step.suite === 'android-offline-practice')).toHaveLength(1);
     expect(api36Steps.indexOf(api36Steps[0]))
       .toBeLessThan(api36Steps.findIndex((step) => step.suite === 'android-offline-practice'));
-    const launchJob = workflow.slice(
-      workflow.indexOf('  android-launch:'),
-      workflow.indexOf('  android-progress-backup:'),
-    );
-    expect(launchJob).toContain('ram-size: 4096M');
-    expect(launchJob).toContain('pnpm mobile:validate:android:matrix');
-    expect(workflow).not.toContain('if (( android_sdk_level');
     expect(offlineSetup).toContain('set -eu');
     expect(offlineSetup).toContain('shell getprop ro.build.version.sdk');
     expect(offlineSetup).toContain('-s "$device" root');

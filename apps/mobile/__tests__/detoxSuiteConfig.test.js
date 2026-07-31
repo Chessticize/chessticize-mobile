@@ -1497,6 +1497,7 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).toContain('releaseVersion.iosPublicVersion');
     expect(flowsSpec).toContain('releaseVersion.androidVersionCode');
     expect(flowsSpec).toContain('releaseVersion.iosBuildNumber');
+    expect(flowsSpec).toContain("waitForVisibleInPracticeScroll('play-again-button')");
     expect(helpers).toContain("by.id('history-filter-toggle')");
     expect(helpers).toContain("by.id('history-rating-filters')");
     expect(flowsSpec).toContain("by.id('history-result-wrong')");
@@ -1527,6 +1528,9 @@ describe('Detox suite configuration', () => {
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
 
     expect(practiceSpec).toContain("openTab('settings-tab', 'settings-show-sprint-guide')");
+    expect(practiceSpec).toContain(
+      "tapUntilExists('practice-add-run', 'practice-run-editor', 3)"
+    );
     expect(practiceSpec).toContain("waitForVisibleInPracticeScroll('history-attention-flag-in-review')");
     expect(practiceSpec).toContain("element(by.id('history-filter-toggle')).tap()");
     expect(practiceSpec).toContain("waitFor(element(by.id('history-advanced-filters'))).not.toExist()");
@@ -1670,10 +1674,6 @@ describe('Detox suite configuration', () => {
       path.resolve(__dirname, '../scripts/android-adaptive-layout-evidence.sh'),
       'utf8'
     );
-    const workflow = fs.readFileSync(
-      path.resolve(__dirname, '../../../.github/workflows/mobile-android.yml'),
-      'utf8'
-    );
 
     const requestLandscape = spec.indexOf("setAdaptiveOrientation('landscape')");
     const waitForSettledLandscape = spec.indexOf(
@@ -1808,11 +1808,8 @@ describe('Detox suite configuration', () => {
     expect(evidence).toContain('original_user_rotation_state');
     expect(evidence).toContain('restore_display_rotation');
     expect(evidence).toContain('git diff --quiet');
-    expect(workflow).toContain('Android adaptive public UI');
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).not.toContain('schedule:');
-    expect(workflow).toContain('apps/mobile/scripts/android-adaptive-layout-evidence.sh');
-    expect(workflow).toContain('android-adaptive-layout-evidence');
+    expect(evidence).toContain('CHESSTICIZE_ANDROID_ADAPTIVE_EVIDENCE_DIR');
+    expect(evidence).toContain('artifacts/android-adaptive-layout');
   });
 
   it('polls physical Android rotation to convergence and fails closed with bounded diagnostics', async () => {
@@ -2118,6 +2115,7 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('waitForReviewAlarmRebased(alarmBeforeTimezone');
     expect(spec).toContain('assertActiveReviewNotificationCount(1)');
     expect(spec).toContain('assertActiveReviewNotificationCount(0)');
+    expect(spec).toContain("await tapSystemNode(['Settings tab']);");
     expect(spec).not.toContain("ReviewReminderLifecycleReceiver");
     expect(spec).not.toContain("'-n'");
     expect(spec).not.toContain("NativeModules");
