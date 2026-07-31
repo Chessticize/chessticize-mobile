@@ -30,19 +30,32 @@ owner-operated external gate. Until that evidence exists, leave every feature
 unselected. No binary is required to preserve accurate undeclared metadata or
 to add the accessibility URL.
 
+## Remediation policy
+
+As of 2026-07-31, the focused gap issues #426 through #432 are closed as not
+planned. This is a demand-driven deferral, not evidence that any gap was fixed.
+The known limitations remain in production, and the corresponding App Store
+features must remain undeclared.
+
+Broad remediation will be reconsidered when direct accessibility reports or
+documented user needs justify the implementation and its ongoing regression
+coverage across iPhone and iPad. Chessticize does not collect usage analytics,
+so a report that identifies the affected puzzle flow, device, and assistive
+setting is the primary signal for reopening this work.
+
 ## Declaration matrix
 
 | Apple feature | iPhone | iPad | Evidence and next action |
 | --- | --- | --- | --- |
-| VoiceOver | Do not declare | Do not declare | Standard, Arrow Duel, Review, and Replay expose the board as one image. There is no accessible piece, legal-destination, or candidate-move input. Track #426. |
-| Voice Control | Do not declare | Do not declare | A user cannot name or number a board move and complete the primary puzzle task. Track #426. |
-| Larger Text | Do not declare | Do not declare | At the largest accessibility size, Start/Edit/Add Run controls, navigation labels, History controls, and Settings content clip or overlap. The same failure occurs in landscape iPad. Track #427. |
-| Sufficient Contrast | Do not declare | Do not declare | White 11pt countdown text on `#F59E0B` is 2.15:1; green 11pt progress text on white is 3.30:1. Both are below 4.5:1 for ordinary text. Track #428. |
-| Differentiate Without Color Alone | Do not declare yet | Do not declare yet | Sampled states pair color with labels, symbols, counts, borders, or placement, but the complete grayscale common-task pass is not recorded. Track #432. |
-| Reduced Motion | Do not declare | Do not declare | Piece movement, layout transitions, and drag springs do not observe the system Reduce Motion setting. Track #430. |
+| VoiceOver | Do not declare | Do not declare | Standard, Arrow Duel, Review, and Replay expose the board as one image. There is no accessible piece, legal-destination, or candidate-move input. Deferred in #426. |
+| Voice Control | Do not declare | Do not declare | A user cannot name or number a board move and complete the primary puzzle task. Deferred in #426. |
+| Larger Text | Do not declare | Do not declare | At the largest accessibility size, Start/Edit/Add Run controls, navigation labels, History controls, and Settings content clip or overlap. The same failure occurs in landscape iPad. Deferred in #427. |
+| Sufficient Contrast | Do not declare | Do not declare | White 11pt countdown text on `#F59E0B` is 2.15:1; green 11pt progress text on white is 3.30:1. Both are below 4.5:1 for ordinary text. Deferred in #428. |
+| Differentiate Without Color Alone | Do not declare yet | Do not declare yet | Sampled states pair color with labels, symbols, counts, borders, or placement, but the complete grayscale common-task pass is not recorded. Deferred in #432. |
+| Reduced Motion | Do not declare | Do not declare | Piece movement, layout transitions, and drag springs do not observe the system Reduce Motion setting. Deferred in #430. |
 | Captions | Do not declare | Do not declare | Chessticize has no timed video or spoken-media experience. Move sounds do not make this declaration applicable. |
 | Audio Descriptions | Do not declare | Do not declare | Chessticize has no video experience requiring a descriptive audio track. |
-| Dark Interface | Do not declare | Do not declare | Enabling system Dark Mode leaves all common puzzle surfaces in the light palette. Track #431. |
+| Dark Interface | Do not declare | Do not declare | Enabling system Dark Mode leaves all common puzzle surfaces in the light palette. Deferred in #431. |
 
 ## Critical-flow results
 
@@ -77,7 +90,7 @@ to add the accessibility URL.
   values, and selected state.
 - The shared preference button is only 34pt high and has no hit slop. Controls
   such as iCloud On/Off and reminder Smart/time/Off therefore miss the 44pt
-  target. Track #429.
+  target. Deferred in #429.
 - At the largest text size, visible content and bottom navigation overlap or
   truncate.
 
@@ -111,10 +124,10 @@ history. They are not store assets.
   controls.
 - Orientation review covers iPhone portrait plus iPad portrait and landscape.
 
-The pending grayscale, Differentiate Without Color, Increase Contrast, Reduce
+The grayscale, Differentiate Without Color, Increase Contrast, Reduce
 Transparency, Bold Text, VoiceOver gesture, and Voice Control voice-command
-passes are tracked by the focused issues above. They are not represented as
-completed evidence.
+passes remain incomplete. Their focused issues are retained as closed records
+under the demand-driven deferral policy; they are not completed evidence.
 
 ## Release boundary
 

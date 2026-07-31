@@ -23,7 +23,7 @@ describe("App Store accessibility declarations", () => {
     expect(Object.values(contract.features).every(({ status }) => status === "not-declared")).toBe(true);
   });
 
-  it("records a focused follow-up for every material product gap", () => {
+  it("records every deferred gap and its demand-driven reopen policy", () => {
     expect(contract.features.voiceOver.followUpIssues).toEqual([426]);
     expect(contract.features.voiceControl.followUpIssues).toEqual([426]);
     expect(contract.features.largerText.followUpIssues).toEqual([427]);
@@ -32,6 +32,12 @@ describe("App Store accessibility declarations", () => {
     expect(contract.features.reducedMotion.followUpIssues).toEqual([430]);
     expect(contract.features.darkInterface.followUpIssues).toEqual([431]);
     expect(contract.features.differentiateWithoutColorAlone.followUpIssues).toEqual([432]);
+    expect(contract.remediationPolicy).toEqual(expect.objectContaining({
+      status: "demand-driven-deferral",
+      decidedOn: "2026-07-31",
+      closedIssues: [426, 427, 428, 429, 430, 431, 432]
+    }));
+    expect(contract.remediationPolicy.reopenSignal).toContain("puzzle flow, device, and assistive setting");
   });
 
   it("documents the board, text, contrast, touch, motion, and appearance evidence", () => {
@@ -52,6 +58,10 @@ describe("App Store accessibility declarations", () => {
     expect(storeAssets).toContain(contract.accessibilityUrl);
     expect(accessibilityPage).toContain("common chess puzzle task");
     expect(accessibilityPage).toContain("not declared in the App Store");
+    expect(accessibilityPage).toContain("not currently scheduled");
+    expect(accessibilityPage).toContain("closed as not planned for now");
+    expect(accessibilityPage).toContain("underlying gaps are not fixed");
+    expect(accessibilityPage).toContain("does not collect usage analytics");
     expect(accessibilityPage).not.toContain("fully accessible");
     expect(accessibilityPage).not.toContain("supports VoiceOver");
   });
