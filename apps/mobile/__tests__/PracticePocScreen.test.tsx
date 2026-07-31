@@ -8395,6 +8395,55 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-schedule-control")).toBeTruthy();
   });
 
+  it("restores Arrow Duel replay after reset following a correct choice", async () => {
+    const renderer = renderStoredArrowDuelReplay();
+    await settleEntryPreview();
+    const initialFen = findByTestId(renderer, "mock-chessboard").props.fen;
+
+    await boardMove(renderer, "b2b1");
+    expect(collectText(findByTestId(renderer, "practice-prompt"))).toBe("Solved");
+    await settleFeedbackSnapshot();
+    expect(findByTestId(renderer, "review-reset-puzzle").props.disabled).toBe(false);
+    const resetBoard = findByTestId(renderer, "mock-chessboard").props.mockResetBoard as jest.Mock;
+    resetBoard.mockClear();
+
+    press(renderer, "review-reset-puzzle");
+    expect(resetBoard).toHaveBeenCalledWith(initialFen);
+    await settleEntryPreview();
+
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(initialFen);
+    expect(findByTestId(renderer, "review-arrow-duel-candidate-overlay-order-f2g3-b2b1")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Choose the best move");
+  });
+
+  it("keeps Replay reset beside Analysis instead of in the header", () => {
+    const renderer = renderStoredArrowDuelReplay();
+    const replayActions = findByTestId(renderer, "review-analysis-toolbar");
+    const headerActions = findByTestId(renderer, "review-header-actions");
+
+    expect(replayActions.findByProps({ testID: "review-analysis-button" })).toBeTruthy();
+    expect(replayActions.findByProps({ testID: "review-reset-puzzle" })).toBeTruthy();
+    expect(headerActions.findAllByProps({ testID: "review-reset-puzzle" })).toHaveLength(0);
+    expect(testIdOrder(renderer, "review-analysis-button", "review-reset-puzzle")).toBeLessThan(0);
+  });
+
+  it("uses the top-left Replay exit to close Analysis before leaving Replay", () => {
+    const renderer = renderStoredArrowDuelReplay();
+    const progress = collectText(findByTestId(renderer, "review-progress"));
+
+    press(renderer, "review-analysis-button");
+    expect(findByTestId(renderer, "review-close-analysis")).toBeTruthy();
+    expect(findByTestId(renderer, "review-exit").props.accessibilityLabel).toBe("Close analysis");
+
+    press(renderer, "review-exit");
+
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-progress"))).toBe(progress);
+    expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
+    expect(findByTestId(renderer, "review-analysis-button")).toBeTruthy();
+    expect(findByTestId(renderer, "review-exit").props.accessibilityLabel).toBe("Exit replay");
+  });
+
   it("shows a review button after a failed sprint with mistakes", async () => {
     const renderer = renderStandardSequenceScreen();
 
@@ -8620,7 +8669,7 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "review-previous").props.disabled).toBe(true);
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
-    expect(findByTestId(renderer, "review-header-actions").findByProps({ testID: "review-reset-puzzle" })).toBeTruthy();
+    expect(findByTestId(renderer, "review-analysis-toolbar").findByProps({ testID: "review-reset-puzzle" })).toBeTruthy();
     press(renderer, "review-next");
     await settleEntryPreview();
     expectText(renderer, "2 / 3 · Standard");
@@ -9566,12 +9615,14 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-analysis-forward");
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(analysisFen);
 
+    press(renderer, "review-exit");
+    expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
+    expect(findByTestId(renderer, "review-session")).toBeTruthy();
     press(renderer, "review-reset-puzzle");
     expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(reviewFen);
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
     await settleEntryPreview();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);
-    expect(() => findByTestId(renderer, "review-close-analysis")).toThrow();
     expect(() => findByTestId(renderer, "review-analysis-line-0")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(reviewFen);
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
@@ -11802,6 +11853,36 @@ function renderStandardSequenceScreen(
     ...props,
     practiceService: createMobilePracticeService("random1000")
   });
+}
+
+function renderStoredArrowDuelReplay(): TestRenderer.ReactTestRenderer {
+  const service = createMobilePracticeService("random1000");
+  const completedAt = new Date().toISOString();
+  service.recordReviewAttempt({
+    puzzleId: "00008",
+    mode: "arrow_duel",
+    ratingKey: "arrow duel 5/30",
+    result: "wrong",
+    submittedMove: "f2g3",
+    expectedMove: "b2b1",
+    startedAt: new Date(Date.now() - 5_000).toISOString(),
+    arrowDuelCandidateOrder: ["f2g3", "b2b1"]
+  }, completedAt);
+  const renderer = renderScreen({ practiceService: service });
+
+  press(renderer, "history-tab");
+  press(renderer, "history-filter-toggle");
+  press(renderer, "history-source-review");
+  press(renderer, "history-rating-arrow duel 5/30");
+  const historyAttemptRow = renderer.root.findAll(
+    (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
+  )[0];
+  if (!historyAttemptRow) {
+    throw new Error("Expected a stored Arrow Duel attempt");
+  }
+  press(renderer, historyAttemptRow.props.testID);
+
+  return renderer;
 }
 
 function startSprintWithPuzzleTiming(
