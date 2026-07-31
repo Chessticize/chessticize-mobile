@@ -54,6 +54,8 @@ function classifyMobileInputPath(relativePath) {
       && (relativePath.endsWith('.md')
         || relativePath.endsWith('.png')
         || relativePath.endsWith('.example.json')))
+    || (relativePath.startsWith('apps/mobile/docs/')
+      && relativePath.endsWith('.md'))
     || (relativePath.startsWith('.codex/')
       && (relativePath.endsWith('/SKILL.md')
         || /\/agents\/[^/]+\.yaml$/.test(relativePath)

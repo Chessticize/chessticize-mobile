@@ -76,6 +76,8 @@ describe('mobile App input identity', () => {
     ['docs/ui-design/assets/mobile-navigation-flow.png', 'record-only'],
     ['docs/android-play-owner-evidence.example.json', 'record-only'],
     ['docs/release-helper.js', 'app-build'],
+    ['apps/mobile/docs/ANDROID_RELEASE_PLAN.md', 'record-only'],
+    ['apps/mobile/docs/release-helper.js', 'app-build'],
     ['.codex/skills/example/SKILL.md', 'record-only'],
     ['.codex/skills/example/agents/openai.yaml', 'record-only'],
     ['.codex/skills/example/scripts/validate.sh', 'app-build'],
