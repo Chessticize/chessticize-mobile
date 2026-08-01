@@ -1091,7 +1091,7 @@ describe("PracticePocScreen", () => {
   it("keeps How Sprint works available on the ordinary Practice Home story", () => {
     const renderer = renderLabScenario("practice-home");
 
-    expect(() => findByTestId(renderer, "training-focus-section")).toThrow();
+    expect(findByTestId(renderer, "training-focus-section")).toBeTruthy();
     expect(() => findByTestId(renderer, "practice-sprint-rules-guide")).toThrow();
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-open"))).toContain(
       "How Sprint works"
