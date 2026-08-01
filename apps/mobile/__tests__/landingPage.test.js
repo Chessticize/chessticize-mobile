@@ -67,7 +67,7 @@ describe("public landing page", () => {
       "<strong>Blunder prevention</strong> with Arrow Duel"
     );
     expect(homepage).toContain(
-      "<strong>Offline and ad-free</strong> by design"
+      "<strong>Offline</strong><br>No ads"
     );
     expect(homepage).toContain("<h3>Works fully offline</h3>");
     expect(homepage).not.toContain("<strong>Two-move</strong> Arrow Duel");
@@ -116,7 +116,9 @@ describe("public landing page", () => {
     expect(accessibilityPage).toContain("common chess puzzle task");
     expect(accessibilityPageText).toContain("Broad remediation is not currently scheduled");
     expect(accessibilityPageText).toContain("complete grayscale common-task walkthrough is still pending");
-    expect(accessibilityPage).toContain("does not collect usage analytics");
+    expect(accessibilityPage).toContain("<h2>Current limitations and checks</h2>");
+    expect(accessibilityPage).not.toContain("How we prioritize accessibility work");
+    expect(accessibilityPage).not.toContain("does not collect usage analytics");
 
     expect(readme).toContain(appStoreUrl);
     expect(readme).toContain(websiteUrl);

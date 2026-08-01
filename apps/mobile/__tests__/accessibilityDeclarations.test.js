@@ -65,8 +65,10 @@ describe("App Store accessibility declarations", () => {
     expect(accessibilityPage).toContain("does not change the current app");
     expect(accessibilityPageText).toContain("No color-only blocker has been confirmed");
     expect(accessibilityPageText).toContain("complete grayscale common-task walkthrough is still pending");
-    expect(accessibilityPage).toContain("does not collect usage analytics");
+    expect(accessibilityPage).toContain("<h2>Current limitations and checks</h2>");
     expect(accessibilityPage.match(/simple-page-section/g)).toHaveLength(2);
+    expect(accessibilityPage).not.toContain("How we prioritize accessibility work");
+    expect(accessibilityPage).not.toContain("does not collect usage analytics");
     expect(accessibilityPage).not.toContain("We will");
     expect(accessibilityPage).not.toContain("demonstrated user demand");
     expect(accessibilityPage).not.toContain("fully accessible");
