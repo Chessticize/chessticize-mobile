@@ -3,7 +3,7 @@
   "metadataId": "app-store-en-us-v1",
   "issue": 413,
   "locale": "en-US",
-  "verifiedOn": "2026-07-29",
+  "verifiedOn": "2026-07-31",
   "officialReferences": [
     "https://developer.apple.com/help/app-store-connect/reference/app-information/app-information",
     "https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information",
@@ -48,8 +48,8 @@
     ]
   },
   "currentVersionWhatsNew": {
-    "sourceTag": "ios-v1.3.3-build-1",
+    "sourceTag": "ios-v1.3.4-build-1",
     "status": "release-candidate",
-    "storeCopy": "• Fixed Replay so completed puzzles reset correctly and Analysis closes predictably.\n• Made Tactical Progress filters clearer for Puzzle solving and Arrow Duel.\n• Kept solved prompts stable and readable across Sprint, Review, and Replay."
+    "storeCopy": "• Improved iPad app window sizing when running on Apple silicon Mac.\n• Kept Practice navigation readable in wide, compact windows."
   }
 }

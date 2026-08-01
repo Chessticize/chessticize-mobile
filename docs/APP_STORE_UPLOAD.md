@@ -1,6 +1,6 @@
 # App Store Upload Runbook
 
-This runbook covers the owner-executed upload step for the 1.3.3 App Store
+This runbook covers the owner-executed upload step for the 1.3.4 App Store
 release path. Recheck Apple's live documentation before executing it:
 
 - Upload builds:
@@ -11,7 +11,7 @@ release path. Recheck Apple's live documentation before executing it:
   https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases
 
 Apple currently supports uploading builds with Xcode, Swift Playground,
-`altool`, or Transporter. This repository standardizes the 1.3.3 path on
+`altool`, or Transporter. This repository standardizes the 1.3.4 path on
 `xcodebuild archive` plus `xcodebuild -exportArchive` using the checked-in
 `apps/mobile/ios/ExportOptions.app-store-connect.plist`.
 
@@ -45,7 +45,7 @@ capturing release evidence when either command above reports an older
 toolchain. Recheck Apple's live requirement immediately before the final
 archive because accepted toolchains can change.
 
-For the 1.3.3 release, perform native build, capture, signing, and upload work
+For the 1.3.4 release, perform native build, capture, signing, and upload work
 on a clean release Mac whose exact Xcode build is supported by App Store
 Connect. Repository preparation on another checkout is not native evidence.
 Record the release Mac's exact `xcodebuild -version` output and confirm that
@@ -106,9 +106,9 @@ and absence of raw URLs. Verify the file's separate release-details link opens
 the exact iOS GitHub Release. The approved file must be present in the clean
 commit that is tagged and archived.
 
-For 1.3.3, `config/app-store-metadata-en-us-v1.json` records the release
+For 1.3.4, `config/app-store-metadata-en-us-v1.json` records the release
 candidate's exact `currentVersionWhatsNew` copy. It must match
-`docs/releases/ios-v1.3.3-build-1.md` before owner approval and tagging. Retain
+`docs/releases/ios-v1.3.4-build-1.md` before owner approval and tagging. Retain
 the submitted metadata evidence required by `docs/STORE_ASSETS.md`.
 
 Before archiving, record whether this is a delta, targeted, or full native
@@ -117,23 +117,24 @@ fast checks above and the signed archive checks. A delta does not require a fres
 full Detox run or a physical TestFlight smoke. Record the affected simulator
 suite for targeted risk, or both `flows` and `practice` for broad native risk.
 
-The 1.3.3 candidate is explicitly **Full native validation**. Its accumulated
-delta spans multiple user journeys and includes shared Detox infrastructure
-changes. The bundled Core Pack remains unchanged from 1.3.2. On the accepted
-release-branch commit, build once and run the complete `flows` and `practice`
-suites through the maintained exact-head runner:
+The 1.3.4 candidate is explicitly **Targeted native validation**. Its bounded
+delta changes iPad-on-Mac window sizing and compact landscape layout behavior.
+The bundled Core Pack remains unchanged from 1.3.3. On the accepted
+release-branch commit, build once and run the affected `practice` suite through
+the maintained exact-head runner, then run the dedicated landscape-layout
+gate:
 
 ```sh
-CHESSTICIZE_E2E_SCOPE=full \
+CHESSTICIZE_E2E_SCOPE=practice \
   DETOX_IOS_DEVICE="iPhone 17-Detox" \
   .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
+pnpm mobile:verify:ios:landscape-layout
 ```
 
 Use a different dedicated compatible simulator name when necessary, and retain
 the runner's commit, App-input digest, app-bundle checksum, Xcode version, build
-result, both suite results, and clean-worktree evidence. Do not downgrade this
-release to delta or targeted scope merely because the repository-preparation PR
-contains mostly metadata.
+result, targeted-suite result, landscape-layout result, and clean-worktree
+evidence.
 
 When the evidence command is applicable, it must report `dirty: false`,
 `status: "pass"`, and `releaseReady: true`. A build-number-only delta with
@@ -142,11 +143,11 @@ unchanged store metadata and screenshots does not regenerate that bundle.
 ## Public Source Tag
 
 Create and publish the source tag before or at the same time as the App Store
-Connect upload. The proposed iOS 1.3.3 build-1 tag is:
+Connect upload. The proposed iOS 1.3.4 build-1 tag is:
 
 ```sh
-git tag -a ios-v1.3.3-build-1 -m "iOS 1.3.3 build 1"
-git push origin ios-v1.3.3-build-1
+git tag -a ios-v1.3.4-build-1 -m "iOS 1.3.4 build 1"
+git push origin ios-v1.3.4-build-1
 ```
 
 Then publish a GitHub release for that tag and attach or copy the
@@ -255,7 +256,7 @@ valid while this signing-account gate is still incomplete.
 ## After Upload
 
 1. Wait for App Store Connect processing to complete.
-2. Confirm the uploaded build number is `1` for version `1.3.3`.
+2. Confirm the uploaded build number is `1` for version `1.3.4`.
 3. Confirm export compliance is accepted for
    `ITSAppUsesNonExemptEncryption = false`.
 4. Optionally configure an internal TestFlight group or run the diagnostic
