@@ -4527,6 +4527,47 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it("resets Practice stack direction and column widths across a live resize", () => {
+    const windowDimensions = ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: {
+        fontScale: number;
+        height: number;
+        scale: number;
+        width: number;
+      }) => void;
+    };
+    windowDimensions.__setWindowDimensions?.({ width: 1180, height: 820, scale: 2, fontScale: 1 });
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+
+    act(() => {
+      windowDimensions.__setWindowDimensions?.({ width: 820, height: 1180, scale: 2, fontScale: 1 });
+    });
+    expect(flattenTestStyle(findByTestId(renderer, "practice-home-layout").props.style).flexDirection)
+      .toBe("column");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-home-primary-column").props.style).width)
+      .toBe("100%");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-home-secondary-column").props.style).width)
+      .toBe("100%");
+
+    act(() => {
+      windowDimensions.__setWindowDimensions?.({ width: 1180, height: 820, scale: 2, fontScale: 1 });
+    });
+    expect(flattenTestStyle(findByTestId(renderer, "practice-home-layout").props.style).flexDirection)
+      .toBe("row");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-home-primary-column").props.style)).toMatchObject({
+      flexBasis: 0,
+      flexGrow: 1.1,
+      flexShrink: 1,
+      width: "auto"
+    });
+    expect(flattenTestStyle(findByTestId(renderer, "practice-home-secondary-column").props.style)).toMatchObject({
+      flexBasis: 0,
+      flexGrow: 0.9,
+      flexShrink: 1,
+      width: "auto"
+    });
+  });
+
   it("does not constrain compact bottom-navigation labels to one line", () => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
