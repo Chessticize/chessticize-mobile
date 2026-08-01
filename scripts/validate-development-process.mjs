@@ -372,8 +372,14 @@ assert.match(mobileLabWorkflow, /--prebuilt/);
 assert.match(mobileLabWorkflow, /--meta=githubDeployment=1/);
 assert.match(mobileLabWorkflow, /--meta=githubCommitRef="\$GITHUB_REF_NAME"/);
 assert.match(mobileLabWorkflow, /deploy_args\+=\(--prod\)/);
-assert.match(mobileLabWorkflow, /vercel inspect "\$deployment_url" --json/);
-assert.match(mobileLabWorkflow, /deployment\.aliases\?\.find/);
+assert.match(mobileLabWorkflow, /createHash\("sha256"\)/);
+assert.match(mobileLabWorkflow, /const slug = `\$\{readable\}-\$\{digest\}`/);
+assert.match(mobileLabWorkflow, /chessticize-mobile-storybook-\$\{slug\}\.vercel\.app/);
+assert.match(
+  mobileLabWorkflow,
+  /vercel alias set "\$deployment_url" "\$branch_alias" --token="\$VERCEL_TOKEN"/
+);
+assert.doesNotMatch(mobileLabWorkflow, /deployment\.aliases\?\.find/);
 assert.ok(
   mobileLabWorkflow.includes('manager_url="https://storybook.chessticize.com/"')
 );

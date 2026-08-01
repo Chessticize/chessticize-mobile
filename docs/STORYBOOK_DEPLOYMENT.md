@@ -2,8 +2,8 @@
 
 The Mobile Interaction Lab is published by GitHub Actions to one dedicated
 Vercel project. `main` owns the long-lived Production deployment. Every other
-branch owns an isolated Preview deployment and Vercel branch URL that advances
-only when that same branch is pushed.
+branch owns an isolated Preview deployment and deterministic Vercel alias that
+advances only when that same branch is pushed.
 
 The stable deployment root is the primary Storybook manager URL. `/storybook/`
 remains a compatibility and repository-validation path. The workflow rejects a
@@ -17,8 +17,9 @@ Storybook deployment is public and must not require authentication.
 - A push to `main` uses the Vercel Production environment and updates the
   project's stable Production domain.
 - A push to any other branch uses the Vercel Preview environment. Git metadata
-  binds the deployment to that branch so its stable branch URL follows later
-  pushes without overwriting another branch.
+  binds the deployment to that branch. The workflow assigns a deterministic
+  alias containing a readable branch prefix and a hash of the full branch name,
+  so later pushes advance only that branch without overwriting another branch.
 - Pull requests still run the Interaction Lab validation job. Deployment uses
   only `push` or manual `workflow_dispatch` events, so untrusted fork pull
   requests never receive Vercel credentials.
@@ -42,9 +43,10 @@ bundle are local or CI artifacts and remain untracked.
    root and `/storybook/` routing, and Git deployment policy.
 3. Set the Production branch to `main`.
 4. Connect `Chessticize/chessticize-mobile` under **Project Settings > Git** so
-   Vercel can maintain generated branch URLs. The committed
+   deployments retain Git source metadata. The committed
    `git.deploymentEnabled: false` setting keeps Vercel from starting its own
-   duplicate builds; GitHub Actions still deploys with explicit Git metadata.
+   duplicate builds; GitHub Actions deploys with explicit Git metadata and
+   assigns the stable Preview alias itself.
 5. Under **Project Settings > Deployment Protection**, leave Production and
    Preview URLs publicly accessible. Do not enable Vercel Authentication or
    password protection for this project. Public access is a repository review
@@ -54,13 +56,10 @@ bundle are local or CI artifacts and remain untracked.
    fails a Production deployment unless both that root URL and its
    `/storybook/` compatibility path return HTTP 200.
 
-Vercel currently restricts connecting GitHub organization repositories to
-Hobby teams. The repository is public, but the supported setup for generated
-branch URLs is still a Vercel team/plan that can connect the organization
-repository. CLI deployments to an unconnected project can still produce exact
-deployment URLs, but they do not satisfy this repository's stable branch-URL
-contract. A wildcard custom domain with CI-managed aliases would be the
-alternative if the project must remain unconnected.
+The deterministic Preview alias is derived from the full Git branch name. A
+readable, DNS-safe prefix makes the URL recognizable, while an eight-character
+SHA-256 suffix prevents truncated or similarly named branches from colliding.
+Updating one alias therefore never moves another branch's review URL.
 
 ## Values to add to GitHub
 
@@ -114,8 +113,8 @@ Preview-versus-Production rule as a push.
 Record all of the following in the PR:
 
 - Storybook source branch and exact 40-character commit SHA.
-- Stable Vercel branch manager root URL, resolved from the deployment's
-  generated branch alias.
+- Stable Vercel branch manager root URL assigned by the workflow for that exact
+  branch.
 - Direct Storybook story URL for the changed scenario.
 - The successful GitHub Actions run and its anonymous HTTP 200 result.
 
@@ -130,9 +129,10 @@ design or authorize product wiring.
   Production, redeploy, and require an unauthenticated HTTP 200 before handoff.
 - **HTTP 404 at `/storybook/`:** verify the Vercel project root is the repository
   root and that the deployment used the committed `vercel.json`.
-- **No stable branch URL:** connect the GitHub repository to the Vercel project
-  and verify that the deployment metadata shows `githubCommitRef`. Exact commit
-  URLs alone do not replace the branch-owned review URL.
+- **No stable branch URL:** inspect the `vercel alias set` step, confirm the team
+  token can assign aliases in the project, and verify that the deployment
+  metadata shows `githubCommitRef`. Exact commit URLs alone do not replace the
+  branch-owned review URL.
 - **Production custom domain fails:** verify that `storybook.chessticize.com`
   is assigned to the project Production environment, then require anonymous
   HTTP 200 at both `https://storybook.chessticize.com/` and its `/storybook/`
@@ -149,4 +149,5 @@ design or authorize product wiring.
 - [Git branch metadata for CLI deployments](https://vercel.com/kb/guide/branch-variables-and-domains-not-linked-to-cli-deployments)
 - [Disable provider-side Git deployments](https://vercel.com/docs/project-configuration/git-configuration#turning-off-all-automatic-deployments)
 - [Pull branch-specific Preview settings](https://vercel.com/docs/cli/pull)
+- [Assign a stable alias](https://vercel.com/docs/cli/alias)
 - [Deployment Protection](https://vercel.com/docs/deployment-protection)

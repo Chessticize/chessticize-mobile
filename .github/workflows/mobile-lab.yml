@@ -145,18 +145,24 @@ jobs:
             manager_url="https://storybook.chessticize.com/"
           else
             branch_alias="$(
-              vercel inspect "$deployment_url" --json --token="$VERCEL_TOKEN" |
-                node -e '
-                  let input = "";
-                  process.stdin.on("data", (chunk) => { input += chunk; });
-                  process.stdin.on("end", () => {
-                    const deployment = JSON.parse(input);
-                    const alias = deployment.aliases?.find((candidate) => candidate.endsWith(".vercel.app"));
-                    if (!alias) process.exit(1);
-                    process.stdout.write(alias);
-                  });
-                '
+              node -e '
+                const branch = process.env.GITHUB_REF_NAME;
+                const readable = branch
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, "-")
+                  .replace(/^-+|-+$/g, "")
+                  .slice(0, 24)
+                  .replace(/-+$/g, "") || "branch";
+                const digest = require("node:crypto")
+                  .createHash("sha256")
+                  .update(branch)
+                  .digest("hex")
+                  .slice(0, 8);
+                const slug = `${readable}-${digest}`;
+                process.stdout.write(`chessticize-mobile-storybook-${slug}.vercel.app`);
+              '
             )"
+            vercel alias set "$deployment_url" "$branch_alias" --token="$VERCEL_TOKEN"
             manager_url="https://${branch_alias}/"
           fi
 
