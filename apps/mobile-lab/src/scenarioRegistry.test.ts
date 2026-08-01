@@ -91,6 +91,7 @@ test("the closed Issue #247 clone keeps its approved Settings scope without a ne
     "Notifications",
     "Sound and haptic toggles",
     "Move and capture audio previews",
+    "Guidance reset",
     "About"
   ]);
   assert.equal(
@@ -279,6 +280,10 @@ test("Practice home keeps its merged value polish in the baseline scenario", () 
   assert.ok(home.scope.includes.includes("Numeric trailing Ratings"));
   assert.ok(home.scope.includes.includes("Single Review status label"));
   assert.ok(home.scope.includes.includes("Centered Review workload count"));
+  assert.ok(home.scope.includes.includes("Training Focus card"));
+  assert.ok(home.scope.includes.includes("Collecting-evidence state"));
+  assert.ok(home.scope.includes.includes("Tactical Profile entry"));
+  assert.match(home.description, /Training Focus collecting-evidence state/);
   assert.deepEqual(storyTagsForScenario("practice-home"), []);
 });
 
@@ -336,15 +341,21 @@ test("Issue #390 owns a four-entry Replay whose status is shown by existing acti
   assert.deepEqual(storyTagsForScenario(replay.id), ["new"]);
 });
 
-test("Issue #415 uses a concrete puzzle milestone and an explicit native boundary", () => {
+test("closed Issue #415 keeps its stable story without a new marker", () => {
   const scenario = scenarioRegistry["practice-app-store-review-request"];
 
   assert.equal(
     scenario.storyId,
     "practice--app-store-review-request-eligible-puzzle-milestone"
   );
-  assert.equal(scenario.isNew, true);
-  assert.deepEqual(storyTagsForScenario(scenario.id), ["new"]);
+  assert.equal(scenario.isNew ?? false, false);
+  assert.deepEqual(storyTagsForScenario(scenario.id), []);
+  assert.equal(
+    newScenarios.some((candidate) =>
+      candidate.issues?.some((issue) => issue.issueNumber === 415)
+    ),
+    false
+  );
   assert.ok(scenario.scope.includes.includes("Four successful puzzle Sprints"));
   assert.ok(scenario.scope.includes.includes("At least two local dates"));
   assert.ok(scenario.scope.includes.includes("No custom pre-prompt"));

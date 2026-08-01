@@ -123,7 +123,7 @@ export const newScenarioMarkers = newScenarioMarkerData as Partial<
 >;
 
 const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
-  "practice-home": defineScenario("practice-home", "Practice", "Home", "practice--home", "Practice home with bordered Run cards whose trailing Ratings use uncluttered numeric values, plus a Review workload count centered in the card's right half.", "practice", ["Bordered Run cards", "Numeric trailing Ratings", "Saved run selection", "Add Run entry", "Edit mode entry", "Progress summary", "Single Review status label", "Centered Review workload count"], ["Run editor", "Review", "History", "Settings"]),
+  "practice-home": defineScenario("practice-home", "Practice", "Home", "practice--home", "Practice home with current Run cards, progress and Review workload, plus the Training Focus collecting-evidence state and its Tactical Profile entry.", "practice", ["Bordered Run cards", "Numeric trailing Ratings", "Saved run selection", "Add Run entry", "Edit mode entry", "Progress summary", "Single Review status label", "Centered Review workload count", "Training Focus card", "Collecting-evidence state", "Tactical Profile entry"], ["Run editor", "Review", "History", "Settings", "Tactical Profile"]),
   "practice-tactical-profile-building": defineScenario("practice-tactical-profile-building", "Practice", "Tactical profile · building", "practice--tactical-profile-building", "Practice Home while the local Tactical Profile derived cache is being prepared.", "practice", ["Existing Practice Home", "Training focus card", "Profile-building state", "No recommendation"], ["Tactical Profile", "Run start", "Review"]),
   "practice-tactical-profile-collecting": defineScenario("practice-tactical-profile-collecting", "Practice", "Tactical profile · collecting evidence", "practice--tactical-profile-collecting-evidence", "Practice Home with an insufficient-data state that asks for varied mixed Runs without implying a weakness.", "practice", ["Existing Practice Home", "Collecting-evidence state", "Mixed Run guidance", "No recommendation"], ["Tactical Profile", "Run start", "Review"]),
   "practice-tactical-profile-balanced": defineScenario("practice-tactical-profile-balanced", "Practice", "Tactical profile · balanced", "practice--tactical-profile-balanced", "Practice Home when the provisional estimate finds recent play balanced without a repeated, meaningful weakness.", "practice", ["Existing Practice Home", "Early-estimate balanced state", "No forced action"], ["Tactical Profile", "Run start", "Review"]),
@@ -259,9 +259,9 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "Settings",
     "iOS sync",
     "settings--ios-sync",
-    "The stable iOS Settings clone with iCloud Sync, Notifications, and the Issue #247 move-feedback design.",
+    "The stable iOS Settings clone with iCloud Sync, Notifications, the Issue #247 move-feedback design, and the current Guidance reset action.",
     "settings",
-    ["iCloud Sync", "Notifications", "Sound and haptic toggles", "Move and capture audio previews", "About"],
+    ["iCloud Sync", "Notifications", "Sound and haptic toggles", "Move and capture audio previews", "Guidance reset", "About"],
     ["Run editor", "Native audio and haptic validation", "Stockfish diagnostics"]
   ),
   "settings-ios-sync-error-details": defineScenario(

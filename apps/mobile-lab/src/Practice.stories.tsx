@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
-import { LabScenario } from "./LabScenario.tsx";
+import { LabScenario, type LabStoryPresentation } from "./LabScenario.tsx";
 import {
   centerTestId,
   clickTestId,
@@ -27,12 +27,70 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const ARROW_DUEL_GUIDE_SCENARIO_ID = "practice-arrow-duel-guide" as const;
+const ARROW_DUEL_GUIDE_PRESENTATIONS = {
+  header: {
+    storyId: "practice--arrow-duel-guide-header",
+    title: "Arrow Duel · step 1 · Sprint header"
+  },
+  slow: {
+    storyId: "practice--arrow-duel-guide-slow",
+    title: "Arrow Duel · step 2 · Slow"
+  },
+  timedOut: {
+    storyId: "practice--arrow-duel-guide-timed-out",
+    title: "Arrow Duel · step 3 · Timed out"
+  },
+  unclear: {
+    storyId: "practice--arrow-duel-guide-unclear",
+    title: "Arrow Duel · step 4 · Unclear"
+  },
+  arrowDuel: {
+    storyId: "practice--arrow-duel-guide",
+    title: "Arrow Duel · step 5 after shared guide"
+  }
+} as const satisfies Record<string, LabStoryPresentation>;
+
+function arrowDuelGuideArgs(
+  storyPresentation: LabStoryPresentation
+): {
+  scenarioId: typeof ARROW_DUEL_GUIDE_SCENARIO_ID;
+  storyPresentation: LabStoryPresentation;
+} {
+  return {
+    scenarioId: ARROW_DUEL_GUIDE_SCENARIO_ID,
+    storyPresentation
+  };
+}
+
+async function advanceArrowDuelGuide(
+  canvasElement: HTMLElement,
+  step: 1 | 2 | 3 | 4 | 5
+): Promise<void> {
+  await waitForTestId(canvasElement, "practice-active-session-guide");
+  for (let index = 1; index < step; index += 1) {
+    await clickTestId(canvasElement, "practice-session-guide-start");
+  }
+}
+
+function expectFullScreenStoryId(canvasElement: HTMLElement, storyId: string): void {
+  const link = Array.from(canvasElement.ownerDocument.querySelectorAll("a")).find(
+    (candidate) => candidate.textContent === "Full-screen URL"
+  );
+  const expectedHref = `./iframe.html?id=${storyId}&viewMode=story`;
+  if (link?.getAttribute("href") !== expectedHref) {
+    throw new Error(`Expected Full-screen URL to link to ${expectedHref}`);
+  }
+}
+
 export const Home: Story = {
   args: { scenarioId: "practice-home" },
   play: async ({ canvasElement }) => {
     await expectTestIdText(canvasElement, "practice-mode-standard-rating", "925");
     await expectTestIdText(canvasElement, "practice-mode-arrow-duel-rating", "875");
     await expectTestIdText(canvasElement, "practice-review-due-count", "28");
+    await waitForTestId(canvasElement, "training-focus-card");
+    await waitForText(canvasElement, "More information needed");
     await expectTestIdHorizontalCentersAligned(
       canvasElement,
       "practice-progress-weekly-metric",
@@ -240,21 +298,65 @@ export const ActiveSessionGuideExit: Story = {
   }
 };
 
-export const ArrowDuelGuide: Story = {
-  name: "Arrow Duel · step 5 after shared guide",
-  args: { scenarioId: "practice-arrow-duel-guide" },
+export const ArrowDuelGuideHeader: Story = {
+  name: ARROW_DUEL_GUIDE_PRESENTATIONS.header.title,
+  args: arrowDuelGuideArgs(ARROW_DUEL_GUIDE_PRESENTATIONS.header),
   play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "practice-active-session-guide");
+    await advanceArrowDuelGuide(canvasElement, 1);
+    await waitForTestId(canvasElement, "practice-session-guide-coach-overview");
     await waitForText(canvasElement, "1 of 5");
-    for (let index = 0; index < 4; index += 1) {
-      await clickTestId(canvasElement, "practice-session-guide-start");
-    }
+    expectFullScreenStoryId(canvasElement, ARROW_DUEL_GUIDE_PRESENTATIONS.header.storyId);
+  }
+};
+
+export const ArrowDuelGuideSlow: Story = {
+  name: ARROW_DUEL_GUIDE_PRESENTATIONS.slow.title,
+  args: arrowDuelGuideArgs(ARROW_DUEL_GUIDE_PRESENTATIONS.slow),
+  play: async ({ canvasElement }) => {
+    await advanceArrowDuelGuide(canvasElement, 2);
+    await waitForTestId(canvasElement, "practice-session-guide-coach-slow");
+    await waitForText(canvasElement, "2 of 5");
+    await waitForText(canvasElement, "Amber means you’re taking too long");
+    expectFullScreenStoryId(canvasElement, ARROW_DUEL_GUIDE_PRESENTATIONS.slow.storyId);
+  }
+};
+
+export const ArrowDuelGuideTimedOut: Story = {
+  name: ARROW_DUEL_GUIDE_PRESENTATIONS.timedOut.title,
+  args: arrowDuelGuideArgs(ARROW_DUEL_GUIDE_PRESENTATIONS.timedOut),
+  play: async ({ canvasElement }) => {
+    await advanceArrowDuelGuide(canvasElement, 3);
+    await waitForTestId(canvasElement, "practice-session-guide-coach-timeout");
+    await waitForText(canvasElement, "3 of 5");
+    await waitForText(canvasElement, "This puzzle counts as a mistake");
+    expectFullScreenStoryId(canvasElement, ARROW_DUEL_GUIDE_PRESENTATIONS.timedOut.storyId);
+  }
+};
+
+export const ArrowDuelGuideUnclear: Story = {
+  name: ARROW_DUEL_GUIDE_PRESENTATIONS.unclear.title,
+  args: arrowDuelGuideArgs(ARROW_DUEL_GUIDE_PRESENTATIONS.unclear),
+  play: async ({ canvasElement }) => {
+    await advanceArrowDuelGuide(canvasElement, 4);
+    await waitForTestId(canvasElement, "practice-session-guide-coach-unclear");
+    await waitForText(canvasElement, "4 of 5");
+    await waitForText(canvasElement, "Use Mark as unclear after a correct answer");
+    expectFullScreenStoryId(canvasElement, ARROW_DUEL_GUIDE_PRESENTATIONS.unclear.storyId);
+  }
+};
+
+export const ArrowDuelGuide: Story = {
+  name: ARROW_DUEL_GUIDE_PRESENTATIONS.arrowDuel.title,
+  args: arrowDuelGuideArgs(ARROW_DUEL_GUIDE_PRESENTATIONS.arrowDuel),
+  play: async ({ canvasElement }) => {
+    await advanceArrowDuelGuide(canvasElement, 5);
     await waitForTestId(canvasElement, "practice-arrow-duel-guide");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-timing-demo");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
     await waitForTestId(canvasElement, "session-abandon");
     await waitForText(canvasElement, "5 of 5");
+    expectFullScreenStoryId(canvasElement, ARROW_DUEL_GUIDE_PRESENTATIONS.arrowDuel.storyId);
     await centerTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     expectTestIdAbsent(canvasElement, "session-board");
   }

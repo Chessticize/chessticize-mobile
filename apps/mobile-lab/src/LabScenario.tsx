@@ -65,23 +65,48 @@ type ScenarioRuntime = {
   service: PracticeService;
 };
 
-export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): React.JSX.Element {
+export type LabStoryPresentation = {
+  storyId: string;
+  title: string;
+};
+
+export function LabScenario({
+  scenarioId,
+  storyPresentation
+}: {
+  scenarioId: LabScenarioId;
+  storyPresentation?: LabStoryPresentation;
+}): React.JSX.Element {
   const runtime = useMemo(() => createScenarioRuntime(scenarioId), [scenarioId]);
 
-  return <LabScenarioContent key={scenarioId} runtime={runtime} scenarioId={scenarioId} />;
+  return (
+    <LabScenarioContent
+      key={scenarioId}
+      runtime={runtime}
+      scenarioId={scenarioId}
+      storyPresentation={storyPresentation}
+    />
+  );
 }
 
 function LabScenarioContent({
   runtime,
-  scenarioId
+  scenarioId,
+  storyPresentation
 }: {
   runtime: ScenarioRuntime;
   scenarioId: LabScenarioId;
+  storyPresentation?: LabStoryPresentation;
 }): React.JSX.Element {
+  const tacticalProfileScenarioId = isTacticalProfileScenario(scenarioId)
+    ? scenarioId
+    : scenarioId === "practice-home"
+      ? "practice-tactical-profile-collecting"
+      : null;
   const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>([]);
   const [tacticalProfileState, setTacticalProfileState] = useState(() =>
-    isTacticalProfileScenario(scenarioId)
-      ? initialTacticalProfileFixtureState(scenarioId)
+    tacticalProfileScenarioId
+      ? initialTacticalProfileFixtureState(tacticalProfileScenarioId)
       : { screen: "home" as const, selectedTaskFamily: "line" as const }
   );
   const [startedFocusedRun, setStartedFocusedRun] = useState<SprintState | null>(null);
@@ -102,16 +127,16 @@ function LabScenarioContent({
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
   useEffect(() => setSelectedCustomThemes([]), [scenarioId]);
   useEffect(() => {
-    if (isTacticalProfileScenario(scenarioId)) {
-      setTacticalProfileState(initialTacticalProfileFixtureState(scenarioId));
+    if (tacticalProfileScenarioId) {
+      setTacticalProfileState(initialTacticalProfileFixtureState(tacticalProfileScenarioId));
       setStartedFocusedRun(null);
     }
-  }, [scenarioId]);
+  }, [tacticalProfileScenarioId]);
 
-  const tacticalProfilePresentation = isTacticalProfileScenario(scenarioId)
+  const tacticalProfilePresentation = tacticalProfileScenarioId
     && startedFocusedRun === null
     ? tacticalProfilePresentationFor(
-        scenarioId,
+        tacticalProfileScenarioId,
         tacticalProfileState,
         (intent) => {
           if (intent.type === "start-focused-run") {
@@ -137,7 +162,7 @@ function LabScenarioContent({
       };
 
   return (
-    <LabScenarioShell scenarioId={scenarioId}>
+    <LabScenarioShell scenarioId={scenarioId} storyPresentation={storyPresentation}>
       <PracticePocScreen
         key={startedFocusedRun === null
           ? `scenario-${scenarioId}`
@@ -492,12 +517,16 @@ function sprintResultReplayDesignItems(): NonNullable<
 
 export function LabScenarioShell({
   children,
-  scenarioId
+  scenarioId,
+  storyPresentation
 }: {
   children: React.ReactNode;
   scenarioId: LabScenarioId;
+  storyPresentation?: LabStoryPresentation;
 }): React.JSX.Element {
   const definition = scenarioRegistry[scenarioId];
+  const storyId = storyPresentation?.storyId ?? definition.storyId;
+  const storyTitle = storyPresentation?.title ?? definition.title;
 
   return (
     <div className="lab-scenario-shell">
@@ -506,7 +535,7 @@ export function LabScenarioShell({
           <summary>
             {definition.nativeBoundary
               ? `${definition.group} · Native boundary`
-              : `${definition.group} · ${definition.title}`}
+              : `${definition.group} · ${storyTitle}`}
           </summary>
           <div className="lab-toolbar-body">
             <p>{definition.description}</p>
@@ -535,7 +564,7 @@ export function LabScenarioShell({
               >
                 Reset scenario
               </button>
-              <a href={`./iframe.html?id=${definition.storyId}&viewMode=story`}>Full-screen URL</a>
+              <a href={`./iframe.html?id=${storyId}&viewMode=story`}>Full-screen URL</a>
             </div>
           </div>
         </details>
@@ -603,6 +632,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
+    sprintGuidanceEnabled: scenarioId.startsWith("settings-"),
     sprintRulesDesignPreview: sprintRulesDesignPreviewFor(scenarioId),
     standardTargetCorrect: 1,
     arrowDuelTargetCorrect: 1,

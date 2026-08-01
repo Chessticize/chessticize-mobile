@@ -32,6 +32,8 @@ export const IosSync: Story = {
     );
     await waitForTestId(canvasElement, "settings-move-feedback-preview-move");
     await waitForTestId(canvasElement, "settings-move-feedback-preview-capture");
+    await waitForTestId(canvasElement, "settings-guidance-section");
+    await waitForText(canvasElement, "Reset guides");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-success");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-mistake");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-device-note");

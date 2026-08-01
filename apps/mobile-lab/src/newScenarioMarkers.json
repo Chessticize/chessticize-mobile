@@ -31,14 +31,6 @@
       }
     ]
   },
-  "practice-app-store-review-request": {
-    "issues": [
-      {
-        "issueNumber": 415,
-        "changeNote": "Use a successful puzzle Sprint result as the native Apple review boundary without adding a custom pre-prompt"
-      }
-    ]
-  },
   "history-attempt-detail": {
     "issues": [
       {
