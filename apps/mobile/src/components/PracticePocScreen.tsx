@@ -4368,8 +4368,10 @@ function PracticeHome({
       >
         <View style={[
           styles.practiceHomePrimaryColumn,
-          !adaptiveLayout.usesWideContent ? styles.practiceHomeColumnStacked : null
-        ]}>
+          adaptiveLayout.usesWideContent
+            ? styles.practiceHomePrimaryColumnWide
+            : styles.practiceHomeColumnStacked
+        ]} testID="practice-home-primary-column">
           {runManagement ? (
             <PracticeRunHome
               presentation={runManagement}
@@ -4404,8 +4406,10 @@ function PracticeHome({
 
         <View style={[
           styles.practiceHomeSecondaryColumn,
-          !adaptiveLayout.usesWideContent ? styles.practiceHomeColumnStacked : null
-        ]}>
+          adaptiveLayout.usesWideContent
+            ? styles.practiceHomeSecondaryColumnWide
+            : styles.practiceHomeColumnStacked
+        ]} testID="practice-home-secondary-column">
           {runManagement && !selectedRun ? (
             <PracticeNoRunProgressCard />
           ) : (
@@ -15306,14 +15310,24 @@ const styles = StyleSheet.create({
     gap: 18
   },
   practiceHomePrimaryColumn: {
-    flex: 1.1,
     gap: 12,
     minWidth: 0
   },
+  practiceHomePrimaryColumnWide: {
+    flexBasis: 0,
+    flexGrow: 1.1,
+    flexShrink: 1,
+    width: "auto"
+  },
   practiceHomeSecondaryColumn: {
-    flex: 0.9,
     gap: 12,
     minWidth: 280
+  },
+  practiceHomeSecondaryColumnWide: {
+    flexBasis: 0,
+    flexGrow: 0.9,
+    flexShrink: 1,
+    width: "auto"
   },
   practiceHomeColumnStacked: {
     flexBasis: "auto",
