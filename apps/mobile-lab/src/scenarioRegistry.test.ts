@@ -91,6 +91,7 @@ test("the closed Issue #247 clone keeps its approved Settings scope without a ne
     "Notifications",
     "Sound and haptic toggles",
     "Move and capture audio previews",
+    "Guidance reset",
     "About"
   ]);
   assert.equal(
@@ -279,6 +280,10 @@ test("Practice home keeps its merged value polish in the baseline scenario", () 
   assert.ok(home.scope.includes.includes("Numeric trailing Ratings"));
   assert.ok(home.scope.includes.includes("Single Review status label"));
   assert.ok(home.scope.includes.includes("Centered Review workload count"));
+  assert.ok(home.scope.includes.includes("Training Focus card"));
+  assert.ok(home.scope.includes.includes("Collecting-evidence state"));
+  assert.ok(home.scope.includes.includes("Tactical Profile entry"));
+  assert.match(home.description, /Training Focus collecting-evidence state/);
   assert.deepEqual(storyTagsForScenario("practice-home"), []);
 });
 

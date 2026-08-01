@@ -65,18 +65,38 @@ type ScenarioRuntime = {
   service: PracticeService;
 };
 
-export function LabScenario({ scenarioId }: { scenarioId: LabScenarioId }): React.JSX.Element {
+export type LabStoryPresentation = {
+  storyId: string;
+  title: string;
+};
+
+export function LabScenario({
+  scenarioId,
+  storyPresentation
+}: {
+  scenarioId: LabScenarioId;
+  storyPresentation?: LabStoryPresentation;
+}): React.JSX.Element {
   const runtime = useMemo(() => createScenarioRuntime(scenarioId), [scenarioId]);
 
-  return <LabScenarioContent key={scenarioId} runtime={runtime} scenarioId={scenarioId} />;
+  return (
+    <LabScenarioContent
+      key={scenarioId}
+      runtime={runtime}
+      scenarioId={scenarioId}
+      storyPresentation={storyPresentation}
+    />
+  );
 }
 
 function LabScenarioContent({
   runtime,
-  scenarioId
+  scenarioId,
+  storyPresentation
 }: {
   runtime: ScenarioRuntime;
   scenarioId: LabScenarioId;
+  storyPresentation?: LabStoryPresentation;
 }): React.JSX.Element {
   const tacticalProfileScenarioId = isTacticalProfileScenario(scenarioId)
     ? scenarioId
@@ -142,7 +162,7 @@ function LabScenarioContent({
       };
 
   return (
-    <LabScenarioShell scenarioId={scenarioId}>
+    <LabScenarioShell scenarioId={scenarioId} storyPresentation={storyPresentation}>
       <PracticePocScreen
         key={startedFocusedRun === null
           ? `scenario-${scenarioId}`
@@ -497,12 +517,16 @@ function sprintResultReplayDesignItems(): NonNullable<
 
 export function LabScenarioShell({
   children,
-  scenarioId
+  scenarioId,
+  storyPresentation
 }: {
   children: React.ReactNode;
   scenarioId: LabScenarioId;
+  storyPresentation?: LabStoryPresentation;
 }): React.JSX.Element {
   const definition = scenarioRegistry[scenarioId];
+  const storyId = storyPresentation?.storyId ?? definition.storyId;
+  const storyTitle = storyPresentation?.title ?? definition.title;
 
   return (
     <div className="lab-scenario-shell">
@@ -511,7 +535,7 @@ export function LabScenarioShell({
           <summary>
             {definition.nativeBoundary
               ? `${definition.group} · Native boundary`
-              : `${definition.group} · ${definition.title}`}
+              : `${definition.group} · ${storyTitle}`}
           </summary>
           <div className="lab-toolbar-body">
             <p>{definition.description}</p>
@@ -540,7 +564,7 @@ export function LabScenarioShell({
               >
                 Reset scenario
               </button>
-              <a href={`./iframe.html?id=${definition.storyId}&viewMode=story`}>Full-screen URL</a>
+              <a href={`./iframe.html?id=${storyId}&viewMode=story`}>Full-screen URL</a>
             </div>
           </div>
         </details>
