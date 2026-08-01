@@ -48,8 +48,8 @@
     ]
   },
   "currentVersionWhatsNew": {
-    "sourceTag": "ios-v1.3.2-build-1",
+    "sourceTag": "ios-v1.3.3-build-1",
     "status": "release-candidate",
-    "storeCopy": "• Reduced app size while keeping all 1.4 million bundled puzzles.\n• Simplified the Home Review card by hiding zero and duplicate counts."
+    "storeCopy": "• Fixed Replay so completed puzzles reset correctly and Analysis closes predictably.\n• Made Tactical Progress filters clearer for Puzzle solving and Arrow Duel.\n• Kept solved prompts stable and readable across Sprint, Review, and Replay."
   }
 }

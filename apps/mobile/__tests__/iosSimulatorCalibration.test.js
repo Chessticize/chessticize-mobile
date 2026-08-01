@@ -249,4 +249,26 @@ describe("captured PNG orientation", () => {
     expect(copyIndex).toBeGreaterThan(0);
     expect(validationIndex).toBeGreaterThan(copyIndex);
   });
+
+  it("normalizes Xcode 26.6 landscape framebuffer PNGs before validation", () => {
+    const copyIndex = calibrationRunner.indexOf(
+      'cp "$source_path" "$DESTINATION/$scene.png"'
+    );
+    const landscapeGuardIndex = calibrationRunner.indexOf(
+      'if [[ "$orientation" == "landscape" ]]',
+      copyIndex
+    );
+    const rotationIndex = calibrationRunner.indexOf(
+      'sips --rotate 90',
+      landscapeGuardIndex
+    );
+    const validationIndex = calibrationRunner.indexOf(
+      '"$PNG_ORIENTATION_VALIDATOR" "$DESTINATION/$scene.png" "$orientation"',
+      rotationIndex
+    );
+
+    expect(landscapeGuardIndex).toBeGreaterThan(copyIndex);
+    expect(rotationIndex).toBeGreaterThan(landscapeGuardIndex);
+    expect(validationIndex).toBeGreaterThan(rotationIndex);
+  });
 });

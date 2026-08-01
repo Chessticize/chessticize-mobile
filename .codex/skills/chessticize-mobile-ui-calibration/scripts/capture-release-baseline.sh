@@ -51,13 +51,24 @@ cd "$REPO_ROOT"
   fail "Full portrait/landscape calibration requires a dedicated iPad Simulator; run iPhone store capture in portrait only."
 git rev-parse --show-toplevel >/dev/null 2>&1 || fail "Run inside the Chessticize Mobile repository."
 command -v brew >/dev/null 2>&1 || fail "Homebrew is required to select the locked Ruby 3.3 toolchain."
+command -v caffeinate >/dev/null 2>&1 || fail "caffeinate is required to keep local visual QA unlocked."
+command -v ioreg >/dev/null 2>&1 || fail "ioreg is required to verify the macOS console state."
 command -v node >/dev/null 2>&1 || fail "Node.js is required to resolve the exact Simulator."
+command -v sips >/dev/null 2>&1 || fail "sips is required to normalize Simulator PNG orientation."
 command -v xcrun >/dev/null 2>&1 || fail "Xcode command-line tools are required."
 [[ -x "$ORIENTATION_RUNNER" ]] || fail "Missing executable orientation runner: $ORIENTATION_RUNNER"
 [[ -x "$SIMULATOR_TARGET_RESOLVER" ]] || \
   fail "Missing executable Simulator target resolver: $SIMULATOR_TARGET_RESOLVER"
 [[ -x "$PNG_ORIENTATION_VALIDATOR" ]] || \
   fail "Missing executable PNG orientation validator: $PNG_ORIENTATION_VALIDATOR"
+if ioreg -n Root -d1 | grep '"IOConsoleLocked" = Yes' >/dev/null; then
+  fail "Unlock the Mac before local visual QA so Simulator window control remains available."
+fi
+
+if [[ "${CHESSTICIZE_UI_CALIBRATION_CAFFEINATED:-0}" != "1" ]]; then
+  export CHESSTICIZE_UI_CALIBRATION_CAFFEINATED=1
+  exec /usr/bin/caffeinate -dimsu "$0" "$@"
+fi
 
 RUBY_PREFIX="$(brew --prefix ruby@3.3 2>/dev/null)" || \
   fail "Install Homebrew ruby@3.3 before running UI calibration."
@@ -142,8 +153,22 @@ copy_capture() {
     local source_path="$source_dir/$scene.png"
     [[ -f "$source_path" ]] || fail "Missing expected $orientation screenshot: $scene.png"
     cp "$source_path" "$DESTINATION/$scene.png"
+    if [[ "$orientation" == "landscape" ]] && \
+      ! "$PNG_ORIENTATION_VALIDATOR" "$DESTINATION/$scene.png" landscape >/dev/null 2>&1; then
+      # Xcode 26.6 can expose the verified landscape UIKit surface inside a
+      # portrait-shaped physical framebuffer. Detox then writes the pixels
+      # counter-clockwise, so normalize that deterministic representation.
+      /usr/bin/sips --rotate 90 "$DESTINATION/$scene.png" >/dev/null
+    fi
     "$PNG_ORIENTATION_VALIDATOR" "$DESTINATION/$scene.png" "$orientation"
   done
+}
+
+restart_exact_simulator() {
+  xcrun simctl shutdown "$SIMULATOR_UDID" 2>/dev/null || true
+  xcrun simctl boot "$SIMULATOR_UDID"
+  xcrun simctl bootstatus "$SIMULATOR_UDID" -b
+  "/usr/bin/open" -a Simulator --args -CurrentDeviceUDID "$SIMULATOR_UDID"
 }
 
 echo "Calibrating commit $HEAD_BEFORE on $DEVICE_NAME ($SIMULATOR_UDID)"
@@ -154,9 +179,7 @@ DESTINATION="$REPO_ROOT/scratch/rendering-checks/$SHORT_SHA/release-$DEVICE_SLUG
 [[ ! -e "$DESTINATION" ]] || fail "Move or remove the existing capture directory: $DESTINATION"
 mkdir -p "$DESTINATION"
 
-xcrun simctl boot "$SIMULATOR_UDID" 2>/dev/null || true
-xcrun simctl bootstatus "$SIMULATOR_UDID" -b
-"/usr/bin/open" -a Simulator --args -CurrentDeviceUDID "$SIMULATOR_UDID"
+restart_exact_simulator
 
 "$ORIENTATION_RUNNER" "$SIMULATOR_UDID" "$DEVICE_NAME" portrait
 PORTRAIT_MARKER="$(mktemp -t chessticize-ui-calibration-portrait)"
@@ -165,6 +188,7 @@ CHESSTICIZE_STORE_ASSET_ORIENTATION=portrait pnpm mobile:e2e:store-assets:ios:re
 copy_capture portrait "$PORTRAIT_MARKER" "${PORTRAIT_SCENES[@]}"
 
 RESTORE_PORTRAIT=1
+restart_exact_simulator
 "$ORIENTATION_RUNNER" "$SIMULATOR_UDID" "$DEVICE_NAME" landscape
 LANDSCAPE_MARKER="$(mktemp -t chessticize-ui-calibration-landscape)"
 touch "$LANDSCAPE_MARKER"
