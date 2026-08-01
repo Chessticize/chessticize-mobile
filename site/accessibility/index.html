@@ -38,16 +38,15 @@
         <p class="eyebrow">Accessibility</p>
         <h1>What the current app supports</h1>
         <p>
-          Chessticize includes labeled controls and adaptable iPhone and iPad
-          layouts, but we do not claim complete support for an accessibility
-          feature until every common chess puzzle task passes.
+          Chessticize does not currently declare support for any App Store
+          accessibility feature. Some surrounding controls have useful labels,
+          but the puzzle board does not provide a complete accessible move-entry
+          path, and not every common chess puzzle task has been verified.
         </p>
         <p>
-          The broad remediation work described below is not currently scheduled.
-          We will reassess it when direct accessibility reports or documented
-          user needs justify the implementation and ongoing test coverage. Until
-          then, these limitations remain part of the current app and the related
-          features remain undeclared in the App Store.
+          Broad remediation is not currently scheduled. The related issue records
+          are closed as not planned; that status does not change the current app
+          or complete any pending verification.
         </p>
       </div>
 
@@ -74,11 +73,11 @@
         <section class="info-card">
           <h2>Visual and motion checks</h2>
           <p>
-            Contrast, grayscale operation, touch targets, and Reduce Motion
-            behavior have known gaps or incomplete verification. Their broad
-            follow-up work is deferred. We will publish a feature declaration
-            only after the unchanged live app or a new release passes every
-            required puzzle flow.
+            Verified contrast failures remain, some Settings controls are smaller
+            than the 44pt target, and the app does not follow Reduce Motion. No
+            color-only blocker has been confirmed, but the complete grayscale
+            common-task walkthrough is still pending. These features remain
+            undeclared.
           </p>
         </section>
 
@@ -92,28 +91,26 @@
         </section>
       </div>
 
-      <section class="simple-page-header">
+      <section class="simple-page-header simple-page-section">
         <h2>How we prioritize accessibility work</h2>
         <p>
-          The known board, text, contrast, touch-target, motion, dark-interface,
-          and grayscale issues are closed as not planned for now; the
-          underlying gaps are not fixed. Each area adds product states and
-          long-term regression coverage across iPhone and iPad, so we are
-          deferring that investment until there is demonstrated user demand.
+          Verified board, text, contrast, touch-target, motion, and dark-interface
+          limitations remain in the current app. The grayscale check is different:
+          no color-only blocker has been confirmed, but the complete walkthrough
+          is not recorded.
         </p>
         <p>
-          Chessticize does not collect usage analytics. Specific reports about
-          a puzzle flow, device, and assistive setting are therefore the most
-          useful signal for reconsidering and reopening this work.
+          Chessticize does not collect usage analytics. A report that names the
+          puzzle flow, device, and assistive setting provides concrete context if
+          this scope is reconsidered.
         </p>
       </section>
 
-      <section class="simple-page-header">
+      <section class="simple-page-header simple-page-section">
         <h2>Share accessibility feedback</h2>
         <p>
-          Tell us which puzzle flow, device, and assistive setting you used.
-          Public reports help others follow progress; private questions can go
-          to support.
+          Include the puzzle flow, device, and assistive setting you used. Public
+          reports can be tracked on GitHub; private questions can go to support.
         </p>
         <div class="button-row">
           <a
