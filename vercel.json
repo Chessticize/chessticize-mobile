@@ -15,6 +15,14 @@
   ],
   "rewrites": [
     {
+      "source": "/storybook",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/storybook/",
+      "destination": "/index.html"
+    },
+    {
       "source": "/storybook/:path*",
       "destination": "/:path*"
     }

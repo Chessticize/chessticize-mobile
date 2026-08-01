@@ -387,6 +387,14 @@ assert.deepEqual(vercelConfig.redirects, [
 ]);
 assert.deepEqual(vercelConfig.rewrites, [
   {
+    source: "/storybook",
+    destination: "/index.html"
+  },
+  {
+    source: "/storybook/",
+    destination: "/index.html"
+  },
+  {
     source: "/storybook/:path*",
     destination: "/:path*"
   }
