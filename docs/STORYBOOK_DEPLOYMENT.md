@@ -79,13 +79,13 @@ and variables > Actions**:
 
 | GitHub secret | Value |
 | --- | --- |
-| `VERCEL_TOKEN` | The Vercel access token |
+| `VERCEL_TEAM_TOKEN` | A Vercel access token scoped to all projects in the owning team |
 | `VERCEL_ORG_ID` | `.vercel/project.json` `orgId` |
 | `VERCEL_PROJECT_ID` | `.vercel/project.json` `projectId` |
 
 The workflow fails before contacting Vercel when any required secret is absent.
-Rotate `VERCEL_TOKEN` before it expires by replacing the GitHub secret; no code
-change is required.
+Rotate `VERCEL_TEAM_TOKEN` before it expires by replacing the GitHub secret; no
+code change is required.
 
 ## First deployment
 
