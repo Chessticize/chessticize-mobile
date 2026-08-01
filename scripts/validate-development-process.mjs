@@ -72,6 +72,9 @@ const releaseSourcePolicy = read("docs/RELEASE_SOURCE_POLICY.md");
 const androidValidation = read("docs/ANDROID_VALIDATION.md");
 const appStoreUpload = read("docs/APP_STORE_UPLOAD.md");
 const landingPageDoc = read("docs/LANDING_PAGE.md");
+const storybookDeployment = read("docs/STORYBOOK_DEPLOYMENT.md");
+const vercelConfig = JSON.parse(read("vercel.json"));
+const gitignore = read(".gitignore");
 const landingPage = read("site/index.html");
 const landingPageAndroid = read("site/android/index.html");
 const landingPageSupport = read("site/support/index.html");
@@ -206,6 +209,8 @@ assert.equal(count(processWorkflow, '- "apps/mobile-lab/README.md"'), 2);
 assert.equal(count(processWorkflow, '- "docs/RELEASE_NOTES.md"'), 2);
 assert.equal(count(processWorkflow, '- "docs/releases/**"'), 2);
 assert.equal(count(processWorkflow, '- "docs/LANDING_PAGE.md"'), 2);
+assert.equal(count(processWorkflow, '- "docs/STORYBOOK_DEPLOYMENT.md"'), 2);
+assert.equal(count(processWorkflow, '- "vercel.json"'), 2);
 assert.equal(count(processWorkflow, '- "site/**"'), 2);
 assert.equal(
   count(processWorkflow, '- "apps/mobile/__tests__/landingPage.test.js"'),
@@ -252,6 +257,7 @@ assert.doesNotMatch(landingPageStyles, /@import|url\(\s*["']?https?:\/\//i);
 assert.match(rootReadme, /https:\/\/apps\.apple\.com\/us\/app\/chessticize\/id6788610123/);
 assert.match(rootReadme, /https:\/\/chessticize\.github\.io\/chessticize-mobile\/android\//);
 assert.match(rootReadme, /site\/assets\/screenshots\/contact-sheet\.webp/);
+assert.match(rootReadme, /docs\/STORYBOOK_DEPLOYMENT\.md/);
 assert.match(landingPageDoc, /pnpm landing-page:assets/);
 assert.match(landingPageAssetGenerator, /--source-root/);
 assert.equal(landingPageAssetManifest.schemaVersion, 1);
@@ -279,7 +285,7 @@ assert.match(devLoopSkill, /existing product-clone story/i);
 assert.match(labReadme, /Do not add a parallel standalone page/i);
 assert.match(prTemplate, /Storybook-first design approved before product wiring/);
 assert.match(prTemplate, /Storybook-only design increment/);
-assert.match(prTemplate, /Full Storybook manager URL:/);
+assert.match(prTemplate, /Stable branch Storybook manager URL:/);
 assert.match(prTemplate, /Removed after the linked issue was closed/);
 assert.match(prTemplate, /Design approval record:/);
 assert.match(agents, /Storybook-only PR[\s\S]*may merge while the linked product issue remains open/);
@@ -338,7 +344,8 @@ for (const publicStorybookPolicy of [
   issueTriage,
   issueTriageSkill,
   devLoopSkill,
-  prTemplate
+  prTemplate,
+  storybookDeployment
 ]) {
   assert.match(
     publicStorybookPolicy,
@@ -346,10 +353,68 @@ for (const publicStorybookPolicy of [
   );
 }
 assert.doesNotMatch(issueTriageSkill, /owner-only deployment/i);
-assert.match(issueTriage, /Every Sites deployment URL is production/);
+assert.match(issueTriage, /Vercel Preview is a review artifact/);
 for (const lifecycleContract of [issueTriage, issueTriageSkill, uiFlowDesign, processWorkflow]) {
   assert.doesNotMatch(lifecycleContract, /sites\/storybook-previews|preview-manifest/);
 }
+
+assert.match(mobileLabWorkflow, /branches: \["\*\*"\]/);
+assert.match(mobileLabWorkflow, /Deploy branch Storybook to Vercel/);
+assert.match(mobileLabWorkflow, /github\.event\.deleted == false/);
+assert.match(mobileLabWorkflow, /needs: validate/);
+assert.match(mobileLabWorkflow, /VERCEL_TOKEN: \$\{\{ secrets\.VERCEL_TEAM_TOKEN \}\}/);
+assert.match(mobileLabWorkflow, /VERCEL_ORG_ID: \$\{\{ secrets\.VERCEL_ORG_ID \}\}/);
+assert.match(mobileLabWorkflow, /VERCEL_PROJECT_ID: \$\{\{ secrets\.VERCEL_PROJECT_ID \}\}/);
+assert.match(mobileLabWorkflow, /VERCEL_CLI_VERSION: 58\.4\.4/);
+assert.match(mobileLabWorkflow, /vercel@\$VERCEL_CLI_VERSION/);
+assert.match(mobileLabWorkflow, /--git-branch="\$GITHUB_REF_NAME"/);
+assert.match(mobileLabWorkflow, /--prebuilt/);
+assert.match(mobileLabWorkflow, /--meta=githubDeployment=1/);
+assert.match(mobileLabWorkflow, /--meta=githubCommitRef="\$GITHUB_REF_NAME"/);
+assert.match(mobileLabWorkflow, /deploy_args\+=\(--prod\)/);
+assert.match(mobileLabWorkflow, /vercel inspect "\$deployment_url" --json/);
+assert.match(mobileLabWorkflow, /deployment\.aliases\?\.find/);
+assert.ok(
+  mobileLabWorkflow.includes('manager_url="https://storybook.chessticize.com/storybook/"')
+);
+assert.match(mobileLabWorkflow, /immutable_storybook_url/);
+assert.match(mobileLabWorkflow, /Unauthenticated Storybook request returned HTTP/);
+assert.match(mobileLabWorkflow, /verify_public_url "\$IMMUTABLE_STORYBOOK_URL"/);
+assert.match(mobileLabWorkflow, /verify_public_url "\$STORYBOOK_URL"/);
+assert.equal(vercelConfig.buildCommand, "pnpm mobile:lab:validate");
+assert.equal(vercelConfig.installCommand, "pnpm install --frozen-lockfile");
+assert.equal(vercelConfig.outputDirectory, "apps/mobile-lab/storybook-static");
+assert.equal(vercelConfig.git.deploymentEnabled, false);
+assert.deepEqual(vercelConfig.redirects, [
+  {
+    source: "/",
+    destination: "/storybook/",
+    permanent: false
+  }
+]);
+assert.deepEqual(vercelConfig.rewrites, [
+  {
+    source: "/storybook",
+    destination: "/index.html"
+  },
+  {
+    source: "/storybook/",
+    destination: "/index.html"
+  },
+  {
+    source: "/storybook/:path*",
+    destination: "/:path*"
+  }
+]);
+assert.match(gitignore, /^\.vercel\/$/m);
+assert.match(storybookDeployment, /`main` owns the long-lived Production deployment/);
+assert.match(storybookDeployment, /stable branch URL/);
+assert.match(storybookDeployment, /untrusted fork pull\s+requests never receive Vercel credentials/i);
+assert.match(storybookDeployment, /VERCEL_TEAM_TOKEN/);
+assert.match(storybookDeployment, /VERCEL_ORG_ID/);
+assert.match(storybookDeployment, /VERCEL_PROJECT_ID/);
+assert.match(storybookDeployment, /vercel@58\.4\.4/);
+assert.match(storybookDeployment, /HTTP 200/);
 
 assert.match(scenarioRegistry, /newScenarioMarkerData/);
 assert.match(markerPolicy, /Number\.isInteger\(issueNumber\)/);

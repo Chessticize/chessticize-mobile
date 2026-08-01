@@ -57,29 +57,29 @@ rollout, or release integration yet.
    What's New page.
 7. Record explicit design approval in the issue or PR before product wiring.
 
-When remote preview publication is authorized and Sites is available, publish
-the complete `apps/mobile-lab` Storybook to a site and Sites project dedicated
-to the exact feature branch. Never reuse that project ID or live URL for a
-different source branch, including another branch for the same issue. Reuse the
-site only for later commits on its owning branch. Before every deployment,
-verify that the recorded source branch and commit match the application branch
-being reviewed; a mismatch is a publication blocker, not permission to replace
-the existing site. Every Storybook review site, including the main-branch
-catalog and every branch-owned site, is public and must not require
-authentication. Set the Sites access mode to public and verify that an
-unauthenticated request to `/storybook/` returns HTTP 200 before handoff. Record
-the branch, exact source commit, and branch-owned URL in the issue and PR.
+When remote preview publication is authorized, push the reviewed exact commit
+and let the Mobile Interaction Lab GitHub Actions workflow deploy the complete
+`apps/mobile-lab` Storybook to the dedicated Vercel project. Each feature branch
+owns an isolated Preview deployment and stable branch URL; later pushes advance
+only that URL, while `main` owns the long-lived Production catalog. Never reuse
+a URL from a different source branch, including another branch for the same
+issue. Before handoff, verify that Vercel records the reviewed source branch and
+exact commit. A mismatch is a publication blocker, not permission to replace
+another branch's deployment. Every Storybook deployment is public and must not
+require authentication. The workflow verifies that an unauthenticated request
+to `/storybook/` returns HTTP 200. Record the branch, exact source commit,
+stable branch URL, direct story URL, and successful workflow run in the issue
+and PR. Follow `docs/STORYBOOK_DEPLOYMENT.md` for setup and recovery.
 If publication is unavailable after a concrete deployment attempt, an explicit
 repository-owner authorization may waive this gate for that PR. Record the
 failed publication result, the site's resulting access state, the owner's
 authorization, and the follow-up needed before handoff or merge. Keep any
 usable owner-only deployment in place; never substitute or overwrite another
-branch's review site.
-Do not commit generated Storybook bundles, copied preview files, Sites project
-metadata, or hosting result files to the application branch. A Sites deployment
-is a production URL, but it remains a design artifact: it does not count as approval
-or product implementation. Save a Sites version without deploying it when only
-a reviewable candidate is authorized.
+branch's review deployment.
+Do not commit generated Storybook bundles, copied preview files, `.vercel/`
+project-link metadata, or hosting result files to the application branch. A
+Vercel deployment remains a design artifact: it does not count as approval or
+product implementation.
 
 When the current interaction increment is coherent and checks pass, the design
 PR may become ready and merge to `main` before approval or implementation.

@@ -14,6 +14,7 @@ on:
       - "docs/RELEASE_NOTES.md"
       - "docs/releases/**"
       - "docs/RELEASE_SOURCE_POLICY.md"
+      - "docs/STORYBOOK_DEPLOYMENT.md"
       - "docs/TESTFLIGHT_QA.md"
       - "docs/TESTING_ARCHITECTURE.md"
       - "docs/agents/**"
@@ -22,6 +23,7 @@ on:
       - "apps/mobile/__tests__/landingPage.test.js"
       - "scripts/prepare-landing-page-assets.mjs"
       - "scripts/validate-development-process.mjs"
+      - "vercel.json"
   push:
     branches:
       - main
@@ -37,6 +39,7 @@ on:
       - "docs/RELEASE_NOTES.md"
       - "docs/releases/**"
       - "docs/RELEASE_SOURCE_POLICY.md"
+      - "docs/STORYBOOK_DEPLOYMENT.md"
       - "docs/TESTFLIGHT_QA.md"
       - "docs/TESTING_ARCHITECTURE.md"
       - "docs/agents/**"
@@ -45,6 +48,7 @@ on:
       - "apps/mobile/__tests__/landingPage.test.js"
       - "scripts/prepare-landing-page-assets.mjs"
       - "scripts/validate-development-process.mjs"
+      - "vercel.json"
 
 permissions:
   contents: read

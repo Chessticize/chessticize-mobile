@@ -167,8 +167,8 @@ A design PR may become ready and merge to `main` when its current interaction
 increment is coherent and its required checks pass. Merging design artifacts is
 not design approval and does not authorize product wiring. Continue later
 feedback rounds from current `main`, update the same issue-owned scenarios, and
-deploy through the new branch's dedicated site, project, and URL until the
-design is approved for implementation.
+deploy through the new branch's isolated Vercel Preview and stable branch URL
+until the design is approved for implementation.
 
 Each New Scenario Marker ownership remains on `main` for as long as its linked
 issue is open. Remove only that ownership in a cleanup change after GitHub
@@ -183,22 +183,21 @@ record those as later diagnostic or validation work.
 
 ### Hosted preview handoff
 
-When remote preview publication is authorized and Sites is available, build and
-deploy the complete `apps/mobile-lab` Storybook from the reviewed branch's exact
-commit through a Sites project dedicated to that branch. Reuse the site only for
-later commits on the same branch; a new branch gets a new project and URL, even
-for the same issue. Stop if the recorded source branch or commit does not match
-the reviewed application branch. Every Storybook review site, including the
-main-branch catalog and every branch-owned site, is public and must not require
-authentication. Set Sites access mode to public and verify that an
-unauthenticated request to `/storybook/` returns HTTP 200 before handoff.
+When remote preview publication is authorized, push the reviewed branch's exact
+commit and let the Mobile Interaction Lab GitHub Actions workflow deploy the
+complete `apps/mobile-lab` Storybook to the dedicated Vercel project. Each
+branch owns an isolated Preview deployment and stable branch URL; later pushes
+advance only that URL, while `main` owns the Production catalog. Stop if the
+recorded source branch or commit does not match the reviewed application
+branch. Every Storybook deployment is public and must not require
+authentication. Require the workflow's unauthenticated HTTP 200 check at
+`/storybook/` before handoff. Follow `docs/STORYBOOK_DEPLOYMENT.md`.
 
 Do not commit `storybook-static`, copied bundles, a preview manifest, or hosting
 result files to the application branch. Generate deployment input in ignored or
 temporary storage and keep the source commit as the identity recorded in the
 issue and PR. A hosted preview does not approve a design or begin product
-implementation. Every Sites deployment URL is production; save without
-deploying when the request authorizes only a reviewable candidate.
+implementation. A Vercel Preview is a review artifact, not a product release.
 
 ## 9. Leave A Durable Comment
 

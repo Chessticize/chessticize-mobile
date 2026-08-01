@@ -1,0 +1,30 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm mobile:lab:validate",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "outputDirectory": "apps/mobile-lab/storybook-static",
+  "git": {
+    "deploymentEnabled": false
+  },
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/storybook/",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/storybook",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/storybook/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/storybook/:path*",
+      "destination": "/:path*"
+    }
+  ]
+}

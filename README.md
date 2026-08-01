@@ -46,6 +46,7 @@ harness (`apps/cli`), and bundled puzzle fixtures (`fixtures/puzzles`).
 - [Mobile UI Design](docs/ui-design/MOBILE_UI_DESIGN.md) — authoritative screen behavior and visual spec
 - [Core Library And CLI](docs/CORE_CLI.md) — backend package layout and CLI harness
 - [Testing Architecture](docs/TESTING_ARCHITECTURE.md) — test-layer responsibilities, critical E2E regression scope, and SQLite migration compatibility design
+- [Storybook Deployment](docs/STORYBOOK_DEPLOYMENT.md) — branch-isolated Vercel previews and the maintained `main` catalog
 - [App Store Plan](docs/APP_STORE_PLAN.md) — historical first-release foundation plan
 - [App Store Assets](docs/STORE_ASSETS.md) — current App Store metadata and screenshot capture plan
 - [Accessibility Audit](docs/ACCESSIBILITY_AUDIT.md) — evidence-backed iPhone and iPad accessibility declaration decisions
