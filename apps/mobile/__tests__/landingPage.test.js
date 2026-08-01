@@ -12,6 +12,7 @@ const homepage = read("site/index.html");
 const androidPage = read("site/android/index.html");
 const supportPage = read("site/support/index.html");
 const accessibilityPage = read("site/accessibility/index.html");
+const accessibilityPageText = accessibilityPage.replace(/\s+/gu, " ");
 const notFoundPage = read("site/404.html");
 const styles = read("site/styles.css");
 const readme = read("README.md");
@@ -57,6 +58,41 @@ describe("public landing page", () => {
     expect(publicCopy).not.toMatch(/\bweakness(?:es)?\b/i);
   });
 
+  it("leads with offline, ad-free practice and explains Arrow Duel by benefit", () => {
+    expect(homepage).toContain("Free · Offline · Ad-free · Open source");
+    expect(homepage).toMatch(
+      /Learn to reject tempting\s+blunders in Arrow Duel\./
+    );
+    expect(homepage).toContain(
+      "<strong>Blunder prevention</strong> with Arrow Duel"
+    );
+    expect(homepage).toContain(
+      "<strong>Offline</strong><br>No ads"
+    );
+    expect(homepage).toContain("<h3>Works fully offline</h3>");
+    expect(homepage).not.toContain("<strong>Two-move</strong> Arrow Duel");
+    expect(homepage).not.toContain("<strong>On-device</strong> Stockfish");
+    expect(homepage).not.toContain("<h3>On-device analysis</h3>");
+
+    for (const page of [homepage, androidPage, supportPage, accessibilityPage]) {
+      expect(page).toContain(
+        "Private, offline, ad-free chess puzzle practice."
+      );
+    }
+  });
+
+  it("leads with an iPhone product view and keeps iPad support secondary", () => {
+    expect(homepage).toContain('src="./assets/screenshots/iphone-01.webp"');
+    expect(homepage).toContain(
+      'alt="Chessticize running a Standard puzzle Sprint on iPhone"'
+    );
+    expect(homepage).toContain("<strong>Also on iPad.</strong>");
+    expect(homepage).toContain("optional private iCloud Sync");
+    expect(homepage).not.toContain("Landscape-first on iPad");
+    expect(homepage).not.toContain('class="ipad-section');
+    expect(homepage).not.toMatch(/src="\.\/assets\/screenshots\/ipad-/);
+  });
+
   it("keeps install, support, privacy, license, and source paths prominent", () => {
     for (const page of [homepage, androidPage, supportPage, accessibilityPage]) {
       expect(page).toContain(appStoreUrl);
@@ -78,8 +114,11 @@ describe("public landing page", () => {
     expect(supportPage).toContain("/issues/new?title=Feature");
     expect(accessibilityPage).toContain("/issues/new?title=Accessibility");
     expect(accessibilityPage).toContain("common chess puzzle task");
-    expect(accessibilityPage).toContain("demonstrated user demand");
-    expect(accessibilityPage).toContain("does not collect usage analytics");
+    expect(accessibilityPageText).toContain("Broad remediation is not currently scheduled");
+    expect(accessibilityPageText).toContain("complete grayscale common-task walkthrough is still pending");
+    expect(accessibilityPage).toContain("<h2>Current limitations and checks</h2>");
+    expect(accessibilityPage).not.toContain("How we prioritize accessibility work");
+    expect(accessibilityPage).not.toContain("does not collect usage analytics");
 
     expect(readme).toContain(appStoreUrl);
     expect(readme).toContain(websiteUrl);
@@ -148,6 +187,49 @@ describe("public landing page", () => {
     }, 0);
 
     expect(totalBytes).toBeLessThan(5_000_000);
+  });
+
+  it("keeps the marketing images responsive at their intrinsic proportions", () => {
+    const globalImageRule = styles.match(/(?:^|\n)img\s*\{([^}]*)\}/)?.[1];
+    expect(globalImageRule).toContain("max-width: 100%");
+    expect(globalImageRule).toContain("height: auto");
+
+    const marketingImageTags = [...homepage.matchAll(/<img\b[\s\S]*?>/g)]
+      .map(([tag]) => tag)
+      .filter((tag) => tag.includes('src="./assets/screenshots/'));
+    expect(marketingImageTags).toHaveLength(6);
+    expect(
+      marketingImageTags.map(
+        (tag) => tag.match(/src="\.\/assets\/screenshots\/([^"]+)"/)?.[1]
+      )
+    ).toEqual([
+      "iphone-01.webp",
+      "iphone-02.webp",
+      "iphone-03.webp",
+      "iphone-04.webp",
+      "iphone-05.webp",
+      "iphone-06.webp"
+    ]);
+
+    for (const tag of marketingImageTags) {
+      const output = `site/${tag.match(/src="\.\/([^"]+)"/)?.[1]}`;
+      const asset = manifest.assets.find(
+        (candidate) => candidate.output === output
+      );
+      expect(asset).toBeDefined();
+      expect(tag).toContain(`width="${asset.width}"`);
+      expect(tag).toContain(`height="${asset.height}"`);
+    }
+  });
+
+  it("keeps the mobile hero readable without the former ultra-tight display type", () => {
+    expect(styles).toContain("font-weight: 800");
+    expect(styles).toContain("font-weight: 760");
+    expect(styles).toContain("font-size: clamp(2.75rem, 12vw, 3.25rem)");
+    expect(styles).toContain("letter-spacing: -0.02em");
+    expect(styles).toContain("line-height: 1.06");
+    expect(styles).toContain("font-size: 0.65rem");
+    expect(styles).toContain("letter-spacing: 0.055em");
   });
 
   it("deploys only the static site with GitHub Pages permissions", () => {

@@ -40,6 +40,7 @@ body {
 img {
   display: block;
   max-width: 100%;
+  height: auto;
 }
 
 a {
@@ -129,8 +130,8 @@ footer nav a:hover {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(460px, 1.2fr);
-  gap: clamp(34px, 6vw, 88px);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  gap: clamp(48px, 7vw, 104px);
   align-items: center;
   min-height: calc(100vh - 72px);
   padding-block: clamp(70px, 10vw, 138px);
@@ -157,18 +158,18 @@ h1 {
   max-width: 760px;
   margin: 0;
   font-size: clamp(3.5rem, 6.7vw, 6.65rem);
-  font-weight: 860;
-  letter-spacing: -0.073em;
-  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
 }
 
 h2 {
   max-width: 820px;
   margin: 0;
   font-size: clamp(2.3rem, 4.8vw, 4.6rem);
-  font-weight: 830;
-  letter-spacing: -0.058em;
-  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.03;
 }
 
 h3 {
@@ -255,7 +256,9 @@ h3 {
 
 .hero-visual {
   position: relative;
+  width: min(100%, 360px);
   margin: 0;
+  justify-self: end;
 }
 
 .hero-visual img {
@@ -273,6 +276,12 @@ h3 {
   border-radius: 50%;
   background: rgba(0, 113, 255, 0.18);
   filter: blur(64px);
+}
+
+@media (max-width: 1200px) {
+  .hero-glow {
+    inset-inline: 0;
+  }
 }
 
 .proof-strip {
@@ -303,7 +312,6 @@ h3 {
 
 .story,
 .feature-section,
-.ipad-section,
 .community {
   padding-block: clamp(92px, 12vw, 164px);
 }
@@ -404,16 +412,16 @@ h3 {
   font-size: 0.9rem;
 }
 
-.ipad-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 26px;
+.platform-note {
+  margin: 28px 0 0;
+  padding: 22px 0 0;
+  border-top: 1px solid rgba(52, 104, 168, 0.14);
+  color: var(--muted);
+  font-size: 0.92rem;
 }
 
-.ipad-grid img {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
+.platform-note strong {
+  color: var(--ink);
 }
 
 .trust-section {
@@ -531,6 +539,10 @@ footer {
   font-size: 1.08rem;
 }
 
+.simple-page-section {
+  margin-top: clamp(56px, 8vw, 96px);
+}
+
 .info-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -602,7 +614,8 @@ footer {
   }
 
   .hero-visual {
-    max-width: 760px;
+    width: min(68vw, 320px);
+    justify-self: center;
   }
 
   .story-grid {
@@ -663,8 +676,26 @@ footer {
     padding-top: 54px;
   }
 
-  h1 {
-    font-size: clamp(3.25rem, 15vw, 5rem);
+  .hero .eyebrow {
+    font-size: 0.65rem;
+    letter-spacing: 0.055em;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.75rem, 12vw, 3.25rem);
+    font-weight: 760;
+    letter-spacing: -0.02em;
+    line-height: 1.06;
+  }
+
+  .hero-lede {
+    margin-top: 22px;
+    font-size: 1.02rem;
+    line-height: 1.58;
+  }
+
+  .install-actions {
+    margin-top: 28px;
   }
 
   .install-actions,
@@ -693,7 +724,6 @@ footer {
   }
 
   .feature-grid,
-  .ipad-grid,
   .info-grid {
     grid-template-columns: 1fr;
   }

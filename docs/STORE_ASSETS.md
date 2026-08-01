@@ -147,12 +147,12 @@ or the final #417 release evidence.
 This no-declaration result is intentional. It must not be replaced by a claim
 based only on labeled surrounding buttons: Standard, Arrow Duel, Review, and
 Replay still expose the puzzle board as a non-operable image to assistive
-technology. Larger Text, contrast, touch targets, Reduce Motion, Dark
-Interface, and the final grayscale pass have focused gap records in
-`docs/ACCESSIBILITY_AUDIT.md`. Those issues are closed as not planned under the
-current demand-driven policy; closing them does not mean the gaps are fixed.
-Reconsider the work when direct accessibility reports or documented user needs
-justify the implementation and ongoing iPhone and iPad regression coverage.
+technology. Verified Larger Text, contrast, touch-target, Reduce Motion, and
+Dark Interface limitations have related records in
+`docs/ACCESSIBILITY_AUDIT.md`. The grayscale result is different: no color-only
+blocker has been confirmed, but the complete common-task walkthrough is still
+pending. Those issue records are closed as not planned; that status does not
+change the current app or complete the pending verification.
 
 Leaving features undeclared and adding the public Accessibility URL do not
 require a new binary. Any UI or behavior fix must ship in a new version before

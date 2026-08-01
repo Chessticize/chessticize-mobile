@@ -35,66 +35,66 @@
       431,
       432
     ],
-    "summary": "Known accessibility gaps remain present, but broad remediation is not currently scheduled. Reassess when direct accessibility reports or documented user needs justify the implementation and ongoing regression coverage.",
-    "reopenSignal": "A specific user need identifying the affected puzzle flow, device, and assistive setting."
+    "summary": "Verified accessibility gaps remain present, and some checks are incomplete. Broad remediation is not currently scheduled.",
+    "reopenSignal": "A specific report identifying the affected puzzle flow, device, and assistive setting."
   },
   "features": {
     "voiceOver": {
       "status": "not-declared",
       "reason": "Standard, Arrow Duel, Review, and Replay expose the puzzle board as one image without an accessible move-entry path.",
-      "followUpIssues": [
+      "relatedIssues": [
         426
       ]
     },
     "voiceControl": {
       "status": "not-declared",
       "reason": "Puzzle moves cannot be completed by visible control name or numbered overlay.",
-      "followUpIssues": [
+      "relatedIssues": [
         426
       ]
     },
     "largerText": {
       "status": "not-declared",
       "reason": "The largest accessibility text size clips or overlaps common controls on iPhone and landscape iPad.",
-      "followUpIssues": [
+      "relatedIssues": [
         427
       ]
     },
     "sufficientContrast": {
       "status": "not-declared",
       "reason": "Verified common-task text pairs include 2.15:1 white-on-amber and 3.30:1 green-on-white contrast.",
-      "followUpIssues": [
+      "relatedIssues": [
         428
       ]
     },
     "differentiateWithoutColorAlone": {
       "status": "not-declared",
       "reason": "No confirmed color-only blocker was found, but the complete grayscale common-task walkthrough is still pending.",
-      "followUpIssues": [
+      "relatedIssues": [
         432
       ]
     },
     "reducedMotion": {
       "status": "not-declared",
       "reason": "The app does not observe the system Reduce Motion setting for board, layout, or reordering animations.",
-      "followUpIssues": [
+      "relatedIssues": [
         430
       ]
     },
     "captions": {
       "status": "not-declared",
       "reason": "The app has no timed video or spoken media experience to support with captions.",
-      "followUpIssues": []
+      "relatedIssues": []
     },
     "audioDescriptions": {
       "status": "not-declared",
       "reason": "The app has no video experience requiring an audio-description track.",
-      "followUpIssues": []
+      "relatedIssues": []
     },
     "darkInterface": {
       "status": "not-declared",
       "reason": "The common puzzle interface remains light when iOS Dark Mode is enabled.",
-      "followUpIssues": [
+      "relatedIssues": [
         431
       ]
     }
@@ -103,14 +103,14 @@
     "touchTargets": {
       "status": "partial",
       "reason": "Primary session and navigation controls are generally 44pt or larger, but shared Settings preference buttons are 34pt high without hit slop.",
-      "followUpIssues": [
+      "relatedIssues": [
         429
       ]
     },
     "orientationAndIpad": {
       "status": "supported-at-standard-text",
       "reason": "The exact-head Release app renders a usable two-column Practice layout in iPad landscape at the standard text size; Larger Text remains blocked separately.",
-      "followUpIssues": [
+      "relatedIssues": [
         427
       ]
     }

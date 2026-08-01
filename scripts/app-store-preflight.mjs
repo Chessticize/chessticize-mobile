@@ -81,6 +81,7 @@ const appStoreMetadata = readJson("config/app-store-metadata-en-us-v1.json");
 const accessibilityAudit = readText("docs/ACCESSIBILITY_AUDIT.md");
 const appStoreAccessibility = readJson("config/app-store-accessibility-v1.json");
 const accessibilityPage = readText("site/accessibility/index.html");
+const accessibilityPageText = accessibilityPage.replace(/\s+/gu, " ");
 const storeAssetsE2e = readText("apps/mobile/e2e/store-assets.e2e.js");
 const testFlightQa = readText("docs/TESTFLIGHT_QA.md");
 const privacyDisclosure = readText("docs/APP_PRIVACY_DISCLOSURE.md");
@@ -316,9 +317,14 @@ check(
     accessibilityPage.includes("common chess puzzle task") &&
     accessibilityPage.includes("not declared in the App Store") &&
     accessibilityPage.includes("not currently scheduled") &&
-    accessibilityPage.includes("closed as not planned for now") &&
-    accessibilityPage.includes("underlying gaps are not fixed"),
-  "The canonical contract, audit, and public page must preserve the demand-driven deferral and leave partial accessibility features undeclared on both iPhone and iPad."
+    accessibilityPage.includes("closed as not planned") &&
+    accessibilityPage.includes("does not change the current app") &&
+    accessibilityPageText.includes("No color-only blocker has been confirmed") &&
+    accessibilityPageText.includes("complete grayscale common-task walkthrough is still pending") &&
+    !accessibilityPage.includes("We will") &&
+    !accessibilityPage.includes("demonstrated user demand") &&
+    !JSON.stringify(appStoreAccessibility).includes("followUpIssues"),
+  "The canonical contract, audit, and public page must distinguish verified gaps from pending checks and leave partial accessibility features undeclared on both iPhone and iPad."
 );
 
 check(
