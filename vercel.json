@@ -6,14 +6,11 @@
   "git": {
     "deploymentEnabled": false
   },
-  "redirects": [
+  "rewrites": [
     {
       "source": "/",
-      "destination": "/storybook/",
-      "permanent": false
-    }
-  ],
-  "rewrites": [
+      "destination": "/index.html"
+    },
     {
       "source": "/storybook",
       "destination": "/index.html"
