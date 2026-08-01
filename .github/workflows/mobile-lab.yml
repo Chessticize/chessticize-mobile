@@ -100,7 +100,7 @@ jobs:
           fi
 
       - name: Install pinned Vercel CLI
-        run: pnpm add --global "vercel@$VERCEL_CLI_VERSION"
+        run: npm install --global "vercel@$VERCEL_CLI_VERSION"
 
       - name: Pull Vercel project settings
         run: |
