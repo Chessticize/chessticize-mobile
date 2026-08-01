@@ -33,6 +33,8 @@ export const Home: Story = {
     await expectTestIdText(canvasElement, "practice-mode-standard-rating", "925");
     await expectTestIdText(canvasElement, "practice-mode-arrow-duel-rating", "875");
     await expectTestIdText(canvasElement, "practice-review-due-count", "28");
+    await waitForTestId(canvasElement, "training-focus-card");
+    await waitForText(canvasElement, "More information needed");
     await expectTestIdHorizontalCentersAligned(
       canvasElement,
       "practice-progress-weekly-metric",
@@ -237,6 +239,52 @@ export const ActiveSessionGuideExit: Story = {
     await waitForTestId(canvasElement, "practice-home");
     expectTestIdAbsent(canvasElement, "practice-active-session-guide");
     expectTestIdAbsent(canvasElement, "session-board");
+  }
+};
+
+export const ArrowDuelGuideHeader: Story = {
+  name: "Arrow Duel · step 1 · Sprint header",
+  args: { scenarioId: "practice-arrow-duel-guide" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-active-session-guide");
+    await waitForTestId(canvasElement, "practice-session-guide-coach-overview");
+    await waitForText(canvasElement, "1 of 5");
+  }
+};
+
+export const ArrowDuelGuideSlow: Story = {
+  name: "Arrow Duel · step 2 · Slow",
+  args: { scenarioId: "practice-arrow-duel-guide" },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-session-guide-start");
+    await waitForTestId(canvasElement, "practice-session-guide-coach-slow");
+    await waitForText(canvasElement, "2 of 5");
+    await waitForText(canvasElement, "Amber means you’re taking too long");
+  }
+};
+
+export const ArrowDuelGuideTimedOut: Story = {
+  name: "Arrow Duel · step 3 · Timed out",
+  args: { scenarioId: "practice-arrow-duel-guide" },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-session-guide-start");
+    await clickTestId(canvasElement, "practice-session-guide-start");
+    await waitForTestId(canvasElement, "practice-session-guide-coach-timeout");
+    await waitForText(canvasElement, "3 of 5");
+    await waitForText(canvasElement, "This puzzle counts as a mistake");
+  }
+};
+
+export const ArrowDuelGuideUnclear: Story = {
+  name: "Arrow Duel · step 4 · Unclear",
+  args: { scenarioId: "practice-arrow-duel-guide" },
+  play: async ({ canvasElement }) => {
+    for (let index = 0; index < 3; index += 1) {
+      await clickTestId(canvasElement, "practice-session-guide-start");
+    }
+    await waitForTestId(canvasElement, "practice-session-guide-coach-unclear");
+    await waitForText(canvasElement, "4 of 5");
+    await waitForText(canvasElement, "Use Mark as unclear after a correct answer");
   }
 };
 

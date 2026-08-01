@@ -78,10 +78,15 @@ function LabScenarioContent({
   runtime: ScenarioRuntime;
   scenarioId: LabScenarioId;
 }): React.JSX.Element {
+  const tacticalProfileScenarioId = isTacticalProfileScenario(scenarioId)
+    ? scenarioId
+    : scenarioId === "practice-home"
+      ? "practice-tactical-profile-collecting"
+      : null;
   const [selectedCustomThemes, setSelectedCustomThemes] = useState<string[]>([]);
   const [tacticalProfileState, setTacticalProfileState] = useState(() =>
-    isTacticalProfileScenario(scenarioId)
-      ? initialTacticalProfileFixtureState(scenarioId)
+    tacticalProfileScenarioId
+      ? initialTacticalProfileFixtureState(tacticalProfileScenarioId)
       : { screen: "home" as const, selectedTaskFamily: "line" as const }
   );
   const [startedFocusedRun, setStartedFocusedRun] = useState<SprintState | null>(null);
@@ -102,16 +107,16 @@ function LabScenarioContent({
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
   useEffect(() => setSelectedCustomThemes([]), [scenarioId]);
   useEffect(() => {
-    if (isTacticalProfileScenario(scenarioId)) {
-      setTacticalProfileState(initialTacticalProfileFixtureState(scenarioId));
+    if (tacticalProfileScenarioId) {
+      setTacticalProfileState(initialTacticalProfileFixtureState(tacticalProfileScenarioId));
       setStartedFocusedRun(null);
     }
-  }, [scenarioId]);
+  }, [tacticalProfileScenarioId]);
 
-  const tacticalProfilePresentation = isTacticalProfileScenario(scenarioId)
+  const tacticalProfilePresentation = tacticalProfileScenarioId
     && startedFocusedRun === null
     ? tacticalProfilePresentationFor(
-        scenarioId,
+        tacticalProfileScenarioId,
         tacticalProfileState,
         (intent) => {
           if (intent.type === "start-focused-run") {
@@ -603,6 +608,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
+    sprintGuidanceEnabled: scenarioId.startsWith("settings-"),
     sprintRulesDesignPreview: sprintRulesDesignPreviewFor(scenarioId),
     standardTargetCorrect: 1,
     arrowDuelTargetCorrect: 1,
