@@ -49,8 +49,10 @@ bundle are local or CI artifacts and remain untracked.
    Preview URLs publicly accessible. Do not enable Vercel Authentication or
    password protection for this project. Public access is a repository review
    gate, not an optional convenience.
-6. If desired, assign a custom domain to Production. This becomes the stable
-   `main` catalog URL; Vercel's default Production domain also remains stable.
+6. Assign `storybook.chessticize.com` to Production. The workflow treats
+   `https://storybook.chessticize.com/storybook/` as the maintained `main`
+   catalog and fails a Production deployment unless that public URL returns
+   HTTP 200.
 
 Vercel currently restricts connecting GitHub organization repositories to
 Hobby teams. The repository is public, but the supported setup for generated
@@ -92,7 +94,8 @@ code change is required.
 1. Add the three repository secrets.
 2. Push this workflow branch. Its normal `push` run validates the complete
    Interaction Lab and creates the branch's Preview deployment.
-3. Open the workflow run summary and follow the Storybook manager URL.
+3. Open the workflow run summary and follow the stable Storybook manager URL.
+   The exact deployment URL is recorded separately for commit-level evidence.
 4. Open the same `/storybook/` URL in a signed-out or private browser window.
    The workflow has already checked HTTP 200 without credentials; the browser
    check confirms the visible manager and story assets load correctly.
@@ -110,7 +113,8 @@ Preview-versus-Production rule as a push.
 Record all of the following in the PR:
 
 - Storybook source branch and exact 40-character commit SHA.
-- Stable Vercel branch manager URL ending in `/storybook/`.
+- Stable Vercel branch manager URL ending in `/storybook/`, resolved from the
+  deployment's generated branch alias.
 - Direct Storybook story URL for the changed scenario.
 - The successful GitHub Actions run and its anonymous HTTP 200 result.
 
@@ -128,6 +132,9 @@ design or authorize product wiring.
 - **No stable branch URL:** connect the GitHub repository to the Vercel project
   and verify that the deployment metadata shows `githubCommitRef`. Exact commit
   URLs alone do not replace the branch-owned review URL.
+- **Production custom domain fails:** verify that `storybook.chessticize.com`
+  is assigned to the project Production environment, then require anonymous
+  HTTP 200 at `https://storybook.chessticize.com/storybook/`.
 - **Two Vercel deployments for one push:** verify the deployed commit contains
   `git.deploymentEnabled: false` and that no second Vercel project is connected
   to the repository.

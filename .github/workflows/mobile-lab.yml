@@ -69,7 +69,7 @@ jobs:
     timeout-minutes: 20
     environment:
       name: storybook/${{ github.ref_name }}
-      url: ${{ steps.deploy.outputs.url }}
+      url: ${{ steps.deploy.outputs.manager_url }}
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -139,26 +139,53 @@ jobs:
           fi
 
           deployment_url="$(vercel deploy "${deploy_args[@]}")"
-          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
-          echo "storybook_url=${deployment_url%/}/storybook/" >> "$GITHUB_OUTPUT"
+          immutable_storybook_url="${deployment_url%/}/storybook/"
+
+          if [[ "$GITHUB_REF_NAME" == "main" ]]; then
+            manager_url="https://storybook.chessticize.com/storybook/"
+          else
+            branch_alias="$(
+              vercel inspect "$deployment_url" --json --token="$VERCEL_TOKEN" |
+                node -e '
+                  let input = "";
+                  process.stdin.on("data", (chunk) => { input += chunk; });
+                  process.stdin.on("end", () => {
+                    const deployment = JSON.parse(input);
+                    const alias = deployment.aliases?.find((candidate) => candidate.endsWith(".vercel.app"));
+                    if (!alias) process.exit(1);
+                    process.stdout.write(alias);
+                  });
+                '
+            )"
+            manager_url="https://${branch_alias}/storybook/"
+          fi
+
+          echo "manager_url=$manager_url" >> "$GITHUB_OUTPUT"
+          echo "immutable_storybook_url=$immutable_storybook_url" >> "$GITHUB_OUTPUT"
 
       - name: Verify public Storybook access
         env:
-          STORYBOOK_URL: ${{ steps.deploy.outputs.storybook_url }}
+          IMMUTABLE_STORYBOOK_URL: ${{ steps.deploy.outputs.immutable_storybook_url }}
+          STORYBOOK_URL: ${{ steps.deploy.outputs.manager_url }}
         run: |
-          status="000"
-          for attempt in 1 2 3 4 5; do
-            status="$(curl --location --silent --output /dev/null --write-out '%{http_code}' "$STORYBOOK_URL")"
-            if [[ "$status" == "200" ]]; then
-              break
-            fi
-            sleep "$((attempt * 2))"
-          done
+          verify_public_url() {
+            local url="$1"
+            local status="000"
 
-          if [[ "$status" != "200" ]]; then
-            echo "::error::Unauthenticated Storybook request returned HTTP $status for $STORYBOOK_URL"
-            exit 1
-          fi
+            for attempt in 1 2 3 4 5; do
+              status="$(curl --location --silent --output /dev/null --write-out '%{http_code}' "$url")"
+              if [[ "$status" == "200" ]]; then
+                return 0
+              fi
+              sleep "$((attempt * 2))"
+            done
+
+            echo "::error::Unauthenticated Storybook request returned HTTP $status for $url"
+            return 1
+          }
+
+          verify_public_url "$IMMUTABLE_STORYBOOK_URL"
+          verify_public_url "$STORYBOOK_URL"
 
           {
             echo "## Storybook deployment"
@@ -166,5 +193,6 @@ jobs:
             echo "- Branch: \`$GITHUB_REF_NAME\`"
             echo "- Commit: \`$GITHUB_SHA\`"
             echo "- Manager: $STORYBOOK_URL"
+            echo "- Exact deployment: $IMMUTABLE_STORYBOOK_URL"
             echo "- Anonymous access: HTTP 200"
           } >> "$GITHUB_STEP_SUMMARY"

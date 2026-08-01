@@ -372,8 +372,15 @@ assert.match(mobileLabWorkflow, /--prebuilt/);
 assert.match(mobileLabWorkflow, /--meta=githubDeployment=1/);
 assert.match(mobileLabWorkflow, /--meta=githubCommitRef="\$GITHUB_REF_NAME"/);
 assert.match(mobileLabWorkflow, /deploy_args\+=\(--prod\)/);
+assert.match(mobileLabWorkflow, /vercel inspect "\$deployment_url" --json/);
+assert.match(mobileLabWorkflow, /deployment\.aliases\?\.find/);
+assert.ok(
+  mobileLabWorkflow.includes('manager_url="https://storybook.chessticize.com/storybook/"')
+);
+assert.match(mobileLabWorkflow, /immutable_storybook_url/);
 assert.match(mobileLabWorkflow, /Unauthenticated Storybook request returned HTTP/);
-assert.match(mobileLabWorkflow, /\$\{deployment_url%\/\}\/storybook\//);
+assert.match(mobileLabWorkflow, /verify_public_url "\$IMMUTABLE_STORYBOOK_URL"/);
+assert.match(mobileLabWorkflow, /verify_public_url "\$STORYBOOK_URL"/);
 assert.equal(vercelConfig.buildCommand, "pnpm mobile:lab:validate");
 assert.equal(vercelConfig.installCommand, "pnpm install --frozen-lockfile");
 assert.equal(vercelConfig.outputDirectory, "apps/mobile-lab/storybook-static");
