@@ -139,10 +139,10 @@ jobs:
           fi
 
           deployment_url="$(vercel deploy "${deploy_args[@]}")"
-          immutable_storybook_url="${deployment_url%/}/storybook/"
+          immutable_url="${deployment_url%/}/"
 
           if [[ "$GITHUB_REF_NAME" == "main" ]]; then
-            manager_url="https://storybook.chessticize.com/storybook/"
+            manager_url="https://storybook.chessticize.com/"
           else
             branch_alias="$(
               vercel inspect "$deployment_url" --json --token="$VERCEL_TOKEN" |
@@ -157,15 +157,15 @@ jobs:
                   });
                 '
             )"
-            manager_url="https://${branch_alias}/storybook/"
+            manager_url="https://${branch_alias}/"
           fi
 
           echo "manager_url=$manager_url" >> "$GITHUB_OUTPUT"
-          echo "immutable_storybook_url=$immutable_storybook_url" >> "$GITHUB_OUTPUT"
+          echo "immutable_url=$immutable_url" >> "$GITHUB_OUTPUT"
 
       - name: Verify public Storybook access
         env:
-          IMMUTABLE_STORYBOOK_URL: ${{ steps.deploy.outputs.immutable_storybook_url }}
+          IMMUTABLE_URL: ${{ steps.deploy.outputs.immutable_url }}
           STORYBOOK_URL: ${{ steps.deploy.outputs.manager_url }}
         run: |
           verify_public_url() {
@@ -184,8 +184,10 @@ jobs:
             return 1
           }
 
-          verify_public_url "$IMMUTABLE_STORYBOOK_URL"
+          verify_public_url "$IMMUTABLE_URL"
           verify_public_url "$STORYBOOK_URL"
+          verify_public_url "${IMMUTABLE_URL}storybook/"
+          verify_public_url "${STORYBOOK_URL}storybook/"
 
           {
             echo "## Storybook deployment"
@@ -193,6 +195,7 @@ jobs:
             echo "- Branch: \`$GITHUB_REF_NAME\`"
             echo "- Commit: \`$GITHUB_SHA\`"
             echo "- Manager: $STORYBOOK_URL"
-            echo "- Exact deployment: $IMMUTABLE_STORYBOOK_URL"
-            echo "- Anonymous access: HTTP 200"
+            echo "- Exact deployment: $IMMUTABLE_URL"
+            echo "- Compatibility path: ${STORYBOOK_URL}storybook/"
+            echo "- Anonymous access: HTTP 200 at both root and \`/storybook/\`"
           } >> "$GITHUB_STEP_SUMMARY"

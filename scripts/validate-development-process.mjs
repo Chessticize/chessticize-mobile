@@ -375,24 +375,24 @@ assert.match(mobileLabWorkflow, /deploy_args\+=\(--prod\)/);
 assert.match(mobileLabWorkflow, /vercel inspect "\$deployment_url" --json/);
 assert.match(mobileLabWorkflow, /deployment\.aliases\?\.find/);
 assert.ok(
-  mobileLabWorkflow.includes('manager_url="https://storybook.chessticize.com/storybook/"')
+  mobileLabWorkflow.includes('manager_url="https://storybook.chessticize.com/"')
 );
-assert.match(mobileLabWorkflow, /immutable_storybook_url/);
+assert.match(mobileLabWorkflow, /immutable_url/);
 assert.match(mobileLabWorkflow, /Unauthenticated Storybook request returned HTTP/);
-assert.match(mobileLabWorkflow, /verify_public_url "\$IMMUTABLE_STORYBOOK_URL"/);
+assert.match(mobileLabWorkflow, /verify_public_url "\$IMMUTABLE_URL"/);
 assert.match(mobileLabWorkflow, /verify_public_url "\$STORYBOOK_URL"/);
+assert.match(mobileLabWorkflow, /verify_public_url "\$\{IMMUTABLE_URL\}storybook\/"/);
+assert.match(mobileLabWorkflow, /verify_public_url "\$\{STORYBOOK_URL\}storybook\/"/);
 assert.equal(vercelConfig.buildCommand, "pnpm mobile:lab:validate");
 assert.equal(vercelConfig.installCommand, "pnpm install --frozen-lockfile");
 assert.equal(vercelConfig.outputDirectory, "apps/mobile-lab/storybook-static");
 assert.equal(vercelConfig.git.deploymentEnabled, false);
-assert.deepEqual(vercelConfig.redirects, [
+assert.equal(vercelConfig.redirects, undefined);
+assert.deepEqual(vercelConfig.rewrites, [
   {
     source: "/",
-    destination: "/storybook/",
-    permanent: false
-  }
-]);
-assert.deepEqual(vercelConfig.rewrites, [
+    destination: "/index.html"
+  },
   {
     source: "/storybook",
     destination: "/index.html"
