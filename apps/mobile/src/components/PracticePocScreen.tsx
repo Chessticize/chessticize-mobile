@@ -15307,6 +15307,7 @@ const styles = StyleSheet.create({
     gap: 14
   },
   practiceHomeStack: {
+    flexDirection: "column",
     gap: 18
   },
   practiceHomePrimaryColumn: {
