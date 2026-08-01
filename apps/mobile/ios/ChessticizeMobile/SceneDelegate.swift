@@ -15,7 +15,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     if ProcessInfo.processInfo.isiOSAppOnMac,
        let sizeRestrictions = windowScene.sizeRestrictions {
       sizeRestrictions.minimumSize = CGSize(width: 820, height: 600)
-      sizeRestrictions.maximumSize = CGSize(width: 1376, height: 1376)
+      sizeRestrictions.maximumSize.width = 1376
     }
 
     let window = UIWindow(windowScene: windowScene)
