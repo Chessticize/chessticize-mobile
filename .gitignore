@@ -24,6 +24,7 @@ apps/mobile-lab/storybook-static/
 scratch/
 
 # Tooling
+.vercel/
 .env
 .env.*
 !.env.example

@@ -42,25 +42,27 @@ corresponding first-use guidance and Interaction Lab guide scenarios in the same
 change, including shared Active Session guidance and Arrow Duel guidance when
 applicable.
 
-Each feedback issue owns its Storybook design track. Every feature branch also
-owns a dedicated full-catalog Storybook site and Sites project; never deploy a
-different branch through that project or overwrite another branch's review URL.
-Later commits on the same branch reuse its site, while a new branch gets a new
-site even when it continues the same issue. Every Storybook review site,
-including the main-branch catalog and every branch-owned site, is public and
-must not require authentication. Verify that an unauthenticated request to
-`/storybook/` returns HTTP 200 after every deployment or access-policy change.
+Each feedback issue owns its Storybook design track. The dedicated Interaction
+Lab Vercel project publishes one isolated full-catalog deployment and stable
+branch URL per feature branch; never substitute a URL owned by another branch.
+Later commits on the same branch advance that branch URL, while `main` owns the
+long-lived Production catalog. GitHub Actions is the single deployment writer;
+the committed Vercel configuration disables duplicate provider-side Git builds.
+Every Storybook review deployment, including the main catalog and every branch
+preview, is public and must not require authentication. Verify that an
+unauthenticated request to `/storybook/` returns HTTP 200 after every deployment
+or access-policy change. Follow `docs/STORYBOOK_DEPLOYMENT.md`.
 If publication is unavailable after a concrete deployment attempt, an explicit
 repository-owner authorization may waive this gate for that PR. Record the
 failed publication result, the site's resulting access state, the owner's
 authorization, and the follow-up needed in the PR before marking it ready or
 merging it. Keep any usable owner-only deployment in place; never substitute or
-overwrite another branch's review site.
+overwrite another branch's review deployment.
 A coherent design increment may merge to `main` before implementation; its
 New Scenario Marker retains one ownership entry per linked issue until that
 issue is closed. A scenario changed by multiple open issues retains every owner.
-Generated Storybook deployment files are not committed to the application
-branch.
+Generated Storybook bundles and Vercel link files are not committed to the
+application branch.
 
 A new screen, navigation destination, stateful modal or sheet, multi-step
 journey, or materially new loading, empty, error, or permission path counts as

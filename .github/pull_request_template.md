@@ -15,7 +15,7 @@ Linked UI issue:
 
 Storybook source branch:
 
-Full Storybook manager URL:
+Stable branch Storybook manager URL:
 
 Direct story URL:
 

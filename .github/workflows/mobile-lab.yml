@@ -3,16 +3,7 @@ name: Mobile Interaction Lab
 on:
   workflow_dispatch:
   push:
-    branches: [main]
-    paths:
-      - ".github/workflows/mobile-lab.yml"
-      - "apps/mobile-lab/**"
-      - "apps/mobile/src/**"
-      - "package.json"
-      - "packages/**"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "tsconfig.json"
+    branches: ["**"]
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
@@ -36,6 +27,7 @@ concurrency:
 jobs:
   validate:
     name: Interaction Lab typecheck and build
+    if: github.event_name != 'push' || github.event.deleted == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -66,3 +58,113 @@ jobs:
           BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
           GITHUB_TOKEN: ${{ github.token }}
         run: pnpm mobile:lab:check-markers
+
+  deploy:
+    name: Deploy branch Storybook to Vercel
+    if: >-
+      (github.event_name == 'push' && github.event.deleted == false) ||
+      github.event_name == 'workflow_dispatch'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: storybook/${{ github.ref_name }}
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_CLI_VERSION: 58.4.4
+    steps:
+      - name: Checkout without LFS assets
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+          cache: pnpm
+
+      - name: Require Vercel deployment credentials
+        run: |
+          if [[ -z "$VERCEL_TOKEN" || -z "$VERCEL_ORG_ID" || -z "$VERCEL_PROJECT_ID" ]]; then
+            echo "::error::Configure VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID as GitHub Actions secrets."
+            exit 1
+          fi
+
+      - name: Install pinned Vercel CLI
+        run: pnpm add --global "vercel@$VERCEL_CLI_VERSION"
+
+      - name: Pull Vercel project settings
+        run: |
+          if [[ "$GITHUB_REF_NAME" == "main" ]]; then
+            vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          else
+            vercel pull --yes --environment=preview --git-branch="$GITHUB_REF_NAME" --token="$VERCEL_TOKEN"
+          fi
+
+      - name: Build the validated Storybook deployment
+        run: |
+          if [[ "$GITHUB_REF_NAME" == "main" ]]; then
+            vercel build --prod --token="$VERCEL_TOKEN"
+          else
+            vercel build --token="$VERCEL_TOKEN"
+          fi
+
+      - name: Deploy the exact branch commit
+        id: deploy
+        run: |
+          deploy_args=(
+            --prebuilt
+            --archive=tgz
+            --token="$VERCEL_TOKEN"
+            --meta=githubDeployment=1
+            --meta=githubCommitRef="$GITHUB_REF_NAME"
+            --meta=githubCommitSha="$GITHUB_SHA"
+            --meta=githubOrg="$GITHUB_REPOSITORY_OWNER"
+            --meta=githubRepo="${GITHUB_REPOSITORY#*/}"
+            --meta=githubCommitOrg="$GITHUB_REPOSITORY_OWNER"
+            --meta=githubCommitRepo="${GITHUB_REPOSITORY#*/}"
+          )
+
+          if [[ "$GITHUB_REF_NAME" == "main" ]]; then
+            deploy_args+=(--prod)
+          fi
+
+          deployment_url="$(vercel deploy "${deploy_args[@]}")"
+          echo "url=$deployment_url" >> "$GITHUB_OUTPUT"
+          echo "storybook_url=${deployment_url%/}/storybook/" >> "$GITHUB_OUTPUT"
+
+      - name: Verify public Storybook access
+        env:
+          STORYBOOK_URL: ${{ steps.deploy.outputs.storybook_url }}
+        run: |
+          status="000"
+          for attempt in 1 2 3 4 5; do
+            status="$(curl --location --silent --output /dev/null --write-out '%{http_code}' "$STORYBOOK_URL")"
+            if [[ "$status" == "200" ]]; then
+              break
+            fi
+            sleep "$((attempt * 2))"
+          done
+
+          if [[ "$status" != "200" ]]; then
+            echo "::error::Unauthenticated Storybook request returned HTTP $status for $STORYBOOK_URL"
+            exit 1
+          fi
+
+          {
+            echo "## Storybook deployment"
+            echo
+            echo "- Branch: \`$GITHUB_REF_NAME\`"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Manager: $STORYBOOK_URL"
+            echo "- Anonymous access: HTTP 200"
+          } >> "$GITHUB_STEP_SUMMARY"

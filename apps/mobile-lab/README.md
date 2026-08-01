@@ -51,7 +51,12 @@ Or run the typecheck, registry tests, and static build together:
 pnpm mobile:lab:validate
 ```
 
-The path-scoped Interaction Lab workflow runs for changes under `apps/mobile-lab`, `apps/mobile/src`, shared packages, or relevant workspace configuration. It does not fetch the LFS puzzle pack.
+Pull-request validation remains path-scoped to Interaction Lab inputs. Every
+branch push validates and deploys the complete catalog through the branch's
+Vercel Preview URL, or the maintained Production URL for `main`. The workflow
+does not fetch the LFS puzzle pack. See
+[`docs/STORYBOOK_DEPLOYMENT.md`](../../docs/STORYBOOK_DEPLOYMENT.md) for the
+one-time account setup and deployment runbook.
 
 ## Browser boundaries
 
@@ -89,7 +94,7 @@ Whole-screen stories are currently marked `free-roam`, matching the monolithic `
 4. Add or update the typed definition and navigation coverage in `scenarioRegistry.ts`.
 5. Export or update the Storybook story in the appropriate product group. A short play function may drive public UI actions after seeding. The complete catalog should show the expected post-implementation product; the `new` tag highlights the issue-owned delta.
 6. Add the scenario ID and a non-empty `issues` array to `newScenarioMarkers.json` for each new or materially changed scenario. Each owning issue gets its own `issueNumber` and one-line `changeNote`; preserve every owner when issues share a scenario. This adds `isNew: true`, the Storybook `new` tag, and the What's New card.
-7. Build and deploy the full Storybook for the issue's exact commit through a site dedicated to the current feature branch. Later commits on that branch reuse the site; another branch, including one for the same issue, must use a different Sites project and URL. Every Storybook review site, including the main-branch catalog and every branch-owned site, is public and must not require authentication. Verify the recorded branch and commit before publishing, stop rather than overwrite a site owned by another branch, and verify that an unauthenticated request to `/storybook/` returns HTTP 200. Record the branch, manager URL, direct story URL, and source commit in the issue and PR; generated bundles, Sites project metadata, and hosting result files stay untracked.
+7. Push the issue's exact commit and let the Mobile Interaction Lab workflow deploy the full Storybook through the current branch's stable Vercel Preview URL. Later pushes advance only that branch URL; another branch, including one for the same issue, receives a different Preview deployment and URL, while `main` owns Production. Every deployment is public and must not require authentication. Verify the recorded branch and commit, stop rather than substitute another branch's URL, and require the workflow's unauthenticated HTTP 200 check at `/storybook/`. Record the branch, stable manager URL, direct story URL, source commit, and workflow run in the issue and PR; generated bundles, `.vercel/` project-link metadata, and hosting result files stay untracked.
 8. A coherent design increment may merge to `main` before implementation. Continue later feedback in a new PR from `main`, updating the same issue-owned scenario through the new branch's dedicated deployment.
 9. Keep each ownership entry while its linked issue remains open. Pull-request CI verifies GitHub records an issue as closed before accepting removal of its ownership; remove the marker only when no ownership remains, and retain the scenario as living UI documentation. An unambiguous one-to-one correction from a mistaken parallel prototype to the existing product-clone scenario is allowed only when the same open issue remains marked.
 10. Record explicit design approval before product wiring starts.

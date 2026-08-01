@@ -23,14 +23,15 @@ Lab design phase first. Follow `docs/agents/ui-flow-design.md`.
    permission states that apply.
 3. Keep this phase isolated from production navigation entries, backend or
    storage mutations, native-module wiring, analytics, and rollout logic.
-4. Add the issue-owned New Scenario Marker, run the Lab checks, and deploy the
-   full Storybook from the exact commit through a site dedicated to the current
-   feature branch. Never reuse that Sites project or URL for another branch;
-   stop if the deployment input names a different branch or commit. Generated
-   deployment files stay outside the application branch. Every Storybook review
-   site, including the main-branch catalog and every branch-owned site, is public
-   and must not require authentication. Verify an unauthenticated request to
-   `/storybook/` returns HTTP 200 before handoff.
+4. Add the issue-owned New Scenario Marker, run the Lab checks, and let the
+   branch push deploy the full Storybook from the exact commit through the
+   dedicated Interaction Lab Vercel project. Use only the stable URL owned by
+   the current branch; later pushes advance it, while `main` owns Production.
+   Stop if the deployment metadata names a different branch or commit.
+   Generated Storybook bundles and Vercel link files stay outside the
+   application branch. Every Storybook review deployment is public and must not
+   require authentication. Verify an unauthenticated request to `/storybook/`
+   returns HTTP 200 before handoff. Follow `docs/STORYBOOK_DEPLOYMENT.md`.
 5. Merge coherent design increments to `main` and iterate from current `main`;
    retain the marker until the linked issue closes.
 6. Record explicit design approval in the issue or PR before starting product
