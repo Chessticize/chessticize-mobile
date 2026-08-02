@@ -23,11 +23,14 @@ Lab design phase first. Follow `docs/agents/ui-flow-design.md`.
    permission states that apply.
 3. Keep this phase isolated from production navigation entries, backend or
    storage mutations, native-module wiring, analytics, and rollout logic.
-4. Add the issue-owned New Scenario Marker, run the Lab checks, and let the
-   branch push deploy the full Storybook from the exact commit through the
-   dedicated Interaction Lab Vercel project. Use only the stable URL owned by
-   the current branch; later pushes advance it, while `main` owns Production.
-   Stop if the deployment metadata names a different branch or commit.
+4. Add the issue-owned New Scenario Marker, run the Lab checks, and push the
+   exact commit. Let the GitHub Actions workflow deploy the full Storybook to
+   the repository's existing shared Interaction Lab Vercel project. GitHub
+   Actions is the only deployment writer: do not create a Vercel project or run
+   `vercel link` or `vercel deploy` locally. Use only the stable branch alias
+   inside that shared project; later pushes advance it, while `main` owns
+   Production. Stop if the deployment metadata names a different branch or
+   commit.
    Generated Storybook bundles and Vercel link files stay outside the
    application branch. Every Storybook review deployment is public and must not
    require authentication. Verify an unauthenticated request to `/storybook/`
