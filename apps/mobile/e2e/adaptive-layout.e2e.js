@@ -40,6 +40,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     const initialOrientation = onlyOrientation === 'landscape' ? 'landscape' : 'portrait';
     await launchForOrientation(initialOrientation);
     await waitForHomeTopFrame();
+    await assertFirstUseSprintRulesGuideLayout();
     await captureHome(initialOrientation);
 
     await selectTestPuzzleSource('familiar15');
@@ -117,6 +118,35 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     }
   });
 });
+
+async function assertFirstUseSprintRulesGuideLayout() {
+  const row = element(by.id('practice-sprint-rule-puzzle-timeout'));
+  const badge = element(by.id('practice-sprint-rule-puzzle-timeout-badge'));
+  const copy = element(by.id('practice-sprint-rule-puzzle-timeout-copy'));
+
+  await waitFor(element(by.id('practice-sprint-rules-guide'))).toBeVisible().withTimeout(10000);
+  await waitFor(element(by.text('TIMEOUT'))).toBeVisible().withTimeout(10000);
+
+  const rowFrame = await frameFor(row);
+  const badgeFrame = await frameFor(badge);
+  const copyFrame = await frameFor(copy);
+  expectFrameContained(badgeFrame, rowFrame, `${deviceLabel} TIMEOUT badge`);
+  expectFrameContained(copyFrame, rowFrame, `${deviceLabel} Puzzle timeout copy`);
+
+  const badgeCopyGap = copyFrame.x - (badgeFrame.x + badgeFrame.width);
+  if (badgeCopyGap < 8) {
+    throw new Error(
+      `${deviceLabel} TIMEOUT badge crowds Puzzle timeout copy: gap=${badgeCopyGap} `
+      + `badge=${JSON.stringify(badgeFrame)} copy=${JSON.stringify(copyFrame)}`
+    );
+  }
+  if (deviceLabel.includes('large-text-phone') && badgeFrame.width <= 72) {
+    throw new Error(
+      `${deviceLabel} TIMEOUT badge did not expand beyond its 72-point baseline: `
+      + JSON.stringify(badgeFrame)
+    );
+  }
+}
 
 async function captureHome(orientation) {
   const homeFrame = await frameFor(element(by.id('adaptive-layout')));
