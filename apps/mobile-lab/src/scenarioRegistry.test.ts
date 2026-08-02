@@ -31,7 +31,7 @@ test("the Practice catalog covers the post-correct Unclear follow-up", () => {
   assert.equal(scenario.group, "Practice");
   assert.ok(scenario.scope.includes.includes("Previous-attempt clarity question"));
   assert.ok(scenario.scope.includes.includes("Blue read-only Marked status"));
-  assert.equal(scenario.isNew, true);
+  assert.equal(scenario.isNew ?? false, false);
 });
 
 test("every typed navigation coverage entry points to a registered scenario", () => {
@@ -49,9 +49,10 @@ test("every typed navigation coverage entry points to a registered scenario", ()
   }
 });
 
-test("New Scenario Markers retain open-issue ownership on the full catalog", () => {
+test("New Scenario Markers derive tags and the current catalog has none", () => {
   const scenarios = Object.values(scenarioRegistry);
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
+  assert.deepEqual(newScenarios, []);
 
   for (const scenario of scenarios) {
     assert.deepEqual(
@@ -69,7 +70,7 @@ test("New Scenario Markers retain open-issue ownership on the full catalog", () 
   }
 });
 
-test("Issue #482 owns the production Incomplete History and Sprint Result states", () => {
+test("closed Issue #482 keeps the production Incomplete states without new markers", () => {
   for (const scenarioId of [
     "history-populated",
     "history-filters",
@@ -78,9 +79,9 @@ test("Issue #482 owns the production Incomplete History and Sprint Result states
     const scenario = scenarioRegistry[scenarioId];
     assert.equal(
       scenario.issues?.some((issue) => issue.issueNumber === 482) ?? false,
-      true
+      false
     );
-    assert.deepEqual(storyTagsForScenario(scenarioId), ["new"]);
+    assert.deepEqual(storyTagsForScenario(scenarioId), []);
   }
   assert.ok(
     scenarioRegistry["history-populated"].scope.includes.includes("Production Incomplete outcome")
@@ -218,7 +219,7 @@ test("the closed Issue #363 scenarios keep their stable URLs without Issue #363 
     scenarioRegistry["history-populated"].issues?.some((issue) => issue.issueNumber === 363) ?? false,
     false
   );
-  assert.deepEqual(storyTagsForScenario("history-populated"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("history-populated"), []);
   assert.deepEqual(storyTagsForScenario("history-progress"), []);
   assert.deepEqual(storyTagsForScenario("history-progress-weakness"), []);
   assert.deepEqual(storyTagsForScenario("history-progress-speed-weakness"), []);
@@ -352,23 +353,27 @@ test("post-attempt handoffs explain Timeout, Wrong, and Slow-correct results", (
   assert.match(afterSlow.description, /automatically marked Unclear/);
 });
 
-test("Issue #390 owns a four-entry Replay whose status is shown by existing actions", () => {
+test("closed Issue #390 keeps its Replay states without new markers", () => {
   const historyReplay = scenarioRegistry["history-attempt-detail"];
   const result = scenarioRegistry["practice-sprint-result-goal"];
   const replay = scenarioRegistry["practice-sprint-result-replay"];
-  const issueScenarios = newScenarios
-    .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 390))
-    .map((scenario) => scenario.id)
-    .sort();
-
-  assert.deepEqual(issueScenarios, [
+  const issueScenarioIds = [
     "history-attempt-detail",
     "history-replay-unavailable",
     "practice-slow-unclear-notice",
     "practice-sprint-result-goal",
     "practice-sprint-result-replay",
     "practice-unclear-follow-up"
-  ]);
+  ] as const;
+
+  for (const scenarioId of issueScenarioIds) {
+    const scenario = scenarioRegistry[scenarioId];
+    assert.equal(
+      scenario.issues?.some((issue) => issue.issueNumber === 390) ?? false,
+      false
+    );
+    assert.deepEqual(storyTagsForScenario(scenarioId), []);
+  }
   assert.match(historyReplay.description, /Replay terminology/);
   assert.equal(result.storyId, "practice--sprint-result-goal-clarity");
   assert.ok(result.scope.includes.includes("Neutral replay entry"));
@@ -379,9 +384,6 @@ test("Issue #390 owns a four-entry Replay whose status is shown by existing acti
   assert.ok(replay.scope.includes.includes("Remove from Review"));
   assert.ok(replay.scope.exits.includes("New replay status badges"));
   assert.match(replay.description, /existing actions instead of new status badges/);
-  assert.deepEqual(storyTagsForScenario(historyReplay.id), ["new"]);
-  assert.deepEqual(storyTagsForScenario(result.id), ["new"]);
-  assert.deepEqual(storyTagsForScenario(replay.id), ["new"]);
 });
 
 test("closed Issue #415 keeps its stable story without a new marker", () => {
