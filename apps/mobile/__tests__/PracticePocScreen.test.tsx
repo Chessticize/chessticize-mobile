@@ -981,6 +981,49 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
+  it("locks the Edit Runs screen while a Run card drag is active", () => {
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ homeEditing: true })
+    });
+    const mainScroll = findByTestId(renderer, "practice-main-scroll");
+    const standardRun = renderer.root.findAllByProps({ testID: "practice-run-standard" })
+      .find((node) => typeof node.props.onTouchStart === "function");
+
+    expect(standardRun).toBeTruthy();
+
+    expect(mainScroll.props.scrollEnabled).toBe(true);
+
+    act(() => {
+      standardRun!.props.onTouchStart();
+    });
+    expect(standardRun!.props.onMoveShouldSetPanResponder({}, { dx: 0, dy: 12 })).toBe(false);
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+
+    act(() => {
+      standardRun!.props.onTouchStart();
+      jest.advanceTimersByTime(180);
+    });
+    expect(standardRun!.props.onMoveShouldSetPanResponder({}, { dx: 0, dy: 12 })).toBe(true);
+
+    act(() => {
+      standardRun!.props.onPanResponderGrant();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+
+    act(() => {
+      standardRun!.props.onPanResponderRelease();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+
+    act(() => {
+      standardRun!.props.onTouchStart();
+      jest.advanceTimersByTime(180);
+      standardRun!.props.onPanResponderGrant();
+      standardRun!.props.onPanResponderTerminate();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+  });
+
   it("renders removal confirmation directly below the selected Run card", () => {
     const renderer = renderScreen({
       runManagementPresentation: runManagementPresentation({

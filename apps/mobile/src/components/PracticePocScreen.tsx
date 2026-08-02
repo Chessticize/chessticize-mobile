@@ -751,6 +751,7 @@ export function PracticePocScreen({
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
   const [reviewBoardTouchActive, setReviewBoardTouchActive] = useState(false);
+  const [runReorderDragActive, setRunReorderDragActive] = useState(false);
   const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryUnavailableAttempt | null>(null);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
   const [historyProgressOpen, setHistoryProgressOpen] = useState(false);
@@ -2881,10 +2882,13 @@ export function PracticePocScreen({
   // surrounding Sprint scroll for the whole session and the fixed Review board
   // in landscape. Review and replay keep their portrait actions scrollable, so
   // they freeze the page only while a touch that started on the board is active.
+  // Edit Runs stays scrollable until a held card actually claims its drag, then
+  // freezes through drop so the card moves without also panning the page.
   const reviewBoardVisible = reviewSessionSource !== null || historyReviewEntries.length > 0;
   const practiceScrollLocked = shouldShowSessionBoard
     || (adaptiveLayout.usesSessionRail && reviewBoardVisible)
-    || reviewBoardTouchActive;
+    || reviewBoardTouchActive
+    || runReorderDragActive;
   const boardGestureEnabled = Boolean(
     isActive
       && !isShowingFeedbackSnapshot
@@ -3871,6 +3875,7 @@ export function PracticePocScreen({
                     onStartMode={(nextMode) => startSprint(nextMode)}
                     onResumeSprint={resumeSprint}
                     onOpenReview={openReviewQueue}
+                    onRunReorderDragActiveChange={setRunReorderDragActive}
                   />
                 ) : null}
 
@@ -4349,7 +4354,8 @@ function PracticeHome({
   onSelectMode,
   onStartMode,
   onResumeSprint,
-  onOpenReview
+  onOpenReview,
+  onRunReorderDragActiveChange
 }: {
   adaptiveLayout: AdaptiveLayout;
   mode: SprintMode;
@@ -4369,6 +4375,7 @@ function PracticeHome({
   onStartMode: (next: SprintMode) => void;
   onResumeSprint: (sprint: SprintState) => void;
   onOpenReview: () => void;
+  onRunReorderDragActiveChange: (active: boolean) => void;
 }): React.JSX.Element {
   const selectedRun = runManagement?.runs.find((run) => run.id === runManagement.selectedRunId) ?? null;
   const progressMode = selectedRun?.mode ?? mode;
@@ -4404,6 +4411,7 @@ function PracticeHome({
               sprintRulesGuideVisible={sprintRulesGuideVisible}
               onDismissSprintRulesGuide={onDismissSprintRulesGuide}
               onOpenSprintRulesGuide={onOpenSprintRulesGuide}
+              onRunReorderDragActiveChange={onRunReorderDragActiveChange}
             />
           ) : (
             <>
@@ -4495,13 +4503,15 @@ function PracticeRunHome({
   sprintRulesGuide,
   sprintRulesGuideVisible,
   onDismissSprintRulesGuide,
-  onOpenSprintRulesGuide
+  onOpenSprintRulesGuide,
+  onRunReorderDragActiveChange
 }: {
   presentation: PracticeRunManagementPresentation;
   sprintRulesGuide?: SprintRulesGuidePresentation;
   sprintRulesGuideVisible: boolean;
   onDismissSprintRulesGuide: () => void;
   onOpenSprintRulesGuide: () => void;
+  onRunReorderDragActiveChange: (active: boolean) => void;
 }): React.JSX.Element {
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dropTargetRunId, setDropTargetRunId] = useState<string | null>(null);
@@ -4544,6 +4554,7 @@ function PracticeRunHome({
     dropTargetRunIdRef.current = null;
     setDraggedRunId(null);
     setDropTargetRunId(null);
+    onRunReorderDragActiveChange(false);
   };
   const startRunDrag = (runId: string): void => {
     const layout = nativeRunLayoutsRef.current.get(runId);
@@ -4553,7 +4564,10 @@ function PracticeRunHome({
     dropTargetRunIdRef.current = null;
     setDraggedRunId(runId);
     setDropTargetRunId(null);
+    onRunReorderDragActiveChange(true);
   };
+
+  useEffect(() => () => onRunReorderDragActiveChange(false), [onRunReorderDragActiveChange]);
   const moveNativeRunDrag = (runId: string, translationY: number): void => {
     const originCenter = nativeDragOriginCenterRef.current;
     if (originCenter === null) {
