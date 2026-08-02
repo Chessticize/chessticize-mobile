@@ -695,6 +695,15 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       break;
     case "history-populated":
     case "history-filters":
+      service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
+      configurePuzzleSource = false;
+      screenProps.historyDesignPreview = {
+        incompleteAttempts: [
+          { attemptId: "history-timeout", slow: false },
+          { attemptId: "history-incomplete-slow", slow: true }
+        ]
+      };
+      break;
     case "history-attempt-detail":
     case "history-progress":
     case "history-progress-weakness":
@@ -1233,6 +1242,16 @@ function createHistoryService(
       ratingAfter: 910
     }),
     historyAttempt({
+      id: "history-incomplete-slow",
+      puzzleId: LAB_PUZZLES[3]!.id,
+      result: "timed_out",
+      timingStatus: "timed_out",
+      elapsedMs: 45_000,
+      completedAt: "2026-07-17T14:30:12.000Z",
+      ratingBefore: 910,
+      ratingAfter: 910
+    }),
+    historyAttempt({
       id: "history-correct",
       puzzleId: LAB_PUZZLES[2]!.id,
       result: "correct",
@@ -1277,6 +1296,13 @@ function createHistoryService(
     ratingAfter: 910
   }));
   store.createSprintSession(completedSprint({
+    id: "session-history-incomplete-slow",
+    mode: "standard",
+    completedAt: "2026-07-17T14:30:12.000Z",
+    ratingBefore: 910,
+    ratingAfter: 910
+  }));
+  store.createSprintSession(completedSprint({
     id: "session-history-unclear",
     mode: "standard",
     completedAt: "2026-07-18T15:00:08.000Z",
@@ -1303,11 +1329,6 @@ function createHistoryService(
     mode: "standard",
     ratingKey: "standard 5/20"
   }, "2026-07-17T14:00:11.000Z");
-  store.scheduleMistakeReview({
-    puzzleId: LAB_PUZZLES[4]!.id,
-    mode: "standard",
-    ratingKey: "standard 5/20"
-  }, "2026-07-17T15:00:12.000Z");
   return new PracticeService(store);
 }
 

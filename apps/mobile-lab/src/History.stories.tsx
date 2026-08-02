@@ -31,6 +31,8 @@ export const PopulatedHistory: Story = {
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);
     await waitForTestId(canvasElement, "history-attempt-history-unclear");
+    await waitForTestId(canvasElement, "history-attempt-history-timeout");
+    await waitForTestId(canvasElement, "history-attempt-history-incomplete-slow");
     await waitForTestId(canvasElement, "history-attention-filter");
     await waitForTestId(canvasElement, "history-active-filter-summary");
     await waitForTestId(canvasElement, "history-progress-button");
@@ -51,8 +53,12 @@ export const FiltersAndActiveFilters: Story = {
     await clickTestId(canvasElement, "history-theme-skewer");
     await clickTestId(canvasElement, "history-theme-promotion");
     await clickTestId(canvasElement, "history-theme-disclosure");
+    await clickTestId(canvasElement, "history-result-incomplete");
+    await waitForTestId(canvasElement, "history-attempt-history-timeout");
+    expectTestIdAbsent(canvasElement, "history-attempt-history-wrong");
     await waitForTestId(canvasElement, "history-theme-selection-detail");
     (canvasElement.querySelector('[data-testid="history-theme-disclosure"]') as HTMLElement | null)?.blur();
+    (canvasElement.querySelector('[data-testid="history-result-incomplete"]') as HTMLElement | null)?.blur();
   }
 };
 

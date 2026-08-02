@@ -69,6 +69,26 @@ test("New Scenario Markers retain open-issue ownership on the full catalog", () 
   }
 });
 
+test("Issue #482 owns the Incomplete History row and filter previews at their stable URLs", () => {
+  for (const scenarioId of ["history-populated", "history-filters"] as const) {
+    const scenario = scenarioRegistry[scenarioId];
+    assert.equal(
+      scenario.issues?.some((issue) => issue.issueNumber === 482) ?? false,
+      true
+    );
+    assert.deepEqual(storyTagsForScenario(scenarioId), ["new"]);
+  }
+  assert.ok(
+    scenarioRegistry["history-populated"].scope.includes.includes("Neutral Incomplete result")
+  );
+  assert.ok(
+    scenarioRegistry["history-filters"].scope.includes.includes("Incomplete Result filter")
+  );
+  assert.ok(
+    scenarioRegistry["history-filters"].scope.includes.includes("Incomplete Attention reason")
+  );
+});
+
 test("the issue #272 preview hands the board to White after the blunder", () => {
   const chess = new Chess(ISSUE_272_LAB_PUZZLE.initialFen);
 
@@ -175,7 +195,11 @@ test("the closed Issue #363 scenarios keep their stable URLs without Issue #363 
       .map((scenario) => scenario.id),
     []
   );
-  assert.deepEqual(storyTagsForScenario("history-populated"), []);
+  assert.equal(
+    scenarioRegistry["history-populated"].issues?.some((issue) => issue.issueNumber === 363) ?? false,
+    false
+  );
+  assert.deepEqual(storyTagsForScenario("history-populated"), ["new"]);
   assert.deepEqual(storyTagsForScenario("history-progress"), []);
   assert.deepEqual(storyTagsForScenario("history-progress-weakness"), []);
   assert.deepEqual(storyTagsForScenario("history-progress-speed-weakness"), []);

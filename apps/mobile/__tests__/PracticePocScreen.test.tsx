@@ -3514,26 +3514,32 @@ describe("PracticePocScreen", () => {
       "Wrong move"
     );
     expect(collectText(findByTestId(renderer, "history-attempt-history-timeout-result"))).toBe(
-      "Timed out"
+      "Incomplete"
     );
     expect(
       findByTestId(renderer, "history-attempt-history-timeout-badge")
-        .findByProps({ testID: "result-badge-wrong-glyph" })
+        .findByProps({ testID: "result-badge-incomplete-glyph" })
     ).toBeTruthy();
     expect(hasStyleEntry(
       findByTestId(renderer, "history-attempt-history-timeout-badge"),
       "backgroundColor",
-      "#DC2626"
+      "#64748B"
     )).toBe(true);
+    expect(() => findByTestId(renderer, "history-attempt-history-timeout-unclear")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-attempt-history-incomplete-slow-result"))).toBe(
+      "Incomplete"
+    );
+    expect(findByTestId(renderer, "history-attempt-history-incomplete-slow-unclear")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-attempt-history-incomplete-slow-slow"))).toBe("Slow");
     expect(() => findByTestId(renderer, "result-badge-alert-glyph")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-timeout-timed_out")).toThrow();
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityLabel).toBe(
-      "Needs attention: Sprint attempts that are unclear or in Review"
+      "Needs attention: Sprint attempts that are Incomplete, unclear, or in Review"
     );
     expect(collectText(findByTestId(renderer, "history-attention-explanation"))).toBe(
-      "Needs attention shows original Sprint attempts only."
+      "Needs attention includes Incomplete, Unclear, or In Review Sprint attempts."
     );
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
       "7 days·All puzzles·Source: Sprint"
@@ -3541,6 +3547,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-incomplete-slow")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
 
@@ -3574,8 +3581,11 @@ describe("PracticePocScreen", () => {
       "#2563EB"
     )).toBe(true);
     expect(collectText(findByTestId(renderer, "history-source-filters"))).toContain("All sources");
+    expect(collectText(findByTestId(renderer, "history-result-filters"))).toBe(
+      "AllCorrectWrongIncomplete"
+    );
     expect(collectText(findByTestId(renderer, "history-attention-flags"))).toBe(
-      "AttentionUnclearIn review"
+      "AttentionUnclearIn reviewIncomplete"
     );
     expect(findByTestId(renderer, "history-attention-flags").props.accessibilityLabel).toBe(
       "Attention filters, match any"
@@ -3583,6 +3593,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attention-flag-mistakes")).toThrow();
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-attention-flag-incomplete")).toBe(true);
     expect(() => findByTestId(renderer, "history-attention-flag-slow")).toThrow();
     expect(() => findByTestId(renderer, "history-attention-flag-timed-out")).toThrow();
     expect(() => findByTestId(renderer, "history-review-status-filters")).toThrow();
@@ -3607,8 +3618,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-theme-all")).toBeTruthy();
 
     press(renderer, "history-attention-flag-unclear");
+    press(renderer, "history-attention-flag-incomplete");
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(false);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-attention-flag-incomplete")).toBe(false);
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: true
     });
@@ -3631,6 +3644,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-attention-flag-unclear");
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(false);
+    expect(historyFilterSelected(renderer, "history-attention-flag-incomplete")).toBe(false);
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: true
     });
@@ -3643,10 +3657,12 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-attention-needs-attention");
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(false);
+    expect(historyFilterSelected(renderer, "history-attention-flag-incomplete")).toBe(false);
 
     press(renderer, "history-attention-flag-in-review");
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-attention-flag-incomplete")).toBe(false);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
       "Attention:"
     );
@@ -3667,6 +3683,7 @@ describe("PracticePocScreen", () => {
     });
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-attention-flag-incomplete")).toBe(true);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
       "7 days·All puzzles·Source: Sprint"
     );
@@ -3688,11 +3705,13 @@ describe("PracticePocScreen", () => {
     });
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(false);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(false);
+    expect(historyFilterSelected(renderer, "history-attention-flag-incomplete")).toBe(false);
     expect(findByTestId(renderer, "history-attempt-history-clean")).toBeTruthy();
 
     press(renderer, "history-attention-needs-attention");
     expect(historyFilterSelected(renderer, "history-attention-flag-unclear")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
+    expect(historyFilterSelected(renderer, "history-attention-flag-incomplete")).toBe(true);
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
   });
 
@@ -3783,7 +3802,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
   });
 
-  it("includes Timed out attempts in the History Wrong filter while preserving their label", async () => {
+  it("keeps Incomplete separate from Wrong and filters it as its own attention reason", async () => {
     const renderer = renderLabScenario("history-populated");
     await flushMicrotasks();
 
@@ -3792,12 +3811,34 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-result-wrong");
 
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-timeout")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-incomplete-slow")).toThrow();
+
+    press(renderer, "history-result-incomplete");
+
+    expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
     expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-incomplete-slow")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "history-attempt-history-timeout-result"))).toBe(
-      "Timed out"
+      "Incomplete"
     );
     expect(() => findByTestId(renderer, "history-attempt-history-correct")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "Result: Incomplete"
+    );
+
+    press(renderer, "history-result-all");
+    press(renderer, "history-attention-flag-unclear");
+    press(renderer, "history-attention-flag-in-review");
+
+    expect(historyFilterSelected(renderer, "history-attention-flag-incomplete")).toBe(true);
+    expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
+      "Attention: Incomplete"
+    );
+    expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-incomplete-slow")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
   });
 
   it("shows direct rating validation and disables Save outside 600-2200", () => {
@@ -7207,6 +7248,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-filter-toggle");
     expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(false);
+    expect(() => findByTestId(renderer, "history-result-incomplete")).toThrow();
+    expect(() => findByTestId(renderer, "history-attention-flag-incomplete")).toThrow();
     press(renderer, "history-result-wrong");
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(true);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Result: Wrong");
