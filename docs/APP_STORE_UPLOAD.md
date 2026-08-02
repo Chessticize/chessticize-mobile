@@ -108,7 +108,7 @@ commit that is tagged and archived.
 
 For 1.3.5, `config/app-store-metadata-en-us-v1.json` records the release
 candidate's exact `currentVersionWhatsNew` copy. It must match
-`docs/releases/ios-v1.3.5-build-1.md` before owner approval and tagging. Retain
+`docs/releases/ios-v1.3.5-build-2.md` before owner approval and tagging. Retain
 the submitted metadata evidence required by `docs/STORE_ASSETS.md`.
 
 Before archiving, record whether this is a delta, targeted, or full native
@@ -131,11 +131,11 @@ unchanged store metadata and screenshots does not regenerate that bundle.
 ## Public Source Tag
 
 Create and publish the source tag before or at the same time as the App Store
-Connect upload. The proposed iOS 1.3.5 build-1 tag is:
+Connect upload. The proposed iOS 1.3.5 build-2 tag is:
 
 ```sh
-git tag -a ios-v1.3.5-build-1 -m "iOS 1.3.5 build 1"
-git push origin ios-v1.3.5-build-1
+git tag -a ios-v1.3.5-build-2 -m "iOS 1.3.5 build 2"
+git push origin ios-v1.3.5-build-2
 ```
 
 Then publish a GitHub release for that tag and attach or copy the

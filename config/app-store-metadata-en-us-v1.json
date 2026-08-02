@@ -48,8 +48,8 @@
     ]
   },
   "currentVersionWhatsNew": {
-    "sourceTag": "ios-v1.3.5-build-1",
+    "sourceTag": "ios-v1.3.5-build-2",
     "status": "release-candidate",
-    "storeCopy": "• Kept the chessboard steady when Arrow Duel Replay shows follow-up guidance.\n• Showed guidance immediately after a wrong Arrow Duel Replay choice."
+    "storeCopy": "• Saved the active puzzle as Incomplete when the Sprint clock reaches zero, without counting it as a mistake.\n• Made Incomplete attempts easy to find in History and mark as Unclear.\n• Kept Arrow Duel Replay guidance immediate without shifting the board."
   }
 }

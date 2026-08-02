@@ -139,7 +139,7 @@ describe("App Store assets document", () => {
 
     expect(template.storeCopy).toBe(storeCopyTemplateBlock());
     expect(template.rules).toContain("Use two or three short bullets and no raw URLs.");
-    expect(currentVersion.sourceTag).toBe("ios-v1.3.5-build-1");
+    expect(currentVersion.sourceTag).toBe("ios-v1.3.5-build-2");
     expect(currentVersion.status).toBe("release-candidate");
     expect(template.storeCopy).not.toMatch(/https?:\/\//u);
     expect(draft).not.toMatch(/https?:\/\//u);

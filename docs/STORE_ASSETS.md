@@ -130,8 +130,8 @@ lead with user benefits, use two or three short bullets, omit raw URLs, and do
 not call stable features experimental unless that qualification is an
 intentional product promise.
 
-This copy belongs to the proposed `ios-v1.3.5-build-1` release identity and
-must match `docs/releases/ios-v1.3.5-build-1.md` before the owner marks that
+This copy belongs to the proposed `ios-v1.3.5-build-2` release identity and
+must match `docs/releases/ios-v1.3.5-build-2.md` before the owner marks that
 note Approved. Issue #417 must retain a screenshot or exported metadata record
 showing the exact submitted text.
 
