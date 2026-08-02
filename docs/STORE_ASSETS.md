@@ -1,6 +1,6 @@
 # App Store Assets
 
-This document is the 1.3.4 source of truth for App Store Connect metadata and
+This document is the 1.3.5 source of truth for App Store Connect metadata and
 store screenshot capture. Recheck Apple's live documentation before upload:
 
 - Screenshot specifications:
@@ -116,22 +116,22 @@ model-derived improvement.
 
 ### What's New
 
-For iOS 1.3.4, review this proposed ready-to-paste copy:
+For iOS 1.3.5, review this proposed ready-to-paste copy:
 
 ```text
-• Improved iPad app window sizing when running on Apple silicon Mac.
-• Kept Practice navigation readable in wide, compact windows.
+• Kept the chessboard steady when Arrow Duel Replay shows follow-up guidance.
+• Showed guidance immediately after a wrong Arrow Duel Replay choice.
 ```
 
-This proposed copy is 130 / 300 Unicode characters, including line breaks.
+This proposed copy is 147 / 300 Unicode characters, including line breaks.
 Future versions must use the reusable template in
 [`docs/releases/RELEASE_NOTES_TEMPLATE.md`](releases/RELEASE_NOTES_TEMPLATE.md):
 lead with user benefits, use two or three short bullets, omit raw URLs, and do
 not call stable features experimental unless that qualification is an
 intentional product promise.
 
-This copy belongs to the proposed `ios-v1.3.4-build-1` release identity and
-must match `docs/releases/ios-v1.3.4-build-1.md` before the owner marks that
+This copy belongs to the proposed `ios-v1.3.5-build-1` release identity and
+must match `docs/releases/ios-v1.3.5-build-1.md` before the owner marks that
 note Approved. Issue #417 must retain a screenshot or exported metadata record
 showing the exact submitted text.
 
@@ -159,7 +159,7 @@ the resulting feature is declared.
 
 ## Screenshot Requirements
 
-The app targets iPhone and iPad for 1.3.4. The current automated capture plan
+The app targets iPhone and iPad for 1.3.5. The current automated capture plan
 covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
 The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
 Apple's current screenshot reference, rechecked on 2026-07-28, lists 6.9" as
@@ -186,9 +186,10 @@ Release rule:
 5. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
 
-The 1.3.4 compact landscape and iPad-on-Mac window changes require a fresh
-exact-head Release capture and inspection before upload. Do not reuse the
-1.3.3 set as final 1.3.4 visual evidence.
+The 1.3.5 change affects the transient Arrow Duel Replay follow-up prompt, which
+is not part of the six-frame marketing story. Exact-head component coverage
+verifies its copy, timing, fixed prompt geometry, and maintained adaptive
+viewports; the approved marketing screenshot set does not need regeneration.
 
 ## Bundled Puzzle Pack Measurement
 

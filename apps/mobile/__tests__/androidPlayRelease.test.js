@@ -677,7 +677,7 @@ function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false 
 }
 
 describe('Android Play release contract', () => {
-  it('pins the proposed Play release to public version 1.3.4 build 12', () => {
+  it('pins the proposed Play release to public version 1.3.5 build 13', () => {
     const sourceTag = canonicalAndroidSourceTag(
       releaseVersion.publicVersion,
       releaseVersion.androidVersionCode,
@@ -707,11 +707,11 @@ describe('Android Play release contract', () => {
 
     expect(releaseVersion).toEqual(
       expect.objectContaining({
-        publicVersion: '1.3.4',
-        androidVersionCode: 12,
+        publicVersion: '1.3.5',
+        androidVersionCode: 13,
       }),
     );
-    expect(sourceTag).toBe('android-v1.3.4-build-12');
+    expect(sourceTag).toBe('android-v1.3.5-build-13');
     expect(ownerEvidenceExample.candidate).toEqual(
       expect.objectContaining(expectedIdentityBinding),
     );
@@ -724,10 +724,10 @@ describe('Android Play release contract', () => {
       ownerEvidenceExample.sourceRelease.reference.endsWith(sourceTag),
     ).toBe(true);
     expect(runbook).toContain(
-      'Android version code: `apps/mobile/release-version.json` (`12`)',
+      'Android version code: `apps/mobile/release-version.json` (`13`)',
     );
-    expect(releaseNote).toContain('Public version: `1.3.4`');
-    expect(releaseNote).toContain('Build or version code: `12`');
+    expect(releaseNote).toContain('Public version: `1.3.5`');
+    expect(releaseNote).toContain('Build or version code: `13`');
     expect(releaseNote).toContain(`Source tag: \`${sourceTag}\``);
     const storeCopy = releaseNote.match(
       /## Store copy \(`en-US`\)\n\n```text\n([\s\S]+?)\n```/,
@@ -735,9 +735,9 @@ describe('Android Play release contract', () => {
     expect(storeCopy).toBeDefined();
     expect(Array.from(storeCopy).length).toBeLessThanOrEqual(300);
     expect(storeCopy).not.toMatch(/https?:\/\//u);
-    expect(storeCopy).toContain('Practice navigation');
-    expect(storeCopy).toContain('adaptive layouts');
-    expect(storeCopy).toContain('compact landscape');
+    expect(storeCopy).toContain('chessboard steady');
+    expect(storeCopy).toContain('Arrow Duel Replay');
+    expect(storeCopy).toContain('immediately');
     expect(storeCopy).not.toContain('Progress Backup');
     expect(releaseNote).not.toMatch(/Rating history/i);
     expect(storeCopy).not.toMatch(/across devices|cross-platform sync/i);
@@ -777,7 +777,8 @@ describe('Android Play release contract', () => {
       'Build 9 is the immutable Android 1.3.1 release',
       'Build 10 is the immutable Android 1.3.2 release',
       'Build 11 is the retained Android 1.3.3 candidate',
-      'Build 12 is the proposed Android 1.3.4 release',
+      'Build 12 is the retained Android 1.3.4 candidate',
+      'Build 13 is the proposed Android 1.3.5 release',
     ]) {
       expect(runbook).toContain(value);
     }
