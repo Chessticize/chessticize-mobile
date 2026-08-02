@@ -15,7 +15,7 @@ import type { AttemptHistoryRow } from "./query-types.ts";
 
 const SPRINT_MODES = new Set(["standard", "blitz", "arrow_duel", "custom"]);
 const SPRINT_STATUSES = new Set(["active", "paused", "won", "failed", "abandoned"]);
-const ATTEMPT_RESULTS = new Set(["correct", "wrong", "timed_out"]);
+const ATTEMPT_RESULTS = new Set(["correct", "wrong", "timed_out", "incomplete"]);
 const ATTEMPT_SOURCES = new Set(["sprint", "scheduled_review"]);
 const TIMING_STATUSES = new Set(["slow", "timed_out"]);
 const PRACTICE_RUN_KINDS = new Set(["standard", "arrow_duel", "custom"]);

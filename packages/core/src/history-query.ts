@@ -21,6 +21,8 @@ import type {
 export type HistoryTimeRange = "7d" | "30d" | "90d" | "1y" | "max";
 export type PuzzleSide = "white" | "black";
 export type HistoryReviewStatus = "queued" | "clear";
+export type HistoryResult = AttemptResult | "incomplete";
+export type HistoryAttentionReason = "unclear" | "in_review" | "incomplete";
 
 export interface HistoryPageQuery {
   limit: number;
@@ -34,7 +36,7 @@ export interface HistoryQuery {
   minRating?: number;
   maxRating?: number;
   source?: AttemptSource;
-  result?: AttemptResult;
+  result?: HistoryResult;
   side?: PuzzleSide;
   themes?: string[];
   /** @deprecated Accept legacy callers, then normalize to themes. */
@@ -44,6 +46,7 @@ export interface HistoryQuery {
   reviewStatus?: HistoryReviewStatus;
   unclear?: boolean;
   attentionOnly?: boolean;
+  attentionReasons?: HistoryAttentionReason[];
   page?: HistoryPageQuery;
 }
 
@@ -216,7 +219,8 @@ export function normalizeHistoryAttemptDetail(attempt: AttemptEvent | HistoryAtt
       : "valid";
   const dataStatus = source === null || mode === null || ratingKey === null || result === null ||
       startedAt === null || completedAt === null || elapsedSeconds === null ||
-      (result !== "timed_out" && submittedMove === null) || expectedMove === null || ratingBefore === null ||
+      (result !== "timed_out" && result !== "incomplete" && submittedMove === null) ||
+      expectedMove === null || ratingBefore === null ||
       ratingAfterStatus === "invalid" || arrowDuelCandidateOrderStatus === "corrupt"
     ? "partial"
     : "complete";
@@ -321,7 +325,9 @@ function normalizeHistoryMode(value: unknown): SprintMode | null {
 }
 
 function normalizeHistoryOutcome(value: unknown): AttemptOutcome | null {
-  return value === "correct" || value === "wrong" || value === "timed_out" ? value : null;
+  return value === "correct" || value === "wrong" || value === "timed_out" || value === "incomplete"
+    ? value
+    : null;
 }
 
 export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {
@@ -440,11 +446,15 @@ export function buildHistoryView(input: {
 
 export function filterHistoryAttemptsForQuery(input: {
   attempts: HistoryAttemptView[];
-  query: Pick<HistoryQuery, "result" | "source" | "mode" | "side" | "minRating" | "maxRating" | "theme" | "themes" | "speedSeconds" | "reviewStatus" | "unclear" | "attentionOnly">;
+  query: Pick<HistoryQuery, "result" | "source" | "mode" | "side" | "minRating" | "maxRating" | "theme" | "themes" | "speedSeconds" | "reviewStatus" | "unclear" | "attentionOnly" | "attentionReasons">;
   reviews: ReviewQueueState[];
 }): HistoryAttemptView[] {
   const selectedThemes = historyThemesForQuery(input.query);
-  const queuedReviewKeys = input.query.reviewStatus === undefined && !input.query.attentionOnly
+  const attentionReasons = input.query.attentionReasons;
+  const needsReviewLookup = input.query.reviewStatus !== undefined ||
+    input.query.attentionOnly === true ||
+    attentionReasons?.includes("in_review") === true;
+  const queuedReviewKeys = !needsReviewLookup
     ? null
     : new Set(
         input.reviews
@@ -452,7 +462,7 @@ export function filterHistoryAttemptsForQuery(input: {
           .map(historyAttemptReviewKey)
       );
   return input.attempts
-    .filter((attempt) => !input.query.result || historyResultForMistakeSemantics(attempt.result) === input.query.result)
+    .filter((attempt) => !input.query.result || historyResultForFilterSemantics(attempt.result) === input.query.result)
     .filter((attempt) => !input.query.source || normalizeHistorySource(attempt.source) === input.query.source)
     .filter((attempt) => !input.query.mode || normalizeHistoryMode(attempt.mode) === input.query.mode)
     .filter((attempt) => !input.query.side || attempt.side === input.query.side)
@@ -462,13 +472,22 @@ export function filterHistoryAttemptsForQuery(input: {
     .filter((attempt) => input.query.speedSeconds === undefined || historyAttemptSpeedSeconds(attempt) === input.query.speedSeconds)
     .filter((attempt) => input.query.unclear === undefined ||
       isAttemptMarkedUnclear(attempt) === input.query.unclear)
-    .filter((attempt) => !input.query.attentionOnly ||
-      isAttemptMarkedUnclear(attempt) ||
-      (
-        queuedReviewKeys !== null &&
-        historyAttemptReviewQueuedFromKeys(attempt, queuedReviewKeys)
-      )
-    )
+    .filter((attempt) => {
+      if (!input.query.attentionOnly && attentionReasons === undefined) {
+        return true;
+      }
+      const reasons = attentionReasons ?? ["unclear", "in_review", "incomplete"];
+      return reasons.some((reason) => {
+        if (reason === "unclear") {
+          return isAttemptMarkedUnclear(attempt);
+        }
+        if (reason === "incomplete") {
+          return attempt.result === "incomplete";
+        }
+        return queuedReviewKeys !== null &&
+          historyAttemptReviewQueuedFromKeys(attempt, queuedReviewKeys);
+      });
+    })
     .filter((attempt) => {
       if (input.query.reviewStatus === undefined || queuedReviewKeys === null) {
         return true;
@@ -663,11 +682,19 @@ function partitionHistoryAttemptsByResult(attempts: HistoryAttemptView[]): Class
 
 function historyResultForMistakeSemantics(value: unknown): AttemptResult | null {
   const result = normalizeHistoryOutcome(value);
-  return result === null
+  return result === null || result === "incomplete"
     ? null
     : isAttemptMistake(result)
       ? "wrong"
       : "correct";
+}
+
+function historyResultForFilterSemantics(value: unknown): HistoryResult | null {
+  const result = normalizeHistoryOutcome(value);
+  if (result === null || result === "incomplete") {
+    return result;
+  }
+  return isAttemptMistake(result) ? "wrong" : "correct";
 }
 
 function buildAttemptPerformanceChart(

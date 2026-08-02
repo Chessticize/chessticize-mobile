@@ -33,6 +33,16 @@ test("accepts exported synthetic review session configs", () => {
   assert.equal(isCanonicalProgressSyncSnapshot(snapshot), true);
 });
 
+test("accepts an Incomplete Sprint attempt without a submitted move", () => {
+  const snapshot = canonicalSnapshot();
+  snapshot.data.attempts[0].result = "incomplete";
+  delete snapshot.data.attempts[0].submittedMove;
+  snapshot.data.attempts[0].unclear = true;
+  snapshot.data.attempts[0].unclearUpdatedAt = "2026-07-26T12:00:01.000Z";
+
+  assert.equal(isCanonicalProgressSyncSnapshot(snapshot), true);
+});
+
 test("rejects malformed nested progress records", () => {
   const cases = [
     ["snapshot device", (value) => { value.deviceId = ""; }],

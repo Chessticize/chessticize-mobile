@@ -505,6 +505,7 @@ export type TacticalProfileAttemptClassification =
       status: "excluded";
       reason:
         | "scheduled_review"
+        | "incomplete"
         | "focused_intervention"
         | "unknown_session_config";
     };
@@ -665,6 +666,9 @@ export function classifyTacticalProfileAttempt(
 ): TacticalProfileAttemptClassification {
   if (input.attempt.source === "scheduled_review") {
     return { status: "excluded", reason: "scheduled_review" };
+  }
+  if (input.attempt.result === "incomplete") {
+    return { status: "excluded", reason: "incomplete" };
   }
   if (!input.sessionConfig) {
     return { status: "excluded", reason: "unknown_session_config" };

@@ -69,8 +69,12 @@ test("New Scenario Markers retain open-issue ownership on the full catalog", () 
   }
 });
 
-test("Issue #482 owns the Incomplete History row and filter previews at their stable URLs", () => {
-  for (const scenarioId of ["history-populated", "history-filters"] as const) {
+test("Issue #482 owns the production Incomplete History and Sprint Result states", () => {
+  for (const scenarioId of [
+    "history-populated",
+    "history-filters",
+    "practice-sprint-result-incomplete"
+  ] as const) {
     const scenario = scenarioRegistry[scenarioId];
     assert.equal(
       scenario.issues?.some((issue) => issue.issueNumber === 482) ?? false,
@@ -79,13 +83,28 @@ test("Issue #482 owns the Incomplete History row and filter previews at their st
     assert.deepEqual(storyTagsForScenario(scenarioId), ["new"]);
   }
   assert.ok(
-    scenarioRegistry["history-populated"].scope.includes.includes("Neutral Incomplete result")
+    scenarioRegistry["history-populated"].scope.includes.includes("Production Incomplete outcome")
+  );
+  assert.ok(
+    scenarioRegistry["history-populated"].scope.includes.includes("Accuracy excludes Incomplete")
+  );
+  assert.ok(
+    scenarioRegistry["history-populated"].scope.includes.includes("Exact-attempt Unclear action")
   );
   assert.ok(
     scenarioRegistry["history-filters"].scope.includes.includes("Incomplete Result filter")
   );
   assert.ok(
     scenarioRegistry["history-filters"].scope.includes.includes("Incomplete Attention reason")
+  );
+  assert.ok(
+    scenarioRegistry["practice-sprint-result-incomplete"].scope.includes.includes(
+      "Exact final-attempt Unclear action"
+    )
+  );
+  assert.match(
+    scenarioRegistry["practice-sprint-result-incomplete"].description,
+    /Was the final puzzle unclear/
   );
 });
 

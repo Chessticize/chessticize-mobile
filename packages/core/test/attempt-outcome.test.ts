@@ -7,4 +7,5 @@ test("isAttemptMistake is the canonical wrong-or-timeout classification", () => 
   assert.equal(isAttemptMistake("correct"), false);
   assert.equal(isAttemptMistake("wrong"), true);
   assert.equal(isAttemptMistake("timed_out"), true);
+  assert.equal(isAttemptMistake("incomplete"), false);
 });

@@ -537,6 +537,9 @@ test("only ordinary mixed Sprint attempts enter Tactical Profile discovery", () 
   const scheduledReview = tacticalAttempt({
     attempt: { source: "scheduled_review" }
   });
+  const incomplete = tacticalAttempt({
+    attempt: { result: "incomplete" }
+  });
   const focused = tacticalAttempt({
     sessionConfig: { themes: ["fork"] }
   });
@@ -549,6 +552,10 @@ test("only ordinary mixed Sprint attempts enter Tactical Profile discovery", () 
   assert.deepEqual(classifyTacticalProfileAttempt(scheduledReview), {
     status: "excluded",
     reason: "scheduled_review"
+  });
+  assert.deepEqual(classifyTacticalProfileAttempt(incomplete), {
+    status: "excluded",
+    reason: "incomplete"
   });
   assert.deepEqual(classifyTacticalProfileAttempt(focused), {
     status: "excluded",

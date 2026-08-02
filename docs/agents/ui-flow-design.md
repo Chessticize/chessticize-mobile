@@ -59,17 +59,20 @@ rollout, or release integration yet.
 
 When remote preview publication is authorized, push the reviewed exact commit
 and let the Mobile Interaction Lab GitHub Actions workflow deploy the complete
-`apps/mobile-lab` Storybook to the dedicated Vercel project. Each feature branch
-owns an isolated Preview deployment and stable branch URL; later pushes advance
-only that URL, while `main` owns the long-lived Production catalog. Never reuse
-a URL from a different source branch, including another branch for the same
-issue. Before handoff, verify that Vercel records the reviewed source branch and
-exact commit. A mismatch is a publication blocker, not permission to replace
-another branch's deployment. Every Storybook deployment is public and must not
-require authentication. The workflow verifies that an unauthenticated request
-to `/storybook/` returns HTTP 200. Record the branch, exact source commit,
-stable branch URL, direct story URL, and successful workflow run in the issue
-and PR. Follow `docs/STORYBOOK_DEPLOYMENT.md` for setup and recovery.
+`apps/mobile-lab` Storybook to the repository's existing shared Vercel project.
+GitHub Actions is the only deployment writer: feature work must not create a
+Vercel project or run `vercel link` or `vercel deploy` locally. Each feature
+branch owns an isolated Preview deployment and stable branch alias inside the
+shared project; later pushes advance only that alias, while `main` owns the
+long-lived Production catalog. Never reuse a URL from a different source
+branch, including another branch for the same issue. Before handoff, verify that
+Vercel records the reviewed source branch and exact commit. A mismatch is a
+publication blocker, not permission to replace another branch's deployment.
+Every Storybook deployment is public and must not require authentication. The
+workflow verifies that an unauthenticated request to `/storybook/` returns HTTP
+200. Record the branch, exact source commit, stable branch URL, direct story
+URL, and successful workflow run in the issue and PR. Follow
+`docs/STORYBOOK_DEPLOYMENT.md` for setup and recovery.
 If publication is unavailable after a concrete deployment attempt, an explicit
 repository-owner authorization may waive this gate for that PR. Record the
 failed publication result, the site's resulting access state, the owner's
@@ -84,11 +87,11 @@ product implementation.
 When the current interaction increment is coherent and checks pass, the design
 PR may become ready and merge to `main` before approval or implementation.
 Continue later feedback rounds from current `main`, update the same scenario,
-and deploy through the new branch's dedicated site. Keep each issue ownership
-entry on `main` until its linked GitHub issue is closed; then remove only that
-entry in a cleanup change. Remove the marker only when no open issue ownership
-remains, and retain the scenario as living UI documentation. Pull-request CI
-checks each removed ownership's issue state.
+and let CI publish the new branch's stable Preview alias inside the shared
+Vercel project. Keep each issue ownership entry on `main` until the linked GitHub issue is closed;
+then remove only that entry in a cleanup change. Remove the marker only when no
+open issue ownership remains, and retain the scenario as living UI
+documentation. Pull-request CI checks each removed ownership's issue state.
 
 If an open issue's marker was attached to a mistaken parallel prototype,
 consolidate that prototype into the existing product-clone scenario and move

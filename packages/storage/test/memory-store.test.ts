@@ -182,7 +182,8 @@ test("PracticeService keeps paused sprints open and resumes through the store bo
   );
   const paused = service.pauseSprint("2026-06-20T00:00:10.000Z");
 
-  assert.equal(paused.status, "paused");
+  assert.equal(paused.state.status, "paused");
+  assert.equal(paused.attempt, undefined);
   assert.equal(service.getActiveSprint()?.id, sprint.id);
   assert.equal(store.clearLocalHistory().sprintSessions, 0);
   assert.equal(service.getActiveSprint()?.status, "paused");
@@ -418,12 +419,13 @@ test("PracticeService records an abandoned run after the first submitted move as
 
   const abandoned = service.abandonSprint("2026-06-20T00:00:10.000Z");
 
-  assert.equal(abandoned.status, "failed");
-  assert.equal(abandoned.endReason, "abandoned");
-  assert.equal(abandoned.correctCount, 0);
-  assert.ok(abandoned.ratingAfter !== undefined);
-  assert.ok(abandoned.ratingAfter < 800);
-  assert.equal(service.getRating("standard 5/20").rating, abandoned.ratingAfter);
+  assert.equal(abandoned.state.status, "failed");
+  assert.equal(abandoned.state.endReason, "abandoned");
+  assert.equal(abandoned.state.correctCount, 0);
+  assert.equal(abandoned.attempt, undefined);
+  assert.ok(abandoned.state.ratingAfter !== undefined);
+  assert.ok(abandoned.state.ratingAfter < 800);
+  assert.equal(service.getRating("standard 5/20").rating, abandoned.state.ratingAfter);
   assert.equal(service.getRating("standard 5/20").games, 1);
   assert.equal(service.getActiveSprint(), undefined);
 });

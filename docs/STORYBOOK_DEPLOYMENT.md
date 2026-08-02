@@ -1,8 +1,9 @@
 # Storybook Vercel Deployment
 
-The Mobile Interaction Lab is published by GitHub Actions to one dedicated
-Vercel project. `main` owns the long-lived Production deployment. Every other
-branch owns an isolated Preview deployment and deterministic Vercel alias that
+The Mobile Interaction Lab is published by GitHub Actions to one existing,
+shared Vercel project. `main` owns the long-lived Production deployment. Every
+other branch owns an isolated Preview deployment and deterministic Vercel alias
+inside that same project; it does not own or create a Vercel project. The alias
 advances only when that same branch is pushed.
 
 The stable deployment root is the primary Storybook manager URL. `/storybook/`
@@ -30,11 +31,20 @@ Storybook deployment is public and must not require authentication.
 - `vercel.json` disables Vercel's separate Git-triggered auto-deployment. The
   GitHub Actions workflow is the single deployment writer, avoiding duplicate
   builds for one push.
+- Normal feature and review work only pushes the branch and observes that
+  workflow. Do not create another Vercel project, run `vercel link`, or run
+  `vercel deploy` locally. Manual `workflow_dispatch` is the only supported
+  deployment retry path.
 
 The generated `.vercel/` link data and `apps/mobile-lab/storybook-static/`
 bundle are local or CI artifacts and remain untracked.
 
-## One-time Vercel setup
+## Repository-owner-only one-time Vercel setup
+
+This provisioning is already complete for the repository. It is not part of a
+feature branch, Storybook review, or ordinary deployment recovery workflow. Do
+not repeat it unless the repository owner is intentionally replacing the
+shared Interaction Lab project.
 
 1. Create or choose a Vercel team and create a project dedicated to the
    Interaction Lab, for example `chessticize-mobile-storybook`.
@@ -67,7 +77,8 @@ Create a Vercel access token from **Account or Team Settings > Tokens**. Scope
 it to the team that owns the Storybook project and give it an expiration date.
 Do not paste the token into an issue, PR, repository file, or chat.
 
-From the repository root, a project owner can run:
+Only during that initial provisioning or an owner-directed project replacement,
+a project owner can run:
 
 ```sh
 pnpm dlx vercel@58.4.4 login

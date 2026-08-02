@@ -296,6 +296,25 @@ function sprintRulesDesignPreviewFor(
       }
     };
   }
+  if (scenarioId === "practice-sprint-result-incomplete") {
+    return {
+      initialResultState: sprintRulesResultState({
+        correctCount: 1,
+        endReason: "time_expired",
+        mistakeCount: 0,
+        ratingAfter: 1090,
+        status: "failed"
+      }),
+      initialResultUnclearPrompt: {
+        marked: false,
+        question: "Was the final puzzle unclear?"
+      },
+      resultUnclearSummary: {
+        slowMarkedCount: 0,
+        userMarkedCount: 0
+      }
+    };
+  }
   if (scenarioId === "practice-sprint-result-extra-attempt") {
     return {
       initialResultState: sprintRulesResultState({
@@ -704,12 +723,6 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "history-filters":
       service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
       configurePuzzleSource = false;
-      screenProps.historyDesignPreview = {
-        incompleteAttempts: [
-          { attemptId: "history-incomplete-fast", slow: false },
-          { attemptId: "history-incomplete-slow", slow: true }
-        ]
-      };
       break;
     case "history-attempt-detail":
     case "history-progress":
@@ -1251,8 +1264,7 @@ function createHistoryService(
     historyAttempt({
       id: "history-incomplete-fast",
       puzzleId: HISTORY_INCOMPLETE_LAB_PUZZLE.id,
-      result: "timed_out",
-      timingStatus: "timed_out",
+      result: "incomplete",
       elapsedMs: 12_000,
       completedAt: "2026-07-17T15:10:12.000Z",
       ratingBefore: 910,
@@ -1261,12 +1273,13 @@ function createHistoryService(
     historyAttempt({
       id: "history-incomplete-slow",
       puzzleId: LAB_PUZZLES[3]!.id,
-      result: "timed_out",
-      timingStatus: "timed_out",
+      result: "incomplete",
+      timingStatus: "slow",
       elapsedMs: 45_000,
       completedAt: "2026-07-17T14:30:12.000Z",
       ratingBefore: 910,
-      ratingAfter: 910
+      ratingAfter: 910,
+      unclear: true
     }),
     historyAttempt({
       id: "history-correct",
@@ -1312,20 +1325,30 @@ function createHistoryService(
     ratingBefore: 910,
     ratingAfter: 910
   }));
-  store.createSprintSession(completedSprint({
-    id: "session-history-incomplete-fast",
-    mode: "standard",
-    completedAt: "2026-07-17T15:10:12.000Z",
-    ratingBefore: 910,
-    ratingAfter: 910
-  }));
-  store.createSprintSession(completedSprint({
-    id: "session-history-incomplete-slow",
-    mode: "standard",
-    completedAt: "2026-07-17T14:30:12.000Z",
-    ratingBefore: 910,
-    ratingAfter: 910
-  }));
+  store.createSprintSession({
+    ...completedSprint({
+      id: "session-history-incomplete-fast",
+      mode: "standard",
+      completedAt: "2026-07-17T15:10:12.000Z",
+      ratingBefore: 910,
+      ratingAfter: 910
+    }),
+    status: "failed",
+    endReason: "time_expired",
+    correctCount: 0
+  });
+  store.createSprintSession({
+    ...completedSprint({
+      id: "session-history-incomplete-slow",
+      mode: "standard",
+      completedAt: "2026-07-17T14:30:12.000Z",
+      ratingBefore: 910,
+      ratingAfter: 910
+    }),
+    status: "failed",
+    endReason: "time_expired",
+    correctCount: 0
+  });
   store.createSprintSession(completedSprint({
     id: "session-history-unclear",
     mode: "standard",
@@ -1390,7 +1413,7 @@ function historyAttempt({
     mode: "standard",
     ratingKey: "standard 5/20",
     result,
-    ...(result === "timed_out"
+    ...(result === "timed_out" || result === "incomplete"
       ? {}
       : { submittedMove: result === "correct" ? "e2e4" : "e2e3" }),
     expectedMove: "e2e4",
