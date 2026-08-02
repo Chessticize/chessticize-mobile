@@ -1,6 +1,6 @@
 # Chessticize Android 1.3.5 (build 13)
 
-- Status: Draft
+- Status: Approved
 - Locale: `en-US`
 - Platform: `Android`
 - Public version: `1.3.5`
@@ -44,4 +44,4 @@ follow-up guidance immediately after a wrong choice.
   benefits.
 - [x] No issue numbers, internal code names, implementation details, or private
   evidence are included.
-- [ ] The release owner approved the copy before the source tag was created.
+- [x] The release owner approved the copy before the source tag was created.
