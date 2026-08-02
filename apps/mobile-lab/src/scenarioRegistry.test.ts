@@ -69,7 +69,7 @@ test("New Scenario Markers retain open-issue ownership on the full catalog", () 
   }
 });
 
-test("Issue #482 owns the Incomplete History row and filter previews at their stable URLs", () => {
+test("Issue #482 owns the production Incomplete History row and filters at their stable URLs", () => {
   for (const scenarioId of ["history-populated", "history-filters"] as const) {
     const scenario = scenarioRegistry[scenarioId];
     assert.equal(
@@ -79,7 +79,13 @@ test("Issue #482 owns the Incomplete History row and filter previews at their st
     assert.deepEqual(storyTagsForScenario(scenarioId), ["new"]);
   }
   assert.ok(
-    scenarioRegistry["history-populated"].scope.includes.includes("Neutral Incomplete result")
+    scenarioRegistry["history-populated"].scope.includes.includes("Production Incomplete outcome")
+  );
+  assert.ok(
+    scenarioRegistry["history-populated"].scope.includes.includes("Accuracy excludes Incomplete")
+  );
+  assert.ok(
+    scenarioRegistry["history-populated"].scope.includes.includes("Exact-attempt Unclear action")
   );
   assert.ok(
     scenarioRegistry["history-filters"].scope.includes.includes("Incomplete Result filter")

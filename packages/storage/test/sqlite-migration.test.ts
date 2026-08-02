@@ -17,7 +17,7 @@ import {
 } from "../src/index.ts";
 import { SyncSQLiteStore, type SyncSqliteDatabase } from "../src/sync-sqlite-store.ts";
 import { computeSchemaSnapshot, type SchemaSnapshot } from "./schema-snapshot.ts";
-import type { Puzzle } from "../../core/src/index.ts";
+import type { AttemptEvent, Puzzle } from "../../core/src/index.ts";
 
 const RELEASED_V0_FIXTURE = resolve(
   "packages/storage/test/fixtures/migrations/schema-v0-ios-1.0.0.sqlite"
@@ -981,6 +981,107 @@ test("SQLite schema at the current version matches the committed golden snapshot
     store.close();
 
     assert.deepEqual(snapshot, await goldenSchemaSnapshot(CURRENT_SCHEMA_VERSION));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("SQLite v16 preserves v15 attempts and admits Incomplete without a submitted move", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-v16-incomplete-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setupStore = new SQLiteStore(databasePath);
+    setupStore.migrate();
+    const setupService = new PracticeService(setupStore);
+    setupService.loadFixturePuzzles(await loadFixturePuzzles());
+    setupService.setPuzzleSelectionScopeIds(["00008"]);
+    const started = setupService.startSprint({
+      mode: "standard",
+      practiceRunId: "standard",
+      targetCorrect: 2,
+      puzzleSelectionSeed: "v15-to-v16"
+    }, "2026-07-31T00:00:00.000Z");
+    const puzzleId = started.currentPuzzle?.puzzle.id ?? assert.fail("expected active puzzle");
+    const legacyAttempt: AttemptEvent = {
+      id: "v15-correct-attempt",
+      source: "sprint",
+      sessionId: started.id,
+      puzzleId,
+      mode: started.config.mode,
+      ratingKey: started.config.ratingKey,
+      result: "correct",
+      submittedMove: "e6e7",
+      expectedMove: "e6e7",
+      startedAt: started.startedAt,
+      completedAt: "2026-07-31T00:00:05.000Z",
+      elapsedMs: 5_000,
+      ratingBefore: started.ratingBefore
+    };
+    setupStore.recordAttempt(legacyAttempt);
+
+    const currentAttemptSql = (setupStore.db.prepare(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'attempts'"
+    ).get() as { sql: string }).sql;
+    const v15AttemptSql = currentAttemptSql
+      .replace('CREATE TABLE "attempts"', "CREATE TABLE attempts_v15")
+      .replace("result IN ('timed_out', 'incomplete')", "result = 'timed_out'")
+      .replace("result NOT IN ('timed_out', 'incomplete')", "result <> 'timed_out'");
+    setupStore.transaction(() => {
+      setupStore.db.exec(v15AttemptSql);
+      setupStore.db.exec("INSERT INTO attempts_v15 SELECT * FROM attempts");
+      setupStore.db.exec("DROP TABLE attempts");
+      setupStore.db.exec("ALTER TABLE attempts_v15 RENAME TO attempts");
+      setupStore.db.exec(`
+        CREATE INDEX attempts_completed_at_id_idx
+          ON attempts(completed_at DESC, id DESC);
+        CREATE INDEX attempts_rating_key_completed_at_id_idx
+          ON attempts(rating_key, completed_at DESC, id DESC);
+        CREATE INDEX attempts_session_result_completed_at_id_idx
+          ON attempts(session_id, result, completed_at DESC, id DESC);
+        CREATE INDEX attempts_puzzle_id_completed_at_id_idx
+          ON attempts(puzzle_id, completed_at DESC, id DESC);
+        CREATE INDEX attempts_unclear_completed_at_idx
+          ON attempts(unclear, completed_at DESC);
+        PRAGMA user_version = 15;
+      `);
+    });
+    setupStore.close();
+
+    const migrated = new SQLiteStore(databasePath);
+    migrated.migrate();
+    try {
+      assert.equal(schemaVersionForStore(migrated), 16);
+      assert.equal(migrated.listAttempts()[0]?.id, legacyAttempt.id);
+      const incomplete: AttemptEvent = {
+        id: "v16-incomplete-attempt",
+        source: legacyAttempt.source,
+        sessionId: legacyAttempt.sessionId,
+        puzzleId: legacyAttempt.puzzleId,
+        mode: legacyAttempt.mode,
+        ratingKey: legacyAttempt.ratingKey,
+        result: "incomplete",
+        expectedMove: legacyAttempt.expectedMove,
+        startedAt: legacyAttempt.startedAt,
+        completedAt: "2026-07-31T00:00:10.000Z",
+        elapsedMs: 10_000,
+        ratingBefore: legacyAttempt.ratingBefore,
+        unclear: true,
+        unclearUpdatedAt: "2026-07-31T00:00:10.000Z"
+      };
+      assert.doesNotThrow(() => migrated.recordAttempt(incomplete));
+      assert.equal(migrated.listAttempts({ result: "incomplete" })[0]?.submittedMove, undefined);
+      assert.throws(
+        () => migrated.recordAttempt({
+          ...incomplete,
+          id: "v16-invalid-incomplete-attempt",
+          submittedMove: "e6e7"
+        }),
+        /constraint/i
+      );
+      assert.deepEqual(migrated.db.prepare("PRAGMA foreign_key_check").all(), []);
+    } finally {
+      migrated.close();
+    }
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

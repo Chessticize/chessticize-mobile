@@ -118,7 +118,7 @@ test("SQLite reopens marked attempts, manual enrollments, and cleared marker sta
     assert.equal(scheduled.review.lastReviewedAt, "2026-07-18T12:00:05.000Z");
     assert.throws(
       () => service.setAttemptUnclear(scheduled.attempt.id, true, "2026-07-18T12:01:00.000Z"),
-      /Only correct Sprint attempts can be marked unclear/
+      /Only correct or incomplete Sprint attempts can be marked unclear/
     );
 
     service.setAttemptUnclear(attemptId, false, "2026-07-17T14:00:00.000Z");

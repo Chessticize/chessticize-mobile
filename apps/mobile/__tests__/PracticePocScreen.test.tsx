@@ -1778,6 +1778,9 @@ describe("PracticePocScreen", () => {
       "The third mistake ends the Sprint."
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
+      "At zero, the active puzzle is saved as Incomplete, not as a mistake, and needs attention. If it is Slow, it is also marked Unclear."
+    );
+    expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
       "The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake."
     );
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-guide"))).toContain(
@@ -1785,6 +1788,9 @@ describe("PracticePocScreen", () => {
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
       "Mistake limit: The third mistake ends the Sprint."
+    );
+    expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
+      "Time limit: Finish the goal before the Sprint clock reaches zero. At zero, the active puzzle is saved as Incomplete"
     );
     expect(findByTestId(renderer, "practice-sprint-rules-guide").props.accessibilityLabel).toContain(
       "Slow warning: The puzzle timer turns amber when you are taking too long."
@@ -2132,13 +2138,13 @@ describe("PracticePocScreen", () => {
     );
     expect(() => findByTestId(activeSession, "practice-session-guide-timeout-overlay")).toThrow();
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-unclear"))).toContain(
-      "Use Mark as unclear after a correct answer"
+      "Use Mark as unclear when needed"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-unclear"))).toContain(
       "Mark as unclear"
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-unclear"))).toContain(
-      "Tap it when your move was correct but the solution still does not make sense to you."
+      "Tap it after a correct answer, or on the final Incomplete puzzle, when the solution still does not make sense to you."
     );
     expect(collectText(findByTestId(activeSession, "practice-session-guide-start"))).toBe(
       "Start Sprint"
@@ -2152,7 +2158,7 @@ describe("PracticePocScreen", () => {
     expect(
       findByTestId(activeSession, "practice-active-session-guide").props.accessibilityLabel
     ).toBe(
-      "Guide 4 of 4. Use Mark as unclear after a correct answer. Tap it when your move was correct but the solution still does not make sense to you."
+      "Guide 4 of 4. Use Mark as unclear when needed. Tap it after a correct answer, or on the final Incomplete puzzle, when the solution still does not make sense to you."
     );
 
     press(activeSession, "practice-session-guide-start");
@@ -2187,7 +2193,7 @@ describe("PracticePocScreen", () => {
     expect(testIdOrder(firstEverArrowDuel, "practice-prompt", "practice-arrow-duel-guide-demo-board")).toBeLessThan(0);
     expect(testIdOrder(firstEverArrowDuel, "practice-arrow-duel-guide-demo-board", "session-score-strip")).toBeLessThan(0);
     expect(collectText(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-coach"))).toContain(
-      "Compare the two moves, then play the stronger one on the board. Other moves are ignored."
+      "Compare the two moves, then play the stronger one on the board. Other moves are ignored. If the Sprint clock reaches zero, the current choice is saved as Incomplete, not as a mistake."
     );
     expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-coach-progress"))).toBe(
       "5 of 5"
@@ -2235,14 +2241,14 @@ describe("PracticePocScreen", () => {
 
     expect(guide.props.accessibilityLabel).not.toMatch(/\b(?:step|tour)\b/i);
     expect(guide.props.accessibilityLabel).toBe(
-      "Guide 1 of 4. Track your Sprint. The top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide."
+      "Guide 1 of 4. Track your Sprint. The top row shows puzzles solved, Sprint time left, and mistakes remaining. At zero, the active puzzle is saved as Incomplete, not as a mistake. The Sprint begins when you finish this guide."
     );
     expect(progress.props.accessibilityLabel).toBe("Guide 1 of 4");
     expect(findByTestId(activeSession, "practice-session-guide-metrics")).toBeTruthy();
     expect(collectText(
       findByTestId(activeSession, "practice-session-guide-coach-copy-overview")
     )).toBe(
-      "SPRINT HEADERTrack your SprintThe top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide."
+      "SPRINT HEADERTrack your SprintThe top row shows puzzles solved, Sprint time left, and mistakes remaining. At zero, the active puzzle is saved as Incomplete, not as a mistake. The Sprint begins when you finish this guide."
     );
 
     press(activeSession, "practice-session-guide-start");
@@ -2278,13 +2284,13 @@ describe("PracticePocScreen", () => {
       activeSession,
       "practice-active-session-guide"
     ).props.accessibilityLabel).toBe(
-      "Guide 4 of 4. Use Mark as unclear after a correct answer. Tap it when your move was correct but the solution still does not make sense to you."
+      "Guide 4 of 4. Use Mark as unclear when needed. Tap it after a correct answer, or on the final Incomplete puzzle, when the solution still does not make sense to you."
     );
     expect(findByTestId(activeSession, "practice-session-guide-demo-unclear")).toBeTruthy();
     expect(collectText(
       findByTestId(activeSession, "practice-session-guide-coach-copy-unclear")
     )).toBe(
-      "UNCLEARUse Mark as unclear after a correct answerTap it when your move was correct but the solution still does not make sense to you."
+      "UNCLEARUse Mark as unclear when neededTap it after a correct answer, or on the final Incomplete puzzle, when the solution still does not make sense to you."
     );
 
     const arrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
@@ -2296,17 +2302,20 @@ describe("PracticePocScreen", () => {
     expect(collectText(
       findByTestId(arrowDuel, "practice-session-guide-coach-copy-arrow-duel")
     )).toBe(
-      "ARROW DUELThe arrows show your two choicesCompare the two moves, then play the stronger one on the board. Other moves are ignored."
+      "ARROW DUELThe arrows show your two choicesCompare the two moves, then play the stronger one on the board. Other moves are ignored. If the Sprint clock reaches zero, the current choice is saved as Incomplete, not as a mistake."
     );
     expect(findByTestId(
       arrowDuel,
       "practice-arrow-duel-guide"
     ).props.accessibilityLabel).toBe(
-      "Guide 1 of 1. The arrows show your two choices. Compare the two moves, then play the stronger one on the board. Other moves are ignored."
+      "Guide 1 of 1. The arrows show your two choices. Compare the two moves, then play the stronger one on the board. Other moves are ignored. If the Sprint clock reaches zero, the current choice is saved as Incomplete, not as a mistake."
     );
 
     const rules = renderLabScenario("practice-first-sprint-guide");
     const rulesText = collectText(findByTestId(rules, "practice-sprint-rules-guide"));
+    expect(rulesText).toContain(
+      "At zero, the active puzzle is saved as Incomplete, not as a mistake, and needs attention. If it is Slow, it is also marked Unclear."
+    );
     expect(rulesText).toContain(
       "The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake."
     );
@@ -3448,7 +3457,7 @@ describe("PracticePocScreen", () => {
     expect(service.listReviewQueue()).toHaveLength(1);
   });
 
-  it("ends the sprint without a puzzle timeout overlay when both deadlines are reached together", () => {
+  it("records a Slow Incomplete without a puzzle timeout overlay when both deadlines are reached together", () => {
     let wallClockMs = Date.parse("2026-07-23T12:00:00.000Z");
     const service = createMobilePracticeService("random1000");
     startSprintWithPuzzleTiming(
@@ -3478,7 +3487,81 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
-    expect(service.listHistory()).toHaveLength(0);
+    expect(service.listHistory()).toHaveLength(1);
+    expect(service.listHistory()[0]).toEqual(expect.objectContaining({
+      result: "incomplete",
+      timingStatus: "slow",
+      unclear: true
+    }));
+    expect(collectText(findByTestId(renderer, "sprint-unclear-prompt"))).toContain(
+      "Was the final puzzle unclear?"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
+  });
+
+  it("lets a just-entered final Incomplete be marked unclear by its exact attempt", () => {
+    let wallClockMs = Date.parse("2026-07-23T12:00:00.000Z");
+    const service = createMobilePracticeService("random1000");
+    let active = startSprintWithPuzzleTiming(
+      service,
+      {
+        durationSeconds: 60,
+        perPuzzleSeconds: 20,
+        puzzleTiming: {
+          slowAfterSeconds: 40,
+          timeoutAfterSeconds: null
+        },
+        targetCorrect: 3,
+        maxMistakes: 3
+      },
+      new Date(wallClockMs).toISOString()
+    );
+    const firstPuzzleId = active.currentPuzzle?.puzzle.id;
+    expect(active.currentPuzzle?.kind).toBe("line");
+    const firstPuzzle = active.currentPuzzle;
+    const userMoves = firstPuzzle?.kind === "line"
+      ? firstPuzzle.puzzle.solutionMoves.filter((_, index) => index >= firstPuzzle.cursor && (index - firstPuzzle.cursor) % 2 === 0)
+      : [];
+    userMoves.forEach((move, index) => {
+      const completedAtMs = Date.parse("2026-07-23T12:00:59.000Z")
+        - (userMoves.length - index - 1) * 1_000;
+      active = service.submitMove(move, new Date(completedAtMs).toISOString()).state;
+    });
+    expect(active.currentPuzzle?.puzzle.id).not.toBe(firstPuzzleId);
+    const previousAttempt = service.listHistory()[0];
+    if (!previousAttempt) {
+      throw new Error("expected previous attempt");
+    }
+    expect(previousAttempt.timingStatus).toBe("slow");
+    expect(previousAttempt.unclear).toBe(true);
+
+    wallClockMs = Date.parse("2026-07-23T12:00:59.000Z");
+    const renderer = renderScreen({
+      currentTimeMs: () => wallClockMs,
+      practiceService: service
+    });
+    press(renderer, "practice-resume-card");
+    act(() => {
+      wallClockMs += 1_000;
+      jest.advanceTimersByTime(1_000);
+    });
+
+    const incomplete = service.listHistory().find((attempt) => attempt.result === "incomplete");
+    if (!incomplete) {
+      throw new Error("expected Incomplete attempt");
+    }
+    expect(incomplete.elapsedMs).toBe(1_000);
+    expect(incomplete.unclear).toBeUndefined();
+    expect(collectText(findByTestId(renderer, "sprint-unclear-prompt"))).toContain(
+      "Was the final puzzle unclear?"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Mark as unclear");
+
+    press(renderer, "sprint-unclear-toggle");
+
+    expect(service.listHistory().find((attempt) => attempt.id === incomplete.id)?.unclear).toBe(true);
+    expect(service.listHistory().find((attempt) => attempt.id === previousAttempt.id)?.unclear).toBe(true);
+    expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
   });
 
   it("defaults History to Needs attention and links its OR reason filters to the primary view", async () => {
@@ -3776,7 +3859,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
     expect(collectText(findByTestId(renderer, "history-attention-explanation"))).toBe(
-      "Needs attention shows original Sprint attempts only."
+      "Needs attention includes Incomplete, Unclear, or In Review Sprint attempts."
     );
 
     press(renderer, "history-filter-toggle");
@@ -3826,7 +3909,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-result-wrong");
 
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
-    expect(() => findByTestId(renderer, "history-attempt-history-timeout")).toThrow();
+    expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-incomplete-fast")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-incomplete-slow")).toThrow();
 
@@ -7266,8 +7349,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-filter-toggle");
     expect(historyFilterSelected(renderer, "history-source-sprint")).toBe(true);
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(false);
-    expect(() => findByTestId(renderer, "history-result-incomplete")).toThrow();
-    expect(() => findByTestId(renderer, "history-attention-flag-incomplete")).toThrow();
+    expect(findByTestId(renderer, "history-result-incomplete")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attention-flag-incomplete")).toBeTruthy();
     press(renderer, "history-result-wrong");
     expect(historyFilterSelected(renderer, "history-result-wrong")).toBe(true);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain("Result: Wrong");

@@ -283,7 +283,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 15;
+export const CURRENT_SCHEMA_VERSION = 16;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -307,7 +307,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 11, to: 12, apply: migrateV11ToV12 },
   { from: 12, to: 13, apply: migrateV12ToV13 },
   { from: 13, to: 14, apply: migrateV13ToV14 },
-  { from: 14, to: 15, apply: migrateV14ToV15 }
+  { from: 14, to: 15, apply: migrateV14ToV15 },
+  { from: 15, to: 16, apply: migrateV15ToV16 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -2749,6 +2750,106 @@ function migrateV14ToV15(db: SyncSqliteDatabase): void {
       app_version TEXT NOT NULL CHECK (length(trim(app_version)) > 0),
       attempted_at TEXT NOT NULL
     );
+  `);
+}
+
+function migrateV15ToV16(db: SyncSqliteDatabase): void {
+  const attemptCount = countRows(db, "attempts");
+  db.exec(`
+    CREATE TABLE attempts_v16 (
+      id TEXT PRIMARY KEY,
+      source TEXT NOT NULL DEFAULT 'sprint',
+      session_id TEXT NOT NULL,
+      puzzle_id TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      rating_key TEXT,
+      result TEXT NOT NULL,
+      submitted_move TEXT,
+      expected_move TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      completed_at TEXT NOT NULL,
+      elapsed_ms INTEGER CHECK (elapsed_ms IS NULL OR elapsed_ms >= 0),
+      timing_status TEXT CHECK (
+        timing_status IS NULL OR timing_status IN ('slow', 'timed_out')
+      ),
+      rating_before INTEGER NOT NULL,
+      rating_after INTEGER,
+      arrow_duel_candidate_order_json TEXT,
+      unclear INTEGER NOT NULL DEFAULT 0 CHECK (unclear IN (0, 1)),
+      unclear_updated_at TEXT,
+      FOREIGN KEY (session_id) REFERENCES sprint_sessions(id),
+      FOREIGN KEY (puzzle_id) REFERENCES puzzles(id),
+      CHECK (
+        (result = 'timed_out' AND timing_status = 'timed_out')
+        OR
+        (result <> 'timed_out' AND (timing_status IS NULL OR timing_status = 'slow'))
+      ),
+      CHECK (
+        (result IN ('timed_out', 'incomplete') AND submitted_move IS NULL)
+        OR
+        (result NOT IN ('timed_out', 'incomplete') AND submitted_move IS NOT NULL)
+      ),
+      CHECK (timing_status IS NULL OR elapsed_ms IS NOT NULL)
+    );
+
+    INSERT INTO attempts_v16 (
+      id,
+      source,
+      session_id,
+      puzzle_id,
+      mode,
+      rating_key,
+      result,
+      submitted_move,
+      expected_move,
+      started_at,
+      completed_at,
+      elapsed_ms,
+      timing_status,
+      rating_before,
+      rating_after,
+      arrow_duel_candidate_order_json,
+      unclear,
+      unclear_updated_at
+    )
+    SELECT
+      id,
+      source,
+      session_id,
+      puzzle_id,
+      mode,
+      rating_key,
+      result,
+      submitted_move,
+      expected_move,
+      started_at,
+      completed_at,
+      elapsed_ms,
+      timing_status,
+      rating_before,
+      rating_after,
+      arrow_duel_candidate_order_json,
+      unclear,
+      unclear_updated_at
+    FROM attempts;
+  `);
+  if (countRows(db, "attempts_v16") !== attemptCount) {
+    throw new Error("SQLite v16 attempt rebuild changed the attempt row count");
+  }
+  db.exec(`
+    DROP TABLE attempts;
+    ALTER TABLE attempts_v16 RENAME TO attempts;
+
+    CREATE INDEX attempts_completed_at_id_idx
+      ON attempts(completed_at DESC, id DESC);
+    CREATE INDEX attempts_rating_key_completed_at_id_idx
+      ON attempts(rating_key, completed_at DESC, id DESC);
+    CREATE INDEX attempts_session_result_completed_at_id_idx
+      ON attempts(session_id, result, completed_at DESC, id DESC);
+    CREATE INDEX attempts_puzzle_id_completed_at_id_idx
+      ON attempts(puzzle_id, completed_at DESC, id DESC);
+    CREATE INDEX attempts_unclear_completed_at_idx
+      ON attempts(unclear, completed_at DESC);
   `);
 }
 

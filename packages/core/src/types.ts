@@ -4,7 +4,7 @@ export type SprintStatus = "active" | "paused" | "won" | "failed" | "abandoned";
 
 export type AttemptResult = "correct" | "wrong";
 
-export type AttemptOutcome = AttemptResult | "timed_out";
+export type AttemptOutcome = AttemptResult | "timed_out" | "incomplete";
 
 export type AttemptTimingStatus = "slow" | "timed_out";
 

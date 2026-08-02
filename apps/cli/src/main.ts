@@ -189,7 +189,12 @@ async function loadPuzzles(path: string): Promise<Puzzle[]> {
 
 function parseHistoryFilter(input: JsonCommand): HistoryFilter {
   const filter: HistoryFilter = {};
-  if (input.result === "correct" || input.result === "wrong") {
+  if (
+    input.result === "correct" ||
+    input.result === "wrong" ||
+    input.result === "timed_out" ||
+    input.result === "incomplete"
+  ) {
     filter.result = input.result;
   }
   if (typeof input.mode === "string") {

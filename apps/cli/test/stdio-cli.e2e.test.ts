@@ -92,6 +92,45 @@ test("CLI records an exact-boundary puzzle timeout as a mistake and schedules Re
   await cli.stop();
 });
 
+test("CLI records the puzzle active at the Sprint deadline as neutral Incomplete", async (t) => {
+  const cli = await startCli(t);
+
+  const start = await cli.command({
+    command: "startSprint",
+    mode: "standard",
+    durationSeconds: 60,
+    perPuzzleSeconds: 20,
+    targetCorrect: 2,
+    maxMistakes: 3,
+    now: "2026-07-24T00:00:00.000Z"
+  });
+  const response = await cli.command({
+    command: "move",
+    move: "e6e7",
+    now: "2026-07-24T00:01:00.000Z"
+  });
+
+  assert.equal(response.feedback, null);
+  assert.equal(response.attempt.result, "incomplete");
+  assert.equal(response.attempt.submittedMove, undefined);
+  assert.equal(response.attempt.completedAt, start.state.deadlineAt);
+  assert.equal(response.state.status, "failed");
+  assert.equal(response.state.endReason, "time_expired");
+  assert.equal(response.state.correctCount, 0);
+  assert.equal(response.state.mistakeCount, 0);
+
+  const history = await cli.command({ command: "history", result: "incomplete" });
+  assert.equal(history.history.length, 1);
+  assert.equal(history.history[0].id, response.attempt.id);
+  const reviews = await cli.command({
+    command: "dueReviews",
+    now: "2026-07-25T00:00:00.000Z"
+  });
+  assert.equal(reviews.dueReviews.length, 0);
+
+  await cli.stop();
+});
+
 test("CLI accepts multiple themes as an OR-filtered sprint contract", async (t) => {
   const cli = await startCli(t);
 

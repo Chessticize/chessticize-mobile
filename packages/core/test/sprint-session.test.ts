@@ -200,9 +200,46 @@ test("sprint deadline wins over the puzzle deadline", () => {
   });
 
   const expired = advanceSprintTime(state, "2026-06-20T00:01:00.000Z");
-  assert.equal(expired.attempt, undefined);
+  assert.equal(expired.attempt?.result, "incomplete");
+  assert.equal(expired.attempt?.completedAt, state.deadlineAt);
+  assert.equal(expired.attempt?.submittedMove, undefined);
+  assert.equal(expired.attempt?.timingStatus, "slow");
+  assert.equal(expired.attempt?.unclear, true);
+  assert.equal(expired.attempt?.unclearUpdatedAt, state.deadlineAt);
   assert.equal(expired.state.status, "failed");
   assert.equal(expired.state.endReason, "time_expired");
+  assert.equal(expired.state.correctCount, 0);
+  assert.equal(expired.state.mistakeCount, 0);
+  assert.equal(advanceSprintTime(expired.state, "2026-06-20T00:01:01.000Z").attempt, undefined);
+});
+
+test("a just-entered final puzzle becomes a clear Incomplete attempt at the Sprint deadline", () => {
+  const started = startSprint({
+    config: buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 60,
+      perPuzzleSeconds: 20,
+      targetCorrect: 3
+    }),
+    puzzles: [oneMovePuzzle("p1"), oneMovePuzzle("p2")],
+    ratingBefore: 900,
+    now: NOW
+  });
+  const first = submitSprintMove(started, "e6e7", "2026-06-20T00:00:59.000Z");
+  assert.equal(first.attempt?.result, "correct");
+  assert.equal(first.attempt?.timingStatus, "slow");
+  assert.equal(first.attempt?.unclear, true);
+
+  const expired = advanceSprintTime(first.state, "2026-06-20T00:01:04.000Z");
+  assert.equal(expired.attempt?.result, "incomplete");
+  assert.equal(expired.attempt?.puzzleId, "p2");
+  assert.equal(expired.attempt?.startedAt, "2026-06-20T00:00:59.000Z");
+  assert.equal(expired.attempt?.completedAt, "2026-06-20T00:01:00.000Z");
+  assert.equal(expired.attempt?.elapsedMs, 1_000);
+  assert.equal(expired.attempt?.timingStatus, undefined);
+  assert.equal(expired.attempt?.unclear, undefined);
+  assert.equal(expired.state.correctCount, 1);
+  assert.equal(expired.state.mistakeCount, 0);
 });
 
 test("pause excludes paused time from puzzle timing and shifts its effective start", () => {
@@ -513,7 +550,9 @@ test("expired sprint fails before accepting another move", () => {
   const result = submitSprintMove(state, "e6e7", "2026-06-20T00:00:02.000Z");
   assert.equal(result.state.status, "failed");
   assert.equal(result.state.endReason, "time_expired");
-  assert.equal(result.attempt, undefined);
+  assert.equal(result.attempt?.result, "incomplete");
+  assert.equal(result.attempt?.submittedMove, undefined);
+  assert.equal(result.feedback, undefined);
 });
 
 test("paused sprint ignores moves and resumes with the remaining time preserved", () => {

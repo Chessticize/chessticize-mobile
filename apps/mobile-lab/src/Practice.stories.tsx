@@ -254,7 +254,7 @@ export const ActiveSessionGuide: Story = {
     await waitForTestId(canvasElement, "practice-session-guide-coach-overview");
     await waitForText(
       canvasElement,
-      "The top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide."
+      "The top row shows puzzles solved, Sprint time left, and mistakes remaining. At zero, the active puzzle is saved as Incomplete, not as a mistake. The Sprint begins when you finish this guide."
     );
     expectTestIdAbsent(canvasElement, "session-board");
   }
@@ -340,7 +340,7 @@ export const ArrowDuelGuideUnclear: Story = {
     await advanceArrowDuelGuide(canvasElement, 4);
     await waitForTestId(canvasElement, "practice-session-guide-coach-unclear");
     await waitForText(canvasElement, "4 of 5");
-    await waitForText(canvasElement, "Use Mark as unclear after a correct answer");
+    await waitForText(canvasElement, "Use Mark as unclear when needed");
     expectFullScreenStoryId(canvasElement, ARROW_DUEL_GUIDE_PRESENTATIONS.unclear.storyId);
   }
 };

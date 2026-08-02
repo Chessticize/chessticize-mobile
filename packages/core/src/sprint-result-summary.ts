@@ -25,6 +25,9 @@ export function buildSprintResultSummary(
   attempts: readonly AttemptEvent[]
 ): SprintResultSummary {
   const sprintAttempts = attempts.filter((attempt) => attempt.source === "sprint");
+  const scoredSprintAttempts = sprintAttempts.filter(
+    (attempt) => attempt.result !== "incomplete"
+  );
   const unclearAttempts = sprintAttempts.filter(
     (attempt) => isAttemptMarkedUnclear(attempt)
   );
@@ -43,9 +46,9 @@ export function buildSprintResultSummary(
 
   return {
     accuracyPercent: Math.round(
-      (result.correctCount / Math.max(1, sprintAttempts.length)) * 100
+      (result.correctCount / Math.max(1, scoredSprintAttempts.length)) * 100
     ),
-    attemptCount: sprintAttempts.length,
+    attemptCount: scoredSprintAttempts.length,
     unclear: {
       slowMarkedCount,
       timedOutMarkedCount,

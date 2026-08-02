@@ -290,6 +290,12 @@ export class PracticeService {
     if (!this.activeSprint) {
       throw new Error("No active sprint");
     }
+    if (
+      this.activeSprint.status === "active" &&
+      new Date(now).getTime() >= new Date(this.activeSprint.deadlineAt).getTime()
+    ) {
+      return this.advanceSprintTime(now).state;
+    }
     const completed = abandonSprintCore(this.activeSprint, now);
     this.store.transaction(() => {
       this.persistCompletedSprint(completed);

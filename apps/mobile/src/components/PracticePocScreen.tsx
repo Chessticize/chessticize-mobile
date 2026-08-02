@@ -48,7 +48,6 @@ import {
   formatReviewDay,
   formatWhitePerspectiveScore,
   historyAttemptReplayAvailability,
-  historyAttemptHasReviewQueued,
   historyAttemptSpeedSeconds,
   isAttemptMarkedUnclear,
   isUnclearAttemptEligible,
@@ -79,10 +78,11 @@ import type {
   EngineAnalysisLine,
   HistoryAttemptView,
   HistoryAttemptReplayAvailability,
+  HistoryAttentionReason,
   HistoryPerformance,
   HistoryPerformancePoint,
+  HistoryResult,
   HistoryTimeRange,
-  HistoryView,
   PuzzleSide,
   Puzzle,
   PuzzleFeedback,
@@ -250,15 +250,6 @@ export type {
   HistoryStrengthSeries
 } from "./historyProgressPresentation.ts";
 
-export type HistoryIncompleteAttemptPresentation = {
-  attemptId: string;
-  slow: boolean;
-};
-
-export type HistoryDesignPreview = {
-  incompleteAttempts: readonly HistoryIncompleteAttemptPresentation[];
-};
-
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
   arrowDuelTargetCorrect?: number;
@@ -267,7 +258,6 @@ interface Props {
   customTargetCorrect?: number;
   debugTrace?: (event: PracticeDebugTraceEvent) => void;
   feedbackIssuesOpener?: (url: string) => Promise<void>;
-  historyDesignPreview?: HistoryDesignPreview;
   historyProgressPresentation?: HistoryProgressPresentation;
   iCloudSyncErrorDetails?: ICloudSyncErrorDetailsPresentation;
   iCloudSyncSupportBundle?: ICloudSyncSupportBundlePresentation;
@@ -354,8 +344,7 @@ type MobileBackPreview = MobileBackDestination & {
 type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
 type HistoryRatingRangeFilter = "all" | "under1000" | "1000-1399" | "1400-plus";
-type HistoryResultFilter = "all" | "correct" | "wrong" | "incomplete";
-type HistoryAttentionReason = "unclear" | "in_review" | "incomplete";
+type HistoryResultFilter = "all" | HistoryResult;
 type CustomThemeFilter = string;
 
 export type PracticeDebugTraceEvent = {
@@ -450,6 +439,19 @@ function previousAttemptNoticeFor(
         attemptId: attempt.id,
         puzzleId: attempt.puzzleId,
         reason: "slow"
+      }
+    : null;
+}
+
+function incompleteUnclearPromptFor(
+  attempt: Pick<AttemptEvent, "id" | "puzzleId" | "result" | "unclear"> | null | undefined
+): UnclearPromptState | null {
+  return attempt?.result === "incomplete"
+    ? {
+        attemptId: attempt.id,
+        marked: Boolean(attempt.unclear),
+        puzzleId: attempt.puzzleId,
+        question: "Was the final puzzle unclear?"
       }
     : null;
 }
@@ -573,10 +575,7 @@ const BOARD_RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 const BOARD_RANKS_FLIPPED = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
 const ALL_HISTORY_ATTENTION_REASONS: readonly HistoryAttentionReason[] = [
   "unclear",
-  "in_review"
-];
-const ALL_HISTORY_ATTENTION_REASONS_WITH_INCOMPLETE: readonly HistoryAttentionReason[] = [
-  ...ALL_HISTORY_ATTENTION_REASONS,
+  "in_review",
   "incomplete"
 ];
 const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
@@ -607,7 +606,6 @@ export function PracticePocScreen({
   customTargetCorrect,
   debugTrace,
   feedbackIssuesOpener = openFeedbackIssuesInBrowser,
-  historyDesignPreview,
   historyProgressPresentation,
   iCloudSyncErrorDetails,
   iCloudSyncSupportBundle,
@@ -742,9 +740,7 @@ export function PracticePocScreen({
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
   const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
   const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
-  const historyAttentionReasonOptions = historyDesignPreview
-    ? ALL_HISTORY_ATTENTION_REASONS_WITH_INCOMPLETE
-    : ALL_HISTORY_ATTENTION_REASONS;
+  const historyAttentionReasonOptions = ALL_HISTORY_ATTENTION_REASONS;
   const [historyResultFilter, setHistoryResultFilter] = useState<HistoryResultFilter>("all");
   const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
   const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
@@ -1135,7 +1131,7 @@ export function PracticePocScreen({
         commitState(advanced.state);
         setFeedback(null);
         setFeedbackPuzzleId(null);
-        setUnclearPrompt(null);
+        setUnclearPrompt(incompleteUnclearPromptFor(advanced.attempt));
         setPreviousAttemptNotice(previousAttemptNoticeFor(
           advanced.attempt,
           advanced.state.status
@@ -1940,6 +1936,12 @@ export function PracticePocScreen({
     try {
       const nextState = service.abandonSprint(nowIso());
       commitState(nextState);
+      setUnclearPrompt(nextState.endReason === "time_expired"
+        ? incompleteUnclearPromptFor(service.listHistory({
+            sessionId: nextState.id,
+            result: "incomplete"
+          })[0])
+        : null);
       setResumableSprint(null);
       setFeedback(null);
       setFeedbackPuzzleId(null);
@@ -1961,6 +1963,12 @@ export function PracticePocScreen({
     try {
       const paused = service.pauseSprint(captureLiveNowIso());
       commitState(paused);
+      setUnclearPrompt(paused.endReason === "time_expired"
+        ? incompleteUnclearPromptFor(service.listHistory({
+            sessionId: paused.id,
+            result: "incomplete"
+          })[0])
+        : null);
       commitBoardInputLocked(true, `pause-${reason}`, paused.currentPuzzle?.puzzle.id ?? null);
       clearFeedbackSnapshot();
       setFeedback(null);
@@ -2127,18 +2135,18 @@ export function PracticePocScreen({
       );
       setPreviousAttemptNotice(nextPreviousAttemptNotice);
       if (next.attempt) {
-        setUnclearPrompt(
+        setUnclearPrompt(incompleteUnclearPromptFor(next.attempt) ?? (
           !nextPreviousAttemptNotice
             && isUnclearAttemptEligible(next.attempt)
             && !next.attempt.unclear
-          ? {
-              attemptId: next.attempt.id,
-              marked: Boolean(next.attempt.unclear),
-              puzzleId: next.attempt.puzzleId,
-              question: "Was it clear why the last correct move worked?"
-            }
-          : null
-        );
+            ? {
+                attemptId: next.attempt.id,
+                marked: Boolean(next.attempt.unclear),
+                puzzleId: next.attempt.puzzleId,
+                question: "Was it clear why the last correct move worked?"
+              }
+            : null
+        ));
       }
       commitState(next.state);
       setFeedback(nextFeedback);
@@ -2356,22 +2364,12 @@ export function PracticePocScreen({
       ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
       ...historyRatingRangeQuery,
       ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-      ...(!historyDesignPreview && (historyResultFilter === "correct" || historyResultFilter === "wrong")
-        ? { result: historyResultFilter }
-        : {}),
+      ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
       ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
       ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
-      ...(historyDesignPreview ? {} : historyAttentionQueryForSelection(historyAttentionReasons))
+      ...historyAttentionQueryForSelection(historyAttentionReasons)
     });
-    const historyReviewAttempts = historyDesignPreview
-      ? filterHistoryDesignPreviewAttempts({
-          attentionReasons: historyAttentionReasons,
-          attempts: historyReviewView.attempts,
-          incompleteAttempts: historyIncompleteAttempts,
-          resultFilter: historyResultFilter,
-          reviews: service.listReviewQueue()
-        })
-      : historyReviewView.attempts;
+    const historyReviewAttempts = historyReviewView.attempts;
     const selectedAttempt = historyReviewAttempts.find((attempt) => attempt.id === attemptId);
     if (!selectedAttempt) {
       return;
@@ -2928,9 +2926,6 @@ export function PracticePocScreen({
       }] as const]
       : [])
   );
-  const historyIncompleteAttempts = new Map(
-    (historyDesignPreview?.incompleteAttempts ?? []).map((attempt) => [attempt.attemptId, attempt] as const)
-  );
   const activeHistoryRatingKey = historyRatingKey;
   const historyRatingRangeQuery = historyRatingRangeFilterToQuery(historyRatingRangeFilter);
   // History views scan the full attempt history, so they are computed only while
@@ -2949,27 +2944,14 @@ export function PracticePocScreen({
         ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
         ...historyRatingRangeQuery,
         ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-        ...(!historyDesignPreview && (historyResultFilter === "correct" || historyResultFilter === "wrong")
-          ? { result: historyResultFilter }
-          : {}),
+        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
-        ...(historyDesignPreview ? {} : historyAttentionQueryForSelection(historyAttentionReasons)),
-        ...(historyDesignPreview ? {} : {
-          page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
-        })
+        ...historyAttentionQueryForSelection(historyAttentionReasons),
+        page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
       })
     : null;
-  const historyView = historyBaseView && historyDesignPreview
-    ? historyDesignPreviewView({
-        attentionReasons: historyAttentionReasons,
-        incompleteAttempts: historyIncompleteAttempts,
-        offset: historyPageOffset,
-        resultFilter: historyResultFilter,
-        reviews: service.listReviewQueue(),
-        view: historyBaseView
-      })
-    : historyBaseView;
+  const historyView = historyBaseView;
   const historyPerformanceView = historyPanelVisible && activeHistoryRatingKey
     ? service.getHistoryView({
         now: nowIso(),
@@ -2977,12 +2959,10 @@ export function PracticePocScreen({
         ratingKey: activeHistoryRatingKey,
         ...historyRatingRangeQuery,
         ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-        ...(!historyDesignPreview && (historyResultFilter === "correct" || historyResultFilter === "wrong")
-          ? { result: historyResultFilter }
-          : {}),
+        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
         ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
         ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
-        ...(historyDesignPreview ? {} : historyAttentionQueryForSelection(historyAttentionReasons))
+        ...historyAttentionQueryForSelection(historyAttentionReasons)
       })
     : null;
   const visibleHistoryAttempts = historyView?.attempts ?? [];
@@ -4069,7 +4049,6 @@ export function PracticePocScreen({
                   availableThemes={historyView.availableThemes}
                   page={visibleHistoryPage ?? historyView.page}
                   attentionReasons={historyAttentionReasons}
-                  historyDesignPreview={historyDesignPreview}
                   themeCatalogPresentation={themeCatalogPresentation}
                   filtersExpanded={historyFiltersExpanded}
                   onFiltersExpandedChange={setHistoryFiltersExpanded}
@@ -4837,7 +4816,7 @@ function SprintRulesGuide({
 
   return (
     <View
-      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass. Time limit: Solve the required puzzles before the Sprint clock reaches zero. Mistake limit: ${mistakeLimitDetail} Slow warning: The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake. Puzzle timeout: When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. Mistakes are not marked Unclear. For example, solving ${presentation.targetCorrect} puzzles with one mistake means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
+      accessibilityLabel={`Your first Sprint. Solve ${presentation.targetCorrect} puzzles to pass. Time limit: Finish the goal before the Sprint clock reaches zero. At zero, the active puzzle is saved as Incomplete, not as a mistake, and needs attention. If it is Slow, it is also marked Unclear. Mistake limit: ${mistakeLimitDetail} Slow warning: The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake. Puzzle timeout: When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. Mistakes are not marked Unclear. For example, solving ${presentation.targetCorrect} puzzles with one mistake means ${presentation.targetCorrect} solved and ${presentation.targetCorrect + 1} attempted.`}
       style={styles.sprintRulesGuide}
       testID="practice-sprint-rules-guide"
     >
@@ -4862,7 +4841,7 @@ function SprintRulesGuide({
       <View style={styles.sprintRulesList}>
         <SprintRuleRow
           badge={presentation.durationLabel}
-          detail="Solve the required puzzles before the Sprint clock reaches zero."
+          detail="Finish the goal before the Sprint clock reaches zero. At zero, the active puzzle is saved as Incomplete, not as a mistake, and needs attention. If it is Slow, it is also marked Unclear."
           label="Time limit"
         />
         <SprintRuleRow
@@ -4975,7 +4954,7 @@ function sessionGuideCallout(
   if (mode === "arrow_duel") {
     return {
       badge: "ARROW DUEL",
-      detail: "Compare the two moves, then play the stronger one on the board. Other moves are ignored.",
+      detail: "Compare the two moves, then play the stronger one on the board. Other moves are ignored. If the Sprint clock reaches zero, the current choice is saved as Incomplete, not as a mistake.",
       id: "arrow-duel",
       title: "The arrows show your two choices",
       tone: "info"
@@ -4986,7 +4965,7 @@ function sessionGuideCallout(
       badge: focusedRun ? "FOCUSED RUN" : "SPRINT HEADER",
       detail: focusedRun
         ? "The top row shows puzzles completed, time left, and Unrated status. Your Rating will not change."
-        : "The top row shows puzzles solved, Sprint time left, and mistakes remaining. The Sprint begins when you finish this guide.",
+        : "The top row shows puzzles solved, Sprint time left, and mistakes remaining. At zero, the active puzzle is saved as Incomplete, not as a mistake. The Sprint begins when you finish this guide.",
       id: "overview",
       title: focusedRun ? "Track the fixed Run" : "Track your Sprint",
       tone: "info"
@@ -5014,9 +4993,9 @@ function sessionGuideCallout(
   }
   return {
     badge: "UNCLEAR",
-    detail: "Tap it when your move was correct but the solution still does not make sense to you.",
+    detail: "Tap it after a correct answer, or on the final Incomplete puzzle, when the solution still does not make sense to you.",
     id: "unclear",
-    title: "Use Mark as unclear after a correct answer",
+    title: "Use Mark as unclear when needed",
     tone: "warning"
   };
 }
@@ -9430,7 +9409,6 @@ function HistoryPanel({
   availableThemes,
   page,
   attentionReasons,
-  historyDesignPreview,
   themeCatalogPresentation,
   onRatingKeyChange,
   onTimeRangeChange,
@@ -9465,7 +9443,6 @@ function HistoryPanel({
   availableThemes: string[];
   page: { limit: number; offset: number; total: number; hasMore: boolean };
   attentionReasons: readonly HistoryAttentionReason[];
-  historyDesignPreview?: HistoryDesignPreview;
   themeCatalogPresentation?: ThemeCatalogPresentation;
   onRatingKeyChange: (ratingKey: string | null) => void;
   onTimeRangeChange: (range: HistoryTimeRange) => void;
@@ -9549,9 +9526,7 @@ function HistoryPanel({
             <FilterButton active={resultFilter === "all"} label="All" testID="history-result-all" onPress={() => onResultFilterChange("all")} />
             <FilterButton active={resultFilter === "correct"} label="Correct" testID="history-result-correct" onPress={() => onResultFilterChange("correct")} />
             <FilterButton active={resultFilter === "wrong"} label="Wrong" testID="history-result-wrong" onPress={() => onResultFilterChange("wrong")} />
-            {historyDesignPreview ? (
-              <FilterButton active={resultFilter === "incomplete"} label="Incomplete" testID="history-result-incomplete" onPress={() => onResultFilterChange("incomplete")} />
-            ) : null}
+            <FilterButton active={resultFilter === "incomplete"} label="Incomplete" testID="history-result-incomplete" onPress={() => onResultFilterChange("incomplete")} />
           </HistoryChipRow>
           <HistoryChipRow testID="history-rating-range-filters">
             {HISTORY_RATING_RANGE_FILTERS.map((ratingRange) => (
@@ -9583,14 +9558,12 @@ function HistoryPanel({
                 testID="history-attention-flag-in-review"
                 onPress={() => onAttentionReasonChange("in_review")}
               />
-              {historyDesignPreview ? (
-                <FilterButton
-                  active={attentionReasons.includes("incomplete")}
-                  label="Incomplete"
-                  testID="history-attention-flag-incomplete"
-                  onPress={() => onAttentionReasonChange("incomplete")}
-                />
-              ) : null}
+              <FilterButton
+                active={attentionReasons.includes("incomplete")}
+                label="Incomplete"
+                testID="history-attention-flag-incomplete"
+                onPress={() => onAttentionReasonChange("incomplete")}
+              />
             </HistoryChipRow>
           </View>
           <HistoryChipRow testID="history-side-filters">
@@ -9629,14 +9602,11 @@ function HistoryPanel({
       <View style={styles.historyTopFilterStack} testID="history-primary-filters">
         <HistoryAttentionFilter
           attentionOnly={attentionOnly}
-          includesIncomplete={historyDesignPreview !== undefined}
           onChange={onAttentionOnlyChange}
         />
         {attentionOnly ? (
           <Text style={styles.helperText} testID="history-attention-explanation">
-            {historyDesignPreview
-              ? "Needs attention includes Incomplete, Unclear, or In Review Sprint attempts."
-              : "Needs attention shows original Sprint attempts only."}
+            Needs attention includes Incomplete, Unclear, or In Review Sprint attempts.
           </Text>
         ) : null}
       </View>
@@ -9703,9 +9673,6 @@ function HistoryPanel({
         <HistoryAttemptRow
           key={attempt.id}
           attempt={attempt}
-          incompletePresentation={historyDesignPreview?.incompleteAttempts.find(
-            (candidate) => candidate.attemptId === attempt.id
-          )}
           nowMs={nowMs}
           onOpen={() => onOpenAttempt(attempt.id)}
         />
@@ -9856,95 +9823,12 @@ function historyActiveFilterLabels({
   return labels;
 }
 
-function historyDesignPreviewView({
-  attentionReasons,
-  incompleteAttempts,
-  offset,
-  resultFilter,
-  reviews,
-  view
-}: {
-  attentionReasons: readonly HistoryAttentionReason[];
-  incompleteAttempts: ReadonlyMap<string, HistoryIncompleteAttemptPresentation>;
-  offset: number;
-  resultFilter: HistoryResultFilter;
-  reviews: ReviewQueueState[];
-  view: HistoryView;
-}): HistoryView {
-  const attempts = filterHistoryDesignPreviewAttempts({
-    attentionReasons,
-    attempts: view.attempts,
-    incompleteAttempts,
-    resultFilter,
-    reviews
-  });
-  const page = {
-    limit: HISTORY_PAGE_LIMIT,
-    offset,
-    total: attempts.length,
-    hasMore: offset + HISTORY_PAGE_LIMIT < attempts.length
-  };
-  return {
-    ...view,
-    attempts: attempts.slice(offset, offset + HISTORY_PAGE_LIMIT),
-    page
-  };
-}
-
-function filterHistoryDesignPreviewAttempts({
-  attentionReasons,
-  attempts,
-  incompleteAttempts,
-  resultFilter,
-  reviews
-}: {
-  attentionReasons: readonly HistoryAttentionReason[];
-  attempts: HistoryAttemptView[];
-  incompleteAttempts: ReadonlyMap<string, HistoryIncompleteAttemptPresentation>;
-  resultFilter: HistoryResultFilter;
-  reviews: ReviewQueueState[];
-}): HistoryAttemptView[] {
-  return attempts
-    .filter((attempt) => {
-      const isIncomplete = incompleteAttempts.has(attempt.id);
-      if (resultFilter === "all") {
-        return true;
-      }
-      if (resultFilter === "incomplete") {
-        return isIncomplete;
-      }
-      return !isIncomplete && attempt.result === resultFilter;
-    })
-    .filter((attempt) => {
-      if (attentionReasons.length === 0) {
-        return true;
-      }
-      const incompletePresentation = incompleteAttempts.get(attempt.id);
-      return attentionReasons.some((reason) => {
-        if (reason === "incomplete") {
-          return incompletePresentation !== undefined;
-        }
-        if (reason === "unclear") {
-          return isAttemptMarkedUnclear(attempt) || incompletePresentation?.slow === true;
-        }
-        return historyAttemptHasReviewQueued(attempt, reviews);
-      });
-    });
-}
-
 function historyAttentionQueryForSelection(
   attentionReasons: readonly HistoryAttentionReason[]
-): { attentionOnly?: true; reviewStatus?: "queued"; unclear?: true } {
-  if (attentionReasons.length === ALL_HISTORY_ATTENTION_REASONS.length) {
-    return { attentionOnly: true };
-  }
-  if (attentionReasons.includes("unclear")) {
-    return { unclear: true };
-  }
-  if (attentionReasons.includes("in_review")) {
-    return { reviewStatus: "queued" };
-  }
-  return {};
+): { attentionReasons?: HistoryAttentionReason[] } {
+  return attentionReasons.length === 0
+    ? {}
+    : { attentionReasons: [...attentionReasons] };
 }
 
 function HistoryActiveFilterStrip({
@@ -10367,11 +10251,9 @@ function HistoryRangeFilters({
 
 function HistoryAttentionFilter({
   attentionOnly,
-  includesIncomplete,
   onChange
 }: {
   attentionOnly: boolean;
-  includesIncomplete: boolean;
   onChange: (attentionOnly: boolean) => void;
 }): React.JSX.Element {
   return (
@@ -10382,9 +10264,7 @@ function HistoryAttentionFilter({
       testID="history-attention-filter"
     >
       <Pressable
-        accessibilityLabel={includesIncomplete
-          ? "Needs attention: Sprint attempts that are Incomplete, unclear, or in Review"
-          : "Needs attention: Sprint attempts that are unclear or in Review"}
+        accessibilityLabel="Needs attention: Sprint attempts that are Incomplete, unclear, or in Review"
         accessibilityRole="radio"
         accessibilityState={{ checked: attentionOnly }}
         aria-checked={attentionOnly}
@@ -10431,26 +10311,22 @@ function HistoryAttentionFilter({
 
 function HistoryAttemptRow({
   attempt,
-  incompletePresentation,
   nowMs,
   onOpen
 }: {
   attempt: HistoryAttemptView;
-  incompletePresentation?: HistoryIncompleteAttemptPresentation;
   nowMs: number;
   onOpen: () => void;
 }): React.JSX.Element {
   const detail = normalizeHistoryAttemptDetail(attempt);
   const persistedTimingStatus = attempt.timingStatus
     ?? (attempt.result === "timed_out" ? "timed_out" : null);
-  const isIncomplete = incompletePresentation !== undefined;
-  const timingStatus = isIncomplete
-    ? incompletePresentation.slow ? "slow" : null
-    : persistedTimingStatus;
+  const isIncomplete = detail.result === "incomplete";
+  const timingStatus = persistedTimingStatus;
   const isTimedOut = !isIncomplete && (timingStatus === "timed_out" || detail.result === "timed_out");
   const isWrong = detail.result === "wrong" && !isTimedOut;
   const isCorrect = detail.result === "correct";
-  const isUnclear = attempt.unclear === true || incompletePresentation?.slow === true;
+  const isUnclear = isAttemptMarkedUnclear(attempt);
   const dateLabel = detail.completedAt === null
     ? "Date unavailable"
     : formatLocalCalendarDateLabel(detail.completedAt, { now: nowMs });
