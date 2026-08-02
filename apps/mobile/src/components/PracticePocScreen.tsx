@@ -8699,7 +8699,9 @@ function PracticePrompt({
   promptSide,
   solved = false,
   promptText,
-  promptHint
+  promptHint,
+  promptHintNumberOfLines,
+  reserveDefaultLayout = false
 }: {
   currentPuzzle: CurrentPuzzleState | undefined;
   kingPieceSize: number;
@@ -8708,24 +8710,34 @@ function PracticePrompt({
   solved?: boolean;
   promptText?: string | null;
   promptHint?: string | null;
+  promptHintNumberOfLines?: number;
+  reserveDefaultLayout?: boolean;
 }): React.JSX.Element | null {
   if (!currentPuzzle) {
     return null;
   }
   const displayedSide = promptSide ?? sideToMove(currentPuzzle.currentFen);
   const side = displayedSide === "b" ? "black" : "white";
-  const isArrowDuel = currentPuzzle.kind === "arrow_duel";
-  const defaultPromptTitle = isArrowDuel ? "Choose the best move" : "Find the best move";
-  const defaultPromptContext = isArrowDuel
+  const usesArrowDuelPrompt = currentPuzzle.kind === "arrow_duel"
+    || (reserveDefaultLayout && mode === "arrow_duel");
+  const defaultPromptTitle = usesArrowDuelPrompt ? "Choose the best move" : "Find the best move";
+  const defaultPromptContext = usesArrowDuelPrompt
     ? `For ${side}, between the two arrows.`
     : `For ${side}.`;
+  const defaultPromptHint = usesArrowDuelPrompt
+    ? "Watch for checks, captures, and attacks!"
+    : null;
   const promptContext = promptText === undefined ? defaultPromptContext : promptText;
   const promptHintCopy = promptHint === undefined
-    ? (isArrowDuel ? "Watch for checks, captures, and attacks!" : null)
+    ? defaultPromptHint
     : promptHint;
   const promptTitle = promptText === undefined
     ? defaultPromptTitle
     : modeLabel(mode);
+  const layoutPromptTitle = reserveDefaultLayout ? defaultPromptTitle : promptTitle;
+  const layoutPromptContext = reserveDefaultLayout ? defaultPromptContext : promptContext;
+  const layoutPromptHint = reserveDefaultLayout ? defaultPromptHint : promptHintCopy;
+  const layoutCopyHidden = solved || reserveDefaultLayout;
 
   return (
     <View style={styles.promptPanel} testID="practice-prompt">
@@ -8742,36 +8754,62 @@ function PracticePrompt({
       <View style={styles.promptCopy} testID="practice-prompt-copy">
         <View testID="practice-prompt-title-slot">
           <Text
-            accessible={!solved}
-            accessibilityElementsHidden={solved}
-            importantForAccessibility={solved ? "no-hide-descendants" : "auto"}
-            style={[styles.promptTitle, solved ? styles.promptSolvedLayoutCopy : null]}
+            accessible={!layoutCopyHidden}
+            accessibilityElementsHidden={layoutCopyHidden}
+            importantForAccessibility={layoutCopyHidden ? "no-hide-descendants" : "auto"}
+            style={[styles.promptTitle, layoutCopyHidden ? styles.promptSolvedLayoutCopy : null]}
             testID="practice-prompt-title-layout"
           >
-            {promptTitle}
+            {layoutPromptTitle}
           </Text>
         </View>
-        {promptContext ? (
+        {layoutPromptContext ? (
           <Text
-            accessible={!solved}
-            accessibilityElementsHidden={solved}
-            importantForAccessibility={solved ? "no-hide-descendants" : "auto"}
-            style={[styles.promptText, solved ? styles.promptSolvedLayoutCopy : null]}
+            accessible={!layoutCopyHidden}
+            accessibilityElementsHidden={layoutCopyHidden}
+            importantForAccessibility={layoutCopyHidden ? "no-hide-descendants" : "auto"}
+            style={[styles.promptText, layoutCopyHidden ? styles.promptSolvedLayoutCopy : null]}
             testID="practice-prompt-context"
           >
-            {promptContext}
+            {layoutPromptContext}
           </Text>
         ) : null}
-        {promptHintCopy ? (
+        {layoutPromptHint ? (
           <Text
-            accessible={!solved}
-            accessibilityElementsHidden={solved}
-            importantForAccessibility={solved ? "no-hide-descendants" : "auto"}
-            style={[styles.promptHint, solved ? styles.promptSolvedLayoutCopy : null]}
+            accessible={!layoutCopyHidden}
+            accessibilityElementsHidden={layoutCopyHidden}
+            importantForAccessibility={layoutCopyHidden ? "no-hide-descendants" : "auto"}
+            numberOfLines={reserveDefaultLayout ? undefined : promptHintNumberOfLines}
+            style={[styles.promptHint, layoutCopyHidden ? styles.promptSolvedLayoutCopy : null]}
             testID="practice-prompt-hint"
           >
-            {promptHintCopy}
+            {layoutPromptHint}
           </Text>
+        ) : null}
+        {reserveDefaultLayout && !solved ? (
+          <View
+            pointerEvents="none"
+            style={[styles.promptSolvedOverlay, styles.promptMessageOverlay]}
+            testID="practice-prompt-message-overlay"
+          >
+            <Text style={styles.promptTitle} testID="practice-prompt-message-title">
+              {promptTitle}
+            </Text>
+            {promptContext ? (
+              <Text style={styles.promptText} testID="practice-prompt-message-context">
+                {promptContext}
+              </Text>
+            ) : null}
+            {promptHintCopy ? (
+              <Text
+                numberOfLines={promptHintNumberOfLines}
+                style={styles.promptHint}
+                testID="practice-prompt-message-hint"
+              >
+                {promptHintCopy}
+              </Text>
+            ) : null}
+          </View>
         ) : null}
         {solved ? (
           <View
@@ -11486,7 +11524,15 @@ function ReviewSession({
     !analysisEnabled && !feedback && currentEntry.mode === "arrow_duel" && reviewState.kind === "line"
       ? currentExpectedMove(reviewState.line)
       : undefined;
-  const isArrowDuelFollowUpReview = currentEntry.mode === "arrow_duel" && reviewState.kind === "line";
+  const isArrowDuelFollowUpReview = currentEntry.mode === "arrow_duel"
+    && (
+      reviewState.kind === "line"
+      || (
+        currentEntry.source !== "due"
+        && reviewState.kind === "arrow_duel"
+        && feedback?.result === "wrong"
+      )
+    );
   const reviewBoardLocked = boardLocked || reviewEntryPreview.locked;
   const boardGestureEnabled = !reviewBoardLocked;
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
@@ -12083,9 +12129,11 @@ function ReviewSession({
         }
         promptHint={
           isArrowDuelFollowUpReview
-            ? "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad."
+            ? "Follow the blue line to see why this move fails."
             : undefined
         }
+        promptHintNumberOfLines={isArrowDuelFollowUpReview ? 2 : undefined}
+        reserveDefaultLayout={isArrowDuelFollowUpReview}
       />
     </View>
   );
@@ -17067,6 +17115,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
     top: 0
+  },
+  promptMessageOverlay: {
+    gap: 2
   },
   promptText: {
     color: "#334155",

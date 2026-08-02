@@ -8505,6 +8505,50 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Choose the best move");
   });
 
+  it.each([
+    { height: 1376, label: "iPad portrait", scale: 2, width: 1032 },
+    { height: 820, label: "iPad landscape", scale: 2, width: 1180 },
+    { height: 390, label: "compact wide-short window", scale: 3, width: 844 },
+    { height: 346, label: "iPad-on-Mac wide-short window", scale: 2, width: 993 },
+    { height: 700, label: "narrow resizable window", scale: 2, width: 280 }
+  ])("keeps the Arrow Duel Replay prompt and board geometry fixed on $label", async ({
+    height,
+    scale,
+    width
+  }: {
+    height: number;
+    label: string;
+    scale: number;
+    width: number;
+  }) => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: {
+        fontScale: number;
+        height: number;
+        scale: number;
+        width: number;
+      }) => void;
+    }).__setWindowDimensions?.({ width, height, scale, fontScale: 1 });
+    const renderer = renderStoredArrowDuelReplay();
+    const initialPromptLayout = promptLayoutSlotTestIDs(renderer);
+    const initialBoardStyle = flattenTestStyle(findByTestId(renderer, "review-board").props.style);
+
+    await boardMove(renderer, "f2g3");
+
+    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+    expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expectPromptMessageReservesLayout(
+      renderer,
+      initialPromptLayout,
+      "Arrow Duel",
+      "Follow the blue line to see why this move fails.",
+      2
+    );
+    expect(flattenTestStyle(findByTestId(renderer, "review-board").props.style)).toEqual(
+      initialBoardStyle
+    );
+  });
+
   it("keeps Replay reset beside Analysis instead of in the header", () => {
     const renderer = renderStoredArrowDuelReplay();
     const replayActions = findByTestId(renderer, "review-analysis-toolbar");
@@ -10012,9 +10056,22 @@ describe("PracticePocScreen", () => {
     expect(countStyleEntry(findByTestId(renderer, "review-board"), "backgroundColor", "#DC2626")).toBeGreaterThan(0);
     press(renderer, "review-close-analysis");
 
+    const initialPromptLayout = promptLayoutSlotTestIDs(renderer);
+    expect(initialPromptLayout).toEqual([
+      "practice-prompt-title-layout",
+      "practice-prompt-context",
+      "practice-prompt-hint"
+    ]);
     await boardMove(renderer, wrongMoves[0] as string);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expectPromptMessageReservesLayout(
+      renderer,
+      initialPromptLayout,
+      "Arrow Duel",
+      "Follow the blue line to see why this move fails.",
+      2
+    );
 
     await settleFeedbackSnapshot();
     await settleFeedbackSnapshot();
@@ -10026,10 +10083,16 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-guided-move-overlay")).toBeTruthy();
     expect(countStyleEntry(findByTestId(renderer, "review-guided-move-overlay"), "backgroundColor", "#2563EB")).toBeGreaterThan(0);
     expect(countStyleEntry(findByTestId(renderer, "review-guided-move-overlay"), "backgroundColor", "#16A34A")).toBe(0);
-    expect(collectText(renderer.root)).not.toContain("Choose the best move");
-    expect(collectText(renderer.root)).not.toContain("Find the best move");
-    expect(collectText(renderer.root)).not.toContain("Follow the puzzle line");
-    expectText(renderer, "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad.");
+    expect(collectVisibleText(renderer.root)).not.toContain("Choose the best move");
+    expect(collectVisibleText(renderer.root)).not.toContain("Find the best move");
+    expect(collectVisibleText(renderer.root)).not.toContain("Follow the puzzle line");
+    expectPromptMessageReservesLayout(
+      renderer,
+      initialPromptLayout,
+      "Arrow Duel",
+      "Follow the blue line to see why this move fails.",
+      2
+    );
     const guidedStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
     await waitForAssertion(() => {
       expect(stockfish.commands).toContain(`position fen ${guidedStartFen}`);
@@ -12936,6 +12999,39 @@ function expectSolvedPromptReservesLayout(
   expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-solved-title").props.style).fontSize)
     .toBe(flattenTestStyle(findByTestId(renderer, "practice-prompt-title-layout").props.style).fontSize);
   for (const slot of slots) {
+    expect(flattenTestStyle(slot.props.style).opacity).toBe(0);
+    expect(slot.props.accessibilityElementsHidden).toBe(true);
+    expect(slot.props.importantForAccessibility).toBe("no-hide-descendants");
+  }
+}
+
+function expectPromptMessageReservesLayout(
+  renderer: TestRenderer.ReactTestRenderer,
+  expectedTestIDs: string[],
+  title: string,
+  hint: string,
+  hintNumberOfLines: number
+): void {
+  const prompt = findByTestId(renderer, "practice-prompt");
+  const overlay = findByTestId(renderer, "practice-prompt-message-overlay");
+  expect(collectVisibleText(prompt)).toBe(`${title}${hint}`);
+  expect(collectVisibleText(overlay)).toBe(`${title}${hint}`);
+  expect(promptLayoutSlotTestIDs(renderer)).toEqual(expectedTestIDs);
+  expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-copy").props.style).position)
+    .toBe("relative");
+  expect(flattenTestStyle(overlay.props.style)).toEqual(expect.objectContaining({
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
+  }));
+  expect(collectText(findByTestId(renderer, "practice-prompt-message-title"))).toBe(title);
+  expect(collectText(findByTestId(renderer, "practice-prompt-message-hint"))).toBe(hint);
+  expect(findByTestId(renderer, "practice-prompt-message-hint").props.numberOfLines)
+    .toBe(hintNumberOfLines);
+  for (const slot of promptLayoutSlots(renderer)) {
     expect(flattenTestStyle(slot.props.style).opacity).toBe(0);
     expect(slot.props.accessibilityElementsHidden).toBe(true);
     expect(slot.props.importantForAccessibility).toBe("no-hide-descendants");
