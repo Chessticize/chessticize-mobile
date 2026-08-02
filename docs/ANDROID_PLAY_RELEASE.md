@@ -22,8 +22,9 @@ is the immutable Android 1.3.2 release submitted to Closed testing with
 corresponding source and the Play-signed GitHub APK mirror complete. Version
 code 11 is the source-published Android 1.3.3 candidate retained while the
 upload-key reset is pending. Version code 12 is the source-published Android
-1.3.4 candidate retained for the same reason. Version code 13 is reserved for
-the proposed Android 1.3.5 release.
+1.3.4 candidate retained for the same reason. Version code 13 is the immutable
+RC1 source identity that was invalidated before signing or Play upload. Version
+code 14 is reserved for the replacement Android 1.3.5 RC2 release.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -340,19 +341,39 @@ Build 12 is the retained Android 1.3.4 candidate:
 Build 12 was not uploaded to Play because the upload-key reset remained
 pending. Its source tag, signed AAB, and source release are immutable.
 
-Build 13 is the proposed Android 1.3.5 release:
+Build 13 is the invalidated Android 1.3.5 RC1 source identity:
 
-- intended annotated tag: `android-v1.3.5-build-13`;
+- annotated tag: `android-v1.3.5-build-13`, targeting
+  `a9e15d82f43302786902541249eec25a02e43381`;
 - primary user-visible change: keep the chessboard steady in Arrow Duel Replay
   and show follow-up guidance immediately after a wrong choice;
 - bundled Core Pack: unchanged immutable `core-pack-v4`, 227,487,744 bytes,
   SHA-256
   `74a81e54729dd1f4f9adee375c728e22ac758d3211e2da81d3b5bd702380083b`;
-- validation scope: exact-head fast checks plus protected signed-artifact
-  verification. No Android native, persistence, dependency, or bundled-resource
-  boundary changed.
+- validation scope was exact-head fast checks plus protected signed-artifact
+  verification because no Android native, persistence, dependency, or
+  bundled-resource boundary had changed.
 
-Build 13 is not yet tagged, signed, uploaded, or distributed. The Play upload
+Build 13 was tagged, but no Android signed-candidate workflow was dispatched and
+neither platform binary was uploaded or distributed. Its tag remains immutable
+audit evidence and must not be moved or reused.
+
+Build 14 is the proposed Android 1.3.5 RC2 release:
+
+- intended annotated tag: `android-v1.3.5-build-14`;
+- primary user-visible changes: save the puzzle active when the Sprint clock
+  reaches zero as Incomplete without counting it as a mistake, make Incomplete
+  attempts easy to find and mark as Unclear in History, and keep Arrow Duel
+  Replay guidance immediate without shifting the board;
+- bundled Core Pack: unchanged immutable `core-pack-v4`, 227,487,744 bytes,
+  SHA-256
+  `74a81e54729dd1f4f9adee375c728e22ac758d3211e2da81d3b5bd702380083b`;
+- validation scope: targeted persistence validation for the SQLite v15-to-v16
+  migration plus exact-head fast checks and the protected signed-artifact/source
+  job. The released-fixture migration matrix and an exact-candidate automated
+  upgrade smoke are required; no unrelated physical-device gate is added.
+
+Build 14 is not yet tagged, signed, uploaded, or distributed. The Play upload
 must wait until the Console no longer reports the upload-key reset request as
 pending.
 
@@ -360,11 +381,11 @@ pending.
 
 - Application ID: `com.chessticize.mobile`
 - Public version: `apps/mobile/release-version.json` (`1.3.5`)
-- Android version code: `apps/mobile/release-version.json` (`13`)
-- iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
+- Android version code: `apps/mobile/release-version.json` (`14`)
+- iOS build number: `apps/mobile/release-version.json` (`2`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.3.5-build-13`
+- Required source tag before any Play track upload: `android-v1.3.5-build-14`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -469,8 +490,8 @@ the mirror and Play track states independently until both are complete.
 
 For a bounded follow-up release:
 
-For Android version `1.3.5` build `13`, release notes and this support document must
-name the canonical source tag `android-v1.3.5-build-13` and the public source
+For Android version `1.3.5` build `14`, release notes and this support document must
+name the canonical source tag `android-v1.3.5-build-14` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 must bind the annotated tag, commit, application ID, version, version code, and
 AAB SHA-256 before Play distribution. A missing or lightweight public tag, a

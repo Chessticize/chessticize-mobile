@@ -631,7 +631,7 @@ for (const releaseDoc of releaseDocs) {
 }
 
 assert.equal(releaseVersion.publicVersion, "1.3.5");
-assert.equal(releaseVersion.androidVersionCode, 13);
+assert.equal(releaseVersion.androidVersionCode, 14);
 assert.ok(
   androidPlayRunbook.includes(
     `Android version code: \`apps/mobile/release-version.json\` ` +

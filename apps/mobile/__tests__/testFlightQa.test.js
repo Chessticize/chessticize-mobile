@@ -16,7 +16,7 @@ describe("TestFlight QA checklist", () => {
   it("keeps TestFlight physical-device diagnostics explicitly optional", () => {
     expect(testFlightDoc).toContain("Optional TestFlight Diagnostics");
     expect(testFlightDoc).toContain("Internal 1.3.5 QA");
-    expect(testFlightDoc).toContain("ios-v1.3.5-build-1");
+    expect(testFlightDoc).toContain("ios-v1.3.5-build-2");
     expect(testFlightDoc).toContain("App Store Connect build");
     expect(testFlightDoc).toContain("not an App Store release gate");
     expect(testFlightDoc).toContain("not required");
