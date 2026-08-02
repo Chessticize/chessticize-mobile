@@ -48,8 +48,8 @@
     ]
   },
   "currentVersionWhatsNew": {
-    "sourceTag": "ios-v1.3.4-build-1",
+    "sourceTag": "ios-v1.3.5-build-1",
     "status": "release-candidate",
-    "storeCopy": "• Improved iPad app window sizing when running on Apple silicon Mac.\n• Kept Practice navigation readable in wide, compact windows."
+    "storeCopy": "• Kept the chessboard steady when Arrow Duel Replay shows follow-up guidance.\n• Showed guidance immediately after a wrong Arrow Duel Replay choice."
   }
 }
