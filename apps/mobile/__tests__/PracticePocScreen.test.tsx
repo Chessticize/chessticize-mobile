@@ -3514,18 +3514,32 @@ describe("PracticePocScreen", () => {
       "Wrong move"
     );
     expect(collectText(findByTestId(renderer, "history-attempt-history-timeout-result"))).toBe(
-      "Incomplete"
+      "Timed out"
     );
     expect(
       findByTestId(renderer, "history-attempt-history-timeout-badge")
-        .findByProps({ testID: "result-badge-incomplete-glyph" })
+        .findByProps({ testID: "result-badge-wrong-glyph" })
     ).toBeTruthy();
     expect(hasStyleEntry(
       findByTestId(renderer, "history-attempt-history-timeout-badge"),
       "backgroundColor",
-      "#64748B"
+      "#DC2626"
     )).toBe(true);
     expect(() => findByTestId(renderer, "history-attempt-history-timeout-unclear")).toThrow();
+    expect(collectText(findByTestId(renderer, "history-attempt-history-incomplete-fast-result"))).toBe(
+      "Incomplete"
+    );
+    expect(
+      findByTestId(renderer, "history-attempt-history-incomplete-fast-badge")
+        .findByProps({ testID: "result-badge-incomplete-glyph" })
+    ).toBeTruthy();
+    expect(hasStyleEntry(
+      findByTestId(renderer, "history-attempt-history-incomplete-fast-badge"),
+      "backgroundColor",
+      "#64748B"
+    )).toBe(true);
+    expect(() => findByTestId(renderer, "history-attempt-history-incomplete-fast-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-incomplete-fast-slow")).toThrow();
     expect(collectText(findByTestId(renderer, "history-attempt-history-incomplete-slow-result"))).toBe(
       "Incomplete"
     );
@@ -3547,6 +3561,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
+    expect(findByTestId(renderer, "history-attempt-history-incomplete-fast")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-incomplete-slow")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-clean")).toThrow();
@@ -3812,14 +3827,16 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-timeout")).toThrow();
+    expect(() => findByTestId(renderer, "history-attempt-history-incomplete-fast")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-incomplete-slow")).toThrow();
 
     press(renderer, "history-result-incomplete");
 
     expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
-    expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-timeout")).toThrow();
+    expect(findByTestId(renderer, "history-attempt-history-incomplete-fast")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-incomplete-slow")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "history-attempt-history-timeout-result"))).toBe(
+    expect(collectText(findByTestId(renderer, "history-attempt-history-incomplete-fast-result"))).toBe(
       "Incomplete"
     );
     expect(() => findByTestId(renderer, "history-attempt-history-correct")).toThrow();
@@ -3836,7 +3853,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toContain(
       "Attention: Incomplete"
     );
-    expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-timeout")).toThrow();
+    expect(findByTestId(renderer, "history-attempt-history-incomplete-fast")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-incomplete-slow")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-history-wrong")).toThrow();
   });

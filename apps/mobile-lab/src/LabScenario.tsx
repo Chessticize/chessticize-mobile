@@ -57,6 +57,13 @@ import {
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
 
+const HISTORY_INCOMPLETE_LAB_PUZZLE: Puzzle = {
+  ...LAB_PUZZLES[4]!,
+  id: "lab-incomplete-06",
+  rating: 1180,
+  themes: ["promotion"]
+};
+
 type ScreenProps = Omit<React.ComponentProps<typeof PracticePocScreen>, "platformCapabilities">;
 
 type ScenarioRuntime = {
@@ -699,7 +706,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       configurePuzzleSource = false;
       screenProps.historyDesignPreview = {
         incompleteAttempts: [
-          { attemptId: "history-timeout", slow: false },
+          { attemptId: "history-incomplete-fast", slow: false },
           { attemptId: "history-incomplete-slow", slow: true }
         ]
       };
@@ -1192,7 +1199,7 @@ function createHistoryService(
   puzzles = LAB_PUZZLES
 ): PracticeService {
   const store = new MemoryStore();
-  store.seedPuzzles(puzzles);
+  store.seedPuzzles([...puzzles, HISTORY_INCOMPLETE_LAB_PUZZLE]);
   if (replayUnavailableOnly) {
     store.recordAttempt({
       id: "history-arrow-legacy",
@@ -1238,6 +1245,16 @@ function createHistoryService(
       timingStatus: "timed_out",
       elapsedMs: 60_000,
       completedAt: "2026-07-17T15:00:12.000Z",
+      ratingBefore: 910,
+      ratingAfter: 910
+    }),
+    historyAttempt({
+      id: "history-incomplete-fast",
+      puzzleId: HISTORY_INCOMPLETE_LAB_PUZZLE.id,
+      result: "timed_out",
+      timingStatus: "timed_out",
+      elapsedMs: 12_000,
+      completedAt: "2026-07-17T15:10:12.000Z",
       ratingBefore: 910,
       ratingAfter: 910
     }),
@@ -1296,6 +1313,13 @@ function createHistoryService(
     ratingAfter: 910
   }));
   store.createSprintSession(completedSprint({
+    id: "session-history-incomplete-fast",
+    mode: "standard",
+    completedAt: "2026-07-17T15:10:12.000Z",
+    ratingBefore: 910,
+    ratingAfter: 910
+  }));
+  store.createSprintSession(completedSprint({
     id: "session-history-incomplete-slow",
     mode: "standard",
     completedAt: "2026-07-17T14:30:12.000Z",
@@ -1329,6 +1353,11 @@ function createHistoryService(
     mode: "standard",
     ratingKey: "standard 5/20"
   }, "2026-07-17T14:00:11.000Z");
+  store.scheduleMistakeReview({
+    puzzleId: LAB_PUZZLES[4]!.id,
+    mode: "standard",
+    ratingKey: "standard 5/20"
+  }, "2026-07-17T15:00:12.000Z");
   return new PracticeService(store);
 }
 
