@@ -1,6 +1,6 @@
 # Chessticize iOS 1.3.5 (build 2)
 
-- Status: Draft
+- Status: Approved
 - Locale: `en-US`
 - Platform: `iOS`
 - Public version: `1.3.5`
@@ -49,4 +49,4 @@ without shifting the board.
   benefits.
 - [x] No issue numbers, internal code names, implementation details, or private
   evidence are included.
-- [ ] The release owner approved the copy before the source tag was created.
+- [x] The release owner approved the copy before the source tag was created.
