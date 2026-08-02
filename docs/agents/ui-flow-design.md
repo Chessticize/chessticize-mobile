@@ -88,11 +88,10 @@ When the current interaction increment is coherent and checks pass, the design
 PR may become ready and merge to `main` before approval or implementation.
 Continue later feedback rounds from current `main`, update the same scenario,
 and let CI publish the new branch's stable Preview alias inside the shared
-Vercel project. Keep each issue ownership entry on `main` until its linked
-GitHub issue is closed; then remove only that entry in a cleanup change. Remove
-the marker only when no open issue ownership remains, and retain the scenario
-as living UI documentation. Pull-request CI checks each removed ownership's
-issue state.
+Vercel project. Keep each issue ownership entry on `main` until the linked GitHub issue is closed;
+then remove only that entry in a cleanup change. Remove the marker only when no
+open issue ownership remains, and retain the scenario as living UI
+documentation. Pull-request CI checks each removed ownership's issue state.
 
 If an open issue's marker was attached to a mistaken parallel prototype,
 consolidate that prototype into the existing product-clone scenario and move
