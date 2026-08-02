@@ -15536,8 +15536,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     height: 36,
     justifyContent: "center",
+    minWidth: 72,
     paddingHorizontal: 6,
-    width: 72
   },
   sprintRuleBadgeDanger: {
     backgroundColor: "#FEE2E2"

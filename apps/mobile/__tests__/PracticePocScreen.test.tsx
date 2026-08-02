@@ -1844,6 +1844,25 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it("lets the TIMEOUT badge expand for Android large text without changing its baseline width", () => {
+    setPracticeViewport({
+      fontScale: 1.5,
+      height: 914,
+      insets: { top: 32, right: 0, bottom: 24, left: 0 },
+      scale: 2.625,
+      width: 412
+    });
+    const renderer = renderLabScenario("practice-first-sprint-guide");
+    const badge = findByTestId(renderer, "practice-sprint-rule-puzzle-timeout-badge");
+    const badgeStyle = flattenTestStyle(badge.props.style);
+    const badgeText = badge.findByType(ReactNative.Text);
+
+    expect(collectText(badge)).toBe("TIMEOUT");
+    expect(badgeStyle.minWidth).toBe(72);
+    expect(badgeStyle.width).toBeUndefined();
+    expect(badgeText.props.numberOfLines).toBe(1);
+  });
+
   it("uses the selected saved Run to calculate the first Sprint pass target", () => {
     const renderer = renderScreen({
       runManagementEnabled: true,
