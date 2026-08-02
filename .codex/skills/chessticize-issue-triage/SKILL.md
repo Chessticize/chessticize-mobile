@@ -105,7 +105,7 @@ For an authorized preview:
 - A coherent design increment may become ready and merge to `main`; merging is
   not explicit approval and does not begin implementation. Continue later
   feedback from current `main`, update the same scenario, and use the new
-  branch's dedicated site.
+  branch's stable Preview alias in the shared Interaction Lab Vercel project.
 - Keep each New Scenario Marker ownership on `main` until its linked GitHub
   issue is closed. Pull-request CI verifies closure before accepting ownership
   removal; remove the marker only after no ownership remains. Retain the scenario
@@ -123,27 +123,31 @@ visible. Triage completion never implies approval to consolidate tickets.
 
 ## Hosted Preview Handoff
 
-When the request authorizes remote preview publication and Sites is available:
+When the request authorizes remote preview publication:
 
-- Build the complete `apps/mobile-lab` Storybook from the issue branch's exact
-  reviewed commit and deploy it through a Sites project dedicated to that exact
-  branch. Never reuse its project ID or URL for another branch; a later branch
-  for the same issue receives a different site.
+- Push the issue branch's exact reviewed commit and let the Mobile Interaction
+  Lab GitHub Actions workflow build and deploy the complete
+  `apps/mobile-lab` Storybook to the repository's existing shared Vercel
+  project. GitHub Actions is the only deployment writer. Never create a Vercel
+  or Sites project for a branch, and never run `vercel link` or `vercel deploy`
+  locally.
+- Use the stable Preview alias assigned to that branch inside the shared
+  project. Never reuse a URL owned by another branch; later pushes to the same
+  branch advance its alias.
 - Before publishing, compare the deployment input's recorded branch and commit
   with the reviewed application branch. Stop on any mismatch instead of
-  overwriting the existing branch owner's site.
+  overwriting the existing branch owner's Preview alias.
 - Every Storybook review site, including the main-branch catalog and every
-  branch-owned site, is public and must not require authentication. Follow the
-  Sites build and hosting skills, set access mode to public, and verify that an
-  unauthenticated request to `/storybook/` returns HTTP 200 before handoff.
-- Package the matching static build and save one version before deployment.
-- Keep `storybook-static`, copied bundles, preview manifests, Sites project
-  metadata, and hosting result files out of the application branch. Use ignored
-  or temporary storage for generated deployment input.
-- Treat every deployed Sites URL as production. If the user asks only for a
-  reviewable candidate, save a version without deploying it.
+  branch-owned Preview, is public and must not require authentication. Verify
+  that the workflow confirms unauthenticated HTTP 200 for the manager root and
+  `/storybook/` before handoff.
+- Keep `storybook-static`, copied bundles, preview manifests, Vercel
+  project-link metadata, and hosting result files out of the application
+  branch. Use ignored or temporary storage for generated deployment input.
 - Add the source branch, full Storybook manager URL, direct story URL, and exact
-  source commit to the issue and PR, along with the explicit approval gate.
+  source commit to the issue and PR, along with the successful workflow run and
+  explicit approval gate.
 
-If Sites is unavailable, keep the pushed Storybook branch and stable local URL
-as the fallback; do not weaken the design gate.
+If the workflow cannot publish, record the failure and keep the design gate in
+place. Use only the repository-owner waiver path in
+`docs/agents/ui-flow-design.md`; do not create a replacement hosting project.

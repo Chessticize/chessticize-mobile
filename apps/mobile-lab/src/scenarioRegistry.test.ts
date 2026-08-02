@@ -69,6 +69,45 @@ test("New Scenario Markers retain open-issue ownership on the full catalog", () 
   }
 });
 
+test("Issue #482 owns the production Incomplete History and Sprint Result states", () => {
+  for (const scenarioId of [
+    "history-populated",
+    "history-filters",
+    "practice-sprint-result-incomplete"
+  ] as const) {
+    const scenario = scenarioRegistry[scenarioId];
+    assert.equal(
+      scenario.issues?.some((issue) => issue.issueNumber === 482) ?? false,
+      true
+    );
+    assert.deepEqual(storyTagsForScenario(scenarioId), ["new"]);
+  }
+  assert.ok(
+    scenarioRegistry["history-populated"].scope.includes.includes("Production Incomplete outcome")
+  );
+  assert.ok(
+    scenarioRegistry["history-populated"].scope.includes.includes("Accuracy excludes Incomplete")
+  );
+  assert.ok(
+    scenarioRegistry["history-populated"].scope.includes.includes("Exact-attempt Unclear action")
+  );
+  assert.ok(
+    scenarioRegistry["history-filters"].scope.includes.includes("Incomplete Result filter")
+  );
+  assert.ok(
+    scenarioRegistry["history-filters"].scope.includes.includes("Incomplete Attention reason")
+  );
+  assert.ok(
+    scenarioRegistry["practice-sprint-result-incomplete"].scope.includes.includes(
+      "Exact final-attempt Unclear action"
+    )
+  );
+  assert.match(
+    scenarioRegistry["practice-sprint-result-incomplete"].description,
+    /Was the final puzzle unclear/
+  );
+});
+
 test("the issue #272 preview hands the board to White after the blunder", () => {
   const chess = new Chess(ISSUE_272_LAB_PUZZLE.initialFen);
 
@@ -175,7 +214,11 @@ test("the closed Issue #363 scenarios keep their stable URLs without Issue #363 
       .map((scenario) => scenario.id),
     []
   );
-  assert.deepEqual(storyTagsForScenario("history-populated"), []);
+  assert.equal(
+    scenarioRegistry["history-populated"].issues?.some((issue) => issue.issueNumber === 363) ?? false,
+    false
+  );
+  assert.deepEqual(storyTagsForScenario("history-populated"), ["new"]);
   assert.deepEqual(storyTagsForScenario("history-progress"), []);
   assert.deepEqual(storyTagsForScenario("history-progress-weakness"), []);
   assert.deepEqual(storyTagsForScenario("history-progress-speed-weakness"), []);

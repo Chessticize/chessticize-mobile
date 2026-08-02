@@ -1,4 +1,28 @@
 {
+  "history-populated": {
+    "issues": [
+      {
+        "issueNumber": 482,
+        "changeNote": "Neutral Incomplete History rows use a gray circle and white dash and independently need attention"
+      }
+    ]
+  },
+  "history-filters": {
+    "issues": [
+      {
+        "issueNumber": 482,
+        "changeNote": "Incomplete appears in both Result and Attention filters"
+      }
+    ]
+  },
+  "practice-sprint-result-incomplete": {
+    "issues": [
+      {
+        "issueNumber": 482,
+        "changeNote": "Sprint Result keeps the exact final Incomplete attempt eligible for Mark as unclear"
+      }
+    ]
+  },
   "practice-slow-unclear-notice": {
     "issues": [
       {

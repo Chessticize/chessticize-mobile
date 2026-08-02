@@ -429,6 +429,82 @@ test("Timed out appears in Wrong and mistake performance while remaining distinc
   ]);
 });
 
+test("Incomplete is neutral, independently filterable, and always needs attention", () => {
+  const fastIncomplete = incompleteAttempt({
+    id: "incomplete-fast",
+    puzzleId: "incomplete-fast-puzzle",
+    completedAt: "2026-06-20T00:01:10.000Z"
+  });
+  const slowIncomplete = {
+    ...incompleteAttempt({
+      id: "incomplete-slow",
+      puzzleId: "incomplete-slow-puzzle",
+      completedAt: "2026-06-20T00:01:20.000Z",
+      unclear: true,
+      unclearUpdatedAt: "2026-06-20T00:01:20.000Z"
+    }),
+    timingStatus: "slow" as const
+  };
+  const wrong = attempt({
+    id: "wrong",
+    puzzleId: "wrong-puzzle",
+    result: "wrong",
+    completedAt: "2026-06-20T00:00:20.000Z"
+  });
+  const correct = attempt({
+    id: "correct",
+    puzzleId: "correct-puzzle",
+    result: "correct",
+    completedAt: "2026-06-20T00:00:10.000Z"
+  });
+  const attempts = [slowIncomplete, fastIncomplete, wrong, correct];
+
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({ attempts, query: { result: "incomplete" }, reviews: [] })
+      .map((historyAttempt) => historyAttempt.id),
+    ["incomplete-slow", "incomplete-fast"]
+  );
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({ attempts, query: { result: "wrong" }, reviews: [] })
+      .map((historyAttempt) => historyAttempt.id),
+    ["wrong"]
+  );
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({ attempts, query: { attentionOnly: true }, reviews: [] })
+      .map((historyAttempt) => historyAttempt.id),
+    ["incomplete-slow", "incomplete-fast"]
+  );
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({
+      attempts,
+      query: { attentionReasons: ["unclear", "incomplete"] },
+      reviews: []
+    }).map((historyAttempt) => historyAttempt.id),
+    ["incomplete-slow", "incomplete-fast"]
+  );
+  assert.deepEqual(
+    filterHistoryAttemptsForQuery({
+      attempts,
+      query: { attentionReasons: ["unclear"] },
+      reviews: []
+    }).map((historyAttempt) => historyAttempt.id),
+    ["incomplete-slow"]
+  );
+
+  const view = buildHistoryView({
+    query: { now: "2026-06-21T12:00:00.000Z", timeRange: "max" },
+    ratingKeys: [],
+    attempts,
+    elo: [],
+    reviews: []
+  });
+  assert.equal(view.performance.correctCount, 1);
+  assert.equal(view.performance.wrongCount, 1);
+  assert.equal(view.performance.accuracyPercent, 50);
+  assert.deepEqual(view.puzzleStats.map((stats) => stats.puzzleId), ["correct-puzzle", "wrong-puzzle"]);
+  assert.equal(normalizeHistoryAttemptDetail(fastIncomplete).dataStatus, "complete");
+});
+
 test("history performance and puzzle stats use the full filtered range, not the visible page", () => {
   const attempts: HistoryAttemptView[] = [
     attempt({ id: "a3", puzzleId: "p3", result: "correct", completedAt: "2026-06-20T00:02:00.000Z" }),
@@ -1012,6 +1088,16 @@ function timedOutAttempt(
     ...withoutSubmittedMove,
     timingStatus: "timed_out"
   };
+}
+
+function incompleteAttempt(
+  input: Omit<AttemptFixtureInput, "result">
+): HistoryAttemptView {
+  const {
+    submittedMove: _submittedMove,
+    ...withoutSubmittedMove
+  } = attempt({ ...input, result: "incomplete" });
+  return withoutSubmittedMove;
 }
 
 function standardPuzzle(): Puzzle {

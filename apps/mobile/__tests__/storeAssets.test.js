@@ -66,7 +66,7 @@ function storeCopyTemplateBlock() {
 
 describe("App Store assets document", () => {
   it("tracks the current release without marketing inferred weaknesses", () => {
-    expect(storeAssetsDoc).toContain("1.3.4 source of truth");
+    expect(storeAssetsDoc).toContain("1.3.5 source of truth");
     expect(appStoreMetadata.issue).toBe(413);
     expect(appStoreMetadata.description).toContain("chess puzzle trainer");
     expect(appStoreMetadata.description).toContain("SOLVE PUZZLES WITH INTENT");
@@ -139,7 +139,7 @@ describe("App Store assets document", () => {
 
     expect(template.storeCopy).toBe(storeCopyTemplateBlock());
     expect(template.rules).toContain("Use two or three short bullets and no raw URLs.");
-    expect(currentVersion.sourceTag).toBe("ios-v1.3.4-build-1");
+    expect(currentVersion.sourceTag).toBe("ios-v1.3.5-build-2");
     expect(currentVersion.status).toBe("release-candidate");
     expect(template.storeCopy).not.toMatch(/https?:\/\//u);
     expect(draft).not.toMatch(/https?:\/\//u);

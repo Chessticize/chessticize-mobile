@@ -16,6 +16,16 @@ const baseAttempt = {
   ratingBefore: 600
 } as const;
 
+const incompleteBaseAttempt = {
+  source: "sprint",
+  sessionId: "session-1",
+  mode: "standard",
+  ratingKey: "standard 5/20",
+  expectedMove: "e2e4",
+  startedAt: "2026-07-25T12:00:00.000Z",
+  ratingBefore: 600
+} as const;
+
 test("Sprint result summary keeps mistakes out of Unclear while adding them to Review", () => {
   const attempts: AttemptEvent[] = [
     {
@@ -62,6 +72,15 @@ test("Sprint result summary keeps mistakes out of Unclear while adding them to R
       puzzleId: "p5",
       result: "wrong",
       completedAt: "2026-07-25T12:02:10.000Z"
+    },
+    {
+      ...incompleteBaseAttempt,
+      id: "incomplete",
+      puzzleId: "p6",
+      result: "incomplete",
+      completedAt: "2026-07-25T12:02:20.000Z",
+      unclear: true,
+      unclearUpdatedAt: "2026-07-25T12:02:20.000Z"
     }
   ];
 
@@ -73,7 +92,7 @@ test("Sprint result summary keeps mistakes out of Unclear while adding them to R
       unclear: {
         slowMarkedCount: 1,
         timedOutMarkedCount: 0,
-        userMarkedCount: 1
+        userMarkedCount: 2
       },
       review: {
         addedCount: 2,

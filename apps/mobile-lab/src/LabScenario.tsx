@@ -57,6 +57,13 @@ import {
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
 
+const HISTORY_INCOMPLETE_LAB_PUZZLE: Puzzle = {
+  ...LAB_PUZZLES[4]!,
+  id: "lab-incomplete-06",
+  rating: 1180,
+  themes: ["promotion"]
+};
+
 type ScreenProps = Omit<React.ComponentProps<typeof PracticePocScreen>, "platformCapabilities">;
 
 type ScenarioRuntime = {
@@ -286,6 +293,25 @@ function sprintRulesDesignPreviewFor(
       resultUnclearSummary: {
         slowMarkedCount: 1,
         userMarkedCount: 1
+      }
+    };
+  }
+  if (scenarioId === "practice-sprint-result-incomplete") {
+    return {
+      initialResultState: sprintRulesResultState({
+        correctCount: 1,
+        endReason: "time_expired",
+        mistakeCount: 0,
+        ratingAfter: 1090,
+        status: "failed"
+      }),
+      initialResultUnclearPrompt: {
+        marked: false,
+        question: "Was the final puzzle unclear?"
+      },
+      resultUnclearSummary: {
+        slowMarkedCount: 0,
+        userMarkedCount: 0
       }
     };
   }
@@ -695,6 +721,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       break;
     case "history-populated":
     case "history-filters":
+      service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
+      configurePuzzleSource = false;
+      break;
     case "history-attempt-detail":
     case "history-progress":
     case "history-progress-weakness":
@@ -1183,7 +1212,7 @@ function createHistoryService(
   puzzles = LAB_PUZZLES
 ): PracticeService {
   const store = new MemoryStore();
-  store.seedPuzzles(puzzles);
+  store.seedPuzzles([...puzzles, HISTORY_INCOMPLETE_LAB_PUZZLE]);
   if (replayUnavailableOnly) {
     store.recordAttempt({
       id: "history-arrow-legacy",
@@ -1233,6 +1262,26 @@ function createHistoryService(
       ratingAfter: 910
     }),
     historyAttempt({
+      id: "history-incomplete-fast",
+      puzzleId: HISTORY_INCOMPLETE_LAB_PUZZLE.id,
+      result: "incomplete",
+      elapsedMs: 12_000,
+      completedAt: "2026-07-17T15:10:12.000Z",
+      ratingBefore: 910,
+      ratingAfter: 910
+    }),
+    historyAttempt({
+      id: "history-incomplete-slow",
+      puzzleId: LAB_PUZZLES[3]!.id,
+      result: "incomplete",
+      timingStatus: "slow",
+      elapsedMs: 45_000,
+      completedAt: "2026-07-17T14:30:12.000Z",
+      ratingBefore: 910,
+      ratingAfter: 910,
+      unclear: true
+    }),
+    historyAttempt({
       id: "history-correct",
       puzzleId: LAB_PUZZLES[2]!.id,
       result: "correct",
@@ -1276,6 +1325,30 @@ function createHistoryService(
     ratingBefore: 910,
     ratingAfter: 910
   }));
+  store.createSprintSession({
+    ...completedSprint({
+      id: "session-history-incomplete-fast",
+      mode: "standard",
+      completedAt: "2026-07-17T15:10:12.000Z",
+      ratingBefore: 910,
+      ratingAfter: 910
+    }),
+    status: "failed",
+    endReason: "time_expired",
+    correctCount: 0
+  });
+  store.createSprintSession({
+    ...completedSprint({
+      id: "session-history-incomplete-slow",
+      mode: "standard",
+      completedAt: "2026-07-17T14:30:12.000Z",
+      ratingBefore: 910,
+      ratingAfter: 910
+    }),
+    status: "failed",
+    endReason: "time_expired",
+    correctCount: 0
+  });
   store.createSprintSession(completedSprint({
     id: "session-history-unclear",
     mode: "standard",
@@ -1340,7 +1413,7 @@ function historyAttempt({
     mode: "standard",
     ratingKey: "standard 5/20",
     result,
-    ...(result === "timed_out"
+    ...(result === "timed_out" || result === "incomplete"
       ? {}
       : { submittedMove: result === "correct" ? "e2e4" : "e2e3" }),
     expectedMove: "e2e4",

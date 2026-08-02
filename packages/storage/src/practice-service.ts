@@ -50,6 +50,7 @@ import type {
   SessionMistakeReviewItem,
   SessionReplayItem,
   SprintConfig,
+  SprintCommandResult,
   SprintMode,
   SprintResultSummary,
   SprintState
@@ -286,9 +287,15 @@ export class PracticeService {
     };
   }
 
-  abandonSprint(now = new Date().toISOString()): SprintState {
+  abandonSprint(now = new Date().toISOString()): SprintCommandResult {
     if (!this.activeSprint) {
       throw new Error("No active sprint");
+    }
+    if (
+      this.activeSprint.status === "active" &&
+      new Date(now).getTime() >= new Date(this.activeSprint.deadlineAt).getTime()
+    ) {
+      return this.advanceSprintTime(now);
     }
     const completed = abandonSprintCore(this.activeSprint, now);
     this.store.transaction(() => {
@@ -296,10 +303,10 @@ export class PracticeService {
     });
     this.activeSprint = undefined;
     this.markTacticalProfileForCompletedSprint(completed);
-    return completed;
+    return { state: completed };
   }
 
-  pauseSprint(now = new Date().toISOString()): SprintState {
+  pauseSprint(now = new Date().toISOString()): SprintCommandResult {
     if (!this.activeSprint) {
       throw new Error("No active sprint");
     }
@@ -318,7 +325,7 @@ export class PracticeService {
     if (!isOpenSprint(result.state)) {
       this.markTacticalProfileForCompletedSprint(result.state);
     }
-    return result.state;
+    return result;
   }
 
   resumeSprint(now = new Date().toISOString()): SprintState {

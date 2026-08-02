@@ -16,7 +16,7 @@ import {
 process.env.TZ = "UTC";
 const PUZZLE_FIXTURE = resolve("fixtures/puzzles/presolved-sample.json");
 
-test("SQLite v15 preserves v9 settings while backfilling Run timing, rebuilding attempts, adding guides, and quieting feedback", async () => {
+test("SQLite v16 preserves v9 settings while backfilling Run timing, rebuilding attempts, adding guides, and quieting feedback", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-v10-timing-"));
   const databasePath = join(directory, "practice.sqlite");
   try {
@@ -238,6 +238,139 @@ test("SQLite v15 preserves v9 settings while backfilling Run timing, rebuilding 
   }
 });
 
+for (const backend of ["memory", "sqlite"] as const) {
+  test(`${backend} records a just-entered final puzzle as Incomplete and binds manual Unclear to it`, async () => {
+    const store = backend === "memory" ? new MemoryStore() : new SQLiteStore(":memory:");
+    if (store instanceof SQLiteStore) {
+      store.migrate();
+    }
+    try {
+      const service = new PracticeService(store);
+      service.loadFixturePuzzles(await loadFixturePuzzles());
+      service.setPuzzleSelectionScopeIds(["00008", "000hf"]);
+      const run = service.createPracticeRun({
+        id: `incomplete-${backend}`,
+        name: `Incomplete ${backend}`,
+        mode: "custom",
+        durationSeconds: 60,
+        perPuzzleSeconds: 20,
+        puzzleTiming: {
+          slowAfterSeconds: 40,
+          timeoutAfterSeconds: null
+        },
+        initialRating: 1800
+      }, "2026-07-24T00:00:00.000Z");
+      let active = service.startSprint({
+        mode: "custom",
+        practiceRunId: run.id,
+        targetCorrect: 3,
+        puzzleSelectionSeed: `incomplete-${backend}`
+      }, "2026-07-24T00:00:00.000Z");
+      const firstPuzzleId = active.currentPuzzle?.puzzle.id;
+      let submissionSecond = 57;
+      while (active.status === "active" && active.currentPuzzle?.puzzle.id === firstPuzzleId) {
+        const currentPuzzle = active.currentPuzzle;
+        assert.equal(currentPuzzle?.kind, "line");
+        const expectedMove = currentPuzzle?.kind === "line"
+          ? currentPuzzle.puzzle.solutionMoves[currentPuzzle.cursor]
+          : undefined;
+        assert.ok(expectedMove);
+        const result = service.submitMove(
+          expectedMove,
+          `2026-07-24T00:00:${String(submissionSecond).padStart(2, "0")}.000Z`
+        );
+        active = result.state;
+        submissionSecond += 1;
+      }
+      const previousAttempt = service.listHistory()[0];
+      assert.equal(previousAttempt?.result, "correct");
+      assert.equal(previousAttempt?.timingStatus, "slow");
+      assert.equal(previousAttempt?.unclear, true);
+
+      const expired = service.advanceSprintTime("2026-07-24T00:01:05.000Z");
+      const incompleteAttempt = expired.attempt ?? assert.fail("expected Incomplete attempt");
+      assert.equal(incompleteAttempt.result, "incomplete");
+      assert.equal(incompleteAttempt.puzzleId, active.currentPuzzle?.puzzle.id);
+      assert.equal(incompleteAttempt.completedAt, "2026-07-24T00:01:00.000Z");
+      assert.equal(incompleteAttempt.submittedMove, undefined);
+      assert.equal(incompleteAttempt.timingStatus, undefined);
+      assert.equal(incompleteAttempt.unclear, undefined);
+      assert.equal(expired.state.correctCount, 1);
+      assert.equal(expired.state.mistakeCount, 0);
+      assert.deepEqual(service.listReviewQueue(), []);
+      assert.deepEqual(
+        service.getHistoryView({
+          now: "2026-07-24T00:02:00.000Z",
+          timeRange: "max",
+          result: "incomplete"
+        }).attempts.map((attempt) => attempt.id),
+        [incompleteAttempt.id]
+      );
+      assert.deepEqual(
+        service.getHistoryView({
+          now: "2026-07-24T00:02:00.000Z",
+          timeRange: "max",
+          result: "wrong"
+        }).attempts,
+        []
+      );
+
+      const marked = service.setAttemptUnclear(
+        incompleteAttempt.id,
+        true,
+        "2026-07-24T00:01:06.000Z"
+      );
+      assert.equal(marked.unclear, true);
+      assert.equal(service.listHistory().find((attempt) => attempt.id === previousAttempt?.id)?.unclear, true);
+      assert.deepEqual(service.getSprintResultSummary(expired.state), {
+        accuracyPercent: 100,
+        attemptCount: 1,
+        unclear: {
+          slowMarkedCount: 1,
+          timedOutMarkedCount: 0,
+          userMarkedCount: 1
+        },
+        review: {
+          addedCount: 0,
+          mistakeCount: 0,
+          timedOutCount: 0
+        }
+      });
+      assert.doesNotThrow(() => mergeLocalDataExports(
+        service.exportLocalData(),
+        service.exportLocalData()
+      ));
+      if (backend === "sqlite") {
+        const replicaStore = new SQLiteStore(":memory:");
+        replicaStore.migrate();
+        try {
+          const replica = new PracticeService(replicaStore);
+          replica.loadFixturePuzzles(await loadFixturePuzzles());
+          replica.importLocalData(service.exportLocalData());
+          assert.deepEqual(
+            replica.listHistory({ result: "incomplete" }).map((attempt) => ({
+              id: attempt.id,
+              submittedMove: attempt.submittedMove,
+              unclear: attempt.unclear
+            })),
+            [{
+              id: incompleteAttempt.id,
+              submittedMove: undefined,
+              unclear: true
+            }]
+          );
+        } finally {
+          replicaStore.close();
+        }
+      }
+    } finally {
+      if (store instanceof SQLiteStore) {
+        store.close();
+      }
+    }
+  });
+}
+
 test("a move submitted at the timeout boundary advances and records one timeout attempt", async () => {
   const store = new MemoryStore();
   const service = new PracticeService(store);
@@ -284,11 +417,13 @@ test("pausing at the puzzle deadline records one timeout and pauses the next puz
 
   const paused = service.pauseSprint("2026-07-24T00:31:00.000Z");
 
-  assert.equal(paused.status, "paused");
-  assert.equal(paused.currentPuzzleIndex, 1);
-  assert.notEqual(paused.currentPuzzle?.puzzle.id, started.currentPuzzle?.puzzle.id);
-  assert.equal(paused.correctCount, 0);
-  assert.equal(paused.mistakeCount, 1);
+  assert.equal(paused.state.status, "paused");
+  assert.equal(paused.state.currentPuzzleIndex, 1);
+  assert.notEqual(paused.state.currentPuzzle?.puzzle.id, started.currentPuzzle?.puzzle.id);
+  assert.equal(paused.state.correctCount, 0);
+  assert.equal(paused.state.mistakeCount, 1);
+  assert.equal(paused.attempt?.result, "timed_out");
+  assert.equal(paused.attempt?.puzzleId, started.currentPuzzle?.puzzle.id);
   assert.deepEqual(
     service.listHistory().map((attempt) => attempt.result),
     ["timed_out"]
@@ -297,6 +432,33 @@ test("pausing at the puzzle deadline records one timeout and pauses the next puz
     service.listReviewQueue().map((review) => review.puzzleId),
     [started.currentPuzzle?.puzzle.id]
   );
+});
+
+test("abandoning after the Sprint deadline settles Incomplete instead of overwriting it as abandoned", async () => {
+  const service = new PracticeService(new MemoryStore());
+  service.loadFixturePuzzles(await loadFixturePuzzles());
+  const started = service.startSprint({
+    mode: "standard",
+    durationSeconds: 60,
+    perPuzzleSeconds: 20,
+    targetCorrect: 2,
+    maxMistakes: 3
+  }, "2026-07-24T00:30:00.000Z");
+
+  const completed = service.abandonSprint("2026-07-24T00:31:01.000Z");
+
+  assert.equal(completed.state.status, "failed");
+  assert.equal(completed.state.endReason, "time_expired");
+  assert.equal(completed.attempt?.result, "incomplete");
+  assert.equal(completed.attempt?.puzzleId, started.currentPuzzle?.puzzle.id);
+  assert.deepEqual(service.listHistory().map((attempt) => ({
+    puzzleId: attempt.puzzleId,
+    result: attempt.result
+  })), [{
+    puzzleId: started.currentPuzzle?.puzzle.id,
+    result: "incomplete"
+  }]);
+  assert.deepEqual(service.listReviewQueue(), []);
 });
 
 for (const backend of ["memory", "sqlite"] as const) {

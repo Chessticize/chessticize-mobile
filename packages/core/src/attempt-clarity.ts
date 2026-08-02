@@ -3,7 +3,8 @@ import type { AttemptEvent } from "./types.ts";
 export function isUnclearAttemptEligible(
   attempt: Pick<AttemptEvent, "source" | "result" | "mode">
 ): boolean {
-  return attempt.source === "sprint" && attempt.result === "correct";
+  return attempt.source === "sprint" &&
+    (attempt.result === "correct" || attempt.result === "incomplete");
 }
 
 export function isAttemptMarkedUnclear(
@@ -18,7 +19,7 @@ export function updateAttemptUnclearState(
   updatedAt: string
 ): AttemptEvent {
   if (!isUnclearAttemptEligible(attempt)) {
-    throw new Error("Only correct Sprint attempts can be marked unclear");
+    throw new Error("Only correct or incomplete Sprint attempts can be marked unclear");
   }
   const updatedAtDate = new Date(updatedAt);
   if (Number.isNaN(updatedAtDate.getTime())) {
