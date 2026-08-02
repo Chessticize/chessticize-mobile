@@ -8505,6 +8505,50 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Choose the best move");
   });
 
+  it.each([
+    { height: 1376, label: "iPad portrait", scale: 2, width: 1032 },
+    { height: 820, label: "iPad landscape", scale: 2, width: 1180 },
+    { height: 390, label: "compact wide-short window", scale: 3, width: 844 },
+    { height: 346, label: "iPad-on-Mac wide-short window", scale: 2, width: 993 },
+    { height: 700, label: "narrow resizable window", scale: 2, width: 280 }
+  ])("keeps the Arrow Duel Replay prompt and board geometry fixed on $label", async ({
+    height,
+    scale,
+    width
+  }: {
+    height: number;
+    label: string;
+    scale: number;
+    width: number;
+  }) => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: {
+        fontScale: number;
+        height: number;
+        scale: number;
+        width: number;
+      }) => void;
+    }).__setWindowDimensions?.({ width, height, scale, fontScale: 1 });
+    const renderer = renderStoredArrowDuelReplay();
+    const initialPromptLayout = promptLayoutSlotTestIDs(renderer);
+    const initialBoardStyle = flattenTestStyle(findByTestId(renderer, "review-board").props.style);
+
+    await boardMove(renderer, "f2g3");
+
+    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+    expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expectPromptMessageReservesLayout(
+      renderer,
+      initialPromptLayout,
+      "Arrow Duel",
+      "Follow the blue line to see why this move fails.",
+      2
+    );
+    expect(flattenTestStyle(findByTestId(renderer, "review-board").props.style)).toEqual(
+      initialBoardStyle
+    );
+  });
+
   it("keeps Replay reset beside Analysis instead of in the header", () => {
     const renderer = renderStoredArrowDuelReplay();
     const replayActions = findByTestId(renderer, "review-analysis-toolbar");
