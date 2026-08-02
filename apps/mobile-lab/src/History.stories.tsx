@@ -38,6 +38,7 @@ export const PopulatedHistory: Story = {
     await waitForTestId(canvasElement, "history-active-filter-summary");
     await waitForTestId(canvasElement, "history-progress-button");
     (canvasElement.querySelector('[data-testid="history-attention-needs-attention"]') as HTMLElement | null)?.blur();
+    (canvasElement.querySelector('[data-testid="history-tab"]') as HTMLElement | null)?.blur();
   }
 };
 
