@@ -127,11 +127,9 @@ async function assertFirstUseSprintRulesGuideLayout() {
   await waitFor(element(by.id('practice-sprint-rules-guide'))).toBeVisible().withTimeout(10000);
   await waitFor(element(by.text('TIMEOUT'))).toBeVisible().withTimeout(10000);
 
-  const [rowFrame, badgeFrame, copyFrame] = await Promise.all([
-    frameFor(row),
-    frameFor(badge),
-    frameFor(copy),
-  ]);
+  const rowFrame = await frameFor(row);
+  const badgeFrame = await frameFor(badge);
+  const copyFrame = await frameFor(copy);
   expectFrameContained(badgeFrame, rowFrame, `${deviceLabel} TIMEOUT badge`);
   expectFrameContained(copyFrame, rowFrame, `${deviceLabel} Puzzle timeout copy`);
 
