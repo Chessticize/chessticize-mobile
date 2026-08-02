@@ -10029,7 +10029,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("Choose the best move");
     expect(collectText(renderer.root)).not.toContain("Find the best move");
     expect(collectText(renderer.root)).not.toContain("Follow the puzzle line");
-    expectText(renderer, "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad.");
+    expectText(renderer, "Follow the blue line to see why this move fails.");
+    expect(findByTestId(renderer, "practice-prompt-hint").props.numberOfLines).toBe(2);
     const guidedStartFen = findByTestId(renderer, "mock-chessboard").props.fen;
     await waitForAssertion(() => {
       expect(stockfish.commands).toContain(`position fen ${guidedStartFen}`);

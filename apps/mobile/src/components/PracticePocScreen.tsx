@@ -8699,7 +8699,8 @@ function PracticePrompt({
   promptSide,
   solved = false,
   promptText,
-  promptHint
+  promptHint,
+  promptHintNumberOfLines
 }: {
   currentPuzzle: CurrentPuzzleState | undefined;
   kingPieceSize: number;
@@ -8708,6 +8709,7 @@ function PracticePrompt({
   solved?: boolean;
   promptText?: string | null;
   promptHint?: string | null;
+  promptHintNumberOfLines?: number;
 }): React.JSX.Element | null {
   if (!currentPuzzle) {
     return null;
@@ -8767,6 +8769,7 @@ function PracticePrompt({
             accessible={!solved}
             accessibilityElementsHidden={solved}
             importantForAccessibility={solved ? "no-hide-descendants" : "auto"}
+            numberOfLines={promptHintNumberOfLines}
             style={[styles.promptHint, solved ? styles.promptSolvedLayoutCopy : null]}
             testID="practice-prompt-hint"
           >
@@ -12083,9 +12086,10 @@ function ReviewSession({
         }
         promptHint={
           isArrowDuelFollowUpReview
-            ? "Blue arrows show the next move in the punishment line. Follow them to see why the choice is bad."
+            ? "Follow the blue line to see why this move fails."
             : undefined
         }
+        promptHintNumberOfLines={isArrowDuelFollowUpReview ? 2 : undefined}
       />
     </View>
   );
