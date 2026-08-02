@@ -15,6 +15,14 @@
       }
     ]
   },
+  "practice-sprint-result-incomplete": {
+    "issues": [
+      {
+        "issueNumber": 482,
+        "changeNote": "Sprint Result keeps the exact final Incomplete attempt eligible for Mark as unclear"
+      }
+    ]
+  },
   "practice-slow-unclear-notice": {
     "issues": [
       {

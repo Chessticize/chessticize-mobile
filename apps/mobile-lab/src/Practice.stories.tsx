@@ -554,6 +554,21 @@ export const SprintResultGoalClarity: Story = {
   }
 };
 
+export const SprintResultIncomplete: Story = {
+  name: "Sprint result · Incomplete final puzzle",
+  args: { scenarioId: "practice-sprint-result-incomplete" },
+  play: async ({ canvasElement }) => {
+    await expectTestIdText(
+      canvasElement,
+      "sprint-unclear-question",
+      "Was the final puzzle unclear?"
+    );
+    await expectTestIdText(canvasElement, "sprint-unclear-toggle", "Mark as unclear");
+    await clickTestId(canvasElement, "sprint-unclear-toggle");
+    await expectTestIdText(canvasElement, "sprint-unclear-marked", "Marked");
+  }
+};
+
 export const SprintResultFlaggedReplay: Story = {
   name: "Sprint result · Flagged replay",
   args: { scenarioId: "practice-sprint-result-replay" },

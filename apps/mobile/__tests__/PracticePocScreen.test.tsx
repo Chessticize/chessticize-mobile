@@ -6200,6 +6200,55 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
   });
 
+  it("uses the pause command's exact final Incomplete attempt for the result Unclear action", () => {
+    let wallClockMs = Date.parse("2026-07-23T12:00:00.000Z");
+    const service = createMobilePracticeService("random1000");
+    let active = startSprintWithPuzzleTiming(
+      service,
+      {
+        durationSeconds: 60,
+        perPuzzleSeconds: 20,
+        puzzleTiming: {
+          slowAfterSeconds: 40,
+          timeoutAfterSeconds: null
+        },
+        targetCorrect: 3,
+        maxMistakes: 3
+      },
+      new Date(wallClockMs).toISOString()
+    );
+    const firstPuzzle = active.currentPuzzle;
+    const userMoves = firstPuzzle?.kind === "line"
+      ? firstPuzzle.puzzle.solutionMoves.filter((_, index) => (
+          index >= firstPuzzle.cursor && (index - firstPuzzle.cursor) % 2 === 0
+        ))
+      : [];
+    userMoves.forEach((move, index) => {
+      const completedAtMs = Date.parse("2026-07-23T12:00:59.000Z")
+        - (userMoves.length - index - 1) * 1_000;
+      active = service.submitMove(move, new Date(completedAtMs).toISOString()).state;
+    });
+    expect(active.currentPuzzle?.puzzle.id).not.toBe(firstPuzzle?.puzzle.id);
+    wallClockMs = Date.parse("2026-07-23T12:00:59.000Z");
+    const renderer = renderScreen({
+      currentTimeMs: () => wallClockMs,
+      practiceService: service
+    });
+
+    press(renderer, "practice-resume-card");
+    wallClockMs += 1_000;
+    press(renderer, "session-pause");
+
+    const incomplete = service.listHistory().find((attempt) => attempt.result === "incomplete");
+    expect(incomplete).toBeTruthy();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-unclear-question"))).toBe(
+      "Was the final puzzle unclear?"
+    );
+    press(renderer, "sprint-unclear-toggle");
+    expect(service.getHistoryAttempt(incomplete!.id)?.unclear).toBe(true);
+  });
+
   it("preserves the countdown after resuming from a pause longer than the remaining sprint", () => {
     let wallClockMs = Date.parse("2026-06-20T00:00:00.000Z");
     const service = createMobilePracticeService("random1000");

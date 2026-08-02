@@ -417,11 +417,13 @@ test("pausing at the puzzle deadline records one timeout and pauses the next puz
 
   const paused = service.pauseSprint("2026-07-24T00:31:00.000Z");
 
-  assert.equal(paused.status, "paused");
-  assert.equal(paused.currentPuzzleIndex, 1);
-  assert.notEqual(paused.currentPuzzle?.puzzle.id, started.currentPuzzle?.puzzle.id);
-  assert.equal(paused.correctCount, 0);
-  assert.equal(paused.mistakeCount, 1);
+  assert.equal(paused.state.status, "paused");
+  assert.equal(paused.state.currentPuzzleIndex, 1);
+  assert.notEqual(paused.state.currentPuzzle?.puzzle.id, started.currentPuzzle?.puzzle.id);
+  assert.equal(paused.state.correctCount, 0);
+  assert.equal(paused.state.mistakeCount, 1);
+  assert.equal(paused.attempt?.result, "timed_out");
+  assert.equal(paused.attempt?.puzzleId, started.currentPuzzle?.puzzle.id);
   assert.deepEqual(
     service.listHistory().map((attempt) => attempt.result),
     ["timed_out"]
@@ -445,8 +447,10 @@ test("abandoning after the Sprint deadline settles Incomplete instead of overwri
 
   const completed = service.abandonSprint("2026-07-24T00:31:01.000Z");
 
-  assert.equal(completed.status, "failed");
-  assert.equal(completed.endReason, "time_expired");
+  assert.equal(completed.state.status, "failed");
+  assert.equal(completed.state.endReason, "time_expired");
+  assert.equal(completed.attempt?.result, "incomplete");
+  assert.equal(completed.attempt?.puzzleId, started.currentPuzzle?.puzzle.id);
   assert.deepEqual(service.listHistory().map((attempt) => ({
     puzzleId: attempt.puzzleId,
     result: attempt.result

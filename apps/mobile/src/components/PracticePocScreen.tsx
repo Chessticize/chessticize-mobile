@@ -1934,14 +1934,9 @@ export function PracticePocScreen({
       return;
     }
     try {
-      const nextState = service.abandonSprint(nowIso());
-      commitState(nextState);
-      setUnclearPrompt(nextState.endReason === "time_expired"
-        ? incompleteUnclearPromptFor(service.listHistory({
-            sessionId: nextState.id,
-            result: "incomplete"
-          })[0])
-        : null);
+      const abandoned = service.abandonSprint(nowIso());
+      commitState(abandoned.state);
+      setUnclearPrompt(incompleteUnclearPromptFor(abandoned.attempt));
       setResumableSprint(null);
       setFeedback(null);
       setFeedbackPuzzleId(null);
@@ -1962,14 +1957,13 @@ export function PracticePocScreen({
     }
     try {
       const paused = service.pauseSprint(captureLiveNowIso());
-      commitState(paused);
-      setUnclearPrompt(paused.endReason === "time_expired"
-        ? incompleteUnclearPromptFor(service.listHistory({
-            sessionId: paused.id,
-            result: "incomplete"
-          })[0])
-        : null);
-      commitBoardInputLocked(true, `pause-${reason}`, paused.currentPuzzle?.puzzle.id ?? null);
+      commitState(paused.state);
+      setUnclearPrompt(incompleteUnclearPromptFor(paused.attempt));
+      commitBoardInputLocked(
+        true,
+        `pause-${reason}`,
+        paused.state.currentPuzzle?.puzzle.id ?? null
+      );
       clearFeedbackSnapshot();
       setFeedback(null);
       setFeedbackPuzzleId(null);

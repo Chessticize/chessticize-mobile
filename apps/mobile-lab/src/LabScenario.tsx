@@ -296,6 +296,25 @@ function sprintRulesDesignPreviewFor(
       }
     };
   }
+  if (scenarioId === "practice-sprint-result-incomplete") {
+    return {
+      initialResultState: sprintRulesResultState({
+        correctCount: 1,
+        endReason: "time_expired",
+        mistakeCount: 0,
+        ratingAfter: 1090,
+        status: "failed"
+      }),
+      initialResultUnclearPrompt: {
+        marked: false,
+        question: "Was the final puzzle unclear?"
+      },
+      resultUnclearSummary: {
+        slowMarkedCount: 0,
+        userMarkedCount: 0
+      }
+    };
+  }
   if (scenarioId === "practice-sprint-result-extra-attempt") {
     return {
       initialResultState: sprintRulesResultState({
