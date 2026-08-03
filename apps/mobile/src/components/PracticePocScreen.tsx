@@ -665,6 +665,7 @@ export function PracticePocScreen({
   const boardInputLockedRef = useRef(false);
   const puzzleEntryPreviewLockedRef = useRef(false);
   const boardInputLockModeRef = useRef<BoardInputLockMode>("hard");
+  const boardInputLockRevisionRef = useRef(0);
   const pendingPremoveRef = useRef<PendingPremove | null>(null);
   const boardVisualFenRef = useRef<string | null>(null);
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1569,7 +1570,9 @@ export function PracticePocScreen({
     reason: string,
     puzzleId?: string | null,
     mode: BoardInputLockMode = "hard"
-  ): void {
+  ): number {
+    const revision = boardInputLockRevisionRef.current + 1;
+    boardInputLockRevisionRef.current = revision;
     const nextMode = nextLocked ? mode : "hard";
     if (nextLocked && mode === "hard") {
       // A hard lock (submit, pause, feedback snapshot) invalidates any premove
@@ -1586,6 +1589,7 @@ export function PracticePocScreen({
       puzzleId,
       locked: nextLocked
     });
+    return revision;
   }
 
   function resetBoardToFen(fen: string | null | undefined, reason: string, puzzleId?: string | null, move?: string): void {
@@ -2233,7 +2237,11 @@ export function PracticePocScreen({
       .map((feedbackMove) => feedbackMove.move);
     const submittedMoveFen = fenAfterMove(submittedPuzzle.currentFen, submittedMove);
     boardSyncInProgressRef.current = true;
-    commitBoardInputLocked(true, "arrow-duel-reply-preview-handoff", submittedPuzzleId);
+    const handoffLockRevision = commitBoardInputLocked(
+      true,
+      "arrow-duel-reply-preview-handoff",
+      submittedPuzzleId
+    );
     playCommittedMoveFeedback("user", submittedMove, submittedPuzzle.currentFen);
     setFeedback({
       autoPlayedMoves: [],
@@ -2264,7 +2272,13 @@ export function PracticePocScreen({
       setArrowDuelReplyChallengePhase("reply");
     } finally {
       boardSyncInProgressRef.current = false;
-      commitBoardInputLocked(false, "arrow-duel-reply-preview-handoff-complete", submittedPuzzleId);
+      if (boardInputLockRevisionRef.current === handoffLockRevision) {
+        commitBoardInputLocked(
+          false,
+          "arrow-duel-reply-preview-handoff-complete",
+          submittedPuzzleId
+        );
+      }
     }
   }
 
@@ -2515,11 +2529,16 @@ export function PracticePocScreen({
       let resumed = nextSprint.status === "paused" && service.getActiveSprint()?.id === nextSprint.id
         ? service.resumeSprint(captureLiveNowIso())
         : nextSprint;
+      const arrowDuelReplyHandoffStillAnimating =
+        resumed.status === "active" &&
+        resumed.currentPuzzle?.kind === "arrow_duel" &&
+        resumed.currentPuzzle.phase === "reply_handoff" &&
+        boardSyncInProgressRef.current;
       if (
         resumed.status === "active" &&
         resumed.currentPuzzle?.kind === "arrow_duel" &&
         resumed.currentPuzzle.phase === "reply_handoff" &&
-        !boardSyncInProgressRef.current
+        !arrowDuelReplyHandoffStillAnimating
       ) {
         resumed = service.beginArrowDuelReply(captureLiveNowIso());
       }
@@ -2533,7 +2552,13 @@ export function PracticePocScreen({
       setFeedbackPuzzleId(null);
       setPreviousAttemptNotice(null);
       clearFeedbackSnapshot();
-      commitBoardInputLocked(false, "resume", resumed.currentPuzzle?.puzzle.id ?? null);
+      commitBoardInputLocked(
+        arrowDuelReplyHandoffStillAnimating,
+        arrowDuelReplyHandoffStillAnimating
+          ? "resume-awaiting-arrow-duel-reply-handoff"
+          : "resume",
+        resumed.currentPuzzle?.puzzle.id ?? null
+      );
       navigateToTab("practice");
       refreshState();
     } catch (caught) {
@@ -2753,8 +2778,14 @@ export function PracticePocScreen({
     const isArrowDuelReplyHandoff =
       nextState.currentPuzzle?.kind === "arrow_duel" &&
       nextState.currentPuzzle.phase === "reply_handoff";
+    let arrowDuelReplyBegan = false;
     boardSyncInProgressRef.current = true;
-    commitBoardInputLocked(true, "opponent-reply", puzzleId, "premove");
+    const replyLockRevision = commitBoardInputLocked(
+      true,
+      "opponent-reply",
+      puzzleId,
+      isArrowDuelReplyHandoff ? "hard" : "premove"
+    );
     try {
       try {
         await sleep(
@@ -2787,14 +2818,22 @@ export function PracticePocScreen({
           activeSprint.currentPuzzle.phase === "reply_handoff" &&
           activeSprint.currentPuzzle.puzzle.id === puzzleId
         ) {
-          commitState(service.beginArrowDuelReply(captureLiveNowIso()));
+          const replying = service.beginArrowDuelReply(captureLiveNowIso());
+          arrowDuelReplyBegan = true;
+          commitState(replying);
           setArrowDuelReplyChallengePhase("reply");
         }
       } finally {
         boardSyncInProgressRef.current = false;
-        // A hard lock taken mid-animation (pause, app background) owns the
-        // board now and must survive this window's unlock.
-        if (boardInputLockModeRef.current === "premove") {
+        // A newer lock taken mid-animation (pause, app background) owns the
+        // board until the session is active again. If a mid-animation resume
+        // let this handoff start the reply, it also owns the matching unlock.
+        // Starting the reply clock and releasing the hard lock therefore form
+        // the single boundary where the player can first move.
+        if (
+          boardInputLockRevisionRef.current === replyLockRevision ||
+          (isArrowDuelReplyHandoff && arrowDuelReplyBegan)
+        ) {
           commitBoardInputLocked(false, "opponent-reply-complete", puzzleId);
         }
       }

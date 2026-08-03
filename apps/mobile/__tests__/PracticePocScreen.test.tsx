@@ -7133,6 +7133,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, arrow.correctMove);
 
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
     expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
       "Choose the best move"
@@ -7148,6 +7149,7 @@ describe("PracticePocScreen", () => {
     const replyContext = findByTestId(renderer, "arrow-duel-reply-context");
     const replyCopyLayer = findByTestId(renderer, "arrow-duel-reply-copy-layer");
     expect(replyBoard.props.flipped).toBe(initialPerspective);
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
     expect(resetBoard).toHaveBeenCalledWith(arrow.currentFen);
     expect(imperativeMove).not.toHaveBeenCalled();
     expect(collectText(replyPrompt)).toContain("Find the reply");
@@ -7170,6 +7172,7 @@ describe("PracticePocScreen", () => {
     );
     expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(initialPerspective);
     expect(requireArrowDuelState(activeSprintForTest(service)).phase).toBe("reply");
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
   });
 
   it("marks a wrong Arrow Duel reply for Review without extra result copy", async () => {
@@ -7206,6 +7209,7 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "paused-session-resume");
     expect(requireArrowDuelState(activeSprintForTest(service)).phase).toBe("reply_handoff");
+    expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
 
     await settleArrowDuelReplyHandoff();
 
@@ -7214,6 +7218,7 @@ describe("PracticePocScreen", () => {
     );
     expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:05");
     expect(requireArrowDuelState(activeSprintForTest(service)).phase).toBe("reply");
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
   });
 
   it("pauses Sprint and puzzle clocks during reply, then times out without redundant copy", async () => {
@@ -7234,6 +7239,7 @@ describe("PracticePocScreen", () => {
     expect(readyReply.replyStartedAt).toBe(new Date(wallClockMs).toISOString());
     expect(readyReply.replyDeadlineAt).toBe(new Date(wallClockMs + 5_000).toISOString());
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
+    expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     const sprintTime = collectText(findByTestId(renderer, "session-timer"));
     const puzzleTime = collectText(findByTestId(renderer, "session-puzzle-timing-label"));
 
