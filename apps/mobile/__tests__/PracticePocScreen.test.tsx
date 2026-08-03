@@ -4621,6 +4621,61 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
   });
 
+  it("plays a completed saved Custom Run again with its stable identity and configuration", async () => {
+    const service = createMobilePracticeService();
+    service.loadFixturePuzzles([androidPracticeFixture.puzzle as Puzzle]);
+    const run = service.createPracticeRun({
+      id: "repeat-custom",
+      name: "Repeat Custom",
+      mode: "custom",
+      durationSeconds: 180,
+      perPuzzleSeconds: 30,
+      targetCorrect: 1,
+      maxMistakes: 2,
+      themes: ["backRankMate"],
+      initialRating: 900
+    });
+    const renderer = renderScreen({
+      practiceService: service,
+      puzzleSelectionId: androidPracticeFixture.puzzle.id,
+      puzzleSelectionSeed: androidPracticeFixture.puzzleSelectionSeed,
+      runManagementEnabled: true
+    });
+
+    press(renderer, `practice-run-select-${run.id}`);
+    press(renderer, "practice-run-start");
+    expect(service.getActiveSprint()).toMatchObject({
+      config: {
+        durationSeconds: 180,
+        perPuzzleSeconds: 30,
+        ratingKey: run.ratingKey,
+        themes: ["backRankMate"]
+      },
+      run: { id: run.id, kind: "custom", name: run.name }
+    });
+
+    await boardMove(renderer, androidPracticeFixture.userMoves[0]);
+    await settleFeedbackSnapshot();
+    await boardMove(renderer, androidPracticeFixture.userMoves[1]);
+    await settleFeedbackSnapshot();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+
+    press(renderer, "play-again-button");
+
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("03:00");
+    expect(service.getActiveSprint()).toMatchObject({
+      status: "active",
+      config: {
+        durationSeconds: 180,
+        perPuzzleSeconds: 30,
+        ratingKey: run.ratingKey,
+        themes: ["backRankMate"]
+      },
+      run: { id: run.id, kind: "custom", name: run.name }
+    });
+  });
+
   it("exposes the mobile app shell automation contract", () => {
     const renderer = renderScreen();
     const mainScroll = findByTestId(renderer, "practice-main-scroll");
