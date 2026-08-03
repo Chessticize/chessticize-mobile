@@ -446,8 +446,8 @@ New Run behavior:
 - Once a Run has rated games, its current rating remains editable from that Run's
   editor without changing its stable Run identity or History linkage.
 - Create Run and Edit Run show the default-on `Opponent reply` switch only for
-  Arrow Duel. Turning it off restores the one-choice flow and selects a
-  separate Rating identity from the enabled configuration.
+  Arrow Duel. Turning it off restores the one-choice flow without changing the
+  Run's Rating identity; both states use the same Arrow Duel Run Rating.
 - If the selected puzzle pack lacks enough eligible puzzles, show a local pack
   warning and offer a broader theme.
 

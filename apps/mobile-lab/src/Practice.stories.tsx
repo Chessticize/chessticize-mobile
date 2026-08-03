@@ -243,7 +243,6 @@ export const ArrowDuelReplySetting: Story = {
       "Find the reply quickly to show you understand the opponent's counterattack."
     );
     await waitForTestId(canvasElement, "practice-run-arrow-duel-reply-seconds");
-    await waitForText(canvasElement, "On and Off keep separate ratings.");
   }
 };
 

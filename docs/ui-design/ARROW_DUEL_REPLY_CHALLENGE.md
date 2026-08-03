@@ -24,12 +24,12 @@ Each Arrow Duel Run has an **Opponent reply** setting:
   up to ten seconds entered directly, rather than a fixed list of
   presets.
 - Turning it off preserves the current one-choice Arrow Duel behavior.
-- On and off configurations have separate Rating identity because they measure
-  different task difficulty.
+- Turning it on or off does not change the Run's Rating identity. Both states
+  contribute to the same Arrow Duel Run Rating.
 
 The Interaction Lab may hold this value in deterministic presentation state.
-Production persistence, sync, legacy-Run migration, and Rating-key changes are
-outside the design phase.
+Production persistence, sync, and legacy-Run migration are outside the design
+phase.
 
 ## Scored Flow
 
@@ -107,6 +107,6 @@ their stable Storybook URLs. It covers:
 - first-use Arrow Duel guidance for the two-stage rule.
 
 The design phase excludes production Sprint/domain behavior, persistent Run
-settings, sync, Rating migration, Review mutations, native integration,
-analytics, rollout, and release work. Explicit design approval must be recorded
-before those boundaries are implemented.
+settings, sync, Review mutations, native integration, analytics, rollout, and
+release work. Explicit design approval must be recorded before those boundaries
+are implemented.

@@ -2324,7 +2324,11 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(
       renderer,
       "practice-run-arrow-duel-reply-setting"
-    ))).toContain("On and Off keep separate ratings");
+    ))).not.toContain("Reply challenge is on by default for this Run.");
+    expect(collectText(findByTestId(
+      renderer,
+      "practice-run-arrow-duel-reply-setting"
+    ))).not.toContain("On and Off keep separate ratings");
     expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("5");
     expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.maxLength)
       .toBe(2);

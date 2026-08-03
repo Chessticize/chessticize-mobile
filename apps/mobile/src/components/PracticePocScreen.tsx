@@ -7060,7 +7060,6 @@ function ArrowDuelReplyChallengeSetting({
     <View style={styles.settingsSection} testID="practice-run-arrow-duel-reply-setting">
       <View style={styles.runTimingSectionCopy}>
         <Text style={styles.sectionLabel}>Arrow Duel</Text>
-        <Text style={styles.helperText}>Reply challenge is on by default for this Run.</Text>
       </View>
       <View style={styles.customConfigCard}>
         <View style={styles.runTimingRow}>
@@ -7068,9 +7067,6 @@ function ArrowDuelReplyChallengeSetting({
             <Text style={styles.listText}>Opponent reply</Text>
             <Text style={styles.helperText}>
               Ask for the opponent's reply after a correct choice.
-            </Text>
-            <Text style={styles.arrowDuelReplyRatingNote}>
-              On and Off keep separate ratings.
             </Text>
           </View>
           <View style={styles.arrowDuelReplySettingControl}>
@@ -17933,12 +17929,6 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
     minWidth: 0
-  },
-  arrowDuelReplyRatingNote: {
-    color: "#2563EB",
-    fontSize: 11,
-    fontWeight: "800",
-    marginTop: 2
   },
   arrowDuelReplySettingControl: {
     alignItems: "center",
