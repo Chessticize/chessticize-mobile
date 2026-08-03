@@ -310,6 +310,7 @@ export type SprintResultReplayDesignItem = SessionReplayItem;
 export type ArrowDuelReplyChallengeDesignPreview = {
   autoTimeoutMs?: number;
   enabled: boolean;
+  replySeconds?: number;
 };
 
 export type SprintRulesDesignPreview = {
@@ -716,6 +717,18 @@ export function PracticePocScreen({
   const [feedback, setFeedback] = useState<SessionFeedback>(null);
   const [arrowDuelReplyChallengeEnabled, setArrowDuelReplyChallengeEnabled] = useState(
     () => sprintRulesDesignPreview?.arrowDuelReplyChallenge?.enabled ?? true
+  );
+  const initialArrowDuelReplySeconds = (() => {
+    const configured = sprintRulesDesignPreview?.arrowDuelReplyChallenge?.replySeconds ?? 5;
+    return Number.isSafeInteger(configured) && configured >= 1 && configured <= 60
+      ? configured
+      : 5;
+  })();
+  const [arrowDuelReplySeconds, setArrowDuelReplySeconds] = useState(
+    initialArrowDuelReplySeconds
+  );
+  const [arrowDuelReplySecondsInput, setArrowDuelReplySecondsInput] = useState(
+    String(initialArrowDuelReplySeconds)
   );
   const [arrowDuelReplyChallengePhase, setArrowDuelReplyChallengePhase] =
     useState<ArrowDuelReplyChallengePhase>("choice");
@@ -3670,6 +3683,7 @@ export function PracticePocScreen({
           kingPieceSize={kingGlyphSizeForBoard(boardSize)}
           phase={arrowDuelReplyChallengePhase}
           promptSide={displayedSideToMove}
+          replySeconds={arrowDuelReplySeconds}
         />
       ) : (
         <PracticePrompt
@@ -4028,6 +4042,29 @@ export function PracticePocScreen({
                       sprintRulesDesignPreview?.arrowDuelReplyChallenge
                         ? {
                             enabled: arrowDuelReplyChallengeEnabled,
+                            replySecondsError: !arrowDuelReplyChallengeEnabled
+                              || (
+                                /^[1-9]\d*$/.test(arrowDuelReplySecondsInput)
+                                && Number.isSafeInteger(Number(arrowDuelReplySecondsInput))
+                                && Number(arrowDuelReplySecondsInput) <= 60
+                              )
+                              ? null
+                              : "Enter 1–60 seconds.",
+                            replySecondsInput: arrowDuelReplySecondsInput,
+                            onReplySecondsInputChange: (value: string) => {
+                              if (!/^\d*$/.test(value)) {
+                                return;
+                              }
+                              setArrowDuelReplySecondsInput(value);
+                              const parsed = Number(value);
+                              if (
+                                /^[1-9]\d*$/.test(value)
+                                && Number.isSafeInteger(parsed)
+                                && parsed <= 60
+                              ) {
+                                setArrowDuelReplySeconds(parsed);
+                              }
+                            },
                             onToggle: () => setArrowDuelReplyChallengeEnabled((current) => !current)
                           }
                         : undefined
@@ -5115,7 +5152,7 @@ function sessionGuideCallout(
     if (arrowDuelReplyChallenge) {
       return {
         badge: "ARROW DUEL",
-        detail: "Choose the stronger arrow. If correct, you get 5 seconds to reply to the tempting move—outside Sprint time. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review.",
+        detail: "Choose the stronger arrow. If correct, reply to the tempting move within this Run's reply time—outside Sprint and puzzle time. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review.",
         id: "arrow-duel",
         title: "Choose, then prove it",
         tone: "info"
@@ -6736,6 +6773,9 @@ function PracticeRunEditor({
 }: {
   arrowDuelReplyChallenge?: {
     enabled: boolean;
+    replySecondsError: string | null;
+    replySecondsInput: string;
+    onReplySecondsInputChange: (value: string) => void;
     onToggle: () => void;
   };
   presentation: PracticeRunManagementPresentation;
@@ -6772,7 +6812,10 @@ function PracticeRunEditor({
         startAccessibilityLabel={isCreate
           ? "Add run to Home"
           : directRunEditing ? `Save ${draft.name} run` : `Save ${draft.name} rating`}
-        startDisabled={presentation.canSave === false}
+        startDisabled={
+          presentation.canSave === false
+          || Boolean(arrowDuelReplyChallenge?.replySecondsError)
+        }
         startTestID="practice-run-save"
         title={isCreate ? "New Run" : directRunEditing ? "Edit Run" : "Edit rating"}
         titleTestID="practice-run-editor-title"
@@ -6956,6 +6999,9 @@ function PracticeRunEditor({
       {directRunEditing && draft.mode === "arrow_duel" && arrowDuelReplyChallenge ? (
         <ArrowDuelReplyChallengeSetting
           enabled={arrowDuelReplyChallenge.enabled}
+          replySecondsError={arrowDuelReplyChallenge.replySecondsError}
+          replySecondsInput={arrowDuelReplyChallenge.replySecondsInput}
+          onReplySecondsInputChange={arrowDuelReplyChallenge.onReplySecondsInputChange}
           onToggle={arrowDuelReplyChallenge.onToggle}
         />
       ) : null}
@@ -6993,9 +7039,15 @@ function PracticeRunEditor({
 
 function ArrowDuelReplyChallengeSetting({
   enabled,
+  replySecondsError,
+  replySecondsInput,
+  onReplySecondsInputChange,
   onToggle
 }: {
   enabled: boolean;
+  replySecondsError: string | null;
+  replySecondsInput: string;
+  onReplySecondsInputChange: (value: string) => void;
   onToggle: () => void;
 }): React.JSX.Element {
   return (
@@ -7009,7 +7061,7 @@ function ArrowDuelReplyChallengeSetting({
           <View style={styles.runTimingRowCopy}>
             <Text style={styles.listText}>Opponent reply</Text>
             <Text style={styles.helperText}>
-              After a correct choice, find the reply in 5 seconds. Reply time does not use Sprint time.
+              Ask for the opponent's reply after a correct choice.
             </Text>
             <Text style={styles.arrowDuelReplyRatingNote}>
               On and Off keep separate ratings.
@@ -7035,6 +7087,51 @@ function ArrowDuelReplyChallengeSetting({
                 <View style={[styles.historyToggleThumb, enabled ? styles.historyToggleThumbActive : null]} />
               </View>
             </Pressable>
+          </View>
+        </View>
+        <View style={styles.runTimingRow} testID="practice-run-arrow-duel-reply-time-row">
+          <View style={styles.runTimingRowCopy}>
+            <Text style={styles.listText}>Reply time</Text>
+            <Text style={styles.helperText}>
+              Default 5 seconds · choose 1–60. Does not use Sprint or puzzle time.
+            </Text>
+            {replySecondsError ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={styles.runNameErrorText}
+                testID="practice-run-arrow-duel-reply-seconds-error"
+              >
+                {replySecondsError}
+              </Text>
+            ) : null}
+          </View>
+          <View
+            style={[
+              styles.arrowDuelReplySecondsControl,
+              !enabled ? styles.runTimingControlDisabled : null
+            ]}
+          >
+            <View
+              style={[
+                styles.arrowDuelReplySecondsInputShell,
+                replySecondsError ? styles.runEloInputShellError : null
+              ]}
+            >
+              <TextInput
+                accessibilityLabel="Opponent reply time in seconds"
+                accessibilityState={{ disabled: !enabled }}
+                editable={enabled}
+                inputMode="numeric"
+                keyboardType="number-pad"
+                maxLength={2}
+                selectTextOnFocus
+                style={styles.arrowDuelReplySecondsInput}
+                testID="practice-run-arrow-duel-reply-seconds"
+                value={replySecondsInput}
+                onChangeText={onReplySecondsInputChange}
+              />
+            </View>
+            <Text style={styles.arrowDuelReplySecondsUnit}>sec</Text>
           </View>
         </View>
       </View>
@@ -8961,12 +9058,14 @@ function ArrowDuelReplyChallengePrompt({
   currentPuzzle,
   kingPieceSize,
   phase,
-  promptSide
+  promptSide,
+  replySeconds
 }: {
   currentPuzzle: ArrowDuelState;
   kingPieceSize: number;
   phase: ArrowDuelReplyChallengePhase;
   promptSide: MoveSide | null;
+  replySeconds: number;
 }): React.JSX.Element {
   const displayedSide = promptSide ?? sideToMove(currentPuzzle.currentFen);
   const side = displayedSide === "b" ? "black" : "white";
@@ -8980,7 +9079,7 @@ function ArrowDuelReplyChallengePrompt({
       }
     : phase === "reply"
       ? {
-          context: "The tempting move was played. What happens next?",
+          context: "If the tempting move was played, what happens next?",
           hint: null,
           title: "Find the reply",
           tone: "reply" as const
@@ -9001,7 +9100,7 @@ function ArrowDuelReplyChallengePrompt({
             }
           : phase === "reply_timeout"
             ? {
-                context: "The five-second reply window expired.",
+                context: `The ${replySeconds}-second reply window expired.`,
                 hint: "One mistake · added to Review.",
                 title: "Reply timed out",
                 tone: "wrong" as const
@@ -9041,15 +9140,12 @@ function ArrowDuelReplyChallengePrompt({
           </Text>
           {phase === "reply" ? (
             <View
-              accessibilityLabel="Five seconds remaining. Sprint time paused."
+              accessibilityLabel={`${replySeconds} ${replySeconds === 1 ? "second" : "seconds"} remaining.`}
               style={styles.arrowDuelReplyTimerGroup}
               testID="arrow-duel-reply-timer-group"
             >
               <Text style={styles.arrowDuelReplyTimer} testID="arrow-duel-reply-timer">
-                0:05
-              </Text>
-              <Text style={styles.arrowDuelReplyPaused} testID="arrow-duel-reply-sprint-paused">
-                SPRINT PAUSED
+                {formatCompactDuration(replySeconds)}
               </Text>
             </View>
           ) : null}
@@ -17483,12 +17579,6 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     textAlign: "center"
   },
-  arrowDuelReplyPaused: {
-    color: "#1D4ED8",
-    fontSize: 8,
-    fontWeight: "900",
-    letterSpacing: 0.25
-  },
   arrowDuelReplyHintWrong: {
     color: "#B91C1C"
   },
@@ -17802,6 +17892,40 @@ const styles = StyleSheet.create({
   arrowDuelReplySettingValue: {
     color: "#334155",
     fontSize: 12,
+    fontWeight: "800"
+  },
+  arrowDuelReplySecondsControl: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 0,
+    gap: 6
+  },
+  arrowDuelReplySecondsInputShell: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#CBD5E1",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    minHeight: 38,
+    overflow: "hidden",
+    width: 64
+  },
+  arrowDuelReplySecondsInput: {
+    color: "#111827",
+    flex: 1,
+    fontFamily: "menlo",
+    fontSize: 14,
+    fontWeight: "800",
+    minHeight: 38,
+    minWidth: 54,
+    paddingHorizontal: 7,
+    paddingVertical: 6,
+    textAlign: "center"
+  },
+  arrowDuelReplySecondsUnit: {
+    color: "#64748B",
+    fontSize: 11,
     fontWeight: "800"
   },
   runTimingControls: {

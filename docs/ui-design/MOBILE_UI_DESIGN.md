@@ -351,8 +351,10 @@ Arrow Duel active-session rules:
 - The board must not reveal which move is best before selection.
 - The planned Opponent reply challenge is defined in
   [`ARROW_DUEL_REPLY_CHALLENGE.md`](ARROW_DUEL_REPLY_CHALLENGE.md). When it is
-  enabled, a correct candidate begins a separate five-second refutation step;
-  both answers must be correct for the puzzle to count as solved.
+  enabled, a correct candidate begins a separate refutation step whose reply
+  time defaults to five seconds and accepts any whole-number value from 1
+  through 60 in Edit Run; both answers must be correct for the puzzle to count
+  as solved.
 - A wrong candidate, wrong reply, or reply timeout makes the whole puzzle wrong
   and adds it to Review. The reply step gives no partial credit.
 - The reply clock and its board handoff are independent of the Sprint deadline,

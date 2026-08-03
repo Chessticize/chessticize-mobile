@@ -20,6 +20,9 @@ Each Arrow Duel Run has an **Opponent reply** setting:
 
 - It defaults to on.
 - It appears in Edit Run only when the Run format is Arrow Duel.
+- Its reply time defaults to five seconds and accepts any whole-number duration
+  from 1 through 60 seconds entered directly, rather than a fixed list of
+  presets.
 - Turning it off preserves the current one-choice Arrow Duel behavior.
 - On and off configurations have separate Rating identity because they measure
   different task difficulty.
@@ -40,17 +43,17 @@ With Opponent reply on:
    solved result.
 4. Play the tempting candidate on the board. Wait until that presentation is
    stable, then ask the player to move for the opponent.
-5. Start an independent five-second reply clock. The reply phase and its board
-   handoff do not consume the Sprint deadline, puzzle elapsed time, Slow
-   threshold, or puzzle Timeout threshold.
+5. Start the Run's configured reply clock, which defaults to five seconds. The
+   reply phase and its board handoff do not consume the Sprint deadline,
+   puzzle elapsed time, Slow threshold, or puzzle Timeout threshold.
 6. The whole puzzle is correct only when both the candidate and reply are
    correct.
 7. A wrong reply or reply timeout makes the whole puzzle wrong and adds the
    failed attempt to Review. There is no partial-credit result.
 
-The UI should make the clock ownership explicit: the five-second reply clock
-is prominent, while the ordinary Sprint and puzzle clocks visibly remain
-paused until the reply resolves.
+The configured reply clock is prominent. Do not add a separate "Sprint paused"
+label; the independent timing rule remains part of scoring behavior, while the
+ordinary Sprint and puzzle clocks do not advance until the reply resolves.
 
 The reply challenge reuses the ordinary puzzle prompt position and surface. It
 stays centered at the same full width and fixed 72-point height. The reply
@@ -96,7 +99,7 @@ The issue #489 design increment updates the existing product clones and keeps
 their stable Storybook URLs. It covers:
 
 - candidate choice and the correct-choice handoff;
-- the five-second opponent-reply state;
+- the configurable opponent-reply state, defaulting to five seconds;
 - correct reply, wrong reply, and timeout outcomes;
 - automatic Review messaging for both failure stages;
 - the default-on Edit Run control and its off state; and

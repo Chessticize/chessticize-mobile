@@ -306,7 +306,7 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.match(activeSessionGuide.description, /full red pointer above that board/);
   assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Choose, then prove it"));
-  assert.ok(arrowDuelGuide.scope.includes.includes("Separate five-second reply window"));
+  assert.ok(arrowDuelGuide.scope.includes.includes("Configurable reply window"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Portrait callout below the board"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Landscape callout in the empty board lane"));
   assert.ok(arrowDuelGuide.scope.includes.includes(

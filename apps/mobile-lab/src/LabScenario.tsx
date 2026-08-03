@@ -91,10 +91,12 @@ export type LabStoryPresentation = {
 
 export function LabScenario({
   arrowDuelReplyAutoTimeoutMs,
+  arrowDuelReplySeconds,
   scenarioId,
   storyPresentation
 }: {
   arrowDuelReplyAutoTimeoutMs?: number;
+  arrowDuelReplySeconds?: number;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
 }): React.JSX.Element {
@@ -104,6 +106,7 @@ export function LabScenario({
     <LabScenarioContent
       key={scenarioId}
       arrowDuelReplyAutoTimeoutMs={arrowDuelReplyAutoTimeoutMs}
+      arrowDuelReplySeconds={arrowDuelReplySeconds}
       runtime={runtime}
       scenarioId={scenarioId}
       storyPresentation={storyPresentation}
@@ -113,11 +116,13 @@ export function LabScenario({
 
 function LabScenarioContent({
   arrowDuelReplyAutoTimeoutMs,
+  arrowDuelReplySeconds,
   runtime,
   scenarioId,
   storyPresentation
 }: {
   arrowDuelReplyAutoTimeoutMs?: number;
+  arrowDuelReplySeconds?: number;
   runtime: ScenarioRuntime;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
@@ -185,14 +190,21 @@ function LabScenarioContent({
         }
       };
   const effectiveScreenProps = arrowDuelReplyAutoTimeoutMs === undefined
+    && arrowDuelReplySeconds === undefined
     ? screenProps
     : {
         ...screenProps,
         sprintRulesDesignPreview: {
           ...screenProps.sprintRulesDesignPreview,
           arrowDuelReplyChallenge: {
+            ...screenProps.sprintRulesDesignPreview?.arrowDuelReplyChallenge,
             enabled: true,
-            autoTimeoutMs: arrowDuelReplyAutoTimeoutMs
+            ...(arrowDuelReplyAutoTimeoutMs === undefined
+              ? {}
+              : { autoTimeoutMs: arrowDuelReplyAutoTimeoutMs }),
+            ...(arrowDuelReplySeconds === undefined
+              ? {}
+              : { replySeconds: arrowDuelReplySeconds })
           }
         }
       };

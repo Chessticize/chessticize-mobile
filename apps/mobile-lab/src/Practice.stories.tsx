@@ -198,9 +198,30 @@ export const ArrowDuelReplySetting: Story = {
     await expectTestIdText(canvasElement, "practice-run-arrow-duel-reply-value", "On");
     await waitForText(
       canvasElement,
-      "After a correct choice, find the reply in 5 seconds. Reply time does not use Sprint time."
+      "Default 5 seconds · choose 1–60. Does not use Sprint or puzzle time."
     );
+    await waitForTestId(canvasElement, "practice-run-arrow-duel-reply-seconds");
     await waitForText(canvasElement, "On and Off keep separate ratings.");
+  }
+};
+
+export const ArrowDuelReplyCustomTime: Story = {
+  name: "Arrow Duel Run editor · custom reply time",
+  args: {
+    scenarioId: "practice-run-arrow-duel-editor",
+    storyPresentation: {
+      storyId: "practice--arrow-duel-reply-setting-custom-time",
+      title: "Arrow Duel Run editor · custom reply time"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-run-home-edit");
+    await clickTestId(canvasElement, "practice-run-edit-arrow-duel");
+    await replaceTextTestId(
+      canvasElement,
+      "practice-run-arrow-duel-reply-seconds",
+      "37"
+    );
   }
 };
 
@@ -540,7 +561,24 @@ export const ArrowDuelPrompt: Story = {
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForText(canvasElement, "Find the reply");
     await expectTestIdText(canvasElement, "arrow-duel-reply-timer", "0:05");
-    await waitForTestId(canvasElement, "arrow-duel-reply-sprint-paused");
+    await expectTestIdAbsent(canvasElement, "arrow-duel-reply-sprint-paused");
+  }
+};
+
+export const ArrowDuelReplyCustomTimer: Story = {
+  name: "Arrow Duel · custom reply timer",
+  args: {
+    arrowDuelReplySeconds: 37,
+    scenarioId: "practice-arrow-duel-prompt",
+    storyPresentation: {
+      storyId: "practice--arrow-duel-reply-custom-timer",
+      title: "Arrow Duel · custom reply timer"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await openArrowDuelChoice(canvasElement);
+    await clickTestId(canvasElement, "lab-board-correct");
+    await expectTestIdText(canvasElement, "arrow-duel-reply-timer", "0:37");
   }
 };
 

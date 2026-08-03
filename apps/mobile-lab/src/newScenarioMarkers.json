@@ -11,7 +11,7 @@
     "issues": [
       {
         "issueNumber": 489,
-        "changeNote": "Explain the choice, five-second reply, and Review consequences."
+        "changeNote": "Explain the choice, configurable reply time, and Review consequences."
       }
     ]
   },

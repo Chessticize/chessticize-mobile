@@ -2256,7 +2256,7 @@ describe("PracticePocScreen", () => {
     expect(testIdOrder(firstEverArrowDuel, "practice-prompt", "practice-arrow-duel-guide-demo-board")).toBeLessThan(0);
     expect(testIdOrder(firstEverArrowDuel, "practice-arrow-duel-guide-demo-board", "session-score-strip")).toBeLessThan(0);
     expect(collectText(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-coach"))).toContain(
-      "Choose the stronger arrow. If correct, you get 5 seconds to reply to the tempting move—outside Sprint time. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review."
+      "Choose the stronger arrow. If correct, reply to the tempting move within this Run's reply time—outside Sprint and puzzle time. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review."
     );
     expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-coach-progress"))).toBe(
       "5 of 5"
@@ -2310,17 +2310,39 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(
       renderer,
       "practice-run-arrow-duel-reply-setting"
-    ))).toContain("Reply time does not use Sprint time");
+    ))).toContain("Does not use Sprint or puzzle time");
     expect(collectText(findByTestId(
       renderer,
       "practice-run-arrow-duel-reply-setting"
     ))).toContain("On and Off keep separate ratings");
+    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("5");
+    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.maxLength)
+      .toBe(2);
+
+    act(() => {
+      findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.onChangeText("37");
+    });
+    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("37");
+
+    act(() => {
+      findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.onChangeText("61");
+    });
+    expect(collectText(findByTestId(
+      renderer,
+      "practice-run-arrow-duel-reply-seconds-error"
+    ))).toBe("Enter 1–60 seconds.");
+    expect(findByTestId(renderer, "practice-run-save").props.disabled).toBe(true);
 
     press(renderer, "practice-run-arrow-duel-reply-toggle");
     expect(collectText(findByTestId(
       renderer,
       "practice-run-arrow-duel-reply-value"
     ))).toBe("Off");
+    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.editable)
+      .toBe(false);
+    expect(() => findByTestId(renderer, "practice-run-arrow-duel-reply-seconds-error"))
+      .toThrow();
+    expect(findByTestId(renderer, "practice-run-save").props.disabled).toBe(false);
   });
 
   it("previews whole-puzzle scoring for choice, reply, and reply timeout", async () => {
@@ -2333,9 +2355,10 @@ describe("PracticePocScreen", () => {
       "Find the reply"
     );
     expect(collectText(findByTestId(correct, "arrow-duel-reply-timer"))).toBe("0:05");
-    expect(collectText(findByTestId(correct, "arrow-duel-reply-sprint-paused"))).toBe(
-      "SPRINT PAUSED"
+    expect(collectText(findByTestId(correct, "arrow-duel-reply-context"))).toBe(
+      "If the tempting move was played, what happens next?"
     );
+    expect(() => findByTestId(correct, "arrow-duel-reply-sprint-paused")).toThrow();
     const replyPrompt = findByTestId(correct, "arrow-duel-reply-challenge");
     expect(flattenTestStyle(replyPrompt.props.style)).toEqual(expect.objectContaining({
       alignSelf: "center",
@@ -2354,6 +2377,17 @@ describe("PracticePocScreen", () => {
       "solved 1, mistakes 0"
     );
     expect(requireLabArrowDuelState().selectedMove).toBeUndefined();
+
+    const customReplyTime = renderLabScenario(
+      "practice-arrow-duel-prompt",
+      { arrowDuelReplySeconds: 37 }
+    );
+    startArrowDuelSprint(customReplyTime);
+    const customReplyTimeState = requireLabArrowDuelState();
+    await boardMove(customReplyTime, customReplyTimeState.correctMove);
+    expect(collectText(findByTestId(customReplyTime, "arrow-duel-reply-timer"))).toBe("0:37");
+    expect(findByTestId(customReplyTime, "arrow-duel-reply-timer-group").props.accessibilityLabel)
+      .toBe("37 seconds remaining.");
 
     const wrongChoice = renderLabScenario("practice-arrow-duel-prompt");
     startArrowDuelSprint(wrongChoice);
@@ -2494,13 +2528,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(
       findByTestId(arrowDuel, "practice-session-guide-coach-copy-arrow-duel")
     )).toBe(
-      "ARROW DUELChoose, then prove itChoose the stronger arrow. If correct, you get 5 seconds to reply to the tempting move—outside Sprint time. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review."
+      "ARROW DUELChoose, then prove itChoose the stronger arrow. If correct, reply to the tempting move within this Run's reply time—outside Sprint and puzzle time. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review."
     );
     expect(findByTestId(
       arrowDuel,
       "practice-arrow-duel-guide"
     ).props.accessibilityLabel).toBe(
-      "Guide 1 of 1. Choose, then prove it. Choose the stronger arrow. If correct, you get 5 seconds to reply to the tempting move—outside Sprint time. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review."
+      "Guide 1 of 1. Choose, then prove it. Choose the stronger arrow. If correct, reply to the tempting move within this Run's reply time—outside Sprint and puzzle time. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review."
     );
 
     const rules = renderLabScenario("practice-first-sprint-guide");
