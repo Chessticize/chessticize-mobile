@@ -150,8 +150,28 @@ export const CustomSetup: Story = {
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-add-run");
     await waitForTestId(canvasElement, "practice-run-editor");
+    await expectTestIdText(
+      canvasElement,
+      "practice-run-theme-selection-detail",
+      "All themes"
+    );
+    expectTestIdAbsent(canvasElement, "custom-theme-fork");
+    await clickTestId(canvasElement, "practice-run-theme-disclosure");
     await clickTestId(canvasElement, "custom-theme-fork");
     await clickTestId(canvasElement, "custom-theme-pin");
+    await expectTestIdText(
+      canvasElement,
+      "practice-run-theme-selection-detail",
+      "Fork · Pin"
+    );
+    await clickTestId(canvasElement, "custom-theme-mixed");
+    await expectTestIdText(
+      canvasElement,
+      "practice-run-theme-selection-detail",
+      "All themes"
+    );
+    await clickTestId(canvasElement, "practice-run-theme-disclosure");
+    expectTestIdAbsent(canvasElement, "custom-theme-fork");
     await waitForTestId(canvasElement, "practice-run-pass-rules");
     await waitForTestId(canvasElement, "practice-run-slow-warning");
     await waitForTestId(canvasElement, "practice-run-puzzle-timeout");

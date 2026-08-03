@@ -4241,6 +4241,49 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-standard-elo-row")).toThrow();
   });
 
+  it("lets the Storybook New Run clone hide named themes behind a History-style disclosure", () => {
+    const renderer = renderScreen({
+      runEditorThemeDisclosure: true,
+      runManagementEnabled: true,
+      themeCatalogPresentation: {
+        groups: [
+          { label: "Checkmates", themes: ["mateIn2"] },
+          { label: "Piece tactics", themes: ["fork", "pin"] }
+        ]
+      }
+    });
+
+    press(renderer, "practice-add-run");
+
+    expect(collectText(findByTestId(renderer, "practice-run-theme-selection-detail"))).toBe(
+      "All themes"
+    );
+    expect(findByTestId(renderer, "practice-run-theme-disclosure").props.accessibilityState).toEqual({
+      expanded: false
+    });
+    expect(() => findByTestId(renderer, "custom-theme-fork")).toThrow();
+
+    press(renderer, "practice-run-theme-disclosure");
+
+    expect(findByTestId(renderer, "practice-run-theme-disclosure").props.accessibilityState).toEqual({
+      expanded: true
+    });
+    expect(findByTestId(renderer, "custom-theme-mixed")).toBeTruthy();
+    expect(findByTestId(renderer, "custom-theme-fork")).toBeTruthy();
+    press(renderer, "custom-theme-fork");
+    press(renderer, "custom-theme-pin");
+    expect(collectText(findByTestId(renderer, "practice-run-theme-selection-detail"))).toBe(
+      "Fork · Pin"
+    );
+
+    press(renderer, "practice-run-theme-disclosure");
+
+    expect(() => findByTestId(renderer, "custom-theme-fork")).toThrow();
+    expect(collectText(findByTestId(renderer, "practice-run-theme-selection-detail"))).toBe(
+      "Fork · Pin"
+    );
+  });
+
   it("creates a real saved Run with All themes without starting a sprint", () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
@@ -12193,7 +12236,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEditorThemeDisclosure" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
     onRenderCommit?: () => void;
     platformCapabilities?: MobilePlatformCapabilities;
   };
@@ -12310,6 +12353,7 @@ function renderScreen({
   onRenderCommit,
   puzzleSelectionId,
   puzzleSelectionSeed,
+  runEditorThemeDisclosure,
   runEloEditingMovedToHome,
   runManagementEnabled,
   runManagementPresentation,
@@ -12335,6 +12379,7 @@ function renderScreen({
         moveFeedbackSettings={moveFeedbackSettings}
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
+        runEditorThemeDisclosure={runEditorThemeDisclosure}
         runEloEditingMovedToHome={runEloEditingMovedToHome}
         runManagementEnabled={runManagementEnabled}
         runManagementPresentation={runManagementPresentation}

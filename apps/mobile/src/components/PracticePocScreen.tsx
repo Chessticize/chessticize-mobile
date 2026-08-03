@@ -271,6 +271,7 @@ interface Props {
   runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
   runEloEditingMovedToHome?: boolean;
+  runEditorThemeDisclosure?: boolean;
   settingsCaptureBottomInset?: number;
   initialTab?: MobileBackPrimaryTab;
   sprintRulesDesignPreview?: SprintRulesDesignPreview;
@@ -632,6 +633,7 @@ export function PracticePocScreen({
   runManagementEnabled = false,
   runManagementPresentation,
   runEloEditingMovedToHome = false,
+  runEditorThemeDisclosure = false,
   settingsCaptureBottomInset,
   initialTab = "practice",
   sprintRulesDesignPreview,
@@ -4070,6 +4072,7 @@ export function PracticePocScreen({
                         : undefined
                     }
                     presentation={activeRunManagementPresentation}
+                    showThemeDisclosure={runEditorThemeDisclosure}
                     showSprintRulesSummary={
                       sprintGuidanceEnabled
                       || sprintRulesDesignPreview?.showRunEditorSummary === true
@@ -6767,6 +6770,7 @@ function RunRemovalConfirmation({
 function PracticeRunEditor({
   arrowDuelReplyChallenge,
   presentation,
+  showThemeDisclosure,
   showSprintRulesSummary,
   themeCatalogPresentation,
   timeoutCountsAsMistake
@@ -6779,6 +6783,7 @@ function PracticeRunEditor({
     onToggle: () => void;
   };
   presentation: PracticeRunManagementPresentation;
+  showThemeDisclosure: boolean;
   showSprintRulesSummary: boolean;
   themeCatalogPresentation?: ThemeCatalogPresentation;
   timeoutCountsAsMistake: boolean;
@@ -6917,6 +6922,7 @@ function PracticeRunEditor({
                   </View>
                 ) : null}
                 <CustomThemeChoiceRow
+                  showDisclosure={showThemeDisclosure}
                   selectedThemes={draft.themes}
                   themeCatalogPresentation={themeCatalogPresentation}
                   testID="practice-run-theme-row"
@@ -8037,11 +8043,13 @@ function CustomValueRow({
 function CustomThemeChoiceRow({
   onChange,
   selectedThemes,
+  showDisclosure = false,
   themeCatalogPresentation,
   testID,
 }: {
   onChange: (next: CustomThemeFilter) => void;
   selectedThemes: readonly CustomThemeFilter[];
+  showDisclosure?: boolean;
   themeCatalogPresentation?: ThemeCatalogPresentation;
   testID: string;
 }): React.JSX.Element {
@@ -8051,6 +8059,7 @@ function CustomThemeChoiceRow({
         onChange={onChange}
         presentation={themeCatalogPresentation}
         selectedThemes={selectedThemes}
+        showDisclosure={showDisclosure}
         testID={testID}
       />
     );
@@ -8078,15 +8087,25 @@ function ThemeCatalogChoiceRow({
   onChange,
   presentation,
   selectedThemes,
+  showDisclosure,
   testID
 }: {
   onChange: (next: CustomThemeFilter) => void;
   presentation: ThemeCatalogPresentation;
   selectedThemes: readonly CustomThemeFilter[];
+  showDisclosure: boolean;
   testID: string;
 }): React.JSX.Element {
+  const [expanded, setExpanded] = useState(!showDisclosure);
+  const selectedThemeLabels = selectedThemes
+    .filter((theme) => theme !== ALL_THEMES_FILTER)
+    .map(customThemeLabel);
+  const selectedThemeDetail = selectedThemeLabels.length === 0
+    ? "All themes"
+    : selectedThemeLabels.join(" · ");
   const allChip = (
     <ThemeChoiceChip
+      label={showDisclosure ? "All themes" : undefined}
       option={ALL_THEMES_FILTER}
       selected={selectedThemes.includes(ALL_THEMES_FILTER)}
       onPress={() => onChange(ALL_THEMES_FILTER)}
@@ -8095,44 +8114,78 @@ function ThemeCatalogChoiceRow({
 
   return (
     <View style={styles.themeCatalogSection} testID={testID}>
-      <View style={styles.themeCatalogHeadingRow}>
-        <View>
-          <Text style={styles.themeCatalogTitle}>Themes</Text>
-          <Text style={styles.requiredFieldLabel}>Choose one or more</Text>
-        </View>
-        {allChip}
-      </View>
-      <View style={styles.themeCatalogGroupGrid}>
-        {presentation.groups.map((group) => (
-          <View key={group.label} style={styles.themeCatalogGroupCard}>
-            <Text style={styles.themeCatalogGroupLabel}>{group.label}</Text>
-            <View style={styles.themeCatalogGroupOptions}>
-              {group.themes.map((theme) => (
-                <ThemeChoiceChip
-                  key={theme}
-                  option={theme}
-                  selected={selectedThemes.includes(theme)}
-                  onPress={() => onChange(theme)}
-                />
-              ))}
-            </View>
+      {showDisclosure ? (
+        <Pressable
+          accessibilityLabel={expanded ? "Hide Run themes" : "Show Run themes"}
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          style={styles.historyThemeDisclosure}
+          testID="practice-run-theme-disclosure"
+          onPress={() => setExpanded((current) => !current)}
+        >
+          <View style={styles.historyThemeDisclosureCopy}>
+            <Text style={styles.themeCatalogTitle}>Themes</Text>
+            <Text
+              accessibilityLabel={`Selected themes: ${selectedThemeDetail}`}
+              ellipsizeMode="tail"
+              numberOfLines={1}
+              style={styles.historyThemeSummary}
+              testID="practice-run-theme-selection-detail"
+            >
+              {selectedThemeDetail}
+            </Text>
           </View>
-        ))}
-      </View>
+          <ChevronGlyph direction={expanded ? "up" : "down"} />
+        </Pressable>
+      ) : (
+        <View style={styles.themeCatalogHeadingRow}>
+          <View>
+            <Text style={styles.themeCatalogTitle}>Themes</Text>
+            <Text style={styles.requiredFieldLabel}>Choose one or more</Text>
+          </View>
+          {allChip}
+        </View>
+      )}
+      {expanded ? (
+        <>
+          {showDisclosure ? (
+            <View style={styles.historyThemeAllRow}>{allChip}</View>
+          ) : null}
+          <View style={styles.themeCatalogGroupGrid}>
+            {presentation.groups.map((group) => (
+              <View key={group.label} style={styles.themeCatalogGroupCard}>
+                <Text style={styles.themeCatalogGroupLabel}>{group.label}</Text>
+                <View style={styles.themeCatalogGroupOptions}>
+                  {group.themes.map((theme) => (
+                    <ThemeChoiceChip
+                      key={theme}
+                      option={theme}
+                      selected={selectedThemes.includes(theme)}
+                      onPress={() => onChange(theme)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }
 
 function ThemeChoiceChip({
+  label,
   onPress,
   option,
   selected
 }: {
+  label?: string;
   onPress: () => void;
   option: CustomThemeFilter;
   selected: boolean;
 }): React.JSX.Element {
-  const label = customThemeLabel(option);
+  const visibleLabel = label ?? customThemeLabel(option);
   const representsAllThemes = option === ALL_THEMES_FILTER;
   return (
     <Pressable
@@ -8140,13 +8193,13 @@ function ThemeChoiceChip({
         ? "Selects all themes and clears named theme selections"
         : "Adds or removes this theme"}
       accessibilityRole={representsAllThemes ? "button" : "checkbox"}
-      accessibilityLabel={representsAllThemes ? "All puzzle themes" : `${label} puzzle theme`}
+      accessibilityLabel={representsAllThemes ? "All puzzle themes" : `${visibleLabel} puzzle theme`}
       accessibilityState={representsAllThemes ? { selected } : { checked: selected }}
-      testID={`custom-theme-${representsAllThemes ? "mixed" : safeTestId(label)}`}
+      testID={`custom-theme-${representsAllThemes ? "mixed" : safeTestId(visibleLabel)}`}
       style={[styles.customMiniChip, selected ? styles.customMiniChipActive : null]}
       onPress={onPress}
     >
-      <Text style={[styles.customMiniChipText, selected ? styles.customMiniChipTextActive : null]}>{label}</Text>
+      <Text style={[styles.customMiniChipText, selected ? styles.customMiniChipTextActive : null]}>{visibleLabel}</Text>
     </Pressable>
   );
 }

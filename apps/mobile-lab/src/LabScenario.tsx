@@ -223,6 +223,10 @@ function LabScenarioContent({
           ? historyProgressPresentationFor(scenarioId)
           : undefined}
         platformCapabilities={runtime.platformCapabilities}
+        runEditorThemeDisclosure={
+          scenarioId === "practice-custom-setup"
+          || scenarioId === "practice-run-name-validation"
+        }
         themeCatalogPresentation={showsThemeCatalogPrototype
           ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
