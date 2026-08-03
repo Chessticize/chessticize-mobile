@@ -76,6 +76,13 @@ function nextCorrectMove(state: SprintState): string {
     throw new Error("Expected a current puzzle");
   }
   if (current.kind === "arrow_duel") {
+    if (current.phase === "reply") {
+      const reply = current.puzzle.solutionMoves[1];
+      if (!reply) {
+        throw new Error(`No opponent reply for Arrow Duel puzzle ${current.puzzle.id}`);
+      }
+      return reply;
+    }
     return current.correctMove;
   }
   const move = current.puzzle.solutionMoves[current.cursor];
