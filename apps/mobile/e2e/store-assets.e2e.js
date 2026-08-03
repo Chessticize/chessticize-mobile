@@ -12,6 +12,10 @@ const {
   waitForVisibleInPracticeScroll
 } = require('./helpers');
 const { expectFrameContained } = require('./screenshotAssertions');
+const {
+  decodeUciMoveHex,
+  sideToMoveFromPositionMetadataHex
+} = require('./puzzlePackBinary');
 
 const describeStoreAssets = process.env.CHESSTICIZE_CAPTURE_STORE_ASSETS === '1' ? describe : describe.skip;
 const captureOrientation = process.env.CHESSTICIZE_STORE_ASSET_ORIENTATION ?? 'portrait';
@@ -377,9 +381,15 @@ async function resolveDisplayedArrowDuelFixture(overlayTestID, puzzleIDTestID) {
   }
 
   const query = [
-    'SELECT stockfish_bestmove || char(9) || initial_fen',
-    'FROM puzzles',
-    `WHERE id = '${puzzleID.replaceAll("'", "''")}';`
+    'SELECT hex(stockfish_bestmove) || char(9) || hex(substr(initial_fen, 9, 1))',
+    'FROM puzzles, pack_format',
+    `WHERE puzzles.id = '${puzzleID.replaceAll("'", "''")}'`,
+    "AND pack_format.format_id = 'chessticize-core-pack'",
+    'AND pack_format.pack_schema_version = 2',
+    "AND pack_format.position_codec = 'chessticize-position'",
+    'AND pack_format.position_codec_version = 1',
+    "AND pack_format.move_codec = 'chessticize-uci16'",
+    'AND pack_format.move_codec_version = 1;'
   ].join(' ');
   const rows = execFileSync('/usr/bin/sqlite3', [puzzlePackPath, query], { encoding: 'utf8' })
     .trim()
@@ -389,9 +399,10 @@ async function resolveDisplayedArrowDuelFixture(overlayTestID, puzzleIDTestID) {
     throw new Error(`Expected bundled puzzle ${puzzleID}, found ${rows.length}`);
   }
 
-  const [correctMove, initialFen] = rows[0].split('\t');
+  const [bestMoveHex, positionMetadataHex] = rows[0].split('\t');
+  const correctMove = decodeUciMoveHex(bestMoveHex);
   const wrongMove = candidates.find((candidate) => candidate !== correctMove);
-  const sideToMove = initialFen?.trim().split(/\s+/)[1];
+  const sideToMove = sideToMoveFromPositionMetadataHex(positionMetadataHex);
   if (!wrongMove || (sideToMove !== 'w' && sideToMove !== 'b')) {
     throw new Error(`Invalid bundled puzzle metadata for candidates ${candidates.join(', ')}`);
   }

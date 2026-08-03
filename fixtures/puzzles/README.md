@@ -40,10 +40,16 @@ artifact/manifest validation. It does not replenish removed rows; promotion
 candidates remain available to Standard.
 
 The release SQLite schema is intentionally runtime-only: `puzzles` keeps the
-source puzzle ID, compact FEN, solution moves, rating, and presolved Stockfish
-fields; `themes` and `puzzle_themes` provide the indexed theme lookup. Compact
-FEN is the canonical first four FEN fields. The 62-row `themes` catalog retains
-its stable numeric IDs, while `puzzle_themes` contains relations only for the 24
+source puzzle ID, compact position, solution moves, rating, and presolved
+Stockfish fields; `themes` and `puzzle_themes` provide the indexed theme
+lookup. Schema version 2 stores positions and moves as versioned BLOBs. The
+`chessticize-position` v1 codec combines a 64-bit occupancy mask, side,
+castling and en-passant metadata, and four-bit piece codes. The
+`chessticize-uci16` v1 codec stores each UCI move in two bytes. The
+single-row `pack_format` table and matching manifest fields make these codecs
+explicit; the runtime still accepts a v4 TEXT pack for rollback compatibility
+and rejects unknown binary versions. The 62-row `themes` catalog retains its
+stable numeric IDs, while `puzzle_themes` contains relations only for the 24
 themes exposed by `SERVER_CURATED_THEMES` and uses `WITHOUT ROWID`. In
 particular, `endgame` remains catalog ID 20 but has no relation rows;
 `hangingPiece` remains supported at catalog ID 25.
@@ -100,6 +106,8 @@ manifest; the Detox iOS build fetches it automatically. The first
 superseded by the corrected depth-20 `core-pack-v2` artifact. `core-pack-v3`
 adds immutable Puzzle Rating Deviation. `core-pack-v4` preserves the v3 puzzle
 rows while shipping the optimized stable-theme relation index described above.
+`core-pack-v5` preserves all v4 puzzle semantics while replacing the three
+large TEXT payload columns with the versioned binary codecs.
 
 To convert a verified older rowid-based pack without changing puzzle rows, run:
 
@@ -114,3 +122,15 @@ then atomically installs the pack/manifest pair. A locally generated candidate
 manifest must not be committed or merged until its artifact is published under
 a new immutable release tag and `scripts/fetch-core-pack.mjs` is updated in the
 same change. Never overwrite an existing Core Pack release.
+
+To encode a verified legacy TEXT pack without resampling or changing puzzle
+semantics, run:
+
+```sh
+pnpm encode:offline-puzzles
+```
+
+The encoder validates the input artifact and manifest, works on a temporary
+copy, round-trips every position and move payload, compares length-prefixed
+semantic hashes before and after conversion, runs SQLite integrity and manifest
+validation, and atomically installs the pack/manifest pair.

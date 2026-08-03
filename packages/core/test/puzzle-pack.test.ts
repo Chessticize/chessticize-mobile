@@ -182,7 +182,14 @@ function readSqlitePackSummary(): {
         COUNT(*) AS puzzleCount,
         SUM(
           CASE
-            WHEN LENGTH(TRIM(stockfish_bestmove)) = 4
+            WHEN typeof(stockfish_bestmove) = 'blob'
+              AND typeof(solution_moves) = 'blob'
+              AND SUBSTR(HEX(stockfish_bestmove), 3, 1) = '0'
+              AND SUBSTR(HEX(solution_moves), 3, 1) = '0'
+            THEN 1
+            WHEN typeof(stockfish_bestmove) = 'text'
+              AND typeof(solution_moves) = 'text'
+              AND LENGTH(TRIM(stockfish_bestmove)) = 4
               AND LENGTH(SUBSTR(TRIM(solution_moves), 1, INSTR(TRIM(solution_moves) || ' ', ' ') - 1)) = 4
             THEN 1
             ELSE 0

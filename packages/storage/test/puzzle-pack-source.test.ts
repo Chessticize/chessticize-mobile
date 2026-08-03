@@ -5,12 +5,86 @@ import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { Puzzle } from "../../core/src/index.ts";
 import {
+  CORE_PACK_FORMAT_ID,
+  CORE_PACK_MOVE_CODEC,
+  CORE_PACK_MOVE_CODEC_VERSION,
+  CORE_PACK_POSITION_CODEC,
+  CORE_PACK_POSITION_CODEC_VERSION,
+  CORE_PACK_SCHEMA_VERSION,
+  encodePuzzlePosition,
+  encodeUciMove,
+  encodeUciMoveLine
+} from "../src/puzzle-pack-binary-codec.ts";
+import {
   NodeSqliteDatabase,
   PackBackedPracticeStore,
   PracticeService,
   SQLitePuzzlePackSource,
   SQLiteStore
 } from "../src/index.ts";
+
+test("SQLitePuzzlePackSource reads a versioned binary pack through its existing public contract", async () => {
+  const puzzles = await loadFixturePuzzles();
+  const packDb = buildBinaryPackDatabase(puzzles);
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb));
+    const expected = puzzles.find((puzzle) => puzzle.id === "00008");
+    const actual = source.getPuzzle("00008");
+
+    assert.ok(expected);
+    assert.ok(actual);
+    assert.equal(
+      actual.initialFen,
+      `${expected.initialFen.split(/\s+/u).slice(0, 4).join(" ")} 0 1`
+    );
+    assert.deepEqual(actual.solutionMoves, expected.solutionMoves);
+    assert.equal(actual.stockfishBestMove, expected.stockfishBestMove);
+    assert.deepEqual(
+      source.selectPuzzles({
+        mode: "standard",
+        limit: 10,
+        themes: ["hangingPiece"]
+      }).map((puzzle) => puzzle.id),
+      ["00008"]
+    );
+  } finally {
+    packDb.close();
+  }
+});
+
+test("SQLitePuzzlePackSource rejects unknown binary pack versions before hydration", async () => {
+  const packDb = buildBinaryPackDatabase(await loadFixturePuzzles());
+  try {
+    packDb.prepare(
+      "UPDATE pack_format SET position_codec_version = ? WHERE id = 1"
+    ).run(CORE_PACK_POSITION_CODEC_VERSION + 1);
+
+    assert.throws(
+      () => new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb)),
+      /Unsupported puzzle pack format/u
+    );
+  } finally {
+    packDb.close();
+  }
+});
+
+test("SQLitePuzzlePackSource rejects a corrupt binary row instead of returning partial puzzle data", async () => {
+  const packDb = buildBinaryPackDatabase(await loadFixturePuzzles());
+  try {
+    packDb.prepare("UPDATE puzzles SET initial_fen = ? WHERE id = ?").run(
+      Uint8Array.from([0x01]),
+      "00008"
+    );
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb));
+
+    assert.throws(
+      () => source.getPuzzle("00008"),
+      /position payload length/u
+    );
+  } finally {
+    packDb.close();
+  }
+});
 
 test("SQLitePuzzlePackSource selects puzzles from a read-only pack schema", async () => {
   const packDb = buildPackDatabase(await loadFixturePuzzles());
@@ -767,6 +841,53 @@ function buildPackDatabase(puzzles: Puzzle[]): DatabaseSync {
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;
+  }
+  return db;
+}
+
+function buildBinaryPackDatabase(puzzles: Puzzle[]): DatabaseSync {
+  const db = buildPackDatabase(puzzles);
+  db.exec(`
+    CREATE TABLE pack_format (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      format_id TEXT NOT NULL,
+      pack_schema_version INTEGER NOT NULL,
+      position_codec TEXT NOT NULL,
+      position_codec_version INTEGER NOT NULL,
+      move_codec TEXT NOT NULL,
+      move_codec_version INTEGER NOT NULL
+    );
+  `);
+  db.prepare(`
+    INSERT INTO pack_format (
+      id,
+      format_id,
+      pack_schema_version,
+      position_codec,
+      position_codec_version,
+      move_codec,
+      move_codec_version
+    ) VALUES (1, ?, ?, ?, ?, ?, ?)
+  `).run(
+    CORE_PACK_FORMAT_ID,
+    CORE_PACK_SCHEMA_VERSION,
+    CORE_PACK_POSITION_CODEC,
+    CORE_PACK_POSITION_CODEC_VERSION,
+    CORE_PACK_MOVE_CODEC,
+    CORE_PACK_MOVE_CODEC_VERSION
+  );
+  const update = db.prepare(`
+    UPDATE puzzles
+    SET initial_fen = ?, solution_moves = ?, stockfish_bestmove = ?
+    WHERE id = ?
+  `);
+  for (const puzzle of puzzles) {
+    update.run(
+      encodePuzzlePosition(puzzle.initialFen),
+      encodeUciMoveLine(puzzle.solutionMoves),
+      encodeUciMove(puzzle.stockfishBestMove ?? ""),
+      puzzle.id
+    );
   }
   return db;
 }

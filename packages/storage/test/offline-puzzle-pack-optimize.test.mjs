@@ -38,11 +38,55 @@ test("fresh Core Pack generation writes the optimized stable-theme schema", () =
   const db = new DatabaseSync(":memory:");
   try {
     initializeDatabase(db);
-    writeSelectedPack(db, [
+    const generated = [
       generatedPuzzle("fresh-hanging", 900, ["endgame", "hangingPiece"]),
       generatedPuzzle("fresh-fork", 1100, ["crushing", "fork"]),
       generatedPuzzle("fresh-no-indexed-theme", 1300, ["endgame"])
-    ]);
+    ];
+    writeSelectedPack(db, generated);
+
+    assert.deepEqual(
+      { ...db.prepare("SELECT * FROM pack_format").get() },
+      {
+        id: 1,
+        format_id: "chessticize-core-pack",
+        pack_schema_version: 2,
+        position_codec: "chessticize-position",
+        position_codec_version: 1,
+        move_codec: "chessticize-uci16",
+        move_codec_version: 1
+      }
+    );
+    assert.equal(
+      db.prepare("SELECT typeof(initial_fen) AS type FROM puzzles LIMIT 1").get().type,
+      "blob"
+    );
+    assert.equal(
+      db.prepare("SELECT typeof(solution_moves) AS type FROM puzzles LIMIT 1").get().type,
+      "blob"
+    );
+    assert.equal(
+      db.prepare("SELECT typeof(stockfish_bestmove) AS type FROM puzzles LIMIT 1").get().type,
+      "blob"
+    );
+
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(db));
+    assert.deepEqual(
+      source.getPuzzle("fresh-hanging"),
+      {
+        id: generated[0].id,
+        initialFen: generated[0].initialFen,
+        solutionMoves: generated[0].solutionMoves,
+        rating: generated[0].rating,
+        ratingDeviation: generated[0].ratingDeviation,
+        themes: ["hangingPiece"],
+        source: "lichess",
+        stockfishEval: generated[0].stockfishEval,
+        stockfishBestMove: generated[0].stockfishBestMove,
+        stockfishEvalAfterFirstMove:
+          generated[0].stockfishEvalAfterFirstMove
+      }
+    );
 
     assert.deepEqual(
       db.prepare("SELECT id, name FROM themes ORDER BY id").all()

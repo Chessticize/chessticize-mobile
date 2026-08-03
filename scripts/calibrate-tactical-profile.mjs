@@ -10,6 +10,12 @@ import {
   tacticalProfileSolveBaselineFeatures,
   tacticalProfileSpeedBaselineFeatures
 } from "../packages/core/src/index.ts";
+import {
+  decodeUciMoveLine
+} from "../packages/storage/src/puzzle-pack-binary-codec.ts";
+import {
+  readPackRowEncoding
+} from "./generate-offline-puzzle-fixture.mjs";
 
 const EPSILON = 1e-9;
 const REQUIRED_DECISION_EVIDENCE = [
@@ -667,6 +673,7 @@ function posteriorFixture(name, count, outcomeForIndex) {
 }
 
 function joinCanonicalObservations(exports, database) {
+  const packRowEncoding = readPackRowEncoding(database);
   const sessions = new Map();
   const attempts = [];
   for (const progress of exports) {
@@ -769,7 +776,10 @@ function joinCanonicalObservations(exports, database) {
       elapsedMs: attempt.elapsedMs,
       decisionCount: config.mode === "arrow_duel"
         ? 1
-        : Math.max(1, Math.ceil(String(puzzle.solutionMoves).trim().split(/\s+/).length / 2))
+        : puzzleSolutionDecisionCount(
+            puzzle.solutionMoves,
+            packRowEncoding
+          )
     });
   }
   return {
@@ -781,6 +791,13 @@ function joinCanonicalObservations(exports, database) {
     ),
     inputAttemptCount: attempts.length
   };
+}
+
+export function puzzleSolutionDecisionCount(solutionMoves, rowEncoding) {
+  const moveCount = rowEncoding === "binary-v1"
+    ? decodeUciMoveLine(solutionMoves).length
+    : String(solutionMoves).trim().split(/\s+/u).filter(Boolean).length;
+  return Math.max(1, Math.ceil(moveCount / 2));
 }
 
 export function assertCalibrationArtifactMatchesReport(
