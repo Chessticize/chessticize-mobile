@@ -73,6 +73,13 @@ async function advanceArrowDuelGuide(
   }
 }
 
+async function openArrowDuelChoice(canvasElement: HTMLElement): Promise<void> {
+  await clickTestId(canvasElement, "practice-mode-arrow-duel");
+  await clickTestId(canvasElement, "practice-start-button");
+  await waitForTestId(canvasElement, "arrow-duel-reply-challenge");
+  await waitForEnabledTestId(canvasElement, "lab-board-correct");
+}
+
 function expectFullScreenStoryId(canvasElement: HTMLElement, storyId: string): void {
   const link = Array.from(canvasElement.ownerDocument.querySelectorAll("a")).find(
     (candidate) => candidate.textContent === "Full-screen URL"
@@ -143,8 +150,28 @@ export const CustomSetup: Story = {
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-add-run");
     await waitForTestId(canvasElement, "practice-run-editor");
+    await expectTestIdText(
+      canvasElement,
+      "practice-run-theme-selection-detail",
+      "All themes"
+    );
+    expectTestIdAbsent(canvasElement, "custom-theme-fork");
+    await clickTestId(canvasElement, "practice-run-theme-disclosure");
     await clickTestId(canvasElement, "custom-theme-fork");
     await clickTestId(canvasElement, "custom-theme-pin");
+    await expectTestIdText(
+      canvasElement,
+      "practice-run-theme-selection-detail",
+      "Fork · Pin"
+    );
+    await clickTestId(canvasElement, "custom-theme-mixed");
+    await expectTestIdText(
+      canvasElement,
+      "practice-run-theme-selection-detail",
+      "All themes"
+    );
+    await clickTestId(canvasElement, "practice-run-theme-disclosure");
+    expectTestIdAbsent(canvasElement, "custom-theme-fork");
     await waitForTestId(canvasElement, "practice-run-pass-rules");
     await waitForTestId(canvasElement, "practice-run-slow-warning");
     await waitForTestId(canvasElement, "practice-run-puzzle-timeout");
@@ -154,6 +181,24 @@ export const CustomSetup: Story = {
     await clickTestId(canvasElement, "practice-run-slow-warning-decrease");
     await waitForText(canvasElement, "0:55");
     await clickTestId(canvasElement, "practice-run-puzzle-timeout-toggle");
+  }
+};
+
+export const CreateArrowDuelReplySetting: Story = {
+  name: "New Run · Arrow Duel reply",
+  args: {
+    scenarioId: "practice-custom-setup",
+    storyPresentation: {
+      storyId: "practice--create-arrow-duel-reply-setting",
+      title: "New Run · Arrow Duel reply"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-add-run");
+    await clickTestId(canvasElement, "custom-mode-arrow-duel");
+    await waitForTestId(canvasElement, "practice-run-arrow-duel-reply-setting");
+    await expectTestIdText(canvasElement, "practice-run-arrow-duel-reply-value", "On");
+    await waitForText(canvasElement, "Defaults to 5 seconds. Maximum 10.");
   }
 };
 
@@ -178,6 +223,63 @@ export const BuiltInRunEditor: Story = {
     await waitForTestId(canvasElement, "practice-run-pass-rules");
     await waitForTestId(canvasElement, "practice-run-slow-warning");
     await waitForTestId(canvasElement, "practice-run-puzzle-timeout");
+  }
+};
+
+export const ArrowDuelReplySetting: Story = {
+  name: "Arrow Duel Run editor · reply on",
+  args: { scenarioId: "practice-run-arrow-duel-editor" },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-run-home-edit");
+    await clickTestId(canvasElement, "practice-run-edit-arrow-duel");
+    await waitForTestId(canvasElement, "practice-run-arrow-duel-reply-setting");
+    await expectTestIdText(canvasElement, "practice-run-arrow-duel-reply-value", "On");
+    await waitForText(
+      canvasElement,
+      "The Sprint and puzzle clocks pause when the reply begins."
+    );
+    await waitForText(
+      canvasElement,
+      "Find the reply quickly to show you understand the opponent's counterattack."
+    );
+    await waitForTestId(canvasElement, "practice-run-arrow-duel-reply-seconds");
+  }
+};
+
+export const ArrowDuelReplyCustomTime: Story = {
+  name: "Arrow Duel Run editor · custom reply time",
+  args: {
+    scenarioId: "practice-run-arrow-duel-editor",
+    storyPresentation: {
+      storyId: "practice--arrow-duel-reply-custom-time",
+      title: "Arrow Duel Run editor · custom reply time"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-run-home-edit");
+    await clickTestId(canvasElement, "practice-run-edit-arrow-duel");
+    await replaceTextTestId(
+      canvasElement,
+      "practice-run-arrow-duel-reply-seconds",
+      "8"
+    );
+  }
+};
+
+export const ArrowDuelRunEditorReplyOff: Story = {
+  name: "Arrow Duel Run editor · reply off",
+  args: {
+    scenarioId: "practice-run-arrow-duel-editor",
+    storyPresentation: {
+      storyId: "practice--arrow-duel-run-editor-reply-off",
+      title: "Arrow Duel Run editor · reply off"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-run-home-edit");
+    await clickTestId(canvasElement, "practice-run-edit-arrow-duel");
+    await clickTestId(canvasElement, "practice-run-arrow-duel-reply-toggle");
+    await expectTestIdText(canvasElement, "practice-run-arrow-duel-reply-value", "Off");
   }
 };
 
@@ -356,6 +458,7 @@ export const ArrowDuelGuide: Story = {
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
     await waitForTestId(canvasElement, "session-abandon");
     await waitForText(canvasElement, "5 of 5");
+    await waitForText(canvasElement, "Choose, then prove it");
     expectFullScreenStoryId(canvasElement, ARROW_DUEL_GUIDE_PRESENTATIONS.arrowDuel.storyId);
     await centerTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     expectTestIdAbsent(canvasElement, "session-board");
@@ -372,6 +475,7 @@ export const ArrowDuelGuideOnly: Story = {
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
     await waitForTestId(canvasElement, "session-abandon");
     await waitForText(canvasElement, "1 of 1");
+    await waitForText(canvasElement, "Choose, then prove it");
     await centerTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     expectTestIdAbsent(canvasElement, "practice-active-session-guide");
     expectTestIdAbsent(canvasElement, "session-board");
@@ -491,12 +595,134 @@ export const UnclearFollowUp: Story = {
 };
 
 export const ArrowDuelPrompt: Story = {
-  name: "Arrow Duel prompt card",
+  name: "Arrow Duel · opponent reply",
   args: { scenarioId: "practice-arrow-duel-prompt" },
   play: async ({ canvasElement }) => {
-    await clickTestId(canvasElement, "practice-mode-arrow-duel");
-    await clickTestId(canvasElement, "practice-start-button");
-    await waitForTestId(canvasElement, "session-board");
+    await openArrowDuelChoice(canvasElement);
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForText(canvasElement, "Find the reply");
+    await expectTestIdText(canvasElement, "arrow-duel-reply-timer", "0:05");
+    await expectTestIdAbsent(canvasElement, "arrow-duel-reply-sprint-paused");
+  }
+};
+
+export const ArrowDuelReplyCustomTimer: Story = {
+  name: "Arrow Duel · custom reply timer",
+  args: {
+    arrowDuelReplySeconds: 8,
+    scenarioId: "practice-arrow-duel-prompt",
+    storyPresentation: {
+      storyId: "practice--arrow-duel-reply-custom-timer",
+      title: "Arrow Duel · custom reply timer"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await openArrowDuelChoice(canvasElement);
+    await clickTestId(canvasElement, "lab-board-correct");
+    await expectTestIdText(canvasElement, "arrow-duel-reply-timer", "0:08");
+  }
+};
+
+export const ArrowDuelChoice: Story = {
+  name: "Arrow Duel · choose the best move",
+  args: {
+    scenarioId: "practice-arrow-duel-prompt",
+    storyPresentation: {
+      storyId: "practice--arrow-duel-choice",
+      title: "Arrow Duel · choose the best move"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await openArrowDuelChoice(canvasElement);
+    await waitForText(canvasElement, "Choose correctly to unlock the reply.");
+    await waitForTestId(canvasElement, "arrow-duel-candidate-overlay");
+  }
+};
+
+export const ArrowDuelReplyCorrect: Story = {
+  name: "Arrow Duel · reply correct",
+  args: {
+    scenarioId: "practice-arrow-duel-prompt",
+    storyPresentation: {
+      storyId: "practice--arrow-duel-reply-correct",
+      title: "Arrow Duel · reply correct"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await openArrowDuelChoice(canvasElement);
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForText(canvasElement, "Find the reply");
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForTestId(canvasElement, "move-feedback-overlay");
+    await waitForText(canvasElement, "Choose the best move");
+  }
+};
+
+export const ArrowDuelWrongChoice: Story = {
+  name: "Arrow Duel · wrong choice",
+  args: {
+    scenarioId: "practice-arrow-duel-prompt",
+    storyPresentation: {
+      storyId: "practice--arrow-duel-wrong-choice",
+      title: "Arrow Duel · wrong choice"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await openArrowDuelChoice(canvasElement);
+    await clickTestId(canvasElement, "lab-board-wrong");
+    await waitForTestId(canvasElement, "move-feedback-overlay");
+    await waitForText(canvasElement, "Choose the best move");
+  }
+};
+
+export const ArrowDuelWrongReply: Story = {
+  name: "Arrow Duel · wrong reply",
+  args: {
+    scenarioId: "practice-arrow-duel-prompt",
+    storyPresentation: {
+      storyId: "practice--arrow-duel-wrong-reply",
+      title: "Arrow Duel · wrong reply"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await openArrowDuelChoice(canvasElement);
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForText(canvasElement, "Find the reply");
+    await clickTestId(canvasElement, "lab-board-wrong");
+    await waitForTestId(canvasElement, "move-feedback-overlay");
+    await waitForText(canvasElement, "Choose the best move");
+  }
+};
+
+export const ArrowDuelReplyTimeout: Story = {
+  name: "Arrow Duel · reply timeout",
+  args: {
+    arrowDuelReplyAutoTimeoutMs: 750,
+    scenarioId: "practice-arrow-duel-prompt",
+    storyPresentation: {
+      storyId: "practice--arrow-duel-reply-timeout",
+      title: "Arrow Duel · reply timeout"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await openArrowDuelChoice(canvasElement);
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForTestId(canvasElement, "session-puzzle-timeout-overlay");
+    await waitForText(canvasElement, "Timed out");
+    await waitForText(canvasElement, "Choose the best move");
+  }
+};
+
+export const ArrowDuelReplyAlternateMate: Story = {
+  name: "Arrow Duel · alternate mate in one",
+  args: { scenarioId: "practice-arrow-duel-mate-in-one" },
+  play: async ({ canvasElement }) => {
+    await openArrowDuelChoice(canvasElement);
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForText(canvasElement, "Find the reply");
+    await waitForEnabledTestId(canvasElement, "lab-board-alternate-mate");
+    await clickTestId(canvasElement, "lab-board-alternate-mate");
+    await waitForTestId(canvasElement, "move-feedback-overlay");
   }
 };
 

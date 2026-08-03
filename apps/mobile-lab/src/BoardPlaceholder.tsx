@@ -65,11 +65,27 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
     entryPreviewPlan(fen) ? "watching" : "idle"
   );
   const [animatedPreviewMove, setAnimatedPreviewMove] = useState<AnimatedPreviewMove | null>(null);
+  const [overlayLocked, setOverlayLocked] = useState(false);
+  const [replyExpectedMove, setReplyExpectedMove] = useState<string | undefined>(undefined);
   const [previewLastMove, setPreviewLastMove] = useState<BoardMove | null>(null);
   const [previewReplayToken, setPreviewReplayToken] = useState(0);
   const previewProgress = useRef(new Animated.Value(0)).current;
   const previewedKeyRef = useRef<string | null>(null);
   const previewMoveWaitersRef = useRef<Array<(move: BoardMove | undefined) => void>>([]);
+
+  useEffect(() => {
+    const nextLocked = Boolean(
+      labDocument()?.querySelector('[data-testid="board-input-blocker"]')
+    );
+    const nextReplyExpectedMove = labDocument()
+      ?.querySelector('[data-testid="arrow-duel-reply-expected-move"]')
+      ?.textContent
+      ?.trim() || undefined;
+    setOverlayLocked((current) => (current === nextLocked ? current : nextLocked));
+    setReplyExpectedMove((current) => (
+      current === nextReplyExpectedMove ? current : nextReplyExpectedMove
+    ));
+  });
 
   useEffect(() => {
     const plan = entryPreviewPlan(fen);
@@ -206,9 +222,14 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
     })),
     []
   );
-  const expected = expectedMoveForLab();
+  const expected = replyExpectedMove ?? expectedMoveForLab();
+  const alternateMate = replyExpectedMove
+    ? firstDifferentImmediateMate(chessRef.current, expected)
+    : undefined;
   const previewPlan = entryPreviewPlan(fen);
-  const locked = isInputLocked(gestureEnabled) || entryPreviewPhase === "watching";
+  const locked = overlayLocked
+    || isInputLocked(gestureEnabled)
+    || entryPreviewPhase === "watching";
   const animatedMoveGeometry = animatedPreviewMove
     ? previewMoveGeometry(animatedPreviewMove, boardSize, flipped)
     : null;
@@ -274,7 +295,7 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
             label="Wrong move"
             testID="lab-board-wrong"
             onPress={() => {
-              const wrongMove = firstDifferentLegalMove(chessRef.current, expected);
+              const wrongMove = wrongMoveForLab(chessRef.current, expected);
               if (wrongMove) {
                 void playMove(wrongMove);
               }
@@ -290,6 +311,16 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
               }
             }}
           />
+          {alternateMate ? (
+            <LabButton
+              disabled={locked}
+              label="Alternate mate"
+              testID="lab-board-alternate-mate"
+              onPress={() => {
+                void playMove(alternateMate);
+              }}
+            />
+          ) : null}
           {previewPlan ? (
             <LabButton
               disabled={entryPreviewPhase !== "ready"}
@@ -363,18 +394,39 @@ function LabButton({
 }
 
 function expectedMoveForLab(): string | undefined {
-  const activePuzzle = getLabPracticeService()?.getActiveSprint()?.currentPuzzle;
+  const replyExpectedMove = labTestText("arrow-duel-reply-expected-move");
+  if (replyExpectedMove) {
+    return replyExpectedMove;
+  }
+  const activePuzzle = activeLabPuzzle();
   if (activePuzzle?.kind === "arrow_duel") {
     return activePuzzle.correctMove;
   }
   if (activePuzzle?.kind === "line") {
     return currentExpectedMove(activePuzzle);
   }
-  const reviewExpectedMove = labDocument()
-    ?.querySelector('[data-testid="review-current-expected-move"]')
-    ?.textContent
-    ?.trim();
+  const reviewExpectedMove = labTestText("review-current-expected-move");
   return reviewExpectedMove || undefined;
+}
+
+function wrongMoveForLab(chess: Chess, expected: string | undefined): BoardMove | undefined {
+  const replyChallengeActive = Boolean(labTestText("arrow-duel-reply-expected-move"));
+  const activePuzzle = activeLabPuzzle();
+  if (!replyChallengeActive && activePuzzle?.kind === "arrow_duel") {
+    return parseUci(activePuzzle.wrongMove);
+  }
+  return firstDifferentLegalMove(chess, expected);
+}
+
+function activeLabPuzzle() {
+  return getLabPracticeService()?.getActiveSprint()?.currentPuzzle;
+}
+
+function labTestText(testID: string): string | undefined {
+  return labDocument()
+    ?.querySelector(`[data-testid="${testID}"]`)
+    ?.textContent
+    ?.trim() || undefined;
 }
 
 function firstDifferentLegalMove(chess: Chess, expected: string | undefined): BoardMove | undefined {
@@ -390,6 +442,37 @@ function firstDifferentLegalMove(chess: Chess, expected: string | undefined): Bo
     to: candidate.to,
     ...(candidate.promotion ? { promotion: candidate.promotion } : {})
   };
+}
+
+function firstDifferentImmediateMate(
+  chess: Chess,
+  expected: string | undefined
+): BoardMove | undefined {
+  const expectedNormalized = expected?.toLowerCase();
+  for (const move of chess.moves({ verbose: true })) {
+    const uci = `${move.from}${move.to}${move.promotion ?? ""}`.toLowerCase();
+    if (uci === expectedNormalized) {
+      continue;
+    }
+    const candidate = createChess(chess.fen());
+    try {
+      candidate.move({
+        from: move.from,
+        to: move.to,
+        ...(move.promotion ? { promotion: move.promotion } : {})
+      });
+    } catch {
+      continue;
+    }
+    if (candidate.isCheckmate()) {
+      return {
+        from: move.from,
+        to: move.to,
+        ...(move.promotion ? { promotion: move.promotion } : {})
+      };
+    }
+  }
+  return undefined;
 }
 
 function parseUci(move: string): BoardMove {
