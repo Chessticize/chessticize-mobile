@@ -4662,6 +4662,8 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "play-again-button");
 
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("03:00");
     expect(service.getActiveSprint()).toMatchObject({
       status: "active",
       config: {

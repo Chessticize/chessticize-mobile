@@ -4445,11 +4445,7 @@ export function PracticePocScreen({
                           return;
                         }
                         if (state.run) {
-                          startSprint(
-                            state.config.mode,
-                            state.run.kind === "custom",
-                            state.run.id
-                          );
+                          startPracticeRun(state.run.id);
                           return;
                         }
                         startSprint(state.config.mode);
