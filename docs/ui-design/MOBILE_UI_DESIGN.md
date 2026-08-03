@@ -357,6 +357,10 @@ Arrow Duel active-session rules:
   as solved.
 - A wrong candidate, wrong reply, or reply timeout makes the whole puzzle wrong
   and adds it to Review. The reply step gives no partial credit.
+- Correct and wrong terminal moves use the same brief green or red board
+  feedback as Standard Sprint, then advance automatically without a separate
+  `Solved`, missed-choice, missed-reply, or Review message in the prompt. Reply
+  timeout keeps only the ordinary brief `Timed out` overlay before advancing.
 - The Sprint and puzzle clocks pause when the reply begins. The reply clock and
   its board handoff do not advance the Sprint deadline, puzzle elapsed time,
   Slow threshold, or puzzle Timeout threshold.

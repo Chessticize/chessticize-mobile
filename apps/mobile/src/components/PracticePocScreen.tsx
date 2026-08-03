@@ -354,11 +354,7 @@ type SessionFeedback = PuzzleFeedback | null;
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
 type ArrowDuelReplyChallengePhase =
   | "choice"
-  | "reply"
-  | "correct"
-  | "wrong_choice"
-  | "wrong_reply"
-  | "reply_timeout";
+  | "reply";
 type HistoryRatingRangeFilter = "all" | "under1000" | "1000-1399" | "1400-plus";
 type HistoryResultFilter = "all" | HistoryResult;
 type CustomThemeFilter = string;
@@ -699,6 +695,8 @@ export function PracticePocScreen({
   const stateRef = useRef<SprintState | null>(null);
   const boardFenRef = useRef<string | null>(null);
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
+  const arrowDuelReplyPuzzleElapsedSecondsRef = useRef(0);
+  const arrowDuelReplyChallengeTimeoutHandlerRef = useRef<() => void>(() => undefined);
   const nowMsRef = useRef<number>(currentTimeMs());
   const reviewBackCommandIdRef = useRef(0);
   const { fontScale, height, width } = useWindowDimensions();
@@ -2101,9 +2099,16 @@ export function PracticePocScreen({
         }
         if (normalizeUci(move) !== normalizeUci(submittedPuzzle.correctMove)) {
           playCommittedMoveFeedback("user", move, submittedPuzzle.currentFen);
-          commitBoardFen(result.state?.fen ?? submittedPuzzle.currentFen);
+          const submittedMoveFen = result.state?.fen ?? submittedPuzzle.currentFen;
+          commitBoardFen(submittedMoveFen);
           setLastBoardMove(moveArrow);
-          setArrowDuelReplyChallengePhase("wrong_choice");
+          finalizeArrowDuelReplyChallengePreview({
+            expectedMove: submittedPuzzle.correctMove,
+            result: "wrong",
+            submittedFen: submittedPuzzle.currentFen,
+            submittedMove: move,
+            submittedMoveFen
+          });
           return;
         }
         const replyFen = fenAfterMove(submittedPuzzle.currentFen, submittedPuzzle.wrongMove);
@@ -2122,10 +2127,19 @@ export function PracticePocScreen({
         boardRef.current?.resetBoard(replyFen);
         commitBoardFen(replyFen);
         setLastBoardMove(arrowFromTo(submittedPuzzle.wrongMove));
+        const replyStartedAtMs = currentTimeMs();
+        const puzzleStartedAtMs = stateRef.current?.currentPuzzleStartedAt
+          ? new Date(stateRef.current.currentPuzzleStartedAt).getTime()
+          : replyStartedAtMs;
+        arrowDuelReplyPuzzleElapsedSecondsRef.current = Math.max(
+          0,
+          Math.floor((replyStartedAtMs - puzzleStartedAtMs) / 1000)
+        );
         setArrowDuelReplyChallengePhase("reply");
         return;
       }
       if (arrowDuelReplyChallengePhase === "reply") {
+        const submittedFen = boardFenRef.current ?? submittedPuzzle.currentFen;
         const expectedReply = submittedPuzzle.puzzle.solutionMoves[1] ?? null;
         let isImmediateMate = false;
         try {
@@ -2139,19 +2153,19 @@ export function PracticePocScreen({
           expectedReply
           && normalizeUci(move) === normalizeUci(expectedReply)
         ) || isImmediateMate;
-        playCommittedMoveFeedback("user", move, boardFenRef.current);
-        commitBoardFen(result.state?.fen ?? boardFenRef.current);
+        const submittedMoveFen = result.state?.fen ?? submittedFen;
+        playCommittedMoveFeedback("user", move, submittedFen);
+        commitBoardFen(submittedMoveFen);
         setLastBoardMove(moveArrow);
-        setArrowDuelReplyChallengePhase(isAcceptedReply ? "correct" : "wrong_reply");
+        finalizeArrowDuelReplyChallengePreview({
+          expectedMove: expectedReply ?? submittedPuzzle.correctMove,
+          result: isAcceptedReply ? "correct" : "wrong",
+          submittedFen,
+          submittedMove: move,
+          submittedMoveFen
+        });
         return;
       }
-      resetBoardToFen(
-        boardFenRef.current,
-        "arrow-duel-reply-preview-complete",
-        submittedPuzzleId,
-        move
-      );
-      return;
     }
     const submittedFen = submittedPuzzle?.currentFen ?? boardFenRef.current ?? null;
     if (submittedPuzzle?.kind === "arrow_duel" && !isArrowDuelCandidate(submittedPuzzle.candidates, move)) {
@@ -2209,6 +2223,76 @@ export function PracticePocScreen({
       submittedPuzzle,
       submittedPuzzleId
     });
+  }
+
+  function finalizeArrowDuelReplyChallengePreview({
+    expectedMove,
+    result,
+    submittedFen,
+    submittedMove,
+    submittedMoveFen
+  }: {
+    expectedMove: string;
+    result: "correct" | "timed_out" | "wrong";
+    submittedFen: string;
+    submittedMove: string | null;
+    submittedMoveFen: string | null;
+  }): void {
+    const activeState = stateRef.current;
+    const submittedPuzzle = activeState?.currentPuzzle;
+    if (activeState?.status !== "active" || submittedPuzzle?.kind !== "arrow_duel") {
+      return;
+    }
+
+    const submittedPuzzleId = submittedPuzzle.puzzle.id;
+    const proxyMove = result === "correct"
+      ? submittedPuzzle.correctMove
+      : submittedPuzzle.wrongMove;
+    commitBoardInputLocked(true, "arrow-duel-reply-preview-result", submittedPuzzleId);
+
+    try {
+      const next = service.submitMove(proxyMove, captureLiveNowIso());
+      commitState(next.state);
+      setArrowDuelReplyChallengePhase("choice");
+
+      if (result === "timed_out") {
+        setFeedback(null);
+        setFeedbackPuzzleId(null);
+        showTimeoutSnapshot(
+          next.state,
+          submittedPuzzle,
+          submittedFen,
+          arrowDuelReplyPuzzleElapsedSecondsRef.current
+        );
+        return;
+      }
+
+      const serviceFeedback = (next.feedback as SessionFeedback) ?? null;
+      const previewFeedback = serviceFeedback
+        ? {
+            ...serviceFeedback,
+            currentFen: submittedMoveFen ?? submittedFen,
+            expectedMove,
+            puzzleSolved: result === "correct",
+            result,
+            submittedMove: submittedMove ?? proxyMove
+          }
+        : null;
+      setFeedback(previewFeedback);
+      setFeedbackPuzzleId(submittedPuzzleId);
+      syncFeedbackSnapshot(
+        next.state,
+        previewFeedback,
+        submittedPuzzle,
+        submittedFen,
+        submittedPuzzleId
+      );
+      boardVisualFenRef.current = submittedMoveFen;
+      syncBoardAfterMove(next.state, previewFeedback, submittedPuzzleId);
+    } catch (caught) {
+      commitBoardInputLocked(false, "arrow-duel-reply-preview-result-error", submittedPuzzleId);
+      setError(errorMessage(caught));
+    }
   }
 
   async function submitAcceptedMove({
@@ -2946,8 +3030,23 @@ export function PracticePocScreen({
       && currentPuzzle?.kind === "arrow_duel"
   );
   useEffect(() => {
+    arrowDuelReplyPuzzleElapsedSecondsRef.current = 0;
     setArrowDuelReplyChallengePhase("choice");
   }, [currentPuzzle?.puzzle.id]);
+  arrowDuelReplyChallengeTimeoutHandlerRef.current = () => {
+    const timeoutPuzzle = stateRef.current?.currentPuzzle;
+    if (timeoutPuzzle?.kind !== "arrow_duel") {
+      return;
+    }
+    finalizeArrowDuelReplyChallengePreview({
+      expectedMove: timeoutPuzzle.puzzle.solutionMoves[1]
+        ?? timeoutPuzzle.correctMove,
+      result: "timed_out",
+      submittedFen: boardFenRef.current ?? timeoutPuzzle.currentFen,
+      submittedMove: null,
+      submittedMoveFen: null
+    });
+  };
   useEffect(() => {
     if (
       !arrowDuelReplyChallengeVisible
@@ -2957,7 +3056,7 @@ export function PracticePocScreen({
       return undefined;
     }
     const timer = setTimeout(() => {
-      setArrowDuelReplyChallengePhase("reply_timeout");
+      arrowDuelReplyChallengeTimeoutHandlerRef.current();
     }, arrowDuelReplyChallengeDesign.autoTimeoutMs);
     return () => clearTimeout(timer);
   }, [
@@ -3536,20 +3635,8 @@ export function PracticePocScreen({
       onResume={isPaused && state ? () => resumeSprint(state) : undefined}
     />
   ) : null;
-  const arrowDuelReplyPreviewScoredState = state?.status === "active"
-    && arrowDuelReplyChallengeVisible
-    && arrowDuelReplyChallengePhase !== "choice"
-    && arrowDuelReplyChallengePhase !== "reply"
-    ? {
-        ...state,
-        correctCount: state.correctCount
-          + (arrowDuelReplyChallengePhase === "correct" ? 1 : 0),
-        mistakeCount: state.mistakeCount
-          + (arrowDuelReplyChallengePhase === "correct" ? 0 : 1)
-      }
-    : state;
-  const sessionScoreNode = arrowDuelReplyPreviewScoredState?.status === "active" ? (
-    <SessionScoreStrip compact={sessionUsesRail} state={arrowDuelReplyPreviewScoredState} />
+  const sessionScoreNode = state?.status === "active" ? (
+    <SessionScoreStrip compact={sessionUsesRail} state={state} />
   ) : null;
   const pausedSessionNode = isPaused && state ? (
     <PausedSessionPanel
@@ -9130,40 +9217,12 @@ function ArrowDuelReplyChallengePrompt({
         title: "Choose the best move",
         tone: "neutral" as const
       }
-    : phase === "reply"
-      ? {
-          context: "If the tempting move was played, what happens next?",
-          hint: null,
-          title: "Find the reply",
-          tone: "reply" as const
-        }
-      : phase === "correct"
-        ? {
-            context: null,
-            hint: null,
-            title: "Solved",
-            tone: "neutral" as const
-          }
-        : phase === "wrong_choice"
-          ? {
-              context: "The other arrow was stronger.",
-              hint: "One mistake · added to Review.",
-              title: "Choice missed",
-              tone: "wrong" as const
-            }
-          : phase === "reply_timeout"
-            ? {
-                context: `The ${replySeconds}-second reply window expired.`,
-                hint: "One mistake · added to Review.",
-                title: "Reply timed out",
-                tone: "wrong" as const
-              }
-            : {
-                context: "That reply does not refute the tempting move.",
-                hint: "One mistake · added to Review.",
-                title: "Reply missed",
-                tone: "wrong" as const
-              };
+    : {
+        context: "If the tempting move was played, what happens next?",
+        hint: null,
+        title: "Find the reply",
+        tone: "reply" as const
+      };
 
   return (
     <View
@@ -9171,8 +9230,7 @@ function ArrowDuelReplyChallengePrompt({
       style={[
         styles.promptPanel,
         styles.arrowDuelReplyPromptPanel,
-        copy.tone === "reply" ? styles.arrowDuelReplyPromptActive : null,
-        copy.tone === "wrong" ? styles.arrowDuelReplyPromptWrong : null
+        copy.tone === "reply" ? styles.arrowDuelReplyPromptActive : null
       ]}
       testID="arrow-duel-reply-challenge"
     >
@@ -9210,10 +9268,7 @@ function ArrowDuelReplyChallengePrompt({
         ) : null}
         {copy.hint ? (
           <Text
-            style={[
-              styles.promptHint,
-              copy.tone === "wrong" ? styles.arrowDuelReplyHintWrong : null
-            ]}
+            style={styles.promptHint}
             testID="arrow-duel-reply-hint"
           >
             {copy.hint}
@@ -17603,10 +17658,6 @@ const styles = StyleSheet.create({
     height: 72,
     width: "100%"
   },
-  arrowDuelReplyPromptWrong: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FCA5A5"
-  },
   arrowDuelReplyTitleRow: {
     alignItems: "flex-start",
     flexDirection: "row",
@@ -17631,9 +17682,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 3,
     textAlign: "center"
-  },
-  arrowDuelReplyHintWrong: {
-    color: "#B91C1C"
   },
   unclearPrompt: {
     alignItems: "center",

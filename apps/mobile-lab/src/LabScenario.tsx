@@ -762,6 +762,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "practice-unclear-follow-up":
       screenProps.arrowDuelTargetCorrect = 2;
       break;
+    case "practice-arrow-duel-prompt":
+      screenProps.arrowDuelTargetCorrect = 2;
+      break;
     case "practice-preparing":
     case "system-loading":
       screenProps.sprintStartDelayMs = 60_000;

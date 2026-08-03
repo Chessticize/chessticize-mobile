@@ -653,7 +653,8 @@ export const ArrowDuelReplyCorrect: Story = {
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForText(canvasElement, "Find the reply");
     await clickTestId(canvasElement, "lab-board-correct");
-    await expectTestIdText(canvasElement, "arrow-duel-reply-challenge", "Solved");
+    await waitForTestId(canvasElement, "move-feedback-overlay");
+    await waitForText(canvasElement, "Choose the best move");
   }
 };
 
@@ -669,8 +670,8 @@ export const ArrowDuelWrongChoice: Story = {
   play: async ({ canvasElement }) => {
     await openArrowDuelChoice(canvasElement);
     await clickTestId(canvasElement, "lab-board-wrong");
-    await waitForText(canvasElement, "Choice missed");
-    await waitForText(canvasElement, "One mistake · added to Review.");
+    await waitForTestId(canvasElement, "move-feedback-overlay");
+    await waitForText(canvasElement, "Choose the best move");
   }
 };
 
@@ -688,8 +689,8 @@ export const ArrowDuelWrongReply: Story = {
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForText(canvasElement, "Find the reply");
     await clickTestId(canvasElement, "lab-board-wrong");
-    await waitForText(canvasElement, "Reply missed");
-    await waitForText(canvasElement, "One mistake · added to Review.");
+    await waitForTestId(canvasElement, "move-feedback-overlay");
+    await waitForText(canvasElement, "Choose the best move");
   }
 };
 
@@ -706,8 +707,9 @@ export const ArrowDuelReplyTimeout: Story = {
   play: async ({ canvasElement }) => {
     await openArrowDuelChoice(canvasElement);
     await clickTestId(canvasElement, "lab-board-correct");
-    await waitForText(canvasElement, "Reply timed out");
-    await waitForText(canvasElement, "One mistake · added to Review.");
+    await waitForTestId(canvasElement, "session-puzzle-timeout-overlay");
+    await waitForText(canvasElement, "Timed out");
+    await waitForText(canvasElement, "Choose the best move");
   }
 };
 
@@ -720,7 +722,7 @@ export const ArrowDuelReplyAlternateMate: Story = {
     await waitForText(canvasElement, "Find the reply");
     await waitForEnabledTestId(canvasElement, "lab-board-alternate-mate");
     await clickTestId(canvasElement, "lab-board-alternate-mate");
-    await expectTestIdText(canvasElement, "arrow-duel-reply-challenge", "Solved");
+    await waitForTestId(canvasElement, "move-feedback-overlay");
   }
 };
 

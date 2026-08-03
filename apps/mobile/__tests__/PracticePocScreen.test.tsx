@@ -2376,10 +2376,11 @@ describe("PracticePocScreen", () => {
     ))).toContain("Defaults to 5 seconds. Maximum 10.");
   });
 
-  it("previews whole-puzzle scoring for choice, reply, and reply timeout", async () => {
+  it("previews Standard-style outcome feedback and automatic advance", async () => {
     const correct = renderLabScenario("practice-arrow-duel-prompt");
     startArrowDuelSprint(correct);
     const correctState = requireLabArrowDuelState();
+    const correctPuzzleId = correctState.puzzle.id;
 
     await boardMove(correct, correctState.correctMove);
     expect(collectText(findByTestId(correct, "arrow-duel-reply-challenge"))).toContain(
@@ -2398,16 +2399,17 @@ describe("PracticePocScreen", () => {
     }));
     expect(() => findByTestId(correct, "arrow-duel-reply-hint")).toThrow();
     await boardMove(correct, correctState.puzzle.solutionMoves[1]!);
-    const solvedPrompt = findByTestId(correct, "arrow-duel-reply-challenge");
-    expect(collectVisibleText(solvedPrompt)).toBe("Solved");
-    expect(flattenTestStyle(solvedPrompt.props.style)).toEqual(expect.objectContaining({
-      backgroundColor: "#FFFFFF",
-      borderColor: "#E2E8F0"
-    }));
+    expect(collectText(correct.root)).not.toContain("Solved");
+    expect(findByTestId(correct, "move-feedback-overlay")).toBeTruthy();
+    expect(hasStyleValue(correct.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
     expect(findByTestId(correct, "session-score-strip").props.accessibilityLabel).toContain(
       "solved 1, mistakes 0"
     );
-    expect(requireLabArrowDuelState().selectedMove).toBeUndefined();
+    await settleFeedbackSnapshot();
+    expect(requireLabArrowDuelState().puzzle.id).not.toBe(correctPuzzleId);
+    expect(collectText(findByTestId(correct, "arrow-duel-reply-challenge"))).toContain(
+      "Choose the best move"
+    );
 
     const customReplyTime = renderLabScenario(
       "practice-arrow-duel-prompt",
@@ -2423,20 +2425,22 @@ describe("PracticePocScreen", () => {
     const wrongChoice = renderLabScenario("practice-arrow-duel-prompt");
     startArrowDuelSprint(wrongChoice);
     const wrongChoiceState = requireLabArrowDuelState();
+    const wrongChoicePuzzleId = wrongChoiceState.puzzle.id;
     await boardMove(wrongChoice, wrongChoiceState.wrongMove);
-    expect(collectText(findByTestId(wrongChoice, "arrow-duel-reply-challenge"))).toContain(
-      "Choice missed"
-    );
-    expect(collectText(findByTestId(wrongChoice, "arrow-duel-reply-challenge"))).toContain(
-      "One mistake · added to Review"
-    );
+    expect(collectText(wrongChoice.root)).not.toContain("Choice missed");
+    expect(collectText(wrongChoice.root)).not.toContain("One mistake · added to Review");
+    expect(findByTestId(wrongChoice, "move-feedback-overlay")).toBeTruthy();
+    expect(hasStyleValue(wrongChoice.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
     expect(findByTestId(wrongChoice, "session-score-strip").props.accessibilityLabel).toContain(
       "solved 0, mistakes 1"
     );
+    await settleFeedbackSnapshot();
+    expect(requireLabArrowDuelState().puzzle.id).not.toBe(wrongChoicePuzzleId);
 
     const wrongReply = renderLabScenario("practice-arrow-duel-prompt");
     startArrowDuelSprint(wrongReply);
     const wrongReplyState = requireLabArrowDuelState();
+    const wrongReplyPuzzleId = wrongReplyState.puzzle.id;
     await boardMove(wrongReply, wrongReplyState.correctMove);
     const replyBoard = findByTestId(wrongReply, "mock-chessboard");
     const replyChess = new Chess(replyBoard.props.fen);
@@ -2449,12 +2453,15 @@ describe("PracticePocScreen", () => {
       wrongReply,
       `${differentReply!.from}${differentReply!.to}${differentReply!.promotion ?? ""}`
     );
-    expect(collectText(findByTestId(wrongReply, "arrow-duel-reply-challenge"))).toContain(
-      "Reply missed"
-    );
+    expect(collectText(wrongReply.root)).not.toContain("Reply missed");
+    expect(collectText(wrongReply.root)).not.toContain("One mistake · added to Review");
+    expect(findByTestId(wrongReply, "move-feedback-overlay")).toBeTruthy();
+    expect(hasStyleValue(wrongReply.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
     expect(findByTestId(wrongReply, "session-score-strip").props.accessibilityLabel).toContain(
       "solved 0, mistakes 1"
     );
+    await settleFeedbackSnapshot();
+    expect(requireLabArrowDuelState().puzzle.id).not.toBe(wrongReplyPuzzleId);
 
     const timeout = renderLabScenario(
       "practice-arrow-duel-prompt",
@@ -2462,16 +2469,23 @@ describe("PracticePocScreen", () => {
     );
     startArrowDuelSprint(timeout);
     const timeoutState = requireLabArrowDuelState();
+    const timeoutPuzzleId = timeoutState.puzzle.id;
     await boardMove(timeout, timeoutState.correctMove);
     act(() => {
       jest.advanceTimersByTime(500);
     });
-    expect(collectText(findByTestId(timeout, "arrow-duel-reply-challenge"))).toContain(
-      "Reply timed out"
+    expect(collectText(timeout.root)).not.toContain("Reply timed out");
+    expect(collectText(findByTestId(timeout, "session-puzzle-timeout-overlay"))).toContain(
+      "Timed out"
+    );
+    expect(collectText(findByTestId(timeout, "session-puzzle-timing-label"))).toBe(
+      "Puzzle 0:00"
     );
     expect(findByTestId(timeout, "session-score-strip").props.accessibilityLabel).toContain(
       "solved 0, mistakes 1"
     );
+    await settleFeedbackSnapshot();
+    expect(requireLabArrowDuelState().puzzle.id).not.toBe(timeoutPuzzleId);
   });
 
   it("accepts an alternate legal mate in one in the sampled reply position", async () => {
@@ -2483,12 +2497,12 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, state.correctMove);
     await boardMove(renderer, "g3g5");
 
-    expect(collectVisibleText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toBe(
-      "Solved"
-    );
-    expect(findByTestId(renderer, "session-score-strip").props.accessibilityLabel).toContain(
-      "solved 1, mistakes 0"
-    );
+    expect(collectText(renderer.root)).not.toContain("Solved");
+    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 / 1");
+    await settleFeedbackSnapshot();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
   });
 
   it("uses semantic first-use guidance without visible tour-step meta copy", () => {

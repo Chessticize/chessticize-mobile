@@ -38,7 +38,8 @@ With Opponent reply on:
 1. Show the two neutral candidate arrows and ask the player to choose the best
    move.
 2. A wrong candidate immediately makes the whole puzzle wrong. Do not ask a
-   second question. Add the failed attempt to Review.
+   second question. Add the failed attempt to Review, show the ordinary brief
+   red move feedback, and advance automatically.
 3. A correct candidate does not complete the puzzle and does not reveal a
    solved result.
 4. Play the tempting candidate on the board. Wait until that presentation is
@@ -48,9 +49,12 @@ With Opponent reply on:
    phase and its board handoff do not advance the Sprint deadline, puzzle
    elapsed time, Slow threshold, or puzzle Timeout threshold.
 6. The whole puzzle is correct only when both the candidate and reply are
-   correct.
+   correct. Show the ordinary brief green move feedback, then advance
+   automatically.
 7. A wrong reply or reply timeout makes the whole puzzle wrong and adds the
-   failed attempt to Review. There is no partial-credit result.
+   failed attempt to Review. A wrong move uses the ordinary brief red feedback;
+   a timeout uses the ordinary brief `Timed out` overlay. Both advance
+   automatically, and there is no partial-credit result.
 
 The configured reply clock is prominent. Do not add a separate "Sprint paused"
 label; the independent timing rule remains part of scoring behavior, while the
@@ -58,8 +62,11 @@ ordinary Sprint and puzzle clocks do not advance until the reply resolves.
 
 The reply challenge reuses the ordinary puzzle prompt position and surface. It
 stays centered at the same full width and fixed 72-point height. The reply
-state explains the position without restating the acceptance rule, and the
-successful state shows only **Solved** on the neutral prompt surface.
+state explains the position without restating the acceptance rule. Once the
+whole puzzle resolves, do not replace that prompt with `Solved`, `Choice
+missed`, `Reply missed`, Review messaging, or any other result copy. Match
+Standard Sprint: the board feedback carries the result during the short handoff
+to the next puzzle.
 
 ## Reply Judgment
 
@@ -101,8 +108,10 @@ their stable Storybook URLs. It covers:
 
 - candidate choice and the correct-choice handoff;
 - the configurable opponent-reply state, defaulting to five seconds;
-- correct reply, wrong reply, and timeout outcomes;
-- automatic Review messaging for both failure stages;
+- Standard-style brief board feedback and automatic advance for correct and
+  wrong replies;
+- the brief ordinary timeout overlay and automatic advance;
+- Review enrollment for both failure stages without redundant result copy;
 - the default-on Create Run and Edit Run control and its off state; and
 - first-use Arrow Duel guidance for the two-stage rule.
 
