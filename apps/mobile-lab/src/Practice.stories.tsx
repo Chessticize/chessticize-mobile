@@ -574,8 +574,7 @@ export const ArrowDuelReplyCorrect: Story = {
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForText(canvasElement, "Find the reply");
     await clickTestId(canvasElement, "lab-board-correct");
-    await waitForText(canvasElement, "Puzzle solved");
-    await waitForText(canvasElement, "This counts as one solved puzzle.");
+    await expectTestIdText(canvasElement, "arrow-duel-reply-challenge", "Solved");
   }
 };
 
@@ -642,7 +641,7 @@ export const ArrowDuelReplyAlternateMate: Story = {
     await waitForText(canvasElement, "Find the reply");
     await waitForEnabledTestId(canvasElement, "lab-board-alternate-mate");
     await clickTestId(canvasElement, "lab-board-alternate-mate");
-    await waitForText(canvasElement, "Puzzle solved");
+    await expectTestIdText(canvasElement, "arrow-duel-reply-challenge", "Solved");
   }
 };
 

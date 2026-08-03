@@ -8981,16 +8981,16 @@ function ArrowDuelReplyChallengePrompt({
     : phase === "reply"
       ? {
           context: "The tempting move was played. What happens next?",
-          hint: "Play the main-line move — or any mate in one.",
+          hint: null,
           title: "Find the reply",
           tone: "reply" as const
         }
       : phase === "correct"
         ? {
-            context: "Best move and reply both correct.",
-            hint: "This counts as one solved puzzle.",
-            title: "Puzzle solved",
-            tone: "correct" as const
+            context: null,
+            hint: null,
+            title: "Solved",
+            tone: "neutral" as const
           }
         : phase === "wrong_choice"
           ? {
@@ -9015,11 +9015,11 @@ function ArrowDuelReplyChallengePrompt({
 
   return (
     <View
-      accessibilityLabel={`${copy.title}. ${copy.context} ${copy.hint}`}
+      accessibilityLabel={[copy.title, copy.context, copy.hint].filter(Boolean).join(". ")}
       style={[
         styles.promptPanel,
+        styles.arrowDuelReplyPromptPanel,
         copy.tone === "reply" ? styles.arrowDuelReplyPromptActive : null,
-        copy.tone === "correct" ? styles.arrowDuelReplyPromptCorrect : null,
         copy.tone === "wrong" ? styles.arrowDuelReplyPromptWrong : null
       ]}
       testID="arrow-duel-reply-challenge"
@@ -9054,19 +9054,22 @@ function ArrowDuelReplyChallengePrompt({
             </View>
           ) : null}
         </View>
-        <Text style={styles.promptText} testID="arrow-duel-reply-context">
-          {copy.context}
-        </Text>
-        <Text
-          style={[
-            styles.promptHint,
-            copy.tone === "correct" ? styles.arrowDuelReplyHintCorrect : null,
-            copy.tone === "wrong" ? styles.arrowDuelReplyHintWrong : null
-          ]}
-          testID="arrow-duel-reply-hint"
-        >
-          {copy.hint}
-        </Text>
+        {copy.context ? (
+          <Text style={styles.promptText} testID="arrow-duel-reply-context">
+            {copy.context}
+          </Text>
+        ) : null}
+        {copy.hint ? (
+          <Text
+            style={[
+              styles.promptHint,
+              copy.tone === "wrong" ? styles.arrowDuelReplyHintWrong : null
+            ]}
+            testID="arrow-duel-reply-hint"
+          >
+            {copy.hint}
+          </Text>
+        ) : null}
         {phase === "reply" ? (
           <Text
             accessibilityElementsHidden
@@ -17446,9 +17449,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#EFF6FF",
     borderColor: "#60A5FA"
   },
-  arrowDuelReplyPromptCorrect: {
-    backgroundColor: "#F0FDF4",
-    borderColor: "#86EFAC"
+  arrowDuelReplyPromptPanel: {
+    alignSelf: "center",
+    height: 72,
+    width: "100%"
   },
   arrowDuelReplyPromptWrong: {
     backgroundColor: "#FEF2F2",
@@ -17484,9 +17488,6 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: "900",
     letterSpacing: 0.25
-  },
-  arrowDuelReplyHintCorrect: {
-    color: "#15803D"
   },
   arrowDuelReplyHintWrong: {
     color: "#B91C1C"

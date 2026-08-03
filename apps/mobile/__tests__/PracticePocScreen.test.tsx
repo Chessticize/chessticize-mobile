@@ -2336,10 +2336,20 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(correct, "arrow-duel-reply-sprint-paused"))).toBe(
       "SPRINT PAUSED"
     );
+    const replyPrompt = findByTestId(correct, "arrow-duel-reply-challenge");
+    expect(flattenTestStyle(replyPrompt.props.style)).toEqual(expect.objectContaining({
+      alignSelf: "center",
+      height: 72,
+      width: "100%"
+    }));
+    expect(() => findByTestId(correct, "arrow-duel-reply-hint")).toThrow();
     await boardMove(correct, correctState.puzzle.solutionMoves[1]!);
-    expect(collectText(findByTestId(correct, "arrow-duel-reply-challenge"))).toContain(
-      "Puzzle solved"
-    );
+    const solvedPrompt = findByTestId(correct, "arrow-duel-reply-challenge");
+    expect(collectVisibleText(solvedPrompt)).toBe("Solved");
+    expect(flattenTestStyle(solvedPrompt.props.style)).toEqual(expect.objectContaining({
+      backgroundColor: "#FFFFFF",
+      borderColor: "#E2E8F0"
+    }));
     expect(findByTestId(correct, "session-score-strip").props.accessibilityLabel).toContain(
       "solved 1, mistakes 0"
     );
@@ -2408,8 +2418,8 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, state.correctMove);
     await boardMove(renderer, "g3g5");
 
-    expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
-      "Puzzle solved"
+    expect(collectVisibleText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toBe(
+      "Solved"
     );
     expect(findByTestId(renderer, "session-score-strip").props.accessibilityLabel).toContain(
       "solved 1, mistakes 0"

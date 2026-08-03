@@ -52,6 +52,11 @@ The UI should make the clock ownership explicit: the five-second reply clock
 is prominent, while the ordinary Sprint and puzzle clocks visibly remain
 paused until the reply resolves.
 
+The reply challenge reuses the ordinary puzzle prompt position and surface. It
+stays centered at the same full width and fixed 72-point height. The reply
+state explains the position without restating the acceptance rule, and the
+successful state shows only **Solved** on the neutral prompt surface.
+
 ## Reply Judgment
 
 The reply passes when either condition is true:
