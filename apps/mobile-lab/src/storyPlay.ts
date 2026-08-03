@@ -100,7 +100,11 @@ export async function dragTestId(
   canvasElement: HTMLElement,
   sourceTestID: string,
   targetTestID: string,
-  onPreview?: () => Promise<void> | void
+  options: {
+    onPickup?: () => Promise<void> | void;
+    onPreview?: () => Promise<void> | void;
+    pointerType?: "mouse" | "touch";
+  } = {}
 ): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   const source = await page.findByTestId(sourceTestID, {}, { timeout: 4_000 });
@@ -112,6 +116,7 @@ export async function dragTestId(
   const sourceRect = source.getBoundingClientRect();
   const targetRect = target.getBoundingClientRect();
   const pointerId = 1;
+  const pointerType = options.pointerType ?? "mouse";
   const dispatchPointerEvent = (
     element: HTMLElement,
     type: string,
@@ -125,13 +130,17 @@ export async function dragTestId(
       clientX: sourceRect.left + sourceRect.width / 2,
       clientY,
       pointerId,
-      pointerType: "mouse"
+      pointerType
     }));
   };
 
   dispatchPointerEvent(source, "pointerdown", sourceRect.top + sourceRect.height / 2, 1);
+  if (pointerType === "touch") {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  await options.onPickup?.();
   dispatchPointerEvent(source, "pointermove", targetRect.top + targetRect.height / 2, 1);
-  await onPreview?.();
+  await options.onPreview?.();
   dispatchPointerEvent(source, "pointerup", targetRect.top + targetRect.height / 2, 0);
 }
 
@@ -244,6 +253,19 @@ export async function expectPointerDrivenRunDrag(
     }
     if (!card.style.transform.includes("scale(1.015)")) {
       throw new Error(`Expected ${testID} to keep the full-size card lifted under the pointer`);
+    }
+  });
+}
+
+export async function expectRunTouchSelectionSuppressed(
+  canvasElement: HTMLElement,
+  testID: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const card = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    if (card.style.userSelect !== "none") {
+      throw new Error(`Expected ${testID} to suppress mobile text selection`);
     }
   });
 }

@@ -6832,6 +6832,16 @@ function RunCardDropSurface({
     webPointerRef.current = null;
     setWebDragOffsetY(0);
   }, [disarmWebDrag]);
+  const beginWebDrag = useCallback((element: WebPointerCaptureElement): void => {
+    if (webDragActiveRef.current) {
+      return;
+    }
+    webDragActiveRef.current = true;
+    webDragArmedRef.current = true;
+    webSuppressClickRef.current = true;
+    element.querySelector?.(":focus")?.blur?.();
+    onDragStart(runId);
+  }, [onDragStart, runId]);
   useEffect(() => () => {
     disarmNativeDrag();
     disarmWebDrag();
@@ -6977,10 +6987,17 @@ function RunCardDropSurface({
             ? "box-shadow 140ms ease"
             : "transform 160ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 140ms ease",
           userSelect: draggable ? "none" : undefined,
+          WebkitTouchCallout: draggable ? "none" : undefined,
+          WebkitUserSelect: draggable ? "none" : undefined,
           willChange: draggable ? "transform" : undefined,
           zIndex: dragging ? 20 : undefined
         }}
         title={draggable ? `Drag ${runName} to reorder` : undefined}
+        onContextMenu={(event) => {
+          if (draggable) {
+            event.preventDefault();
+          }
+        }}
         onDragStart={(event) => {
           event.preventDefault();
         }}
@@ -6999,21 +7016,27 @@ function RunCardDropSurface({
           if (!draggable || blockedControl || event.button !== 0) {
             return;
           }
+          if (event.pointerType === "touch") {
+            event.preventDefault();
+          }
           resetWebPointer();
+          const currentTarget = event.currentTarget as unknown as WebPointerCaptureElement;
           webPointerRef.current = {
             originClientY: event.clientY,
             pointerId: event.pointerId
           };
           webDragArmedRef.current = event.pointerType !== "touch";
           if (event.pointerType === "touch") {
+            const pointerId = event.pointerId;
             webDragArmTimerRef.current = setTimeout(() => {
               webDragArmTimerRef.current = null;
-              webDragArmedRef.current = true;
+              if (webPointerRef.current?.pointerId === pointerId) {
+                beginWebDrag(currentTarget);
+              }
             }, 180);
           }
           try {
-            (event.currentTarget as unknown as WebPointerCaptureElement)
-              .setPointerCapture?.(event.pointerId);
+            currentTarget.setPointerCapture?.(event.pointerId);
           } catch {
             // Storybook play functions dispatch synthetic pointer events.
           }
@@ -7036,11 +7059,7 @@ function RunCardDropSurface({
               resetWebPointer();
               return;
             }
-            webDragActiveRef.current = true;
-            webSuppressClickRef.current = true;
-            (event.currentTarget as unknown as WebPointerCaptureElement)
-              .querySelector?.(":focus")?.blur?.();
-            onDragStart(runId);
+            beginWebDrag(event.currentTarget as unknown as WebPointerCaptureElement);
           }
           event.preventDefault();
           setWebDragOffsetY(deltaY);

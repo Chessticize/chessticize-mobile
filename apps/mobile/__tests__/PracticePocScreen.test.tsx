@@ -1114,6 +1114,59 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it("picks up a Web Run on touch hold before movement and blocks text selection", () => {
+    const platform = ReactNative.Platform as unknown as { OS: string };
+    const previousPlatform = platform.OS;
+    const runReorderFeedbackPreview = jest.fn();
+    platform.OS = "web";
+
+    try {
+      const renderer = renderScreen({
+        runManagementPresentation: runManagementPresentation({ homeEditing: true }),
+        runReorderFeedbackPreview
+      });
+      const pointerSurface = (): TestRenderer.ReactTestInstance => renderer.root.findAll(
+        (node) => node.props["data-testid"] === "practice-run-standard"
+      )[0]!;
+      const currentTarget = {
+        querySelector: jest.fn(() => null),
+        releasePointerCapture: jest.fn(),
+        setPointerCapture: jest.fn()
+      };
+      const preventDefault = jest.fn();
+
+      act(() => {
+        pointerSurface().props.onPointerDown({
+          button: 0,
+          clientY: 100,
+          currentTarget,
+          pointerId: 2,
+          pointerType: "touch",
+          preventDefault,
+          target: { closest: jest.fn(() => null) }
+        });
+        jest.advanceTimersByTime(180);
+      });
+
+      expect(preventDefault).toHaveBeenCalled();
+      expect(runReorderFeedbackPreview).toHaveBeenCalledWith({ haptic: "medium" });
+      expect(pointerSurface().props["data-drag-state"]).toBe("picked-up");
+      expect(pointerSurface().props.style.transform).toContain("translate3d(0, -2px, 0)");
+      expect(pointerSurface().props.style.WebkitUserSelect).toBe("none");
+      expect(pointerSurface().props.style.WebkitTouchCallout).toBe("none");
+
+      act(() => {
+        pointerSurface().props.onPointerCancel({
+          currentTarget,
+          pointerId: 2
+        });
+      });
+      expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    } finally {
+      platform.OS = previousPlatform;
+    }
+  });
+
   it("renders removal confirmation directly below the selected Run card", () => {
     const renderer = renderScreen({
       runManagementPresentation: runManagementPresentation({
