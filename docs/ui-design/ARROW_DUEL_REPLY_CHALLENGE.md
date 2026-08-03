@@ -45,8 +45,10 @@ With Opponent reply on:
    Sprint and puzzle clocks before beginning the handoff.
 4. Keep the board in the original solver's perspective for the whole puzzle.
    After the green confirmation, animate the correct candidate back to its
-   starting square and show a top-of-board `What if…` cue. Hold that preparation
-   beat while the fixed prompt surface switches to the `If...` reply copy, then
+   starting square with a slower, silent undo. During that preparation beat,
+   cover the board with a `What if…` overlay and `Find the opponent’s reply in X
+   seconds.`, where X is the Run's configured reply time. Keep the overlay up
+   while the fixed prompt surface switches to the `If...` reply copy, then
    animate the tempting candidate. The player now moves for the opponent without
    the board flipping.
 5. Start the Run's configured reply clock, which defaults to ten seconds, only
@@ -114,8 +116,9 @@ an engine dependency to scored play.
 The issue #489 design increment updates the existing product clones and keeps
 their stable Storybook URLs. It covers:
 
-- candidate choice and the staged green-confirmation, animated undo,
-  top-of-board `What if…` cue, `If...` prompt, and tempting-move handoff;
+- candidate choice and the staged green-confirmation, slow silent undo,
+  full-board `What if…` overlay with the configured reply time, `If...` prompt,
+  and tempting-move handoff;
 - a board perspective locked to the original solver throughout the candidate
   and opponent-reply stages;
 - the configurable opponent-reply state, defaulting to ten seconds and capped

@@ -107,11 +107,13 @@ export type LabStoryPresentation = {
 
 export function LabScenario({
   arrowDuelReplyAutoTimeoutMs,
+  arrowDuelReplyPreparationHoldMs,
   arrowDuelReplySeconds,
   scenarioId,
   storyPresentation
 }: {
   arrowDuelReplyAutoTimeoutMs?: number;
+  arrowDuelReplyPreparationHoldMs?: number;
   arrowDuelReplySeconds?: number;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
@@ -122,6 +124,7 @@ export function LabScenario({
     <LabScenarioContent
       key={scenarioId}
       arrowDuelReplyAutoTimeoutMs={arrowDuelReplyAutoTimeoutMs}
+      arrowDuelReplyPreparationHoldMs={arrowDuelReplyPreparationHoldMs}
       arrowDuelReplySeconds={arrowDuelReplySeconds}
       runtime={runtime}
       scenarioId={scenarioId}
@@ -132,12 +135,14 @@ export function LabScenario({
 
 function LabScenarioContent({
   arrowDuelReplyAutoTimeoutMs,
+  arrowDuelReplyPreparationHoldMs,
   arrowDuelReplySeconds,
   runtime,
   scenarioId,
   storyPresentation
 }: {
   arrowDuelReplyAutoTimeoutMs?: number;
+  arrowDuelReplyPreparationHoldMs?: number;
   arrowDuelReplySeconds?: number;
   runtime: ScenarioRuntime;
   scenarioId: LabScenarioId;
@@ -226,6 +231,7 @@ function LabScenarioContent({
       }
     : screenProps;
   const effectiveScreenProps = arrowDuelReplyAutoTimeoutMs === undefined
+    && arrowDuelReplyPreparationHoldMs === undefined
     && arrowDuelReplySeconds === undefined
     ? screenPropsWithReplyFixture
     : {
@@ -239,6 +245,9 @@ function LabScenarioContent({
             ...(arrowDuelReplyAutoTimeoutMs === undefined
               ? {}
               : { autoTimeoutMs: arrowDuelReplyAutoTimeoutMs }),
+            ...(arrowDuelReplyPreparationHoldMs === undefined
+              ? {}
+              : { preparationHoldMs: arrowDuelReplyPreparationHoldMs }),
             ...(arrowDuelReplySeconds === undefined
               ? {}
               : { replySeconds: arrowDuelReplySeconds })

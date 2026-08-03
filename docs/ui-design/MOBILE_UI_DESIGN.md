@@ -364,10 +364,11 @@ Arrow Duel active-session rules:
 - The Sprint and puzzle clocks pause when the reply begins. The reply clock and
   its board handoff do not advance the Sprint deadline, puzzle elapsed time,
   Slow threshold, or puzzle Timeout threshold.
-- After green confirmation, the selected move animates back before the tempting
-  move appears. A top-of-board `What if…` cue remains visible through this
-  preparation beat, and the reply timer appears only after the tempting move
-  settles and board input unlocks.
+- After green confirmation, the selected move animates back more slowly and
+  without sound before the tempting move appears. A full-board `What if…`
+  overlay names the actual configured reply window (`Find the opponent’s reply
+  in X seconds.`) throughout this preparation beat. The reply timer appears only
+  after the tempting move settles and board input unlocks.
 - Reply judgment accepts the stored puzzle main-line move or any legal move
   that immediately checkmates. It does not invoke Stockfish.
 

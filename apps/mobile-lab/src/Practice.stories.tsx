@@ -625,6 +625,28 @@ export const ArrowDuelReplyCustomTimer: Story = {
   }
 };
 
+export const ArrowDuelWhatIfPreparation: Story = {
+  name: "Arrow Duel · What if preparation",
+  args: {
+    arrowDuelReplyPreparationHoldMs: 60_000,
+    scenarioId: "practice-arrow-duel-prompt",
+    storyPresentation: {
+      storyId: "practice--arrow-duel-what-if-preparation",
+      title: "Arrow Duel · What if preparation"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await openArrowDuelChoice(canvasElement);
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForTestId(canvasElement, "arrow-duel-what-if-overlay");
+    await expectTestIdText(
+      canvasElement,
+      "arrow-duel-what-if-detail",
+      "Find the opponent’s reply in 10 seconds."
+    );
+  }
+};
+
 export const ArrowDuelChoice: Story = {
   name: "Arrow Duel · choose the best move",
   args: {

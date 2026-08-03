@@ -2447,7 +2447,12 @@ describe("PracticePocScreen", () => {
     );
     startArrowDuelSprint(customReplyTime);
     await boardMove(customReplyTime, ARROW_DUEL_REPLY_LAB_MOVES.default.correctChoice);
-    await settleArrowDuelReplyHandoff();
+    await advanceArrowDuelReplyToPrompt();
+    expect(collectText(findByTestId(
+      customReplyTime,
+      "arrow-duel-what-if-detail"
+    ))).toBe("Find the opponent’s reply in 30 seconds.");
+    await finishArrowDuelReplyHandoff();
     expect(collectText(findByTestId(customReplyTime, "arrow-duel-reply-timer"))).toBe("0:30");
     expect(findByTestId(customReplyTime, "arrow-duel-reply-timer-group").props.accessibilityLabel)
       .toBe("30 seconds remaining.");
@@ -7148,6 +7153,7 @@ describe("PracticePocScreen", () => {
     expect(resetBoard).toHaveBeenCalledWith(arrow.currentFen, {
       lastMove: null,
       slide: {
+        durationMs: 500,
         from: submittedChoice.to,
         to: submittedChoice.from
       }
@@ -7217,12 +7223,29 @@ describe("PracticePocScreen", () => {
     expect(resetBoard).toHaveBeenCalledWith(arrow.currentFen, {
       lastMove: null,
       slide: {
+        durationMs: 500,
         from: submittedChoice.to,
         to: submittedChoice.from
       }
     });
     expect(imperativeMove).not.toHaveBeenCalled();
-    expect(collectText(findByTestId(renderer, "arrow-duel-what-if-overlay"))).toBe("What if…");
+    const whatIfOverlay = findByTestId(renderer, "arrow-duel-what-if-overlay");
+    expect(collectText(whatIfOverlay)).toContain("What if…");
+    expect(collectText(findByTestId(renderer, "arrow-duel-what-if-detail"))).toBe(
+      "Find the opponent’s reply in 10 seconds."
+    );
+    expect(whatIfOverlay.props.accessibilityLabel).toBe(
+      "What if. Find the opponent’s reply in 10 seconds."
+    );
+    expect(flattenTestStyle(whatIfOverlay.props.style)).toEqual(expect.objectContaining({
+      backgroundColor: "rgba(15, 23, 42, 0.90)",
+      bottom: 0,
+      justifyContent: "center",
+      left: 0,
+      right: 0,
+      top: 0,
+      zIndex: 60
+    }));
     expect(() => findByTestId(renderer, "arrow-duel-reply-timer")).toThrow();
     expect(collectText(replyPrompt)).toContain("Find the reply");
     expect(collectText(replyContext)).toBe(
@@ -7247,6 +7270,46 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:10");
     expect(requireArrowDuelState(activeSprintForTest(service)).phase).toBe("reply");
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
+  });
+
+  it("keeps the slower Arrow Duel undo silent before the tempting move", async () => {
+    const service = createMobilePracticeService("familiar15");
+    service.saveSettings({
+      ...service.getSettings(),
+      moveFeedback: {
+        soundEnabled: true,
+        hapticsEnabled: true
+      }
+    });
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
+    const renderer = renderScreen({ practiceService: service, moveFeedbackClient });
+    const arrow = firstArrowDuelPuzzleForTest();
+
+    startArrowDuelSprint(renderer);
+    await boardMove(renderer, arrow.correctMove);
+    expect(moveFeedbackClient.requests).toHaveLength(1);
+
+    await advanceArrowDuelReplyToPrompt();
+
+    expect(moveFeedbackClient.requests).toHaveLength(1);
+    const submittedChoice = parseBoardMove(arrow.correctMove);
+    expect(
+      findByTestId(renderer, "mock-chessboard").props.mockResetBoard
+    ).toHaveBeenCalledWith(arrow.currentFen, {
+      lastMove: null,
+      slide: {
+        durationMs: 500,
+        from: submittedChoice.to,
+        to: submittedChoice.from
+      }
+    });
+
+    await finishArrowDuelReplyHandoff();
+
+    expect(moveFeedbackClient.requests).toEqual([
+      { cue: "move", playHaptic: true, playSound: true },
+      { cue: "move", playHaptic: true, playSound: true }
+    ]);
   });
 
   it("marks a wrong Arrow Duel reply for Review without extra result copy", async () => {

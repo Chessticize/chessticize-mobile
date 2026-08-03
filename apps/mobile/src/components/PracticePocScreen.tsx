@@ -389,6 +389,10 @@ type BoardMove = {
   promotion?: string;
 };
 
+type BoardResetSlide = BoardMove & {
+  durationMs?: number;
+};
+
 type MoveSide = "w" | "b";
 
 type BoardMoveContext = {
@@ -510,6 +514,7 @@ const ARROW_DUEL_CORRECT_CHOICE_FEEDBACK_MS = 220;
 // Let the animated undo and the What if cue register before the tempting move
 // appears. The reply clock still begins only after the new position is ready.
 const ARROW_DUEL_REPLY_PREPARATION_MS = 650;
+const ARROW_DUEL_UNDO_ANIMATION_MS = 500;
 // Shared by the practice and review boards so they animate at the same speed.
 const BOARD_MOVE_ANIMATION_MS = 200;
 const ANALYSIS_DEPTH = 20;
@@ -1606,7 +1611,7 @@ export function PracticePocScreen({
     reason: string,
     puzzleId?: string | null,
     move?: string,
-    slide?: BoardMove | null
+    slide?: BoardResetSlide | null
   ): void {
     if (!fen) {
       return;
@@ -1615,6 +1620,7 @@ export function PracticePocScreen({
       boardRef.current?.resetBoard(fen, {
         lastMove: null,
         slide: {
+          ...(slide.durationMs === undefined ? {} : { durationMs: slide.durationMs }),
           from: slide.from as Square,
           to: slide.to as Square
         }
@@ -2289,12 +2295,19 @@ export function PracticePocScreen({
         submittedPuzzleId,
         submittedMove,
         submittedChoice
-          ? { from: submittedChoice.to, to: submittedChoice.from }
+          ? {
+              durationMs: ARROW_DUEL_UNDO_ANIMATION_MS,
+              from: submittedChoice.to,
+              to: submittedChoice.from
+            }
           : null
       );
       commitBoardFen(submittedPuzzle.currentFen);
       setArrowDuelReplyPromptPhase("reply");
-      await sleep(ARROW_DUEL_REPLY_PREPARATION_MS);
+      await sleep(
+        sprintRulesDesignPreview?.arrowDuelReplyChallenge?.preparationHoldMs
+          ?? ARROW_DUEL_REPLY_PREPARATION_MS
+      );
       await animateBoardMoves(opponentMoves, transition.boardFen ?? null);
       if (transition.lastMove !== undefined) {
         setLastBoardMove(transition.lastMove ? arrowFromTo(transition.lastMove) : null);
@@ -2842,7 +2855,11 @@ export function PracticePocScreen({
             puzzleId,
             submittedMove ?? undefined,
             submittedChoice
-              ? { from: submittedChoice.to, to: submittedChoice.from }
+              ? {
+                  durationMs: ARROW_DUEL_UNDO_ANIMATION_MS,
+                  from: submittedChoice.to,
+                  to: submittedChoice.from
+                }
               : null
           );
           commitBoardFen(submittedFen);
@@ -3311,6 +3328,9 @@ export function PracticePocScreen({
             Math.ceil((new Date(displayedArrowDuelPuzzle.replyDeadlineAt).getTime() - nowMs) / 1000)
           )
         : state?.config.opponentReply?.seconds ?? arrowDuelReplySeconds;
+  const arrowDuelWhatIfDetail = `Find the opponent’s reply in ${arrowDuelReplySecondsRemaining} ${
+    arrowDuelReplySecondsRemaining === 1 ? "second" : "seconds"
+  }.`;
   const currentBoardFen = boardFen ?? currentPuzzle?.currentFen ?? null;
   const displayedPuzzle = feedbackSnapshot?.currentPuzzle ?? currentPuzzle;
   const sessionEntryPreview = usePuzzleEntryPreview({
@@ -3956,14 +3976,19 @@ export function PracticePocScreen({
         {arrowDuelWhatIfVisible ? (
           <View
             accessible
-            accessibilityLabel="What if"
+            accessibilityLabel={`What if. ${arrowDuelWhatIfDetail}`}
             accessibilityLiveRegion="polite"
+            accessibilityRole="alert"
             style={styles.arrowDuelWhatIfOverlay}
             testID="arrow-duel-what-if-overlay"
           >
-            <View style={styles.arrowDuelWhatIfPill}>
-              <Text style={styles.arrowDuelWhatIfText}>What if…</Text>
-            </View>
+            <Text style={styles.arrowDuelWhatIfTitle}>What if…</Text>
+            <Text
+              style={styles.arrowDuelWhatIfDetail}
+              testID="arrow-duel-what-if-detail"
+            >
+              {arrowDuelWhatIfDetail}
+            </Text>
           </View>
         ) : null}
 
@@ -17835,23 +17860,26 @@ const styles = StyleSheet.create({
   },
   arrowDuelWhatIfOverlay: {
     alignItems: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.90)",
+    bottom: 0,
+    justifyContent: "center",
     left: 0,
     pointerEvents: "none",
     position: "absolute",
     right: 0,
-    top: 12,
-    zIndex: 45
+    top: 0,
+    zIndex: 60
   },
-  arrowDuelWhatIfPill: {
-    backgroundColor: "rgba(15, 23, 42, 0.88)",
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7
-  },
-  arrowDuelWhatIfText: {
+  arrowDuelWhatIfTitle: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: 22,
     fontWeight: "900"
+  },
+  arrowDuelWhatIfDetail: {
+    color: "#E2E8F0",
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 6
   },
   coordinateOverlay: {
     left: 0,
