@@ -7,7 +7,6 @@ import { isServerCompatibleCorePackPuzzle } from "../packages/core/src/index.ts"
 import {
   buildSqliteManifest,
   listCsvFiles,
-  readPackRowEncoding,
   readCsvFile,
   sha256File,
   sha256Text,
@@ -17,7 +16,8 @@ import {
   decodePuzzlePosition,
   decodeUciMove,
   decodeUciMoveLine,
-  encodeUciMove
+  encodeUciMove,
+  readPuzzlePackRowEncoding
 } from "../packages/storage/src/puzzle-pack-binary-codec.ts";
 import {
   installArtifactPair
@@ -174,7 +174,7 @@ async function updatePackDatabase(
   let transactionOpen = false;
   try {
     assertPackSchema(db);
-    const rowEncoding = readPackRowEncoding(db);
+    const rowEncoding = readPuzzlePackRowEncoding(db);
     db.exec("PRAGMA journal_mode = OFF; PRAGMA synchronous = OFF; PRAGMA temp_store = MEMORY");
 
     const remainingPuzzleIds = new Set();

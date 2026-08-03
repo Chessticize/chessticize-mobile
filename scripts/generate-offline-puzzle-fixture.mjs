@@ -24,7 +24,8 @@ import {
   decodeUciMoveLine,
   encodePuzzlePosition,
   encodeUciMove,
-  encodeUciMoveLine
+  encodeUciMoveLine,
+  readPuzzlePackRowEncoding
 } from "../packages/storage/src/puzzle-pack-binary-codec.ts";
 import {
   assertKnownCorePackThemes,
@@ -587,7 +588,7 @@ function writeSelectedPack(db, selected) {
 function buildSqliteManifest(path, input, options) {
   const packDb = new DatabaseSync(path, { readOnly: true });
   try {
-    const rowEncoding = readPackRowEncoding(packDb);
+    const rowEncoding = readPuzzlePackRowEncoding(packDb);
     const themeCounts = new Map();
     const matePatternCounts = new Map();
     const buckets = new Map();
@@ -818,7 +819,7 @@ function puzzleFromCandidateRow(row) {
 }
 
 function* iteratePackPuzzles(db) {
-  const rowEncoding = readPackRowEncoding(db);
+  const rowEncoding = readPuzzlePackRowEncoding(db);
   const rows = db.prepare(`
     SELECT
       puzzles.id,
@@ -867,34 +868,6 @@ function* iteratePackPuzzles(db) {
   if (current) {
     yield current;
   }
-}
-
-function readPackRowEncoding(db) {
-  const table = db.prepare(`
-    SELECT 1
-    FROM sqlite_master
-    WHERE type = 'table' AND name = 'pack_format'
-  `).get();
-  if (!table) {
-    return "legacy-text";
-  }
-  const rows = db.prepare("SELECT * FROM pack_format ORDER BY id").all();
-  const format = rows[0];
-  if (
-    rows.length !== 1 ||
-    format?.id !== 1 ||
-    format.format_id !== CORE_PACK_FORMAT_ID ||
-    format.pack_schema_version !== CORE_PACK_SCHEMA_VERSION ||
-    format.position_codec !== CORE_PACK_POSITION_CODEC ||
-    format.position_codec_version !== CORE_PACK_POSITION_CODEC_VERSION ||
-    format.move_codec !== CORE_PACK_MOVE_CODEC ||
-    format.move_codec_version !== CORE_PACK_MOVE_CODEC_VERSION
-  ) {
-    throw new Error(
-      `Unsupported puzzle pack format: ${JSON.stringify(format ?? null)}`
-    );
-  }
-  return "binary-v1";
 }
 
 function parseCsvLine(line) {
@@ -1174,7 +1147,6 @@ export {
   initializeDatabase,
   listCsvFiles,
   main,
-  readPackRowEncoding,
   readCsvFile,
   sha256File,
   sha256Text,

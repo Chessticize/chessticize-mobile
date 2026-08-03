@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import {
@@ -140,6 +141,62 @@ test("keeps the verified artifact pair unchanged when binary encoding fails", as
   assert.equal(await sha256File(fixture.packPath), packHash);
   assert.equal(await readFile(fixture.manifestPath, "utf8"), manifestText);
 });
+
+test("binary encoder CLI succeeds through its real process boundary", async (t) => {
+  const fixture = await createLegacyFixture(PUZZLES);
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const reportPath = join(fixture.root, "binary-report.json");
+
+  const result = runEncoderCli(fixture, reportPath);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /"puzzleCount": 2/u);
+  const report = JSON.parse(await readFile(reportPath, "utf8"));
+  assert.equal(report.puzzleCount, 2);
+  assert.equal(report.semanticRoundTrips, 2);
+  assert.equal(report.integrityCheck, "ok");
+  assert.deepEqual(readPublicPuzzles(fixture.packPath), PUZZLES.map((puzzle) => ({
+    ...puzzle,
+    initialFen: `${puzzle.initialFen.split(/\s+/u).slice(0, 4).join(" ")} 0 1`,
+    source: "lichess"
+  })));
+});
+
+test("binary encoder CLI fails without changing its artifact pair", async (t) => {
+  const fixture = await createLegacyFixture([
+    { ...PUZZLES[0], solutionMoves: ["not-uci"] }
+  ]);
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+  const reportPath = join(fixture.root, "binary-report.json");
+  const packHash = await sha256File(fixture.packPath);
+  const manifestText = await readFile(fixture.manifestPath, "utf8");
+
+  const result = runEncoderCli(fixture, reportPath);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Invalid UCI move/u);
+  assert.equal(await sha256File(fixture.packPath), packHash);
+  assert.equal(await readFile(fixture.manifestPath, "utf8"), manifestText);
+  await assert.rejects(readFile(reportPath), /ENOENT/u);
+});
+
+function runEncoderCli(fixture, reportPath) {
+  return spawnSync(process.execPath, [
+    "--experimental-strip-types",
+    resolve("scripts/encode-offline-puzzle-pack.mjs"),
+    "--pack",
+    fixture.packPath,
+    "--manifest",
+    fixture.manifestPath,
+    "--build-date",
+    "2026-08-03",
+    "--report",
+    reportPath
+  ], {
+    cwd: resolve("."),
+    encoding: "utf8"
+  });
+}
 
 async function createLegacyFixture(puzzles) {
   const root = await mkdtemp(join(tmpdir(), "chessticize-pack-binary-"));

@@ -8,6 +8,14 @@ export const CORE_PACK_MOVE_CODEC = "chessticize-uci16";
 export const CORE_PACK_MOVE_CODEC_VERSION = 1;
 
 export type PuzzlePackBinaryValue = ArrayBuffer | ArrayBufferView;
+export type PuzzlePackRowEncoding = "legacy-text" | "binary-v1";
+
+interface PuzzlePackFormatDatabase {
+  prepare(sql: string): {
+    get(): unknown;
+    all(): unknown[];
+  };
+}
 
 const PIECES = [
   undefined,
@@ -23,6 +31,55 @@ const PROMOTION_CODES: ReadonlyMap<string, number> = new Map(
     promotion === undefined ? [] : [[promotion, code]]
   )
 );
+
+export function readPuzzlePackRowEncoding(
+  db: PuzzlePackFormatDatabase
+): PuzzlePackRowEncoding {
+  const table = db.prepare(`
+    SELECT 1
+    FROM sqlite_master
+    WHERE type = 'table' AND name = 'pack_format'
+  `).get();
+  if (!table) {
+    return "legacy-text";
+  }
+  const rows = db.prepare(`
+    SELECT
+      id,
+      format_id,
+      pack_schema_version,
+      position_codec,
+      position_codec_version,
+      move_codec,
+      move_codec_version
+    FROM pack_format
+    ORDER BY id
+  `).all() as Array<{
+    id: number;
+    format_id: string;
+    pack_schema_version: number;
+    position_codec: string;
+    position_codec_version: number;
+    move_codec: string;
+    move_codec_version: number;
+  }>;
+  const format = rows[0];
+  if (
+    rows.length !== 1 ||
+    format?.id !== 1 ||
+    format.format_id !== CORE_PACK_FORMAT_ID ||
+    format.pack_schema_version !== CORE_PACK_SCHEMA_VERSION ||
+    format.position_codec !== CORE_PACK_POSITION_CODEC ||
+    format.position_codec_version !== CORE_PACK_POSITION_CODEC_VERSION ||
+    format.move_codec !== CORE_PACK_MOVE_CODEC ||
+    format.move_codec_version !== CORE_PACK_MOVE_CODEC_VERSION
+  ) {
+    throw new Error(
+      `Unsupported puzzle pack format: ${JSON.stringify(format ?? null)}`
+    );
+  }
+  return "binary-v1";
+}
 
 export function encodePuzzlePosition(fen: string): Uint8Array {
   const fields = validatedFenFields(fen);

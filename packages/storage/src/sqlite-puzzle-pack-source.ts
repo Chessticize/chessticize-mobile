@@ -9,16 +9,12 @@ import {
 import type { Puzzle } from "../../core/src/index.ts";
 import type { PuzzleSelectionFilter } from "./query-types.ts";
 import {
-  CORE_PACK_FORMAT_ID,
-  CORE_PACK_MOVE_CODEC,
-  CORE_PACK_MOVE_CODEC_VERSION,
-  CORE_PACK_POSITION_CODEC,
-  CORE_PACK_POSITION_CODEC_VERSION,
-  CORE_PACK_SCHEMA_VERSION,
   decodePuzzlePosition,
   decodeUciMove,
   decodeUciMoveLine,
-  type PuzzlePackBinaryValue
+  readPuzzlePackRowEncoding,
+  type PuzzlePackBinaryValue,
+  type PuzzlePackRowEncoding
 } from "./puzzle-pack-binary-codec.ts";
 import {
   selectUniquePuzzles,
@@ -48,7 +44,6 @@ interface PuzzleCandidateRow {
 }
 
 const MAX_SQL_ID_FILTER_VALUES = 900;
-type PuzzlePackRowEncoding = "legacy-text" | "binary-v1";
 
 export type SQLitePuzzlePackArrowDuelEligibility = "validate" | "all" | "all_non_promotion";
 
@@ -714,55 +709,6 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     }
     return Math.max(limit * this.candidateMultiplier, limit + this.candidateFloor);
   }
-}
-
-function readPuzzlePackRowEncoding(
-  db: SyncSqliteDatabase
-): PuzzlePackRowEncoding {
-  const table = db.prepare(`
-    SELECT 1
-    FROM sqlite_master
-    WHERE type = 'table' AND name = 'pack_format'
-  `).get();
-  if (!table) {
-    return "legacy-text";
-  }
-  const rows = db.prepare(`
-    SELECT
-      id,
-      format_id,
-      pack_schema_version,
-      position_codec,
-      position_codec_version,
-      move_codec,
-      move_codec_version
-    FROM pack_format
-    ORDER BY id
-  `).all() as Array<{
-    id: number;
-    format_id: string;
-    pack_schema_version: number;
-    position_codec: string;
-    position_codec_version: number;
-    move_codec: string;
-    move_codec_version: number;
-  }>;
-  const format = rows[0];
-  if (
-    rows.length !== 1 ||
-    format?.id !== 1 ||
-    format.format_id !== CORE_PACK_FORMAT_ID ||
-    format.pack_schema_version !== CORE_PACK_SCHEMA_VERSION ||
-    format.position_codec !== CORE_PACK_POSITION_CODEC ||
-    format.position_codec_version !== CORE_PACK_POSITION_CODEC_VERSION ||
-    format.move_codec !== CORE_PACK_MOVE_CODEC ||
-    format.move_codec_version !== CORE_PACK_MOVE_CODEC_VERSION
-  ) {
-    throw new Error(
-      `Unsupported puzzle pack format: ${JSON.stringify(format ?? null)}`
-    );
-  }
-  return "binary-v1";
 }
 
 function binaryField(

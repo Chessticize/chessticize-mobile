@@ -16,11 +16,11 @@ import {
   decodeUciMoveLine,
   encodePuzzlePosition,
   encodeUciMove,
-  encodeUciMoveLine
+  encodeUciMoveLine,
+  readPuzzlePackRowEncoding
 } from "../packages/storage/src/puzzle-pack-binary-codec.ts";
 import {
   buildSqliteManifest,
-  readPackRowEncoding,
   sha256File,
   sha256Text,
   stableJson
@@ -355,7 +355,7 @@ function updateLengthPrefixed(hash, value) {
 }
 
 function assertLegacyTextPack(db) {
-  if (readPackRowEncoding(db) !== "legacy-text") {
+  if (readPuzzlePackRowEncoding(db) !== "legacy-text") {
     throw new Error("Core Pack already uses the supported binary format");
   }
   for (const table of ["puzzles", "themes", "puzzle_themes"]) {

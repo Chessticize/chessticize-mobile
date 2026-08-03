@@ -11,11 +11,9 @@ import {
   tacticalProfileSpeedBaselineFeatures
 } from "../packages/core/src/index.ts";
 import {
-  decodeUciMoveLine
+  decodeUciMoveLine,
+  readPuzzlePackRowEncoding
 } from "../packages/storage/src/puzzle-pack-binary-codec.ts";
-import {
-  readPackRowEncoding
-} from "./generate-offline-puzzle-fixture.mjs";
 
 const EPSILON = 1e-9;
 const REQUIRED_DECISION_EVIDENCE = [
@@ -673,7 +671,7 @@ function posteriorFixture(name, count, outcomeForIndex) {
 }
 
 function joinCanonicalObservations(exports, database) {
-  const packRowEncoding = readPackRowEncoding(database);
+  const packRowEncoding = readPuzzlePackRowEncoding(database);
   const sessions = new Map();
   const attempts = [];
   for (const progress of exports) {
