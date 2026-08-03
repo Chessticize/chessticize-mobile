@@ -394,35 +394,39 @@ function LabButton({
 }
 
 function expectedMoveForLab(): string | undefined {
-  const replyExpectedMove = labDocument()
-    ?.querySelector('[data-testid="arrow-duel-reply-expected-move"]')
-    ?.textContent
-    ?.trim();
+  const replyExpectedMove = labTestText("arrow-duel-reply-expected-move");
   if (replyExpectedMove) {
     return replyExpectedMove;
   }
-  const activePuzzle = getLabPracticeService()?.getActiveSprint()?.currentPuzzle;
+  const activePuzzle = activeLabPuzzle();
   if (activePuzzle?.kind === "arrow_duel") {
     return activePuzzle.correctMove;
   }
   if (activePuzzle?.kind === "line") {
     return currentExpectedMove(activePuzzle);
   }
-  const reviewExpectedMove = labDocument()
-    ?.querySelector('[data-testid="review-current-expected-move"]')
-    ?.textContent
-    ?.trim();
+  const reviewExpectedMove = labTestText("review-current-expected-move");
   return reviewExpectedMove || undefined;
 }
 
 function wrongMoveForLab(chess: Chess, expected: string | undefined): BoardMove | undefined {
-  const replyChallengeActive = Boolean(labDocument()
-    ?.querySelector('[data-testid="arrow-duel-reply-expected-move"]'));
-  const activePuzzle = getLabPracticeService()?.getActiveSprint()?.currentPuzzle;
+  const replyChallengeActive = Boolean(labTestText("arrow-duel-reply-expected-move"));
+  const activePuzzle = activeLabPuzzle();
   if (!replyChallengeActive && activePuzzle?.kind === "arrow_duel") {
     return parseUci(activePuzzle.wrongMove);
   }
   return firstDifferentLegalMove(chess, expected);
+}
+
+function activeLabPuzzle() {
+  return getLabPracticeService()?.getActiveSprint()?.currentPuzzle;
+}
+
+function labTestText(testID: string): string | undefined {
+  return labDocument()
+    ?.querySelector(`[data-testid="${testID}"]`)
+    ?.textContent
+    ?.trim() || undefined;
 }
 
 function firstDifferentLegalMove(chess: Chess, expected: string | undefined): BoardMove | undefined {

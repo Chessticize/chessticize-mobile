@@ -17,8 +17,10 @@ import {
   PRACTICE_UI_PADDING,
   type PracticeSafeAreaInsets
 } from "../src/components/adaptivePracticeLayout";
-import { LabScenario } from "../../mobile-lab/src/LabScenario";
-import { getLabPracticeService } from "../../mobile-lab/src/boardController";
+import {
+  ARROW_DUEL_REPLY_LAB_MOVES,
+  LabScenario
+} from "../../mobile-lab/src/LabScenario";
 import {
   createMobilePracticeService,
   configureMobilePracticePuzzleSource,
@@ -2379,10 +2381,9 @@ describe("PracticePocScreen", () => {
   it("previews Standard-style outcome feedback and automatic advance", async () => {
     const correct = renderLabScenario("practice-arrow-duel-prompt");
     startArrowDuelSprint(correct);
-    const correctState = requireLabArrowDuelState();
-    const correctPuzzleId = correctState.puzzle.id;
+    const correctPuzzleId = collectText(findByTestId(correct, "session-current-puzzle-id"));
 
-    await boardMove(correct, correctState.correctMove);
+    await boardMove(correct, ARROW_DUEL_REPLY_LAB_MOVES.default.correctChoice);
     expect(collectText(findByTestId(correct, "arrow-duel-reply-challenge"))).toContain(
       "Find the reply"
     );
@@ -2398,7 +2399,7 @@ describe("PracticePocScreen", () => {
       width: "100%"
     }));
     expect(() => findByTestId(correct, "arrow-duel-reply-hint")).toThrow();
-    await boardMove(correct, correctState.puzzle.solutionMoves[1]!);
+    await boardMove(correct, ARROW_DUEL_REPLY_LAB_MOVES.default.expectedReply);
     expect(collectText(correct.root)).not.toContain("Solved");
     expect(findByTestId(correct, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(correct.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
@@ -2406,7 +2407,8 @@ describe("PracticePocScreen", () => {
       "solved 1, mistakes 0"
     );
     await settleFeedbackSnapshot();
-    expect(requireLabArrowDuelState().puzzle.id).not.toBe(correctPuzzleId);
+    expect(collectText(findByTestId(correct, "session-current-puzzle-id")))
+      .not.toBe(correctPuzzleId);
     expect(collectText(findByTestId(correct, "arrow-duel-reply-challenge"))).toContain(
       "Choose the best move"
     );
@@ -2416,17 +2418,18 @@ describe("PracticePocScreen", () => {
       { arrowDuelReplySeconds: 8 }
     );
     startArrowDuelSprint(customReplyTime);
-    const customReplyTimeState = requireLabArrowDuelState();
-    await boardMove(customReplyTime, customReplyTimeState.correctMove);
+    await boardMove(customReplyTime, ARROW_DUEL_REPLY_LAB_MOVES.default.correctChoice);
     expect(collectText(findByTestId(customReplyTime, "arrow-duel-reply-timer"))).toBe("0:08");
     expect(findByTestId(customReplyTime, "arrow-duel-reply-timer-group").props.accessibilityLabel)
       .toBe("8 seconds remaining.");
 
     const wrongChoice = renderLabScenario("practice-arrow-duel-prompt");
     startArrowDuelSprint(wrongChoice);
-    const wrongChoiceState = requireLabArrowDuelState();
-    const wrongChoicePuzzleId = wrongChoiceState.puzzle.id;
-    await boardMove(wrongChoice, wrongChoiceState.wrongMove);
+    const wrongChoicePuzzleId = collectText(findByTestId(
+      wrongChoice,
+      "session-current-puzzle-id"
+    ));
+    await boardMove(wrongChoice, ARROW_DUEL_REPLY_LAB_MOVES.default.wrongChoice);
     expect(collectText(wrongChoice.root)).not.toContain("Choice missed");
     expect(collectText(wrongChoice.root)).not.toContain("One mistake · added to Review");
     expect(findByTestId(wrongChoice, "move-feedback-overlay")).toBeTruthy();
@@ -2435,16 +2438,19 @@ describe("PracticePocScreen", () => {
       "solved 0, mistakes 1"
     );
     await settleFeedbackSnapshot();
-    expect(requireLabArrowDuelState().puzzle.id).not.toBe(wrongChoicePuzzleId);
+    expect(collectText(findByTestId(wrongChoice, "session-current-puzzle-id")))
+      .not.toBe(wrongChoicePuzzleId);
 
     const wrongReply = renderLabScenario("practice-arrow-duel-prompt");
     startArrowDuelSprint(wrongReply);
-    const wrongReplyState = requireLabArrowDuelState();
-    const wrongReplyPuzzleId = wrongReplyState.puzzle.id;
-    await boardMove(wrongReply, wrongReplyState.correctMove);
+    const wrongReplyPuzzleId = collectText(findByTestId(
+      wrongReply,
+      "session-current-puzzle-id"
+    ));
+    await boardMove(wrongReply, ARROW_DUEL_REPLY_LAB_MOVES.default.correctChoice);
     const replyBoard = findByTestId(wrongReply, "mock-chessboard");
     const replyChess = new Chess(replyBoard.props.fen);
-    const expectedReply = wrongReplyState.puzzle.solutionMoves[1]!.toLowerCase();
+    const expectedReply = ARROW_DUEL_REPLY_LAB_MOVES.default.expectedReply.toLowerCase();
     const differentReply = replyChess.moves({ verbose: true }).find((move) => (
       `${move.from}${move.to}${move.promotion ?? ""}`.toLowerCase() !== expectedReply
     ));
@@ -2461,16 +2467,16 @@ describe("PracticePocScreen", () => {
       "solved 0, mistakes 1"
     );
     await settleFeedbackSnapshot();
-    expect(requireLabArrowDuelState().puzzle.id).not.toBe(wrongReplyPuzzleId);
+    expect(collectText(findByTestId(wrongReply, "session-current-puzzle-id")))
+      .not.toBe(wrongReplyPuzzleId);
 
     const timeout = renderLabScenario(
       "practice-arrow-duel-prompt",
       { arrowDuelReplyAutoTimeoutMs: 500 }
     );
     startArrowDuelSprint(timeout);
-    const timeoutState = requireLabArrowDuelState();
-    const timeoutPuzzleId = timeoutState.puzzle.id;
-    await boardMove(timeout, timeoutState.correctMove);
+    const timeoutPuzzleId = collectText(findByTestId(timeout, "session-current-puzzle-id"));
+    await boardMove(timeout, ARROW_DUEL_REPLY_LAB_MOVES.default.correctChoice);
     act(() => {
       jest.advanceTimersByTime(500);
     });
@@ -2485,17 +2491,16 @@ describe("PracticePocScreen", () => {
       "solved 0, mistakes 1"
     );
     await settleFeedbackSnapshot();
-    expect(requireLabArrowDuelState().puzzle.id).not.toBe(timeoutPuzzleId);
+    expect(collectText(findByTestId(timeout, "session-current-puzzle-id")))
+      .not.toBe(timeoutPuzzleId);
   });
 
   it("accepts an alternate legal mate in one in the sampled reply position", async () => {
     const renderer = renderLabScenario("practice-arrow-duel-mate-in-one");
     startArrowDuelSprint(renderer);
-    const state = requireLabArrowDuelState();
 
-    expect(state.puzzle.solutionMoves[1]).toBe("g3f4");
-    await boardMove(renderer, state.correctMove);
-    await boardMove(renderer, "g3g5");
+    await boardMove(renderer, ARROW_DUEL_REPLY_LAB_MOVES.multipleMate.correctChoice);
+    await boardMove(renderer, ARROW_DUEL_REPLY_LAB_MOVES.multipleMate.alternateReply);
 
     expect(collectText(renderer.root)).not.toContain("Solved");
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
@@ -13107,14 +13112,6 @@ function requireArrowDuelState(state: SprintState): ArrowDuelState {
     throw new Error("Expected an active Arrow Duel puzzle");
   }
   return state.currentPuzzle;
-}
-
-function requireLabArrowDuelState(): ArrowDuelState {
-  const state = getLabPracticeService()?.getActiveSprint();
-  if (!state) {
-    throw new Error("Expected an active Interaction Lab sprint");
-  }
-  return requireArrowDuelState(state);
 }
 
 function press(renderer: TestRenderer.ReactTestRenderer, testID: string): void {

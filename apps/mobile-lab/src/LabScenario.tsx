@@ -54,6 +54,9 @@ import {
   historyProgressPresentationFor,
   isHistoryProgressScenario
 } from "./historyProgressFixture.ts";
+import {
+  createArrowDuelReplyChallengeFixture
+} from "./arrowDuelReplyChallengeFixture.ts";
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
 
@@ -75,6 +78,19 @@ const ARROW_DUEL_MULTI_MATE_LAB_PUZZLE: Puzzle = {
   stockfishEvalAfterFirstMove: -10000,
   themes: ["mateIn1"]
 };
+
+export const ARROW_DUEL_REPLY_LAB_MOVES = {
+  default: {
+    correctChoice: PRIMARY_LAB_PUZZLE.stockfishBestMove!,
+    expectedReply: PRIMARY_LAB_PUZZLE.solutionMoves[1]!,
+    wrongChoice: PRIMARY_LAB_PUZZLE.solutionMoves[0]!
+  },
+  multipleMate: {
+    alternateReply: "g3g5",
+    correctChoice: ARROW_DUEL_MULTI_MATE_LAB_PUZZLE.stockfishBestMove!,
+    expectedReply: ARROW_DUEL_MULTI_MATE_LAB_PUZZLE.solutionMoves[1]!
+  }
+} as const;
 
 type ScreenProps = Omit<React.ComponentProps<typeof PracticePocScreen>, "platformCapabilities">;
 
@@ -139,6 +155,13 @@ function LabScenarioContent({
       : { screen: "home" as const, selectedTaskFamily: "line" as const }
   );
   const [startedFocusedRun, setStartedFocusedRun] = useState<SprintState | null>(null);
+  const arrowDuelReplyFixture = useMemo(
+    () => createArrowDuelReplyChallengeFixture(
+      runtime.service,
+      () => new Date(LAB_NOW_MS).toISOString()
+    ),
+    [runtime.service]
+  );
   const showsThemeCatalogPrototype =
     isRunManagementScenario(scenarioId)
     || isHistoryProgressScenario(scenarioId)
@@ -189,16 +212,30 @@ function LabScenarioContent({
           initialActiveState: startedFocusedRun
         }
       };
-  const effectiveScreenProps = arrowDuelReplyAutoTimeoutMs === undefined
-    && arrowDuelReplySeconds === undefined
-    ? screenProps
-    : {
+  const screenPropsWithReplyFixture = screenProps.sprintRulesDesignPreview
+    ?.arrowDuelReplyChallenge
+    ? {
         ...screenProps,
         sprintRulesDesignPreview: {
           ...screenProps.sprintRulesDesignPreview,
           arrowDuelReplyChallenge: {
-            ...screenProps.sprintRulesDesignPreview?.arrowDuelReplyChallenge,
+            ...screenProps.sprintRulesDesignPreview.arrowDuelReplyChallenge,
+            ...arrowDuelReplyFixture
+          }
+        }
+      }
+    : screenProps;
+  const effectiveScreenProps = arrowDuelReplyAutoTimeoutMs === undefined
+    && arrowDuelReplySeconds === undefined
+    ? screenPropsWithReplyFixture
+    : {
+        ...screenPropsWithReplyFixture,
+        sprintRulesDesignPreview: {
+          ...screenPropsWithReplyFixture.sprintRulesDesignPreview,
+          arrowDuelReplyChallenge: {
+            ...screenPropsWithReplyFixture.sprintRulesDesignPreview?.arrowDuelReplyChallenge,
             enabled: true,
+            ...arrowDuelReplyFixture,
             ...(arrowDuelReplyAutoTimeoutMs === undefined
               ? {}
               : { autoTimeoutMs: arrowDuelReplyAutoTimeoutMs }),
@@ -225,7 +262,6 @@ function LabScenarioContent({
         platformCapabilities={runtime.platformCapabilities}
         runEditorThemeDisclosure={
           scenarioId === "practice-custom-setup"
-          || scenarioId === "practice-run-name-validation"
         }
         themeCatalogPresentation={showsThemeCatalogPrototype
           ? SERVER_CURATED_THEME_PRESENTATION
