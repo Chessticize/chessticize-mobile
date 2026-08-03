@@ -1085,7 +1085,7 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
-  it("renders the injected grouped theme catalog in New Run with All selected by default", () => {
+  it("renders the injected grouped theme catalog after expanding New Run themes", () => {
     const onIntent = jest.fn();
     const renderer = renderScreen({
       runManagementPresentation: runManagementPresentation({
@@ -1110,10 +1110,16 @@ describe("PracticePocScreen", () => {
       }
     });
 
+    expect(collectText(findByTestId(renderer, "practice-run-theme-selection-detail"))).toBe(
+      "All themes"
+    );
+    expect(() => findByTestId(renderer, "custom-theme-mixed")).toThrow();
+
+    press(renderer, "practice-run-theme-disclosure");
+
     expect(themeSelected(renderer, "mixed")).toBe(true);
     expect(findByTestId(renderer, "custom-theme-mate-in-4")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-run-editor")).match(/Themes/g)).toHaveLength(1);
-    expect(collectText(findByTestId(renderer, "practice-run-theme-row"))).toContain("Choose one or more");
 
     press(renderer, "custom-theme-mate-in-4");
     expect(onIntent).toHaveBeenLastCalledWith({ type: "toggle-theme", theme: "mateIn4" });
@@ -1124,6 +1130,9 @@ describe("PracticePocScreen", () => {
     await flushMicrotasks();
 
     press(renderer, "practice-add-run");
+
+    expect(() => findByTestId(renderer, "custom-theme-capturing-defender")).toThrow();
+    press(renderer, "practice-run-theme-disclosure");
 
     const themeTestIDs = new Set(
       collectTestIds(findByTestId(renderer, "practice-run-theme-row"))
@@ -4264,9 +4273,8 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-standard-elo-row")).toThrow();
   });
 
-  it("lets the Storybook New Run clone hide named themes behind a History-style disclosure", () => {
+  it("hides Add Run named themes behind a History-style disclosure", () => {
     const renderer = renderScreen({
-      runEditorThemeDisclosure: true,
       runManagementEnabled: true,
       themeCatalogPresentation: {
         groups: [
@@ -12259,7 +12267,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEditorThemeDisclosure" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
     onRenderCommit?: () => void;
     platformCapabilities?: MobilePlatformCapabilities;
   };
@@ -12376,7 +12384,6 @@ function renderScreen({
   onRenderCommit,
   puzzleSelectionId,
   puzzleSelectionSeed,
-  runEditorThemeDisclosure,
   runEloEditingMovedToHome,
   runManagementEnabled,
   runManagementPresentation,
@@ -12402,7 +12409,6 @@ function renderScreen({
         moveFeedbackSettings={moveFeedbackSettings}
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
-        runEditorThemeDisclosure={runEditorThemeDisclosure}
         runEloEditingMovedToHome={runEloEditingMovedToHome}
         runManagementEnabled={runManagementEnabled}
         runManagementPresentation={runManagementPresentation}

@@ -276,7 +276,6 @@ interface Props {
   runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
   runEloEditingMovedToHome?: boolean;
-  runEditorThemeDisclosure?: boolean;
   settingsCaptureBottomInset?: number;
   initialTab?: MobileBackPrimaryTab;
   sprintRulesDesignPreview?: SprintRulesDesignPreview;
@@ -625,7 +624,6 @@ export function PracticePocScreen({
   runManagementEnabled = false,
   runManagementPresentation,
   runEloEditingMovedToHome = false,
-  runEditorThemeDisclosure = false,
   settingsCaptureBottomInset,
   initialTab = "practice",
   sprintRulesDesignPreview,
@@ -4123,7 +4121,6 @@ export function PracticePocScreen({
                         : undefined
                     }
                     presentation={activeRunManagementPresentation}
-                    showThemeDisclosure={runEditorThemeDisclosure}
                     showSprintRulesSummary={
                       sprintGuidanceEnabled
                       || sprintRulesDesignPreview?.showRunEditorSummary === true
@@ -6821,7 +6818,6 @@ function RunRemovalConfirmation({
 function PracticeRunEditor({
   arrowDuelReplyChallenge,
   presentation,
-  showThemeDisclosure,
   showSprintRulesSummary,
   themeCatalogPresentation,
   timeoutCountsAsMistake
@@ -6834,7 +6830,6 @@ function PracticeRunEditor({
     onToggle: () => void;
   };
   presentation: PracticeRunManagementPresentation;
-  showThemeDisclosure: boolean;
   showSprintRulesSummary: boolean;
   themeCatalogPresentation?: ThemeCatalogPresentation;
   timeoutCountsAsMistake: boolean;
@@ -6973,7 +6968,7 @@ function PracticeRunEditor({
                   </View>
                 ) : null}
                 <CustomThemeChoiceRow
-                  showDisclosure={showThemeDisclosure}
+                  showDisclosure
                   selectedThemes={draft.themes}
                   themeCatalogPresentation={themeCatalogPresentation}
                   testID="practice-run-theme-row"
