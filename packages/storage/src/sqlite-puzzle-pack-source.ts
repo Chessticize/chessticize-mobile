@@ -9,6 +9,14 @@ import {
 import type { Puzzle } from "../../core/src/index.ts";
 import type { PuzzleSelectionFilter } from "./query-types.ts";
 import {
+  decodePuzzlePosition,
+  decodeUciMove,
+  decodeUciMoveLine,
+  readPuzzlePackRowEncoding,
+  type PuzzlePackBinaryValue,
+  type PuzzlePackRowEncoding
+} from "./puzzle-pack-binary-codec.ts";
+import {
   selectUniquePuzzles,
   selectUniquePuzzlesForRatingBands
 } from "./puzzle-selection.ts";
@@ -21,12 +29,12 @@ import type { SyncSqliteDatabase } from "./sync-sqlite-store.ts";
 
 interface PuzzlePackRow {
   id: string;
-  initial_fen: string;
-  solution_moves: string;
+  initial_fen: string | PuzzlePackBinaryValue;
+  solution_moves: string | PuzzlePackBinaryValue;
   rating: number;
   rating_deviation?: number;
   stockfish_eval: number;
-  stockfish_bestmove: string;
+  stockfish_bestmove: string | PuzzlePackBinaryValue;
   stockfish_eval_after_first_move: number;
 }
 
@@ -51,12 +59,14 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
   private readonly candidateMultiplier: number;
   private readonly candidateFloor: number;
   private readonly arrowDuelEligibility: SQLitePuzzlePackArrowDuelEligibility;
+  private readonly rowEncoding: PuzzlePackRowEncoding;
 
   constructor(db: SyncSqliteDatabase, options: SQLitePuzzlePackSourceOptions = {}) {
     this.db = db;
     this.candidateMultiplier = options.candidateMultiplier ?? 50;
     this.candidateFloor = options.candidateFloor ?? 200;
     this.arrowDuelEligibility = options.arrowDuelEligibility ?? "validate";
+    this.rowEncoding = readPuzzlePackRowEncoding(db);
   }
 
   countPuzzles(filter?: PuzzleSelectionFilter): number {
@@ -632,10 +642,15 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
   }
 
   private puzzleFromRow(row: PuzzlePackRow, themes = this.themesForPuzzle(row.id)): Puzzle {
+    const binary = this.rowEncoding === "binary-v1";
     return {
       id: row.id,
-      initialFen: expandFen(row.initial_fen),
-      solutionMoves: splitWords(row.solution_moves),
+      initialFen: binary
+        ? expandFen(decodePuzzlePosition(binaryField(row.initial_fen, "initial_fen")))
+        : expandFen(textField(row.initial_fen, "initial_fen")),
+      solutionMoves: binary
+        ? decodeUciMoveLine(binaryField(row.solution_moves, "solution_moves"))
+        : splitWords(textField(row.solution_moves, "solution_moves")),
       rating: row.rating,
       ...(row.rating_deviation === undefined
         ? {}
@@ -643,7 +658,9 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       themes,
       source: "lichess",
       stockfishEval: row.stockfish_eval,
-      stockfishBestMove: row.stockfish_bestmove,
+      stockfishBestMove: binary
+        ? decodeUciMove(binaryField(row.stockfish_bestmove, "stockfish_bestmove"))
+        : textField(row.stockfish_bestmove, "stockfish_bestmove"),
       stockfishEvalAfterFirstMove: row.stockfish_eval_after_first_move
     };
   }
@@ -692,6 +709,26 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     }
     return Math.max(limit * this.candidateMultiplier, limit + this.candidateFloor);
   }
+}
+
+function binaryField(
+  value: string | PuzzlePackBinaryValue,
+  field: string
+): PuzzlePackBinaryValue {
+  if (typeof value === "string") {
+    throw new Error(`Binary puzzle pack field ${field} is not a BLOB`);
+  }
+  return value;
+}
+
+function textField(
+  value: string | PuzzlePackBinaryValue,
+  field: string
+): string {
+  if (typeof value !== "string") {
+    throw new Error(`Legacy puzzle pack field ${field} is not TEXT`);
+  }
+  return value;
 }
 
 function seededOffset(seedInput: string | number, scope: string, candidateCount: number): number {

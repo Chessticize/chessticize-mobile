@@ -266,7 +266,12 @@ interface SprintSessionExportRow {
   runName?: string | null;
 }
 
-export type SyncSqliteValue = string | number | null;
+export type SyncSqliteValue =
+  | string
+  | number
+  | null
+  | ArrayBuffer
+  | ArrayBufferView;
 
 export interface SyncSqliteStatement {
   run(...params: SyncSqliteValue[]): void;

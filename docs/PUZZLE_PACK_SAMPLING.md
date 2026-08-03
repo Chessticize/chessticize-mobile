@@ -217,9 +217,10 @@ This is intentionally not a full renewal: it never adds or resamples puzzle
 IDs and does not backfill rows removed by the depth-20 eligibility check. The
 result may therefore contain fewer puzzles than `targetPuzzleCount`.
 `core-pack-v2` is the historical corrected artifact produced by this workflow.
-The current `core-pack-v3` rebuild retains those corrected positions while
-adding the immutable Puzzle Rating Deviation feature required by Tactical
-Profile. Publish future updates under new immutable release tags; never
+The `core-pack-v3` rebuild retains those corrected positions while adding the
+immutable Puzzle Rating Deviation feature required by Tactical Profile. The
+current `core-pack-v5` retains those positions and features in a versioned
+binary row encoding. Publish future updates under new immutable release tags; never
 overwrite an existing Core Pack release.
 
 ### Depth-20 correction result (2026-07-10)
@@ -262,6 +263,23 @@ overwrite an existing Core Pack release.
 - Published SHA-256:
   `74a81e54729dd1f4f9adee375c728e22ac758d3211e2da81d3b5bd702380083b`.
 - Published release: `core-pack-v4`; the fetch script references its immutable
+  `bundled-core-pack.sqlite` asset.
+
+### Binary row-encoding release (2026-08-03)
+
+- Puzzle rows and public puzzle semantics preserved: 1,400,000 / 1,400,000.
+- Every position, solution line, and Stockfish best move passed an independent
+  encode/decode round trip. The length-prefixed semantic SHA-256 before and
+  after conversion is
+  `d1eb3baa7aee47c7638c9952c23b525bca0b21dc7cb4bc6f3ff5b3f8deffaae5`.
+- `pack_format` records schema version 2, `chessticize-position` v1, and
+  `chessticize-uci16` v1. The same identities are authenticated by the
+  manifest.
+- SQLite integrity: `ok`; artifact size reduced from 227,487,744 to
+  164,163,584 bytes (63,324,160 bytes, 27.84% smaller).
+- Published SHA-256:
+  `4f8726cd64c8e490708f9c6b7b411dad3736d5936c0493d71fd42bbe4404a811`.
+- Published release: `core-pack-v5`; the fetch script references its immutable
   `bundled-core-pack.sqlite` asset.
 
 ## Regenerating And Publishing The Pack

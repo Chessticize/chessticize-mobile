@@ -1,17 +1,26 @@
 {
   "id": "core",
   "title": "Core Pack",
-  "buildDate": "2026-07-30",
+  "buildDate": "2026-08-03",
   "source": "Lichess puzzle database",
   "sourceLicense": "CC0",
   "sourceSnapshotDate": "2025-07-24",
   "presolve": "Chessticize depth-20 Stockfish presolve",
   "presolveDepth": 20,
   "licenseNote": "Derived from Lichess puzzle data with Chessticize presolve metadata.",
-  "manifestHash": "sha256:6315ca04db2a8d2f12974b15d74a1f383d589fd17d4f8f49791eebb8b3a6ab71",
-  "packFileHash": "sha256:74a81e54729dd1f4f9adee375c728e22ac758d3211e2da81d3b5bd702380083b",
-  "packFileBytes": 227487744,
+  "manifestHash": "sha256:8d0d56c2ef2057a6cfd34b4b3c4e72fa49b4950455e5bb740345c1d98e1f7a8a",
+  "packFileHash": "sha256:4f8726cd64c8e490708f9c6b7b411dad3736d5936c0493d71fd42bbe4404a811",
+  "packFileBytes": 164163584,
   "format": "sqlite",
+  "packSchemaVersion": 2,
+  "positionCodec": {
+    "name": "chessticize-position",
+    "version": 1
+  },
+  "moveCodec": {
+    "name": "chessticize-uci16",
+    "version": 1
+  },
   "seed": "chessticize-core-pack-v1-2026-07-04",
   "targetPuzzleCount": 1400000,
   "puzzleCount": 1400000,

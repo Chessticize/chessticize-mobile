@@ -13,6 +13,21 @@ import {
   isServerCompatibleCorePackPuzzle
 } from "../packages/core/src/index.ts";
 import {
+  CORE_PACK_FORMAT_ID,
+  CORE_PACK_MOVE_CODEC,
+  CORE_PACK_MOVE_CODEC_VERSION,
+  CORE_PACK_POSITION_CODEC,
+  CORE_PACK_POSITION_CODEC_VERSION,
+  CORE_PACK_SCHEMA_VERSION,
+  decodePuzzlePosition,
+  decodeUciMove,
+  decodeUciMoveLine,
+  encodePuzzlePosition,
+  encodeUciMove,
+  encodeUciMoveLine,
+  readPuzzlePackRowEncoding
+} from "../packages/storage/src/puzzle-pack-binary-codec.ts";
+import {
   assertKnownCorePackThemes,
   CORE_PACK_THEME_CATALOG,
   corePackThemeId,
@@ -192,13 +207,23 @@ function initializeDatabase(db) {
 
     CREATE TABLE puzzles (
       id TEXT PRIMARY KEY,
-      initial_fen TEXT NOT NULL,
-      solution_moves TEXT NOT NULL,
+      initial_fen BLOB NOT NULL,
+      solution_moves BLOB NOT NULL,
       rating INTEGER NOT NULL,
       rating_deviation INTEGER NOT NULL,
       stockfish_eval REAL NOT NULL,
-      stockfish_bestmove TEXT NOT NULL,
+      stockfish_bestmove BLOB NOT NULL,
       stockfish_eval_after_first_move REAL NOT NULL
+    );
+
+    CREATE TABLE pack_format (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      format_id TEXT NOT NULL,
+      pack_schema_version INTEGER NOT NULL,
+      position_codec TEXT NOT NULL,
+      position_codec_version INTEGER NOT NULL,
+      move_codec TEXT NOT NULL,
+      move_codec_version INTEGER NOT NULL
     );
 
     CREATE TABLE themes (
@@ -217,6 +242,24 @@ function initializeDatabase(db) {
     CREATE INDEX puzzles_rating_idx ON puzzles(rating, id);
     CREATE INDEX puzzle_themes_theme_rating_idx ON puzzle_themes(theme_id, rating, puzzle_id);
   `);
+  db.prepare(`
+    INSERT INTO pack_format (
+      id,
+      format_id,
+      pack_schema_version,
+      position_codec,
+      position_codec_version,
+      move_codec,
+      move_codec_version
+    ) VALUES (1, ?, ?, ?, ?, ?, ?)
+  `).run(
+    CORE_PACK_FORMAT_ID,
+    CORE_PACK_SCHEMA_VERSION,
+    CORE_PACK_POSITION_CODEC,
+    CORE_PACK_POSITION_CODEC_VERSION,
+    CORE_PACK_MOVE_CODEC,
+    CORE_PACK_MOVE_CODEC_VERSION
+  );
 }
 
 async function ingestCandidates(db, sourcePath, options) {
@@ -518,12 +561,12 @@ function writeSelectedPack(db, selected) {
     for (const puzzle of puzzles) {
       insertPuzzle.run(
         puzzle.id,
-        canonicalPositionFen(puzzle.initialFen),
-        puzzle.solutionMoves.join(" "),
+        encodePuzzlePosition(puzzle.initialFen),
+        encodeUciMoveLine(puzzle.solutionMoves),
         puzzle.rating,
         puzzle.ratingDeviation,
         puzzle.stockfishEval,
-        puzzle.stockfishBestMove,
+        encodeUciMove(puzzle.stockfishBestMove),
         puzzle.stockfishEvalAfterFirstMove
       );
       for (const theme of new Set(puzzle.themes)) {
@@ -545,6 +588,7 @@ function writeSelectedPack(db, selected) {
 function buildSqliteManifest(path, input, options) {
   const packDb = new DatabaseSync(path, { readOnly: true });
   try {
+    const rowEncoding = readPuzzlePackRowEncoding(packDb);
     const themeCounts = new Map();
     const matePatternCounts = new Map();
     const buckets = new Map();
@@ -626,6 +670,19 @@ function buildSqliteManifest(path, input, options) {
       packFileHash: input.packFileHash,
       packFileBytes: input.packFileBytes,
       format: input.format,
+      ...(rowEncoding === "binary-v1"
+        ? {
+            packSchemaVersion: CORE_PACK_SCHEMA_VERSION,
+            positionCodec: {
+              name: CORE_PACK_POSITION_CODEC,
+              version: CORE_PACK_POSITION_CODEC_VERSION
+            },
+            moveCodec: {
+              name: CORE_PACK_MOVE_CODEC,
+              version: CORE_PACK_MOVE_CODEC_VERSION
+            }
+          }
+        : {}),
       seed: input.seed,
       targetPuzzleCount: input.targetPuzzleCount,
       puzzleCount,
@@ -762,6 +819,7 @@ function puzzleFromCandidateRow(row) {
 }
 
 function* iteratePackPuzzles(db) {
+  const rowEncoding = readPuzzlePackRowEncoding(db);
   const rows = db.prepare(`
     SELECT
       puzzles.id,
@@ -786,14 +844,20 @@ function* iteratePackPuzzles(db) {
       }
       current = {
         id: row.id,
-        initialFen: expandFen(row.initial_fen),
-        solutionMoves: splitWords(row.solution_moves),
+        initialFen: rowEncoding === "binary-v1"
+          ? expandFen(decodePuzzlePosition(row.initial_fen))
+          : expandFen(row.initial_fen),
+        solutionMoves: rowEncoding === "binary-v1"
+          ? decodeUciMoveLine(row.solution_moves)
+          : splitWords(row.solution_moves),
         rating: row.rating,
         ratingDeviation: row.rating_deviation,
         themes: [],
         source: "lichess",
         stockfishEval: row.stockfish_eval,
-        stockfishBestMove: row.stockfish_bestmove,
+        stockfishBestMove: rowEncoding === "binary-v1"
+          ? decodeUciMove(row.stockfish_bestmove)
+          : row.stockfish_bestmove,
         stockfishEvalAfterFirstMove: row.stockfish_eval_after_first_move
       };
     }

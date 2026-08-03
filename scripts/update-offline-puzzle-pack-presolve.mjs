@@ -13,6 +13,13 @@ import {
   stableJson
 } from "./generate-offline-puzzle-fixture.mjs";
 import {
+  decodePuzzlePosition,
+  decodeUciMove,
+  decodeUciMoveLine,
+  encodeUciMove,
+  readPuzzlePackRowEncoding
+} from "../packages/storage/src/puzzle-pack-binary-codec.ts";
+import {
   installArtifactPair
 } from "./offline-puzzle-pack-artifact.mjs";
 import {
@@ -167,6 +174,7 @@ async function updatePackDatabase(
   let transactionOpen = false;
   try {
     assertPackSchema(db);
+    const rowEncoding = readPuzzlePackRowEncoding(db);
     db.exec("PRAGMA journal_mode = OFF; PRAGMA synchronous = OFF; PRAGMA temp_store = MEMORY");
 
     const remainingPuzzleIds = new Set();
@@ -225,7 +233,7 @@ async function updatePackDatabase(
         if (!existing) {
           throw new Error(`Pack puzzle ${id} disappeared during the update`);
         }
-        assertSameSourcePuzzle(existing, sourceRow);
+        assertSameSourcePuzzle(existing, sourceRow, rowEncoding);
 
         const stockfishEval = parseOptionalNumber(sourceRow.stockfish_eval, "stockfish_eval", id);
         const stockfishBestMove = sourceRow.stockfish_bestmove?.trim() || undefined;
@@ -235,7 +243,10 @@ async function updatePackDatabase(
           id
         );
         const evalChanged = stockfishEval !== existing.stockfish_eval;
-        const bestMoveChanged = stockfishBestMove !== existing.stockfish_bestmove;
+        const existingBestMove = rowEncoding === "binary-v1"
+          ? decodeUciMove(existing.stockfish_bestmove)
+          : existing.stockfish_bestmove;
+        const bestMoveChanged = stockfishBestMove !== existingBestMove;
         const evalAfterChanged = stockfishEvalAfterFirstMove !== existing.stockfish_eval_after_first_move;
         const changed = evalChanged || bestMoveChanged || evalAfterChanged;
 
@@ -254,8 +265,12 @@ async function updatePackDatabase(
 
         const puzzle = {
           id,
-          initialFen: expandFen(existing.initial_fen),
-          solutionMoves: splitWords(existing.solution_moves),
+          initialFen: rowEncoding === "binary-v1"
+            ? expandFen(decodePuzzlePosition(existing.initial_fen))
+            : expandFen(existing.initial_fen),
+          solutionMoves: rowEncoding === "binary-v1"
+            ? decodeUciMoveLine(existing.solution_moves)
+            : splitWords(existing.solution_moves),
           rating: existing.rating,
           themes: [],
           source: "lichess",
@@ -283,7 +298,14 @@ async function updatePackDatabase(
         );
 
         if (changed) {
-          updatePuzzle.run(stockfishEval, stockfishBestMove, stockfishEvalAfterFirstMove, id);
+          updatePuzzle.run(
+            stockfishEval,
+            rowEncoding === "binary-v1"
+              ? encodeUciMove(stockfishBestMove)
+              : stockfishBestMove,
+            stockfishEvalAfterFirstMove,
+            id
+          );
           updatedRows += 1;
         } else {
           unchangedRows += 1;
@@ -352,13 +374,19 @@ function assertPackSchema(db) {
   }
 }
 
-function assertSameSourcePuzzle(existing, sourceRow) {
+function assertSameSourcePuzzle(existing, sourceRow, rowEncoding) {
   const sourceFen = canonicalPositionFen(sourceRow.FEN ?? "");
   const sourceMoves = splitWords(sourceRow.Moves).join(" ");
   const sourceRating = parseRequiredNumber(sourceRow.Rating, "Rating", existing.id);
+  const existingFen = rowEncoding === "binary-v1"
+    ? decodePuzzlePosition(existing.initial_fen)
+    : existing.initial_fen;
+  const existingMoves = rowEncoding === "binary-v1"
+    ? decodeUciMoveLine(existing.solution_moves).join(" ")
+    : existing.solution_moves;
   if (
-    sourceFen !== existing.initial_fen ||
-    sourceMoves !== existing.solution_moves ||
+    sourceFen !== existingFen ||
+    sourceMoves !== existingMoves ||
     sourceRating !== existing.rating
   ) {
     throw new Error(

@@ -19,12 +19,27 @@ import {
   evaluateCalibrationReadiness,
   parseCalibrationArguments,
   posteriorApproximationReport,
+  puzzleSolutionDecisionCount,
   reliabilityBins,
   runCalibration,
   scoreBinaryPredictions,
   splitWholeSessions,
   verifyPackIdentity
 } from "./calibrate-tactical-profile.mjs";
+
+test("calibration counts decisions from legacy and binary Core Pack move lines", () => {
+  assert.equal(
+    puzzleSolutionDecisionCount("e2e4 e7e5 g1f3 b8c6", "legacy-text"),
+    2
+  );
+  assert.equal(
+    puzzleSolutionDecisionCount(
+      Uint8Array.from([0x0c, 0x07, 0x34, 0x09, 0x46, 0x05, 0xb9, 0x0a]),
+      "binary-v1"
+    ),
+    2
+  );
+});
 
 test("bundled calibration artifact is valid and tied to the predeclared policy and pack", async () => {
   const [artifact, policy, manifest] = await Promise.all([

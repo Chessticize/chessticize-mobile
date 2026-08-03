@@ -32,6 +32,7 @@
     "extract:tactical-profile-progress": "node --experimental-strip-types scripts/extract-tactical-profile-progress.mjs",
     "calibrate:tactical-profile": "node --experimental-strip-types scripts/calibrate-tactical-profile.mjs",
     "optimize:offline-puzzles": "node --experimental-strip-types scripts/optimize-offline-puzzle-pack.mjs",
+    "encode:offline-puzzles": "node --experimental-strip-types scripts/encode-offline-puzzle-pack.mjs",
     "update:offline-puzzle-presolve": "node --experimental-strip-types scripts/update-offline-puzzle-pack-presolve.mjs",
     "typecheck": "tsc --noEmit",
     "mobile:start": "pnpm --filter ChessticizeMobile start",

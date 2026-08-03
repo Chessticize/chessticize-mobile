@@ -5,11 +5,17 @@ import { join } from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import {
+  initializeDatabase,
   sha256File,
   sha256Text,
-  stableJson
+  stableJson,
+  writeSelectedPack
 } from "../../../scripts/generate-offline-puzzle-fixture.mjs";
 import { updateOfflinePuzzlePackPresolve } from "../../../scripts/update-offline-puzzle-pack-presolve.mjs";
+import {
+  NodeSqliteDatabase,
+  SQLitePuzzlePackSource
+} from "../src/index.ts";
 
 const FULL_FEN = "r6k/pp2r2p/4Rp1Q/3p4/8/1N1P2R1/PqP2bPP/7K b - - 0 24";
 const PACK_FEN = "r6k/pp2r2p/4Rp1Q/3p4/8/1N1P2R1/PqP2bPP/7K b - -";
@@ -121,6 +127,70 @@ test("updates retained IDs from depth 20 and removes puzzles that stop qualifyin
   );
 });
 
+test("updates a binary Core Pack without changing its row encoding", async (t) => {
+  const fixture = await createFixture({
+    binary: true,
+    packIds: ["00008", "0000A"],
+    sourceRows: [
+      sourceRow("00008", -453, "b2b1", 693),
+      sourceRow("0000A", -450, "b2b1", 683)
+    ]
+  });
+  t.after(() => rm(fixture.root, { recursive: true, force: true }));
+
+  const report = await updateOfflinePuzzlePackPresolve({
+    sourcePath: fixture.sourcePath,
+    packPath: fixture.packPath,
+    manifestPath: fixture.manifestPath,
+    buildDate: "2026-08-03",
+    sourceSnapshotDate: "2025-07-24",
+    presolveDepth: 20,
+    maxRating: 2200,
+    log: () => {}
+  });
+
+  assert.equal(report.updatedRows, 1);
+  assert.equal(report.removedRows, 0);
+  const db = new DatabaseSync(fixture.packPath, { readOnly: true });
+  try {
+    assert.deepEqual(
+      {
+        ...db.prepare(`
+          SELECT
+            typeof(initial_fen) AS initial_fen_type,
+            typeof(solution_moves) AS solution_moves_type,
+            typeof(stockfish_bestmove) AS stockfish_bestmove_type
+          FROM puzzles
+          WHERE id = '00008'
+        `).get()
+      },
+      {
+        initial_fen_type: "blob",
+        solution_moves_type: "blob",
+        stockfish_bestmove_type: "blob"
+      }
+    );
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(db));
+    const updated = source.getPuzzle("00008");
+    assert.equal(updated?.stockfishEval, -453);
+    assert.equal(updated?.stockfishBestMove, "b2b1");
+    assert.equal(updated?.stockfishEvalAfterFirstMove, 693);
+  } finally {
+    db.close();
+  }
+
+  const manifest = JSON.parse(await readFile(fixture.manifestPath, "utf8"));
+  assert.equal(manifest.packSchemaVersion, 2);
+  assert.deepEqual(manifest.positionCodec, {
+    name: "chessticize-position",
+    version: 1
+  });
+  assert.deepEqual(manifest.moveCodec, {
+    name: "chessticize-uci16",
+    version: 1
+  });
+});
+
 test("leaves the original artifact and manifest untouched when the depth-20 source is incomplete", async (t) => {
   const fixture = await createFixture({
     packIds: ["00008", "00009"],
@@ -185,58 +255,81 @@ async function createFixture(input) {
 
   const db = new DatabaseSync(packPath);
   try {
-    db.exec(`
-      CREATE TABLE puzzles (
-        id TEXT PRIMARY KEY,
-        initial_fen TEXT NOT NULL,
-        solution_moves TEXT NOT NULL,
-        rating INTEGER NOT NULL,
-        rating_deviation INTEGER NOT NULL,
-        stockfish_eval REAL NOT NULL,
-        stockfish_bestmove TEXT NOT NULL,
-        stockfish_eval_after_first_move REAL NOT NULL
+    if (input.binary) {
+      initializeDatabase(db);
+      writeSelectedPack(
+        db,
+        input.packIds.map((id) => ({
+          id,
+          initialFen: FULL_FEN,
+          solutionMoves: MOVES.split(" "),
+          rating: 1798,
+          ratingDeviation: 77,
+          popularity: 95,
+          nbPlays: 8020,
+          themes: ["crushing"],
+          openingTags: [],
+          source: "lichess",
+          stockfishEval: ORIGINAL_PRESOLVE.stockfishEval,
+          stockfishBestMove: ORIGINAL_PRESOLVE.stockfishBestMove,
+          stockfishEvalAfterFirstMove:
+            ORIGINAL_PRESOLVE.stockfishEvalAfterFirstMove
+        }))
       );
-      CREATE TABLE themes (
-        id INTEGER PRIMARY KEY,
-        name TEXT NOT NULL UNIQUE
+    } else {
+      db.exec(`
+        CREATE TABLE puzzles (
+          id TEXT PRIMARY KEY,
+          initial_fen TEXT NOT NULL,
+          solution_moves TEXT NOT NULL,
+          rating INTEGER NOT NULL,
+          rating_deviation INTEGER NOT NULL,
+          stockfish_eval REAL NOT NULL,
+          stockfish_bestmove TEXT NOT NULL,
+          stockfish_eval_after_first_move REAL NOT NULL
+        );
+        CREATE TABLE themes (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL UNIQUE
+        );
+        CREATE TABLE puzzle_themes (
+          puzzle_id TEXT NOT NULL,
+          theme_id INTEGER NOT NULL,
+          rating INTEGER NOT NULL,
+          PRIMARY KEY (puzzle_id, theme_id)
+        );
+        CREATE INDEX puzzles_rating_idx ON puzzles(rating, id);
+        CREATE INDEX puzzle_themes_theme_rating_idx ON puzzle_themes(theme_id, rating, puzzle_id);
+        INSERT INTO themes (id, name) VALUES (1, 'crushing');
+      `);
+      const insertPuzzle = db.prepare(`
+        INSERT INTO puzzles (
+          id,
+          initial_fen,
+          solution_moves,
+          rating,
+          rating_deviation,
+          stockfish_eval,
+          stockfish_bestmove,
+          stockfish_eval_after_first_move
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const insertTheme = db.prepare(
+        "INSERT INTO puzzle_themes (puzzle_id, theme_id, rating) VALUES (?, 1, 1798)"
       );
-      CREATE TABLE puzzle_themes (
-        puzzle_id TEXT NOT NULL,
-        theme_id INTEGER NOT NULL,
-        rating INTEGER NOT NULL,
-        PRIMARY KEY (puzzle_id, theme_id)
-      );
-      CREATE INDEX puzzles_rating_idx ON puzzles(rating, id);
-      CREATE INDEX puzzle_themes_theme_rating_idx ON puzzle_themes(theme_id, rating, puzzle_id);
-      INSERT INTO themes (id, name) VALUES (1, 'crushing');
-    `);
-    const insertPuzzle = db.prepare(`
-      INSERT INTO puzzles (
-        id,
-        initial_fen,
-        solution_moves,
-        rating,
-        rating_deviation,
-        stockfish_eval,
-        stockfish_bestmove,
-        stockfish_eval_after_first_move
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const insertTheme = db.prepare(
-      "INSERT INTO puzzle_themes (puzzle_id, theme_id, rating) VALUES (?, 1, 1798)"
-    );
-    for (const id of input.packIds) {
-      insertPuzzle.run(
-        id,
-        PACK_FEN,
-        MOVES,
-        1798,
-        77,
-        ORIGINAL_PRESOLVE.stockfishEval,
-        ORIGINAL_PRESOLVE.stockfishBestMove,
-        ORIGINAL_PRESOLVE.stockfishEvalAfterFirstMove
-      );
-      insertTheme.run(id);
+      for (const id of input.packIds) {
+        insertPuzzle.run(
+          id,
+          PACK_FEN,
+          MOVES,
+          1798,
+          77,
+          ORIGINAL_PRESOLVE.stockfishEval,
+          ORIGINAL_PRESOLVE.stockfishBestMove,
+          ORIGINAL_PRESOLVE.stockfishEvalAfterFirstMove
+        );
+        insertTheme.run(id);
+      }
     }
   } finally {
     db.close();
