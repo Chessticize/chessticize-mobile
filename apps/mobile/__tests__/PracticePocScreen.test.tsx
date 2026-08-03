@@ -18,6 +18,7 @@ import {
   type PracticeSafeAreaInsets
 } from "../src/components/adaptivePracticeLayout";
 import { LabScenario } from "../../mobile-lab/src/LabScenario";
+import { getLabPracticeService } from "../../mobile-lab/src/boardController";
 import {
   createMobilePracticeService,
   configureMobilePracticePuzzleSource,
@@ -2255,7 +2256,7 @@ describe("PracticePocScreen", () => {
     expect(testIdOrder(firstEverArrowDuel, "practice-prompt", "practice-arrow-duel-guide-demo-board")).toBeLessThan(0);
     expect(testIdOrder(firstEverArrowDuel, "practice-arrow-duel-guide-demo-board", "session-score-strip")).toBeLessThan(0);
     expect(collectText(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-coach"))).toContain(
-      "Compare the two moves, then play the stronger one on the board. Other moves are ignored. If the Sprint clock reaches zero, the current choice is saved as Incomplete, not as a mistake."
+      "Choose the stronger arrow. If correct, you get 5 seconds to reply to the tempting move—outside Sprint time. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review."
     );
     expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-coach-progress"))).toBe(
       "5 of 5"
@@ -2293,6 +2294,125 @@ describe("PracticePocScreen", () => {
     );
     expect(collectText(findByTestId(returningArrowDuel, "practice-session-guide-start"))).toBe(
       "Start Arrow Duel"
+    );
+  });
+
+  it("previews the default-on Arrow Duel reply setting without saving it", () => {
+    const renderer = renderLabScenario("practice-run-arrow-duel-editor");
+
+    press(renderer, "practice-run-home-edit");
+    press(renderer, "practice-run-edit-arrow-duel");
+
+    expect(collectText(findByTestId(
+      renderer,
+      "practice-run-arrow-duel-reply-value"
+    ))).toBe("On");
+    expect(collectText(findByTestId(
+      renderer,
+      "practice-run-arrow-duel-reply-setting"
+    ))).toContain("Reply time does not use Sprint time");
+    expect(collectText(findByTestId(
+      renderer,
+      "practice-run-arrow-duel-reply-setting"
+    ))).toContain("On and Off keep separate ratings");
+
+    press(renderer, "practice-run-arrow-duel-reply-toggle");
+    expect(collectText(findByTestId(
+      renderer,
+      "practice-run-arrow-duel-reply-value"
+    ))).toBe("Off");
+  });
+
+  it("previews whole-puzzle scoring for choice, reply, and reply timeout", async () => {
+    const correct = renderLabScenario("practice-arrow-duel-prompt");
+    startArrowDuelSprint(correct);
+    const correctState = requireLabArrowDuelState();
+
+    await boardMove(correct, correctState.correctMove);
+    expect(collectText(findByTestId(correct, "arrow-duel-reply-challenge"))).toContain(
+      "Find the reply"
+    );
+    expect(collectText(findByTestId(correct, "arrow-duel-reply-timer"))).toBe("0:05");
+    expect(collectText(findByTestId(correct, "arrow-duel-reply-sprint-paused"))).toBe(
+      "SPRINT PAUSED"
+    );
+    await boardMove(correct, correctState.puzzle.solutionMoves[1]!);
+    expect(collectText(findByTestId(correct, "arrow-duel-reply-challenge"))).toContain(
+      "Puzzle solved"
+    );
+    expect(findByTestId(correct, "session-score-strip").props.accessibilityLabel).toContain(
+      "solved 1, mistakes 0"
+    );
+    expect(requireLabArrowDuelState().selectedMove).toBeUndefined();
+
+    const wrongChoice = renderLabScenario("practice-arrow-duel-prompt");
+    startArrowDuelSprint(wrongChoice);
+    const wrongChoiceState = requireLabArrowDuelState();
+    await boardMove(wrongChoice, wrongChoiceState.wrongMove);
+    expect(collectText(findByTestId(wrongChoice, "arrow-duel-reply-challenge"))).toContain(
+      "Choice missed"
+    );
+    expect(collectText(findByTestId(wrongChoice, "arrow-duel-reply-challenge"))).toContain(
+      "One mistake · added to Review"
+    );
+    expect(findByTestId(wrongChoice, "session-score-strip").props.accessibilityLabel).toContain(
+      "solved 0, mistakes 1"
+    );
+
+    const wrongReply = renderLabScenario("practice-arrow-duel-prompt");
+    startArrowDuelSprint(wrongReply);
+    const wrongReplyState = requireLabArrowDuelState();
+    await boardMove(wrongReply, wrongReplyState.correctMove);
+    const replyBoard = findByTestId(wrongReply, "mock-chessboard");
+    const replyChess = new Chess(replyBoard.props.fen);
+    const expectedReply = wrongReplyState.puzzle.solutionMoves[1]!.toLowerCase();
+    const differentReply = replyChess.moves({ verbose: true }).find((move) => (
+      `${move.from}${move.to}${move.promotion ?? ""}`.toLowerCase() !== expectedReply
+    ));
+    expect(differentReply).toBeDefined();
+    await boardMove(
+      wrongReply,
+      `${differentReply!.from}${differentReply!.to}${differentReply!.promotion ?? ""}`
+    );
+    expect(collectText(findByTestId(wrongReply, "arrow-duel-reply-challenge"))).toContain(
+      "Reply missed"
+    );
+    expect(findByTestId(wrongReply, "session-score-strip").props.accessibilityLabel).toContain(
+      "solved 0, mistakes 1"
+    );
+
+    const timeout = renderLabScenario(
+      "practice-arrow-duel-prompt",
+      { arrowDuelReplyAutoTimeoutMs: 500 }
+    );
+    startArrowDuelSprint(timeout);
+    const timeoutState = requireLabArrowDuelState();
+    await boardMove(timeout, timeoutState.correctMove);
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(collectText(findByTestId(timeout, "arrow-duel-reply-challenge"))).toContain(
+      "Reply timed out"
+    );
+    expect(findByTestId(timeout, "session-score-strip").props.accessibilityLabel).toContain(
+      "solved 0, mistakes 1"
+    );
+  });
+
+  it("accepts an alternate legal mate in one in the sampled reply position", async () => {
+    const renderer = renderLabScenario("practice-arrow-duel-mate-in-one");
+    startArrowDuelSprint(renderer);
+    const state = requireLabArrowDuelState();
+
+    expect(state.puzzle.solutionMoves[1]).toBe("g3f4");
+    await boardMove(renderer, state.correctMove);
+    await boardMove(renderer, "g3g5");
+
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
+      "Puzzle solved"
+    );
+    expect(findByTestId(renderer, "session-score-strip").props.accessibilityLabel).toContain(
+      "solved 1, mistakes 0"
     );
   });
 
@@ -2364,13 +2484,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(
       findByTestId(arrowDuel, "practice-session-guide-coach-copy-arrow-duel")
     )).toBe(
-      "ARROW DUELThe arrows show your two choicesCompare the two moves, then play the stronger one on the board. Other moves are ignored. If the Sprint clock reaches zero, the current choice is saved as Incomplete, not as a mistake."
+      "ARROW DUELChoose, then prove itChoose the stronger arrow. If correct, you get 5 seconds to reply to the tempting move—outside Sprint time. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review."
     );
     expect(findByTestId(
       arrowDuel,
       "practice-arrow-duel-guide"
     ).props.accessibilityLabel).toBe(
-      "Guide 1 of 1. The arrows show your two choices. Compare the two moves, then play the stronger one on the board. Other moves are ignored. If the Sprint clock reaches zero, the current choice is saved as Incomplete, not as a mistake."
+      "Guide 1 of 1. Choose, then prove it. Choose the stronger arrow. If correct, you get 5 seconds to reply to the tempting move—outside Sprint time. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review."
     );
 
     const rules = renderLabScenario("practice-first-sprint-guide");
@@ -12171,11 +12291,12 @@ function renderScreen({
 }
 
 function renderLabScenario(
-  scenarioId: React.ComponentProps<typeof LabScenario>["scenarioId"]
+  scenarioId: React.ComponentProps<typeof LabScenario>["scenarioId"],
+  props: Omit<React.ComponentProps<typeof LabScenario>, "scenarioId"> = {}
 ): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   act(() => {
-    renderer = TestRenderer.create(<LabScenario scenarioId={scenarioId} />);
+    renderer = TestRenderer.create(<LabScenario scenarioId={scenarioId} {...props} />);
   });
   if (!renderer) {
     throw new Error("LabScenario did not render");
@@ -12852,6 +12973,14 @@ function requireArrowDuelState(state: SprintState): ArrowDuelState {
     throw new Error("Expected an active Arrow Duel puzzle");
   }
   return state.currentPuzzle;
+}
+
+function requireLabArrowDuelState(): ArrowDuelState {
+  const state = getLabPracticeService()?.getActiveSprint();
+  if (!state) {
+    throw new Error("Expected an active Interaction Lab sprint");
+  }
+  return requireArrowDuelState(state);
 }
 
 function press(renderer: TestRenderer.ReactTestRenderer, testID: string): void {

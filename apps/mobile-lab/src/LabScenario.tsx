@@ -64,6 +64,18 @@ const HISTORY_INCOMPLETE_LAB_PUZZLE: Puzzle = {
   themes: ["promotion"]
 };
 
+const ARROW_DUEL_MULTI_MATE_LAB_PUZZLE: Puzzle = {
+  id: "lab-arrow-duel-multiple-mates",
+  initialFen: "6k1/pp2p2p/6p1/P2p4/4b3/2P3q1/1P1KBr2/R1Q1R3 w - -",
+  rating: 1963,
+  solutionMoves: ["c1d1", "g3f4"],
+  source: "synthetic",
+  stockfishBestMove: "d2d1",
+  stockfishEval: 0,
+  stockfishEvalAfterFirstMove: -10000,
+  themes: ["mateIn1"]
+};
+
 type ScreenProps = Omit<React.ComponentProps<typeof PracticePocScreen>, "platformCapabilities">;
 
 type ScenarioRuntime = {
@@ -78,9 +90,11 @@ export type LabStoryPresentation = {
 };
 
 export function LabScenario({
+  arrowDuelReplyAutoTimeoutMs,
   scenarioId,
   storyPresentation
 }: {
+  arrowDuelReplyAutoTimeoutMs?: number;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
 }): React.JSX.Element {
@@ -89,6 +103,7 @@ export function LabScenario({
   return (
     <LabScenarioContent
       key={scenarioId}
+      arrowDuelReplyAutoTimeoutMs={arrowDuelReplyAutoTimeoutMs}
       runtime={runtime}
       scenarioId={scenarioId}
       storyPresentation={storyPresentation}
@@ -97,10 +112,12 @@ export function LabScenario({
 }
 
 function LabScenarioContent({
+  arrowDuelReplyAutoTimeoutMs,
   runtime,
   scenarioId,
   storyPresentation
 }: {
+  arrowDuelReplyAutoTimeoutMs?: number;
   runtime: ScenarioRuntime;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
@@ -167,6 +184,18 @@ function LabScenarioContent({
           initialActiveState: startedFocusedRun
         }
       };
+  const effectiveScreenProps = arrowDuelReplyAutoTimeoutMs === undefined
+    ? screenProps
+    : {
+        ...screenProps,
+        sprintRulesDesignPreview: {
+          ...screenProps.sprintRulesDesignPreview,
+          arrowDuelReplyChallenge: {
+            enabled: true,
+            autoTimeoutMs: arrowDuelReplyAutoTimeoutMs
+          }
+        }
+      };
 
   return (
     <LabScenarioShell scenarioId={scenarioId} storyPresentation={storyPresentation}>
@@ -187,7 +216,7 @@ function LabScenarioContent({
           : undefined}
         runEloEditingMovedToHome
         tacticalProfilePresentation={tacticalProfilePresentation}
-        {...screenProps}
+        {...effectiveScreenProps}
       />
     </LabScenarioShell>
   );
@@ -201,6 +230,7 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-custom-setup",
     "practice-run-name-validation",
     "practice-run-standard-editor",
+    "practice-run-arrow-duel-editor",
     "practice-custom-rating-editor",
     "practice-run-remove-confirmation",
     "practice-runs-empty"
@@ -225,9 +255,13 @@ function sprintRulesDesignPreviewFor(
   if (
     scenarioId === "practice-custom-setup"
     || scenarioId === "practice-run-standard-editor"
+    || scenarioId === "practice-run-arrow-duel-editor"
     || scenarioId === "practice-custom-rating-editor"
   ) {
     return {
+      ...(scenarioId === "practice-run-arrow-duel-editor"
+        ? { arrowDuelReplyChallenge: { enabled: true } }
+        : {}),
       firstRunGuide,
       showRunEditorSummary: true,
       timeoutCountsAsMistake: true
@@ -247,6 +281,7 @@ function sprintRulesDesignPreviewFor(
     };
     const arrowDuelGuide = {
       ...sharedGuide,
+      arrowDuelReplyChallenge: true,
       guideKey: "arrow_duel" as const,
       mode: "arrow_duel" as const
     };
@@ -268,6 +303,15 @@ function sprintRulesDesignPreviewFor(
         mode: "standard",
         targetCorrect: 15
       }],
+      timeoutCountsAsMistake: true
+    };
+  }
+  if (
+    scenarioId === "practice-arrow-duel-prompt"
+    || scenarioId === "practice-arrow-duel-mate-in-one"
+  ) {
+    return {
+      arrowDuelReplyChallenge: { enabled: true },
       timeoutCountsAsMistake: true
     };
   }
@@ -675,6 +719,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
   }
 
   switch (scenarioId) {
+    case "practice-arrow-duel-mate-in-one":
+      service = createArrowDuelMultipleMateService();
+      configurePuzzleSource = false;
+      break;
     case "practice-sprint-result-goal":
     case "practice-sprint-result-replay":
       service = createSprintResultReplayService();
@@ -920,6 +968,12 @@ function createRunManagementService(empty: boolean, dueReviewCount = 0): Practic
   const service = new PracticeService(store);
   seedRunManagementCatalog(service, empty);
   return service;
+}
+
+function createArrowDuelMultipleMateService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles([ARROW_DUEL_MULTI_MATE_LAB_PUZZLE]);
+  return new PracticeService(store);
 }
 
 function seedRunManagementCatalog(service: PracticeService, empty: boolean): void {

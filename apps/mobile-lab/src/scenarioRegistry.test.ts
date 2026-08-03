@@ -49,10 +49,22 @@ test("every typed navigation coverage entry points to a registered scenario", ()
   }
 });
 
-test("New Scenario Markers derive tags and the current catalog has none", () => {
+test("New Scenario Markers derive tags for the Arrow Duel reply design", () => {
   const scenarios = Object.values(scenarioRegistry);
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
-  assert.deepEqual(newScenarios, []);
+  assert.deepEqual(
+    newScenarios.map((scenario) => scenario.id),
+    [
+      "practice-run-arrow-duel-editor",
+      "practice-arrow-duel-guide",
+      "practice-arrow-duel-guide-only",
+      "practice-arrow-duel-prompt",
+      "practice-arrow-duel-mate-in-one"
+    ]
+  );
+  assert.ok(newScenarios.every(
+    (scenario) => scenario.issues.some((issue) => issue.issueNumber === 489)
+  ));
 
   for (const scenario of scenarios) {
     assert.deepEqual(
@@ -293,7 +305,8 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   ));
   assert.match(activeSessionGuide.description, /full red pointer above that board/);
   assert.ok(arrowDuelGuide.scope.includes.includes("ARROW DUEL semantic callout"));
-  assert.ok(arrowDuelGuide.scope.includes.includes("The arrows show your two choices"));
+  assert.ok(arrowDuelGuide.scope.includes.includes("Choose, then prove it"));
+  assert.ok(arrowDuelGuide.scope.includes.includes("Separate five-second reply window"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Portrait callout below the board"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Landscape callout in the empty board lane"));
   assert.ok(arrowDuelGuide.scope.includes.includes(
@@ -302,7 +315,7 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.ok(arrowDuelGuide.scope.includes.includes(
     "Always-available direct guide exit without completion"
   ));
-  assert.match(arrowDuelGuide.description, /two arrows are the user's two choices/);
+  assert.match(arrowDuelGuide.description, /choice-and-reply rule/);
   assert.match(arrowDuelGuide.description, /straight upward connector/);
   assert.match(arrowDuelGuide.description, /cannot read as a third move arrow/);
   const arrowDuelGuideOnly = scenarioRegistry["practice-arrow-duel-guide-only"];

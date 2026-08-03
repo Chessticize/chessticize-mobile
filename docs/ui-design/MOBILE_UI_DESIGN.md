@@ -349,6 +349,16 @@ Arrow Duel active-session rules:
 - Candidate arrows are neutral before selection.
 - Candidate ordering is randomized by backend/domain logic and stored with the attempt.
 - The board must not reveal which move is best before selection.
+- The planned Opponent reply challenge is defined in
+  [`ARROW_DUEL_REPLY_CHALLENGE.md`](ARROW_DUEL_REPLY_CHALLENGE.md). When it is
+  enabled, a correct candidate begins a separate five-second refutation step;
+  both answers must be correct for the puzzle to count as solved.
+- A wrong candidate, wrong reply, or reply timeout makes the whole puzzle wrong
+  and adds it to Review. The reply step gives no partial credit.
+- The reply clock and its board handoff are independent of the Sprint deadline,
+  puzzle elapsed time, Slow threshold, and puzzle Timeout threshold.
+- Reply judgment accepts the stored puzzle main-line move or any legal move
+  that immediately checkmates. It does not invoke Stockfish.
 
 Arrow Duel Replay and Review rules:
 
@@ -432,6 +442,9 @@ New Run behavior:
 - Add to Home is disabled only when the Run is invalid or no eligible puzzles exist locally.
 - Once a Run has rated games, its current rating remains editable from that Run's
   editor without changing its stable Run identity or History linkage.
+- Edit Run shows the default-on `Opponent reply` switch only for Arrow Duel.
+  Turning it off restores the one-choice flow and selects a separate Rating
+  identity from the enabled configuration.
 - If the selected puzzle pack lacks enough eligible puzzles, show a local pack
   warning and offer a broader theme.
 
