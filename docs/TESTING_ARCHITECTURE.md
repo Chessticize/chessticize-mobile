@@ -198,7 +198,8 @@ behavior. This includes:
 - Standard sprint target reached, maximum mistakes, timeout, abandon, pause,
   resume, puzzle exhaustion, and rating effects.
 - Arrow Duel correct choice, wrong choice, non-candidate move, candidate order,
-  review metadata, and sprint completion.
+  opponent-reply acceptance, mate-in-one alternatives, independent reply
+  timeout, frozen Sprint/puzzle clocks, review metadata, and sprint completion.
 - Custom rating-key separation across timing, theme, and mode configurations.
 - Review scheduling success/failure intervals, overdue boundaries, and context
   separation.
@@ -222,7 +223,8 @@ Representative component coverage includes:
 
 - Start, pause, resume, timeout, abandon confirmation, and result summaries.
 - Standard and Arrow Duel board callback handling, including ignored illegal or
-  stale callbacks.
+  stale callbacks, the tempting-move handoff, opponent-reply feedback, and
+  automatic advance.
 - Custom setup variants, multiple saved configurations, theme selection, and
   the selected rating bucket/ELO.
 - Review queue states, scheduled review completion, review analysis, and

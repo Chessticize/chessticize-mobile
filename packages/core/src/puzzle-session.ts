@@ -37,7 +37,7 @@ export function submitLineMove(state: PuzzleLineState, move: string): {
   if (!isLegalMove(state.currentFen, submittedMove)) {
     throw new Error(`Move ${move} is not legal in the current position`);
   }
-  if (submittedMove !== normalizeMove(expectedMove) && !isLegalCheckmateMove(state.currentFen, submittedMove)) {
+  if (!isPuzzleMoveAccepted(state.currentFen, expectedMove, submittedMove)) {
     return {
       state,
       feedback: {
@@ -111,6 +111,7 @@ export function beginArrowDuelPuzzle(puzzle: Puzzle, seedOrOptions: string | num
     candidates,
     correctMove,
     wrongMove,
+    phase: "choice",
     solved: false
   };
 }
@@ -129,12 +130,19 @@ function validateArrowDuelCandidateOrder(input: {
   return input.candidateOrder;
 }
 
-export function submitArrowDuelChoice(state: ArrowDuelState, move: string): {
+export function submitArrowDuelChoice(
+  state: ArrowDuelState,
+  move: string,
+  options: { opponentReply: boolean } = { opponentReply: false }
+): {
   state: ArrowDuelState;
   feedback: PuzzleFeedback;
 } {
   if (state.solved) {
     throw new Error("Puzzle is already solved");
+  }
+  if (state.phase !== "choice") {
+    throw new Error("Arrow Duel is waiting for the opponent reply");
   }
   const isCorrect = normalizeMove(move) === normalizeMove(state.correctMove);
   const isCandidate = state.candidates.some((candidate) => normalizeMove(candidate) === normalizeMove(move));
@@ -142,6 +150,28 @@ export function submitArrowDuelChoice(state: ArrowDuelState, move: string): {
 
   if (!isCandidate) {
     throw new Error(`Move ${move} is not one of the Arrow Duel candidates`);
+  }
+
+  if (isCorrect && options.opponentReply) {
+    const replyFen = appendMove(state.currentFen, [], state.wrongMove).currentFen;
+    return {
+      state: {
+        ...state,
+        currentFen: replyFen,
+        phase: "reply_handoff",
+        selectedMove: move,
+        solved: false
+      },
+      feedback: {
+        result: "correct",
+        puzzleSolved: false,
+        submittedMove: move,
+        expectedMove: state.correctMove,
+        autoPlayedMoves: [state.wrongMove],
+        currentFen: replyFen,
+        review
+      }
+    };
   }
 
   return {
@@ -158,6 +188,106 @@ export function submitArrowDuelChoice(state: ArrowDuelState, move: string): {
       autoPlayedMoves: isCorrect ? [] : review.punishmentLine,
       currentFen: state.currentFen,
       review
+    }
+  };
+}
+
+export function submitArrowDuelReply(state: ArrowDuelState, move: string): {
+  state: ArrowDuelState;
+  feedback: PuzzleFeedback;
+} {
+  if (state.solved) {
+    throw new Error("Puzzle is already solved");
+  }
+  if (state.phase !== "reply") {
+    throw new Error("Arrow Duel is not accepting an opponent reply");
+  }
+  const expectedMove = state.puzzle.solutionMoves[1];
+  if (!expectedMove) {
+    throw new Error(`Puzzle ${state.puzzle.id} does not have an opponent reply`);
+  }
+  const submittedMove = normalizeMove(move);
+  if (!isLegalMove(state.currentFen, submittedMove)) {
+    throw new Error(`Move ${move} is not legal in the current position`);
+  }
+  const accepted = isPuzzleMoveAccepted(state.currentFen, expectedMove, submittedMove);
+  const submittedFen = appendMove(state.currentFen, [], submittedMove).currentFen;
+  return {
+    state: {
+      ...state,
+      ...(accepted ? { currentFen: submittedFen } : {}),
+      solved: accepted
+    },
+    feedback: {
+      result: accepted ? "correct" : "wrong",
+      puzzleSolved: accepted,
+      submittedMove: move,
+      expectedMove,
+      autoPlayedMoves: [],
+      currentFen: accepted ? submittedFen : state.currentFen
+    }
+  };
+}
+
+export function submitArrowDuelFollowUpMove(state: PuzzleLineState, move: string): {
+  state: PuzzleLineState;
+  feedback: PuzzleFeedback;
+} {
+  const expectedMove = state.puzzle.solutionMoves[state.cursor];
+  if (!expectedMove) {
+    throw new Error("Puzzle has no Arrow Duel follow-up move at current cursor");
+  }
+
+  const submittedMove = normalizeMove(move);
+  if (!isLegalMove(state.currentFen, submittedMove)) {
+    throw new Error(`Move ${move} is not legal in the current position`);
+  }
+  if (!isPuzzleMoveAccepted(state.currentFen, expectedMove, submittedMove)) {
+    return {
+      state,
+      feedback: {
+        result: "wrong",
+        puzzleSolved: false,
+        submittedMove: move,
+        expectedMove,
+        autoPlayedMoves: [],
+        currentFen: state.currentFen
+      }
+    };
+  }
+
+  const played = appendMove(state.currentFen, state.playedMoves, submittedMove);
+  const isCheckmate = isCheckmateFen(played.currentFen);
+  let currentFen = played.currentFen;
+  let cursor = isCheckmate ? state.puzzle.solutionMoves.length : state.cursor + 1;
+  let playedMoves = played.playedMoves;
+  const autoPlayedMoves: string[] = [];
+  const replyMove = isCheckmate ? undefined : state.puzzle.solutionMoves[cursor];
+  if (replyMove) {
+    const reply = appendMove(currentFen, playedMoves, replyMove);
+    autoPlayedMoves.push(replyMove);
+    currentFen = reply.currentFen;
+    playedMoves = reply.playedMoves;
+    cursor += 1;
+  }
+
+  const nextState: PuzzleLineState = {
+    ...state,
+    currentFen,
+    playedMoves,
+    cursor,
+    autoPlayedMoves,
+    solved: cursor >= state.puzzle.solutionMoves.length
+  };
+  return {
+    state: nextState,
+    feedback: {
+      result: "correct",
+      puzzleSolved: nextState.solved,
+      submittedMove: move,
+      expectedMove,
+      autoPlayedMoves,
+      currentFen
     }
   };
 }
@@ -252,6 +382,18 @@ function isLegalCheckmateMove(currentFen: string, move: string): boolean {
   } catch {
     return false;
   }
+}
+
+export function isPuzzleMoveAccepted(
+  currentFen: string,
+  expectedMove: string,
+  submittedMove: string
+): boolean {
+  const normalizedMove = normalizeMove(submittedMove);
+  return isLegalMove(currentFen, normalizedMove) && (
+    normalizedMove === normalizeMove(expectedMove) ||
+    isLegalCheckmateMove(currentFen, normalizedMove)
+  );
 }
 
 function isLegalMove(currentFen: string, move: string): boolean {

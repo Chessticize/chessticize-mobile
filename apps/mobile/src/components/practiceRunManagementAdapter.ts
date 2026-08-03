@@ -43,6 +43,9 @@ export function createPracticeRunManagementAdapter(
           const saved = service.updatePracticeRun(command.runId, {
             name: command.name,
             rating: command.elo,
+            ...(command.opponentReply === undefined
+              ? {}
+              : { opponentReply: command.opponentReply }),
             puzzleTiming: command.puzzleTiming
           });
           changedRunId = saved.run.id;
@@ -84,6 +87,9 @@ function presentationForRun(
     elo: service.getRating(run.ratingKey).rating,
     durationSeconds: run.durationSeconds,
     perPuzzleSeconds: run.perPuzzleSeconds,
+    ...(run.opponentReply === undefined
+      ? {}
+      : { opponentReply: { ...run.opponentReply } }),
     puzzleTiming: resolvePuzzleTimingPolicy(run.puzzleTiming, run.perPuzzleSeconds),
     themes: run.themes ?? [ALL_THEME_SELECTION]
   };
@@ -99,6 +105,9 @@ function createPracticeRunCommand(
     durationSeconds: draft.durationSeconds,
     perPuzzleSeconds: draft.perPuzzleSeconds,
     puzzleTiming: draft.puzzleTiming,
+    ...(draft.mode === "arrow_duel" && draft.opponentReply
+      ? { opponentReply: { ...draft.opponentReply } }
+      : {}),
     initialRating: draft.elo,
     ...(themes.length === 0 ? {} : { themes })
   };

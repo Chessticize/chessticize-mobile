@@ -9,6 +9,8 @@ import {
   beginLinePuzzle,
   currentExpectedMove,
   submitArrowDuelChoice,
+  submitArrowDuelFollowUpMove,
+  submitArrowDuelReply,
   submitLineMove
 } from "../src/index.ts";
 import type { Puzzle } from "../src/index.ts";
@@ -133,6 +135,88 @@ test("Arrow Duel rejects moves outside the displayed candidates without creating
   );
   assert.equal(state.selectedMove, undefined);
   assert.equal(state.solved, false);
+});
+
+test("Arrow Duel enters the reply handoff after the correct choice", () => {
+  const state = beginArrowDuelPuzzle(samplePuzzle("reply"));
+  const result = submitArrowDuelChoice(state, state.correctMove, {
+    opponentReply: true
+  });
+
+  assert.equal(result.state.phase, "reply_handoff");
+  assert.equal(result.state.solved, false);
+  assert.deepEqual(result.feedback.autoPlayedMoves, [state.wrongMove]);
+  assert.equal(
+    result.state.currentFen,
+    applyMovesToFen(state.currentFen, [state.wrongMove])
+  );
+});
+
+test("Arrow Duel accepts the stored reply and rejects another legal move", () => {
+  const state = beginArrowDuelPuzzle(samplePuzzle("reply"));
+  const handoff = submitArrowDuelChoice(state, state.correctMove, {
+    opponentReply: true
+  }).state;
+  const replyState = { ...handoff, phase: "reply" as const };
+
+  const wrong = submitArrowDuelReply(replyState, "e6d6");
+  assert.equal(wrong.feedback.result, "wrong");
+  assert.equal(wrong.feedback.expectedMove, "e6e7");
+  assert.equal(wrong.state.currentFen, replyState.currentFen);
+
+  const correct = submitArrowDuelReply(replyState, "e6e7");
+  assert.equal(correct.feedback.result, "correct");
+  assert.equal(correct.feedback.puzzleSolved, true);
+  assert.equal(correct.state.solved, true);
+});
+
+test("Arrow Duel accepts any legal immediate mate as the reply", () => {
+  const puzzle: Puzzle = {
+    id: "alternate-reply-mate",
+    initialFen: "6k1/pp2p2p/6p1/P2p4/4b3/2P3q1/1P1KBr2/R1Q1R3 w - - 0 1",
+    solutionMoves: ["c1d1", "g3f4"],
+    rating: 1800,
+    themes: ["mate"],
+    source: "lichess",
+    stockfishBestMove: "d2d1"
+  };
+  const state = beginArrowDuelPuzzle(puzzle);
+  const handoff = submitArrowDuelChoice(state, state.correctMove, {
+    opponentReply: true
+  }).state;
+  const result = submitArrowDuelReply(
+    { ...handoff, phase: "reply" },
+    "g3g5"
+  );
+
+  assert.equal(result.feedback.expectedMove, "g3f4");
+  assert.equal(result.feedback.result, "correct");
+  assert.equal(new Chess(result.state.currentFen).isCheckmate(), true);
+});
+
+test("Arrow Duel Review follow-up uses the same immediate-mate exception", () => {
+  const puzzle: Puzzle = {
+    id: "alternate-review-mate",
+    initialFen: "8/8/8/8/8/8/2Q5/k1K5 w - - 0 1",
+    solutionMoves: ["c2a4"],
+    rating: 1200,
+    themes: ["mate"],
+    source: "lichess",
+    stockfishBestMove: "c2b2"
+  };
+  const result = submitArrowDuelFollowUpMove({
+    kind: "line",
+    puzzle,
+    currentFen: puzzle.initialFen,
+    playedMoves: [],
+    cursor: 0,
+    autoPlayedMoves: [],
+    solved: false
+  }, "c2b1");
+
+  assert.equal(result.feedback.result, "correct");
+  assert.equal(result.feedback.puzzleSolved, true);
+  assert.equal(result.state.solved, true);
 });
 
 test("offline regression sample manifest points at stable Standard puzzle shapes", () => {

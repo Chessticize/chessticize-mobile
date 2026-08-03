@@ -193,6 +193,7 @@ function isSprintConfig(value: unknown): value is SprintConfig {
     isPositiveFiniteNumber(value.durationSeconds) &&
     isPositiveFiniteNumber(value.perPuzzleSeconds) &&
     isOptional(value.puzzleTiming, isPuzzleTimingPolicy) &&
+    isOpponentReplyForMode(value.mode, value.opponentReply) &&
     isPositiveInteger(value.targetCorrect) &&
     isNonNegativeInteger(value.maxMistakes) &&
     isNonEmptyString(value.ratingKey) &&
@@ -224,6 +225,7 @@ function isPracticeRunRecord(value: unknown): value is PracticeRunRecord {
     isPositiveFiniteNumber(value.durationSeconds) &&
     isPositiveFiniteNumber(value.perPuzzleSeconds) &&
     isOptional(value.puzzleTiming, isPuzzleTimingPolicy) &&
+    isOpponentReplyForMode(value.mode, value.opponentReply) &&
     isPositiveInteger(value.targetCorrect) &&
     isNonNegativeInteger(value.maxMistakes) &&
     isOptional(value.themes, isStringArray) &&
@@ -236,6 +238,19 @@ function isPuzzleTimingPolicy(value: unknown): boolean {
   return isRecord(value) &&
     (value.slowAfterSeconds === null || isPositiveFiniteNumber(value.slowAfterSeconds)) &&
     (value.timeoutAfterSeconds === null || isPositiveFiniteNumber(value.timeoutAfterSeconds));
+}
+
+function isOpponentReplyConfig(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.enabled === "boolean" &&
+    isPositiveInteger(value.seconds) &&
+    value.seconds <= 10;
+}
+
+function isOpponentReplyForMode(mode: unknown, value: unknown): boolean {
+  return value === undefined || (
+    mode === "arrow_duel" && isOpponentReplyConfig(value)
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

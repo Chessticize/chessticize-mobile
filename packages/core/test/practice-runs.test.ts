@@ -31,6 +31,10 @@ test("built-in Runs preserve the existing Standard and Arrow Duel rating keys", 
     slowAfterSeconds: 60,
     timeoutAfterSeconds: 90
   });
+  assert.deepEqual(arrowDuel?.opponentReply, {
+    enabled: true,
+    seconds: 5
+  });
 });
 
 test("Custom Runs use stable independent rating keys even with identical configurations", () => {
@@ -99,6 +103,35 @@ test("Custom Runs use stable independent rating keys even with identical configu
     ratingKey: "run:run-a",
     themes: ["fork", "pin"]
   });
+});
+
+test("Arrow Duel Run opponent reply settings persist without changing Rating identity", () => {
+  const existingRuns = defaultPracticeRuns();
+  const run = createCustomPracticeRun({
+    id: "reply-drill",
+    name: "Reply Drill",
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    targetCorrect: 10,
+    maxMistakes: 3,
+    opponentReply: { enabled: false, seconds: 10 },
+    homeOrder: existingRuns.length,
+    updatedAt: NOW,
+    existingRuns
+  });
+  const config = practiceRunSprintConfig(run);
+
+  assert.deepEqual(run.opponentReply, { enabled: false, seconds: 10 });
+  assert.deepEqual(config.opponentReply, { enabled: false, seconds: 10 });
+  assert.equal(config.ratingKey, run.ratingKey);
+  assert.equal(
+    config.ratingKey,
+    practiceRunSprintConfig({
+      ...run,
+      opponentReply: { enabled: true, seconds: 5 }
+    }).ratingKey
+  );
 });
 
 test("Run names are trimmed, required, limited, unique case-insensitively, and reserve built-ins", () => {
@@ -205,6 +238,10 @@ test("legacy Custom Sprint configs become named Home Runs without changing their
   assert.equal(new Set(migrated.map((run) => run.id)).size, migrated.length);
   assert.ok(migrated.every((run) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(run.id)));
   assert.ok(migrated.every((run) => run.name.length <= PRACTICE_RUN_NAME_MAX_LENGTH));
+  assert.deepEqual(
+    migrated.find((run) => run.mode === "arrow_duel")?.opponentReply,
+    { enabled: true, seconds: 5 }
+  );
 });
 
 test("reorder, archive, and restore preserve identity and append restored Runs", () => {

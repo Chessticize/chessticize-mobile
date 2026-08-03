@@ -1,5 +1,6 @@
 import {
   defaultSprintConfig,
+  resolveOpponentReplyConfig,
   resolvePuzzleTimingPolicy
 } from "./sprint-config.ts";
 import { normalizeThemeSelection } from "./theme-catalog.ts";
@@ -8,6 +9,7 @@ import type {
   CustomSprintConfigRecord,
   PracticeRunRecord,
   PuzzleTimingPolicy,
+  OpponentReplyConfig,
   SprintConfig
 } from "./types.ts";
 
@@ -60,6 +62,7 @@ export function createCustomPracticeRun(input: {
   puzzleTiming?: PuzzleTimingPolicy;
   targetCorrect: number;
   maxMistakes: number;
+  opponentReply?: OpponentReplyConfig;
   themes?: readonly string[];
   homeOrder: number;
   updatedAt: string;
@@ -90,6 +93,7 @@ export function createCustomPracticeRun(input: {
     puzzleTiming: resolvePuzzleTimingPolicy(input.puzzleTiming, input.perPuzzleSeconds),
     targetCorrect: input.targetCorrect,
     maxMistakes: input.maxMistakes,
+    ...opponentReplyForRun(input.mode, input.opponentReply),
     ...(normalizedRunThemes(input.themes).length === 0
       ? {}
       : { themes: normalizedRunThemes(input.themes) }),
@@ -188,6 +192,7 @@ export function practiceRunsFromLegacyCustomConfigs(
       puzzleTiming: resolvePuzzleTimingPolicy(undefined, config.perPuzzleSeconds),
       targetCorrect: config.targetCorrect,
       maxMistakes: config.maxMistakes,
+      ...opponentReplyForRun(mode),
       ...(themes.length === 0 ? {} : { themes }),
       homeOrder,
       archived: false,
@@ -210,6 +215,7 @@ export function practiceRunSprintConfig(run: PracticeRunRecord): SprintConfig {
     puzzleTiming: resolvePuzzleTimingPolicy(run.puzzleTiming, run.perPuzzleSeconds),
     targetCorrect: run.targetCorrect,
     maxMistakes: run.maxMistakes,
+    ...opponentReplyForRun(run.mode, run.opponentReply),
     ratingKey: run.ratingKey,
     ...(run.themes === undefined ? {} : { themes: [...run.themes] })
   };
@@ -291,6 +297,9 @@ export function clonePracticeRun(run: PracticeRunRecord): PracticeRunRecord {
     ...(run.puzzleTiming === undefined
       ? {}
       : { puzzleTiming: { ...run.puzzleTiming } }),
+    ...(run.opponentReply === undefined
+      ? {}
+      : { opponentReply: { ...run.opponentReply } }),
     ...(run.themes === undefined ? {} : { themes: [...run.themes] })
   };
 }
@@ -326,6 +335,9 @@ function builtInPracticeRun(
     puzzleTiming: resolvePuzzleTimingPolicy(config.puzzleTiming, config.perPuzzleSeconds),
     targetCorrect: config.targetCorrect,
     maxMistakes: config.maxMistakes,
+    ...(config.opponentReply === undefined
+      ? {}
+      : { opponentReply: { ...config.opponentReply } }),
     ...(config.themes === undefined ? {} : { themes: [...config.themes] }),
     homeOrder,
     archived: false,
@@ -342,6 +354,7 @@ function canonicalizeBuiltInPracticeRun(run: PracticeRunRecord): PracticeRunReco
     ...canonical,
     name: run.name,
     puzzleTiming: resolvePuzzleTimingPolicy(run.puzzleTiming, canonical.perPuzzleSeconds),
+    ...opponentReplyForRun(canonical.mode, run.opponentReply),
     archived: run.archived,
     homeOrder: run.homeOrder,
     updatedAt: run.updatedAt
@@ -415,6 +428,14 @@ function stableTextFingerprint(value: string): string {
 
 function normalizedRunThemes(themes?: readonly string[]): string[] {
   return normalizeThemeSelection(themes).filter((theme) => theme !== "mixed");
+}
+
+function opponentReplyForRun(
+  mode: PracticeRunRecord["mode"],
+  config?: OpponentReplyConfig
+): { opponentReply?: OpponentReplyConfig } {
+  const opponentReply = resolveOpponentReplyConfig(mode, config);
+  return opponentReply === undefined ? {} : { opponentReply };
 }
 
 function assertPositiveInteger(value: number, field: string): void {

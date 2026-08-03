@@ -349,7 +349,7 @@ Arrow Duel active-session rules:
 - Candidate arrows are neutral before selection.
 - Candidate ordering is randomized by backend/domain logic and stored with the attempt.
 - The board must not reveal which move is best before selection.
-- The planned Opponent reply challenge is defined in
+- The Opponent reply challenge is defined in
   [`ARROW_DUEL_REPLY_CHALLENGE.md`](ARROW_DUEL_REPLY_CHALLENGE.md). When it is
   enabled, a correct candidate begins a separate refutation step whose reply
   time defaults to five seconds and accepts any positive whole-number value up to ten in

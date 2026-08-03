@@ -12,8 +12,12 @@ import {
 } from "./practice-runs.ts";
 import { clampManualRating } from "./ratings.ts";
 import {
+  DEFAULT_OPPONENT_REPLY_SECONDS,
+  OPPONENT_REPLY_MAX_SECONDS,
+  OPPONENT_REPLY_MIN_SECONDS,
   defaultPuzzleTimingPolicy,
   defaultSprintConfig,
+  resolveOpponentReplyConfig,
   resolvePuzzleTimingPolicy,
   validatePuzzleTimingPolicy
 } from "./sprint-config.ts";
@@ -34,6 +38,7 @@ export type PracticeRunManagementRun = {
   durationSeconds: number;
   perPuzzleSeconds: number;
   puzzleTiming: PuzzleTimingPolicy;
+  opponentReply?: PracticeRunRecord["opponentReply"];
   themes: readonly string[];
 };
 
@@ -49,10 +54,12 @@ export type PracticeRunManagementIntent =
   | { type: "change-elo-input"; value: string }
   | { type: "change-mode"; mode: "custom" | "arrow_duel" }
   | { type: "change-name"; name: string }
+  | { type: "change-opponent-reply-seconds-input"; value: string }
   | { type: "change-per-puzzle"; perPuzzleSeconds: number }
   | { type: "change-puzzle-timing"; puzzleTiming: PuzzleTimingPolicy }
   | { type: "step-elo-input"; direction: -1 | 1 }
   | { type: "toggle-theme"; theme: string }
+  | { type: "toggle-opponent-reply" }
   | { type: "confirm-remove" }
   | { type: "dismiss-remove" }
   | { type: "edit-run"; runId: string }
@@ -84,6 +91,7 @@ export type PracticeRunManagementCommand =
     runId: string;
     name: string;
     elo: number;
+    opponentReply?: NonNullable<PracticeRunManagementDraft["opponentReply"]>;
     puzzleTiming: PuzzleTimingPolicy;
   };
 
@@ -107,6 +115,8 @@ export type PracticeRunManagementSnapshot = PracticeRunManagementCatalog & {
   homeEditing: boolean;
   nameError: string | null;
   notice: string | null;
+  opponentReplySecondsError: string | null;
+  opponentReplySecondsInput: string | null;
   removeCandidateId: string | null;
   screen: "home" | "create" | "edit";
   selectedRunId: string | null;
@@ -170,6 +180,8 @@ export function createPracticeRunManagementController(
           homeEditing: false,
           nameError: null,
           notice: null,
+          opponentReplySecondsError: null,
+          opponentReplySecondsInput: String(DEFAULT_OPPONENT_REPLY_SECONDS),
           removeCandidateId: null,
           screen: "create"
         });
@@ -199,7 +211,22 @@ export function createPracticeRunManagementController(
         return;
       case "change-mode":
         if (view.screen === "create") {
-          commit(updateDraft(view, { mode: intent.mode }));
+          const opponentReply = intent.mode === "arrow_duel"
+            ? resolveOpponentReplyConfig(
+                "arrow_duel",
+                view.draft?.opponentReply
+              )
+            : undefined;
+          commit({
+            ...updateDraft(view, {
+              mode: intent.mode,
+              ...(opponentReply === undefined ? {} : { opponentReply })
+            }),
+            opponentReplySecondsError: null,
+            opponentReplySecondsInput: opponentReply
+              ? String(opponentReply.seconds)
+              : view.opponentReplySecondsInput
+          });
         }
         return;
       case "change-name":
@@ -207,6 +234,31 @@ export function createPracticeRunManagementController(
           commit({ ...updateDraft(view, { name: intent.name }), nameError: null });
         }
         return;
+      case "change-opponent-reply-seconds-input": {
+        if (
+          (view.screen !== "create" && view.screen !== "edit") ||
+          view.draft?.mode !== "arrow_duel"
+        ) {
+          return;
+        }
+        const opponentReplySecondsError = validateOpponentReplySecondsInput(
+          intent.value
+        );
+        const seconds = Number(intent.value);
+        commit({
+          ...(opponentReplySecondsError
+            ? view
+            : updateDraft(view, {
+                opponentReply: {
+                  enabled: view.draft.opponentReply?.enabled ?? true,
+                  seconds
+                }
+              })),
+          opponentReplySecondsError,
+          opponentReplySecondsInput: intent.value
+        });
+        return;
+      }
       case "change-per-puzzle":
         if (view.screen === "create") {
           commit(updateDraft(view, {
@@ -246,6 +298,10 @@ export function createPracticeRunManagementController(
             homeEditing: true,
             nameError: null,
             notice: null,
+            opponentReplySecondsError: null,
+            opponentReplySecondsInput: run.opponentReply
+              ? String(run.opponentReply.seconds)
+              : null,
             removeCandidateId: null,
             screen: "edit"
           });
@@ -277,11 +333,23 @@ export function createPracticeRunManagementController(
               puzzleTiming: defaultPuzzleTimingPolicy(
                 previous.config.perPuzzleSeconds
               ),
+              ...(previous.config.mode === "arrow_duel"
+                ? {
+                    opponentReply: resolveOpponentReplyConfig(
+                      "arrow_duel",
+                      undefined
+                    )!
+                  }
+                : {}),
               themes: normalizeThemeChoiceSelection(previous.config.themes)
             },
             eloError: null,
             eloInput: String(previous.rating),
-            nameError: null
+            nameError: null,
+            opponentReplySecondsError: null,
+            opponentReplySecondsInput: previous.config.mode === "arrow_duel"
+              ? String(DEFAULT_OPPONENT_REPLY_SECONDS)
+              : view.opponentReplySecondsInput
           });
         }
         return;
@@ -346,12 +414,39 @@ export function createPracticeRunManagementController(
           removeCandidateId: null
         });
         return;
+      case "toggle-opponent-reply":
+        if (
+          (view.screen === "create" || view.screen === "edit") &&
+          view.draft?.mode === "arrow_duel"
+        ) {
+          const current = resolveOpponentReplyConfig(
+            "arrow_duel",
+            view.draft.opponentReply
+          )!;
+          const enabled = !current.enabled;
+          commit({
+            ...updateDraft(view, {
+              opponentReply: { ...current, enabled }
+            }),
+            opponentReplySecondsError: enabled
+              ? validateOpponentReplySecondsInput(
+                  view.opponentReplySecondsInput ?? String(current.seconds)
+                )
+              : null
+          });
+        }
+        return;
     }
   };
 
   const saveRun = (): void => {
     const draft = view.draft;
-    if (!draft || view.eloError || validateEloInput(view.eloInput ?? String(draft.elo))) {
+    if (
+      !draft ||
+      view.eloError ||
+      view.opponentReplySecondsError ||
+      validateEloInput(view.eloInput ?? String(draft.elo))
+    ) {
       return;
     }
     try {
@@ -379,6 +474,9 @@ export function createPracticeRunManagementController(
           runId: draft.id,
           name: draft.name,
           elo: draft.elo,
+          ...(draft.opponentReply === undefined
+            ? {}
+            : { opponentReply: { ...draft.opponentReply } }),
           puzzleTiming: { ...draft.puzzleTiming }
         });
         const saved = result.catalog.runs.find((run) => run.id === result.changedRunId);
@@ -427,6 +525,8 @@ function initialView(
     homeEditing: false,
     nameError: null,
     notice: null,
+    opponentReplySecondsError: null,
+    opponentReplySecondsInput: null,
     removeCandidateId: null,
     screen: "home",
     selectedRunId: selectedRunId(runs, "standard")
@@ -502,6 +602,19 @@ function validateEloInput(value: string): string | null {
     : PRACTICE_RUN_ELO_ERROR;
 }
 
+export function validateOpponentReplySecondsInput(value: string): string | null {
+  const error = `Enter a positive whole number up to ${OPPONENT_REPLY_MAX_SECONDS} seconds.`;
+  if (!/^\d+$/.test(value)) {
+    return error;
+  }
+  const seconds = Number(value);
+  return Number.isInteger(seconds) &&
+    seconds >= OPPONENT_REPLY_MIN_SECONDS &&
+    seconds <= OPPONENT_REPLY_MAX_SECONDS
+    ? null
+    : error;
+}
+
 function returnHome(
   view: RunManagementViewState,
   homeEditing = false
@@ -514,6 +627,8 @@ function returnHome(
     homeEditing,
     nameError: null,
     notice: null,
+    opponentReplySecondsError: null,
+    opponentReplySecondsInput: null,
     removeCandidateId: null,
     screen: "home"
   };
@@ -537,7 +652,7 @@ function buildSnapshot(
   return {
     ...cloneCatalog(catalog),
     ...cloneView(view),
-    canSave: view.eloError === null && (
+    canSave: view.eloError === null && view.opponentReplySecondsError === null && (
       view.screen !== "create" || view.draft === null
         ? true
         : adapter.canCreate(view.draft)
@@ -574,6 +689,9 @@ function cloneDraft(
 ): PracticeRunManagementDraft {
   return {
     ...draft,
+    ...(draft.opponentReply === undefined
+      ? {}
+      : { opponentReply: { ...draft.opponentReply } }),
     puzzleTiming: { ...draft.puzzleTiming },
     themes: [...draft.themes]
   };
@@ -582,6 +700,9 @@ function cloneDraft(
 function cloneRun(run: PracticeRunManagementRun): PracticeRunManagementRun {
   return {
     ...run,
+    ...(run.opponentReply === undefined
+      ? {}
+      : { opponentReply: { ...run.opponentReply } }),
     puzzleTiming: resolvePuzzleTimingPolicy(
       run.puzzleTiming,
       run.perPuzzleSeconds

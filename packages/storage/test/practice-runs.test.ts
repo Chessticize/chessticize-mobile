@@ -192,6 +192,55 @@ for (const backend of ["memory", "sqlite"] as const) {
   });
 }
 
+for (const backend of ["memory", "sqlite"] as const) {
+  test(`${backend} Arrow Duel Runs persist configurable opponent reply without changing ELO identity`, async () => {
+    const store = backend === "memory" ? new MemoryStore() : new SQLiteStore(":memory:");
+    if (store instanceof SQLiteStore) {
+      store.migrate();
+    }
+    try {
+      store.seedPuzzles(await loadFixturePuzzles());
+      const service = new PracticeService(store);
+      const run = service.createPracticeRun({
+        id: `reply-run-${backend}`,
+        name: `Reply Run ${backend}`,
+        mode: "arrow_duel",
+        durationSeconds: 300,
+        perPuzzleSeconds: 30,
+        targetCorrect: 1,
+        opponentReply: { enabled: false, seconds: 8 },
+        initialRating: 950
+      }, "2026-07-22T12:00:00.000Z");
+
+      assert.deepEqual(run.opponentReply, { enabled: false, seconds: 8 });
+      const updated = service.updatePracticeRun(run.id, {
+        name: run.name,
+        rating: 950,
+        opponentReply: { enabled: true, seconds: 10 }
+      }, "2026-07-22T12:01:00.000Z");
+      assert.equal(updated.run.ratingKey, run.ratingKey);
+      assert.deepEqual(updated.run.opponentReply, { enabled: true, seconds: 10 });
+      assert.throws(() => service.updatePracticeRun(run.id, {
+        name: run.name,
+        rating: 950,
+        opponentReply: { enabled: true, seconds: 11 }
+      }), /between 1 and 10 seconds/);
+
+      const sprint = service.startSprint({
+        mode: "arrow_duel",
+        practiceRunId: run.id,
+        puzzleSelectionSeed: "reply-run"
+      }, "2026-07-22T12:02:00.000Z");
+      assert.equal(sprint.config.ratingKey, run.ratingKey);
+      assert.deepEqual(sprint.config.opponentReply, { enabled: true, seconds: 10 });
+    } finally {
+      if (store instanceof SQLiteStore) {
+        store.close();
+      }
+    }
+  });
+}
+
 test("SQLite practice Runs survive reopen with their ELO and archived state", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-practice-runs-"));
   const databasePath = join(directory, "practice.sqlite");
@@ -208,6 +257,15 @@ test("SQLite practice Runs survive reopen with their ELO and archived state", as
       perPuzzleSeconds: 10,
       initialRating: 875
     }, "2026-07-22T11:00:00.000Z");
+    const replyRun = service.createPracticeRun({
+      id: "saved-reply-run",
+      name: "Saved Reply Run",
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      opponentReply: { enabled: false, seconds: 9 },
+      initialRating: 900
+    }, "2026-07-22T11:00:10.000Z");
     service.updatePracticeRun(run.id, {
       name: "Renamed Saved Run",
       rating: 1125
@@ -222,6 +280,10 @@ test("SQLite practice Runs survive reopen with their ELO and archived state", as
       assert.equal(reopenedService.listPracticeRuns().find((candidate) => candidate.id === run.id)?.archived, true);
       assert.equal(reopenedService.listPracticeRuns().find((candidate) => candidate.id === run.id)?.name, "Renamed Saved Run");
       assert.equal(reopenedService.getRating(run.ratingKey).rating, 1125);
+      assert.deepEqual(
+        reopenedService.listPracticeRuns().find((candidate) => candidate.id === replyRun.id)?.opponentReply,
+        { enabled: false, seconds: 9 }
+      );
     } finally {
       reopened.close();
     }

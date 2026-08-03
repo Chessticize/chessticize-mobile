@@ -5,6 +5,7 @@ import {
   clonePracticeRun,
   buildSessionMistakeReview,
   createDefaultRating,
+  DEFAULT_OPPONENT_REPLY_SECONDS,
   defaultPuzzleTimingPolicy,
   enrollReviewContext,
   filterHistoryAttemptsForQuery,
@@ -17,6 +18,7 @@ import {
   preferredReviewScheduleChange,
   removeReviewContext,
   resetRating as resetRatingRecord,
+  resolveOpponentReplyConfig,
   resolveHistoryRange,
   reviewDayFor,
   scheduleMistakeForContext,
@@ -223,6 +225,8 @@ interface PracticeRunRow {
   timeout_after_seconds?: number | null;
   target_correct: number;
   max_mistakes: number;
+  opponent_reply_enabled?: number;
+  opponent_reply_seconds?: number;
   themes_json: string | null;
   home_order: number;
   archived: number;
@@ -288,7 +292,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 16;
+export const CURRENT_SCHEMA_VERSION = 17;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -313,7 +317,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 12, to: 13, apply: migrateV12ToV13 },
   { from: 13, to: 14, apply: migrateV13ToV14 },
   { from: 14, to: 15, apply: migrateV14ToV15 },
-  { from: 15, to: 16, apply: migrateV15ToV16 }
+  { from: 15, to: 16, apply: migrateV15ToV16 },
+  { from: 16, to: 17, apply: migrateV16ToV17 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -588,12 +593,14 @@ export class SyncSQLiteStore implements PracticeStore {
 
   savePracticeRun(run: PracticeRunRecord): void {
     const puzzleTiming = normalizedRunPuzzleTiming(run);
+    const opponentReply = normalizedRunOpponentReply(run);
     this.db.prepare(
       `INSERT INTO practice_runs (
         id, kind, name, mode, rating_key, duration_seconds, per_puzzle_seconds,
         slow_after_seconds, timeout_after_seconds, target_correct, max_mistakes,
-        themes_json, home_order, archived, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        opponent_reply_enabled, opponent_reply_seconds, themes_json, home_order,
+        archived, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         kind = excluded.kind,
         name = excluded.name,
@@ -605,6 +612,8 @@ export class SyncSQLiteStore implements PracticeStore {
         timeout_after_seconds = excluded.timeout_after_seconds,
         target_correct = excluded.target_correct,
         max_mistakes = excluded.max_mistakes,
+        opponent_reply_enabled = excluded.opponent_reply_enabled,
+        opponent_reply_seconds = excluded.opponent_reply_seconds,
         themes_json = excluded.themes_json,
         home_order = excluded.home_order,
         archived = excluded.archived,
@@ -621,6 +630,8 @@ export class SyncSQLiteStore implements PracticeStore {
       puzzleTiming.timeoutAfterSeconds,
       run.targetCorrect,
       run.maxMistakes,
+      boolToInt(opponentReply.enabled),
+      opponentReply.seconds,
       run.themes === undefined ? null : JSON.stringify(run.themes),
       run.homeOrder,
       boolToInt(run.archived),
@@ -2526,6 +2537,7 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV10ToV11(db);
   migrateV11ToV12(db);
   migrateV14ToV15(db);
+  migrateV16ToV17(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -2535,7 +2547,9 @@ function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
     hasColumn(db, "app_settings", "sprint_active_session_guide_seen") &&
     hasColumn(db, "app_settings", "sprint_arrow_duel_guide_seen") &&
     hasColumn(db, "app_settings", "sprint_focused_run_guide_seen") &&
-    hasTable(db, "app_review_request_state");
+    hasTable(db, "app_review_request_state") &&
+    hasColumn(db, "practice_runs", "opponent_reply_enabled") &&
+    hasColumn(db, "practice_runs", "opponent_reply_seconds");
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -2856,6 +2870,33 @@ function migrateV15ToV16(db: SyncSqliteDatabase): void {
     CREATE INDEX attempts_unclear_completed_at_idx
       ON attempts(unclear, completed_at DESC);
   `);
+}
+
+function migrateV16ToV17(db: SyncSqliteDatabase): void {
+  const hadOpponentReplyEnabled = hasColumn(
+    db,
+    "practice_runs",
+    "opponent_reply_enabled"
+  );
+  ensureColumn(
+    db,
+    "practice_runs",
+    "opponent_reply_enabled",
+    "ALTER TABLE practice_runs ADD COLUMN opponent_reply_enabled INTEGER NOT NULL DEFAULT 0 " +
+      "CHECK (opponent_reply_enabled IN (0, 1))"
+  );
+  ensureColumn(
+    db,
+    "practice_runs",
+    "opponent_reply_seconds",
+    `ALTER TABLE practice_runs ADD COLUMN opponent_reply_seconds INTEGER NOT NULL DEFAULT ${DEFAULT_OPPONENT_REPLY_SECONDS} ` +
+      "CHECK (opponent_reply_seconds BETWEEN 1 AND 10)"
+  );
+  if (!hadOpponentReplyEnabled) {
+    db.exec(
+      "UPDATE practice_runs SET opponent_reply_enabled = 1 WHERE mode = 'arrow_duel'"
+    );
+  }
 }
 
 function readSchemaVersion(db: SyncSqliteDatabase): number {
@@ -3188,6 +3229,17 @@ function practiceRunFromRow(row: PracticeRunRow): PracticeRunRecord {
         slowAfterSeconds: row.slow_after_seconds,
         timeoutAfterSeconds: row.timeout_after_seconds
       };
+  const opponentReply = row.mode === "arrow_duel"
+    ? resolveOpponentReplyConfig(
+        row.mode,
+        row.opponent_reply_enabled === undefined || row.opponent_reply_seconds === undefined
+          ? undefined
+          : {
+              enabled: intToBool(row.opponent_reply_enabled),
+              seconds: row.opponent_reply_seconds
+            }
+      )
+    : undefined;
   return {
     id: row.id,
     kind: row.kind,
@@ -3199,10 +3251,21 @@ function practiceRunFromRow(row: PracticeRunRow): PracticeRunRecord {
     puzzleTiming,
     targetCorrect: row.target_correct,
     maxMistakes: row.max_mistakes,
+    ...(opponentReply === undefined ? {} : { opponentReply }),
     ...(themes === undefined ? {} : { themes }),
     homeOrder: row.home_order,
     archived: intToBool(row.archived),
     updatedAt: row.updated_at
+  };
+}
+
+function normalizedRunOpponentReply(run: PracticeRunRecord): {
+  enabled: boolean;
+  seconds: number;
+} {
+  return resolveOpponentReplyConfig(run.mode, run.opponentReply) ?? {
+    enabled: false,
+    seconds: DEFAULT_OPPONENT_REPLY_SECONDS
   };
 }
 

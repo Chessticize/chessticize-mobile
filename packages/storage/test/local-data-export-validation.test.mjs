@@ -43,6 +43,24 @@ test("accepts an Incomplete Sprint attempt without a submitted move", () => {
   assert.equal(isCanonicalProgressSyncSnapshot(snapshot), true);
 });
 
+test("accepts bounded Arrow Duel opponent reply settings", () => {
+  const snapshot = canonicalSnapshot();
+  snapshot.data.sprintSessions[0].mode = "arrow_duel";
+  snapshot.data.sprintSessions[0].config.mode = "arrow_duel";
+  snapshot.data.sprintSessions[0].config.opponentReply = {
+    enabled: true,
+    seconds: 10
+  };
+  snapshot.data.practiceRuns[0].kind = "arrow_duel";
+  snapshot.data.practiceRuns[0].mode = "arrow_duel";
+  snapshot.data.practiceRuns[0].opponentReply = {
+    enabled: false,
+    seconds: 1
+  };
+
+  assert.equal(isCanonicalProgressSyncSnapshot(snapshot), true);
+});
+
 test("rejects malformed nested progress records", () => {
   const cases = [
     ["snapshot device", (value) => { value.deviceId = ""; }],
@@ -52,13 +70,24 @@ test("rejects malformed nested progress records", () => {
     ["review", (value) => { value.data.reviewQueue[0].lastResult = "timed_out"; }],
     ["removal", (value) => { value.data.reviewRemovals[0].removedAt = "not-a-date"; }],
     ["session", (value) => { value.data.sprintSessions[0].config.durationSeconds = 0; }],
+    ["session opponent reply mode", (value) => {
+      value.data.sprintSessions[0].config.opponentReply = { enabled: true, seconds: 5 };
+    }],
+    ["session opponent reply seconds", (value) => {
+      value.data.sprintSessions[0].mode = "arrow_duel";
+      value.data.sprintSessions[0].config.mode = "arrow_duel";
+      value.data.sprintSessions[0].config.opponentReply = { enabled: true, seconds: 11 };
+    }],
     ["session rating games", (value) => { value.data.sprintSessions[0].ratingGamesBefore = 0.5; }],
     ["session rating deviation", (value) => { value.data.sprintSessions[0].ratingDeviationBefore = 0; }],
     ["session volatility", (value) => { value.data.sprintSessions[0].volatilityBefore = -0.06; }],
     ["partial session rating anchor", (value) => {
       delete value.data.sprintSessions[0].volatilityBefore;
     }],
-    ["run", (value) => { value.data.practiceRuns[0].archived = "no"; }]
+    ["run", (value) => { value.data.practiceRuns[0].archived = "no"; }],
+    ["run opponent reply mode", (value) => {
+      value.data.practiceRuns[0].opponentReply = { enabled: false, seconds: 5 };
+    }]
   ];
   for (const [label, mutate] of cases) {
     const candidate = canonicalSnapshot();

@@ -36,7 +36,7 @@ async function main(): Promise<void> {
     ok: true,
     type: "ready",
     protocol: PROTOCOL_VERSION,
-    commands: ["startSprint", "move", "chooseArrow", "state", "history", "dueReviews", "resetRating", "exit"]
+    commands: ["startSprint", "move", "chooseArrow", "beginOpponentReply", "state", "history", "dueReviews", "resetRating", "exit"]
   });
 
   const lines = createInterface({
@@ -79,6 +79,7 @@ async function handleCommand(service: PracticeService, input: JsonCommand): Prom
       perPuzzleSeconds?: number;
       targetCorrect?: number;
       maxMistakes?: number;
+      opponentReply?: { enabled: boolean; seconds: number };
       themes?: string[];
       minRating?: number;
       maxRating?: number;
@@ -89,6 +90,9 @@ async function handleCommand(service: PracticeService, input: JsonCommand): Prom
     setOptional(startCommand, "perPuzzleSeconds", optionalNumber(input.perPuzzleSeconds));
     setOptional(startCommand, "targetCorrect", optionalNumber(input.targetCorrect));
     setOptional(startCommand, "maxMistakes", optionalNumber(input.maxMistakes));
+    if (input.opponentReply !== undefined) {
+      startCommand.opponentReply = parseOpponentReply(input.opponentReply);
+    }
     const themes = optionalStringArray(input.themes) ?? [];
     if (input.theme !== undefined) {
       const legacyTheme = optionalString(input.theme);
@@ -118,6 +122,14 @@ async function handleCommand(service: PracticeService, input: JsonCommand): Prom
       feedback: result.feedback ?? null,
       attempt: result.attempt ?? null
     });
+    return false;
+  }
+
+  if (command === "beginOpponentReply") {
+    const state = service.beginArrowDuelReply(
+      optionalString(input.now) ?? new Date().toISOString()
+    );
+    writeJson({ ok: true, type: "state", state: serializeSprintView(state) });
     return false;
   }
 
@@ -235,6 +247,21 @@ function optionalStringArray(value: unknown): string[] | undefined {
     throw new Error("Expected an array of non-empty strings");
   }
   return value;
+}
+
+function parseOpponentReply(value: unknown): { enabled: boolean; seconds: number } {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    typeof (value as { enabled?: unknown }).enabled !== "boolean" ||
+    typeof (value as { seconds?: unknown }).seconds !== "number"
+  ) {
+    throw new Error("opponentReply must include enabled and seconds");
+  }
+  return {
+    enabled: (value as { enabled: boolean }).enabled,
+    seconds: (value as { seconds: number }).seconds
+  };
 }
 
 function requiredValue(argv: string[], index: number): string {

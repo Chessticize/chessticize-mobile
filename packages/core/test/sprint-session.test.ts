@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   advanceSprintTime,
   abandonSprint,
+  beginArrowDuelReply,
   buildSprintConfig,
   defaultSprintConfig,
   pauseSprint,
@@ -30,6 +31,10 @@ test("default sprint configs model minutes, target count, and max mistakes", () 
   });
   assert.equal(defaultSprintConfig("blitz").targetCorrect, 30);
   assert.equal(defaultSprintConfig("arrow_duel").targetCorrect, 10);
+  assert.deepEqual(defaultSprintConfig("arrow_duel").opponentReply, {
+    enabled: true,
+    seconds: 5
+  });
 });
 
 test("sprint initializes a per-puzzle deadline and records Slow from the puzzle start", () => {
@@ -416,7 +421,8 @@ test("a correct Arrow Duel move records the puzzle and advances to the next puzz
       durationSeconds: 300,
       perPuzzleSeconds: 30,
       targetCorrect: 2,
-      maxMistakes: 3
+      maxMistakes: 3,
+      opponentReply: { enabled: false, seconds: 5 }
     }),
     puzzles: [samplePuzzle("p1"), samplePuzzle("p2")],
     ratingBefore: 600,
@@ -430,6 +436,173 @@ test("a correct Arrow Duel move records the puzzle and advances to the next puzz
   assert.equal(result.state.status, "active");
   assert.equal(result.state.correctCount, 1);
   assert.equal(result.state.currentPuzzle?.puzzle.id, "p2");
+});
+
+test("a correct Arrow Duel choice starts a separately timed opponent reply", () => {
+  const started = startSprint({
+    config: buildSprintConfig({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 2,
+      maxMistakes: 3,
+      opponentReply: { enabled: true, seconds: 5 }
+    }),
+    puzzles: [samplePuzzle("p1"), samplePuzzle("p2")],
+    ratingBefore: 600,
+    now: NOW
+  });
+
+  const choice = submitSprintMove(started, "b2b1", "2026-06-20T00:00:05.000Z");
+  assert.equal(choice.attempt, undefined);
+  assert.equal(choice.state.correctCount, 0);
+  assert.equal(choice.state.currentPuzzle?.kind, "arrow_duel");
+  assert.equal(choice.state.currentPuzzle?.phase, "reply_handoff");
+  assert.equal(choice.state.currentPuzzle?.replyPauseStartedAt, "2026-06-20T00:00:05.000Z");
+  assert.equal(choice.state.deadlineAt, "2026-06-20T00:05:00.000Z");
+
+  const ignored = advanceSprintTime(choice.state, "2026-06-20T00:02:00.000Z");
+  assert.equal(ignored.attempt, undefined);
+  assert.equal(ignored.state, choice.state);
+
+  const replying = beginArrowDuelReply(choice.state, "2026-06-20T00:00:07.000Z");
+  assert.equal(replying.currentPuzzle?.kind, "arrow_duel");
+  assert.equal(replying.currentPuzzle?.phase, "reply");
+  assert.equal(replying.currentPuzzle?.replyStartedAt, "2026-06-20T00:00:07.000Z");
+  assert.equal(replying.currentPuzzle?.replyDeadlineAt, "2026-06-20T00:00:12.000Z");
+
+  const reply = submitSprintMove(replying, "e6e7", "2026-06-20T00:00:10.000Z");
+  assert.equal(reply.feedback?.result, "correct");
+  assert.equal(reply.attempt?.result, "correct");
+  assert.equal(reply.attempt?.elapsedMs, 5_000);
+  assert.equal(reply.state.correctCount, 1);
+  assert.equal(reply.state.currentPuzzle?.puzzle.id, "p2");
+  assert.equal(reply.state.currentPuzzleStartedAt, "2026-06-20T00:00:10.000Z");
+  assert.equal(reply.state.deadlineAt, "2026-06-20T00:05:05.000Z");
+  assert.equal(reply.state.totalPausedMs, 5_000);
+});
+
+test("a wrong Arrow Duel reply marks the whole puzzle wrong", () => {
+  const started = startSprint({
+    config: buildSprintConfig({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 2,
+      maxMistakes: 3
+    }),
+    puzzles: [samplePuzzle("p1"), samplePuzzle("p2")],
+    ratingBefore: 600,
+    now: NOW
+  });
+  const choice = submitSprintMove(started, "b2b1", "2026-06-20T00:00:04.000Z");
+  const replying = beginArrowDuelReply(choice.state, "2026-06-20T00:00:05.000Z");
+  const reply = submitSprintMove(replying, "e6d6", "2026-06-20T00:00:06.000Z");
+
+  assert.equal(reply.feedback?.result, "wrong");
+  assert.equal(reply.attempt?.result, "wrong");
+  assert.equal(reply.attempt?.expectedMove, "e6e7");
+  assert.equal(reply.state.correctCount, 0);
+  assert.equal(reply.state.mistakeCount, 1);
+  assert.equal(reply.state.currentPuzzle?.puzzle.id, "p2");
+  assert.equal(reply.attempt?.elapsedMs, 4_000);
+});
+
+test("an Arrow Duel reply timeout excludes reply time and advances once", () => {
+  const started = startSprint({
+    config: buildSprintConfig({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 2,
+      maxMistakes: 3,
+      opponentReply: { enabled: true, seconds: 5 }
+    }),
+    puzzles: [samplePuzzle("p1"), samplePuzzle("p2")],
+    ratingBefore: 600,
+    now: NOW
+  });
+  const choice = submitSprintMove(started, "b2b1", "2026-06-20T00:00:04.000Z");
+  const replying = beginArrowDuelReply(choice.state, "2026-06-20T00:00:06.000Z");
+
+  assert.equal(advanceSprintTime(replying, "2026-06-20T00:00:10.999Z").attempt, undefined);
+  const timedOut = advanceSprintTime(replying, "2026-06-20T00:00:11.000Z");
+  assert.equal(timedOut.attempt?.result, "timed_out");
+  assert.equal(timedOut.attempt?.expectedMove, "e6e7");
+  assert.equal(timedOut.attempt?.elapsedMs, 4_000);
+  assert.equal(timedOut.state.mistakeCount, 1);
+  assert.equal(timedOut.state.currentPuzzle?.puzzle.id, "p2");
+  assert.equal(timedOut.state.deadlineAt, "2026-06-20T00:05:07.000Z");
+  assert.equal(timedOut.state.totalPausedMs, 7_000);
+
+  const repeated = advanceSprintTime(timedOut.state, "2026-06-20T00:00:11.000Z");
+  assert.equal(repeated.attempt, undefined);
+  assert.equal(repeated.state.currentPuzzle?.puzzle.id, "p2");
+});
+
+test("manual pause during an Arrow Duel reply shifts its independent deadline", () => {
+  const started = startSprint({
+    config: buildSprintConfig({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 2,
+      maxMistakes: 3
+    }),
+    puzzles: [samplePuzzle("p1"), samplePuzzle("p2")],
+    ratingBefore: 600,
+    now: NOW
+  });
+  const choice = submitSprintMove(started, "b2b1", "2026-06-20T00:00:01.000Z");
+  const replying = beginArrowDuelReply(choice.state, "2026-06-20T00:00:02.000Z");
+  const paused = pauseSprint(replying, "2026-06-20T00:00:03.000Z").state;
+  const resumed = resumeSprint(paused, "2026-06-20T00:00:13.000Z");
+
+  assert.equal(resumed.currentPuzzle?.kind, "arrow_duel");
+  assert.equal(resumed.currentPuzzle?.replyDeadlineAt, "2026-06-20T00:00:17.000Z");
+  assert.equal(advanceSprintTime(resumed, "2026-06-20T00:00:16.999Z").attempt, undefined);
+  assert.equal(advanceSprintTime(resumed, "2026-06-20T00:00:17.000Z").attempt?.result, "timed_out");
+});
+
+test("Opponent reply bounds validate without splitting Arrow Duel rating", () => {
+  const disabled = buildSprintConfig({
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    opponentReply: { enabled: false, seconds: 1 }
+  });
+  const enabled = buildSprintConfig({
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    opponentReply: { enabled: true, seconds: 10 }
+  });
+
+  assert.equal(disabled.ratingKey, enabled.ratingKey);
+  assert.throws(() => buildSprintConfig({
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    opponentReply: { enabled: true, seconds: 0 }
+  }), /between 1 and 10 seconds/);
+  assert.throws(() => buildSprintConfig({
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    opponentReply: { enabled: true, seconds: 11 }
+  }), /between 1 and 10 seconds/);
+  assert.throws(() => buildSprintConfig({
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    opponentReply: { enabled: true, seconds: 1.5 }
+  }), /whole number/);
+  assert.throws(() => buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    opponentReply: { enabled: false, seconds: 5 }
+  }), /only for Arrow Duel/);
 });
 
 test("Arrow Duel candidate ordering is stable for one attempt and seeded by the sprint session", () => {
@@ -477,7 +650,8 @@ test("Arrow Duel attempts store the displayed candidate order", () => {
       durationSeconds: 300,
       perPuzzleSeconds: 30,
       targetCorrect: 1,
-      maxMistakes: 3
+      maxMistakes: 3,
+      opponentReply: { enabled: false, seconds: 5 }
     }),
     puzzles: [samplePuzzle("p1")],
     ratingBefore: 600,
@@ -497,7 +671,8 @@ test("a target-one correct Arrow Duel sprint completes immediately", () => {
       durationSeconds: 300,
       perPuzzleSeconds: 30,
       targetCorrect: 1,
-      maxMistakes: 3
+      maxMistakes: 3,
+      opponentReply: { enabled: false, seconds: 5 }
     }),
     puzzles: [samplePuzzle("p1"), samplePuzzle("p2")],
     ratingBefore: 600,
@@ -518,7 +693,8 @@ test("exhausting the local puzzle set completes the sprint as a pass", () => {
       durationSeconds: 300,
       perPuzzleSeconds: 30,
       targetCorrect: 2,
-      maxMistakes: 3
+      maxMistakes: 3,
+      opponentReply: { enabled: false, seconds: 5 }
     }),
     puzzles: [samplePuzzle("p1")],
     ratingBefore: 600,
