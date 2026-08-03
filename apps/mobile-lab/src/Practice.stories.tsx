@@ -4,6 +4,7 @@ import {
   centerTestId,
   clickTestId,
   dragTestId,
+  expectPointerDrivenRunDrag,
   expectReorderAnimation,
   expectRunCardPickedUp,
   expectRunCardInsets,
@@ -11,7 +12,7 @@ import {
   expectTestIdText,
   expectTestIdAbsent,
   expectTestIdsInOrder,
-  expectUniformRunDropTarget,
+  expectRunInsertionTarget,
   openPracticeSession,
   replaceTextTestId,
   waitForEnabledTestId,
@@ -127,6 +128,7 @@ export const EditAndReorderRuns: Story = {
       "practice-run-arrow-duel",
       async () => {
         await expectRunCardPickedUp(canvasElement, "practice-run-endgame-sprint");
+        await expectPointerDrivenRunDrag(canvasElement, "practice-run-endgame-sprint");
         await expectTestIdText(
           canvasElement,
           "lab-run-reorder-feedback",
@@ -134,14 +136,14 @@ export const EditAndReorderRuns: Story = {
         );
         await expectTestIdsInOrder(canvasElement, [
           "practice-run-standard",
-          "practice-run-endgame-sprint",
           "practice-run-arrow-duel",
-          "practice-run-tactics-focus"
+          "practice-run-tactics-focus",
+          "practice-run-endgame-sprint"
         ]);
-        await expectReorderAnimation(canvasElement);
-        await expectUniformRunDropTarget(canvasElement, "practice-run-arrow-duel");
+        await expectRunInsertionTarget(canvasElement, "practice-run-arrow-duel", "before");
       }
     );
+    await expectReorderAnimation(canvasElement);
     await expectTestIdsInOrder(canvasElement, [
       "practice-run-standard",
       "practice-run-endgame-sprint",
@@ -165,6 +167,7 @@ export const EditAndReorderRunsPickedUp: Story = {
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-run-home-edit");
     await expectRunCardPickedUp(canvasElement, "practice-run-endgame-sprint");
+    await expectPointerDrivenRunDrag(canvasElement, "practice-run-endgame-sprint");
     await expectTestIdText(
       canvasElement,
       "lab-run-reorder-feedback",

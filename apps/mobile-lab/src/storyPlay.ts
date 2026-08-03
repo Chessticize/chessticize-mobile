@@ -105,26 +105,34 @@ export async function dragTestId(
   const page = within(canvasElement.ownerDocument.body);
   const source = await page.findByTestId(sourceTestID, {}, { timeout: 4_000 });
   const target = await page.findByTestId(targetTestID, {}, { timeout: 4_000 });
-  const DataTransferConstructor = canvasElement.ownerDocument.defaultView?.DataTransfer;
-  const DragEventConstructor = canvasElement.ownerDocument.defaultView?.DragEvent;
-  if (!DataTransferConstructor || !DragEventConstructor) {
-    throw new Error("This browser does not expose the APIs required to test drag-and-drop");
+  const PointerEventConstructor = canvasElement.ownerDocument.defaultView?.PointerEvent;
+  if (!PointerEventConstructor) {
+    throw new Error("This browser does not expose the Pointer Events required to test reordering");
   }
-  const dataTransfer = new DataTransferConstructor();
-  const dispatchDragEvent = (element: HTMLElement, type: string): void => {
-    element.dispatchEvent(new DragEventConstructor(type, {
+  const sourceRect = source.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const pointerId = 1;
+  const dispatchPointerEvent = (
+    element: HTMLElement,
+    type: string,
+    clientY: number,
+    buttons: number
+  ): void => {
+    element.dispatchEvent(new PointerEventConstructor(type, {
       bubbles: true,
+      buttons,
       cancelable: true,
-      dataTransfer
+      clientX: sourceRect.left + sourceRect.width / 2,
+      clientY,
+      pointerId,
+      pointerType: "mouse"
     }));
   };
 
-  dispatchDragEvent(source, "dragstart");
-  dispatchDragEvent(target, "dragenter");
-  dispatchDragEvent(target, "dragover");
+  dispatchPointerEvent(source, "pointerdown", sourceRect.top + sourceRect.height / 2, 1);
+  dispatchPointerEvent(source, "pointermove", targetRect.top + targetRect.height / 2, 1);
   await onPreview?.();
-  dispatchDragEvent(target, "drop");
-  dispatchDragEvent(source, "dragend");
+  dispatchPointerEvent(source, "pointerup", targetRect.top + targetRect.height / 2, 0);
 }
 
 export async function expectTestIdsInOrder(
@@ -168,9 +176,8 @@ export async function expectRunCardPickedUp(
     if (card.dataset.pickupHaptic !== "medium") {
       throw new Error(`Expected ${testID} to request medium pickup haptics`);
     }
-    if (!card.style.transform.includes("translate3d(0px, -2px, 0px)")
-      && !card.style.transform.includes("translate3d(0, -2px, 0)")) {
-      throw new Error(`Expected ${testID} to lift slightly when picked up`);
+    if (!card.style.transform.includes("translate3d")) {
+      throw new Error(`Expected ${testID} to expose its lifted drag transform`);
     }
     if (!card.style.transform.includes("scale(1.015)")) {
       throw new Error(`Expected ${testID} to scale slightly when picked up`);
@@ -199,9 +206,10 @@ export async function expectRunCardInsets(
   });
 }
 
-export async function expectUniformRunDropTarget(
+export async function expectRunInsertionTarget(
   canvasElement: HTMLElement,
-  testID: string
+  testID: string,
+  position: "after" | "before"
 ): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   const card = await page.findByTestId(testID, {}, { timeout: 4_000 });
@@ -211,11 +219,31 @@ export async function expectUniformRunDropTarget(
   }
   await waitFor(() => {
     const style = view.getComputedStyle(card);
-    if (style.borderTopWidth !== style.borderBottomWidth) {
-      throw new Error(`Expected ${testID} to use an even border on every edge`);
+    if (card.dataset.dropPosition !== position) {
+      throw new Error(`Expected ${testID} to expose a ${position} insertion target`);
     }
-    if (style.boxShadow.includes("-3px") || !style.boxShadow.includes("0px 0px 0px 2px")) {
-      throw new Error(`Expected ${testID} to use a uniform focus ring without a thick top edge`);
+    const expectedOffset = position === "before" ? "-4px" : "4px";
+    if (!style.boxShadow.includes(expectedOffset) || style.boxShadow.includes("0px 0px 0px 2px")) {
+      throw new Error(`Expected ${testID} to use a ${position} insertion line without a focus ring`);
+    }
+  });
+}
+
+export async function expectPointerDrivenRunDrag(
+  canvasElement: HTMLElement,
+  testID: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const card = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    if (card.dataset.dragMechanism !== "pointer") {
+      throw new Error(`Expected ${testID} to use pointer-driven dragging`);
+    }
+    if (card.dataset.browserDragGhost !== "suppressed" || card.draggable) {
+      throw new Error(`Expected ${testID} to suppress the browser-native drag ghost`);
+    }
+    if (!card.style.transform.includes("scale(1.015)")) {
+      throw new Error(`Expected ${testID} to keep the full-size card lifted under the pointer`);
     }
   });
 }

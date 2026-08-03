@@ -161,6 +161,9 @@ function LabScenarioContent({
   );
   const [startedFocusedRun, setStartedFocusedRun] = useState<SprintState | null>(null);
   const [runReorderFeedbackPreview, setRunReorderFeedbackPreview] = useState<string | null>(null);
+  const [runReorderDesignPreviewActive, setRunReorderDesignPreviewActive] = useState(
+    runReorderPickedUpRunId !== undefined
+  );
   const arrowDuelReplyFixture = useMemo(
     () => createArrowDuelReplyChallengeFixture(
       runtime.service,
@@ -184,6 +187,10 @@ function LabScenarioContent({
   );
   useEffect(() => () => clearLabPracticeService(runtime.service), [runtime.service]);
   useEffect(() => setSelectedCustomThemes([]), [scenarioId]);
+  useEffect(() => {
+    setRunReorderDesignPreviewActive(runReorderPickedUpRunId !== undefined);
+    setRunReorderFeedbackPreview(null);
+  }, [runReorderPickedUpRunId, scenarioId]);
   useEffect(() => {
     if (tacticalProfileScenarioId) {
       setTacticalProfileState(initialTacticalProfileFixtureState(tacticalProfileScenarioId));
@@ -254,7 +261,7 @@ function LabScenarioContent({
 
   return (
     <LabScenarioShell
-      nativeFeedbackPreview={runReorderPickedUpRunId
+      nativeFeedbackPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
         ? "Medium haptic requested on pickup"
         : runReorderFeedbackPreview}
       scenarioId={scenarioId}
@@ -272,13 +279,16 @@ function LabScenarioContent({
           ? historyProgressPresentationFor(scenarioId)
           : undefined}
         platformCapabilities={runtime.platformCapabilities}
-        runReorderDesignPreview={runReorderPickedUpRunId
+        runReorderDesignPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
           ? { pickedUpRunId: runReorderPickedUpRunId }
           : undefined}
         runReorderFeedbackPreview={scenarioId === "practice-home-edit"
-          ? ({ haptic }) => setRunReorderFeedbackPreview(
-              `${haptic === "medium" ? "Medium" : haptic} haptic requested on pickup`
-            )
+          ? ({ haptic }) => {
+              setRunReorderDesignPreviewActive(false);
+              setRunReorderFeedbackPreview(
+                `${haptic === "medium" ? "Medium" : haptic} haptic requested on pickup`
+              );
+            }
           : undefined}
         themeCatalogPresentation={showsThemeCatalogPrototype
           ? SERVER_CURATED_THEME_PRESENTATION

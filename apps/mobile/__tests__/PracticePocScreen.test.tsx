@@ -1054,6 +1054,66 @@ describe("PracticePocScreen", () => {
     expect(runReorderFeedbackPreview).not.toHaveBeenCalled();
   });
 
+  it("uses pointer-driven Web dragging without a browser-native ghost", () => {
+    const platform = ReactNative.Platform as unknown as { OS: string };
+    const previousPlatform = platform.OS;
+    const runReorderFeedbackPreview = jest.fn();
+    platform.OS = "web";
+
+    try {
+      const renderer = renderScreen({
+        runManagementPresentation: runManagementPresentation({ homeEditing: true }),
+        runReorderFeedbackPreview
+      });
+      const pointerSurface = (): TestRenderer.ReactTestInstance => renderer.root.findAll(
+        (node) => node.props["data-testid"] === "practice-run-standard"
+      )[0]!;
+      const currentTarget = {
+        querySelector: jest.fn(() => null),
+        releasePointerCapture: jest.fn(),
+        setPointerCapture: jest.fn()
+      };
+      const target = { closest: jest.fn(() => null) };
+
+      act(() => {
+        pointerSurface().props.onPointerDown({
+          button: 0,
+          clientY: 100,
+          currentTarget,
+          pointerId: 1,
+          pointerType: "mouse",
+          target
+        });
+        pointerSurface().props.onPointerMove({
+          clientY: 124,
+          currentTarget,
+          pointerId: 1,
+          preventDefault: jest.fn(),
+          target
+        });
+      });
+
+      expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(1);
+      expect(pointerSurface().props.draggable).toBe(false);
+      expect(pointerSurface().props["data-browser-drag-ghost"]).toBe("suppressed");
+      expect(pointerSurface().props["data-drag-mechanism"]).toBe("pointer");
+      expect(pointerSurface().props["data-drag-state"]).toBe("picked-up");
+      expect(pointerSurface().props.style.transform).toContain("translate3d(0, 22px, 0)");
+      expect(pointerSurface().props.style.transform).toContain("scale(1.015)");
+
+      act(() => {
+        pointerSurface().props.onPointerCancel({
+          currentTarget,
+          pointerId: 1
+        });
+      });
+      expect(pointerSurface().props["data-drag-state"]).toBeUndefined();
+      expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    } finally {
+      platform.OS = previousPlatform;
+    }
+  });
+
   it("renders removal confirmation directly below the selected Run card", () => {
     const renderer = renderScreen({
       runManagementPresentation: runManagementPresentation({
