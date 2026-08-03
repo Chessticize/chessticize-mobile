@@ -260,9 +260,6 @@ function LabScenarioContent({
           ? historyProgressPresentationFor(scenarioId)
           : undefined}
         platformCapabilities={runtime.platformCapabilities}
-        runEditorThemeDisclosure={
-          scenarioId === "practice-custom-setup"
-        }
         themeCatalogPresentation={showsThemeCatalogPrototype
           ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
