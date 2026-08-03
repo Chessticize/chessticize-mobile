@@ -116,9 +116,10 @@ Example:
 
 Supported commands:
 
-- `startSprint`: starts a sprint with `mode`, optional timing fields, optional target/mistake limits, optional rating/theme bounds, optional theme, optional `puzzleSelectionSeed`, and optional deterministic `now`.
+- `startSprint`: starts a sprint with `mode`, optional timing fields, optional target/mistake limits, optional rating/theme bounds, optional theme, optional Arrow Duel `opponentReply`, optional `puzzleSelectionSeed`, and optional deterministic `now`.
 - `move`: submits a normal puzzle move, with optional deterministic `now`.
 - `chooseArrow`: submits an Arrow Duel candidate, with optional deterministic `now`. It uses the same backend path as `move`; the active puzzle type decides validation.
+- `beginOpponentReply`: starts the configured Arrow Duel reply clock after the tempting-move board handoff, with optional deterministic `now`.
 - `state`: returns the active sprint view, or `null` when no sprint is active.
 - `history`: filters attempts by `result`, `mode`, `since`, `puzzleId`, and attempt source when available.
 - `dueReviews`: lists review items due by `now`, or by the current clock when omitted.
@@ -141,6 +142,6 @@ GitHub Actions runs these checks in `.github/workflows/core.yml` on pull request
 
 Coverage focus:
 
-- Core unit tests cover multi-step puzzle progression, Arrow Duel review arrows, candidate rejection, sprint success/failure, ELO floor/update behavior, default sprint rules, total timeout and per-puzzle pace behavior, seeded puzzle selection, and spaced repetition intervals.
+- Core unit tests cover multi-step puzzle progression, Arrow Duel review arrows, candidate and opponent-reply judgment, reply timeout and clock freezing, sprint success/failure, ELO floor/update behavior, default sprint rules, total timeout and per-puzzle pace behavior, seeded puzzle selection, and spaced repetition intervals.
 - Storage integration tests use real `node:sqlite` databases for fixture seeding, puzzle selection, attempt history filters, due review queries, rating reset generations, transaction rollback, active sprint protection, and completed sprint persistence.
-- CLI E2E tests spawn the real CLI process, communicate only through stdio, and verify normal multi-step sprint behavior, Arrow Duel wrong-choice review output, history/review source semantics, and invalid command handling.
+- CLI E2E tests spawn the real CLI process, communicate only through stdio, and verify normal multi-step sprint behavior, Arrow Duel choice and opponent-reply outcomes, history/review source semantics, and invalid command handling.

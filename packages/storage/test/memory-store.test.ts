@@ -81,6 +81,76 @@ test("MemoryStore records due reviews for wrong Arrow Duel choices", async () =>
   assert.equal(service.getDueReviews("2026-06-20T12:00:00.000Z").length, 0);
 });
 
+test("PracticeService records wrong and timed-out Arrow Duel replies in Review", async () => {
+  const wrongStore = new MemoryStore();
+  wrongStore.seedPuzzles(await loadFixturePuzzles());
+  const wrongService = new PracticeService(wrongStore);
+  const started = wrongService.startSprint({
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    targetCorrect: 1,
+    maxMistakes: 3,
+    minRating: 1700,
+    maxRating: 1800
+  }, "2026-06-20T12:00:00.000Z");
+  assert.deepEqual(started.config.opponentReply, { enabled: true, seconds: 5 });
+
+  const choice = wrongService.submitMove("b2b1", "2026-06-20T12:00:04.000Z");
+  assert.equal(choice.attempt, undefined);
+  assert.equal(choice.state.currentPuzzle?.kind, "arrow_duel");
+  assert.equal(choice.state.currentPuzzle?.phase, "reply_handoff");
+  wrongService.beginArrowDuelReply("2026-06-20T12:00:05.000Z");
+  const wrong = wrongService.submitMove("e6d6", "2026-06-20T12:00:06.000Z");
+  assert.equal(wrong.attempt?.result, "wrong");
+  assert.equal(wrongStore.listAttempts().length, 1);
+  assert.equal(wrongService.listReviewQueue().length, 1);
+
+  const timeoutStore = new MemoryStore();
+  timeoutStore.seedPuzzles(await loadFixturePuzzles());
+  const timeoutService = new PracticeService(timeoutStore);
+  timeoutService.startSprint({
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    targetCorrect: 1,
+    maxMistakes: 3,
+    minRating: 1700,
+    maxRating: 1800,
+    opponentReply: { enabled: true, seconds: 3 }
+  }, "2026-06-20T13:00:00.000Z");
+  timeoutService.submitMove("b2b1", "2026-06-20T13:00:04.000Z");
+  timeoutService.beginArrowDuelReply("2026-06-20T13:00:05.000Z");
+  const timedOut = timeoutService.advanceSprintTime("2026-06-20T13:00:08.000Z");
+
+  assert.equal(timedOut.attempt?.result, "timed_out");
+  assert.equal(timeoutStore.listAttempts().length, 1);
+  assert.equal(timeoutService.listReviewQueue().length, 1);
+});
+
+test("PracticeService abandons during reply after the original Sprint deadline", async () => {
+  const store = new MemoryStore();
+  store.seedPuzzles(await loadFixturePuzzles());
+  const service = new PracticeService(store);
+  service.startSprint({
+    mode: "arrow_duel",
+    durationSeconds: 60,
+    perPuzzleSeconds: 30,
+    targetCorrect: 2,
+    maxMistakes: 3,
+    minRating: 1700,
+    maxRating: 1800
+  }, "2026-06-20T12:00:00.000Z");
+  service.submitMove("b2b1", "2026-06-20T12:00:59.000Z");
+  service.beginArrowDuelReply("2026-06-20T12:01:00.000Z");
+
+  const abandoned = service.abandonSprint("2026-06-20T12:01:01.000Z");
+
+  assert.equal(abandoned.state.status, "failed");
+  assert.equal(abandoned.state.endReason, "abandoned");
+  assert.equal(service.getActiveSprint(), undefined);
+});
+
 test("MemoryStore sprint misses do not count as failed scheduled review lapses", () => {
   const store = new MemoryStore();
   const context = { puzzleId: "000hf", mode: "standard" as const, ratingKey: "standard 5/20" };

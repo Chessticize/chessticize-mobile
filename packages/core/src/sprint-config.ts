@@ -1,4 +1,9 @@
-import type { PuzzleTimingPolicy, SprintConfig, SprintMode } from "./types.ts";
+import type {
+  OpponentReplyConfig,
+  PuzzleTimingPolicy,
+  SprintConfig,
+  SprintMode
+} from "./types.ts";
 import { namedThemesForSelection } from "./theme-catalog.ts";
 
 const DEFAULT_DURATION_SECONDS = 5 * 60;
@@ -6,6 +11,9 @@ export const PUZZLE_TIMING_MIN_SECONDS = 10;
 export const PUZZLE_TIMING_MAX_SECONDS = 180;
 export const PUZZLE_TIMING_STEP_SECONDS = 5;
 export const PUZZLE_TIMING_MIN_GAP_SECONDS = 5;
+export const DEFAULT_OPPONENT_REPLY_SECONDS = 5;
+export const OPPONENT_REPLY_MIN_SECONDS = 1;
+export const OPPONENT_REPLY_MAX_SECONDS = 10;
 
 export function defaultSprintConfig(mode: SprintMode): SprintConfig {
   if (mode === "standard") {
@@ -31,6 +39,7 @@ export function buildSprintConfig(input: {
   maxAttempts?: number;
   ratingPolicy?: SprintConfig["ratingPolicy"];
   tacticalFocus?: SprintConfig["tacticalFocus"];
+  opponentReply?: OpponentReplyConfig;
 }): SprintConfig {
   if (!Number.isInteger(input.durationSeconds) || input.durationSeconds <= 0) {
     throw new Error("durationSeconds must be a positive integer");
@@ -70,6 +79,10 @@ export function buildSprintConfig(input: {
     perPuzzleSeconds: input.perPuzzleSeconds,
     themes: selectedThemes
   });
+  const opponentReply = resolveOpponentReplyConfig(
+    input.mode,
+    input.opponentReply
+  );
 
   return {
     mode: input.mode,
@@ -79,6 +92,7 @@ export function buildSprintConfig(input: {
     targetCorrect,
     maxMistakes,
     ratingKey,
+    ...(opponentReply === undefined ? {} : { opponentReply }),
     ...(selectedThemes.length === 0 ? {} : { themes: selectedThemes }),
     ...(input.maxAttempts === undefined ? {} : { maxAttempts: input.maxAttempts }),
     ...(input.ratingPolicy === undefined ? {} : { ratingPolicy: input.ratingPolicy }),
@@ -91,6 +105,42 @@ export function buildSprintConfig(input: {
           }
         })
   };
+}
+
+export function resolveOpponentReplyConfig(
+  mode: SprintMode,
+  config?: OpponentReplyConfig
+): OpponentReplyConfig | undefined {
+  if (mode !== "arrow_duel") {
+    if (config !== undefined) {
+      throw new Error("Opponent reply is available only for Arrow Duel");
+    }
+    return undefined;
+  }
+  return validateOpponentReplyConfig(config ?? {
+    enabled: true,
+    seconds: DEFAULT_OPPONENT_REPLY_SECONDS
+  });
+}
+
+export function validateOpponentReplyConfig(
+  config: OpponentReplyConfig
+): OpponentReplyConfig {
+  if (typeof config.enabled !== "boolean") {
+    throw new Error("opponentReply.enabled must be a boolean");
+  }
+  if (!Number.isInteger(config.seconds)) {
+    throw new Error("opponentReply.seconds must be a whole number of seconds");
+  }
+  if (
+    config.seconds < OPPONENT_REPLY_MIN_SECONDS ||
+    config.seconds > OPPONENT_REPLY_MAX_SECONDS
+  ) {
+    throw new Error(
+      `opponentReply.seconds must be between ${OPPONENT_REPLY_MIN_SECONDS} and ${OPPONENT_REPLY_MAX_SECONDS} seconds`
+    );
+  }
+  return { ...config };
 }
 
 function validateTacticalFocus(

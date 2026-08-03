@@ -10,8 +10,17 @@ import type {
   SprintState
 } from "./types.ts";
 import { calculateSprintRatingChange, DEFAULT_RATING_DEVIATION, DEFAULT_VOLATILITY } from "./ratings.ts";
-import { beginArrowDuelPuzzle, beginLinePuzzle, submitArrowDuelChoice, submitLineMove } from "./puzzle-session.ts";
-import { resolvePuzzleTimingPolicy } from "./sprint-config.ts";
+import {
+  beginArrowDuelPuzzle,
+  beginLinePuzzle,
+  submitArrowDuelChoice,
+  submitArrowDuelReply,
+  submitLineMove
+} from "./puzzle-session.ts";
+import {
+  resolveOpponentReplyConfig,
+  resolvePuzzleTimingPolicy
+} from "./sprint-config.ts";
 import { isUnclearAttemptEligible } from "./attempt-clarity.ts";
 
 export function startSprint(input: {
@@ -26,12 +35,17 @@ export function startSprint(input: {
     throw new Error("Cannot start a sprint without puzzles");
   }
   const startedAt = new Date(input.now);
+  const opponentReply = resolveOpponentReplyConfig(
+    input.config.mode,
+    input.config.opponentReply
+  );
   const config: SprintConfig = {
     ...input.config,
     puzzleTiming: resolvePuzzleTimingPolicy(
       input.config.puzzleTiming,
       input.config.perPuzzleSeconds
-    )
+    ),
+    ...(opponentReply === undefined ? {} : { opponentReply })
   };
   const deadlineAt = new Date(startedAt.getTime() + config.durationSeconds * 1000).toISOString();
   const state: SprintState = {
@@ -66,11 +80,36 @@ export function submitSprintMove(state: SprintState, move: string, now: string):
     throw new Error("Sprint has no current puzzle");
   }
   if (timedState.currentPuzzle.kind === "arrow_duel") {
-    const { state: puzzleState, feedback } = submitArrowDuelChoice(timedState.currentPuzzle, move);
+    if (timedState.currentPuzzle.phase === "reply_handoff") {
+      throw new Error("Arrow Duel reply handoff is still in progress");
+    }
+    if (timedState.currentPuzzle.phase === "reply") {
+      const { state: puzzleState, feedback } = submitArrowDuelReply(
+        timedState.currentPuzzle,
+        move
+      );
+      const clocksResumed = resumeOpponentReplyClocks(timedState, now);
+      return applyPuzzleFeedback(
+        {
+          ...clocksResumed,
+          currentPuzzle: puzzleState
+        },
+        feedback,
+        now
+      );
+    }
+    const { state: puzzleState, feedback } = submitArrowDuelChoice(
+      timedState.currentPuzzle,
+      move,
+      { opponentReply: timedState.config.opponentReply?.enabled === true }
+    );
+    const nextPuzzleState = puzzleState.phase === "reply_handoff"
+      ? { ...puzzleState, replyPauseStartedAt: new Date(now).toISOString() }
+      : puzzleState;
     return applyPuzzleFeedback(
       {
         ...timedState,
-        currentPuzzle: puzzleState
+        currentPuzzle: nextPuzzleState
       },
       feedback,
       now
@@ -91,6 +130,25 @@ export function submitSprintMove(state: SprintState, move: string, now: string):
 export function advanceSprintTime(state: SprintState, now: string): SprintCommandResult {
   if (state.status !== "active") {
     return { state };
+  }
+  if (
+    state.currentPuzzle?.kind === "arrow_duel" &&
+    state.currentPuzzle.phase === "reply_handoff"
+  ) {
+    return { state };
+  }
+  if (
+    state.currentPuzzle?.kind === "arrow_duel" &&
+    state.currentPuzzle.phase === "reply"
+  ) {
+    const replyDeadlineAt = state.currentPuzzle.replyDeadlineAt;
+    if (!replyDeadlineAt) {
+      throw new Error("Arrow Duel reply has no deadline");
+    }
+    if (new Date(now).getTime() < new Date(replyDeadlineAt).getTime()) {
+      return { state };
+    }
+    return applyOpponentReplyTimeout(state, now);
   }
   if (new Date(now).getTime() >= new Date(state.deadlineAt).getTime()) {
     return {
@@ -139,6 +197,39 @@ export function advanceSprintTime(state: SprintState, now: string): SprintComman
   };
 }
 
+export function beginArrowDuelReply(state: SprintState, now: string): SprintState {
+  if (state.status !== "active") {
+    throw new Error("Arrow Duel reply requires an active Sprint");
+  }
+  if (
+    state.currentPuzzle?.kind !== "arrow_duel" ||
+    state.currentPuzzle.phase !== "reply_handoff" ||
+    !state.currentPuzzle.replyPauseStartedAt
+  ) {
+    throw new Error("Arrow Duel is not waiting to begin an opponent reply");
+  }
+  const opponentReply = state.config.opponentReply;
+  if (!opponentReply?.enabled) {
+    throw new Error("Opponent reply is disabled for this Sprint");
+  }
+  const startedAtMs = Math.max(
+    new Date(state.currentPuzzle.replyPauseStartedAt).getTime(),
+    new Date(now).getTime()
+  );
+  const replyStartedAt = new Date(startedAtMs).toISOString();
+  return {
+    ...state,
+    currentPuzzle: {
+      ...state.currentPuzzle,
+      phase: "reply",
+      replyStartedAt,
+      replyDeadlineAt: new Date(
+        startedAtMs + opponentReply.seconds * 1000
+      ).toISOString()
+    }
+  };
+}
+
 export function pauseSprint(state: SprintState, now: string): SprintCommandResult {
   const advanced = advanceSprintTime(state, now);
   if (advanced.state.status !== "active") {
@@ -173,6 +264,22 @@ export function resumeSprint(state: SprintState, now: string): SprintState {
       ? { currentPuzzleStartedAt: shiftIso(state.currentPuzzleStartedAt, pausedMs) }
       : {}),
     ...(state.currentPuzzleDeadlineAt ? { currentPuzzleDeadlineAt: shiftIso(state.currentPuzzleDeadlineAt, pausedMs) } : {}),
+    ...(state.currentPuzzle?.kind === "arrow_duel"
+      ? {
+          currentPuzzle: {
+            ...state.currentPuzzle,
+            ...(state.currentPuzzle.replyPauseStartedAt
+              ? { replyPauseStartedAt: shiftIso(state.currentPuzzle.replyPauseStartedAt, pausedMs) }
+              : {}),
+            ...(state.currentPuzzle.replyStartedAt
+              ? { replyStartedAt: shiftIso(state.currentPuzzle.replyStartedAt, pausedMs) }
+              : {}),
+            ...(state.currentPuzzle.replyDeadlineAt
+              ? { replyDeadlineAt: shiftIso(state.currentPuzzle.replyDeadlineAt, pausedMs) }
+              : {})
+          }
+        }
+      : {}),
     totalPausedMs: (state.totalPausedMs ?? 0) + pausedMs
   };
 }
@@ -221,6 +328,9 @@ export function serializeCurrentPuzzleView(currentPuzzle: CurrentPuzzleState): u
       themes: currentPuzzle.puzzle.themes,
       candidates: currentPuzzle.candidates,
       selectedMove: currentPuzzle.selectedMove,
+      phase: currentPuzzle.phase,
+      replyStartedAt: currentPuzzle.replyStartedAt,
+      replyDeadlineAt: currentPuzzle.replyDeadlineAt,
       solved: currentPuzzle.solved
     };
   }
@@ -233,6 +343,104 @@ export function serializeCurrentPuzzleView(currentPuzzle: CurrentPuzzleState): u
     playedMoves: currentPuzzle.playedMoves,
     userMoveNumber: Math.ceil(currentPuzzle.cursor / 2),
     solved: currentPuzzle.solved
+  };
+}
+
+function applyOpponentReplyTimeout(
+  state: SprintState,
+  now: string
+): SprintCommandResult {
+  if (
+    state.currentPuzzle?.kind !== "arrow_duel" ||
+    state.currentPuzzle.phase !== "reply" ||
+    !state.currentPuzzle.replyDeadlineAt
+  ) {
+    throw new Error("Cannot time out an inactive Arrow Duel reply");
+  }
+  const timedOutAt = state.currentPuzzle.replyDeadlineAt;
+  const resumed = resumeOpponentReplyClocks(state, timedOutAt);
+  const attempt = buildOpponentReplyTimeoutAttempt(resumed, timedOutAt);
+  const nextPuzzleIndex = state.currentPuzzleIndex + 1;
+  const afterTimeout: SprintState = {
+    ...resumed,
+    mistakeCount: resumed.mistakeCount + 1,
+    currentStreak: 0
+  };
+  if (reachedAttemptLimit(afterTimeout)) {
+    return {
+      state: completeSprintForPolicy(afterTimeout, "won", "attempt_limit", timedOutAt),
+      attempt
+    };
+  }
+  if (afterTimeout.mistakeCount >= afterTimeout.config.maxMistakes) {
+    return {
+      state: completeSprintForPolicy(afterTimeout, "failed", "max_mistakes", timedOutAt),
+      attempt
+    };
+  }
+  if (nextPuzzleIndex >= state.puzzles.length) {
+    return {
+      state: completeSprintForPolicy(afterTimeout, "failed", "puzzles_exhausted", timedOutAt),
+      attempt
+    };
+  }
+  return {
+    state: beginCurrentPuzzle(afterTimeout, nextPuzzleIndex, new Date(now).toISOString()),
+    attempt
+  };
+}
+
+function resumeOpponentReplyClocks(state: SprintState, completedAt: string): SprintState {
+  if (
+    state.currentPuzzle?.kind !== "arrow_duel" ||
+    !state.currentPuzzle.replyPauseStartedAt
+  ) {
+    return state;
+  }
+  const pausedMs = Math.max(
+    0,
+    new Date(completedAt).getTime() -
+      new Date(state.currentPuzzle.replyPauseStartedAt).getTime()
+  );
+  return {
+    ...state,
+    deadlineAt: shiftIso(state.deadlineAt, pausedMs),
+    ...(state.currentPuzzleStartedAt
+      ? { currentPuzzleStartedAt: shiftIso(state.currentPuzzleStartedAt, pausedMs) }
+      : {}),
+    ...(state.currentPuzzleDeadlineAt
+      ? { currentPuzzleDeadlineAt: shiftIso(state.currentPuzzleDeadlineAt, pausedMs) }
+      : {}),
+    totalPausedMs: (state.totalPausedMs ?? 0) + pausedMs
+  };
+}
+
+function buildOpponentReplyTimeoutAttempt(
+  state: SprintState,
+  timedOutAt: string
+): AttemptEvent {
+  if (state.currentPuzzle?.kind !== "arrow_duel") {
+    throw new Error("Cannot build Arrow Duel reply timeout without its puzzle");
+  }
+  const expectedMove = state.currentPuzzle.puzzle.solutionMoves[1];
+  if (!expectedMove) {
+    throw new Error("Arrow Duel reply timeout has no expected move");
+  }
+  return {
+    id: generateId(),
+    source: "sprint",
+    sessionId: state.id,
+    puzzleId: state.currentPuzzle.puzzle.id,
+    mode: state.config.mode,
+    ratingKey: state.config.ratingKey,
+    result: "timed_out",
+    expectedMove,
+    startedAt: state.currentPuzzleStartedAt ?? state.startedAt,
+    completedAt: timedOutAt,
+    elapsedMs: currentPuzzleElapsedMs(state, timedOutAt),
+    timingStatus: "timed_out",
+    ratingBefore: state.ratingBefore,
+    arrowDuelCandidateOrder: [...state.currentPuzzle.candidates]
   };
 }
 

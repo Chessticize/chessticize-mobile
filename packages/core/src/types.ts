@@ -44,6 +44,8 @@ export interface SprintConfig {
   targetCorrect: number;
   maxMistakes: number;
   ratingKey: string;
+  /** Optional only for persisted legacy configs; current Arrow Duel configs populate it. */
+  opponentReply?: OpponentReplyConfig;
   themes?: string[];
   /** A fixed attempt ceiling used by bounded interventions such as Tactical Focus. */
   maxAttempts?: number;
@@ -63,6 +65,11 @@ export interface SprintConfig {
 export interface PuzzleTimingPolicy {
   slowAfterSeconds: number | null;
   timeoutAfterSeconds: number | null;
+}
+
+export interface OpponentReplyConfig {
+  enabled: boolean;
+  seconds: number;
 }
 
 export interface CustomSprintConfigRecord {
@@ -92,6 +99,8 @@ export interface PracticeRunRecord {
   puzzleTiming?: PuzzleTimingPolicy;
   targetCorrect: number;
   maxMistakes: number;
+  /** Optional only for imported legacy Runs; current Arrow Duel Runs populate it. */
+  opponentReply?: OpponentReplyConfig;
   themes?: string[];
   homeOrder: number;
   archived: boolean;
@@ -130,7 +139,11 @@ export interface ArrowDuelState {
   candidates: string[];
   correctMove: string;
   wrongMove: string;
+  phase: "choice" | "reply_handoff" | "reply";
   selectedMove?: string;
+  replyPauseStartedAt?: string;
+  replyStartedAt?: string;
+  replyDeadlineAt?: string;
   solved: boolean;
 }
 

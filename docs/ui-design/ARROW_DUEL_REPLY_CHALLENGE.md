@@ -1,12 +1,11 @@
 # Arrow Duel Opponent Reply Challenge
 
-Status: approved product contract, Interaction Lab design phase only.
+Status: implemented product contract and living Interaction Lab documentation.
 
 Tracking issue: [#489](https://github.com/Chessticize/chessticize-mobile/issues/489).
 
-This document defines the planned Arrow Duel redesign. It does not describe
-production behavior until the Storybook design is approved and the domain,
-storage, Rating, Review, and mobile wiring ship in a later implementation.
+This document defines the shipped Arrow Duel redesign across Core, storage,
+sync, Review, Run management, CLI, and the mobile UI.
 
 ## Goal
 
@@ -27,9 +26,9 @@ Each Arrow Duel Run has an **Opponent reply** setting:
 - Turning it on or off does not change the Run's Rating identity. Both states
   contribute to the same Arrow Duel Run Rating.
 
-The Interaction Lab may hold this value in deterministic presentation state.
-Production persistence, sync, and legacy-Run migration are outside the design
-phase.
+The setting persists with the Run and syncs without changing its Rating key.
+Legacy Arrow Duel Runs receive the enabled five-second default during
+compatibility normalization and SQLite migration.
 
 ## Scored Flow
 
@@ -115,7 +114,7 @@ their stable Storybook URLs. It covers:
 - the default-on Create Run and Edit Run control and its off state; and
 - first-use Arrow Duel guidance for the two-stage rule.
 
-The design phase excludes production Sprint/domain behavior, persistent Run
-settings, sync, Review mutations, native integration, analytics, rollout, and
-release work. Explicit design approval must be recorded before those boundaries
-are implemented.
+These scenarios remain living UI documentation for the production behavior.
+Their deterministic preview adapter is isolated from the production state
+machine so Storybook timing can stay stable while the shipped flow exercises
+the Core and storage boundaries.

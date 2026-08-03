@@ -707,7 +707,15 @@ test("Android Arrow Duel seed completes through the shared pack-backed service",
       [...fixture.candidates].sort()
     );
 
-    const result = service.submitMove(fixture.correctMove, "2026-07-16T12:00:01.000Z");
+    const choice = service.submitMove(fixture.correctMove, "2026-07-16T12:00:01.000Z");
+    assert.equal(choice.attempt, undefined);
+    assert.equal(choice.state.currentPuzzle?.kind, "arrow_duel");
+    assert.equal(choice.state.currentPuzzle?.phase, "reply_handoff");
+    service.beginArrowDuelReply("2026-07-16T12:00:02.000Z");
+    const result = service.submitMove(
+      fixture.puzzle.solutionMoves[1]!,
+      "2026-07-16T12:00:03.000Z"
+    );
 
     assert.equal(result.state.status, "won");
     assert.equal(result.attempt?.result, "correct");

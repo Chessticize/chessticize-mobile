@@ -63,6 +63,7 @@ import {
   reviewDueLabel,
   reviewQueueForecast,
   submitArrowDuelChoice,
+  submitArrowDuelFollowUpMove,
   submitLineMove,
   SERVER_CURATED_THEME_PRESENTATION,
   SERVER_CURATED_THEMES,
@@ -1131,9 +1132,22 @@ export function PracticePocScreen({
     const puzzleDeadlineMs = state.currentPuzzleDeadlineAt
       ? new Date(state.currentPuzzleDeadlineAt).getTime()
       : null;
-    const sprintDeadlineReached = nowMs >= sprintDeadlineMs;
-    const puzzleDeadlineReached = puzzleDeadlineMs !== null && nowMs >= puzzleDeadlineMs;
-    if (!sprintDeadlineReached && !puzzleDeadlineReached) {
+    const opponentReplyClocksPaused =
+      state.currentPuzzle?.kind === "arrow_duel" &&
+      state.currentPuzzle.phase !== "choice";
+    const replyDeadlineMs =
+      state.currentPuzzle?.kind === "arrow_duel" &&
+      state.currentPuzzle.phase === "reply" &&
+      state.currentPuzzle.replyDeadlineAt
+        ? new Date(state.currentPuzzle.replyDeadlineAt).getTime()
+        : null;
+    const replyDeadlineReached = replyDeadlineMs !== null && nowMs >= replyDeadlineMs;
+    const sprintDeadlineReached = !opponentReplyClocksPaused && nowMs >= sprintDeadlineMs;
+    const puzzleDeadlineReached =
+      !opponentReplyClocksPaused &&
+      puzzleDeadlineMs !== null &&
+      nowMs >= puzzleDeadlineMs;
+    if (!sprintDeadlineReached && !puzzleDeadlineReached && !replyDeadlineReached) {
       return;
     }
 
@@ -1142,16 +1156,20 @@ export function PracticePocScreen({
       const submittedPuzzleId = submittedPuzzle?.puzzle.id ?? null;
       const submittedFen = submittedPuzzle?.currentFen ?? boardFenRef.current ?? null;
       if (
-        puzzleDeadlineReached &&
+        (puzzleDeadlineReached || replyDeadlineReached) &&
         !sprintDeadlineReached &&
         submittedPuzzleId &&
         puzzleTimeoutInFlightRef.current === submittedPuzzleId
       ) {
         return;
       }
-      if (puzzleDeadlineReached && !sprintDeadlineReached && submittedPuzzleId) {
+      if ((puzzleDeadlineReached || replyDeadlineReached) && !sprintDeadlineReached && submittedPuzzleId) {
         puzzleTimeoutInFlightRef.current = submittedPuzzleId;
-        commitBoardInputLocked(true, "puzzle-timeout", submittedPuzzleId);
+        commitBoardInputLocked(
+          true,
+          replyDeadlineReached ? "arrow-duel-reply-timeout" : "puzzle-timeout",
+          submittedPuzzleId
+        );
       }
       try {
         const advanced = service.advanceSprintTime(new Date(nowMs).toISOString());
@@ -1159,10 +1177,15 @@ export function PracticePocScreen({
         setFeedback(null);
         setFeedbackPuzzleId(null);
         setUnclearPrompt(incompleteUnclearPromptFor(advanced.attempt));
-        setPreviousAttemptNotice(previousAttemptNoticeFor(
-          advanced.attempt,
-          advanced.state.status
-        ));
+        setPreviousAttemptNotice(
+          submittedPuzzle?.kind === "arrow_duel" &&
+          state.config.opponentReply?.enabled
+            ? null
+            : previousAttemptNoticeFor(
+                advanced.attempt,
+                advanced.state.status
+              )
+        );
         if (
           advanced.attempt?.timingStatus === "timed_out" &&
           submittedPuzzle &&
@@ -1181,7 +1204,11 @@ export function PracticePocScreen({
           clearFeedbackSnapshot();
           commitBoardInputLocked(
             false,
-            sprintDeadlineReached ? "sprint-expired" : "puzzle-timeout-complete",
+            sprintDeadlineReached
+              ? "sprint-expired"
+              : replyDeadlineReached
+                ? "arrow-duel-reply-timeout-complete"
+                : "puzzle-timeout-complete",
             advanced.state.currentPuzzle?.puzzle.id ?? null
           );
           commitBoardFen(advanced.state.currentPuzzle?.currentFen ?? null);
@@ -1904,6 +1931,14 @@ export function PracticePocScreen({
               ...(nextMode === "arrow_duel" && arrowDuelTargetCorrect !== undefined
                 ? { targetCorrect: arrowDuelTargetCorrect }
                 : {}),
+              ...(nextMode === "arrow_duel" && arrowDuelReplyChallengeDesign
+                ? {
+                    opponentReply: {
+                      enabled: false,
+                      seconds: arrowDuelReplySeconds
+                    }
+                  }
+                : {}),
               ...(useCustomTiming && customTargetCorrect !== undefined
                 ? { targetCorrect: customTargetCorrect }
                 : {}),
@@ -2076,7 +2111,7 @@ export function PracticePocScreen({
     }
     const submittedPuzzle = activeState.currentPuzzle;
     if (
-      arrowDuelReplyChallengeVisible
+      arrowDuelReplyChallengePreviewVisible
       && submittedPuzzle?.kind === "arrow_duel"
       && arrowDuelReplyChallengeDesign?.resolveMove
     ) {
@@ -2115,7 +2150,11 @@ export function PracticePocScreen({
       return;
     }
     const submittedFen = submittedPuzzle?.currentFen ?? boardFenRef.current ?? null;
-    if (submittedPuzzle?.kind === "arrow_duel" && !isArrowDuelCandidate(submittedPuzzle.candidates, move)) {
+    if (
+      submittedPuzzle?.kind === "arrow_duel" &&
+      submittedPuzzle.phase === "choice" &&
+      !isArrowDuelCandidate(submittedPuzzle.candidates, move)
+    ) {
       if (submittedFen) {
         boardRef.current?.resetBoard(submittedFen);
         commitBoardFen(submittedFen);
@@ -2259,10 +2298,14 @@ export function PracticePocScreen({
       const next = service.submitMove(move, captureLiveNowIso());
       playCommittedMoveFeedback("user", move, submittedFen);
       const nextFeedback = (next.feedback as SessionFeedback) ?? null;
-      const nextPreviousAttemptNotice = previousAttemptNoticeFor(
-        next.attempt,
-        next.state.status
-      );
+      const nextPreviousAttemptNotice =
+        submittedPuzzle?.kind === "arrow_duel" &&
+        stateRef.current?.config.opponentReply?.enabled
+          ? null
+          : previousAttemptNoticeFor(
+              next.attempt,
+              next.state.status
+            );
       setPreviousAttemptNotice(nextPreviousAttemptNotice);
       if (next.attempt) {
         setUnclearPrompt(incompleteUnclearPromptFor(next.attempt) ?? (
@@ -2319,7 +2362,7 @@ export function PracticePocScreen({
       }
       if (shouldAnimateSamePuzzleReply(next.state, nextFeedback, submittedPuzzleId)) {
         commitBoardFen(nextVisualFen);
-        await animateSamePuzzleReply(next.state, nextFeedback);
+        await animateSamePuzzleReply(next.state, nextFeedback, submittedFen);
         return;
       }
       syncFeedbackSnapshot(next.state, nextFeedback, submittedPuzzle, submittedFen, submittedPuzzleId);
@@ -2411,9 +2454,17 @@ export function PracticePocScreen({
   function resumeSprint(nextSprint: SprintState): void {
     setError(null);
     try {
-      const resumed = nextSprint.status === "paused" && service.getActiveSprint()?.id === nextSprint.id
+      let resumed = nextSprint.status === "paused" && service.getActiveSprint()?.id === nextSprint.id
         ? service.resumeSprint(captureLiveNowIso())
         : nextSprint;
+      if (
+        resumed.status === "active" &&
+        resumed.currentPuzzle?.kind === "arrow_duel" &&
+        resumed.currentPuzzle.phase === "reply_handoff" &&
+        !boardSyncInProgressRef.current
+      ) {
+        resumed = service.beginArrowDuelReply(captureLiveNowIso());
+      }
       setMode(resumed.config.mode);
       setSessionReplayItems([]);
       commitState(resumed);
@@ -2635,7 +2686,8 @@ export function PracticePocScreen({
 
   async function animateSamePuzzleReply(
     nextState: SprintState,
-    nextFeedback: SessionFeedback
+    nextFeedback: SessionFeedback,
+    submittedFen: string | null
   ): Promise<void> {
     const nextFen = nextState.currentPuzzle?.currentFen ?? null;
     const autoMoves = nextFeedback?.autoPlayedMoves ?? [];
@@ -2647,7 +2699,31 @@ export function PracticePocScreen({
         await sleep(USER_FEEDBACK_BEFORE_AUTO_MS);
         setFeedback(null);
         setFeedbackPuzzleId(null);
+        if (
+          nextState.currentPuzzle?.kind === "arrow_duel" &&
+          nextState.currentPuzzle.phase === "reply_handoff" &&
+          submittedFen
+        ) {
+          resetBoardToFen(
+            submittedFen,
+            "arrow-duel-reply-handoff",
+            puzzleId
+          );
+          commitBoardFen(submittedFen);
+        }
         await animateBoardMoves(autoMoves, nextFen);
+        const activeSprint = service.getActiveSprint();
+        if (
+          nextState.currentPuzzle?.kind === "arrow_duel" &&
+          nextState.currentPuzzle.phase === "reply_handoff" &&
+          activeSprint?.id === nextState.id &&
+          activeSprint.status === "active" &&
+          activeSprint.currentPuzzle?.kind === "arrow_duel" &&
+          activeSprint.currentPuzzle.phase === "reply_handoff" &&
+          activeSprint.currentPuzzle.puzzle.id === puzzleId
+        ) {
+          commitState(service.beginArrowDuelReply(captureLiveNowIso()));
+        }
       } finally {
         boardSyncInProgressRef.current = false;
         // A hard lock taken mid-animation (pause, app background) owns the
@@ -2972,12 +3048,32 @@ export function PracticePocScreen({
   const arrowDuelReplyChallengeDesign =
     sprintRulesDesignPreview?.arrowDuelReplyChallenge;
   const arrowDuelReplyAutoTimeoutMs = arrowDuelReplyChallengeDesign?.autoTimeoutMs;
-  const arrowDuelReplyChallengeVisible = Boolean(
+  const arrowDuelReplyChallengePreviewVisible = Boolean(
     arrowDuelReplyChallengeDesign?.enabled
       && arrowDuelReplyChallengeDesign.resolveMove
       && arrowDuelReplyChallengeEnabled
       && currentPuzzle?.kind === "arrow_duel"
   );
+  const arrowDuelReplyChallengeProductionVisible = Boolean(
+    !arrowDuelReplyChallengePreviewVisible &&
+      state?.config.opponentReply?.enabled &&
+      currentPuzzle?.kind === "arrow_duel"
+  );
+  const displayedArrowDuelPuzzle =
+    feedbackSnapshot?.currentPuzzle.kind === "arrow_duel"
+      ? feedbackSnapshot.currentPuzzle
+      : currentPuzzle?.kind === "arrow_duel"
+        ? currentPuzzle
+        : undefined;
+  const arrowDuelReplyChallengeVisible =
+    arrowDuelReplyChallengePreviewVisible ||
+    arrowDuelReplyChallengeProductionVisible;
+  const arrowDuelReplyChallengeDisplayPhase: ArrowDuelReplyChallengePhase =
+    arrowDuelReplyChallengePreviewVisible
+      ? arrowDuelReplyChallengePhase
+      : displayedArrowDuelPuzzle?.phase === "reply"
+        ? "reply"
+        : "choice";
   useEffect(() => {
     arrowDuelReplyPuzzleElapsedSecondsRef.current = 0;
     setArrowDuelReplyChallengePhase("choice");
@@ -3011,7 +3107,7 @@ export function PracticePocScreen({
   };
   useEffect(() => {
     if (
-      !arrowDuelReplyChallengeVisible
+      !arrowDuelReplyChallengePreviewVisible
       || arrowDuelReplyChallengePhase !== "reply"
       || arrowDuelReplyAutoTimeoutMs === undefined
     ) {
@@ -3024,11 +3120,19 @@ export function PracticePocScreen({
   }, [
     arrowDuelReplyAutoTimeoutMs,
     arrowDuelReplyChallengePhase,
-    arrowDuelReplyChallengeVisible
+    arrowDuelReplyChallengePreviewVisible
   ]);
-  const effectiveSessionNowMs = state?.status === "paused" && state.pausedAt
-    ? new Date(state.pausedAt).getTime()
-    : nowMs;
+  const opponentReplyPauseStartedAt =
+    arrowDuelReplyChallengeProductionVisible &&
+    currentPuzzle?.kind === "arrow_duel" &&
+    currentPuzzle.phase !== "choice"
+      ? currentPuzzle.replyPauseStartedAt
+      : undefined;
+  const effectiveSessionNowMs = opponentReplyPauseStartedAt
+    ? new Date(opponentReplyPauseStartedAt).getTime()
+    : state?.status === "paused" && state.pausedAt
+      ? new Date(state.pausedAt).getTime()
+      : nowMs;
   const sprintElapsedMs = state
     ? Math.max(0, effectiveSessionNowMs - new Date(state.startedAt).getTime())
     : 0;
@@ -3036,6 +3140,16 @@ export function PracticePocScreen({
     ? Math.max(0, new Date(state.deadlineAt).getTime() - effectiveSessionNowMs)
     : 0;
   const timerText = formatDuration(Math.max(0, Math.floor(remainingMs / 1000)));
+  const arrowDuelReplySecondsRemaining =
+    arrowDuelReplyChallengePreviewVisible
+      ? arrowDuelReplySeconds
+      : displayedArrowDuelPuzzle?.phase === "reply" &&
+          displayedArrowDuelPuzzle.replyDeadlineAt
+        ? Math.max(
+            0,
+            Math.ceil((new Date(displayedArrowDuelPuzzle.replyDeadlineAt).getTime() - nowMs) / 1000)
+          )
+        : state?.config.opponentReply?.seconds ?? arrowDuelReplySeconds;
   const currentBoardFen = boardFen ?? currentPuzzle?.currentFen ?? null;
   const displayedPuzzle = feedbackSnapshot?.currentPuzzle ?? currentPuzzle;
   const sessionEntryPreview = usePuzzleEntryPreview({
@@ -3086,11 +3200,6 @@ export function PracticePocScreen({
       && !isShowingFeedbackSnapshot
       && !sessionEntryPreview.locked
       && (!boardInputLocked || boardPremoveWindow)
-      && (
-        !arrowDuelReplyChallengeVisible
-        || arrowDuelReplyChallengePhase === "choice"
-        || arrowDuelReplyChallengePhase === "reply"
-      )
   );
   const displayedSideToMove = displayedBoardFen ? sideToMove(displayedBoardFen) : null;
   const submittedMoveForCurrentPuzzle =
@@ -3669,7 +3778,10 @@ export function PracticePocScreen({
             testID="session-puzzle-timeout-overlay"
           >
             <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
-            {sprintGuidanceEnabled || sprintRulesDesignPreview?.timeoutCountsAsMistake === true ? (
+            {(sprintGuidanceEnabled || sprintRulesDesignPreview?.timeoutCountsAsMistake === true) && !(
+              feedbackSnapshot.currentPuzzle.kind === "arrow_duel" &&
+              feedbackSnapshot.currentPuzzle.phase === "reply"
+            ) ? (
               <Text style={styles.puzzleTimeoutOverlayDetail}>Added to Review</Text>
             ) : null}
           </View>
@@ -3695,7 +3807,13 @@ export function PracticePocScreen({
 
         {displayedPuzzle?.kind === "arrow_duel"
           && !boardFeedback
-          && (!arrowDuelReplyChallengeVisible || arrowDuelReplyChallengePhase === "choice")
+          && (!arrowDuelReplyChallengeVisible || (
+            arrowDuelReplyChallengeDisplayPhase === "choice" &&
+            (
+              arrowDuelReplyChallengePreviewVisible ||
+              displayedPuzzle.phase === "choice"
+            )
+          ))
           && readyArrowDuelBoardKey === arrowDuelBoardRenderKey ? (
           <ArrowCandidateOverlay
             boardSize={boardSize}
@@ -3732,9 +3850,9 @@ export function PracticePocScreen({
         <ArrowDuelReplyChallengePrompt
           currentPuzzle={displayedPuzzle}
           kingPieceSize={kingGlyphSizeForBoard(boardSize)}
-          phase={arrowDuelReplyChallengePhase}
+          phase={arrowDuelReplyChallengeDisplayPhase}
           promptSide={displayedSideToMove}
-          replySeconds={arrowDuelReplySeconds}
+          replySeconds={arrowDuelReplySecondsRemaining}
         />
       ) : (
         <PracticePrompt
@@ -4090,33 +4208,49 @@ export function PracticePocScreen({
                 {!isSessionGuideVisible && !isOpenSession && state === null && activeRunManagementPresentation && activeRunManagementPresentation.screen !== "home" ? (
                   <PracticeRunEditor
                     arrowDuelReplyChallenge={
-                      sprintRulesDesignPreview?.arrowDuelReplyChallenge
+                      activeRunManagementPresentation.draft?.mode === "arrow_duel"
                         ? {
-                            enabled: arrowDuelReplyChallengeEnabled,
-                            replySecondsError: !arrowDuelReplyChallengeEnabled
-                              || (
-                                /^[1-9]\d*$/.test(arrowDuelReplySecondsInput)
-                                && Number.isSafeInteger(Number(arrowDuelReplySecondsInput))
-                                && Number(arrowDuelReplySecondsInput) <= 10
-                              )
-                              ? null
-                              : "Enter a positive whole number up to 10 seconds.",
-                            replySecondsInput: arrowDuelReplySecondsInput,
-                            onReplySecondsInputChange: (value: string) => {
-                              if (!/^\d*$/.test(value)) {
-                                return;
-                              }
-                              setArrowDuelReplySecondsInput(value);
-                              const parsed = Number(value);
-                              if (
-                                /^[1-9]\d*$/.test(value)
-                                && Number.isSafeInteger(parsed)
-                                && parsed <= 10
-                              ) {
-                                setArrowDuelReplySeconds(parsed);
-                              }
-                            },
-                            onToggle: () => setArrowDuelReplyChallengeEnabled((current) => !current)
+                            enabled: sprintRulesDesignPreview?.arrowDuelReplyChallenge
+                              ? arrowDuelReplyChallengeEnabled
+                              : activeRunManagementPresentation.draft.opponentReply?.enabled ?? true,
+                            replySecondsError: sprintRulesDesignPreview?.arrowDuelReplyChallenge
+                              ? !arrowDuelReplyChallengeEnabled
+                                || (
+                                  /^[1-9]\d*$/.test(arrowDuelReplySecondsInput)
+                                  && Number.isSafeInteger(Number(arrowDuelReplySecondsInput))
+                                  && Number(arrowDuelReplySecondsInput) <= 10
+                                )
+                                ? null
+                                : "Enter a positive whole number up to 10 seconds."
+                              : activeRunManagementPresentation.opponentReplySecondsError ?? null,
+                            replySecondsInput: sprintRulesDesignPreview?.arrowDuelReplyChallenge
+                              ? arrowDuelReplySecondsInput
+                              : activeRunManagementPresentation.opponentReplySecondsInput
+                                ?? String(activeRunManagementPresentation.draft.opponentReply?.seconds ?? 5),
+                            onReplySecondsInputChange: sprintRulesDesignPreview?.arrowDuelReplyChallenge
+                              ? (value: string) => {
+                                  if (!/^\d*$/.test(value)) {
+                                    return;
+                                  }
+                                  setArrowDuelReplySecondsInput(value);
+                                  const parsed = Number(value);
+                                  if (
+                                    /^[1-9]\d*$/.test(value)
+                                    && Number.isSafeInteger(parsed)
+                                    && parsed <= 10
+                                  ) {
+                                    setArrowDuelReplySeconds(parsed);
+                                  }
+                                }
+                              : (value: string) => activeRunManagementPresentation.onIntent({
+                                  type: "change-opponent-reply-seconds-input",
+                                  value
+                                }),
+                            onToggle: sprintRulesDesignPreview?.arrowDuelReplyChallenge
+                              ? () => setArrowDuelReplyChallengeEnabled((current) => !current)
+                              : () => activeRunManagementPresentation.onIntent({
+                                  type: "toggle-opponent-reply"
+                                })
                           }
                         : undefined
                     }
@@ -5467,6 +5601,7 @@ const ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE: CurrentPuzzleState = {
   correctMove: "g6g7",
   currentFen: SESSION_GUIDE_DEMO_FEN,
   kind: "arrow_duel",
+  phase: "choice",
   puzzle: {
     id: "arrow-duel-guide-qg7-mate",
     initialFen: SESSION_GUIDE_DEMO_FEN,
@@ -13533,72 +13668,6 @@ function lineStateAfterMoves(puzzle: Puzzle, moves: string[]): PuzzleLineState {
     cursor: playedMoves.length,
     autoPlayedMoves: [],
     solved: playedMoves.length >= puzzle.solutionMoves.length
-  };
-}
-
-function submitArrowDuelFollowUpMove(state: PuzzleLineState, move: string): {
-  state: PuzzleLineState;
-  feedback: PuzzleFeedback;
-} {
-  const expectedMove = state.puzzle.solutionMoves[state.cursor];
-  if (!expectedMove) {
-    throw new Error("Puzzle has no Arrow Duel follow-up move at current cursor");
-  }
-
-  const submittedMove = normalizeUci(move);
-  const submittedFen = fenAfterMove(state.currentFen, submittedMove);
-  if (!submittedFen) {
-    throw new Error(`Move ${move} is not legal in the current position`);
-  }
-  if (submittedMove !== normalizeUci(expectedMove)) {
-    return {
-      state,
-      feedback: {
-        result: "wrong",
-        puzzleSolved: false,
-        submittedMove: move,
-        expectedMove,
-        autoPlayedMoves: [],
-        currentFen: state.currentFen
-      }
-    };
-  }
-
-  let currentFen = submittedFen;
-  let cursor = state.cursor + 1;
-  const playedMoves = [...state.playedMoves, submittedMove];
-  const autoPlayedMoves: string[] = [];
-  const replyMove = state.puzzle.solutionMoves[cursor];
-  if (replyMove) {
-    const replyFen = fenAfterMove(currentFen, replyMove);
-    if (!replyFen) {
-      throw new Error(`Arrow Duel follow-up reply ${replyMove} is not legal`);
-    }
-    autoPlayedMoves.push(replyMove);
-    playedMoves.push(normalizeUci(replyMove));
-    currentFen = replyFen;
-    cursor += 1;
-  }
-
-  const nextState: PuzzleLineState = {
-    ...state,
-    currentFen,
-    playedMoves,
-    cursor,
-    autoPlayedMoves,
-    solved: cursor >= state.puzzle.solutionMoves.length
-  };
-
-  return {
-    state: nextState,
-    feedback: {
-      result: "correct",
-      puzzleSolved: nextState.solved,
-      submittedMove: move,
-      expectedMove,
-      autoPlayedMoves,
-      currentFen
-    }
   };
 }
 

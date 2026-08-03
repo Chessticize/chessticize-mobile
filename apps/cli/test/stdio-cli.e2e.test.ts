@@ -229,6 +229,92 @@ test("CLI supports Arrow Duel wrong-choice review arrows and review scheduling",
   await cli.stop();
 });
 
+test("CLI completes the default Arrow Duel opponent reply challenge", async (t) => {
+  const cli = await startCli(t);
+  const start = await cli.command({
+    command: "startSprint",
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    targetCorrect: 1,
+    maxMistakes: 3,
+    minRating: 1700,
+    maxRating: 1800,
+    now: "2026-06-20T00:00:00.000Z"
+  });
+  assert.equal(start.state.currentPuzzle.phase, "choice");
+
+  const choice = await cli.command({
+    command: "chooseArrow",
+    move: "b2b1",
+    now: "2026-06-20T00:00:04.000Z"
+  });
+  assert.equal(choice.attempt, null);
+  assert.equal(choice.state.currentPuzzle.phase, "reply_handoff");
+
+  const replying = await cli.command({
+    command: "beginOpponentReply",
+    now: "2026-06-20T00:00:05.000Z"
+  });
+  assert.equal(replying.state.currentPuzzle.phase, "reply");
+  assert.equal(replying.state.currentPuzzle.replyDeadlineAt, "2026-06-20T00:00:10.000Z");
+
+  const reply = await cli.command({
+    command: "move",
+    move: "e6e7",
+    now: "2026-06-20T00:00:06.000Z"
+  });
+  assert.equal(reply.feedback.result, "correct");
+  assert.equal(reply.attempt.result, "correct");
+  assert.equal(reply.state.status, "won");
+
+  const history = await cli.command({ command: "history" });
+  assert.equal(history.history.length, 1);
+  assert.equal(history.history[0].result, "correct");
+  await cli.stop();
+});
+
+test("CLI times out an Arrow Duel reply and schedules Review", async (t) => {
+  const cli = await startCli(t);
+  await cli.command({
+    command: "startSprint",
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    targetCorrect: 1,
+    maxMistakes: 3,
+    minRating: 1700,
+    maxRating: 1800,
+    opponentReply: { enabled: true, seconds: 2 },
+    now: "2026-06-20T00:00:00.000Z"
+  });
+  await cli.command({
+    command: "chooseArrow",
+    move: "b2b1",
+    now: "2026-06-20T00:00:04.000Z"
+  });
+  await cli.command({
+    command: "beginOpponentReply",
+    now: "2026-06-20T00:00:05.000Z"
+  });
+  const timedOut = await cli.command({
+    command: "move",
+    move: "e6e7",
+    now: "2026-06-20T00:00:07.000Z"
+  });
+
+  assert.equal(timedOut.feedback, null);
+  assert.equal(timedOut.attempt.result, "timed_out");
+  assert.equal(timedOut.state.mistakeCount, 1);
+  const reviews = await cli.command({
+    command: "dueReviews",
+    now: "2026-06-22T00:00:00.000Z"
+  });
+  assert.equal(reviews.dueReviews.length, 1);
+  assert.equal(reviews.dueReviews[0].puzzleId, "00008");
+  await cli.stop();
+});
+
 test("CLI rejects non-candidate Arrow Duel moves without recording attempts", async (t) => {
   const cli = await startCli(t);
 

@@ -862,6 +862,38 @@ test("progress sync preserves explicit custom timing in either merge direction w
   }
 });
 
+test("progress sync preserves Arrow Duel opponent reply when a newer old client omits it", async () => {
+  const service = new PracticeService(new MemoryStore());
+  service.loadFixturePuzzles(await loadFixturePuzzles());
+  const run = service.createPracticeRun({
+    id: "old-client-reply-sync",
+    name: "Before reply sync",
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30,
+    opponentReply: { enabled: false, seconds: 9 },
+    initialRating: 900
+  }, "2026-07-24T02:47:00.000Z");
+  const current = service.exportLocalData();
+  const oldClient = structuredClone(current);
+  const oldClientRun = oldClient.practiceRuns.find((candidate) => candidate.id === run.id)!;
+  oldClientRun.name = "Renamed before reply support";
+  oldClientRun.updatedAt = "2026-07-24T02:48:00.000Z";
+  delete oldClientRun.opponentReply;
+
+  for (const merged of [
+    mergeLocalDataExports(current, oldClient),
+    mergeLocalDataExports(oldClient, current)
+  ]) {
+    const mergedRun = merged.practiceRuns.find((candidate) => candidate.id === run.id);
+    assert.equal(mergedRun?.name, "Renamed before reply support");
+    assert.deepEqual(mergedRun?.opponentReply, {
+      enabled: false,
+      seconds: 9
+    });
+  }
+});
+
 test("progress sync deterministically preserves enriched attempt timing and Run policy", async () => {
   const source = new PracticeService(new MemoryStore());
   source.loadFixturePuzzles(await loadFixturePuzzles());

@@ -196,6 +196,10 @@ test("previous configurations, start effects, and refresh stay outside React", (
       slowAfterSeconds: 20,
       timeoutAfterSeconds: 30
     },
+    opponentReply: {
+      enabled: true,
+      seconds: 5
+    },
     themes: ["fork", "pin"]
   });
   controller.dispatch({ type: "cancel-edit" });
@@ -209,6 +213,63 @@ test("previous configurations, start effects, and refresh stay outside React", (
   adapter.catalog.runs = adapter.catalog.runs.filter((run) => run.id !== "tactics-focus");
   controller.refresh();
   assert.equal(controller.getSnapshot().selectedRunId, "standard");
+});
+
+test("Arrow Duel Runs configure opponent reply on create and edit", () => {
+  const adapter = new FakeRunManagementAdapter();
+  const controller = createPracticeRunManagementController(adapter);
+
+  controller.dispatch({ type: "add-run" });
+  controller.dispatch({ type: "change-name", name: "Reply Drill" });
+  controller.dispatch({ type: "change-mode", mode: "arrow_duel" });
+  assert.deepEqual(controller.getSnapshot().draft?.opponentReply, {
+    enabled: true,
+    seconds: 5
+  });
+
+  controller.dispatch({
+    type: "change-opponent-reply-seconds-input",
+    value: "11"
+  });
+  assert.equal(
+    controller.getSnapshot().opponentReplySecondsError,
+    "Enter a positive whole number up to 10 seconds."
+  );
+  assert.equal(controller.getSnapshot().canSave, false);
+
+  controller.dispatch({ type: "toggle-opponent-reply" });
+  assert.equal(controller.getSnapshot().canSave, true);
+  controller.dispatch({ type: "save-run" });
+  const created = controller.getSnapshot().runs.find(
+    (run) => run.name === "Reply Drill"
+  );
+  assert.deepEqual(created?.opponentReply, { enabled: false, seconds: 5 });
+
+  assert.ok(created);
+  controller.dispatch({ type: "toggle-home-edit" });
+  controller.dispatch({ type: "edit-run", runId: created.id });
+  controller.dispatch({ type: "toggle-opponent-reply" });
+  controller.dispatch({
+    type: "change-opponent-reply-seconds-input",
+    value: "10"
+  });
+  controller.dispatch({ type: "save-run" });
+
+  assert.deepEqual(
+    controller.getSnapshot().runs.find((run) => run.id === created.id)?.opponentReply,
+    { enabled: true, seconds: 10 }
+  );
+  assert.deepEqual(adapter.commands.at(-1), {
+    type: "update-run",
+    runId: created.id,
+    name: "Reply Drill",
+    elo: 900,
+    opponentReply: { enabled: true, seconds: 10 },
+    puzzleTiming: {
+      slowAfterSeconds: 40,
+      timeoutAfterSeconds: 60
+    }
+  });
 });
 
 class FakeRunManagementAdapter implements PracticeRunManagementAdapter {
@@ -261,6 +322,9 @@ class FakeRunManagementAdapter implements PracticeRunManagementAdapter {
             ...run,
             name: command.name.trim(),
             elo: command.elo,
+            ...(command.opponentReply === undefined
+              ? {}
+              : { opponentReply: { ...command.opponentReply } }),
             puzzleTiming: { ...command.puzzleTiming }
           }
           : run);
@@ -323,7 +387,10 @@ type MutableCatalog = {
 function baseRuns(): PracticeRunManagementRun[] {
   return [
     run("standard", "Standard", "standard", "standard", 925, 300, 20, ["mixed"]),
-    run("arrow-duel", "Arrow Duel", "arrow_duel", "arrow_duel", 875, 300, 20, ["mixed"]),
+    {
+      ...run("arrow-duel", "Arrow Duel", "arrow_duel", "arrow_duel", 875, 300, 20, ["mixed"]),
+      opponentReply: { enabled: true, seconds: 5 }
+    },
     run("tactics-focus", "Tactics Focus", "custom", "custom", 1040, 600, 30, ["fork", "pin"]),
     run("endgame-sprint", "Endgame Sprint", "custom", "custom", 810, 180, 10, ["endgame"])
   ];
@@ -371,6 +438,9 @@ function uniqueRunId(name: string, catalog: MutableCatalog): string {
 function cloneRun(run: PracticeRunManagementRun): PracticeRunManagementRun {
   return {
     ...run,
+    ...(run.opponentReply === undefined
+      ? {}
+      : { opponentReply: { ...run.opponentReply } }),
     puzzleTiming: { ...run.puzzleTiming },
     themes: [...run.themes]
   };

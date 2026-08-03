@@ -1673,7 +1673,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "focused-run-start");
     expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
     expect(findByTestId(renderer, "session-rating-policy")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain(
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
       "Choose the best move"
     );
     expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toContain(
@@ -1682,6 +1682,11 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 15");
 
     await boardMove(renderer, "e8f7");
+    await settleArrowDuelReplyHandoff();
+    const expectedReply = collectText(
+      findByTestId(renderer, "arrow-duel-reply-expected-move")
+    );
+    await boardMove(renderer, expectedReply);
 
     expect(() => findByTestId(renderer, "error-panel")).toThrow();
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 / 15");
@@ -4338,6 +4343,38 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-standard-elo-row")).toThrow();
   });
 
+  it("creates and edits a real Arrow Duel Run opponent reply setting", () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+
+    press(renderer, "practice-add-run");
+    press(renderer, "custom-mode-arrow-duel");
+    expect(collectText(findByTestId(renderer, "practice-run-arrow-duel-reply-value"))).toBe("On");
+    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("5");
+    act(() => {
+      findByTestId(renderer, "practice-run-name-input").props.onChangeText("Reply Drill");
+      findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.onChangeText("8");
+    });
+    press(renderer, "practice-run-arrow-duel-reply-toggle");
+    press(renderer, "practice-run-save");
+
+    const created = service.listPracticeRuns().find((run) => run.name === "Reply Drill");
+    expect(created?.opponentReply).toEqual({ enabled: false, seconds: 8 });
+    expect(created?.ratingKey).toBe(`run:${created?.id}`);
+
+    press(renderer, "practice-run-home-edit");
+    press(renderer, `practice-run-edit-${created?.id}`);
+    press(renderer, "practice-run-arrow-duel-reply-toggle");
+    act(() => {
+      findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.onChangeText("10");
+    });
+    press(renderer, "practice-run-save");
+
+    const updated = service.getActivePracticeRun(created!.id);
+    expect(updated.opponentReply).toEqual({ enabled: true, seconds: 10 });
+    expect(updated.ratingKey).toBe(created?.ratingKey);
+  });
+
   it("offers the web timing range and customizable linked defaults when adding a Run", () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
@@ -6139,6 +6176,8 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "session-progress-block").props.accessibilityLabel).toBe("Progress 0 of 1");
     await boardMove(renderer, arrow.correctMove);
+    await settleArrowDuelReplyHandoff();
+    await boardMove(renderer, arrow.puzzle.solutionMoves[1]!);
     await settleFeedbackSnapshot();
     expectText(renderer, "Sprint complete");
     expect(collectText(findByTestId(renderer, "sprint-result-solved"))).toContain("1 / 1");
@@ -6983,15 +7022,15 @@ describe("PracticePocScreen", () => {
       .toBe(`Arrow Duel candidates: ${arrow.candidates.join(", ")}`);
     expect(findByTestId(renderer, "practice-prompt-icon")).toBeTruthy();
     expect(findByTestId(renderer, "practice-prompt-side-glyph")).toBeTruthy();
-    expect(testIdOrder(renderer, "practice-prompt", "session-board")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "arrow-duel-reply-challenge", "session-board")).toBeLessThan(0);
     expect(testIdOrder(renderer, "session-board", "session-score-strip")).toBeLessThan(0);
     expect(findByTestId(renderer, "session-score-strip").props.accessibilityLabel).toBe("Session score: solved 0, mistakes 0, left 10");
     expect(collectText(findByTestId(renderer, "session-score-left-value"))).toBe("10");
     expect(collectText(findByTestId(renderer, "session-score-strip"))).toBe("0010");
-    expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Choose the best move");
-    expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("between the two arrows");
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain("Choose the best move");
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain("between the two arrows");
     expect(findByTestId(renderer, "practice-prompt-side-glyph")).toBeTruthy();
-    expectText(renderer, "Watch for checks, captures, and attacks!");
+    expectText(renderer, "Choose correctly to unlock the reply.");
     const neutralArrowBodies = countStyleEntry(findByTestId(renderer, "session-board"), "backgroundColor", "#2563EB");
     expect(neutralArrowBodies).toBeGreaterThan(0);
     expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", "#2563EB")).toBe(neutralArrowBodies);
@@ -6999,26 +7038,28 @@ describe("PracticePocScreen", () => {
     expect(hasStyleValue(findByTestId(renderer, "session-board"), "#DC2626")).toBe(false);
   });
 
-  it("advances Arrow Duel after a correct board move", async () => {
-    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
+  it("advances Arrow Duel only after a correct opponent reply", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
     const arrow = firstArrowDuelPuzzleForTest();
 
     startArrowDuelSprint(renderer);
-    const unsolvedPromptLayout = promptLayoutSlotTestIDs(renderer);
-    expect(unsolvedPromptLayout).toEqual([
-      "practice-prompt-title-layout",
-      "practice-prompt-context",
-      "practice-prompt-hint"
-    ]);
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
+      "Choose the best move"
+    );
     act(() => {
       findByTestId(renderer, "mock-chessboard").props.onReady();
     });
     expect(findByTestId(renderer, "arrow-duel-candidate-overlay")).toBeTruthy();
 
     await boardMove(renderer, arrow.correctMove);
+    const handoffBoard = findByTestId(renderer, "mock-chessboard");
+    const resetBoard = handoffBoard.props.mockResetBoard as jest.Mock;
+    const imperativeMove = handoffBoard.props.mockImperativeMove as jest.Mock;
+    resetBoard.mockClear();
+    imperativeMove.mockClear();
 
-    expect(promptLayoutSlotTestIDs(renderer)).toEqual(unsolvedPromptLayout);
-    expectText(renderer, "1 / 10");
+    expectText(renderer, "0 / 10");
     expect(collectText(renderer.root)).not.toContain("Correct");
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
@@ -7027,6 +7068,25 @@ describe("PracticePocScreen", () => {
     expect(countStyleEntry(findByTestId(renderer, "session-board"), "backgroundColor", "#DC2626")).toBe(0);
     expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", "#DC2626")).toBe(0);
     expect(() => findByTestId(renderer, "feedback-panel")).toThrow();
+    expect(service.listHistory()).toHaveLength(0);
+
+    await settleArrowDuelReplyHandoff();
+    expect(resetBoard).toHaveBeenCalledWith(arrow.currentFen);
+    expect(imperativeMove).toHaveBeenCalledWith(parseBoardMove(arrow.wrongMove));
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
+      "Find the reply"
+    );
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:05");
+    expect(renderer.root.findAllByProps({ testID: "arrow-duel-candidate-overlay" })).toHaveLength(0);
+
+    await boardMove(renderer, arrow.puzzle.solutionMoves[1]!);
+    expectText(renderer, "1 / 10");
+    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
+      "Find the reply"
+    );
+    expect(collectText(renderer.root)).not.toContain("Solved");
+    expect(service.listHistory()).toHaveLength(1);
     await settleFeedbackSnapshot();
 
     expect(renderer.root.findAllByProps({ testID: "arrow-duel-candidate-overlay" })).toHaveLength(0);
@@ -7034,6 +7094,94 @@ describe("PracticePocScreen", () => {
       findByTestId(renderer, "mock-chessboard").props.onReady();
     });
     expect(findByTestId(renderer, "arrow-duel-candidate-overlay")).toBeTruthy();
+  });
+
+  it("marks a wrong Arrow Duel reply for Review without extra result copy", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+    const arrow = firstArrowDuelPuzzleForTest();
+
+    startArrowDuelSprint(renderer);
+    await boardMove(renderer, arrow.correctMove);
+    await settleArrowDuelReplyHandoff();
+    const replyFen = findByTestId(renderer, "mock-chessboard").props.fen;
+    const expectedReply = arrow.puzzle.solutionMoves[1]!;
+    const wrongReply = firstLegalNonCandidate(replyFen, [expectedReply]);
+    await boardMove(renderer, wrongReply);
+
+    expectSessionMistakes(renderer, 1);
+    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+    expect(collectText(renderer.root)).not.toContain("Incorrect");
+    expect(collectText(renderer.root)).not.toContain("Added to Review");
+    expect(service.listReviewQueue()).toHaveLength(1);
+    expect(service.listHistory()).toHaveLength(1);
+    await settleFeedbackSnapshot();
+  });
+
+  it("waits for the Arrow Duel handoff to settle after an immediate pause and resume", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({ practiceService: service });
+    const arrow = firstArrowDuelPuzzleForTest();
+
+    startArrowDuelSprint(renderer);
+    await boardMove(renderer, arrow.correctMove);
+    press(renderer, "session-pause");
+    expect(findByTestId(renderer, "paused-session-panel")).toBeTruthy();
+
+    press(renderer, "paused-session-resume");
+    expect(requireArrowDuelState(activeSprintForTest(service)).phase).toBe("reply_handoff");
+
+    await settleArrowDuelReplyHandoff();
+
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
+      "Find the reply"
+    );
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:05");
+    expect(requireArrowDuelState(activeSprintForTest(service)).phase).toBe("reply");
+  });
+
+  it("pauses Sprint and puzzle clocks during reply, then times out without redundant copy", async () => {
+    let wallClockMs = Date.parse("2026-08-03T12:00:00.000Z");
+    const service = createMobilePracticeService("familiar15");
+    const renderer = renderScreen({
+      currentTimeMs: () => wallClockMs,
+      practiceService: service
+    });
+    const arrow = firstArrowDuelPuzzleForTest();
+
+    startArrowDuelSprint(renderer);
+    await boardMove(renderer, arrow.correctMove);
+    await settleArrowDuelReplyHandoff();
+    const sprintTime = collectText(findByTestId(renderer, "session-timer"));
+    const puzzleTime = collectText(findByTestId(renderer, "session-puzzle-timing-label"));
+
+    act(() => {
+      wallClockMs += 3_000;
+      jest.advanceTimersByTime(3_000);
+    });
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:02");
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe(sprintTime);
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe(puzzleTime);
+
+    press(renderer, "session-pause");
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe(sprintTime);
+    press(renderer, "paused-session-resume");
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe(sprintTime);
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe(puzzleTime);
+
+    act(() => {
+      wallClockMs += 2_000;
+      jest.advanceTimersByTime(2_000);
+    });
+    expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toContain(
+      "Timed out"
+    );
+    expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).not.toContain(
+      "Added to Review"
+    );
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:00");
+    expectSessionMistakes(renderer, 1);
+    expect(service.listReviewQueue()).toHaveLength(1);
   });
 
   it("ignores non-candidate Arrow Duel board moves without recording attempts", async () => {
@@ -13294,6 +13442,14 @@ async function settleFeedbackSnapshot(): Promise<void> {
   ) {
     await settleEntryPreview();
   }
+}
+
+async function settleArrowDuelReplyHandoff(): Promise<void> {
+  await act(async () => {
+    jest.advanceTimersByTime(250);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 }
 
 async function advanceEntryPreviewBy(milliseconds: number): Promise<void> {

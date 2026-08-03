@@ -8,6 +8,7 @@ import {
   buildSessionReplay,
   buildSprintConfig,
   buildSprintResultSummary,
+  beginArrowDuelReply as beginArrowDuelReplyCore,
   clonePracticeRun,
   createCustomPracticeRun,
   createDefaultRating,
@@ -20,6 +21,7 @@ import {
   practiceRunSprintConfig,
   renamePracticeRun,
   reorderPracticeRuns,
+  resolveOpponentReplyConfig,
   resolvePuzzleTimingPolicy,
   restorePracticeRun,
   samePracticeRun,
@@ -39,6 +41,7 @@ import type {
   CustomSprintConfigRecord,
   HistoryQuery,
   HistoryView,
+  OpponentReplyConfig,
   Puzzle,
   PracticeRunRecord,
   PuzzleTimingPolicy,
@@ -89,6 +92,7 @@ export interface StartSprintCommand {
   perPuzzleSeconds?: number;
   targetCorrect?: number;
   maxMistakes?: number;
+  opponentReply?: OpponentReplyConfig;
   themes?: string[];
   /** @deprecated Accept legacy callers, then normalize to themes. */
   theme?: string;
@@ -108,6 +112,7 @@ export interface CreatePracticeRunCommand {
   puzzleTiming?: PuzzleTimingPolicy;
   targetCorrect?: number;
   maxMistakes?: number;
+  opponentReply?: OpponentReplyConfig;
   themes?: string[];
   initialRating: number;
 }
@@ -116,6 +121,7 @@ export interface UpdatePracticeRunCommand {
   name: string;
   rating: number;
   puzzleTiming?: PuzzleTimingPolicy;
+  opponentReply?: OpponentReplyConfig;
 }
 
 export class PracticeRunAvailabilityError extends Error {
@@ -257,6 +263,16 @@ export class PracticeService {
     return response;
   }
 
+  beginArrowDuelReply(now = new Date().toISOString()): SprintState {
+    if (!this.activeSprint) {
+      throw new Error("No active sprint");
+    }
+    const next = beginArrowDuelReplyCore(this.activeSprint, now);
+    this.activeSprint = next;
+    this.store.updateSprintSession(next);
+    return next;
+  }
+
   advanceSprintTime(now = new Date().toISOString()): {
     state: SprintState;
     attempt?: AttemptEvent;
@@ -291,8 +307,12 @@ export class PracticeService {
     if (!this.activeSprint) {
       throw new Error("No active sprint");
     }
+    const opponentReplyClocksPaused =
+      this.activeSprint.currentPuzzle?.kind === "arrow_duel" &&
+      this.activeSprint.currentPuzzle.phase !== "choice";
     if (
       this.activeSprint.status === "active" &&
+      !opponentReplyClocksPaused &&
       new Date(now).getTime() >= new Date(this.activeSprint.deadlineAt).getTime()
     ) {
       return this.advanceSprintTime(now);
@@ -572,6 +592,9 @@ export class PracticeService {
       ...(command.puzzleTiming === undefined ? {} : { puzzleTiming: command.puzzleTiming }),
       targetCorrect: command.targetCorrect ?? Math.floor(command.durationSeconds / command.perPuzzleSeconds),
       maxMistakes: command.maxMistakes ?? 3,
+      ...(command.opponentReply === undefined
+        ? {}
+        : { opponentReply: command.opponentReply }),
       ...(command.themes === undefined ? {} : { themes: command.themes }),
       homeOrder: activeCount,
       updatedAt: now,
@@ -627,6 +650,14 @@ export class PracticeService {
     const renamedRun = renamePracticeRun(runId, command.name, existingRuns, now);
     const updatedRun: PracticeRunRecord = {
       ...renamedRun,
+      ...(currentRun.mode === "arrow_duel"
+        ? {
+            opponentReply: resolveOpponentReplyConfig(
+              "arrow_duel",
+              command.opponentReply ?? currentRun.opponentReply
+            )!
+          }
+        : {}),
       puzzleTiming: command.puzzleTiming === undefined
         ? resolvePuzzleTimingPolicy(currentRun.puzzleTiming, currentRun.perPuzzleSeconds)
         : validatePuzzleTimingPolicy(command.puzzleTiming)
@@ -853,6 +884,7 @@ export class PracticeService {
       perPuzzleSeconds: number;
       targetCorrect?: number;
       maxMistakes?: number;
+      opponentReply?: OpponentReplyConfig;
       themes?: string[];
     } = {
       mode: command.mode,
@@ -864,6 +896,9 @@ export class PracticeService {
     }
     if (command.maxMistakes !== undefined) {
       configInput.maxMistakes = command.maxMistakes;
+    }
+    if (command.opponentReply !== undefined) {
+      configInput.opponentReply = command.opponentReply;
     }
     const themes = normalizeThemeSelection([
       ...(command.themes ?? []),

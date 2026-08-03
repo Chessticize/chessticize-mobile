@@ -21,6 +21,8 @@ export type PracticeRunManagementPresentation = {
   homeEditing: boolean;
   nameError: string | null;
   notice: string | null;
+  opponentReplySecondsError?: string | null;
+  opponentReplySecondsInput?: string | null;
   previousConfigs?: readonly {
     config: CustomSprintConfigRecord;
     rating: number;
