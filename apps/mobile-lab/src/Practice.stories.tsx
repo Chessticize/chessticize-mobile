@@ -599,8 +599,10 @@ export const ArrowDuelPrompt: Story = {
   args: { scenarioId: "practice-arrow-duel-prompt" },
   play: async ({ canvasElement }) => {
     await openArrowDuelChoice(canvasElement);
+    await waitForText(canvasElement, "White orientation");
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForText(canvasElement, "Find the reply");
+    await waitForText(canvasElement, "White orientation");
     await expectTestIdText(canvasElement, "arrow-duel-reply-timer", "0:05");
     await expectTestIdAbsent(canvasElement, "arrow-duel-reply-sprint-paused");
   }
