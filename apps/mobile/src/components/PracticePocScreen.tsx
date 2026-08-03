@@ -720,7 +720,7 @@ export function PracticePocScreen({
   );
   const initialArrowDuelReplySeconds = (() => {
     const configured = sprintRulesDesignPreview?.arrowDuelReplyChallenge?.replySeconds ?? 5;
-    return Number.isSafeInteger(configured) && configured >= 1 && configured <= 60
+    return Number.isSafeInteger(configured) && configured >= 1 && configured <= 10
       ? configured
       : 5;
   })();
@@ -4046,10 +4046,10 @@ export function PracticePocScreen({
                               || (
                                 /^[1-9]\d*$/.test(arrowDuelReplySecondsInput)
                                 && Number.isSafeInteger(Number(arrowDuelReplySecondsInput))
-                                && Number(arrowDuelReplySecondsInput) <= 60
+                                && Number(arrowDuelReplySecondsInput) <= 10
                               )
                               ? null
-                              : "Enter 1–60 seconds.",
+                              : "Enter a positive whole number up to 10 seconds.",
                             replySecondsInput: arrowDuelReplySecondsInput,
                             onReplySecondsInputChange: (value: string) => {
                               if (!/^\d*$/.test(value)) {
@@ -4060,7 +4060,7 @@ export function PracticePocScreen({
                               if (
                                 /^[1-9]\d*$/.test(value)
                                 && Number.isSafeInteger(parsed)
-                                && parsed <= 60
+                                && parsed <= 10
                               ) {
                                 setArrowDuelReplySeconds(parsed);
                               }
@@ -5152,7 +5152,7 @@ function sessionGuideCallout(
     if (arrowDuelReplyChallenge) {
       return {
         badge: "ARROW DUEL",
-        detail: "Choose the stronger arrow. If correct, reply to the tempting move within this Run's reply time—outside Sprint and puzzle time. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review.",
+        detail: "Choose the stronger arrow. If correct, find the reply quickly to show you understand the opponent's counterattack. The Sprint and puzzle clocks pause when the reply begins. A wrong choice, reply, or timeout makes the puzzle a mistake and adds it to Review.",
         id: "arrow-duel",
         title: "Choose, then prove it",
         tone: "info"
@@ -6996,7 +6996,7 @@ function PracticeRunEditor({
         <SprintPassRulesSummary config={sprintRules} />
       ) : null}
 
-      {directRunEditing && draft.mode === "arrow_duel" && arrowDuelReplyChallenge ? (
+      {(isCreate || directRunEditing) && draft.mode === "arrow_duel" && arrowDuelReplyChallenge ? (
         <ArrowDuelReplyChallengeSetting
           enabled={arrowDuelReplyChallenge.enabled}
           replySecondsError={arrowDuelReplyChallenge.replySecondsError}
@@ -7093,7 +7093,11 @@ function ArrowDuelReplyChallengeSetting({
           <View style={styles.runTimingRowCopy}>
             <Text style={styles.listText}>Reply time</Text>
             <Text style={styles.helperText}>
-              Default 5 seconds · choose 1–60. Does not use Sprint or puzzle time.
+              Defaults to 5 seconds. Maximum 10.
+            </Text>
+            <Text style={styles.helperText}>
+              The Sprint and puzzle clocks pause when the reply begins. Find the reply quickly to
+              show you understand the opponent's counterattack.
             </Text>
             {replySecondsError ? (
               <Text

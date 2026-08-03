@@ -271,7 +271,7 @@ function sprintRulesDesignPreviewFor(
     || scenarioId === "practice-custom-rating-editor"
   ) {
     return {
-      ...(scenarioId === "practice-run-arrow-duel-editor"
+      ...(scenarioId === "practice-custom-setup" || scenarioId === "practice-run-arrow-duel-editor"
         ? { arrowDuelReplyChallenge: { enabled: true } }
         : {}),
       firstRunGuide,

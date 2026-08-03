@@ -31,11 +31,19 @@
       }
     ]
   },
+  "practice-custom-setup": {
+    "issues": [
+      {
+        "issueNumber": 489,
+        "changeNote": "Preview the default-on Opponent reply setting when creating an Arrow Duel Run."
+      }
+    ]
+  },
   "practice-run-arrow-duel-editor": {
     "issues": [
       {
         "issueNumber": 489,
-        "changeNote": "Preview the default-on Opponent reply setting in Edit Run."
+        "changeNote": "Preview the default-on Opponent reply setting in Edit Run with a ten-second maximum."
       }
     ]
   }

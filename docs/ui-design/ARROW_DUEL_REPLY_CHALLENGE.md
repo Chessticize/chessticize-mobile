@@ -19,9 +19,9 @@ then finding the puzzle's refutation of the tempting candidate.
 Each Arrow Duel Run has an **Opponent reply** setting:
 
 - It defaults to on.
-- It appears in Edit Run only when the Run format is Arrow Duel.
-- Its reply time defaults to five seconds and accepts any whole-number duration
-  from 1 through 60 seconds entered directly, rather than a fixed list of
+- It appears in Create Run and Edit Run when the Run format is Arrow Duel.
+- Its reply time defaults to five seconds and accepts any positive whole-number duration
+  up to ten seconds entered directly, rather than a fixed list of
   presets.
 - Turning it off preserves the current one-choice Arrow Duel behavior.
 - On and off configurations have separate Rating identity because they measure
@@ -43,9 +43,10 @@ With Opponent reply on:
    solved result.
 4. Play the tempting candidate on the board. Wait until that presentation is
    stable, then ask the player to move for the opponent.
-5. Start the Run's configured reply clock, which defaults to five seconds. The
-   reply phase and its board handoff do not consume the Sprint deadline,
-   puzzle elapsed time, Slow threshold, or puzzle Timeout threshold.
+5. Pause the Sprint and puzzle clocks when the reply begins, then start the
+   Run's configured reply clock, which defaults to five seconds. The reply
+   phase and its board handoff do not advance the Sprint deadline, puzzle
+   elapsed time, Slow threshold, or puzzle Timeout threshold.
 6. The whole puzzle is correct only when both the candidate and reply are
    correct.
 7. A wrong reply or reply timeout makes the whole puzzle wrong and adds the
@@ -102,7 +103,7 @@ their stable Storybook URLs. It covers:
 - the configurable opponent-reply state, defaulting to five seconds;
 - correct reply, wrong reply, and timeout outcomes;
 - automatic Review messaging for both failure stages;
-- the default-on Edit Run control and its off state; and
+- the default-on Create Run and Edit Run control and its off state; and
 - first-use Arrow Duel guidance for the two-stage rule.
 
 The design phase excludes production Sprint/domain behavior, persistent Run

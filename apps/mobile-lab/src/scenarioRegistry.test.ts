@@ -55,6 +55,7 @@ test("New Scenario Markers derive tags for the Arrow Duel reply design", () => {
   assert.deepEqual(
     newScenarios.map((scenario) => scenario.id),
     [
+      "practice-custom-setup",
       "practice-run-arrow-duel-editor",
       "practice-arrow-duel-guide",
       "practice-arrow-duel-guide-only",

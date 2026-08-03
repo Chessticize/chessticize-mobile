@@ -352,13 +352,14 @@ Arrow Duel active-session rules:
 - The planned Opponent reply challenge is defined in
   [`ARROW_DUEL_REPLY_CHALLENGE.md`](ARROW_DUEL_REPLY_CHALLENGE.md). When it is
   enabled, a correct candidate begins a separate refutation step whose reply
-  time defaults to five seconds and accepts any whole-number value from 1
-  through 60 in Edit Run; both answers must be correct for the puzzle to count
+  time defaults to five seconds and accepts any positive whole-number value up to ten in
+  Create Run or Edit Run; both answers must be correct for the puzzle to count
   as solved.
 - A wrong candidate, wrong reply, or reply timeout makes the whole puzzle wrong
   and adds it to Review. The reply step gives no partial credit.
-- The reply clock and its board handoff are independent of the Sprint deadline,
-  puzzle elapsed time, Slow threshold, and puzzle Timeout threshold.
+- The Sprint and puzzle clocks pause when the reply begins. The reply clock and
+  its board handoff do not advance the Sprint deadline, puzzle elapsed time,
+  Slow threshold, or puzzle Timeout threshold.
 - Reply judgment accepts the stored puzzle main-line move or any legal move
   that immediately checkmates. It does not invoke Stockfish.
 
@@ -444,9 +445,9 @@ New Run behavior:
 - Add to Home is disabled only when the Run is invalid or no eligible puzzles exist locally.
 - Once a Run has rated games, its current rating remains editable from that Run's
   editor without changing its stable Run identity or History linkage.
-- Edit Run shows the default-on `Opponent reply` switch only for Arrow Duel.
-  Turning it off restores the one-choice flow and selects a separate Rating
-  identity from the enabled configuration.
+- Create Run and Edit Run show the default-on `Opponent reply` switch only for
+  Arrow Duel. Turning it off restores the one-choice flow and selects a
+  separate Rating identity from the enabled configuration.
 - If the selected puzzle pack lacks enough eligible puzzles, show a local pack
   warning and offer a broader theme.
 
