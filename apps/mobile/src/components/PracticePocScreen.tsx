@@ -4444,7 +4444,15 @@ export function PracticePocScreen({
                           resetToIdle();
                           return;
                         }
-                        startSprint(mode);
+                        if (state.run) {
+                          startSprint(
+                            state.config.mode,
+                            state.run.kind === "custom",
+                            state.run.id
+                          );
+                          return;
+                        }
+                        startSprint(state.config.mode);
                       }}
                       onBack={resetToIdle}
                       onOpenHistory={() => {
