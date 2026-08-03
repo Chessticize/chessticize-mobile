@@ -33,7 +33,7 @@ test("default sprint configs model minutes, target count, and max mistakes", () 
   assert.equal(defaultSprintConfig("arrow_duel").targetCorrect, 10);
   assert.deepEqual(defaultSprintConfig("arrow_duel").opponentReply, {
     enabled: true,
-    seconds: 5
+    seconds: 10
   });
 });
 
@@ -559,9 +559,9 @@ test("manual pause during an Arrow Duel reply shifts its independent deadline", 
   const resumed = resumeSprint(paused, "2026-06-20T00:00:13.000Z");
 
   assert.equal(resumed.currentPuzzle?.kind, "arrow_duel");
-  assert.equal(resumed.currentPuzzle?.replyDeadlineAt, "2026-06-20T00:00:17.000Z");
-  assert.equal(advanceSprintTime(resumed, "2026-06-20T00:00:16.999Z").attempt, undefined);
-  assert.equal(advanceSprintTime(resumed, "2026-06-20T00:00:17.000Z").attempt?.result, "timed_out");
+  assert.equal(resumed.currentPuzzle?.replyDeadlineAt, "2026-06-20T00:00:22.000Z");
+  assert.equal(advanceSprintTime(resumed, "2026-06-20T00:00:21.999Z").attempt, undefined);
+  assert.equal(advanceSprintTime(resumed, "2026-06-20T00:00:22.000Z").attempt?.result, "timed_out");
 });
 
 test("Opponent reply bounds validate without splitting Arrow Duel rating", () => {
@@ -575,7 +575,7 @@ test("Opponent reply bounds validate without splitting Arrow Duel rating", () =>
     mode: "arrow_duel",
     durationSeconds: 300,
     perPuzzleSeconds: 30,
-    opponentReply: { enabled: true, seconds: 10 }
+    opponentReply: { enabled: true, seconds: 30 }
   });
 
   assert.equal(disabled.ratingKey, enabled.ratingKey);
@@ -584,13 +584,13 @@ test("Opponent reply bounds validate without splitting Arrow Duel rating", () =>
     durationSeconds: 300,
     perPuzzleSeconds: 30,
     opponentReply: { enabled: true, seconds: 0 }
-  }), /between 1 and 10 seconds/);
+  }), /between 1 and 30 seconds/);
   assert.throws(() => buildSprintConfig({
     mode: "arrow_duel",
     durationSeconds: 300,
     perPuzzleSeconds: 30,
-    opponentReply: { enabled: true, seconds: 11 }
-  }), /between 1 and 10 seconds/);
+    opponentReply: { enabled: true, seconds: 31 }
+  }), /between 1 and 30 seconds/);
   assert.throws(() => buildSprintConfig({
     mode: "arrow_duel",
     durationSeconds: 300,

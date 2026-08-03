@@ -13,6 +13,8 @@ import {
   normalizeRatingRecord,
   mergePracticeRunCatalogs,
   namedThemesForSelection,
+  OPPONENT_REPLY_MAX_SECONDS,
+  OPPONENT_REPLY_MIN_SECONDS,
   orderReviewQueue,
   practiceRunsFromLegacyCustomConfigs,
   preferredReviewScheduleChange,
@@ -292,7 +294,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 17;
+export const CURRENT_SCHEMA_VERSION = 18;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -318,7 +320,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 13, to: 14, apply: migrateV13ToV14 },
   { from: 14, to: 15, apply: migrateV14ToV15 },
   { from: 15, to: 16, apply: migrateV15ToV16 },
-  { from: 16, to: 17, apply: migrateV16ToV17 }
+  { from: 16, to: 17, apply: migrateV16ToV17 },
+  { from: 17, to: 18, apply: migrateV17ToV18 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -2530,6 +2533,11 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
     "app_settings",
     "move_feedback_sound_enabled"
   );
+  const hadOpponentReplyColumns = hasColumn(
+    db,
+    "practice_runs",
+    "opponent_reply_enabled"
+  ) && hasColumn(db, "practice_runs", "opponent_reply_seconds");
   ensureMoveFeedbackColumns(db);
   if (!hadMoveFeedbackSoundColumn) {
     db.exec("UPDATE app_settings SET move_feedback_sound_enabled = 0");
@@ -2538,6 +2546,9 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV11ToV12(db);
   migrateV14ToV15(db);
   migrateV16ToV17(db);
+  if (!hadOpponentReplyColumns) {
+    migrateV17ToV18(db);
+  }
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -2897,6 +2908,90 @@ function migrateV16ToV17(db: SyncSqliteDatabase): void {
       "UPDATE practice_runs SET opponent_reply_enabled = 1 WHERE mode = 'arrow_duel'"
     );
   }
+}
+
+function migrateV17ToV18(db: SyncSqliteDatabase): void {
+  const runCount = countRows(db, "practice_runs");
+  db.exec(`
+    CREATE TABLE practice_runs_v18 (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL CHECK (kind IN ('standard', 'arrow_duel', 'custom')),
+      name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+      mode TEXT NOT NULL CHECK (mode IN ('standard', 'arrow_duel', 'custom')),
+      rating_key TEXT NOT NULL UNIQUE,
+      duration_seconds INTEGER NOT NULL CHECK (duration_seconds > 0),
+      per_puzzle_seconds INTEGER NOT NULL CHECK (per_puzzle_seconds > 0),
+      target_correct INTEGER NOT NULL CHECK (target_correct > 0),
+      max_mistakes INTEGER NOT NULL CHECK (max_mistakes > 0),
+      themes_json TEXT,
+      home_order INTEGER NOT NULL CHECK (home_order >= 0),
+      archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
+      updated_at TEXT NOT NULL,
+      slow_after_seconds INTEGER CHECK (
+        slow_after_seconds IS NULL OR slow_after_seconds > 0
+      ),
+      timeout_after_seconds INTEGER CHECK (
+        timeout_after_seconds IS NULL OR timeout_after_seconds > 0
+      ),
+      opponent_reply_enabled INTEGER NOT NULL DEFAULT 0 CHECK (
+        opponent_reply_enabled IN (0, 1)
+      ),
+      opponent_reply_seconds INTEGER NOT NULL DEFAULT ${DEFAULT_OPPONENT_REPLY_SECONDS} CHECK (
+        opponent_reply_seconds BETWEEN ${OPPONENT_REPLY_MIN_SECONDS} AND ${OPPONENT_REPLY_MAX_SECONDS}
+      )
+    );
+
+    INSERT INTO practice_runs_v18 (
+      id,
+      kind,
+      name,
+      mode,
+      rating_key,
+      duration_seconds,
+      per_puzzle_seconds,
+      target_correct,
+      max_mistakes,
+      themes_json,
+      home_order,
+      archived,
+      updated_at,
+      slow_after_seconds,
+      timeout_after_seconds,
+      opponent_reply_enabled,
+      opponent_reply_seconds
+    )
+    SELECT
+      id,
+      kind,
+      name,
+      mode,
+      rating_key,
+      duration_seconds,
+      per_puzzle_seconds,
+      target_correct,
+      max_mistakes,
+      themes_json,
+      home_order,
+      archived,
+      updated_at,
+      slow_after_seconds,
+      timeout_after_seconds,
+      opponent_reply_enabled,
+      opponent_reply_seconds
+    FROM practice_runs;
+  `);
+  if (countRows(db, "practice_runs_v18") !== runCount) {
+    throw new Error("SQLite v18 practice Run rebuild changed the row count");
+  }
+  db.exec(`
+    DROP TABLE practice_runs;
+    ALTER TABLE practice_runs_v18 RENAME TO practice_runs;
+
+    CREATE INDEX practice_runs_home_order_idx
+      ON practice_runs(archived, home_order, id);
+    CREATE INDEX practice_runs_updated_at_idx
+      ON practice_runs(updated_at, id);
+  `);
 }
 
 function readSchemaVersion(db: SyncSqliteDatabase): number {

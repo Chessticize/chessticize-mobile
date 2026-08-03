@@ -5,11 +5,12 @@ import type {
   PracticeSettings
 } from "./practice-store.ts";
 import type { ProgressSyncSnapshot } from "./progress-sync.ts";
-import type {
-  PracticeRunRecord,
-  RatingRecord,
-  ReviewScheduleRemoval,
-  SprintConfig
+import {
+  OPPONENT_REPLY_MAX_SECONDS,
+  type PracticeRunRecord,
+  type RatingRecord,
+  type ReviewScheduleRemoval,
+  type SprintConfig
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow } from "./query-types.ts";
 
@@ -244,7 +245,7 @@ function isOpponentReplyConfig(value: unknown): boolean {
   return isRecord(value) &&
     typeof value.enabled === "boolean" &&
     isPositiveInteger(value.seconds) &&
-    value.seconds <= 10;
+    value.seconds <= OPPONENT_REPLY_MAX_SECONDS;
 }
 
 function isOpponentReplyForMode(mode: unknown, value: unknown): boolean {

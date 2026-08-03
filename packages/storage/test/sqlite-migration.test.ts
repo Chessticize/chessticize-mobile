@@ -1087,7 +1087,7 @@ test("SQLite current schema preserves v15 attempts and admits Incomplete without
   }
 });
 
-test("SQLite v17 defaults legacy Arrow Duel Runs to a five-second opponent reply", async () => {
+test("SQLite v17 defaults legacy Arrow Duel Runs to ten seconds and v18 allows thirty", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-v17-opponent-reply-migration-"));
   const databasePath = join(directory, "practice.sqlite");
   try {
@@ -1108,9 +1108,51 @@ test("SQLite v17 defaults legacy Arrow Duel Runs to a five-second opponent reply
       assert.equal(standard?.opponentReply, undefined);
       assert.deepEqual(arrowDuel?.opponentReply, {
         enabled: true,
+        seconds: 10
+      });
+      assert.doesNotThrow(() => {
+        migrated.db.prepare(
+          "UPDATE practice_runs SET opponent_reply_seconds = ? WHERE id = ?"
+        ).run(30, "arrow-duel");
+      });
+      assert.throws(() => {
+        migrated.db.prepare(
+          "UPDATE practice_runs SET opponent_reply_seconds = ? WHERE id = ?"
+        ).run(31, "arrow-duel");
+      }, /constraint/i);
+      assert.equal(schemaVersionForStore(migrated), CURRENT_SCHEMA_VERSION);
+      assert.equal(integrityResultForStore(migrated), "ok");
+      assert.deepEqual(migrated.db.prepare("PRAGMA foreign_key_check").all(), []);
+    } finally {
+      migrated.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("SQLite v18 preserves an existing v17 opponent reply duration", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-v18-opponent-reply-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setup = new SQLiteStore(databasePath);
+    setup.migrate();
+    setup.db.prepare(
+      "UPDATE practice_runs SET opponent_reply_seconds = ? WHERE id = ?"
+    ).run(5, "arrow-duel");
+    setup.db.exec("PRAGMA user_version = 17");
+    setup.close();
+
+    const migrated = new SQLiteStore(databasePath);
+    migrated.migrate();
+    try {
+      const arrowDuel = migrated.listPracticeRuns().find((run) => run.id === "arrow-duel");
+      assert.deepEqual(arrowDuel?.opponentReply, {
+        enabled: true,
         seconds: 5
       });
       assert.equal(schemaVersionForStore(migrated), CURRENT_SCHEMA_VERSION);
+      assert.equal(integrityResultForStore(migrated), "ok");
       assert.deepEqual(migrated.db.prepare("PRAGMA foreign_key_check").all(), []);
     } finally {
       migrated.close();

@@ -94,7 +94,7 @@ test("PracticeService records wrong and timed-out Arrow Duel replies in Review",
     minRating: 1700,
     maxRating: 1800
   }, "2026-06-20T12:00:00.000Z");
-  assert.deepEqual(started.config.opponentReply, { enabled: true, seconds: 5 });
+  assert.deepEqual(started.config.opponentReply, { enabled: true, seconds: 10 });
 
   const choice = wrongService.submitMove("b2b1", "2026-06-20T12:00:04.000Z");
   assert.equal(choice.attempt, undefined);

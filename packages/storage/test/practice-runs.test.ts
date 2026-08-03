@@ -216,15 +216,15 @@ for (const backend of ["memory", "sqlite"] as const) {
       const updated = service.updatePracticeRun(run.id, {
         name: run.name,
         rating: 950,
-        opponentReply: { enabled: true, seconds: 10 }
+        opponentReply: { enabled: true, seconds: 30 }
       }, "2026-07-22T12:01:00.000Z");
       assert.equal(updated.run.ratingKey, run.ratingKey);
-      assert.deepEqual(updated.run.opponentReply, { enabled: true, seconds: 10 });
+      assert.deepEqual(updated.run.opponentReply, { enabled: true, seconds: 30 });
       assert.throws(() => service.updatePracticeRun(run.id, {
         name: run.name,
         rating: 950,
-        opponentReply: { enabled: true, seconds: 11 }
-      }), /between 1 and 10 seconds/);
+        opponentReply: { enabled: true, seconds: 31 }
+      }), /between 1 and 30 seconds/);
 
       const sprint = service.startSprint({
         mode: "arrow_duel",
@@ -232,7 +232,7 @@ for (const backend of ["memory", "sqlite"] as const) {
         puzzleSelectionSeed: "reply-run"
       }, "2026-07-22T12:02:00.000Z");
       assert.equal(sprint.config.ratingKey, run.ratingKey);
-      assert.deepEqual(sprint.config.opponentReply, { enabled: true, seconds: 10 });
+      assert.deepEqual(sprint.config.opponentReply, { enabled: true, seconds: 30 });
     } finally {
       if (store instanceof SQLiteStore) {
         store.close();

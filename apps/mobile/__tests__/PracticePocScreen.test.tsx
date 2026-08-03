@@ -2326,7 +2326,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(
       renderer,
       "practice-run-arrow-duel-reply-setting"
-    ))).toContain("Defaults to 5 seconds. Maximum 10.");
+    ))).toContain("Defaults to 10 seconds. Maximum 30.");
     expect(collectText(findByTestId(
       renderer,
       "practice-run-arrow-duel-reply-setting"
@@ -2345,7 +2345,7 @@ describe("PracticePocScreen", () => {
       renderer,
       "practice-run-arrow-duel-reply-setting"
     ))).not.toContain("On and Off keep separate ratings");
-    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("5");
+    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("10");
     expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.maxLength)
       .toBe(2);
 
@@ -2355,12 +2355,12 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("8");
 
     act(() => {
-      findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.onChangeText("11");
+      findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.onChangeText("31");
     });
     expect(collectText(findByTestId(
       renderer,
       "practice-run-arrow-duel-reply-seconds-error"
-    ))).toBe("Enter a positive whole number up to 10 seconds.");
+    ))).toBe("Enter a positive whole number up to 30 seconds.");
     expect(findByTestId(renderer, "practice-run-save").props.disabled).toBe(true);
 
     press(renderer, "practice-run-arrow-duel-reply-toggle");
@@ -2385,11 +2385,11 @@ describe("PracticePocScreen", () => {
       renderer,
       "practice-run-arrow-duel-reply-value"
     ))).toBe("On");
-    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("5");
+    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("10");
     expect(collectText(findByTestId(
       renderer,
       "practice-run-arrow-duel-reply-setting"
-    ))).toContain("Defaults to 5 seconds. Maximum 10.");
+    ))).toContain("Defaults to 10 seconds. Maximum 30.");
   });
 
   it("previews Standard-style outcome feedback and automatic advance", async () => {
@@ -2411,7 +2411,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(correct, "arrow-duel-reply-challenge"))).toContain(
       "Find the reply"
     );
-    expect(collectText(findByTestId(correct, "arrow-duel-reply-timer"))).toBe("0:05");
+    expect(collectText(findByTestId(correct, "arrow-duel-reply-timer"))).toBe("0:10");
     expect(collectText(findByTestId(correct, "arrow-duel-reply-context"))).toBe(
       "If the tempting move was played, what happens next?"
     );
@@ -2443,14 +2443,14 @@ describe("PracticePocScreen", () => {
 
     const customReplyTime = renderLabScenario(
       "practice-arrow-duel-prompt",
-      { arrowDuelReplySeconds: 8 }
+      { arrowDuelReplySeconds: 30 }
     );
     startArrowDuelSprint(customReplyTime);
     await boardMove(customReplyTime, ARROW_DUEL_REPLY_LAB_MOVES.default.correctChoice);
     await settleArrowDuelReplyHandoff();
-    expect(collectText(findByTestId(customReplyTime, "arrow-duel-reply-timer"))).toBe("0:08");
+    expect(collectText(findByTestId(customReplyTime, "arrow-duel-reply-timer"))).toBe("0:30");
     expect(findByTestId(customReplyTime, "arrow-duel-reply-timer-group").props.accessibilityLabel)
-      .toBe("8 seconds remaining.");
+      .toBe("30 seconds remaining.");
 
     const wrongChoice = renderLabScenario("practice-arrow-duel-prompt");
     startArrowDuelSprint(wrongChoice);
@@ -4368,7 +4368,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "practice-add-run");
     press(renderer, "custom-mode-arrow-duel");
     expect(collectText(findByTestId(renderer, "practice-run-arrow-duel-reply-value"))).toBe("On");
-    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("5");
+    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("10");
     act(() => {
       findByTestId(renderer, "practice-run-name-input").props.onChangeText("Reply Drill");
       findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.onChangeText("8");
@@ -7103,7 +7103,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain("Choose the best move");
     expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain("between the two arrows");
     expect(findByTestId(renderer, "practice-prompt-side-glyph")).toBeTruthy();
-    expectText(renderer, "Choose correctly to unlock the reply.");
+    expectText(renderer, "Be ready for a quick reply check.");
     const neutralArrowBodies = countStyleEntry(findByTestId(renderer, "session-board"), "backgroundColor", "#2563EB");
     expect(neutralArrowBodies).toBeGreaterThan(0);
     expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", "#2563EB")).toBe(neutralArrowBodies);
@@ -7144,12 +7144,19 @@ describe("PracticePocScreen", () => {
     expect(service.listHistory()).toHaveLength(0);
 
     await settleArrowDuelReplyHandoff();
-    expect(resetBoard).toHaveBeenCalledWith(arrow.currentFen);
+    const submittedChoice = parseBoardMove(arrow.correctMove);
+    expect(resetBoard).toHaveBeenCalledWith(arrow.currentFen, {
+      lastMove: null,
+      slide: {
+        from: submittedChoice.to,
+        to: submittedChoice.from
+      }
+    });
     expect(imperativeMove).toHaveBeenCalledWith(parseBoardMove(arrow.wrongMove));
     expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
       "Find the reply"
     );
-    expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:05");
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:10");
     expect(renderer.root.findAllByProps({ testID: "arrow-duel-candidate-overlay" })).toHaveLength(0);
 
     await boardMove(renderer, arrow.puzzle.solutionMoves[1]!);
@@ -7196,6 +7203,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(initialPerspective);
     expect(resetBoard).not.toHaveBeenCalled();
     expect(imperativeMove).not.toHaveBeenCalled();
+    expect(() => findByTestId(renderer, "arrow-duel-what-if-overlay")).toThrow();
 
     await advanceArrowDuelReplyToPrompt();
 
@@ -7205,8 +7213,17 @@ describe("PracticePocScreen", () => {
     const replyCopyLayer = findByTestId(renderer, "arrow-duel-reply-copy-layer");
     expect(replyBoard.props.flipped).toBe(initialPerspective);
     expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
-    expect(resetBoard).toHaveBeenCalledWith(arrow.currentFen);
+    const submittedChoice = parseBoardMove(arrow.correctMove);
+    expect(resetBoard).toHaveBeenCalledWith(arrow.currentFen, {
+      lastMove: null,
+      slide: {
+        from: submittedChoice.to,
+        to: submittedChoice.from
+      }
+    });
     expect(imperativeMove).not.toHaveBeenCalled();
+    expect(collectText(findByTestId(renderer, "arrow-duel-what-if-overlay"))).toBe("What if…");
+    expect(() => findByTestId(renderer, "arrow-duel-reply-timer")).toThrow();
     expect(collectText(replyPrompt)).toContain("Find the reply");
     expect(collectText(replyContext)).toBe(
       "If the tempting move was played, what happens next?"
@@ -7226,6 +7243,8 @@ describe("PracticePocScreen", () => {
       imperativeMove.mock.invocationCallOrder[0]
     );
     expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(initialPerspective);
+    expect(() => findByTestId(renderer, "arrow-duel-what-if-overlay")).toThrow();
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:10");
     expect(requireArrowDuelState(activeSprintForTest(service)).phase).toBe("reply");
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
   });
@@ -7271,7 +7290,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
       "Find the reply"
     );
-    expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:05");
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:10");
     expect(requireArrowDuelState(activeSprintForTest(service)).phase).toBe("reply");
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
   });
@@ -7292,7 +7311,7 @@ describe("PracticePocScreen", () => {
     await settleArrowDuelReplyHandoff();
     const readyReply = requireArrowDuelState(activeSprintForTest(service));
     expect(readyReply.replyStartedAt).toBe(new Date(wallClockMs).toISOString());
-    expect(readyReply.replyDeadlineAt).toBe(new Date(wallClockMs + 5_000).toISOString());
+    expect(readyReply.replyDeadlineAt).toBe(new Date(wallClockMs + 10_000).toISOString());
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     const sprintTime = collectText(findByTestId(renderer, "session-timer"));
@@ -7302,7 +7321,7 @@ describe("PracticePocScreen", () => {
       wallClockMs += 3_000;
       jest.advanceTimersByTime(3_000);
     });
-    expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:02");
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:07");
     expect(collectText(findByTestId(renderer, "session-timer"))).toBe(sprintTime);
     expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe(puzzleTime);
 
@@ -7313,8 +7332,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe(puzzleTime);
 
     act(() => {
-      wallClockMs += 2_000;
-      jest.advanceTimersByTime(2_000);
+      wallClockMs += 7_000;
+      jest.advanceTimersByTime(7_000);
     });
     expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toContain(
       "Timed out"
@@ -13602,7 +13621,7 @@ async function advanceArrowDuelReplyToPrompt(): Promise<void> {
 
 async function finishArrowDuelReplyHandoff(): Promise<void> {
   await act(async () => {
-    jest.advanceTimersByTime(140);
+    jest.advanceTimersByTime(650);
     await Promise.resolve();
     await Promise.resolve();
   });

@@ -257,7 +257,7 @@ test("CLI completes the default Arrow Duel opponent reply challenge", async (t) 
     now: "2026-06-20T00:00:05.000Z"
   });
   assert.equal(replying.state.currentPuzzle.phase, "reply");
-  assert.equal(replying.state.currentPuzzle.replyDeadlineAt, "2026-06-20T00:00:10.000Z");
+  assert.equal(replying.state.currentPuzzle.replyDeadlineAt, "2026-06-20T00:00:15.000Z");
 
   const reply = await cli.command({
     command: "move",

@@ -33,7 +33,7 @@ test("built-in Runs preserve the existing Standard and Arrow Duel rating keys", 
   });
   assert.deepEqual(arrowDuel?.opponentReply, {
     enabled: true,
-    seconds: 5
+    seconds: 10
   });
 });
 
@@ -240,7 +240,7 @@ test("legacy Custom Sprint configs become named Home Runs without changing their
   assert.ok(migrated.every((run) => run.name.length <= PRACTICE_RUN_NAME_MAX_LENGTH));
   assert.deepEqual(
     migrated.find((run) => run.mode === "arrow_duel")?.opponentReply,
-    { enabled: true, seconds: 5 }
+    { enabled: true, seconds: 10 }
   );
 });
 

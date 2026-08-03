@@ -198,7 +198,7 @@ export const CreateArrowDuelReplySetting: Story = {
     await clickTestId(canvasElement, "custom-mode-arrow-duel");
     await waitForTestId(canvasElement, "practice-run-arrow-duel-reply-setting");
     await expectTestIdText(canvasElement, "practice-run-arrow-duel-reply-value", "On");
-    await waitForText(canvasElement, "Defaults to 5 seconds. Maximum 10.");
+    await waitForText(canvasElement, "Defaults to 10 seconds. Maximum 30.");
   }
 };
 
@@ -261,7 +261,7 @@ export const ArrowDuelReplyCustomTime: Story = {
     await replaceTextTestId(
       canvasElement,
       "practice-run-arrow-duel-reply-seconds",
-      "8"
+      "30"
     );
   }
 };
@@ -603,7 +603,7 @@ export const ArrowDuelPrompt: Story = {
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForText(canvasElement, "Find the reply");
     await waitForText(canvasElement, "Black orientation");
-    await expectTestIdText(canvasElement, "arrow-duel-reply-timer", "0:05");
+    await expectTestIdText(canvasElement, "arrow-duel-reply-timer", "0:10");
     await expectTestIdAbsent(canvasElement, "arrow-duel-reply-sprint-paused");
   }
 };
@@ -611,7 +611,7 @@ export const ArrowDuelPrompt: Story = {
 export const ArrowDuelReplyCustomTimer: Story = {
   name: "Arrow Duel · custom reply timer",
   args: {
-    arrowDuelReplySeconds: 8,
+    arrowDuelReplySeconds: 30,
     scenarioId: "practice-arrow-duel-prompt",
     storyPresentation: {
       storyId: "practice--arrow-duel-reply-custom-timer",
@@ -621,7 +621,7 @@ export const ArrowDuelReplyCustomTimer: Story = {
   play: async ({ canvasElement }) => {
     await openArrowDuelChoice(canvasElement);
     await clickTestId(canvasElement, "lab-board-correct");
-    await expectTestIdText(canvasElement, "arrow-duel-reply-timer", "0:08");
+    await expectTestIdText(canvasElement, "arrow-duel-reply-timer", "0:30");
   }
 };
 
@@ -636,7 +636,7 @@ export const ArrowDuelChoice: Story = {
   },
   play: async ({ canvasElement }) => {
     await openArrowDuelChoice(canvasElement);
-    await waitForText(canvasElement, "Choose correctly to unlock the reply.");
+    await waitForText(canvasElement, "Be ready for a quick reply check.");
     await waitForTestId(canvasElement, "arrow-duel-candidate-overlay");
   }
 };

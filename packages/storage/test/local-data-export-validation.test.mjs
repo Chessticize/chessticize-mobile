@@ -49,7 +49,7 @@ test("accepts bounded Arrow Duel opponent reply settings", () => {
   snapshot.data.sprintSessions[0].config.mode = "arrow_duel";
   snapshot.data.sprintSessions[0].config.opponentReply = {
     enabled: true,
-    seconds: 10
+    seconds: 30
   };
   snapshot.data.practiceRuns[0].kind = "arrow_duel";
   snapshot.data.practiceRuns[0].mode = "arrow_duel";
@@ -76,7 +76,7 @@ test("rejects malformed nested progress records", () => {
     ["session opponent reply seconds", (value) => {
       value.data.sprintSessions[0].mode = "arrow_duel";
       value.data.sprintSessions[0].config.mode = "arrow_duel";
-      value.data.sprintSessions[0].config.opponentReply = { enabled: true, seconds: 11 };
+      value.data.sprintSessions[0].config.opponentReply = { enabled: true, seconds: 31 };
     }],
     ["session rating games", (value) => { value.data.sprintSessions[0].ratingGamesBefore = 0.5; }],
     ["session rating deviation", (value) => { value.data.sprintSessions[0].ratingDeviationBefore = 0; }],
