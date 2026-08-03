@@ -11,9 +11,9 @@ export const PUZZLE_TIMING_MIN_SECONDS = 10;
 export const PUZZLE_TIMING_MAX_SECONDS = 180;
 export const PUZZLE_TIMING_STEP_SECONDS = 5;
 export const PUZZLE_TIMING_MIN_GAP_SECONDS = 5;
-export const DEFAULT_OPPONENT_REPLY_SECONDS = 5;
+export const DEFAULT_OPPONENT_REPLY_SECONDS = 10;
 export const OPPONENT_REPLY_MIN_SECONDS = 1;
-export const OPPONENT_REPLY_MAX_SECONDS = 10;
+export const OPPONENT_REPLY_MAX_SECONDS = 30;
 
 export function defaultSprintConfig(mode: SprintMode): SprintConfig {
   if (mode === "standard") {

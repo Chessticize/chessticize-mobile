@@ -198,7 +198,7 @@ test("previous configurations, start effects, and refresh stay outside React", (
     },
     opponentReply: {
       enabled: true,
-      seconds: 5
+      seconds: 10
     },
     themes: ["fork", "pin"]
   });
@@ -224,16 +224,16 @@ test("Arrow Duel Runs configure opponent reply on create and edit", () => {
   controller.dispatch({ type: "change-mode", mode: "arrow_duel" });
   assert.deepEqual(controller.getSnapshot().draft?.opponentReply, {
     enabled: true,
-    seconds: 5
+    seconds: 10
   });
 
   controller.dispatch({
     type: "change-opponent-reply-seconds-input",
-    value: "11"
+    value: "31"
   });
   assert.equal(
     controller.getSnapshot().opponentReplySecondsError,
-    "Enter a positive whole number up to 10 seconds."
+    "Enter a positive whole number up to 30 seconds."
   );
   assert.equal(controller.getSnapshot().canSave, false);
 
@@ -243,7 +243,7 @@ test("Arrow Duel Runs configure opponent reply on create and edit", () => {
   const created = controller.getSnapshot().runs.find(
     (run) => run.name === "Reply Drill"
   );
-  assert.deepEqual(created?.opponentReply, { enabled: false, seconds: 5 });
+  assert.deepEqual(created?.opponentReply, { enabled: false, seconds: 10 });
 
   assert.ok(created);
   controller.dispatch({ type: "toggle-home-edit" });
@@ -251,20 +251,20 @@ test("Arrow Duel Runs configure opponent reply on create and edit", () => {
   controller.dispatch({ type: "toggle-opponent-reply" });
   controller.dispatch({
     type: "change-opponent-reply-seconds-input",
-    value: "10"
+    value: "30"
   });
   controller.dispatch({ type: "save-run" });
 
   assert.deepEqual(
     controller.getSnapshot().runs.find((run) => run.id === created.id)?.opponentReply,
-    { enabled: true, seconds: 10 }
+    { enabled: true, seconds: 30 }
   );
   assert.deepEqual(adapter.commands.at(-1), {
     type: "update-run",
     runId: created.id,
     name: "Reply Drill",
     elo: 900,
-    opponentReply: { enabled: true, seconds: 10 },
+    opponentReply: { enabled: true, seconds: 30 },
     puzzleTiming: {
       slowAfterSeconds: 40,
       timeoutAfterSeconds: 60

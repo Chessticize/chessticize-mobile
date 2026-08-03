@@ -42,6 +42,7 @@ import {
   buildSprintConfig,
   collectHistoryRatingKeys,
   currentExpectedMove,
+  DEFAULT_OPPONENT_REPLY_SECONDS,
   defaultSprintConfig,
   formatLocalCalendarDate,
   formatLocalCalendarDateLabel,
@@ -54,6 +55,8 @@ import {
   isReviewOverdue,
   markSprintGuideSeen,
   normalizeHistoryAttemptDetail,
+  OPPONENT_REPLY_MAX_SECONDS,
+  OPPONENT_REPLY_MIN_SECONDS,
   PRACTICE_RUN_NAME_MAX_LENGTH,
   RATING_FLOOR,
   resetSprintGuideProgress,
@@ -504,7 +507,9 @@ const FEEDBACK_SNAPSHOT_MS = 800;
 // reply animates. Kept short — the reply window delays the user's next move.
 const USER_FEEDBACK_BEFORE_AUTO_MS = 120;
 const ARROW_DUEL_CORRECT_CHOICE_FEEDBACK_MS = 220;
-const ARROW_DUEL_REPLY_PROMPT_LEAD_MS = 140;
+// Let the animated undo and the What if cue register before the tempting move
+// appears. The reply clock still begins only after the new position is ready.
+const ARROW_DUEL_REPLY_PREPARATION_MS = 650;
 // Shared by the practice and review boards so they animate at the same speed.
 const BOARD_MOVE_ANIMATION_MS = 200;
 const ANALYSIS_DEPTH = 20;
@@ -717,10 +722,13 @@ export function PracticePocScreen({
     () => sprintRulesDesignPreview?.arrowDuelReplyChallenge?.enabled ?? true
   );
   const initialArrowDuelReplySeconds = (() => {
-    const configured = sprintRulesDesignPreview?.arrowDuelReplyChallenge?.replySeconds ?? 5;
-    return Number.isSafeInteger(configured) && configured >= 1 && configured <= 10
+    const configured = sprintRulesDesignPreview?.arrowDuelReplyChallenge?.replySeconds
+      ?? DEFAULT_OPPONENT_REPLY_SECONDS;
+    return Number.isSafeInteger(configured)
+      && configured >= OPPONENT_REPLY_MIN_SECONDS
+      && configured <= OPPONENT_REPLY_MAX_SECONDS
       ? configured
-      : 5;
+      : DEFAULT_OPPONENT_REPLY_SECONDS;
   })();
   const [arrowDuelReplySeconds, setArrowDuelReplySeconds] = useState(
     initialArrowDuelReplySeconds
@@ -732,6 +740,7 @@ export function PracticePocScreen({
     useState<ArrowDuelReplyChallengePhase>("choice");
   const [arrowDuelReplyPromptPhase, setArrowDuelReplyPromptPhase] =
     useState<ArrowDuelReplyChallengePhase>("choice");
+  const [arrowDuelWhatIfVisible, setArrowDuelWhatIfVisible] = useState(false);
   const [aggregateRevision, setAggregateRevision] = useState(0);
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueState[]>([]);
   const [dueReviewItems, setDueReviewItems] = useState<ReviewQueueItem[]>([]);
@@ -1592,11 +1601,27 @@ export function PracticePocScreen({
     return revision;
   }
 
-  function resetBoardToFen(fen: string | null | undefined, reason: string, puzzleId?: string | null, move?: string): void {
+  function resetBoardToFen(
+    fen: string | null | undefined,
+    reason: string,
+    puzzleId?: string | null,
+    move?: string,
+    slide?: BoardMove | null
+  ): void {
     if (!fen) {
       return;
     }
-    boardRef.current?.resetBoard(fen);
+    if (slide) {
+      boardRef.current?.resetBoard(fen, {
+        lastMove: null,
+        slide: {
+          from: slide.from as Square,
+          to: slide.to as Square
+        }
+      });
+    } else {
+      boardRef.current?.resetBoard(fen);
+    }
     emitTrace({
       type: "board-reset",
       reason,
@@ -2256,21 +2281,28 @@ export function PracticePocScreen({
       await sleep(ARROW_DUEL_CORRECT_CHOICE_FEEDBACK_MS);
       setFeedback(null);
       setFeedbackPuzzleId(null);
+      setArrowDuelWhatIfVisible(true);
+      const submittedChoice = arrowFromTo(submittedMove);
       resetBoardToFen(
         submittedPuzzle.currentFen,
         transition.resetReason ?? "arrow-duel-reply-preview-handoff",
         submittedPuzzleId,
-        submittedMove
+        submittedMove,
+        submittedChoice
+          ? { from: submittedChoice.to, to: submittedChoice.from }
+          : null
       );
       commitBoardFen(submittedPuzzle.currentFen);
       setArrowDuelReplyPromptPhase("reply");
-      await sleep(ARROW_DUEL_REPLY_PROMPT_LEAD_MS);
+      await sleep(ARROW_DUEL_REPLY_PREPARATION_MS);
       await animateBoardMoves(opponentMoves, transition.boardFen ?? null);
       if (transition.lastMove !== undefined) {
         setLastBoardMove(transition.lastMove ? arrowFromTo(transition.lastMove) : null);
       }
       setArrowDuelReplyChallengePhase("reply");
+      setArrowDuelWhatIfVisible(false);
     } finally {
+      setArrowDuelWhatIfVisible(false);
       boardSyncInProgressRef.current = false;
       if (boardInputLockRevisionRef.current === handoffLockRevision) {
         commitBoardInputLocked(
@@ -2434,7 +2466,12 @@ export function PracticePocScreen({
       }
       if (shouldAnimateSamePuzzleReply(next.state, nextFeedback, submittedPuzzleId)) {
         commitBoardFen(nextVisualFen);
-        await animateSamePuzzleReply(next.state, nextFeedback, submittedFen);
+        await animateSamePuzzleReply(
+          next.state,
+          nextFeedback,
+          submittedFen,
+          nextFeedback?.submittedMove ?? null
+        );
         return;
       }
       syncFeedbackSnapshot(next.state, nextFeedback, submittedPuzzle, submittedFen, submittedPuzzleId);
@@ -2770,7 +2807,8 @@ export function PracticePocScreen({
   async function animateSamePuzzleReply(
     nextState: SprintState,
     nextFeedback: SessionFeedback,
-    submittedFen: string | null
+    submittedFen: string | null,
+    submittedMove: string | null
   ): Promise<void> {
     const nextFen = nextState.currentPuzzle?.currentFen ?? null;
     const autoMoves = nextFeedback?.autoPlayedMoves ?? [];
@@ -2796,18 +2834,27 @@ export function PracticePocScreen({
         setFeedback(null);
         setFeedbackPuzzleId(null);
         if (isArrowDuelReplyHandoff && submittedFen) {
+          setArrowDuelWhatIfVisible(true);
+          const submittedChoice = submittedMove ? arrowFromTo(submittedMove) : null;
           resetBoardToFen(
             submittedFen,
             "arrow-duel-reply-handoff",
-            puzzleId
+            puzzleId,
+            submittedMove ?? undefined,
+            submittedChoice
+              ? { from: submittedChoice.to, to: submittedChoice.from }
+              : null
           );
           commitBoardFen(submittedFen);
         }
         if (isArrowDuelReplyHandoff) {
           setArrowDuelReplyPromptPhase("reply");
-          await sleep(ARROW_DUEL_REPLY_PROMPT_LEAD_MS);
+          await sleep(ARROW_DUEL_REPLY_PREPARATION_MS);
         }
         await animateBoardMoves(autoMoves, nextFen);
+        if (isArrowDuelReplyHandoff) {
+          setArrowDuelWhatIfVisible(false);
+        }
         const activeSprint = service.getActiveSprint();
         if (
           nextState.currentPuzzle?.kind === "arrow_duel" &&
@@ -2824,6 +2871,7 @@ export function PracticePocScreen({
           setArrowDuelReplyChallengePhase("reply");
         }
       } finally {
+        setArrowDuelWhatIfVisible(false);
         boardSyncInProgressRef.current = false;
         // A newer lock taken mid-animation (pause, app background) owns the
         // board until the session is active again. If a mid-animation resume
@@ -3182,10 +3230,14 @@ export function PracticePocScreen({
         )
         ? "reply"
         : "choice";
+  const arrowDuelReplyReady = arrowDuelReplyChallengePreviewVisible
+    ? arrowDuelReplyChallengePhase === "reply"
+    : displayedArrowDuelPuzzle?.phase === "reply";
   useEffect(() => {
     arrowDuelReplyPuzzleElapsedSecondsRef.current = 0;
     setArrowDuelReplyChallengePhase("choice");
     setArrowDuelReplyPromptPhase("choice");
+    setArrowDuelWhatIfVisible(false);
   }, [currentPuzzle?.puzzle.id]);
   arrowDuelReplyChallengeTimeoutHandlerRef.current = () => {
     const timeoutPuzzle = stateRef.current?.currentPuzzle;
@@ -3901,6 +3953,20 @@ export function PracticePocScreen({
           </View>
         ) : null}
 
+        {arrowDuelWhatIfVisible ? (
+          <View
+            accessible
+            accessibilityLabel="What if"
+            accessibilityLiveRegion="polite"
+            style={styles.arrowDuelWhatIfOverlay}
+            testID="arrow-duel-what-if-overlay"
+          >
+            <View style={styles.arrowDuelWhatIfPill}>
+              <Text style={styles.arrowDuelWhatIfText}>What if…</Text>
+            </View>
+          </View>
+        ) : null}
+
         {displayedLastBoardMove ? (
           <LastMoveOverlay
             boardSize={boardSize}
@@ -3966,6 +4032,7 @@ export function PracticePocScreen({
           kingPieceSize={kingGlyphSizeForBoard(boardSize)}
           phase={arrowDuelReplyChallengeDisplayPhase}
           promptSide={arrowDuelPromptSide}
+          replyReady={arrowDuelReplyReady}
           replySeconds={arrowDuelReplySecondsRemaining}
         />
       ) : (
@@ -4332,15 +4399,18 @@ export function PracticePocScreen({
                                 || (
                                   /^[1-9]\d*$/.test(arrowDuelReplySecondsInput)
                                   && Number.isSafeInteger(Number(arrowDuelReplySecondsInput))
-                                  && Number(arrowDuelReplySecondsInput) <= 10
+                                  && Number(arrowDuelReplySecondsInput) <= OPPONENT_REPLY_MAX_SECONDS
                                 )
                                 ? null
-                                : "Enter a positive whole number up to 10 seconds."
+                                : `Enter a positive whole number up to ${OPPONENT_REPLY_MAX_SECONDS} seconds.`
                               : activeRunManagementPresentation.opponentReplySecondsError ?? null,
                             replySecondsInput: sprintRulesDesignPreview?.arrowDuelReplyChallenge
                               ? arrowDuelReplySecondsInput
                               : activeRunManagementPresentation.opponentReplySecondsInput
-                                ?? String(activeRunManagementPresentation.draft.opponentReply?.seconds ?? 5),
+                                ?? String(
+                                  activeRunManagementPresentation.draft.opponentReply?.seconds
+                                    ?? DEFAULT_OPPONENT_REPLY_SECONDS
+                                ),
                             onReplySecondsInputChange: sprintRulesDesignPreview?.arrowDuelReplyChallenge
                               ? (value: string) => {
                                   if (!/^\d*$/.test(value)) {
@@ -4351,7 +4421,7 @@ export function PracticePocScreen({
                                   if (
                                     /^[1-9]\d*$/.test(value)
                                     && Number.isSafeInteger(parsed)
-                                    && parsed <= 10
+                                    && parsed <= OPPONENT_REPLY_MAX_SECONDS
                                   ) {
                                     setArrowDuelReplySeconds(parsed);
                                   }
@@ -7394,7 +7464,7 @@ function ArrowDuelReplyChallengeSetting({
           <View style={styles.runTimingRowCopy}>
             <Text style={styles.listText}>Reply time</Text>
             <Text style={styles.helperText}>
-              Defaults to 5 seconds. Maximum 10.
+              Defaults to {DEFAULT_OPPONENT_REPLY_SECONDS} seconds. Maximum {OPPONENT_REPLY_MAX_SECONDS}.
             </Text>
             <Text style={styles.helperText}>
               The Sprint and puzzle clocks pause when the reply begins. Find the reply quickly to
@@ -9411,12 +9481,14 @@ function ArrowDuelReplyChallengePrompt({
   kingPieceSize,
   phase,
   promptSide,
+  replyReady,
   replySeconds
 }: {
   currentPuzzle: ArrowDuelState;
   kingPieceSize: number;
   phase: ArrowDuelReplyChallengePhase;
   promptSide: MoveSide | null;
+  replyReady: boolean;
   replySeconds: number;
 }): React.JSX.Element {
   const displayedSide = promptSide ?? sideToMove(currentPuzzle.currentFen);
@@ -9425,7 +9497,7 @@ function ArrowDuelReplyChallengePrompt({
   const copy = phase === "choice"
     ? {
         context: `For ${side}, between the two arrows.`,
-        hint: "Choose correctly to unlock the reply.",
+        hint: "Be ready for a quick reply check.",
         title: "Choose the best move",
         tone: "neutral" as const
       }
@@ -9468,7 +9540,7 @@ function ArrowDuelReplyChallengePrompt({
             <Text style={styles.promptTitle} testID="arrow-duel-reply-title">
               {copy.title}
             </Text>
-            {phase === "reply" ? (
+            {phase === "reply" && replyReady ? (
               <View
                 accessibilityLabel={`${replySeconds} ${replySeconds === 1 ? "second" : "seconds"} remaining.`}
                 style={styles.arrowDuelReplyTimerGroup}
@@ -17760,6 +17832,26 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: "transparent",
     zIndex: 50
+  },
+  arrowDuelWhatIfOverlay: {
+    alignItems: "center",
+    left: 0,
+    pointerEvents: "none",
+    position: "absolute",
+    right: 0,
+    top: 12,
+    zIndex: 45
+  },
+  arrowDuelWhatIfPill: {
+    backgroundColor: "rgba(15, 23, 42, 0.88)",
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7
+  },
+  arrowDuelWhatIfText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "900"
   },
   coordinateOverlay: {
     left: 0,

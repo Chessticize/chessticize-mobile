@@ -19,16 +19,17 @@ Each Arrow Duel Run has an **Opponent reply** setting:
 
 - It defaults to on.
 - It appears in Create Run and Edit Run when the Run format is Arrow Duel.
-- Its reply time defaults to five seconds and accepts any positive whole-number duration
-  up to ten seconds entered directly, rather than a fixed list of
+- Its reply time defaults to ten seconds and accepts any positive whole-number duration
+  up to thirty seconds entered directly, rather than a fixed list of
   presets.
 - Turning it off preserves the current one-choice Arrow Duel behavior.
 - Turning it on or off does not change the Run's Rating identity. Both states
   contribute to the same Arrow Duel Run Rating.
 
 The setting persists with the Run and syncs without changing its Rating key.
-Legacy Arrow Duel Runs receive the enabled five-second default during
-compatibility normalization and SQLite migration.
+Legacy Arrow Duel Runs that do not yet have the setting receive the enabled
+ten-second default during compatibility normalization and SQLite migration.
+Runs that already store a reply duration keep their configured value.
 
 ## Scored Flow
 
@@ -43,10 +44,12 @@ With Opponent reply on:
    solved result. Show the ordinary brief green move feedback, then pause the
    Sprint and puzzle clocks before beginning the handoff.
 4. Keep the board in the original solver's perspective for the whole puzzle.
-   After the green confirmation, undo the correct candidate, switch the fixed
-   prompt surface to the `If...` reply copy, and then animate the tempting
-   candidate. The player now moves for the opponent without the board flipping.
-5. Start the Run's configured reply clock, which defaults to five seconds, only
+   After the green confirmation, animate the correct candidate back to its
+   starting square and show a top-of-board `What if…` cue. Hold that preparation
+   beat while the fixed prompt surface switches to the `If...` reply copy, then
+   animate the tempting candidate. The player now moves for the opponent without
+   the board flipping.
+5. Start the Run's configured reply clock, which defaults to ten seconds, only
    after the tempting candidate has settled and board input is available. None
    of the green confirmation, undo, prompt transition, or move animation uses
    reply time. The reply phase and its board handoff do not advance the Sprint
@@ -111,11 +114,12 @@ an engine dependency to scored play.
 The issue #489 design increment updates the existing product clones and keeps
 their stable Storybook URLs. It covers:
 
-- candidate choice and the staged green-confirmation, undo, `If...` prompt,
-  and tempting-move handoff;
+- candidate choice and the staged green-confirmation, animated undo,
+  top-of-board `What if…` cue, `If...` prompt, and tempting-move handoff;
 - a board perspective locked to the original solver throughout the candidate
   and opponent-reply stages;
-- the configurable opponent-reply state, defaulting to five seconds;
+- the configurable opponent-reply state, defaulting to ten seconds and capped
+  at thirty seconds;
 - Standard-style brief board feedback and automatic advance for correct and
   wrong replies;
 - the brief ordinary timeout overlay and automatic advance;

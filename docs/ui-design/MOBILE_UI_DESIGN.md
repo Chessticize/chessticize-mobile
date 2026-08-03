@@ -352,7 +352,7 @@ Arrow Duel active-session rules:
 - The Opponent reply challenge is defined in
   [`ARROW_DUEL_REPLY_CHALLENGE.md`](ARROW_DUEL_REPLY_CHALLENGE.md). When it is
   enabled, a correct candidate begins a separate refutation step whose reply
-  time defaults to five seconds and accepts any positive whole-number value up to ten in
+  time defaults to ten seconds and accepts any positive whole-number value up to thirty in
   Create Run or Edit Run; both answers must be correct for the puzzle to count
   as solved.
 - A wrong candidate, wrong reply, or reply timeout makes the whole puzzle wrong
@@ -364,6 +364,10 @@ Arrow Duel active-session rules:
 - The Sprint and puzzle clocks pause when the reply begins. The reply clock and
   its board handoff do not advance the Sprint deadline, puzzle elapsed time,
   Slow threshold, or puzzle Timeout threshold.
+- After green confirmation, the selected move animates back before the tempting
+  move appears. A top-of-board `What if…` cue remains visible through this
+  preparation beat, and the reply timer appears only after the tempting move
+  settles and board input unlocks.
 - Reply judgment accepts the stored puzzle main-line move or any legal move
   that immediately checkmates. It does not invoke Stockfish.
 
