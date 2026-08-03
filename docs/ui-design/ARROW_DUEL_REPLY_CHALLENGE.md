@@ -40,13 +40,17 @@ With Opponent reply on:
    second question. Add the failed attempt to Review, show the ordinary brief
    red move feedback, and advance automatically.
 3. A correct candidate does not complete the puzzle and does not reveal a
-   solved result.
-4. Play the tempting candidate on the board. Wait until that presentation is
-   stable, then ask the player to move for the opponent.
-5. Pause the Sprint and puzzle clocks when the reply begins, then start the
-   Run's configured reply clock, which defaults to five seconds. The reply
-   phase and its board handoff do not advance the Sprint deadline, puzzle
-   elapsed time, Slow threshold, or puzzle Timeout threshold.
+   solved result. Show the ordinary brief green move feedback, then pause the
+   Sprint and puzzle clocks before beginning the handoff.
+4. Keep the board in the original solver's perspective for the whole puzzle.
+   After the green confirmation, undo the correct candidate, switch the fixed
+   prompt surface to the `If...` reply copy, and then animate the tempting
+   candidate. The player now moves for the opponent without the board flipping.
+5. Start the Run's configured reply clock, which defaults to five seconds, only
+   after the tempting candidate has settled and board input is available. None
+   of the green confirmation, undo, prompt transition, or move animation uses
+   reply time. The reply phase and its board handoff do not advance the Sprint
+   deadline, puzzle elapsed time, Slow threshold, or puzzle Timeout threshold.
 6. The whole puzzle is correct only when both the candidate and reply are
    correct. Show the ordinary brief green move feedback, then advance
    automatically.
@@ -60,9 +64,11 @@ label; the independent timing rule remains part of scoring behavior, while the
 ordinary Sprint and puzzle clocks do not advance until the reply resolves.
 
 The reply challenge reuses the ordinary puzzle prompt position and surface. It
-stays centered at the same full width and fixed 72-point height. The reply
-state explains the position without restating the acceptance rule. Once the
-whole puzzle resolves, do not replace that prompt with `Solved`, `Choice
+stays centered at the same full width and fixed 72-point height. Candidate and
+reply copy occupy the same absolutely positioned copy layer so the handoff
+cannot change the prompt's geometry. The reply state explains the position
+without restating the acceptance rule. Once the whole puzzle resolves, do not
+replace that prompt with `Solved`, `Choice
 missed`, `Reply missed`, Review messaging, or any other result copy. Match
 Standard Sprint: the board feedback carries the result during the short handoff
 to the next puzzle.
@@ -105,7 +111,10 @@ an engine dependency to scored play.
 The issue #489 design increment updates the existing product clones and keeps
 their stable Storybook URLs. It covers:
 
-- candidate choice and the correct-choice handoff;
+- candidate choice and the staged green-confirmation, undo, `If...` prompt,
+  and tempting-move handoff;
+- a board perspective locked to the original solver throughout the candidate
+  and opponent-reply stages;
 - the configurable opponent-reply state, defaulting to five seconds;
 - Standard-style brief board feedback and automatic advance for correct and
   wrong replies;

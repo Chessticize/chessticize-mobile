@@ -503,6 +503,8 @@ const FEEDBACK_SNAPSHOT_MS = 800;
 // Brief pause so the correct-move feedback registers before the opponent
 // reply animates. Kept short — the reply window delays the user's next move.
 const USER_FEEDBACK_BEFORE_AUTO_MS = 120;
+const ARROW_DUEL_CORRECT_CHOICE_FEEDBACK_MS = 220;
+const ARROW_DUEL_REPLY_PROMPT_LEAD_MS = 140;
 // Shared by the practice and review boards so they animate at the same speed.
 const BOARD_MOVE_ANIMATION_MS = 200;
 const ANALYSIS_DEPTH = 20;
@@ -663,6 +665,7 @@ export function PracticePocScreen({
   const boardInputLockedRef = useRef(false);
   const puzzleEntryPreviewLockedRef = useRef(false);
   const boardInputLockModeRef = useRef<BoardInputLockMode>("hard");
+  const boardInputLockRevisionRef = useRef(0);
   const pendingPremoveRef = useRef<PendingPremove | null>(null);
   const boardVisualFenRef = useRef<string | null>(null);
   const feedbackSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -726,6 +729,8 @@ export function PracticePocScreen({
     String(initialArrowDuelReplySeconds)
   );
   const [arrowDuelReplyChallengePhase, setArrowDuelReplyChallengePhase] =
+    useState<ArrowDuelReplyChallengePhase>("choice");
+  const [arrowDuelReplyPromptPhase, setArrowDuelReplyPromptPhase] =
     useState<ArrowDuelReplyChallengePhase>("choice");
   const [aggregateRevision, setAggregateRevision] = useState(0);
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueState[]>([]);
@@ -1565,7 +1570,9 @@ export function PracticePocScreen({
     reason: string,
     puzzleId?: string | null,
     mode: BoardInputLockMode = "hard"
-  ): void {
+  ): number {
+    const revision = boardInputLockRevisionRef.current + 1;
+    boardInputLockRevisionRef.current = revision;
     const nextMode = nextLocked ? mode : "hard";
     if (nextLocked && mode === "hard") {
       // A hard lock (submit, pause, feedback snapshot) invalidates any premove
@@ -1582,6 +1589,7 @@ export function PracticePocScreen({
       puzzleId,
       locked: nextLocked
     });
+    return revision;
   }
 
   function resetBoardToFen(fen: string | null | undefined, reason: string, puzzleId?: string | null, move?: string): void {
@@ -2123,13 +2131,13 @@ export function PracticePocScreen({
           puzzle: submittedPuzzle,
           resultFen: result.state?.fen ?? null
         });
-        applyArrowDuelReplyPreviewTransition(
-          transition,
-          submittedPuzzle,
-          submittedPuzzle.puzzle.id,
-          move
-        );
         if (arrowDuelReplyChallengePhase === "choice" && transition.phase === "reply") {
+          await stageArrowDuelReplyPreviewHandoff(
+            transition,
+            submittedPuzzle,
+            submittedPuzzle.puzzle.id,
+            move
+          );
           const replyStartedAtMs = currentTimeMs();
           const puzzleStartedAtMs = stateRef.current?.currentPuzzleStartedAt
             ? new Date(stateRef.current.currentPuzzleStartedAt).getTime()
@@ -2137,6 +2145,13 @@ export function PracticePocScreen({
           arrowDuelReplyPuzzleElapsedSecondsRef.current = Math.max(
             0,
             Math.floor((replyStartedAtMs - puzzleStartedAtMs) / 1000)
+          );
+        } else {
+          applyArrowDuelReplyPreviewTransition(
+            transition,
+            submittedPuzzle,
+            submittedPuzzle.puzzle.id,
+            move
           );
         }
       } catch (caught) {
@@ -2211,6 +2226,62 @@ export function PracticePocScreen({
     });
   }
 
+  async function stageArrowDuelReplyPreviewHandoff(
+    transition: ArrowDuelReplyChallengePreviewTransition,
+    submittedPuzzle: ArrowDuelState,
+    submittedPuzzleId: string,
+    submittedMove: string
+  ): Promise<void> {
+    const opponentMoves = (transition.feedbackMoves ?? [])
+      .filter((feedbackMove) => feedbackMove.actor === "opponent")
+      .map((feedbackMove) => feedbackMove.move);
+    const submittedMoveFen = fenAfterMove(submittedPuzzle.currentFen, submittedMove);
+    boardSyncInProgressRef.current = true;
+    const handoffLockRevision = commitBoardInputLocked(
+      true,
+      "arrow-duel-reply-preview-handoff",
+      submittedPuzzleId
+    );
+    playCommittedMoveFeedback("user", submittedMove, submittedPuzzle.currentFen);
+    setFeedback({
+      autoPlayedMoves: [],
+      currentFen: submittedMoveFen ?? submittedPuzzle.currentFen,
+      expectedMove: submittedPuzzle.correctMove,
+      puzzleSolved: false,
+      result: "correct",
+      submittedMove
+    });
+    setFeedbackPuzzleId(submittedPuzzleId);
+    try {
+      await sleep(ARROW_DUEL_CORRECT_CHOICE_FEEDBACK_MS);
+      setFeedback(null);
+      setFeedbackPuzzleId(null);
+      resetBoardToFen(
+        submittedPuzzle.currentFen,
+        transition.resetReason ?? "arrow-duel-reply-preview-handoff",
+        submittedPuzzleId,
+        submittedMove
+      );
+      commitBoardFen(submittedPuzzle.currentFen);
+      setArrowDuelReplyPromptPhase("reply");
+      await sleep(ARROW_DUEL_REPLY_PROMPT_LEAD_MS);
+      await animateBoardMoves(opponentMoves, transition.boardFen ?? null);
+      if (transition.lastMove !== undefined) {
+        setLastBoardMove(transition.lastMove ? arrowFromTo(transition.lastMove) : null);
+      }
+      setArrowDuelReplyChallengePhase("reply");
+    } finally {
+      boardSyncInProgressRef.current = false;
+      if (boardInputLockRevisionRef.current === handoffLockRevision) {
+        commitBoardInputLocked(
+          false,
+          "arrow-duel-reply-preview-handoff-complete",
+          submittedPuzzleId
+        );
+      }
+    }
+  }
+
   function applyArrowDuelReplyPreviewTransition(
     transition: ArrowDuelReplyChallengePreviewTransition,
     submittedPuzzle: ArrowDuelState,
@@ -2239,6 +2310,7 @@ export function PracticePocScreen({
       setLastBoardMove(transition.lastMove ? arrowFromTo(transition.lastMove) : null);
     }
     setArrowDuelReplyChallengePhase(transition.phase);
+    setArrowDuelReplyPromptPhase(transition.phase);
 
     const completion = transition.completion;
     if (!completion) {
@@ -2457,11 +2529,16 @@ export function PracticePocScreen({
       let resumed = nextSprint.status === "paused" && service.getActiveSprint()?.id === nextSprint.id
         ? service.resumeSprint(captureLiveNowIso())
         : nextSprint;
+      const arrowDuelReplyHandoffStillAnimating =
+        resumed.status === "active" &&
+        resumed.currentPuzzle?.kind === "arrow_duel" &&
+        resumed.currentPuzzle.phase === "reply_handoff" &&
+        boardSyncInProgressRef.current;
       if (
         resumed.status === "active" &&
         resumed.currentPuzzle?.kind === "arrow_duel" &&
         resumed.currentPuzzle.phase === "reply_handoff" &&
-        !boardSyncInProgressRef.current
+        !arrowDuelReplyHandoffStillAnimating
       ) {
         resumed = service.beginArrowDuelReply(captureLiveNowIso());
       }
@@ -2475,7 +2552,13 @@ export function PracticePocScreen({
       setFeedbackPuzzleId(null);
       setPreviousAttemptNotice(null);
       clearFeedbackSnapshot();
-      commitBoardInputLocked(false, "resume", resumed.currentPuzzle?.puzzle.id ?? null);
+      commitBoardInputLocked(
+        arrowDuelReplyHandoffStillAnimating,
+        arrowDuelReplyHandoffStillAnimating
+          ? "resume-awaiting-arrow-duel-reply-handoff"
+          : "resume",
+        resumed.currentPuzzle?.puzzle.id ?? null
+      );
       navigateToTab("practice");
       refreshState();
     } catch (caught) {
@@ -2692,24 +2775,37 @@ export function PracticePocScreen({
     const nextFen = nextState.currentPuzzle?.currentFen ?? null;
     const autoMoves = nextFeedback?.autoPlayedMoves ?? [];
     const puzzleId = nextState.currentPuzzle?.puzzle.id ?? null;
+    const isArrowDuelReplyHandoff =
+      nextState.currentPuzzle?.kind === "arrow_duel" &&
+      nextState.currentPuzzle.phase === "reply_handoff";
+    let arrowDuelReplyBegan = false;
     boardSyncInProgressRef.current = true;
-    commitBoardInputLocked(true, "opponent-reply", puzzleId, "premove");
+    const replyLockRevision = commitBoardInputLocked(
+      true,
+      "opponent-reply",
+      puzzleId,
+      isArrowDuelReplyHandoff ? "hard" : "premove"
+    );
     try {
       try {
-        await sleep(USER_FEEDBACK_BEFORE_AUTO_MS);
+        await sleep(
+          isArrowDuelReplyHandoff
+            ? ARROW_DUEL_CORRECT_CHOICE_FEEDBACK_MS
+            : USER_FEEDBACK_BEFORE_AUTO_MS
+        );
         setFeedback(null);
         setFeedbackPuzzleId(null);
-        if (
-          nextState.currentPuzzle?.kind === "arrow_duel" &&
-          nextState.currentPuzzle.phase === "reply_handoff" &&
-          submittedFen
-        ) {
+        if (isArrowDuelReplyHandoff && submittedFen) {
           resetBoardToFen(
             submittedFen,
             "arrow-duel-reply-handoff",
             puzzleId
           );
           commitBoardFen(submittedFen);
+        }
+        if (isArrowDuelReplyHandoff) {
+          setArrowDuelReplyPromptPhase("reply");
+          await sleep(ARROW_DUEL_REPLY_PROMPT_LEAD_MS);
         }
         await animateBoardMoves(autoMoves, nextFen);
         const activeSprint = service.getActiveSprint();
@@ -2722,13 +2818,22 @@ export function PracticePocScreen({
           activeSprint.currentPuzzle.phase === "reply_handoff" &&
           activeSprint.currentPuzzle.puzzle.id === puzzleId
         ) {
-          commitState(service.beginArrowDuelReply(captureLiveNowIso()));
+          const replying = service.beginArrowDuelReply(captureLiveNowIso());
+          arrowDuelReplyBegan = true;
+          commitState(replying);
+          setArrowDuelReplyChallengePhase("reply");
         }
       } finally {
         boardSyncInProgressRef.current = false;
-        // A hard lock taken mid-animation (pause, app background) owns the
-        // board now and must survive this window's unlock.
-        if (boardInputLockModeRef.current === "premove") {
+        // A newer lock taken mid-animation (pause, app background) owns the
+        // board until the session is active again. If a mid-animation resume
+        // let this handoff start the reply, it also owns the matching unlock.
+        // Starting the reply clock and releasing the hard lock therefore form
+        // the single boundary where the player can first move.
+        if (
+          boardInputLockRevisionRef.current === replyLockRevision ||
+          (isArrowDuelReplyHandoff && arrowDuelReplyBegan)
+        ) {
           commitBoardInputLocked(false, "opponent-reply-complete", puzzleId);
         }
       }
@@ -3070,13 +3175,17 @@ export function PracticePocScreen({
     arrowDuelReplyChallengeProductionVisible;
   const arrowDuelReplyChallengeDisplayPhase: ArrowDuelReplyChallengePhase =
     arrowDuelReplyChallengePreviewVisible
-      ? arrowDuelReplyChallengePhase
-      : displayedArrowDuelPuzzle?.phase === "reply"
+      ? arrowDuelReplyPromptPhase
+      : displayedArrowDuelPuzzle?.phase === "reply" || (
+          displayedArrowDuelPuzzle?.phase === "reply_handoff" &&
+          arrowDuelReplyPromptPhase === "reply"
+        )
         ? "reply"
         : "choice";
   useEffect(() => {
     arrowDuelReplyPuzzleElapsedSecondsRef.current = 0;
     setArrowDuelReplyChallengePhase("choice");
+    setArrowDuelReplyPromptPhase("choice");
   }, [currentPuzzle?.puzzle.id]);
   arrowDuelReplyChallengeTimeoutHandlerRef.current = () => {
     const timeoutPuzzle = stateRef.current?.currentPuzzle;
@@ -3202,6 +3311,11 @@ export function PracticePocScreen({
       && (!boardInputLocked || boardPremoveWindow)
   );
   const displayedSideToMove = displayedBoardFen ? sideToMove(displayedBoardFen) : null;
+  const arrowDuelPromptSide = displayedArrowDuelPuzzle
+    ? arrowDuelReplyChallengeDisplayPhase === "reply"
+      ? oppositeMoveSide(sideToMove(displayedArrowDuelPuzzle.puzzle.initialFen))
+      : sideToMove(displayedArrowDuelPuzzle.puzzle.initialFen)
+    : displayedSideToMove;
   const submittedMoveForCurrentPuzzle =
     boardFeedback?.submittedMove && boardFeedback.submittedMove !== "__illegal__"
       ? arrowFromTo(boardFeedback.submittedMove)
@@ -3851,7 +3965,7 @@ export function PracticePocScreen({
           currentPuzzle={displayedPuzzle}
           kingPieceSize={kingGlyphSizeForBoard(boardSize)}
           phase={arrowDuelReplyChallengeDisplayPhase}
-          promptSide={displayedSideToMove}
+          promptSide={arrowDuelPromptSide}
           replySeconds={arrowDuelReplySecondsRemaining}
         />
       ) : (
@@ -9338,46 +9452,54 @@ function ArrowDuelReplyChallengePrompt({
           testID="practice-prompt-side-glyph"
         />
       </View>
-      <View style={styles.promptCopy} testID="practice-prompt-copy">
-        <View style={styles.arrowDuelReplyTitleRow}>
-          <Text style={styles.promptTitle} testID="arrow-duel-reply-title">
-            {copy.title}
-          </Text>
-          {phase === "reply" ? (
-            <View
-              accessibilityLabel={`${replySeconds} ${replySeconds === 1 ? "second" : "seconds"} remaining.`}
-              style={styles.arrowDuelReplyTimerGroup}
-              testID="arrow-duel-reply-timer-group"
+      <View
+        style={[styles.promptCopy, styles.arrowDuelReplyPromptCopy]}
+        testID="practice-prompt-copy"
+      >
+        <View
+          style={styles.arrowDuelReplyCopyLayer}
+          testID="arrow-duel-reply-copy-layer"
+        >
+          <View style={styles.arrowDuelReplyTitleRow}>
+            <Text style={styles.promptTitle} testID="arrow-duel-reply-title">
+              {copy.title}
+            </Text>
+            {phase === "reply" ? (
+              <View
+                accessibilityLabel={`${replySeconds} ${replySeconds === 1 ? "second" : "seconds"} remaining.`}
+                style={styles.arrowDuelReplyTimerGroup}
+                testID="arrow-duel-reply-timer-group"
+              >
+                <Text style={styles.arrowDuelReplyTimer} testID="arrow-duel-reply-timer">
+                  {formatCompactDuration(replySeconds)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          {copy.context ? (
+            <Text style={styles.promptText} testID="arrow-duel-reply-context">
+              {copy.context}
+            </Text>
+          ) : null}
+          {copy.hint ? (
+            <Text
+              style={styles.promptHint}
+              testID="arrow-duel-reply-hint"
             >
-              <Text style={styles.arrowDuelReplyTimer} testID="arrow-duel-reply-timer">
-                {formatCompactDuration(replySeconds)}
-              </Text>
-            </View>
+              {copy.hint}
+            </Text>
+          ) : null}
+          {phase === "reply" ? (
+            <Text
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              style={FABRIC_SAFE_HIDDEN_TEXT_STYLE}
+              testID="arrow-duel-reply-expected-move"
+            >
+              {expectedReply}
+            </Text>
           ) : null}
         </View>
-        {copy.context ? (
-          <Text style={styles.promptText} testID="arrow-duel-reply-context">
-            {copy.context}
-          </Text>
-        ) : null}
-        {copy.hint ? (
-          <Text
-            style={styles.promptHint}
-            testID="arrow-duel-reply-hint"
-          >
-            {copy.hint}
-          </Text>
-        ) : null}
-        {phase === "reply" ? (
-          <Text
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-            style={FABRIC_SAFE_HIDDEN_TEXT_STYLE}
-            testID="arrow-duel-reply-expected-move"
-          >
-            {expectedReply}
-          </Text>
-        ) : null}
       </View>
     </View>
   );
@@ -15599,7 +15721,14 @@ function diagnosticPvSan(fen: string, pv: string[]): string {
 }
 
 function shouldFlipBoard(currentPuzzle: CurrentPuzzleState): boolean {
-  return sideToMove(currentPuzzle.currentFen) === "b";
+  const perspectiveFen = currentPuzzle.kind === "arrow_duel"
+    ? currentPuzzle.puzzle.initialFen
+    : currentPuzzle.currentFen;
+  return sideToMove(perspectiveFen) === "b";
+}
+
+function oppositeMoveSide(side: MoveSide): MoveSide {
+  return side === "b" ? "w" : "b";
 }
 
 function sideToMove(fen: string): MoveSide {
@@ -17685,6 +17814,18 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     height: 72,
     width: "100%"
+  },
+  arrowDuelReplyPromptCopy: {
+    alignSelf: "stretch",
+    height: 52
+  },
+  arrowDuelReplyCopyLayer: {
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
   },
   arrowDuelReplyTitleRow: {
     alignItems: "flex-start",
