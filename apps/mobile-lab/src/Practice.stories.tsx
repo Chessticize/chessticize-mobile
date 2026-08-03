@@ -5,6 +5,7 @@ import {
   clickTestId,
   dragTestId,
   expectReorderAnimation,
+  expectRunCardPickedUp,
   expectRunCardInsets,
   expectTestIdHorizontalCentersAligned,
   expectTestIdText,
@@ -124,15 +125,22 @@ export const EditAndReorderRuns: Story = {
       canvasElement,
       "practice-run-endgame-sprint",
       "practice-run-arrow-duel",
-      async () => expectTestIdsInOrder(canvasElement, [
-        "practice-run-standard",
-        "practice-run-endgame-sprint",
-        "practice-run-arrow-duel",
-        "practice-run-tactics-focus"
-      ]).then(async () => {
+      async () => {
+        await expectRunCardPickedUp(canvasElement, "practice-run-endgame-sprint");
+        await expectTestIdText(
+          canvasElement,
+          "lab-run-reorder-feedback",
+          "LAB previewMedium haptic requested on pickup"
+        );
+        await expectTestIdsInOrder(canvasElement, [
+          "practice-run-standard",
+          "practice-run-endgame-sprint",
+          "practice-run-arrow-duel",
+          "practice-run-tactics-focus"
+        ]);
         await expectReorderAnimation(canvasElement);
         await expectUniformRunDropTarget(canvasElement, "practice-run-arrow-duel");
-      })
+      }
     );
     await expectTestIdsInOrder(canvasElement, [
       "practice-run-standard",
@@ -141,6 +149,27 @@ export const EditAndReorderRuns: Story = {
       "practice-run-tactics-focus"
     ]);
     expectTestIdAbsent(canvasElement, "practice-run-notice");
+  }
+};
+
+export const EditAndReorderRunsPickedUp: Story = {
+  name: "Edit and reorder runs · picked up",
+  args: {
+    scenarioId: "practice-home-edit",
+    runReorderPickedUpRunId: "endgame-sprint",
+    storyPresentation: {
+      storyId: "practice--edit-and-reorder-runs-picked-up",
+      title: "Edit and reorder runs · picked up"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-run-home-edit");
+    await expectRunCardPickedUp(canvasElement, "practice-run-endgame-sprint");
+    await expectTestIdText(
+      canvasElement,
+      "lab-run-reorder-feedback",
+      "LAB previewMedium haptic requested on pickup"
+    );
   }
 };
 

@@ -276,6 +276,10 @@ interface Props {
   puzzleSelectionSeed?: string;
   runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
+  runReorderDesignPreview?: {
+    pickedUpRunId: string;
+  };
+  runReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
   runEloEditingMovedToHome?: boolean;
   settingsCaptureBottomInset?: number;
   initialTab?: MobileBackPrimaryTab;
@@ -285,6 +289,10 @@ interface Props {
   systemBack?: MobileSystemBackSource;
   tacticalProfilePresentation?: TacticalProfilePresentation;
 }
+
+export type RunReorderPickupFeedback = {
+  haptic: "medium";
+};
 
 export type SprintRulesGuidePresentation = {
   durationLabel: string;
@@ -624,6 +632,8 @@ export function PracticePocScreen({
   puzzleSelectionSeed,
   runManagementEnabled = false,
   runManagementPresentation,
+  runReorderDesignPreview,
+  runReorderFeedbackPreview,
   runEloEditingMovedToHome = false,
   settingsCaptureBottomInset,
   initialTab = "practice",
@@ -4202,6 +4212,8 @@ export function PracticePocScreen({
                     onResumeSprint={resumeSprint}
                     onOpenReview={openReviewQueue}
                     onRunReorderDragActiveChange={setRunReorderDragActive}
+                    runReorderDesignPreview={runReorderDesignPreview}
+                    onRunReorderFeedbackPreview={runReorderFeedbackPreview}
                   />
                 ) : null}
 
@@ -4728,7 +4740,9 @@ function PracticeHome({
   onStartMode,
   onResumeSprint,
   onOpenReview,
-  onRunReorderDragActiveChange
+  onRunReorderDragActiveChange,
+  runReorderDesignPreview,
+  onRunReorderFeedbackPreview
 }: {
   adaptiveLayout: AdaptiveLayout;
   mode: SprintMode;
@@ -4749,6 +4763,8 @@ function PracticeHome({
   onResumeSprint: (sprint: SprintState) => void;
   onOpenReview: () => void;
   onRunReorderDragActiveChange: (active: boolean) => void;
+  runReorderDesignPreview?: Props["runReorderDesignPreview"];
+  onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
 }): React.JSX.Element {
   const selectedRun = runManagement?.runs.find((run) => run.id === runManagement.selectedRunId) ?? null;
   const progressMode = selectedRun?.mode ?? mode;
@@ -4785,6 +4801,8 @@ function PracticeHome({
               onDismissSprintRulesGuide={onDismissSprintRulesGuide}
               onOpenSprintRulesGuide={onOpenSprintRulesGuide}
               onRunReorderDragActiveChange={onRunReorderDragActiveChange}
+              runReorderDesignPreview={runReorderDesignPreview}
+              onRunReorderFeedbackPreview={onRunReorderFeedbackPreview}
             />
           ) : (
             <>
@@ -4877,7 +4895,9 @@ function PracticeRunHome({
   sprintRulesGuideVisible,
   onDismissSprintRulesGuide,
   onOpenSprintRulesGuide,
-  onRunReorderDragActiveChange
+  onRunReorderDragActiveChange,
+  runReorderDesignPreview,
+  onRunReorderFeedbackPreview
 }: {
   presentation: PracticeRunManagementPresentation;
   sprintRulesGuide?: SprintRulesGuidePresentation;
@@ -4885,6 +4905,8 @@ function PracticeRunHome({
   onDismissSprintRulesGuide: () => void;
   onOpenSprintRulesGuide: () => void;
   onRunReorderDragActiveChange: (active: boolean) => void;
+  runReorderDesignPreview?: Props["runReorderDesignPreview"];
+  onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
 }): React.JSX.Element {
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dropTargetRunId, setDropTargetRunId] = useState<string | null>(null);
@@ -4938,6 +4960,7 @@ function PracticeRunHome({
     setDraggedRunId(runId);
     setDropTargetRunId(null);
     onRunReorderDragActiveChange(true);
+    onRunReorderFeedbackPreview?.({ haptic: "medium" });
   };
 
   useEffect(() => () => onRunReorderDragActiveChange(false), [onRunReorderDragActiveChange]);
@@ -5004,11 +5027,14 @@ function PracticeRunHome({
       if (Math.abs(deltaY) < 0.5) {
         continue;
       }
+      const isPickedUp = runId === draggedRunIdRef.current;
+      const pickedUpOffset = isPickedUp ? -2 : 0;
+      const pickedUpScale = isPickedUp ? " scale(1.015)" : "";
       element.getAnimations?.().forEach((animation) => animation.cancel());
       element.dataset.reorderAnimation = "moving";
       const animation = element.animate([
-        { transform: `translate3d(0, ${deltaY}px, 0)` },
-        { transform: "translate3d(0, 0, 0)" }
+        { transform: `translate3d(0, ${deltaY + pickedUpOffset}px, 0)${pickedUpScale}` },
+        { transform: `translate3d(0, ${pickedUpOffset}px, 0)${pickedUpScale}` }
       ], {
         duration: 220,
         easing: "cubic-bezier(0.22, 1, 0.36, 1)"
@@ -5130,7 +5156,10 @@ function PracticeRunHome({
                 active={run.id === presentation.selectedRunId}
                 canMoveDown={index < presentation.runs.length - 1}
                 canMoveUp={index > 0}
-                dragging={run.id === draggedRunId}
+                dragging={run.id === (
+                  draggedRunId
+                  ?? (presentation.homeEditing ? runReorderDesignPreview?.pickedUpRunId : null)
+                )}
                 directRunEditing={presentation.directRunEditing === true}
                 dropTarget={run.id === dropTargetRunId && run.id !== draggedRunId}
                 editing={presentation.homeEditing}
@@ -6806,6 +6835,8 @@ function RunCardDropSurface({
       <div
         aria-grabbed={draggable ? dragging : undefined}
         aria-dropeffect={dropTarget ? "move" : undefined}
+        data-drag-state={dragging ? "picked-up" : undefined}
+        data-pickup-haptic={dragging ? "medium" : undefined}
         data-testid={testID}
         draggable={draggable}
         ref={(element) => onElementChange(runId, element as unknown as WebRunElement | null)}
@@ -6824,6 +6855,7 @@ function RunCardDropSurface({
           paddingRight: webStyle.paddingRight ?? paddingHorizontal,
           paddingTop: webStyle.paddingTop ?? paddingVertical,
           touchAction: draggable ? "none" : undefined,
+          transform: dragging ? "translate3d(0, -2px, 0) scale(1.015)" : undefined,
           transition: "border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease",
           userSelect: draggable ? "none" : undefined,
           willChange: draggable ? "transform" : undefined
@@ -6870,7 +6902,13 @@ function RunCardDropSurface({
       onTouchStart={armNativeDrag}
       style={[
         style,
-        draggable ? { transform: [{ translateY: nativeDragOffset }] } : null,
+        draggable ? {
+          transform: [
+            { translateY: nativeDragOffset },
+            { translateY: dragging ? -2 : 0 },
+            { scale: dragging ? 1.015 : 1 }
+          ]
+        } : null,
         dragging ? styles.runCardNativeDragging : null
       ]}
       testID={testID}

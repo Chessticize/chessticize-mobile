@@ -984,9 +984,11 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
-  it("locks the Edit Runs screen while a Run card drag is active", () => {
+  it("shows picked-up feedback and locks Edit Runs while a Run card drag is active", () => {
+    const runReorderFeedbackPreview = jest.fn();
     const renderer = renderScreen({
-      runManagementPresentation: runManagementPresentation({ homeEditing: true })
+      runManagementPresentation: runManagementPresentation({ homeEditing: true }),
+      runReorderFeedbackPreview
     });
     const mainScroll = findByTestId(renderer, "practice-main-scroll");
     const standardRun = renderer.root.findAllByProps({ testID: "practice-run-standard" })
@@ -1012,6 +1014,13 @@ describe("PracticePocScreen", () => {
       standardRun!.props.onPanResponderGrant();
     });
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+    expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(1);
+    expect(runReorderFeedbackPreview).toHaveBeenCalledWith({ haptic: "medium" });
+    const pickedUpRun = renderer.root.findAllByProps({ testID: "practice-run-standard" })
+      .find((node) => typeof node.props.onTouchStart === "function");
+    expect(pickedUpRun).toBeTruthy();
+    expect(flattenTestStyle(pickedUpRun!.props.style).transform)
+      .toEqual(expect.arrayContaining([{ translateY: -2 }, { scale: 1.015 }]));
 
     act(() => {
       standardRun!.props.onPanResponderRelease();
@@ -1025,6 +1034,24 @@ describe("PracticePocScreen", () => {
       standardRun!.props.onPanResponderTerminate();
     });
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the Storybook picked-up state visual-only", () => {
+    const runReorderFeedbackPreview = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ homeEditing: true }),
+      runReorderDesignPreview: { pickedUpRunId: "tactics-focus" },
+      runReorderFeedbackPreview
+    });
+    const pickedUpRun = renderer.root.findAllByProps({ testID: "practice-run-tactics-focus" })
+      .find((node) => typeof node.props.onTouchStart === "function");
+
+    expect(pickedUpRun).toBeTruthy();
+    expect(flattenTestStyle(pickedUpRun!.props.style).transform)
+      .toEqual(expect.arrayContaining([{ translateY: -2 }, { scale: 1.015 }]));
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    expect(runReorderFeedbackPreview).not.toHaveBeenCalled();
   });
 
   it("renders removal confirmation directly below the selected Run card", () => {
@@ -12415,7 +12442,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "runReorderDesignPreview" | "runReorderFeedbackPreview" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
     onRenderCommit?: () => void;
     platformCapabilities?: MobilePlatformCapabilities;
   };
@@ -12535,6 +12562,8 @@ function renderScreen({
   runEloEditingMovedToHome,
   runManagementEnabled,
   runManagementPresentation,
+  runReorderDesignPreview,
+  runReorderFeedbackPreview,
   sprintRulesDesignPreview,
   sprintStartDelayMs,
   standardTargetCorrect,
@@ -12560,6 +12589,8 @@ function renderScreen({
         runEloEditingMovedToHome={runEloEditingMovedToHome}
         runManagementEnabled={runManagementEnabled}
         runManagementPresentation={runManagementPresentation}
+        runReorderDesignPreview={runReorderDesignPreview}
+        runReorderFeedbackPreview={runReorderFeedbackPreview}
         sprintRulesDesignPreview={sprintRulesDesignPreview}
         sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}

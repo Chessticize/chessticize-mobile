@@ -49,12 +49,13 @@ test("every typed navigation coverage entry points to a registered scenario", ()
   }
 });
 
-test("New Scenario Markers derive tags for the Arrow Duel reply design", () => {
+test("New Scenario Markers derive catalog tags from issue ownership", () => {
   const scenarios = Object.values(scenarioRegistry);
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
   assert.deepEqual(
     newScenarios.map((scenario) => scenario.id),
     [
+      "practice-home-edit",
       "practice-custom-setup",
       "practice-run-arrow-duel-editor",
       "practice-arrow-duel-guide",
@@ -63,9 +64,12 @@ test("New Scenario Markers derive tags for the Arrow Duel reply design", () => {
       "practice-arrow-duel-mate-in-one"
     ]
   );
-  assert.ok(newScenarios.every(
-    (scenario) => scenario.issues.some((issue) => issue.issueNumber === 489)
-  ));
+  assert.ok(scenarioRegistry["practice-home-edit"].issues?.some(
+    (issue) => issue.issueNumber === 498
+  ) ?? false);
+  assert.ok(scenarioRegistry["practice-arrow-duel-prompt"].issues?.some(
+    (issue) => issue.issueNumber === 489
+  ) ?? false);
 
   for (const scenario of scenarios) {
     assert.deepEqual(

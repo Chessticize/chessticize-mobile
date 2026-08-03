@@ -108,11 +108,13 @@ export type LabStoryPresentation = {
 export function LabScenario({
   arrowDuelReplyAutoTimeoutMs,
   arrowDuelReplySeconds,
+  runReorderPickedUpRunId,
   scenarioId,
   storyPresentation
 }: {
   arrowDuelReplyAutoTimeoutMs?: number;
   arrowDuelReplySeconds?: number;
+  runReorderPickedUpRunId?: string;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
 }): React.JSX.Element {
@@ -123,6 +125,7 @@ export function LabScenario({
       key={scenarioId}
       arrowDuelReplyAutoTimeoutMs={arrowDuelReplyAutoTimeoutMs}
       arrowDuelReplySeconds={arrowDuelReplySeconds}
+      runReorderPickedUpRunId={runReorderPickedUpRunId}
       runtime={runtime}
       scenarioId={scenarioId}
       storyPresentation={storyPresentation}
@@ -133,12 +136,14 @@ export function LabScenario({
 function LabScenarioContent({
   arrowDuelReplyAutoTimeoutMs,
   arrowDuelReplySeconds,
+  runReorderPickedUpRunId,
   runtime,
   scenarioId,
   storyPresentation
 }: {
   arrowDuelReplyAutoTimeoutMs?: number;
   arrowDuelReplySeconds?: number;
+  runReorderPickedUpRunId?: string;
   runtime: ScenarioRuntime;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
@@ -155,6 +160,7 @@ function LabScenarioContent({
       : { screen: "home" as const, selectedTaskFamily: "line" as const }
   );
   const [startedFocusedRun, setStartedFocusedRun] = useState<SprintState | null>(null);
+  const [runReorderFeedbackPreview, setRunReorderFeedbackPreview] = useState<string | null>(null);
   const arrowDuelReplyFixture = useMemo(
     () => createArrowDuelReplyChallengeFixture(
       runtime.service,
@@ -247,7 +253,13 @@ function LabScenarioContent({
       };
 
   return (
-    <LabScenarioShell scenarioId={scenarioId} storyPresentation={storyPresentation}>
+    <LabScenarioShell
+      nativeFeedbackPreview={runReorderPickedUpRunId
+        ? "Medium haptic requested on pickup"
+        : runReorderFeedbackPreview}
+      scenarioId={scenarioId}
+      storyPresentation={storyPresentation}
+    >
       <PracticePocScreen
         key={startedFocusedRun === null
           ? `scenario-${scenarioId}`
@@ -260,6 +272,14 @@ function LabScenarioContent({
           ? historyProgressPresentationFor(scenarioId)
           : undefined}
         platformCapabilities={runtime.platformCapabilities}
+        runReorderDesignPreview={runReorderPickedUpRunId
+          ? { pickedUpRunId: runReorderPickedUpRunId }
+          : undefined}
+        runReorderFeedbackPreview={scenarioId === "practice-home-edit"
+          ? ({ haptic }) => setRunReorderFeedbackPreview(
+              `${haptic === "medium" ? "Medium" : haptic} haptic requested on pickup`
+            )
+          : undefined}
         themeCatalogPresentation={showsThemeCatalogPrototype
           ? SERVER_CURATED_THEME_PRESENTATION
           : undefined}
@@ -636,10 +656,12 @@ function sprintResultReplayDesignItems(): NonNullable<
 
 export function LabScenarioShell({
   children,
+  nativeFeedbackPreview,
   scenarioId,
   storyPresentation
 }: {
   children: React.ReactNode;
+  nativeFeedbackPreview?: string | null;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
 }): React.JSX.Element {
@@ -649,6 +671,16 @@ export function LabScenarioShell({
 
   return (
     <div className="lab-scenario-shell">
+      {nativeFeedbackPreview ? (
+        <div
+          className="lab-native-feedback-preview"
+          data-testid="lab-run-reorder-feedback"
+          role="status"
+        >
+          <strong>LAB preview</strong>
+          <span>{nativeFeedbackPreview}</span>
+        </div>
+      ) : null}
       <aside className="lab-toolbar" aria-label="Interaction Lab scenario controls">
         <details>
           <summary>

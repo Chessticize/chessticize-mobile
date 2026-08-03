@@ -28,6 +28,29 @@ html {
   display: flex;
 }
 
+.lab-native-feedback-preview {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid #60a5fa;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+  color: #f8fafc;
+  display: flex;
+  font-size: 12px;
+  gap: 7px;
+  left: 50%;
+  padding: 7px 11px;
+  pointer-events: none;
+  position: fixed;
+  top: 10px;
+  transform: translateX(-50%);
+  z-index: 100000;
+}
+
+.lab-native-feedback-preview strong {
+  color: #93c5fd;
+}
+
 .lab-toolbar {
   bottom: 10px;
   left: 10px;

@@ -39,6 +39,14 @@
       }
     ]
   },
+  "practice-home-edit": {
+    "issues": [
+      {
+        "issueNumber": 498,
+        "changeNote": "Preview medium haptic intent and whole-card lift when a Run is picked up for reordering."
+      }
+    ]
+  },
   "practice-run-arrow-duel-editor": {
     "issues": [
       {

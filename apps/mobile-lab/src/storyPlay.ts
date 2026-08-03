@@ -152,6 +152,32 @@ export async function expectReorderAnimation(canvasElement: HTMLElement): Promis
   });
 }
 
+export async function expectRunCardPickedUp(
+  canvasElement: HTMLElement,
+  testID: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const card = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    if (card.getAttribute("aria-grabbed") !== "true") {
+      throw new Error(`Expected ${testID} to expose its grabbed state`);
+    }
+    if (card.dataset.dragState !== "picked-up") {
+      throw new Error(`Expected ${testID} to expose its picked-up visual state`);
+    }
+    if (card.dataset.pickupHaptic !== "medium") {
+      throw new Error(`Expected ${testID} to request medium pickup haptics`);
+    }
+    if (!card.style.transform.includes("translate3d(0px, -2px, 0px)")
+      && !card.style.transform.includes("translate3d(0, -2px, 0)")) {
+      throw new Error(`Expected ${testID} to lift slightly when picked up`);
+    }
+    if (!card.style.transform.includes("scale(1.015)")) {
+      throw new Error(`Expected ${testID} to scale slightly when picked up`);
+    }
+  });
+}
+
 export async function expectRunCardInsets(
   canvasElement: HTMLElement,
   testID: string
