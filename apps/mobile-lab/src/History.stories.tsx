@@ -6,7 +6,8 @@ import {
   expectTestIdText,
   openHistory,
   waitForEnabledTestId,
-  waitForTestId
+  waitForTestId,
+  waitForText
 } from "./storyPlay.ts";
 
 const meta = {
@@ -146,7 +147,9 @@ export const ArrowDuelReplayFullLine: Story = {
     await waitForEnabledTestId(canvasElement, "lab-board-correct");
     expectTestIdAbsent(canvasElement, "review-arrow-duel-reply-timer");
     await clickTestId(canvasElement, "lab-board-correct");
-    await waitForTestId(canvasElement, "review-guided-move-overlay");
+    await waitForText(canvasElement, "Find the best move");
+    await waitForText(canvasElement, "For white.");
+    expectTestIdAbsent(canvasElement, "review-guided-move-overlay");
     expectTestIdAbsent(canvasElement, "practice-prompt-solved-overlay");
   }
 };

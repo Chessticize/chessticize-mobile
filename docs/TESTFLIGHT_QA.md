@@ -107,11 +107,12 @@ result. Unchecked items do not block App Store submission.
 - [ ] Start Arrow Duel.
 - [ ] Confirm exactly two arrows render with the shared arrow style.
 - [ ] Select the better move and confirm correct feedback.
-- [ ] With Opponent reply on, confirm the full-board `What if…` preparation is
-      shown for 1.5 seconds, the board does not flip, and the reply countdown
-      begins only when the opponent pieces can be moved.
-- [ ] Select the weaker move on another puzzle and confirm the guided mistake
-      line stays in review rather than jumping away.
+- [ ] With Opponent reply on, confirm the full-board `What if you made the
+      other move?` preparation is shown for 1.5 seconds, the board does not
+      flip, and the reply countdown begins only when the opponent pieces can be
+      moved.
+- [ ] Select the weaker move on another puzzle and confirm the attempt is marked
+      wrong before the Sprint advances without extra result copy.
 - [ ] Confirm the Analysis panel can be opened from Arrow Duel review.
 
 ### Post-Sprint Mistake Review
@@ -122,8 +123,8 @@ result. Unchecked items do not block App Store submission.
 - [ ] Navigate previous/next within the mistake set.
 - [ ] Reset the current puzzle to the puzzle initial position.
 - [ ] For an Arrow Duel Run with Opponent reply on, confirm Replay has no reply
-      countdown and does not show `Solved` until the reply and complete stored
-      puzzle line have been played.
+      countdown or guide arrows and does not show `Solved` until the reply and
+      complete stored puzzle line have been played.
 - [ ] Turn Opponent reply off and confirm Replay returns to the one-choice flow.
 - [ ] Tap an analysis candidate row and confirm it makes the candidate move.
 - [ ] Exit the post-sprint review and confirm the app returns to Practice ready

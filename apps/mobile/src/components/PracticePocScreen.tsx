@@ -41,6 +41,7 @@ import {
   buildPuzzleGuidedAnalysisLines,
   buildSprintConfig,
   collectHistoryRatingKeys,
+  continueArrowDuelReplyLine,
   currentExpectedMove,
   DEFAULT_OPPONENT_REPLY_SECONDS,
   defaultSprintConfig,
@@ -4043,6 +4044,7 @@ export function PracticePocScreen({
       {arrowDuelReplyChallengeVisible && displayedPuzzle?.kind === "arrow_duel" ? (
         <ArrowDuelReplyChallengePrompt
           currentPuzzle={displayedPuzzle}
+          frameHeight={adaptiveLayout.promptFrameHeight}
           kingPieceSize={kingGlyphSizeForBoard(boardSize)}
           phase={arrowDuelReplyChallengeDisplayPhase}
           promptSide={arrowDuelPromptSide}
@@ -4052,6 +4054,7 @@ export function PracticePocScreen({
       ) : (
         <PracticePrompt
           currentPuzzle={displayedPuzzle}
+          frameHeight={adaptiveLayout.promptFrameHeight}
           kingPieceSize={kingGlyphSizeForBoard(boardSize)}
           mode={mode}
         />
@@ -6343,6 +6346,7 @@ function SessionCoachmarkDemo({
           >
             <PracticePrompt
               currentPuzzle={currentPuzzle}
+              frameHeight={adaptiveLayout.promptFrameHeight}
               kingPieceSize={kingGlyphSizeForBoard(boardSize)}
               mode={mode}
             />
@@ -6592,6 +6596,7 @@ function SessionCoachmarkDemo({
               >
                 <PracticePrompt
                   currentPuzzle={currentPuzzle}
+                  frameHeight={adaptiveLayout.promptFrameHeight}
                   kingPieceSize={kingGlyphSizeForBoard(boardSize)}
                   mode={mode}
                 />
@@ -9500,13 +9505,13 @@ function ArrowDuelWhatIfOverlay({
   return (
     <View
       accessible
-      accessibilityLabel={`What if. ${detail}`}
+      accessibilityLabel={`What if you made the other move? ${detail}`}
       accessibilityLiveRegion="polite"
       accessibilityRole="alert"
       style={styles.arrowDuelWhatIfOverlay}
       testID={`${testIDPrefix}-what-if-overlay`}
     >
-      <Text style={styles.arrowDuelWhatIfTitle}>What if…</Text>
+      <Text style={styles.arrowDuelWhatIfTitle}>What if you made the other move?</Text>
       <Text
         style={styles.arrowDuelWhatIfDetail}
         testID={`${testIDPrefix}-what-if-detail`}
@@ -9519,6 +9524,7 @@ function ArrowDuelWhatIfOverlay({
 
 function ArrowDuelReplyChallengePrompt({
   currentPuzzle,
+  frameHeight,
   kingPieceSize,
   legacyPracticePromptTestIDs = false,
   phase,
@@ -9530,6 +9536,7 @@ function ArrowDuelReplyChallengePrompt({
   testIDPrefix = "arrow-duel"
 }: {
   currentPuzzle: ArrowDuelState;
+  frameHeight: number;
   kingPieceSize: number;
   legacyPracticePromptTestIDs?: boolean;
   phase: ArrowDuelReplyChallengePhase;
@@ -9562,6 +9569,7 @@ function ArrowDuelReplyChallengePrompt({
       accessibilityLabel={[copy.title, copy.context, copy.hint].filter(Boolean).join(". ")}
       style={[
         styles.promptPanel,
+        { height: frameHeight },
         styles.arrowDuelReplyPromptPanel,
         copy.tone === "reply" ? styles.arrowDuelReplyPromptActive : null
       ]}
@@ -9606,26 +9614,25 @@ function ArrowDuelReplyChallengePrompt({
               </View>
             ) : null}
           </View>
-          {copy.context ? (
-            <Text
-              style={styles.promptText}
-              testID={legacyPracticePromptTestIDs
-                ? "practice-prompt-context"
-                : `${testIDPrefix}-reply-context`}
-            >
-              {copy.context}
-            </Text>
-          ) : null}
-          {copy.hint ? (
-            <Text
-              style={styles.promptHint}
-              testID={legacyPracticePromptTestIDs
-                ? "practice-prompt-hint"
-                : `${testIDPrefix}-reply-hint`}
-            >
-              {copy.hint}
-            </Text>
-          ) : null}
+          <Text
+            style={styles.promptText}
+            testID={legacyPracticePromptTestIDs
+              ? "practice-prompt-context"
+              : `${testIDPrefix}-reply-context`}
+          >
+            {copy.context}
+          </Text>
+          <Text
+            accessible={Boolean(copy.hint)}
+            accessibilityElementsHidden={!copy.hint}
+            importantForAccessibility={copy.hint ? "auto" : "no-hide-descendants"}
+            style={[styles.promptHint, copy.hint ? null : styles.promptSolvedLayoutCopy]}
+            testID={legacyPracticePromptTestIDs
+              ? "practice-prompt-hint"
+              : `${testIDPrefix}-reply-hint`}
+          >
+            {copy.hint ?? "\u00A0"}
+          </Text>
           {phase === "reply" ? (
             <Text
               accessibilityElementsHidden
@@ -9644,6 +9651,7 @@ function ArrowDuelReplyChallengePrompt({
 
 function PracticePrompt({
   currentPuzzle,
+  frameHeight,
   kingPieceSize,
   mode,
   promptSide,
@@ -9654,6 +9662,7 @@ function PracticePrompt({
   reserveDefaultLayout = false
 }: {
   currentPuzzle: CurrentPuzzleState | undefined;
+  frameHeight: number;
   kingPieceSize: number;
   mode: SprintMode;
   promptSide?: MoveSide;
@@ -9688,9 +9697,11 @@ function PracticePrompt({
   const layoutPromptContext = reserveDefaultLayout ? defaultPromptContext : promptContext;
   const layoutPromptHint = reserveDefaultLayout ? defaultPromptHint : promptHintCopy;
   const layoutCopyHidden = solved || reserveDefaultLayout;
+  const layoutContextHidden = layoutCopyHidden || !layoutPromptContext;
+  const layoutHintHidden = layoutCopyHidden || !layoutPromptHint;
 
   return (
-    <View style={styles.promptPanel} testID="practice-prompt">
+    <View style={[styles.promptPanel, { height: frameHeight }]} testID="practice-prompt">
       <View
         style={[styles.promptIcon, { height: kingPieceSize, width: kingPieceSize }]}
         testID="practice-prompt-icon"
@@ -9713,29 +9724,25 @@ function PracticePrompt({
             {layoutPromptTitle}
           </Text>
         </View>
-        {layoutPromptContext ? (
-          <Text
-            accessible={!layoutCopyHidden}
-            accessibilityElementsHidden={layoutCopyHidden}
-            importantForAccessibility={layoutCopyHidden ? "no-hide-descendants" : "auto"}
-            style={[styles.promptText, layoutCopyHidden ? styles.promptSolvedLayoutCopy : null]}
-            testID="practice-prompt-context"
-          >
-            {layoutPromptContext}
-          </Text>
-        ) : null}
-        {layoutPromptHint ? (
-          <Text
-            accessible={!layoutCopyHidden}
-            accessibilityElementsHidden={layoutCopyHidden}
-            importantForAccessibility={layoutCopyHidden ? "no-hide-descendants" : "auto"}
-            numberOfLines={reserveDefaultLayout ? undefined : promptHintNumberOfLines}
-            style={[styles.promptHint, layoutCopyHidden ? styles.promptSolvedLayoutCopy : null]}
-            testID="practice-prompt-hint"
-          >
-            {layoutPromptHint}
-          </Text>
-        ) : null}
+        <Text
+          accessible={!layoutContextHidden}
+          accessibilityElementsHidden={layoutContextHidden}
+          importantForAccessibility={layoutContextHidden ? "no-hide-descendants" : "auto"}
+          style={[styles.promptText, layoutContextHidden ? styles.promptSolvedLayoutCopy : null]}
+          testID="practice-prompt-context"
+        >
+          {layoutPromptContext ?? "\u00A0"}
+        </Text>
+        <Text
+          accessible={!layoutHintHidden}
+          accessibilityElementsHidden={layoutHintHidden}
+          importantForAccessibility={layoutHintHidden ? "no-hide-descendants" : "auto"}
+          numberOfLines={reserveDefaultLayout ? undefined : promptHintNumberOfLines}
+          style={[styles.promptHint, layoutHintHidden ? styles.promptSolvedLayoutCopy : null]}
+          testID="practice-prompt-hint"
+        >
+          {layoutPromptHint ?? "\u00A0"}
+        </Text>
         {reserveDefaultLayout && !solved ? (
           <View
             pointerEvents="none"
@@ -12491,11 +12498,24 @@ function ReviewSession({
   const displayFen = analysisEnabled
     ? (analysisFen ?? currentFen)
     : (reviewEntryPreview.displayFen ?? currentFen);
-  const reviewPromptSide = sideToMove(reviewStartingFen(currentEntry));
-  const baseBoardFlipped = reviewPromptSide === "b";
+  const reviewPerspectiveSide = sideToMove(reviewStartingFen(currentEntry));
+  const reviewPromptSide = currentEntry.mode === "arrow_duel"
+    && reviewReplyChallengeEnabled
+    && currentPuzzle.kind === "arrow_duel"
+    && reviewReplyPromptPhase === "reply"
+    ? oppositeMoveSide(sideToMove(currentEntry.puzzle.initialFen))
+    : currentEntry.mode === "arrow_duel" && isReplay && reviewState.kind === "line"
+      ? feedback?.puzzleSolved
+        ? oppositeMoveSide(sideToMove(currentFen))
+        : sideToMove(currentFen)
+      : reviewPerspectiveSide;
+  const baseBoardFlipped = reviewPerspectiveSide === "b";
   const boardFlipped = manualBoardFlip ? !baseBoardFlipped : baseBoardFlipped;
   const feedbackMove = feedback?.submittedMove && feedback.submittedMove !== "__illegal__" ? arrowFromTo(feedback.submittedMove) : null;
-  const shouldShowGuidedCurrentEval = !analysisEnabled && currentEntry.mode === "arrow_duel" && reviewState.kind === "line";
+  const shouldShowGuidedCurrentEval = !isReplay
+    && !analysisEnabled
+    && currentEntry.mode === "arrow_duel"
+    && reviewState.kind === "line";
   const shouldRunGuidedCurrentEval = shouldShowGuidedCurrentEval && !isTerminalPosition(currentFen);
   const stockfishTargetFen = analysisEnabled
     ? displayFen
@@ -12527,10 +12547,15 @@ function ReviewSession({
       ? reviewState.duel.wrongMove
       : undefined;
   const guidedReviewMove =
-    !analysisEnabled && !feedback && currentEntry.mode === "arrow_duel" && reviewState.kind === "line"
+    !isReplay
+      && !analysisEnabled
+      && !feedback
+      && currentEntry.mode === "arrow_duel"
+      && reviewState.kind === "line"
       ? currentExpectedMove(reviewState.line)
       : undefined;
-  const isArrowDuelFollowUpReview = currentEntry.mode === "arrow_duel"
+  const isArrowDuelFollowUpReview = !isReplay
+    && currentEntry.mode === "arrow_duel"
     && (
       reviewState.kind === "line"
       || (
@@ -12655,18 +12680,32 @@ function ReviewSession({
     }
     setReviewTimedOut(true);
     setWrongSeen(true);
+    setBoardLocked(true);
     recordCurrentReviewResult("wrong", {
       submittedMove: "__timeout__",
       expectedMove: expectedReviewMove(currentPuzzle)
     });
-    if (!hasNextScheduledReview) {
-      finishReviewSession();
-      return;
-    }
-    goToNextDueReview();
     // The timer state is the trigger; the render-local recorder must not restart the effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentEntry.source, currentPuzzle, reviewRemainingSeconds, reviewResultRecorded, reviewTimedOut]);
+
+  useEffect(() => {
+    if (!reviewTimedOut) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (!hasNextScheduledReview) {
+        finishReviewSession();
+        return;
+      }
+      goToNextDueReview();
+    }, FEEDBACK_SNAPSHOT_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+    // Timeout feedback owns one stable snapshot before the Review advances.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryIndex, hasNextScheduledReview, reviewTimedOut]);
 
   function resetCurrentReview(nextIndex = entryIndex): void {
     const nextState = startReviewPuzzle(entries[nextIndex]);
@@ -12945,6 +12984,14 @@ function ReviewSession({
         goToNextDueReview();
         return;
       }
+      if (isReplay) {
+        const replySideLine = beginLinePuzzle(currentEntry.puzzle);
+        setReviewState({ kind: "line", line: replySideLine });
+        boardRef.current?.resetBoard(replySideLine.currentFen);
+        setFeedback(null);
+        setBoardLocked(false);
+        return;
+      }
       const replyMoves = result.feedback.autoPlayedMoves.slice(1);
       const finalFen = fenAfterMoves(submittedFen, result.feedback.autoPlayedMoves) ?? submittedFen;
       if (replyMoves.length > 0) {
@@ -13045,25 +13092,44 @@ function ReviewSession({
         return;
       }
 
-      const replyEndsPuzzle = isTerminalPosition(result.state.currentFen)
-        || currentEntry.puzzle.solutionMoves.length <= 2;
-      const continuation = lineStateAfterMoves(
-        currentEntry.puzzle,
-        currentEntry.puzzle.solutionMoves.slice(0, 2)
-      );
+      const continuation = continueArrowDuelReplyLine(currentEntry.puzzle, move);
+      const replyEndsBeforeAutoPlay = continuation.feedback.puzzleSolved
+        && continuation.feedback.autoPlayedMoves.length === 0;
       setFeedback({
         ...result.feedback,
-        puzzleSolved: replyEndsPuzzle
+        puzzleSolved: replyEndsBeforeAutoPlay
       });
       await sleep(FEEDBACK_SNAPSHOT_MS);
-      if (replyEndsPuzzle) {
+      if (replyEndsBeforeAutoPlay) {
         advanceReview("correct", {
           submittedMove: result.feedback.submittedMove,
           expectedMove: result.feedback.expectedMove
         });
         return;
       }
-      setReviewState({ kind: "line", line: continuation });
+
+      if (continuation.feedback.autoPlayedMoves.length > 0) {
+        setFeedback(null);
+        await animateReviewBoardMoves(
+          continuation.feedback.autoPlayedMoves,
+          continuation.state.currentFen
+        );
+      }
+      setReviewState({ kind: "line", line: continuation.state });
+      if (continuation.feedback.puzzleSolved) {
+        setFeedback({
+          ...result.feedback,
+          autoPlayedMoves: [],
+          currentFen: continuation.state.currentFen,
+          puzzleSolved: true
+        });
+        await sleep(FEEDBACK_SNAPSHOT_MS);
+        advanceReview("correct", {
+          submittedMove: result.feedback.submittedMove,
+          expectedMove: result.feedback.expectedMove
+        });
+        return;
+      }
       setFeedback(null);
       setBoardLocked(false);
     } catch {
@@ -13273,6 +13339,7 @@ function ReviewSession({
         && feedback?.result !== "wrong" ? (
         <ArrowDuelReplyChallengePrompt
           currentPuzzle={currentPuzzle}
+          frameHeight={adaptiveLayout.promptFrameHeight}
           kingPieceSize={kingGlyphSizeForBoard(boardSize)}
           legacyPracticePromptTestIDs
           phase={reviewReplyPromptPhase}
@@ -13286,6 +13353,7 @@ function ReviewSession({
       ) : (
         <PracticePrompt
           currentPuzzle={currentPuzzle}
+          frameHeight={adaptiveLayout.promptFrameHeight}
           kingPieceSize={kingGlyphSizeForBoard(boardSize)}
           mode={currentEntry.mode}
           promptSide={reviewPromptSide}
@@ -13659,6 +13727,18 @@ function ReviewSession({
                 detail={reviewWhatIfDetail}
                 testIDPrefix="review-arrow-duel"
               />
+            ) : null}
+            {reviewTimedOut ? (
+              <View
+                accessible
+                accessibilityLabel="Timed out"
+                accessibilityLiveRegion="assertive"
+                accessibilityRole="alert"
+                style={styles.puzzleTimeoutOverlay}
+                testID="review-puzzle-timeout-overlay"
+              >
+                <Text style={styles.puzzleTimeoutOverlayTitle}>Timed out</Text>
+              </View>
             ) : null}
             {reviewState.kind === "arrow_duel"
               && reviewState.duel.phase === "choice"
@@ -18160,7 +18240,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    minHeight: 72,
+    overflow: "hidden",
     paddingHorizontal: 12,
     paddingVertical: 9
   },
@@ -18178,12 +18258,10 @@ const styles = StyleSheet.create({
   },
   arrowDuelReplyPromptPanel: {
     alignSelf: "center",
-    height: 72,
     width: "100%"
   },
   arrowDuelReplyPromptCopy: {
-    alignSelf: "stretch",
-    height: 52
+    alignSelf: "stretch"
   },
   arrowDuelReplyCopyLayer: {
     bottom: 0,

@@ -7,6 +7,7 @@ import {
   applyMovesToFen,
   beginArrowDuelPuzzle,
   beginLinePuzzle,
+  continueArrowDuelReplyLine,
   currentExpectedMove,
   submitArrowDuelChoice,
   submitArrowDuelFollowUpMove,
@@ -168,6 +169,30 @@ test("Arrow Duel accepts the stored reply and rejects another legal move", () =>
   assert.equal(correct.feedback.result, "correct");
   assert.equal(correct.feedback.puzzleSolved, true);
   assert.equal(correct.state.solved, true);
+});
+
+test("Arrow Duel Replay keeps the player on the reply side through the full line", () => {
+  const puzzle = samplePuzzle("00008");
+  let continuation = continueArrowDuelReplyLine(puzzle, puzzle.solutionMoves[1]!);
+
+  assert.deepEqual(continuation.feedback.autoPlayedMoves, [puzzle.solutionMoves[2]]);
+  assert.equal(continuation.state.cursor, 3);
+  assert.equal(currentExpectedMove(continuation.state), puzzle.solutionMoves[3]);
+
+  continuation = submitArrowDuelFollowUpMove(
+    continuation.state,
+    puzzle.solutionMoves[3]!
+  );
+  assert.deepEqual(continuation.feedback.autoPlayedMoves, [puzzle.solutionMoves[4]]);
+  assert.equal(continuation.state.cursor, 5);
+  assert.equal(currentExpectedMove(continuation.state), puzzle.solutionMoves[5]);
+
+  continuation = submitArrowDuelFollowUpMove(
+    continuation.state,
+    puzzle.solutionMoves[5]!
+  );
+  assert.equal(continuation.feedback.puzzleSolved, true);
+  assert.equal(continuation.state.solved, true);
 });
 
 test("Arrow Duel accepts any legal immediate mate as the reply", () => {

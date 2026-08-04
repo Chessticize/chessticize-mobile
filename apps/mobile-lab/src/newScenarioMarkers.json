@@ -59,7 +59,7 @@
     "issues": [
       {
         "issueNumber": 489,
-        "changeNote": "Keep Replay untimed and require the complete stored line before Solved."
+        "changeNote": "Keep Replay untimed and unassisted from the reply side until the complete stored line is solved."
       }
     ]
   }

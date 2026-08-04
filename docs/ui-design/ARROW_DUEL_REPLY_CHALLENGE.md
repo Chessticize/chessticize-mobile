@@ -46,8 +46,9 @@ With Opponent reply on:
 4. Keep the board in the original solver's perspective for the whole puzzle.
    After the green confirmation, animate the correct candidate back to its
    starting square with a slower, silent undo. During that preparation beat,
-   cover the board with a `What if…` overlay and `Find the opponent’s reply in X
-   seconds.`, where X is the Run's configured reply time. Keep the overlay up
+   cover the board with a `What if you made the other move?` overlay and `Find
+   the opponent’s reply in X seconds.`, where X is the Run's configured reply
+   time. Keep the overlay up
    for 1.5 seconds while the fixed prompt surface switches to the `If...` reply copy, then
    animate the tempting candidate. The player now moves for the opponent without
    the board flipping.
@@ -101,15 +102,21 @@ The Run setting governs every scored or reconstructed Arrow Duel attempt:
   one-choice behavior.
 - With it on, scheduled Review requires both the candidate and reply. The reply
   uses the same configured duration as the Run, and its countdown starts only
-  after the 1.5-second `What if…` handoff has completed and board input is
-  available. A wrong candidate, wrong reply, or reply timeout records one
+  after the 1.5-second `What if you made the other move?` handoff has completed
+  and board input is available. A wrong candidate, wrong reply, or reply timeout records one
   failed Review attempt; both correct answers record one successful Review
-  attempt.
+  attempt. A timeout first shows the ordinary brief full-board `Timed out`
+  handoff, then advances.
 - Replay uses the same candidate and reply judgment but has no countdown. After
   a correct reply, Replay continues through the stored puzzle line: the player
-  makes each remaining expected move and the opponent replies automatically.
-  Replay shows `Solved` only after that complete line has been played, or when
-  an accepted immediate mate ends the position.
+  remains the reply-side player and makes each remaining move for that side
+  while the opponent replies automatically. Replay provides no guide arrow or
+  live guided evaluation; Analysis remains available only when the player asks
+  for it. Replay shows `Solved` only after that complete line has been played,
+  or when an accepted immediate mate ends the position.
+- If the candidate itself is wrong in Replay, keep the red feedback snapshot,
+  then leave the tempting move on the board and let the player solve from the
+  reply side. Do not auto-play or reveal that reply.
 - A Replay reconstructed from a persisted Sprint uses that Sprint's saved Run
   setting. A due Review uses the current setting for its Run. Neither path
   changes the Run's Rating identity, and Replay never writes History or changes
@@ -139,7 +146,8 @@ The issue #489 design increment updates the existing product clones and keeps
 their stable Storybook URLs. It covers:
 
 - candidate choice and the staged green-confirmation, slow silent undo,
-  full-board `What if…` overlay with the configured reply time, `If...` prompt,
+  full-board `What if you made the other move?` overlay with the configured
+  reply time, `If...` prompt,
   and tempting-move handoff after a 1.5-second preparation beat;
 - a board perspective locked to the original solver throughout the candidate
   and opponent-reply stages;
@@ -149,8 +157,9 @@ their stable Storybook URLs. It covers:
   wrong replies;
 - the brief ordinary timeout overlay and automatic advance;
 - Review enrollment for both failure stages without redundant result copy;
-- the same configured reply countdown in scheduled Review and the untimed,
-  full-line completion rule in Replay;
+- the same configured reply countdown and visible `Timed out` handoff in
+  scheduled Review, plus the untimed, unassisted reply-side full-line
+  completion rule in Replay;
 - the default-on Create Run and Edit Run control and its off state; and
 - first-use Arrow Duel guidance for the two-stage rule.
 
@@ -158,3 +167,8 @@ These scenarios remain living UI documentation for the production behavior.
 Their deterministic preview adapter is isolated from the production state
 machine so Storybook timing can stay stable while the shipped flow exercises
 the Core and storage boundaries.
+
+All choice, reply, Review, Replay, guidance, and solved prompts follow the
+shared Prompt frame contract in `MOBILE_UI_DESIGN.md`. Arrow Duel may change
+copy or tone inside that frame, but it must not declare a mode-specific height
+or remove one of the reserved title, context, and hint layout slots.
