@@ -223,12 +223,15 @@ Representative component coverage includes:
 
 - Start, pause, resume, timeout, abandon confirmation, and result summaries.
 - Standard and Arrow Duel board callback handling, including ignored illegal or
-  stale callbacks, the tempting-move handoff, opponent-reply feedback, and
-  automatic advance.
+  stale callbacks, the fixed 1.5-second tempting-move handoff, opponent-reply
+  feedback, and automatic advance.
 - Custom setup variants, multiple saved configurations, theme selection, and
   the selected rating bucket/ELO.
-- Review queue states, scheduled review completion, review analysis, and
+- Review queue states, scheduled review completion, the Run-configured Arrow
+  Duel reply countdown beginning only after input unlock, review analysis, and
   notification routing.
+- Untimed Arrow Duel Replay requiring the reply and every remaining stored-line
+  move before `Solved`, while the setting-off path retains one-choice behavior.
 - History filters, paging, chart interaction, row-to-review navigation, and
   return navigation.
 - Settings reachability, ELO editing, iCloud on/off/manual sync wiring, and

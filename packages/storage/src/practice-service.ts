@@ -576,6 +576,29 @@ export class PracticeService {
     return this.store.listPracticeRuns().map(clonePracticeRun);
   }
 
+  opponentReplyForReview(input: {
+    mode: SprintMode;
+    ratingKey: string;
+    attempt?: Pick<AttemptEvent, "source" | "sessionId">;
+  }): OpponentReplyConfig | undefined {
+    if (input.mode !== "arrow_duel") {
+      return undefined;
+    }
+    if (input.attempt?.source === "sprint") {
+      const originalSession = this.store.getSprintSessions([input.attempt.sessionId])[0];
+      if (originalSession?.config?.mode === "arrow_duel") {
+        return resolveOpponentReplyConfig(
+          "arrow_duel",
+          originalSession.config.opponentReply
+        );
+      }
+    }
+    const run = this.store.listPracticeRuns().find(
+      (candidate) => candidate.ratingKey === input.ratingKey
+    );
+    return resolveOpponentReplyConfig("arrow_duel", run?.opponentReply);
+  }
+
   createPracticeRun(
     command: CreatePracticeRunCommand,
     now = new Date().toISOString()

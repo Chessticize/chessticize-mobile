@@ -5,7 +5,9 @@ import {
   expectTestIdAbsent,
   expectTestIdText,
   openHistory,
-  waitForTestId
+  waitForEnabledTestId,
+  waitForTestId,
+  waitForText
 } from "./storyPlay.ts";
 
 const meta = {
@@ -130,6 +132,66 @@ export const AttemptDetail: Story = {
     await expectTestIdText(canvasElement, "history-attempt-clear-unclear", "Mark clear");
     await clickTestId(canvasElement, "review-analysis-button");
     await waitForTestId(canvasElement, "review-theme-rail");
+  }
+};
+
+export const ArrowDuelReplayFullLine: Story = {
+  name: "Arrow Duel Replay · full line",
+  args: { scenarioId: "history-arrow-duel-replay" },
+  play: async ({ canvasElement }) => {
+    await openHistory(canvasElement);
+    await clickTestId(canvasElement, "history-attention-all");
+    await clickTestId(canvasElement, "history-attempt-history-arrow-duel-replay");
+    await waitForEnabledTestId(canvasElement, "lab-board-correct");
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForEnabledTestId(canvasElement, "lab-board-correct");
+    expectTestIdAbsent(canvasElement, "review-arrow-duel-reply-timer");
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForText(canvasElement, "Find the best move");
+    await waitForText(canvasElement, "For white.");
+    expectTestIdAbsent(canvasElement, "review-guided-move-overlay");
+    expectTestIdAbsent(canvasElement, "practice-prompt-solved-overlay");
+  }
+};
+
+export const ArrowDuelReplayPunishmentLine: Story = {
+  name: "Arrow Duel Replay · punishment line",
+  args: {
+    scenarioId: "history-arrow-duel-replay",
+    storyPresentation: {
+      storyId: "history--arrow-duel-replay-punishment-line",
+      title: "Arrow Duel Replay · punishment line"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await openHistory(canvasElement);
+    await clickTestId(canvasElement, "history-attention-all");
+    await clickTestId(canvasElement, "history-attempt-history-arrow-duel-replay");
+    await waitForEnabledTestId(canvasElement, "lab-board-wrong");
+    await clickTestId(canvasElement, "lab-board-wrong");
+    await waitForTestId(canvasElement, "review-guided-move-overlay");
+    await waitForText(canvasElement, "Follow the blue line to see why this move fails.");
+  }
+};
+
+export const ArrowDuelReplaySolved: Story = {
+  name: "Arrow Duel Replay · solved",
+  args: {
+    scenarioId: "history-arrow-duel-replay",
+    storyPresentation: {
+      storyId: "history--arrow-duel-replay-solved",
+      title: "Arrow Duel Replay · solved"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await openHistory(canvasElement);
+    await clickTestId(canvasElement, "history-attention-all");
+    await clickTestId(canvasElement, "history-attempt-history-arrow-duel-replay");
+    for (let moveIndex = 0; moveIndex < 4; moveIndex += 1) {
+      await waitForEnabledTestId(canvasElement, "lab-board-correct");
+      await clickTestId(canvasElement, "lab-board-correct");
+    }
+    await waitForText(canvasElement, "Solved");
   }
 };
 

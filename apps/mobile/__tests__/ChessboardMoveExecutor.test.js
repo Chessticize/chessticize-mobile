@@ -15,9 +15,20 @@
 // These tests fail against the pre-#157 executor and pass after it.
 
 jest.mock("react-native-reanimated", () => ({
-  // The executor only calls withSpring at move time; tests decide when (and
-  // whether) each spring settles via the fake shared values below.
-  withSpring: (target, _config, callback) => ({ __spring: true, target, callback })
+  // Tests decide when (and whether) each animation settles via the fake
+  // shared values below.
+  withSpring: (target, config, callback) => ({
+    __animation: "spring",
+    target,
+    config,
+    callback
+  }),
+  withTiming: (target, config, callback) => ({
+    __animation: "timing",
+    target,
+    config,
+    callback
+  })
 }));
 
 jest.mock("react-native-worklets", () => ({
@@ -41,9 +52,14 @@ function fakeSharedValue(initial) {
     pending: null,
     get: () => sv.current,
     set: (next) => {
-      if (next && typeof next === "object" && next.__spring) {
+      if (next && typeof next === "object" && next.__animation) {
         const cancelled = sv.pending;
-        sv.pending = { target: next.target, callback: next.callback };
+        sv.pending = {
+          animation: next.__animation,
+          target: next.target,
+          config: next.config,
+          callback: next.callback
+        };
         if (cancelled && cancelled.callback) {
           cancelled.callback(false);
         }
@@ -253,5 +269,32 @@ describe("react-native-chessboard move executor behavior", () => {
     expect(boardState.squares.f5.piece.get()).toBeNull();
     expect(boardState.squares.e5.piece.get()).toBeNull();
     expectSlotsMatchChess(chess, boardState);
+  });
+
+  it("uses a caller-supplied duration for a deliberately paced reset slide", () => {
+    const { boardState, executor } = createExecutor();
+    const targetFen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+
+    executor.resetBoard(targetFen, {
+      slide: { durationMs: 500, from: "e2", to: "e4" }
+    });
+
+    expect(boardState.squares.e4.translateY.pending).toEqual(expect.objectContaining({
+      animation: "timing",
+      config: { duration: 500 }
+    }));
+  });
+
+  it("retains the board spring when a reset slide has no custom duration", () => {
+    const { boardState, executor } = createExecutor();
+    const targetFen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+
+    executor.resetBoard(targetFen, {
+      slide: { from: "e2", to: "e4" }
+    });
+
+    expect(boardState.squares.e4.translateY.pending).toEqual(expect.objectContaining({
+      animation: "spring"
+    }));
   });
 });

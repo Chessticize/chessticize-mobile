@@ -229,6 +229,13 @@ export function submitArrowDuelReply(state: ArrowDuelState, move: string): {
   };
 }
 
+export function continueArrowDuelReplyLine(
+  puzzle: Puzzle,
+  replyMove: string
+): ReturnType<typeof submitLineMove> {
+  return submitLineMove(beginLinePuzzle(puzzle), replyMove);
+}
+
 export function submitArrowDuelFollowUpMove(state: PuzzleLineState, move: string): {
   state: PuzzleLineState;
   feedback: PuzzleFeedback;

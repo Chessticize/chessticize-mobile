@@ -61,7 +61,9 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       "practice-arrow-duel-guide",
       "practice-arrow-duel-guide-only",
       "practice-arrow-duel-prompt",
-      "practice-arrow-duel-mate-in-one"
+      "practice-arrow-duel-mate-in-one",
+      "review-arrow-duel-reply",
+      "history-arrow-duel-replay"
     ]
   );
   assert.ok(scenarioRegistry["practice-home-edit"].issues?.some(

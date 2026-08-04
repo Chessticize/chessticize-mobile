@@ -5,6 +5,44 @@ import {
 } from "../src/components/adaptivePracticeLayout";
 
 describe("buildPracticeAdaptiveLayout", () => {
+  it.each([
+    {
+      expectedHeight: 96,
+      fontScale: 1,
+      height: 956,
+      label: "ordinary portrait slot",
+      width: 440
+    },
+    {
+      expectedHeight: 112,
+      fontScale: 1,
+      height: 700,
+      label: "narrow prompt slot",
+      width: 280
+    },
+    {
+      expectedHeight: 144,
+      fontScale: 2,
+      height: 1376,
+      label: "accessibility text scale",
+      width: 1032
+    }
+  ])("uses one adaptive prompt-frame contract for $label", ({
+    expectedHeight,
+    fontScale,
+    height,
+    width
+  }) => {
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale,
+      height,
+      insets: { top: 0, right: 0, bottom: 0, left: 0 },
+      width
+    });
+
+    expect(layout.promptFrameHeight).toBe(expectedHeight);
+  });
+
   it("reserves the locked-session controls on a short compact portrait viewport", () => {
     const layout = buildPracticeAdaptiveLayout({
       fontScale: 1,
