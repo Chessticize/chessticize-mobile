@@ -14,6 +14,7 @@ import {
   expectTestIdAbsent,
   expectTestIdsInOrder,
   expectRunInsertionTarget,
+  expectRunPreviewShift,
   openPracticeSession,
   replaceTextTestId,
   waitForEnabledTestId,
@@ -125,16 +126,17 @@ export const EditAndReorderRuns: Story = {
     await expectRunCardInsets(canvasElement, "practice-run-standard");
     await dragTestId(
       canvasElement,
-      "practice-run-endgame-sprint",
       "practice-run-arrow-duel",
+      "practice-run-endgame-sprint",
       {
         pointerType: "touch",
+        targetVerticalFraction: 0.1,
         onPickup: async () => {
-          await expectRunCardPickedUp(canvasElement, "practice-run-endgame-sprint");
-          await expectPointerDrivenRunDrag(canvasElement, "practice-run-endgame-sprint");
+          await expectRunCardPickedUp(canvasElement, "practice-run-arrow-duel");
+          await expectPointerDrivenRunDrag(canvasElement, "practice-run-arrow-duel");
           await expectRunTouchSelectionSuppressed(
             canvasElement,
-            "practice-run-endgame-sprint"
+            "practice-run-arrow-duel"
           );
           await expectTestIdText(
             canvasElement,
@@ -143,8 +145,8 @@ export const EditAndReorderRuns: Story = {
           );
         },
         onPreview: async () => {
-          await expectRunCardPickedUp(canvasElement, "practice-run-endgame-sprint");
-          await expectPointerDrivenRunDrag(canvasElement, "practice-run-endgame-sprint");
+          await expectRunCardPickedUp(canvasElement, "practice-run-arrow-duel");
+          await expectPointerDrivenRunDrag(canvasElement, "practice-run-arrow-duel");
           await expectTestIdText(
             canvasElement,
             "lab-run-reorder-feedback",
@@ -156,16 +158,18 @@ export const EditAndReorderRuns: Story = {
             "practice-run-tactics-focus",
             "practice-run-endgame-sprint"
           ]);
-          await expectRunInsertionTarget(canvasElement, "practice-run-arrow-duel", "before");
+          await expectRunInsertionTarget(canvasElement, "practice-run-endgame-sprint", "after");
+          await expectRunPreviewShift(canvasElement, "practice-run-tactics-focus", "up");
+          await expectRunPreviewShift(canvasElement, "practice-run-endgame-sprint", "up");
         }
       }
     );
     await expectReorderAnimation(canvasElement);
     await expectTestIdsInOrder(canvasElement, [
       "practice-run-standard",
+      "practice-run-tactics-focus",
       "practice-run-endgame-sprint",
-      "practice-run-arrow-duel",
-      "practice-run-tactics-focus"
+      "practice-run-arrow-duel"
     ]);
     expectTestIdAbsent(canvasElement, "practice-run-notice");
   }

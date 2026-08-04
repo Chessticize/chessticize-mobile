@@ -1098,7 +1098,7 @@ describe("PracticePocScreen", () => {
       expect(pointerSurface().props["data-browser-drag-ghost"]).toBe("suppressed");
       expect(pointerSurface().props["data-drag-mechanism"]).toBe("pointer");
       expect(pointerSurface().props["data-drag-state"]).toBe("picked-up");
-      expect(pointerSurface().props.style.transform).toContain("translate3d(0, 22px, 0)");
+      expect(pointerSurface().props.style.transform).toContain("translate3d(10px, 22px, 0)");
       expect(pointerSurface().props.style.transform).toContain("scale(1.015)");
 
       act(() => {
@@ -1114,7 +1114,7 @@ describe("PracticePocScreen", () => {
     }
   });
 
-  it("picks up a Web Run on touch hold before movement and blocks text selection", () => {
+  it("keeps touch scrolling available before pickup and auto-scrolls during a Web Run drag", () => {
     const platform = ReactNative.Platform as unknown as { OS: string };
     const previousPlatform = platform.OS;
     const runReorderFeedbackPreview = jest.fn();
@@ -1128,7 +1128,18 @@ describe("PracticePocScreen", () => {
       const pointerSurface = (): TestRenderer.ReactTestInstance => renderer.root.findAll(
         (node) => node.props["data-testid"] === "practice-run-standard"
       )[0]!;
+      const scrollElement = {
+        clientHeight: 400,
+        scrollHeight: 1_200,
+        scrollTop: 0,
+        getBoundingClientRect: jest.fn(() => ({
+          bottom: 400,
+          height: 400,
+          top: 0
+        }))
+      };
       const currentTarget = {
+        closest: jest.fn(() => scrollElement),
         querySelector: jest.fn(() => null),
         releasePointerCapture: jest.fn(),
         setPointerCapture: jest.fn()
@@ -1145,15 +1156,32 @@ describe("PracticePocScreen", () => {
           preventDefault,
           target: { closest: jest.fn(() => null) }
         });
+      });
+
+      expect(preventDefault).not.toHaveBeenCalled();
+      expect(pointerSurface().props.style.touchAction).toBe("pan-y");
+
+      act(() => {
         jest.advanceTimersByTime(180);
       });
 
-      expect(preventDefault).toHaveBeenCalled();
       expect(runReorderFeedbackPreview).toHaveBeenCalledWith({ haptic: "medium" });
       expect(pointerSurface().props["data-drag-state"]).toBe("picked-up");
-      expect(pointerSurface().props.style.transform).toContain("translate3d(0, -2px, 0)");
+      expect(pointerSurface().props.style.transform).toContain("translate3d(10px, -2px, 0)");
       expect(pointerSurface().props.style.WebkitUserSelect).toBe("none");
       expect(pointerSurface().props.style.WebkitTouchCallout).toBe("none");
+
+      act(() => {
+        pointerSurface().props.onPointerMove({
+          clientY: 390,
+          currentTarget,
+          pointerId: 2,
+          preventDefault: jest.fn(),
+          target: { closest: jest.fn(() => null) }
+        });
+        jest.advanceTimersByTime(96);
+      });
+      expect(scrollElement.scrollTop).toBeGreaterThan(0);
 
       act(() => {
         pointerSurface().props.onPointerCancel({
@@ -1161,6 +1189,11 @@ describe("PracticePocScreen", () => {
           pointerId: 2
         });
       });
+      const scrollTopAfterCancel = scrollElement.scrollTop;
+      act(() => {
+        jest.advanceTimersByTime(96);
+      });
+      expect(scrollElement.scrollTop).toBe(scrollTopAfterCancel);
       expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
     } finally {
       platform.OS = previousPlatform;
