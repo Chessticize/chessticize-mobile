@@ -107,6 +107,9 @@ result. Unchecked items do not block App Store submission.
 - [ ] Start Arrow Duel.
 - [ ] Confirm exactly two arrows render with the shared arrow style.
 - [ ] Select the better move and confirm correct feedback.
+- [ ] With Opponent reply on, confirm the full-board `What if…` preparation is
+      shown for 1.5 seconds, the board does not flip, and the reply countdown
+      begins only when the opponent pieces can be moved.
 - [ ] Select the weaker move on another puzzle and confirm the guided mistake
       line stays in review rather than jumping away.
 - [ ] Confirm the Analysis panel can be opened from Arrow Duel review.
@@ -118,6 +121,10 @@ result. Unchecked items do not block App Store submission.
       general Review tab queue.
 - [ ] Navigate previous/next within the mistake set.
 - [ ] Reset the current puzzle to the puzzle initial position.
+- [ ] For an Arrow Duel Run with Opponent reply on, confirm Replay has no reply
+      countdown and does not show `Solved` until the reply and complete stored
+      puzzle line have been played.
+- [ ] Turn Opponent reply off and confirm Replay returns to the one-choice flow.
 - [ ] Tap an analysis candidate row and confirm it makes the candidate move.
 - [ ] Exit the post-sprint review and confirm the app returns to Practice ready
       to start another sprint.
@@ -141,6 +148,12 @@ result. Unchecked items do not block App Store submission.
       advances.
 - [ ] Answer a review puzzle incorrectly and confirm a Continue affordance is
       shown.
+- [ ] For an Arrow Duel Run with Opponent reply on, confirm Review asks for the
+      reply with the Run's configured countdown; verify the countdown starts
+      after the 1.5-second handoff and that a wrong reply or timeout fails the
+      Review.
+- [ ] Turn Opponent reply off and confirm Arrow Duel Review returns to the
+      one-choice flow.
 - [ ] Complete the visible due queue without corrupting sprint ratings.
 
 ### Settings

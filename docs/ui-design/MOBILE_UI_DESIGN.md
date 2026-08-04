@@ -367,7 +367,7 @@ Arrow Duel active-session rules:
 - After green confirmation, the selected move animates back more slowly and
   without sound before the tempting move appears. A full-board `What if…`
   overlay names the actual configured reply window (`Find the opponent’s reply
-  in X seconds.`) throughout this preparation beat. The reply timer appears only
+  in X seconds.`) for a fixed 1.5-second preparation beat. The reply timer appears only
   after the tempting move settles and board input unlocks.
 - Reply judgment accepts the stored puzzle main-line move or any legal move
   that immediately checkmates. It does not invoke Stockfish.
@@ -375,6 +375,10 @@ Arrow Duel active-session rules:
 Arrow Duel Replay and Review rules:
 
 - Replay and Review reconstruction must reuse the candidate order stored on the original attempt. Neither may generate a fresh default order for History, post-Sprint Replay, or Review.
+- The Run's Opponent reply setting applies consistently to Sprint, Replay, and scheduled Review. When it is off, Replay and Review retain the original one-choice flow.
+- When Opponent reply is on, scheduled Review requires the candidate and reply. Its reply countdown uses the same configured Run duration and starts only when the 1.5-second `What if…` handoff, tempting-move animation, and input lock have finished. Either wrong answer or a reply timeout records the Review as wrong.
+- Replay uses the same two-stage judgment without any countdown. A correct reply opens the remaining stored puzzle line; the player must make every remaining expected move while opponent replies animate automatically. Show `Solved` only after the full line completes or an accepted immediate mate ends it.
+- Replay from an original Sprint uses that persisted Sprint's reply configuration. Due Review uses the current configuration of its Run. Neither on/off state creates a separate Rating.
 - Green always means the best move.
 - Red always means the inferior candidate.
 - Replay should avoid redundant legend or choice-marker chips; use board arrows, feedback highlights, and the guided line to explain the state.

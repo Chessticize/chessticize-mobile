@@ -233,6 +233,24 @@ for (const backend of ["memory", "sqlite"] as const) {
       }, "2026-07-22T12:02:00.000Z");
       assert.equal(sprint.config.ratingKey, run.ratingKey);
       assert.deepEqual(sprint.config.opponentReply, { enabled: true, seconds: 30 });
+
+      service.updatePracticeRun(run.id, {
+        name: run.name,
+        rating: 950,
+        opponentReply: { enabled: false, seconds: 12 }
+      }, "2026-07-22T12:03:00.000Z");
+      assert.deepEqual(service.opponentReplyForReview({
+        mode: "arrow_duel",
+        ratingKey: run.ratingKey,
+        attempt: {
+          source: "sprint",
+          sessionId: sprint.id
+        }
+      }), { enabled: true, seconds: 30 });
+      assert.deepEqual(service.opponentReplyForReview({
+        mode: "arrow_duel",
+        ratingKey: run.ratingKey
+      }), { enabled: false, seconds: 12 });
     } finally {
       if (store instanceof SQLiteStore) {
         store.close();

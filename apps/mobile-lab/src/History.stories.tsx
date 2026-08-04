@@ -5,6 +5,7 @@ import {
   expectTestIdAbsent,
   expectTestIdText,
   openHistory,
+  waitForEnabledTestId,
   waitForTestId
 } from "./storyPlay.ts";
 
@@ -130,6 +131,23 @@ export const AttemptDetail: Story = {
     await expectTestIdText(canvasElement, "history-attempt-clear-unclear", "Mark clear");
     await clickTestId(canvasElement, "review-analysis-button");
     await waitForTestId(canvasElement, "review-theme-rail");
+  }
+};
+
+export const ArrowDuelReplayFullLine: Story = {
+  name: "Arrow Duel Replay · full line",
+  args: { scenarioId: "history-arrow-duel-replay" },
+  play: async ({ canvasElement }) => {
+    await openHistory(canvasElement);
+    await clickTestId(canvasElement, "history-attention-all");
+    await clickTestId(canvasElement, "history-attempt-history-arrow-duel-replay");
+    await waitForEnabledTestId(canvasElement, "lab-board-correct");
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForEnabledTestId(canvasElement, "lab-board-correct");
+    expectTestIdAbsent(canvasElement, "review-arrow-duel-reply-timer");
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForTestId(canvasElement, "review-guided-move-overlay");
+    expectTestIdAbsent(canvasElement, "practice-prompt-solved-overlay");
   }
 };
 

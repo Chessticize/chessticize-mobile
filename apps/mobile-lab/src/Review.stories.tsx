@@ -4,6 +4,7 @@ import {
   clickTestId,
   expectTestIdAbsent,
   openReviewQueue,
+  waitForEnabledTestId,
   waitForTestId,
   waitForVisibleTestId
 } from "./storyPlay.ts";
@@ -62,6 +63,20 @@ export const ReviewSession: Story = {
     await clickTestId(canvasElement, "review-start-due");
     await waitForTestId(canvasElement, "review-session");
     await waitForTestId(canvasElement, "lab-board-placeholder");
+  }
+};
+
+export const ArrowDuelReply: Story = {
+  name: "Arrow Duel reply",
+  args: { scenarioId: "review-arrow-duel-reply" },
+  play: async ({ canvasElement }) => {
+    await openReviewQueue(canvasElement);
+    await clickTestId(canvasElement, "review-filter-toggle");
+    await clickTestId(canvasElement, "review-filter-arrow-duel");
+    await clickTestId(canvasElement, "review-start-due");
+    await waitForEnabledTestId(canvasElement, "lab-board-correct");
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForTestId(canvasElement, "review-arrow-duel-reply-timer");
   }
 };
 

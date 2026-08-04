@@ -79,6 +79,18 @@ const ARROW_DUEL_MULTI_MATE_LAB_PUZZLE: Puzzle = {
   themes: ["mateIn1"]
 };
 
+const ARROW_DUEL_REPLAY_LAB_PUZZLE: Puzzle = {
+  id: "lab-arrow-duel-replay-line",
+  initialFen: "4k3/8/8/8/8/8/4P3/4K3 b - - 0 1",
+  rating: 820,
+  solutionMoves: ["e8d7", "e2e4", "d7e6", "e4e5", "e6f5", "e5e6"],
+  source: "synthetic",
+  stockfishBestMove: "e8f7",
+  stockfishEval: 180,
+  stockfishEvalAfterFirstMove: -220,
+  themes: ["endgame"]
+};
+
 export const ARROW_DUEL_REPLY_LAB_MOVES = {
   default: {
     correctChoice: PRIMARY_LAB_PUZZLE.stockfishBestMove!,
@@ -817,6 +829,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       break;
     case "review-due":
     case "review-session":
+    case "review-arrow-duel-reply":
     case "review-feedback-analysis":
       service = createReviewService("due");
       break;
@@ -838,6 +851,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "history-progress-weakness":
     case "history-progress-speed-weakness":
       service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
+      configurePuzzleSource = false;
+      break;
+    case "history-arrow-duel-replay":
+      service = createArrowDuelReplayService();
       configurePuzzleSource = false;
       break;
     case "history-replay-unavailable":
@@ -1296,6 +1313,8 @@ function createIssue272Service(withDueReview: boolean): PracticeService {
 function createReviewService(kind: "due" | "overdue"): PracticeService {
   const store = new MemoryStore();
   store.seedPuzzles(LAB_PUZZLES);
+  const service = new PracticeService(store);
+  const arrowDuelRun = service.getActivePracticeRun("arrow-duel");
   const enrolledAt = kind === "overdue"
     ? "2026-07-13T12:00:00.000Z"
     : "2026-07-17T12:00:00.000Z";
@@ -1303,9 +1322,39 @@ function createReviewService(kind: "due" | "overdue"): PracticeService {
     store.scheduleMistakeReview({
       puzzleId: puzzle.id,
       mode: index === 2 ? "arrow_duel" : "standard",
-      ratingKey: index === 2 ? "arrow duel 5/30" : `standard 5/${20 + index * 10}`
+      ratingKey: index === 2 ? arrowDuelRun.ratingKey : `standard 5/${20 + index * 10}`
     }, enrolledAt);
   }
+  service.updatePracticeRun(arrowDuelRun.id, {
+    name: arrowDuelRun.name,
+    rating: service.getRating(arrowDuelRun.ratingKey).rating,
+    opponentReply: { enabled: true, seconds: 12 }
+  }, enrolledAt);
+  return service;
+}
+
+function createArrowDuelReplayService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles([ARROW_DUEL_REPLAY_LAB_PUZZLE]);
+  store.recordAttempt({
+    id: "history-arrow-duel-replay",
+    source: "sprint",
+    sessionId: "history-arrow-duel-replay-session",
+    puzzleId: ARROW_DUEL_REPLAY_LAB_PUZZLE.id,
+    mode: "arrow_duel",
+    ratingKey: "arrow_duel 5/30",
+    result: "wrong",
+    submittedMove: ARROW_DUEL_REPLAY_LAB_PUZZLE.solutionMoves[0]!,
+    expectedMove: ARROW_DUEL_REPLAY_LAB_PUZZLE.stockfishBestMove!,
+    startedAt: "2026-07-18T17:58:00.000Z",
+    completedAt: "2026-07-18T17:58:08.000Z",
+    ratingBefore: 880,
+    ratingAfter: 860,
+    arrowDuelCandidateOrder: [
+      ARROW_DUEL_REPLAY_LAB_PUZZLE.solutionMoves[0]!,
+      ARROW_DUEL_REPLAY_LAB_PUZZLE.stockfishBestMove!
+    ]
+  });
   return new PracticeService(store);
 }
 

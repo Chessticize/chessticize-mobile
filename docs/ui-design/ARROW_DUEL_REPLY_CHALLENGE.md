@@ -48,7 +48,7 @@ With Opponent reply on:
    starting square with a slower, silent undo. During that preparation beat,
    cover the board with a `What if…` overlay and `Find the opponent’s reply in X
    seconds.`, where X is the Run's configured reply time. Keep the overlay up
-   while the fixed prompt surface switches to the `If...` reply copy, then
+   for 1.5 seconds while the fixed prompt surface switches to the `If...` reply copy, then
    animate the tempting candidate. The player now moves for the opponent without
    the board flipping.
 5. Start the Run's configured reply clock, which defaults to ten seconds, only
@@ -93,6 +93,28 @@ Stockfish. Standard Puzzle, Arrow Duel reply, Replay, and Review should share
 one Core acceptance rule so the legal-checkmate exception cannot drift between
 surfaces.
 
+## Replay And Review
+
+The Run setting governs every scored or reconstructed Arrow Duel attempt:
+
+- With **Opponent reply** off, Sprint, Replay, and Review keep the original
+  one-choice behavior.
+- With it on, scheduled Review requires both the candidate and reply. The reply
+  uses the same configured duration as the Run, and its countdown starts only
+  after the 1.5-second `What if…` handoff has completed and board input is
+  available. A wrong candidate, wrong reply, or reply timeout records one
+  failed Review attempt; both correct answers record one successful Review
+  attempt.
+- Replay uses the same candidate and reply judgment but has no countdown. After
+  a correct reply, Replay continues through the stored puzzle line: the player
+  makes each remaining expected move and the opponent replies automatically.
+  Replay shows `Solved` only after that complete line has been played, or when
+  an accepted immediate mate ends the position.
+- A Replay reconstructed from a persisted Sprint uses that Sprint's saved Run
+  setting. A due Review uses the current setting for its Run. Neither path
+  changes the Run's Rating identity, and Replay never writes History or changes
+  the Review schedule.
+
 ## Core Pack Evidence
 
 A deterministic stratified audit on August 3, 2026 sampled the current
@@ -118,7 +140,7 @@ their stable Storybook URLs. It covers:
 
 - candidate choice and the staged green-confirmation, slow silent undo,
   full-board `What if…` overlay with the configured reply time, `If...` prompt,
-  and tempting-move handoff;
+  and tempting-move handoff after a 1.5-second preparation beat;
 - a board perspective locked to the original solver throughout the candidate
   and opponent-reply stages;
 - the configurable opponent-reply state, defaulting to ten seconds and capped
@@ -127,6 +149,8 @@ their stable Storybook URLs. It covers:
   wrong replies;
 - the brief ordinary timeout overlay and automatic advance;
 - Review enrollment for both failure stages without redundant result copy;
+- the same configured reply countdown in scheduled Review and the untimed,
+  full-line completion rule in Replay;
 - the default-on Create Run and Edit Run control and its off state; and
 - first-use Arrow Duel guidance for the two-stage rule.
 

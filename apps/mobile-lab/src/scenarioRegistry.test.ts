@@ -60,7 +60,9 @@ test("New Scenario Markers derive tags for the Arrow Duel reply design", () => {
       "practice-arrow-duel-guide",
       "practice-arrow-duel-guide-only",
       "practice-arrow-duel-prompt",
-      "practice-arrow-duel-mate-in-one"
+      "practice-arrow-duel-mate-in-one",
+      "review-arrow-duel-reply",
+      "history-arrow-duel-replay"
     ]
   );
   assert.ok(newScenarios.every(

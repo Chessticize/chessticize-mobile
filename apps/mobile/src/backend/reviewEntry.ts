@@ -2,6 +2,7 @@ import {
   curatedPuzzleThemes,
   type AttemptEvent,
   type HistoryAttemptView,
+  type OpponentReplyConfig,
   type Puzzle,
   type SprintMode
 } from "../../../../packages/core/src/index.ts";
@@ -12,6 +13,7 @@ export type ReviewEntry = {
   ratingKey: string;
   source: "session" | "due" | "history";
   curatedThemes: string[];
+  opponentReply?: OpponentReplyConfig;
   attempt?: AttemptEvent | HistoryAttemptView;
 };
 
