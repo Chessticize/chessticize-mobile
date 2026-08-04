@@ -195,6 +195,7 @@ import {
 } from "./MoveFeedbackSettingsSection.tsx";
 import {
   emitCommittedMoveFeedback,
+  emitRunReorderPickupFeedback,
   moveFeedbackCueForMove,
   type MoveFeedbackActor,
   type MoveFeedbackClient
@@ -1420,6 +1421,19 @@ export function PracticePocScreen({
       service.getSettings().moveFeedback
     ).catch(() => {
       // Feedback is nonessential and must never interrupt a chess move.
+    });
+  }
+
+  function playRunReorderPickupFeedback(feedback: RunReorderPickupFeedback): void {
+    runReorderFeedbackPreview?.(feedback);
+    if (!moveFeedbackClient) {
+      return;
+    }
+    void emitRunReorderPickupFeedback(
+      moveFeedbackClient,
+      service.getSettings().moveFeedback
+    ).catch(() => {
+      // Pickup feedback is nonessential and must never interrupt Run reordering.
     });
   }
 
@@ -4394,7 +4408,7 @@ export function PracticePocScreen({
                     onOpenReview={openReviewQueue}
                     onRunReorderDragActiveChange={setRunReorderDragActive}
                     runReorderDesignPreview={runReorderDesignPreview}
-                    onRunReorderFeedbackPreview={runReorderFeedbackPreview}
+                    onRunReorderFeedbackPreview={playRunReorderPickupFeedback}
                   />
                 ) : null}
 

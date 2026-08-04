@@ -74,6 +74,20 @@ export async function emitCommittedMoveFeedback(
   await client.play(request);
 }
 
+export async function emitRunReorderPickupFeedback(
+  client: MoveFeedbackClient,
+  preferences: MoveFeedbackPreferences
+): Promise<void> {
+  if (!preferences.hapticsEnabled) {
+    return;
+  }
+  await client.play({
+    cue: "move",
+    playSound: false,
+    playHaptic: true
+  });
+}
+
 export function moveFeedbackCueForMove(
   fen: string,
   uciMove: string

@@ -2,6 +2,7 @@ import {
   FakeMoveFeedbackClient,
   createNativeMoveFeedbackClient,
   emitCommittedMoveFeedback,
+  emitRunReorderPickupFeedback,
   moveFeedbackCueForMove,
   type MoveFeedbackClient
 } from "../src/platform/moveFeedback";
@@ -66,6 +67,32 @@ describe("move feedback", () => {
     );
 
     expect(client.play).not.toHaveBeenCalled();
+  });
+
+  it("requests a medium haptic without move audio when a Run is picked up", async () => {
+    const client = new FakeMoveFeedbackClient();
+
+    await emitRunReorderPickupFeedback(
+      client,
+      { soundEnabled: true, hapticsEnabled: true }
+    );
+
+    expect(client.requests).toEqual([{
+      cue: "move",
+      playSound: false,
+      playHaptic: true
+    }]);
+  });
+
+  it("does not request Run pickup haptics when haptic feedback is disabled", async () => {
+    const client = new FakeMoveFeedbackClient();
+
+    await emitRunReorderPickupFeedback(
+      client,
+      { soundEnabled: true, hapticsEnabled: false }
+    );
+
+    expect(client.requests).toEqual([]);
   });
 
   it("forwards semantic requests to the native module in its stable argument order", async () => {
