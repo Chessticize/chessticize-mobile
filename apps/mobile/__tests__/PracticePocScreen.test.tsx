@@ -1190,6 +1190,82 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it("keeps a consecutive native drop aligned while reordered layouts are still pending", () => {
+    const service = createMobilePracticeService("random1000");
+    service.createPracticeRun({
+      id: "test-run",
+      name: "Test Run",
+      mode: "custom",
+      durationSeconds: 180,
+      perPuzzleSeconds: 5,
+      initialRating: 600,
+      themes: ["mixed"]
+    });
+    service.createPracticeRun({
+      id: "arrow-duel-long",
+      name: "Arrow Duel Long",
+      mode: "arrow_duel",
+      durationSeconds: 600,
+      perPuzzleSeconds: 30,
+      initialRating: 770,
+      themes: ["mixed"]
+    });
+    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+    press(renderer, "practice-run-home-edit");
+
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-standard"), 0, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-arrow-duel"), 110, 100);
+    const testRun = findNativeRunDragSurface(renderer, "practice-run-test-run");
+    layoutNativeRunSurface(testRun, 220, 100);
+    layoutNativeRunSurface(
+      findNativeRunDragSurface(renderer, "practice-run-arrow-duel-long"),
+      330,
+      100
+    );
+
+    startNativeRunDrag(testRun, 270);
+    moveNativeRunDrag(testRun, 50, -220);
+    act(() => {
+      testRun.props.onPanResponderRelease();
+    });
+    expect(service.listPracticeRuns().filter((run) => !run.archived).map((run) => run.id)).toEqual([
+      "test-run",
+      "standard",
+      "arrow-duel",
+      "arrow-duel-long"
+    ]);
+
+    // React Native can deliver the new card layouts after the next gesture begins.
+    // The visual slots are already in their committed order, so the second drag
+    // must not use each keyed card's stale pre-drop y coordinate.
+    const arrowDuelLong = findNativeRunDragSurface(renderer, "practice-run-arrow-duel-long");
+    startNativeRunDrag(arrowDuelLong, 380);
+    moveNativeRunDrag(arrowDuelLong, 160, -220);
+
+    const standardPreviewTransform = flattenTestStyle(
+      findNativeRunDragSurface(renderer, "practice-run-standard").props.style
+    ).transform as Array<{ translateY?: number | { value: number } }>;
+    const arrowDuelPreviewTransform = flattenTestStyle(
+      findNativeRunDragSurface(renderer, "practice-run-arrow-duel").props.style
+    ).transform as Array<{ translateY?: number | { value: number } }>;
+    expect(standardPreviewTransform.some((entry) =>
+      typeof entry.translateY === "object" && entry.translateY.value === 110
+    )).toBe(true);
+    expect(arrowDuelPreviewTransform.some((entry) =>
+      typeof entry.translateY === "object" && entry.translateY.value === 110
+    )).toBe(true);
+
+    act(() => {
+      arrowDuelLong.props.onPanResponderRelease();
+    });
+    expect(service.listPracticeRuns().filter((run) => !run.archived).map((run) => run.id)).toEqual([
+      "test-run",
+      "arrow-duel-long",
+      "standard",
+      "arrow-duel"
+    ]);
+  });
+
   it("cancels a native Run insertion preview without committing the reorder", () => {
     const onIntent = jest.fn();
     const renderer = renderScreen({

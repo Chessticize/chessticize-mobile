@@ -5345,11 +5345,31 @@ function PracticeRunHome({
       sourceStride: dragSourceStrideRef.current
     }), listRect.top);
   };
+  const commitNativeRunLayoutPreview = (runId: string): void => {
+    if (Platform.OS === "web" || insertionOutlineTopRef.current === null) {
+      return;
+    }
+    const nextLayouts = new Map(nativeRunLayoutsRef.current);
+    for (const run of presentation.runs) {
+      const layout = nativeRunLayoutsRef.current.get(run.id);
+      if (!layout) {
+        continue;
+      }
+      nextLayouts.set(run.id, {
+        height: layout.height,
+        y: run.id === runId
+          ? insertionOutlineTopRef.current
+          : layout.y + (dropPreviewOffsetsRef.current[run.id] ?? 0)
+      });
+    }
+    nativeRunLayoutsRef.current = nextLayouts;
+  };
   const dropRun = (): boolean => {
     const runId = draggedRunIdRef.current;
     const targetRunId = dropTargetRunIdRef.current;
     if (runId && targetRunId) {
       committedDropSettlingRef.current = true;
+      commitNativeRunLayoutPreview(runId);
       reorderRun(runId, targetRunId, false);
       finishRunDrag();
       return true;
