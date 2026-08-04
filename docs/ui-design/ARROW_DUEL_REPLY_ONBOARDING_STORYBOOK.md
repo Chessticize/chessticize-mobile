@@ -84,9 +84,12 @@ alternative move before showing the preparation cue:
 
 - If the alternative position is playable, continue to the preparation cue and
   reply countdown.
-- If it has no legal reply because it is checkmate or stalemate, pass the
-  puzzle immediately. Do not show the preparation cue, reply prompt, countdown,
-  or reply-timeout path.
+- If it is stalemate, pass the puzzle and advance directly to the next puzzle.
+  Do not show the `After you choose correctly…` guide copy, preparation cue,
+  `Got it`, reply prompt, countdown, or reply-timeout path.
+
+The worse alternative cannot be checkmate: a checkmating move would not be the
+worse candidate. The boundary case is therefore explicitly stalemate-only.
 
 The dedicated Storybook boundary case uses `Qg7#` as the correct choice and
 `Qf7` as the stalemating alternative.

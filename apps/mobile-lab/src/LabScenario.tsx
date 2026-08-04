@@ -874,6 +874,8 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "practice-arrow-duel-terminal-other-move":
       service = createArrowDuelTerminalOtherMoveService();
       configurePuzzleSource = false;
+      screenProps.arrowDuelTargetCorrect = 2;
+      screenProps.puzzleSelectionSeed = "terminal-stalemate";
       break;
     case "practice-sprint-result-goal":
     case "practice-sprint-result-replay":
@@ -1138,7 +1140,10 @@ function createArrowDuelMultipleMateService(): PracticeService {
 
 function createArrowDuelTerminalOtherMoveService(): PracticeService {
   const store = new MemoryStore();
-  store.seedPuzzles([ARROW_DUEL_TERMINAL_OTHER_MOVE_LAB_PUZZLE]);
+  store.seedPuzzles([
+    ARROW_DUEL_TERMINAL_OTHER_MOVE_LAB_PUZZLE,
+    PRIMARY_LAB_PUZZLE
+  ]);
   return new PracticeService(store);
 }
 

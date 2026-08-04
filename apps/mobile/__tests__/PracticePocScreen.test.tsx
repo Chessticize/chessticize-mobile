@@ -2910,11 +2910,20 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(() => findByTestId(renderer, "arrow-duel-what-if-overlay")).toThrow();
+    expect(() => findByTestId(renderer, "arrow-duel-what-if-action")).toThrow();
     expect(() => findByTestId(renderer, "arrow-duel-reply-timer")).toThrow();
-    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 / 1");
+    expect(collectText(renderer.root)).not.toContain("After you choose correctly");
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 / 2");
 
     await settleFeedbackSnapshot();
-    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+    act(() => {
+      findByTestId(renderer, "mock-chessboard").props.onReady();
+    });
+    expect(findByTestId(renderer, "arrow-duel-candidate-overlay")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
+      "Choose the best move"
+    );
   });
 
   it("uses semantic first-use guidance without visible tour-step meta copy", () => {

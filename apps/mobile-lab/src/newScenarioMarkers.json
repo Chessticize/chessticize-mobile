@@ -27,7 +27,7 @@
     "issues": [
       {
         "issueNumber": 489,
-        "changeNote": "Preview an immediate pass when the other candidate move ends in stalemate and therefore has no reply."
+        "changeNote": "Preview an immediate next-puzzle handoff when the other candidate move is stalemate, without showing reply guidance or a countdown."
       }
     ]
   },

@@ -881,7 +881,7 @@ export const ArrowDuelReplyAlternateMate: Story = {
 };
 
 export const ArrowDuelTerminalOtherMoveNoReply: Story = {
-  name: "Arrow Duel · terminal other move · no reply",
+  name: "Arrow Duel · stalemate alternate · next puzzle",
   args: { scenarioId: "practice-arrow-duel-terminal-other-move" },
   play: async ({ canvasElement }) => {
     await openArrowDuelChoice(canvasElement);
@@ -889,8 +889,12 @@ export const ArrowDuelTerminalOtherMoveNoReply: Story = {
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForTestId(canvasElement, "move-feedback-overlay");
     await expectTestIdAbsent(canvasElement, "arrow-duel-what-if-overlay");
+    await expectTestIdAbsent(canvasElement, "arrow-duel-what-if-action");
     await expectTestIdAbsent(canvasElement, "arrow-duel-reply-timer");
-    await waitForTestId(canvasElement, "sprint-summary-panel");
+    await waitForText(canvasElement, "Choose the best move");
+    await expectTestIdText(canvasElement, "session-progress", "1 / 2");
+    await waitForTestId(canvasElement, "arrow-duel-candidate-overlay");
+    await expectTestIdAbsent(canvasElement, "sprint-summary-panel");
   }
 };
 
