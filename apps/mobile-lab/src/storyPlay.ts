@@ -246,11 +246,29 @@ export async function expectRunInsertionTarget(
     ) {
       throw new Error(`Expected the ${position} insertion slot to use a blue dashed outline`);
     }
-    if (insertionOutline.getBoundingClientRect().height < 40) {
-      throw new Error(`Expected the ${position} insertion outline to frame the open card slot`);
+    const outlineRect = insertionOutline.getBoundingClientRect();
+    const targetRect = card.getBoundingClientRect();
+    if (
+      Math.abs(outlineRect.width - targetRect.width) > 2
+      || Math.abs(outlineRect.height - targetRect.height) > 2
+    ) {
+      throw new Error(`Expected the ${position} insertion outline to match the card slot size`);
     }
-    if (Number(insertionOutline.style.zIndex) <= 20) {
-      throw new Error(`Expected the ${position} insertion outline to stay above the picked-up card`);
+    const pickedUpCard = canvasElement.ownerDocument.body.querySelector<HTMLElement>(
+      '[data-drag-state="picked-up"]'
+    );
+    if (!pickedUpCard) {
+      throw new Error("Expected a picked-up card while checking the insertion outline");
+    }
+    const targetZIndex = Number(
+      canvasElement.ownerDocument.defaultView?.getComputedStyle(card).zIndex
+    );
+    const outlineZIndex = Number(style.zIndex);
+    const pickedUpZIndex = Number(
+      canvasElement.ownerDocument.defaultView?.getComputedStyle(pickedUpCard).zIndex
+    );
+    if (!(outlineZIndex > targetZIndex && outlineZIndex < pickedUpZIndex)) {
+      throw new Error(`Expected the ${position} insertion outline below the picked-up card`);
     }
   });
 }

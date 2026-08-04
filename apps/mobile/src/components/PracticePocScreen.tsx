@@ -5328,12 +5328,12 @@ function PracticeRunHome({
                 borderRadius: 12,
                 boxSizing: "border-box",
                 height: webDragSourceHeightRef.current,
-                left: 8,
+                left: 0,
                 pointerEvents: "none",
                 position: "absolute",
-                right: 8,
+                right: 0,
                 top: webInsertionOutlineTop,
-                zIndex: 40
+                zIndex: 15
               }}
             />
           ) : null}
