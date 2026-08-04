@@ -411,6 +411,10 @@ function moveSideDisplayName(side: MoveSide): "Black" | "White" {
   return side === "b" ? "Black" : "White";
 }
 
+function replyPreparationInstruction(seconds: number): string {
+  return `You’ll have ${seconds} ${seconds === 1 ? "second" : "seconds"} to play the best reply.`;
+}
+
 type BoardMoveContext = {
   puzzleId: string | null;
 };
@@ -3395,7 +3399,7 @@ export function PracticePocScreen({
         : state?.config.opponentReply?.seconds ?? arrowDuelReplySeconds;
   const explicitReplySideCopy = arrowDuelReplyChallengeDesign?.explicitReplySideCopy === true;
   const arrowDuelWhatIfDetail = explicitReplySideCopy
-    ? `Your ${arrowDuelReplySecondsRemaining}-second reply timer starts next.`
+    ? replyPreparationInstruction(arrowDuelReplySecondsRemaining)
     : `Find the opponent’s reply in ${arrowDuelReplySecondsRemaining} ${
         arrowDuelReplySecondsRemaining === 1 ? "second" : "seconds"
       }.`;
@@ -4048,6 +4052,7 @@ export function PracticePocScreen({
               && !arrowDuelReplyPreparationAcknowledged
               ? "Got it"
               : undefined}
+            compactTitle={boardSize < 300}
             detail={arrowDuelWhatIfDetail}
             onAction={() => {
               setArrowDuelReplyPreparationAcknowledged(true);
@@ -4057,6 +4062,10 @@ export function PracticePocScreen({
             title={explicitReplySideCopy && arrowDuelPromptSide
               ? `What would ${moveSideDisplayName(arrowDuelPromptSide)} play after the other move?`
               : undefined}
+            titleSide={explicitReplySideCopy && arrowDuelPromptSide
+              ? arrowDuelPromptSide
+              : undefined}
+            veryCompactTitle={boardSize < 250}
           />
         ) : null}
 
@@ -10220,16 +10229,22 @@ function ErrorPanel({ error }: { error: string }): React.JSX.Element {
 
 function ArrowDuelWhatIfOverlay({
   actionLabel,
+  compactTitle = false,
   detail,
   onAction,
   testIDPrefix,
-  title = "What if you made\nthe other move?"
+  title = "What if you made\nthe other move?",
+  titleSide,
+  veryCompactTitle = false
 }: {
   actionLabel?: string;
+  compactTitle?: boolean;
   detail: string;
   onAction?: () => void;
   testIDPrefix: string;
   title?: string;
+  titleSide?: MoveSide;
+  veryCompactTitle?: boolean;
 }): React.JSX.Element {
   const accessibilityTitle = title.replace(/\s+/g, " ");
   return (
@@ -10242,12 +10257,59 @@ function ArrowDuelWhatIfOverlay({
       style={styles.arrowDuelWhatIfOverlay}
       testID={`${testIDPrefix}-what-if-overlay`}
     >
-      <Text
-        style={styles.arrowDuelWhatIfTitle}
-        testID={`${testIDPrefix}-what-if-title`}
-      >
-        {title}
-      </Text>
+      {titleSide ? (
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={styles.arrowDuelWhatIfTitleBlock}
+          testID={`${testIDPrefix}-what-if-title`}
+        >
+          <View style={styles.arrowDuelWhatIfTitleLead}>
+            <Text style={[
+              styles.arrowDuelWhatIfTitleLine,
+              compactTitle ? styles.arrowDuelWhatIfTitleLineCompact : null,
+              veryCompactTitle ? styles.arrowDuelWhatIfTitleLineVeryCompact : null
+            ]}>
+              What would
+            </Text>
+            <View
+              style={[
+                styles.arrowDuelWhatIfSideGlyphChip,
+                compactTitle ? styles.arrowDuelWhatIfSideGlyphChipCompact : null,
+                veryCompactTitle ? styles.arrowDuelWhatIfSideGlyphChipVeryCompact : null
+              ]}
+              testID={`${testIDPrefix}-what-if-side-glyph`}
+            >
+              <MoveSideGlyph
+                kingPieceSize={veryCompactTitle ? 19 : compactTitle ? 22 : 26}
+                side={titleSide}
+                testID={`${testIDPrefix}-what-if-side-king`}
+              />
+            </View>
+            <Text style={[
+              styles.arrowDuelWhatIfTitleLine,
+              compactTitle ? styles.arrowDuelWhatIfTitleLineCompact : null,
+              veryCompactTitle ? styles.arrowDuelWhatIfTitleLineVeryCompact : null
+            ]}>
+              play
+            </Text>
+          </View>
+          <Text style={[
+            styles.arrowDuelWhatIfTitleLine,
+            compactTitle ? styles.arrowDuelWhatIfTitleLineCompact : null,
+            veryCompactTitle ? styles.arrowDuelWhatIfTitleLineVeryCompact : null
+          ]}>
+            after the other move?
+          </Text>
+        </View>
+      ) : (
+        <Text
+          style={styles.arrowDuelWhatIfTitle}
+          testID={`${testIDPrefix}-what-if-title`}
+        >
+          {title}
+        </Text>
+      )}
       <Text
         style={styles.arrowDuelWhatIfDetail}
         testID={`${testIDPrefix}-what-if-detail`}
@@ -13368,7 +13430,7 @@ function ReviewSession({
         ?? Math.max(0, reviewPerPuzzleSeconds - Math.floor((reviewNowMs - reviewStartedAtMs) / 1000))
       : null;
   const reviewWhatIfDetail = explicitReplySideCopy
-    ? `Your ${reviewReplySeconds}-second reply timer starts next.`
+    ? replyPreparationInstruction(reviewReplySeconds)
     : `Find the opponent’s reply in ${reviewReplySeconds} ${
         reviewReplySeconds === 1 ? "second" : "seconds"
       }.`;
@@ -14505,11 +14567,14 @@ function ReviewSession({
             ) : null}
             {reviewWhatIfVisible ? (
               <ArrowDuelWhatIfOverlay
+                compactTitle={boardSize < 300}
                 detail={reviewWhatIfDetail}
                 testIDPrefix="review-arrow-duel"
                 title={explicitReplySideCopy
                   ? `What would ${moveSideDisplayName(reviewPromptSide)} play after the other move?`
                   : undefined}
+                titleSide={explicitReplySideCopy ? reviewPromptSide : undefined}
+                veryCompactTitle={boardSize < 250}
               />
             ) : null}
             {reviewTimedOut ? (
@@ -19039,6 +19104,55 @@ const styles = StyleSheet.create({
     maxWidth: 280,
     textAlign: "center",
     width: "100%"
+  },
+  arrowDuelWhatIfTitleBlock: {
+    alignItems: "center",
+    maxWidth: 280,
+    width: "100%"
+  },
+  arrowDuelWhatIfTitleLead: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center"
+  },
+  arrowDuelWhatIfTitleLine: {
+    color: "#FFFFFF",
+    flexShrink: 1,
+    fontSize: 22,
+    fontWeight: "900",
+    lineHeight: 27,
+    textAlign: "center"
+  },
+  arrowDuelWhatIfTitleLineCompact: {
+    fontSize: 20,
+    lineHeight: 24
+  },
+  arrowDuelWhatIfTitleLineVeryCompact: {
+    fontSize: 18,
+    lineHeight: 22
+  },
+  arrowDuelWhatIfSideGlyphChip: {
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderColor: "#CBD5E1",
+    borderRadius: 7,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: "center",
+    marginHorizontal: 7,
+    width: 32
+  },
+  arrowDuelWhatIfSideGlyphChipCompact: {
+    borderRadius: 6,
+    height: 28,
+    marginHorizontal: 5,
+    width: 28
+  },
+  arrowDuelWhatIfSideGlyphChipVeryCompact: {
+    borderRadius: 5,
+    height: 24,
+    marginHorizontal: 4,
+    width: 24
   },
   arrowDuelWhatIfDetail: {
     color: "#E2E8F0",

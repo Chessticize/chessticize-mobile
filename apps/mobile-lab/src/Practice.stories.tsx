@@ -95,9 +95,9 @@ async function openArrowDuelReplyCue(canvasElement: HTMLElement): Promise<void> 
   await expectTestIdText(
     canvasElement,
     "arrow-duel-what-if-detail",
-    "Your 10-second reply timer starts next."
+    "You’ll have 10 seconds to play the best reply."
   );
-  await waitForText(canvasElement, "What would White play after the other move?");
+  await waitForTestId(canvasElement, "arrow-duel-what-if-side-glyph");
 }
 
 function expectFullScreenStoryId(canvasElement: HTMLElement, storyId: string): void {

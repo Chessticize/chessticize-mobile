@@ -2737,11 +2737,23 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(
       customReplyTime,
       "arrow-duel-what-if-detail"
-    ))).toBe("Your 30-second reply timer starts next.");
+    ))).toBe("You’ll have 30 seconds to play the best reply.");
     await finishArrowDuelReplyHandoff();
     expect(collectText(findByTestId(customReplyTime, "arrow-duel-reply-timer"))).toBe("0:30");
     expect(findByTestId(customReplyTime, "arrow-duel-reply-timer-group").props.accessibilityLabel)
       .toBe("30 seconds remaining.");
+
+    const singularReplyTime = renderLabScenario(
+      "practice-arrow-duel-prompt",
+      { arrowDuelReplySeconds: 1 }
+    );
+    startArrowDuelSprint(singularReplyTime);
+    await boardMove(singularReplyTime, ARROW_DUEL_REPLY_LAB_MOVES.default.correctChoice);
+    await advanceArrowDuelReplyToPrompt();
+    expect(collectText(findByTestId(
+      singularReplyTime,
+      "arrow-duel-what-if-detail"
+    ))).toBe("You’ll have 1 second to play the best reply.");
 
     const wrongChoice = renderLabScenario("practice-arrow-duel-prompt");
     startArrowDuelSprint(wrongChoice);
@@ -2831,8 +2843,21 @@ describe("PracticePocScreen", () => {
     expect(action.props.accessibilityRole).toBe("button");
     expect(action.props.accessibilityLabel).toBe("Got it");
     expect(flattenTestStyle(action.props.style).minHeight).toBeGreaterThanOrEqual(44);
-    expect(collectText(findByTestId(renderer, "arrow-duel-what-if-title"))).toBe(
-      "What would White play after the other move?"
+    const visibleTitle = collectText(findByTestId(renderer, "arrow-duel-what-if-title"));
+    expect(visibleTitle).toContain("What would");
+    expect(visibleTitle).toContain("after the other move?");
+    expect(visibleTitle).not.toContain("White");
+    const sideGlyph = findByTestId(renderer, "arrow-duel-what-if-side-glyph");
+    expect(flattenTestStyle(sideGlyph.props.style)).toEqual(expect.objectContaining({
+      height: 32,
+      width: 32
+    }));
+    expect(findByTestId(renderer, "arrow-duel-what-if-side-king")).toBeTruthy();
+    expect(findByTestId(renderer, "arrow-duel-what-if-overlay").props.accessibilityLabel).toBe(
+      "What would White play after the other move? You’ll have 10 seconds to play the best reply."
+    );
+    expect(collectText(findByTestId(renderer, "arrow-duel-what-if-detail"))).toBe(
+      "You’ll have 10 seconds to play the best reply."
     );
     expect(() => findByTestId(renderer, "arrow-duel-reply-timer")).toThrow();
 

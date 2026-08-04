@@ -39,18 +39,20 @@ position in production. Black is not a hard-coded product rule.
 
 Preparation cue:
 
-- Title: `What would Black play after the other move?`
-- Supporting line: `Your 10-second reply timer starts next.`
+- Visible title: `What would [Black king glyph] play after the other move?`
+- Accessible title: `What would Black play after the other move?`
+- Supporting line: `You’ll have 10 seconds to play the best reply.`
 
 Ready prompt:
 
 - Title: `Find Black’s reply`
 - Context: `The other move was played.`
 
-White replaces Black when White is the replying side. The supporting line
-retains the configured reply duration and clarifies that the reply clock does
-not begin while the board is still preparing. It avoids repeating the title or
-describing an action that is not ready yet.
+The shared king glyph changes to White when White is the replying side, while
+assistive technology receives the full side name. The supporting line retains
+the configured reply duration and directly tells the player what to do once the
+board is ready. Future tense keeps clear that the reply clock has not begun on
+the preparation cue.
 
 ## Proposed preparation progression
 
