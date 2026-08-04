@@ -2430,6 +2430,8 @@ describe("PracticePocScreen", () => {
     expect(collectVisibleText(findByTestId(correct, "arrow-duel-reply-hint"))).toBe("");
     expect(findByTestId(correct, "arrow-duel-reply-hint").props.accessibilityElementsHidden)
       .toBe(true);
+    expect(flattenTestStyle(findByTestId(correct, "arrow-duel-reply-hint").props.style))
+      .toEqual(expect.objectContaining({ opacity: 0, position: "absolute" }));
     await boardMove(correct, ARROW_DUEL_REPLY_LAB_MOVES.default.expectedReply);
     expect(collectText(correct.root)).not.toContain("Solved");
     expect(findByTestId(correct, "move-feedback-overlay")).toBeTruthy();
@@ -7178,6 +7180,10 @@ describe("PracticePocScreen", () => {
     );
     expect(reviewPromptSlots).toEqual(standardPromptSlots);
     expect(replayPromptSlots).toEqual(standardPromptSlots);
+    expect(flattenTestStyle(findByTestId(standard, "practice-prompt-copy").props.style).gap)
+      .toBe(5);
+    expect(flattenTestStyle(findByTestId(standard, "practice-prompt-hint").props.style))
+      .toEqual(expect.objectContaining({ opacity: 0, position: "absolute" }));
   });
 
   it("advances Arrow Duel only after a correct opponent reply", async () => {
@@ -7294,7 +7300,14 @@ describe("PracticePocScreen", () => {
     });
     expect(imperativeMove).not.toHaveBeenCalled();
     const whatIfOverlay = findByTestId(renderer, "arrow-duel-what-if-overlay");
-    expect(collectText(whatIfOverlay)).toContain("What if you made the other move?");
+    const whatIfTitle = findByTestId(renderer, "arrow-duel-what-if-title");
+    expect(collectText(whatIfTitle)).toBe("What if you made\nthe other move?");
+    expect(flattenTestStyle(whatIfTitle.props.style)).toEqual(expect.objectContaining({
+      lineHeight: 27,
+      maxWidth: 280,
+      textAlign: "center",
+      width: "100%"
+    }));
     expect(collectText(findByTestId(renderer, "arrow-duel-what-if-detail"))).toBe(
       "Find the opponent’s reply in 10 seconds."
     );
@@ -7316,8 +7329,11 @@ describe("PracticePocScreen", () => {
       "If the tempting move was played, what happens next?"
     );
     expect(flattenTestStyle(replyCopyLayer.props.style)).toEqual(expect.objectContaining({
+      gap: 5,
       position: "absolute"
     }));
+    expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-copy").props.style).gap)
+      .toBe(5);
     expect(flattenTestStyle(replyPrompt.props.style)).toEqual(expect.objectContaining({
       height: PRACTICE_PROMPT_BASE_HEIGHT,
       width: "100%"
@@ -9470,6 +9486,25 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Choose the best move");
   });
 
+  it("keeps a wrong Arrow Duel Replay choice on the guided punishment line", async () => {
+    const renderer = renderStoredArrowDuelReplay();
+
+    await boardMove(renderer, "f2g3");
+
+    expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toContain(
+      "Follow the blue line to see why this move fails."
+    );
+
+    await settleFeedbackSnapshot();
+    await settleFeedbackSnapshot();
+
+    expect(findByTestId(renderer, "review-guided-move-overlay")).toBeTruthy();
+    expect(findByTestId(renderer, "review-guided-eval-list")).toBeTruthy();
+    expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toContain(
+      "Follow the blue line to see why this move fails."
+    );
+  });
+
   it.each([
     { height: 1376, label: "iPad portrait", scale: 2, width: 1032 },
     { height: 820, label: "iPad landscape", scale: 2, width: 1180 },
@@ -9502,20 +9537,20 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toContain(
+      "Follow the blue line to see why this move fails."
+    );
     expect(flattenTestStyle(findByTestId(renderer, "review-board").props.style)).toEqual(
       initialBoardStyle
     );
 
     await settleFeedbackSnapshot();
+    await settleFeedbackSnapshot();
     expect(promptLayoutSlotTestIDs(renderer)).toEqual(initialPromptLayout);
     expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toContain(
-      "Find the best move"
+      "Follow the blue line to see why this move fails."
     );
-    expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toContain(
-      "For white."
-    );
-    expect(() => findByTestId(renderer, "review-guided-move-overlay")).toThrow();
-    expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe("e6e7");
+    expect(findByTestId(renderer, "review-guided-move-overlay")).toBeTruthy();
     expect(flattenTestStyle(findByTestId(renderer, "review-board").props.style)).toEqual(
       initialBoardStyle
     );
@@ -10968,7 +11003,7 @@ describe("PracticePocScreen", () => {
     expect(stockfish.listenerCount()).toBe(0);
   });
 
-  it("replays Arrow Duel mistakes as an unassisted reply-side puzzle", async () => {
+  it("replays a wrong Arrow Duel choice through its guided punishment line", async () => {
     const service = createMobilePracticeService("familiar15");
     const renderer = renderScreen({ practiceService: service });
     const wrongMoves: string[] = [];
@@ -11014,33 +11049,34 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, wrongMoves[0] as string);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toContain(
+      "Follow the blue line to see why this move fails."
+    );
 
+    await settleFeedbackSnapshot();
     await settleFeedbackSnapshot();
     expectText(renderer, "1 / 3 · Arrow Duel");
     expect(() => findByTestId(renderer, "review-arrow-legend")).toThrow();
     expect(() => findByTestId(renderer, "review-arrow-choice-marker")).toThrow();
     expect(collectText(renderer.root)).not.toContain("Green = best move");
     expect(collectText(renderer.root)).not.toContain("You chose:");
-    expect(() => findByTestId(renderer, "review-guided-move-overlay")).toThrow();
-    expect(() => findByTestId(renderer, "review-guided-eval-list")).toThrow();
+    expect(findByTestId(renderer, "review-guided-move-overlay")).toBeTruthy();
+    expect(findByTestId(renderer, "review-guided-eval-list")).toBeTruthy();
     expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toContain(
-      "Find the best move"
+      "Follow the blue line to see why this move fails."
     );
     expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(initialPerspective);
-    expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBe(
-      new Chess(firstPuzzle.initialFen).turn() === "b" ? "w" : "b"
-    );
 
-    for (let cursor = 1; cursor < firstPuzzleSolution.length; cursor += 2) {
-      const replySideMove = firstPuzzleSolution[cursor];
-      if (!replySideMove) {
+    for (let cursor = 2; cursor < firstPuzzleSolution.length; cursor += 2) {
+      const punishmentMove = firstPuzzleSolution[cursor];
+      if (!punishmentMove) {
         break;
       }
-      await boardMove(renderer, replySideMove);
+      await boardMove(renderer, punishmentMove);
       await settleFeedbackSnapshot();
-      expect(() => findByTestId(renderer, "review-guided-move-overlay")).toThrow();
       expect(findByTestId(renderer, "mock-chessboard").props.flipped).toBe(initialPerspective);
-      if (cursor < firstPuzzleSolution.length - 1) {
+      if (cursor + 2 < firstPuzzleSolution.length) {
+        expect(findByTestId(renderer, "review-guided-move-overlay")).toBeTruthy();
         expect(collectVisibleText(renderer.root)).not.toContain("Solved");
       }
     }

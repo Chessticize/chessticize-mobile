@@ -517,6 +517,7 @@ const ARROW_DUEL_CORRECT_CHOICE_FEEDBACK_MS = 220;
 // appears. The reply clock still begins only after the new position is ready.
 const ARROW_DUEL_REPLY_PREPARATION_MS = 1_500;
 const ARROW_DUEL_UNDO_ANIMATION_MS = 500;
+const PRACTICE_PROMPT_COPY_GAP = 5;
 // Shared by the practice and review boards so they animate at the same speed.
 const BOARD_MOVE_ANIMATION_MS = 200;
 const ANALYSIS_DEPTH = 20;
@@ -9511,7 +9512,12 @@ function ArrowDuelWhatIfOverlay({
       style={styles.arrowDuelWhatIfOverlay}
       testID={`${testIDPrefix}-what-if-overlay`}
     >
-      <Text style={styles.arrowDuelWhatIfTitle}>What if you made the other move?</Text>
+      <Text
+        style={styles.arrowDuelWhatIfTitle}
+        testID={`${testIDPrefix}-what-if-title`}
+      >
+        What if you made{"\n"}the other move?
+      </Text>
       <Text
         style={styles.arrowDuelWhatIfDetail}
         testID={`${testIDPrefix}-what-if-detail`}
@@ -9626,7 +9632,7 @@ function ArrowDuelReplyChallengePrompt({
             accessible={Boolean(copy.hint)}
             accessibilityElementsHidden={!copy.hint}
             importantForAccessibility={copy.hint ? "auto" : "no-hide-descendants"}
-            style={[styles.promptHint, copy.hint ? null : styles.promptSolvedLayoutCopy]}
+            style={[styles.promptHint, copy.hint ? null : styles.promptEmptyLayoutCopy]}
             testID={legacyPracticePromptTestIDs
               ? "practice-prompt-hint"
               : `${testIDPrefix}-reply-hint`}
@@ -9738,7 +9744,14 @@ function PracticePrompt({
           accessibilityElementsHidden={layoutHintHidden}
           importantForAccessibility={layoutHintHidden ? "no-hide-descendants" : "auto"}
           numberOfLines={reserveDefaultLayout ? undefined : promptHintNumberOfLines}
-          style={[styles.promptHint, layoutHintHidden ? styles.promptSolvedLayoutCopy : null]}
+          style={[
+            styles.promptHint,
+            layoutHintHidden
+              ? layoutPromptHint
+                ? styles.promptSolvedLayoutCopy
+                : styles.promptEmptyLayoutCopy
+              : null
+          ]}
           testID="practice-prompt-hint"
         >
           {layoutPromptHint ?? "\u00A0"}
@@ -11717,7 +11730,11 @@ type ReviewQueueFilter =
   | `speed:${number}`;
 
 type ReviewPuzzleState =
-  | { kind: "line"; line: PuzzleLineState }
+  | {
+      kind: "line";
+      line: PuzzleLineState;
+      arrowDuelLineKind?: "punishment" | "reply";
+    }
   | { kind: "arrow_duel"; duel: ArrowDuelState };
 
 function buildServiceReviewEntry(
@@ -12504,7 +12521,10 @@ function ReviewSession({
     && currentPuzzle.kind === "arrow_duel"
     && reviewReplyPromptPhase === "reply"
     ? oppositeMoveSide(sideToMove(currentEntry.puzzle.initialFen))
-    : currentEntry.mode === "arrow_duel" && isReplay && reviewState.kind === "line"
+    : currentEntry.mode === "arrow_duel"
+      && isReplay
+      && reviewState.kind === "line"
+      && reviewState.arrowDuelLineKind === "reply"
       ? feedback?.puzzleSolved
         ? oppositeMoveSide(sideToMove(currentFen))
         : sideToMove(currentFen)
@@ -12512,10 +12532,18 @@ function ReviewSession({
   const baseBoardFlipped = reviewPerspectiveSide === "b";
   const boardFlipped = manualBoardFlip ? !baseBoardFlipped : baseBoardFlipped;
   const feedbackMove = feedback?.submittedMove && feedback.submittedMove !== "__illegal__" ? arrowFromTo(feedback.submittedMove) : null;
-  const shouldShowGuidedCurrentEval = !isReplay
-    && !analysisEnabled
+  const isArrowDuelPunishmentLine = currentEntry.mode === "arrow_duel"
+    && (
+      reviewState.kind === "line"
+        ? reviewState.arrowDuelLineKind === "punishment"
+        : reviewState.duel.phase === "choice"
+          && currentEntry.source !== "due"
+          && feedback?.result === "wrong"
+    );
+  const shouldShowGuidedCurrentEval = !analysisEnabled
     && currentEntry.mode === "arrow_duel"
-    && reviewState.kind === "line";
+    && reviewState.kind === "line"
+    && isArrowDuelPunishmentLine;
   const shouldRunGuidedCurrentEval = shouldShowGuidedCurrentEval && !isTerminalPosition(currentFen);
   const stockfishTargetFen = analysisEnabled
     ? displayFen
@@ -12547,23 +12575,14 @@ function ReviewSession({
       ? reviewState.duel.wrongMove
       : undefined;
   const guidedReviewMove =
-    !isReplay
-      && !analysisEnabled
+    !analysisEnabled
       && !feedback
       && currentEntry.mode === "arrow_duel"
       && reviewState.kind === "line"
+      && isArrowDuelPunishmentLine
       ? currentExpectedMove(reviewState.line)
       : undefined;
-  const isArrowDuelFollowUpReview = !isReplay
-    && currentEntry.mode === "arrow_duel"
-    && (
-      reviewState.kind === "line"
-      || (
-        currentEntry.source !== "due"
-        && reviewState.kind === "arrow_duel"
-        && feedback?.result === "wrong"
-      )
-    );
+  const isArrowDuelFollowUpReview = isArrowDuelPunishmentLine;
   const reviewBoardLocked = boardLocked || reviewEntryPreview.locked;
   const boardGestureEnabled = !reviewBoardLocked;
   const boardDraggableColor = boardGestureEnabled ? sideToMove(displayFen) : null;
@@ -12984,14 +13003,6 @@ function ReviewSession({
         goToNextDueReview();
         return;
       }
-      if (isReplay) {
-        const replySideLine = beginLinePuzzle(currentEntry.puzzle);
-        setReviewState({ kind: "line", line: replySideLine });
-        boardRef.current?.resetBoard(replySideLine.currentFen);
-        setFeedback(null);
-        setBoardLocked(false);
-        return;
-      }
       const replyMoves = result.feedback.autoPlayedMoves.slice(1);
       const finalFen = fenAfterMoves(submittedFen, result.feedback.autoPlayedMoves) ?? submittedFen;
       if (replyMoves.length > 0) {
@@ -13000,7 +13011,8 @@ function ReviewSession({
       }
       setReviewState({
         kind: "line",
-        line: lineStateAfterMoves(currentEntry.puzzle, result.feedback.autoPlayedMoves)
+        line: lineStateAfterMoves(currentEntry.puzzle, result.feedback.autoPlayedMoves),
+        arrowDuelLineKind: "punishment"
       });
       setFeedback(null);
       setBoardLocked(false);
@@ -13115,7 +13127,11 @@ function ReviewSession({
           continuation.state.currentFen
         );
       }
-      setReviewState({ kind: "line", line: continuation.state });
+      setReviewState({
+        kind: "line",
+        line: continuation.state,
+        arrowDuelLineKind: "reply"
+      });
       if (continuation.feedback.puzzleSolved) {
         setFeedback({
           ...result.feedback,
@@ -13171,7 +13187,11 @@ function ReviewSession({
         setFeedback(null);
         await animateReviewBoardMoves(result.feedback.autoPlayedMoves, result.state.currentFen);
       }
-      setReviewState({ kind: "line", line: result.state });
+      setReviewState({
+        kind: "line",
+        line: result.state,
+        arrowDuelLineKind: reviewState.arrowDuelLineKind
+      });
       if (result.feedback.puzzleSolved) {
         setFeedback(result.feedback);
         await sleep(FEEDBACK_SNAPSHOT_MS);
@@ -18186,6 +18206,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
     left: 0,
+    paddingHorizontal: 24,
     pointerEvents: "none",
     position: "absolute",
     right: 0,
@@ -18195,13 +18216,19 @@ const styles = StyleSheet.create({
   arrowDuelWhatIfTitle: {
     color: "#FFFFFF",
     fontSize: 22,
-    fontWeight: "900"
+    fontWeight: "900",
+    lineHeight: 27,
+    maxWidth: 280,
+    textAlign: "center",
+    width: "100%"
   },
   arrowDuelWhatIfDetail: {
     color: "#E2E8F0",
     fontSize: 14,
     fontWeight: "700",
-    marginTop: 6
+    lineHeight: 19,
+    marginTop: 8,
+    textAlign: "center"
   },
   coordinateOverlay: {
     left: 0,
@@ -18265,6 +18292,7 @@ const styles = StyleSheet.create({
   },
   arrowDuelReplyCopyLayer: {
     bottom: 0,
+    gap: PRACTICE_PROMPT_COPY_GAP,
     justifyContent: "center",
     left: 0,
     position: "absolute",
@@ -18368,7 +18396,7 @@ const styles = StyleSheet.create({
   },
   promptCopy: {
     flex: 1,
-    gap: 2,
+    gap: PRACTICE_PROMPT_COPY_GAP,
     minWidth: 0,
     position: "relative"
   },
@@ -18386,7 +18414,7 @@ const styles = StyleSheet.create({
     top: 0
   },
   promptMessageOverlay: {
-    gap: 2
+    gap: PRACTICE_PROMPT_COPY_GAP
   },
   promptText: {
     color: "#334155",
@@ -18400,6 +18428,10 @@ const styles = StyleSheet.create({
   },
   promptSolvedLayoutCopy: {
     opacity: 0
+  },
+  promptEmptyLayoutCopy: {
+    opacity: 0,
+    position: "absolute"
   },
   sessionScoreStrip: {
     alignItems: "center",

@@ -425,7 +425,7 @@ function expectedMoveForLab(displayFen: string): string | undefined {
     }
   }
   const reviewExpectedMove = labTestText("review-current-expected-move");
-  return reviewExpectedMove || undefined;
+  return reviewExpectedMove || replayPuzzlePosition(displayFen)?.expectedMove;
 }
 
 function wrongMoveForLab(chess: Chess, expected: string | undefined): BoardMove | undefined {
@@ -434,7 +434,47 @@ function wrongMoveForLab(chess: Chess, expected: string | undefined): BoardMove 
   if (!replyChallengeActive && activePuzzle?.kind === "arrow_duel") {
     return parseUci(activePuzzle.wrongMove);
   }
+  if (labDocument()?.querySelector('[data-testid="review-arrow-duel-candidate-overlay"]')) {
+    const expectedNormalized = expected?.toLowerCase();
+    const replayCandidate = replayPuzzlePosition(chess.fen())?.puzzle.solutionMoves[0];
+    if (replayCandidate && replayCandidate.toLowerCase() !== expectedNormalized) {
+      return parseUci(replayCandidate);
+    }
+  }
   return firstDifferentLegalMove(chess, expected);
+}
+
+function replayPuzzlePosition(displayFen: string) {
+  const service = getLabPracticeService();
+  if (!service) {
+    return undefined;
+  }
+  const targetFen = normalizedFen(displayFen);
+  for (const attempt of service.listHistory()) {
+    const puzzle = service.getPuzzle(attempt.puzzleId);
+    if (!puzzle) {
+      continue;
+    }
+    const chess = createChess(puzzle.initialFen);
+    for (let cursor = 0; cursor <= puzzle.solutionMoves.length; cursor += 1) {
+      if (chess.fen() === targetFen) {
+        return {
+          expectedMove: puzzle.solutionMoves[cursor],
+          puzzle
+        };
+      }
+      const move = puzzle.solutionMoves[cursor];
+      if (!move) {
+        break;
+      }
+      try {
+        chess.move(parseUci(move));
+      } catch {
+        break;
+      }
+    }
+  }
+  return undefined;
 }
 
 function activeLabPuzzle() {
