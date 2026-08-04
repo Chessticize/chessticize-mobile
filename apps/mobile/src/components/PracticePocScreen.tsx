@@ -308,6 +308,7 @@ export type SprintRulesGuidePresentation = {
 
 export type SprintSessionGuidePresentation = SprintRulesGuidePresentation & {
   arrowDuelReplyChallenge?: boolean;
+  arrowDuelReplyOnboarding?: "choice_then_reply";
   focusedRun?: boolean;
   guideKey?: Exclude<SprintGuideKey, "rules">;
   maxAttempts?: number;
@@ -405,6 +406,10 @@ type BoardResetSlide = BoardMove & {
 };
 
 type MoveSide = "w" | "b";
+
+function moveSideDisplayName(side: MoveSide): "Black" | "White" {
+  return side === "b" ? "Black" : "White";
+}
 
 type BoardMoveContext = {
   puzzleId: string | null;
@@ -728,6 +733,7 @@ export function PracticePocScreen({
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
   const arrowDuelReplyPuzzleElapsedSecondsRef = useRef(0);
   const arrowDuelReplyChallengeTimeoutHandlerRef = useRef<() => void>(() => undefined);
+  const arrowDuelReplyPreparationContinueRef = useRef<(() => void) | null>(null);
   const nowMsRef = useRef<number>(currentTimeMs());
   const reviewBackCommandIdRef = useRef(0);
   const { fontScale, height, width } = useWindowDimensions();
@@ -769,6 +775,8 @@ export function PracticePocScreen({
   const [arrowDuelReplyPromptPhase, setArrowDuelReplyPromptPhase] =
     useState<ArrowDuelReplyChallengePhase>("choice");
   const [arrowDuelWhatIfVisible, setArrowDuelWhatIfVisible] = useState(false);
+  const [arrowDuelReplyPreparationAcknowledged, setArrowDuelReplyPreparationAcknowledged] =
+    useState(false);
   const [aggregateRevision, setAggregateRevision] = useState(0);
   const [reviewQueue, setReviewQueue] = useState<ReviewQueueState[]>([]);
   const [dueReviewItems, setDueReviewItems] = useState<ReviewQueueItem[]>([]);
@@ -2341,10 +2349,21 @@ export function PracticePocScreen({
       );
       commitBoardFen(submittedPuzzle.currentFen);
       setArrowDuelReplyPromptPhase("reply");
-      await sleep(
-        sprintRulesDesignPreview?.arrowDuelReplyChallenge?.preparationHoldMs
-          ?? ARROW_DUEL_REPLY_PREPARATION_MS
-      );
+      setArrowDuelReplyPreparationAcknowledged(false);
+      if (
+        sprintRulesDesignPreview?.arrowDuelReplyChallenge
+          ?.preparationConfirmationRequired === true
+      ) {
+        await new Promise<void>((resolve) => {
+          arrowDuelReplyPreparationContinueRef.current = resolve;
+        });
+        arrowDuelReplyPreparationContinueRef.current = null;
+      } else {
+        await sleep(
+          sprintRulesDesignPreview?.arrowDuelReplyChallenge?.preparationHoldMs
+            ?? ARROW_DUEL_REPLY_PREPARATION_MS
+        );
+      }
       await animateBoardMoves(opponentMoves, transition.boardFen ?? null);
       if (transition.lastMove !== undefined) {
         setLastBoardMove(transition.lastMove ? arrowFromTo(transition.lastMove) : null);
@@ -2352,6 +2371,7 @@ export function PracticePocScreen({
       setArrowDuelReplyChallengePhase("reply");
       setArrowDuelWhatIfVisible(false);
     } finally {
+      arrowDuelReplyPreparationContinueRef.current = null;
       setArrowDuelWhatIfVisible(false);
       boardSyncInProgressRef.current = false;
       if (boardInputLockRevisionRef.current === handoffLockRevision) {
@@ -3294,6 +3314,7 @@ export function PracticePocScreen({
     setArrowDuelReplyChallengePhase("choice");
     setArrowDuelReplyPromptPhase("choice");
     setArrowDuelWhatIfVisible(false);
+    setArrowDuelReplyPreparationAcknowledged(false);
   }, [currentPuzzle?.puzzle.id]);
   arrowDuelReplyChallengeTimeoutHandlerRef.current = () => {
     const timeoutPuzzle = stateRef.current?.currentPuzzle;
@@ -3372,9 +3393,12 @@ export function PracticePocScreen({
             Math.ceil((new Date(displayedArrowDuelPuzzle.replyDeadlineAt).getTime() - nowMs) / 1000)
           )
         : state?.config.opponentReply?.seconds ?? arrowDuelReplySeconds;
-  const arrowDuelWhatIfDetail = `Find the opponent’s reply in ${arrowDuelReplySecondsRemaining} ${
-    arrowDuelReplySecondsRemaining === 1 ? "second" : "seconds"
-  }.`;
+  const explicitReplySideCopy = arrowDuelReplyChallengeDesign?.explicitReplySideCopy === true;
+  const arrowDuelWhatIfDetail = explicitReplySideCopy
+    ? `Your ${arrowDuelReplySecondsRemaining}-second reply timer starts next.`
+    : `Find the opponent’s reply in ${arrowDuelReplySecondsRemaining} ${
+        arrowDuelReplySecondsRemaining === 1 ? "second" : "seconds"
+      }.`;
   const currentBoardFen = boardFen ?? currentPuzzle?.currentFen ?? null;
   const displayedPuzzle = feedbackSnapshot?.currentPuzzle ?? currentPuzzle;
   const sessionEntryPreview = usePuzzleEntryPreview({
@@ -4019,8 +4043,20 @@ export function PracticePocScreen({
 
         {arrowDuelWhatIfVisible ? (
           <ArrowDuelWhatIfOverlay
+            actionLabel={sprintRulesDesignPreview?.arrowDuelReplyChallenge
+              ?.preparationConfirmationRequired === true
+              && !arrowDuelReplyPreparationAcknowledged
+              ? "Got it"
+              : undefined}
             detail={arrowDuelWhatIfDetail}
+            onAction={() => {
+              setArrowDuelReplyPreparationAcknowledged(true);
+              arrowDuelReplyPreparationContinueRef.current?.();
+            }}
             testIDPrefix="arrow-duel"
+            title={explicitReplySideCopy && arrowDuelPromptSide
+              ? `What would ${moveSideDisplayName(arrowDuelPromptSide)} play after the other move?`
+              : undefined}
           />
         ) : null}
 
@@ -4084,15 +4120,19 @@ export function PracticePocScreen({
       ]}
     >
       {arrowDuelReplyChallengeVisible && displayedPuzzle?.kind === "arrow_duel" ? (
-        <ArrowDuelReplyChallengePrompt
-          currentPuzzle={displayedPuzzle}
-          frameHeight={adaptiveLayout.promptFrameHeight}
-          kingPieceSize={kingGlyphSizeForBoard(boardSize)}
-          phase={arrowDuelReplyChallengeDisplayPhase}
-          promptSide={arrowDuelPromptSide}
-          replyReady={arrowDuelReplyReady}
-          replySeconds={arrowDuelReplySecondsRemaining}
-        />
+          <ArrowDuelReplyChallengePrompt
+            currentPuzzle={displayedPuzzle}
+            explicitReplySideCopy={explicitReplySideCopy}
+            frameHeight={adaptiveLayout.promptFrameHeight}
+            hideSideGlyph={explicitReplySideCopy && (
+              sessionUsesRail ? adaptiveLayout.sessionRailWidth : boardSize
+            ) < 240}
+            kingPieceSize={kingGlyphSizeForBoard(boardSize)}
+            phase={arrowDuelReplyChallengeDisplayPhase}
+            promptSide={arrowDuelPromptSide}
+            replyReady={arrowDuelReplyReady}
+            replySeconds={arrowDuelReplySecondsRemaining}
+          />
       ) : (
         <PracticePrompt
           currentPuzzle={displayedPuzzle}
@@ -4259,9 +4299,15 @@ export function PracticePocScreen({
                     adaptiveLayout={adaptiveLayout}
                     boardSize={boardSize}
                     coachStep={sessionGuideCoachStep}
+                    coachStepOffset={sessionGuidePresentations
+                      .slice(0, sessionGuideIndex)
+                      .reduce((total, guide) => total + sessionGuideCoachStepCount(guide), 0)}
                     presentation={sessionGuidePresentation}
                     stepNumber={sessionGuideIndex + 1}
-                    totalSteps={sessionGuidePresentations.length}
+                    totalCoachSteps={sessionGuidePresentations.reduce(
+                      (total, guide) => total + sessionGuideCoachStepCount(guide),
+                      0
+                    )}
                     onExit={dismissSessionGuide}
                     onBack={() => {
                       if (sessionGuideCoachStep > 0) {
@@ -4276,10 +4322,13 @@ export function PracticePocScreen({
                     }}
                     onContinue={() => {
                       if (
-                        sessionGuidePresentation.mode === "standard"
-                        && sessionGuideCoachStep < 3
+                        sessionGuideCoachStep
+                          < sessionGuideCoachStepCount(sessionGuidePresentation) - 1
                       ) {
-                        setSessionGuideCoachStep((current) => Math.min(current + 1, 3));
+                        setSessionGuideCoachStep((current) => Math.min(
+                          current + 1,
+                          sessionGuideCoachStepCount(sessionGuidePresentation) - 1
+                        ));
                         return;
                       }
                       const nextIndex = sessionGuideIndex + 1;
@@ -4625,6 +4674,7 @@ export function PracticePocScreen({
                   currentTimeMs={currentTimeMs}
                   deferBackRelevantTransition={deferBackRelevantTransition}
                   entries={historyReviewEntries}
+                  explicitReplySideCopy={explicitReplySideCopy}
                   initialIndex={historyReviewInitialIndex}
                   moveFeedbackClient={moveFeedbackClient}
                   service={service}
@@ -4749,6 +4799,7 @@ export function PracticePocScreen({
                 adaptiveLayout={adaptiveLayout}
                 boardSize={boardSize}
                 dueReviewItems={dueReviewItems}
+                explicitReplySideCopy={explicitReplySideCopy}
                 nowMs={nowMs}
                 reviewQueue={reviewQueue}
                 currentTimeMs={currentTimeMs}
@@ -5717,7 +5768,11 @@ function SprintRuleRow({
 type SessionGuideCallout = {
   badge: string;
   detail: string;
-  id: "arrow-duel" | "overview" | "slow" | "timeout" | "unclear";
+  id: "arrow-duel" | "arrow-duel-reply" | "overview" | "slow" | "timeout" | "unclear";
+  timingStages?: readonly {
+    duration: string;
+    label: string;
+  }[];
   title: string;
   tone: "danger" | "info" | "warning";
 };
@@ -5751,9 +5806,32 @@ function sessionGuideCallout(
   mode: "standard" | "arrow_duel",
   coachStep: number,
   focusedRun = false,
-  arrowDuelReplyChallenge = false
+  arrowDuelReplyChallenge = false,
+  arrowDuelReplyOnboarding = false
 ): SessionGuideCallout {
   if (mode === "arrow_duel") {
+    if (arrowDuelReplyChallenge && arrowDuelReplyOnboarding) {
+      return coachStep === 0
+        ? {
+            badge: "ARROW DUEL · 1 OF 2",
+            detail: "Play one of the two arrows. A correct choice rewinds the board and plays the other, tempting move instead.",
+            id: "arrow-duel",
+            title: "Choose the stronger move",
+            tone: "info"
+          }
+        : {
+            badge: "FIND THE REPLY · 2 OF 2",
+            detail: "After the other move lands, play Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review.",
+            id: "arrow-duel-reply",
+            timingStages: [
+              { duration: "Got it", label: "First cue" },
+              { duration: "1.5 sec", label: "Sprints 2–3" },
+              { duration: "1 sec", label: "Sprint 4+" }
+            ],
+            title: "Then reply for Black",
+            tone: "info"
+          };
+    }
     if (arrowDuelReplyChallenge) {
       return {
         badge: "ARROW DUEL",
@@ -5811,26 +5889,37 @@ function sessionGuideCallout(
   };
 }
 
+function sessionGuideCoachStepCount(
+  presentation: SprintSessionGuidePresentation
+): number {
+  if (presentation.mode === "standard") {
+    return 4;
+  }
+  return presentation.arrowDuelReplyOnboarding === "choice_then_reply" ? 2 : 1;
+}
+
 function ActiveSessionGuide({
   adaptiveLayout,
   boardSize,
   coachStep,
+  coachStepOffset,
   onBack,
   onContinue,
   onExit,
   presentation,
   stepNumber,
-  totalSteps
+  totalCoachSteps
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
   coachStep: number;
+  coachStepOffset: number;
   onBack: () => void;
   onContinue: () => void;
   onExit: () => void;
   presentation: SprintSessionGuidePresentation;
   stepNumber: number;
-  totalSteps: number;
+  totalCoachSteps: number;
 }): React.JSX.Element {
   const isArrowDuel = presentation.mode === "arrow_duel";
   const isFocusedRun = presentation.focusedRun === true;
@@ -5842,14 +5931,11 @@ function ActiveSessionGuide({
           adaptiveLayout.contentHeight * (adaptiveLayout.isRegularWidth ? 0.42 : 0.34)
         )
       );
-  const hasNextGuide = stepNumber < totalSteps;
-  const unifiedCoachTotal = totalSteps > 1 ? 5 : isArrowDuel ? 1 : 4;
-  const unifiedCoachStep = isArrowDuel && totalSteps > 1
-    ? 5
-    : isArrowDuel
-      ? 1
-      : coachStep + 1;
+  const currentGuideCoachSteps = sessionGuideCoachStepCount(presentation);
+  const isLastCoachStep = coachStep >= currentGuideCoachSteps - 1;
+  const unifiedCoachStep = coachStepOffset + coachStep + 1;
   const hasPreviousCoachStep = coachStep > 0 || stepNumber > 1;
+  const usesNarrowGuideNavigation = !adaptiveLayout.usesSessionRail && boardSize < 240;
   const landscapeAlignment = adaptiveLayout.usesSessionRail
     ? buildSessionGuideLandscapeAlignment({
         boardSize: guideBoardSize,
@@ -5857,7 +5943,7 @@ function ActiveSessionGuide({
         sessionRailWidth: adaptiveLayout.sessionRailWidth
       })
     : undefined;
-  const continueLabel = !isArrowDuel && (coachStep < 3 || hasNextGuide)
+  const continueLabel = !isLastCoachStep || unifiedCoachStep < totalCoachSteps
     ? "Next"
     : isFocusedRun
       ? "Start Focused Run"
@@ -5868,12 +5954,13 @@ function ActiveSessionGuide({
     presentation.mode,
     coachStep,
     isFocusedRun,
-    presentation.arrowDuelReplyChallenge === true
+    presentation.arrowDuelReplyChallenge === true,
+    presentation.arrowDuelReplyOnboarding === "choice_then_reply"
   );
 
   return (
     <View
-      accessibilityLabel={`Guide ${unifiedCoachStep} of ${unifiedCoachTotal}. ${callout.title}. ${callout.detail}`}
+      accessibilityLabel={`Guide ${unifiedCoachStep} of ${totalCoachSteps}. ${callout.title}. ${callout.detail}${callout.timingStages ? ` Preparation cue: ${callout.timingStages.map((stage) => `${stage.label}, ${stage.duration}`).join("; ")}.` : ""}`}
       style={styles.sessionGuideCalibrated}
       testID={isArrowDuel ? "practice-arrow-duel-guide" : "practice-active-session-guide"}
     >
@@ -5883,7 +5970,7 @@ function ActiveSessionGuide({
         style={FABRIC_SAFE_HIDDEN_TEXT_STYLE}
         testID="practice-session-guide-progress"
       >
-        GUIDE {unifiedCoachStep} OF {unifiedCoachTotal} · YOUR FIRST {isFocusedRun ? "FOCUSED RUN" : isArrowDuel ? "ARROW DUEL" : "ACTIVE SPRINT"}
+        GUIDE {unifiedCoachStep} OF {totalCoachSteps} · YOUR FIRST {isFocusedRun ? "FOCUSED RUN" : isArrowDuel ? "ARROW DUEL" : "ACTIVE SPRINT"}
       </Text>
       <SessionCoachmarkDemo
         adaptiveLayout={adaptiveLayout}
@@ -5909,7 +5996,9 @@ function ActiveSessionGuide({
                   width: adaptiveLayout.sessionRailWidth
                 }
               ]
-            : null
+            : usesNarrowGuideNavigation
+              ? styles.sessionGuideCoachNavigationNarrow
+              : null
         ]}
         testID="practice-session-guide-navigation"
       >
@@ -5923,6 +6012,9 @@ function ActiveSessionGuide({
               styles.sessionGuideCoachBackButton,
               adaptiveLayout.usesSessionRail
                 ? styles.sessionGuideCoachBackButtonRail
+                : null,
+              usesNarrowGuideNavigation
+                ? styles.sessionGuideCoachActionNarrow
                 : null,
               !hasPreviousCoachStep
                 ? styles.sessionGuideCoachBackButtonDisabled
@@ -5942,7 +6034,7 @@ function ActiveSessionGuide({
               Back
             </Text>
           </Pressable>
-        ) : (
+        ) : usesNarrowGuideNavigation ? null : (
           <View
             style={[
               styles.sessionGuideCoachBackSpacer,
@@ -5953,12 +6045,17 @@ function ActiveSessionGuide({
           />
         )}
         <Text
-          accessibilityLabel={`Guide ${unifiedCoachStep} of ${unifiedCoachTotal}`}
+          accessibilityLabel={`Guide ${unifiedCoachStep} of ${totalCoachSteps}`}
           numberOfLines={1}
-          style={styles.sessionGuideCoachProgress}
+          style={[
+            styles.sessionGuideCoachProgress,
+            usesNarrowGuideNavigation
+              ? styles.sessionGuideCoachProgressNarrow
+              : null
+          ]}
           testID="practice-session-guide-coach-progress"
         >
-          {unifiedCoachStep} of {unifiedCoachTotal}
+          {unifiedCoachStep} of {totalCoachSteps}
         </Text>
         <Pressable
           accessibilityRole="button"
@@ -5967,15 +6064,18 @@ function ActiveSessionGuide({
             styles.sessionGuideCoachNextButton,
             adaptiveLayout.usesSessionRail
               ? styles.sessionGuideCoachNextButtonRail
+              : null,
+            usesNarrowGuideNavigation
+              ? styles.sessionGuideCoachActionNarrow
               : null
           ]}
           testID="practice-session-guide-start"
           onPress={onContinue}
         >
           <Text
-            adjustsFontSizeToFit={adaptiveLayout.usesSessionRail}
+            adjustsFontSizeToFit={adaptiveLayout.usesSessionRail || usesNarrowGuideNavigation}
             minimumFontScale={0.8}
-            numberOfLines={1}
+            numberOfLines={usesNarrowGuideNavigation ? 2 : 1}
             style={[
               styles.sessionGuideStartButtonText,
               adaptiveLayout.usesSessionRail
@@ -6036,6 +6136,21 @@ const ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE: CurrentPuzzleState = {
   solved: false,
   wrongMove: "g6e6"
 };
+const ARROW_DUEL_REPLY_GUIDE_DEMO_FEN = "7k/8/4QK2/8/8/8/8/8 b - - 1 1";
+const ARROW_DUEL_REPLY_GUIDE_DEMO_CURRENT_PUZZLE: CurrentPuzzleState = {
+  ...ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE,
+  currentFen: ARROW_DUEL_REPLY_GUIDE_DEMO_FEN,
+  phase: "reply",
+  puzzle: {
+    ...ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE.puzzle,
+    solutionMoves: ["g6e6", "h8g8"]
+  }
+};
+const ARROW_DUEL_REPLY_GUIDE_DEMO_PIECES: typeof SESSION_GUIDE_DEMO_PIECES = {
+  7: { spriteColumn: 5, spriteRow: 1 },
+  20: { spriteColumn: 4, spriteRow: 0 },
+  21: { spriteColumn: 5, spriteRow: 0 }
+};
 
 function SessionCoachmarkDemo({
   adaptiveLayout,
@@ -6055,6 +6170,9 @@ function SessionCoachmarkDemo({
   presentation: SprintSessionGuidePresentation;
 }): React.JSX.Element {
   const isArrowDuel = mode === "arrow_duel";
+  const isArrowDuelReplyStep = isArrowDuel
+    && presentation.arrowDuelReplyOnboarding === "choice_then_reply"
+    && coachStep === 1;
   const [measuredLayouts, setMeasuredLayouts] = useState<
     Partial<Record<SessionGuideMeasuredLayoutKey, SessionGuideMeasuredLayout>>
   >({});
@@ -6108,8 +6226,13 @@ function SessionCoachmarkDemo({
   }, [adaptiveLayout.usesSessionRail, rememberMeasuredLayout]);
   const boardSquareSize = boardSize / 8;
   const currentPuzzle = isArrowDuel
-    ? ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE
+    ? isArrowDuelReplyStep
+      ? ARROW_DUEL_REPLY_GUIDE_DEMO_CURRENT_PUZZLE
+      : ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE
     : SESSION_GUIDE_DEMO_CURRENT_PUZZLE;
+  const demoPieces = isArrowDuelReplyStep
+    ? ARROW_DUEL_REPLY_GUIDE_DEMO_PIECES
+    : SESSION_GUIDE_DEMO_PIECES;
   const guideState: SprintState = {
     bestStreak: 0,
     config: {
@@ -6162,7 +6285,8 @@ function SessionCoachmarkDemo({
     mode,
     coachStep,
     presentation.focusedRun === true,
-    presentation.arrowDuelReplyChallenge === true
+    presentation.arrowDuelReplyChallenge === true,
+    presentation.arrowDuelReplyOnboarding === "choice_then_reply"
   );
   const calloutUsesBoard = adaptiveLayout.usesSessionRail
     && !isArrowDuel
@@ -6229,6 +6353,18 @@ function SessionCoachmarkDemo({
   const arrowDuelLandscapeGeometry = isArrowDuel && adaptiveLayout.usesSessionRail
     ? buildArrowDuelLandscapeGuideGeometry(boardSize)
     : undefined;
+  const portraitArrowDuelCalloutWidth = isArrowDuelReplyStep
+    ? Math.min(
+        Math.max(
+          adaptiveLayout.boardSize,
+          Math.min(280, Math.max(0, adaptiveLayout.contentWidth - 32))
+        ),
+        640
+      )
+    : adaptiveLayout.boardSize;
+  const usesNarrowReplyTimingRamp = isArrowDuelReplyStep
+    && !adaptiveLayout.usesSessionRail
+    && portraitArrowDuelCalloutWidth < 260;
   const landscapeAlignment = adaptiveLayout.usesSessionRail
     ? buildSessionGuideLandscapeAlignment({
         boardSize,
@@ -6276,7 +6412,7 @@ function SessionCoachmarkDemo({
               alignSelf: "center" as const,
               marginTop: 18,
               position: "relative" as const,
-              width: adaptiveLayout.boardSize
+              width: portraitArrowDuelCalloutWidth
             }
           : {
               left: 0,
@@ -6468,7 +6604,7 @@ function SessionCoachmarkDemo({
               left: Math.round(
                 (adaptiveLayout.usesSessionRail
                   ? 0
-                  : (adaptiveLayout.boardSize - boardSize) / 2)
+                  : (portraitArrowDuelCalloutWidth - boardSize) / 2)
                   + boardSize * 0.79
               ),
               right: undefined,
@@ -6518,6 +6654,41 @@ function SessionCoachmarkDemo({
         </Text>
         <Text style={styles.sessionGuideInfoTitle}>{callout.title}</Text>
         <Text style={styles.sessionGuideInfoText}>{callout.detail}</Text>
+        {callout.timingStages ? (
+          <View
+            accessibilityLabel={`Preparation cue. ${callout.timingStages.map((stage) => `${stage.label}, ${stage.duration}`).join(". ")}.`}
+            style={[
+              styles.sessionGuideReplyTimingRamp,
+              usesNarrowReplyTimingRamp
+                ? styles.sessionGuideReplyTimingRampNarrow
+                : null
+            ]}
+            testID="practice-arrow-duel-guide-reply-timing-ramp"
+          >
+            {callout.timingStages.map((stage) => (
+              <View
+                key={stage.label}
+                style={[
+                  styles.sessionGuideReplyTimingStage,
+                  usesNarrowReplyTimingRamp
+                    ? styles.sessionGuideReplyTimingStageNarrow
+                    : null
+                ]}
+                testID={`practice-arrow-duel-guide-reply-timing-${stage.duration.replace(/[^0-9a-z]+/gi, "-").toLowerCase()}`}
+              >
+                <Text
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={styles.sessionGuideReplyTimingLabel}
+                >
+                  {stage.label}
+                </Text>
+                <Text style={styles.sessionGuideReplyTimingDuration}>{stage.duration}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </View>
       {pointerPlacement === "bottom" ? pointerNode : null}
     </View>
@@ -6559,12 +6730,28 @@ function SessionCoachmarkDemo({
             ]}
             testID="practice-session-guide-prompt"
           >
-            <PracticePrompt
-              currentPuzzle={currentPuzzle}
-              frameHeight={adaptiveLayout.promptFrameHeight}
-              kingPieceSize={kingGlyphSizeForBoard(boardSize)}
-              mode={mode}
-            />
+            {isArrowDuelReplyStep && currentPuzzle.kind === "arrow_duel" ? (
+              <ArrowDuelReplyChallengePrompt
+                currentPuzzle={currentPuzzle}
+                explicitReplySideCopy
+                frameHeight={adaptiveLayout.promptFrameHeight}
+                hideSideGlyph={boardSize < 240}
+                kingPieceSize={kingGlyphSizeForBoard(boardSize)}
+                phase="reply"
+                promptSide="b"
+                replyReady
+                replySeconds={10}
+                rootTestID="practice-prompt"
+                testIDPrefix="practice-arrow-duel-guide"
+              />
+            ) : (
+              <PracticePrompt
+                currentPuzzle={currentPuzzle}
+                frameHeight={adaptiveLayout.promptFrameHeight}
+                kingPieceSize={kingGlyphSizeForBoard(boardSize)}
+                mode={mode}
+              />
+            )}
           </View>
         </>
       ) : null}
@@ -6593,7 +6780,9 @@ function SessionCoachmarkDemo({
           <View
             accessible
             accessibilityLabel={isArrowDuel
-              ? "Fixed example Arrow Duel puzzle, White to move, two candidate arrows, not interactive"
+              ? isArrowDuelReplyStep
+                ? "Fixed example Arrow Duel reply position, Black to move after the other move, not interactive"
+                : "Fixed example Arrow Duel puzzle, White to move, two candidate arrows, not interactive"
               : "Fixed example chess puzzle, White to move, not interactive"}
             accessibilityRole="image"
             ref={!isArrowDuel && !adaptiveLayout.usesSessionRail
@@ -6623,7 +6812,7 @@ function SessionCoachmarkDemo({
               ]}
             >
               {Array.from({ length: 64 }, (_, index) => {
-                const piece = SESSION_GUIDE_DEMO_PIECES[index];
+                const piece = demoPieces[index];
                 return (
                   <View
                     key={index}
@@ -6674,12 +6863,20 @@ function SessionCoachmarkDemo({
               flipped={false}
             />
             <BoardInputBlocker />
-            {isArrowDuel && currentPuzzle.kind === "arrow_duel" ? (
+            {isArrowDuel && !isArrowDuelReplyStep && currentPuzzle.kind === "arrow_duel" ? (
               <ArrowCandidateOverlay
                 boardSize={boardSize}
                 candidates={currentPuzzle.candidates}
                 flipped={false}
                 testID="practice-arrow-duel-guide-candidates"
+              />
+            ) : null}
+            {isArrowDuelReplyStep ? (
+              <LastMoveOverlay
+                boardSize={boardSize}
+                flipped={false}
+                move={{ from: "g6", to: "e6" }}
+                overlayTestID="practice-arrow-duel-guide-reply-last-move"
               />
             ) : null}
             {!isArrowDuel && coachStep === 2 ? (
@@ -6809,12 +7006,28 @@ function SessionCoachmarkDemo({
                 ]}
                 testID="practice-session-guide-prompt"
               >
-                <PracticePrompt
-                  currentPuzzle={currentPuzzle}
-                  frameHeight={adaptiveLayout.promptFrameHeight}
-                  kingPieceSize={kingGlyphSizeForBoard(boardSize)}
-                  mode={mode}
-                />
+                {isArrowDuelReplyStep && currentPuzzle.kind === "arrow_duel" ? (
+                  <ArrowDuelReplyChallengePrompt
+                    currentPuzzle={currentPuzzle}
+                    explicitReplySideCopy
+                    frameHeight={adaptiveLayout.promptFrameHeight}
+                    hideSideGlyph={adaptiveLayout.sessionRailWidth < 240}
+                    kingPieceSize={kingGlyphSizeForBoard(boardSize)}
+                    phase="reply"
+                    promptSide="b"
+                    replyReady
+                    replySeconds={10}
+                    rootTestID="practice-prompt"
+                    testIDPrefix="practice-arrow-duel-guide"
+                  />
+                ) : (
+                  <PracticePrompt
+                    currentPuzzle={currentPuzzle}
+                    frameHeight={adaptiveLayout.promptFrameHeight}
+                    kingPieceSize={kingGlyphSizeForBoard(boardSize)}
+                    mode={mode}
+                  />
+                )}
               </View>
               <View
                 ref={slowTargetRef}
@@ -10006,18 +10219,26 @@ function ErrorPanel({ error }: { error: string }): React.JSX.Element {
 }
 
 function ArrowDuelWhatIfOverlay({
+  actionLabel,
   detail,
-  testIDPrefix
+  onAction,
+  testIDPrefix,
+  title = "What if you made\nthe other move?"
 }: {
+  actionLabel?: string;
   detail: string;
+  onAction?: () => void;
   testIDPrefix: string;
+  title?: string;
 }): React.JSX.Element {
+  const accessibilityTitle = title.replace(/\s+/g, " ");
   return (
     <View
       accessible
-      accessibilityLabel={`What if you made the other move? ${detail}`}
+      accessibilityLabel={`${accessibilityTitle} ${detail}`}
       accessibilityLiveRegion="polite"
       accessibilityRole="alert"
+      pointerEvents={actionLabel && onAction ? "auto" : "none"}
       style={styles.arrowDuelWhatIfOverlay}
       testID={`${testIDPrefix}-what-if-overlay`}
     >
@@ -10025,7 +10246,7 @@ function ArrowDuelWhatIfOverlay({
         style={styles.arrowDuelWhatIfTitle}
         testID={`${testIDPrefix}-what-if-title`}
       >
-        What if you made{"\n"}the other move?
+        {title}
       </Text>
       <Text
         style={styles.arrowDuelWhatIfDetail}
@@ -10033,13 +10254,26 @@ function ArrowDuelWhatIfOverlay({
       >
         {detail}
       </Text>
+      {actionLabel && onAction ? (
+        <Pressable
+          accessibilityLabel={actionLabel}
+          accessibilityRole="button"
+          style={styles.arrowDuelWhatIfAction}
+          testID={`${testIDPrefix}-what-if-action`}
+          onPress={onAction}
+        >
+          <Text style={styles.arrowDuelWhatIfActionText}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
 function ArrowDuelReplyChallengePrompt({
   currentPuzzle,
+  explicitReplySideCopy = false,
   frameHeight,
+  hideSideGlyph = false,
   kingPieceSize,
   legacyPracticePromptTestIDs = false,
   phase,
@@ -10051,7 +10285,9 @@ function ArrowDuelReplyChallengePrompt({
   testIDPrefix = "arrow-duel"
 }: {
   currentPuzzle: ArrowDuelState;
+  explicitReplySideCopy?: boolean;
   frameHeight: number;
+  hideSideGlyph?: boolean;
   kingPieceSize: number;
   legacyPracticePromptTestIDs?: boolean;
   phase: ArrowDuelReplyChallengePhase;
@@ -10064,6 +10300,7 @@ function ArrowDuelReplyChallengePrompt({
 }): React.JSX.Element {
   const displayedSide = promptSide ?? sideToMove(currentPuzzle.currentFen);
   const side = displayedSide === "b" ? "black" : "white";
+  const sideName = moveSideDisplayName(displayedSide);
   const expectedReply = currentPuzzle.puzzle.solutionMoves[1] ?? "";
   const copy = phase === "choice"
     ? {
@@ -10073,9 +10310,11 @@ function ArrowDuelReplyChallengePrompt({
         tone: "neutral" as const
       }
     : {
-        context: "If the tempting move was played, what happens next?",
+        context: explicitReplySideCopy
+          ? "The other move was played."
+          : "If the tempting move was played, what happens next?",
         hint: null,
-        title: "Find the reply",
+        title: explicitReplySideCopy ? `Find ${sideName}’s reply` : "Find the reply",
         tone: "reply" as const
       };
 
@@ -10090,16 +10329,18 @@ function ArrowDuelReplyChallengePrompt({
       ]}
       testID={rootTestID ?? `${testIDPrefix}-reply-challenge`}
     >
-      <View
-        style={[styles.promptIcon, { height: kingPieceSize, width: kingPieceSize }]}
-        testID="practice-prompt-icon"
-      >
-        <MoveSideGlyph
-          kingPieceSize={kingPieceSize}
-          side={displayedSide}
-          testID="practice-prompt-side-glyph"
-        />
-      </View>
+      {!hideSideGlyph ? (
+        <View
+          style={[styles.promptIcon, { height: kingPieceSize, width: kingPieceSize }]}
+          testID="practice-prompt-icon"
+        >
+          <MoveSideGlyph
+            kingPieceSize={kingPieceSize}
+            side={displayedSide}
+            testID="practice-prompt-side-glyph"
+          />
+        </View>
+      ) : null}
       <View
         style={[styles.promptCopy, styles.arrowDuelReplyPromptCopy]}
         testID="practice-prompt-copy"
@@ -12274,6 +12515,7 @@ function ReviewPanel({
   currentTimeMs,
   deferBackRelevantTransition,
   dueReviewItems,
+  explicitReplySideCopy,
   filtersExpanded,
   moveFeedbackClient,
   nowMs,
@@ -12300,6 +12542,7 @@ function ReviewPanel({
   currentTimeMs: () => number;
   deferBackRelevantTransition: DeferBackRelevantTransition;
   dueReviewItems: ReviewQueueItem[];
+  explicitReplySideCopy?: boolean;
   filtersExpanded: boolean;
   moveFeedbackClient: MoveFeedbackClient | null;
   nowMs: number;
@@ -12465,6 +12708,7 @@ function ReviewPanel({
         currentTimeMs={currentTimeMs}
         deferBackRelevantTransition={deferBackRelevantTransition}
         entries={activeEntries}
+        explicitReplySideCopy={explicitReplySideCopy}
         initialIndex={activeEntryInitialIndex}
         moveFeedbackClient={moveFeedbackClient}
         scheduledReviewCompletedCount={completedReviews.length}
@@ -12876,6 +13120,7 @@ function ReviewSession({
   currentTimeMs,
   deferBackRelevantTransition,
   entries,
+  explicitReplySideCopy = false,
   initialIndex = 0,
   moveFeedbackClient,
   onAnalysisActiveChange,
@@ -12899,6 +13144,7 @@ function ReviewSession({
   currentTimeMs: () => number;
   deferBackRelevantTransition: DeferBackRelevantTransition;
   entries: ReviewEntry[];
+  explicitReplySideCopy?: boolean;
   initialIndex?: number;
   moveFeedbackClient: MoveFeedbackClient | null;
   onAnalysisActiveChange?: (active: boolean) => void;
@@ -13121,9 +13367,11 @@ function ReviewSession({
       ? reviewReplyRemainingSeconds
         ?? Math.max(0, reviewPerPuzzleSeconds - Math.floor((reviewNowMs - reviewStartedAtMs) / 1000))
       : null;
-  const reviewWhatIfDetail = `Find the opponent’s reply in ${reviewReplySeconds} ${
-    reviewReplySeconds === 1 ? "second" : "seconds"
-  }.`;
+  const reviewWhatIfDetail = explicitReplySideCopy
+    ? `Your ${reviewReplySeconds}-second reply timer starts next.`
+    : `Find the opponent’s reply in ${reviewReplySeconds} ${
+        reviewReplySeconds === 1 ? "second" : "seconds"
+      }.`;
   const analysisEngineLabel =
     analysisEngineStatus === "stockfish"
       ? `SF 18 NNUE${analysisDepth > 0 ? ` · Depth ${analysisDepth}${analysisIsRunning ? `/${ANALYSIS_DEPTH}` : ""}` : ""}`
@@ -13868,7 +14116,11 @@ function ReviewSession({
         && feedback?.result !== "wrong" ? (
         <ArrowDuelReplyChallengePrompt
           currentPuzzle={currentPuzzle}
+          explicitReplySideCopy={explicitReplySideCopy}
           frameHeight={adaptiveLayout.promptFrameHeight}
+          hideSideGlyph={explicitReplySideCopy && (
+            adaptiveLayout.usesSessionRail ? adaptiveLayout.sessionRailWidth : boardSize
+          ) < 240}
           kingPieceSize={kingGlyphSizeForBoard(boardSize)}
           legacyPracticePromptTestIDs
           phase={reviewReplyPromptPhase}
@@ -14255,6 +14507,9 @@ function ReviewSession({
               <ArrowDuelWhatIfOverlay
                 detail={reviewWhatIfDetail}
                 testIDPrefix="review-arrow-duel"
+                title={explicitReplySideCopy
+                  ? `What would ${moveSideDisplayName(reviewPromptSide)} play after the other move?`
+                  : undefined}
               />
             ) : null}
             {reviewTimedOut ? (
@@ -17506,6 +17761,11 @@ const styles = StyleSheet.create({
     position: "absolute",
     zIndex: 6
   },
+  sessionGuideCoachNavigationNarrow: {
+    flexDirection: "column",
+    gap: 6,
+    padding: 6
+  },
   sessionGuideCoachBackButton: {
     alignItems: "center",
     borderColor: "#CBD5E1",
@@ -17520,6 +17780,10 @@ const styles = StyleSheet.create({
     minHeight: 44,
     minWidth: 64,
     paddingHorizontal: 8
+  },
+  sessionGuideCoachActionNarrow: {
+    minWidth: 0,
+    width: "100%"
   },
   sessionGuideCoachBackButtonDisabled: {
     backgroundColor: "#F8FAFC",
@@ -17549,6 +17813,11 @@ const styles = StyleSheet.create({
     minWidth: 42,
     textAlign: "center"
   },
+  sessionGuideCoachProgressNarrow: {
+    flex: 0,
+    minWidth: 0,
+    width: "100%"
+  },
   sessionGuideCoachNextButton: {
     alignItems: "center",
     backgroundColor: "#2563EB",
@@ -17573,6 +17842,50 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontSize: 11,
     lineHeight: 16
+  },
+  sessionGuideReplyTimingRamp: {
+    flexDirection: "row",
+    gap: 5,
+    marginTop: 3
+  },
+  sessionGuideReplyTimingRampNarrow: {
+    flexDirection: "column"
+  },
+  sessionGuideReplyTimingStage: {
+    alignItems: "center",
+    backgroundColor: "#EFF6FF",
+    borderColor: "#BFDBFE",
+    borderRadius: 7,
+    borderWidth: 1,
+    flex: 1,
+    gap: 1,
+    minWidth: 0,
+    paddingHorizontal: 4,
+    paddingVertical: 5
+  },
+  sessionGuideReplyTimingStageNarrow: {
+    flexBasis: "auto",
+    flexDirection: "row",
+    flexGrow: 0,
+    flexShrink: 0,
+    justifyContent: "space-between",
+    minHeight: 28,
+    paddingHorizontal: 8,
+    width: "100%"
+  },
+  sessionGuideReplyTimingLabel: {
+    color: "#475569",
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.1,
+    textAlign: "center"
+  },
+  sessionGuideReplyTimingDuration: {
+    color: "#1D4ED8",
+    fontFamily: "menlo",
+    fontSize: 10,
+    fontWeight: "900",
+    textAlign: "center"
   },
   sessionGuideStartButtonText: {
     color: "#FFFFFF",
@@ -18713,7 +19026,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     left: 0,
     paddingHorizontal: 24,
-    pointerEvents: "none",
     position: "absolute",
     right: 0,
     top: 0,
@@ -18735,6 +19047,21 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 8,
     textAlign: "center"
+  },
+  arrowDuelWhatIfAction: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 9,
+    justifyContent: "center",
+    marginTop: 18,
+    minHeight: 44,
+    minWidth: 112,
+    paddingHorizontal: 18
+  },
+  arrowDuelWhatIfActionText: {
+    color: "#0F172A",
+    fontSize: 15,
+    fontWeight: "900"
   },
   coordinateOverlay: {
     left: 0,

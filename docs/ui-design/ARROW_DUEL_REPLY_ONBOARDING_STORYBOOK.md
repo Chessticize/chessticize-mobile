@@ -1,0 +1,93 @@
+# Arrow Duel Reply Onboarding Storybook Proposal
+
+Status: Storybook review only. This proposal does not change production guide
+eligibility, preparation-duration persistence, Sprint state, Review state, or
+runtime answer handling. Product wiring begins only after explicit approval.
+
+## Problem
+
+Opponent reply is now the default Arrow Duel behavior, but the first-use guide
+still compresses the choice and reply into one explanation. A new player can
+choose between the arrows without learning the handoff that follows: the board
+rewinds, the other move is played, and the player must answer for a named side.
+
+The preparation cue and the ready prompt also use generic wording. Neither one
+makes White or Black explicit, so the player has to infer who should move from
+the board alone.
+
+## Proposed first-use sequence
+
+Keep the four shared Active Session guide screens unchanged. Replace the one
+Arrow Duel screen with two responsive screens:
+
+1. **Choose the stronger move**
+   - Show the two real candidate arrows.
+   - Explain that a correct choice rewinds the board and plays the other,
+     tempting move.
+2. **Then reply for Black**
+   - Show the resulting position without candidate or answer arrows.
+   - Highlight the other move as the last move.
+   - Use the real side glyph and the side-specific ready prompt.
+   - Explain the mistake and Review consequence without introducing partial
+     scoring.
+   - Show the proposed preparation progression as a compact three-part strip.
+
+The named side is fixture-driven in Storybook and must be derived from the
+position in production. Black is not a hard-coded product rule.
+
+## Proposed copy
+
+Preparation cue:
+
+- Title: `What would Black play after the other move?`
+- Supporting line: `Your 10-second reply timer starts next.`
+
+Ready prompt:
+
+- Title: `Find Black’s reply`
+- Context: `The other move was played.`
+
+White replaces Black when White is the replying side. The supporting line
+retains the configured reply duration and clarifies that the reply clock does
+not begin while the board is still preparing. It avoids repeating the title or
+describing an action that is not ready yet.
+
+## Proposed preparation progression
+
+The Storybook interpretation gives the first-ever cue an explicit
+acknowledgement, then reduces passive display time as the player becomes
+familiar with the handoff:
+
+- First-ever cue: remains visible until the player taps `Got it`.
+- Later cues in that first Sprint and the next two Arrow Duel Sprints: 1.5
+  seconds.
+- Fourth and later Arrow Duel Sprints: 1 second.
+
+The progression is currently presentation data only. Approval is still needed
+before deciding where the completed familiarity stage is persisted and how
+Reset guides affects it. Scheduled Review and Replay must reuse the approved
+copy, but their duration relationship to Sprint familiarity remains a product
+wiring decision.
+
+## Responsive contract
+
+- Phone portrait: keep the board unobscured; put the callout below it; preserve
+  44-point Back, Next, Start, and Exit targets.
+- Phone landscape: keep the board and control rail side by side; place the
+  callout in the board's empty lower lane; do not let its connector resemble a
+  third candidate arrow.
+- iPad portrait and landscape: preserve the same hierarchy rather than
+  expanding copy to long desktop line lengths.
+- Compact 320-point width and increased text scale: allow body copy to wrap;
+  keep each timing-stage label on one line with flexible type scaling; never
+  clip the side-specific prompt or its countdown.
+- The full-board cue must remain centered and balanced with a two- or three-line
+  title, a shorter supporting line, and no forced line break tied to one device.
+
+## Storybook boundary
+
+The Interaction Lab enables the two-step guide and side-specific copy through
+design-preview inputs. Production defaults remain unchanged in this phase.
+The first-cue story exposes the real `Got it` interaction. The later cue stories
+are frozen for visual review and labeled with their proposed 1.5-second and
+1-second stages; they do not implement the familiarity counter or persistence.

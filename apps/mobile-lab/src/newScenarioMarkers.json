@@ -3,7 +3,7 @@
     "issues": [
       {
         "issueNumber": 489,
-        "changeNote": "Explain the new choice-and-reply rule after the shared Sprint guide."
+        "changeNote": "Add a dedicated Find the reply guide step, explicit side-to-move copy, and the proposed first-cue Got it then 1.5s to 1s preparation ramp."
       }
     ]
   },
@@ -11,7 +11,7 @@
     "issues": [
       {
         "issueNumber": 489,
-        "changeNote": "Explain the choice, configurable reply time, and Review consequences."
+        "changeNote": "Show both Arrow Duel onboarding steps for users who already know the shared Sprint guide."
       }
     ]
   },
@@ -27,7 +27,7 @@
     "issues": [
       {
         "issueNumber": 489,
-        "changeNote": "Try the Arrow Duel choice-and-reply challenge and its Standard-style automatic outcome handoff."
+        "changeNote": "Preview explicit White or Black reply copy before and after the preparation handoff."
       }
     ]
   },

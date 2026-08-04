@@ -36,6 +36,8 @@ export type ArrowDuelReplyChallengePreviewTransition = {
 export type ArrowDuelReplyChallengeDesignPreview = {
   autoTimeoutMs?: number;
   enabled: boolean;
+  explicitReplySideCopy?: boolean;
+  preparationConfirmationRequired?: boolean;
   preparationHoldMs?: number;
   replySeconds?: number;
   resolveMove?: (input: {

@@ -119,6 +119,7 @@ export type LabStoryPresentation = {
 
 export function LabScenario({
   arrowDuelReplyAutoTimeoutMs,
+  arrowDuelReplyPreparationConfirmationRequired,
   arrowDuelReplyPreparationHoldMs,
   arrowDuelReplySeconds,
   runReorderPickedUpRunId,
@@ -126,6 +127,7 @@ export function LabScenario({
   storyPresentation
 }: {
   arrowDuelReplyAutoTimeoutMs?: number;
+  arrowDuelReplyPreparationConfirmationRequired?: boolean;
   arrowDuelReplyPreparationHoldMs?: number;
   arrowDuelReplySeconds?: number;
   runReorderPickedUpRunId?: string;
@@ -138,6 +140,9 @@ export function LabScenario({
     <LabScenarioContent
       key={scenarioId}
       arrowDuelReplyAutoTimeoutMs={arrowDuelReplyAutoTimeoutMs}
+      arrowDuelReplyPreparationConfirmationRequired={
+        arrowDuelReplyPreparationConfirmationRequired
+      }
       arrowDuelReplyPreparationHoldMs={arrowDuelReplyPreparationHoldMs}
       arrowDuelReplySeconds={arrowDuelReplySeconds}
       runReorderPickedUpRunId={runReorderPickedUpRunId}
@@ -150,6 +155,7 @@ export function LabScenario({
 
 function LabScenarioContent({
   arrowDuelReplyAutoTimeoutMs,
+  arrowDuelReplyPreparationConfirmationRequired,
   arrowDuelReplyPreparationHoldMs,
   arrowDuelReplySeconds,
   runReorderPickedUpRunId,
@@ -158,6 +164,7 @@ function LabScenarioContent({
   storyPresentation
 }: {
   arrowDuelReplyAutoTimeoutMs?: number;
+  arrowDuelReplyPreparationConfirmationRequired?: boolean;
   arrowDuelReplyPreparationHoldMs?: number;
   arrowDuelReplySeconds?: number;
   runReorderPickedUpRunId?: string;
@@ -256,6 +263,7 @@ function LabScenarioContent({
       }
     : screenProps;
   const effectiveScreenProps = arrowDuelReplyAutoTimeoutMs === undefined
+    && arrowDuelReplyPreparationConfirmationRequired === undefined
     && arrowDuelReplyPreparationHoldMs === undefined
     && arrowDuelReplySeconds === undefined
     ? screenPropsWithReplyFixture
@@ -270,6 +278,12 @@ function LabScenarioContent({
             ...(arrowDuelReplyAutoTimeoutMs === undefined
               ? {}
               : { autoTimeoutMs: arrowDuelReplyAutoTimeoutMs }),
+            ...(arrowDuelReplyPreparationConfirmationRequired === undefined
+              ? {}
+              : {
+                  preparationConfirmationRequired:
+                    arrowDuelReplyPreparationConfirmationRequired
+                }),
             ...(arrowDuelReplyPreparationHoldMs === undefined
               ? {}
               : { preparationHoldMs: arrowDuelReplyPreparationHoldMs }),
@@ -382,6 +396,7 @@ function sprintRulesDesignPreviewFor(
     const arrowDuelGuide = {
       ...sharedGuide,
       arrowDuelReplyChallenge: true,
+      arrowDuelReplyOnboarding: "choice_then_reply" as const,
       guideKey: "arrow_duel" as const,
       mode: "arrow_duel" as const
     };
@@ -409,9 +424,13 @@ function sprintRulesDesignPreviewFor(
   if (
     scenarioId === "practice-arrow-duel-prompt"
     || scenarioId === "practice-arrow-duel-mate-in-one"
+    || scenarioId === "review-arrow-duel-reply"
   ) {
     return {
-      arrowDuelReplyChallenge: { enabled: true },
+      arrowDuelReplyChallenge: {
+        enabled: true,
+        explicitReplySideCopy: true
+      },
       timeoutCountsAsMistake: true
     };
   }
