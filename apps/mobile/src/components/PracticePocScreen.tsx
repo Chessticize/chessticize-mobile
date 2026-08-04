@@ -5228,6 +5228,16 @@ function PracticeRunHome({
       runElementsRef.current.delete(runId);
     }
   }, []);
+  const recordNativeRunLayout = (runId: string, layout: NativeRunLayout): void => {
+    // PanResponder movement is evaluated against one geometry snapshot. React
+    // Native can deliver queued onLayout generations after pickup, so accepting
+    // them here would mix old and new card coordinates in the same gesture.
+    // The committed drop already advances this snapshot optimistically; fresh
+    // native layouts may replace it only after the gesture has finished.
+    if (draggedRunIdRef.current === null) {
+      nativeRunLayoutsRef.current.set(runId, layout);
+    }
+  };
   const captureRunPositions = (): void => {
     if (Platform.OS !== "web") {
       return;
@@ -5592,7 +5602,7 @@ function PracticeRunHome({
                 onDrop={dropRun}
                 onKeyboardReorder={reorderRunWithKeyboard}
                 onNativeDragMove={moveNativeRunDrag}
-                onNativeLayout={(runId, layout) => nativeRunLayoutsRef.current.set(runId, layout)}
+                onNativeLayout={recordNativeRunLayout}
                 onWebDragMove={previewWebRunDropTarget}
                 onWebDrop={dropRun}
               />
@@ -7326,7 +7336,6 @@ function RunCardDropSurface({
   const nativePickupActiveRef = useRef(false);
   const nativeDragCompensationRef = useRef(0);
   const nativeDragDyRef = useRef(0);
-  const nativeLayoutYRef = useRef<number | null>(null);
   const nativeDragArmedRef = useRef(false);
   const nativeDragArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nativeAutoScrollSpeedRef = useRef(0);
@@ -7510,12 +7519,6 @@ function RunCardDropSurface({
       nativeDragOffset.setValue(0);
       nativeDragCompensationRef.current = 0;
       nativeDragDyRef.current = 0;
-      // The committed reorder moved this card's base to where it is already
-      // drawn, but React Native reports that layout asynchronously — sometimes
-      // after the next drag has begun. Clearing the baseline makes the next
-      // onLayout a fresh reference point instead of a phantom mid-drag base
-      // move that would shift the card and poison the pointer position.
-      nativeLayoutYRef.current = null;
     }
     nativeDropPreviewOffset.stopAnimation();
     if (committedDropSettling && dropPreviewOffsetY === 0) {
@@ -7691,12 +7694,6 @@ function RunCardDropSurface({
 
   const handleNativeLayout = (event: LayoutChangeEvent): void => {
     const layout = event.nativeEvent.layout;
-    const previousY = nativeLayoutYRef.current;
-    if (nativeDragActiveRef.current && previousY !== null && previousY !== layout.y) {
-      nativeDragCompensationRef.current += previousY - layout.y;
-      nativeDragOffset.setValue(nativeDragDyRef.current + nativeDragCompensationRef.current);
-    }
-    nativeLayoutYRef.current = layout.y;
     onNativeLayout(runId, { y: layout.y, height: layout.height });
   };
 
