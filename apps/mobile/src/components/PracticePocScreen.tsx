@@ -5169,6 +5169,7 @@ function PracticeRunHome({
   const [dropTargetPosition, setDropTargetPosition] = useState<RunDropTargetPosition | null>(null);
   const [insertionOutlineTop, setInsertionOutlineTop] = useState<number | null>(null);
   const [dropPreviewOffsets, setDropPreviewOffsets] = useState<Record<string, number>>({});
+  const committedDropSettlingRef = useRef(false);
   const draggedRunIdRef = useRef<string | null>(null);
   const dropTargetRunIdRef = useRef<string | null>(null);
   const dropTargetPositionRef = useRef<RunDropTargetPosition | null>(null);
@@ -5200,10 +5201,16 @@ function PracticeRunHome({
       [...runElementsRef.current].map(([runId, element]) => [runId, element.getBoundingClientRect()])
     );
   };
-  const reorderRun = (runId: string, targetRunId: string): void => {
+  const reorderRun = (
+    runId: string,
+    targetRunId: string,
+    animateNativeLayout = true
+  ): void => {
     if (runId !== targetRunId) {
       captureRunPositions();
-      configureNativeRunLayoutAnimation();
+      if (animateNativeLayout) {
+        configureNativeRunLayoutAnimation();
+      }
       presentation.onIntent({ type: "move-run", runId, targetRunId });
     }
   };
@@ -5257,6 +5264,7 @@ function PracticeRunHome({
     setDropTargetPosition(null);
     setInsertionOutlineTop(null);
     setDropPreviewOffsets({});
+    committedDropSettlingRef.current = false;
     onRunReorderDragActiveChange(true);
     onRunReorderFeedbackPreview?.({ haptic: "medium" });
   };
@@ -5337,13 +5345,17 @@ function PracticeRunHome({
       sourceStride: dragSourceStrideRef.current
     }), listRect.top);
   };
-  const dropRun = (): void => {
+  const dropRun = (): boolean => {
     const runId = draggedRunIdRef.current;
     const targetRunId = dropTargetRunIdRef.current;
     if (runId && targetRunId) {
-      reorderRun(runId, targetRunId);
+      committedDropSettlingRef.current = true;
+      reorderRun(runId, targetRunId, false);
+      finishRunDrag();
+      return true;
     }
     finishRunDrag();
+    return false;
   };
   const reorderRunWithKeyboard = (runId: string, direction: "up" | "down"): void => {
     const index = presentation.runs.findIndex((run) => run.id === runId);
@@ -5508,6 +5520,7 @@ function PracticeRunHome({
                   draggedRunId
                   ?? (presentation.homeEditing ? runReorderDesignPreview?.pickedUpRunId : null)
                 )}
+                committedDropSettling={committedDropSettlingRef.current}
                 dropPreviewOffsetY={dropPreviewOffsets[run.id] ?? 0}
                 directRunEditing={presentation.directRunEditing === true}
                 dropTargetPosition={run.id === dropTargetRunId && run.id !== draggedRunId
@@ -6874,6 +6887,7 @@ function PracticeRunCard({
   active,
   canMoveDown,
   canMoveUp,
+  committedDropSettling,
   directRunEditing,
   dragging,
   dropPreviewOffsetY,
@@ -6896,6 +6910,7 @@ function PracticeRunCard({
   active: boolean;
   canMoveDown: boolean;
   canMoveUp: boolean;
+  committedDropSettling: boolean;
   directRunEditing: boolean;
   dragging: boolean;
   dropPreviewOffsetY: number;
@@ -6911,7 +6926,7 @@ function PracticeRunCard({
   onNativeLayout: (runId: string, layout: NativeRunLayout) => void;
   onWebDragMove: (runId: string, pointerY: number) => void;
   onWebDrop: () => void;
-  onDrop: () => void;
+  onDrop: () => boolean;
   onKeyboardReorder: (runId: string, direction: "up" | "down") => void;
   run: PracticeRunPresentation;
 }): React.JSX.Element {
@@ -6929,6 +6944,7 @@ function PracticeRunCard({
     <RunCardDropSurface
       draggable={editing}
       dragging={dragging}
+      committedDropSettling={committedDropSettling}
       dropPreviewOffsetY={dropPreviewOffsetY}
       dropTargetPosition={dropTargetPosition}
       dropTarget={dropTarget}
@@ -7206,6 +7222,7 @@ type WebTouchMoveElement = {
 
 function RunCardDropSurface({
   children,
+  committedDropSettling,
   draggable,
   dragging,
   dropPreviewOffsetY,
@@ -7226,6 +7243,7 @@ function RunCardDropSurface({
   onDrop
 }: {
   children: React.ReactNode;
+  committedDropSettling: boolean;
   draggable: boolean;
   dragging: boolean;
   dropPreviewOffsetY: number;
@@ -7243,7 +7261,7 @@ function RunCardDropSurface({
   onNativeLayout: (runId: string, layout: NativeRunLayout) => void;
   onWebDragMove: (runId: string, pointerY: number) => void;
   onWebDrop: () => void;
-  onDrop: () => void;
+  onDrop: () => boolean;
 }): React.JSX.Element {
   const nativeDragOffset = useRef(new Animated.Value(0)).current;
   const nativeDropPreviewOffset = useRef(new Animated.Value(dropPreviewOffsetY)).current;
@@ -7426,8 +7444,19 @@ function RunCardDropSurface({
     webElementRef.current = element;
     onElementChange(runId, element as unknown as WebRunElement | null);
   }, [handleWebTouchMove, onElementChange, runId]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (Platform.OS === "web") {
+      return;
+    }
+    if (committedDropSettling) {
+      nativeDragOffset.stopAnimation();
+      nativeDragOffset.setValue(0);
+      nativeDragCompensationRef.current = 0;
+      nativeDragDyRef.current = 0;
+    }
+    nativeDropPreviewOffset.stopAnimation();
+    if (committedDropSettling && dropPreviewOffsetY === 0) {
+      nativeDropPreviewOffset.setValue(0);
       return;
     }
     Animated.spring(nativeDropPreviewOffset, {
@@ -7437,7 +7466,12 @@ function RunCardDropSurface({
       mass: 0.8,
       useNativeDriver: true
     }).start();
-  }, [dropPreviewOffsetY, nativeDropPreviewOffset]);
+  }, [
+    committedDropSettling,
+    dropPreviewOffsetY,
+    nativeDragOffset,
+    nativeDropPreviewOffset
+  ]);
   useEffect(() => () => {
     disarmNativeDrag();
     disarmWebDrag();
@@ -7549,7 +7583,10 @@ function RunCardDropSurface({
       stopNativeAutoScroll();
       nativeDragActiveRef.current = false;
       nativePickupActiveRef.current = false;
-      nativeDragHandlersRef.current.onDrop();
+      const committed = nativeDragHandlersRef.current.onDrop();
+      if (committed) {
+        return;
+      }
       Animated.spring(nativeDragOffset, {
         toValue: 0,
         damping: 24,

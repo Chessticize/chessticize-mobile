@@ -1131,6 +1131,65 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "practice-run-insertion-outline")).toThrow();
   });
 
+  it("settles displaced native Runs directly into the committed drop layout", () => {
+    const springSpy = jest.spyOn(ReactNative.Animated, "spring");
+    const layoutAnimationSpy = jest.spyOn(ReactNative.LayoutAnimation, "configureNext");
+    try {
+      const service = createMobilePracticeService("random1000");
+      const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+      press(renderer, "practice-run-home-edit");
+      const standardRun = findNativeRunDragSurface(renderer, "practice-run-standard");
+      const arrowDuelRun = findNativeRunDragSurface(renderer, "practice-run-arrow-duel");
+
+      layoutNativeRunSurface(standardRun, 0, 100);
+      layoutNativeRunSurface(arrowDuelRun, 110, 100);
+      startNativeRunDrag(standardRun, 50);
+      moveNativeRunDrag(standardRun, 150, 100);
+
+      const arrowDuelPreviewTransform = flattenTestStyle(
+        findNativeRunDragSurface(renderer, "practice-run-arrow-duel").props.style
+      ).transform as Array<{ translateY?: number | { value: number } }>;
+      const displacedOffset = arrowDuelPreviewTransform.find((entry) =>
+        typeof entry.translateY === "object" && entry.translateY.value === -110
+      )?.translateY;
+      const draggedTransform = flattenTestStyle(
+        findNativeRunDragSurface(renderer, "practice-run-standard").props.style
+      ).transform as Array<{ translateY?: number | { value: number } }>;
+      const draggedOffset = draggedTransform.find((entry) =>
+        typeof entry.translateY === "object" && entry.translateY.value === 100
+      )?.translateY;
+      expect(typeof displacedOffset).toBe("object");
+      expect(typeof draggedOffset).toBe("object");
+      springSpy.mockClear();
+      layoutAnimationSpy.mockClear();
+
+      act(() => {
+        standardRun.props.onPanResponderRelease();
+      });
+
+      expect(springSpy.mock.calls.some(([value, configuration]) =>
+        value === (displacedOffset as unknown) && configuration.toValue === 0
+      )).toBe(false);
+      expect(springSpy.mock.calls.some(([value, configuration]) =>
+        value === (draggedOffset as unknown) && configuration.toValue === 0
+      )).toBe(false);
+      expect(layoutAnimationSpy).not.toHaveBeenCalled();
+      expect((displacedOffset as { value: number }).value).toBe(0);
+      expect((draggedOffset as { value: number }).value).toBe(0);
+      expect([...new Set(renderer.root.findAll((node) =>
+        typeof node.props.onTouchStart === "function"
+          && typeof node.props.testID === "string"
+          && node.props.testID.startsWith("practice-run-")
+      ).map((node) => node.props.testID as string))]).toEqual([
+        "practice-run-arrow-duel",
+        "practice-run-standard"
+      ]);
+    } finally {
+      layoutAnimationSpy.mockRestore();
+      springSpy.mockRestore();
+    }
+  });
+
   it("cancels a native Run insertion preview without committing the reorder", () => {
     const onIntent = jest.fn();
     const renderer = renderScreen({
@@ -1152,6 +1211,51 @@ describe("PracticePocScreen", () => {
     expect(onIntent).not.toHaveBeenCalled();
     expect(() => findByTestId(renderer, "practice-run-insertion-outline")).toThrow();
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+  });
+
+  it("keeps the spring-back animation when a native Run drag is canceled", () => {
+    const springSpy = jest.spyOn(ReactNative.Animated, "spring");
+    try {
+      const renderer = renderScreen({
+        runManagementPresentation: runManagementPresentation({ homeEditing: true })
+      });
+      const standardRun = findNativeRunDragSurface(renderer, "practice-run-standard");
+      const tacticsRun = findNativeRunDragSurface(renderer, "practice-run-tactics-focus");
+      const candidateRun = findNativeRunDragSurface(renderer, "practice-run-candidate-sprint");
+
+      layoutNativeRunSurface(standardRun, 0, 100);
+      layoutNativeRunSurface(tacticsRun, 110, 100);
+      layoutNativeRunSurface(candidateRun, 220, 100);
+      startNativeRunDrag(standardRun, 50);
+      moveNativeRunDrag(standardRun, 260, 210);
+
+      const displacedOffset = (flattenTestStyle(
+        findNativeRunDragSurface(renderer, "practice-run-tactics-focus").props.style
+      ).transform as Array<{ translateY?: number | { value: number } }>).find((entry) =>
+        typeof entry.translateY === "object" && entry.translateY.value === -110
+      )?.translateY;
+      const draggedOffset = (flattenTestStyle(
+        findNativeRunDragSurface(renderer, "practice-run-standard").props.style
+      ).transform as Array<{ translateY?: number | { value: number } }>).find((entry) =>
+        typeof entry.translateY === "object" && entry.translateY.value === 210
+      )?.translateY;
+      expect(typeof displacedOffset).toBe("object");
+      expect(typeof draggedOffset).toBe("object");
+      springSpy.mockClear();
+
+      act(() => {
+        standardRun.props.onPanResponderTerminate();
+      });
+
+      expect(springSpy.mock.calls.some(([value, configuration]) =>
+        value === (displacedOffset as unknown) && configuration.toValue === 0
+      )).toBe(true);
+      expect(springSpy.mock.calls.some(([value, configuration]) =>
+        value === (draggedOffset as unknown) && configuration.toValue === 0
+      )).toBe(true);
+    } finally {
+      springSpy.mockRestore();
+    }
   });
 
   it("lets a native Run return to its original insertion slot before drop", () => {
