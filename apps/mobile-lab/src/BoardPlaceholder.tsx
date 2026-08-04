@@ -29,6 +29,7 @@ type BoardPlaceholderProps = {
   gestureEnabled?: boolean;
   onIllegalMove?: (from: string, to: string) => void;
   onMove?: (result: BoardMoveResult) => void;
+  onReady?: () => void;
 };
 
 type BoardPlaceholderRef = {
@@ -56,7 +57,15 @@ type EntryPreviewPlan = {
 type AnimatedPreviewMove = BoardMove & { glyph: string };
 
 const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(function BoardPlaceholder(
-  { boardSize = 320, fen, flipped = false, gestureEnabled = true, onIllegalMove, onMove },
+  {
+    boardSize = 320,
+    fen,
+    flipped = false,
+    gestureEnabled = true,
+    onIllegalMove,
+    onMove,
+    onReady
+  },
   ref
 ) {
   const chessRef = useRef(createChess(fen));
@@ -72,6 +81,10 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
   const previewProgress = useRef(new Animated.Value(0)).current;
   const previewedKeyRef = useRef<string | null>(null);
   const previewMoveWaitersRef = useRef<Array<(move: BoardMove | undefined) => void>>([]);
+
+  useEffect(() => {
+    onReady?.();
+  }, [fen, onReady]);
 
   useEffect(() => {
     const nextLocked = Boolean(

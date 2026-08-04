@@ -525,6 +525,10 @@ export const ArrowDuelGuideChoice: Story = {
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-timing-demo");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-candidates");
+    await waitForTestId(
+      canvasElement,
+      "practice-arrow-duel-guide-candidates-order-g6g7-g6e8"
+    );
     await waitForTestId(canvasElement, "session-abandon");
     await waitForText(canvasElement, "5 of 6");
     await waitForText(canvasElement, "Choose the stronger move");
@@ -543,7 +547,6 @@ export const ArrowDuelGuide: Story = {
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-timing-demo");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     await waitForTestId(canvasElement, "practice-arrow-duel-guide-reply-last-move");
-    await waitForTestId(canvasElement, "practice-arrow-duel-guide-reply-timing-ramp");
     await waitForTestId(canvasElement, "session-abandon");
     await waitForText(canvasElement, "6 of 6");
     await waitForText(canvasElement, "Then reply for Black");
@@ -570,7 +573,6 @@ export const ArrowDuelGuideOnly: Story = {
     await waitForText(canvasElement, "2 of 2");
     await waitForText(canvasElement, "Then reply for Black");
     await waitForText(canvasElement, "Find Black’s reply");
-    await waitForTestId(canvasElement, "practice-arrow-duel-guide-reply-timing-ramp");
     expectTestIdAbsent(canvasElement, "practice-arrow-duel-guide-candidates");
     await centerTestId(canvasElement, "practice-arrow-duel-guide-demo-board");
     expectTestIdAbsent(canvasElement, "practice-active-session-guide");
@@ -870,6 +872,20 @@ export const ArrowDuelReplyAlternateMate: Story = {
     await waitForEnabledTestId(canvasElement, "lab-board-alternate-mate");
     await clickTestId(canvasElement, "lab-board-alternate-mate");
     await waitForTestId(canvasElement, "move-feedback-overlay");
+  }
+};
+
+export const ArrowDuelTerminalOtherMoveNoReply: Story = {
+  name: "Arrow Duel · terminal other move · no reply",
+  args: { scenarioId: "practice-arrow-duel-terminal-other-move" },
+  play: async ({ canvasElement }) => {
+    await openArrowDuelChoice(canvasElement);
+    await waitForTestId(canvasElement, "arrow-duel-candidate-overlay");
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForTestId(canvasElement, "move-feedback-overlay");
+    await expectTestIdAbsent(canvasElement, "arrow-duel-what-if-overlay");
+    await expectTestIdAbsent(canvasElement, "arrow-duel-reply-timer");
+    await waitForTestId(canvasElement, "sprint-summary-panel");
   }
 };
 

@@ -5778,10 +5778,6 @@ type SessionGuideCallout = {
   badge: string;
   detail: string;
   id: "arrow-duel" | "arrow-duel-reply" | "overview" | "slow" | "timeout" | "unclear";
-  timingStages?: readonly {
-    duration: string;
-    label: string;
-  }[];
   title: string;
   tone: "danger" | "info" | "warning";
 };
@@ -5832,11 +5828,6 @@ function sessionGuideCallout(
             badge: "FIND THE REPLY · 2 OF 2",
             detail: "After the other move lands, play Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review.",
             id: "arrow-duel-reply",
-            timingStages: [
-              { duration: "Got it", label: "First cue" },
-              { duration: "1.5 sec", label: "Sprints 2–3" },
-              { duration: "1 sec", label: "Sprint 4+" }
-            ],
             title: "Then reply for Black",
             tone: "info"
           };
@@ -5969,7 +5960,7 @@ function ActiveSessionGuide({
 
   return (
     <View
-      accessibilityLabel={`Guide ${unifiedCoachStep} of ${totalCoachSteps}. ${callout.title}. ${callout.detail}${callout.timingStages ? ` Preparation cue: ${callout.timingStages.map((stage) => `${stage.label}, ${stage.duration}`).join("; ")}.` : ""}`}
+      accessibilityLabel={`Guide ${unifiedCoachStep} of ${totalCoachSteps}. ${callout.title}. ${callout.detail}`}
       style={styles.sessionGuideCalibrated}
       testID={isArrowDuel ? "practice-arrow-duel-guide" : "practice-active-session-guide"}
     >
@@ -6126,7 +6117,7 @@ const SESSION_GUIDE_DEMO_CURRENT_PUZZLE: CurrentPuzzleState = {
   solved: false
 };
 const ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE: CurrentPuzzleState = {
-  candidates: ["g6g7", "g6e6"],
+  candidates: ["g6g7", "g6e8"],
   correctMove: "g6g7",
   currentFen: SESSION_GUIDE_DEMO_FEN,
   kind: "arrow_duel",
@@ -6135,7 +6126,7 @@ const ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE: CurrentPuzzleState = {
     id: "arrow-duel-guide-qg7-mate",
     initialFen: SESSION_GUIDE_DEMO_FEN,
     rating: 800,
-    solutionMoves: ["g6e6"],
+    solutionMoves: ["g6e8"],
     source: "synthetic",
     stockfishBestMove: "g6g7",
     stockfishEval: 900,
@@ -6143,21 +6134,21 @@ const ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE: CurrentPuzzleState = {
     themes: ["mateIn1"]
   },
   solved: false,
-  wrongMove: "g6e6"
+  wrongMove: "g6e8"
 };
-const ARROW_DUEL_REPLY_GUIDE_DEMO_FEN = "7k/8/4QK2/8/8/8/8/8 b - - 1 1";
+const ARROW_DUEL_REPLY_GUIDE_DEMO_FEN = "4Q2k/8/5K2/8/8/8/8/8 b - - 1 1";
 const ARROW_DUEL_REPLY_GUIDE_DEMO_CURRENT_PUZZLE: CurrentPuzzleState = {
   ...ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE,
   currentFen: ARROW_DUEL_REPLY_GUIDE_DEMO_FEN,
   phase: "reply",
   puzzle: {
     ...ARROW_DUEL_GUIDE_DEMO_CURRENT_PUZZLE.puzzle,
-    solutionMoves: ["g6e6", "h8g8"]
+    solutionMoves: ["g6e8", "h8h7"]
   }
 };
 const ARROW_DUEL_REPLY_GUIDE_DEMO_PIECES: typeof SESSION_GUIDE_DEMO_PIECES = {
+  4: { spriteColumn: 4, spriteRow: 0 },
   7: { spriteColumn: 5, spriteRow: 1 },
-  20: { spriteColumn: 4, spriteRow: 0 },
   21: { spriteColumn: 5, spriteRow: 0 }
 };
 
@@ -6371,9 +6362,6 @@ function SessionCoachmarkDemo({
         640
       )
     : adaptiveLayout.boardSize;
-  const usesNarrowReplyTimingRamp = isArrowDuelReplyStep
-    && !adaptiveLayout.usesSessionRail
-    && portraitArrowDuelCalloutWidth < 260;
   const landscapeAlignment = adaptiveLayout.usesSessionRail
     ? buildSessionGuideLandscapeAlignment({
         boardSize,
@@ -6663,41 +6651,6 @@ function SessionCoachmarkDemo({
         </Text>
         <Text style={styles.sessionGuideInfoTitle}>{callout.title}</Text>
         <Text style={styles.sessionGuideInfoText}>{callout.detail}</Text>
-        {callout.timingStages ? (
-          <View
-            accessibilityLabel={`Preparation cue. ${callout.timingStages.map((stage) => `${stage.label}, ${stage.duration}`).join(". ")}.`}
-            style={[
-              styles.sessionGuideReplyTimingRamp,
-              usesNarrowReplyTimingRamp
-                ? styles.sessionGuideReplyTimingRampNarrow
-                : null
-            ]}
-            testID="practice-arrow-duel-guide-reply-timing-ramp"
-          >
-            {callout.timingStages.map((stage) => (
-              <View
-                key={stage.label}
-                style={[
-                  styles.sessionGuideReplyTimingStage,
-                  usesNarrowReplyTimingRamp
-                    ? styles.sessionGuideReplyTimingStageNarrow
-                    : null
-                ]}
-                testID={`practice-arrow-duel-guide-reply-timing-${stage.duration.replace(/[^0-9a-z]+/gi, "-").toLowerCase()}`}
-              >
-                <Text
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.75}
-                  numberOfLines={1}
-                  style={styles.sessionGuideReplyTimingLabel}
-                >
-                  {stage.label}
-                </Text>
-                <Text style={styles.sessionGuideReplyTimingDuration}>{stage.duration}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
       </View>
       {pointerPlacement === "bottom" ? pointerNode : null}
     </View>
@@ -6884,7 +6837,7 @@ function SessionCoachmarkDemo({
               <LastMoveOverlay
                 boardSize={boardSize}
                 flipped={false}
-                move={{ from: "g6", to: "e6" }}
+                move={{ from: "g6", to: "e8" }}
                 overlayTestID="practice-arrow-duel-guide-reply-last-move"
               />
             ) : null}
@@ -17907,50 +17860,6 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontSize: 11,
     lineHeight: 16
-  },
-  sessionGuideReplyTimingRamp: {
-    flexDirection: "row",
-    gap: 5,
-    marginTop: 3
-  },
-  sessionGuideReplyTimingRampNarrow: {
-    flexDirection: "column"
-  },
-  sessionGuideReplyTimingStage: {
-    alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
-    borderRadius: 7,
-    borderWidth: 1,
-    flex: 1,
-    gap: 1,
-    minWidth: 0,
-    paddingHorizontal: 4,
-    paddingVertical: 5
-  },
-  sessionGuideReplyTimingStageNarrow: {
-    flexBasis: "auto",
-    flexDirection: "row",
-    flexGrow: 0,
-    flexShrink: 0,
-    justifyContent: "space-between",
-    minHeight: 28,
-    paddingHorizontal: 8,
-    width: "100%"
-  },
-  sessionGuideReplyTimingLabel: {
-    color: "#475569",
-    fontSize: 8,
-    fontWeight: "800",
-    letterSpacing: 0.1,
-    textAlign: "center"
-  },
-  sessionGuideReplyTimingDuration: {
-    color: "#1D4ED8",
-    fontFamily: "menlo",
-    fontSize: 10,
-    fontWeight: "900",
-    textAlign: "center"
   },
   sessionGuideStartButtonText: {
     color: "#FFFFFF",

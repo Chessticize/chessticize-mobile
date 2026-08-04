@@ -79,6 +79,18 @@ const ARROW_DUEL_MULTI_MATE_LAB_PUZZLE: Puzzle = {
   themes: ["mateIn1"]
 };
 
+const ARROW_DUEL_TERMINAL_OTHER_MOVE_LAB_PUZZLE: Puzzle = {
+  id: "lab-arrow-duel-terminal-other-move",
+  initialFen: "7k/8/5KQ1/8/8/8/8/8 w - - 0 1",
+  rating: 600,
+  solutionMoves: ["g6f7"],
+  source: "synthetic",
+  stockfishBestMove: "g6g7",
+  stockfishEval: 0,
+  stockfishEvalAfterFirstMove: -10000,
+  themes: ["mateIn1", "stalemate"]
+};
+
 const ARROW_DUEL_REPLAY_LAB_PUZZLE: Puzzle = {
   id: "lab-arrow-duel-replay-line",
   initialFen: "4k3/8/8/8/8/8/4P3/4K3 b - - 0 1",
@@ -101,6 +113,10 @@ export const ARROW_DUEL_REPLY_LAB_MOVES = {
     alternateReply: "g3g5",
     correctChoice: ARROW_DUEL_MULTI_MATE_LAB_PUZZLE.stockfishBestMove!,
     expectedReply: ARROW_DUEL_MULTI_MATE_LAB_PUZZLE.solutionMoves[1]!
+  },
+  terminalOtherMove: {
+    correctChoice: ARROW_DUEL_TERMINAL_OTHER_MOVE_LAB_PUZZLE.stockfishBestMove!,
+    terminalOtherMove: ARROW_DUEL_TERMINAL_OTHER_MOVE_LAB_PUZZLE.solutionMoves[0]!
   }
 } as const;
 
@@ -424,6 +440,7 @@ function sprintRulesDesignPreviewFor(
   if (
     scenarioId === "practice-arrow-duel-prompt"
     || scenarioId === "practice-arrow-duel-mate-in-one"
+    || scenarioId === "practice-arrow-duel-terminal-other-move"
     || scenarioId === "review-arrow-duel-reply"
   ) {
     return {
@@ -854,6 +871,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       service = createArrowDuelMultipleMateService();
       configurePuzzleSource = false;
       break;
+    case "practice-arrow-duel-terminal-other-move":
+      service = createArrowDuelTerminalOtherMoveService();
+      configurePuzzleSource = false;
+      break;
     case "practice-sprint-result-goal":
     case "practice-sprint-result-replay":
       service = createSprintResultReplayService();
@@ -1112,6 +1133,12 @@ function createRunManagementService(empty: boolean, dueReviewCount = 0): Practic
 function createArrowDuelMultipleMateService(): PracticeService {
   const store = new MemoryStore();
   store.seedPuzzles([ARROW_DUEL_MULTI_MATE_LAB_PUZZLE]);
+  return new PracticeService(store);
+}
+
+function createArrowDuelTerminalOtherMoveService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles([ARROW_DUEL_TERMINAL_OTHER_MOVE_LAB_PUZZLE]);
   return new PracticeService(store);
 }
 

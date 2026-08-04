@@ -21,7 +21,7 @@ Keep the four shared Active Session guide screens unchanged. Replace the one
 Arrow Duel screen with two responsive screens:
 
 1. **Choose the stronger move**
-   - Show the two real candidate arrows.
+   - Show the two legal candidate arrows: `Qg7#` and `Qe8+`.
    - Explain that a correct choice rewinds the board and plays the other,
      tempting move.
 2. **Then reply for Black**
@@ -30,7 +30,9 @@ Arrow Duel screen with two responsive screens:
    - Use the real side glyph and the side-specific ready prompt.
    - Explain the mistake and Review consequence without introducing partial
      scoring.
-   - Show the proposed preparation progression as a compact three-part strip.
+
+The guide does not expose the familiarity-timing progression. Its three timing
+states remain available as separate Storybook cue stories for design review.
 
 The named side is fixture-driven in Storybook and must be derived from the
 position in production. Black is not a hard-coded product rule.
@@ -71,6 +73,21 @@ Reset guides affects it. Scheduled Review and Replay must reuse the approved
 copy, but their duration relationship to Sprint familiarity remains a product
 wiring decision.
 
+## Terminal alternative rule
+
+The reply phase exists only when the other move leaves a legal reply. After the
+player chooses the correct move, the design checks the position produced by the
+alternative move before showing the preparation cue:
+
+- If the alternative position is playable, continue to the preparation cue and
+  reply countdown.
+- If it has no legal reply because it is checkmate or stalemate, pass the
+  puzzle immediately. Do not show the preparation cue, reply prompt, countdown,
+  or reply-timeout path.
+
+The dedicated Storybook boundary case uses `Qg7#` as the correct choice and
+`Qf7` as the stalemating alternative.
+
 ## Responsive contract
 
 - Phone portrait: keep the board unobscured; put the callout below it; preserve
@@ -80,9 +97,8 @@ wiring decision.
   third candidate arrow.
 - iPad portrait and landscape: preserve the same hierarchy rather than
   expanding copy to long desktop line lengths.
-- Compact 320-point width and increased text scale: allow body copy to wrap;
-  keep each timing-stage label on one line with flexible type scaling; never
-  clip the side-specific prompt or its countdown.
+- Compact 320-point width and increased text scale: allow body copy to wrap and
+  never clip the side-specific prompt or its countdown.
 - The full-board cue must remain centered and balanced with a two- or three-line
   title, a shorter supporting line, and no forced line break tied to one device.
 

@@ -62,6 +62,7 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       "practice-arrow-duel-guide-only",
       "practice-arrow-duel-prompt",
       "practice-arrow-duel-mate-in-one",
+      "practice-arrow-duel-terminal-other-move",
       "review-arrow-duel-reply",
       "history-arrow-duel-replay"
     ]
@@ -314,18 +315,22 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.ok(arrowDuelGuide.scope.includes.includes("Two-step Arrow Duel mental model"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Guide 5: choose the stronger move"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Guide 6: Find the reply for Black"));
-  assert.ok(arrowDuelGuide.scope.includes.includes("First cue requires Got it"));
-  assert.ok(arrowDuelGuide.scope.includes.includes("Next two Sprints 1.5-second preparation"));
-  assert.ok(arrowDuelGuide.scope.includes.includes("Later Sprints 1-second preparation"));
+  assert.ok(arrowDuelGuide.scope.includes.includes("Legal Qg7 and Qe8 candidate arrows"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Portrait callout below the board"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Landscape callout in the empty board lane"));
   assert.ok(arrowDuelGuide.scope.includes.includes(
     "Always-available direct guide exit without completion"
   ));
-  assert.match(arrowDuelGuide.description, /reply for the named side/);
-  assert.match(arrowDuelGuide.description, /waits for Got it/);
-  assert.match(arrowDuelGuide.description, /1\.5 seconds/);
-  assert.match(arrowDuelGuide.description, /1 second/);
+  assert.match(arrowDuelGuide.description, /reply for Black/);
+  assert.match(arrowDuelGuide.description, /familiarity-timing internals out/);
+  assert.match(
+    scenarioRegistry["practice-arrow-duel-terminal-other-move"].description,
+    /Qf7 stalemate/
+  );
+  assert.match(
+    scenarioRegistry["practice-arrow-duel-terminal-other-move"].description,
+    /without a preparation cue, reply prompt, countdown, or timeout path/
+  );
   const arrowDuelGuideOnly = scenarioRegistry["practice-arrow-duel-guide-only"];
   assert.ok(arrowDuelGuideOnly.scope.includes.includes(
     "Always-available direct guide exit without completion"

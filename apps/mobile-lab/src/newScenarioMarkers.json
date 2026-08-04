@@ -3,7 +3,7 @@
     "issues": [
       {
         "issueNumber": 489,
-        "changeNote": "Add a dedicated Find the reply guide step, explicit side-to-move copy, and the proposed first-cue Got it then 1.5s to 1s preparation ramp."
+        "changeNote": "Add a dedicated Find the reply guide step and explicit side-to-move copy without exposing familiarity-timing internals."
       }
     ]
   },
@@ -20,6 +20,14 @@
       {
         "issueNumber": 489,
         "changeNote": "Verify that a legal alternate mate in one is accepted as the reply."
+      }
+    ]
+  },
+  "practice-arrow-duel-terminal-other-move": {
+    "issues": [
+      {
+        "issueNumber": 489,
+        "changeNote": "Preview an immediate pass when the other candidate move ends in stalemate and therefore has no reply."
       }
     ]
   },
