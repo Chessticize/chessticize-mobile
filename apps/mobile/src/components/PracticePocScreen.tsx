@@ -1219,12 +1219,16 @@ export function PracticePocScreen({
                 advanced.state.status
               )
         );
+        // A terminal timeout has no next active puzzle, but it still owns the
+        // same stable feedback snapshot before Sprint Result replaces the board.
         if (
           advanced.attempt?.timingStatus === "timed_out" &&
           submittedPuzzle &&
           submittedFen &&
-          advanced.state.status === "active" &&
-          advanced.state.currentPuzzle?.puzzle.id !== submittedPuzzleId
+          (
+            advanced.state.status !== "active" ||
+            advanced.state.currentPuzzle?.puzzle.id !== submittedPuzzleId
+          )
         ) {
           showTimeoutSnapshot(
             advanced.state,
