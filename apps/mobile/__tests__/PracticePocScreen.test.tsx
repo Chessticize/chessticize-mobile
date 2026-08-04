@@ -1266,6 +1266,72 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
+  it("keeps a consecutive native drop accurate when reordered layouts arrive mid-drag", () => {
+    const service = createMobilePracticeService("random1000");
+    service.createPracticeRun({
+      id: "test-run",
+      name: "Test Run",
+      mode: "custom",
+      durationSeconds: 180,
+      perPuzzleSeconds: 5,
+      initialRating: 600,
+      themes: ["mixed"]
+    });
+    service.createPracticeRun({
+      id: "arrow-duel-long",
+      name: "Arrow Duel Long",
+      mode: "arrow_duel",
+      durationSeconds: 600,
+      perPuzzleSeconds: 30,
+      initialRating: 770,
+      themes: ["mixed"]
+    });
+    const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+    press(renderer, "practice-run-home-edit");
+
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-standard"), 0, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-arrow-duel"), 110, 100);
+    const testRun = findNativeRunDragSurface(renderer, "practice-run-test-run");
+    layoutNativeRunSurface(testRun, 220, 100);
+    layoutNativeRunSurface(
+      findNativeRunDragSurface(renderer, "practice-run-arrow-duel-long"),
+      330,
+      100
+    );
+
+    startNativeRunDrag(testRun, 270);
+    moveNativeRunDrag(testRun, 50, -220);
+    act(() => {
+      testRun.props.onPanResponderRelease();
+    });
+    expect(service.listPracticeRuns().filter((run) => !run.archived).map((run) => run.id)).toEqual([
+      "test-run",
+      "standard",
+      "arrow-duel",
+      "arrow-duel-long"
+    ]);
+
+    // React Native can deliver the committed reorder's onLayout callbacks after
+    // the user has already picked up the next card. Those late notifications
+    // describe positions the cards are already drawn at, so they must not be
+    // treated as a mid-drag base move that shifts the card and the pointer.
+    const standardRun = findNativeRunDragSurface(renderer, "practice-run-standard");
+    startNativeRunDrag(standardRun, 160);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-test-run"), 0, 100);
+    layoutNativeRunSurface(standardRun, 110, 100);
+    moveNativeRunDrag(standardRun, 275, 115);
+
+    act(() => {
+      standardRun.props.onPanResponderRelease();
+    });
+    expect(service.listPracticeRuns().filter((run) => !run.archived).map((run) => run.id)).toEqual([
+      "test-run",
+      "arrow-duel",
+      "standard",
+      "arrow-duel-long"
+    ]);
+  });
+
   it("cancels a native Run insertion preview without committing the reorder", () => {
     const onIntent = jest.fn();
     const renderer = renderScreen({

@@ -7473,6 +7473,12 @@ function RunCardDropSurface({
       nativeDragOffset.setValue(0);
       nativeDragCompensationRef.current = 0;
       nativeDragDyRef.current = 0;
+      // The committed reorder moved this card's base to where it is already
+      // drawn, but React Native reports that layout asynchronously — sometimes
+      // after the next drag has begun. Clearing the baseline makes the next
+      // onLayout a fresh reference point instead of a phantom mid-drag base
+      // move that would shift the card and poison the pointer position.
+      nativeLayoutYRef.current = null;
     }
     nativeDropPreviewOffset.stopAnimation();
     if (committedDropSettling && dropPreviewOffsetY === 0) {
