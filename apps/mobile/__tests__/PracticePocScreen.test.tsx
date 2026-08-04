@@ -1048,6 +1048,42 @@ describe("PracticePocScreen", () => {
     expect(moveFeedbackClient.requests).toHaveLength(2);
   });
 
+  it("picks up a native Run when the hold threshold elapses without waiting for movement", () => {
+    const runReorderFeedbackPreview = jest.fn();
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
+    const renderer = renderScreen({
+      moveFeedbackClient,
+      runManagementPresentation: runManagementPresentation({ homeEditing: true }),
+      runReorderFeedbackPreview
+    });
+    const standardRun = findNativeRunDragSurface(renderer, "practice-run-standard");
+
+    act(() => {
+      standardRun.props.onTouchStart();
+      jest.advanceTimersByTime(180);
+    });
+
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+    expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(1);
+    expect(moveFeedbackClient.requests).toEqual([{
+      cue: "move",
+      playSound: false,
+      playHaptic: true
+    }]);
+    expect(flattenTestStyle(
+      findNativeRunDragSurface(renderer, "practice-run-standard").props.style
+    ).transform).toEqual(expect.arrayContaining([
+      { translateX: 10 },
+      { translateY: -2 },
+      { scale: 1.015 }
+    ]));
+
+    act(() => {
+      standardRun.props.onTouchEnd();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+  });
+
   it("previews a native card-sized insertion slot and commits the reorder only on drop", () => {
     const onIntent = jest.fn();
     const renderer = renderScreen({
@@ -1116,6 +1152,31 @@ describe("PracticePocScreen", () => {
     expect(onIntent).not.toHaveBeenCalled();
     expect(() => findByTestId(renderer, "practice-run-insertion-outline")).toThrow();
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+  });
+
+  it("lets a native Run return to its original insertion slot before drop", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ homeEditing: true, onIntent })
+    });
+    const standardRun = findNativeRunDragSurface(renderer, "practice-run-standard");
+    const tacticsRun = findNativeRunDragSurface(renderer, "practice-run-tactics-focus");
+    const candidateRun = findNativeRunDragSurface(renderer, "practice-run-candidate-sprint");
+
+    layoutNativeRunSurface(standardRun, 0, 100);
+    layoutNativeRunSurface(tacticsRun, 110, 100);
+    layoutNativeRunSurface(candidateRun, 220, 100);
+    startNativeRunDrag(tacticsRun, 160);
+    moveNativeRunDrag(tacticsRun, 270, 110);
+    expect(findByTestId(renderer, "practice-run-insertion-outline")).toBeTruthy();
+
+    moveNativeRunDrag(tacticsRun, 170, 10);
+    expect(() => findByTestId(renderer, "practice-run-insertion-outline")).toThrow();
+
+    act(() => {
+      tacticsRun.props.onPanResponderRelease();
+    });
+    expect(onIntent).not.toHaveBeenCalled();
   });
 
   it("auto-scrolls the native Edit Runs list at an edge and stops on cancellation", () => {

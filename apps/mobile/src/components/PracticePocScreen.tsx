@@ -7121,6 +7121,13 @@ function buildRunReorderPreview({
   if (!target) {
     return null;
   }
+  const targetCenter = target.layout.top + target.layout.height / 2;
+  if (
+    Math.abs(pointerCenter - originCenter)
+    <= Math.abs(pointerCenter - targetCenter)
+  ) {
+    return null;
+  }
 
   const previewOffset = movingDown ? -sourceStride : sourceStride;
   const firstShiftedIndex = Math.min(runIndex, target.index);
@@ -7241,6 +7248,7 @@ function RunCardDropSurface({
   const nativeDragOffset = useRef(new Animated.Value(0)).current;
   const nativeDropPreviewOffset = useRef(new Animated.Value(dropPreviewOffsetY)).current;
   const nativeDragActiveRef = useRef(false);
+  const nativePickupActiveRef = useRef(false);
   const nativeDragCompensationRef = useRef(0);
   const nativeDragDyRef = useRef(0);
   const nativeLayoutYRef = useRef<number | null>(null);
@@ -7285,8 +7293,23 @@ function RunCardDropSurface({
     nativeDragArmTimerRef.current = setTimeout(() => {
       nativeDragArmTimerRef.current = null;
       nativeDragArmedRef.current = true;
+      if (!nativePickupActiveRef.current) {
+        nativePickupActiveRef.current = true;
+        nativeDragCompensationRef.current = 0;
+        nativeDragDyRef.current = 0;
+        nativeDragOffset.stopAnimation();
+        nativeRunReorderScrollController.refreshBounds();
+        onDragStart(runId);
+      }
     }, 180);
-  }, [disarmNativeDrag, draggable]);
+  }, [
+    disarmNativeDrag,
+    draggable,
+    nativeDragOffset,
+    nativeRunReorderScrollController,
+    onDragStart,
+    runId
+  ]);
   const disarmWebDrag = useCallback((): void => {
     if (webDragArmTimerRef.current) {
       clearTimeout(webDragArmTimerRef.current);
@@ -7435,6 +7458,15 @@ function RunCardDropSurface({
     onDrop,
     onNativeDragMove
   };
+  const cancelHeldNativePickup = useCallback((): void => {
+    disarmNativeDrag();
+    if (!nativePickupActiveRef.current || nativeDragActiveRef.current) {
+      return;
+    }
+    nativePickupActiveRef.current = false;
+    stopNativeAutoScroll();
+    nativeDragHandlersRef.current.onDragEnd();
+  }, [disarmNativeDrag, stopNativeAutoScroll]);
   const applyNativeDragPosition = useCallback((translationY: number): void => {
     nativeDragDyRef.current = translationY;
     const effectiveTranslationY = translationY + nativeDragCompensationRef.current;
@@ -7503,7 +7535,10 @@ function RunCardDropSurface({
       nativeDragDyRef.current = 0;
       nativeDragOffset.stopAnimation();
       nativeRunReorderScrollController.refreshBounds();
-      handlers.onDragStart(handlers.runId);
+      if (!nativePickupActiveRef.current) {
+        nativePickupActiveRef.current = true;
+        handlers.onDragStart(handlers.runId);
+      }
     },
     onPanResponderMove: (event, gesture: PanResponderGestureState) => {
       applyNativeDragPosition(gesture.dy);
@@ -7513,6 +7548,7 @@ function RunCardDropSurface({
       disarmNativeDrag();
       stopNativeAutoScroll();
       nativeDragActiveRef.current = false;
+      nativePickupActiveRef.current = false;
       nativeDragHandlersRef.current.onDrop();
       Animated.spring(nativeDragOffset, {
         toValue: 0,
@@ -7529,6 +7565,7 @@ function RunCardDropSurface({
       disarmNativeDrag();
       stopNativeAutoScroll();
       nativeDragActiveRef.current = false;
+      nativePickupActiveRef.current = false;
       nativeDragHandlersRef.current.onDragEnd();
       Animated.spring(nativeDragOffset, {
         toValue: 0,
@@ -7742,8 +7779,8 @@ function RunCardDropSurface({
       {...(draggable ? nativePanResponder.panHandlers : {})}
       accessibilityHint={draggable ? "Touch and hold, then drag vertically to reorder this run. Arrow buttons are also available." : undefined}
       onLayout={handleNativeLayout}
-      onTouchCancel={disarmNativeDrag}
-      onTouchEnd={disarmNativeDrag}
+      onTouchCancel={cancelHeldNativePickup}
+      onTouchEnd={cancelHeldNativePickup}
       onTouchStart={armNativeDrag}
       style={[
         style,
