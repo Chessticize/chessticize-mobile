@@ -986,7 +986,11 @@ describe("PracticePocScreen", () => {
 
   it("shows picked-up feedback and locks Edit Runs while a Run card drag is active", () => {
     const runReorderFeedbackPreview = jest.fn();
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
+    const practiceService = createMobilePracticeService("random1000");
     const renderer = renderScreen({
+      moveFeedbackClient,
+      practiceService,
       runManagementPresentation: runManagementPresentation({ homeEditing: true }),
       runReorderFeedbackPreview
     });
@@ -1016,6 +1020,11 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
     expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(1);
     expect(runReorderFeedbackPreview).toHaveBeenCalledWith({ haptic: "medium" });
+    expect(moveFeedbackClient.requests).toEqual([{
+      cue: "move",
+      playSound: false,
+      playHaptic: true
+    }]);
     const pickedUpRun = renderer.root.findAllByProps({ testID: "practice-run-standard" })
       .find((node) => typeof node.props.onTouchStart === "function");
     expect(pickedUpRun).toBeTruthy();
@@ -1035,11 +1044,76 @@ describe("PracticePocScreen", () => {
     });
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
     expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(2);
+    expect(moveFeedbackClient.requests).toHaveLength(2);
+  });
+
+  it("respects disabled haptics when a Run card enters drag mode", () => {
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
+    const practiceService = createMobilePracticeService("random1000");
+    practiceService.saveSettings({
+      ...practiceService.getSettings(),
+      moveFeedback: {
+        soundEnabled: true,
+        hapticsEnabled: false
+      }
+    });
+    const renderer = renderScreen({
+      moveFeedbackClient,
+      practiceService,
+      runManagementPresentation: runManagementPresentation({ homeEditing: true })
+    });
+    const standardRun = renderer.root.findAllByProps({ testID: "practice-run-standard" })
+      .find((node) => typeof node.props.onTouchStart === "function");
+
+    expect(standardRun).toBeTruthy();
+    act(() => {
+      standardRun!.props.onTouchStart();
+      jest.advanceTimersByTime(180);
+      standardRun!.props.onPanResponderGrant();
+    });
+
+    expect(moveFeedbackClient.requests).toEqual([]);
+  });
+
+  it("keeps Run dragging active when pickup haptic feedback fails", async () => {
+    const moveFeedbackClient = {
+      play: jest.fn(async () => {
+        throw new Error("haptic unavailable");
+      })
+    };
+    const renderer = renderScreen({
+      moveFeedbackClient,
+      runManagementPresentation: runManagementPresentation({ homeEditing: true })
+    });
+    const standardRun = renderer.root.findAllByProps({ testID: "practice-run-standard" })
+      .find((node) => typeof node.props.onTouchStart === "function");
+
+    expect(standardRun).toBeTruthy();
+    await act(async () => {
+      standardRun!.props.onTouchStart();
+      jest.advanceTimersByTime(180);
+      standardRun!.props.onPanResponderGrant();
+      await Promise.resolve();
+    });
+
+    expect(moveFeedbackClient.play).toHaveBeenCalledWith({
+      cue: "move",
+      playSound: false,
+      playHaptic: true
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+
+    act(() => {
+      standardRun!.props.onPanResponderRelease();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
   });
 
   it("keeps the Storybook picked-up state visual-only", () => {
     const runReorderFeedbackPreview = jest.fn();
+    const moveFeedbackClient = new FakeMoveFeedbackClient();
     const renderer = renderScreen({
+      moveFeedbackClient,
       runManagementPresentation: runManagementPresentation({ homeEditing: true }),
       runReorderDesignPreview: { pickedUpRunId: "tactics-focus" },
       runReorderFeedbackPreview
@@ -1052,6 +1126,7 @@ describe("PracticePocScreen", () => {
       .toEqual(expect.arrayContaining([{ translateY: -2 }, { scale: 1.015 }]));
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
     expect(runReorderFeedbackPreview).not.toHaveBeenCalled();
+    expect(moveFeedbackClient.requests).toEqual([]);
   });
 
   it("uses pointer-driven Web dragging without a browser-native ghost", () => {
