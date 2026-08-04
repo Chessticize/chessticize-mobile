@@ -4,12 +4,43 @@ const backHandlerListeners = new Set();
 const windowDimensionListeners = new Set();
 const defaultWindowDimensions = { width: 390, height: 844, scale: 3, fontScale: 1 };
 let windowDimensions = { ...defaultWindowDimensions };
+let scrollViewCommands = [];
+let scrollViewFrame = { x: 0, y: 0, width: 390, height: 400 };
 
 function component(name) {
   return function MockComponent(props) {
     return React.createElement(name, props, props.children);
   };
 }
+
+const MockScrollView = React.forwardRef(function MockScrollView(props, ref) {
+  React.useImperativeHandle(ref, () => ({
+    getNativeScrollRef() {
+      return {
+        measureInWindow(callback) {
+          callback(
+            scrollViewFrame.x,
+            scrollViewFrame.y,
+            scrollViewFrame.width,
+            scrollViewFrame.height
+          );
+        }
+      };
+    },
+    measureInWindow(callback) {
+      callback(
+        scrollViewFrame.x,
+        scrollViewFrame.y,
+        scrollViewFrame.width,
+        scrollViewFrame.height
+      );
+    },
+    scrollTo(options) {
+      scrollViewCommands.push({ ...options });
+    }
+  }));
+  return React.createElement('ScrollView', props, props.children);
+});
 
 class AnimatedValue {
   constructor(value) {
@@ -55,6 +86,16 @@ module.exports = {
     for (const listener of Array.from(windowDimensionListeners)) {
       listener();
     }
+  },
+  __getScrollViewCommands() {
+    return scrollViewCommands.map((command) => ({ ...command }));
+  },
+  __resetScrollView() {
+    scrollViewCommands = [];
+    scrollViewFrame = { x: 0, y: 0, width: 390, height: 400 };
+  },
+  __setScrollViewFrame(nextFrame) {
+    scrollViewFrame = { ...scrollViewFrame, ...nextFrame };
   },
   LogBox: {
     ignoreAllLogs() {}
@@ -132,7 +173,7 @@ module.exports = {
   },
   Pressable: component('Pressable'),
   SafeAreaView: component('SafeAreaView'),
-  ScrollView: component('ScrollView'),
+  ScrollView: MockScrollView,
   StatusBar: component('StatusBar'),
   Text: component('Text'),
   TextInput: component('TextInput'),

@@ -664,6 +664,42 @@ export function PracticePocScreen({
   const iCloudSyncClient = platformCapabilities.progressSync.client;
   const iCloudSyncDiagnosticsClient = platformCapabilities.progressSync.diagnostics;
   const boardRef = useRef<ChessboardRef | null>(null);
+  const practiceMainScrollRef = useRef<ScrollView | null>(null);
+  const practiceMainScrollMetricsRef = useRef({
+    contentHeight: 0,
+    offsetY: 0,
+    viewportHeight: 0,
+    windowBottom: 0,
+    windowTop: 0
+  });
+  const nativeRunReorderScrollController = useMemo<NativeRunReorderScrollController>(() => ({
+    getSnapshot(): NativeRunReorderScrollSnapshot | null {
+      const metrics = practiceMainScrollMetricsRef.current;
+      if (metrics.viewportHeight <= 0 || metrics.windowBottom <= metrics.windowTop) {
+        return null;
+      }
+      return { ...metrics };
+    },
+    refreshBounds(): void {
+      practiceMainScrollRef.current?.getNativeScrollRef()?.measureInWindow((_x, y, _width, height) => {
+        const metrics = practiceMainScrollMetricsRef.current;
+        metrics.windowTop = y;
+        metrics.windowBottom = y + (height > 0 ? height : metrics.viewportHeight);
+      });
+    },
+    scrollBy(deltaY: number): number {
+      const metrics = practiceMainScrollMetricsRef.current;
+      const maxOffsetY = Math.max(0, metrics.contentHeight - metrics.viewportHeight);
+      const nextOffsetY = Math.max(0, Math.min(maxOffsetY, metrics.offsetY + deltaY));
+      const appliedDeltaY = nextOffsetY - metrics.offsetY;
+      if (appliedDeltaY === 0 || !practiceMainScrollRef.current) {
+        return 0;
+      }
+      metrics.offsetY = nextOffsetY;
+      practiceMainScrollRef.current.scrollTo({ animated: false, y: nextOffsetY });
+      return appliedDeltaY;
+    }
+  }), []);
   const sessionBoardHandlersRef = useRef<{
     onIllegalMove: (from: Square, to: Square) => void;
     onMove: (result: MoveResult) => void;
@@ -4197,11 +4233,23 @@ export function PracticePocScreen({
           ) : null}
 
           <ScrollView
+            ref={practiceMainScrollRef}
             keyboardShouldPersistTaps="handled"
             testID="practice-main-scroll"
             scrollEnabled={!practiceScrollLocked}
+            scrollEventThrottle={16}
             showsHorizontalScrollIndicator={false}
             showsVerticalScrollIndicator={false}
+            onContentSizeChange={(_contentWidth, contentHeight) => {
+              practiceMainScrollMetricsRef.current.contentHeight = contentHeight;
+            }}
+            onLayout={(event) => {
+              practiceMainScrollMetricsRef.current.viewportHeight = event.nativeEvent.layout.height;
+              nativeRunReorderScrollController.refreshBounds();
+            }}
+            onScroll={(event) => {
+              practiceMainScrollMetricsRef.current.offsetY = event.nativeEvent.contentOffset.y;
+            }}
             contentContainerStyle={[
               styles.content,
               adaptiveLayout.usesWideContent && !sessionUsesRail ? styles.contentWide : null,
@@ -4407,6 +4455,7 @@ export function PracticePocScreen({
                     onResumeSprint={resumeSprint}
                     onOpenReview={openReviewQueue}
                     onRunReorderDragActiveChange={setRunReorderDragActive}
+                    nativeRunReorderScrollController={nativeRunReorderScrollController}
                     runReorderDesignPreview={runReorderDesignPreview}
                     onRunReorderFeedbackPreview={playRunReorderPickupFeedback}
                   />
@@ -4943,6 +4992,7 @@ function PracticeHome({
   onResumeSprint,
   onOpenReview,
   onRunReorderDragActiveChange,
+  nativeRunReorderScrollController,
   runReorderDesignPreview,
   onRunReorderFeedbackPreview
 }: {
@@ -4965,6 +5015,7 @@ function PracticeHome({
   onResumeSprint: (sprint: SprintState) => void;
   onOpenReview: () => void;
   onRunReorderDragActiveChange: (active: boolean) => void;
+  nativeRunReorderScrollController: NativeRunReorderScrollController;
   runReorderDesignPreview?: Props["runReorderDesignPreview"];
   onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
 }): React.JSX.Element {
@@ -5003,6 +5054,7 @@ function PracticeHome({
               onDismissSprintRulesGuide={onDismissSprintRulesGuide}
               onOpenSprintRulesGuide={onOpenSprintRulesGuide}
               onRunReorderDragActiveChange={onRunReorderDragActiveChange}
+              nativeRunReorderScrollController={nativeRunReorderScrollController}
               runReorderDesignPreview={runReorderDesignPreview}
               onRunReorderFeedbackPreview={onRunReorderFeedbackPreview}
             />
@@ -5098,6 +5150,7 @@ function PracticeRunHome({
   onDismissSprintRulesGuide,
   onOpenSprintRulesGuide,
   onRunReorderDragActiveChange,
+  nativeRunReorderScrollController,
   runReorderDesignPreview,
   onRunReorderFeedbackPreview
 }: {
@@ -5107,26 +5160,27 @@ function PracticeRunHome({
   onDismissSprintRulesGuide: () => void;
   onOpenSprintRulesGuide: () => void;
   onRunReorderDragActiveChange: (active: boolean) => void;
+  nativeRunReorderScrollController: NativeRunReorderScrollController;
   runReorderDesignPreview?: Props["runReorderDesignPreview"];
   onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
 }): React.JSX.Element {
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dropTargetRunId, setDropTargetRunId] = useState<string | null>(null);
   const [dropTargetPosition, setDropTargetPosition] = useState<RunDropTargetPosition | null>(null);
-  const [webInsertionOutlineTop, setWebInsertionOutlineTop] = useState<number | null>(null);
-  const [webDropPreviewOffsets, setWebDropPreviewOffsets] = useState<Record<string, number>>({});
+  const [insertionOutlineTop, setInsertionOutlineTop] = useState<number | null>(null);
+  const [dropPreviewOffsets, setDropPreviewOffsets] = useState<Record<string, number>>({});
   const draggedRunIdRef = useRef<string | null>(null);
   const dropTargetRunIdRef = useRef<string | null>(null);
   const dropTargetPositionRef = useRef<RunDropTargetPosition | null>(null);
-  const webDropPreviewOffsetsRef = useRef<Record<string, number>>({});
+  const insertionOutlineTopRef = useRef<number | null>(null);
+  const dropPreviewOffsetsRef = useRef<Record<string, number>>({});
   const webDragOriginCenterRef = useRef<number | null>(null);
-  const webDragSourceHeightRef = useRef(0);
-  const webDragSourceStrideRef = useRef(0);
+  const dragSourceHeightRef = useRef(0);
+  const dragSourceStrideRef = useRef(0);
   const webRunListElementRef = useRef<WebRunElement | null>(null);
   const runElementsRef = useRef(new Map<string, WebRunElement>());
   const nativeRunLayoutsRef = useRef(new Map<string, NativeRunLayout>());
   const nativeDragOriginCenterRef = useRef<number | null>(null);
-  const nativeDragPreviousCenterRef = useRef<number | null>(null);
   const previousRunRectsRef = useRef<Map<string, WebRunRect> | null>(null);
   const selectedRun = presentation.runs.find((run) => run.id === presentation.selectedRunId) ?? null;
   const showRestore = presentation.hiddenRuns.length > 0
@@ -5155,174 +5209,135 @@ function PracticeRunHome({
   };
   const finishRunDrag = (): void => {
     nativeDragOriginCenterRef.current = null;
-    nativeDragPreviousCenterRef.current = null;
     draggedRunIdRef.current = null;
     dropTargetRunIdRef.current = null;
     dropTargetPositionRef.current = null;
+    insertionOutlineTopRef.current = null;
     webDragOriginCenterRef.current = null;
-    webDragSourceHeightRef.current = 0;
-    webDragSourceStrideRef.current = 0;
-    webDropPreviewOffsetsRef.current = {};
+    dragSourceHeightRef.current = 0;
+    dragSourceStrideRef.current = 0;
+    dropPreviewOffsetsRef.current = {};
     setDraggedRunId(null);
     setDropTargetRunId(null);
     setDropTargetPosition(null);
-    setWebInsertionOutlineTop(null);
-    setWebDropPreviewOffsets({});
+    setInsertionOutlineTop(null);
+    setDropPreviewOffsets({});
     onRunReorderDragActiveChange(false);
   };
   const startRunDrag = (runId: string): void => {
     const layout = nativeRunLayoutsRef.current.get(runId);
     nativeDragOriginCenterRef.current = layout ? layout.y + layout.height / 2 : null;
-    nativeDragPreviousCenterRef.current = nativeDragOriginCenterRef.current;
     const webRunElement = runElementsRef.current.get(runId);
-    const webRunIndex = presentation.runs.findIndex((run) => run.id === runId);
-    if (Platform.OS === "web" && webRunElement && webRunIndex >= 0) {
+    const runIndex = presentation.runs.findIndex((run) => run.id === runId);
+    const adjacentRun = presentation.runs[runIndex + 1] ?? presentation.runs[runIndex - 1];
+    if (Platform.OS === "web" && webRunElement && runIndex >= 0) {
       const runRect = webRunElement.getBoundingClientRect();
-      const adjacentRun = presentation.runs[webRunIndex + 1] ?? presentation.runs[webRunIndex - 1];
       const adjacentRect = adjacentRun
         ? runElementsRef.current.get(adjacentRun.id)?.getBoundingClientRect()
         : undefined;
       webDragOriginCenterRef.current = runRect.top + runRect.height / 2;
-      webDragSourceHeightRef.current = runRect.height;
-      webDragSourceStrideRef.current = adjacentRect
+      dragSourceHeightRef.current = runRect.height;
+      dragSourceStrideRef.current = adjacentRect
         ? Math.abs(adjacentRect.top - runRect.top)
         : runRect.height;
+    } else if (layout && runIndex >= 0) {
+      const adjacentLayout = adjacentRun ? nativeRunLayoutsRef.current.get(adjacentRun.id) : undefined;
+      dragSourceHeightRef.current = layout.height;
+      dragSourceStrideRef.current = adjacentLayout
+        ? Math.abs(adjacentLayout.y - layout.y)
+        : layout.height;
     }
     draggedRunIdRef.current = runId;
     dropTargetRunIdRef.current = null;
     dropTargetPositionRef.current = null;
-    webDropPreviewOffsetsRef.current = {};
+    insertionOutlineTopRef.current = null;
+    dropPreviewOffsetsRef.current = {};
     setDraggedRunId(runId);
     setDropTargetRunId(null);
     setDropTargetPosition(null);
-    setWebInsertionOutlineTop(null);
-    setWebDropPreviewOffsets({});
+    setInsertionOutlineTop(null);
+    setDropPreviewOffsets({});
     onRunReorderDragActiveChange(true);
     onRunReorderFeedbackPreview?.({ haptic: "medium" });
   };
 
   useEffect(() => () => onRunReorderDragActiveChange(false), [onRunReorderDragActiveChange]);
-  const moveNativeRunDrag = (runId: string, translationY: number): void => {
-    const originCenter = nativeDragOriginCenterRef.current;
-    if (originCenter === null) {
-      return;
-    }
-    const fingerCenter = originCenter + translationY;
-    const previousCenter = nativeDragPreviousCenterRef.current ?? originCenter;
-    nativeDragPreviousCenterRef.current = fingerCenter;
-    const movingDown = fingerCenter > previousCenter;
-    if (fingerCenter === previousCenter) {
-      return;
-    }
-    const target = presentation.runs
-      .filter((run) => run.id !== runId)
-      .map((run) => ({ run, layout: nativeRunLayoutsRef.current.get(run.id) }))
-      .filter((entry): entry is { run: PracticeRunPresentation; layout: NativeRunLayout } => entry.layout !== undefined)
-      .filter((entry) => {
-        const targetCenter = entry.layout.y + entry.layout.height / 2;
-        return movingDown
-          ? targetCenter > previousCenter && targetCenter <= fingerCenter
-          : targetCenter < previousCenter && targetCenter >= fingerCenter;
-      })
-      .sort((left, right) => {
-        const leftCenter = left.layout.y + left.layout.height / 2;
-        const rightCenter = right.layout.y + right.layout.height / 2;
-        return movingDown ? rightCenter - leftCenter : leftCenter - rightCenter;
-      })[0];
-    if (target) {
-      previewNativeRunReorder(runId, target.run.id);
-    }
-  };
-  const previewNativeRunReorder = (runId: string, targetRunId: string): void => {
-    if (runId === targetRunId) {
-      return;
-    }
-    const runIndex = presentation.runs.findIndex((run) => run.id === runId);
-    const targetIndex = presentation.runs.findIndex((run) => run.id === targetRunId);
-    const targetPosition = runIndex < targetIndex ? "after" : "before";
-    dropTargetRunIdRef.current = targetRunId;
-    dropTargetPositionRef.current = targetPosition;
-    setDropTargetRunId(targetRunId);
-    setDropTargetPosition(targetPosition);
-    reorderRun(runId, targetRunId);
-  };
-  const previewWebRunDropTarget = (runId: string, pointerY: number): void => {
-    const runIndex = presentation.runs.findIndex((run) => run.id === runId);
-    const runOriginCenter = webDragOriginCenterRef.current;
-    if (runOriginCenter === null || runIndex < 0) {
-      return;
-    }
-    const movingDown = pointerY > runOriginCenter;
-    const currentPreviewOffsets = webDropPreviewOffsetsRef.current;
-    const target = presentation.runs
-      .map((run, index) => ({
-        index,
-        run,
-        rect: runElementsRef.current.get(run.id)?.getBoundingClientRect()
-      }))
-      .filter((entry): entry is {
-        index: number;
-        run: PracticeRunPresentation;
-        rect: WebRunRect;
-      } => entry.run.id !== runId && entry.rect !== undefined)
-      .filter((entry) => movingDown ? entry.index > runIndex : entry.index < runIndex)
-      .sort((left, right) => {
-        const leftTop = left.rect.top - (currentPreviewOffsets[left.run.id] ?? 0);
-        const rightTop = right.rect.top - (currentPreviewOffsets[right.run.id] ?? 0);
-        const leftDistance = Math.abs(leftTop + left.rect.height / 2 - pointerY);
-        const rightDistance = Math.abs(rightTop + right.rect.height / 2 - pointerY);
-        return leftDistance - rightDistance;
-      })[0];
-    const targetRunId = target?.run.id ?? null;
-    const targetPosition: RunDropTargetPosition | null = target
-      ? movingDown ? "after" : "before"
+  const applyRunDropPreview = (
+    preview: RunReorderPreview | null,
+    outlineContainerTop = 0
+  ): void => {
+    const targetRunId = preview?.targetRunId ?? null;
+    const targetPosition = preview?.targetPosition ?? null;
+    const nextOffsets = preview?.offsets ?? {};
+    const nextOutlineTop = preview
+      ? preview.insertionOutlineTop - outlineContainerTop
       : null;
-    const nextPreviewOffsets: Record<string, number> = {};
-    if (target && webDragSourceStrideRef.current > 0) {
-      const previewOffset = movingDown
-        ? -webDragSourceStrideRef.current
-        : webDragSourceStrideRef.current;
-      const firstShiftedIndex = Math.min(runIndex, target.index);
-      const lastShiftedIndex = Math.max(runIndex, target.index);
-      presentation.runs.forEach((run, index) => {
-        if (index >= firstShiftedIndex && index <= lastShiftedIndex && index !== runIndex) {
-          nextPreviewOffsets[run.id] = previewOffset;
-        }
-      });
-    }
-    const previewOffsetsUnchanged = presentation.runs.every((run) =>
-      (currentPreviewOffsets[run.id] ?? 0) === (nextPreviewOffsets[run.id] ?? 0)
+    const offsetsUnchanged = presentation.runs.every((run) =>
+      (dropPreviewOffsetsRef.current[run.id] ?? 0) === (nextOffsets[run.id] ?? 0)
     );
-    const listRect = webRunListElementRef.current?.getBoundingClientRect();
-    const targetPreviewOffset = target ? nextPreviewOffsets[target.run.id] ?? 0 : 0;
-    const targetBaseTop = target
-      ? target.rect.top - (currentPreviewOffsets[target.run.id] ?? 0)
-      : null;
-    const insertionGap = target
-      ? Math.max(8, webDragSourceStrideRef.current - target.rect.height)
-      : 0;
-    const sourceHeight = webDragSourceHeightRef.current;
-    const nextInsertionOutlineTop = target && targetBaseTop !== null && listRect && sourceHeight > 0
-      ? (movingDown
-          ? targetBaseTop + targetPreviewOffset + target.rect.height + insertionGap
-          : targetBaseTop + targetPreviewOffset - insertionGap - sourceHeight) - listRect.top
-      : null;
     if (
       targetRunId === dropTargetRunIdRef.current
       && targetPosition === dropTargetPositionRef.current
-      && previewOffsetsUnchanged
+      && nextOutlineTop === insertionOutlineTopRef.current
+      && offsetsUnchanged
     ) {
       return;
     }
     dropTargetRunIdRef.current = targetRunId;
     dropTargetPositionRef.current = targetPosition;
+    insertionOutlineTopRef.current = nextOutlineTop;
+    dropPreviewOffsetsRef.current = nextOffsets;
     setDropTargetRunId(targetRunId);
     setDropTargetPosition(targetPosition);
-    setWebInsertionOutlineTop(nextInsertionOutlineTop);
-    webDropPreviewOffsetsRef.current = nextPreviewOffsets;
-    setWebDropPreviewOffsets(nextPreviewOffsets);
+    setInsertionOutlineTop(nextOutlineTop);
+    setDropPreviewOffsets(nextOffsets);
   };
-  const dropWebRun = (): void => {
+  const moveNativeRunDrag = (runId: string, translationY: number): void => {
+    const originCenter = nativeDragOriginCenterRef.current;
+    if (originCenter === null) {
+      return;
+    }
+    const layouts = new Map<string, RunReorderItemLayout>();
+    for (const [layoutRunId, nativeLayout] of nativeRunLayoutsRef.current) {
+      layouts.set(layoutRunId, { height: nativeLayout.height, top: nativeLayout.y });
+    }
+    applyRunDropPreview(buildRunReorderPreview({
+      layouts,
+      originCenter,
+      pointerCenter: originCenter + translationY,
+      runId,
+      runs: presentation.runs,
+      sourceHeight: dragSourceHeightRef.current,
+      sourceStride: dragSourceStrideRef.current
+    }));
+  };
+  const previewWebRunDropTarget = (runId: string, pointerY: number): void => {
+    const runOriginCenter = webDragOriginCenterRef.current;
+    const listRect = webRunListElementRef.current?.getBoundingClientRect();
+    if (runOriginCenter === null || !listRect) {
+      return;
+    }
+    const layouts = new Map<string, RunReorderItemLayout>();
+    for (const run of presentation.runs) {
+      const rect = runElementsRef.current.get(run.id)?.getBoundingClientRect();
+      if (rect) {
+        layouts.set(run.id, {
+          height: rect.height,
+          top: rect.top - (dropPreviewOffsetsRef.current[run.id] ?? 0)
+        });
+      }
+    }
+    applyRunDropPreview(buildRunReorderPreview({
+      layouts,
+      originCenter: runOriginCenter,
+      pointerCenter: pointerY,
+      runId,
+      runs: presentation.runs,
+      sourceHeight: dragSourceHeightRef.current,
+      sourceStride: dragSourceStrideRef.current
+    }), listRect.top);
+  };
+  const dropRun = (): void => {
     const runId = draggedRunIdRef.current;
     const targetRunId = dropTargetRunIdRef.current;
     if (runId && targetRunId) {
@@ -5480,7 +5495,7 @@ function PracticeRunHome({
           ref={(element) => {
             webRunListElementRef.current = element as unknown as WebRunElement | null;
           }}
-          style={[styles.modeList, Platform.OS === "web" ? { position: "relative" } : null]}
+          style={[styles.modeList, { position: "relative" }]}
           testID="practice-run-list"
         >
           {presentation.runs.map((run, index) => (
@@ -5493,7 +5508,7 @@ function PracticeRunHome({
                   draggedRunId
                   ?? (presentation.homeEditing ? runReorderDesignPreview?.pickedUpRunId : null)
                 )}
-                dropPreviewOffsetY={webDropPreviewOffsets[run.id] ?? 0}
+                dropPreviewOffsetY={dropPreviewOffsets[run.id] ?? 0}
                 directRunEditing={presentation.directRunEditing === true}
                 dropTargetPosition={run.id === dropTargetRunId && run.id !== draggedRunId
                   ? dropTargetPosition
@@ -5505,19 +5520,20 @@ function PracticeRunHome({
                 onCardElement={registerRunElement}
                 onDragEnd={finishRunDrag}
                 onDragStart={startRunDrag}
-                onDrop={finishRunDrag}
+                nativeRunReorderScrollController={nativeRunReorderScrollController}
+                onDrop={dropRun}
                 onKeyboardReorder={reorderRunWithKeyboard}
                 onNativeDragMove={moveNativeRunDrag}
                 onNativeLayout={(runId, layout) => nativeRunLayoutsRef.current.set(runId, layout)}
                 onWebDragMove={previewWebRunDropTarget}
-                onWebDrop={dropWebRun}
+                onWebDrop={dropRun}
               />
               {presentation.removeCandidateId === run.id ? (
                 <RunRemovalConfirmation run={run} onIntent={presentation.onIntent} />
               ) : null}
             </React.Fragment>
           ))}
-          {Platform.OS === "web" && webInsertionOutlineTop !== null && dropTargetPosition ? (
+          {Platform.OS === "web" && insertionOutlineTop !== null && dropTargetPosition ? (
             <div
               aria-hidden="true"
               data-run-insertion-outline={dropTargetPosition}
@@ -5529,14 +5545,29 @@ function PracticeRunHome({
                 border: "2px dashed #2563EB",
                 borderRadius: 12,
                 boxSizing: "border-box",
-                height: webDragSourceHeightRef.current,
+                height: dragSourceHeightRef.current,
                 left: 0,
                 pointerEvents: "none",
                 position: "absolute",
                 right: 0,
-                top: webInsertionOutlineTop,
+                top: insertionOutlineTop,
                 zIndex: 15
               }}
+            />
+          ) : null}
+          {Platform.OS !== "web" && insertionOutlineTop !== null && dropTargetPosition ? (
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              pointerEvents="none"
+              style={[
+                styles.runInsertionOutline,
+                {
+                  height: dragSourceHeightRef.current,
+                  top: insertionOutlineTop
+                }
+              ]}
+              testID="practice-run-insertion-outline"
             />
           ) : null}
         </View>
@@ -6849,6 +6880,7 @@ function PracticeRunCard({
   dropTargetPosition,
   dropTarget,
   editing,
+  nativeRunReorderScrollController,
   onIntent,
   onCardElement,
   onDragEnd,
@@ -6870,6 +6902,7 @@ function PracticeRunCard({
   dropTargetPosition: RunDropTargetPosition | null;
   dropTarget: boolean;
   editing: boolean;
+  nativeRunReorderScrollController: NativeRunReorderScrollController;
   onIntent: PracticeRunManagementPresentation["onIntent"];
   onCardElement: (runId: string, element: WebRunElement | null) => void;
   onDragEnd: () => void;
@@ -6899,6 +6932,7 @@ function PracticeRunCard({
       dropPreviewOffsetY={dropPreviewOffsetY}
       dropTargetPosition={dropTargetPosition}
       dropTarget={dropTarget}
+      nativeRunReorderScrollController={nativeRunReorderScrollController}
       runId={run.id}
       runName={run.name}
       style={[
@@ -7023,6 +7057,92 @@ type NativeRunLayout = {
   y: number;
 };
 
+type NativeRunReorderScrollSnapshot = {
+  contentHeight: number;
+  offsetY: number;
+  viewportHeight: number;
+  windowBottom: number;
+  windowTop: number;
+};
+
+type NativeRunReorderScrollController = {
+  getSnapshot: () => NativeRunReorderScrollSnapshot | null;
+  refreshBounds: () => void;
+  scrollBy: (deltaY: number) => number;
+};
+
+type RunReorderItemLayout = {
+  height: number;
+  top: number;
+};
+
+type RunReorderPreview = {
+  insertionOutlineTop: number;
+  offsets: Record<string, number>;
+  targetPosition: RunDropTargetPosition;
+  targetRunId: string;
+};
+
+function buildRunReorderPreview({
+  layouts,
+  originCenter,
+  pointerCenter,
+  runId,
+  runs,
+  sourceHeight,
+  sourceStride
+}: {
+  layouts: ReadonlyMap<string, RunReorderItemLayout>;
+  originCenter: number;
+  pointerCenter: number;
+  runId: string;
+  runs: readonly PracticeRunPresentation[];
+  sourceHeight: number;
+  sourceStride: number;
+}): RunReorderPreview | null {
+  const runIndex = runs.findIndex((run) => run.id === runId);
+  if (runIndex < 0 || pointerCenter === originCenter || sourceHeight <= 0 || sourceStride <= 0) {
+    return null;
+  }
+  const movingDown = pointerCenter > originCenter;
+  const target = runs
+    .map((run, index) => ({ index, layout: layouts.get(run.id), run }))
+    .filter((entry): entry is {
+      index: number;
+      layout: RunReorderItemLayout;
+      run: PracticeRunPresentation;
+    } => entry.run.id !== runId && entry.layout !== undefined)
+    .filter((entry) => movingDown ? entry.index > runIndex : entry.index < runIndex)
+    .sort((left, right) => {
+      const leftDistance = Math.abs(left.layout.top + left.layout.height / 2 - pointerCenter);
+      const rightDistance = Math.abs(right.layout.top + right.layout.height / 2 - pointerCenter);
+      return leftDistance - rightDistance;
+    })[0];
+  if (!target) {
+    return null;
+  }
+
+  const previewOffset = movingDown ? -sourceStride : sourceStride;
+  const firstShiftedIndex = Math.min(runIndex, target.index);
+  const lastShiftedIndex = Math.max(runIndex, target.index);
+  const offsets: Record<string, number> = {};
+  runs.forEach((run, index) => {
+    if (index >= firstShiftedIndex && index <= lastShiftedIndex && index !== runIndex) {
+      offsets[run.id] = previewOffset;
+    }
+  });
+  const targetPreviewOffset = offsets[target.run.id] ?? 0;
+  const insertionGap = Math.max(8, sourceStride - target.layout.height);
+  return {
+    insertionOutlineTop: movingDown
+      ? target.layout.top + targetPreviewOffset + target.layout.height + insertionGap
+      : target.layout.top + targetPreviewOffset - insertionGap - sourceHeight,
+    offsets,
+    targetPosition: movingDown ? "after" : "before",
+    targetRunId: target.run.id
+  };
+}
+
 type WebRunAnimation = {
   cancel: () => void;
   oncancel: (() => void) | null;
@@ -7084,6 +7204,7 @@ function RunCardDropSurface({
   dropPreviewOffsetY,
   dropTargetPosition,
   dropTarget,
+  nativeRunReorderScrollController,
   runId,
   runName,
   style,
@@ -7103,6 +7224,7 @@ function RunCardDropSurface({
   dropPreviewOffsetY: number;
   dropTargetPosition: RunDropTargetPosition | null;
   dropTarget: boolean;
+  nativeRunReorderScrollController: NativeRunReorderScrollController;
   runId: string;
   runName: string;
   style: React.ComponentProps<typeof View>["style"];
@@ -7117,12 +7239,15 @@ function RunCardDropSurface({
   onDrop: () => void;
 }): React.JSX.Element {
   const nativeDragOffset = useRef(new Animated.Value(0)).current;
+  const nativeDropPreviewOffset = useRef(new Animated.Value(dropPreviewOffsetY)).current;
   const nativeDragActiveRef = useRef(false);
   const nativeDragCompensationRef = useRef(0);
   const nativeDragDyRef = useRef(0);
   const nativeLayoutYRef = useRef<number | null>(null);
   const nativeDragArmedRef = useRef(false);
   const nativeDragArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nativeAutoScrollSpeedRef = useRef(0);
+  const nativeAutoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [webDragOffsetY, setWebDragOffsetY] = useState(0);
   const webDragActiveRef = useRef(false);
   const webDragArmedRef = useRef(false);
@@ -7144,6 +7269,13 @@ function RunCardDropSurface({
       nativeDragArmTimerRef.current = null;
     }
     nativeDragArmedRef.current = false;
+  }, []);
+  const stopNativeAutoScroll = useCallback((): void => {
+    if (nativeAutoScrollTimerRef.current) {
+      clearInterval(nativeAutoScrollTimerRef.current);
+      nativeAutoScrollTimerRef.current = null;
+    }
+    nativeAutoScrollSpeedRef.current = 0;
   }, []);
   const armNativeDrag = useCallback((): void => {
     disarmNativeDrag();
@@ -7271,11 +7403,24 @@ function RunCardDropSurface({
     webElementRef.current = element;
     onElementChange(runId, element as unknown as WebRunElement | null);
   }, [handleWebTouchMove, onElementChange, runId]);
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      return;
+    }
+    Animated.spring(nativeDropPreviewOffset, {
+      toValue: dropPreviewOffsetY,
+      damping: 24,
+      stiffness: 260,
+      mass: 0.8,
+      useNativeDriver: true
+    }).start();
+  }, [dropPreviewOffsetY, nativeDropPreviewOffset]);
   useEffect(() => () => {
     disarmNativeDrag();
     disarmWebDrag();
+    stopNativeAutoScroll();
     stopWebAutoScroll();
-  }, [disarmNativeDrag, disarmWebDrag, stopWebAutoScroll]);
+  }, [disarmNativeDrag, disarmWebDrag, stopNativeAutoScroll, stopWebAutoScroll]);
   const nativeDragHandlersRef = useRef({
     runId,
     onDragEnd,
@@ -7290,6 +7435,53 @@ function RunCardDropSurface({
     onDrop,
     onNativeDragMove
   };
+  const applyNativeDragPosition = useCallback((translationY: number): void => {
+    nativeDragDyRef.current = translationY;
+    const effectiveTranslationY = translationY + nativeDragCompensationRef.current;
+    nativeDragOffset.setValue(effectiveTranslationY);
+    const handlers = nativeDragHandlersRef.current;
+    handlers.onNativeDragMove(handlers.runId, effectiveTranslationY);
+  }, [nativeDragOffset]);
+  const refreshNativeAutoScroll = useCallback((pageY: number): void => {
+    const snapshot = nativeRunReorderScrollController.getSnapshot();
+    if (!snapshot || !nativeDragActiveRef.current) {
+      stopNativeAutoScroll();
+      return;
+    }
+    const edgeSize = Math.min(64, snapshot.viewportHeight / 4);
+    const distanceFromTop = pageY - snapshot.windowTop;
+    const distanceFromBottom = snapshot.windowBottom - pageY;
+    const maxOffsetY = Math.max(0, snapshot.contentHeight - snapshot.viewportHeight);
+    let speed = 0;
+    if (distanceFromTop < edgeSize && snapshot.offsetY > 0) {
+      speed = -Math.max(2, 14 * (1 - Math.max(0, distanceFromTop) / edgeSize));
+    } else if (distanceFromBottom < edgeSize && snapshot.offsetY < maxOffsetY) {
+      speed = Math.max(2, 14 * (1 - Math.max(0, distanceFromBottom) / edgeSize));
+    }
+    nativeAutoScrollSpeedRef.current = speed;
+    if (speed === 0) {
+      stopNativeAutoScroll();
+      return;
+    }
+    if (nativeAutoScrollTimerRef.current) {
+      return;
+    }
+    nativeAutoScrollTimerRef.current = setInterval(() => {
+      if (!nativeDragActiveRef.current) {
+        stopNativeAutoScroll();
+        return;
+      }
+      const appliedDeltaY = nativeRunReorderScrollController.scrollBy(
+        nativeAutoScrollSpeedRef.current
+      );
+      if (appliedDeltaY === 0) {
+        stopNativeAutoScroll();
+        return;
+      }
+      nativeDragCompensationRef.current += appliedDeltaY;
+      applyNativeDragPosition(nativeDragDyRef.current);
+    }, 16);
+  }, [applyNativeDragPosition, nativeRunReorderScrollController, stopNativeAutoScroll]);
   const nativePanResponder = useMemo(() => {
     const shouldClaimNativeDrag = (_event: unknown, gesture: PanResponderGestureState): boolean => {
       const movedPastThreshold = Math.abs(gesture.dy) > 6 || Math.abs(gesture.dx) > 6;
@@ -7310,16 +7502,16 @@ function RunCardDropSurface({
       nativeDragCompensationRef.current = 0;
       nativeDragDyRef.current = 0;
       nativeDragOffset.stopAnimation();
+      nativeRunReorderScrollController.refreshBounds();
       handlers.onDragStart(handlers.runId);
     },
-    onPanResponderMove: (_event, gesture: PanResponderGestureState) => {
-      const handlers = nativeDragHandlersRef.current;
-      nativeDragDyRef.current = gesture.dy;
-      nativeDragOffset.setValue(gesture.dy + nativeDragCompensationRef.current);
-      handlers.onNativeDragMove(handlers.runId, gesture.dy);
+    onPanResponderMove: (event, gesture: PanResponderGestureState) => {
+      applyNativeDragPosition(gesture.dy);
+      refreshNativeAutoScroll(event.nativeEvent.pageY);
     },
     onPanResponderRelease: () => {
       disarmNativeDrag();
+      stopNativeAutoScroll();
       nativeDragActiveRef.current = false;
       nativeDragHandlersRef.current.onDrop();
       Animated.spring(nativeDragOffset, {
@@ -7335,6 +7527,7 @@ function RunCardDropSurface({
     },
     onPanResponderTerminate: () => {
       disarmNativeDrag();
+      stopNativeAutoScroll();
       nativeDragActiveRef.current = false;
       nativeDragHandlersRef.current.onDragEnd();
       Animated.spring(nativeDragOffset, {
@@ -7343,11 +7536,21 @@ function RunCardDropSurface({
         stiffness: 260,
         mass: 0.8,
         useNativeDriver: true
-      }).start();
+      }).start(() => {
+        nativeDragCompensationRef.current = 0;
+        nativeDragDyRef.current = 0;
+      });
     },
     onPanResponderTerminationRequest: () => false
     });
-  }, [disarmNativeDrag, nativeDragOffset]);
+  }, [
+    applyNativeDragPosition,
+    disarmNativeDrag,
+    nativeDragOffset,
+    nativeRunReorderScrollController,
+    refreshNativeAutoScroll,
+    stopNativeAutoScroll
+  ]);
 
   const handleNativeLayout = (event: LayoutChangeEvent): void => {
     const layout = event.nativeEvent.layout;
@@ -7547,6 +7750,8 @@ function RunCardDropSurface({
         draggable ? {
           transform: [
             { translateY: nativeDragOffset },
+            { translateY: nativeDropPreviewOffset },
+            { translateX: dragging ? 10 : 0 },
             { translateY: dragging ? -2 : 0 },
             { scale: dragging ? 1.015 : 1 }
           ]
@@ -17272,6 +17477,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 14,
     zIndex: 20
+  },
+  runInsertionOutline: {
+    backgroundColor: "rgba(37, 99, 235, 0.025)",
+    borderColor: "#2563EB",
+    borderRadius: 12,
+    borderStyle: "dashed",
+    borderWidth: 2,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    zIndex: 15
   },
   runEditingMeta: {
     borderTopColor: "#E2E8F0",

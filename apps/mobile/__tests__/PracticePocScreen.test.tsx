@@ -124,6 +124,7 @@ afterEach(() => {
     });
   }
   (AppState as unknown as { __reset?: () => void }).__reset?.();
+  (ReactNative as unknown as { __resetScrollView?: () => void }).__resetScrollView?.();
   (ReactNative as unknown as { __resetWindowDimensions?: () => void }).__resetWindowDimensions?.();
   (SafeAreaContext as unknown as { __resetSafeAreaInsets?: () => void }).__resetSafeAreaInsets?.();
   jest.useRealTimers();
@@ -1029,7 +1030,7 @@ describe("PracticePocScreen", () => {
       .find((node) => typeof node.props.onTouchStart === "function");
     expect(pickedUpRun).toBeTruthy();
     expect(flattenTestStyle(pickedUpRun!.props.style).transform)
-      .toEqual(expect.arrayContaining([{ translateY: -2 }, { scale: 1.015 }]));
+      .toEqual(expect.arrayContaining([{ translateX: 10 }, { translateY: -2 }, { scale: 1.015 }]));
 
     act(() => {
       standardRun!.props.onPanResponderRelease();
@@ -1045,6 +1046,114 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
     expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(2);
     expect(moveFeedbackClient.requests).toHaveLength(2);
+  });
+
+  it("previews a native card-sized insertion slot and commits the reorder only on drop", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ homeEditing: true, onIntent })
+    });
+    const standardRun = findNativeRunDragSurface(renderer, "practice-run-standard");
+    const tacticsRun = findNativeRunDragSurface(renderer, "practice-run-tactics-focus");
+    const candidateRun = findNativeRunDragSurface(renderer, "practice-run-candidate-sprint");
+
+    layoutNativeRunSurface(standardRun, 0, 100);
+    layoutNativeRunSurface(tacticsRun, 110, 100);
+    layoutNativeRunSurface(candidateRun, 220, 100);
+    startNativeRunDrag(standardRun, 50);
+    moveNativeRunDrag(standardRun, 260, 210);
+
+    expect(onIntent).not.toHaveBeenCalled();
+    const insertionOutline = findByTestId(renderer, "practice-run-insertion-outline");
+    expect(flattenTestStyle(insertionOutline.props.style)).toEqual(expect.objectContaining({
+      borderColor: "#2563EB",
+      borderStyle: "dashed",
+      borderWidth: 2,
+      height: 100,
+      left: 0,
+      right: 0,
+      top: 220,
+      zIndex: 15
+    }));
+    const previewTransform = flattenTestStyle(
+      findNativeRunDragSurface(renderer, "practice-run-tactics-focus").props.style
+    ).transform as Array<{ translateY?: number | { value: number } }>;
+    expect(previewTransform.some((entry) =>
+      typeof entry.translateY === "object" && entry.translateY.value === -110
+    )).toBe(true);
+
+    act(() => {
+      standardRun.props.onPanResponderRelease();
+    });
+
+    expect(onIntent).toHaveBeenCalledTimes(1);
+    expect(onIntent).toHaveBeenCalledWith({
+      type: "move-run",
+      runId: "standard",
+      targetRunId: "candidate-sprint"
+    });
+    expect(() => findByTestId(renderer, "practice-run-insertion-outline")).toThrow();
+  });
+
+  it("cancels a native Run insertion preview without committing the reorder", () => {
+    const onIntent = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ homeEditing: true, onIntent })
+    });
+    const standardRun = findNativeRunDragSurface(renderer, "practice-run-standard");
+
+    layoutNativeRunSurface(standardRun, 0, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-tactics-focus"), 110, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-candidate-sprint"), 220, 100);
+    startNativeRunDrag(standardRun, 50);
+    moveNativeRunDrag(standardRun, 150, 100);
+
+    expect(findByTestId(renderer, "practice-run-insertion-outline")).toBeTruthy();
+    act(() => {
+      standardRun.props.onPanResponderTerminate();
+    });
+
+    expect(onIntent).not.toHaveBeenCalled();
+    expect(() => findByTestId(renderer, "practice-run-insertion-outline")).toThrow();
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+  });
+
+  it("auto-scrolls the native Edit Runs list at an edge and stops on cancellation", () => {
+    const nativeScrollMock = ReactNative as unknown as {
+      __getScrollViewCommands?: () => Array<{ animated: boolean; y: number }>;
+      __setScrollViewFrame?: (frame: { height: number; width: number; x: number; y: number }) => void;
+    };
+    nativeScrollMock.__setScrollViewFrame?.({ x: 0, y: 100, width: 390, height: 400 });
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ homeEditing: true })
+    });
+    const mainScroll = findByTestId(renderer, "practice-main-scroll");
+    const standardRun = findNativeRunDragSurface(renderer, "practice-run-standard");
+
+    act(() => {
+      mainScroll.props.onLayout({ nativeEvent: { layout: { height: 400 } } });
+      mainScroll.props.onContentSizeChange(390, 1_200);
+    });
+    layoutNativeRunSurface(standardRun, 0, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-tactics-focus"), 110, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-candidate-sprint"), 220, 100);
+    startNativeRunDrag(standardRun, 150);
+    moveNativeRunDrag(standardRun, 490, 340);
+    act(() => {
+      jest.advanceTimersByTime(96);
+    });
+
+    const commands = nativeScrollMock.__getScrollViewCommands?.() ?? [];
+    expect(commands.some((command) => command.y > 0 && command.animated === false)).toBe(true);
+
+    act(() => {
+      standardRun.props.onPanResponderTerminate();
+    });
+    const commandCountAfterCancel = nativeScrollMock.__getScrollViewCommands?.().length ?? 0;
+    act(() => {
+      jest.advanceTimersByTime(96);
+    });
+    expect(nativeScrollMock.__getScrollViewCommands?.()).toHaveLength(commandCountAfterCancel);
   });
 
   it("respects disabled haptics when a Run card enters drag mode", () => {
@@ -13923,6 +14032,49 @@ async function waitForAssertion(assertion: () => void, attempts = 10): Promise<v
 
 function findByTestId(renderer: TestRenderer.ReactTestRenderer, testID: string): TestRenderer.ReactTestInstance {
   return renderer.root.findByProps({ testID });
+}
+
+function findNativeRunDragSurface(
+  renderer: TestRenderer.ReactTestRenderer,
+  testID: string
+): TestRenderer.ReactTestInstance {
+  const surface = renderer.root.findAllByProps({ testID })
+    .find((node) => typeof node.props.onTouchStart === "function");
+  if (!surface) {
+    throw new Error(`Could not find native Run drag surface ${testID}`);
+  }
+  return surface;
+}
+
+function layoutNativeRunSurface(
+  surface: TestRenderer.ReactTestInstance,
+  y: number,
+  height: number
+): void {
+  act(() => {
+    surface.props.onLayout({ nativeEvent: { layout: { height, y } } });
+  });
+}
+
+function startNativeRunDrag(surface: TestRenderer.ReactTestInstance, pageY: number): void {
+  act(() => {
+    surface.props.onTouchStart();
+    jest.advanceTimersByTime(180);
+    surface.props.onPanResponderGrant({ nativeEvent: { pageY } });
+  });
+}
+
+function moveNativeRunDrag(
+  surface: TestRenderer.ReactTestInstance,
+  pageY: number,
+  dy: number
+): void {
+  act(() => {
+    surface.props.onPanResponderMove(
+      { nativeEvent: { pageY } },
+      { dx: 0, dy }
+    );
+  });
 }
 
 function setPracticeViewport({
