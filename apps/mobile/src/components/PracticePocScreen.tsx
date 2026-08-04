@@ -279,6 +279,10 @@ interface Props {
   puzzleSelectionSeed?: string;
   runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
+  runReorderDesignPreview?: {
+    pickedUpRunId: string;
+  };
+  runReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
   runEloEditingMovedToHome?: boolean;
   settingsCaptureBottomInset?: number;
   initialTab?: MobileBackPrimaryTab;
@@ -288,6 +292,10 @@ interface Props {
   systemBack?: MobileSystemBackSource;
   tacticalProfilePresentation?: TacticalProfilePresentation;
 }
+
+export type RunReorderPickupFeedback = {
+  haptic: "medium";
+};
 
 export type SprintRulesGuidePresentation = {
   durationLabel: string;
@@ -631,6 +639,8 @@ export function PracticePocScreen({
   puzzleSelectionSeed,
   runManagementEnabled = false,
   runManagementPresentation,
+  runReorderDesignPreview,
+  runReorderFeedbackPreview,
   runEloEditingMovedToHome = false,
   settingsCaptureBottomInset,
   initialTab = "practice",
@@ -4383,6 +4393,8 @@ export function PracticePocScreen({
                     onResumeSprint={resumeSprint}
                     onOpenReview={openReviewQueue}
                     onRunReorderDragActiveChange={setRunReorderDragActive}
+                    runReorderDesignPreview={runReorderDesignPreview}
+                    onRunReorderFeedbackPreview={runReorderFeedbackPreview}
                   />
                 ) : null}
 
@@ -4916,7 +4928,9 @@ function PracticeHome({
   onStartMode,
   onResumeSprint,
   onOpenReview,
-  onRunReorderDragActiveChange
+  onRunReorderDragActiveChange,
+  runReorderDesignPreview,
+  onRunReorderFeedbackPreview
 }: {
   adaptiveLayout: AdaptiveLayout;
   mode: SprintMode;
@@ -4937,6 +4951,8 @@ function PracticeHome({
   onResumeSprint: (sprint: SprintState) => void;
   onOpenReview: () => void;
   onRunReorderDragActiveChange: (active: boolean) => void;
+  runReorderDesignPreview?: Props["runReorderDesignPreview"];
+  onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
 }): React.JSX.Element {
   const selectedRun = runManagement?.runs.find((run) => run.id === runManagement.selectedRunId) ?? null;
   const progressMode = selectedRun?.mode ?? mode;
@@ -4973,6 +4989,8 @@ function PracticeHome({
               onDismissSprintRulesGuide={onDismissSprintRulesGuide}
               onOpenSprintRulesGuide={onOpenSprintRulesGuide}
               onRunReorderDragActiveChange={onRunReorderDragActiveChange}
+              runReorderDesignPreview={runReorderDesignPreview}
+              onRunReorderFeedbackPreview={onRunReorderFeedbackPreview}
             />
           ) : (
             <>
@@ -5065,7 +5083,9 @@ function PracticeRunHome({
   sprintRulesGuideVisible,
   onDismissSprintRulesGuide,
   onOpenSprintRulesGuide,
-  onRunReorderDragActiveChange
+  onRunReorderDragActiveChange,
+  runReorderDesignPreview,
+  onRunReorderFeedbackPreview
 }: {
   presentation: PracticeRunManagementPresentation;
   sprintRulesGuide?: SprintRulesGuidePresentation;
@@ -5073,11 +5093,22 @@ function PracticeRunHome({
   onDismissSprintRulesGuide: () => void;
   onOpenSprintRulesGuide: () => void;
   onRunReorderDragActiveChange: (active: boolean) => void;
+  runReorderDesignPreview?: Props["runReorderDesignPreview"];
+  onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
 }): React.JSX.Element {
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dropTargetRunId, setDropTargetRunId] = useState<string | null>(null);
+  const [dropTargetPosition, setDropTargetPosition] = useState<RunDropTargetPosition | null>(null);
+  const [webInsertionOutlineTop, setWebInsertionOutlineTop] = useState<number | null>(null);
+  const [webDropPreviewOffsets, setWebDropPreviewOffsets] = useState<Record<string, number>>({});
   const draggedRunIdRef = useRef<string | null>(null);
   const dropTargetRunIdRef = useRef<string | null>(null);
+  const dropTargetPositionRef = useRef<RunDropTargetPosition | null>(null);
+  const webDropPreviewOffsetsRef = useRef<Record<string, number>>({});
+  const webDragOriginCenterRef = useRef<number | null>(null);
+  const webDragSourceHeightRef = useRef(0);
+  const webDragSourceStrideRef = useRef(0);
+  const webRunListElementRef = useRef<WebRunElement | null>(null);
   const runElementsRef = useRef(new Map<string, WebRunElement>());
   const nativeRunLayoutsRef = useRef(new Map<string, NativeRunLayout>());
   const nativeDragOriginCenterRef = useRef<number | null>(null);
@@ -5113,19 +5144,47 @@ function PracticeRunHome({
     nativeDragPreviousCenterRef.current = null;
     draggedRunIdRef.current = null;
     dropTargetRunIdRef.current = null;
+    dropTargetPositionRef.current = null;
+    webDragOriginCenterRef.current = null;
+    webDragSourceHeightRef.current = 0;
+    webDragSourceStrideRef.current = 0;
+    webDropPreviewOffsetsRef.current = {};
     setDraggedRunId(null);
     setDropTargetRunId(null);
+    setDropTargetPosition(null);
+    setWebInsertionOutlineTop(null);
+    setWebDropPreviewOffsets({});
     onRunReorderDragActiveChange(false);
   };
   const startRunDrag = (runId: string): void => {
     const layout = nativeRunLayoutsRef.current.get(runId);
     nativeDragOriginCenterRef.current = layout ? layout.y + layout.height / 2 : null;
     nativeDragPreviousCenterRef.current = nativeDragOriginCenterRef.current;
+    const webRunElement = runElementsRef.current.get(runId);
+    const webRunIndex = presentation.runs.findIndex((run) => run.id === runId);
+    if (Platform.OS === "web" && webRunElement && webRunIndex >= 0) {
+      const runRect = webRunElement.getBoundingClientRect();
+      const adjacentRun = presentation.runs[webRunIndex + 1] ?? presentation.runs[webRunIndex - 1];
+      const adjacentRect = adjacentRun
+        ? runElementsRef.current.get(adjacentRun.id)?.getBoundingClientRect()
+        : undefined;
+      webDragOriginCenterRef.current = runRect.top + runRect.height / 2;
+      webDragSourceHeightRef.current = runRect.height;
+      webDragSourceStrideRef.current = adjacentRect
+        ? Math.abs(adjacentRect.top - runRect.top)
+        : runRect.height;
+    }
     draggedRunIdRef.current = runId;
     dropTargetRunIdRef.current = null;
+    dropTargetPositionRef.current = null;
+    webDropPreviewOffsetsRef.current = {};
     setDraggedRunId(runId);
     setDropTargetRunId(null);
+    setDropTargetPosition(null);
+    setWebInsertionOutlineTop(null);
+    setWebDropPreviewOffsets({});
     onRunReorderDragActiveChange(true);
+    onRunReorderFeedbackPreview?.({ haptic: "medium" });
   };
 
   useEffect(() => () => onRunReorderDragActiveChange(false), [onRunReorderDragActiveChange]);
@@ -5157,16 +5216,105 @@ function PracticeRunHome({
         return movingDown ? rightCenter - leftCenter : leftCenter - rightCenter;
       })[0];
     if (target) {
-      previewRunReorder(runId, target.run.id);
+      previewNativeRunReorder(runId, target.run.id);
     }
   };
-  const previewRunReorder = (runId: string, targetRunId: string): void => {
+  const previewNativeRunReorder = (runId: string, targetRunId: string): void => {
     if (runId === targetRunId) {
       return;
     }
+    const runIndex = presentation.runs.findIndex((run) => run.id === runId);
+    const targetIndex = presentation.runs.findIndex((run) => run.id === targetRunId);
+    const targetPosition = runIndex < targetIndex ? "after" : "before";
     dropTargetRunIdRef.current = targetRunId;
+    dropTargetPositionRef.current = targetPosition;
     setDropTargetRunId(targetRunId);
+    setDropTargetPosition(targetPosition);
     reorderRun(runId, targetRunId);
+  };
+  const previewWebRunDropTarget = (runId: string, pointerY: number): void => {
+    const runIndex = presentation.runs.findIndex((run) => run.id === runId);
+    const runOriginCenter = webDragOriginCenterRef.current;
+    if (runOriginCenter === null || runIndex < 0) {
+      return;
+    }
+    const movingDown = pointerY > runOriginCenter;
+    const currentPreviewOffsets = webDropPreviewOffsetsRef.current;
+    const target = presentation.runs
+      .map((run, index) => ({
+        index,
+        run,
+        rect: runElementsRef.current.get(run.id)?.getBoundingClientRect()
+      }))
+      .filter((entry): entry is {
+        index: number;
+        run: PracticeRunPresentation;
+        rect: WebRunRect;
+      } => entry.run.id !== runId && entry.rect !== undefined)
+      .filter((entry) => movingDown ? entry.index > runIndex : entry.index < runIndex)
+      .sort((left, right) => {
+        const leftTop = left.rect.top - (currentPreviewOffsets[left.run.id] ?? 0);
+        const rightTop = right.rect.top - (currentPreviewOffsets[right.run.id] ?? 0);
+        const leftDistance = Math.abs(leftTop + left.rect.height / 2 - pointerY);
+        const rightDistance = Math.abs(rightTop + right.rect.height / 2 - pointerY);
+        return leftDistance - rightDistance;
+      })[0];
+    const targetRunId = target?.run.id ?? null;
+    const targetPosition: RunDropTargetPosition | null = target
+      ? movingDown ? "after" : "before"
+      : null;
+    const nextPreviewOffsets: Record<string, number> = {};
+    if (target && webDragSourceStrideRef.current > 0) {
+      const previewOffset = movingDown
+        ? -webDragSourceStrideRef.current
+        : webDragSourceStrideRef.current;
+      const firstShiftedIndex = Math.min(runIndex, target.index);
+      const lastShiftedIndex = Math.max(runIndex, target.index);
+      presentation.runs.forEach((run, index) => {
+        if (index >= firstShiftedIndex && index <= lastShiftedIndex && index !== runIndex) {
+          nextPreviewOffsets[run.id] = previewOffset;
+        }
+      });
+    }
+    const previewOffsetsUnchanged = presentation.runs.every((run) =>
+      (currentPreviewOffsets[run.id] ?? 0) === (nextPreviewOffsets[run.id] ?? 0)
+    );
+    const listRect = webRunListElementRef.current?.getBoundingClientRect();
+    const targetPreviewOffset = target ? nextPreviewOffsets[target.run.id] ?? 0 : 0;
+    const targetBaseTop = target
+      ? target.rect.top - (currentPreviewOffsets[target.run.id] ?? 0)
+      : null;
+    const insertionGap = target
+      ? Math.max(8, webDragSourceStrideRef.current - target.rect.height)
+      : 0;
+    const sourceHeight = webDragSourceHeightRef.current;
+    const nextInsertionOutlineTop = target && targetBaseTop !== null && listRect && sourceHeight > 0
+      ? (movingDown
+          ? targetBaseTop + targetPreviewOffset + target.rect.height + insertionGap
+          : targetBaseTop + targetPreviewOffset - insertionGap - sourceHeight) - listRect.top
+      : null;
+    if (
+      targetRunId === dropTargetRunIdRef.current
+      && targetPosition === dropTargetPositionRef.current
+      && previewOffsetsUnchanged
+    ) {
+      return;
+    }
+    dropTargetRunIdRef.current = targetRunId;
+    dropTargetPositionRef.current = targetPosition;
+    setDropTargetRunId(targetRunId);
+    setDropTargetPosition(targetPosition);
+    setWebInsertionOutlineTop(nextInsertionOutlineTop);
+    webDropPreviewOffsetsRef.current = nextPreviewOffsets;
+    setWebDropPreviewOffsets(nextPreviewOffsets);
+  };
+  const dropWebRun = (): void => {
+    const runId = draggedRunIdRef.current;
+    const targetRunId = dropTargetRunIdRef.current;
+    if (runId && targetRunId) {
+      reorderRun(runId, targetRunId);
+    }
+    finishRunDrag();
   };
   const reorderRunWithKeyboard = (runId: string, direction: "up" | "down"): void => {
     const index = presentation.runs.findIndex((run) => run.id === runId);
@@ -5192,11 +5340,14 @@ function PracticeRunHome({
       if (Math.abs(deltaY) < 0.5) {
         continue;
       }
+      const isPickedUp = runId === draggedRunIdRef.current;
+      const pickedUpOffset = isPickedUp ? -2 : 0;
+      const pickedUpScale = isPickedUp ? " scale(1.015)" : "";
       element.getAnimations?.().forEach((animation) => animation.cancel());
       element.dataset.reorderAnimation = "moving";
       const animation = element.animate([
-        { transform: `translate3d(0, ${deltaY}px, 0)` },
-        { transform: "translate3d(0, 0, 0)" }
+        { transform: `translate3d(0, ${deltaY + pickedUpOffset}px, 0)${pickedUpScale}` },
+        { transform: `translate3d(0, ${pickedUpOffset}px, 0)${pickedUpScale}` }
       ], {
         duration: 220,
         easing: "cubic-bezier(0.22, 1, 0.36, 1)"
@@ -5311,37 +5462,69 @@ function PracticeRunHome({
           </Pressable>
         </View>
       ) : (
-        <View style={styles.modeList} testID="practice-run-list">
+        <View
+          ref={(element) => {
+            webRunListElementRef.current = element as unknown as WebRunElement | null;
+          }}
+          style={[styles.modeList, Platform.OS === "web" ? { position: "relative" } : null]}
+          testID="practice-run-list"
+        >
           {presentation.runs.map((run, index) => (
             <React.Fragment key={run.id}>
               <PracticeRunCard
                 active={run.id === presentation.selectedRunId}
                 canMoveDown={index < presentation.runs.length - 1}
                 canMoveUp={index > 0}
-                dragging={run.id === draggedRunId}
+                dragging={run.id === (
+                  draggedRunId
+                  ?? (presentation.homeEditing ? runReorderDesignPreview?.pickedUpRunId : null)
+                )}
+                dropPreviewOffsetY={webDropPreviewOffsets[run.id] ?? 0}
                 directRunEditing={presentation.directRunEditing === true}
+                dropTargetPosition={run.id === dropTargetRunId && run.id !== draggedRunId
+                  ? dropTargetPosition
+                  : null}
                 dropTarget={run.id === dropTargetRunId && run.id !== draggedRunId}
                 editing={presentation.homeEditing}
                 run={run}
                 onIntent={presentation.onIntent}
                 onCardElement={registerRunElement}
                 onDragEnd={finishRunDrag}
-                onDragEnter={(targetRunId) => {
-                  if (draggedRunIdRef.current) {
-                    previewRunReorder(draggedRunIdRef.current, targetRunId);
-                  }
-                }}
                 onDragStart={startRunDrag}
                 onDrop={finishRunDrag}
                 onKeyboardReorder={reorderRunWithKeyboard}
                 onNativeDragMove={moveNativeRunDrag}
                 onNativeLayout={(runId, layout) => nativeRunLayoutsRef.current.set(runId, layout)}
+                onWebDragMove={previewWebRunDropTarget}
+                onWebDrop={dropWebRun}
               />
               {presentation.removeCandidateId === run.id ? (
                 <RunRemovalConfirmation run={run} onIntent={presentation.onIntent} />
               ) : null}
             </React.Fragment>
           ))}
+          {Platform.OS === "web" && webInsertionOutlineTop !== null && dropTargetPosition ? (
+            <div
+              aria-hidden="true"
+              data-run-insertion-outline={dropTargetPosition}
+              data-run-insertion-target={dropTargetRunId
+                ? `practice-run-${safeTestId(dropTargetRunId)}`
+                : undefined}
+              style={{
+                backgroundColor: "rgba(37, 99, 235, 0.025)",
+                border: "2px dashed #2563EB",
+                borderRadius: 12,
+                boxSizing: "border-box",
+                height: webDragSourceHeightRef.current,
+                left: 0,
+                pointerEvents: "none",
+                position: "absolute",
+                right: 0,
+                top: webInsertionOutlineTop,
+                zIndex: 15
+              }}
+            />
+          ) : null}
         </View>
       )}
 
@@ -6648,15 +6831,18 @@ function PracticeRunCard({
   canMoveUp,
   directRunEditing,
   dragging,
+  dropPreviewOffsetY,
+  dropTargetPosition,
   dropTarget,
   editing,
   onIntent,
   onCardElement,
   onDragEnd,
-  onDragEnter,
   onDragStart,
   onNativeDragMove,
   onNativeLayout,
+  onWebDragMove,
+  onWebDrop,
   onDrop,
   onKeyboardReorder,
   run
@@ -6666,15 +6852,18 @@ function PracticeRunCard({
   canMoveUp: boolean;
   directRunEditing: boolean;
   dragging: boolean;
+  dropPreviewOffsetY: number;
+  dropTargetPosition: RunDropTargetPosition | null;
   dropTarget: boolean;
   editing: boolean;
   onIntent: PracticeRunManagementPresentation["onIntent"];
   onCardElement: (runId: string, element: WebRunElement | null) => void;
   onDragEnd: () => void;
-  onDragEnter: (targetRunId: string) => void;
   onDragStart: (runId: string) => void;
   onNativeDragMove: (runId: string, translationY: number) => void;
   onNativeLayout: (runId: string, layout: NativeRunLayout) => void;
+  onWebDragMove: (runId: string, pointerY: number) => void;
+  onWebDrop: () => void;
   onDrop: () => void;
   onKeyboardReorder: (runId: string, direction: "up" | "down") => void;
   run: PracticeRunPresentation;
@@ -6693,6 +6882,8 @@ function PracticeRunCard({
     <RunCardDropSurface
       draggable={editing}
       dragging={dragging}
+      dropPreviewOffsetY={dropPreviewOffsetY}
+      dropTargetPosition={dropTargetPosition}
       dropTarget={dropTarget}
       runId={run.id}
       runName={run.name}
@@ -6702,16 +6893,16 @@ function PracticeRunCard({
         active && !editing ? styles.practiceModeCardActive : null,
         active && !editing ? styles.managedRunCardActive : null,
         editing ? styles.runCardEditing : null,
-        dropTarget ? styles.runCardDropTarget : null,
         dragging ? styles.runCardDragging : null
       ]}
       testID={`practice-run-${safeTestId(run.id)}`}
       onDragEnd={onDragEnd}
-      onDragEnter={onDragEnter}
       onDragStart={onDragStart}
       onElementChange={onCardElement}
       onNativeDragMove={onNativeDragMove}
       onNativeLayout={onNativeLayout}
+      onWebDragMove={onWebDragMove}
+      onWebDrop={onWebDrop}
       onDrop={onDrop}
     >
       <Pressable
@@ -6802,16 +6993,15 @@ function PracticeRunCard({
   );
 }
 
-const RUN_DRAG_DATA_TYPE = "text/plain";
-
-type WebRunDataTransfer = {
-  dropEffect: string;
-  effectAllowed: string;
-  setData: (format: string, value: string) => void;
-};
+type RunDropTargetPosition = "after" | "before";
 
 type WebRunRect = {
+  height: number;
   top: number;
+};
+
+type WebScrollRect = WebRunRect & {
+  bottom: number;
 };
 
 type NativeRunLayout = {
@@ -6841,37 +7031,75 @@ type WebRunStyle = React.CSSProperties & {
   paddingVertical?: React.CSSProperties["paddingTop"];
 };
 
+type WebPointerCaptureElement = {
+  closest?: (selectors: string) => unknown;
+  querySelector?: (selectors: string) => { blur?: () => void } | null;
+  releasePointerCapture?: (pointerId: number) => void;
+  setPointerCapture?: (pointerId: number) => void;
+};
+
+type WebScrollableElement = {
+  clientHeight: number;
+  getBoundingClientRect: () => WebScrollRect;
+  scrollHeight: number;
+  scrollTop: number;
+};
+
+type WebTouchMoveEvent = {
+  cancelable: boolean;
+  preventDefault: () => void;
+  touches: readonly { clientY: number }[];
+};
+
+type WebTouchMoveElement = {
+  addEventListener: (
+    type: "touchmove",
+    listener: (event: WebTouchMoveEvent) => void,
+    options: { passive: false }
+  ) => void;
+  removeEventListener: (
+    type: "touchmove",
+    listener: (event: WebTouchMoveEvent) => void
+  ) => void;
+};
+
 function RunCardDropSurface({
   children,
   draggable,
   dragging,
+  dropPreviewOffsetY,
+  dropTargetPosition,
   dropTarget,
   runId,
   runName,
   style,
   testID,
   onDragEnd,
-  onDragEnter,
   onDragStart,
   onElementChange,
   onNativeDragMove,
   onNativeLayout,
+  onWebDragMove,
+  onWebDrop,
   onDrop
 }: {
   children: React.ReactNode;
   draggable: boolean;
   dragging: boolean;
+  dropPreviewOffsetY: number;
+  dropTargetPosition: RunDropTargetPosition | null;
   dropTarget: boolean;
   runId: string;
   runName: string;
   style: React.ComponentProps<typeof View>["style"];
   testID: string;
   onDragEnd: () => void;
-  onDragEnter: (targetRunId: string) => void;
   onDragStart: (runId: string) => void;
   onElementChange: (runId: string, element: WebRunElement | null) => void;
   onNativeDragMove: (runId: string, translationY: number) => void;
   onNativeLayout: (runId: string, layout: NativeRunLayout) => void;
+  onWebDragMove: (runId: string, pointerY: number) => void;
+  onWebDrop: () => void;
   onDrop: () => void;
 }): React.JSX.Element {
   const nativeDragOffset = useRef(new Animated.Value(0)).current;
@@ -6881,6 +7109,21 @@ function RunCardDropSurface({
   const nativeLayoutYRef = useRef<number | null>(null);
   const nativeDragArmedRef = useRef(false);
   const nativeDragArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [webDragOffsetY, setWebDragOffsetY] = useState(0);
+  const webDragActiveRef = useRef(false);
+  const webDragArmedRef = useRef(false);
+  const webDragArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const webPointerRef = useRef<{
+    latestClientY: number;
+    originClientY: number;
+    originScrollTop: number;
+    pointerId: number;
+    scrollElement: WebScrollableElement | null;
+  } | null>(null);
+  const webAutoScrollSpeedRef = useRef(0);
+  const webAutoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const webElementRef = useRef<WebTouchMoveElement | null>(null);
+  const webSuppressClickRef = useRef(false);
   const disarmNativeDrag = useCallback((): void => {
     if (nativeDragArmTimerRef.current) {
       clearTimeout(nativeDragArmTimerRef.current);
@@ -6898,7 +7141,127 @@ function RunCardDropSurface({
       nativeDragArmedRef.current = true;
     }, 180);
   }, [disarmNativeDrag, draggable]);
-  useEffect(() => disarmNativeDrag, [disarmNativeDrag]);
+  const disarmWebDrag = useCallback((): void => {
+    if (webDragArmTimerRef.current) {
+      clearTimeout(webDragArmTimerRef.current);
+      webDragArmTimerRef.current = null;
+    }
+    webDragArmedRef.current = false;
+  }, []);
+  const stopWebAutoScroll = useCallback((): void => {
+    if (webAutoScrollTimerRef.current) {
+      clearInterval(webAutoScrollTimerRef.current);
+      webAutoScrollTimerRef.current = null;
+    }
+    webAutoScrollSpeedRef.current = 0;
+  }, []);
+  const applyWebDragPosition = useCallback((clientY: number): void => {
+    const pointer = webPointerRef.current;
+    if (!pointer || !webDragActiveRef.current) {
+      return;
+    }
+    pointer.latestClientY = clientY;
+    const scrollDelta = pointer.scrollElement
+      ? pointer.scrollElement.scrollTop - pointer.originScrollTop
+      : 0;
+    setWebDragOffsetY(clientY - pointer.originClientY + scrollDelta);
+    onWebDragMove(runId, clientY);
+  }, [onWebDragMove, runId]);
+  const refreshWebAutoScroll = useCallback((clientY: number): void => {
+    const pointer = webPointerRef.current;
+    const scrollElement = pointer?.scrollElement;
+    if (!pointer || !scrollElement || !webDragActiveRef.current) {
+      stopWebAutoScroll();
+      return;
+    }
+    pointer.latestClientY = clientY;
+    const scrollRect = scrollElement.getBoundingClientRect();
+    const edgeSize = Math.min(64, scrollRect.height / 4);
+    const distanceFromTop = clientY - scrollRect.top;
+    const distanceFromBottom = scrollRect.bottom - clientY;
+    const maxScrollTop = Math.max(0, scrollElement.scrollHeight - scrollElement.clientHeight);
+    let speed = 0;
+    if (distanceFromTop < edgeSize && scrollElement.scrollTop > 0) {
+      speed = -Math.max(2, 14 * (1 - Math.max(0, distanceFromTop) / edgeSize));
+    } else if (distanceFromBottom < edgeSize && scrollElement.scrollTop < maxScrollTop) {
+      speed = Math.max(2, 14 * (1 - Math.max(0, distanceFromBottom) / edgeSize));
+    }
+    webAutoScrollSpeedRef.current = speed;
+    if (speed === 0) {
+      stopWebAutoScroll();
+      return;
+    }
+    if (webAutoScrollTimerRef.current) {
+      return;
+    }
+    webAutoScrollTimerRef.current = setInterval(() => {
+      const activePointer = webPointerRef.current;
+      const activeScrollElement = activePointer?.scrollElement;
+      if (!activePointer || !activeScrollElement || !webDragActiveRef.current) {
+        stopWebAutoScroll();
+        return;
+      }
+      const activeMaxScrollTop = Math.max(
+        0,
+        activeScrollElement.scrollHeight - activeScrollElement.clientHeight
+      );
+      const nextScrollTop = Math.max(
+        0,
+        Math.min(activeMaxScrollTop, activeScrollElement.scrollTop + webAutoScrollSpeedRef.current)
+      );
+      if (nextScrollTop === activeScrollElement.scrollTop) {
+        stopWebAutoScroll();
+        return;
+      }
+      activeScrollElement.scrollTop = nextScrollTop;
+      applyWebDragPosition(activePointer.latestClientY);
+    }, 16);
+  }, [applyWebDragPosition, stopWebAutoScroll]);
+  const resetWebPointer = useCallback((): void => {
+    stopWebAutoScroll();
+    disarmWebDrag();
+    webDragActiveRef.current = false;
+    webPointerRef.current = null;
+    setWebDragOffsetY(0);
+  }, [disarmWebDrag, stopWebAutoScroll]);
+  const beginWebDrag = useCallback((element: WebPointerCaptureElement): void => {
+    if (webDragActiveRef.current) {
+      return;
+    }
+    webDragActiveRef.current = true;
+    webDragArmedRef.current = true;
+    webSuppressClickRef.current = true;
+    element.querySelector?.(":focus")?.blur?.();
+    onDragStart(runId);
+  }, [onDragStart, runId]);
+  const handleWebTouchMove = useCallback((event: WebTouchMoveEvent): void => {
+    const touch = event.touches[0];
+    if (!touch || !webDragActiveRef.current) {
+      return;
+    }
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+    applyWebDragPosition(touch.clientY);
+    refreshWebAutoScroll(touch.clientY);
+  }, [applyWebDragPosition, refreshWebAutoScroll]);
+  const registerWebElement = useCallback((rawElement: unknown): void => {
+    const element = rawElement as (WebTouchMoveElement & WebRunElement) | null;
+    const previousElement = webElementRef.current;
+    if (previousElement && previousElement !== element) {
+      previousElement.removeEventListener("touchmove", handleWebTouchMove);
+    }
+    if (element && previousElement !== element) {
+      element.addEventListener("touchmove", handleWebTouchMove, { passive: false });
+    }
+    webElementRef.current = element;
+    onElementChange(runId, element as unknown as WebRunElement | null);
+  }, [handleWebTouchMove, onElementChange, runId]);
+  useEffect(() => () => {
+    disarmNativeDrag();
+    disarmWebDrag();
+    stopWebAutoScroll();
+  }, [disarmNativeDrag, disarmWebDrag, stopWebAutoScroll]);
   const nativeDragHandlersRef = useRef({
     runId,
     onDragEnd,
@@ -6990,20 +7353,34 @@ function RunCardDropSurface({
       paddingVertical,
       ...webStyle
     } = flattenedStyle;
+    const releasePointerCapture = (
+      element: WebPointerCaptureElement,
+      pointerId: number
+    ): void => {
+      try {
+        element.releasePointerCapture?.(pointerId);
+      } catch {
+        // Synthetic Storybook pointer events are not registered as browser-owned pointers.
+      }
+    };
     return (
       <div
         aria-grabbed={draggable ? dragging : undefined}
         aria-dropeffect={dropTarget ? "move" : undefined}
+        data-browser-drag-ghost={draggable ? "suppressed" : undefined}
+        data-drag-mechanism={draggable ? "pointer" : undefined}
+        data-drag-state={dragging ? "picked-up" : undefined}
+        data-drop-position={dropTargetPosition ?? undefined}
+        data-drop-preview-offset={dropPreviewOffsetY || undefined}
+        data-pickup-haptic={dragging ? "medium" : undefined}
         data-testid={testID}
-        draggable={draggable}
-        ref={(element) => onElementChange(runId, element as unknown as WebRunElement | null)}
+        draggable={false}
+        ref={registerWebElement}
         style={{
           ...webStyle,
           boxShadow: dragging
             ? "0 12px 28px rgba(15, 23, 42, 0.20)"
-            : dropTarget
-              ? "0 0 0 2px rgba(37, 99, 235, 0.16), 0 4px 12px rgba(15, 23, 42, 0.10)"
-              : "0 1px 3px rgba(15, 23, 42, 0.08)",
+            : "0 1px 3px rgba(15, 23, 42, 0.08)",
           boxSizing: "border-box",
           cursor: draggable ? (dragging ? "grabbing" : "grab") : "default",
           display: "flex",
@@ -7011,37 +7388,132 @@ function RunCardDropSurface({
           paddingLeft: webStyle.paddingLeft ?? paddingHorizontal,
           paddingRight: webStyle.paddingRight ?? paddingHorizontal,
           paddingTop: webStyle.paddingTop ?? paddingVertical,
-          touchAction: draggable ? "none" : undefined,
-          transition: "border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease",
+          position: "relative",
+          touchAction: draggable ? "pan-y" : undefined,
+          transform: dragging
+            ? `translate3d(10px, ${webDragOffsetY - 2}px, 0) scale(1.015)`
+            : dropPreviewOffsetY
+              ? `translate3d(0, ${dropPreviewOffsetY}px, 0)`
+              : undefined,
+          transition: webDragActiveRef.current
+            ? "box-shadow 140ms ease"
+            : "transform 160ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 140ms ease",
           userSelect: draggable ? "none" : undefined,
-          willChange: draggable ? "transform" : undefined
+          WebkitTouchCallout: draggable ? "none" : undefined,
+          WebkitUserSelect: draggable ? "none" : undefined,
+          willChange: draggable ? "transform" : undefined,
+          zIndex: dragging ? 20 : dropTarget ? 10 : undefined
         }}
         title={draggable ? `Drag ${runName} to reorder` : undefined}
-        onDragEnd={onDragEnd}
-        onDragEnter={(event) => {
-          event.preventDefault();
-          onDragEnter(runId);
-        }}
-        onDragOver={(event) => {
-          event.preventDefault();
-          (event.dataTransfer as unknown as WebRunDataTransfer).dropEffect = "move";
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          onDrop();
+        onContextMenu={(event) => {
+          if (draggable) {
+            event.preventDefault();
+          }
         }}
         onDragStart={(event) => {
+          event.preventDefault();
+        }}
+        onClickCapture={(event) => {
+          if (!webSuppressClickRef.current) {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          webSuppressClickRef.current = false;
+        }}
+        onPointerDown={(event) => {
           const blockedControl = (event.target as unknown as WebRunElement).closest?.(
             '[data-testid^="practice-run-move-"], [data-testid^="practice-run-edit-"], [data-testid^="practice-run-remove-"]'
           );
-          if (!draggable || blockedControl) {
-            event.preventDefault();
+          if (!draggable || blockedControl || event.button !== 0) {
             return;
           }
-          const dataTransfer = event.dataTransfer as unknown as WebRunDataTransfer;
-          dataTransfer.effectAllowed = "move";
-          dataTransfer.setData(RUN_DRAG_DATA_TYPE, runId);
-          onDragStart(runId);
+          resetWebPointer();
+          const currentTarget = event.currentTarget as unknown as WebPointerCaptureElement;
+          const scrollElement = currentTarget.closest?.(
+            '[data-testid="practice-main-scroll"]'
+          ) as WebScrollableElement | null | undefined;
+          webPointerRef.current = {
+            latestClientY: event.clientY,
+            originClientY: event.clientY,
+            originScrollTop: scrollElement?.scrollTop ?? 0,
+            pointerId: event.pointerId,
+            scrollElement: scrollElement ?? null
+          };
+          webDragArmedRef.current = event.pointerType !== "touch";
+          if (event.pointerType === "touch") {
+            const pointerId = event.pointerId;
+            webDragArmTimerRef.current = setTimeout(() => {
+              webDragArmTimerRef.current = null;
+              if (webPointerRef.current?.pointerId === pointerId) {
+                beginWebDrag(currentTarget);
+              }
+            }, 180);
+          }
+          try {
+            currentTarget.setPointerCapture?.(event.pointerId);
+          } catch {
+            // Storybook play functions dispatch synthetic pointer events.
+          }
+        }}
+        onPointerMove={(event) => {
+          const pointer = webPointerRef.current;
+          if (!pointer || pointer.pointerId !== event.pointerId) {
+            return;
+          }
+          const deltaY = event.clientY - pointer.originClientY;
+          if (!webDragActiveRef.current) {
+            if (Math.abs(deltaY) <= 6) {
+              return;
+            }
+            if (!webDragArmedRef.current) {
+              releasePointerCapture(
+                event.currentTarget as unknown as WebPointerCaptureElement,
+                event.pointerId
+              );
+              resetWebPointer();
+              return;
+            }
+            beginWebDrag(event.currentTarget as unknown as WebPointerCaptureElement);
+          }
+          event.preventDefault();
+          applyWebDragPosition(event.clientY);
+          refreshWebAutoScroll(event.clientY);
+        }}
+        onPointerUp={(event) => {
+          const pointer = webPointerRef.current;
+          if (!pointer || pointer.pointerId !== event.pointerId) {
+            return;
+          }
+          const wasDragging = webDragActiveRef.current;
+          releasePointerCapture(
+            event.currentTarget as unknown as WebPointerCaptureElement,
+            event.pointerId
+          );
+          if (wasDragging) {
+            event.preventDefault();
+            (event.currentTarget as unknown as WebPointerCaptureElement)
+              .querySelector?.(":focus")?.blur?.();
+            onWebDrop();
+            setTimeout(() => {
+              webSuppressClickRef.current = false;
+            }, 0);
+          }
+          resetWebPointer();
+        }}
+        onPointerCancel={(event) => {
+          const pointer = webPointerRef.current;
+          if (!pointer || pointer.pointerId !== event.pointerId) {
+            return;
+          }
+          releasePointerCapture(
+            event.currentTarget as unknown as WebPointerCaptureElement,
+            event.pointerId
+          );
+          if (webDragActiveRef.current) {
+            onDragEnd();
+          }
+          resetWebPointer();
         }}
       >
         {children}
@@ -7058,7 +7530,13 @@ function RunCardDropSurface({
       onTouchStart={armNativeDrag}
       style={[
         style,
-        draggable ? { transform: [{ translateY: nativeDragOffset }] } : null,
+        draggable ? {
+          transform: [
+            { translateY: nativeDragOffset },
+            { translateY: dragging ? -2 : 0 },
+            { scale: dragging ? 1.015 : 1 }
+          ]
+        } : null,
         dragging ? styles.runCardNativeDragging : null
       ]}
       testID={testID}
@@ -16769,9 +17247,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexWrap: "wrap",
     paddingVertical: 10
-  },
-  runCardDropTarget: {
-    borderColor: "#2563EB"
   },
   runCardDragging: {
     opacity: 0.9

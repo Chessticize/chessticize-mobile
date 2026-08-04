@@ -4,13 +4,17 @@ import {
   centerTestId,
   clickTestId,
   dragTestId,
+  expectPointerDrivenRunDrag,
   expectReorderAnimation,
+  expectRunCardPickedUp,
   expectRunCardInsets,
+  expectRunTouchSelectionSuppressed,
   expectTestIdHorizontalCentersAligned,
   expectTestIdText,
   expectTestIdAbsent,
   expectTestIdsInOrder,
-  expectUniformRunDropTarget,
+  expectRunInsertionTarget,
+  expectRunPreviewShift,
   openPracticeSession,
   replaceTextTestId,
   waitForEnabledTestId,
@@ -122,25 +126,74 @@ export const EditAndReorderRuns: Story = {
     await expectRunCardInsets(canvasElement, "practice-run-standard");
     await dragTestId(
       canvasElement,
-      "practice-run-endgame-sprint",
       "practice-run-arrow-duel",
-      async () => expectTestIdsInOrder(canvasElement, [
-        "practice-run-standard",
-        "practice-run-endgame-sprint",
-        "practice-run-arrow-duel",
-        "practice-run-tactics-focus"
-      ]).then(async () => {
-        await expectReorderAnimation(canvasElement);
-        await expectUniformRunDropTarget(canvasElement, "practice-run-arrow-duel");
-      })
+      "practice-run-endgame-sprint",
+      {
+        pointerType: "touch",
+        targetVerticalFraction: 0.1,
+        onPickup: async () => {
+          await expectRunCardPickedUp(canvasElement, "practice-run-arrow-duel");
+          await expectPointerDrivenRunDrag(canvasElement, "practice-run-arrow-duel");
+          await expectRunTouchSelectionSuppressed(
+            canvasElement,
+            "practice-run-arrow-duel"
+          );
+          await expectTestIdText(
+            canvasElement,
+            "lab-run-reorder-feedback",
+            "LAB previewMedium haptic requested on pickup"
+          );
+        },
+        onPreview: async () => {
+          await expectRunCardPickedUp(canvasElement, "practice-run-arrow-duel");
+          await expectPointerDrivenRunDrag(canvasElement, "practice-run-arrow-duel");
+          await expectTestIdText(
+            canvasElement,
+            "lab-run-reorder-feedback",
+            "LAB previewMedium haptic requested on pickup"
+          );
+          await expectTestIdsInOrder(canvasElement, [
+            "practice-run-standard",
+            "practice-run-arrow-duel",
+            "practice-run-tactics-focus",
+            "practice-run-endgame-sprint"
+          ]);
+          await expectRunInsertionTarget(canvasElement, "practice-run-endgame-sprint", "after");
+          await expectRunPreviewShift(canvasElement, "practice-run-tactics-focus", "up");
+          await expectRunPreviewShift(canvasElement, "practice-run-endgame-sprint", "up");
+        }
+      }
     );
+    await expectReorderAnimation(canvasElement);
     await expectTestIdsInOrder(canvasElement, [
       "practice-run-standard",
+      "practice-run-tactics-focus",
       "practice-run-endgame-sprint",
-      "practice-run-arrow-duel",
-      "practice-run-tactics-focus"
+      "practice-run-arrow-duel"
     ]);
     expectTestIdAbsent(canvasElement, "practice-run-notice");
+  }
+};
+
+export const EditAndReorderRunsPickedUp: Story = {
+  name: "Edit and reorder runs · picked up",
+  args: {
+    scenarioId: "practice-home-edit",
+    runReorderPickedUpRunId: "endgame-sprint",
+    storyPresentation: {
+      storyId: "practice--edit-and-reorder-runs-picked-up",
+      title: "Edit and reorder runs · picked up"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "practice-run-home-edit");
+    await expectRunCardPickedUp(canvasElement, "practice-run-endgame-sprint");
+    await expectPointerDrivenRunDrag(canvasElement, "practice-run-endgame-sprint");
+    await expectTestIdText(
+      canvasElement,
+      "lab-run-reorder-feedback",
+      "LAB previewMedium haptic requested on pickup"
+    );
   }
 };
 

@@ -984,9 +984,11 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
-  it("locks the Edit Runs screen while a Run card drag is active", () => {
+  it("shows picked-up feedback and locks Edit Runs while a Run card drag is active", () => {
+    const runReorderFeedbackPreview = jest.fn();
     const renderer = renderScreen({
-      runManagementPresentation: runManagementPresentation({ homeEditing: true })
+      runManagementPresentation: runManagementPresentation({ homeEditing: true }),
+      runReorderFeedbackPreview
     });
     const mainScroll = findByTestId(renderer, "practice-main-scroll");
     const standardRun = renderer.root.findAllByProps({ testID: "practice-run-standard" })
@@ -1012,6 +1014,13 @@ describe("PracticePocScreen", () => {
       standardRun!.props.onPanResponderGrant();
     });
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+    expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(1);
+    expect(runReorderFeedbackPreview).toHaveBeenCalledWith({ haptic: "medium" });
+    const pickedUpRun = renderer.root.findAllByProps({ testID: "practice-run-standard" })
+      .find((node) => typeof node.props.onTouchStart === "function");
+    expect(pickedUpRun).toBeTruthy();
+    expect(flattenTestStyle(pickedUpRun!.props.style).transform)
+      .toEqual(expect.arrayContaining([{ translateY: -2 }, { scale: 1.015 }]));
 
     act(() => {
       standardRun!.props.onPanResponderRelease();
@@ -1025,6 +1034,170 @@ describe("PracticePocScreen", () => {
       standardRun!.props.onPanResponderTerminate();
     });
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the Storybook picked-up state visual-only", () => {
+    const runReorderFeedbackPreview = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ homeEditing: true }),
+      runReorderDesignPreview: { pickedUpRunId: "tactics-focus" },
+      runReorderFeedbackPreview
+    });
+    const pickedUpRun = renderer.root.findAllByProps({ testID: "practice-run-tactics-focus" })
+      .find((node) => typeof node.props.onTouchStart === "function");
+
+    expect(pickedUpRun).toBeTruthy();
+    expect(flattenTestStyle(pickedUpRun!.props.style).transform)
+      .toEqual(expect.arrayContaining([{ translateY: -2 }, { scale: 1.015 }]));
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    expect(runReorderFeedbackPreview).not.toHaveBeenCalled();
+  });
+
+  it("uses pointer-driven Web dragging without a browser-native ghost", () => {
+    const platform = ReactNative.Platform as unknown as { OS: string };
+    const previousPlatform = platform.OS;
+    const runReorderFeedbackPreview = jest.fn();
+    platform.OS = "web";
+
+    try {
+      const renderer = renderScreen({
+        runManagementPresentation: runManagementPresentation({ homeEditing: true }),
+        runReorderFeedbackPreview
+      });
+      const pointerSurface = (): TestRenderer.ReactTestInstance => renderer.root.findAll(
+        (node) => node.props["data-testid"] === "practice-run-standard"
+      )[0]!;
+      const currentTarget = {
+        querySelector: jest.fn(() => null),
+        releasePointerCapture: jest.fn(),
+        setPointerCapture: jest.fn()
+      };
+      const target = { closest: jest.fn(() => null) };
+
+      act(() => {
+        pointerSurface().props.onPointerDown({
+          button: 0,
+          clientY: 100,
+          currentTarget,
+          pointerId: 1,
+          pointerType: "mouse",
+          target
+        });
+        pointerSurface().props.onPointerMove({
+          clientY: 124,
+          currentTarget,
+          pointerId: 1,
+          preventDefault: jest.fn(),
+          target
+        });
+      });
+
+      expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(1);
+      expect(pointerSurface().props.draggable).toBe(false);
+      expect(pointerSurface().props["data-browser-drag-ghost"]).toBe("suppressed");
+      expect(pointerSurface().props["data-drag-mechanism"]).toBe("pointer");
+      expect(pointerSurface().props["data-drag-state"]).toBe("picked-up");
+      expect(pointerSurface().props.style.transform).toContain("translate3d(10px, 22px, 0)");
+      expect(pointerSurface().props.style.transform).toContain("scale(1.015)");
+
+      act(() => {
+        pointerSurface().props.onPointerCancel({
+          currentTarget,
+          pointerId: 1
+        });
+      });
+      expect(pointerSurface().props["data-drag-state"]).toBeUndefined();
+      expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    } finally {
+      platform.OS = previousPlatform;
+    }
+  });
+
+  it("keeps touch scrolling available before pickup and auto-scrolls during a Web Run drag", () => {
+    const platform = ReactNative.Platform as unknown as { OS: string };
+    const previousPlatform = platform.OS;
+    const runReorderFeedbackPreview = jest.fn();
+    platform.OS = "web";
+
+    try {
+      const renderer = renderScreen({
+        runManagementPresentation: runManagementPresentation({ homeEditing: true }),
+        runReorderFeedbackPreview
+      });
+      const pointerSurface = (): TestRenderer.ReactTestInstance => renderer.root.findAll(
+        (node) => node.props["data-testid"] === "practice-run-standard"
+      )[0]!;
+      const scrollElement = {
+        clientHeight: 400,
+        scrollHeight: 1_200,
+        scrollTop: 0,
+        getBoundingClientRect: jest.fn(() => ({
+          bottom: 400,
+          height: 400,
+          top: 0
+        }))
+      };
+      const currentTarget = {
+        closest: jest.fn(() => scrollElement),
+        querySelector: jest.fn(() => null),
+        releasePointerCapture: jest.fn(),
+        setPointerCapture: jest.fn()
+      };
+      const preventDefault = jest.fn();
+
+      act(() => {
+        pointerSurface().props.onPointerDown({
+          button: 0,
+          clientY: 100,
+          currentTarget,
+          pointerId: 2,
+          pointerType: "touch",
+          preventDefault,
+          target: { closest: jest.fn(() => null) }
+        });
+      });
+
+      expect(preventDefault).not.toHaveBeenCalled();
+      expect(pointerSurface().props.style.touchAction).toBe("pan-y");
+
+      act(() => {
+        jest.advanceTimersByTime(180);
+      });
+
+      expect(runReorderFeedbackPreview).toHaveBeenCalledWith({ haptic: "medium" });
+      expect(pointerSurface().props["data-drag-state"]).toBe("picked-up");
+      expect(pointerSurface().props.style.transform).toContain("translate3d(10px, -2px, 0)");
+      expect(pointerSurface().props.style.WebkitUserSelect).toBe("none");
+      expect(pointerSurface().props.style.WebkitTouchCallout).toBe("none");
+
+      act(() => {
+        pointerSurface().props.onPointerMove({
+          clientY: 390,
+          currentTarget,
+          pointerId: 2,
+          preventDefault: jest.fn(),
+          target: { closest: jest.fn(() => null) }
+        });
+        jest.advanceTimersByTime(96);
+      });
+      expect(scrollElement.scrollTop).toBeGreaterThan(0);
+
+      act(() => {
+        pointerSurface().props.onPointerCancel({
+          currentTarget,
+          pointerId: 2
+        });
+      });
+      const scrollTopAfterCancel = scrollElement.scrollTop;
+      act(() => {
+        jest.advanceTimersByTime(96);
+      });
+      expect(scrollElement.scrollTop).toBe(scrollTopAfterCancel);
+      expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    } finally {
+      platform.OS = previousPlatform;
+    }
   });
 
   it("renders removal confirmation directly below the selected Run card", () => {
@@ -12577,7 +12750,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "runReorderDesignPreview" | "runReorderFeedbackPreview" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
     onRenderCommit?: () => void;
     platformCapabilities?: MobilePlatformCapabilities;
   };
@@ -12697,6 +12870,8 @@ function renderScreen({
   runEloEditingMovedToHome,
   runManagementEnabled,
   runManagementPresentation,
+  runReorderDesignPreview,
+  runReorderFeedbackPreview,
   sprintRulesDesignPreview,
   sprintStartDelayMs,
   standardTargetCorrect,
@@ -12722,6 +12897,8 @@ function renderScreen({
         runEloEditingMovedToHome={runEloEditingMovedToHome}
         runManagementEnabled={runManagementEnabled}
         runManagementPresentation={runManagementPresentation}
+        runReorderDesignPreview={runReorderDesignPreview}
+        runReorderFeedbackPreview={runReorderFeedbackPreview}
         sprintRulesDesignPreview={sprintRulesDesignPreview}
         sprintStartDelayMs={sprintStartDelayMs}
         standardTargetCorrect={standardTargetCorrect}

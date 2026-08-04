@@ -162,5 +162,17 @@ module.exports = {
     create(styles) {
       return styles;
     },
+    flatten(style) {
+      if (!style) {
+        return {};
+      }
+      if (Array.isArray(style)) {
+        return style.reduce(
+          (merged, entry) => Object.assign(merged, module.exports.StyleSheet.flatten(entry)),
+          {}
+        );
+      }
+      return typeof style === 'object' ? { ...style } : {};
+    },
   },
 };

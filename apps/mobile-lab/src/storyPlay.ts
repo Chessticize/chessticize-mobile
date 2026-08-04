@@ -100,31 +100,51 @@ export async function dragTestId(
   canvasElement: HTMLElement,
   sourceTestID: string,
   targetTestID: string,
-  onPreview?: () => Promise<void> | void
+  options: {
+    onPickup?: () => Promise<void> | void;
+    onPreview?: () => Promise<void> | void;
+    pointerType?: "mouse" | "touch";
+    targetVerticalFraction?: number;
+  } = {}
 ): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   const source = await page.findByTestId(sourceTestID, {}, { timeout: 4_000 });
   const target = await page.findByTestId(targetTestID, {}, { timeout: 4_000 });
-  const DataTransferConstructor = canvasElement.ownerDocument.defaultView?.DataTransfer;
-  const DragEventConstructor = canvasElement.ownerDocument.defaultView?.DragEvent;
-  if (!DataTransferConstructor || !DragEventConstructor) {
-    throw new Error("This browser does not expose the APIs required to test drag-and-drop");
+  const PointerEventConstructor = canvasElement.ownerDocument.defaultView?.PointerEvent;
+  if (!PointerEventConstructor) {
+    throw new Error("This browser does not expose the Pointer Events required to test reordering");
   }
-  const dataTransfer = new DataTransferConstructor();
-  const dispatchDragEvent = (element: HTMLElement, type: string): void => {
-    element.dispatchEvent(new DragEventConstructor(type, {
+  const sourceRect = source.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const pointerId = 1;
+  const pointerType = options.pointerType ?? "mouse";
+  const targetVerticalFraction = options.targetVerticalFraction ?? 0.5;
+  const dispatchPointerEvent = (
+    element: HTMLElement,
+    type: string,
+    clientY: number,
+    buttons: number
+  ): void => {
+    element.dispatchEvent(new PointerEventConstructor(type, {
       bubbles: true,
+      buttons,
       cancelable: true,
-      dataTransfer
+      clientX: sourceRect.left + sourceRect.width / 2,
+      clientY,
+      pointerId,
+      pointerType
     }));
   };
 
-  dispatchDragEvent(source, "dragstart");
-  dispatchDragEvent(target, "dragenter");
-  dispatchDragEvent(target, "dragover");
-  await onPreview?.();
-  dispatchDragEvent(target, "drop");
-  dispatchDragEvent(source, "dragend");
+  dispatchPointerEvent(source, "pointerdown", sourceRect.top + sourceRect.height / 2, 1);
+  if (pointerType === "touch") {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  await options.onPickup?.();
+  const targetClientY = targetRect.top + targetRect.height * targetVerticalFraction;
+  dispatchPointerEvent(source, "pointermove", targetClientY, 1);
+  await options.onPreview?.();
+  dispatchPointerEvent(source, "pointerup", targetClientY, 0);
 }
 
 export async function expectTestIdsInOrder(
@@ -152,6 +172,34 @@ export async function expectReorderAnimation(canvasElement: HTMLElement): Promis
   });
 }
 
+export async function expectRunCardPickedUp(
+  canvasElement: HTMLElement,
+  testID: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const card = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    if (card.getAttribute("aria-grabbed") !== "true") {
+      throw new Error(`Expected ${testID} to expose its grabbed state`);
+    }
+    if (card.dataset.dragState !== "picked-up") {
+      throw new Error(`Expected ${testID} to expose its picked-up visual state`);
+    }
+    if (card.dataset.pickupHaptic !== "medium") {
+      throw new Error(`Expected ${testID} to request medium pickup haptics`);
+    }
+    if (!card.style.transform.includes("translate3d")) {
+      throw new Error(`Expected ${testID} to expose its lifted drag transform`);
+    }
+    if (!card.style.transform.includes("translate3d(10px")) {
+      throw new Error(`Expected ${testID} to move slightly right when picked up`);
+    }
+    if (!card.style.transform.includes("scale(1.015)")) {
+      throw new Error(`Expected ${testID} to scale slightly when picked up`);
+    }
+  });
+}
+
 export async function expectRunCardInsets(
   canvasElement: HTMLElement,
   testID: string
@@ -173,23 +221,108 @@ export async function expectRunCardInsets(
   });
 }
 
-export async function expectUniformRunDropTarget(
+export async function expectRunInsertionTarget(
+  canvasElement: HTMLElement,
+  testID: string,
+  position: "after" | "before"
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const card = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    if (card.dataset.dropPosition !== position) {
+      throw new Error(`Expected ${testID} to expose a ${position} insertion target`);
+    }
+    const insertionOutline = canvasElement.ownerDocument.body.querySelector<HTMLElement>(
+      `[data-run-insertion-outline="${position}"][data-run-insertion-target="${testID}"]`
+    );
+    if (!insertionOutline) {
+      throw new Error(`Expected ${testID} to render a visible ${position} insertion outline`);
+    }
+    const style = canvasElement.ownerDocument.defaultView?.getComputedStyle(insertionOutline);
+    if (
+      style?.borderStyle !== "dashed"
+      || style.borderWidth !== "2px"
+      || style.borderColor !== "rgb(37, 99, 235)"
+    ) {
+      throw new Error(`Expected the ${position} insertion slot to use a blue dashed outline`);
+    }
+    const outlineRect = insertionOutline.getBoundingClientRect();
+    const targetRect = card.getBoundingClientRect();
+    if (
+      Math.abs(outlineRect.width - targetRect.width) > 2
+      || Math.abs(outlineRect.height - targetRect.height) > 2
+    ) {
+      throw new Error(`Expected the ${position} insertion outline to match the card slot size`);
+    }
+    const pickedUpCard = canvasElement.ownerDocument.body.querySelector<HTMLElement>(
+      '[data-drag-state="picked-up"]'
+    );
+    if (!pickedUpCard) {
+      throw new Error("Expected a picked-up card while checking the insertion outline");
+    }
+    const targetZIndex = Number(
+      canvasElement.ownerDocument.defaultView?.getComputedStyle(card).zIndex
+    );
+    const outlineZIndex = Number(style.zIndex);
+    const pickedUpZIndex = Number(
+      canvasElement.ownerDocument.defaultView?.getComputedStyle(pickedUpCard).zIndex
+    );
+    if (!(outlineZIndex > targetZIndex && outlineZIndex < pickedUpZIndex)) {
+      throw new Error(`Expected the ${position} insertion outline below the picked-up card`);
+    }
+  });
+}
+
+export async function expectRunPreviewShift(
+  canvasElement: HTMLElement,
+  testID: string,
+  direction: "down" | "up"
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const card = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    const offset = Number(card.dataset.dropPreviewOffset ?? 0);
+    if ((direction === "up" && offset >= 0) || (direction === "down" && offset <= 0)) {
+      throw new Error(`Expected ${testID} to preview-shift ${direction}`);
+    }
+    if (!card.style.transform.includes(`translate3d(0px, ${offset}px, 0px)`)
+      && !card.style.transform.includes(`translate3d(0, ${offset}px, 0)`)) {
+      throw new Error(`Expected ${testID} to expose its ${direction} preview transform`);
+    }
+  });
+}
+
+export async function expectPointerDrivenRunDrag(
   canvasElement: HTMLElement,
   testID: string
 ): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   const card = await page.findByTestId(testID, {}, { timeout: 4_000 });
-  const view = canvasElement.ownerDocument.defaultView;
-  if (!view) {
-    throw new Error("Expected a browser window for Run drop-target verification");
-  }
   await waitFor(() => {
-    const style = view.getComputedStyle(card);
-    if (style.borderTopWidth !== style.borderBottomWidth) {
-      throw new Error(`Expected ${testID} to use an even border on every edge`);
+    if (card.dataset.dragMechanism !== "pointer") {
+      throw new Error(`Expected ${testID} to use pointer-driven dragging`);
     }
-    if (style.boxShadow.includes("-3px") || !style.boxShadow.includes("0px 0px 0px 2px")) {
-      throw new Error(`Expected ${testID} to use a uniform focus ring without a thick top edge`);
+    if (card.dataset.browserDragGhost !== "suppressed" || card.draggable) {
+      throw new Error(`Expected ${testID} to suppress the browser-native drag ghost`);
+    }
+    if (!card.style.transform.includes("scale(1.015)")) {
+      throw new Error(`Expected ${testID} to keep the full-size card lifted under the pointer`);
+    }
+  });
+}
+
+export async function expectRunTouchSelectionSuppressed(
+  canvasElement: HTMLElement,
+  testID: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const card = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    if (card.style.userSelect !== "none") {
+      throw new Error(`Expected ${testID} to suppress mobile text selection`);
+    }
+    if (card.style.touchAction !== "pan-y") {
+      throw new Error(`Expected ${testID} to preserve vertical scrolling before pickup`);
     }
   });
 }

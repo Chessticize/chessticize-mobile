@@ -39,6 +39,14 @@
       }
     ]
   },
+  "practice-home-edit": {
+    "issues": [
+      {
+        "issueNumber": 498,
+        "changeNote": "Preview medium haptic intent, a full-size pointer-following card, and a single insertion line while reordering."
+      }
+    ]
+  },
   "practice-run-arrow-duel-editor": {
     "issues": [
       {
