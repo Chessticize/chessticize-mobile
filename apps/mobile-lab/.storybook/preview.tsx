@@ -77,8 +77,16 @@ const preview: Preview = {
           },
           type: "mobile"
         },
+        tabletPortrait: {
+          name: "iPad portrait · Release",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.tabletPortrait.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.tabletPortrait.height}px`
+          },
+          type: "tablet"
+        },
         regularWidth: {
-          name: "Regular width",
+          name: "iPad landscape · Release",
           styles: {
             width: `${LAB_DEVICE_VIEWPORTS.regularWidth.width}px`,
             height: `${LAB_DEVICE_VIEWPORTS.regularWidth.height}px`

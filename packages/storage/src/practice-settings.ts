@@ -1,5 +1,6 @@
 import {
   defaultSprintGuideProgress,
+  type ArrowDuelReplyCueStage,
   type ReviewReminderSettings
 } from "../../core/src/index.ts";
 import type { PracticeSettings, ReviewReminderPreference } from "./practice-store.ts";
@@ -38,7 +39,10 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
       rulesSeen: settings.sprintGuides?.rulesSeen ?? false,
       activeSessionSeen: settings.sprintGuides?.activeSessionSeen ?? false,
       arrowDuelSeen: settings.sprintGuides?.arrowDuelSeen ?? false,
-      focusedRunSeen: settings.sprintGuides?.focusedRunSeen ?? false
+      focusedRunSeen: settings.sprintGuides?.focusedRunSeen ?? false,
+      arrowDuelReplyCueStage: normalizeArrowDuelReplyCueStage(
+        settings.sprintGuides?.arrowDuelReplyCueStage
+      )
     }
   });
 }
@@ -59,9 +63,18 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
       rulesSeen: settings.sprintGuides?.rulesSeen ?? false,
       activeSessionSeen: settings.sprintGuides?.activeSessionSeen ?? false,
       arrowDuelSeen: settings.sprintGuides?.arrowDuelSeen ?? false,
-      focusedRunSeen: settings.sprintGuides?.focusedRunSeen ?? false
+      focusedRunSeen: settings.sprintGuides?.focusedRunSeen ?? false,
+      arrowDuelReplyCueStage: normalizeArrowDuelReplyCueStage(
+        settings.sprintGuides?.arrowDuelReplyCueStage
+      )
     }
   };
+}
+
+function normalizeArrowDuelReplyCueStage(
+  value: ArrowDuelReplyCueStage | undefined
+): ArrowDuelReplyCueStage {
+  return value === 1 || value === 2 || value === 3 ? value : 0;
 }
 
 export function normalizeReviewReminderPreference(preference: ReviewReminderPreference): ReviewReminderPreference {

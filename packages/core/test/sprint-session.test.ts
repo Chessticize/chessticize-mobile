@@ -482,6 +482,33 @@ test("a correct Arrow Duel choice starts a separately timed opponent reply", () 
   assert.equal(reply.state.totalPausedMs, 5_000);
 });
 
+test("a stalemating alternate passes immediately without starting the reply clock", () => {
+  const started = startSprint({
+    config: buildSprintConfig({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 2,
+      maxMistakes: 3,
+      opponentReply: { enabled: true, seconds: 10 }
+    }),
+    puzzles: [stalemateAlternatePuzzle(), samplePuzzle("p2")],
+    ratingBefore: 600,
+    now: NOW
+  });
+
+  const result = submitSprintMove(started, "g6g7", "2026-06-20T00:00:05.000Z");
+
+  assert.equal(result.feedback?.result, "correct");
+  assert.equal(result.feedback?.puzzleSolved, true);
+  assert.deepEqual(result.feedback?.autoPlayedMoves, []);
+  assert.equal(result.attempt?.result, "correct");
+  assert.equal(result.state.correctCount, 1);
+  assert.equal(result.state.currentPuzzle?.puzzle.id, "p2");
+  assert.equal(result.state.deadlineAt, "2026-06-20T00:05:00.000Z");
+  assert.equal(result.state.totalPausedMs ?? 0, 0);
+});
+
 test("a wrong Arrow Duel reply marks the whole puzzle wrong", () => {
   const started = startSprint({
     config: buildSprintConfig({
@@ -912,6 +939,18 @@ function samplePuzzle(id: string): Puzzle {
     themes: ["crushing", "hangingPiece", "long", "middlegame"],
     source: "lichess",
     stockfishBestMove: "b2b1"
+  };
+}
+
+function stalemateAlternatePuzzle(): Puzzle {
+  return {
+    id: "stalemate-alternate",
+    initialFen: "7k/8/5KQ1/8/8/8/8/8 w - - 0 1",
+    solutionMoves: ["g6f7"],
+    rating: 600,
+    themes: ["mateIn1", "stalemate"],
+    source: "synthetic",
+    stockfishBestMove: "g6g7"
   };
 }
 

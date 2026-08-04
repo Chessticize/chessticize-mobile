@@ -746,13 +746,13 @@ export const ArrowDuelReplyCustomTimer: Story = {
 };
 
 export const ArrowDuelWhatIfNextTwoSprints: Story = {
-  name: "Arrow Duel · cue · Sprints 2–3 (1.5 sec)",
+  name: "Arrow Duel · cue · 1.5 sec",
   args: {
     arrowDuelReplyPreparationHoldMs: 60_000,
     scenarioId: "practice-arrow-duel-prompt",
     storyPresentation: {
       storyId: "practice--arrow-duel-what-if-next-two-sprints",
-      title: "Arrow Duel · cue · Sprints 2–3 (1.5 sec)"
+      title: "Arrow Duel · cue · 1.5 sec"
     }
   },
   play: async ({ canvasElement }) => {
@@ -762,13 +762,13 @@ export const ArrowDuelWhatIfNextTwoSprints: Story = {
 };
 
 export const ArrowDuelWhatIfLaterSprints: Story = {
-  name: "Arrow Duel · cue · later Sprints (1 sec)",
+  name: "Arrow Duel · cue · 1 sec",
   args: {
     arrowDuelReplyPreparationHoldMs: 60_000,
     scenarioId: "practice-arrow-duel-prompt",
     storyPresentation: {
       storyId: "practice--arrow-duel-what-if-later-sprints",
-      title: "Arrow Duel · cue · later Sprints (1 sec)"
+      title: "Arrow Duel · cue · 1 sec"
     }
   },
   play: async ({ canvasElement }) => {

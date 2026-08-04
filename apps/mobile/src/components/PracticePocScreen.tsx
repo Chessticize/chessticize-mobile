@@ -33,8 +33,11 @@ import {
 } from "./sessionGuideGeometry.ts";
 import {
   analyzeFenWithUciEngine,
+  acknowledgeArrowDuelReplyCue,
   ALL_THEME_SELECTION,
+  advanceArrowDuelReplyCueSprint,
   applyMovesToFen,
+  arrowDuelReplyCuePresentationFor,
   beginArrowDuelPuzzle,
   beginLinePuzzle,
   buildCurrentPositionEvaluationLine,
@@ -1709,7 +1712,10 @@ export function PracticePocScreen({
     nextMode: SprintMode,
     useCustomTiming: boolean,
     practiceRunId?: string
-  ): SprintRulesGuidePresentation {
+  ): SprintRulesGuidePresentation & {
+    arrowDuelReplyChallenge?: boolean;
+    arrowDuelReplyOnboarding?: "choice_then_reply";
+  } {
     const config = practiceRunId === undefined
       ? sprintConfigFor(
           nextMode,
@@ -1724,10 +1730,18 @@ export function PracticePocScreen({
       : nextMode === "standard"
         ? standardTargetCorrect
         : arrowDuelTargetCorrect;
+    const hasOpponentReply = nextMode === "arrow_duel"
+      && config.opponentReply?.enabled === true;
     return {
       durationLabel: formatSprintDurationLabel(config.durationSeconds),
       maxMistakes: config.maxMistakes,
-      targetCorrect: targetOverride ?? config.targetCorrect
+      targetCorrect: targetOverride ?? config.targetCorrect,
+      ...(hasOpponentReply
+        ? {
+            arrowDuelReplyChallenge: true,
+            arrowDuelReplyOnboarding: "choice_then_reply" as const
+          }
+        : {})
     };
   }
 
@@ -1746,6 +1760,8 @@ export function PracticePocScreen({
     practiceRunId?: string,
     pendingStart?: PendingGuidedStart,
     presentationOverride?: SprintRulesGuidePresentation & {
+      arrowDuelReplyChallenge?: boolean;
+      arrowDuelReplyOnboarding?: "choice_then_reply";
       focusedRun?: boolean;
       maxAttempts?: number;
     }
@@ -1844,7 +1860,14 @@ export function PracticePocScreen({
           focusedRun: true,
           maxAttempts: prepared.prepared.config.maxAttempts,
           maxMistakes: prepared.prepared.config.maxMistakes,
-          targetCorrect: prepared.prepared.config.targetCorrect
+          targetCorrect: prepared.prepared.config.targetCorrect,
+          ...(nextMode === "arrow_duel"
+            && prepared.prepared.config.opponentReply?.enabled === true
+            ? {
+                arrowDuelReplyChallenge: true,
+                arrowDuelReplyOnboarding: "choice_then_reply" as const
+              }
+            : {})
         }
       )) {
         return;
@@ -2046,6 +2069,19 @@ export function PracticePocScreen({
   }
 
   function adoptStartedSprint(started: SprintState): void {
+    if (
+      sprintGuidanceEnabled
+      && started.config.mode === "arrow_duel"
+      && started.config.opponentReply?.enabled === true
+    ) {
+      const settings = service.getSettings();
+      const sprintGuides = advanceArrowDuelReplyCueSprint(settings.sprintGuides);
+      service.saveSettings({
+        ...settings,
+        sprintGuides
+      });
+      setSettingsRevision((current) => current + 1);
+    }
     setMode(started.config.mode);
     setSessionReplayItems([]);
     commitState(started);
@@ -2929,7 +2965,21 @@ export function PracticePocScreen({
         }
         if (isArrowDuelReplyHandoff) {
           setArrowDuelReplyPromptPhase("reply");
-          await sleep(ARROW_DUEL_REPLY_PREPARATION_MS);
+          setArrowDuelReplyPreparationAcknowledged(false);
+          const cuePresentation = sprintGuidanceEnabled
+            ? arrowDuelReplyCuePresentationFor(service.getSettings().sprintGuides)
+            : {
+                confirmationRequired: false,
+                holdMs: ARROW_DUEL_REPLY_PREPARATION_MS
+              };
+          if (cuePresentation.confirmationRequired) {
+            await new Promise<void>((resolve) => {
+              arrowDuelReplyPreparationContinueRef.current = resolve;
+            });
+            arrowDuelReplyPreparationContinueRef.current = null;
+          } else {
+            await sleep(cuePresentation.holdMs ?? ARROW_DUEL_REPLY_PREPARATION_MS);
+          }
         }
         await animateBoardMoves(autoMoves, nextFen);
         if (isArrowDuelReplyHandoff) {
@@ -2951,6 +3001,7 @@ export function PracticePocScreen({
           setArrowDuelReplyChallengePhase("reply");
         }
       } finally {
+        arrowDuelReplyPreparationContinueRef.current = null;
         setArrowDuelWhatIfVisible(false);
         boardSyncInProgressRef.current = false;
         // A newer lock taken mid-animation (pause, app background) owns the
@@ -3397,7 +3448,12 @@ export function PracticePocScreen({
             Math.ceil((new Date(displayedArrowDuelPuzzle.replyDeadlineAt).getTime() - nowMs) / 1000)
           )
         : state?.config.opponentReply?.seconds ?? arrowDuelReplySeconds;
-  const explicitReplySideCopy = arrowDuelReplyChallengeDesign?.explicitReplySideCopy === true;
+  const productionReplyCuePresentation = sprintGuidanceEnabled
+    && arrowDuelReplyChallengeProductionVisible
+    ? arrowDuelReplyCuePresentationFor(service.getSettings().sprintGuides)
+    : null;
+  const explicitReplySideCopy = sprintGuidanceEnabled
+    || arrowDuelReplyChallengeDesign?.explicitReplySideCopy === true;
   const arrowDuelWhatIfDetail = explicitReplySideCopy
     ? replyPreparationInstruction(arrowDuelReplySecondsRemaining)
     : `Find the opponent’s reply in ${arrowDuelReplySecondsRemaining} ${
@@ -4047,16 +4103,27 @@ export function PracticePocScreen({
 
         {arrowDuelWhatIfVisible ? (
           <ArrowDuelWhatIfOverlay
-            actionLabel={sprintRulesDesignPreview?.arrowDuelReplyChallenge
+            actionLabel={(sprintRulesDesignPreview?.arrowDuelReplyChallenge
               ?.preparationConfirmationRequired === true
+              || productionReplyCuePresentation?.confirmationRequired === true)
               && !arrowDuelReplyPreparationAcknowledged
               ? "Got it"
               : undefined}
             compactTitle={boardSize < 300}
             detail={arrowDuelWhatIfDetail}
             onAction={() => {
+              if (productionReplyCuePresentation?.confirmationRequired === true) {
+                const settings = service.getSettings();
+                service.saveSettings({
+                  ...settings,
+                  sprintGuides: acknowledgeArrowDuelReplyCue(settings.sprintGuides)
+                });
+                setSettingsRevision((current) => current + 1);
+              }
               setArrowDuelReplyPreparationAcknowledged(true);
-              arrowDuelReplyPreparationContinueRef.current?.();
+              const continueReply = arrowDuelReplyPreparationContinueRef.current;
+              arrowDuelReplyPreparationContinueRef.current = null;
+              continueReply?.();
             }}
             testIDPrefix="arrow-duel"
             title={explicitReplySideCopy && arrowDuelPromptSide

@@ -247,6 +247,7 @@ interface AppSettingsRow {
   sprint_active_session_guide_seen: number;
   sprint_arrow_duel_guide_seen: number;
   sprint_focused_run_guide_seen: number;
+  sprint_arrow_duel_reply_cue_stage: number;
 }
 
 interface AppReviewRequestStateRow {
@@ -294,7 +295,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 18;
+export const CURRENT_SCHEMA_VERSION = 19;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -321,7 +322,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 14, to: 15, apply: migrateV14ToV15 },
   { from: 15, to: 16, apply: migrateV15ToV16 },
   { from: 16, to: 17, apply: migrateV16ToV17 },
-  { from: 17, to: 18, apply: migrateV17ToV18 }
+  { from: 17, to: 18, apply: migrateV17ToV18 },
+  { from: 18, to: 19, apply: migrateV18ToV19 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -674,8 +676,9 @@ export class SyncSQLiteStore implements PracticeStore {
           sprint_rules_guide_seen,
           sprint_active_session_guide_seen,
           sprint_arrow_duel_guide_seen,
-          sprint_focused_run_guide_seen
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          sprint_focused_run_guide_seen,
+          sprint_arrow_duel_reply_cue_stage
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         boolToInt(cloned.sync.iCloudEnabled),
@@ -689,7 +692,8 @@ export class SyncSQLiteStore implements PracticeStore {
         boolToInt(cloned.sprintGuides.rulesSeen),
         boolToInt(cloned.sprintGuides.activeSessionSeen),
         boolToInt(cloned.sprintGuides.arrowDuelSeen),
-        boolToInt(cloned.sprintGuides.focusedRunSeen ?? false)
+        boolToInt(cloned.sprintGuides.focusedRunSeen ?? false),
+        cloned.sprintGuides.arrowDuelReplyCueStage ?? 0
       );
   }
 
@@ -2546,6 +2550,7 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV11ToV12(db);
   migrateV14ToV15(db);
   migrateV16ToV17(db);
+  migrateV18ToV19(db);
   if (!hadOpponentReplyColumns) {
     migrateV17ToV18(db);
   }
@@ -2558,6 +2563,7 @@ function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
     hasColumn(db, "app_settings", "sprint_active_session_guide_seen") &&
     hasColumn(db, "app_settings", "sprint_arrow_duel_guide_seen") &&
     hasColumn(db, "app_settings", "sprint_focused_run_guide_seen") &&
+    hasColumn(db, "app_settings", "sprint_arrow_duel_reply_cue_stage") &&
     hasTable(db, "app_review_request_state") &&
     hasColumn(db, "practice_runs", "opponent_reply_enabled") &&
     hasColumn(db, "practice_runs", "opponent_reply_seconds");
@@ -2994,6 +3000,16 @@ function migrateV17ToV18(db: SyncSqliteDatabase): void {
   `);
 }
 
+function migrateV18ToV19(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "sprint_arrow_duel_reply_cue_stage",
+    "ALTER TABLE app_settings ADD COLUMN sprint_arrow_duel_reply_cue_stage INTEGER NOT NULL DEFAULT 0 " +
+      "CHECK (sprint_arrow_duel_reply_cue_stage BETWEEN 0 AND 3)"
+  );
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -3139,7 +3155,10 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
       rulesSeen: intToBool(row.sprint_rules_guide_seen),
       activeSessionSeen: intToBool(row.sprint_active_session_guide_seen),
       arrowDuelSeen: intToBool(row.sprint_arrow_duel_guide_seen),
-      focusedRunSeen: intToBool(row.sprint_focused_run_guide_seen)
+      focusedRunSeen: intToBool(row.sprint_focused_run_guide_seen),
+      arrowDuelReplyCueStage: normalizeArrowDuelReplyCueStage(
+        row.sprint_arrow_duel_reply_cue_stage
+      )
     }
   };
 }
@@ -3500,6 +3519,10 @@ function boolToInt(value: boolean): number {
 
 function intToBool(value: number): boolean {
   return value !== 0;
+}
+
+function normalizeArrowDuelReplyCueStage(value: number): 0 | 1 | 2 | 3 {
+  return value === 1 || value === 2 || value === 3 ? value : 0;
 }
 
 // This is the frozen schema produced by migration 0 -> 1. Add a new migration

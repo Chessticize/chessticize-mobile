@@ -147,7 +147,8 @@ test("SQLite v16 preserves v9 settings while backfilling Run timing, rebuilding 
         rulesSeen: false,
         activeSessionSeen: false,
         arrowDuelSeen: false,
-        focusedRunSeen: false
+        focusedRunSeen: false,
+        arrowDuelReplyCueStage: 0
       });
       assert.deepEqual(
         store.listPracticeRuns().map((run) => ({

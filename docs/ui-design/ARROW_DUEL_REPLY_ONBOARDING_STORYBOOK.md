@@ -1,8 +1,8 @@
-# Arrow Duel Reply Onboarding Storybook Proposal
+# Arrow Duel Reply Onboarding
 
-Status: Storybook review only. This proposal does not change production guide
-eligibility, preparation-duration persistence, Sprint state, Review state, or
-runtime answer handling. Product wiring begins only after explicit approval.
+Status: approved Storybook design with production wiring in PR #506. The
+Interaction Lab remains the living visual reference for the implemented guide,
+preparation cue, and side-specific reply prompt.
 
 ## Problem
 
@@ -15,7 +15,7 @@ The preparation cue and the ready prompt also use generic wording. Neither one
 makes White or Black explicit, so the player has to infer who should move from
 the board alone.
 
-## Proposed first-use sequence
+## First-use sequence
 
 Keep the four shared Active Session guide screens unchanged. Replace the one
 Arrow Duel screen with two responsive screens:
@@ -40,7 +40,7 @@ states remain available as separate Storybook cue stories for design review.
 The named side is fixture-driven in Storybook and must be derived from the
 position in production. Black is not a hard-coded product rule.
 
-## Proposed copy
+## Copy
 
 Preparation cue:
 
@@ -59,22 +59,19 @@ the configured reply duration and directly tells the player what to do once the
 board is ready. Future tense keeps clear that the reply clock has not begun on
 the preparation cue.
 
-## Proposed preparation progression
+## Preparation progression
 
-The Storybook interpretation gives the first-ever cue an explicit
-acknowledgement, then reduces passive display time as the player becomes
-familiar with the handoff:
+The first-ever cue requires an explicit acknowledgement, then passive display
+time decreases as the player becomes familiar with the handoff:
 
 - First-ever cue: remains visible until the player taps `Got it`.
-- Later cues in that first Sprint and the next two Arrow Duel Sprints: 1.5
-  seconds.
-- Fourth and later Arrow Duel Sprints: 1 second.
+- Later cues in that first Sprint and the next Arrow Duel Sprint: 1.5 seconds.
+- Third and later Arrow Duel Sprints: 1 second.
 
-The progression is currently presentation data only. Approval is still needed
-before deciding where the completed familiarity stage is persisted and how
-Reset guides affects it. Scheduled Review and Replay must reuse the approved
-copy, but their duration relationship to Sprint familiarity remains a product
-wiring decision.
+The completed familiarity stage is persisted as device-local guide progress.
+Reset guides restores the first-ever `Got it` state along with every other
+first-use guide. Scheduled Review and Replay reuse the approved side-specific
+copy; Sprint familiarity controls only the Sprint preparation cue.
 
 ## Terminal alternative rule
 
@@ -110,12 +107,10 @@ behavior is implemented.
 - The full-board cue must remain centered and balanced with a two- or three-line
   title, a shorter supporting line, and no forced line break tied to one device.
 
-## Storybook boundary
+## Storybook reference
 
-The Interaction Lab enables the two-step guide and side-specific copy through
-design-preview inputs. Production defaults remain unchanged in this phase.
-The first-cue story exposes the real `Got it` interaction. The later cue stories
-are frozen for visual review and labeled with their proposed 1.5-second and
-1-second stages; they do not implement the familiarity counter or persistence.
-The dedicated `Arrow Duel · first reply cue · Got it` story is placed next to
-the guide stories so the acknowledgement state can be reviewed directly.
+The Interaction Lab keeps the approved two-step guide and side-specific copy as
+deterministic visual references. The first-cue story exposes the real `Got it`
+interaction. The 1.5-second and 1-second cue stories stay frozen so each state
+can be reviewed without racing the production timer. The production flow owns
+the persisted familiarity counter and Reset-guides behavior.

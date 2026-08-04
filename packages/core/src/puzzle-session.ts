@@ -154,24 +154,26 @@ export function submitArrowDuelChoice(
 
   if (isCorrect && options.opponentReply) {
     const replyFen = appendMove(state.currentFen, [], state.wrongMove).currentFen;
-    return {
-      state: {
-        ...state,
-        currentFen: replyFen,
-        phase: "reply_handoff",
-        selectedMove: move,
-        solved: false
-      },
-      feedback: {
-        result: "correct",
-        puzzleSolved: false,
-        submittedMove: move,
-        expectedMove: state.correctMove,
-        autoPlayedMoves: [state.wrongMove],
-        currentFen: replyFen,
-        review
-      }
-    };
+    if (!new Chess(replyFen).isStalemate()) {
+      return {
+        state: {
+          ...state,
+          currentFen: replyFen,
+          phase: "reply_handoff",
+          selectedMove: move,
+          solved: false
+        },
+        feedback: {
+          result: "correct",
+          puzzleSolved: false,
+          submittedMove: move,
+          expectedMove: state.correctMove,
+          autoPlayedMoves: [state.wrongMove],
+          currentFen: replyFen,
+          review
+        }
+      };
+    }
   }
 
   return {

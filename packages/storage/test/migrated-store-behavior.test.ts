@@ -87,7 +87,8 @@ for (const label of STORE_LABELS) {
           rulesSeen: true,
           activeSessionSeen: true,
           arrowDuelSeen: false,
-          focusedRunSeen: true
+          focusedRunSeen: true,
+          arrowDuelReplyCueStage: 2
         }
       });
 
@@ -100,7 +101,8 @@ for (const label of STORE_LABELS) {
           rulesSeen: true,
           activeSessionSeen: true,
           arrowDuelSeen: false,
-          focusedRunSeen: true
+          focusedRunSeen: true,
+          arrowDuelReplyCueStage: 2
         }
       });
     } finally {

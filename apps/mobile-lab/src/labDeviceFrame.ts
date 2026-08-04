@@ -32,10 +32,15 @@ export const LAB_DEVICE_VIEWPORTS = {
     height: 402,
     insets: { top: 0, right: 62, bottom: 21, left: 62 }
   },
+  tabletPortrait: {
+    width: 820,
+    height: 1180,
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
+  },
   regularWidth: {
     width: 1180,
     height: 820,
-    insets: { top: 0, right: 0, bottom: 0, left: 0 }
+    insets: { top: 0, right: 0, bottom: 20, left: 0 }
   }
 } as const satisfies Record<string, LabDeviceViewport>;
 

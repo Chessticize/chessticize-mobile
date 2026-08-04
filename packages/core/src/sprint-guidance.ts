@@ -11,6 +11,14 @@ export type SprintGuideProgress = {
   activeSessionSeen: boolean;
   arrowDuelSeen: boolean;
   focusedRunSeen?: boolean;
+  arrowDuelReplyCueStage?: ArrowDuelReplyCueStage;
+};
+
+export type ArrowDuelReplyCueStage = 0 | 1 | 2 | 3;
+
+export type ArrowDuelReplyCuePresentation = {
+  confirmationRequired: boolean;
+  holdMs: number | null;
 };
 
 export type SprintSessionGuideKey = Exclude<SprintGuideKey, "rules">;
@@ -20,7 +28,8 @@ export function defaultSprintGuideProgress(): SprintGuideProgress {
     rulesSeen: false,
     activeSessionSeen: false,
     arrowDuelSeen: false,
-    focusedRunSeen: false
+    focusedRunSeen: false,
+    arrowDuelReplyCueStage: 0
   };
 }
 
@@ -42,6 +51,50 @@ export function markSprintGuideSeen(
     case "focused_run":
       return { ...progress, focusedRunSeen: true };
   }
+}
+
+export function acknowledgeArrowDuelReplyCue(
+  progress: SprintGuideProgress
+): SprintGuideProgress {
+  return {
+    ...progress,
+    arrowDuelReplyCueStage: Math.max(1, arrowDuelReplyCueStageFor(progress)) as ArrowDuelReplyCueStage
+  };
+}
+
+export function advanceArrowDuelReplyCueSprint(
+  progress: SprintGuideProgress
+): SprintGuideProgress {
+  const stage = arrowDuelReplyCueStageFor(progress);
+  return {
+    ...progress,
+    arrowDuelReplyCueStage: stage === 0
+      ? 0
+      : Math.min(3, stage + 1) as ArrowDuelReplyCueStage
+  };
+}
+
+export function arrowDuelReplyCuePresentationFor(
+  progress: SprintGuideProgress
+): ArrowDuelReplyCuePresentation {
+  const stage = arrowDuelReplyCueStageFor(progress);
+  if (stage === 0) {
+    return {
+      confirmationRequired: true,
+      holdMs: null
+    };
+  }
+  return {
+    confirmationRequired: false,
+    holdMs: stage < 3 ? 1_500 : 1_000
+  };
+}
+
+function arrowDuelReplyCueStageFor(
+  progress: SprintGuideProgress
+): ArrowDuelReplyCueStage {
+  const stage = progress.arrowDuelReplyCueStage;
+  return stage === 1 || stage === 2 || stage === 3 ? stage : 0;
 }
 
 export function sprintSessionGuidesFor(

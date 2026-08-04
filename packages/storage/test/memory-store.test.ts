@@ -370,7 +370,8 @@ test("PracticeService persists settings through the store boundary", () => {
       rulesSeen: false,
       activeSessionSeen: false,
       arrowDuelSeen: false,
-      focusedRunSeen: false
+      focusedRunSeen: false,
+      arrowDuelReplyCueStage: 0
     }
   });
 
@@ -392,7 +393,8 @@ test("PracticeService persists settings through the store boundary", () => {
       rulesSeen: true,
       activeSessionSeen: true,
       arrowDuelSeen: false,
-      focusedRunSeen: true
+      focusedRunSeen: true,
+      arrowDuelReplyCueStage: 2
     }
   });
 
@@ -419,7 +421,8 @@ test("PracticeService persists settings through the store boundary", () => {
       rulesSeen: true,
       activeSessionSeen: true,
       arrowDuelSeen: false,
-      focusedRunSeen: true
+      focusedRunSeen: true,
+      arrowDuelReplyCueStage: 2
     }
   });
 });
