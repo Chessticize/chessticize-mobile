@@ -48,10 +48,10 @@ With Opponent reply on:
    starting square with a slower, silent undo. During that preparation beat,
    cover the board with a `What if you made the other move?` overlay and `Find
    the opponent’s reply in X seconds.`, where X is the Run's configured reply
-   time. Keep the overlay up
-   for 1.5 seconds while the fixed prompt surface switches to the `If...` reply copy, then
-   animate the tempting candidate. The player now moves for the opponent without
-   the board flipping.
+   time. Keep the overlay through a 1.5-second preparation beat while the fixed
+   prompt surface switches to the `If...` reply copy, then animate the tempting
+   candidate under that same overlay. Dismiss it when the move settles. The
+   player now moves for the opponent without the board flipping.
 5. Start the Run's configured reply clock, which defaults to ten seconds, only
    after the tempting candidate has settled and board input is available. None
    of the green confirmation, undo, prompt transition, or move animation uses
@@ -70,11 +70,13 @@ label; the independent timing rule remains part of scoring behavior, while the
 ordinary Sprint and puzzle clocks do not advance until the reply resolves.
 
 The reply challenge reuses the ordinary puzzle prompt position and surface. It
-stays centered at the same full width and fixed 72-point height. Candidate and
-reply copy occupy the same absolutely positioned copy layer so the handoff
-cannot change the prompt's geometry. The reply state explains the position
-without restating the acceptance rule. Once the whole puzzle resolves, do not
-replace that prompt with `Solved`, `Choice
+stays centered at the same full width and uses the single adaptive Prompt frame
+contract defined in [`MOBILE_UI_DESIGN.md`](MOBILE_UI_DESIGN.md#adaptive-practice-and-review).
+Arrow Duel must not declare a mode-specific height. Candidate and reply copy
+occupy the same absolutely positioned copy layer so the handoff cannot change
+the prompt's geometry. The reply state explains the position without restating
+the acceptance rule. Once the whole puzzle resolves, do not replace that
+prompt with `Solved`, `Choice
 missed`, `Reply missed`, Review messaging, or any other result copy. Match
 Standard Sprint: the board feedback carries the result during the short handoff
 to the next puzzle.
@@ -107,16 +109,17 @@ The Run setting governs every scored or reconstructed Arrow Duel attempt:
   failed Review attempt; both correct answers record one successful Review
   attempt. A timeout first shows the ordinary brief full-board `Timed out`
   handoff, then advances.
-- Replay uses the same candidate and reply judgment but has no countdown. After
-  a correct reply, Replay continues through the stored puzzle line: the player
+- Replay has no countdown. After a correct candidate, the player must find the
+  opponent reply without guide arrows or live guided evaluation. After a
+  correct reply, Replay continues through the stored puzzle line: the player
   remains the reply-side player and makes each remaining move for that side
-  while the opponent replies automatically. Replay provides no guide arrow or
-  live guided evaluation; Analysis remains available only when the player asks
-  for it. Replay shows `Solved` only after that complete line has been played,
-  or when an accepted immediate mate ends the position.
+  while the opponent replies automatically. Analysis remains available only
+  when the player asks for it. Replay shows `Solved` only after that complete
+  line has been played, or when an accepted immediate mate ends the position.
 - If the candidate itself is wrong in Replay, keep the red feedback snapshot,
-  then leave the tempting move on the board and let the player solve from the
-  reply side. Do not auto-play or reveal that reply.
+  then preserve the established guided punishment-line feedback: auto-play the
+  opponent response and use the stored blue-arrow line to show why the move
+  fails. Do not replace this feedback with the unassisted reply-side challenge.
 - A Replay reconstructed from a persisted Sprint uses that Sprint's saved Run
   setting. A due Review uses the current setting for its Run. Neither path
   changes the Run's Rating identity, and Replay never writes History or changes

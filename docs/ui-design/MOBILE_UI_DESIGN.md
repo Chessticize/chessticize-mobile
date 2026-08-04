@@ -354,7 +354,7 @@ Developer/test-build controls:
 Arrow Duel Replay behavior:
 
 - The colored candidate arrows render in Analysis mode at the puzzle's initial position: correct Stockfish best move is green, the blunder or inferior candidate is red.
-- The Replay surface does not show separate color-legend or "You chose" chips. Candidate arrows appear only for the initial choice and Analysis comparison; the continuation is an unassisted puzzle.
+- The Replay surface does not show separate color-legend or "You chose" chips. Candidate arrows appear only for the initial choice and Analysis comparison; after a correct candidate, the reply-side continuation is an unassisted puzzle.
 - If the user chose wrong, automatically play the opponent response or punishment line.
 - Prefer stored puzzle solution lines for explanation; fall back to local Stockfish when the stored line is not enough.
 - Do not show a live evaluation while the Replay continuation is being solved. Current-position evaluation belongs to explicit Analysis.
@@ -386,8 +386,9 @@ Arrow Duel active-session rules:
   without sound before the tempting move appears. A full-board `What if you
   made the other move?`
   overlay names the actual configured reply window (`Find the opponent’s reply
-  in X seconds.`) for a fixed 1.5-second preparation beat. The reply timer appears only
-  after the tempting move settles and board input unlocks.
+  in X seconds.`) for a fixed 1.5-second preparation beat, remains over the
+  tempting-move animation, and dismisses when that move settles. The reply
+  timer appears only after the move settles and board input unlocks.
 - Reply judgment accepts the stored puzzle main-line move or any legal move
   that immediately checkmates. It does not invoke Stockfish.
 
@@ -397,11 +398,11 @@ Arrow Duel Replay and Review rules:
 - The Run's Opponent reply setting applies consistently to Sprint, Replay, and scheduled Review. When it is off, Replay and Review retain the original one-choice flow.
 - When Opponent reply is on, scheduled Review requires the candidate and reply. Its reply countdown uses the same configured Run duration and starts only when the 1.5-second `What if you made the other move?` handoff, tempting-move animation, and input lock have finished. Either wrong answer or a reply timeout records the Review as wrong. Timeout keeps the board locked under the ordinary brief full-board `Timed out` handoff before advancing.
 - Replay uses the same two-stage judgment without any countdown. A correct reply opens the remaining stored puzzle line as an unassisted puzzle from the reply side: the player makes every remaining move for that side while opponent replies animate automatically. Do not show guide arrows or live evaluation while solving. Show `Solved` only after the full line completes or an accepted immediate mate ends it.
-- A wrong Replay candidate keeps its brief red feedback, then starts that same unassisted reply-side puzzle from the tempting position. The reply is not auto-played or revealed.
+- A wrong Replay candidate keeps its brief red feedback, then follows the established guided punishment line: auto-play the opponent response and use the stored blue-arrow line to show why the move fails. Do not replace this feedback with the unassisted reply-side challenge.
 - Replay from an original Sprint uses that persisted Sprint's reply configuration. Due Review uses the current configuration of its Run. Neither on/off state creates a separate Rating.
 - Green always means the best move.
 - Red always means the inferior candidate.
-- Replay should avoid redundant legend or choice-marker chips. Initial candidate arrows and brief move feedback explain the two-stage choice; once the reply-side continuation begins, the board supplies no move hint.
+- Replay should avoid redundant legend or choice-marker chips. Initial candidate arrows and brief move feedback explain the two-stage choice; after a correct candidate, the reply-side continuation supplies no move hint. A wrong candidate still uses the guided punishment line.
 - During the remaining stored line, wait for the player to find each reply-side move without an arrow, then animate the opponent's next move. Continue until the line ends, then show `Solved`. Reset returns to the initial candidate choice, and Analysis remains an explicit opt-in.
 - Review copy should explain the tactical reason only when the data supports it; otherwise show engine line and evaluation shift.
 - In Review, selecting the wrong Arrow Duel candidate records a failed Review attempt and resets or contracts that puzzle's schedule. The user may then enter Replay to inspect the line without creating additional history.

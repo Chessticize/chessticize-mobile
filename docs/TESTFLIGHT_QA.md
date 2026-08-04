@@ -122,9 +122,12 @@ result. Unchecked items do not block App Store submission.
       general Review tab queue.
 - [ ] Navigate previous/next within the mistake set.
 - [ ] Reset the current puzzle to the puzzle initial position.
-- [ ] For an Arrow Duel Run with Opponent reply on, confirm Replay has no reply
-      countdown or guide arrows and does not show `Solved` until the reply and
-      complete stored puzzle line have been played.
+- [ ] For an Arrow Duel Run with Opponent reply on, choose the correct candidate
+      and confirm its reply-side Replay has no countdown or guide arrows and
+      does not show `Solved` until the reply and complete stored puzzle line
+      have been played.
+- [ ] Choose the wrong Replay candidate and confirm the red snapshot still
+      transitions into the stored blue-arrow punishment line.
 - [ ] Turn Opponent reply off and confirm Replay returns to the one-choice flow.
 - [ ] Tap an analysis candidate row and confirm it makes the candidate move.
 - [ ] Exit the post-sprint review and confirm the app returns to Practice ready

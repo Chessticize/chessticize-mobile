@@ -7493,6 +7493,41 @@ describe("PracticePocScreen", () => {
     expect(service.listReviewQueue()).toHaveLength(1);
   });
 
+  it("excludes the opponent-reply pause from Sprint Result time", async () => {
+    let wallClockMs = Date.parse("2026-08-03T12:00:00.000Z");
+    const service = createMobilePracticeService("familiar15");
+    const started = service.startSprint({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 1,
+      maxMistakes: 3,
+      opponentReply: { enabled: true, seconds: 10 }
+    }, new Date(wallClockMs).toISOString());
+    const arrow = requireArrowDuelState(started);
+    const renderer = renderScreen({
+      currentTimeMs: () => wallClockMs,
+      practiceService: service
+    });
+
+    press(renderer, "practice-resume-card");
+    act(() => {
+      findByTestId(renderer, "mock-chessboard").props.onReady();
+    });
+    wallClockMs += 5_000;
+    await boardMove(renderer, arrow.correctMove);
+    await advanceArrowDuelReplyToPrompt();
+    wallClockMs += 2_000;
+    await finishArrowDuelReplyHandoff();
+
+    wallClockMs += 8_000;
+    await boardMove(renderer, arrow.puzzle.solutionMoves[1]!);
+    await settleFeedbackSnapshot();
+
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-result-time"))).toBe("Time00:05");
+  });
+
   it("ignores non-candidate Arrow Duel board moves without recording attempts", async () => {
     const trace: PracticeDebugTraceEvent[] = [];
     const renderer = renderScreen({

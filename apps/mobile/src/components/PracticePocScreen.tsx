@@ -3315,7 +3315,12 @@ export function PracticePocScreen({
       ? new Date(state.pausedAt).getTime()
       : nowMs;
   const sprintElapsedMs = state
-    ? Math.max(0, effectiveSessionNowMs - new Date(state.startedAt).getTime())
+    ? Math.max(
+        0,
+        effectiveSessionNowMs -
+          new Date(state.startedAt).getTime() -
+          (state.totalPausedMs ?? 0)
+      )
     : 0;
   const remainingMs = state
     ? Math.max(0, new Date(state.deadlineAt).getTime() - effectiveSessionNowMs)
