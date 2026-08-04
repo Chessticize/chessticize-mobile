@@ -1166,7 +1166,19 @@ describe("PracticePocScreen", () => {
 
       act(() => {
         standardRun.props.onPanResponderRelease();
+        // Keep the dragged card at the preview destination until Fabric can
+        // commit both the reordered parent tree and the zeroed transform.
+        // Clearing it in the responder flashes the card back in its source slot.
+        expect((draggedOffset as { value: number }).value).toBe(100);
       });
+
+      const committedDraggedTransform = flattenTestStyle(
+        findNativeRunDragSurface(renderer, "practice-run-standard").props.style
+      ).transform as Array<{ translateY?: number | { value: number } }>;
+      expect(committedDraggedTransform.slice(0, 2)).toEqual([
+        { translateY: 0 },
+        { translateY: 0 }
+      ]);
 
       expect(springSpy.mock.calls.some(([value, configuration]) =>
         value === (displacedOffset as unknown) && configuration.toValue === 0
@@ -1494,8 +1506,16 @@ describe("PracticePocScreen", () => {
     const nativeScrollMock = ReactNative as unknown as {
       __getScrollViewCommands?: () => Array<{ animated: boolean; y: number }>;
       __setScrollViewFrame?: (frame: { height: number; width: number; x: number; y: number }) => void;
+      __setViewFrame?: (
+        testID: string,
+        frame: { height: number; width: number; x: number; y: number }
+      ) => void;
     };
     nativeScrollMock.__setScrollViewFrame?.({ x: 0, y: 100, width: 390, height: 400 });
+    nativeScrollMock.__setViewFrame?.(
+      "practice-run-list",
+      { x: 0, y: 100, width: 390, height: 600 }
+    );
     const renderer = renderScreen({
       runManagementPresentation: runManagementPresentation({ homeEditing: true })
     });
@@ -1526,6 +1546,71 @@ describe("PracticePocScreen", () => {
       jest.advanceTimersByTime(96);
     });
     expect(nativeScrollMock.__getScrollViewCommands?.()).toHaveLength(commandCountAfterCancel);
+  });
+
+  it("keeps a device-trace 1-to-3 drop at the third slot outside the edge zone", () => {
+    const nativeScrollMock = ReactNative as unknown as {
+      __getScrollViewCommands?: () => Array<{ animated: boolean; y: number }>;
+      __setScrollViewFrame?: (frame: { height: number; width: number; x: number; y: number }) => void;
+      __setViewFrame?: (
+        testID: string,
+        frame: { height: number; width: number; x: number; y: number }
+      ) => void;
+    };
+    nativeScrollMock.__setScrollViewFrame?.({ x: 0, y: 116.67, width: 440, height: 747 });
+    nativeScrollMock.__setViewFrame?.(
+      "practice-run-list",
+      { x: 0, y: 275, width: 440, height: 653 }
+    );
+    const onIntent = jest.fn();
+    const presentation = runManagementPresentation({ homeEditing: true, onIntent });
+    presentation.runs = [
+      ...presentation.runs,
+      {
+        ...presentation.runs[2],
+        id: "fourth-run",
+        ratingKey: "run:fourth-run",
+        name: "Fourth Run"
+      },
+      {
+        ...presentation.runs[2],
+        id: "fifth-run",
+        ratingKey: "run:fifth-run",
+        name: "Fifth Run"
+      }
+    ];
+    const renderer = renderScreen({ runManagementPresentation: presentation });
+    const mainScroll = findByTestId(renderer, "practice-main-scroll");
+    const runSurfaces = [
+      "standard",
+      "tactics-focus",
+      "candidate-sprint",
+      "fourth-run",
+      "fifth-run"
+    ].map((runId) => findNativeRunDragSurface(renderer, `practice-run-${runId}`));
+
+    act(() => {
+      mainScroll.props.onLayout({ nativeEvent: { layout: { height: 747 } } });
+      mainScroll.props.onContentSizeChange(440, 1_997);
+    });
+    runSurfaces.forEach((surface, index) => {
+      layoutNativeRunSurface(surface, index * 130.67, 118);
+    });
+    startNativeRunDrag(runSurfaces[0], 545.33);
+    moveNativeRunDrag(runSurfaces[0], 819.33, 274);
+    act(() => {
+      jest.advanceTimersByTime(1_104);
+    });
+    expect(nativeScrollMock.__getScrollViewCommands?.()).toHaveLength(0);
+    act(() => {
+      runSurfaces[0].props.onPanResponderRelease();
+    });
+
+    expect(onIntent).toHaveBeenLastCalledWith({
+      type: "move-run",
+      runId: "standard",
+      targetRunId: "candidate-sprint"
+    });
   });
 
   it("respects disabled haptics when a Run card enters drag mode", () => {

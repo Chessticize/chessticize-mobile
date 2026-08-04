@@ -685,6 +685,8 @@ export function PracticePocScreen({
   const practiceMainScrollMetricsRef = useRef({
     contentHeight: 0,
     offsetY: 0,
+    reorderWindowBottom: 0,
+    reorderWindowTop: 0,
     viewportHeight: 0,
     windowBottom: 0,
     windowTop: 0
@@ -692,27 +694,44 @@ export function PracticePocScreen({
   const nativeRunReorderScrollController = useMemo<NativeRunReorderScrollController>(() => ({
     getSnapshot(): NativeRunReorderScrollSnapshot | null {
       const metrics = practiceMainScrollMetricsRef.current;
-      if (metrics.viewportHeight <= 0 || metrics.windowBottom <= metrics.windowTop) {
+      if (
+        metrics.viewportHeight <= 0
+        || metrics.windowBottom <= metrics.windowTop
+        || metrics.reorderWindowBottom <= metrics.reorderWindowTop
+      ) {
         return null;
       }
       return { ...metrics };
     },
-    refreshBounds(): void {
+    refreshBounds(reorderElement?: NativeRunReorderMeasureElement | null): void {
       practiceMainScrollRef.current?.getNativeScrollRef()?.measureInWindow((_x, y, _width, height) => {
         const metrics = practiceMainScrollMetricsRef.current;
         metrics.windowTop = y;
         metrics.windowBottom = y + (height > 0 ? height : metrics.viewportHeight);
       });
+      reorderElement?.measureInWindow((_x, y, _width, height) => {
+        const metrics = practiceMainScrollMetricsRef.current;
+        metrics.reorderWindowTop = y;
+        metrics.reorderWindowBottom = y + height;
+      });
     },
     scrollBy(deltaY: number): number {
       const metrics = practiceMainScrollMetricsRef.current;
       const maxOffsetY = Math.max(0, metrics.contentHeight - metrics.viewportHeight);
-      const nextOffsetY = Math.max(0, Math.min(maxOffsetY, metrics.offsetY + deltaY));
+      const reorderDeltaLimit = deltaY < 0
+        ? Math.min(0, metrics.reorderWindowTop - metrics.windowTop)
+        : Math.max(0, metrics.reorderWindowBottom - metrics.windowBottom);
+      const boundedDeltaY = deltaY < 0
+        ? Math.max(deltaY, reorderDeltaLimit)
+        : Math.min(deltaY, reorderDeltaLimit);
+      const nextOffsetY = Math.max(0, Math.min(maxOffsetY, metrics.offsetY + boundedDeltaY));
       const appliedDeltaY = nextOffsetY - metrics.offsetY;
       if (appliedDeltaY === 0 || !practiceMainScrollRef.current) {
         return 0;
       }
       metrics.offsetY = nextOffsetY;
+      metrics.reorderWindowTop -= appliedDeltaY;
+      metrics.reorderWindowBottom -= appliedDeltaY;
       practiceMainScrollRef.current.scrollTo({ animated: false, y: nextOffsetY });
       return appliedDeltaY;
     }
@@ -5214,6 +5233,7 @@ function PracticeRunHome({
   const dragSourceHeightRef = useRef(0);
   const dragSourceStrideRef = useRef(0);
   const webRunListElementRef = useRef<WebRunElement | null>(null);
+  const nativeRunListElementRef = useRef<NativeRunReorderMeasureElement | null>(null);
   const runElementsRef = useRef(new Map<string, WebRunElement>());
   const nativeRunLayoutsRef = useRef(new Map<string, NativeRunLayout>());
   const nativeDragOriginCenterRef = useRef<number | null>(null);
@@ -5277,6 +5297,9 @@ function PracticeRunHome({
     onRunReorderDragActiveChange(false);
   };
   const startRunDrag = (runId: string): void => {
+    if (Platform.OS !== "web") {
+      nativeRunReorderScrollController.refreshBounds(nativeRunListElementRef.current);
+    }
     const layout = nativeRunLayoutsRef.current.get(runId);
     nativeDragOriginCenterRef.current = layout ? layout.y + layout.height / 2 : null;
     const webRunElement = runElementsRef.current.get(runId);
@@ -5571,6 +5594,7 @@ function PracticeRunHome({
         <View
           ref={(element) => {
             webRunListElementRef.current = element as unknown as WebRunElement | null;
+            nativeRunListElementRef.current = element as unknown as NativeRunReorderMeasureElement | null;
           }}
           style={[styles.modeList, { position: "relative" }]}
           testID="practice-run-list"
@@ -7140,9 +7164,17 @@ type NativeRunLayout = {
   y: number;
 };
 
+type NativeRunReorderMeasureElement = {
+  measureInWindow: (
+    callback: (x: number, y: number, width: number, height: number) => void
+  ) => void;
+};
+
 type NativeRunReorderScrollSnapshot = {
   contentHeight: number;
   offsetY: number;
+  reorderWindowBottom: number;
+  reorderWindowTop: number;
   viewportHeight: number;
   windowBottom: number;
   windowTop: number;
@@ -7150,7 +7182,7 @@ type NativeRunReorderScrollSnapshot = {
 
 type NativeRunReorderScrollController = {
   getSnapshot: () => NativeRunReorderScrollSnapshot | null;
-  refreshBounds: () => void;
+  refreshBounds: (reorderElement?: NativeRunReorderMeasureElement | null) => void;
   scrollBy: (deltaY: number) => number;
 };
 
@@ -7580,14 +7612,19 @@ function RunCardDropSurface({
       stopNativeAutoScroll();
       return;
     }
-    const edgeSize = Math.min(64, snapshot.viewportHeight / 4);
-    const distanceFromTop = pageY - snapshot.windowTop;
-    const distanceFromBottom = snapshot.windowBottom - pageY;
+    const visibleReorderTop = Math.max(snapshot.windowTop, snapshot.reorderWindowTop);
+    const visibleReorderBottom = Math.min(snapshot.windowBottom, snapshot.reorderWindowBottom);
+    const edgeSize = Math.min(24, snapshot.viewportHeight / 4);
+    const distanceFromTop = pageY - visibleReorderTop;
+    const distanceFromBottom = visibleReorderBottom - pageY;
     const maxOffsetY = Math.max(0, snapshot.contentHeight - snapshot.viewportHeight);
+    const canScrollUp = snapshot.reorderWindowTop < snapshot.windowTop && snapshot.offsetY > 0;
+    const canScrollDown = snapshot.reorderWindowBottom > snapshot.windowBottom
+      && snapshot.offsetY < maxOffsetY;
     let speed = 0;
-    if (distanceFromTop < edgeSize && snapshot.offsetY > 0) {
+    if (distanceFromTop < edgeSize && canScrollUp) {
       speed = -Math.max(2, 14 * (1 - Math.max(0, distanceFromTop) / edgeSize));
-    } else if (distanceFromBottom < edgeSize && snapshot.offsetY < maxOffsetY) {
+    } else if (distanceFromBottom < edgeSize && canScrollDown) {
       speed = Math.max(2, 14 * (1 - Math.max(0, distanceFromBottom) / edgeSize));
     }
     nativeAutoScrollSpeedRef.current = speed;
@@ -7883,8 +7920,8 @@ function RunCardDropSurface({
         style,
         draggable ? {
           transform: [
-            { translateY: nativeDragOffset },
-            { translateY: nativeDropPreviewOffset },
+            { translateY: committedDropSettling ? 0 : nativeDragOffset },
+            { translateY: committedDropSettling ? 0 : nativeDropPreviewOffset },
             { translateX: dragging ? 10 : 0 },
             { translateY: dragging ? -2 : 0 },
             { scale: dragging ? 1.015 : 1 }
