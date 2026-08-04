@@ -89,9 +89,10 @@ The worse alternative cannot be checkmate: a checkmating move would not be the
 worse candidate. The boundary case is therefore explicitly stalemate-only.
 
 The implementation acceptance case uses `Qg7#` as the correct choice and `Qf7`
-as the stalemating alternative. It is intentionally omitted from this
-onboarding-only Storybook review and should be previewed when the production
-behavior is implemented.
+as the stalemating alternative. Core, Sprint, and rendered component regressions
+cover this rules-only boundary. It has no standalone Storybook scenario because
+the player sees the existing correct-feedback handoff and the next puzzle, not a
+distinct interaction.
 
 ## Responsive contract
 
@@ -113,4 +114,6 @@ The Interaction Lab keeps the approved two-step guide and side-specific copy as
 deterministic visual references. The first-cue story exposes the real `Got it`
 interaction. The 1.5-second and 1-second cue stories stay frozen so each state
 can be reviewed without racing the production timer. The production flow owns
-the persisted familiarity counter and Reset-guides behavior.
+the persisted familiarity counter and Reset-guides behavior. Alternate-mate
+acceptance and stalemate bypass remain implementation rules with automated
+coverage, not separate Storybook pages.

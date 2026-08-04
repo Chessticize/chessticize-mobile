@@ -2893,24 +2893,12 @@ describe("PracticePocScreen", () => {
     });
   });
 
-  it("accepts an alternate legal mate in one in the sampled reply position", async () => {
-    const renderer = renderLabScenario("practice-arrow-duel-mate-in-one");
-    startArrowDuelSprint(renderer);
-
-    await boardMove(renderer, ARROW_DUEL_REPLY_LAB_MOVES.multipleMate.correctChoice);
-    await settleArrowDuelReplyHandoff();
-    await boardMove(renderer, ARROW_DUEL_REPLY_LAB_MOVES.multipleMate.alternateReply);
-
-    expect(collectText(renderer.root)).not.toContain("Solved");
-    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
-    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 / 1");
-    await settleFeedbackSnapshot();
-    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
-  });
-
   it("passes without asking for a reply when the other move is stalemate", async () => {
-    const renderer = renderLabScenario("practice-arrow-duel-terminal-other-move");
+    const renderer = renderScreen({
+      arrowDuelTargetCorrect: 2,
+      practiceService: createStalemateAlternatePracticeService(),
+      puzzleSelectionSeed: "terminal-stalemate"
+    });
     startArrowDuelSprint(renderer);
 
     act(() => {
@@ -2918,10 +2906,7 @@ describe("PracticePocScreen", () => {
     });
     const candidates = findByTestId(renderer, "arrow-duel-candidate-overlay").props.candidates;
     expect(new Set(candidates)).toEqual(new Set(["g6g7", "g6f7"]));
-    await boardMove(
-      renderer,
-      ARROW_DUEL_REPLY_LAB_MOVES.terminalOtherMove.correctChoice
-    );
+    await boardMove(renderer, "g6g7");
 
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(() => findByTestId(renderer, "arrow-duel-what-if-overlay")).toThrow();
@@ -13813,6 +13798,35 @@ function createMultiContextDueReviewService(): PracticeService {
     "2026-06-20T00:00:10.000Z"
   );
   return service;
+}
+
+function createStalemateAlternatePracticeService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles([
+    {
+      id: "component-arrow-duel-stalemate-alternate",
+      initialFen: "7k/8/5KQ1/8/8/8/8/8 w - - 0 1",
+      rating: 600,
+      solutionMoves: ["g6f7"],
+      source: "synthetic",
+      stockfishBestMove: "g6g7",
+      stockfishEval: 0,
+      stockfishEvalAfterFirstMove: -10000,
+      themes: ["mateIn1", "stalemate"]
+    },
+    {
+      id: "component-arrow-duel-follow-up",
+      initialFen: "4k3/8/8/8/8/8/4P3/4K3 b - - 0 1",
+      rating: 780,
+      solutionMoves: ["e8d7", "e2e4"],
+      source: "synthetic",
+      stockfishBestMove: "e8f7",
+      stockfishEval: 180,
+      stockfishEvalAfterFirstMove: -220,
+      themes: ["endgame"]
+    }
+  ]);
+  return new PracticeService(store);
 }
 
 function renderScreen({

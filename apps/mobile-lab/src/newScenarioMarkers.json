@@ -21,6 +21,12 @@
         "issueNumber": 489,
         "changeNote": "Preview explicit White or Black reply copy before and after the preparation handoff."
       }
+    ],
+    "absorbedIssueMarkers": [
+      {
+        "issueNumber": 489,
+        "count": 1
+      }
     ]
   },
   "practice-custom-setup": {

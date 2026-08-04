@@ -47,6 +47,26 @@ test("New Scenario Marker records require registered scenarios and complete issu
     validateScenarioMarkers({ "practice-home": { issues: [] } }, knownScenarioIds),
     ["practice-home: issues must be a non-empty array."]
   );
+  assert.deepEqual(
+    validateScenarioMarkers(
+      {
+        "practice-home": {
+          issues: [{ issueNumber: 245, changeNote: "Owned change." }],
+          absorbedIssueMarkers: [
+            { issueNumber: 246, count: 1 },
+            { issueNumber: 245, count: 0 },
+            { issueNumber: 245, count: 1 }
+          ]
+        }
+      },
+      knownScenarioIds
+    ),
+    [
+      "practice-home: absorbedIssueMarkers[0].issueNumber must also own this scenario.",
+      "practice-home: absorbedIssueMarkers[1].count must be a positive integer.",
+      "practice-home: absorbedIssueMarkers issue #245 is listed more than once."
+    ]
+  );
 });
 
 test("marker cleanup follows issue ownership across a corrective scenario move", () => {
@@ -69,6 +89,96 @@ test("marker cleanup follows issue ownership across a corrective scenario move",
   assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, {}), [
     { scenarioId: "practice-home", issueNumber: 245 },
     { scenarioId: "review-due", issueNumber: 246 }
+  ]);
+});
+
+test("one marker may move between scenarios while the same issue owns other scenarios", () => {
+  const baseMarkers = {
+    "practice-arrow-duel-guide": {
+      issues: [{ issueNumber: 489, changeNote: "Existing guide" }]
+    },
+    "practice-retired-implementation-detail": {
+      issues: [{ issueNumber: 489, changeNote: "Implementation-only edge case" }]
+    }
+  };
+  const currentMarkers = {
+    "practice-arrow-duel-guide": {
+      issues: [{ issueNumber: 489, changeNote: "Existing guide" }]
+    },
+    "practice-arrow-duel-guide-only": {
+      issues: [{ issueNumber: 489, changeNote: "Replacement product guide" }]
+    }
+  };
+
+  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), []);
+});
+
+test("an existing scenario may explicitly absorb one retired marker for the same issue", () => {
+  const baseMarkers = {
+    "practice-arrow-duel-guide": {
+      issues: [{ issueNumber: 489, changeNote: "Existing guide" }]
+    },
+    "practice-retired-implementation-detail": {
+      issues: [{ issueNumber: 489, changeNote: "Not an independent interaction" }]
+    }
+  };
+  const currentMarkers = {
+    "practice-arrow-duel-guide": {
+      issues: [{ issueNumber: 489, changeNote: "Existing guide" }],
+      absorbedIssueMarkers: [{ issueNumber: 489, count: 1 }]
+    }
+  };
+
+  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), []);
+});
+
+test("an absorbed marker count cannot hide additional removals", () => {
+  const baseMarkers = {
+    "practice-arrow-duel-guide": {
+      issues: [{ issueNumber: 489, changeNote: "Existing guide" }]
+    },
+    "practice-first-implementation-detail": {
+      issues: [{ issueNumber: 489, changeNote: "First detail" }]
+    },
+    "practice-second-implementation-detail": {
+      issues: [{ issueNumber: 489, changeNote: "Second detail" }]
+    }
+  };
+  const currentMarkers = {
+    "practice-arrow-duel-guide": {
+      issues: [{ issueNumber: 489, changeNote: "Existing guide" }],
+      absorbedIssueMarkers: [{ issueNumber: 489, count: 1 }]
+    }
+  };
+
+  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), [
+    { scenarioId: "practice-second-implementation-detail", issueNumber: 489 }
+  ]);
+});
+
+test("one replacement marker cannot hide two removals for the same open issue", () => {
+  const baseMarkers = {
+    "practice-arrow-duel-guide": {
+      issues: [{ issueNumber: 489, changeNote: "Existing guide" }]
+    },
+    "practice-first-implementation-detail": {
+      issues: [{ issueNumber: 489, changeNote: "First implementation detail" }]
+    },
+    "practice-second-implementation-detail": {
+      issues: [{ issueNumber: 489, changeNote: "Second implementation detail" }]
+    }
+  };
+  const currentMarkers = {
+    "practice-arrow-duel-guide": {
+      issues: [{ issueNumber: 489, changeNote: "Existing guide" }]
+    },
+    "practice-arrow-duel-guide-only": {
+      issues: [{ issueNumber: 489, changeNote: "One replacement product guide" }]
+    }
+  };
+
+  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), [
+    { scenarioId: "practice-second-implementation-detail", issueNumber: 489 }
   ]);
 });
 

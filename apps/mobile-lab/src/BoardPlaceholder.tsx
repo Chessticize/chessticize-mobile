@@ -236,9 +236,6 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
     []
   );
   const expected = replyExpectedMove ?? expectedMoveForLab(displayFen);
-  const alternateMate = replyExpectedMove
-    ? firstDifferentImmediateMate(chessRef.current, expected)
-    : undefined;
   const previewPlan = entryPreviewPlan(fen);
   const locked = overlayLocked
     || isInputLocked(gestureEnabled)
@@ -324,16 +321,6 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
               }
             }}
           />
-          {alternateMate ? (
-            <LabButton
-              disabled={locked}
-              label="Alternate mate"
-              testID="lab-board-alternate-mate"
-              onPress={() => {
-                void playMove(alternateMate);
-              }}
-            />
-          ) : null}
           {previewPlan ? (
             <LabButton
               disabled={entryPreviewPhase !== "ready"}
@@ -514,37 +501,6 @@ function firstDifferentLegalMove(chess: Chess, expected: string | undefined): Bo
     to: candidate.to,
     ...(candidate.promotion ? { promotion: candidate.promotion } : {})
   };
-}
-
-function firstDifferentImmediateMate(
-  chess: Chess,
-  expected: string | undefined
-): BoardMove | undefined {
-  const expectedNormalized = expected?.toLowerCase();
-  for (const move of chess.moves({ verbose: true })) {
-    const uci = `${move.from}${move.to}${move.promotion ?? ""}`.toLowerCase();
-    if (uci === expectedNormalized) {
-      continue;
-    }
-    const candidate = createChess(chess.fen());
-    try {
-      candidate.move({
-        from: move.from,
-        to: move.to,
-        ...(move.promotion ? { promotion: move.promotion } : {})
-      });
-    } catch {
-      continue;
-    }
-    if (candidate.isCheckmate()) {
-      return {
-        from: move.from,
-        to: move.to,
-        ...(move.promotion ? { promotion: move.promotion } : {})
-      };
-    }
-  }
-  return undefined;
 }
 
 function parseUci(move: string): BoardMove {

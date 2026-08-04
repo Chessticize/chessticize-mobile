@@ -321,14 +321,6 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   ));
   assert.match(arrowDuelGuide.description, /reply for Black/);
   assert.match(arrowDuelGuide.description, /familiarity-timing internals out/);
-  assert.match(
-    scenarioRegistry["practice-arrow-duel-terminal-other-move"].description,
-    /Qf7 stalemate/
-  );
-  assert.match(
-    scenarioRegistry["practice-arrow-duel-terminal-other-move"].description,
-    /without a preparation cue, reply prompt, countdown, or timeout path/
-  );
   const arrowDuelGuideOnly = scenarioRegistry["practice-arrow-duel-guide-only"];
   assert.ok(arrowDuelGuideOnly.scope.includes.includes(
     "Always-available direct guide exit without completion"
