@@ -56,6 +56,10 @@ const ARROW_DUEL_GUIDE_PRESENTATIONS = {
   arrowDuelReply: {
     storyId: "practice--arrow-duel-guide",
     title: "Arrow Duel · step 6 · find the reply"
+  },
+  arrowDuelGotIt: {
+    storyId: "practice--arrow-duel-what-if-preparation",
+    title: "Arrow Duel · first reply cue · Got it"
   }
 } as const satisfies Record<string, LabStoryPresentation>;
 
@@ -580,6 +584,24 @@ export const ArrowDuelGuideOnly: Story = {
   }
 };
 
+export const ArrowDuelWhatIfPreparation: Story = {
+  name: ARROW_DUEL_GUIDE_PRESENTATIONS.arrowDuelGotIt.title,
+  args: {
+    arrowDuelReplyPreparationConfirmationRequired: true,
+    scenarioId: "practice-arrow-duel-prompt",
+    storyPresentation: ARROW_DUEL_GUIDE_PRESENTATIONS.arrowDuelGotIt
+  },
+  play: async ({ canvasElement }) => {
+    await openArrowDuelReplyCue(canvasElement);
+    await waitForTestId(canvasElement, "arrow-duel-what-if-action");
+    await waitForText(canvasElement, "Got it");
+    expectFullScreenStoryId(
+      canvasElement,
+      ARROW_DUEL_GUIDE_PRESENTATIONS.arrowDuelGotIt.storyId
+    );
+  }
+};
+
 export const ArrowDuelGuideExit: Story = {
   name: "Arrow Duel · step 6 · Exit",
   args: { scenarioId: "practice-arrow-duel-guide" },
@@ -720,23 +742,6 @@ export const ArrowDuelReplyCustomTimer: Story = {
     await openArrowDuelChoice(canvasElement);
     await clickTestId(canvasElement, "lab-board-correct");
     await expectTestIdText(canvasElement, "arrow-duel-reply-timer", "0:30");
-  }
-};
-
-export const ArrowDuelWhatIfPreparation: Story = {
-  name: "Arrow Duel · cue · first encounter (Got it)",
-  args: {
-    arrowDuelReplyPreparationConfirmationRequired: true,
-    scenarioId: "practice-arrow-duel-prompt",
-    storyPresentation: {
-      storyId: "practice--arrow-duel-what-if-preparation",
-      title: "Arrow Duel · cue · first encounter (Got it)"
-    }
-  },
-  play: async ({ canvasElement }) => {
-    await openArrowDuelReplyCue(canvasElement);
-    await waitForTestId(canvasElement, "arrow-duel-what-if-action");
-    await waitForText(canvasElement, "Got it");
   }
 };
 

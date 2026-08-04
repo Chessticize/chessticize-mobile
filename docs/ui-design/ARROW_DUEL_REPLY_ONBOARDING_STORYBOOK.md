@@ -28,6 +28,9 @@ Arrow Duel screen with two responsive screens:
    - Show the resulting position without candidate or answer arrows.
    - Highlight the other move as the last move.
    - Use the real side glyph and the side-specific ready prompt.
+   - Explain that the reply is requested only after a correct choice to test
+     the player's understanding of the counterplay, then give the 10-second
+     reply limit.
    - Explain the mistake and Review consequence without introducing partial
      scoring.
 
@@ -109,3 +112,5 @@ design-preview inputs. Production defaults remain unchanged in this phase.
 The first-cue story exposes the real `Got it` interaction. The later cue stories
 are frozen for visual review and labeled with their proposed 1.5-second and
 1-second stages; they do not implement the familiarity counter or persistence.
+The dedicated `Arrow Duel · first reply cue · Got it` story is placed next to
+the guide stories so the acknowledgement state can be reviewed directly.

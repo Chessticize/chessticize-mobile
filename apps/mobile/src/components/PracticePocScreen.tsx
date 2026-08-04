@@ -5826,7 +5826,7 @@ function sessionGuideCallout(
           }
         : {
             badge: "FIND THE REPLY · 2 OF 2",
-            detail: "After the other move lands, play Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review.",
+            detail: "After you choose correctly, we’ll test your understanding of the counterplay by playing the move you didn’t choose. You’ll then have 10 seconds to find Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review.",
             id: "arrow-duel-reply",
             title: "Then reply for Black",
             tone: "info"

@@ -2997,13 +2997,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(
       findByTestId(arrowDuel, "practice-session-guide-coach-copy-arrow-duel-reply")
     )).toBe(
-      "FIND THE REPLY · 2 OF 2Then reply for BlackAfter the other move lands, play Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review."
+      "FIND THE REPLY · 2 OF 2Then reply for BlackAfter you choose correctly, we’ll test your understanding of the counterplay by playing the move you didn’t choose. You’ll then have 10 seconds to find Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review."
     );
     expect(findByTestId(
       arrowDuel,
       "practice-arrow-duel-guide"
     ).props.accessibilityLabel).toBe(
-      "Guide 2 of 2. Then reply for Black. After the other move lands, play Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review."
+      "Guide 2 of 2. Then reply for Black. After you choose correctly, we’ll test your understanding of the counterplay by playing the move you didn’t choose. You’ll then have 10 seconds to find Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review."
     );
 
     const rules = renderLabScenario("practice-first-sprint-guide");
