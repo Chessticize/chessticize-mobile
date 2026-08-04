@@ -115,6 +115,51 @@ test("Arrow Duel eligibility includes an exact stalemate alternate when the best
     })),
     true
   );
+
+  assert.equal(
+    isServerCompatibleArrowDuelPuzzle(arrowPuzzle({
+      id: "zero-eval-without-stalemate",
+      initialFen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      solutionMoves: ["d2d4"],
+      stockfishBestMove: "e2e4",
+      stockfishEval: 10000,
+      stockfishEvalAfterFirstMove: 0
+    })),
+    false
+  );
+  assert.equal(
+    isServerCompatibleArrowDuelPuzzle(arrowPuzzle({
+      id: "stalemate-threshold",
+      initialFen: "7k/8/5KQ1/8/8/8/8/8 w - - 0 1",
+      solutionMoves: ["g6f7"],
+      stockfishBestMove: "g6g7",
+      stockfishEval: 200,
+      stockfishEvalAfterFirstMove: 0
+    })),
+    false
+  );
+  assert.equal(
+    isServerCompatibleArrowDuelPuzzle(arrowPuzzle({
+      id: "black-stalemate-alternate",
+      initialFen: "8/8/8/8/8/5kq1/8/7K b - - 0 1",
+      solutionMoves: ["g3f2"],
+      stockfishBestMove: "g3g2",
+      stockfishEval: -10000,
+      stockfishEvalAfterFirstMove: 0
+    })),
+    true
+  );
+  assert.equal(
+    isServerCompatibleArrowDuelPuzzle(arrowPuzzle({
+      id: "black-stalemate-threshold",
+      initialFen: "8/8/8/8/8/5kq1/8/7K b - - 0 1",
+      solutionMoves: ["g3f2"],
+      stockfishBestMove: "g3g2",
+      stockfishEval: -200,
+      stockfishEvalAfterFirstMove: 0
+    })),
+    false
+  );
 });
 
 test("Arrow Duel eligibility excludes promotion candidates that its arrows cannot distinguish", () => {

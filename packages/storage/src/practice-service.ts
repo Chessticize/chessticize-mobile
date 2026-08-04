@@ -205,13 +205,7 @@ export class PracticeService {
           ...(previousConfig ? { previous: previousConfig } : {})
         }));
       }
-      if (config.mode === "arrow_duel" && config.opponentReply?.enabled === true) {
-        const settings = this.store.getSettings();
-        this.store.saveSettings({
-          ...settings,
-          sprintGuides: advanceArrowDuelReplyCueSprint(settings.sprintGuides)
-        });
-      }
+      this.advanceReplyCueForStartedSprint(config);
       this.store.createSprintSession(sprint);
     });
     return sprint;
@@ -496,7 +490,10 @@ export class PracticeService {
       now
     });
     this.activeSprint = sprint;
-    this.store.createSprintSession(sprint);
+    this.store.transaction(() => {
+      this.advanceReplyCueForStartedSprint(sprint.config);
+      this.store.createSprintSession(sprint);
+    });
     return sprint;
   }
 
@@ -727,6 +724,17 @@ export class PracticeService {
   saveSettings(settings: PracticeSettings): PracticeSettings {
     this.store.saveSettings(settings);
     return this.store.getSettings();
+  }
+
+  private advanceReplyCueForStartedSprint(config: SprintConfig): void {
+    if (config.mode !== "arrow_duel" || config.opponentReply?.enabled !== true) {
+      return;
+    }
+    const settings = this.store.getSettings();
+    this.store.saveSettings({
+      ...settings,
+      sprintGuides: advanceArrowDuelReplyCueSprint(settings.sprintGuides)
+    });
   }
 
   acknowledgeArrowDuelReplyCue(): PracticeSettings {

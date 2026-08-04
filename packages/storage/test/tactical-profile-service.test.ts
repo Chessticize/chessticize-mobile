@@ -1812,6 +1812,26 @@ test("PracticeService starts the prepared Focused Run through the normal session
   );
 });
 
+test("PracticeService advances reply-cue familiarity for a Focused Arrow Duel start", () => {
+  const store = arrowFocusedRunStore();
+  seedArrowWeaknessHistory(store);
+  const profile = arrowService(store, new MemoryTacticalProfileRepository());
+  const practice = new PracticeService(store, profile);
+
+  practice.acknowledgeArrowDuelReplyCue();
+  assert.equal(practice.getSettings().sprintGuides.arrowDuelReplyCueStage, 1);
+
+  const started = practice.startFocusedRun(
+    "arrow_duel",
+    "2026-07-25T00:00:00.000Z",
+    "arrow-focus-seed"
+  );
+
+  assert.equal(started.config.mode, "arrow_duel");
+  assert.equal(started.config.opponentReply?.enabled, true);
+  assert.equal(practice.getSettings().sprintGuides.arrowDuelReplyCueStage, 2);
+});
+
 test("an active Focused Run keeps its frozen puzzle IDs, Rating band, and quotas", () => {
   const store = seededStore();
   store.seedPuzzles(
@@ -2208,6 +2228,119 @@ function service(
       ratingBandHalfWidths: [100, 200]
     }
   });
+}
+
+function arrowService(
+  store: MemoryStore,
+  repository: MemoryTacticalProfileRepository
+): TacticalProfileService {
+  return new TacticalProfileService({
+    progressStore: store,
+    puzzleSource: store,
+    repository,
+    calibration: CALIBRATION,
+    naturalFrequency: { line: {}, arrow_duel: { fork: 0.12 } },
+    focusedRunPolicy: {
+      runSize: 15,
+      recentPuzzleDays: 30,
+      ratingBandHalfWidths: [100, 200]
+    }
+  });
+}
+
+function arrowFocusedRunStore(): MemoryStore {
+  const store = new MemoryStore();
+  const focused = Array.from({ length: 12 }, (_, index) =>
+    arrowPuzzle(`arrow-evidence-${index}`, ["fork"], index)
+  );
+  const freshFocused = Array.from({ length: 12 }, (_, index) =>
+    arrowPuzzle(`arrow-fresh-fork-${index}`, ["fork"], index + 12)
+  );
+  const mixed = Array.from({ length: 12 }, (_, index) =>
+    arrowPuzzle(`arrow-mixed-${index}`, ["sacrifice"], index + 24)
+  );
+  store.seedPuzzles([...focused, ...freshFocused, ...mixed]);
+  store.saveRating({
+    key: "arrow_duel 5/30",
+    generation: 0,
+    rating: 925,
+    ratingDeviation: 80,
+    volatility: 0.06,
+    games: 12
+  });
+  return store;
+}
+
+function seedArrowWeaknessHistory(store: MemoryStore): void {
+  const config = buildSprintConfig({
+    mode: "arrow_duel",
+    durationSeconds: 300,
+    perPuzzleSeconds: 30
+  });
+  for (let sessionIndex = 0; sessionIndex < 3; sessionIndex += 1) {
+    const day = 10 + sessionIndex * 4;
+    const startedAt = `2026-07-${String(day).padStart(2, "0")}T00:00:00.000Z`;
+    const completedAt = `2026-07-${String(day).padStart(2, "0")}T00:04:00.000Z`;
+    const session = startSprint({
+      id: `arrow-mixed-session-${sessionIndex}`,
+      config,
+      puzzles: [store.getPuzzle(`arrow-evidence-${sessionIndex * 4}`)!],
+      ratingBefore: 925,
+      now: startedAt
+    });
+    store.transaction(() => {
+      store.createSprintSession(session);
+      for (let offset = 0; offset < 4; offset += 1) {
+        const index = sessionIndex * 4 + offset;
+        store.recordAttempt({
+          ...attempt({
+            id: `arrow-attempt-${index}`,
+            sessionId: session.id,
+            puzzleId: `arrow-evidence-${index}`,
+            completedAt
+          }),
+          mode: "arrow_duel",
+          ratingKey: config.ratingKey
+        });
+      }
+      store.updateSprintSession({
+        ...session,
+        status: "failed",
+        completedAt,
+        endReason: "max_mistakes",
+        correctCount: 0,
+        mistakeCount: 4,
+        ratingAfter: 900
+      });
+    });
+  }
+}
+
+function arrowPuzzle(id: string, themes: string[], index: number): Puzzle {
+  const optionalPawnFiles = new Set(
+    ["a", "b", "c", "f", "g", "h"].filter((_, bit) => (index & (1 << bit)) !== 0)
+  );
+  const whitePawnRank = compressFenRank(
+    ["a", "b", "c", "d", "e", "f", "g", "h"]
+      .map((file) => file === "d" || file === "e" || optionalPawnFiles.has(file) ? "P" : "1")
+      .join("")
+  );
+  return {
+    id,
+    initialFen: `4k3/pppppppp/8/8/8/8/${whitePawnRank}/4K3 w - - 0 1`,
+    solutionMoves: ["d2d4"],
+    rating: 925,
+    ratingDeviation: 80,
+    themes,
+    source: "synthetic",
+    stockfishBestMove: "e2e4",
+    stockfishEval: -50,
+    stockfishEvalAfterFirstMove: -300
+  };
+}
+
+function compressFenRank(rank: string): string {
+  return rank.replace(/1+/g, (empty) => String(empty.length));
 }
 
 function seededStore(): MemoryStore {
