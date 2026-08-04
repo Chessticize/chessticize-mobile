@@ -232,17 +232,25 @@ export async function expectRunInsertionTarget(
     if (card.dataset.dropPosition !== position) {
       throw new Error(`Expected ${testID} to expose a ${position} insertion target`);
     }
-    const insertionLine = canvasElement.ownerDocument.body.querySelector<HTMLElement>(
-      `[data-run-insertion-line="${position}"][data-run-insertion-target="${testID}"]`
+    const insertionOutline = canvasElement.ownerDocument.body.querySelector<HTMLElement>(
+      `[data-run-insertion-outline="${position}"][data-run-insertion-target="${testID}"]`
     );
-    if (!insertionLine || insertionLine.style.backgroundColor !== "rgb(37, 99, 235)") {
-      throw new Error(`Expected ${testID} to render a visible ${position} insertion line`);
+    if (!insertionOutline) {
+      throw new Error(`Expected ${testID} to render a visible ${position} insertion outline`);
     }
-    if (insertionLine.style.position !== "absolute" || insertionLine.style.top === "") {
-      throw new Error(`Expected the ${position} insertion line to overlay the open card slot`);
+    const style = canvasElement.ownerDocument.defaultView?.getComputedStyle(insertionOutline);
+    if (
+      style?.borderStyle !== "dashed"
+      || style.borderWidth !== "2px"
+      || style.borderColor !== "rgb(37, 99, 235)"
+    ) {
+      throw new Error(`Expected the ${position} insertion slot to use a blue dashed outline`);
     }
-    if (Number(insertionLine.style.zIndex) <= 20) {
-      throw new Error(`Expected the ${position} insertion line to stay above the picked-up card`);
+    if (insertionOutline.getBoundingClientRect().height < 40) {
+      throw new Error(`Expected the ${position} insertion outline to frame the open card slot`);
+    }
+    if (Number(insertionOutline.style.zIndex) <= 20) {
+      throw new Error(`Expected the ${position} insertion outline to stay above the picked-up card`);
     }
   });
 }

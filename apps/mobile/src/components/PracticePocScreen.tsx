@@ -4911,13 +4911,14 @@ function PracticeRunHome({
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dropTargetRunId, setDropTargetRunId] = useState<string | null>(null);
   const [dropTargetPosition, setDropTargetPosition] = useState<RunDropTargetPosition | null>(null);
-  const [webInsertionLineTop, setWebInsertionLineTop] = useState<number | null>(null);
+  const [webInsertionOutlineTop, setWebInsertionOutlineTop] = useState<number | null>(null);
   const [webDropPreviewOffsets, setWebDropPreviewOffsets] = useState<Record<string, number>>({});
   const draggedRunIdRef = useRef<string | null>(null);
   const dropTargetRunIdRef = useRef<string | null>(null);
   const dropTargetPositionRef = useRef<RunDropTargetPosition | null>(null);
   const webDropPreviewOffsetsRef = useRef<Record<string, number>>({});
   const webDragOriginCenterRef = useRef<number | null>(null);
+  const webDragSourceHeightRef = useRef(0);
   const webDragSourceStrideRef = useRef(0);
   const webRunListElementRef = useRef<WebRunElement | null>(null);
   const runElementsRef = useRef(new Map<string, WebRunElement>());
@@ -4957,12 +4958,13 @@ function PracticeRunHome({
     dropTargetRunIdRef.current = null;
     dropTargetPositionRef.current = null;
     webDragOriginCenterRef.current = null;
+    webDragSourceHeightRef.current = 0;
     webDragSourceStrideRef.current = 0;
     webDropPreviewOffsetsRef.current = {};
     setDraggedRunId(null);
     setDropTargetRunId(null);
     setDropTargetPosition(null);
-    setWebInsertionLineTop(null);
+    setWebInsertionOutlineTop(null);
     setWebDropPreviewOffsets({});
     onRunReorderDragActiveChange(false);
   };
@@ -4979,6 +4981,7 @@ function PracticeRunHome({
         ? runElementsRef.current.get(adjacentRun.id)?.getBoundingClientRect()
         : undefined;
       webDragOriginCenterRef.current = runRect.top + runRect.height / 2;
+      webDragSourceHeightRef.current = runRect.height;
       webDragSourceStrideRef.current = adjacentRect
         ? Math.abs(adjacentRect.top - runRect.top)
         : runRect.height;
@@ -4990,7 +4993,7 @@ function PracticeRunHome({
     setDraggedRunId(runId);
     setDropTargetRunId(null);
     setDropTargetPosition(null);
-    setWebInsertionLineTop(null);
+    setWebInsertionOutlineTop(null);
     setWebDropPreviewOffsets({});
     onRunReorderDragActiveChange(true);
     onRunReorderFeedbackPreview?.({ haptic: "medium" });
@@ -5096,10 +5099,11 @@ function PracticeRunHome({
     const insertionGap = target
       ? Math.max(8, webDragSourceStrideRef.current - target.rect.height)
       : 0;
-    const nextInsertionLineTop = target && targetBaseTop !== null && listRect
+    const sourceHeight = webDragSourceHeightRef.current;
+    const nextInsertionOutlineTop = target && targetBaseTop !== null && listRect && sourceHeight > 0
       ? (movingDown
-          ? targetBaseTop + targetPreviewOffset + target.rect.height + insertionGap / 2
-          : targetBaseTop + targetPreviewOffset - insertionGap / 2) - listRect.top
+          ? targetBaseTop + targetPreviewOffset + target.rect.height + insertionGap
+          : targetBaseTop + targetPreviewOffset - insertionGap - sourceHeight) - listRect.top
       : null;
     if (
       targetRunId === dropTargetRunIdRef.current
@@ -5112,7 +5116,7 @@ function PracticeRunHome({
     dropTargetPositionRef.current = targetPosition;
     setDropTargetRunId(targetRunId);
     setDropTargetPosition(targetPosition);
-    setWebInsertionLineTop(nextInsertionLineTop);
+    setWebInsertionOutlineTop(nextInsertionOutlineTop);
     webDropPreviewOffsetsRef.current = nextPreviewOffsets;
     setWebDropPreviewOffsets(nextPreviewOffsets);
   };
@@ -5311,23 +5315,24 @@ function PracticeRunHome({
               ) : null}
             </React.Fragment>
           ))}
-          {Platform.OS === "web" && webInsertionLineTop !== null && dropTargetPosition ? (
+          {Platform.OS === "web" && webInsertionOutlineTop !== null && dropTargetPosition ? (
             <div
               aria-hidden="true"
-              data-run-insertion-line={dropTargetPosition}
+              data-run-insertion-outline={dropTargetPosition}
               data-run-insertion-target={dropTargetRunId
                 ? `practice-run-${safeTestId(dropTargetRunId)}`
                 : undefined}
               style={{
-                backgroundColor: "#2563EB",
-                borderRadius: 999,
-                boxShadow: "0 0 0 2px rgba(219, 234, 254, 0.98)",
-                height: 3,
-                left: 12,
+                backgroundColor: "rgba(37, 99, 235, 0.025)",
+                border: "2px dashed #2563EB",
+                borderRadius: 12,
+                boxSizing: "border-box",
+                height: webDragSourceHeightRef.current,
+                left: 8,
                 pointerEvents: "none",
                 position: "absolute",
-                right: 12,
-                top: webInsertionLineTop - 1.5,
+                right: 8,
+                top: webInsertionOutlineTop,
                 zIndex: 40
               }}
             />
