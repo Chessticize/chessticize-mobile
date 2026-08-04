@@ -556,7 +556,7 @@ export const ArrowDuelGuide: Story = {
 };
 
 export const ArrowDuelGuideOnly: Story = {
-  name: "Arrow Duel · single first-use step",
+  name: "Arrow Duel · two first-use steps",
   args: { scenarioId: "practice-arrow-duel-guide-only" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "practice-arrow-duel-guide");
@@ -595,7 +595,7 @@ export const ArrowDuelGuideExit: Story = {
 };
 
 export const ArrowDuelGuideOnlyExit: Story = {
-  name: "Arrow Duel · single first-use step · Exit",
+  name: "Arrow Duel · two first-use steps · Exit",
   args: { scenarioId: "practice-arrow-duel-guide-only" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "practice-arrow-duel-guide");
