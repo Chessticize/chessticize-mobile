@@ -3827,6 +3827,55 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(firstPuzzleFen);
   });
 
+  it("shows a terminal timeout when a board callback reaches the puzzle deadline first", async () => {
+    let wallClockMs = Date.parse("2026-07-23T12:00:00.000Z");
+    const service = createMobilePracticeService("random1000");
+    startSprintWithPuzzleTiming(
+      service,
+      {
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        puzzleTiming: {
+          slowAfterSeconds: 40,
+          timeoutAfterSeconds: 60
+        },
+        targetCorrect: 15,
+        maxMistakes: 1
+      },
+      new Date(wallClockMs).toISOString()
+    );
+    const renderer = renderScreen({
+      currentTimeMs: () => wallClockMs,
+      practiceService: service
+    });
+
+    press(renderer, "practice-resume-card");
+    await settleEntryPreview();
+    wallClockMs += 60_000;
+    await boardMove(renderer, "e2e6");
+
+    expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toContain(
+      "Timed out"
+    );
+    expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+
+    act(() => {
+      jest.advanceTimersByTime(799);
+    });
+    expect(findByTestId(renderer, "session-puzzle-timeout-overlay")).toBeTruthy();
+    expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "1 attempt · Included in replay"
+    );
+  });
+
   it("automatically marks a Slow correct attempt Unclear and explains the read-only handoff", async () => {
     let wallClockMs = Date.parse("2026-07-23T12:00:00.000Z");
     const service = createMobilePracticeService("random1000");
@@ -7783,14 +7832,16 @@ describe("PracticePocScreen", () => {
       "Timed out"
     );
     expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
-    expect(service.listHistory()[0]).toMatchObject({ result: "timed_out" });
-    expect(service.listReviewQueue()).toHaveLength(1);
 
     act(() => {
       jest.advanceTimersByTime(800);
     });
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "1 attempt · Included in replay"
+    );
   });
 
   it("shows a terminal Arrow Duel reply timeout before opening the summary", async () => {
@@ -7827,14 +7878,111 @@ describe("PracticePocScreen", () => {
       "Timed out"
     );
     expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
-    expect(service.listHistory()[0]).toMatchObject({ result: "timed_out" });
-    expect(service.listReviewQueue()).toHaveLength(1);
 
     act(() => {
       jest.advanceTimersByTime(800);
     });
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "1 attempt · Included in replay"
+    );
+  });
+
+  it("shows a terminal Arrow Duel choice timeout when its board callback reaches the deadline first", async () => {
+    let wallClockMs = Date.parse("2026-08-03T12:00:00.000Z");
+    const service = createMobilePracticeService("familiar15");
+    const started = service.startSprint({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 10,
+      maxMistakes: 1,
+      opponentReply: { enabled: true, seconds: 10 }
+    }, new Date(wallClockMs).toISOString());
+    const arrow = requireArrowDuelState(started);
+    const renderer = renderScreen({
+      currentTimeMs: () => wallClockMs,
+      practiceService: service
+    });
+
+    press(renderer, "practice-resume-card");
+    act(() => {
+      findByTestId(renderer, "mock-chessboard").props.onReady();
+    });
+    wallClockMs = Date.parse(started.currentPuzzleDeadlineAt!);
+    await boardMove(renderer, arrow.correctMove);
+
+    expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toBe(
+      "Timed out"
+    );
+    expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+
+    act(() => {
+      jest.advanceTimersByTime(799);
+    });
+    expect(findByTestId(renderer, "session-puzzle-timeout-overlay")).toBeTruthy();
+    expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "1 attempt · Included in replay"
+    );
+  });
+
+  it("shows a terminal Arrow Duel reply timeout when its board callback reaches the deadline first", async () => {
+    let wallClockMs = Date.parse("2026-08-03T12:00:00.000Z");
+    const service = createMobilePracticeService("familiar15");
+    const started = service.startSprint({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 10,
+      maxMistakes: 1,
+      opponentReply: { enabled: true, seconds: 10 }
+    }, new Date(wallClockMs).toISOString());
+    const arrow = requireArrowDuelState(started);
+    const renderer = renderScreen({
+      currentTimeMs: () => wallClockMs,
+      practiceService: service
+    });
+
+    press(renderer, "practice-resume-card");
+    act(() => {
+      findByTestId(renderer, "mock-chessboard").props.onReady();
+    });
+    await boardMove(renderer, arrow.correctMove);
+    await settleArrowDuelReplyHandoff();
+    const replying = requireArrowDuelState(activeSprintForTest(service));
+    wallClockMs = Date.parse(replying.replyDeadlineAt!);
+    await boardMove(renderer, arrow.puzzle.solutionMoves[1]!);
+
+    expect(collectText(findByTestId(renderer, "session-puzzle-timeout-overlay"))).toBe(
+      "Timed out"
+    );
+    expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+
+    act(() => {
+      jest.advanceTimersByTime(799);
+    });
+    expect(findByTestId(renderer, "session-puzzle-timeout-overlay")).toBeTruthy();
+    expect(() => findByTestId(renderer, "sprint-summary-panel")).toThrow();
+
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
+      "1 attempt · Included in replay"
+    );
   });
 
   it("excludes the opponent-reply pause from Sprint Result time", async () => {
