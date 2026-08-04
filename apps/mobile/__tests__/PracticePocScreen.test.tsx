@@ -1267,7 +1267,7 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
-  it("keeps a consecutive native drop accurate when reordered layouts arrive mid-drag", () => {
+  it("keeps a six-Run first-to-third native drop accurate when reordered layouts arrive mid-drag", () => {
     const service = createMobilePracticeService("random1000");
     service.createPracticeRun({
       id: "test-run",
@@ -1287,6 +1287,24 @@ describe("PracticePocScreen", () => {
       initialRating: 770,
       themes: ["mixed"]
     });
+    service.createPracticeRun({
+      id: "speed-run",
+      name: "Speed Run",
+      mode: "custom",
+      durationSeconds: 120,
+      perPuzzleSeconds: 10,
+      initialRating: 650,
+      themes: ["mixed"]
+    });
+    service.createPracticeRun({
+      id: "endgame-run",
+      name: "Endgame Run",
+      mode: "custom",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      initialRating: 700,
+      themes: ["endgame"]
+    });
     const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
     press(renderer, "practice-run-home-edit");
 
@@ -1299,38 +1317,69 @@ describe("PracticePocScreen", () => {
       330,
       100
     );
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-speed-run"), 440, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-endgame-run"), 550, 100);
 
     startNativeRunDrag(testRun, 270);
     moveNativeRunDrag(testRun, 50, -220);
     act(() => {
       testRun.props.onPanResponderRelease();
     });
-    expect(service.listPracticeRuns().filter((run) => !run.archived).map((run) => run.id)).toEqual([
-      "test-run",
-      "standard",
-      "arrow-duel",
-      "arrow-duel-long"
+    expect(renderedNativeRunTestIds(renderer)).toEqual([
+      "practice-run-test-run",
+      "practice-run-standard",
+      "practice-run-arrow-duel",
+      "practice-run-arrow-duel-long",
+      "practice-run-speed-run",
+      "practice-run-endgame-run"
     ]);
 
     // React Native can deliver the committed reorder's onLayout callbacks after
     // the user has already picked up the next card. Those late notifications
     // describe positions the cards are already drawn at, so they must not be
     // treated as a mid-drag base move that shifts the card and the pointer.
-    const standardRun = findNativeRunDragSurface(renderer, "practice-run-standard");
-    startNativeRunDrag(standardRun, 160);
-    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-test-run"), 0, 100);
-    layoutNativeRunSurface(standardRun, 110, 100);
-    moveNativeRunDrag(standardRun, 275, 115);
+    const firstRun = findNativeRunDragSurface(renderer, "practice-run-test-run");
+    startNativeRunDrag(firstRun, 50);
+    layoutNativeRunSurface(firstRun, 0, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-standard"), 110, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-arrow-duel"), 220, 100);
+    layoutNativeRunSurface(
+      findNativeRunDragSurface(renderer, "practice-run-arrow-duel-long"),
+      330,
+      100
+    );
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-speed-run"), 440, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-endgame-run"), 550, 100);
+    moveNativeRunDrag(firstRun, 270, 220);
+
+    expect(flattenTestStyle(
+      findByTestId(renderer, "practice-run-insertion-outline").props.style
+    )).toEqual(expect.objectContaining({
+      borderStyle: "dashed",
+      height: 100,
+      top: 220
+    }));
+    for (const crossedRunTestId of ["practice-run-standard", "practice-run-arrow-duel"]) {
+      const previewTransform = flattenTestStyle(
+        findNativeRunDragSurface(renderer, crossedRunTestId).props.style
+      ).transform as Array<{ translateY?: number | { value: number } }>;
+      expect(previewTransform.some((entry) =>
+        typeof entry.translateY === "object" && entry.translateY.value === -110
+      )).toBe(true);
+    }
 
     act(() => {
-      standardRun.props.onPanResponderRelease();
+      firstRun.props.onPanResponderRelease();
     });
-    expect(service.listPracticeRuns().filter((run) => !run.archived).map((run) => run.id)).toEqual([
-      "test-run",
-      "arrow-duel",
-      "standard",
-      "arrow-duel-long"
+    expect(renderedNativeRunTestIds(renderer)).toEqual([
+      "practice-run-standard",
+      "practice-run-arrow-duel",
+      "practice-run-test-run",
+      "practice-run-arrow-duel-long",
+      "practice-run-speed-run",
+      "practice-run-endgame-run"
     ]);
+    expect(() => findByTestId(renderer, "practice-run-insertion-outline")).toThrow();
   });
 
   it("cancels a native Run insertion preview without committing the reorder", () => {
@@ -14942,6 +14991,16 @@ function findNativeRunDragSurface(
     throw new Error(`Could not find native Run drag surface ${testID}`);
   }
   return surface;
+}
+
+function renderedNativeRunTestIds(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return [...new Set(
+    findByTestId(renderer, "practice-run-list").findAll((node) =>
+      typeof node.props.onTouchStart === "function"
+        && typeof node.props.testID === "string"
+        && node.props.testID.startsWith("practice-run-")
+    ).map((node) => node.props.testID as string)
+  )];
 }
 
 function layoutNativeRunSurface(
