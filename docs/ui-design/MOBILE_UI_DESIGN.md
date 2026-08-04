@@ -166,6 +166,24 @@ Active Sprint:
 - The prompt must not appear below the fold in landscape. If the prompt plus actions overflow, the control rail scrolls independently while the board remains fixed.
 - Arrow Duel candidate arrows stay on the board in every class. Do not move candidate selection into separate landscape buttons.
 
+Prompt frame contract:
+
+- Every active-puzzle prompt in Sprint, Review, and Replay uses the single
+  `AdaptiveLayout.promptFrameHeight` value. A mode or state must never add its
+  own `height` or fall back to content-driven `minHeight` behavior.
+- The ordinary prompt frame is 96 pt. Slots narrower than 300 pt reserve an
+  additional 16 pt. Text scaling adds
+  `round(max(0, fontScale - 1) * 48)` pt; the frame uses the larger of the
+  narrow-slot and text-scale adjustments.
+- Every prompt reserves the same title, context, and hint layout slots. Missing
+  copy remains visually and accessibly hidden in its slot instead of removing
+  the slot from layout.
+- `Solved`, wrong-line guidance, reply-stage copy, and other transient messages
+  replace copy with an absolute overlay inside the fixed frame. They must not
+  mount a differently sized card or move the board.
+- Geometry regression coverage must compare Standard and Arrow Duel and retain
+  the contract through scheduled Review, Replay, narrow slots, and large text.
+
 Replay:
 
 - Compact portrait keeps board above the analysis toolbar and line list.
@@ -336,10 +354,10 @@ Developer/test-build controls:
 Arrow Duel Replay behavior:
 
 - The colored candidate arrows render in Analysis mode at the puzzle's initial position: correct Stockfish best move is green, the blunder or inferior candidate is red.
-- The Replay surface does not show separate color-legend or "You chose" chips. The board arrows and guided punishment-line state carry the context.
+- The Replay surface does not show separate color-legend or "You chose" chips. Candidate arrows appear only for the initial choice and Analysis comparison; after a correct candidate, the reply-side continuation is an unassisted puzzle.
 - If the user chose wrong, automatically play the opponent response or punishment line.
 - Prefer stored puzzle solution lines for explanation; fall back to local Stockfish when the stored line is not enough.
-- While the punishment line is being replayed, show the current-position evaluation, not the original candidate evals.
+- Do not show a live evaluation while the Replay continuation is being solved. Current-position evaluation belongs to explicit Analysis.
 - If the punishment line reaches checkmate, show the game result (`1-0` or `0-1`) and "Checkmate".
 - The user can switch to analysis at any point. Analysis mode uses Stockfish, shows candidate lines, and does not mutate official review history.
 - A wrong Arrow Duel Replay stays on the same puzzle after the punishment line. It must not auto-advance to the next puzzle.
@@ -364,21 +382,28 @@ Arrow Duel active-session rules:
 - The Sprint and puzzle clocks pause when the reply begins. The reply clock and
   its board handoff do not advance the Sprint deadline, puzzle elapsed time,
   Slow threshold, or puzzle Timeout threshold.
-- After green confirmation, the selected move animates back before the tempting
-  move appears. A top-of-board `What if…` cue remains visible through this
-  preparation beat, and the reply timer appears only after the tempting move
-  settles and board input unlocks.
+- After green confirmation, the selected move animates back more slowly and
+  without sound before the tempting move appears. A full-board `What if you
+  made the other move?`
+  overlay names the actual configured reply window (`Find the opponent’s reply
+  in X seconds.`) for a fixed 1.5-second preparation beat, remains over the
+  tempting-move animation, and dismisses when that move settles. The reply
+  timer appears only after the move settles and board input unlocks.
 - Reply judgment accepts the stored puzzle main-line move or any legal move
   that immediately checkmates. It does not invoke Stockfish.
 
 Arrow Duel Replay and Review rules:
 
 - Replay and Review reconstruction must reuse the candidate order stored on the original attempt. Neither may generate a fresh default order for History, post-Sprint Replay, or Review.
+- The Run's Opponent reply setting applies consistently to Sprint, Replay, and scheduled Review. When it is off, Replay and Review retain the original one-choice flow.
+- When Opponent reply is on, scheduled Review requires the candidate and reply. Its reply countdown uses the same configured Run duration and starts only when the 1.5-second `What if you made the other move?` handoff, tempting-move animation, and input lock have finished. Either wrong answer or a reply timeout records the Review as wrong. Timeout keeps the board locked under the ordinary brief full-board `Timed out` handoff before advancing.
+- Replay uses the same two-stage judgment without any countdown. A correct reply opens the remaining stored puzzle line as an unassisted puzzle from the reply side: the player makes every remaining move for that side while opponent replies animate automatically. Do not show guide arrows or live evaluation while solving. Show `Solved` only after the full line completes or an accepted immediate mate ends it.
+- A wrong Replay candidate keeps its brief red feedback, then follows the established guided punishment line: auto-play the opponent response and use the stored blue-arrow line to show why the move fails. Do not replace this feedback with the unassisted reply-side challenge.
+- Replay from an original Sprint uses that persisted Sprint's reply configuration. Due Review uses the current configuration of its Run. Neither on/off state creates a separate Rating.
 - Green always means the best move.
 - Red always means the inferior candidate.
-- Replay should avoid redundant legend or choice-marker chips; use board arrows, feedback highlights, and the guided line to explain the state.
-- After a wrong answer, the opponent's refutation reply plays automatically, then the punishment line continues as a guided interaction: the user plays each expected move themselves by following the guide arrow, so no pause/step transport controls are needed. Replay is available by resetting the puzzle. Throughout the line, show the live Stockfish evaluation of the current position. The current implementation uses the compact Replay toolbar and guided arrows rather than a playback transport bar.
-- If the stored punishment line requires the user's next move, show that expected move with an arrow, wait for the user to make it, then play the next reply. Continue until the line ends, then stop.
+- Replay should avoid redundant legend or choice-marker chips. Initial candidate arrows and brief move feedback explain the two-stage choice; after a correct candidate, the reply-side continuation supplies no move hint. A wrong candidate still uses the guided punishment line.
+- During the remaining stored line, wait for the player to find each reply-side move without an arrow, then animate the opponent's next move. Continue until the line ends, then show `Solved`. Reset returns to the initial candidate choice, and Analysis remains an explicit opt-in.
 - Review copy should explain the tactical reason only when the data supports it; otherwise show engine line and evaluation shift.
 - In Review, selecting the wrong Arrow Duel candidate records a failed Review attempt and resets or contracts that puzzle's schedule. The user may then enter Replay to inspect the line without creating additional history.
 
@@ -739,6 +764,9 @@ Accessibility rules:
   compact wide-short and foldable-sized windows, iPad portrait, iPad landscape,
   and iPad split-view widths.
 - Adaptive component tests should render the app shell with explicit width/height pairs and assert chrome placement, board sizing, rail visibility, and absence of overlapping controls.
+- Prompt component tests must assert the shared adaptive frame height and the
+  three reserved copy slots rather than accepting mode-specific natural
+  heights.
 - Simulator screenshot QA should keep iPhones in portrait and use an iPad for
   landscape and resizable native evidence. It should include at least one
   active Sprint, one Arrow Duel state, one Replay state, and one

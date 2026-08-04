@@ -51,7 +51,23 @@
     "issues": [
       {
         "issueNumber": 489,
-        "changeNote": "Preview the default-on Opponent reply setting in Edit Run with a ten-second maximum."
+        "changeNote": "Preview the default-on Opponent reply setting in Edit Run with a thirty-second maximum."
+      }
+    ]
+  },
+  "review-arrow-duel-reply": {
+    "issues": [
+      {
+        "issueNumber": 489,
+        "changeNote": "Require the same configured opponent reply and countdown in scheduled Review."
+      }
+    ]
+  },
+  "history-arrow-duel-replay": {
+    "issues": [
+      {
+        "issueNumber": 489,
+        "changeNote": "Keep Replay untimed and unassisted from the reply side until the complete stored line is solved."
       }
     ]
   }

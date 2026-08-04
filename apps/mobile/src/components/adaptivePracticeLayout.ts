@@ -20,6 +20,7 @@ export type AdaptiveLayout = {
   isLandscape: boolean;
   isLargeText: boolean;
   isRegularWidth: boolean;
+  promptFrameHeight: number;
   sessionPackedRowWidth: number;
   sessionRailGap: number;
   sessionRailWidth: number;
@@ -31,8 +32,12 @@ export type AdaptiveLayout = {
 };
 
 export const PRACTICE_UI_PADDING = 16;
+export const PRACTICE_PROMPT_BASE_HEIGHT = 96;
 
 const SESSION_RAIL_GAP_MIN = 14;
+const PRACTICE_PROMPT_NARROW_WIDTH = 300;
+const PRACTICE_PROMPT_NARROW_EXTRA_HEIGHT = 16;
+const PRACTICE_PROMPT_FONT_SCALE_EXTRA_HEIGHT = 48;
 const COMPACT_LANDSCAPE_RAIL_MIN = 220;
 const COMPACT_LANDSCAPE_RAIL_MAX = 300;
 const REGULAR_RAIL_MIN = 296;
@@ -113,6 +118,17 @@ export function buildPracticeAdaptiveLayout({
     ? Math.min(sessionBoardSlotWidth, sessionBoardSlotHeight)
     : Math.min(portraitBoardSlotWidth, portraitBoardSlotHeight);
   const boardSize = Math.floor(Math.max(0, Math.min(boardSlot, boardMax)));
+  const promptSlotWidth = usesSessionRail ? sessionRailWidth : boardSize;
+  const promptNarrowExtraHeight = promptSlotWidth < PRACTICE_PROMPT_NARROW_WIDTH
+    ? PRACTICE_PROMPT_NARROW_EXTRA_HEIGHT
+    : 0;
+  const promptFontScaleExtraHeight = Math.round(
+    Math.max(0, fontScale - 1) * PRACTICE_PROMPT_FONT_SCALE_EXTRA_HEIGHT
+  );
+  const promptFrameHeight = PRACTICE_PROMPT_BASE_HEIGHT + Math.max(
+    promptNarrowExtraHeight,
+    promptFontScaleExtraHeight
+  );
   const maximumSessionRailGap = Math.max(
     0,
     sessionContentWidth - PRACTICE_UI_PADDING * 2 - boardSize - sessionRailWidth
@@ -134,6 +150,7 @@ export function buildPracticeAdaptiveLayout({
     isLandscape,
     isLargeText,
     isRegularWidth,
+    promptFrameHeight,
     sessionPackedRowWidth: boardSize + sessionRailWidth + sessionRailGap,
     sessionRailGap,
     sessionRailWidth,

@@ -45,10 +45,13 @@ With Opponent reply on:
    Sprint and puzzle clocks before beginning the handoff.
 4. Keep the board in the original solver's perspective for the whole puzzle.
    After the green confirmation, animate the correct candidate back to its
-   starting square and show a top-of-board `What if…` cue. Hold that preparation
-   beat while the fixed prompt surface switches to the `If...` reply copy, then
-   animate the tempting candidate. The player now moves for the opponent without
-   the board flipping.
+   starting square with a slower, silent undo. During that preparation beat,
+   cover the board with a `What if you made the other move?` overlay and `Find
+   the opponent’s reply in X seconds.`, where X is the Run's configured reply
+   time. Keep the overlay through a 1.5-second preparation beat while the fixed
+   prompt surface switches to the `If...` reply copy, then animate the tempting
+   candidate under that same overlay. Dismiss it when the move settles. The
+   player now moves for the opponent without the board flipping.
 5. Start the Run's configured reply clock, which defaults to ten seconds, only
    after the tempting candidate has settled and board input is available. None
    of the green confirmation, undo, prompt transition, or move animation uses
@@ -67,11 +70,13 @@ label; the independent timing rule remains part of scoring behavior, while the
 ordinary Sprint and puzzle clocks do not advance until the reply resolves.
 
 The reply challenge reuses the ordinary puzzle prompt position and surface. It
-stays centered at the same full width and fixed 72-point height. Candidate and
-reply copy occupy the same absolutely positioned copy layer so the handoff
-cannot change the prompt's geometry. The reply state explains the position
-without restating the acceptance rule. Once the whole puzzle resolves, do not
-replace that prompt with `Solved`, `Choice
+stays centered at the same full width and uses the single adaptive Prompt frame
+contract defined in [`MOBILE_UI_DESIGN.md`](MOBILE_UI_DESIGN.md#adaptive-practice-and-review).
+Arrow Duel must not declare a mode-specific height. Candidate and reply copy
+occupy the same absolutely positioned copy layer so the handoff cannot change
+the prompt's geometry. The reply state explains the position without restating
+the acceptance rule. Once the whole puzzle resolves, do not replace that
+prompt with `Solved`, `Choice
 missed`, `Reply missed`, Review messaging, or any other result copy. Match
 Standard Sprint: the board feedback carries the result during the short handoff
 to the next puzzle.
@@ -90,6 +95,35 @@ Runtime judgment uses chess rules and stored puzzle data only. It must not run
 Stockfish. Standard Puzzle, Arrow Duel reply, Replay, and Review should share
 one Core acceptance rule so the legal-checkmate exception cannot drift between
 surfaces.
+
+## Replay And Review
+
+The Run setting governs every scored or reconstructed Arrow Duel attempt:
+
+- With **Opponent reply** off, Sprint, Replay, and Review keep the original
+  one-choice behavior.
+- With it on, scheduled Review requires both the candidate and reply. The reply
+  uses the same configured duration as the Run, and its countdown starts only
+  after the 1.5-second `What if you made the other move?` handoff has completed
+  and board input is available. A wrong candidate, wrong reply, or reply timeout records one
+  failed Review attempt; both correct answers record one successful Review
+  attempt. A timeout first shows the ordinary brief full-board `Timed out`
+  handoff, then advances.
+- Replay has no countdown. After a correct candidate, the player must find the
+  opponent reply without guide arrows or live guided evaluation. After a
+  correct reply, Replay continues through the stored puzzle line: the player
+  remains the reply-side player and makes each remaining move for that side
+  while the opponent replies automatically. Analysis remains available only
+  when the player asks for it. Replay shows `Solved` only after that complete
+  line has been played, or when an accepted immediate mate ends the position.
+- If the candidate itself is wrong in Replay, keep the red feedback snapshot,
+  then preserve the established guided punishment-line feedback: auto-play the
+  opponent response and use the stored blue-arrow line to show why the move
+  fails. Do not replace this feedback with the unassisted reply-side challenge.
+- A Replay reconstructed from a persisted Sprint uses that Sprint's saved Run
+  setting. A due Review uses the current setting for its Run. Neither path
+  changes the Run's Rating identity, and Replay never writes History or changes
+  the Review schedule.
 
 ## Core Pack Evidence
 
@@ -114,8 +148,10 @@ an engine dependency to scored play.
 The issue #489 design increment updates the existing product clones and keeps
 their stable Storybook URLs. It covers:
 
-- candidate choice and the staged green-confirmation, animated undo,
-  top-of-board `What if…` cue, `If...` prompt, and tempting-move handoff;
+- candidate choice and the staged green-confirmation, slow silent undo,
+  full-board `What if you made the other move?` overlay with the configured
+  reply time, `If...` prompt,
+  and tempting-move handoff after a 1.5-second preparation beat;
 - a board perspective locked to the original solver throughout the candidate
   and opponent-reply stages;
 - the configurable opponent-reply state, defaulting to ten seconds and capped
@@ -124,6 +160,9 @@ their stable Storybook URLs. It covers:
   wrong replies;
 - the brief ordinary timeout overlay and automatic advance;
 - Review enrollment for both failure stages without redundant result copy;
+- the same configured reply countdown and visible `Timed out` handoff in
+  scheduled Review, plus the untimed, unassisted reply-side full-line
+  completion rule in Replay;
 - the default-on Create Run and Edit Run control and its off state; and
 - first-use Arrow Duel guidance for the two-stage rule.
 
@@ -131,3 +170,8 @@ These scenarios remain living UI documentation for the production behavior.
 Their deterministic preview adapter is isolated from the production state
 machine so Storybook timing can stay stable while the shipped flow exercises
 the Core and storage boundaries.
+
+All choice, reply, Review, Replay, guidance, and solved prompts follow the
+shared Prompt frame contract in `MOBILE_UI_DESIGN.md`. Arrow Duel may change
+copy or tone inside that frame, but it must not declare a mode-specific height
+or remove one of the reserved title, context, and hint layout slots.
