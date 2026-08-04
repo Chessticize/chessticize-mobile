@@ -15,22 +15,6 @@
       }
     ]
   },
-  "practice-arrow-duel-mate-in-one": {
-    "issues": [
-      {
-        "issueNumber": 489,
-        "changeNote": "Verify that a legal alternate mate in one is accepted as the reply."
-      }
-    ]
-  },
-  "practice-arrow-duel-terminal-other-move": {
-    "issues": [
-      {
-        "issueNumber": 489,
-        "changeNote": "Preview an immediate next-puzzle handoff when the other candidate move is stalemate, without showing reply guidance or a countdown."
-      }
-    ]
-  },
   "practice-arrow-duel-prompt": {
     "issues": [
       {

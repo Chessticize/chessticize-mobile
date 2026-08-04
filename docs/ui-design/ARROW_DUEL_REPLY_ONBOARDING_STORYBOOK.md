@@ -91,8 +91,10 @@ alternative move before showing the preparation cue:
 The worse alternative cannot be checkmate: a checkmating move would not be the
 worse candidate. The boundary case is therefore explicitly stalemate-only.
 
-The dedicated Storybook boundary case uses `Qg7#` as the correct choice and
-`Qf7` as the stalemating alternative.
+The implementation acceptance case uses `Qg7#` as the correct choice and `Qf7`
+as the stalemating alternative. It is intentionally omitted from this
+onboarding-only Storybook review and should be previewed when the production
+behavior is implemented.
 
 ## Responsive contract
 

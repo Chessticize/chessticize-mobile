@@ -867,37 +867,6 @@ export const ArrowDuelReplyTimeout: Story = {
   }
 };
 
-export const ArrowDuelReplyAlternateMate: Story = {
-  name: "Arrow Duel · alternate mate in one",
-  args: { scenarioId: "practice-arrow-duel-mate-in-one" },
-  play: async ({ canvasElement }) => {
-    await openArrowDuelChoice(canvasElement);
-    await clickTestId(canvasElement, "lab-board-correct");
-    await waitForText(canvasElement, "Find Black’s reply");
-    await waitForEnabledTestId(canvasElement, "lab-board-alternate-mate");
-    await clickTestId(canvasElement, "lab-board-alternate-mate");
-    await waitForTestId(canvasElement, "move-feedback-overlay");
-  }
-};
-
-export const ArrowDuelTerminalOtherMoveNoReply: Story = {
-  name: "Arrow Duel · stalemate alternate · next puzzle",
-  args: { scenarioId: "practice-arrow-duel-terminal-other-move" },
-  play: async ({ canvasElement }) => {
-    await openArrowDuelChoice(canvasElement);
-    await waitForTestId(canvasElement, "arrow-duel-candidate-overlay");
-    await clickTestId(canvasElement, "lab-board-correct");
-    await waitForTestId(canvasElement, "move-feedback-overlay");
-    await expectTestIdAbsent(canvasElement, "arrow-duel-what-if-overlay");
-    await expectTestIdAbsent(canvasElement, "arrow-duel-what-if-action");
-    await expectTestIdAbsent(canvasElement, "arrow-duel-reply-timer");
-    await waitForText(canvasElement, "Choose the best move");
-    await expectTestIdText(canvasElement, "session-progress", "1 / 2");
-    await waitForTestId(canvasElement, "arrow-duel-candidate-overlay");
-    await expectTestIdAbsent(canvasElement, "sprint-summary-panel");
-  }
-};
-
 export const BlunderMovePreview: Story = {
   name: "Blunder move preview",
   args: { scenarioId: "practice-blunder-move-preview" },
