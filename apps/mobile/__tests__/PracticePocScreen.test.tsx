@@ -1350,6 +1350,21 @@ describe("PracticePocScreen", () => {
     );
     layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-speed-run"), 440, 100);
     layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-endgame-run"), 550, 100);
+
+    // A prior native layout generation can remain queued behind the committed
+    // reorder. Once pickup freezes the next drag's geometry, that stale
+    // generation must not move the card or replace the parent's optimistic
+    // snapshot before the finger crosses two Runs.
+    layoutNativeRunSurface(firstRun, 220, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-standard"), 0, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-arrow-duel"), 110, 100);
+    layoutNativeRunSurface(
+      findNativeRunDragSurface(renderer, "practice-run-arrow-duel-long"),
+      330,
+      100
+    );
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-speed-run"), 440, 100);
+    layoutNativeRunSurface(findNativeRunDragSurface(renderer, "practice-run-endgame-run"), 550, 100);
     moveNativeRunDrag(firstRun, 270, 220);
 
     expect(flattenTestStyle(
