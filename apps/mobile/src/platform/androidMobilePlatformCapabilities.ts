@@ -44,8 +44,8 @@ export function composeAndroidMobilePlatformCapabilities(
   return {
     storage: {
       practiceService: service,
-      configurePuzzleSource: source =>
-        configureMobilePracticePuzzleSource(service, source),
+      configurePuzzleSource: (source, mode) =>
+        configureMobilePracticePuzzleSource(service, source, mode),
     },
     progressProtection: {
       kind: 'android_managed_backup',

@@ -33,9 +33,7 @@ import {
 } from "./sessionGuideGeometry.ts";
 import {
   analyzeFenWithUciEngine,
-  acknowledgeArrowDuelReplyCue,
   ALL_THEME_SELECTION,
-  advanceArrowDuelReplyCueSprint,
   applyMovesToFen,
   arrowDuelReplyCuePresentationFor,
   beginArrowDuelPuzzle,
@@ -2010,6 +2008,9 @@ export function PracticePocScreen({
           service.setRating(config.ratingKey, customInitialRating);
         }
       }
+      if (configurePuzzleSource) {
+        configurePuzzleSource(puzzleSource, config?.mode ?? nextMode);
+      }
       if (puzzleSelectionId) {
         service.setPuzzleSelectionScopeIds([puzzleSelectionId]);
       }
@@ -2069,19 +2070,6 @@ export function PracticePocScreen({
   }
 
   function adoptStartedSprint(started: SprintState): void {
-    if (
-      sprintGuidanceEnabled
-      && started.config.mode === "arrow_duel"
-      && started.config.opponentReply?.enabled === true
-    ) {
-      const settings = service.getSettings();
-      const sprintGuides = advanceArrowDuelReplyCueSprint(settings.sprintGuides);
-      service.saveSettings({
-        ...settings,
-        sprintGuides
-      });
-      setSettingsRevision((current) => current + 1);
-    }
     setMode(started.config.mode);
     setSessionReplayItems([]);
     commitState(started);
@@ -2342,6 +2330,25 @@ export function PracticePocScreen({
     });
   }
 
+  async function waitForArrowDuelReplyPreparation(cue: {
+    confirmationRequired: boolean;
+    holdMs: number | null;
+  }): Promise<void> {
+    setArrowDuelReplyPromptPhase("reply");
+    setArrowDuelReplyPreparationAcknowledged(false);
+    try {
+      if (cue.confirmationRequired) {
+        await new Promise<void>((resolve) => {
+          arrowDuelReplyPreparationContinueRef.current = resolve;
+        });
+        return;
+      }
+      await sleep(cue.holdMs ?? ARROW_DUEL_REPLY_PREPARATION_MS);
+    } finally {
+      arrowDuelReplyPreparationContinueRef.current = null;
+    }
+  }
+
   async function stageArrowDuelReplyPreviewHandoff(
     transition: ArrowDuelReplyChallengePreviewTransition,
     submittedPuzzle: ArrowDuelState,
@@ -2388,22 +2395,12 @@ export function PracticePocScreen({
           : null
       );
       commitBoardFen(submittedPuzzle.currentFen);
-      setArrowDuelReplyPromptPhase("reply");
-      setArrowDuelReplyPreparationAcknowledged(false);
-      if (
-        sprintRulesDesignPreview?.arrowDuelReplyChallenge
-          ?.preparationConfirmationRequired === true
-      ) {
-        await new Promise<void>((resolve) => {
-          arrowDuelReplyPreparationContinueRef.current = resolve;
-        });
-        arrowDuelReplyPreparationContinueRef.current = null;
-      } else {
-        await sleep(
-          sprintRulesDesignPreview?.arrowDuelReplyChallenge?.preparationHoldMs
-            ?? ARROW_DUEL_REPLY_PREPARATION_MS
-        );
-      }
+      await waitForArrowDuelReplyPreparation({
+        confirmationRequired: sprintRulesDesignPreview?.arrowDuelReplyChallenge
+          ?.preparationConfirmationRequired === true,
+        holdMs: sprintRulesDesignPreview?.arrowDuelReplyChallenge?.preparationHoldMs
+          ?? ARROW_DUEL_REPLY_PREPARATION_MS
+      });
       await animateBoardMoves(opponentMoves, transition.boardFen ?? null);
       if (transition.lastMove !== undefined) {
         setLastBoardMove(transition.lastMove ? arrowFromTo(transition.lastMove) : null);
@@ -2411,7 +2408,6 @@ export function PracticePocScreen({
       setArrowDuelReplyChallengePhase("reply");
       setArrowDuelWhatIfVisible(false);
     } finally {
-      arrowDuelReplyPreparationContinueRef.current = null;
       setArrowDuelWhatIfVisible(false);
       boardSyncInProgressRef.current = false;
       if (boardInputLockRevisionRef.current === handoffLockRevision) {
@@ -2964,22 +2960,13 @@ export function PracticePocScreen({
           commitBoardFen(submittedFen);
         }
         if (isArrowDuelReplyHandoff) {
-          setArrowDuelReplyPromptPhase("reply");
-          setArrowDuelReplyPreparationAcknowledged(false);
           const cuePresentation = sprintGuidanceEnabled
             ? arrowDuelReplyCuePresentationFor(service.getSettings().sprintGuides)
             : {
                 confirmationRequired: false,
                 holdMs: ARROW_DUEL_REPLY_PREPARATION_MS
               };
-          if (cuePresentation.confirmationRequired) {
-            await new Promise<void>((resolve) => {
-              arrowDuelReplyPreparationContinueRef.current = resolve;
-            });
-            arrowDuelReplyPreparationContinueRef.current = null;
-          } else {
-            await sleep(cuePresentation.holdMs ?? ARROW_DUEL_REPLY_PREPARATION_MS);
-          }
+          await waitForArrowDuelReplyPreparation(cuePresentation);
         }
         await animateBoardMoves(autoMoves, nextFen);
         if (isArrowDuelReplyHandoff) {
@@ -3001,7 +2988,6 @@ export function PracticePocScreen({
           setArrowDuelReplyChallengePhase("reply");
         }
       } finally {
-        arrowDuelReplyPreparationContinueRef.current = null;
         setArrowDuelWhatIfVisible(false);
         boardSyncInProgressRef.current = false;
         // A newer lock taken mid-animation (pause, app background) owns the
@@ -4113,11 +4099,7 @@ export function PracticePocScreen({
             detail={arrowDuelWhatIfDetail}
             onAction={() => {
               if (productionReplyCuePresentation?.confirmationRequired === true) {
-                const settings = service.getSettings();
-                service.saveSettings({
-                  ...settings,
-                  sprintGuides: acknowledgeArrowDuelReplyCue(settings.sprintGuides)
-                });
+                service.acknowledgeArrowDuelReplyCue();
                 setSettingsRevision((current) => current + 1);
               }
               setArrowDuelReplyPreparationAcknowledged(true);
@@ -10269,73 +10251,78 @@ function ArrowDuelWhatIfOverlay({
   const accessibilityTitle = title.replace(/\s+/g, " ");
   return (
     <View
-      accessible
-      accessibilityLabel={`${accessibilityTitle} ${detail}`}
-      accessibilityLiveRegion="polite"
-      accessibilityRole="alert"
       pointerEvents={actionLabel && onAction ? "auto" : "none"}
       style={styles.arrowDuelWhatIfOverlay}
       testID={`${testIDPrefix}-what-if-overlay`}
     >
-      {titleSide ? (
-        <View
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={styles.arrowDuelWhatIfTitleBlock}
-          testID={`${testIDPrefix}-what-if-title`}
-        >
-          <View style={styles.arrowDuelWhatIfTitleLead}>
-            <Text style={[
-              styles.arrowDuelWhatIfTitleLine,
-              compactTitle ? styles.arrowDuelWhatIfTitleLineCompact : null,
-              veryCompactTitle ? styles.arrowDuelWhatIfTitleLineVeryCompact : null
-            ]}>
-              What would
-            </Text>
-            <View
-              style={[
-                styles.arrowDuelWhatIfSideGlyphChip,
-                compactTitle ? styles.arrowDuelWhatIfSideGlyphChipCompact : null,
-                veryCompactTitle ? styles.arrowDuelWhatIfSideGlyphChipVeryCompact : null
-              ]}
-              testID={`${testIDPrefix}-what-if-side-glyph`}
-            >
-              <MoveSideGlyph
-                kingPieceSize={veryCompactTitle ? 19 : compactTitle ? 22 : 26}
-                side={titleSide}
-                testID={`${testIDPrefix}-what-if-side-king`}
-              />
+      <View
+        accessible
+        accessibilityLabel={`${accessibilityTitle} ${detail}`}
+        accessibilityLiveRegion="polite"
+        accessibilityRole="alert"
+        style={styles.arrowDuelWhatIfAnnouncement}
+        testID={`${testIDPrefix}-what-if-announcement`}
+      >
+        {titleSide ? (
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={styles.arrowDuelWhatIfTitleBlock}
+            testID={`${testIDPrefix}-what-if-title`}
+          >
+            <View style={styles.arrowDuelWhatIfTitleLead}>
+              <Text style={[
+                styles.arrowDuelWhatIfTitleLine,
+                compactTitle ? styles.arrowDuelWhatIfTitleLineCompact : null,
+                veryCompactTitle ? styles.arrowDuelWhatIfTitleLineVeryCompact : null
+              ]}>
+                What would
+              </Text>
+              <View
+                style={[
+                  styles.arrowDuelWhatIfSideGlyphChip,
+                  compactTitle ? styles.arrowDuelWhatIfSideGlyphChipCompact : null,
+                  veryCompactTitle ? styles.arrowDuelWhatIfSideGlyphChipVeryCompact : null
+                ]}
+                testID={`${testIDPrefix}-what-if-side-glyph`}
+              >
+                <MoveSideGlyph
+                  kingPieceSize={veryCompactTitle ? 19 : compactTitle ? 22 : 26}
+                  side={titleSide}
+                  testID={`${testIDPrefix}-what-if-side-king`}
+                />
+              </View>
+              <Text style={[
+                styles.arrowDuelWhatIfTitleLine,
+                compactTitle ? styles.arrowDuelWhatIfTitleLineCompact : null,
+                veryCompactTitle ? styles.arrowDuelWhatIfTitleLineVeryCompact : null
+              ]}>
+                play
+              </Text>
             </View>
             <Text style={[
               styles.arrowDuelWhatIfTitleLine,
               compactTitle ? styles.arrowDuelWhatIfTitleLineCompact : null,
               veryCompactTitle ? styles.arrowDuelWhatIfTitleLineVeryCompact : null
             ]}>
-              play
+              after the other move?
             </Text>
           </View>
-          <Text style={[
-            styles.arrowDuelWhatIfTitleLine,
-            compactTitle ? styles.arrowDuelWhatIfTitleLineCompact : null,
-            veryCompactTitle ? styles.arrowDuelWhatIfTitleLineVeryCompact : null
-          ]}>
-            after the other move?
+        ) : (
+          <Text
+            style={styles.arrowDuelWhatIfTitle}
+            testID={`${testIDPrefix}-what-if-title`}
+          >
+            {title}
           </Text>
-        </View>
-      ) : (
+        )}
         <Text
-          style={styles.arrowDuelWhatIfTitle}
-          testID={`${testIDPrefix}-what-if-title`}
+          style={styles.arrowDuelWhatIfDetail}
+          testID={`${testIDPrefix}-what-if-detail`}
         >
-          {title}
+          {detail}
         </Text>
-      )}
-      <Text
-        style={styles.arrowDuelWhatIfDetail}
-        testID={`${testIDPrefix}-what-if-detail`}
-      >
-        {detail}
-      </Text>
+      </View>
       {actionLabel && onAction ? (
         <Pressable
           accessibilityLabel={actionLabel}
@@ -19071,6 +19058,10 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     zIndex: 60
+  },
+  arrowDuelWhatIfAnnouncement: {
+    alignItems: "center",
+    width: "100%"
   },
   arrowDuelWhatIfTitle: {
     color: "#FFFFFF",

@@ -427,6 +427,31 @@ test("PracticeService persists settings through the store boundary", () => {
   });
 });
 
+test("PracticeService owns persisted Arrow Duel reply-cue transitions", async () => {
+  const store = new MemoryStore();
+  store.seedPuzzles(await loadFixturePuzzles());
+  const service = new PracticeService(store);
+
+  service.acknowledgeArrowDuelReplyCue();
+  assert.equal(service.getSettings().sprintGuides.arrowDuelReplyCueStage, 1);
+
+  service.startSprint(
+    {
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 1,
+      maxMistakes: 3,
+      minRating: 1700,
+      maxRating: 1800,
+      opponentReply: { enabled: true, seconds: 10 }
+    },
+    "2026-06-20T12:00:00.000Z"
+  );
+
+  assert.equal(service.getSettings().sprintGuides.arrowDuelReplyCueStage, 2);
+});
+
 test("PracticeService persists reminder preferences through the MemoryStore boundary", () => {
   const service = new PracticeService(new MemoryStore());
 

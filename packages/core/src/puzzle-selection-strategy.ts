@@ -111,6 +111,14 @@ function isServerCompatiblePuzzle(
     return false;
   }
 
+  if (
+    evalAfterBlunder === 0 &&
+    isStalematingMove(puzzle.initialFen, normalizedBlunderMove)
+  ) {
+    const movingSide = new Chess(puzzle.initialFen).turn();
+    return movingSide === "w" ? bestEval > 200 : bestEval < -200;
+  }
+
   if (evalAfterBlunder > 0) {
     return bestEval <= 60 && evalAfterBlunder - bestEval > 200;
   }
@@ -118,6 +126,20 @@ function isServerCompatiblePuzzle(
     return bestEval >= -60 && bestEval - evalAfterBlunder > 200;
   }
   return false;
+}
+
+function isStalematingMove(fen: string, move: string): boolean {
+  try {
+    const chess = new Chess(fen);
+    const result = chess.move({
+      from: move.slice(0, 2),
+      to: move.slice(2, 4),
+      ...(move.length > 4 ? { promotion: move.slice(4, 5) } : {})
+    });
+    return result !== null && chess.isStalemate();
+  } catch {
+    return false;
+  }
 }
 
 export function hasArrowDuelPromotionCandidate(puzzle: Puzzle): boolean {

@@ -3,7 +3,8 @@ import {
   tacticalThemeFrequencyAtRating,
   tacticalThemeInventoryUpperBound,
   type Puzzle,
-  type PuzzlePackManifest
+  type PuzzlePackManifest,
+  type SprintMode
 } from "../../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
 import { PackBackedPracticeStore } from "../../../../packages/storage/src/pack-backed-practice-store.ts";
@@ -25,7 +26,7 @@ import { productionTacticalProfileCalibration } from "../backend/tacticalProfile
 const bundledCoreManifest = require("../../../../fixtures/puzzles/bundled-core-pack.manifest.json") as PuzzlePackManifest;
 const regressionPuzzles = require("../../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];
 const familiar15Manifest = require("../../../../fixtures/puzzles/familiar-15-e2e.manifest.json") as {
-  puzzles: Array<{ fixture?: Puzzle; id: string }>;
+  puzzles: Array<{ arrowDuelFixture?: Puzzle; fixture?: Puzzle; id: string }>;
   sourceFixture: string;
 };
 
@@ -39,7 +40,7 @@ const BUNDLED_CORE_PACK_OPTIONS = {
 
 let persistentPracticeService: PracticeService | undefined;
 let persistentProgressDatabasePath: string | undefined;
-const seededPuzzleSources = new WeakMap<PracticeService, Set<MobilePuzzleSource>>();
+const seededPuzzleSources = new WeakMap<PracticeService, Set<string>>();
 const packBackedServices = new WeakSet<PracticeService>();
 let persistentPracticeServicePromise: Promise<PracticeService> | undefined;
 
@@ -269,16 +270,21 @@ function bundledNaturalFrequency() {
   };
 }
 
-export function configureMobilePracticePuzzleSource(service: PracticeService, source: MobilePuzzleSource): void {
+export function configureMobilePracticePuzzleSource(
+  service: PracticeService,
+  source: MobilePuzzleSource,
+  mode: SprintMode = "standard"
+): void {
   if (source === "bundledCore" && packBackedServices.has(service)) {
     service.setPuzzleSelectionScopeIds(undefined);
     return;
   }
-  const puzzles = puzzlesForSource(source);
-  const seededSources = seededPuzzleSources.get(service) ?? new Set<MobilePuzzleSource>();
-  if (!seededSources.has(source)) {
+  const puzzles = puzzlesForSource(source, mode);
+  const seededSources = seededPuzzleSources.get(service) ?? new Set<string>();
+  const sourceKey = source === "familiar15" ? `${source}:${mode}` : source;
+  if (!seededSources.has(sourceKey)) {
     service.loadFixturePuzzles(puzzles);
-    seededSources.add(source);
+    seededSources.add(sourceKey);
     seededPuzzleSources.set(service, seededSources);
   }
   service.setPuzzleSelectionScopeIds(puzzles.map((puzzle) => puzzle.id));
@@ -303,12 +309,12 @@ export function shouldRandomizePuzzleSelection(source: MobilePuzzleSource): bool
   return source !== "familiar15";
 }
 
-function puzzlesForSource(source: MobilePuzzleSource): Puzzle[] {
+function puzzlesForSource(source: MobilePuzzleSource, mode: SprintMode = "standard"): Puzzle[] {
   if (source === "bundledCore") {
     return bundledCoreFixturePuzzles();
   }
   if (source === "familiar15") {
-    return familiarPuzzles();
+    return familiarPuzzles(mode);
   }
   return regressionPuzzles;
 }
@@ -317,10 +323,12 @@ function bundledCoreFixturePuzzles(): Puzzle[] {
   return require("../../../../fixtures/puzzles/bundled-core-pack.json") as Puzzle[];
 }
 
-function familiarPuzzles(): Puzzle[] {
+function familiarPuzzles(mode: SprintMode): Puzzle[] {
   const byId = new Map(regressionPuzzles.map((puzzle) => [puzzle.id, puzzle]));
   return familiar15Manifest.puzzles.map((entry) => {
-    const puzzle = entry.fixture ?? byId.get(entry.id);
+    const puzzle = mode === "arrow_duel"
+      ? entry.arrowDuelFixture ?? entry.fixture ?? byId.get(entry.id)
+      : entry.fixture ?? byId.get(entry.id);
     if (puzzle === undefined) {
       throw new Error(
         `Familiar 15 manifest puzzle ${entry.id} is missing from ${familiar15Manifest.sourceFixture}`

@@ -13,6 +13,17 @@
         "source": "synthetic",
         "stockfishBestMove": "c2a4"
       },
+      "arrowDuelFixture": {
+        "id": "test-arrow-duel-stalemate-alternate",
+        "initialFen": "7k/8/5KQ1/8/8/8/8/8 w - - 0 1",
+        "solutionMoves": ["g6f7"],
+        "rating": 800,
+        "themes": ["mateIn1", "stalemate", "regression"],
+        "source": "synthetic",
+        "stockfishBestMove": "g6g7",
+        "stockfishEval": 10000,
+        "stockfishEvalAfterFirstMove": 0
+      },
       "userMoveOverrides": ["c2b1"]
     },
     { "id": "000hf" },

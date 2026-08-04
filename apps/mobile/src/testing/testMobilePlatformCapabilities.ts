@@ -1,4 +1,5 @@
 import type { PracticeService } from '../../../../packages/storage/src/practice-service.ts';
+import type { SprintMode } from '../../../../packages/core/src/index.ts';
 import type { ICloudProgressSyncClient } from '../platform/iCloudProgressSync.ts';
 import type { ICloudSyncDiagnosticsClient } from '../platform/iCloudSyncDiagnostics.ts';
 import {
@@ -26,6 +27,7 @@ export interface TestMobilePlatformCapabilityOverrides {
   configurePuzzleSource?: (
     service: PracticeService,
     source: MobilePuzzleSource,
+    mode?: SprintMode,
   ) => void;
   stockfish?: Partial<MobileStockfishCapabilities>;
   reviewReminderScheduler?: ReviewReminderScheduler | null;
@@ -56,7 +58,11 @@ export function createTestMobilePlatformCapabilities(
     storage: {
       practiceService: service,
       ...(supportsPuzzleSourceConfiguration
-        ? { configurePuzzleSource: source => configurePuzzleSource(service, source) }
+        ? {
+            configurePuzzleSource: (source, mode) => mode === undefined
+              ? configurePuzzleSource(service, source)
+              : configurePuzzleSource(service, source, mode)
+          }
         : {}),
     },
     progressProtection: overrides.progressProtection ?? { kind: 'icloud_sync' },

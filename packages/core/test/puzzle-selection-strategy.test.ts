@@ -103,6 +103,20 @@ test("Arrow Duel eligibility mirrors server eval thresholds and requires same-si
   );
 });
 
+test("Arrow Duel eligibility includes an exact stalemate alternate when the best move wins", () => {
+  assert.equal(
+    isServerCompatibleArrowDuelPuzzle(arrowPuzzle({
+      id: "stalemate-alternate",
+      initialFen: "7k/8/5KQ1/8/8/8/8/8 w - - 0 1",
+      solutionMoves: ["g6f7"],
+      stockfishBestMove: "g6g7",
+      stockfishEval: 10000,
+      stockfishEvalAfterFirstMove: 0
+    })),
+    true
+  );
+});
+
 test("Arrow Duel eligibility excludes promotion candidates that its arrows cannot distinguish", () => {
   const bestMoveUnderpromotion = arrowPuzzle({
     id: "best-move-underpromotion",

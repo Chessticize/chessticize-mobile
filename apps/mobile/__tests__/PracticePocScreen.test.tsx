@@ -2861,6 +2861,14 @@ describe("PracticePocScreen", () => {
     const action = findByTestId(renderer, "arrow-duel-what-if-action");
     expect(action.props.accessibilityRole).toBe("button");
     expect(action.props.accessibilityLabel).toBe("Got it");
+    expect(findByTestId(renderer, "arrow-duel-what-if-overlay").props.accessible)
+      .not.toBe(true);
+    const announcement = findByTestId(renderer, "arrow-duel-what-if-announcement");
+    expect(announcement.props.accessible).toBe(true);
+    expect(announcement.props.accessibilityRole).toBe("alert");
+    expect(announcement.props.accessibilityLabel).toBe(
+      "What would White play after the other move? You’ll have 10 seconds to play the best reply."
+    );
     expect(flattenTestStyle(action.props.style).minHeight).toBeGreaterThanOrEqual(44);
     const visibleTitle = collectText(findByTestId(renderer, "arrow-duel-what-if-title"));
     expect(visibleTitle).toContain("What would");
@@ -2872,7 +2880,7 @@ describe("PracticePocScreen", () => {
       width: 32
     }));
     expect(findByTestId(renderer, "arrow-duel-what-if-side-king")).toBeTruthy();
-    expect(findByTestId(renderer, "arrow-duel-what-if-overlay").props.accessibilityLabel).toBe(
+    expect(findByTestId(renderer, "arrow-duel-what-if-announcement").props.accessibilityLabel).toBe(
       "What would White play after the other move? You’ll have 10 seconds to play the best reply."
     );
     expect(collectText(findByTestId(renderer, "arrow-duel-what-if-detail"))).toBe(
@@ -6718,6 +6726,25 @@ describe("PracticePocScreen", () => {
     });
   });
 
+  it("configures the fixed puzzle source for the mode being started", () => {
+    const service = createMobilePracticeService();
+    const configurePuzzleSource = jest.fn();
+    const renderer = renderScreen({
+      practiceServiceFactory: () => service,
+      configurePuzzleSource
+    });
+
+    press(renderer, "test-puzzle-source-familiar15");
+    configurePuzzleSource.mockClear();
+    startArrowDuelSprint(renderer);
+
+    expect(configurePuzzleSource).toHaveBeenCalledWith(
+      service,
+      "familiar15",
+      "arrow_duel"
+    );
+  });
+
   it("randomizes core pack sprint starts while keeping Familiar 15 deterministic", () => {
     const coreService = createMobilePracticeService();
     const coreStartSprintSpy = jest.spyOn(coreService, "startSprint");
@@ -7731,7 +7758,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "arrow-duel-what-if-action").props.accessibilityLabel)
       .toBe("Got it");
-    expect(findByTestId(renderer, "arrow-duel-what-if-overlay").props.accessibilityLabel)
+    expect(findByTestId(renderer, "arrow-duel-what-if-announcement").props.accessibilityLabel)
       .toBe("What would Black play after the other move? You’ll have 10 seconds to play the best reply.");
     expect(collectText(findByTestId(renderer, "arrow-duel-what-if-title")))
       .not.toContain("Black");
@@ -7925,7 +7952,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "arrow-duel-what-if-detail"))).toBe(
       "Find the opponent’s reply in 10 seconds."
     );
-    expect(whatIfOverlay.props.accessibilityLabel).toBe(
+    expect(findByTestId(renderer, "arrow-duel-what-if-announcement").props.accessibilityLabel).toBe(
       "What if you made the other move? Find the opponent’s reply in 10 seconds."
     );
     expect(flattenTestStyle(whatIfOverlay.props.style)).toEqual(expect.objectContaining({

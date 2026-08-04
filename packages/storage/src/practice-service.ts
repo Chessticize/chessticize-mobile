@@ -1,5 +1,7 @@
 import {
+  acknowledgeArrowDuelReplyCue,
   abandonSprint as abandonSprintCore,
+  advanceArrowDuelReplyCueSprint,
   advanceSprintTime as advanceSprintTimeCore,
   applySprintRatingChange,
   archivePracticeRun,
@@ -202,6 +204,13 @@ export class PracticeService {
           lastStartedAt: now,
           ...(previousConfig ? { previous: previousConfig } : {})
         }));
+      }
+      if (config.mode === "arrow_duel" && config.opponentReply?.enabled === true) {
+        const settings = this.store.getSettings();
+        this.store.saveSettings({
+          ...settings,
+          sprintGuides: advanceArrowDuelReplyCueSprint(settings.sprintGuides)
+        });
       }
       this.store.createSprintSession(sprint);
     });
@@ -717,6 +726,15 @@ export class PracticeService {
 
   saveSettings(settings: PracticeSettings): PracticeSettings {
     this.store.saveSettings(settings);
+    return this.store.getSettings();
+  }
+
+  acknowledgeArrowDuelReplyCue(): PracticeSettings {
+    const settings = this.store.getSettings();
+    this.store.saveSettings({
+      ...settings,
+      sprintGuides: acknowledgeArrowDuelReplyCue(settings.sprintGuides)
+    });
     return this.store.getSettings();
   }
 

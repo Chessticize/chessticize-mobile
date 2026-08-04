@@ -1,5 +1,5 @@
 // Mobile platform composition belongs outside the backend/domain seam.
-import type { UciEngineTransport } from '../../../../packages/core/src/index.ts';
+import type { SprintMode, UciEngineTransport } from '../../../../packages/core/src/index.ts';
 import type { PracticeService } from '../../../../packages/storage/src/practice-service.ts';
 import type { ICloudProgressSyncClient } from './iCloudProgressSync.ts';
 import type { ICloudSyncDiagnosticsClient } from './iCloudSyncDiagnostics.ts';
@@ -13,7 +13,7 @@ import type { AppStoreReviewRequestClient } from './appStoreReviewRequest.ts';
 
 export interface MobileStorageCapabilities {
   practiceService: PracticeService;
-  configurePuzzleSource?: (source: MobilePuzzleSource) => void;
+  configurePuzzleSource?: (source: MobilePuzzleSource, mode?: SprintMode) => void;
 }
 
 export interface MobileProgressSyncCapabilities {
