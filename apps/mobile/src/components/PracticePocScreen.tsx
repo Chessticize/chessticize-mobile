@@ -518,6 +518,15 @@ const ARROW_VISUAL_STYLES = {
   }
 } as const;
 const FEEDBACK_SNAPSHOT_MS = 800;
+
+function shouldShowTimeoutSnapshot(
+  nextState: SprintState,
+  submittedPuzzleId: string | null
+): boolean {
+  return nextState.status !== "active" ||
+    nextState.currentPuzzle?.puzzle.id !== submittedPuzzleId;
+}
+
 // Brief pause so the correct-move feedback registers before the opponent
 // reply animates. Kept short — the reply window delays the user's next move.
 const USER_FEEDBACK_BEFORE_AUTO_MS = 120;
@@ -1219,12 +1228,13 @@ export function PracticePocScreen({
                 advanced.state.status
               )
         );
+        // A terminal timeout has no next active puzzle, but it still owns the
+        // same stable feedback snapshot before Sprint Result replaces the board.
         if (
           advanced.attempt?.timingStatus === "timed_out" &&
           submittedPuzzle &&
           submittedFen &&
-          advanced.state.status === "active" &&
-          advanced.state.currentPuzzle?.puzzle.id !== submittedPuzzleId
+          shouldShowTimeoutSnapshot(advanced.state, submittedPuzzleId)
         ) {
           showTimeoutSnapshot(
             advanced.state,
@@ -2482,8 +2492,7 @@ export function PracticePocScreen({
         next.attempt?.result === "timed_out" &&
         submittedPuzzle &&
         submittedFen &&
-        next.state.status === "active" &&
-        next.state.currentPuzzle?.puzzle.id !== submittedPuzzleId
+        shouldShowTimeoutSnapshot(next.state, submittedPuzzleId)
       ) {
         puzzleTimeoutInFlightRef.current = submittedPuzzleId;
         resetBoardToFen(
@@ -2502,6 +2511,9 @@ export function PracticePocScreen({
           submittedFen,
           Math.floor((next.attempt.elapsedMs ?? 0) / 1000)
         );
+        if (next.state.status !== "active") {
+          refreshState();
+        }
         return;
       }
       if (shouldAnimateSamePuzzleReply(next.state, nextFeedback, submittedPuzzleId)) {
