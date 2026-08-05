@@ -888,9 +888,17 @@ describe('Detox suite configuration', () => {
         permissionGranted = true;
       }
     });
+    const waitForFreshInstallReady = jest.fn(async () => {
+      expect(permissionGranted).toBe(true);
+    });
 
-    await launchWithFreshAndroidRuntimePermission(resetPermission, launch);
+    await launchWithFreshAndroidRuntimePermission(
+      resetPermission,
+      launch,
+      waitForFreshInstallReady
+    );
 
+    expect(waitForFreshInstallReady).toHaveBeenCalledTimes(1);
     expect(permissionGranted).toBe(false);
   });
 
@@ -2274,17 +2282,22 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain("PracticeService");
     expect(spec).not.toContain("run-as");
 
-    expect(spec).toContain(
-      'launchWithFreshAndroidRuntimePermission(resetNotificationPermission)'
-    );
+    expect(spec).toContain('launchWithFreshAndroidRuntimePermission(');
+    expect(spec).toContain('waitForFreshInstallPracticeHome');
+    expect(spec).toContain("by.id('practice-home')");
     const permissionLaunchIndex = helpers.indexOf(
       'async function launchWithFreshAndroidRuntimePermission('
     );
     const deleteLaunchIndex = helpers.indexOf('delete: true', permissionLaunchIndex);
+    const readyIndex = helpers.indexOf(
+      'await waitForFreshInstallReady();',
+      permissionLaunchIndex
+    );
     const resetIndex = helpers.indexOf('resetPermission();', permissionLaunchIndex);
     const noDeleteLaunchIndex = helpers.indexOf('delete: false', resetIndex);
     expect(deleteLaunchIndex).toBeGreaterThan(permissionLaunchIndex);
-    expect(resetIndex).toBeGreaterThan(deleteLaunchIndex);
+    expect(readyIndex).toBeGreaterThan(deleteLaunchIndex);
+    expect(resetIndex).toBeGreaterThan(readyIndex);
     expect(noDeleteLaunchIndex).toBeGreaterThan(resetIndex);
     expect(spec).toContain("['pm', 'revoke', APP_ID, PERMISSION]");
     expect(spec).toContain("'clear-permission-flags', APP_ID, PERMISSION, 'user-set'");

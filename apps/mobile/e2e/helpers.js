@@ -632,12 +632,14 @@ async function launchWithDisabledSynchronization(
 
 async function launchWithFreshAndroidRuntimePermission(
   resetPermission,
-  launch = launchWithDisabledSynchronization
+  launch = launchWithDisabledSynchronization,
+  waitForFreshInstallReady = async () => {}
 ) {
   await launch({
     newInstance: true,
     delete: true,
   });
+  await waitForFreshInstallReady();
   resetPermission();
   await launch({
     newInstance: true,
