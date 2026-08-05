@@ -1590,7 +1590,13 @@ describe('Detox suite configuration', () => {
     const historyCase = flowsSpec.slice(historyCaseStart, historyCaseEnd);
 
     expect(flowsSpec).toContain("device.getPlatform() === 'android'");
+    expect(reminderCase).toContain(
+      "waitForVisibleInPracticeScroll('test-puzzle-source-familiar15');"
+    );
     expect(reminderCase).toContain('grantAndroidNotificationPermission();');
+    expect(reminderCase.indexOf(
+      "waitForVisibleInPracticeScroll('test-puzzle-source-familiar15');"
+    )).toBeLessThan(reminderCase.indexOf('grantAndroidNotificationPermission();'));
     expect(reminderCase.indexOf('grantAndroidNotificationPermission();')).toBeLessThan(
       reminderCase.indexOf('launchAppAt(sprintNowMs')
     );

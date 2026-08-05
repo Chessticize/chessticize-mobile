@@ -216,6 +216,9 @@ describe('Key user flows', () => {
     const sprintNowMs = Date.now() - (2 * dayMs);
     if (device.getPlatform() === 'android') {
       // This suite can follow native permission journeys on the same emulator.
+      // Let the clean launch finish copying its bundled puzzle database before
+      // the fixture relaunch can terminate that first-start initialization.
+      await waitForVisibleInPracticeScroll('test-puzzle-source-familiar15');
       // Establish its authorized OS fixture explicitly before the app relaunch.
       grantAndroidNotificationPermission();
     }
