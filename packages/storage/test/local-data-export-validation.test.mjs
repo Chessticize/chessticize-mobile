@@ -14,6 +14,7 @@ test("accepts the complete current progress sync contract", () => {
 test("accepts documented optional legacy fields", () => {
   const snapshot = canonicalSnapshot();
   delete snapshot.data.settings.sprintGuides.focusedRunSeen;
+  delete snapshot.data.settings.sprintGuides.arrowDuelReplyCueStage;
   delete snapshot.data.reviewRemovals;
   delete snapshot.data.sprintSessions[0].config.puzzleTiming;
   delete snapshot.data.sprintSessions[0].ratingGamesBefore;
@@ -65,6 +66,7 @@ test("rejects malformed nested progress records", () => {
   const cases = [
     ["snapshot device", (value) => { value.deviceId = ""; }],
     ["settings", (value) => { value.data.settings.sync.iCloudEnabled = "yes"; }],
+    ["reply cue stage", (value) => { value.data.settings.sprintGuides.arrowDuelReplyCueStage = 4; }],
     ["rating", (value) => { value.data.ratings[0].games = "one"; }],
     ["attempt", (value) => { value.data.attempts[0].source = "unknown"; }],
     ["review", (value) => { value.data.reviewQueue[0].lastResult = "timed_out"; }],
@@ -115,7 +117,8 @@ function canonicalSnapshot() {
           rulesSeen: true,
           activeSessionSeen: true,
           arrowDuelSeen: true,
-          focusedRunSeen: true
+          focusedRunSeen: true,
+          arrowDuelReplyCueStage: 3
         }
       },
       ratings: [{

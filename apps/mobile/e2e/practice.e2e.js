@@ -208,12 +208,12 @@ describe('Practice POC', () => {
     await selectTestPuzzleSource('familiar15');
     await startPracticeMode('arrow-duel');
     await waitForVisibleInPracticeScroll('session-board');
-    // 00Kbj is the first Arrow-Duel-eligible familiar15 puzzle. Assert the
-    // fixture contract before playing its known wrong candidate.
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h1h2', 10000);
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h3h4', 10000);
+    // The fixed Arrow Duel set starts with the synthetic Qg7 mate versus Qf7
+    // stalemate regression. Assert the fixture before choosing the worse move.
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'g6g7', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'g6f7', 10000);
 
-    await playBoardMove('session-board', 'h3h4');
+    await playBoardMove('session-board', 'g6f7');
 
     await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
     await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);

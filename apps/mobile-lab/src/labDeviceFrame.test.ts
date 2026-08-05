@@ -30,6 +30,27 @@ test("the safe-area provider receives the matching frame for each maintained pho
   });
 });
 
+test("the maintained iPad viewports cover portrait and landscape Release geometry", () => {
+  assert.deepEqual(LAB_DEVICE_VIEWPORTS.tabletPortrait, {
+    width: 820,
+    height: 1180,
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
+  });
+  assert.deepEqual(LAB_DEVICE_VIEWPORTS.regularWidth, {
+    width: 1180,
+    height: 820,
+    insets: { top: 0, right: 0, bottom: 20, left: 0 }
+  });
+  assert.deepEqual(labSafeAreaMetricsForViewport(820, 1180), {
+    frame: { x: 0, y: 0, width: 820, height: 1180 },
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
+  });
+  assert.deepEqual(labSafeAreaMetricsForViewport(1180, 820), {
+    frame: { x: 0, y: 0, width: 1180, height: 820 },
+    insets: { top: 0, right: 0, bottom: 20, left: 0 }
+  });
+});
+
 test("the calibrated landscape frame produces the Release board and control-rail geometry", () => {
   const viewport = LAB_DEVICE_VIEWPORTS.phoneLandscape;
   const layout = buildPracticeAdaptiveLayout({
@@ -45,9 +66,9 @@ test("the calibrated landscape frame produces the Release board and control-rail
   assert.equal(layout.sessionRailGap, 90);
 });
 
-test("non-device desktop viewports do not invent phone Safe Area insets", () => {
-  assert.deepEqual(labSafeAreaMetricsForViewport(1180, 820), {
-    frame: { x: 0, y: 0, width: 1180, height: 820 },
+test("non-device desktop viewports do not invent device Safe Area insets", () => {
+  assert.deepEqual(labSafeAreaMetricsForViewport(1024, 768), {
+    frame: { x: 0, y: 0, width: 1024, height: 768 },
     insets: { top: 0, right: 0, bottom: 0, left: 0 }
   });
 });

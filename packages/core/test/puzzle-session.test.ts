@@ -153,6 +153,28 @@ test("Arrow Duel enters the reply handoff after the correct choice", () => {
   );
 });
 
+test("Arrow Duel completes immediately when the unchosen move is stalemate", () => {
+  const puzzle: Puzzle = {
+    id: "stalemate-alternate",
+    initialFen: "7k/8/5KQ1/8/8/8/8/8 w - - 0 1",
+    solutionMoves: ["g6f7"],
+    rating: 600,
+    themes: ["mateIn1", "stalemate"],
+    source: "synthetic",
+    stockfishBestMove: "g6g7"
+  };
+  const state = beginArrowDuelPuzzle(puzzle);
+  const result = submitArrowDuelChoice(state, state.correctMove, {
+    opponentReply: true
+  });
+
+  assert.equal(result.state.phase, "choice");
+  assert.equal(result.state.solved, true);
+  assert.equal(result.feedback.result, "correct");
+  assert.equal(result.feedback.puzzleSolved, true);
+  assert.deepEqual(result.feedback.autoPlayedMoves, []);
+});
+
 test("Arrow Duel accepts the stored reply and rejects another legal move", () => {
   const state = beginArrowDuelPuzzle(samplePuzzle("reply"));
   const handoff = submitArrowDuelChoice(state, state.correctMove, {

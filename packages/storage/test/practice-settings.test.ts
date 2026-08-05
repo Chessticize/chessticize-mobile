@@ -18,7 +18,8 @@ test("Sprint guide progress defaults unseen and legacy settings normalize safely
     rulesSeen: false,
     activeSessionSeen: false,
     arrowDuelSeen: false,
-    focusedRunSeen: false
+    focusedRunSeen: false,
+    arrowDuelReplyCueStage: 0
   });
 
   const legacySettings = {
@@ -34,7 +35,8 @@ test("Sprint guide progress defaults unseen and legacy settings normalize safely
     rulesSeen: false,
     activeSessionSeen: false,
     arrowDuelSeen: false,
-    focusedRunSeen: false
+    focusedRunSeen: false,
+    arrowDuelReplyCueStage: 0
   });
 });
 
@@ -49,7 +51,8 @@ test("Sprint guide progress is cloned independently", () => {
     rulesSeen: true,
     activeSessionSeen: false,
     arrowDuelSeen: false,
-    focusedRunSeen: false
+    focusedRunSeen: false,
+    arrowDuelReplyCueStage: 0
   });
 });
 

@@ -44,8 +44,8 @@ export function composeIOSMobilePlatformCapabilities(
   return {
     storage: {
       practiceService: service,
-      configurePuzzleSource: source =>
-        configureMobilePracticePuzzleSource(service, source),
+      configurePuzzleSource: (source, mode) =>
+        configureMobilePracticePuzzleSource(service, source, mode),
     },
     progressProtection: {
       kind: 'icloud_sync',

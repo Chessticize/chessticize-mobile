@@ -66,7 +66,12 @@ function isPracticeSettings(value: unknown): value is PracticeSettings {
   return typeof sprintGuides.rulesSeen === "boolean" &&
     typeof sprintGuides.activeSessionSeen === "boolean" &&
     typeof sprintGuides.arrowDuelSeen === "boolean" &&
-    isOptional(sprintGuides.focusedRunSeen, isBoolean);
+    isOptional(sprintGuides.focusedRunSeen, isBoolean) &&
+    isOptional(sprintGuides.arrowDuelReplyCueStage, isArrowDuelReplyCueStage);
+}
+
+function isArrowDuelReplyCueStage(value: unknown): boolean {
+  return value === 0 || value === 1 || value === 2 || value === 3;
 }
 
 function isReviewReminder(value: unknown): boolean {

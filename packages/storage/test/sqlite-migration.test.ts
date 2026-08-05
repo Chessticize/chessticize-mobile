@@ -336,7 +336,8 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
           rulesSeen: false,
           activeSessionSeen: false,
           arrowDuelSeen: false,
-          focusedRunSeen: false
+          focusedRunSeen: false,
+          arrowDuelReplyCueStage: 0
         }
       });
       assert.deepEqual(
@@ -435,7 +436,8 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
           rulesSeen: true,
           activeSessionSeen: false,
           arrowDuelSeen: false,
-          focusedRunSeen: false
+          focusedRunSeen: false,
+          arrowDuelReplyCueStage: 0
         }
       });
       service.recordReviewAttempt(
@@ -584,7 +586,8 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
           rulesSeen: false,
           activeSessionSeen: false,
           arrowDuelSeen: false,
-          focusedRunSeen: false
+          focusedRunSeen: false,
+          arrowDuelReplyCueStage: 0
         }
       });
       assert.deepEqual(service.getRating("standard 5/20"), {
@@ -792,7 +795,8 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
           rulesSeen: true,
           activeSessionSeen: true,
           arrowDuelSeen: false,
-          focusedRunSeen: true
+          focusedRunSeen: true,
+          arrowDuelReplyCueStage: 2
         }
       });
       assert.equal(service.listHistory().length, 6);
@@ -815,7 +819,8 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
       rulesSeen: true,
       activeSessionSeen: true,
       arrowDuelSeen: false,
-      focusedRunSeen: true
+      focusedRunSeen: true,
+      arrowDuelReplyCueStage: 2
     });
     reopened.close();
     assert.deepEqual(databaseSnapshot(databasePath), afterWrite);
@@ -1156,6 +1161,51 @@ test("SQLite v18 preserves an existing v17 opponent reply duration", async () =>
       assert.deepEqual(migrated.db.prepare("PRAGMA foreign_key_check").all(), []);
     } finally {
       migrated.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("SQLite v19 defaults legacy reply-cue familiarity and persists later progress", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-v19-reply-cue-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setup = new SQLiteStore(databasePath);
+    setup.migrate();
+    setup.db.exec(`
+      ALTER TABLE app_settings DROP COLUMN sprint_arrow_duel_reply_cue_stage;
+      PRAGMA user_version = 18;
+    `);
+    setup.close();
+
+    const migrated = new SQLiteStore(databasePath);
+    migrated.migrate();
+    try {
+      assert.equal(migrated.getSettings().sprintGuides.arrowDuelReplyCueStage, 0);
+      migrated.saveSettings({
+        ...migrated.getSettings(),
+        sprintGuides: {
+          ...migrated.getSettings().sprintGuides,
+          arrowDuelReplyCueStage: 2
+        }
+      });
+      assert.throws(() => {
+        migrated.db.prepare(
+          "UPDATE app_settings SET sprint_arrow_duel_reply_cue_stage = 4 WHERE id = 'default'"
+        ).run();
+      }, /constraint/i);
+      assert.equal(schemaVersionForStore(migrated), CURRENT_SCHEMA_VERSION);
+    } finally {
+      migrated.close();
+    }
+
+    const reopened = new SQLiteStore(databasePath);
+    reopened.migrate();
+    try {
+      assert.equal(reopened.getSettings().sprintGuides.arrowDuelReplyCueStage, 2);
+    } finally {
+      reopened.close();
     }
   } finally {
     await rm(directory, { recursive: true, force: true });

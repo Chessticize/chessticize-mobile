@@ -40,7 +40,9 @@ function resolveMove(
       );
     }
     if (normalizeUci(move) !== normalizeUci(puzzle.correctMove)) {
-      const submittedMoveFen = resultFen ?? puzzle.currentFen;
+      const submittedMoveFen = resultFen
+        ?? fenAfterMove(puzzle.currentFen, move)
+        ?? puzzle.currentFen;
       return {
         boardAction: "commit",
         boardFen: submittedMoveFen,
@@ -68,6 +70,28 @@ function resolveMove(
         puzzle.currentFen,
         "arrow-duel-reply-preview-invalid-line"
       );
+    }
+    if (hasNoLegalReply(replyFen)) {
+      const submittedMoveFen = resultFen ?? puzzle.currentFen;
+      return {
+        boardAction: "commit",
+        boardFen: submittedMoveFen,
+        completion: completePreview(
+          service,
+          nowIso,
+          puzzle.correctMove,
+          {
+            expectedMove: puzzle.correctMove,
+            result: "correct",
+            submittedFen: puzzle.currentFen,
+            submittedMove: move,
+            submittedMoveFen
+          }
+        ),
+        feedbackMoves: [{ actor: "user", move, preMoveFen: puzzle.currentFen }],
+        lastMove: move,
+        phase: "choice"
+      };
     }
     return {
       boardAction: "reset",
@@ -169,6 +193,14 @@ function isImmediateCheckmate(fen: string | null): boolean {
   }
   try {
     return new Chess(fen).isCheckmate();
+  } catch {
+    return false;
+  }
+}
+
+function hasNoLegalReply(fen: string): boolean {
+  try {
+    return new Chess(fen).moves().length === 0;
   } catch {
     return false;
   }

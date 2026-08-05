@@ -7,6 +7,7 @@ const {
   familiar15UserMoves,
 } = require('../e2e/familiar15Fixture');
 const {
+  configureMobilePracticePuzzleSource,
   createMobilePracticeService,
 } = require('../src/platform/mobilePractice');
 
@@ -42,6 +43,28 @@ describe('Familiar 15 shared E2E fixture', () => {
       const arrowDuelPosition = familiar15ArrowDuelStartingPosition(puzzle);
       expect(arrowDuelPosition.turn()).toBe(puzzle.initialFen.split(' ')[1]);
     }
+  });
+
+  it('runs the Qf7 stalemate alternate as the first fixed Arrow Duel puzzle', () => {
+    const service = createMobilePracticeService('familiar15');
+    configureMobilePracticePuzzleSource(service, 'familiar15', 'arrow_duel');
+
+    const sprint = service.startSprint({
+      durationSeconds: 300,
+      maxMistakes: 3,
+      mode: 'arrow_duel',
+      opponentReply: {enabled: true, seconds: 10},
+      perPuzzleSeconds: 30,
+      targetCorrect: 1,
+    }, '2026-07-19T00:00:00.000Z');
+
+    expect(sprint.currentPuzzle.puzzle.id).toBe('test-arrow-duel-stalemate-alternate');
+    expect(sprint.currentPuzzle.candidates.sort()).toEqual(['g6f7', 'g6g7']);
+
+    const solved = service.submitMove('g6g7', '2026-07-19T00:00:01.000Z');
+    expect(solved.feedback.puzzleSolved).toBe(true);
+    expect(solved.feedback.autoPlayedMoves).toEqual([]);
+    expect(solved.state.status).toBe('won');
   });
 
   it('documents the one accepted alternate mate and derives the promotion-free prefix', () => {

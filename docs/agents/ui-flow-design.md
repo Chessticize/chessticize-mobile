@@ -98,6 +98,12 @@ consolidate that prototype into the existing product-clone scenario and move
 the same issue ownership to it only as an unambiguous one-to-one correction.
 This is a marker correction, not marker cleanup; the issue must remain
 represented by a `new` marker until it closes.
+If the destination scenario already owns the same issue, keep its single
+visible ownership and declare the retired ownership count with
+`absorbedIssueMarkers` on that destination marker. CI consumes only the
+declared count; any additional removal still requires its linked issue to be
+closed. This metadata consolidates review ownership and does not create a
+second Storybook scenario.
 
 Do not infer approval from a passing test, an open PR, or the absence of
 comments. Approval must be an affirmative user or designer decision recorded in

@@ -67,18 +67,6 @@ const HISTORY_INCOMPLETE_LAB_PUZZLE: Puzzle = {
   themes: ["promotion"]
 };
 
-const ARROW_DUEL_MULTI_MATE_LAB_PUZZLE: Puzzle = {
-  id: "lab-arrow-duel-multiple-mates",
-  initialFen: "6k1/pp2p2p/6p1/P2p4/4b3/2P3q1/1P1KBr2/R1Q1R3 w - -",
-  rating: 1963,
-  solutionMoves: ["c1d1", "g3f4"],
-  source: "synthetic",
-  stockfishBestMove: "d2d1",
-  stockfishEval: 0,
-  stockfishEvalAfterFirstMove: -10000,
-  themes: ["mateIn1"]
-};
-
 const ARROW_DUEL_REPLAY_LAB_PUZZLE: Puzzle = {
   id: "lab-arrow-duel-replay-line",
   initialFen: "4k3/8/8/8/8/8/4P3/4K3 b - - 0 1",
@@ -96,11 +84,6 @@ export const ARROW_DUEL_REPLY_LAB_MOVES = {
     correctChoice: PRIMARY_LAB_PUZZLE.stockfishBestMove!,
     expectedReply: PRIMARY_LAB_PUZZLE.solutionMoves[1]!,
     wrongChoice: PRIMARY_LAB_PUZZLE.solutionMoves[0]!
-  },
-  multipleMate: {
-    alternateReply: "g3g5",
-    correctChoice: ARROW_DUEL_MULTI_MATE_LAB_PUZZLE.stockfishBestMove!,
-    expectedReply: ARROW_DUEL_MULTI_MATE_LAB_PUZZLE.solutionMoves[1]!
   }
 } as const;
 
@@ -119,6 +102,7 @@ export type LabStoryPresentation = {
 
 export function LabScenario({
   arrowDuelReplyAutoTimeoutMs,
+  arrowDuelReplyPreparationConfirmationRequired,
   arrowDuelReplyPreparationHoldMs,
   arrowDuelReplySeconds,
   runReorderPickedUpRunId,
@@ -126,6 +110,7 @@ export function LabScenario({
   storyPresentation
 }: {
   arrowDuelReplyAutoTimeoutMs?: number;
+  arrowDuelReplyPreparationConfirmationRequired?: boolean;
   arrowDuelReplyPreparationHoldMs?: number;
   arrowDuelReplySeconds?: number;
   runReorderPickedUpRunId?: string;
@@ -138,6 +123,9 @@ export function LabScenario({
     <LabScenarioContent
       key={scenarioId}
       arrowDuelReplyAutoTimeoutMs={arrowDuelReplyAutoTimeoutMs}
+      arrowDuelReplyPreparationConfirmationRequired={
+        arrowDuelReplyPreparationConfirmationRequired
+      }
       arrowDuelReplyPreparationHoldMs={arrowDuelReplyPreparationHoldMs}
       arrowDuelReplySeconds={arrowDuelReplySeconds}
       runReorderPickedUpRunId={runReorderPickedUpRunId}
@@ -150,6 +138,7 @@ export function LabScenario({
 
 function LabScenarioContent({
   arrowDuelReplyAutoTimeoutMs,
+  arrowDuelReplyPreparationConfirmationRequired,
   arrowDuelReplyPreparationHoldMs,
   arrowDuelReplySeconds,
   runReorderPickedUpRunId,
@@ -158,6 +147,7 @@ function LabScenarioContent({
   storyPresentation
 }: {
   arrowDuelReplyAutoTimeoutMs?: number;
+  arrowDuelReplyPreparationConfirmationRequired?: boolean;
   arrowDuelReplyPreparationHoldMs?: number;
   arrowDuelReplySeconds?: number;
   runReorderPickedUpRunId?: string;
@@ -256,6 +246,7 @@ function LabScenarioContent({
       }
     : screenProps;
   const effectiveScreenProps = arrowDuelReplyAutoTimeoutMs === undefined
+    && arrowDuelReplyPreparationConfirmationRequired === undefined
     && arrowDuelReplyPreparationHoldMs === undefined
     && arrowDuelReplySeconds === undefined
     ? screenPropsWithReplyFixture
@@ -270,6 +261,12 @@ function LabScenarioContent({
             ...(arrowDuelReplyAutoTimeoutMs === undefined
               ? {}
               : { autoTimeoutMs: arrowDuelReplyAutoTimeoutMs }),
+            ...(arrowDuelReplyPreparationConfirmationRequired === undefined
+              ? {}
+              : {
+                  preparationConfirmationRequired:
+                    arrowDuelReplyPreparationConfirmationRequired
+                }),
             ...(arrowDuelReplyPreparationHoldMs === undefined
               ? {}
               : { preparationHoldMs: arrowDuelReplyPreparationHoldMs }),
@@ -382,6 +379,7 @@ function sprintRulesDesignPreviewFor(
     const arrowDuelGuide = {
       ...sharedGuide,
       arrowDuelReplyChallenge: true,
+      arrowDuelReplyOnboarding: "choice_then_reply" as const,
       guideKey: "arrow_duel" as const,
       mode: "arrow_duel" as const
     };
@@ -408,10 +406,13 @@ function sprintRulesDesignPreviewFor(
   }
   if (
     scenarioId === "practice-arrow-duel-prompt"
-    || scenarioId === "practice-arrow-duel-mate-in-one"
+    || scenarioId === "review-arrow-duel-reply"
   ) {
     return {
-      arrowDuelReplyChallenge: { enabled: true },
+      arrowDuelReplyChallenge: {
+        enabled: true,
+        explicitReplySideCopy: true
+      },
       timeoutCountsAsMistake: true
     };
   }
@@ -831,10 +832,6 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
   }
 
   switch (scenarioId) {
-    case "practice-arrow-duel-mate-in-one":
-      service = createArrowDuelMultipleMateService();
-      configurePuzzleSource = false;
-      break;
     case "practice-sprint-result-goal":
     case "practice-sprint-result-replay":
       service = createSprintResultReplayService();
@@ -1088,12 +1085,6 @@ function createRunManagementService(empty: boolean, dueReviewCount = 0): Practic
   const service = new PracticeService(store);
   seedRunManagementCatalog(service, empty);
   return service;
-}
-
-function createArrowDuelMultipleMateService(): PracticeService {
-  const store = new MemoryStore();
-  store.seedPuzzles([ARROW_DUEL_MULTI_MATE_LAB_PUZZLE]);
-  return new PracticeService(store);
 }
 
 function seedRunManagementCatalog(service: PracticeService, empty: boolean): void {

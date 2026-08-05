@@ -107,13 +107,14 @@ describe('Key user flows', () => {
     await expect(element(by.id('arrow-duel-candidate-a'))).not.toExist();
     await expect(element(by.id('arrow-duel-candidate-b'))).not.toExist();
     await waitFor(element(by.id('session-progress'))).toHaveText('0 / 10').withTimeout(10000);
-    // 00Kbj is the first Arrow-Duel-eligible familiar15 puzzle. Assert the
-    // fixture contract before playing its Stockfish-best candidate.
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h1h2', 10000);
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'h3h4', 10000);
+    // Fixed Arrow Duel begins with Qg7 mate versus the Qf7 stalemate alternate.
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'g6g7', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'g6f7', 10000);
 
-    await playBoardMove('session-board', 'h1h2');
+    await playBoardMove('session-board', 'g6g7');
     await waitFor(element(by.id('session-progress'))).toHaveText('1 / 10').withTimeout(10000);
+    await expect(element(by.id('arrow-duel-what-if-overlay'))).not.toExist();
+    await expect(element(by.id('arrow-duel-reply-timer'))).not.toExist();
   });
 
   it('schedules failed sprint mistakes into the review queue', async () => {

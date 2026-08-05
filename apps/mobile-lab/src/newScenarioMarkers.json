@@ -3,7 +3,7 @@
     "issues": [
       {
         "issueNumber": 489,
-        "changeNote": "Explain the new choice-and-reply rule after the shared Sprint guide."
+        "changeNote": "Add a dedicated Find the reply guide step and explicit side-to-move copy without exposing familiarity-timing internals."
       }
     ]
   },
@@ -11,15 +11,7 @@
     "issues": [
       {
         "issueNumber": 489,
-        "changeNote": "Explain the choice, configurable reply time, and Review consequences."
-      }
-    ]
-  },
-  "practice-arrow-duel-mate-in-one": {
-    "issues": [
-      {
-        "issueNumber": 489,
-        "changeNote": "Verify that a legal alternate mate in one is accepted as the reply."
+        "changeNote": "Show both Arrow Duel onboarding steps for users who already know the shared Sprint guide."
       }
     ]
   },
@@ -27,7 +19,13 @@
     "issues": [
       {
         "issueNumber": 489,
-        "changeNote": "Try the Arrow Duel choice-and-reply challenge and its Standard-style automatic outcome handoff."
+        "changeNote": "Preview explicit White or Black reply copy before and after the preparation handoff."
+      }
+    ],
+    "absorbedIssueMarkers": [
+      {
+        "issueNumber": 489,
+        "count": 1
       }
     ]
   },

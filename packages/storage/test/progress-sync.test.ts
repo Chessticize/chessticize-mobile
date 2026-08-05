@@ -149,22 +149,28 @@ test("derived Tactical Profile cache cannot enter local export or iCloud sync pa
   }
 });
 
-test("Focused Run guide progress stays device-local across progress sync merges", async () => {
+test("Sprint guide and reply-cue progress stay device-local across progress sync merges", async () => {
   const localService = new PracticeService(await seededMemoryStore());
   localService.saveSettings({
     ...localService.getSettings(),
     sprintGuides: {
       ...localService.getSettings().sprintGuides,
-      focusedRunSeen: true
+      focusedRunSeen: true,
+      arrowDuelReplyCueStage: 2
     }
   });
   const local = localService.exportLocalData();
   const remote: LocalDataImport = structuredClone(local);
   remote.settings.sprintGuides.focusedRunSeen = false;
+  remote.settings.sprintGuides.arrowDuelReplyCueStage = 0;
 
   assert.equal(
     mergeLocalDataExports(local, remote).settings.sprintGuides.focusedRunSeen,
     true
+  );
+  assert.equal(
+    mergeLocalDataExports(local, remote).settings.sprintGuides.arrowDuelReplyCueStage,
+    2
   );
 });
 

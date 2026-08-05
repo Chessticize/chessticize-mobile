@@ -216,7 +216,8 @@ test("SQLite migration preserves legacy settings while adding current safety and
         rulesSeen: false,
         activeSessionSeen: false,
         arrowDuelSeen: false,
-        focusedRunSeen: false
+        focusedRunSeen: false,
+        arrowDuelReplyCueStage: 0
       }
     });
 
@@ -228,7 +229,8 @@ test("SQLite migration preserves legacy settings while adding current safety and
         rulesSeen: true,
         activeSessionSeen: true,
         arrowDuelSeen: false,
-        focusedRunSeen: true
+        focusedRunSeen: true,
+        arrowDuelReplyCueStage: 2
       }
     });
     store.migrate();
@@ -248,6 +250,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
       sprint_active_session_guide_seen: number;
       sprint_arrow_duel_guide_seen: number;
       sprint_focused_run_guide_seen: number;
+      sprint_arrow_duel_reply_cue_stage: number;
     };
     const integrity = migratedDb.prepare("PRAGMA integrity_check").get() as { integrity_check: string };
     migratedDb.close();
@@ -256,6 +259,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
     assert.ok(columns.some((column) => column.name === "move_feedback_sound_enabled"));
     assert.ok(columns.some((column) => column.name === "move_feedback_haptics_enabled"));
     assert.ok(columns.some((column) => column.name === "sprint_focused_run_guide_seen"));
+    assert.ok(columns.some((column) => column.name === "sprint_arrow_duel_reply_cue_stage"));
     assert.deepEqual({ ...settings }, {
       id: "default",
       sync_icloud_enabled: 1,
@@ -267,7 +271,8 @@ test("SQLite migration preserves legacy settings while adding current safety and
       sprint_rules_guide_seen: 1,
       sprint_active_session_guide_seen: 1,
       sprint_arrow_duel_guide_seen: 0,
-      sprint_focused_run_guide_seen: 1
+      sprint_focused_run_guide_seen: 1,
+      sprint_arrow_duel_reply_cue_stage: 2
     });
     assert.equal(integrity.integrity_check, "ok");
   } finally {
@@ -877,7 +882,8 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
             rulesSeen: false,
             activeSessionSeen: false,
             arrowDuelSeen: false,
-            focusedRunSeen: false
+            focusedRunSeen: false,
+            arrowDuelReplyCueStage: 0
           }
         });
 
@@ -899,7 +905,8 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
             rulesSeen: true,
             activeSessionSeen: true,
             arrowDuelSeen: false,
-            focusedRunSeen: true
+            focusedRunSeen: true,
+            arrowDuelReplyCueStage: 2
           }
         });
 
@@ -936,7 +943,8 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
             rulesSeen: true,
             activeSessionSeen: true,
             arrowDuelSeen: false,
-            focusedRunSeen: true
+            focusedRunSeen: true,
+            arrowDuelReplyCueStage: 2
           }
         });
         assert.deepEqual(service.getReviewReminderPreference(), { mode: "fixed", fixedLocalTime: "08:15" });
