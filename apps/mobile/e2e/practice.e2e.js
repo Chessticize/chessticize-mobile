@@ -278,7 +278,7 @@ describe('Practice POC', () => {
     await waitForVisibleInPracticeScroll('session-board');
 
     await playBoardMove('session-board', FIRST_STANDARD_FEEDBACK_MOVES.accepted);
-    await waitForVisibleInPracticeScroll('sprint-unclear-prompt');
+    await waitFor(element(by.id('sprint-unclear-toggle'))).toBeVisible().withTimeout(10000);
     await element(by.id('sprint-unclear-toggle')).tap();
     await waitFor(element(by.text('Marked')))
       .toBeVisible()
