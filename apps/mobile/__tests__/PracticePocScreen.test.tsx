@@ -986,6 +986,22 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
+  it("keeps native Run transforms mounted after leaving Edit Runs", () => {
+    const renderer = renderScreen({ runManagementEnabled: true });
+
+    press(renderer, "practice-run-home-edit");
+    expect(flattenTestStyle(
+      findNativeRunDragSurface(renderer, "practice-run-standard").props.style
+    ).transform).toEqual(expect.any(Array));
+
+    press(renderer, "practice-run-home-done");
+    const settledRunSurface = renderer.root
+      .findAllByProps({ testID: "practice-run-standard" })
+      .find((node) => Array.isArray(flattenTestStyle(node.props.style).transform));
+
+    expect(settledRunSurface).toBeTruthy();
+  });
+
   it("shows picked-up feedback and locks Edit Runs while a Run card drag is active", () => {
     const runReorderFeedbackPreview = jest.fn();
     const moveFeedbackClient = new FakeMoveFeedbackClient();
