@@ -193,13 +193,21 @@ describe('Practice POC', () => {
   });
 
   it('renders Arrow Duel candidate arrows on the board', async () => {
+    await launchWithDisabledSynchronization({
+      newInstance: true,
+      delete: true,
+      launchArgs: {
+        chessticizePuzzleSelectionId: 'bfPfS',
+        chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED
+      }
+    });
     await startPracticeMode('arrow-duel');
     await waitForVisibleInPracticeScroll('session-board');
-    // The default 5/30 Arrow Duel config and pinned seed select two long
-    // candidate vectors from the packaged Core Pack. Candidate order is
+    // Pin the packaged puzzle whose two long candidate vectors make the
+    // absolute painted-arrow-area assertion meaningful. Candidate order is
     // session-seeded, so wait for both vectors without assuming order.
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'e6h6', 10000);
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'd5c3', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f8', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f7', 10000);
 
     const boardFrame = await frameFor(element(by.id('session-board')));
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');
