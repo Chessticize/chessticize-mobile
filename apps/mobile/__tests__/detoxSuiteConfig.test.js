@@ -1655,6 +1655,7 @@ describe('Detox suite configuration', () => {
       "tapUntilExists('practice-add-run', 'practice-run-editor', 3)"
     );
     expect(practiceSpec).toContain("waitForVisibleInPracticeScroll('history-attention-flag-in-review')");
+    expect(practiceSpec).toContain("waitForVisibleInPracticeScroll('sprint-unclear-prompt')");
     expect(practiceSpec).toContain("element(by.id('history-filter-toggle')).tap()");
     expect(practiceSpec).toContain("waitFor(element(by.id('history-advanced-filters'))).not.toExist()");
     expect(practiceSpec).toContain("element(by.text('Correct')).atIndex(0)");
