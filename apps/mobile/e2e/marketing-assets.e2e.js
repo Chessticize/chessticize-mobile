@@ -189,6 +189,10 @@ async function prepareCustomRun() {
     story.fictionalUser.customRun.name
   );
   await dismissRunNameKeyboard();
+  await expect(element(by.id('practice-run-theme-selection-detail')))
+    .toHaveText('All themes');
+  await expect(element(by.id('custom-theme-fork'))).not.toExist();
+  await element(by.id('practice-run-theme-disclosure')).tap();
   await waitForVisibleInPracticeScroll('custom-theme-fork');
   await element(by.id('custom-theme-fork')).tap();
   await waitForVisibleInPracticeScroll('custom-theme-pin');
