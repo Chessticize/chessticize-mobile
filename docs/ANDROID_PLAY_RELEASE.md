@@ -24,7 +24,8 @@ code 11 is the source-published Android 1.3.3 candidate retained while the
 upload-key reset is pending. Version code 12 is the source-published Android
 1.3.4 candidate retained for the same reason. Version code 13 is the immutable
 RC1 source identity that was invalidated before signing or Play upload. Version
-code 14 is reserved for the replacement Android 1.3.5 RC2 release.
+code 14 completed the Android 1.3.5 source, signed-candidate, Play-generated APK,
+and GitHub mirror path. Version code 15 is reserved for Android 1.4.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -358,9 +359,10 @@ Build 13 was tagged, but no Android signed-candidate workflow was dispatched and
 neither platform binary was uploaded or distributed. Its tag remains immutable
 audit evidence and must not be moved or reused.
 
-Build 14 is the proposed Android 1.3.5 RC2 release:
+Build 14 is the immutable Android 1.3.5 release:
 
-- intended annotated tag: `android-v1.3.5-build-14`;
+- annotated tag: `android-v1.3.5-build-14`, targeting
+  `7e37352208d0b4e8ee2145fad6871ee4bd36a4a9`;
 - primary user-visible changes: save the puzzle active when the Sprint clock
   reaches zero as Incomplete without counting it as a mistake, make Incomplete
   attempts easy to find and mark as Unclear in History, and keep Arrow Duel
@@ -370,22 +372,54 @@ Build 14 is the proposed Android 1.3.5 RC2 release:
   `74a81e54729dd1f4f9adee375c728e22ac758d3211e2da81d3b5bd702380083b`;
 - validation scope: targeted persistence validation for the SQLite v15-to-v16
   migration plus exact-head fast checks and the protected signed-artifact/source
-  job. The released-fixture migration matrix and an exact-candidate automated
-  upgrade smoke are required; no unrelated physical-device gate is added.
+  job, including the released-fixture migration matrix and exact-candidate
+  automated upgrade smoke;
+- protected candidate workflow run:
+  [`30758305282`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30758305282);
+- signed AAB: 337,467,541 bytes, SHA-256
+  `4b056b412fb6751a0a8d1799f70eb78d5b015dc62d48e9a4be1ca03643ef015a`;
+- public corresponding-source release:
+  [`android-v1.3.5-build-14`](https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.3.5-build-14);
+- public source-manifest SHA-256:
+  `64d534a21ff64624328a8ff2c34e4413ac804a51868478e59f712435b20dacbd`;
+- successful APK-mirror workflow run:
+  [`30761831439`](https://github.com/Chessticize/chessticize-mobile/actions/runs/30761831439);
+- Play-signed universal APK: 256,992,372 bytes, SHA-256
+  `1a19ac14c7be1fe24c15a613987935abd292a720070fd4037882ecb9824fa101`;
+- Play app-signing certificate SHA-256:
+  `318a4453d4052c90364d3abfe376dce9c06a04ab70db7ce1d5d43ba995cff900`.
 
-Build 14 is not yet tagged, signed, uploaded, or distributed. The Play upload
-must wait until the Console no longer reports the upload-key reset request as
-pending.
+Build 14 was submitted to Closed testing / Alpha and its GitHub binary mirror
+is complete. The last recorded authoritative Play state was Changes in review;
+refresh the live track before reporting a later publication state. Do not move
+the tag, rebuild the AAB, replace its public artifacts, or reuse version code
+14.
+
+Build 15 is the proposed Android 1.4 release:
+
+- intended annotated tag: `android-v1.4.0-build-15`;
+- primary user-visible changes: add the Arrow Duel opponent-reply challenge,
+  improve saved-Run reordering and configuration, and retain all 1.4 million
+  offline puzzles in the smaller Core Pack v5 database;
+- bundled Core Pack: immutable `core-pack-v5`, 164,163,584 bytes, SHA-256
+  `4f8726cd64c8e490708f9c6b7b411dad3736d5936c0493d71fd42bbe4404a811`;
+- validation scope: full native validation because the accumulated delta spans
+  SQLite schema v16-to-v19 migrations, a new bundled puzzle-pack encoding,
+  shared native E2E inputs, multiple Arrow Duel journeys, and native Run pickup
+  feedback. Run exact-head fast checks, both local shared suites, the released
+  fixture upgrade boundary, and the protected signed-artifact/source job.
+
+Build 15 is not yet tagged, signed, uploaded, or distributed.
 
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.3.5`)
-- Android version code: `apps/mobile/release-version.json` (`14`)
-- iOS build number: `apps/mobile/release-version.json` (`2`, independent from Android)
+- Public version: `apps/mobile/release-version.json` (`1.4`)
+- Android version code: `apps/mobile/release-version.json` (`15`)
+- iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.3.5-build-14`
+- Required source tag before any Play track upload: `android-v1.4.0-build-15`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -490,8 +524,8 @@ the mirror and Play track states independently until both are complete.
 
 For a bounded follow-up release:
 
-For Android version `1.3.5` build `14`, release notes and this support document must
-name the canonical source tag `android-v1.3.5-build-14` and the public source
+For Android version `1.4` build `15`, release notes and this support document must
+name the canonical source tag `android-v1.4.0-build-15` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 must bind the annotated tag, commit, application ID, version, version code, and
 AAB SHA-256 before Play distribution. A missing or lightweight public tag, a

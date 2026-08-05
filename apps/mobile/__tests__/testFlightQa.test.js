@@ -15,8 +15,8 @@ const exportOptions = fs.readFileSync(
 describe("TestFlight QA checklist", () => {
   it("keeps TestFlight physical-device diagnostics explicitly optional", () => {
     expect(testFlightDoc).toContain("Optional TestFlight Diagnostics");
-    expect(testFlightDoc).toContain("Internal 1.3.5 QA");
-    expect(testFlightDoc).toContain("ios-v1.3.5-build-2");
+    expect(testFlightDoc).toContain("Internal 1.4 QA");
+    expect(testFlightDoc).toContain("ios-v1.4.0-build-1");
     expect(testFlightDoc).toContain("App Store Connect build");
     expect(testFlightDoc).toContain("not an App Store release gate");
     expect(testFlightDoc).toContain("not required");
@@ -123,10 +123,10 @@ describe("TestFlight QA checklist", () => {
       "App Store Connect release notes"
     );
     expect(appStoreUploadDoc).toContain(
-      "The 1.3.5 candidate is explicitly a **Delta release**"
+      "The 1.4 candidate is explicitly a **Full native release**"
     );
     expect(appStoreUploadDoc).toContain("a fresh Detox build");
-    expect(appStoreUploadDoc).toContain("is not required");
+    expect(appStoreUploadDoc).toContain("is required");
     expect(appStoreUploadDoc).toContain("brew --prefix ruby@3.3");
     expect(appStoreUploadDoc).toContain("requires Homebrew Ruby 3.3");
   });
