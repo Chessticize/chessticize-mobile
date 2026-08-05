@@ -4,7 +4,7 @@
   "private": true,
   "license": "GPL-3.0-or-later",
   "type": "module",
-  "packageManager": "pnpm@11.1.2",
+  "packageManager": "pnpm@11.20.0",
   "scripts": {
     "test": "node --experimental-strip-types --test packages/core/test/*.test.ts packages/storage/test/*.test.ts packages/storage/test/*.test.mjs apps/cli/test/*.test.ts scripts/*.test.mjs",
     "test:unit": "node --experimental-strip-types --test packages/core/test/*.test.ts",

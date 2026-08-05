@@ -66,7 +66,7 @@ pnpm mobile:test
 adb devices -l
 ```
 
-Require Node 22 LTS, pnpm 11.1.2, Java 17 or newer, and the Android packages in
+Require Node 22 LTS, pnpm 11.20.0, Java 17 or newer, and the Android packages in
 `docs/ANDROID_VALIDATION.md`. Report PASS/WARN/FAIL. Do not run this mutating
 setup during a strict read-only audit.
 

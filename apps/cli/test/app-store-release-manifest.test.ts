@@ -78,7 +78,7 @@ test("App Store release manifest reports source identity and hashed release arti
     ? `${releaseVersion.iosPublicVersion}.0`
     : releaseVersion.iosPublicVersion;
   assert.equal(manifest.releaseTagSuggestion, `ios-v${tagVersion}-build-${releaseVersion.iosBuildNumber}`);
-  assert.equal(manifest.packageManager, "pnpm@11.1.2");
+  assert.equal(manifest.packageManager, "pnpm@11.20.0");
   assert.deepEqual(manifest.app, {
     displayName: "Chessticize",
     bundleIdentifier: "com.chessticize.mobile",
