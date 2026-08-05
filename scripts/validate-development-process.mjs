@@ -15,6 +15,7 @@ const {
 const read = (relativePath) => readFileSync(path.join(repoRoot, relativePath), "utf8");
 const count = (text, needle) => text.split(needle).length - 1;
 
+const rootPackage = JSON.parse(read("package.json"));
 const coreWorkflow = read(".github/workflows/core.yml");
 const mobileWorkflow = read(".github/workflows/mobile-js.yml");
 const mobileLabWorkflow = read(".github/workflows/mobile-lab.yml");
@@ -365,8 +366,14 @@ assert.match(mobileLabWorkflow, /needs: validate/);
 assert.match(mobileLabWorkflow, /VERCEL_TOKEN: \$\{\{ secrets\.VERCEL_TEAM_TOKEN \}\}/);
 assert.match(mobileLabWorkflow, /VERCEL_ORG_ID: \$\{\{ secrets\.VERCEL_ORG_ID \}\}/);
 assert.match(mobileLabWorkflow, /VERCEL_PROJECT_ID: \$\{\{ secrets\.VERCEL_PROJECT_ID \}\}/);
-assert.match(mobileLabWorkflow, /VERCEL_CLI_VERSION: 58\.4\.4/);
-assert.match(mobileLabWorkflow, /vercel@\$VERCEL_CLI_VERSION/);
+assert.equal(rootPackage.devDependencies?.vercel, "58.4.4");
+assert.equal(count(mobileLabWorkflow, "run: pnpm install --frozen-lockfile"), 2);
+assert.doesNotMatch(mobileLabWorkflow, /npm install --global/);
+assert.doesNotMatch(mobileLabWorkflow, /pnpm dlx\s+vercel/);
+assert.equal(count(mobileLabWorkflow, "pnpm exec vercel"), 6);
+assert.match(mobileLabWorkflow, /pnpm exec vercel pull/);
+assert.match(mobileLabWorkflow, /pnpm exec vercel build/);
+assert.match(mobileLabWorkflow, /pnpm exec vercel deploy/);
 assert.match(mobileLabWorkflow, /--git-branch="\$GITHUB_REF_NAME"/);
 assert.match(mobileLabWorkflow, /--prebuilt/);
 assert.match(mobileLabWorkflow, /--meta=githubDeployment=1/);
@@ -377,7 +384,7 @@ assert.match(mobileLabWorkflow, /const slug = `\$\{readable\}-\$\{digest\}`/);
 assert.match(mobileLabWorkflow, /chessticize-mobile-storybook-\$\{slug\}\.vercel\.app/);
 assert.match(
   mobileLabWorkflow,
-  /vercel alias set "\$deployment_url" "\$branch_alias" --token="\$VERCEL_TOKEN"/
+  /pnpm exec vercel alias set "\$deployment_url" "\$branch_alias" --token="\$VERCEL_TOKEN"/
 );
 assert.doesNotMatch(mobileLabWorkflow, /deployment\.aliases\?\.find/);
 assert.ok(
@@ -389,6 +396,9 @@ assert.match(mobileLabWorkflow, /verify_public_url "\$IMMUTABLE_URL"/);
 assert.match(mobileLabWorkflow, /verify_public_url "\$STORYBOOK_URL"/);
 assert.match(mobileLabWorkflow, /verify_public_url "\$\{IMMUTABLE_URL\}storybook\/"/);
 assert.match(mobileLabWorkflow, /verify_public_url "\$\{STORYBOOK_URL\}storybook\/"/);
+assert.doesNotMatch(storybookDeployment, /pnpm dlx\s+vercel/);
+assert.match(storybookDeployment, /pnpm exec vercel login/);
+assert.match(storybookDeployment, /pnpm exec vercel link/);
 assert.equal(vercelConfig.buildCommand, "pnpm mobile:lab:validate");
 assert.equal(vercelConfig.installCommand, "pnpm install --frozen-lockfile");
 assert.equal(vercelConfig.outputDirectory, "apps/mobile-lab/storybook-static");
@@ -419,7 +429,7 @@ assert.match(storybookDeployment, /untrusted fork pull\s+requests never receive 
 assert.match(storybookDeployment, /VERCEL_TEAM_TOKEN/);
 assert.match(storybookDeployment, /VERCEL_ORG_ID/);
 assert.match(storybookDeployment, /VERCEL_PROJECT_ID/);
-assert.match(storybookDeployment, /vercel@58\.4\.4/);
+assert.match(storybookDeployment, /lockfile integrity and build-script policy/);
 assert.match(storybookDeployment, /HTTP 200/);
 
 assert.match(scenarioRegistry, /newScenarioMarkerData/);
