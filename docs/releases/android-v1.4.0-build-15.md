@@ -1,6 +1,6 @@
 # Chessticize Android 1.4 (build 15)
 
-- Status: Draft
+- Status: Approved
 - Locale: `en-US`
 - Platform: `Android`
 - Public version: `1.4`
@@ -49,4 +49,4 @@ puzzle offline library in a smaller bundled database.
   benefits.
 - [x] No issue numbers, internal code names, implementation details, or private
   evidence are included.
-- [ ] The release owner approved the copy before the source tag was created.
+- [x] The release owner approved the copy before the source tag was created.
