@@ -51,6 +51,7 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain('fixture.wrongMove');
     expect(journey).toContain('fixture.correctMove');
     expect(journey).toContain("by.id('arrow-duel-reply-challenge')");
+    expect(journey).toContain("by.id('arrow-duel-what-if-action')");
     expect(journey).toContain('fixture.puzzle.solutionMoves[1]');
     expect(journey).toContain("by.id('move-feedback-overlay')");
     expect(journey).toContain("toHaveText('No more puzzles')");
