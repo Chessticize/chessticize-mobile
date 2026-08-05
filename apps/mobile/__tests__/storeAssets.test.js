@@ -251,6 +251,9 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("by.id('practice-sprint-rules-dismiss')");
     expect(storeAssetsE2e).toContain("by.id('practice-active-session-guide')");
     expect(storeAssetsE2e).toContain("by.id('practice-arrow-duel-guide')");
+    expect(storeAssetsE2e).toContain(
+      "by.id('practice-session-guide-coach-copy-arrow-duel-reply')"
+    );
     expect(storeAssetsE2e).toContain("by.id('practice-session-guide-start')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-15-sprint-result')");
     expect(storeAssetsE2e).toContain("waitForScreenOrientation('landscape')");

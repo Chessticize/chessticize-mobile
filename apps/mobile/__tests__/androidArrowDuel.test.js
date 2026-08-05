@@ -36,7 +36,10 @@ describe('Android Arrow Duel release slice', () => {
       wrongMove: 'c3e4',
       correctMove: 'h4f6',
       expectedRatingAfter: 775,
-      puzzle: expect.objectContaining({ id: '03wH4' })
+      puzzle: expect.objectContaining({
+        id: '03wH4',
+        solutionMoves: ['c3e4', 'g7a1', 'd5d1', 'a1d1']
+      })
     }));
     expect(suiteConfig).toContain('android-arrow-duel.e2e.js');
     expect(suiteConfig).toContain("activeSuite === 'android-arrow-duel'");
@@ -47,6 +50,9 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain('waitForElementAccessibilityLabelContaining');
     expect(journey).toContain('fixture.wrongMove');
     expect(journey).toContain('fixture.correctMove');
+    expect(journey).toContain("by.id('arrow-duel-reply-challenge')");
+    expect(journey).toContain("by.id('arrow-duel-what-if-action')");
+    expect(journey).toContain('fixture.puzzle.solutionMoves[1]');
     expect(journey).toContain("by.id('move-feedback-overlay')");
     expect(journey).toContain("toHaveText('No more puzzles')");
     expect(journey).not.toContain('sleep(1800)');

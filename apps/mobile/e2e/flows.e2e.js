@@ -17,6 +17,11 @@ const {
   grantAndroidRuntimePermission,
   withAndroidUiDiagnostics
 } = require('./helpers');
+const {
+  findUniqueAndroidUiNodeByLabel,
+  readAndroidUiHierarchy,
+  tapAndroidUiNode,
+} = require('./androidPublicUiEvidence');
 const releaseVersion = require('../release-version.json');
 
 const APP_ID = 'com.chessticize.mobile';
@@ -211,6 +216,9 @@ describe('Key user flows', () => {
     const sprintNowMs = Date.now() - (2 * dayMs);
     if (device.getPlatform() === 'android') {
       // This suite can follow native permission journeys on the same emulator.
+      // Let the clean launch finish copying its bundled puzzle database before
+      // the fixture relaunch can terminate that first-start initialization.
+      await waitForVisibleInPracticeScroll('test-puzzle-source-familiar15');
       // Establish its authorized OS fixture explicitly before the app relaunch.
       grantAndroidNotificationPermission();
     }
@@ -371,8 +379,16 @@ describe('Key user flows', () => {
     await element(by.id('practice-run-elo-input')).replaceText('700');
     await element(by.id('practice-run-save')).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
-    await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
-    await element(by.id('practice-run-home-done')).tap();
+    if (device.getPlatform() === 'android') {
+      const doneEditingRuns = findUniqueAndroidUiNodeByLabel(
+        readAndroidUiHierarchy(),
+        'Finish editing runs'
+      );
+      tapAndroidUiNode(doneEditingRuns);
+      await waitFor(element(by.id('practice-run-home-edit'))).toExist().withTimeout(10000);
+    } else {
+      await tapUntilExists('practice-run-home-done', 'practice-run-home-edit', 3);
+    }
     await waitForElementTextContaining('practice-mode-standard-rating', '700', 5000);
 
     await device.terminateApp();
@@ -409,6 +425,11 @@ async function createSavedCustomRun(name, { shorterDuration = false, themes = []
   if (shorterDuration) {
     await waitForVisibleInPracticeScroll('practice-run-duration-stepper-decrease');
     await element(by.id('practice-run-duration-stepper-decrease')).tap();
+  }
+  if (themes.length > 0) {
+    await expect(element(by.id('practice-run-theme-selection-detail'))).toHaveText('All themes');
+    await expect(element(by.id(`custom-theme-${themes[0]}`))).not.toExist();
+    await element(by.id('practice-run-theme-disclosure')).tap();
   }
   for (const theme of themes) {
     await waitForVisibleInPracticeScroll(`custom-theme-${theme}`);

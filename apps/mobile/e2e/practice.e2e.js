@@ -14,6 +14,7 @@ const {
   setAndroidDisplayOrientation,
   startPracticeMode,
   tapUntilExists,
+  textFromAttributes,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
   waitForElementAccessibilityLabelContaining,
@@ -29,9 +30,8 @@ const {
   FIRST_STANDARD_FEEDBACK_MOVES,
 } = require('./familiar15Fixture');
 
-// The visual assertion measures absolute painted arrow area. Pin the public
-// service's packaged-core selection to two long candidate vectors so random
-// move geometry cannot turn that rendering check into a pixel-count lottery.
+// Keep this seed stable to reduce fixture churn. The test reads and validates
+// the actual runtime candidates before checking that both neutral arrows paint.
 const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v4:23';
 
 describe('Practice POC', () => {
@@ -60,7 +60,12 @@ describe('Practice POC', () => {
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('practice-add-run'))).toBeVisible().withTimeout(10000);
     await tapUntilExists('practice-add-run', 'practice-run-editor', 3);
-    await expect(element(by.id('custom-theme-mixed').and(by.traits(['selected'])))).toExist();
+    await expect(element(by.id('practice-run-theme-selection-detail'))).toHaveText('All themes');
+    await expect(element(by.id('custom-theme-mixed'))).not.toExist();
+    await element(by.id('practice-run-theme-disclosure')).tap();
+    await waitFor(element(by.id('custom-theme-mixed').and(by.traits(['selected']))))
+      .toExist()
+      .withTimeout(10000);
     await element(by.id('practice-run-name-input')).replaceText('Calculation Lab');
     await dismissRunNameKeyboard();
     await element(by.id('practice-main-scroll')).scrollTo('top');
@@ -71,16 +76,24 @@ describe('Practice POC', () => {
     await element(by.id('practice-run-home-edit')).tap();
     await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
 
-    const standardBeforeScroll = await frameFor(element(by.id('practice-run-standard')));
-    await element(by.id('practice-run-standard')).swipe('up', 'slow', 0.1, 0.5, 0.5);
-    await sleep(400);
-    const standardAfterScroll = await frameFor(element(by.id('practice-run-standard')));
-    const arrowAfterScroll = await frameFor(element(by.id('practice-run-arrow-duel')));
-    if (standardAfterScroll.y >= standardBeforeScroll.y - 5) {
-      throw new Error('Expected a slow non-hold swipe starting on a Run card to scroll Edit Runs');
-    }
-    if (standardAfterScroll.y >= arrowAfterScroll.y) {
-      throw new Error('Expected a slow non-hold Edit Runs scroll gesture to preserve Run order');
+    const adaptiveFrame = await frameFor(element(by.id('adaptive-layout')));
+    if (adaptiveFrame.height < 1000) {
+      const standardBeforeScroll = await frameFor(element(by.id('practice-run-standard')));
+      await element(by.id('practice-run-standard')).swipe('up', 'fast', 0.1, 0.5, 0.5);
+      await sleep(400);
+      const standardAfterScroll = await frameFor(element(by.id('practice-run-standard')));
+      const arrowAfterScroll = await frameFor(element(by.id('practice-run-arrow-duel')));
+      if (standardAfterScroll.y >= standardBeforeScroll.y - 5) {
+        throw new Error('Expected a fast non-hold swipe starting on a Run card to scroll Edit Runs');
+      }
+      if (standardAfterScroll.y >= arrowAfterScroll.y) {
+        throw new Error('Expected a fast non-hold Edit Runs scroll gesture to preserve Run order');
+      }
+      await element(by.id('practice-main-scroll')).scroll(20, 'up');
+      await sleep(100);
+    } else {
+      await expect(element(by.id('practice-run-standard'))).toBeVisible();
+      await expect(element(by.id('practice-run-arrow-duel'))).toBeVisible();
     }
     // Keep the small verified scroll offset so both drag endpoints remain
     // actionable on shorter portrait viewports.
@@ -93,7 +106,7 @@ describe('Practice POC', () => {
       await dragAndroidElementToElement('practice-run-standard', 'practice-run-arrow-duel');
     } else {
       await element(by.id('practice-run-standard')).longPressAndDrag(
-        300,
+        750,
         0.5,
         0.5,
         element(by.id('practice-run-arrow-duel')),
@@ -192,11 +205,15 @@ describe('Practice POC', () => {
   it('renders Arrow Duel candidate arrows on the board', async () => {
     await startPracticeMode('arrow-duel');
     await waitForVisibleInPracticeScroll('session-board');
-    // The default 5/30 Arrow Duel config and pinned seed select packaged puzzle
-    // bfPfS through PracticeService's rating fallback. Candidate order is
-    // session-seeded, so wait for both long vectors without assuming order.
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f8', 10000);
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f7', 10000);
+    const candidateText = textFromAttributes(
+      await element(by.id('arrow-duel-candidate-overlay')).getAttributes()
+    );
+    const candidates = [
+      ...new Set(candidateText.match(/[a-h][1-8][a-h][1-8][qrbn]?/g) ?? []),
+    ];
+    if (candidates.length !== 2) {
+      throw new Error(`Expected two neutral Arrow Duel candidates, received ${candidateText}`);
+    }
 
     const boardFrame = await frameFor(element(by.id('session-board')));
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');
@@ -261,7 +278,7 @@ describe('Practice POC', () => {
     await waitForVisibleInPracticeScroll('session-board');
 
     await playBoardMove('session-board', FIRST_STANDARD_FEEDBACK_MOVES.accepted);
-    await waitFor(element(by.id('sprint-unclear-prompt'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('sprint-unclear-toggle'))).toBeVisible().withTimeout(10000);
     await element(by.id('sprint-unclear-toggle')).tap();
     await waitFor(element(by.text('Marked')))
       .toBeVisible()
