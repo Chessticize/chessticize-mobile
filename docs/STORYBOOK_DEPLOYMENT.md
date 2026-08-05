@@ -102,6 +102,12 @@ The workflow fails before contacting Vercel when any required secret is absent.
 Rotate `VERCEL_TEAM_TOKEN` before it expires by replacing the GitHub secret; no
 code change is required.
 
+The deploy job does not expose these credentials while installing JavaScript
+dependencies or building Storybook. It injects them only into the three steps
+that validate credentials, pull project settings, or contact Vercel to deploy.
+The local Vercel build uses the already-pulled project settings without an
+authentication token.
+
 ## First deployment
 
 1. Add the three repository secrets.

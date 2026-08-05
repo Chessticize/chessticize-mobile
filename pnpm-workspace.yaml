@@ -1,11 +1,40 @@
 packages:
   - "apps/*"
   - "packages/*"
+minimumReleaseAge: 10080
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+# These exact versions were already locked and reviewed in PR #513. New versions
+# remain subject to the seven-day maturation period.
+minimumReleaseAgeExclude:
+  - "@vercel/backends@0.8.30"
+  - "@vercel/build-utils@13.36.3"
+  - "@vercel/cervel@0.1.38"
+  - "@vercel/elysia@0.1.107"
+  - "@vercel/express@0.1.121"
+  - "@vercel/fastify@0.1.110"
+  - "@vercel/gatsby-plugin-vercel-builder@2.2.33"
+  - "@vercel/h3@0.1.116"
+  - "@vercel/hono@0.2.110"
+  - "@vercel/koa@0.1.90"
+  - "@vercel/nestjs@0.2.111"
+  - "@vercel/next@4.20.5"
+  - "@vercel/node@5.9.3"
+  - "@vercel/python@6.54.1"
+  - "@vercel/static-build@2.11.13"
+  - "get-tsconfig@4.14.1"
+  - "vercel@58.4.4"
+trustPolicy: no-downgrade
+trustPolicyIgnoreAfter: 525600
+# This exact version predates the policy and was already reviewed in PR #228.
+trustPolicyExclude:
+  - "ua-parser-js@1.0.41"
+trustLockfile: false
+blockExoticSubdeps: true
 allowBuilds:
-  detox: true
-  dtrace-provider: true
-  esbuild: true
-  unrs-resolver: true
+  detox@20.51.4: true
+  dtrace-provider@0.8.8: true
+  "esbuild@0.27.0 || 0.28.1": true
 patchedDependencies:
   detox@20.51.4: patches/detox@20.51.4.patch
   react-native@0.86.0: patches/react-native@0.86.0.patch

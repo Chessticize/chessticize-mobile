@@ -16,6 +16,7 @@ const read = (relativePath) => readFileSync(path.join(repoRoot, relativePath), "
 const count = (text, needle) => text.split(needle).length - 1;
 
 const rootPackage = JSON.parse(read("package.json"));
+const pnpmWorkspace = read("pnpm-workspace.yaml");
 const coreWorkflow = read(".github/workflows/core.yml");
 const mobileWorkflow = read(".github/workflows/mobile-js.yml");
 const mobileLabWorkflow = read(".github/workflows/mobile-lab.yml");
@@ -107,6 +108,9 @@ const workflowDirectory = path.join(repoRoot, ".github/workflows");
 const workflowFiles = readdirSync(workflowDirectory)
   .filter((fileName) => fileName.endsWith(".yml"))
   .sort();
+const workflowSources = workflowFiles.map((fileName) =>
+  read(`.github/workflows/${fileName}`)
+);
 
 assert.deepEqual(workflowFiles, [
   "core.yml",
@@ -118,6 +122,29 @@ assert.deepEqual(workflowFiles, [
   "pages.yml",
   "process.yml"
 ]);
+assert.equal(rootPackage.packageManager, "pnpm@11.20.0");
+assert.equal(count(workflowSources.join("\n"), "version: 11.20.0"), 6);
+assert.doesNotMatch(workflowSources.join("\n"), /version: 11\.1\.2/);
+assert.match(pnpmWorkspace, /^minimumReleaseAge: 10080$/m);
+assert.match(pnpmWorkspace, /^minimumReleaseAgeStrict: true$/m);
+assert.match(pnpmWorkspace, /^minimumReleaseAgeIgnoreMissingTime: false$/m);
+assert.match(
+  pnpmWorkspace,
+  /^# remain subject to the seven-day maturation period\.$/m
+);
+assert.doesNotMatch(pnpmWorkspace, /^\s+- ["']?@vercel\/\*["']?$/m);
+assert.match(pnpmWorkspace, /^trustPolicy: no-downgrade$/m);
+assert.match(pnpmWorkspace, /^trustPolicyIgnoreAfter: 525600$/m);
+assert.match(pnpmWorkspace, /^trustPolicyExclude:\n  - "ua-parser-js@1\.0\.41"$/m);
+assert.match(pnpmWorkspace, /^trustLockfile: false$/m);
+assert.match(pnpmWorkspace, /^blockExoticSubdeps: true$/m);
+assert.match(pnpmWorkspace, /^  detox@20\.51\.4: true$/m);
+assert.match(pnpmWorkspace, /^  dtrace-provider@0\.8\.8: true$/m);
+assert.match(pnpmWorkspace, /^  "esbuild@0\.27\.0 \|\| 0\.28\.1": true$/m);
+assert.doesNotMatch(
+  pnpmWorkspace,
+  /^  (?:detox|dtrace-provider|esbuild|unrs-resolver): true$/m
+);
 assert.equal(
   existsSync(path.join(workflowDirectory, "mobile-android.yml")),
   false
@@ -363,9 +390,28 @@ assert.match(mobileLabWorkflow, /branches: \["\*\*"\]/);
 assert.match(mobileLabWorkflow, /Deploy branch Storybook to Vercel/);
 assert.match(mobileLabWorkflow, /github\.event\.deleted == false/);
 assert.match(mobileLabWorkflow, /needs: validate/);
-assert.match(mobileLabWorkflow, /VERCEL_TOKEN: \$\{\{ secrets\.VERCEL_TEAM_TOKEN \}\}/);
-assert.match(mobileLabWorkflow, /VERCEL_ORG_ID: \$\{\{ secrets\.VERCEL_ORG_ID \}\}/);
-assert.match(mobileLabWorkflow, /VERCEL_PROJECT_ID: \$\{\{ secrets\.VERCEL_PROJECT_ID \}\}/);
+const mobileLabDeployHeader = mobileLabWorkflow.match(
+  /\n  deploy:\n[\s\S]*?\n    steps:\n/
+)?.[0];
+assert.ok(mobileLabDeployHeader);
+assert.doesNotMatch(mobileLabDeployHeader, /secrets\./);
+assert.equal(
+  count(mobileLabWorkflow, "VERCEL_TOKEN: ${{ secrets.VERCEL_TEAM_TOKEN }}"),
+  3
+);
+assert.equal(
+  count(mobileLabWorkflow, "VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}"),
+  3
+);
+assert.equal(
+  count(mobileLabWorkflow, "VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}"),
+  3
+);
+const mobileLabBuildStep = mobileLabWorkflow.match(
+  /      - name: Build the validated Storybook deployment\n[\s\S]*?\n      - name: Deploy the exact branch commit/
+)?.[0];
+assert.ok(mobileLabBuildStep);
+assert.doesNotMatch(mobileLabBuildStep, /secrets\.|VERCEL_TOKEN|--token/);
 assert.equal(rootPackage.devDependencies?.vercel, "58.4.4");
 assert.equal(count(mobileLabWorkflow, "run: pnpm install --frozen-lockfile"), 2);
 assert.doesNotMatch(mobileLabWorkflow, /npm install --global/);

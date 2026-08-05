@@ -61,7 +61,7 @@ pnpm --version
 pnpm install --frozen-lockfile
 ```
 
-`package.json` currently pins pnpm 11.1.2. If the pnpm launcher hangs on signature or registry verification, install that pinned version normally; never disable signature verification.
+`package.json` currently pins pnpm 11.20.0. If the pnpm launcher hangs on signature or registry verification, install that pinned version normally; never disable signature verification.
 
 ### 3. Hydrate Git LFS resources in every fresh worktree
 

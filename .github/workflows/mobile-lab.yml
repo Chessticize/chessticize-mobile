@@ -39,7 +39,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 11.1.2
+          version: 11.20.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -70,10 +70,6 @@ jobs:
     environment:
       name: storybook/${{ github.ref_name }}
       url: ${{ steps.deploy.outputs.manager_url }}
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TEAM_TOKEN }}
     steps:
       - name: Checkout without LFS assets
         uses: actions/checkout@v4
@@ -83,7 +79,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 11.1.2
+          version: 11.20.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -92,6 +88,10 @@ jobs:
           cache: pnpm
 
       - name: Require Vercel deployment credentials
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TEAM_TOKEN }}
         run: |
           if [[ -z "$VERCEL_TOKEN" || -z "$VERCEL_ORG_ID" || -z "$VERCEL_PROJECT_ID" ]]; then
             echo "::error::Configure VERCEL_TEAM_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID as GitHub Actions secrets."
@@ -102,6 +102,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Pull Vercel project settings
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TEAM_TOKEN }}
         run: |
           if [[ "$GITHUB_REF_NAME" == "main" ]]; then
             pnpm exec vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
@@ -112,13 +116,17 @@ jobs:
       - name: Build the validated Storybook deployment
         run: |
           if [[ "$GITHUB_REF_NAME" == "main" ]]; then
-            pnpm exec vercel build --prod --token="$VERCEL_TOKEN"
+            pnpm exec vercel build --prod
           else
-            pnpm exec vercel build --token="$VERCEL_TOKEN"
+            pnpm exec vercel build
           fi
 
       - name: Deploy the exact branch commit
         id: deploy
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TEAM_TOKEN }}
         run: |
           deploy_args=(
             --prebuilt
