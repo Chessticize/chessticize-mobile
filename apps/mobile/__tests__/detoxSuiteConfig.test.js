@@ -1202,7 +1202,7 @@ describe('Detox suite configuration', () => {
     expect(tacticalProfileCase).not.toContain('tactical-profile-back-home');
   });
 
-  it('pins the Arrow Duel screenshot to the exact runtime-selected long-arrow fixture', () => {
+  it('verifies two runtime Arrow Duel candidates before the pixel assertion', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const renderCaseStart = practiceSpec.indexOf("it('renders Arrow Duel candidate arrows on the board'");
     const renderCaseEnd = practiceSpec.indexOf("it('shows Arrow Duel feedback after a wrong candidate move'");
@@ -1214,25 +1214,14 @@ describe('Detox suite configuration', () => {
     expect(practiceSpec).toContain(
       'chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED'
     );
-    expect(renderCase).toContain("chessticizePuzzleSelectionId: 'bfPfS'");
-    expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'a7g7', 10000)"
-    );
-    expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'a4a3', 10000)"
-    );
-    expect(renderCase.indexOf("'a7g7'")).toBeLessThan(
+    expect(renderCase).toContain('textFromAttributes(');
+    expect(renderCase).toContain("candidateText.match(/[a-h][1-8][a-h][1-8][qrbn]?/g)");
+    expect(renderCase).toContain('candidates.length !== 2');
+    expect(renderCase).toContain('Expected two neutral Arrow Duel candidates');
+    expect(renderCase).not.toContain('chessticizePuzzleSelectionId');
+    expect(renderCase.indexOf('candidates.length !== 2')).toBeLessThan(
       renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
     );
-    expect(renderCase.indexOf("'a4a3'")).toBeLessThan(
-      renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
-    );
-    expect(renderCase).toContain('bfPfS');
-    expect(renderCase).not.toContain('eQNYb');
-    expect(renderCase).not.toContain("'f1f8'");
-    expect(renderCase).not.toContain("'f1f7'");
-    expect(renderCase).not.toContain("'d7d1'");
-    expect(renderCase).not.toContain("'d7f7'");
     expect(practiceSpec).toContain('if (arrowLikePixels <= 5000)');
   });
 
