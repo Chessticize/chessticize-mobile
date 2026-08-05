@@ -17,6 +17,11 @@ const {
   grantAndroidRuntimePermission,
   withAndroidUiDiagnostics
 } = require('./helpers');
+const {
+  findUniqueAndroidUiNodeByLabel,
+  readAndroidUiHierarchy,
+  tapAndroidUiNode,
+} = require('./androidPublicUiEvidence');
 const releaseVersion = require('../release-version.json');
 
 const APP_ID = 'com.chessticize.mobile';
@@ -371,7 +376,16 @@ describe('Key user flows', () => {
     await element(by.id('practice-run-elo-input')).replaceText('700');
     await element(by.id('practice-run-save')).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
-    await tapUntilExists('practice-run-home-done', 'practice-run-management', 3);
+    if (device.getPlatform() === 'android') {
+      const doneEditingRuns = findUniqueAndroidUiNodeByLabel(
+        readAndroidUiHierarchy(),
+        'Finish editing runs'
+      );
+      tapAndroidUiNode(doneEditingRuns);
+      await waitFor(element(by.id('practice-run-home-edit'))).toExist().withTimeout(10000);
+    } else {
+      await tapUntilExists('practice-run-home-done', 'practice-run-home-edit', 3);
+    }
     await waitForElementTextContaining('practice-mode-standard-rating', '700', 5000);
 
     await device.terminateApp();

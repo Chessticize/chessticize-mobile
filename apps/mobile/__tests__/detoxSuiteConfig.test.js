@@ -1125,7 +1125,7 @@ describe('Detox suite configuration', () => {
     );
   });
 
-  it('retries leaving Run editing until the public Run manager confirms the transition', () => {
+  it('leaves Run editing through the public Done control and confirms the transition', () => {
     const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
     const caseStart = flowsSpec.indexOf(
       "it('persists rating, history, review queue, and saved Runs after relaunch'"
@@ -1133,11 +1133,21 @@ describe('Detox suite configuration', () => {
     const caseEnd = flowsSpec.indexOf('\n  });', caseStart);
     const persistenceCase = flowsSpec.slice(caseStart, caseEnd);
 
+    expect(persistenceCase).toContain("device.getPlatform() === 'android'");
+    expect(persistenceCase).toContain('findUniqueAndroidUiNodeByLabel(');
+    expect(persistenceCase).toContain("'Finish editing runs'");
+    expect(persistenceCase).toContain('tapAndroidUiNode(doneEditingRuns);');
     expect(persistenceCase).toContain(
-      "tapUntilExists('practice-run-home-done', 'practice-run-management', 3)"
+      "tapUntilExists('practice-run-home-done', 'practice-run-home-edit', 3)"
+    );
+    expect(persistenceCase).toContain(
+      "waitFor(element(by.id('practice-run-home-edit'))).toExist()"
     );
     expect(persistenceCase).not.toContain(
       "element(by.id('practice-run-home-done')).tap()"
+    );
+    expect(persistenceCase).not.toContain(
+      "tapUntilExists('practice-run-home-done', 'practice-run-management', 3)"
     );
   });
 
