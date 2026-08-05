@@ -1114,6 +1114,9 @@ describe('Detox suite configuration', () => {
     expect(helper).toContain(
       "tapUntilExists('practice-run-save', 'practice-run-home-edit', 3)"
     );
+    expect(helper).toContain('if (themes.length > 0)');
+    expect(helper).toContain("by.id('practice-run-theme-selection-detail')");
+    expect(helper).toContain("by.id('practice-run-theme-disclosure')");
     expect(helper).not.toContain(
       "waitFor(element(by.id('practice-run-home-edit'))).toBeVisible()"
     );
