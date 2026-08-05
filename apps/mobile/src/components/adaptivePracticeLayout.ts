@@ -47,6 +47,8 @@ const PHONE_PORTRAIT_BOARD_MAX = 560;
 const REGULAR_LANDSCAPE_BOARD_MAX = 640;
 const REGULAR_PORTRAIT_BOARD_MAX = 860;
 const REGULAR_LANDSCAPE_RESERVED_SESSION_CHROME_HEIGHT = 120;
+// Compact portrait locks the outer scroll while the board accepts input, so
+// this budget must also keep the post-answer Unclear action inside the viewport.
 const COMPACT_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 332;
 const REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 240;
 
