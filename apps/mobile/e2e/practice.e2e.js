@@ -212,8 +212,8 @@ describe('Practice POC', () => {
     // Pin the packaged puzzle whose two long candidate vectors make the
     // absolute painted-arrow-area assertion meaningful. Candidate order is
     // session-seeded, so wait for both vectors without assuming order.
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f8', 10000);
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f7', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'a7g7', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'a4a3', 10000);
 
     const boardFrame = await frameFor(element(by.id('session-board')));
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');

@@ -1213,21 +1213,21 @@ describe('Detox suite configuration', () => {
     );
     expect(renderCase).toContain("chessticizePuzzleSelectionId: 'bfPfS'");
     expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f8', 10000)"
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'a7g7', 10000)"
     );
     expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f7', 10000)"
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'a4a3', 10000)"
     );
-    expect(renderCase.indexOf("'f1f8'")).toBeLessThan(
+    expect(renderCase.indexOf("'a7g7'")).toBeLessThan(
       renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
     );
-    expect(renderCase.indexOf("'f1f7'")).toBeLessThan(
+    expect(renderCase.indexOf("'a4a3'")).toBeLessThan(
       renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
     );
     expect(renderCase).toContain('bfPfS');
     expect(renderCase).not.toContain('eQNYb');
-    expect(renderCase).not.toContain("'e6h6'");
-    expect(renderCase).not.toContain("'d5c3'");
+    expect(renderCase).not.toContain("'f1f8'");
+    expect(renderCase).not.toContain("'f1f7'");
     expect(renderCase).not.toContain("'d7d1'");
     expect(renderCase).not.toContain("'d7f7'");
     expect(practiceSpec).toContain('if (arrowLikePixels <= 5000)');
