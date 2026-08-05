@@ -1041,7 +1041,7 @@ describe('Detox suite configuration', () => {
       "dragAndroidElementToElement('practice-run-standard', 'practice-run-arrow-duel')"
     );
     expect(runManagementCase).toContain(
-      "element(by.id('practice-run-standard')).swipe('up', 'fast', 0.25, 0.5, 0.5)"
+      "element(by.id('practice-run-standard')).swipe('up', 'fast', 0.1, 0.5, 0.5)"
     );
     expect(runManagementCase).toContain("frameFor(element(by.id('adaptive-layout')))");
     expect(runManagementCase).toContain('adaptiveFrame.height < 1000');
