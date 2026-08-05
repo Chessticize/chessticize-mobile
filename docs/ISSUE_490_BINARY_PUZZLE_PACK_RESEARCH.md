@@ -14,11 +14,15 @@ and the resulting decision. The prototype generator, dual-format reader, and
 test-only iOS launch adapter were kept in the ignored `scratch/` workspace or
 temporarily patched for measurement and then removed. The repository's
 production schema, generator, reader, manifest, packaged fixture, and native
-launch behavior are unchanged.
+launch behavior were unchanged at the pinned research commit.
 
 Research source commit: `eeb9e359e72b035d34e22039d025de95f6aab9db`.
 
-## Current release baseline
+This is a historical research record. Production adoption was subsequently
+delivered separately in PR #494; neither that implementation nor its release
+artifact is part of this documentation-only PR.
+
+## Pinned research baseline
 
 The release baseline is not JSON. The app ships a generated, read-only SQLite
 database. Its `puzzles` table stores `initial_fen`, `solution_moves`, and
@@ -353,6 +357,8 @@ byte-identical JavaScript bundles.
 | Android Hermes bundle | `34e39eaf80c4511c017f7e214a5bded2fee03576665a1312147a4abaf4282a7a` | same |
 | Android E2E AAB | `82c45b82e8a2e0f7c29162563bc2dbee72dddd4335fe226d1807d8c6e408bbfd` | `393bb39707924375318ec33a69df6f97e1c9f7f05e84c8c013fa6d6888176518` |
 | Android E2E APK | `cf18ac9a4765bbc82eb57d29d48713decfd063bd4a333bc8f94e4966aec62f80` | `0825e510271187293e272e54adf7e1013c027bf8303f6dfc732cdf1c3f43f2ae` |
+| Android device-targetable APK-set archive | `3172f718173af60f6638326d8375c7029908ec3a4d0af785cf1bbd0a21c8d6c7` | `27c9fc48ca054df285e36ada18c062f55f04c6f888cfc75f27a3734e37bf24a6` |
+| Android universal APK-set archive | `d25d32bac5c9059dbd576f522e4925a5a8bf1881b0d07b4c081283efd720913a` | `a33a0c80f8c3bb348aed93fc8552964cb0072169956c4d54425ee3c1a058d2f3` |
 | iOS Hermes bundle | `a58644fbe68711c5dbbc03eaf72863a15f0a192acfad475871dca9c84f183844` | same |
 | iOS simulator ZIP proxy | `eac46a15d6aaa1d02308e83f18486741661aadae8c31be72a038ee3e95bfe8b3` | `731f4248a01b8e04e1215c4fbaa4bee6d7be102bf3751183175e0a8ec7ac90cc` |
 
@@ -362,6 +368,12 @@ arm64-v8a and x86_64. It is appropriate for a matched delta, not a production
 signature or Play Console report. iOS used locally signed Release-simulator
 `.app` bundles containing both simulator architectures. It is not a device
 archive or App Store IPA.
+
+The retained simulator ZIP is the immutable content identity for each measured
+`.app` directory; logical and allocated directory sizes were measured before
+archiving. The arm64 and x86_64 API 36 bundletool device-spec SHA-256 values
+were `d98aa7cdc9d5690c463f8930d72a5b7a02d9620a304d2a21c024cdabbb8bef4f`
+and `7b0222ced44c482f22f73503a8ad9acbd3ce7826e65741d447218fc4690404a5`.
 
 The binary reader was first covered by the existing 19-test storage suite and
 mobile typecheck. Full-corpus generation, Android builds, and iOS builds then
@@ -392,8 +404,22 @@ node scratch/issue-490/generate-binary-pack.mjs \
   scratch/issue-490/binary-pack-generation.json
 gzip -9 -c fixtures/puzzles/bundled-core-pack.sqlite \
   > scratch/issue-490/text.sqlite.gz
+gzip -9 -c scratch/issue-490/bundled-core-pack-binary.sqlite \
+  > scratch/issue-490/binary.sqlite.gz
 brotli -q 11 fixtures/puzzles/bundled-core-pack.sqlite \
   -o scratch/issue-490/text.sqlite.br
+brotli -q 11 scratch/issue-490/bundled-core-pack-binary.sqlite \
+  -o scratch/issue-490/binary.sqlite.br
+zip -9 -j -q scratch/issue-490/text.sqlite.zip \
+  fixtures/puzzles/bundled-core-pack.sqlite
+zip -9 -j -q scratch/issue-490/binary.sqlite.zip \
+  scratch/issue-490/bundled-core-pack-binary.sqlite
+node --expose-gc --experimental-strip-types --no-warnings \
+  scratch/issue-490/benchmark-pack-reader.mjs \
+  fixtures/puzzles/bundled-core-pack.sqlite
+node --expose-gc --experimental-strip-types --no-warnings \
+  scratch/issue-490/benchmark-pack-reader.mjs \
+  scratch/issue-490/bundled-core-pack-binary.sqlite
 ```
 
 Matched Android artifacts used the repository's `e2e` Gradle variant with a
@@ -410,6 +436,54 @@ The relevant build and public-UI validation entry points were:
   assembleAndroidTest -DtestBuildType=e2e
 pnpm mobile:e2e:build:ios:release
 pnpm mobile:e2e:test:android -- e2e/android-standard-practice.e2e.js
+```
+
+The exact Android delivery estimates used debug-signed APK-set archives built
+for both candidates, then applied the recorded device specs:
+
+```sh
+for variant in text binary; do
+  java -jar scratch/issue-490/bundletool-all-1.18.3.jar build-apks \
+    --bundle=scratch/issue-490/android/$variant/app-e2e.aab \
+    --output=scratch/issue-490/android/$variant/app-e2e.apks \
+    --ks=apps/mobile/android/app/debug.keystore \
+    --ks-key-alias=androiddebugkey --ks-pass=pass:android \
+    --key-pass=pass:android --overwrite
+  java -jar scratch/issue-490/bundletool-all-1.18.3.jar build-apks \
+    --bundle=scratch/issue-490/android/$variant/app-e2e.aab \
+    --output=scratch/issue-490/android/$variant/app-e2e-universal.apks \
+    --mode=universal --ks=apps/mobile/android/app/debug.keystore \
+    --ks-key-alias=androiddebugkey --ks-pass=pass:android \
+    --key-pass=pass:android --overwrite
+  for spec in device-arm64-api36.json device-x86_64-api36.json; do
+    java -jar scratch/issue-490/bundletool-all-1.18.3.jar get-size total \
+      --apks=scratch/issue-490/android/$variant/app-e2e.apks \
+      --device-spec=scratch/issue-490/android/$spec
+  done
+done
+```
+
+Installed-data, file, memory, and simulator ZIP accounting used:
+
+```sh
+adb -s emulator-5554 shell run-as com.chessticize.mobile du -ak .
+adb -s emulator-5554 shell "run-as com.chessticize.mobile \
+  stat -c '%n:%s:%b:%B' databases/*.sqlite files/profileInstalled \
+  shared_prefs/review-reminder-native.xml"
+adb -s emulator-5554 shell dumpsys meminfo com.chessticize.mobile
+adb -s emulator-5554 shell am start -W -S \
+  com.chessticize.mobile/.MainActivity
+
+IOS_DATA=$(xcrun simctl get_app_container "$IOS_DEVICE" \
+  com.chessticize.mobile data)
+du -ak "$IOS_DATA"
+find "$IOS_DATA" -type f -exec stat -f '%N:%z:%b:%k' {} +
+/usr/bin/time -p xcrun simctl launch --terminate-running-process \
+  "$IOS_DEVICE" com.chessticize.mobile
+(cd scratch/issue-490/ios/text && \
+  /usr/bin/zip -qry -9 text-simulator.zip Chessticize.app)
+(cd scratch/issue-490/ios/binary && \
+  /usr/bin/zip -qry -9 binary-simulator.zip Chessticize.app)
 ```
 
 The iOS public-UI check used `detox test --configuration ios.sim.release`
@@ -475,6 +549,37 @@ on both platforms. Minor allocated-byte differences come from filesystem block
 accounting. Practice-state databases were the same size in each matched pair,
 so the saving persisted after use.
 
+The raw top-level Android allocation breakdown was identical after first launch
+and after the completed/relaunched session except that `code_cache` was replaced
+by `app_dxmaker_cache`:
+
+| Android app-data allocation | TEXT | Binary |
+| --- | ---: | ---: |
+| Databases directory | 222,404 KiB | 160,560 KiB |
+| Cache directories | 16 KiB | 16 KiB |
+| Shared preferences | 16 KiB | 16 KiB |
+| Files | 16 KiB | 16 KiB |
+| Bridgeless split-bundle directory | 8 KiB | 8 KiB |
+| Root metadata/allocation | 8 KiB | 8 KiB |
+| **Total** | **222,468 KiB** | **160,624 KiB** |
+
+Within the databases directory, the copied pack occupied 222,164 versus
+160,320 KiB; `chessticize-mobile.sqlite` occupied 200 KiB and the Tactical
+Profile cache 32 KiB in both candidates.
+
+The iOS simulator's post-practice breakdown separated caches and databases.
+At first launch, preferences occupied 4 KiB and all other simulator-managed
+state/allocation occupied 120 KiB, producing the 222,504/160,664 KiB totals:
+
+| iOS post-practice app-data allocation | TEXT | Binary |
+| --- | ---: | ---: |
+| Copied pack database | 222,156 KiB | 160,316 KiB |
+| Practice database | 196 KiB | 196 KiB |
+| Tactical Profile cache database | 28 KiB | 28 KiB |
+| Preferences | 8 KiB | 8 KiB |
+| Other simulator-managed state/allocation | 3,316 KiB | 3,316 KiB |
+| **Total** | **225,704 KiB** | **163,864 KiB** |
+
 The existing Android Standard Practice Detox journey passed on both formats:
 it opened the 1,400,000-puzzle public source, completed the fixed bundled
 session, relaunched, and restored rating, weekly progress, and History. The
@@ -493,16 +598,22 @@ rows. The benchmark script and result SHA-256 values were:
 - TEXT JSON: `6eb46cdd67090439a46e387254488b8cfdc3f56ea5d232d9a928d0e4ba007e9c`
 - binary JSON: `2bbc400f72d777a3199df2406140c2c40b426408900d0aba279d27e56570304f`
 
-| Median operation | TEXT | Binary | Delta |
-| --- | ---: | ---: | ---: |
-| Open and count | 2.643 ms | 2.734 ms | +0.090 ms |
-| First hydration | 0.110 ms | 0.126 ms | +0.016 ms |
-| Select/hydrate 20 | 19.117 ms | 19.558 ms | +0.441 ms |
-| Hydrate 1,000 known rows | 5.067 ms | 9.538 ms | +4.471 ms (4.47 microseconds/row) |
+| Operation / format | Min | Median | P95 | Max | Mean |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Open and count / TEXT | 2.294 ms | 2.643 ms | 4.063 ms | 4.084 ms | 2.730 ms |
+| Open and count / binary | 2.628 ms | 2.734 ms | 4.893 ms | 30.676 ms | 3.733 ms |
+| First hydration / TEXT | 0.107 ms | 0.110 ms | 0.228 ms | 1.118 ms | 0.155 ms |
+| First hydration / binary | 0.120 ms | 0.126 ms | 0.182 ms | 1.607 ms | 0.180 ms |
+| Select/hydrate 20 / TEXT | 14.246 ms | 19.117 ms | 39.636 ms | 46.658 ms | 21.829 ms |
+| Select/hydrate 20 / binary | 14.393 ms | 19.558 ms | 169.465 ms | 446.250 ms | 41.412 ms |
+| Hydrate 1,000 / TEXT | 4.709 ms | 5.067 ms | 6.113 ms | 6.327 ms | 5.167 ms |
+| Hydrate 1,000 / binary | 7.055 ms | 9.538 ms | 16.073 ms | 17.058 ms | 9.984 ms |
 
 Separate-process cold-cache outliers made the binary selection p95 unstable,
 so medians and the deterministic 1,000-row cost are the useful comparison.
-Both formats produced checksum `43,964,281`.
+Both formats produced checksum `43,964,281`. The full distributions make the
+binary selection outliers visible rather than treating one p95 or one cold
+launch as a typical user-visible result.
 
 Single-sample cold-launch observations did not show a regression: Android
 reported 1,538 ms for TEXT and 1,175 ms for binary; the iOS `simctl launch`
@@ -510,6 +621,19 @@ request took 0.53 s and 0.51 s respectively. They are sanity checks, not claims
 that binary is faster. Android first-screen memory was effectively identical
 (TEXT/binary total PSS 100,986/100,980 KiB), as was the post-practice snapshot
 (153,258/153,321 KiB). No repeatable memory cost was observed.
+
+The original prototype run did not record process CPU time. A bounded
+post-implementation guardrail therefore reran the same benchmark script and ID
+corpus three times through the production dual reader at
+`461f64c03416d2c5881cf90d4037a6d89de2db35`, comparing the retained TEXT pack
+with released Core Pack v5 (`4f8726cd64c8e490708f9c6b7b411dad3736d5936c0493d71fd42bbe4404a811`).
+TEXT user/system CPU seconds were 1.31/0.46, 1.30/0.46, and 1.32/0.47; binary
+values were 2.14/0.49, 2.20/0.46, and 2.01/0.44. This follow-up is explicitly
+production-reader evidence, not a relabelling of the original prototype run;
+it found less than one extra CPU second across the complete synthetic campaign.
+The follow-up command was `/usr/bin/time -lp node --expose-gc
+--experimental-strip-types --no-warnings
+scratch/issue-490/benchmark-pack-reader.mjs <pack.sqlite>`.
 
 ## Versioning, determinism, and corruption contract
 
