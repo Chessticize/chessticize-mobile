@@ -48,8 +48,8 @@
     ]
   },
   "currentVersionWhatsNew": {
-    "sourceTag": "ios-v1.3.5-build-2",
+    "sourceTag": "ios-v1.4.0-build-1",
     "status": "release-candidate",
-    "storeCopy": "• Saved the active puzzle as Incomplete when the Sprint clock reaches zero, without counting it as a mistake.\n• Made Incomplete attempts easy to find in History and mark as Unclear.\n• Kept Arrow Duel Replay guidance immediate without shifting the board."
+    "storeCopy": "• After choosing the stronger move, find the opponent’s best reply in Arrow Duel.\n• Reorder saved Runs with smoother drag feedback and haptics, and scan Add Run themes faster.\n• Keep all 1.4 million offline puzzles with a smaller bundled puzzle library."
   }
 }

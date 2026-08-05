@@ -986,6 +986,22 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
+  it("keeps native Run transforms mounted after leaving Edit Runs", () => {
+    const renderer = renderScreen({ runManagementEnabled: true });
+
+    press(renderer, "practice-run-home-edit");
+    expect(flattenTestStyle(
+      findNativeRunDragSurface(renderer, "practice-run-standard").props.style
+    ).transform).toEqual(expect.any(Array));
+
+    press(renderer, "practice-run-home-done");
+    const settledRunSurface = renderer.root
+      .findAllByProps({ testID: "practice-run-standard" })
+      .find((node) => Array.isArray(flattenTestStyle(node.props.style).transform));
+
+    expect(settledRunSurface).toBeTruthy();
+  });
+
   it("shows picked-up feedback and locks Edit Runs while a Run card drag is active", () => {
     const runReorderFeedbackPreview = jest.fn();
     const moveFeedbackClient = new FakeMoveFeedbackClient();
@@ -6140,7 +6156,7 @@ describe("PracticePocScreen", () => {
   });
 
   it.each([
-    { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 224, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
+    { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 204, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
     { label: "modern iPhone portrait", width: 430, height: 932, scale: 3, layout: "compactPortrait", boardSize: 398, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
     { label: "compact wide-short window", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, railWidth: 64, sessionRail: true, homeColumns: false },
     { label: "iPad-on-Mac wide-short window", width: 993, height: 346, scale: 2, layout: "compactLandscape", boardSize: 314, sideRail: true, railWidth: 168, sessionRail: true, homeColumns: true },

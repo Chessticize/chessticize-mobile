@@ -53,7 +53,16 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await openNewRunEditor();
       await element(by.id('practice-run-name-input')).replaceText(CUSTOM_RUN_NAME);
       await element(by.id('custom-mode-arrow-duel')).tap();
+      await waitFor(element(by.id('practice-run-arrow-duel-reply-setting')))
+        .toExist()
+        .withTimeout(10000);
       await element(by.id('custom-mode-regular')).tap();
+      await waitFor(element(by.id('practice-run-arrow-duel-reply-setting')))
+        .not.toExist()
+        .withTimeout(10000);
+      await expect(element(by.id('practice-run-theme-selection-detail'))).toHaveText('All themes');
+      await expect(element(by.id(CUSTOM_RUN_THEME_TEST_ID))).not.toExist();
+      await element(by.id('practice-run-theme-disclosure')).tap();
       await waitForVisibleInPracticeScroll(CUSTOM_RUN_THEME_TEST_ID);
       await element(by.id(CUSTOM_RUN_THEME_TEST_ID)).tap();
       await waitForVisibleInPracticeScroll('practice-run-duration-stepper-decrease');

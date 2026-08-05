@@ -39,7 +39,11 @@ describe('Android Review reminders through public and system surfaces', () => {
   });
 
   beforeEach(async () => {
-    await launchWithFreshAndroidRuntimePermission(resetNotificationPermission);
+    await launchWithFreshAndroidRuntimePermission(
+      resetNotificationPermission,
+      launchWithDisabledSynchronization,
+      waitForFreshInstallPracticeHome
+    );
     await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
   });
 
@@ -182,6 +186,13 @@ function resetNotificationPermission() {
   adbShell(['pm', 'revoke', APP_ID, PERMISSION]);
   adbShell(['pm', 'clear-permission-flags', APP_ID, PERMISSION, 'user-set']);
   adbShell(['pm', 'clear-permission-flags', APP_ID, PERMISSION, 'user-fixed']);
+}
+
+async function waitForFreshInstallPracticeHome() {
+  // The clean install owns the first puzzle-pack copy. Do not terminate it to
+  // reset permission state until the real Practice surface proves that copy is
+  // complete, or the next launch can observe a partial local SQLite image.
+  await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
 }
 
 function deviceTimezone() {

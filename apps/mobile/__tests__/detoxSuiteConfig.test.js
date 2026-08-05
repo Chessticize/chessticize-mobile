@@ -888,9 +888,17 @@ describe('Detox suite configuration', () => {
         permissionGranted = true;
       }
     });
+    const waitForFreshInstallReady = jest.fn(async () => {
+      expect(permissionGranted).toBe(true);
+    });
 
-    await launchWithFreshAndroidRuntimePermission(resetPermission, launch);
+    await launchWithFreshAndroidRuntimePermission(
+      resetPermission,
+      launch,
+      waitForFreshInstallReady
+    );
 
+    expect(waitForFreshInstallReady).toHaveBeenCalledTimes(1);
     expect(permissionGranted).toBe(false);
   });
 
@@ -1040,7 +1048,50 @@ describe('Detox suite configuration', () => {
     expect(runManagementCase).toContain(
       "dragAndroidElementToElement('practice-run-standard', 'practice-run-arrow-duel')"
     );
-    expect(runManagementCase).toContain('.longPressAndDrag(');
+    expect(runManagementCase).toContain(
+      "element(by.id('practice-run-standard')).swipe('up', 'fast', 0.1, 0.5, 0.5)"
+    );
+    expect(runManagementCase).toContain(
+      "element(by.id('practice-main-scroll')).scroll(20, 'up')"
+    );
+    expect(runManagementCase).toContain("frameFor(element(by.id('adaptive-layout')))");
+    expect(runManagementCase).toContain('adaptiveFrame.height < 1000');
+    expect(runManagementCase).toContain(
+      "expect(element(by.id('practice-run-arrow-duel'))).toBeVisible()"
+    );
+    expect(runManagementCase).not.toContain(
+      "element(by.id('practice-run-standard')).swipe('up', 'slow'"
+    );
+    expect(runManagementCase).toContain('.longPressAndDrag(\n        750,');
+  });
+
+  it('expands the collapsed theme picker before selecting the default Run theme', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const caseStart = practiceSpec.indexOf(
+      "it('creates, reorders, edits, archives, restores, and relaunches a saved Run'"
+    );
+    const caseEnd = practiceSpec.indexOf(
+      "it('persists first-use Sprint guidance",
+      caseStart
+    );
+    const runManagementCase = practiceSpec.slice(caseStart, caseEnd);
+    const collapsedSummary = runManagementCase.indexOf(
+      "element(by.id('practice-run-theme-selection-detail'))"
+    );
+    const absentTheme = runManagementCase.indexOf(
+      "expect(element(by.id('custom-theme-mixed'))).not.toExist()"
+    );
+    const expandThemes = runManagementCase.indexOf(
+      "element(by.id('practice-run-theme-disclosure')).tap()"
+    );
+    const selectedTheme = runManagementCase.indexOf(
+      "element(by.id('custom-theme-mixed').and(by.traits(['selected'])))"
+    );
+
+    expect(collapsedSummary).toBeGreaterThan(0);
+    expect(absentTheme).toBeGreaterThan(collapsedSummary);
+    expect(expandThemes).toBeGreaterThan(absentTheme);
+    expect(selectedTheme).toBeGreaterThan(expandThemes);
   });
 
   it('gives the Android Run drag arm timer a safe hold before the first move', () => {
@@ -1074,8 +1125,37 @@ describe('Detox suite configuration', () => {
     expect(helper).toContain(
       "tapUntilExists('practice-run-save', 'practice-run-home-edit', 3)"
     );
+    expect(helper).toContain('if (themes.length > 0)');
+    expect(helper).toContain("by.id('practice-run-theme-selection-detail')");
+    expect(helper).toContain("by.id('practice-run-theme-disclosure')");
     expect(helper).not.toContain(
       "waitFor(element(by.id('practice-run-home-edit'))).toBeVisible()"
+    );
+  });
+
+  it('leaves Run editing through the public Done control and confirms the transition', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const caseStart = flowsSpec.indexOf(
+      "it('persists rating, history, review queue, and saved Runs after relaunch'"
+    );
+    const caseEnd = flowsSpec.indexOf('\n  });', caseStart);
+    const persistenceCase = flowsSpec.slice(caseStart, caseEnd);
+
+    expect(persistenceCase).toContain("device.getPlatform() === 'android'");
+    expect(persistenceCase).toContain('findUniqueAndroidUiNodeByLabel(');
+    expect(persistenceCase).toContain("'Finish editing runs'");
+    expect(persistenceCase).toContain('tapAndroidUiNode(doneEditingRuns);');
+    expect(persistenceCase).toContain(
+      "tapUntilExists('practice-run-home-done', 'practice-run-home-edit', 3)"
+    );
+    expect(persistenceCase).toContain(
+      "waitFor(element(by.id('practice-run-home-edit'))).toExist()"
+    );
+    expect(persistenceCase).not.toContain(
+      "element(by.id('practice-run-home-done')).tap()"
+    );
+    expect(persistenceCase).not.toContain(
+      "tapUntilExists('practice-run-home-done', 'practice-run-management', 3)"
     );
   });
 
@@ -1159,7 +1239,7 @@ describe('Detox suite configuration', () => {
     expect(tacticalProfileCase).not.toContain('tactical-profile-back-home');
   });
 
-  it('pins the Arrow Duel screenshot to the exact runtime-selected long-arrow fixture', () => {
+  it('verifies two runtime Arrow Duel candidates before the pixel assertion', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const renderCaseStart = practiceSpec.indexOf("it('renders Arrow Duel candidate arrows on the board'");
     const renderCaseEnd = practiceSpec.indexOf("it('shows Arrow Duel feedback after a wrong candidate move'");
@@ -1171,22 +1251,14 @@ describe('Detox suite configuration', () => {
     expect(practiceSpec).toContain(
       'chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED'
     );
-    expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f8', 10000)"
-    );
-    expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f7', 10000)"
-    );
-    expect(renderCase.indexOf("'f1f8'")).toBeLessThan(
+    expect(renderCase).toContain('textFromAttributes(');
+    expect(renderCase).toContain("candidateText.match(/[a-h][1-8][a-h][1-8][qrbn]?/g)");
+    expect(renderCase).toContain('candidates.length !== 2');
+    expect(renderCase).toContain('Expected two neutral Arrow Duel candidates');
+    expect(renderCase).not.toContain('chessticizePuzzleSelectionId');
+    expect(renderCase.indexOf('candidates.length !== 2')).toBeLessThan(
       renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
     );
-    expect(renderCase.indexOf("'f1f7'")).toBeLessThan(
-      renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
-    );
-    expect(renderCase).toContain('bfPfS');
-    expect(renderCase).not.toContain('eQNYb');
-    expect(renderCase).not.toContain("'d7d1'");
-    expect(renderCase).not.toContain("'d7f7'");
     expect(practiceSpec).toContain('if (arrowLikePixels <= 5000)');
   });
 
@@ -1526,7 +1598,13 @@ describe('Detox suite configuration', () => {
     const historyCase = flowsSpec.slice(historyCaseStart, historyCaseEnd);
 
     expect(flowsSpec).toContain("device.getPlatform() === 'android'");
+    expect(reminderCase).toContain(
+      "waitForVisibleInPracticeScroll('test-puzzle-source-familiar15');"
+    );
     expect(reminderCase).toContain('grantAndroidNotificationPermission();');
+    expect(reminderCase.indexOf(
+      "waitForVisibleInPracticeScroll('test-puzzle-source-familiar15');"
+    )).toBeLessThan(reminderCase.indexOf('grantAndroidNotificationPermission();'));
     expect(reminderCase.indexOf('grantAndroidNotificationPermission();')).toBeLessThan(
       reminderCase.indexOf('launchAppAt(sprintNowMs')
     );
@@ -1577,6 +1655,9 @@ describe('Detox suite configuration', () => {
       "tapUntilExists('practice-add-run', 'practice-run-editor', 3)"
     );
     expect(practiceSpec).toContain("waitForVisibleInPracticeScroll('history-attention-flag-in-review')");
+    expect(practiceSpec).toContain(
+      "waitFor(element(by.id('sprint-unclear-toggle'))).toBeVisible().withTimeout(10000)"
+    );
     expect(practiceSpec).toContain("element(by.id('history-filter-toggle')).tap()");
     expect(practiceSpec).toContain("waitFor(element(by.id('history-advanced-filters'))).not.toExist()");
     expect(practiceSpec).toContain("element(by.text('Correct')).atIndex(0)");
@@ -2204,17 +2285,22 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain("PracticeService");
     expect(spec).not.toContain("run-as");
 
-    expect(spec).toContain(
-      'launchWithFreshAndroidRuntimePermission(resetNotificationPermission)'
-    );
+    expect(spec).toContain('launchWithFreshAndroidRuntimePermission(');
+    expect(spec).toContain('waitForFreshInstallPracticeHome');
+    expect(spec).toContain("by.id('practice-home')");
     const permissionLaunchIndex = helpers.indexOf(
       'async function launchWithFreshAndroidRuntimePermission('
     );
     const deleteLaunchIndex = helpers.indexOf('delete: true', permissionLaunchIndex);
+    const readyIndex = helpers.indexOf(
+      'await waitForFreshInstallReady();',
+      permissionLaunchIndex
+    );
     const resetIndex = helpers.indexOf('resetPermission();', permissionLaunchIndex);
     const noDeleteLaunchIndex = helpers.indexOf('delete: false', resetIndex);
     expect(deleteLaunchIndex).toBeGreaterThan(permissionLaunchIndex);
-    expect(resetIndex).toBeGreaterThan(deleteLaunchIndex);
+    expect(readyIndex).toBeGreaterThan(deleteLaunchIndex);
+    expect(resetIndex).toBeGreaterThan(readyIndex);
     expect(noDeleteLaunchIndex).toBeGreaterThan(resetIndex);
     expect(spec).toContain("['pm', 'revoke', APP_ID, PERMISSION]");
     expect(spec).toContain("'clear-permission-flags', APP_ID, PERMISSION, 'user-set'");

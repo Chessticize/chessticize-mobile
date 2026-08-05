@@ -1,6 +1,6 @@
 ---
 name: chessticize-release-delta-qa
-description: Audit Chessticize Mobile changes since an exact published release with simulator visual verification as the primary acceptance layer. Identify changed screens and states, capture and inspect the exact-head Release app across relevant viewports and orientations, judge functional correctness, copy quality, and presentation quality such as hierarchy, alignment, typography, spacing, and visual balance, use automated tests as supporting evidence, file visual, copy, aesthetic, layout, or functional product defects without fixing them, and repair proven test or workflow drift. Use for post-release regression sweeps, pre-release visual QA, requests to summarize fixes since a version, or requests to have a subagent validate changed mobile journeys.
+description: Audit Chessticize Mobile changes since an exact published release with simulator visual verification as the primary acceptance layer and a locked-Mac-compatible Release build gate for iPad landscape geometry. Identify changed screens and states, capture and inspect the exact-head Release app across relevant viewports and orientations, judge functional correctness, copy quality, and presentation quality such as hierarchy, alignment, typography, spacing, and visual balance, use automated tests as supporting evidence, file visual, copy, aesthetic, layout, or functional product defects without fixing them, and repair proven test or workflow drift. Use for post-release regression sweeps, pre-release visual QA, iPad landscape release validation without unlocking macOS, requests to summarize fixes since a version, or requests to have a subagent validate changed mobile journeys.
 ---
 
 # Chessticize Release Delta QA
@@ -106,8 +106,11 @@ scope from the union of changes since the release, not only the newest PR.
   wide-short, live-resize, and foldable-sized component or Interaction Lab
   evidence for the same changed state. A portrait pass is not evidence for a
   wide or landscape layout.
-- Always capture and inspect the maintained fifteen Release scenes plus the
-  eleven layout-sensitive landscape scenes on a dedicated iPad simulator.
+- Always cover the maintained fifteen Release scenes. Capture and inspect them
+  when host visual calibration is available. For functional iPad landscape
+  geometry, always run the dedicated exact-head gate below; the eleven
+  layout-sensitive landscape screenshots are optional visual evidence and do
+  not replace that native-frame gate.
 - Keep ordinary full-screen iPhone simulator captures in portrait. Do not
   restore iPhone rotation merely to satisfy an older screenshot matrix.
 - Add another device family when the delta touches adaptive layout, Safe Area,
@@ -138,7 +141,25 @@ the app without Metro.
 
 ## 4. Capture And Inspect Release Simulator Evidence
 
-From the clean exact application head, run the existing calibration workflow:
+From the clean exact application head, run the iPad landscape functional gate:
+
+```sh
+pnpm mobile:verify:ios:landscape-layout
+```
+
+This command resolves a dedicated installed iPad simulator, copies the
+production Info.plist into the ignored build directory, restricts only that
+Release validation build to full-screen landscape, and verifies six product
+states through native element frames. It does not use the Simulator menu or
+macOS window automation, so it runs while the Mac is locked. Record the exact
+head, simulator, build result, app artifact checksum, and six-state result.
+Never commit the validation Info.plist or apply its landscape-only settings to
+the production target.
+
+Do not treat a locked Mac as a blocker for functional iPad landscape
+acceptance. A lock only prevents screenshot-based aesthetic inspection that
+depends on host Simulator rotation. When that additional visual evidence is
+requested and the host is unlocked, run the existing calibration workflow:
 
 ```sh
 DETOX_IOS_DEVICE="iPad Pro 11-inch (M5)" \
@@ -150,8 +171,9 @@ iPhone Release scenes with the portrait-only store-assets journey and archive
 its screenshots separately. Preserve each device's output directory before
 starting another capture so a later run cannot overwrite the evidence.
 
-Verify orientation from the app's observed adaptive-layout frame or the
-captured image dimensions before accepting each portrait or landscape file.
+Verify orientation from the functional gate's observed native root frame or
+the captured image dimensions before accepting each portrait or landscape
+result.
 The requested orientation, screenshot filename, and a successful capture
 command are not proof. If simulator rotation is ignored or the observed frame
 never reaches the requested orientation, fail the capture row as blocked and
@@ -291,8 +313,10 @@ Report:
 - Release build and capture commands, screenshot directories, Xcode, simulator
   profiles, orientations, and clean-worktree evidence.
 - Per-scene functional, copy, and presentation results with explicit
-  observations, including every maintained portrait and iPad landscape image
-  plus the required compact wide-short and foldable-sized lower-layer rows.
+  observations for the selected visual matrix, the six-state iPad landscape
+  native-frame result, and the required compact wide-short and foldable-sized
+  lower-layer rows. Identify optional landscape screenshots that were not
+  collected because host visual calibration was unavailable.
 - Matrix totals for pass, fail, blocked, and not-applicable.
 - Validation-drift repairs, their original failure evidence, exact changed
   artifacts, and passing rerun evidence.
@@ -300,5 +324,8 @@ Report:
 - Explicit checks still requiring physical hardware or account access.
 - The workflow/skill commit or PR when the user asked to persist the method.
 
-Do not describe the sweep as complete if a high-priority matrix row is blocked
-or if the build identity cannot be proven.
+Do not describe the sweep as complete if a high-priority functional matrix row
+is blocked, the iPad landscape native-frame gate fails when selected, or the
+build identity cannot be proven. A locked Mac alone does not block functional
+iPad landscape acceptance after the dedicated gate passes; report the omitted
+optional screenshot evidence precisely.
