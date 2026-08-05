@@ -1,6 +1,6 @@
 # App Store Assets
 
-This document is the 1.3.5 source of truth for App Store Connect metadata and
+This document is the 1.4 source of truth for App Store Connect metadata and
 store screenshot capture. Recheck Apple's live documentation before upload:
 
 - Screenshot specifications:
@@ -116,22 +116,23 @@ model-derived improvement.
 
 ### What's New
 
-For iOS 1.3.5, review this proposed ready-to-paste copy:
+For iOS 1.4, review this proposed ready-to-paste copy:
 
 ```text
-• Kept the chessboard steady when Arrow Duel Replay shows follow-up guidance.
-• Showed guidance immediately after a wrong Arrow Duel Replay choice.
+• After choosing the stronger move, find the opponent’s best reply in Arrow Duel.
+• Reorder saved Runs with smoother drag feedback and haptics, and scan Add Run themes faster.
+• Keep all 1.4 million offline puzzles with a smaller bundled puzzle library.
 ```
 
-This proposed copy is 147 / 300 Unicode characters, including line breaks.
+This proposed copy is 253 / 300 Unicode characters, including line breaks.
 Future versions must use the reusable template in
 [`docs/releases/RELEASE_NOTES_TEMPLATE.md`](releases/RELEASE_NOTES_TEMPLATE.md):
 lead with user benefits, use two or three short bullets, omit raw URLs, and do
 not call stable features experimental unless that qualification is an
 intentional product promise.
 
-This copy belongs to the proposed `ios-v1.3.5-build-2` release identity and
-must match `docs/releases/ios-v1.3.5-build-2.md` before the owner marks that
+This copy belongs to the proposed `ios-v1.4.0-build-1` release identity and
+must match `docs/releases/ios-v1.4.0-build-1.md` before the owner marks that
 note Approved. Issue #417 must retain a screenshot or exported metadata record
 showing the exact submitted text.
 
@@ -159,7 +160,7 @@ the resulting feature is declared.
 
 ## Screenshot Requirements
 
-The app targets iPhone and iPad for 1.3.5. The current automated capture plan
+The app targets iPhone and iPad for 1.4. The current automated capture plan
 covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
 The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
 Apple's current screenshot reference, rechecked on 2026-07-28, lists 6.9" as
@@ -186,10 +187,11 @@ Release rule:
 5. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
 
-The 1.3.5 change affects the transient Arrow Duel Replay follow-up prompt, which
-is not part of the six-frame marketing story. Exact-head component coverage
-verifies its copy, timing, fixed prompt geometry, and maintained adaptive
-viewports; the approved marketing screenshot set does not need regeneration.
+The 1.4 changes add the Arrow Duel opponent-reply handoff and improve Run
+management, neither of which changes the selected six-frame marketing moments.
+The prior approved marketing compositions may be reused only after the current
+metadata and screenshot audit passes. The separate release-delta workflow must
+still recapture and inspect its exact-head product baseline.
 
 ## Bundled Puzzle Pack Measurement
 
@@ -210,9 +212,15 @@ themes, and uses `WITHOUT ROWID`. It measures `227,487,744` bytes
 The same SQLite file measures `111,379,967` bytes (`106.22 MiB`) in a
 standalone ZIP level-9 test; measure the final signed APK/IPA separately because
 platform packaging and signing add other assets and metadata.
-The App fetches this immutable `core-pack-v4` asset by default; iOS and Android
+The published August 3 `core-pack-v5` binary row encoding preserves all
+1,400,000 puzzles and their semantic digest while storing FEN positions and
+UCI lines as versioned BLOB values. It measures `164,163,584` bytes
+(`156.56 MiB`), a further 27.84% reduction from v4, with SHA-256
+`4f8726cd64c8e490708f9c6b7b411dad3736d5936c0493d71fd42bbe4404a811`.
+The App fetches this immutable `core-pack-v5` asset by default; iOS and Android
 builds verify it against the committed manifest before copying it into the
-application bundle.
+application bundle. Measure the final signed candidate separately before
+approving the release-note size claim.
 
 ## Release-QA Screenshot Set
 
