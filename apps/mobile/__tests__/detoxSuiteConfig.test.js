@@ -1051,7 +1051,7 @@ describe('Detox suite configuration', () => {
     expect(runManagementCase).not.toContain(
       "element(by.id('practice-run-standard')).swipe('up', 'slow'"
     );
-    expect(runManagementCase).toContain('.longPressAndDrag(');
+    expect(runManagementCase).toContain('.longPressAndDrag(\n        750,');
   });
 
   it('expands the collapsed theme picker before selecting the default Run theme', () => {

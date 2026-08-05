@@ -104,7 +104,7 @@ describe('Practice POC', () => {
       await dragAndroidElementToElement('practice-run-standard', 'practice-run-arrow-duel');
     } else {
       await element(by.id('practice-run-standard')).longPressAndDrag(
-        300,
+        750,
         0.5,
         0.5,
         element(by.id('practice-run-arrow-duel')),
