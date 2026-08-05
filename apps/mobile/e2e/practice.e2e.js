@@ -63,7 +63,9 @@ describe('Practice POC', () => {
     await expect(element(by.id('practice-run-theme-selection-detail'))).toHaveText('All themes');
     await expect(element(by.id('custom-theme-mixed'))).not.toExist();
     await element(by.id('practice-run-theme-disclosure')).tap();
-    await expect(element(by.id('custom-theme-mixed').and(by.traits(['selected'])))).toExist();
+    await waitFor(element(by.id('custom-theme-mixed').and(by.traits(['selected']))))
+      .toExist()
+      .withTimeout(10000);
     await element(by.id('practice-run-name-input')).replaceText('Calculation Lab');
     await dismissRunNameKeyboard();
     await element(by.id('practice-main-scroll')).scrollTo('top');
