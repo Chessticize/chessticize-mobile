@@ -35,6 +35,10 @@ describe('Android Custom Practice release slice', () => {
       .toContainEqual({ kind: 'detox', suite: 'android-custom-practice' });
     expect(spec).toContain("by.id('practice-add-run')");
     expect(spec).toContain("by.id('practice-run-name-input')");
+    expect(spec).toContain("by.id('practice-run-arrow-duel-reply-setting')");
+    expect(spec).toContain("by.id('practice-run-theme-selection-detail')");
+    expect(spec).toContain("by.id('practice-run-theme-disclosure')");
+    expect(spec).toContain('expect(element(by.id(CUSTOM_RUN_THEME_TEST_ID))).not.toExist()');
     expect(spec).toContain('startSelectedPracticeRun,');
     expect(spec).toContain('await startSelectedPracticeRun();');
     expect(spec).not.toContain("await element(by.id('practice-run-start')).tap()");
