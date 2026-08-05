@@ -1,6 +1,6 @@
 # Issue #490 Binary Puzzle-Pack Encoding Research
 
-Status date: 2026-08-03
+Research date: 2026-08-03. Fail-closed follow-up: 2026-08-04.
 
 ## Scope and status
 
@@ -117,9 +117,10 @@ candidate because its bit allocation matches the domain exactly:
 
 The format description must choose one byte order and reserve every unused bit
 as zero. The decoder must reject an invalid byte length, nonzero reserved bits,
-an impossible piece count or piece code, invalid side/castling/en-passant
-state, invalid square or promotion code, and any position that fails the
-existing domain validation. SQLite's `integrity_check` verifies low-level page,
+an impossible piece count or piece code, an out-of-range en-passant code, an
+invalid square or promotion code, and any position that fails the existing
+domain validation. Castling flags must round-trip every canonical combination.
+SQLite's `integrity_check` verifies low-level page,
 record, table, index, and constraint consistency; it does not establish the
 chess semantics of an otherwise well-formed BLOB
 ([SQLite `integrity_check`](https://www.sqlite.org/pragma.html#pragma_integrity_check)).
@@ -325,11 +326,41 @@ identical at all three stages:
 | `PRAGMA integrity_check` | `ok` |
 | SQLite page size / freelist | 4,096 / 0 |
 
-Mutation checks rejected a truncated position, nonzero reserved position bits,
-an invalid piece code, an odd move length, a nonzero reserved move bit, and an
-invalid promotion code. Version rejection and artifact-hash rejection remain
-implementation requirements because the research reader was deliberately not
-promoted to production.
+The original mutation checks rejected a truncated position, nonzero reserved
+position bits, an invalid piece code, an odd move length, a nonzero reserved
+move bit, and an invalid promotion code. The temporary dual reader exercised
+both the TEXT control and BLOB candidate through the same 19-test public storage
+contract; both returned `ok` from `PRAGMA integrity_check`. The prototype did
+not pretend to prove version or artifact-hash rejection: those were explicit
+adoption gates because the research reader was deliberately removed.
+
+Those gates are no longer unanswered. The separately reviewed production
+implementation at commit
+`461f64c03416d2c5881cf90d4037a6d89de2db35` added the versioned reader,
+canonical codec validator, atomic generator, and authenticated manifest. On
+2026-08-04, the following exact follow-up commands passed at test-runner commit
+`0eb414bfa68dda07ad732755d33f95e1eed53669`; the production codec, reader,
+encoder, and pack-authentication sources and their focused tests were unchanged
+from `461f64c03416d2c5881cf90d4037a6d89de2db35`:
+
+```sh
+node --experimental-strip-types --test \
+  packages/storage/test/puzzle-pack-binary-codec.test.ts \
+  packages/storage/test/puzzle-pack-source.test.ts \
+  packages/storage/test/offline-puzzle-pack-binary-encode.test.mjs
+node --experimental-strip-types --test \
+  scripts/calibrate-tactical-profile.test.mjs
+```
+
+The first command passed 29/29 tests. Its fail-closed cases cover unknown
+format/codec versions before hydration, corrupt row payloads, invalid lengths,
+reserved bits, piece and promotion codes, non-canonical chess state, and atomic
+generator failure. It also round-trips side to move, castling, en passant, and
+underpromotion. The second command passed 14/14 tests, including deterministic
+rejection when the SQLite bytes do not match the manifest's size or SHA-256.
+This is explicitly post-research implementation evidence, not a relabelling of
+the original prototype run; it closes the risks that the research correctly
+left as mandatory gates.
 
 The raw database result was:
 
@@ -359,6 +390,9 @@ byte-identical JavaScript bundles.
 | Android E2E APK | `cf18ac9a4765bbc82eb57d29d48713decfd063bd4a333bc8f94e4966aec62f80` | `0825e510271187293e272e54adf7e1013c027bf8303f6dfc732cdf1c3f43f2ae` |
 | Android device-targetable APK-set archive | `3172f718173af60f6638326d8375c7029908ec3a4d0af785cf1bbd0a21c8d6c7` | `27c9fc48ca054df285e36ada18c062f55f04c6f888cfc75f27a3734e37bf24a6` |
 | Android universal APK-set archive | `d25d32bac5c9059dbd576f522e4925a5a8bf1881b0d07b4c081283efd720913a` | `a33a0c80f8c3bb348aed93fc8552964cb0072169956c4d54425ee3c1a058d2f3` |
+| SQLite gzip level-9 proxy | `1112e29fceedccad301e2aefe7e963168a10cd67f9ca22584864c3672ceb394d` | `f6386c777c931c92363c465e7f887b78f79e96219eb570305de66fc3e2b480d4` |
+| SQLite ZIP level-9 proxy | `12e880a24bd5b05b6d85b97cf4b6e0d0191d2da6c070c16b6346f2f75aab2d87` | `6c5729b1a888875e1e41d76e236894e58a0d3833a2b54f6ce1286bb79e77be11` |
+| SQLite Brotli quality-11 proxy | `493e8df8777052b8f7a9fd9093f273da8cf0ac060937515b100c5cd138707a6c` | `9bae90e42c36f1f967c768cdf2d5de7b815a2d27988c0550276cfc14a93b5f9f` |
 | iOS Hermes bundle | `a58644fbe68711c5dbbc03eaf72863a15f0a192acfad475871dca9c84f183844` | same |
 | iOS simulator ZIP proxy | `eac46a15d6aaa1d02308e83f18486741661aadae8c31be72a038ee3e95bfe8b3` | `731f4248a01b8e04e1215c4fbaa4bee6d7be102bf3751183175e0a8ec7ac90cc` |
 
@@ -394,11 +428,15 @@ node --experimental-strip-types --test packages/storage/test/puzzle-pack-source.
 pnpm typecheck
 ```
 
-The ignored research generator was invoked against that exact control artifact
-and recorded its own source and result hashes above:
+The ignored research generator and benchmark were invoked against that exact
+control artifact. Their source/result hashes and the output hashes above make
+the retained evidence auditable, while the normative bit profile is the
+independent reproduction contract. They are intentionally not committed
+production tools, so a fresh reproduction must implement that profile rather
+than depend on an ignored local filename:
 
 ```sh
-node scratch/issue-490/generate-binary-pack.mjs \
+node --no-warnings scratch/issue-490/generate-binary-pack.mjs \
   fixtures/puzzles/bundled-core-pack.sqlite \
   scratch/issue-490/bundled-core-pack-binary.sqlite \
   scratch/issue-490/binary-pack-generation.json
@@ -416,10 +454,15 @@ zip -9 -j -q scratch/issue-490/binary.sqlite.zip \
   scratch/issue-490/bundled-core-pack-binary.sqlite
 node --expose-gc --experimental-strip-types --no-warnings \
   scratch/issue-490/benchmark-pack-reader.mjs \
-  fixtures/puzzles/bundled-core-pack.sqlite
+  fixtures/puzzles/bundled-core-pack.sqlite \
+  > scratch/issue-490/benchmark-text.json
 node --expose-gc --experimental-strip-types --no-warnings \
   scratch/issue-490/benchmark-pack-reader.mjs \
-  scratch/issue-490/bundled-core-pack-binary.sqlite
+  scratch/issue-490/bundled-core-pack-binary.sqlite \
+  > scratch/issue-490/benchmark-binary.json
+shasum -a 256 \
+  scratch/issue-490/{text,binary}.sqlite.{gz,zip,br} \
+  scratch/issue-490/benchmark-{text,binary}.json
 ```
 
 Matched Android artifacts used the repository's `e2e` Gradle variant with a
@@ -431,11 +474,32 @@ table proves the JavaScript payload was held constant within each platform.
 The relevant build and public-UI validation entry points were:
 
 ```sh
-./apps/mobile/android/gradlew -p apps/mobile/android \
-  createBundleE2eJsAndAssets --rerun-tasks bundleE2e assembleE2e \
-  assembleAndroidTest -DtestBuildType=e2e
+(cd apps/mobile/android && \
+  ./gradlew createBundleE2eJsAndAssets --rerun-tasks \
+  bundleE2e assembleE2e assembleAndroidTest -DtestBuildType=e2e)
 pnpm mobile:e2e:build:ios:release
-pnpm mobile:e2e:test:android -- e2e/android-standard-practice.e2e.js
+(cd apps/mobile && \
+  DETOX_ACTIVE_SUITE=android-standard-practice \
+  DETOX_ANDROID_DEVICE=emulator-5554 \
+  pnpm exec detox test --configuration android.attached.e2e --cleanup)
+```
+
+The fixture swap and app-bundle capture were explicit and hash-checked. The
+tracked TEXT pack was restored before the report commit:
+
+```sh
+cp fixtures/puzzles/bundled-core-pack.sqlite \
+  scratch/issue-490/bundled-core-pack-text.sqlite
+shasum -a 256 scratch/issue-490/bundled-core-pack-text.sqlite
+cp scratch/issue-490/bundled-core-pack-binary.sqlite \
+  fixtures/puzzles/bundled-core-pack.sqlite
+shasum -a 256 fixtures/puzzles/bundled-core-pack.sqlite
+pnpm mobile:e2e:build:ios:release
+ditto apps/mobile/ios/build-release/Build/Products/Release-iphonesimulator/Chessticize.app \
+  scratch/issue-490/ios/binary/Chessticize.app
+cp scratch/issue-490/bundled-core-pack-text.sqlite \
+  fixtures/puzzles/bundled-core-pack.sqlite
+shasum -a 256 fixtures/puzzles/bundled-core-pack.sqlite
 ```
 
 The exact Android delivery estimates used debug-signed APK-set archives built
@@ -466,6 +530,12 @@ done
 Installed-data, file, memory, and simulator ZIP accounting used:
 
 ```sh
+emulator -avd Chessticize-Play-API36 -memory 4096 \
+  -partition-size 8192 -cores 4 -gpu swiftshader \
+  -no-snapshot-load -no-snapshot-save -no-audio -no-boot-anim -no-window
+adb -s emulator-5554 uninstall com.chessticize.mobile.test
+adb -s emulator-5554 uninstall com.chessticize.mobile
+adb -s emulator-5554 install scratch/issue-490/android/text/app-e2e.apk
 adb -s emulator-5554 shell run-as com.chessticize.mobile du -ak .
 adb -s emulator-5554 shell "run-as com.chessticize.mobile \
   stat -c '%n:%s:%b:%B' databases/*.sqlite files/profileInstalled \
@@ -473,23 +543,47 @@ adb -s emulator-5554 shell "run-as com.chessticize.mobile \
 adb -s emulator-5554 shell dumpsys meminfo com.chessticize.mobile
 adb -s emulator-5554 shell am start -W -S \
   com.chessticize.mobile/.MainActivity
+adb -s emulator-5554 uninstall com.chessticize.mobile
+adb -s emulator-5554 install scratch/issue-490/android/binary/app-e2e.apk
 
+xcrun simctl create iPhone-17-Issue490 \
+  com.apple.CoreSimulator.SimDeviceType.iPhone-17 \
+  com.apple.CoreSimulator.SimRuntime.iOS-26-5
+IOS_DEVICE=B37759DD-ACF2-45A8-A127-553A706D8FD2
+xcrun simctl boot "$IOS_DEVICE"
+xcrun simctl bootstatus "$IOS_DEVICE" -b
+xcrun simctl install "$IOS_DEVICE" \
+  scratch/issue-490/ios/text/Chessticize.app
 IOS_DATA=$(xcrun simctl get_app_container "$IOS_DEVICE" \
   com.chessticize.mobile data)
 du -ak "$IOS_DATA"
 find "$IOS_DATA" -type f -exec stat -f '%N:%z:%b:%k' {} +
 /usr/bin/time -p xcrun simctl launch --terminate-running-process \
   "$IOS_DEVICE" com.chessticize.mobile
+xcrun simctl terminate "$IOS_DEVICE" com.chessticize.mobile
+xcrun simctl uninstall "$IOS_DEVICE" com.chessticize.mobile
+xcrun simctl install "$IOS_DEVICE" \
+  scratch/issue-490/ios/binary/Chessticize.app
 (cd scratch/issue-490/ios/text && \
   /usr/bin/zip -qry -9 text-simulator.zip Chessticize.app)
 (cd scratch/issue-490/ios/binary && \
   /usr/bin/zip -qry -9 binary-simulator.zip Chessticize.app)
 ```
 
-The iOS public-UI check used `detox test --configuration ios.sim.release`
-against a temporary issue-scoped spec; that spec and its test-only native
+The iOS public-UI check's exact invocation was:
+
+```sh
+(cd apps/mobile && \
+  DETOX_ACTIVE_SUITE=issue-490-ios-practice \
+  DETOX_IOS_DEVICE=iPhone-17-Issue490 \
+  DETOX_IOS_DEVICE_UDID=B37759DD-ACF2-45A8-A127-553A706D8FD2 \
+  pnpm exec detox test --configuration ios.sim.release --cleanup)
+```
+
+It selected a temporary issue-scoped spec; that spec and its test-only native
 launch adapter were removed rather than presented as a maintained regression
-suite.
+suite. Cleanup used `xcrun simctl shutdown` followed by `xcrun simctl delete`
+for the recorded UUID.
 
 The binary runs temporarily replaced the packaged fixture only after the
 control artifacts had been copied to `scratch/`. The tracked fixture, reader,
@@ -666,10 +760,10 @@ Deterministic generation requires a normative codec description with:
 The prototype verifier must validate all 1,400,000 decoded rows against the
 current domain representation, then re-encode them and compare exact candidate
 bytes. It must also include mutation tests for truncated and odd-length BLOBs,
-unknown versions, reserved bits, impossible piece/promotion codes, invalid
-castling/en-passant state, and artifact hash mismatch. `PRAGMA integrity_check`
-and existing pack validation remain required but are not substitutes for these
-codec checks.
+unknown versions, reserved bits, impossible piece/promotion codes,
+non-canonical FEN or en-passant state, and artifact hash mismatch. `PRAGMA
+integrity_check` and existing pack validation remain required but are not
+substitutes for these codec checks.
 
 ## Decision and implementation plan
 
