@@ -13,8 +13,10 @@ Storybook deployment is public and must not require authentication.
 
 ## Deployment model
 
-- `.github/workflows/mobile-lab.yml` validates every branch push, builds with a
-  pinned Vercel CLI, and uploads the prebuilt output from that exact commit.
+- `.github/workflows/mobile-lab.yml` validates every branch push, installs the
+  exact-pinned Vercel CLI from the frozen repository lockfile, and uploads the
+  prebuilt output from that exact commit. Its CLI and transitive dependencies
+  are therefore covered by pnpm's lockfile integrity and build-script policy.
 - A push to `main` uses the Vercel Production environment and updates the
   project's stable Production domain.
 - A push to any other branch uses the Vercel Preview environment. Git metadata
@@ -81,8 +83,9 @@ Only during that initial provisioning or an owner-directed project replacement,
 a project owner can run:
 
 ```sh
-pnpm dlx vercel@58.4.4 login
-pnpm dlx vercel@58.4.4 link
+pnpm install --frozen-lockfile
+pnpm exec vercel login
+pnpm exec vercel link
 ```
 
 The ignored `.vercel/project.json` file contains `orgId` and `projectId`. Add
