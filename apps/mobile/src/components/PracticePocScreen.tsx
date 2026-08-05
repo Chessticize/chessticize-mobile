@@ -8142,15 +8142,17 @@ function RunCardDropSurface({
       onTouchStart={armNativeDrag}
       style={[
         style,
-        draggable ? {
+        // Fabric may still hold a synchronous native-driver transform override
+        // when Edit Runs closes, so keep the React prop type stable at zero.
+        {
           transform: [
-            { translateY: committedDropSettling ? 0 : nativeDragOffset },
-            { translateY: committedDropSettling ? 0 : nativeDropPreviewOffset },
-            { translateX: dragging ? 10 : 0 },
-            { translateY: dragging ? -2 : 0 },
-            { scale: dragging ? 1.015 : 1 }
+            { translateY: draggable && !committedDropSettling ? nativeDragOffset : 0 },
+            { translateY: draggable && !committedDropSettling ? nativeDropPreviewOffset : 0 },
+            { translateX: draggable && dragging ? 10 : 0 },
+            { translateY: draggable && dragging ? -2 : 0 },
+            { scale: draggable && dragging ? 1.015 : 1 }
           ]
-        } : null,
+        },
         dragging ? styles.runCardNativeDragging : null
       ]}
       testID={testID}
