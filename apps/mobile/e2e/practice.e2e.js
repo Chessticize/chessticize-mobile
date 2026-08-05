@@ -30,9 +30,8 @@ const {
   FIRST_STANDARD_FEEDBACK_MOVES,
 } = require('./familiar15Fixture');
 
-// The visual assertion measures absolute painted arrow area. Pin the public
-// service's packaged-core selection to two long candidate vectors so random
-// move geometry cannot turn that rendering check into a pixel-count lottery.
+// Keep this seed stable to reduce fixture churn. The test reads and validates
+// the actual runtime candidates before checking that both neutral arrows paint.
 const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v4:23';
 
 describe('Practice POC', () => {
