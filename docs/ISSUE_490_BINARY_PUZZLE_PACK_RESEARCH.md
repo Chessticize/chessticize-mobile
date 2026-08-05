@@ -27,19 +27,19 @@ artifact is part of this documentation-only PR.
 The release baseline is not JSON. The app ships a generated, read-only SQLite
 database. Its `puzzles` table stores `initial_fen`, `solution_moves`, and
 `stockfish_bestmove` as `TEXT`
-([generator schema](../scripts/generate-offline-puzzle-fixture.mjs)). The JSON
+([generator schema](https://github.com/Chessticize/chessticize-mobile/blob/eeb9e359e72b035d34e22039d025de95f6aab9db/scripts/generate-offline-puzzle-fixture.mjs)). The JSON
 pack is retained only as a small development/test compatibility fixture and is
 not the release-default puzzle source
-([fixture documentation](../fixtures/puzzles/README.md)).
+([fixture documentation](https://github.com/Chessticize/chessticize-mobile/blob/eeb9e359e72b035d34e22039d025de95f6aab9db/fixtures/puzzles/README.md)).
 
 The current `core-pack-v4` manifest records 1,400,000 puzzles, a raw SQLite
 size of 227,487,744 bytes, and SHA-256
 `74a81e54729dd1f4f9adee375c728e22ac758d3211e2da81d3b5bd702380083b`
-([manifest](../fixtures/puzzles/bundled-core-pack.manifest.json)). The existing
+([manifest](https://github.com/Chessticize/chessticize-mobile/blob/eeb9e359e72b035d34e22039d025de95f6aab9db/fixtures/puzzles/bundled-core-pack.manifest.json)). The existing
 pack report records a ZIP level-9 proxy of 111,379,967 bytes, 51% below the raw
 database, while explicitly warning that this is not a signed APK/IPA
 measurement
-([sampling report](PUZZLE_PACK_SAMPLING.md#theme-index-optimization-release-2026-07-30)).
+([sampling report](https://github.com/Chessticize/chessticize-mobile/blob/eeb9e359e72b035d34e22039d025de95f6aab9db/docs/PUZZLE_PACK_SAMPLING.md#theme-index-optimization-release-2026-07-30)).
 
 The issue's current page-level reconstruction estimates that replacing both
 position and move text with the proposed binary forms could reduce the raw
@@ -52,7 +52,7 @@ The matched simulator/emulator runs established the effective delivery
 behavior on both platforms: the pack exists in the installed application and
 is copied into the app data container on first launch. This follows the
 platform adapter's bundled-database opening path in
-[`DeviceSQLiteStore`](../apps/mobile/src/platform/deviceSQLiteStore.ts). A raw
+[`DeviceSQLiteStore`](https://github.com/Chessticize/chessticize-mobile/blob/eeb9e359e72b035d34e22039d025de95f6aab9db/apps/mobile/src/platform/deviceSQLiteStore.ts). A raw
 pack reduction therefore applies twice after first launch on both measured
 platforms: once in the installed app and once in app data. Packaging
 compression changes the installed-app contribution on Android, while the iOS
@@ -76,7 +76,7 @@ native storage module. OP-SQLite's official API accepts `ArrayBuffer` and typed
 arrays for BLOB values and returns data that can be viewed as `Uint8Array`
 ([OP-SQLite BLOB support](https://op-engineering.github.io/op-sqlite/docs/api/#blob-support)).
 The app currently pins React Native 0.86.0 and OP-SQLite 17.1.1
-([mobile dependencies](../apps/mobile/package.json)).
+([mobile dependencies](https://github.com/Chessticize/chessticize-mobile/blob/eeb9e359e72b035d34e22039d025de95f6aab9db/apps/mobile/package.json)).
 
 Replacing the database with a single MessagePack, CBOR, Protobuf, or
 FlatBuffers file would require rebuilding the rating/theme indexes, random
@@ -126,7 +126,7 @@ chess semantics of an otherwise well-formed BLOB
 
 The current pack stores compact FEN's first four fields. The reader restores
 the omitted halfmove and fullmove fields as `0 1`
-([current reader](../packages/storage/src/sqlite-puzzle-pack-source.ts)). The
+([current reader](https://github.com/Chessticize/chessticize-mobile/blob/eeb9e359e72b035d34e22039d025de95f6aab9db/packages/storage/src/sqlite-puzzle-pack-source.ts)). The
 round-trip oracle should therefore be equality to the current canonical domain
 position, not byte equality to a six-field source FEN that the release pack
 does not preserve today.
