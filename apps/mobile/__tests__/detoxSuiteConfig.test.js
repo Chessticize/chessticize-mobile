@@ -1125,6 +1125,22 @@ describe('Detox suite configuration', () => {
     );
   });
 
+  it('retries leaving Run editing until the public Run manager confirms the transition', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const caseStart = flowsSpec.indexOf(
+      "it('persists rating, history, review queue, and saved Runs after relaunch'"
+    );
+    const caseEnd = flowsSpec.indexOf('\n  });', caseStart);
+    const persistenceCase = flowsSpec.slice(caseStart, caseEnd);
+
+    expect(persistenceCase).toContain(
+      "tapUntilExists('practice-run-home-done', 'practice-run-management', 3)"
+    );
+    expect(persistenceCase).not.toContain(
+      "element(by.id('practice-run-home-done')).tap()"
+    );
+  });
+
   it('dismisses the Run name keyboard through a public editor surface', () => {
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
     const helperStart = helpers.indexOf('async function dismissRunNameKeyboard');

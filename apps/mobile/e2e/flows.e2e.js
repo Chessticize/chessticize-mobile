@@ -371,8 +371,7 @@ describe('Key user flows', () => {
     await element(by.id('practice-run-elo-input')).replaceText('700');
     await element(by.id('practice-run-save')).tap();
     await element(by.id('practice-main-scroll')).scrollTo('top');
-    await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
-    await element(by.id('practice-run-home-done')).tap();
+    await tapUntilExists('practice-run-home-done', 'practice-run-management', 3);
     await waitForElementTextContaining('practice-mode-standard-rating', '700', 5000);
 
     await device.terminateApp();
