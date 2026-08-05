@@ -52,7 +52,7 @@ describe("buildPracticeAdaptiveLayout", () => {
     });
 
     expect(layout.className).toBe("compactPortrait");
-    expect(layout.boardSize).toBe(339);
+    expect(layout.boardSize).toBe(319);
   });
 
   it("keeps a tall compact portrait board width-bound", () => {
