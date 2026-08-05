@@ -129,6 +129,10 @@ async function failArrowDuelSprint() {
   await takePortraitScreenshotAtTop('app-store-14-arrow-duel-guide');
   await takeLandscapeScreenshot('app-store-14-arrow-duel-guide');
   await element(by.id('practice-session-guide-start')).tap();
+  await waitFor(element(by.id('practice-session-guide-coach-copy-arrow-duel-reply')))
+    .toExist()
+    .withTimeout(10000);
+  await element(by.id('practice-session-guide-start')).tap();
   await waitForVisibleInPracticeScroll('session-board');
 
   for (let mistakeCount = 1; mistakeCount <= 3; mistakeCount += 1) {

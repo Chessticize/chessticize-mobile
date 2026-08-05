@@ -1043,6 +1043,35 @@ describe('Detox suite configuration', () => {
     expect(runManagementCase).toContain('.longPressAndDrag(');
   });
 
+  it('expands the collapsed theme picker before selecting the default Run theme', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const caseStart = practiceSpec.indexOf(
+      "it('creates, reorders, edits, archives, restores, and relaunches a saved Run'"
+    );
+    const caseEnd = practiceSpec.indexOf(
+      "it('persists first-use Sprint guidance",
+      caseStart
+    );
+    const runManagementCase = practiceSpec.slice(caseStart, caseEnd);
+    const collapsedSummary = runManagementCase.indexOf(
+      "element(by.id('practice-run-theme-selection-detail'))"
+    );
+    const absentTheme = runManagementCase.indexOf(
+      "expect(element(by.id('custom-theme-mixed'))).not.toExist()"
+    );
+    const expandThemes = runManagementCase.indexOf(
+      "element(by.id('practice-run-theme-disclosure')).tap()"
+    );
+    const selectedTheme = runManagementCase.indexOf(
+      "element(by.id('custom-theme-mixed').and(by.traits(['selected'])))"
+    );
+
+    expect(collapsedSummary).toBeGreaterThan(0);
+    expect(absentTheme).toBeGreaterThan(collapsedSummary);
+    expect(expandThemes).toBeGreaterThan(absentTheme);
+    expect(selectedTheme).toBeGreaterThan(expandThemes);
+  });
+
   it('gives the Android Run drag arm timer a safe hold before the first move', () => {
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
     const helperStart = helpers.indexOf('async function dragAndroidElementToElement');
@@ -1172,19 +1201,21 @@ describe('Detox suite configuration', () => {
       'chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED'
     );
     expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f8', 10000)"
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'e6h6', 10000)"
     );
     expect(renderCase).toContain(
-      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f7', 10000)"
+      "waitForElementTextContaining('arrow-duel-candidate-overlay', 'd5c3', 10000)"
     );
-    expect(renderCase.indexOf("'f1f8'")).toBeLessThan(
+    expect(renderCase.indexOf("'e6h6'")).toBeLessThan(
       renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
     );
-    expect(renderCase.indexOf("'f1f7'")).toBeLessThan(
+    expect(renderCase.indexOf("'d5c3'")).toBeLessThan(
       renderCase.indexOf("takeScreenshot('arrow-duel-neutral-arrows')")
     );
-    expect(renderCase).toContain('bfPfS');
+    expect(renderCase).not.toContain('bfPfS');
     expect(renderCase).not.toContain('eQNYb');
+    expect(renderCase).not.toContain("'f1f8'");
+    expect(renderCase).not.toContain("'f1f7'");
     expect(renderCase).not.toContain("'d7d1'");
     expect(renderCase).not.toContain("'d7f7'");
     expect(practiceSpec).toContain('if (arrowLikePixels <= 5000)');

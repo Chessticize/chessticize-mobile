@@ -61,6 +61,8 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
     await withAndroidUiDiagnostics(async () => {
       await startArrowDuel();
       await playBoardMove('session-board', fixture.correctMove);
+      await waitFor(element(by.id('arrow-duel-reply-challenge'))).toBeVisible().withTimeout(10000);
+      await playBoardMove('session-board', fixture.puzzle.solutionMoves[1]);
 
       await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
       await waitFor(element(by.id('sprint-result-solved'))).toHaveText('Solved 1').withTimeout(10000);

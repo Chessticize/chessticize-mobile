@@ -60,6 +60,9 @@ describe('Practice POC', () => {
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await waitFor(element(by.id('practice-add-run'))).toBeVisible().withTimeout(10000);
     await tapUntilExists('practice-add-run', 'practice-run-editor', 3);
+    await expect(element(by.id('practice-run-theme-selection-detail'))).toHaveText('All themes');
+    await expect(element(by.id('custom-theme-mixed'))).not.toExist();
+    await element(by.id('practice-run-theme-disclosure')).tap();
     await expect(element(by.id('custom-theme-mixed').and(by.traits(['selected'])))).toExist();
     await element(by.id('practice-run-name-input')).replaceText('Calculation Lab');
     await dismissRunNameKeyboard();
@@ -192,11 +195,11 @@ describe('Practice POC', () => {
   it('renders Arrow Duel candidate arrows on the board', async () => {
     await startPracticeMode('arrow-duel');
     await waitForVisibleInPracticeScroll('session-board');
-    // The default 5/30 Arrow Duel config and pinned seed select packaged puzzle
-    // bfPfS through PracticeService's rating fallback. Candidate order is
-    // session-seeded, so wait for both long vectors without assuming order.
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f8', 10000);
-    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'f1f7', 10000);
+    // The default 5/30 Arrow Duel config and pinned seed select two long
+    // candidate vectors from the packaged Core Pack. Candidate order is
+    // session-seeded, so wait for both vectors without assuming order.
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'e6h6', 10000);
+    await waitForElementTextContaining('arrow-duel-candidate-overlay', 'd5c3', 10000);
 
     const boardFrame = await frameFor(element(by.id('session-board')));
     const screenshotPath = await device.takeScreenshot('arrow-duel-neutral-arrows');
