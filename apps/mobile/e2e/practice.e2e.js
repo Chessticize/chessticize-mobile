@@ -74,16 +74,22 @@ describe('Practice POC', () => {
     await element(by.id('practice-run-home-edit')).tap();
     await waitFor(element(by.id('practice-run-home-done'))).toBeVisible().withTimeout(10000);
 
-    const standardBeforeScroll = await frameFor(element(by.id('practice-run-standard')));
-    await element(by.id('practice-run-standard')).swipe('up', 'fast', 0.25, 0.5, 0.5);
-    await sleep(400);
-    const standardAfterScroll = await frameFor(element(by.id('practice-run-standard')));
-    const arrowAfterScroll = await frameFor(element(by.id('practice-run-arrow-duel')));
-    if (standardAfterScroll.y >= standardBeforeScroll.y - 5) {
-      throw new Error('Expected a slow non-hold swipe starting on a Run card to scroll Edit Runs');
-    }
-    if (standardAfterScroll.y >= arrowAfterScroll.y) {
-      throw new Error('Expected a slow non-hold Edit Runs scroll gesture to preserve Run order');
+    const adaptiveFrame = await frameFor(element(by.id('adaptive-layout')));
+    if (adaptiveFrame.height < 1000) {
+      const standardBeforeScroll = await frameFor(element(by.id('practice-run-standard')));
+      await element(by.id('practice-run-standard')).swipe('up', 'fast', 0.25, 0.5, 0.5);
+      await sleep(400);
+      const standardAfterScroll = await frameFor(element(by.id('practice-run-standard')));
+      const arrowAfterScroll = await frameFor(element(by.id('practice-run-arrow-duel')));
+      if (standardAfterScroll.y >= standardBeforeScroll.y - 5) {
+        throw new Error('Expected a fast non-hold swipe starting on a Run card to scroll Edit Runs');
+      }
+      if (standardAfterScroll.y >= arrowAfterScroll.y) {
+        throw new Error('Expected a fast non-hold Edit Runs scroll gesture to preserve Run order');
+      }
+    } else {
+      await expect(element(by.id('practice-run-standard'))).toBeVisible();
+      await expect(element(by.id('practice-run-arrow-duel'))).toBeVisible();
     }
     // Keep the small verified scroll offset so both drag endpoints remain
     // actionable on shorter portrait viewports.

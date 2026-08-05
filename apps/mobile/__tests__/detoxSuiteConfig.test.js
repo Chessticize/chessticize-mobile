@@ -1043,6 +1043,11 @@ describe('Detox suite configuration', () => {
     expect(runManagementCase).toContain(
       "element(by.id('practice-run-standard')).swipe('up', 'fast', 0.25, 0.5, 0.5)"
     );
+    expect(runManagementCase).toContain("frameFor(element(by.id('adaptive-layout')))");
+    expect(runManagementCase).toContain('adaptiveFrame.height < 1000');
+    expect(runManagementCase).toContain(
+      "expect(element(by.id('practice-run-arrow-duel'))).toBeVisible()"
+    );
     expect(runManagementCase).not.toContain(
       "element(by.id('practice-run-standard')).swipe('up', 'slow'"
     );
