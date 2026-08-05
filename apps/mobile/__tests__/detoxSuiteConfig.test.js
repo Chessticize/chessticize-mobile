@@ -1040,6 +1040,12 @@ describe('Detox suite configuration', () => {
     expect(runManagementCase).toContain(
       "dragAndroidElementToElement('practice-run-standard', 'practice-run-arrow-duel')"
     );
+    expect(runManagementCase).toContain(
+      "element(by.id('practice-run-standard')).swipe('up', 'fast', 0.25, 0.5, 0.5)"
+    );
+    expect(runManagementCase).not.toContain(
+      "element(by.id('practice-run-standard')).swipe('up', 'slow'"
+    );
     expect(runManagementCase).toContain('.longPressAndDrag(');
   });
 
