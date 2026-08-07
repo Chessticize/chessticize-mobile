@@ -29,11 +29,12 @@ const supportUrl = `${websiteUrl}support/`;
 const accessibilityUrl = `${websiteUrl}accessibility/`;
 const androidReleaseBase =
   "https://github.com/Chessticize/chessticize-mobile/releases";
+const androidReleaseTag = "android-v1.4.0-build-15";
 const apkUrl =
-  `${androidReleaseBase}/download/android-v1.3.0-build-8/` +
-  "Chessticize-Android-1.3.apk";
+  `${androidReleaseBase}/download/${androidReleaseTag}/` +
+  "Chessticize-Android-1.4.apk";
 const checksum =
-  "29cbfb529a38e215cd7fc6763284618288031c624cbf65cce0e381eafe3bbea0";
+  "1f7387fbc1098515fec83f2e02161445839e127613afd2278098d01bb0dedbb5";
 
 describe("public landing page", () => {
   it("uses concrete puzzle language without unshipped personalization claims", () => {
@@ -126,6 +127,13 @@ describe("public landing page", () => {
     expect(readme).toContain(supportUrl);
     expect(readme).toContain(accessibilityUrl);
     expect(readme).toContain("site/assets/screenshots/contact-sheet.webp");
+
+    expect(androidPage).toContain("Android · Version 1.4");
+    expect(androidPage).toContain("Universal APK · 231 MiB");
+    expect(androidPage).toContain(`${apkUrl}.sha256`);
+    expect(androidPage).toContain(
+      `${androidReleaseBase}/tag/${androidReleaseTag}`
+    );
   });
 
   it("is static, local-asset-only, and free of analytics", () => {
