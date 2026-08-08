@@ -47,10 +47,13 @@ published site remains plain static files.
 
 - iOS uses the stable App Store product URL
   `https://apps.apple.com/us/app/chessticize/id6788610123`.
-- Android uses the Pages route `android/` as the stable public entry point.
-  Update that page's APK, checksum, version, size, and source-release links
-  together after the protected Android release workflow publishes a new
-  Play-signed APK mirror.
+- Android uses the stable Google Play product URL
+  `https://play.google.com/store/apps/details?id=com.chessticize.mobile` as the
+  primary install action after Production publication is verified. The Pages
+  route `android/` remains the stable installation guide and manual APK entry
+  point. Keep Google Play primary there, and update the fallback APK, checksum,
+  version, size, and source-release links together after the protected Android
+  release workflow publishes a new Play-signed APK mirror.
 - App Store Connect uses the homepage as the Marketing URL, `support/` as the
   Support URL, and `accessibility/` as the Accessibility URL. The complete
   privacy policy remains the repository-hosted `docs/PRIVACY_POLICY.md`; the
