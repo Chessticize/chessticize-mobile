@@ -283,6 +283,14 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(landingPageStyles, /@import|url\(\s*["']?https?:\/\//i);
 assert.match(rootReadme, /https:\/\/apps\.apple\.com\/us\/app\/chessticize\/id6788610123/);
+assert.match(
+  landingPage,
+  /https:\/\/play\.google\.com\/store\/apps\/details\?id=com\.chessticize\.mobile/
+);
+assert.match(
+  landingPageAndroid,
+  /https:\/\/play\.google\.com\/store\/apps\/details\?id=com\.chessticize\.mobile/
+);
 assert.match(rootReadme, /https:\/\/chessticize\.github\.io\/chessticize-mobile\/android\//);
 assert.match(rootReadme, /site\/assets\/screenshots\/contact-sheet\.webp/);
 assert.match(rootReadme, /docs\/STORYBOOK_DEPLOYMENT\.md/);

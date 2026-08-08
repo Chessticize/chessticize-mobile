@@ -23,6 +23,8 @@ const manifest = JSON.parse(read("site/assets/marketing-assets.json"));
 
 const appStoreUrl =
   "https://apps.apple.com/us/app/chessticize/id6788610123";
+const googlePlayUrl =
+  "https://play.google.com/store/apps/details?id=com.chessticize.mobile";
 const websiteUrl = "https://chessticize.github.io/chessticize-mobile/";
 const androidUrl = `${websiteUrl}android/`;
 const supportUrl = `${websiteUrl}support/`;
@@ -103,11 +105,16 @@ describe("public landing page", () => {
     }
 
     expect(homepage).toContain("./android/");
+    expect(homepage).toContain(googlePlayUrl);
+    expect(homepage).toContain("<strong>Google Play</strong>");
     expect(homepage).toContain("./support/");
     expect(homepage).toContain("./accessibility/");
     expect(homepage).toContain("docs/PRIVACY_POLICY.md");
     expect(homepage).toContain("/LICENSE");
     expect(androidPage).toContain(apkUrl);
+    expect(androidPage).toContain(googlePlayUrl);
+    expect(androidPage).toContain("Google Play is the recommended install path");
+    expect(androidPage).toContain("Google Play installations update through Google Play");
     expect(androidPage).toContain(checksum);
     expect(androidPage).toContain("does not update itself");
     expect(supportPage).toContain("support@chessticize.com");
