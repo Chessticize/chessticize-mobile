@@ -98,6 +98,9 @@ describe("App Store assets document", () => {
     expect(Array.from(promotionalText).length).toBeLessThanOrEqual(
       limits.promotionalTextCharacters
     );
+    expect(promotionalText).toBe(
+      "Free, offline, no-ads, open-source app to practice rating-matched chess puzzles and prevent blunders with Arrow Duel. Learn from mistakes with scheduled Review."
+    );
     expect(Array.from(description).length).toBeLessThanOrEqual(limits.descriptionCharacters);
     expect(Buffer.byteLength(keywords, "utf8")).toBeLessThanOrEqual(limits.keywordsBytes);
 
@@ -108,27 +111,26 @@ describe("App Store assets document", () => {
     expect(descriptionBlock()).toBe(description);
   });
 
-  it("uses concrete puzzle language and a clean keyword field", () => {
-    const metadataWords = new Set(
-      `${appStoreMetadata.appName.value} ${appStoreMetadata.subtitle}`
-        .toLowerCase()
-        .split(/\s+/u)
-    );
+  it("uses concrete puzzle language and the owner-approved keyword order", () => {
     const keywords = appStoreMetadata.keywords.split(",");
 
     expect(appStoreMetadata.promotionalText).toContain("chess puzzles");
     expect(appStoreMetadata.description).toContain("chess puzzle trainer");
-    expect(keywords).toContain("tactics");
-    expect(keywords).toContain("stockfish");
-    expect(keywords).toContain("checkmate");
-    expect(keywords).toContain("open source");
-    expect(keywords).not.toContain("offline");
-    expect(keywords).not.toContain("chess");
-    expect(keywords).not.toContain("puzzle");
-    expect(keywords).not.toContain("trainer");
+    expect(keywords).toEqual([
+      "chess",
+      "puzzle",
+      "tactics",
+      "blunder",
+      "review",
+      "training",
+      "elo",
+      "analysis",
+      "stockfish",
+      "checkmate",
+      "offline"
+    ]);
     expect(new Set(keywords).size).toBe(keywords.length);
     expect(keywords.every((keyword) => keyword.length > 2)).toBe(true);
-    expect(keywords.some((keyword) => metadataWords.has(keyword))).toBe(false);
     expect(appStoreMetadata.keywords).not.toMatch(/,\s/u);
   });
 

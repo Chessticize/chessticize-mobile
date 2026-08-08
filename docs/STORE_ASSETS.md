@@ -42,8 +42,8 @@ Connect's stricter 100-byte reference.
 | --- | --- | --- |
 | App name | `Chessticize` | Keep the distinctive cross-platform brand; 11 / 30 characters. |
 | Subtitle | `Offline Chess Puzzle Trainer` | Concrete product description; 28 / 30 characters. |
-| Promotional text | `Practice rating-matched chess puzzles with Arrow Duel, Custom Runs, and scheduled Review—offline, without ads or an account, and open source.` | 141 / 170 characters. |
-| Keywords | `tactics,blunder,sprint,review,spaced repetition,elo,analysis,stockfish,checkmate,open source` | 92 / 100 UTF-8 bytes; no name/subtitle duplication, no spaces after commas, and no category names or competitor terms. |
+| Promotional text | `Free, offline, no-ads, open-source app to practice rating-matched chess puzzles and prevent blunders with Arrow Duel. Learn from mistakes with scheduled Review.` | 160 / 170 characters. |
+| Keywords | `chess,puzzle,tactics,blunder,review,training,elo,analysis,stockfish,checkmate,offline` | 85 / 100 UTF-8 bytes; owner-approved search terms in submission order, with no spaces after commas, repeated entries, category names, or competitor terms. |
 | Support URL | `https://chessticize.github.io/chessticize-mobile/support/` | Stable public support, bug-report, feature-request, and private-contact entry point. |
 | Marketing URL | `https://chessticize.github.io/chessticize-mobile/` | Stable public product page with iOS and Android install paths. |
 | Accessibility URL | `https://chessticize.github.io/chessticize-mobile/accessibility/` | Current support and known limitations; do not use this page to imply an undeclared feature. |
@@ -59,12 +59,12 @@ Keep `Chessticize`. The evaluated alternative,
 turns the installed cross-platform brand into a generic keyword-bearing name.
 Apple indexes the app name, subtitle, keywords, and company name. The subtitle
 therefore identifies the app as an offline chess puzzle trainer, while the
-keyword field carries complementary terms without duplicating `offline`,
-`chess`, `puzzle`, or `trainer`. This avoids a version-bound rename while
-describing the product directly. Revisit the name only with localized search
-evidence or a product-page test that justifies the brand cost. If an expanded
-name is tested later, prefer the more concrete `Chessticize: Chess Puzzles` over
-`Chessticize: Chess Tactics`.
+owner-approved keyword field deliberately reinforces the core `offline`,
+`chess`, and `puzzle` queries alongside complementary training terms. This
+avoids a version-bound rename while describing the product directly. Revisit
+the name only with localized search evidence or a product-page test that
+justifies the brand cost. If an expanded name is tested later, prefer the more
+concrete `Chessticize: Chess Puzzles` over `Chessticize: Chess Tactics`.
 
 ### Description
 

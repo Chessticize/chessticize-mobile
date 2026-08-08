@@ -260,7 +260,9 @@ check(
     Array.from(appStoreMetadata.description).length <= appStoreMetadata.limits.descriptionCharacters &&
     Buffer.byteLength(appStoreMetadata.keywords, "utf8") <= appStoreMetadata.limits.keywordsBytes &&
     !appStoreMetadata.keywords.includes(", ") &&
-    appStoreMetadata.promotionalText.startsWith("Practice rating-matched chess puzzles") &&
+    appStoreMetadata.promotionalText.includes("rating-matched chess puzzles") &&
+    appStoreMetadata.promotionalText.includes("Arrow Duel") &&
+    appStoreMetadata.promotionalText.includes("scheduled Review") &&
     appStoreMetadata.description.startsWith("Practice chess puzzles with purpose") &&
     appStoreMetadata.description.includes("chess puzzle trainer") &&
     !appStoreMetadata.description.includes("Tactical Profile") &&
