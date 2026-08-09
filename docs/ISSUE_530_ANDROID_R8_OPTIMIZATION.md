@@ -16,7 +16,9 @@ upload-signed build or the final clean-head Android validation record.
   method names
 - no package-wide `com.chessticize.mobile.**` keep rule is present
 - Detox's broader React Native inspection rules are isolated to
-  `releaseE2e`; they do not appear in the production merged configuration
+  `releaseE2e`; an exact-class reminder test ABI is also isolated there because
+  Android instrumentation compiles separately from the target app. Neither
+  rule set appears in the production merged configuration
 
 The production verifier requires non-empty `configuration.txt`, `mapping.txt`,
 `resources.txt`, `seeds.txt`, and `usage.txt`, confirms that application code

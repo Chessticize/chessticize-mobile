@@ -344,6 +344,7 @@ android {
             matchingFallbacks = ["release"]
             signingConfig signingConfigs.debug
             manifestPlaceholders = [usesCleartextTraffic: false]
+            proguardFile "proguard-rules-release-e2e.pro"
             proguardFile "${rootProject.projectDir}/../node_modules/detox/android/detox/proguard-rules-app.pro"
         }
     }
