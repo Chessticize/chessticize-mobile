@@ -35,7 +35,7 @@ export const IosSync: Story = {
     await waitForTestId(canvasElement, "settings-guidance-section");
     await waitForText(canvasElement, "Reset guides");
     await waitForTestId(canvasElement, "settings-arrow-duel-section");
-    await waitForText(canvasElement, "Opponent reply challenge");
+    await waitForText(canvasElement, "Find the opponent’s best reply");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-success");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-mistake");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-device-note");
@@ -56,12 +56,12 @@ export const ArrowDuelOpponentReply: Story = {
     await waitForTestId(canvasElement, "settings-arrow-duel-section");
     await waitForText(
       canvasElement,
-      "Optional after a correct choice. Each Run can turn it off or choose its reply time in Edit Run."
+      "After you choose the better arrow, we play the other move so you can find the opponent’s best reply. Your Sprint and puzzle timers pause while you reply. You can turn this off or change the time for each Run in Edit Run."
     );
     await clickTestId(canvasElement, "settings-arrow-duel-opponent-reply-off");
     await waitForText(
       canvasElement,
-      "Every Run uses one choice. Saved per-Run choices and reply times stay unchanged."
+      "After you choose the better arrow, you’ll go straight to the next puzzle in every Run. If you turn this back on, each Run will use the reply setting and time you previously chose."
     );
   }
 };

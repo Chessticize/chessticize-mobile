@@ -143,11 +143,12 @@ test("the closed Issue #247 clone keeps its approved scope while Issue #523 reus
   assert.deepEqual(storyTagsForScenario("settings-ios-sync"), ["new"]);
   assert.deepEqual(scenarioRegistry["settings-ios-sync"].scope.includes, [
     "iCloud Sync",
-    "Global Arrow Duel opponent-reply control",
-    "Optional explanation",
+    "Global Arrow Duel reply control",
+    "User-first On explanation",
+    "Paused Sprint and puzzle timers",
     "Per-Run Edit Run handoff",
-    "One-choice fallback",
-    "Saved Run intent preserved",
+    "Straight-to-next-puzzle Off explanation",
+    "Previously chosen Run settings restored on re-enable",
     "Notifications",
     "Sound and haptic toggles",
     "Move and capture audio previews",

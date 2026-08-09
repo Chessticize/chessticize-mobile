@@ -550,6 +550,8 @@ const ARROW_DUEL_CORRECT_CHOICE_FEEDBACK_MS = 220;
 const ARROW_DUEL_REPLY_PREPARATION_MS = 1_500;
 const ARROW_DUEL_UNDO_ANIMATION_MS = 500;
 const PRACTICE_PROMPT_COPY_GAP = 5;
+const ARROW_DUEL_OPTIONAL_SETTINGS_COPY =
+  "This extra challenge is optional — turn it off in Settings.";
 // Shared by the practice and review boards so they animate at the same speed.
 const BOARD_MOVE_ANIMATION_MS = 200;
 const ANALYSIS_DEPTH = 20;
@@ -6010,7 +6012,7 @@ function sessionGuideCallout(
         : {
             badge: "FIND THE REPLY · 2 OF 2",
             detail: opponentReplySettingsHint
-              ? "After a correct choice, we play the other move and give you 10 seconds to find Black’s best reply. Sprint time stays paused. This extra challenge is optional — turn it off in Settings. A miss or timeout is one mistake and goes to Review."
+              ? "After you choose correctly, we play the other move. You have 10 seconds to find Black’s best reply while your Sprint time is paused. A miss or timeout counts as one mistake and goes to Review."
               : "After you choose correctly, we’ll test your understanding of the counterplay by playing the move you didn’t choose. You’ll then have 10 seconds to find Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review.",
             id: "arrow-duel-reply",
             title: "Then reply for Black",
@@ -6143,10 +6145,16 @@ function ActiveSessionGuide({
     presentation.arrowDuelReplyOnboarding === "choice_then_reply",
     presentation.opponentReplySettingsHint === true
   );
+  const optionalSettingsCopy = isArrowDuel
+    && presentation.arrowDuelReplyOnboarding === "choice_then_reply"
+    && presentation.opponentReplySettingsHint === true
+    && coachStep === 1
+    ? ` ${ARROW_DUEL_OPTIONAL_SETTINGS_COPY}`
+    : "";
 
   return (
     <View
-      accessibilityLabel={`Guide ${unifiedCoachStep} of ${totalCoachSteps}. ${callout.title}. ${callout.detail}`}
+      accessibilityLabel={`Guide ${unifiedCoachStep} of ${totalCoachSteps}. ${callout.title}. ${callout.detail}${optionalSettingsCopy}`}
       style={styles.sessionGuideCalibrated}
       testID={isArrowDuel ? "practice-arrow-duel-guide" : "practice-active-session-guide"}
     >
@@ -6478,6 +6486,9 @@ function SessionCoachmarkDemo({
     presentation.arrowDuelReplyOnboarding === "choice_then_reply",
     presentation.opponentReplySettingsHint === true
   );
+  const optionalSettingsCopy = isArrowDuelReplyStep && opponentReplySettingsHint
+    ? ` ${ARROW_DUEL_OPTIONAL_SETTINGS_COPY}`
+    : "";
   const calloutUsesBoard = adaptiveLayout.usesSessionRail
     && !isArrowDuel
     && (coachStep === 1 || coachStep === 3);
@@ -6841,6 +6852,21 @@ function SessionCoachmarkDemo({
         </Text>
         <Text style={styles.sessionGuideInfoTitle}>{callout.title}</Text>
         <Text style={styles.sessionGuideInfoText}>{callout.detail}</Text>
+        {isArrowDuelReplyStep && opponentReplySettingsHint ? (
+          <Text
+            style={styles.sessionGuideOptionalSettingsNotice}
+            testID="practice-session-guide-optional-settings-notice"
+          >
+            <Text>This extra challenge is </Text>
+            <Text
+              style={styles.sessionGuideOptionalSettingsLabel}
+              testID="practice-session-guide-optional-settings-label"
+            >
+              optional
+            </Text>
+            <Text> — turn it off in Settings.</Text>
+          </Text>
+        ) : null}
       </View>
       {pointerPlacement === "bottom" ? pointerNode : null}
     </View>
@@ -6848,7 +6874,7 @@ function SessionCoachmarkDemo({
 
   return (
     <View
-      accessibilityLabel={`Guide ${guideNumber}. ${callout.title}. ${callout.detail}`}
+      accessibilityLabel={`Guide ${guideNumber}. ${callout.title}. ${callout.detail}${optionalSettingsCopy}`}
       ref={guideFrameRef}
       style={styles.sessionGuideCoachFrame}
       testID={isArrowDuel
@@ -8581,13 +8607,18 @@ function ArrowDuelReplyChallengeSetting({
         <View style={styles.runTimingRow}>
           <View style={styles.runTimingRowCopy}>
             <Text style={styles.listText}>
-              {individualRunCopy ? "Opponent reply for this Run" : "Opponent reply"}
+              Find the opponent’s best reply
             </Text>
             <Text style={styles.helperText}>
               {individualRunCopy
-                ? "Controls this Run only. Turn it off to keep Arrow Duel to one choice."
-                : "Ask for the opponent's reply after a correct choice."}
+                ? "After you choose the better arrow, we play the other move so you can find the opponent’s best reply."
+                : "After you choose the better arrow, find the opponent’s best reply."}
             </Text>
+            {individualRunCopy ? (
+              <Text style={styles.helperText}>
+                This setting only changes this Run. Turn it off to go straight to the next puzzle.
+              </Text>
+            ) : null}
           </View>
           <View style={styles.arrowDuelReplySettingControl}>
             <Text
@@ -8597,7 +8628,7 @@ function ArrowDuelReplyChallengeSetting({
               {enabled ? "On" : "Off"}
             </Text>
             <Pressable
-              accessibilityLabel="Opponent reply"
+              accessibilityLabel="Find the opponent’s best reply"
               accessibilityRole="switch"
               accessibilityState={{ checked: enabled }}
               accessibilityValue={{ text: enabled ? "On" : "Off" }}
@@ -8613,17 +8644,16 @@ function ArrowDuelReplyChallengeSetting({
         </View>
         <View style={styles.runTimingRow} testID="practice-run-arrow-duel-reply-time-row">
           <View style={styles.runTimingRowCopy}>
-            <Text style={styles.listText}>Reply time</Text>
+            <Text style={styles.listText}>Time to find the reply</Text>
             <Text style={styles.helperText}>
-              Defaults to {DEFAULT_OPPONENT_REPLY_SECONDS} seconds. Maximum {OPPONENT_REPLY_MAX_SECONDS}.
+              You’ll have {DEFAULT_OPPONENT_REPLY_SECONDS} seconds by default. Choose up to {OPPONENT_REPLY_MAX_SECONDS} seconds.
             </Text>
             <Text style={styles.helperText}>
-              The Sprint and puzzle clocks pause when the reply begins. Find the reply quickly to
-              show you understand the opponent's counterattack.
+              Your Sprint and puzzle timers pause while you find the reply.
             </Text>
             {individualRunCopy ? (
               <Text style={styles.helperText}>
-                The global Opponent reply challenge setting is on.
+                To turn this extra challenge off for every Run, go to Settings.
               </Text>
             ) : null}
             {replySecondsError ? (
@@ -8649,7 +8679,7 @@ function ArrowDuelReplyChallengeSetting({
               ]}
             >
               <TextInput
-                accessibilityLabel="Opponent reply time in seconds"
+                accessibilityLabel="Time to find the opponent’s reply in seconds"
                 accessibilityState={{ disabled: !enabled }}
                 editable={enabled}
                 inputMode="numeric"
@@ -15718,11 +15748,11 @@ function SettingsPanel({
           wide={adaptiveLayout.usesWideContent}
         >
           <SettingsRow
-            label="Opponent reply challenge"
+            label="Find the opponent’s best reply"
             value={arrowDuelOpponentReplyGlobalSetting.enabled ? "On" : "Off"}
             detail={arrowDuelOpponentReplyGlobalSetting.enabled
-              ? "Optional after a correct choice. Each Run can turn it off or choose its reply time in Edit Run."
-              : "Every Run uses one choice. Saved per-Run choices and reply times stay unchanged."}
+              ? "After you choose the better arrow, we play the other move so you can find the opponent’s best reply. Your Sprint and puzzle timers pause while you reply. You can turn this off or change the time for each Run in Edit Run."
+              : "After you choose the better arrow, you’ll go straight to the next puzzle in every Run. If you turn this back on, each Run will use the reply setting and time you previously chose."}
             testID="settings-arrow-duel-opponent-reply"
           />
           <View
@@ -15735,7 +15765,7 @@ function SettingsPanel({
               testID="settings-arrow-duel-opponent-reply-on"
               onPress={() => {
                 arrowDuelOpponentReplyGlobalSetting.onChange(true);
-                setStatusMessage("Opponent reply challenge enabled");
+                setStatusMessage("Runs will now include the opponent’s best reply");
               }}
             />
             <SettingsPreferenceButton
@@ -15744,7 +15774,7 @@ function SettingsPanel({
               testID="settings-arrow-duel-opponent-reply-off"
               onPress={() => {
                 arrowDuelOpponentReplyGlobalSetting.onChange(false);
-                setStatusMessage("Opponent reply challenge disabled for every Run");
+                setStatusMessage("Runs will now go straight to the next puzzle");
               }}
             />
           </View>
@@ -18381,6 +18411,22 @@ const styles = StyleSheet.create({
     color: "#475569",
     fontSize: 11,
     lineHeight: 16
+  },
+  sessionGuideOptionalSettingsNotice: {
+    backgroundColor: "#DBEAFE",
+    borderColor: "#93C5FD",
+    borderRadius: 7,
+    borderWidth: 1,
+    color: "#1E3A8A",
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6
+  },
+  sessionGuideOptionalSettingsLabel: {
+    color: "#1D4ED8",
+    fontWeight: "900"
   },
   sessionGuideStartButtonText: {
     color: "#FFFFFF",
