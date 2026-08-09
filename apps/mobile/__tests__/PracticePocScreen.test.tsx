@@ -4029,7 +4029,7 @@ describe("PracticePocScreen", () => {
     expect(calloutStyle).toMatchObject({
       left: "50%",
       position: "absolute",
-      top: Math.round(boardHeight * 0.4)
+      top: Math.round(boardHeight * 0.4 + boardHeight / 8)
     });
     expect(calloutStyle.transform).toEqual([
       { translateX: -calloutWidth / 2 }
