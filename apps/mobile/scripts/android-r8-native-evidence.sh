@@ -8,7 +8,7 @@ ADB="${ADB_PATH:-${SDK_ROOT:+$SDK_ROOT/platform-tools/adb}}"
 AAPT2="${AAPT2_PATH:-${SDK_ROOT:+$SDK_ROOT/build-tools/36.0.0/aapt2}}"
 DEVICE="${DETOX_ANDROID_DEVICE:-emulator-5554}"
 APP_ID="com.chessticize.mobile"
-TEST_RUNNER="$APP_ID.test/androidx.test.runner.AndroidJUnitRunner"
+TEST_RUNNER="$APP_ID.test/com.chessticize.mobile.R8ValidationInstrumentation"
 APP_APK="${CHESSTICIZE_ANDROID_R8_APK:-$APP_DIR/android/app/build/outputs/apk/r8Validation/app-r8Validation.apk}"
 APP_BUNDLE="${CHESSTICIZE_ANDROID_R8_BUNDLE:-$APP_DIR/android/app/build/outputs/bundle/r8Validation/app-r8Validation.aab}"
 TEST_APK="${CHESSTICIZE_ANDROID_R8_TEST_APK:-$APP_DIR/android/app/build/outputs/apk/androidTest/r8Validation/app-r8Validation-androidTest.apk}"
@@ -87,35 +87,14 @@ done
 "$ADB" -s "$DEVICE" install -r -t "$TEST_APK" \
   > "$ARTIFACT_DIR/test-install.txt"
 
-run_instrumentation() {
-  local class_name="$1"
-  local expected_summary="$2"
-  local output_name="$3"
-  local status=0
-
-  set +e
-  "$ADB" -s "$DEVICE" shell am instrument -w \
-    -e class "$class_name" \
-    "$TEST_RUNNER" > "$ARTIFACT_DIR/$output_name" 2>&1
-  status=$?
-  set -e
-  cat "$ARTIFACT_DIR/$output_name"
-  test "$status" -eq 0
-  grep -F "$expected_summary" "$ARTIFACT_DIR/$output_name"
-}
-
-run_instrumentation \
-  com.chessticize.mobile.R8NativeBoundariesIntegrationTest \
-  'OK (2 tests)' \
-  native-boundaries.txt
-run_instrumentation \
-  com.chessticize.mobile.ReviewReminderNotificationsIntegrationTest \
-  'OK (8 tests)' \
-  reminder-boundaries.txt
-run_instrumentation \
-  com.chessticize.mobile.ReleasedDatabaseFixtureInstallerTest \
-  'OK (1 test)' \
-  migration-fixture-installer.txt
+set +e
+"$ADB" -s "$DEVICE" shell am instrument -w "$TEST_RUNNER" \
+  > "$ARTIFACT_DIR/native-boundaries.txt" 2>&1
+instrumentation_status=$?
+set -e
+cat "$ARTIFACT_DIR/native-boundaries.txt"
+test "$instrumentation_status" -eq 0
+grep -F 'R8_VALIDATION_PASS' "$ARTIFACT_DIR/native-boundaries.txt"
 
 "$ADB" -s "$DEVICE" shell pm clear "$APP_ID" > "$ARTIFACT_DIR/app-clear.txt"
 "$ADB" -s "$DEVICE" shell am start -W -S \
