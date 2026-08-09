@@ -29,7 +29,7 @@ export const EmptyQueue: Story = {
 };
 
 export const DueQueue: Story = {
-  name: "Due queue",
+  name: "Home",
   args: { scenarioId: "review-due" },
   play: async ({ canvasElement }) => {
     await openReviewQueue(canvasElement);
@@ -40,6 +40,7 @@ export const DueQueue: Story = {
     await waitForText(canvasElement, "First missed 1 day ago");
     await waitForText(canvasElement, "Last retry 3 days ago");
     await expectTestIdsInOrder(canvasElement, [
+      "review-start-due",
       "review-due-items",
       "review-today-history"
     ]);

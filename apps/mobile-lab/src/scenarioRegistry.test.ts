@@ -75,6 +75,8 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   assert.ok(scenarioRegistry["review-due"].issues?.some(
     (issue) => issue.issueNumber === 520
   ) ?? false);
+  assert.equal(scenarioRegistry["review-due"].title, "Home");
+  assert.equal(scenarioRegistry["review-due"].storyId, "review--due-queue");
 
   for (const scenario of scenarios) {
     assert.deepEqual(
