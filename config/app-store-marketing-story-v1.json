@@ -38,7 +38,7 @@
     "kind": "release-like",
     "puzzlePack": {
       "id": "core",
-      "manifestHash": "sha256:18ff2b9bdccb452d115b3b1d4f45a8070cd952681b4baeafd10da00f45f45afd"
+      "manifestHash": "sha256:67156b90e5d388228640a1acfbabd132f090d4d92a73f28a83b0f97bdbe89863"
     }
   },
   "fictionalUser": {
