@@ -13379,6 +13379,31 @@ function ReviewPanel({
     );
   }
 
+  const reviewFilterOptions = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.reviewFilterScroller}
+      contentContainerStyle={styles.reviewFilterContent}
+      testID="review-queue-filters"
+    >
+      <FilterButton active={queueFilter === "all"} label="All due" testID="review-filter-all" onPress={() => setQueueFilter("all")} />
+      <FilterButton active={queueFilter === "overdue"} label="Overdue" testID="review-filter-overdue" onPress={() => setQueueFilter("overdue")} />
+      <FilterButton active={queueFilter === "failed"} label="Failed again" testID="review-filter-failed" onPress={() => setQueueFilter("failed")} />
+      <FilterButton active={queueFilter === "mode:standard"} label="Standard" testID="review-filter-mode-standard" onPress={() => setQueueFilter("mode:standard")} />
+      <FilterButton active={queueFilter === "arrow_duel"} label="Arrow Duel only" testID="review-filter-arrow-duel" onPress={() => setQueueFilter("arrow_duel")} />
+      {speedFilters.map((speed) => (
+        <FilterButton
+          key={speed}
+          active={queueFilter === `speed:${speed}`}
+          label={`${speed}s pace`}
+          testID={`review-filter-speed-${speed}`}
+          onPress={() => setQueueFilter(`speed:${speed}`)}
+        />
+      ))}
+    </ScrollView>
+  );
+
   return (
     <View style={styles.reviewQueuePanel} testID="review-panel">
       <View style={styles.historyHeaderRow} testID="review-action-header">
@@ -13482,30 +13507,15 @@ function ReviewPanel({
         </View>
       ) : null}
 
-      {filtersExpanded ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.reviewFilterScroller}
-          contentContainerStyle={styles.reviewFilterContent}
-          testID="review-queue-filters"
+      {collapsibleMotionPreview ? (
+        <CollapsibleRegion
+          contentTestID="review-filter-options"
+          expanded={filtersExpanded}
+          motion={collapsibleMotionPreview}
         >
-          <FilterButton active={queueFilter === "all"} label="All due" testID="review-filter-all" onPress={() => setQueueFilter("all")} />
-          <FilterButton active={queueFilter === "overdue"} label="Overdue" testID="review-filter-overdue" onPress={() => setQueueFilter("overdue")} />
-          <FilterButton active={queueFilter === "failed"} label="Failed again" testID="review-filter-failed" onPress={() => setQueueFilter("failed")} />
-          <FilterButton active={queueFilter === "mode:standard"} label="Standard" testID="review-filter-mode-standard" onPress={() => setQueueFilter("mode:standard")} />
-          <FilterButton active={queueFilter === "arrow_duel"} label="Arrow Duel only" testID="review-filter-arrow-duel" onPress={() => setQueueFilter("arrow_duel")} />
-          {speedFilters.map((speed) => (
-            <FilterButton
-              key={speed}
-              active={queueFilter === `speed:${speed}`}
-              label={`${speed}s pace`}
-              testID={`review-filter-speed-${speed}`}
-              onPress={() => setQueueFilter(`speed:${speed}`)}
-            />
-          ))}
-        </ScrollView>
-      ) : null}
+          {reviewFilterOptions}
+        </CollapsibleRegion>
+      ) : filtersExpanded ? reviewFilterOptions : null}
 
       {(filtersExpanded || reviewTodayDesignPreview?.showTodaySections === true)
         && filteredDueReviewItems.length > 0 ? (

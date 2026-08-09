@@ -19,7 +19,15 @@
     "issues": [
       {
         "issueNumber": 520,
-        "changeNote": "On Review Home, add synchronized height, fade, and chevron motion to the default-open collapsible sections while retaining fixed-height aligned controls."
+        "changeNote": "On Review Home, add the shared disclosure motion to the Filter panel and synchronized height, fade, and chevron motion to the default-open Today sections."
+      }
+    ]
+  },
+  "review-filters": {
+    "issues": [
+      {
+        "issueNumber": 520,
+        "changeNote": "Preview the shared short height-and-fade disclosure motion when Review filters expand or collapse."
       }
     ]
   }

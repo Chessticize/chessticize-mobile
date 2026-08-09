@@ -4306,6 +4306,24 @@ describe("PracticePocScreen", () => {
     await flushMicrotasks();
     press(reviewRenderer, "review-tab");
 
+    expect(findByTestId(reviewRenderer, "review-filter-options-motion").props).toMatchObject({
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
+    press(reviewRenderer, "review-filter-toggle");
+    expect(findByTestId(reviewRenderer, "review-filter-options-motion").props).toMatchObject({
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
+    });
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+    press(reviewRenderer, "review-filter-toggle");
+    expect(findByTestId(reviewRenderer, "review-filter-options-motion").props).toMatchObject({
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
+
     expect(findByTestId(reviewRenderer, "review-today-to-review-items-motion")).toBeTruthy();
     expect(findByTestId(reviewRenderer, "review-today-history-items-motion")).toBeTruthy();
     press(reviewRenderer, "review-today-to-review-toggle");

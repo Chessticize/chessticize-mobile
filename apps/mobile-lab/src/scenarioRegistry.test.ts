@@ -54,9 +54,9 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
   assert.deepEqual(
     newScenarios.map((scenario) => scenario.id),
-    ["practice-custom-setup", "review-due", "history-filters"]
+    ["practice-custom-setup", "review-due", "review-filters", "history-filters"]
   );
-  for (const scenarioId of ["practice-custom-setup", "review-due", "history-filters"] as const) {
+  for (const scenarioId of ["practice-custom-setup", "review-due", "review-filters", "history-filters"] as const) {
     assert.ok(scenarioRegistry[scenarioId].issues?.some(
       (issue) => issue.issueNumber === 520
     ) ?? false);

@@ -815,7 +815,8 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     collapsibleMotionPreview: [
       "history-filters",
       "practice-custom-setup",
-      "review-due"
+      "review-due",
+      "review-filters"
     ].includes(scenarioId)
       ? { durationMs: 200 }
       : undefined,
