@@ -1,5 +1,0 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <instrumentation
-        android:name="com.chessticize.mobile.R8ValidationInstrumentation"
-        android:targetPackage="com.chessticize.mobile" />
-</manifest>
