@@ -16,7 +16,7 @@ class ReleasedDatabaseFixtureInstallerTest {
     val database = targetContext.getDatabasePath(DATABASE_NAME)
 
     targetContext.deleteDatabase(DATABASE_NAME)
-    assertTrue(database.parentFile?.mkdirs() != false)
+    assertTrue(database.parentFile?.let { it.isDirectory || it.mkdirs() } == true)
     instrumentation.context.assets.open(FIXTURE_NAME).use { source ->
       database.outputStream().use(source::copyTo)
     }

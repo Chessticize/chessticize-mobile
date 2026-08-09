@@ -39,7 +39,7 @@ function installReleasedProgressFixture() {
   const adb = androidAdbPath();
   const serial = process.env.DETOX_ANDROID_DEVICE || 'emulator-5554';
   execFileSync(adb, ['-s', serial, 'shell', 'pm', 'clear', APP_ID], { stdio: 'inherit' });
-  execFileSync(
+  const instrumentation = execFileSync(
     adb,
     [
       '-s', serial,
@@ -47,8 +47,12 @@ function installReleasedProgressFixture() {
       '-e', 'class', FIXTURE_INSTALLER_CLASS,
       TEST_RUNNER,
     ],
-    { stdio: 'inherit' },
+    { encoding: 'utf8' },
   );
+  process.stdout.write(instrumentation);
+  if (!instrumentation.includes('OK (1 test)')) {
+    throw new Error('Released database fixture installer did not pass.');
+  }
   execFileSync(adb, ['-s', serial, 'shell', 'am', 'force-stop', APP_ID], {
     stdio: 'inherit',
   });
