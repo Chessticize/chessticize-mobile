@@ -4004,6 +4004,38 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "practice-arrow-duel-guide-candidates")).toThrow();
   });
 
+  it("overlays the Arrow Duel reply guide on the board in the maintained iPhone portrait viewport", () => {
+    setPracticeViewport({
+      width: 402,
+      height: 874,
+      scale: 3,
+      insets: { top: 62, right: 0, bottom: 34, left: 0 }
+    });
+
+    const renderer = renderLabScenario("practice-arrow-duel-guide-only");
+    press(renderer, "practice-session-guide-start");
+
+    const boardStyle = flattenTestStyle(findByTestId(
+      renderer,
+      "practice-arrow-duel-guide-demo-board"
+    ).props.style);
+    const calloutStyle = flattenTestStyle(findByTestId(
+      renderer,
+      "practice-arrow-duel-guide-coach"
+    ).props.style);
+    const boardHeight = Number(boardStyle.height);
+    const calloutWidth = Number(calloutStyle.width);
+
+    expect(calloutStyle).toMatchObject({
+      left: "50%",
+      position: "absolute",
+      top: Math.round(boardHeight * 0.36)
+    });
+    expect(calloutStyle.transform).toEqual([
+      { translateX: -calloutWidth / 2 }
+    ]);
+  });
+
   it("keeps the reply guide operable with large text on a compact phone", () => {
     setPracticeViewport({
       width: 320,

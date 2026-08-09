@@ -6681,12 +6681,22 @@ function SessionCoachmarkDemo({
       }
     : {
         ...(isArrowDuel
-          ? {
-              alignSelf: "center" as const,
-              marginTop: 18,
-              position: "relative" as const,
-              width: portraitArrowDuelCalloutWidth
-            }
+          ? isArrowDuelReplyStep
+            ? {
+                left: "50%" as const,
+                position: "absolute" as const,
+                top: Math.round(boardSize * 0.36),
+                transform: [{
+                  translateX: -portraitArrowDuelCalloutWidth / 2
+                }],
+                width: portraitArrowDuelCalloutWidth
+              }
+            : {
+                alignSelf: "center" as const,
+                marginTop: 18,
+                position: "relative" as const,
+                width: portraitArrowDuelCalloutWidth
+              }
           : {
               left: 0,
               right: 0,
