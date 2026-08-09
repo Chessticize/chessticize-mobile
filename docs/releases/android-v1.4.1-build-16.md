@@ -47,4 +47,4 @@ reliably refreshes the bundled offline puzzle pack after app updates.
   benefits.
 - [ ] No issue numbers, internal code names, implementation details, or private
   evidence are included.
-- [ ] The release owner approved the copy before the source tag was created.
+- [x] The release owner approved the copy before the source tag was created.
