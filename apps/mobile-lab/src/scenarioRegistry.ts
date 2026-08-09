@@ -246,7 +246,7 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "practice-tactical-focus-result": defineScenario("practice-tactical-focus-result", "Practice", "Tactical Focus · result", "practice--tactical-focus-result", "Completed fixed Tactical Focus Run that clearly stays unrated, reports the planned-puzzle ending, and returns to Practice instead of immediately replaying stale focus.", "practice", ["Focused Run complete", "Planned puzzles complete", "Unrated Rating", "Back to Practice"], ["Practice home", "Review"], "contained"),
   "practice-reminder-prompt": defineScenario("practice-reminder-prompt", "Practice", "Review reminder prompt", "practice--review-reminder-prompt", "First-mistake notification-permission prompt driven by a maintained fake client.", "practice", ["Permission rationale", "Enable", "Dismiss"], ["Active sprint"]),
   "review-empty": defineScenario("review-empty", "Review", "Empty queue", "review--empty-queue", "Review with no due or future items.", "review", ["Empty state", "Practice return"], ["Practice"]),
-  "review-due": defineScenario("review-due", "Review", "Due queue", "review--due-queue", "Deterministic due workload with multiple contexts.", "review", ["Due metrics", "Forecast", "Queue rows", "Start review"], ["Review session", "Practice"]),
+  "review-due": defineScenario("review-due", "Review", "Due queue", "review--due-queue", "The stable Review queue shows today's scheduled retries before today's completed attempts, with a distinct retry icon and concise attempt recency.", "review", ["Due metrics", "Forecast", "Today to review", "Blue retry icon", "First-miss recency", "Last-retry recency", "Completed today", "Start review"], ["Production review-history derivation", "Review session", "Practice"]),
   "review-overdue": defineScenario("review-overdue", "Review", "Overdue queue", "review--overdue-queue", "Overdue workload and danger treatment.", "review", ["Overdue count", "Due rows", "Forecast"], ["Review session", "Practice"]),
   "review-filters": defineScenario("review-filters", "Review", "Filters", "review--filters", "Expanded filters with an active overdue selection.", "review", ["Mode, speed, theme, and overdue filters", "Active filter summary"], ["Review session", "Practice"]),
   "review-session": defineScenario("review-session", "Review", "Review session", "review--review-session", "Due Review session using the Board Placeholder and public queue state. Portrait keeps the established stack; landscape matches Sprint with a fixed full board on the left and a scrollable header, timer, instruction, and actions rail on the right.", "review", ["Stable board through resize", "Portrait stack", "Landscape board-left control rail", "Timer", "Context", "Previous and next"], ["Review queue"]),
@@ -290,7 +290,7 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "settings--i-cloud-sync-support-bundle",
     "The always-available iOS Settings entry under Help & Feedback for preparing support diagnostics even when no sync failure was captured.",
     "settings",
-    ["Help & Feedback placement", "Email Support final row", "Persistent Settings entry", "Sensitive-data confirmation", "Consistent local SQLite snapshot", "CloudKit JSON snapshot", "Diagnostic manifest", "iOS Share Sheet handoff"],
+    ["Help & Feedback placement", "Email Support final row", "Persistent Settings entry", "Sensitive-data confirmation", "Consistent local SQLite snapshot", "Progress V2 NDJSON capture", "Optional read-only V1 JSON snapshot", "Diagnostic manifest", "iOS Share Sheet handoff"],
     ["User-controlled support handoff", "Native database snapshot and Share Sheet"],
     "contained"
   ),
@@ -301,7 +301,7 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "settings--i-cloud-sync-support-bundle-partial",
     "The support-bundle recovery branch when the local SQLite snapshot is available but CloudKit cannot return its JSON progress snapshot.",
     "settings",
-    ["Sensitive-data confirmation", "CloudKit snapshot unavailable", "Explicit partial-bundle warning", "Included-file inventory", "iOS Share Sheet handoff"],
+    ["Sensitive-data confirmation", "CloudKit V2 capture unavailable", "Explicit partial-bundle warning", "Included-file inventory", "iOS Share Sheet handoff"],
     ["iCloud sync error details", "Native database snapshot and Share Sheet"],
     "contained"
   ),

@@ -21,8 +21,9 @@ import type { HistoryQuery, HistoryView, ReviewReminderSettings } from "../../co
 import type { SprintGuideProgress } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type { PracticeProgressSummary } from "./rating-history.ts";
+import type { ProgressV2PersistenceHost } from "./progress-v2-persistence.ts";
 
-export interface ClearLocalHistoryResult {
+export interface ClearSyncedHistoryResult {
   attempts: number;
   reviewEvents: number;
   reviewQueue: number;
@@ -126,7 +127,7 @@ export interface PracticeRatingActivity {
   lastPlayedAt: string;
 }
 
-export interface PracticeStore {
+export interface PracticeStore extends ProgressV2PersistenceHost {
   seedPuzzles(puzzles: Puzzle[]): void;
   countPuzzles(filter?: PuzzleSelectionFilter): number;
   getPuzzle(id: string): Puzzle | undefined;
@@ -169,7 +170,7 @@ export interface PracticeStore {
     data: LocalDataImport,
     observer?: LocalDataImportObserver
   ): LocalDataImportResult;
-  clearLocalHistory(): ClearLocalHistoryResult;
+  clearSyncedHistory(now: string): ClearSyncedHistoryResult;
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[];
   scheduleMistakeReview(context: ReviewContext, now: string): ReviewQueueState;
   enrollReview(context: ReviewContext, now: string, initiatingAttemptId?: string): ReviewQueueState;

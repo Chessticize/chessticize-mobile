@@ -89,7 +89,8 @@ describe("iOS App Store privacy artifacts", () => {
     const pbxproj = readText(join(appRoot, "ios", "ChessticizeMobile.xcodeproj", "project.pbxproj"));
 
     expect(implementation).toContain("sqlite3_backup_init");
-    expect(implementation).toContain("icloud-progress-snapshot.json");
+    expect(implementation).toContain("icloud-progress-v2.ndjson");
+    expect(implementation).toContain("icloud-progress-v1.json");
     expect(implementation).toContain("UIPasteboard");
     expect(implementation).toContain("UIActivityViewController");
     expect(implementation).toContain("sha256");
@@ -97,8 +98,9 @@ describe("iOS App Store privacy artifacts", () => {
     expect(implementation).toContain("integrityCheckPassed");
     expect(implementation).toContain("operatingSystemVersion");
     expect(implementation).toContain("appleIdIncluded");
-    expect(implementation).toContain("ChessticizeCloudKitSnapshotTimeoutSeconds");
-    expect(implementation).toContain("the request timed out after 8 seconds");
+    expect(implementation).toContain("bundleFormatVersion\": @2");
+    expect(implementation).toContain("cloudProgress");
+    expect(implementation).not.toContain("fetchCloudSnapshot");
     expect(implementation).toContain("ChessticizeSupportArchiveLifetimeSeconds");
     expect(implementation).toContain("completionWithItemsHandler");
     expect(implementation).toContain("chessticizeICloudDiagnosticsFixture");

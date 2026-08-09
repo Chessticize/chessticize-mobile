@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   isCanonicalLocalDataExport,
-  isCanonicalProgressSyncSnapshot
+  isCanonicalProgressSyncSnapshot,
+  normalizeLegacyProgressSyncSnapshot
 } from "../src/local-data-export-validation.ts";
 
 test("accepts the complete current progress sync contract", () => {
@@ -22,6 +23,16 @@ test("accepts documented optional legacy fields", () => {
   delete snapshot.data.sprintSessions[0].volatilityBefore;
   delete snapshot.data.practiceRuns[0].puzzleTiming;
   assert.equal(isCanonicalProgressSyncSnapshot(snapshot), true);
+});
+
+test("normalizes legacy snapshots to the device-local Arrow Duel default", () => {
+  const snapshot = canonicalSnapshot();
+  snapshot.data.settings.arrowDuel.opponentReplyEnabled = false;
+
+  assert.deepEqual(
+    normalizeLegacyProgressSyncSnapshot(snapshot)?.data.settings.arrowDuel,
+    { opponentReplyEnabled: true }
+  );
 });
 
 test("accepts exported synthetic review session configs", () => {
@@ -66,6 +77,7 @@ test("rejects malformed nested progress records", () => {
   const cases = [
     ["snapshot device", (value) => { value.deviceId = ""; }],
     ["settings", (value) => { value.data.settings.sync.iCloudEnabled = "yes"; }],
+    ["Arrow Duel setting", (value) => { value.data.settings.arrowDuel.opponentReplyEnabled = "yes"; }],
     ["reply cue stage", (value) => { value.data.settings.sprintGuides.arrowDuelReplyCueStage = 4; }],
     ["rating", (value) => { value.data.ratings[0].games = "one"; }],
     ["attempt", (value) => { value.data.attempts[0].source = "unknown"; }],
@@ -111,6 +123,7 @@ function canonicalSnapshot() {
       schemaVersion: 1,
       settings: {
         sync: { iCloudEnabled: true },
+        arrowDuel: { opponentReplyEnabled: true },
         notifications: { reviewReminder: { mode: "smart" } },
         moveFeedback: { soundEnabled: true, hapticsEnabled: true },
         sprintGuides: {

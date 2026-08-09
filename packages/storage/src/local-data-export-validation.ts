@@ -13,6 +13,7 @@ import {
   type SprintConfig
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow } from "./query-types.ts";
+import { defaultPracticeSettings } from "./practice-settings.ts";
 
 const SPRINT_MODES = new Set(["standard", "blitz", "arrow_duel", "custom"]);
 const SPRINT_STATUSES = new Set(["active", "paused", "won", "failed", "abandoned"]);
@@ -29,6 +30,40 @@ export function isCanonicalProgressSyncSnapshot(
     isNonEmptyString(value.deviceId) &&
     isIsoDate(value.updatedAt) &&
     isCanonicalLocalDataExport(value.data);
+}
+
+/**
+ * V1 snapshots predate some optional progress families and settings fields.
+ * Normalize only those known additions, then run the current strict validator
+ * before allowing the payload across the storage boundary.
+ */
+export function normalizeLegacyProgressSyncSnapshot(
+  value: unknown
+): ProgressSyncSnapshot | undefined {
+  if (!isRecord(value) || value.schemaVersion !== 1 || !isNonEmptyString(value.deviceId) ||
+      !isIsoDate(value.updatedAt) || !isRecord(value.data)) {
+    return undefined;
+  }
+  const data = value.data;
+  if (!isRecord(data.settings)) return undefined;
+  const defaults = defaultPracticeSettings();
+  const settings = data.settings;
+  const normalized = {
+    ...value,
+    data: {
+      ...data,
+      settings: {
+        sync: settings.sync,
+        arrowDuel: defaults.arrowDuel,
+        notifications: settings.notifications,
+        moveFeedback: settings.moveFeedback ?? defaults.moveFeedback,
+        sprintGuides: settings.sprintGuides ?? defaults.sprintGuides
+      },
+      reviewRemovals: data.reviewRemovals ?? [],
+      practiceRuns: data.practiceRuns ?? []
+    }
+  };
+  return isCanonicalProgressSyncSnapshot(normalized) ? normalized : undefined;
 }
 
 export function isCanonicalLocalDataExport(
@@ -48,12 +83,15 @@ export function isCanonicalLocalDataExport(
 function isPracticeSettings(value: unknown): value is PracticeSettings {
   if (!isRecord(value)) return false;
   const sync = value.sync;
+  const arrowDuel = value.arrowDuel;
   const notifications = value.notifications;
   const moveFeedback = value.moveFeedback;
   const sprintGuides = value.sprintGuides;
   if (
     !isRecord(sync) ||
     typeof sync.iCloudEnabled !== "boolean" ||
+    !isRecord(arrowDuel) ||
+    typeof arrowDuel.opponentReplyEnabled !== "boolean" ||
     !isRecord(notifications) ||
     !isReviewReminder(notifications.reviewReminder) ||
     !isRecord(moveFeedback) ||

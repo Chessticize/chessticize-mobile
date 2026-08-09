@@ -973,7 +973,7 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
   }
 });
 
-test("PracticeService clears SQLite local history without resetting ratings or puzzles", async () => {
+test("PracticeService clears synced SQLite history without resetting ratings or puzzles", async () => {
   const store = await seededStore();
   const service = new PracticeService(store);
   try {
@@ -1003,7 +1003,7 @@ test("PracticeService clears SQLite local history without resetting ratings or p
     assert.deepEqual(exported.ratings.map((rating) => rating.key), ["standard 5/20"]);
     const ratingBefore = service.getRating("standard 5/20");
 
-    const result = service.clearLocalHistory();
+    const result = service.clearSyncedHistory("2026-06-21T00:00:00.000Z");
 
     assert.deepEqual(result, {
       attempts: 2,

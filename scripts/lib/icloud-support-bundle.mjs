@@ -6,15 +6,21 @@ import { DatabaseSync } from "node:sqlite";
 
 const ALLOWED_FILES = new Set([
   "diagnostic.txt",
+  "icloud-progress-v1.json",
+  "icloud-progress-v2.ndjson",
   "icloud-progress-snapshot.json",
   "local-progress.sqlite",
   "manifest.json"
 ]);
 const MAX_ARCHIVE_BYTES = 512 * 1024 * 1024;
 const MAX_ZIP_ENTRIES = 16;
+const MAX_CLOUD_NDJSON_BYTES = 256 * 1024 * 1024;
+const MAX_CLOUD_CHANGE_LINES = 250_000;
+const MAX_CLOUD_LINE_BYTES = 8 * 1024 * 1024;
 
 export async function inspectICloudSupportBundle(inputPath) {
   return withICloudSupportBundle(inputPath, async ({
+    cloudProgress,
     cloudSnapshot,
     diagnosticText,
     localDatabasePath,
@@ -32,12 +38,16 @@ export async function inspectICloudSupportBundle(inputPath) {
       sha256
     })),
     localDatabase: inspectSQLiteSnapshot(localDatabasePath),
-    cloudSnapshot: cloudSnapshot
-      ? summarizeCloudSnapshot(cloudSnapshot)
-      : {
-          available: false,
-          unavailableReason: manifest.cloudSnapshot?.unavailableReason ?? null
-        },
+    ...(manifest.bundleFormatVersion === 1
+      ? {
+          cloudSnapshot: cloudSnapshot
+            ? summarizeCloudSnapshot(cloudSnapshot)
+            : {
+                available: false,
+                unavailableReason: manifest.cloudSnapshot?.unavailableReason ?? null
+              }
+        }
+      : { cloudProgress: summarizeCloudProgress(cloudProgress, manifest) }),
     diagnosticBytes: Buffer.byteLength(diagnosticText, "utf8")
   }));
 }
@@ -86,14 +96,34 @@ export async function withICloudSupportBundle(inputPath, visit) {
     await verifyManifestFiles(manifest, readEntry);
 
     const diagnosticText = (await readEntry("diagnostic.txt")).toString("utf8");
-    const cloudSnapshot = manifest.kind === "complete"
+    const cloudSnapshot = manifest.bundleFormatVersion === 1 && manifest.kind === "complete"
       ? validateCloudSnapshot(parseJson(
           await readEntry("icloud-progress-snapshot.json"),
           "icloud-progress-snapshot.json"
         ))
+      : manifest.bundleFormatVersion === 2 && manifest.cloudProgress.v1.status === "captured"
+        ? validateCloudSnapshot(parseJson(
+            await readEntry("icloud-progress-v1.json"),
+            "icloud-progress-v1.json"
+          ))
+        : undefined;
+    const cloudProgress = manifest.bundleFormatVersion === 2
+      ? {
+          v1: {
+            status: manifest.cloudProgress.v1.status,
+            ...(cloudSnapshot === undefined ? {} : { snapshot: cloudSnapshot })
+          },
+          v2: {
+            ...manifest.cloudProgress.v2,
+            changes: manifest.cloudProgress.v2.status === "unavailable"
+              ? []
+              : parseCloudV2Ndjson(await readEntry("icloud-progress-v2.ndjson"), manifest)
+          }
+        }
       : undefined;
 
     return await visit({
+      cloudProgress,
       cloudSnapshot,
       diagnosticText,
       localDatabasePath,
@@ -247,6 +277,121 @@ function summarizeCloudSnapshot(snapshot) {
   };
 }
 
+function summarizeCloudProgress(cloudProgress, manifest) {
+  const changes = cloudProgress?.v2.changes ?? [];
+  const records = changes.filter((change) => change.changeType === "record");
+  const deletions = changes.filter((change) => change.changeType === "deleted");
+  return {
+    complete: manifest.cloudProgress.complete,
+    unavailableReason: manifest.cloudProgress.unavailableReason,
+    v2: {
+      status: manifest.cloudProgress.v2.status,
+      captureStartedAt: manifest.cloudProgress.v2.captureStartedAt,
+      captureCompletedAt: manifest.cloudProgress.v2.captureCompletedAt,
+      bytes: manifest.cloudProgress.v2.bytes,
+      recordCount: records.length,
+      deletionCount: deletions.length,
+      familyCounts: countV2Families(records),
+      finalTokenFingerprint: manifest.cloudProgress.v2.finalTokenFingerprint
+    },
+    v1: {
+      status: manifest.cloudProgress.v1.status,
+      ...(cloudProgress?.v1.snapshot === undefined
+        ? {}
+        : { snapshot: summarizeCloudSnapshot(cloudProgress.v1.snapshot) })
+    }
+  };
+}
+
+function parseCloudV2Ndjson(contents, manifest) {
+  if (!Buffer.isBuffer(contents) || contents.length > MAX_CLOUD_NDJSON_BYTES) {
+    throw new Error("CloudKit Progress V2 NDJSON exceeds its inspection limit.");
+  }
+  const text = contents.toString("utf8");
+  const rawLines = text.length === 0 ? [] : text.split("\n");
+  if (rawLines.at(-1) === "") rawLines.pop();
+  if (rawLines.length > MAX_CLOUD_CHANGE_LINES) {
+    throw new Error("CloudKit Progress V2 NDJSON contains too many changes.");
+  }
+  const changes = rawLines.map((line, index) => {
+    if (Buffer.byteLength(line, "utf8") > MAX_CLOUD_LINE_BYTES) {
+      throw new Error(`CloudKit Progress V2 NDJSON line ${index + 1} exceeds its limit.`);
+    }
+    const change = parseJson(Buffer.from(line), `icloud-progress-v2.ndjson line ${index + 1}`);
+    validateCloudV2Change(change, index + 1);
+    return change;
+  });
+  const records = changes.filter((change) => change.changeType === "record");
+  const deletions = changes.filter((change) => change.changeType === "deleted");
+  if (
+    records.length !== manifest.cloudProgress.v2.recordCount ||
+    deletions.length !== manifest.cloudProgress.v2.deletionCount ||
+    JSON.stringify(countV2Families(records)) !==
+      JSON.stringify(sortObject(manifest.cloudProgress.v2.familyCounts))
+  ) {
+    throw new Error("CloudKit Progress V2 NDJSON counts do not match the manifest.");
+  }
+  return changes;
+}
+
+function validateCloudV2Change(value, lineNumber) {
+  if (!isPlainObject(value) || typeof value.recordName !== "string") {
+    throw new Error(`CloudKit Progress V2 NDJSON line ${lineNumber} is invalid.`);
+  }
+  const identity = parseV2RecordName(value.recordName);
+  if (!identity) {
+    throw new Error(`CloudKit Progress V2 NDJSON line ${lineNumber} has an invalid identity.`);
+  }
+  if (value.recordType !== "ProgressV2Record") {
+    throw new Error(`CloudKit Progress V2 NDJSON line ${lineNumber} has an invalid record type.`);
+  }
+  if (value.changeType === "deleted") return;
+  if (
+    value.changeType !== "record" ||
+    value.schemaVersion !== 2 ||
+    value.kind !== identity.kind ||
+    typeof value.payload !== "string"
+  ) {
+    throw new Error(`CloudKit Progress V2 NDJSON line ${lineNumber} has an invalid record.`);
+  }
+  const payload = parseJson(Buffer.from(value.payload), `Progress V2 payload on line ${lineNumber}`);
+  if (
+    !isPlainObject(payload) ||
+    payload.formatVersion !== 2 ||
+    payload.kind !== identity.kind ||
+    payload.entityKey !== identity.entityKey ||
+    (payload.state !== "present" && payload.state !== "deleted") ||
+    (payload.state === "present" && !("value" in payload)) ||
+    (payload.state === "deleted" && typeof payload.deletedAt !== "string")
+  ) {
+    throw new Error(`CloudKit Progress V2 payload on line ${lineNumber} is invalid.`);
+  }
+}
+
+function parseV2RecordName(recordName) {
+  const match = /^v2\|([^|]+)\|(.*)$/.exec(recordName);
+  const kinds = new Set([
+    "attempt", "manifest", "practice_run", "preferences", "rating",
+    "review_schedule", "sprint_session"
+  ]);
+  if (!match || !kinds.has(match[1])) return undefined;
+  try {
+    return { kind: match[1], entityKey: decodeURIComponent(match[2]) };
+  } catch {
+    return undefined;
+  }
+}
+
+function countV2Families(records) {
+  const counts = {};
+  for (const record of records) counts[record.kind] = (counts[record.kind] ?? 0) + 1;
+  return sortObject(counts);
+}
+
+function sortObject(value) {
+  return Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)));
+}
+
 async function verifyManifestFiles(manifest, readEntry) {
   const names = new Set();
   for (const file of manifest.files) {
@@ -276,29 +421,60 @@ async function verifyManifestFiles(manifest, readEntry) {
       throw new Error(`Support bundle manifest is missing ${required}.`);
     }
   }
-  const hasCloudSnapshot = names.has("icloud-progress-snapshot.json");
+  if (manifest.bundleFormatVersion === 1) {
+    const hasCloudSnapshot = names.has("icloud-progress-snapshot.json");
+    if (
+      (manifest.kind === "complete" && !hasCloudSnapshot)
+      || (manifest.kind === "partial" && hasCloudSnapshot)
+    ) {
+      throw new Error("Support bundle kind does not match its CloudKit snapshot files.");
+    }
+    return;
+  }
+  const hasV2 = names.has("icloud-progress-v2.ndjson");
+  const hasV1 = names.has("icloud-progress-v1.json");
   if (
-    (manifest.kind === "complete" && !hasCloudSnapshot)
-    || (manifest.kind === "partial" && hasCloudSnapshot)
+    hasV2 === (manifest.cloudProgress.v2.status === "unavailable") ||
+    hasV1 !== (manifest.cloudProgress.v1.status === "captured") ||
+    (manifest.kind === "complete") !== manifest.cloudProgress.complete
   ) {
-    throw new Error("Support bundle kind does not match its CloudKit snapshot files.");
+    throw new Error("Support bundle kind does not match its CloudKit progress files.");
   }
 }
 
 function validateManifest(value) {
   if (
     !isPlainObject(value)
-    || value.bundleFormatVersion !== 1
+    || (value.bundleFormatVersion !== 1 && value.bundleFormatVersion !== 2)
     || (value.kind !== "complete" && value.kind !== "partial")
     || typeof value.createdAt !== "string"
     || !Array.isArray(value.files)
     || !isPlainObject(value.app)
     || !isPlainObject(value.sync)
     || !isPlainObject(value.environment)
-    || !isPlainObject(value.cloudSnapshot)
+    || (value.bundleFormatVersion === 1 && !isPlainObject(value.cloudSnapshot))
+    || (value.bundleFormatVersion === 2 && !isValidV2CloudProgress(value.cloudProgress))
   ) {
     throw new Error("Support bundle manifest format is invalid.");
   }
+}
+
+function isValidV2CloudProgress(value) {
+  if (!isPlainObject(value) || typeof value.complete !== "boolean" ||
+      !isPlainObject(value.v2) || !isPlainObject(value.v1)) return false;
+  const validV2Statuses = new Set(["complete", "not_initialized", "unavailable"]);
+  const validV1Statuses = new Set(["captured", "missing", "skipped_sealed", "unavailable"]);
+  return validV2Statuses.has(value.v2.status) &&
+    validV1Statuses.has(value.v1.status) &&
+    (value.v2.captureStartedAt === null || typeof value.v2.captureStartedAt === "string") &&
+    (value.v2.captureCompletedAt === null || typeof value.v2.captureCompletedAt === "string") &&
+    Number.isSafeInteger(value.v2.bytes) && value.v2.bytes >= 0 &&
+    Number.isSafeInteger(value.v2.recordCount) && value.v2.recordCount >= 0 &&
+    Number.isSafeInteger(value.v2.deletionCount) && value.v2.deletionCount >= 0 &&
+    isPlainObject(value.v2.familyCounts) &&
+    Object.values(value.v2.familyCounts).every((count) => Number.isSafeInteger(count) && count >= 0) &&
+    (value.v2.finalTokenFingerprint === null ||
+      (typeof value.v2.finalTokenFingerprint === "string" && /^[a-f0-9]{16,64}$/.test(value.v2.finalTokenFingerprint)));
 }
 
 function validateCloudSnapshot(value) {

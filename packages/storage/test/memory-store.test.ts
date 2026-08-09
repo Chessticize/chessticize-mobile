@@ -255,7 +255,7 @@ test("PracticeService keeps paused sprints open and resumes through the store bo
   assert.equal(paused.state.status, "paused");
   assert.equal(paused.attempt, undefined);
   assert.equal(service.getActiveSprint()?.id, sprint.id);
-  assert.equal(store.clearLocalHistory().sprintSessions, 0);
+  assert.equal(store.clearSyncedHistory("2026-06-20T00:00:41.000Z").sprintSessions, 0);
   assert.equal(service.getActiveSprint()?.status, "paused");
 
   const resumed = service.resumeSprint("2026-06-20T00:00:40.000Z");
@@ -790,7 +790,7 @@ test("PracticeService accepts a legacy singular theme command without broadening
   assert.deepEqual(sprint.puzzles.map((puzzle) => puzzle.id), ["000hf"]);
 });
 
-test("PracticeService clears MemoryStore local history without resetting ratings or puzzles", async () => {
+test("PracticeService clears synced MemoryStore history without resetting ratings or puzzles", async () => {
   const store = new MemoryStore();
   store.seedPuzzles(await loadFixturePuzzles());
   const service = new PracticeService(store);
@@ -812,7 +812,7 @@ test("PracticeService clears MemoryStore local history without resetting ratings
   assert.deepEqual(exported.ratings.map((rating) => rating.key), ["standard 5/20"]);
   const ratingBefore = service.getRating("standard 5/20");
 
-  const result = service.clearLocalHistory();
+  const result = service.clearSyncedHistory("2026-06-21T00:00:00.000Z");
 
   assert.deepEqual(result, {
     attempts: 1,

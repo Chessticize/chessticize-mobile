@@ -46,7 +46,7 @@ import type {
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type {
-  ClearLocalHistoryResult,
+  ClearSyncedHistoryResult,
   ExportedSprintSession,
   LocalDataImport,
   LocalDataImportObserver,
@@ -62,6 +62,10 @@ import { buildPracticeProgressSummary } from "./rating-history.ts";
 import { clonePracticeSettings, defaultPracticeSettings, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import type { ReviewReminderPreference } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
+import {
+  InMemoryProgressV2Persistence,
+  type ProgressV2Tombstone
+} from "./progress-v2-persistence.ts";
 import {
   selectUniquePuzzles,
   selectUniquePuzzlesForRatingBands
@@ -91,6 +95,10 @@ export class MemoryStore implements PracticeStore {
   private settings = defaultPracticeSettings();
   private appReviewRequestAttempt: AppReviewRequestAttempt | undefined;
   private tacticalProfileSourceRevision = 0;
+  readonly progressV2 = new InMemoryProgressV2Persistence(
+    () => this.exportProgressV2Data(),
+    (tombstones) => this.applyProgressV2MemoryTombstones(tombstones)
+  );
 
   seedPuzzles(puzzles: Puzzle[]): void {
     for (const puzzle of puzzles) {
@@ -139,17 +147,26 @@ export class MemoryStore implements PracticeStore {
   }
 
   getRating(key: string): RatingRecord {
-    const existing = this.ratings.get(key);
+    const existing = [...this.ratings.values()]
+      .filter((rating) => rating.key === key)
+      .sort((left, right) => right.generation - left.generation)[0];
     if (existing) {
       return normalizeRatingRecord(existing);
     }
     const created = createDefaultRating(key);
-    this.ratings.set(key, created);
+    this.saveRating(created);
     return created;
   }
 
   listRatings(): RatingRecord[] {
-    return [...this.ratings.values()]
+    const latest = new Map<string, RatingRecord>();
+    for (const rating of this.ratings.values()) {
+      const previous = latest.get(rating.key);
+      if (!previous || rating.generation > previous.generation) {
+        latest.set(rating.key, rating);
+      }
+    }
+    return [...latest.values()]
       .map((rating) => normalizeRatingRecord(rating))
       .sort((left, right) => left.key.localeCompare(right.key));
   }
@@ -170,7 +187,10 @@ export class MemoryStore implements PracticeStore {
   }
 
   saveRating(record: RatingRecord): void {
-    this.ratings.set(record.key, normalizeRatingRecord(record));
+    this.ratings.set(
+      `${record.key}\u001f${record.generation}`,
+      normalizeRatingRecord(record)
+    );
   }
 
   resetRating(key: string): RatingRecord {
@@ -358,6 +378,17 @@ export class MemoryStore implements PracticeStore {
     };
   }
 
+  private exportProgressV2Data(): LocalDataExport {
+    return {
+      ...this.exportLocalData(),
+      ratings: [...this.ratings.values()]
+        .map((rating) => normalizeRatingRecord(rating))
+        .sort((left, right) =>
+          left.key.localeCompare(right.key) || left.generation - right.generation
+        )
+    };
+  }
+
   listSprintSessions(): ExportedSprintSession[] {
     return [...this.sessions.values()]
       .map(exportedSprintSessionFromState)
@@ -456,9 +487,10 @@ export class MemoryStore implements PracticeStore {
       }
     }
     for (const rating of data.ratings) {
-      const previous = this.getRating(rating.key);
-      const next = preferredRating(previous, rating);
-      if (!sameRating(previous, next)) {
+      const ratingMapKey = `${rating.key}\u001f${rating.generation}`;
+      const previous = this.ratings.get(ratingMapKey);
+      const next = previous === undefined ? rating : preferredRating(previous, rating);
+      if (previous === undefined || !sameRating(previous, next)) {
         this.saveRating(next);
         result.ratings += 1;
       }
@@ -568,7 +600,7 @@ export class MemoryStore implements PracticeStore {
     return result;
   }
 
-  clearLocalHistory(): ClearLocalHistoryResult {
+  clearSyncedHistory(now: string): ClearSyncedHistoryResult {
     const evidenceSessionIds = new Set(
       [...this.sessions.values()]
         .filter(isTacticalProfileEvidenceSession)
@@ -579,15 +611,36 @@ export class MemoryStore implements PracticeStore {
         attempt.source === "sprint" &&
         evidenceSessionIds.has(attempt.sessionId)
     );
-    const result: ClearLocalHistoryResult = {
+    const result: ClearSyncedHistoryResult = {
       attempts: this.attempts.length,
       reviewEvents: 0,
       reviewQueue: this.reviewQueue.size,
       sprintSessions: [...this.sessions.values()].filter((session) => !isOpenSprint(session)).length
     };
+    this.progressV2.stageLocalTombstones([
+      ...this.attempts.map((attempt) => ({
+        kind: "attempt" as const,
+        entityKey: attempt.id,
+        deletedAt: now
+      })),
+      ...[...this.sessions.values()]
+        .filter((session) => !isOpenSprint(session))
+        .map((session) => ({
+          kind: "sprint_session" as const,
+          entityKey: session.id,
+          deletedAt: now
+        }))
+    ], now);
     this.attempts.splice(0, this.attempts.length);
+    for (const review of this.reviewQueue.values()) {
+      this.reviewRemovals.set(reviewQueueKey(review), {
+        puzzleId: review.puzzleId,
+        mode: review.mode,
+        ratingKey: review.ratingKey,
+        removedAt: now
+      });
+    }
     this.reviewQueue.clear();
-    this.reviewRemovals.clear();
     for (const [id, session] of this.sessions) {
       if (!isOpenSprint(session)) {
         this.sessions.delete(id);
@@ -597,6 +650,36 @@ export class MemoryStore implements PracticeStore {
       this.tacticalProfileSourceRevision += 1;
     }
     return result;
+  }
+
+  private applyProgressV2MemoryTombstones(tombstones: readonly ProgressV2Tombstone[]): void {
+    const deletedAttempts = new Set(
+      tombstones.filter((item) => item.kind === "attempt").map((item) => item.entityKey)
+    );
+    for (let index = this.attempts.length - 1; index >= 0; index -= 1) {
+      if (deletedAttempts.has(this.attempts[index]!.id)) {
+        this.attempts.splice(index, 1);
+      }
+    }
+    for (const tombstone of tombstones) {
+      if (tombstone.kind === "sprint_session") {
+        this.sessions.delete(tombstone.entityKey);
+      } else if (tombstone.kind === "practice_run") {
+        this.practiceRuns.delete(tombstone.entityKey);
+      } else if (tombstone.kind === "review_schedule") {
+        const [puzzleId, mode, ratingKey] = tombstone.entityKey.split("\u001f");
+        if (puzzleId && mode && ratingKey) {
+          const key = reviewQueueKey({ puzzleId, mode: mode as ReviewContext["mode"], ratingKey });
+          this.reviewQueue.delete(key);
+          this.reviewRemovals.set(key, {
+            puzzleId,
+            mode: mode as ReviewContext["mode"],
+            ratingKey,
+            removedAt: tombstone.deletedAt
+          });
+        }
+      }
+    }
   }
 
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[] {

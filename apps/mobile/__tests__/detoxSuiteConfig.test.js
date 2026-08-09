@@ -957,6 +957,25 @@ describe('Detox suite configuration', () => {
     expect(scrollDown).toBeGreaterThan(requireVisible);
   });
 
+  it('accepts a support bundle that becomes ready before its preparing state is observed', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const testStart = flowsSpec.indexOf(
+      "it('prepares support diagnostics from Settings without requiring a sync error'"
+    );
+    const testEnd = flowsSpec.indexOf("\n  it('", testStart + 1);
+    const supportBundleTest = flowsSpec.slice(testStart, testEnd);
+
+    expect(supportBundleTest).toContain('tapUntilAnyExists(');
+    expect(supportBundleTest).toContain(
+      "['settings-sync-support-bundle-preparing', 'settings-sync-support-bundle-share']"
+    );
+    expect(supportBundleTest).toContain(
+      "waitFor(element(by.id('settings-sync-support-bundle-share')))"
+    );
+    expect(supportBundleTest).toContain('.withTimeout(60000)');
+    expect(supportBundleTest).not.toContain("tapUntilExists(");
+  });
+
   it('scrolls first-use guide actions into view before tapping them on taller devices', () => {
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
     const helperStart = helpers.indexOf('async function completeFirstUseSessionGuides');

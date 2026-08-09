@@ -120,8 +120,12 @@ import type {
   ReviewQueueDuePromotionResult,
   ReviewReminderPreference
 } from "../../../../packages/storage/src/practice-store.ts";
-import { syncPracticeProgress } from "../../../../packages/storage/src/progress-sync.ts";
-import type { ProgressSyncResult } from "../../../../packages/storage/src/progress-sync.ts";
+import {
+  ProgressV2SyncCancelledError,
+  fingerprintOpaqueToken,
+  syncPracticeProgressV2,
+  type ProgressV2SyncResult
+} from "../../../../packages/storage/src/progress-sync-v2.ts";
 import type { PracticeProgressSummary } from "../../../../packages/storage/src/rating-history.ts";
 import {
   getBundledCorePackManifest,
@@ -135,7 +139,10 @@ import {
   type ReviewReminderPermissionStatus,
   type ReviewReminderScheduleResult
 } from "../platform/reviewReminderScheduler.ts";
-import type { ICloudAccountStatus } from "../platform/iCloudProgressSync.ts";
+import {
+  captureProgressForSupport,
+  type ICloudAccountStatus
+} from "../platform/iCloudProgressSync.ts";
 import {
   captureICloudSyncFailure,
   formatAndroidSupportOverviewDiagnostic,
@@ -143,6 +150,7 @@ import {
   formatICloudSyncOverviewDiagnostic,
   iCloudSyncAttemptLabel,
   type ICloudSyncFailureDiagnostic,
+  type ICloudSyncDiagnosticMetadata,
   type SupportDiagnosticMetadata
 } from "../platform/iCloudSyncDiagnostics.ts";
 import type {
@@ -288,6 +296,7 @@ interface Props {
   };
   runReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
   runEloEditingMovedToHome?: boolean;
+  reviewTodayDesignPreview?: ReviewTodayDesignPreview;
   settingsCaptureBottomInset?: number;
   initialTab?: MobileBackPrimaryTab;
   sprintRulesDesignPreview?: SprintRulesDesignPreview;
@@ -329,6 +338,10 @@ export type SprintResultUnclearPromptPresentation = {
 };
 
 export type SprintResultReplayDesignItem = SessionReplayItem;
+
+export type ReviewTodayDesignPreview = {
+  showTodaySections: boolean;
+};
 
 export type SprintRulesDesignPreview = {
   arrowDuelReplyChallenge?: ArrowDuelReplyChallengeDesignPreview;
@@ -676,6 +689,7 @@ export function PracticePocScreen({
   runReorderDesignPreview,
   runReorderFeedbackPreview,
   runEloEditingMovedToHome = false,
+  reviewTodayDesignPreview,
   settingsCaptureBottomInset,
   initialTab = "practice",
   sprintRulesDesignPreview,
@@ -794,6 +808,7 @@ export function PracticePocScreen({
   const scheduledReviewAttemptCountRef = useRef<number | null>(null);
   const reviewReminderPromptDismissedRef = useRef(false);
   const iCloudSyncInFlightRef = useRef<Promise<string> | null>(null);
+  const iCloudSyncGenerationRef = useRef(0);
   const stateRef = useRef<SprintState | null>(null);
   const boardFenRef = useRef<string | null>(null);
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
@@ -975,6 +990,7 @@ export function PracticePocScreen({
     [fontScale, height, insets, width]
   );
   const boardSize = adaptiveLayout.boardSize;
+  const progressV2Diagnostics = service.getProgressV2Diagnostics();
   const syncDiagnosticMetadata = {
     appVersion: platformCapabilities.applicationMetadata.versionName,
     ...(platformCapabilities.applicationMetadata.buildNumber
@@ -982,7 +998,41 @@ export function PracticePocScreen({
       : {}),
     iCloudAccountStatus: iCloudAccountStatusRef.current,
     iCloudSyncEnabled,
-    latestSyncStatus: iCloudSyncStatus
+    latestSyncStatus: iCloudSyncStatus,
+    progressV2: {
+      phase: progressV2Diagnostics.phase,
+      zoneInitialized: progressV2Diagnostics.zoneInitialized,
+      ...(progressV2Diagnostics.serverChangeTokenFingerprint === undefined
+        ? {}
+        : { serverChangeTokenFingerprint: progressV2Diagnostics.serverChangeTokenFingerprint }),
+      pendingOutboxCount: progressV2Diagnostics.pendingOutboxCount,
+      ...(progressV2Diagnostics.oldestPendingOutboxAt === undefined
+        ? {}
+        : { oldestPendingOutboxAt: progressV2Diagnostics.oldestPendingOutboxAt }),
+      ...(progressV2Diagnostics.lastPullAt === undefined
+        ? {}
+        : { lastPullAt: progressV2Diagnostics.lastPullAt }),
+      ...(progressV2Diagnostics.lastPushAt === undefined
+        ? {}
+        : { lastPushAt: progressV2Diagnostics.lastPushAt }),
+      legacyImportPending: progressV2Diagnostics.pendingV1ChangeTag !== undefined,
+      ...(progressV2Diagnostics.lastV1ChangeTag === undefined
+        ? {}
+        : {
+            lastV1ChangeTagFingerprint: fingerprintOpaqueToken(
+              progressV2Diagnostics.lastV1ChangeTag
+            )
+          }),
+      ...(progressV2Diagnostics.lastV1ImportAt === undefined
+        ? {}
+        : { lastV1ImportAt: progressV2Diagnostics.lastV1ImportAt }),
+      ...(progressV2Diagnostics.lastV1CheckAt === undefined
+        ? {}
+        : { lastV1CheckAt: progressV2Diagnostics.lastV1CheckAt }),
+      ...(progressV2Diagnostics.lastV1CheckStatus === undefined
+        ? {}
+        : { lastV1CheckStatus: progressV2Diagnostics.lastV1CheckStatus })
+    }
   };
   const supportDiagnosticMetadata: SupportDiagnosticMetadata =
     progressProtection.kind === "android_managed_backup"
@@ -1004,18 +1054,56 @@ export function PracticePocScreen({
         },
         onPrepare: async () => {
           const createdAt = new Date(currentTimeMs()).toISOString();
+          const cloudCapture = progressProtection.kind === "android_managed_backup"
+            ? undefined
+            : iCloudSyncClient
+              ? await captureProgressForSupport(
+                  iCloudSyncClient,
+                  progressV2Diagnostics.phase
+                )
+              : {
+                  formatVersion: 2 as const,
+                  accountStatus: "unavailable" as const,
+                  v2: {
+                    status: "unavailable" as const,
+                    ndjson: "",
+                    recordCount: 0,
+                    deletionCount: 0,
+                    familyCounts: {},
+                    bytes: 0,
+                    startedAt: createdAt,
+                    completedAt: createdAt,
+                    unavailableReason: "icloud_v2_transport_unavailable"
+                  },
+                  v1: {
+                    status: progressV2Diagnostics.phase === "sealed"
+                      ? "skipped_sealed" as const
+                      : "unavailable" as const,
+                    ...(progressV2Diagnostics.phase === "sealed"
+                      ? {}
+                      : { unavailableReason: "icloud_v1_transport_unavailable" })
+                  }
+                };
+          const preparedMetadata: SupportDiagnosticMetadata =
+            progressProtection.kind === "android_managed_backup"
+              ? supportDiagnosticMetadata
+              : {
+                  ...syncDiagnosticMetadata,
+                  iCloudAccountStatus: cloudCapture?.accountStatus ?? "unavailable"
+                };
           const prepared = await iCloudSyncDiagnosticsClient.prepareSupportBundle({
+            ...(cloudCapture === undefined ? {} : { cloudCapture }),
             diagnosticText: progressProtection.kind === "android_managed_backup"
               ? formatAndroidSupportOverviewDiagnostic(
-                  supportDiagnosticMetadata,
+                  preparedMetadata,
                   createdAt
                 )
               : formatICloudSyncOverviewDiagnostic(
-                  syncDiagnosticMetadata,
+                  preparedMetadata as ICloudSyncDiagnosticMetadata,
                   createdAt,
                   lastICloudSyncFailure
                 ),
-            metadata: supportDiagnosticMetadata
+            metadata: preparedMetadata
           });
           return prepared;
         },
@@ -1473,6 +1561,8 @@ export function PracticePocScreen({
   }
 
   function saveICloudSyncEnabled(enabled: boolean): void {
+    iCloudSyncGenerationRef.current += 1;
+    iCloudSyncInFlightRef.current = null;
     service.saveSettings({
       ...service.getSettings(),
       sync: {
@@ -1547,19 +1637,29 @@ export function PracticePocScreen({
       return iCloudSyncInFlightRef.current;
     }
 
+    const generation = iCloudSyncGenerationRef.current;
+    const isCurrent = () =>
+      generation === iCloudSyncGenerationRef.current &&
+      service.getSettings().sync.iCloudEnabled;
+
     const work = (async () => {
       setICloudSyncStatus("Syncing");
       try {
         const accountStatus = await iCloudSyncClient.getAccountStatus();
+        if (!isCurrent()) {
+          setICloudSyncStatus("Off");
+          return "iCloud sync is off";
+        }
         iCloudAccountStatusRef.current = accountStatus;
         if (accountStatus !== "available") {
           const message = iCloudAccountStatusMessage(accountStatus);
           setICloudSyncStatus(message);
           return message;
         }
-        const result = await syncPracticeProgress(service, iCloudSyncClient, {
+        const result = await syncPracticeProgressV2(service, iCloudSyncClient, {
           deviceId: "ios-mobile",
-          now: nowIso
+          now: nowIso,
+          isCurrent
         });
         refreshState();
         setICloudSyncEnabled(service.getSettings().sync.iCloudEnabled);
@@ -1568,6 +1668,11 @@ export function PracticePocScreen({
         setICloudSyncStatus(message);
         return message;
       } catch (caught) {
+        if (caught instanceof ProgressV2SyncCancelledError) {
+          const message = service.getSettings().sync.iCloudEnabled ? "Ready" : "Off";
+          setICloudSyncStatus(message);
+          return message === "Off" ? "iCloud sync is off" : "iCloud sync was superseded";
+        }
         const message = "iCloud sync failed";
         setLastICloudSyncFailure(captureICloudSyncFailure(caught, {
           attempt: iCloudSyncAttemptLabel(reason),
@@ -4971,6 +5076,7 @@ export function PracticePocScreen({
                 explicitReplySideCopy={explicitReplySideCopy}
                 opponentReplySettingsHint={opponentReplySettingsHint}
                 nowMs={nowMs}
+                reviewTodayDesignPreview={reviewTodayDesignPreview}
                 reviewQueue={reviewQueue}
                 currentTimeMs={currentTimeMs}
                 deferBackRelevantTransition={deferBackRelevantTransition}
@@ -13058,6 +13164,7 @@ function ReviewPanel({
   onSessionAttemptClearUnclear,
   onSessionSourceChange,
   onScheduleTestReviewReminder,
+  reviewTodayDesignPreview,
   reviewQueue,
   reviewReminderScheduleStatus,
   service,
@@ -13086,6 +13193,7 @@ function ReviewPanel({
   onSessionAttemptClearUnclear?: (attemptId: string) => AttemptEvent | null;
   onSessionSourceChange?: (source: ReviewEntry["source"] | null) => void;
   onScheduleTestReviewReminder?: () => Promise<ReviewReminderScheduleResult>;
+  reviewTodayDesignPreview?: ReviewTodayDesignPreview;
   reviewQueue: ReviewQueueState[];
   reviewReminderScheduleStatus?: string;
   service: PracticeService;
@@ -13388,14 +13496,18 @@ function ReviewPanel({
         </ScrollView>
       ) : null}
 
-      {filtersExpanded && filteredDueReviewItems.length > 0 ? (
+      {(filtersExpanded || reviewTodayDesignPreview?.showTodaySections === true)
+        && filteredDueReviewItems.length > 0 ? (
         <View style={styles.reviewItemList} testID="review-due-items">
-          <Text style={styles.sectionLabel}>Due items</Text>
+          <Text style={styles.sectionLabel}>
+            {reviewTodayDesignPreview?.showTodaySections === true ? "Today to review" : "Due items"}
+          </Text>
           {filteredDueReviewItems.slice(0, 4).map((item) => (
             <ReviewQueueItemCard
               key={`${item.review.puzzleId}:${item.review.mode}:${item.review.ratingKey}`}
               item={item}
               nowMs={nowMs}
+              showTodayPresentation={reviewTodayDesignPreview?.showTodaySections === true}
               onPress={() => startReviewEntries([buildServiceReviewEntry(service, {
                 puzzle: item.puzzle,
                 mode: item.review.mode,
@@ -13524,18 +13636,55 @@ function ReviewActiveFilterStrip({ labels }: { labels: string[] }): React.JSX.El
   );
 }
 
+function reviewTodayActivityLabel(review: ReviewQueueState, nowMs: number): string {
+  const activityAt = review.lastReviewedAt ?? review.enrolledAt;
+  if (!activityAt) {
+    return "Scheduled for review";
+  }
+  const activity = reviewRelativeDayLabel(activityAt, nowMs);
+  if (review.reviewCount > 0) {
+    return `Last retry ${activity}`;
+  }
+  if (review.lastResult === "wrong") {
+    return `First missed ${activity}`;
+  }
+  return `Added to Review ${activity}`;
+}
+
+function reviewRelativeDayLabel(value: string, nowMs: number): string {
+  const date = new Date(value);
+  const now = new Date(nowMs);
+  if (!Number.isFinite(date.getTime()) || !Number.isFinite(now.getTime())) {
+    return formatLocalCalendarDate(value);
+  }
+  const dateDay = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  const nowDay = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysAgo = Math.max(0, Math.round((nowDay - dateDay) / (24 * 60 * 60 * 1000)));
+  if (daysAgo === 0) {
+    return "today";
+  }
+  if (daysAgo === 1) {
+    return "1 day ago";
+  }
+  return `${daysAgo} days ago`;
+}
+
 function ReviewQueueItemCard({
   item,
   nowMs,
+  showTodayPresentation,
   onPress
 }: {
   item: ReviewQueueItem;
   nowMs: number;
+  showTodayPresentation: boolean;
   onPress: () => void;
 }): React.JSX.Element {
-  const activityLabel = item.review.lastReviewedAt
-    ? `Last wrong ${formatLocalCalendarDate(item.review.lastReviewedAt)}`
-    : `Added manually ${formatLocalCalendarDate(item.review.enrolledAt ?? item.review.dueDay)}`;
+  const activityLabel = showTodayPresentation
+    ? reviewTodayActivityLabel(item.review, nowMs)
+    : item.review.lastReviewedAt
+      ? `Last wrong ${formatLocalCalendarDate(item.review.lastReviewedAt)}`
+      : `Added manually ${formatLocalCalendarDate(item.review.enrolledAt ?? item.review.dueDay)}`;
   const dueKind = reviewDueState(item.review, nowMs);
   const dueState = dueKind === "overdue"
     ? "Overdue"
@@ -13548,6 +13697,7 @@ function ReviewQueueItemCard({
   const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`;
   const accessibilityLabel = [
     `Start ${modeLabel(item.review.mode)} review`,
+    ...(showTodayPresentation ? ["Scheduled retry"] : []),
     activityLabel,
     dueState,
     `${item.review.intervalDays} day interval`,
@@ -13564,6 +13714,11 @@ function ReviewQueueItemCard({
       style={styles.reviewItemCard}
       onPress={onPress}
     >
+      {showTodayPresentation ? (
+        <View style={styles.reviewRetryBadge} testID={`${rowTestId}-badge`}>
+          <Text style={styles.reviewRetryGlyph}>↻</Text>
+        </View>
+      ) : null}
       <View style={styles.reviewItemCopy}>
         <Text style={styles.historyRowTitle}>{modeLabel(item.review.mode)}</Text>
         <Text testID={`${rowTestId}-context`} style={styles.helperText}>{activityLabel}</Text>
@@ -15577,14 +15732,15 @@ function localReminderTarget(date: Date): string {
   return `${String(date.getFullYear()).padStart(4, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-function progressSyncStatusMessage(result: ProgressSyncResult): string {
+function progressSyncStatusMessage(result: ProgressV2SyncResult): string {
   if (result.status === "disabled") {
     return "iCloud sync is off";
   }
   const importedCount = result.imported.ratings +
     result.imported.attempts +
     result.imported.reviewQueue +
-    result.imported.sprintSessions;
+    result.imported.sprintSessions +
+    result.imported.practiceRuns;
   if (importedCount === 0) {
     return "Synced";
   }
@@ -19284,6 +19440,21 @@ const styles = StyleSheet.create({
     minHeight: 82,
     paddingHorizontal: 12,
     paddingVertical: 10
+  },
+  reviewRetryBadge: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 999,
+    height: 28,
+    justifyContent: "center",
+    width: 28
+  },
+  reviewRetryGlyph: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "800",
+    lineHeight: 22,
+    textAlign: "center"
   },
   reviewItemCopy: {
     flex: 1,

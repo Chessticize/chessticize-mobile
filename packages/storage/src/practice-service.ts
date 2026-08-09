@@ -63,7 +63,7 @@ import type {
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter } from "./query-types.ts";
 import type {
-  ClearLocalHistoryResult,
+  ClearSyncedHistoryResult,
   ExportedSprintSession,
   LocalDataImport,
   LocalDataImportResult,
@@ -74,6 +74,13 @@ import type {
   ReviewReminderPreference
 } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
+import type {
+  ProgressV2Diagnostics,
+  ProgressV2Persistence,
+  ProgressV2RecordIdentity,
+  ProgressV2StatePatch,
+  ProgressV2Tombstone
+} from "./progress-v2-persistence.ts";
 import {
   indexSprintSessionsByRatingKey,
   reconcileRatingWithSprintSessions
@@ -167,6 +174,57 @@ export class PracticeService {
     this.store = store;
     this.tacticalProfile = tacticalProfile;
     this.reconcilePersistedRatings();
+  }
+
+  get progressV2(): ProgressV2Persistence {
+    if (!this.store.progressV2) {
+      throw new Error("Progress V2 persistence is unavailable for this store");
+    }
+    return this.store.progressV2;
+  }
+
+  getProgressV2Diagnostics(): ProgressV2Diagnostics {
+    const state = this.progressV2.readState();
+    const outbox = this.progressV2.getOutboxStats();
+    return {
+      phase: state.phase,
+      zoneInitialized: state.zoneInitialized,
+      ...(state.serverChangeTokenFingerprint === undefined
+        ? {}
+        : { serverChangeTokenFingerprint: state.serverChangeTokenFingerprint }),
+      pendingOutboxCount: outbox.pendingCount,
+      ...(outbox.oldestEnqueuedAt === undefined
+        ? {}
+        : { oldestPendingOutboxAt: outbox.oldestEnqueuedAt }),
+      ...(state.lastPullAt === undefined ? {} : { lastPullAt: state.lastPullAt }),
+      ...(state.lastPushAt === undefined ? {} : { lastPushAt: state.lastPushAt }),
+      ...(state.lastV1ChangeTag === undefined ? {} : { lastV1ChangeTag: state.lastV1ChangeTag }),
+      ...(state.pendingV1ChangeTag === undefined ? {} : { pendingV1ChangeTag: state.pendingV1ChangeTag }),
+      ...(state.lastV1ImportAt === undefined ? {} : { lastV1ImportAt: state.lastV1ImportAt }),
+      ...(state.lastV1CheckAt === undefined ? {} : { lastV1CheckAt: state.lastV1CheckAt }),
+      ...(state.lastV1CheckStatus === undefined ? {} : { lastV1CheckStatus: state.lastV1CheckStatus })
+    };
+  }
+
+  applyProgressV2RemoteBatch(
+    data: LocalDataImport,
+    tombstones: readonly ProgressV2Tombstone[],
+    patch: ProgressV2StatePatch,
+    restage: readonly ProgressV2RecordIdentity[] = []
+  ): LocalDataImportResult {
+    const result = this.progressV2.applyRemoteBatch(patch, () => {
+      const imported = this.importLocalData(data);
+      this.progressV2.applyTombstones(tombstones);
+      this.progressV2.stageOutbox(
+        restage,
+        patch.lastPullAt ?? new Date().toISOString()
+      );
+      return imported;
+    });
+    if (tombstones.length > 0) {
+      this.tacticalProfile?.markCanonicalImportChanged();
+    }
+    return result;
   }
 
   startSprint(command: StartSprintCommand, now = new Date().toISOString()): SprintState {
@@ -439,8 +497,8 @@ export class PracticeService {
     };
   }
 
-  clearLocalHistory(): ClearLocalHistoryResult {
-    const result = this.store.transaction(() => this.store.clearLocalHistory());
+  clearSyncedHistory(now = new Date().toISOString()): ClearSyncedHistoryResult {
+    const result = this.store.transaction(() => this.store.clearSyncedHistory(now));
     this.tacticalProfile?.markCanonicalImportChanged();
     return result;
   }

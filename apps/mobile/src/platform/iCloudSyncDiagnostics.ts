@@ -1,6 +1,24 @@
 // Mobile platform adapter; kept outside the backend/domain seam.
 import { NativeModules } from "react-native";
-import type { ICloudAccountStatus } from "./iCloudProgressSync.ts";
+import type {
+  ICloudAccountStatus,
+  ProgressV2SupportCapture
+} from "./iCloudProgressSync.ts";
+
+export type ProgressV2SupportDiagnostics = {
+  phase: "bridging" | "sealed";
+  zoneInitialized: boolean;
+  serverChangeTokenFingerprint?: string;
+  pendingOutboxCount: number;
+  oldestPendingOutboxAt?: string;
+  lastPullAt?: string;
+  lastPushAt?: string;
+  legacyImportPending: boolean;
+  lastV1ChangeTagFingerprint?: string;
+  lastV1ImportAt?: string;
+  lastV1CheckAt?: string;
+  lastV1CheckStatus?: "available" | "missing";
+};
 
 export type ICloudSyncAttempt =
   | "App Background"
@@ -25,6 +43,7 @@ export type ICloudSyncDiagnosticMetadata = {
   iCloudAccountStatus: ICloudAccountStatus | "not_checked";
   iCloudSyncEnabled: boolean;
   latestSyncStatus: string;
+  progressV2: ProgressV2SupportDiagnostics;
 };
 
 export type AndroidSupportDiagnosticMetadata = {
@@ -49,6 +68,7 @@ export interface ICloudSyncDiagnosticsClient {
   copyText(text: string): Promise<void>;
   discardSupportBundle(bundleUrl: string): Promise<void>;
   prepareSupportBundle(input: {
+    cloudCapture?: ProgressV2SupportCapture;
     diagnosticText: string;
     metadata: SupportDiagnosticMetadata;
   }): Promise<PreparedICloudSyncSupportBundle>;
@@ -68,7 +88,8 @@ type NativeICloudSyncDiagnosticsModule = {
   prepareSupportBundle?: (
     databasePath: string,
     diagnosticText: string,
-    metadata: SupportDiagnosticMetadata
+    metadata: SupportDiagnosticMetadata,
+    cloudCapture?: ProgressV2SupportCapture
   ) => Promise<NativePreparedSupportBundle>;
   shareSupportBundle?: (bundleUrl: string) => Promise<unknown>;
 };
@@ -97,11 +118,12 @@ export function createNativeICloudSyncDiagnosticsClient(
     discardSupportBundle: async (bundleUrl) => {
       await nativeModule.discardSupportBundle?.(bundleUrl);
     },
-    prepareSupportBundle: async ({ diagnosticText, metadata }) => {
+    prepareSupportBundle: async ({ cloudCapture, diagnosticText, metadata }) => {
       const result = await nativeModule.prepareSupportBundle?.(
         databasePath,
         diagnosticText,
-        metadata
+        metadata,
+        cloudCapture
       );
       return normalizePreparedSupportBundle(result);
     },
@@ -176,6 +198,15 @@ export function formatICloudSyncOverviewDiagnostic(
     `iCloud sync setting: ${metadata.iCloudSyncEnabled ? "On" : "Off"}`,
     `iCloud account status: ${metadata.iCloudAccountStatus}`,
     `Latest sync status: ${metadata.latestSyncStatus}`,
+    `V2 migration phase: ${metadata.progressV2.phase}`,
+    `V2 zone initialized locally: ${metadata.progressV2.zoneInitialized ? "yes" : "no"}`,
+    `V2 pending outbox records: ${metadata.progressV2.pendingOutboxCount}`,
+    `V2 change token fingerprint: ${metadata.progressV2.serverChangeTokenFingerprint ?? "none"}`,
+    `V1 import pending V2 durability: ${metadata.progressV2.legacyImportPending ? "yes" : "no"}`,
+    `Last imported V1 tag fingerprint: ${metadata.progressV2.lastV1ChangeTagFingerprint ?? "none"}`,
+    `Last V1 import: ${metadata.progressV2.lastV1ImportAt ?? "none"}`,
+    `Last V1 metadata check: ${metadata.progressV2.lastV1CheckAt ?? "none"}`,
+    `Last V1 metadata result: ${metadata.progressV2.lastV1CheckStatus ?? "none"}`,
     ...(lastFailure
       ? [
           "",
@@ -239,6 +270,18 @@ export function normalizePreparedSupportBundle(
 function phaseForCode(code: string): string {
   if (code.includes("account")) {
     return "Check iCloud Account";
+  }
+  if (code.includes("zone")) {
+    return "Initialize Progress V2";
+  }
+  if (code.includes("v1")) {
+    return "Read V1 Migration Bridge";
+  }
+  if (code.includes("token") || code.includes("fetch_changes")) {
+    return "Pull V2 Changes";
+  }
+  if (code.includes("v2_modify") || code.includes("v2_record") || code.includes("partial")) {
+    return "Push V2 Outbox";
   }
   if (
     code === "icloud_payload_write_failed"
@@ -314,6 +357,18 @@ function safeMessageForCode(code: string): string {
       return "The iCloud progress snapshot changed during sync.";
     case "icloud_save_failed":
       return "CloudKit could not save the progress snapshot.";
+    case "icloud_v2_zone_create_failed":
+    case "icloud_v2_zone_fetch_failed":
+      return "CloudKit could not initialize Progress V2.";
+    case "icloud_v2_fetch_changes_failed":
+      return "CloudKit could not fetch incremental Progress V2 changes.";
+    case "icloud_change_token_expired":
+      return "The saved Progress V2 change token expired and will be rebuilt.";
+    case "icloud_v2_modify_failed":
+      return "CloudKit could not save the pending Progress V2 records.";
+    case "icloud_v1_metadata_failed":
+    case "icloud_v1_fetch_failed":
+      return "CloudKit could not read the legacy V1 migration bridge.";
     default:
       return "iCloud sync failed. Use the bounded code and domain below for support.";
   }

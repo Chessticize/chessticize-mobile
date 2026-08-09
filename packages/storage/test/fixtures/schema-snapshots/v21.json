@@ -31,6 +31,13 @@
     "name": "app_settings",
     "columns": [
       {
+        "name": "arrow_duel_opponent_reply_enabled",
+        "type": "INTEGER",
+        "notNull": true,
+        "defaultValue": "1",
+        "primaryKeyIndex": 0
+      },
+      {
         "name": "id",
         "type": "TEXT",
         "notNull": false,

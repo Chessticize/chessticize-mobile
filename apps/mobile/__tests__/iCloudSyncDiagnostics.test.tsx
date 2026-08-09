@@ -21,7 +21,7 @@ describe("iCloud sync diagnostics bridge", () => {
       bundleUrl: "file:///tmp/chessticize-support.zip",
       files: [
         "local-progress.sqlite",
-        "icloud-progress-snapshot.json",
+        "icloud-progress-v2.ndjson",
         "diagnostic.txt",
         "manifest.json"
       ],
@@ -42,7 +42,8 @@ describe("iCloud sync diagnostics bridge", () => {
       buildNumber: "45",
       iCloudAccountStatus: "available" as const,
       iCloudSyncEnabled: true,
-      latestSyncStatus: "Synced"
+      latestSyncStatus: "Synced",
+      progressV2: sampleProgressV2Diagnostics()
     };
 
     await client?.copyText("safe diagnostic");
@@ -57,7 +58,8 @@ describe("iCloud sync diagnostics bridge", () => {
     expect(prepareSupportBundle).toHaveBeenCalledWith(
       "/progress.sqlite",
       "safe diagnostic",
-      metadata
+      metadata,
+      undefined
     );
     expect(shareSupportBundle).toHaveBeenCalledWith(bundle?.bundleUrl);
     expect(discardSupportBundle).toHaveBeenCalledWith(bundle?.bundleUrl);
@@ -83,7 +85,8 @@ describe("iCloud sync diagnostics bridge", () => {
       buildNumber: "45",
       iCloudAccountStatus: "available" as const,
       iCloudSyncEnabled: true,
-      latestSyncStatus: "iCloud sync failed"
+      latestSyncStatus: "iCloud sync failed",
+      progressV2: sampleProgressV2Diagnostics()
     };
 
     const text = formatICloudSyncFailureDiagnostic(failure, metadata);
@@ -144,8 +147,24 @@ describe("iCloud sync diagnostics bridge", () => {
         appVersion: "1.2.3",
         iCloudAccountStatus: "not_checked",
         iCloudSyncEnabled: true,
-        latestSyncStatus: "Ready"
+        latestSyncStatus: "Ready",
+        progressV2: sampleProgressV2Diagnostics()
       }
     })).rejects.toThrow(/invalid/);
   });
 });
+
+function sampleProgressV2Diagnostics() {
+  return {
+    phase: "bridging" as const,
+    zoneInitialized: true,
+    serverChangeTokenFingerprint: "0123456789abcdef",
+    pendingOutboxCount: 2,
+    oldestPendingOutboxAt: "2026-07-26T16:40:00.000Z",
+    lastPullAt: "2026-07-26T16:41:00.000Z",
+    lastPushAt: "2026-07-26T16:41:01.000Z",
+    legacyImportPending: false,
+    lastV1ChangeTagFingerprint: "fedcba9876543210",
+    lastV1ImportAt: "2026-07-25T10:00:00.000Z"
+  };
+}

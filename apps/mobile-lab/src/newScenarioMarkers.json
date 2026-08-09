@@ -39,6 +39,14 @@
       }
     ]
   },
+  "review-due": {
+    "issues": [
+      {
+        "issueNumber": 520,
+        "changeNote": "Show scheduled retries before completed reviews, with a distinct retry icon and concise attempt-history recency."
+      }
+    ]
+  },
   "review-arrow-duel-reply": {
     "issues": [
       {
@@ -60,6 +68,30 @@
       {
         "issueNumber": 523,
         "changeNote": "Share the same global Arrow Duel opponent-reply control in Android Settings."
+      }
+    ]
+  },
+  "settings-ios-sync-error-details": {
+    "issues": [
+      {
+        "issueNumber": 522,
+        "changeNote": "Document the Progress V2 support bundle as one incremental-record NDJSON capture with an optional read-only V1 bridge snapshot."
+      }
+    ]
+  },
+  "settings-ios-sync-support-bundle": {
+    "issues": [
+      {
+        "issueNumber": 522,
+        "changeNote": "List the complete Progress V2 NDJSON capture and optional V1 JSON bridge snapshot in the support export."
+      }
+    ]
+  },
+  "settings-ios-sync-support-bundle-partial": {
+    "issues": [
+      {
+        "issueNumber": 522,
+        "changeNote": "Show the bounded partial-export state when the Progress V2 zone capture is unavailable."
       }
     ]
   }

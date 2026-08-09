@@ -691,6 +691,32 @@ async function tapUntilExists(tapTestID, expectedTestID, attempts) {
   throw lastError;
 }
 
+async function tapUntilAnyExists(tapTestID, expectedTestIDs, attempts) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    await element(by.id(tapTestID)).tap();
+    try {
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < 15000) {
+        for (const expectedTestID of expectedTestIDs) {
+          if (await detoxElementExists(expectedTestID)) {
+            return;
+          }
+        }
+        await sleep(250);
+      }
+      throw new Error(`None of the expected elements appeared: ${expectedTestIDs.join(', ')}`);
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < attempts) {
+        await waitForVisibleInPracticeScroll(tapTestID);
+        await sleep(500);
+      }
+    }
+  }
+  throw lastError;
+}
+
 async function waitForElementTextContaining(testID, expected, timeoutMs, pollIntervalMs = 500) {
   const startedAt = Date.now();
   let lastText = '';
@@ -1023,6 +1049,7 @@ module.exports = {
   startSelectedPracticeRun,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
+  tapUntilAnyExists,
   tapUntilExists,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
