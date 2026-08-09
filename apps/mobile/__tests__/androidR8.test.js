@@ -76,6 +76,9 @@ describe('Android R8 release optimization', () => {
     expect(releaseE2eRules).toContain(
       '-keep,includedescriptorclasses class com.chessticize.mobile.StoredReviewReminder',
     );
+    expect(releaseE2eRules).toContain(
+      '-keep,includedescriptorclasses class com.chessticize.mobile.MainActivityKt',
+    );
     expect(releaseE2eRules).not.toContain('com.chessticize.mobile.**');
     const releaseBlock = build.match(
       /\n\s{8}release \{([\s\S]*?)\n\s{8}\}\n\s{8}\/\/ Exercise/,
