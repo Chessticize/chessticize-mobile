@@ -5,6 +5,7 @@
 -keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderAlarmReceiver { *; }
 -keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderAlarmScheduler { *; }
 -keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderLifecycleReceiver { *; }
+-keep,includedescriptorclasses class com.chessticize.mobile.MainActivityKt { *; }
 -keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderNotifications { *; }
 -keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderPermissionResult { *; }
 -keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderPermissionState { *; }
