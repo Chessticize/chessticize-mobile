@@ -13539,7 +13539,7 @@ function ReviewPanel({
       </View>
 
       {filterControlsBeforeReviewAction ? (
-        <View testID="review-filter-controls">
+        <View style={styles.reviewFilterControlSlot} testID="review-filter-controls">
           {reviewFilterOptionsRegion}
           {reviewFilterSummaryRegion}
         </View>
@@ -19454,6 +19454,9 @@ const styles = StyleSheet.create({
   },
   reviewQueuePanel: {
     gap: 12
+  },
+  reviewFilterControlSlot: {
+    minHeight: 32
   },
   reviewFilterButton: {
     alignItems: "center",
