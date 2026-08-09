@@ -120,14 +120,9 @@ export const Home: Story = {
   play: async ({ canvasElement }) => {
     await expectTestIdText(canvasElement, "practice-mode-standard-rating", "925");
     await expectTestIdText(canvasElement, "practice-mode-arrow-duel-rating", "875");
-    await expectTestIdText(canvasElement, "practice-review-due-count", "28");
+    expectTestIdAbsent(canvasElement, "practice-review-strip");
     await waitForTestId(canvasElement, "training-focus-card");
     await waitForText(canvasElement, "More information needed");
-    await expectTestIdHorizontalCentersAligned(
-      canvasElement,
-      "practice-progress-weekly-metric",
-      "practice-review-due-count"
-    );
   }
 };
 

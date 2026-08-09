@@ -1,4 +1,12 @@
 {
+  "practice-home": {
+    "issues": [
+      {
+        "issueNumber": 520,
+        "changeNote": "Remove the duplicate Review card from Practice Home now that Review has its own dedicated tab."
+      }
+    ]
+  },
   "history-filters": {
     "issues": [
       {
@@ -27,7 +35,7 @@
     "issues": [
       {
         "issueNumber": 520,
-        "changeNote": "Preview the shared short height-and-fade disclosure motion when Review filters expand or collapse."
+        "changeNote": "Preview the shared short height-and-fade disclosure motion without the redundant active-filter summary chips."
       }
     ]
   }

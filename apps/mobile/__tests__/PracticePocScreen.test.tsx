@@ -4315,6 +4315,7 @@ describe("PracticePocScreen", () => {
       accessibilityElementsHidden: false,
       pointerEvents: "auto"
     });
+    expect(() => findByTestId(reviewRenderer, "review-active-filter-summary")).toThrow();
     act(() => {
       jest.advanceTimersByTime(100);
     });
@@ -4343,6 +4344,10 @@ describe("PracticePocScreen", () => {
       accessibilityElementsHidden: false,
       pointerEvents: "auto"
     });
+
+    const practiceHomeRenderer = renderLabScenario("practice-home");
+    await flushMicrotasks();
+    expect(() => findByTestId(practiceHomeRenderer, "practice-review-strip")).toThrow();
 
     const historyRenderer = renderLabScenario("history-filters");
     await flushMicrotasks();

@@ -89,6 +89,7 @@ export const DueQueue: Story = {
     await expectTestIdHeight(canvasElement, "review-completed-today-toggle", 44);
     await clickTestId(canvasElement, "review-filter-toggle");
     await waitForVisibleTestId(canvasElement, "review-filter-options-motion");
+    expectTestIdAbsent(canvasElement, "review-active-filter-summary");
     await clickTestId(canvasElement, "review-filter-toggle");
     await waitForHiddenTestId(canvasElement, "review-filter-options-motion");
     expectTestIdAbsent(canvasElement, "review-dev-controls");
@@ -111,7 +112,7 @@ export const Filters: Story = {
     await clickTestId(canvasElement, "review-filter-toggle");
     await waitForVisibleTestId(canvasElement, "review-filter-options-motion");
     await clickTestId(canvasElement, "review-filter-overdue");
-    await waitForTestId(canvasElement, "review-active-filter-summary");
+    expectTestIdAbsent(canvasElement, "review-active-filter-summary");
   }
 };
 

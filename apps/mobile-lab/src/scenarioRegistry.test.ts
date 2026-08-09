@@ -54,9 +54,9 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
   assert.deepEqual(
     newScenarios.map((scenario) => scenario.id),
-    ["practice-custom-setup", "review-due", "review-filters", "history-filters"]
+    ["practice-home", "practice-custom-setup", "review-due", "review-filters", "history-filters"]
   );
-  for (const scenarioId of ["practice-custom-setup", "review-due", "review-filters", "history-filters"] as const) {
+  for (const scenarioId of ["practice-home", "practice-custom-setup", "review-due", "review-filters", "history-filters"] as const) {
     assert.ok(scenarioRegistry[scenarioId].issues?.some(
       (issue) => issue.issueNumber === 520
     ) ?? false);
@@ -329,17 +329,16 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.deepEqual(storyTagsForScenario(settingsGuidance.id), []);
 });
 
-test("Practice home keeps its merged value polish in the baseline scenario", () => {
+test("Practice home delegates Review workload to the dedicated tab", () => {
   const home = scenarioRegistry["practice-home"];
 
   assert.ok(home.scope.includes.includes("Numeric trailing Ratings"));
-  assert.ok(home.scope.includes.includes("Single Review status label"));
-  assert.ok(home.scope.includes.includes("Centered Review workload count"));
+  assert.ok(home.scope.includes.includes("No duplicate Review card"));
   assert.ok(home.scope.includes.includes("Training Focus card"));
   assert.ok(home.scope.includes.includes("Collecting-evidence state"));
   assert.ok(home.scope.includes.includes("Tactical Profile entry"));
-  assert.match(home.description, /Training Focus collecting-evidence state/);
-  assert.deepEqual(storyTagsForScenario("practice-home"), []);
+  assert.match(home.description, /dedicated Review tab/);
+  assert.deepEqual(storyTagsForScenario("practice-home"), ["new"]);
 });
 
 test("post-attempt handoffs explain Timeout, Wrong, and Slow-correct results", () => {

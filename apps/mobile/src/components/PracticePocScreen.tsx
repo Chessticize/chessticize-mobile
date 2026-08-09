@@ -283,6 +283,8 @@ interface Props {
   };
   puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
+  practiceHomeReviewCardVisible?: boolean;
+  reviewActiveFilterSummaryVisible?: boolean;
   runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
   runReorderDesignPreview?: {
@@ -690,6 +692,8 @@ export function PracticePocScreen({
   moveFeedbackSettings,
   puzzleSelectionId,
   puzzleSelectionSeed,
+  practiceHomeReviewCardVisible = true,
+  reviewActiveFilterSummaryVisible = true,
   runManagementEnabled = false,
   runManagementPresentation,
   runReorderDesignPreview,
@@ -4625,6 +4629,7 @@ export function PracticePocScreen({
                     dueReviewCount={dueTodayCount}
                     overdueReviewCount={overdueCount}
                     progress={practiceProgress}
+                    reviewCardVisible={practiceHomeReviewCardVisible}
                     runManagement={activeRunManagementPresentation}
                     sprintRulesGuide={sprintRulesGuidePresentation}
                     sprintRulesGuideVisible={sprintRulesGuideVisible}
@@ -4957,6 +4962,7 @@ export function PracticePocScreen({
                 explicitReplySideCopy={explicitReplySideCopy}
                 nowMs={nowMs}
                 reviewTodayDesignPreview={reviewTodayDesignPreview}
+                reviewActiveFilterSummaryVisible={reviewActiveFilterSummaryVisible}
                 reviewQueue={reviewQueue}
                 currentTimeMs={currentTimeMs}
                 deferBackRelevantTransition={deferBackRelevantTransition}
@@ -5173,6 +5179,7 @@ function PracticeHome({
   dueReviewCount,
   overdueReviewCount,
   progress,
+  reviewCardVisible,
   runManagement,
   sprintRulesGuide,
   sprintRulesGuideVisible,
@@ -5196,6 +5203,7 @@ function PracticeHome({
   dueReviewCount: number;
   overdueReviewCount: number;
   progress: PracticeProgressSummary;
+  reviewCardVisible: boolean;
   runManagement?: PracticeRunManagementPresentation;
   sprintRulesGuide?: SprintRulesGuidePresentation;
   sprintRulesGuideVisible: boolean;
@@ -5296,40 +5304,44 @@ function PracticeHome({
             <TacticalProfileHomeCard presentation={tacticalProfile} />
           ) : null}
 
-          <Text style={styles.sectionLabel}>Review</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Open scheduled mistake reviews${dueReviewCount > 0 ? `, ${dueReviewCount} due today` : ""}${overdueReviewCount > 0 ? ", overdue reviews" : ""}`}
-            testID="practice-review-strip"
-            style={styles.practiceReviewStrip}
-            onPress={onOpenReview}
-          >
-            <View style={styles.reviewStripStatusCopy}>
-              <Text style={styles.listText}>{reviewStatusLabel}</Text>
-            </View>
-            <View
-              style={styles.practiceSummaryColumnGap}
-              testID="practice-review-strip-column-gap"
-            />
-            <View
-              style={styles.reviewStripActionArea}
-              testID="practice-review-strip-action-area"
-            >
-              <View
-                style={styles.reviewStripCounts}
-                testID="practice-review-strip-counts"
+          {reviewCardVisible ? (
+            <>
+              <Text style={styles.sectionLabel}>Review</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open scheduled mistake reviews${dueReviewCount > 0 ? `, ${dueReviewCount} due today` : ""}${overdueReviewCount > 0 ? ", overdue reviews" : ""}`}
+                testID="practice-review-strip"
+                style={styles.practiceReviewStrip}
+                onPress={onOpenReview}
               >
-                {dueReviewCount > 0 ? (
-                  <View style={styles.reviewStripMetric} testID="practice-review-due-count">
-                    <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
+                <View style={styles.reviewStripStatusCopy}>
+                  <Text style={styles.listText}>{reviewStatusLabel}</Text>
+                </View>
+                <View
+                  style={styles.practiceSummaryColumnGap}
+                  testID="practice-review-strip-column-gap"
+                />
+                <View
+                  style={styles.reviewStripActionArea}
+                  testID="practice-review-strip-action-area"
+                >
+                  <View
+                    style={styles.reviewStripCounts}
+                    testID="practice-review-strip-counts"
+                  >
+                    {dueReviewCount > 0 ? (
+                      <View style={styles.reviewStripMetric} testID="practice-review-due-count">
+                        <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
+                      </View>
+                    ) : null}
                   </View>
-                ) : null}
-              </View>
-              <View style={styles.reviewStripChevron} testID="practice-review-strip-chevron">
-                <ChevronGlyph direction="right" />
-              </View>
-            </View>
-          </Pressable>
+                  <View style={styles.reviewStripChevron} testID="practice-review-strip-chevron">
+                    <ChevronGlyph direction="right" />
+                  </View>
+                </View>
+              </Pressable>
+            </>
+          ) : null}
         </View>
       </View>
     </View>
@@ -13171,6 +13183,7 @@ function ReviewPanel({
   onSessionSourceChange,
   onScheduleTestReviewReminder,
   reviewTodayDesignPreview,
+  reviewActiveFilterSummaryVisible,
   reviewQueue,
   reviewReminderScheduleStatus,
   service,
@@ -13200,6 +13213,7 @@ function ReviewPanel({
   onSessionSourceChange?: (source: ReviewEntry["source"] | null) => void;
   onScheduleTestReviewReminder?: () => Promise<ReviewReminderScheduleResult>;
   reviewTodayDesignPreview?: ReviewTodayDesignPreview;
+  reviewActiveFilterSummaryVisible: boolean;
   reviewQueue: ReviewQueueState[];
   reviewReminderScheduleStatus?: string;
   service: PracticeService;
@@ -13258,7 +13272,8 @@ function ReviewPanel({
   const filteredContextGroups = groupReviewEntriesByContext(filteredDueEntries);
   const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems, nowMs);
   const activeFilterLabels = reviewActiveFilterLabels(queueFilter, queueSummary);
-  const showActiveFilterStrip = filtersExpanded || queueFilter !== "all";
+  const showActiveFilterStrip = reviewActiveFilterSummaryVisible
+    && (filtersExpanded || queueFilter !== "all");
   const reviewDueSummaryLabel = filteredDueEntries.length > 0
     ? queueSummary.dueStatusLabel
     : dueReviewItems.length === 0

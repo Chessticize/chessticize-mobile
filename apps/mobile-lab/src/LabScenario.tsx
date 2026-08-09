@@ -297,6 +297,8 @@ function LabScenarioContent({
           ? historyProgressPresentationFor(scenarioId)
           : undefined}
         platformCapabilities={runtime.platformCapabilities}
+        practiceHomeReviewCardVisible={false}
+        reviewActiveFilterSummaryVisible={false}
         runReorderDesignPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
           ? { pickedUpRunId: runReorderPickedUpRunId }
           : undefined}
