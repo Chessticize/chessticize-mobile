@@ -16,8 +16,10 @@ as separate phases.
 - Use a dedicated simulator such as `iPhone 17-Detox`. Never use the simulator that holds manual-test data: Detox launches with `delete: true` and wipes the app sandbox.
 - Treat Debug as `Chessticize Dev` with bundle ID
   `com.chessticize.mobile.dev` and CloudKit container
-  `iCloud.com.chessticize.mobile.dev`. Treat Release as the production app with
-  `com.chessticize.mobile` and `iCloud.com.chessticize.mobile`.
+  `iCloud.com.chessticize.mobile.dev`, using the visually distinct
+  `AppIconDev` asset. Treat Release as the production app with
+  `com.chessticize.mobile`, `iCloud.com.chessticize.mobile`, and the production
+  `AppIcon` asset.
 - Install only Debug on a personal physical device before release. Use
   `pnpm mobile:ios:dev:device`; do not use a Release device build for routine
   testing.

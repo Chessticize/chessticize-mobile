@@ -128,6 +128,8 @@ Keep the iOS identities fail-closed:
 
 - Debug is `Chessticize Dev` (`com.chessticize.mobile.dev`) and uses only
   `iCloud.com.chessticize.mobile.dev` in the CloudKit Development environment.
+- Debug uses the visually distinct `AppIconDev` asset. Release must continue
+  to use the production `AppIcon` asset.
 - Release is `Chessticize` (`com.chessticize.mobile`) and uses the production
   `iCloud.com.chessticize.mobile` container.
 - Install only Debug on a personal physical device before release. Use

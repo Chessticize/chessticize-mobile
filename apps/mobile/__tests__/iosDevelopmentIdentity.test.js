@@ -40,7 +40,22 @@ describe('iOS development identity isolation', () => {
     const releaseEntitlements = readText(
       join(iosRoot, 'ChessticizeMobile', 'ChessticizeMobile.entitlements'),
     );
+    const productionIcon = join(
+      iosRoot,
+      'ChessticizeMobile',
+      'Images.xcassets',
+      'AppIcon.appiconset',
+      'AppIcon-ios-marketing-1024.png',
+    );
+    const devIcon = join(
+      iosRoot,
+      'ChessticizeMobile',
+      'Images.xcassets',
+      'AppIconDev.appiconset',
+      'AppIcon-ios-marketing-1024.png',
+    );
 
+    expect(debug).toContain('ASSETCATALOG_COMPILER_APPICON_NAME = AppIconDev;');
     expect(debug).toContain(
       'CODE_SIGN_ENTITLEMENTS = ChessticizeMobile/ChessticizeMobileDev.entitlements;',
     );
@@ -49,6 +64,7 @@ describe('iOS development identity isolation', () => {
     expect(release).toContain(
       'CODE_SIGN_ENTITLEMENTS = ChessticizeMobile/ChessticizeMobile.entitlements;',
     );
+    expect(release).toContain('ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;');
     expect(release).toContain('INFOPLIST_KEY_CFBundleDisplayName = Chessticize;');
     expect(release).toContain('PRODUCT_BUNDLE_IDENTIFIER = com.chessticize.mobile;');
     expect(infoPlist).toContain(
@@ -70,6 +86,9 @@ describe('iOS development identity isolation', () => {
     expect(releaseEntitlements).not.toContain(
       '<string>iCloud.com.chessticize.mobile.dev</string>',
     );
+    expect(
+      readFileSync(devIcon).equals(readFileSync(productionIcon)),
+    ).toBe(false);
   });
 
   it('runs Xcode interactively with Debug while reserving Release for profiling and archives', () => {

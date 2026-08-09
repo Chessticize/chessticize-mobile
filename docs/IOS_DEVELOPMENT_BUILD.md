@@ -13,7 +13,9 @@ The two bundle IDs give iOS separate app sandboxes, so their SQLite databases,
 preferences, and uninstall lifecycle do not overlap. The separate iCloud
 containers prevent either app from reading or merging the other app's private
 CloudKit snapshot. Do not associate the production iCloud container with the
-Dev App ID.
+Dev App ID. Debug also uses the purple-banded `AppIconDev` icon so it remains
+visually distinct from the App Store app on the Home Screen; Release continues
+to use the production `AppIcon` asset.
 
 ## One-Time Apple Developer Setup
 
