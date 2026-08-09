@@ -14,6 +14,7 @@ import type { Puzzle, PuzzlePackManifest } from "../src/index.ts";
 
 test("bundled core puzzle pack manifest matches the shipped puzzle artifact", (t) => {
   const manifest = readBundledManifest();
+  assert.equal(manifest.packVersion, 5);
   if (manifest.format === "sqlite") {
     if (!existsSync(resolve("fixtures/puzzles/bundled-core-pack.sqlite"))) {
       t.skip("core pack artifact not fetched; run pnpm fetch:core-pack (Mobile iOS CI verifies the real artifact)");
@@ -70,6 +71,27 @@ test("bundled core puzzle pack manifest matches the shipped puzzle artifact", (t
   assert.ok(manifest.themes.includes("endgame"));
   assert.ok(manifest.manifestHash.startsWith("sha256:"));
   assert.deepEqual(manifest, rebuilt);
+});
+
+test("puzzle pack manifests preserve the content version used by runtime caches", () => {
+  const [puzzle] = JSON.parse(
+    readFileSync(resolve("fixtures/puzzles/presolved-1000.json"), "utf8")
+  ) as Puzzle[];
+  assert.ok(puzzle);
+
+  const manifest = buildPuzzlePackManifest([puzzle], {
+    id: "versioned-pack",
+    title: "Versioned pack",
+    buildDate: "2026-08-09",
+    source: "test",
+    sourceLicense: "test",
+    presolve: "test",
+    licenseNote: "test",
+    manifestHash: "sha256:test",
+    packVersion: 5
+  });
+
+  assert.equal(manifest.packVersion, 5);
 });
 
 test("Tactical Profile frequencies follow the nearest current-Rating bucket", () => {

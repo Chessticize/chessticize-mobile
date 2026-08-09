@@ -39,10 +39,18 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
   }
 
   static async openReadOnlyPuzzlePack(
-    name = MOBILE_DATABASE_LAYOUT.bundledPuzzlePackDatabaseName,
-    options: SQLitePuzzlePackSourceOptions = {}
+    name: string,
+    options: SQLitePuzzlePackSourceOptions = {},
+    obsoleteCacheNames: readonly string[] = []
   ): Promise<SQLitePuzzlePackSource> {
-    const bundledPack = DeviceSQLiteStore.openBundledReadOnlyPuzzlePack(name, options);
+    const validatedObsoleteCacheNames = validateObsoleteBundledPuzzlePackCacheNames(
+      obsoleteCacheNames
+    );
+    const bundledPack = DeviceSQLiteStore.openBundledReadOnlyPuzzlePack(
+      name,
+      options,
+      validatedObsoleteCacheNames
+    );
     if (bundledPack) {
       return bundledPack;
     }
@@ -54,28 +62,30 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
     if (!copied) {
       throw new Error(`Bundled puzzle pack could not be copied: ${name}`);
     }
-    return new SQLitePuzzlePackSource(
-      new OPSqliteDatabase(open({ name, readOnly: true } as Parameters<typeof open>[0] & { readOnly: boolean })),
-      options
-    );
+    const pack = openReadOnlyPuzzlePackDatabase({ name }, options);
+    deleteObsoleteBundledPuzzlePackCaches(validatedObsoleteCacheNames);
+    return pack;
   }
 
   static openBundledReadOnlyPuzzlePack(
-    name = MOBILE_DATABASE_LAYOUT.bundledPuzzlePackDatabaseName,
-    options: SQLitePuzzlePackSourceOptions = {}
+    name: string,
+    options: SQLitePuzzlePackSourceOptions = {},
+    obsoleteCacheNames: readonly string[] = []
   ): SQLitePuzzlePackSource | undefined {
-    const iosBundleLocation = Platform.OS === "ios" ? bundledJsDirectory() : undefined;
+    const validatedObsoleteCacheNames = validateObsoleteBundledPuzzlePackCacheNames(
+      obsoleteCacheNames
+    );
+    const iosBundleLocation = Platform.OS === "ios" ? iosBundleResourceDirectory() : undefined;
     if (!iosBundleLocation) {
       return undefined;
     }
-    return new SQLitePuzzlePackSource(
-      new OPSqliteDatabase(open({ name, location: iosBundleLocation, readOnly: true } as Parameters<typeof open>[0] & { readOnly: boolean })),
-      options
-    );
+    const pack = openReadOnlyPuzzlePackDatabase({ name, location: iosBundleLocation }, options);
+    deleteObsoleteBundledPuzzlePackCaches(validatedObsoleteCacheNames);
+    return pack;
   }
 
   static canOpenBundledReadOnlyPuzzlePack(): boolean {
-    return Platform.OS === "ios" && bundledJsDirectory() !== undefined;
+    return Platform.OS === "ios" && iosBundleResourceDirectory() !== undefined;
   }
 
   close(): void {
@@ -87,7 +97,16 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
   }
 }
 
-function bundledJsDirectory(): string | undefined {
+function iosBundleResourceDirectory(): string | undefined {
+  const applicationMetadata = NativeModules.ApplicationMetadata as
+    | { bundleResourcePath?: unknown }
+    | undefined;
+  if (
+    typeof applicationMetadata?.bundleResourcePath === "string"
+    && applicationMetadata.bundleResourcePath.length > 0
+  ) {
+    return applicationMetadata.bundleResourcePath;
+  }
   const sourceCode = NativeModules.SourceCode as { scriptURL?: string } | undefined;
   const scriptUrl = sourceCode?.scriptURL;
   if (!scriptUrl?.startsWith("file://")) {
@@ -118,6 +137,38 @@ function moveBundledDatabaseAsset(args: { filename: string; path: string }): Pro
     return Promise.reject(new Error("OPSQLite asset copy API is unavailable"));
   }
   return module.moveAssetsDatabase(args);
+}
+
+function validateObsoleteBundledPuzzlePackCacheNames(names: readonly string[]): string[] {
+  const uniqueNames = [...new Set(names)];
+  for (const name of uniqueNames) {
+    if (!/^bundled-core-pack(?:-v[1-9]\d*)?\.sqlite$/u.test(name)) {
+      throw new Error(`Refusing to delete unexpected bundled puzzle-pack cache: ${name}`);
+    }
+  }
+  return uniqueNames;
+}
+
+function deleteObsoleteBundledPuzzlePackCaches(names: readonly string[]): void {
+  for (const name of names) {
+    open({ name }).delete();
+  }
+}
+
+function openReadOnlyPuzzlePackDatabase(
+  input: { name: string; location?: string },
+  options: SQLitePuzzlePackSourceOptions
+): SQLitePuzzlePackSource {
+  const nativeDb = open({
+    ...input,
+    readOnly: true
+  } as Parameters<typeof open>[0] & { readOnly: boolean });
+  try {
+    return new SQLitePuzzlePackSource(new OPSqliteDatabase(nativeDb), options);
+  } catch (error) {
+    nativeDb.close();
+    throw error;
+  }
 }
 
 export class OPSqliteDatabase implements SyncSqliteDatabase {
