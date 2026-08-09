@@ -2885,6 +2885,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(firstArrowDuel, "practice-arrow-duel-guide"))).toContain(
       "Then reply for Black"
     );
+    expect(collectText(findByTestId(
+      firstArrowDuel,
+      "practice-session-guide-optional-settings-notice"
+    ))).toBe("This extra challenge is optional — turn it off in Settings.");
     expect(freshService.getSettings().sprintGuides.arrowDuelSeen).toBe(false);
 
     press(firstArrowDuel, "practice-session-guide-start");
@@ -2915,6 +2919,37 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(returningArrowDuel, "practice-arrow-duel-guide")).toBeTruthy();
     expect(() => findByTestId(returningArrowDuel, "practice-active-session-guide")).toThrow();
     expect(collectText(findByTestId(returningArrowDuel, "practice-session-guide-coach-progress"))).toBe("1 of 2");
+  });
+
+  it("omits the opponent-reply guide step when the global setting is off", () => {
+    const service = createMobilePracticeService("random1000");
+    service.saveSettings({
+      ...service.getSettings(),
+      arrowDuel: { opponentReplyEnabled: false },
+      sprintGuides: {
+        ...service.getSettings().sprintGuides,
+        rulesSeen: true,
+        activeSessionSeen: true,
+        arrowDuelSeen: false
+      }
+    });
+    const renderer = renderScreen({
+      sprintGuidanceEnabled: true,
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "practice-run-select-arrow-duel");
+    press(renderer, "practice-run-start");
+
+    expect(collectText(findByTestId(
+      renderer,
+      "practice-session-guide-coach-progress"
+    ))).toBe("1 of 1");
+    expect(() => findByTestId(
+      renderer,
+      "practice-session-guide-optional-settings-notice"
+    )).toThrow();
   });
 
   it("lets Arrow Duel leave either guide without completing its own guidance", () => {
@@ -3342,6 +3377,32 @@ describe("PracticePocScreen", () => {
     press(renderer, "settings-arrow-duel-opponent-reply-on");
     expect(collectText(findByTestId(renderer, "settings-status-message")))
       .toBe("Runs will now include the opponent’s best reply");
+  });
+
+  it("persists the production global setting and hides the individual Run override", () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({
+      initialTab: "settings",
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    expect(collectText(findByTestId(
+      renderer,
+      "settings-arrow-duel-opponent-reply"
+    ))).toContain("On");
+    press(renderer, "settings-arrow-duel-opponent-reply-off");
+    expect(service.getSettings().arrowDuel.opponentReplyEnabled).toBe(false);
+
+    press(renderer, "practice-tab");
+    press(renderer, "practice-run-home-edit");
+    press(renderer, "practice-run-edit-arrow-duel");
+
+    expect(() => findByTestId(
+      renderer,
+      "practice-run-arrow-duel-reply-setting"
+    )).toThrow();
+    expect(findByTestId(renderer, "practice-run-puzzle-timing")).toBeTruthy();
   });
 
   it("hides the individual Run override while the global setting is off", () => {
@@ -5583,35 +5644,32 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "settings-standard-elo-row")).toThrow();
   });
 
-  it("creates and edits a real Arrow Duel Run opponent reply setting", () => {
+  it("lets a new Arrow Duel Run inherit the global default, then edits its reply setting", () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
 
     press(renderer, "practice-add-run");
     press(renderer, "custom-mode-arrow-duel");
-    expect(collectText(findByTestId(renderer, "practice-run-arrow-duel-reply-value"))).toBe("On");
-    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("10");
+    expect(() => findByTestId(renderer, "practice-run-arrow-duel-reply-setting")).toThrow();
     act(() => {
       findByTestId(renderer, "practice-run-name-input").props.onChangeText("Reply Drill");
+    });
+    press(renderer, "practice-run-save");
+
+    const created = service.listPracticeRuns().find((run) => run.name === "Reply Drill");
+    expect(created?.opponentReply).toEqual({ enabled: true, seconds: 10 });
+    expect(created?.ratingKey).toBe(`run:${created?.id}`);
+
+    press(renderer, "practice-run-home-edit");
+    press(renderer, `practice-run-edit-${created?.id}`);
+    act(() => {
       findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.onChangeText("8");
     });
     press(renderer, "practice-run-arrow-duel-reply-toggle");
     press(renderer, "practice-run-save");
 
-    const created = service.listPracticeRuns().find((run) => run.name === "Reply Drill");
-    expect(created?.opponentReply).toEqual({ enabled: false, seconds: 8 });
-    expect(created?.ratingKey).toBe(`run:${created?.id}`);
-
-    press(renderer, "practice-run-home-edit");
-    press(renderer, `practice-run-edit-${created?.id}`);
-    press(renderer, "practice-run-arrow-duel-reply-toggle");
-    act(() => {
-      findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.onChangeText("10");
-    });
-    press(renderer, "practice-run-save");
-
     const updated = service.getActivePracticeRun(created!.id);
-    expect(updated.opponentReply).toEqual({ enabled: true, seconds: 10 });
+    expect(updated.opponentReply).toEqual({ enabled: false, seconds: 8 });
     expect(updated.ratingKey).toBe(created?.ratingKey);
   });
 
@@ -8445,10 +8503,14 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "arrow-duel-what-if-action").props.accessibilityLabel)
       .toBe("Got it");
     expect(findByTestId(renderer, "arrow-duel-what-if-announcement").props.accessibilityLabel)
-      .toBe("What would Black play after the other move? You’ll have 10 seconds to play the best reply.");
+      .toBe("What would Black play after the other move? You’ll have 10 seconds to play the best reply. Optional · Turn off in Settings");
     expect(collectText(findByTestId(renderer, "arrow-duel-what-if-title")))
       .not.toContain("Black");
     expect(findByTestId(renderer, "arrow-duel-what-if-side-king")).toBeTruthy();
+    expect(collectText(findByTestId(
+      renderer,
+      "arrow-duel-what-if-settings-hint"
+    ))).toBe("Optional · Turn off in Settings");
     expect(() => findByTestId(renderer, "arrow-duel-reply-timer")).toThrow();
 
     act(() => {
@@ -8464,6 +8526,8 @@ describe("PracticePocScreen", () => {
         .toBe("Find Black’s reply");
       expect(collectText(findByTestId(renderer, "arrow-duel-reply-context")))
         .toBe("The other move was played.");
+      expect(collectText(findByTestId(renderer, "arrow-duel-reply-hint")))
+        .toBe("Optional · Turn off in Settings");
       expect(collectText(findByTestId(renderer, "arrow-duel-reply-timer"))).toBe("0:10");
     });
   });
@@ -8639,7 +8703,7 @@ describe("PracticePocScreen", () => {
       "Find the opponent’s reply in 10 seconds."
     );
     expect(findByTestId(renderer, "arrow-duel-what-if-announcement").props.accessibilityLabel).toBe(
-      "What if you made the other move? Find the opponent’s reply in 10 seconds."
+      "What if you made the other move? Find the opponent’s reply in 10 seconds. Optional · Turn off in Settings"
     );
     expect(flattenTestStyle(whatIfOverlay.props.style)).toEqual(expect.objectContaining({
       backgroundColor: "rgba(15, 23, 42, 0.90)",
@@ -12861,12 +12925,18 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-arrow-duel-what-if-detail"))).toBe(
       "Find the opponent’s reply in 12 seconds."
     );
+    expect(collectText(findByTestId(
+      renderer,
+      "review-arrow-duel-what-if-settings-hint"
+    ))).toBe("Optional · Turn off in Settings");
 
     await advanceEntryPreviewBy(1_499);
     expect(findByTestId(renderer, "review-arrow-duel-what-if-overlay")).toBeTruthy();
     expect(() => findByTestId(renderer, "review-arrow-duel-reply-timer")).toThrow();
     await advanceEntryPreviewBy(1);
     expect(collectText(findByTestId(renderer, "review-arrow-duel-reply-timer"))).toBe("0:12");
+    expect(collectText(findByTestId(renderer, "practice-prompt-hint")))
+      .toBe("Optional · Turn off in Settings");
     expect(collectText(findByTestId(renderer, "review-current-expected-move"))).toBe(
       arrow.puzzle.solutionMoves[1]
     );
@@ -12929,13 +12999,13 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-session")).toThrow();
   });
 
-  it("keeps the one-choice scheduled Review behavior when opponent reply is off", async () => {
+  it("keeps the one-choice scheduled Review behavior when the global setting is off", async () => {
     const service = createMobilePracticeService("random1000");
     const builtInRun = service.getActivePracticeRun("arrow-duel");
     service.updatePracticeRun(builtInRun.id, {
       name: builtInRun.name,
       rating: service.getRating(builtInRun.ratingKey).rating,
-      opponentReply: { enabled: false, seconds: 10 }
+      opponentReply: { enabled: true, seconds: 17 }
     }, "2026-06-20T00:00:00.000Z");
     const sprint = service.startSprint({
       mode: "arrow_duel",
@@ -12944,6 +13014,10 @@ describe("PracticePocScreen", () => {
     }, "2026-06-20T00:00:00.000Z");
     const arrow = requireArrowDuelState(sprint);
     service.submitMove(arrow.wrongMove, "2026-06-20T00:00:05.000Z");
+    service.saveSettings({
+      ...service.getSettings(),
+      arrowDuel: { opponentReplyEnabled: false }
+    });
     jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
     const renderer = renderScreen({ practiceService: service });
 

@@ -159,6 +159,9 @@ function sampleSnapshot(): ProgressSyncSnapshot {
     data: {
       schemaVersion: 1,
       settings: {
+        arrowDuel: {
+          opponentReplyEnabled: true
+        },
         sync: {
           iCloudEnabled: true
         },

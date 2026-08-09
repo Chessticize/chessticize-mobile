@@ -2,7 +2,8 @@
 
 Status: implemented product contract and living Interaction Lab documentation.
 
-Tracking issue: [#489](https://github.com/Chessticize/chessticize-mobile/issues/489).
+Tracking issues: [#489](https://github.com/Chessticize/chessticize-mobile/issues/489)
+and [#523](https://github.com/Chessticize/chessticize-mobile/issues/523).
 
 This document defines the shipped Arrow Duel redesign across Core, storage,
 sync, Review, Run management, CLI, and the mobile UI.
@@ -13,12 +14,21 @@ Arrow Duel should distinguish a calculated choice from a correct guess. A
 player demonstrates the tactic only by choosing the stronger candidate and
 then finding the puzzle's refutation of the tempting candidate.
 
-## Run Setting
+## Global And Run Settings
+
+Settings has a device-local **Find the opponent’s best reply** preference. It
+defaults to on. Turning it off removes the reply challenge from every Arrow
+Duel Run without changing the saved preference or reply time inside any Run.
+Turning it back on restores each Run's previously saved choice and time. The
+global preference is never applied from a progress-sync payload, so an older
+or second device cannot silently re-enable the challenge on this device.
 
 Each Arrow Duel Run has an **Opponent reply** setting:
 
 - It defaults to on.
-- It appears in Create Run and Edit Run when the Run format is Arrow Duel.
+- It appears in Edit Run only while the global preference is on. New Runs
+  inherit the global default without showing a duplicate override during
+  creation.
 - Its reply time defaults to ten seconds and accepts any positive whole-number duration
   up to thirty seconds entered directly, rather than a fixed list of
   presets.
@@ -30,6 +40,14 @@ The setting persists with the Run and syncs without changing its Rating key.
 Legacy Arrow Duel Runs that do not yet have the setting receive the enabled
 ten-second default during compatibility normalization and SQLite migration.
 Runs that already store a reply duration keep their configured value.
+
+The effective behavior is `global preference on AND Run preference on`.
+Neither layer rewrites the other.
+
+First-use guidance and every Sprint or Review reply prompt end with the visible
+escape hatch `Optional · Turn off in Settings`. The longer first-use callout
+keeps **Optional** visually emphasized and appears on its own final line. When
+the global preference is off, reply-specific guidance and prompts are omitted.
 
 ## Scored Flow
 

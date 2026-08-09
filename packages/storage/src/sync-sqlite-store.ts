@@ -239,6 +239,7 @@ interface AppSettingsRow {
   id: string;
   sync_icloud_enabled: number;
   sync_upload_allowed: number;
+  arrow_duel_opponent_reply_enabled: number;
   review_reminder_mode: PracticeSettings["notifications"]["reviewReminder"]["mode"];
   review_reminder_fixed_local_time: string | null;
   move_feedback_sound_enabled: number;
@@ -295,7 +296,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 19;
+export const CURRENT_SCHEMA_VERSION = 20;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -323,7 +324,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 15, to: 16, apply: migrateV15ToV16 },
   { from: 16, to: 17, apply: migrateV16ToV17 },
   { from: 17, to: 18, apply: migrateV17ToV18 },
-  { from: 18, to: 19, apply: migrateV18ToV19 }
+  { from: 18, to: 19, apply: migrateV18ToV19 },
+  { from: 19, to: 20, apply: migrateV19ToV20 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -669,6 +671,7 @@ export class SyncSQLiteStore implements PracticeStore {
           id,
           sync_icloud_enabled,
           sync_upload_allowed,
+          arrow_duel_opponent_reply_enabled,
           review_reminder_mode,
           review_reminder_fixed_local_time,
           move_feedback_sound_enabled,
@@ -678,11 +681,12 @@ export class SyncSQLiteStore implements PracticeStore {
           sprint_arrow_duel_guide_seen,
           sprint_focused_run_guide_seen,
           sprint_arrow_duel_reply_cue_stage
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         boolToInt(cloned.sync.iCloudEnabled),
         0,
+        boolToInt(cloned.arrowDuel.opponentReplyEnabled),
         cloned.notifications.reviewReminder.mode,
         cloned.notifications.reviewReminder.mode === "fixed"
           ? cloned.notifications.reviewReminder.fixedLocalTime
@@ -2551,13 +2555,15 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV14ToV15(db);
   migrateV16ToV17(db);
   migrateV18ToV19(db);
+  migrateV19ToV20(db);
   if (!hadOpponentReplyColumns) {
     migrateV17ToV18(db);
   }
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
-  return hasColumn(db, "app_settings", "move_feedback_sound_enabled") &&
+  return hasColumn(db, "app_settings", "arrow_duel_opponent_reply_enabled") &&
+    hasColumn(db, "app_settings", "move_feedback_sound_enabled") &&
     hasColumn(db, "app_settings", "move_feedback_haptics_enabled") &&
     hasColumn(db, "app_settings", "sprint_rules_guide_seen") &&
     hasColumn(db, "app_settings", "sprint_active_session_guide_seen") &&
@@ -3010,6 +3016,16 @@ function migrateV18ToV19(db: SyncSqliteDatabase): void {
   );
 }
 
+function migrateV19ToV20(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "arrow_duel_opponent_reply_enabled",
+    "ALTER TABLE app_settings ADD COLUMN arrow_duel_opponent_reply_enabled INTEGER NOT NULL DEFAULT 1 " +
+      "CHECK (arrow_duel_opponent_reply_enabled IN (0, 1))"
+  );
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -3143,6 +3159,9 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
   return {
     sync: {
       iCloudEnabled: intToBool(row.sync_icloud_enabled)
+    },
+    arrowDuel: {
+      opponentReplyEnabled: intToBool(row.arrow_duel_opponent_reply_enabled ?? 1)
     },
     notifications: {
       reviewReminder: reminder

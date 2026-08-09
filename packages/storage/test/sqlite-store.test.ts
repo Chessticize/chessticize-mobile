@@ -209,6 +209,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
     const store = new SQLiteStore(dbPath);
     store.migrate();
     assert.deepEqual(store.getSettings(), {
+      arrowDuel: { opponentReplyEnabled: true },
       sync: { iCloudEnabled: false },
       notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "19:00" } },
       moveFeedback: { soundEnabled: false, hapticsEnabled: true },
@@ -222,6 +223,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
     });
 
     store.saveSettings({
+      arrowDuel: { opponentReplyEnabled: false },
       sync: { iCloudEnabled: true },
       notifications: { reviewReminder: { mode: "off" } },
       moveFeedback: { soundEnabled: false, hapticsEnabled: true },
@@ -264,6 +266,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
       id: "default",
       sync_icloud_enabled: 1,
       sync_upload_allowed: 0,
+      arrow_duel_opponent_reply_enabled: 0,
       review_reminder_mode: "off",
       review_reminder_fixed_local_time: null,
       move_feedback_sound_enabled: 0,
@@ -866,6 +869,9 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
       const service = new PracticeService(store);
       try {
         assert.deepEqual(service.getSettings(), {
+          arrowDuel: {
+            opponentReplyEnabled: true
+          },
           sync: {
             iCloudEnabled: true
           },
@@ -888,6 +894,9 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
         });
 
         service.saveSettings({
+          arrowDuel: {
+            opponentReplyEnabled: false
+          },
           sync: {
             iCloudEnabled: true
           },
@@ -926,6 +935,9 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
       const service = new PracticeService(store);
       try {
         assert.deepEqual(service.getSettings(), {
+          arrowDuel: {
+            opponentReplyEnabled: false
+          },
           sync: {
             iCloudEnabled: true
           },

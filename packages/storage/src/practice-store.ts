@@ -97,6 +97,9 @@ export interface PracticeSettings {
   sync: {
     iCloudEnabled: boolean;
   };
+  arrowDuel: {
+    opponentReplyEnabled: boolean;
+  };
   notifications: {
     reviewReminder: ReviewReminderPreference;
   };
