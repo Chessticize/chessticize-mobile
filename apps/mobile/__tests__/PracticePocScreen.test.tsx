@@ -3280,7 +3280,9 @@ describe("PracticePocScreen", () => {
   it("shows the Arrow Duel difficulty multi-select only in debug builds", () => {
     const debugGlobals = globalThis as typeof globalThis & {
       __CHESSTICIZE_PRACTICE_DEBUG__?: boolean;
+      __DEV__?: boolean;
     };
+    const originalDev = debugGlobals.__DEV__;
     const onIntent = jest.fn();
     const presentation = runManagementPresentation({
       directRunEditing: true,
@@ -3302,13 +3304,15 @@ describe("PracticePocScreen", () => {
     });
 
     debugGlobals.__CHESSTICIZE_PRACTICE_DEBUG__ = false;
+    debugGlobals.__DEV__ = false;
     const releaseRenderer = renderScreen({ runManagementPresentation: presentation });
     expect(() => findByTestId(
       releaseRenderer,
       "practice-run-arrow-duel-difficulty-setting"
     )).toThrow();
 
-    debugGlobals.__CHESSTICIZE_PRACTICE_DEBUG__ = true;
+    delete debugGlobals.__CHESSTICIZE_PRACTICE_DEBUG__;
+    debugGlobals.__DEV__ = true;
     const debugRenderer = renderScreen({ runManagementPresentation: presentation });
     expect(collectText(findByTestId(
       debugRenderer,
@@ -3325,7 +3329,7 @@ describe("PracticePocScreen", () => {
       type: "toggle-arrow-duel-difficulty",
       difficulty: 2
     });
-    delete debugGlobals.__CHESSTICIZE_PRACTICE_DEBUG__;
+    debugGlobals.__DEV__ = originalDev;
   });
 
   it("previews Standard-style outcome feedback and automatic advance", async () => {

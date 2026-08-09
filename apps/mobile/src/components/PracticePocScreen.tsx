@@ -153,7 +153,11 @@ import type {
   MobilePlatformCapabilities,
   MobileStockfishCapabilities
 } from "../platform/mobilePlatformCapabilities.ts";
-import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../releaseConfig.ts";
+import {
+  arePracticeTestControlsEnabled,
+  isPracticeDebugEnabled,
+  isReactNativeDevBuild
+} from "../releaseConfig.ts";
 import { isStoreAssetCaptureEnabled } from "../platform/testLaunchConfig.ts";
 import { usePracticeRunManagement } from "./usePracticeRunManagement.ts";
 import {
@@ -4678,7 +4682,7 @@ export function PracticePocScreen({
                         : undefined
                     }
                     presentation={activeRunManagementPresentation}
-                    showArrowDuelDifficulty={isPracticeDebugEnabled()}
+                    showArrowDuelDifficulty={isReactNativeDevBuild()}
                     showSprintRulesSummary={
                       sprintGuidanceEnabled
                       || sprintRulesDesignPreview?.showRunEditorSummary === true
