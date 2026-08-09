@@ -63,6 +63,7 @@ describe('Android R8 release optimization', () => {
     const detoxRunner = read('apps/mobile/scripts/android-test-for-detox.sh');
 
     expect(build).toMatch(/releaseE2e\s*\{\s*initWith release/);
+    expect(build).toMatch(/releaseE2e[\s\S]*debuggable true/);
     expect(build).toMatch(/releaseE2e[\s\S]*signingConfig signingConfigs\.debug/);
     expect(build).toMatch(
       /releaseE2e[\s\S]*proguardFile "\$\{rootProject\.projectDir\}\/\.\.\/node_modules\/detox\/android\/detox\/proguard-rules-app\.pro"/,
@@ -84,6 +85,7 @@ describe('Android R8 release optimization', () => {
       /\n\s{8}release \{([\s\S]*?)\n\s{8}\}\n\s{8}\/\/ Exercise/,
     );
     expect(releaseBlock).not.toBeNull();
+    expect(releaseBlock?.[1]).not.toContain('debuggable true');
     expect(releaseBlock?.[1]).not.toContain('detox/proguard-rules-app.pro');
     expect(releaseBlock?.[1]).not.toContain('proguard-rules-release-e2e.pro');
     expect(detox).toContain("'android.releaseE2e'");
