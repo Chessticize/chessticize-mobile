@@ -3,9 +3,11 @@ import { LabScenario } from "./LabScenario.tsx";
 import {
   clickTestId,
   expectTestIdAbsent,
+  expectTestIdsInOrder,
   openReviewQueue,
   waitForEnabledTestId,
   waitForTestId,
+  waitForText,
   waitForVisibleTestId
 } from "./storyPlay.ts";
 
@@ -32,6 +34,15 @@ export const DueQueue: Story = {
   play: async ({ canvasElement }) => {
     await openReviewQueue(canvasElement);
     await waitForVisibleTestId(canvasElement, "review-start-due");
+    await waitForTestId(canvasElement, "review-due-items");
+    await waitForTestId(canvasElement, "review-due-item-lab-fork-01-standard-badge");
+    await waitForTestId(canvasElement, "review-today-history");
+    await waitForText(canvasElement, "First missed 1 day ago");
+    await waitForText(canvasElement, "Last retry 3 days ago");
+    await expectTestIdsInOrder(canvasElement, [
+      "review-due-items",
+      "review-today-history"
+    ]);
     expectTestIdAbsent(canvasElement, "review-dev-controls");
   }
 };

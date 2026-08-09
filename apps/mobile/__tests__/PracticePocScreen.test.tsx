@@ -11516,6 +11516,52 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-start-session-mistakes")).toThrow();
   });
 
+  it("previews today's scheduled retries before completed reviews", () => {
+    jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
+    const service = createDueReviewService(3);
+    service.recordReviewAttempt({
+      puzzleId: "review-badge-1",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-06-20T11:00:00.000Z"
+    }, "2026-06-20T11:00:05.000Z");
+    service.recordReviewAttempt({
+      puzzleId: "review-badge-2",
+      mode: "standard",
+      ratingKey: "standard 5/20",
+      result: "correct",
+      submittedMove: "e2e4",
+      expectedMove: "e2e4",
+      startedAt: "2026-06-21T11:00:00.000Z"
+    }, "2026-06-21T11:00:05.000Z");
+    const renderer = renderScreen({
+      practiceService: service,
+      reviewTodayDesignPreview: { showTodaySections: true }
+    });
+
+    press(renderer, "review-tab");
+
+    expect(findByTestId(renderer, "review-filter-toggle").props.accessibilityState).toEqual({ expanded: false });
+    expect(collectText(findByTestId(renderer, "review-due-items"))).toContain("Today to review");
+    expect(collectText(findByTestId(renderer, "review-due-items"))).toContain("First missed 2 days ago");
+    expect(collectText(findByTestId(renderer, "review-due-items"))).toContain("Last retry 1 day ago");
+    expect(collectText(findByTestId(renderer, "review-today-history"))).toContain("Completed today");
+    expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1 / 3");
+
+    const firstRetryRow = findByTestId(renderer, "review-due-item-review-badge-0-standard");
+    expect(firstRetryRow.props.accessibilityLabel).toContain("Scheduled retry");
+    expect(firstRetryRow.props.accessibilityLabel).toContain("First missed 2 days ago");
+    expect(collectText(findByTestId(renderer, "review-due-item-review-badge-0-standard-badge"))).toBe("↻");
+    expect(hasStyleEntry(
+      findByTestId(renderer, "review-due-item-review-badge-0-standard-badge"),
+      "backgroundColor",
+      "#2563EB"
+    )).toBe(true);
+  });
+
   it("counts reviews as overdue after the next 4 AM review-day rollover", () => {
     const service = createMobilePracticeService("random1000");
     service.startSprint(
@@ -14303,7 +14349,7 @@ function createScriptedStockfishTransport(
 }
 
 type RenderScreenOptions = TestMobilePlatformCapabilityOverrides &
-  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "runReorderDesignPreview" | "runReorderFeedbackPreview" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
+  Pick<React.ComponentProps<typeof PracticePocScreen>, "arrowDuelTargetCorrect" | "currentTimeMs" | "customTargetCorrect" | "debugTrace" | "initialTab" | "moveFeedbackSettings" | "puzzleSelectionId" | "puzzleSelectionSeed" | "reviewTodayDesignPreview" | "runEloEditingMovedToHome" | "runManagementEnabled" | "runManagementPresentation" | "runReorderDesignPreview" | "runReorderFeedbackPreview" | "sprintGuidanceEnabled" | "sprintRulesDesignPreview" | "sprintStartDelayMs" | "standardTargetCorrect" | "systemBack" | "tacticalProfilePresentation" | "themeCatalogPresentation"> & {
     onRenderCommit?: () => void;
     platformCapabilities?: MobilePlatformCapabilities;
   };
@@ -14449,6 +14495,7 @@ function renderScreen({
   onRenderCommit,
   puzzleSelectionId,
   puzzleSelectionSeed,
+  reviewTodayDesignPreview,
   runEloEditingMovedToHome,
   runManagementEnabled,
   runManagementPresentation,
@@ -14476,6 +14523,7 @@ function renderScreen({
         moveFeedbackSettings={moveFeedbackSettings}
         puzzleSelectionId={puzzleSelectionId}
         puzzleSelectionSeed={puzzleSelectionSeed}
+        reviewTodayDesignPreview={reviewTodayDesignPreview}
         runEloEditingMovedToHome={runEloEditingMovedToHome}
         runManagementEnabled={runManagementEnabled}
         runManagementPresentation={runManagementPresentation}

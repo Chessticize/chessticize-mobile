@@ -53,6 +53,14 @@
       }
     ]
   },
+  "review-due": {
+    "issues": [
+      {
+        "issueNumber": 520,
+        "changeNote": "Show scheduled retries before completed reviews, with a distinct retry icon and concise attempt-history recency."
+      }
+    ]
+  },
   "review-arrow-duel-reply": {
     "issues": [
       {

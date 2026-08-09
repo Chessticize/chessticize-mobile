@@ -288,6 +288,7 @@ interface Props {
   };
   runReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
   runEloEditingMovedToHome?: boolean;
+  reviewTodayDesignPreview?: ReviewTodayDesignPreview;
   settingsCaptureBottomInset?: number;
   initialTab?: MobileBackPrimaryTab;
   sprintRulesDesignPreview?: SprintRulesDesignPreview;
@@ -328,6 +329,10 @@ export type SprintResultUnclearPromptPresentation = {
 };
 
 export type SprintResultReplayDesignItem = SessionReplayItem;
+
+export type ReviewTodayDesignPreview = {
+  showTodaySections: boolean;
+};
 
 export type SprintRulesDesignPreview = {
   arrowDuelReplyChallenge?: ArrowDuelReplyChallengeDesignPreview;
@@ -670,6 +675,7 @@ export function PracticePocScreen({
   runReorderDesignPreview,
   runReorderFeedbackPreview,
   runEloEditingMovedToHome = false,
+  reviewTodayDesignPreview,
   settingsCaptureBottomInset,
   initialTab = "practice",
   sprintRulesDesignPreview,
@@ -4927,6 +4933,7 @@ export function PracticePocScreen({
                 dueReviewItems={dueReviewItems}
                 explicitReplySideCopy={explicitReplySideCopy}
                 nowMs={nowMs}
+                reviewTodayDesignPreview={reviewTodayDesignPreview}
                 reviewQueue={reviewQueue}
                 currentTimeMs={currentTimeMs}
                 deferBackRelevantTransition={deferBackRelevantTransition}
@@ -12940,6 +12947,7 @@ function ReviewPanel({
   onSessionAttemptClearUnclear,
   onSessionSourceChange,
   onScheduleTestReviewReminder,
+  reviewTodayDesignPreview,
   reviewQueue,
   reviewReminderScheduleStatus,
   service,
@@ -12967,6 +12975,7 @@ function ReviewPanel({
   onSessionAttemptClearUnclear?: (attemptId: string) => AttemptEvent | null;
   onSessionSourceChange?: (source: ReviewEntry["source"] | null) => void;
   onScheduleTestReviewReminder?: () => Promise<ReviewReminderScheduleResult>;
+  reviewTodayDesignPreview?: ReviewTodayDesignPreview;
   reviewQueue: ReviewQueueState[];
   reviewReminderScheduleStatus?: string;
   service: PracticeService;
@@ -13268,14 +13277,18 @@ function ReviewPanel({
         </ScrollView>
       ) : null}
 
-      {filtersExpanded && filteredDueReviewItems.length > 0 ? (
+      {(filtersExpanded || reviewTodayDesignPreview?.showTodaySections === true)
+        && filteredDueReviewItems.length > 0 ? (
         <View style={styles.reviewItemList} testID="review-due-items">
-          <Text style={styles.sectionLabel}>Due items</Text>
+          <Text style={styles.sectionLabel}>
+            {reviewTodayDesignPreview?.showTodaySections === true ? "Today to review" : "Due items"}
+          </Text>
           {filteredDueReviewItems.slice(0, 4).map((item) => (
             <ReviewQueueItemCard
               key={`${item.review.puzzleId}:${item.review.mode}:${item.review.ratingKey}`}
               item={item}
               nowMs={nowMs}
+              showTodayPresentation={reviewTodayDesignPreview?.showTodaySections === true}
               onPress={() => startReviewEntries([buildServiceReviewEntry(service, {
                 puzzle: item.puzzle,
                 mode: item.review.mode,
@@ -13404,18 +13417,55 @@ function ReviewActiveFilterStrip({ labels }: { labels: string[] }): React.JSX.El
   );
 }
 
+function reviewTodayActivityLabel(review: ReviewQueueState, nowMs: number): string {
+  const activityAt = review.lastReviewedAt ?? review.enrolledAt;
+  if (!activityAt) {
+    return "Scheduled for review";
+  }
+  const activity = reviewRelativeDayLabel(activityAt, nowMs);
+  if (review.reviewCount > 0) {
+    return `Last retry ${activity}`;
+  }
+  if (review.lastResult === "wrong") {
+    return `First missed ${activity}`;
+  }
+  return `Added to Review ${activity}`;
+}
+
+function reviewRelativeDayLabel(value: string, nowMs: number): string {
+  const date = new Date(value);
+  const now = new Date(nowMs);
+  if (!Number.isFinite(date.getTime()) || !Number.isFinite(now.getTime())) {
+    return formatLocalCalendarDate(value);
+  }
+  const dateDay = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  const nowDay = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysAgo = Math.max(0, Math.round((nowDay - dateDay) / (24 * 60 * 60 * 1000)));
+  if (daysAgo === 0) {
+    return "today";
+  }
+  if (daysAgo === 1) {
+    return "1 day ago";
+  }
+  return `${daysAgo} days ago`;
+}
+
 function ReviewQueueItemCard({
   item,
   nowMs,
+  showTodayPresentation,
   onPress
 }: {
   item: ReviewQueueItem;
   nowMs: number;
+  showTodayPresentation: boolean;
   onPress: () => void;
 }): React.JSX.Element {
-  const activityLabel = item.review.lastReviewedAt
-    ? `Last wrong ${formatLocalCalendarDate(item.review.lastReviewedAt)}`
-    : `Added manually ${formatLocalCalendarDate(item.review.enrolledAt ?? item.review.dueDay)}`;
+  const activityLabel = showTodayPresentation
+    ? reviewTodayActivityLabel(item.review, nowMs)
+    : item.review.lastReviewedAt
+      ? `Last wrong ${formatLocalCalendarDate(item.review.lastReviewedAt)}`
+      : `Added manually ${formatLocalCalendarDate(item.review.enrolledAt ?? item.review.dueDay)}`;
   const dueKind = reviewDueState(item.review, nowMs);
   const dueState = dueKind === "overdue"
     ? "Overdue"
@@ -13428,6 +13478,7 @@ function ReviewQueueItemCard({
   const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`;
   const accessibilityLabel = [
     `Start ${modeLabel(item.review.mode)} review`,
+    ...(showTodayPresentation ? ["Scheduled retry"] : []),
     activityLabel,
     dueState,
     `${item.review.intervalDays} day interval`,
@@ -13444,6 +13495,11 @@ function ReviewQueueItemCard({
       style={styles.reviewItemCard}
       onPress={onPress}
     >
+      {showTodayPresentation ? (
+        <View style={styles.reviewRetryBadge} testID={`${rowTestId}-badge`}>
+          <Text style={styles.reviewRetryGlyph}>↻</Text>
+        </View>
+      ) : null}
       <View style={styles.reviewItemCopy}>
         <Text style={styles.historyRowTitle}>{modeLabel(item.review.mode)}</Text>
         <Text testID={`${rowTestId}-context`} style={styles.helperText}>{activityLabel}</Text>
@@ -19099,6 +19155,21 @@ const styles = StyleSheet.create({
     minHeight: 82,
     paddingHorizontal: 12,
     paddingVertical: 10
+  },
+  reviewRetryBadge: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 999,
+    height: 28,
+    justifyContent: "center",
+    width: 28
+  },
+  reviewRetryGlyph: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "800",
+    lineHeight: 22,
+    textAlign: "center"
   },
   reviewItemCopy: {
     flex: 1,

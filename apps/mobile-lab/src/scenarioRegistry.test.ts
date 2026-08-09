@@ -61,6 +61,7 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       "practice-arrow-duel-guide",
       "practice-arrow-duel-guide-only",
       "practice-arrow-duel-prompt",
+      "review-due",
       "review-arrow-duel-reply",
       "history-arrow-duel-replay"
     ]
@@ -70,6 +71,9 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   ) ?? false);
   assert.ok(scenarioRegistry["practice-arrow-duel-prompt"].issues?.some(
     (issue) => issue.issueNumber === 489
+  ) ?? false);
+  assert.ok(scenarioRegistry["review-due"].issues?.some(
+    (issue) => issue.issueNumber === 520
   ) ?? false);
 
   for (const scenario of scenarios) {

@@ -815,6 +815,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
+    reviewTodayDesignPreview: scenarioId === "review-due"
+      ? { showTodaySections: true }
+      : undefined,
     sprintGuidanceEnabled: scenarioId.startsWith("settings-"),
     sprintRulesDesignPreview: sprintRulesDesignPreviewFor(scenarioId),
     standardTargetCorrect: 1,
@@ -1351,19 +1354,64 @@ function createReviewService(kind: "due" | "overdue"): PracticeService {
   const enrolledAt = kind === "overdue"
     ? "2026-07-13T12:00:00.000Z"
     : "2026-07-17T12:00:00.000Z";
+  const retryEnrollmentAt = "2026-07-13T12:00:00.000Z";
   for (const [index, puzzle] of LAB_PUZZLES.slice(0, 3).entries()) {
     store.scheduleMistakeReview({
       puzzleId: puzzle.id,
       mode: index === 2 ? "arrow_duel" : "standard",
       ratingKey: index === 2 ? arrowDuelRun.ratingKey : `standard 5/${20 + index * 10}`
-    }, enrolledAt);
+    }, kind === "due" && index === 2 ? retryEnrollmentAt : enrolledAt);
   }
   service.updatePracticeRun(arrowDuelRun.id, {
     name: arrowDuelRun.name,
     rating: service.getRating(arrowDuelRun.ratingKey).rating,
     opponentReply: { enabled: true, seconds: 12 }
   }, enrolledAt);
+
+  if (kind === "due") {
+    const completedPuzzle = LAB_PUZZLES[1]!;
+    recordLabReviewAttempt(
+      service,
+      completedPuzzle,
+      "standard",
+      "standard 5/30",
+      "2026-07-18T15:00:08.000Z"
+    );
+
+    const retryPuzzle = LAB_PUZZLES[2]!;
+    for (const completedAt of ["2026-07-14T15:00:08.000Z", "2026-07-15T15:00:08.000Z"]) {
+      recordLabReviewAttempt(
+        service,
+        retryPuzzle,
+        "arrow_duel",
+        arrowDuelRun.ratingKey,
+        completedAt
+      );
+    }
+  }
   return service;
+}
+
+function recordLabReviewAttempt(
+  service: PracticeService,
+  puzzle: Puzzle,
+  mode: SprintMode,
+  ratingKey: string,
+  completedAt: string
+): void {
+  const expectedMove = puzzle.solutionMoves[0]!;
+  service.recordReviewAttempt({
+    puzzleId: puzzle.id,
+    mode,
+    ratingKey,
+    result: "correct",
+    submittedMove: expectedMove,
+    expectedMove,
+    startedAt: new Date(new Date(completedAt).getTime() - 8_000).toISOString(),
+    ...(mode === "arrow_duel"
+      ? { arrowDuelCandidateOrder: [expectedMove, puzzle.stockfishBestMove ?? expectedMove] }
+      : {})
+  }, completedAt);
 }
 
 function createArrowDuelReplayService(): PracticeService {
