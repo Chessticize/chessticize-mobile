@@ -3,6 +3,8 @@ import { LabScenario } from "./LabScenario.tsx";
 import {
   clickTestId,
   expectTestIdAbsent,
+  expectTestIdHeight,
+  expectTestIdVerticalCentersAligned,
   expectTestIdText,
   expectTestIdsInOrder,
   openReviewQueue,
@@ -40,7 +42,19 @@ export const DueQueue: Story = {
     await waitForTestId(canvasElement, "review-due-item-lab-fork-01-standard-badge");
     await waitForTestId(canvasElement, "review-today-history");
     await waitForTestId(canvasElement, "review-completed-today-toggle");
-    expectTestIdAbsent(canvasElement, "review-today-history-items");
+    await waitForTestId(canvasElement, "review-today-history-items");
+    await expectTestIdHeight(canvasElement, "review-today-to-review-toggle", 44);
+    await expectTestIdHeight(canvasElement, "review-completed-today-toggle", 44);
+    await expectTestIdVerticalCentersAligned(
+      canvasElement,
+      "review-today-to-review-toggle-count",
+      "review-today-to-review-toggle-chevron"
+    );
+    await expectTestIdVerticalCentersAligned(
+      canvasElement,
+      "review-completed-today-toggle-count",
+      "review-completed-today-toggle-chevron"
+    );
     await waitForText(canvasElement, "First missed 1 day ago");
     await waitForText(canvasElement, "Last retry 3 days ago");
     await expectTestIdText(
@@ -60,12 +74,16 @@ export const DueQueue: Story = {
     ]);
     await clickTestId(canvasElement, "review-today-to-review-toggle");
     expectTestIdAbsent(canvasElement, "review-today-to-review-items");
+    await expectTestIdHeight(canvasElement, "review-today-to-review-toggle", 44);
     await clickTestId(canvasElement, "review-today-to-review-toggle");
     await waitForTestId(canvasElement, "review-today-to-review-items");
-    await clickTestId(canvasElement, "review-completed-today-toggle");
-    await waitForTestId(canvasElement, "review-today-history-items");
+    await expectTestIdHeight(canvasElement, "review-today-to-review-toggle", 44);
     await clickTestId(canvasElement, "review-completed-today-toggle");
     expectTestIdAbsent(canvasElement, "review-today-history-items");
+    await expectTestIdHeight(canvasElement, "review-completed-today-toggle", 44);
+    await clickTestId(canvasElement, "review-completed-today-toggle");
+    await waitForTestId(canvasElement, "review-today-history-items");
+    await expectTestIdHeight(canvasElement, "review-completed-today-toggle", 44);
     expectTestIdAbsent(canvasElement, "review-dev-controls");
   }
 };

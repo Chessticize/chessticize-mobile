@@ -11543,7 +11543,7 @@ describe("PracticePocScreen", () => {
         showTodaySections: true,
         collapsibleSections: {
           todayInitiallyExpanded: true,
-          completedInitiallyExpanded: false
+          completedInitiallyExpanded: true
         },
         attemptSummaries: [
           {
@@ -11570,12 +11570,18 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-due-items"))).toContain("Today to review");
     expect(collectText(findByTestId(renderer, "review-today-to-review-toggle"))).toContain("2");
     expect(findByTestId(renderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({ expanded: true });
+    expect(hasStyleEntry(findByTestId(renderer, "review-today-to-review-toggle"), "height", 44)).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "review-today-to-review-toggle-meta"), "height", 18)).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "review-today-to-review-toggle-meta"), "alignItems", "center")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "review-today-to-review-toggle-count"), "lineHeight", 18)).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "review-today-to-review-toggle-chevron"), "height", 18)).toBe(true);
     expect(collectText(findByTestId(renderer, "review-due-items"))).toContain("First missed 2 days ago");
     expect(collectText(findByTestId(renderer, "review-due-items"))).toContain("Last retry 1 day ago");
     expect(collectText(findByTestId(renderer, "review-today-history"))).toContain("Completed today");
     expect(collectText(findByTestId(renderer, "review-completed-today-toggle"))).toContain("1");
-    expect(findByTestId(renderer, "review-completed-today-toggle").props.accessibilityState).toEqual({ expanded: false });
-    expect(() => findByTestId(renderer, "review-today-history-items")).toThrow();
+    expect(findByTestId(renderer, "review-completed-today-toggle").props.accessibilityState).toEqual({ expanded: true });
+    expect(hasStyleEntry(findByTestId(renderer, "review-completed-today-toggle"), "height", 44)).toBe(true);
+    expect(findByTestId(renderer, "review-today-history-items")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1 / 3");
 
     const firstRetryRow = findByTestId(renderer, "review-due-item-review-badge-0-standard");
@@ -11602,11 +11608,13 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-due-item-review-badge-0-standard")).toThrow();
 
     press(renderer, "review-completed-today-toggle");
-    expect(findByTestId(renderer, "review-completed-today-toggle").props.accessibilityState).toEqual({ expanded: true });
-    expect(findByTestId(renderer, "review-today-history-items")).toBeTruthy();
+    expect(findByTestId(renderer, "review-completed-today-toggle").props.accessibilityState).toEqual({ expanded: false });
+    expect(() => findByTestId(renderer, "review-today-history-items")).toThrow();
 
     press(renderer, "review-today-to-review-toggle");
     expect(findByTestId(renderer, "review-due-item-review-badge-0-standard")).toBeTruthy();
+    press(renderer, "review-completed-today-toggle");
+    expect(findByTestId(renderer, "review-today-history-items")).toBeTruthy();
   });
 
   it("counts reviews as overdue after the next 4 AM review-day rollover", () => {

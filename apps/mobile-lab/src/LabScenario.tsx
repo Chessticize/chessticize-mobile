@@ -820,7 +820,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
           showTodaySections: true,
           collapsibleSections: {
             todayInitiallyExpanded: true,
-            completedInitiallyExpanded: false
+            completedInitiallyExpanded: true
           },
           attemptSummaries: [
             {

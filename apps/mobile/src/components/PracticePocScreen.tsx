@@ -13604,9 +13604,11 @@ function ReviewSectionToggle({
       onPress={onPress}
     >
       <Text style={styles.sectionLabel}>{label}</Text>
-      <View style={styles.reviewSectionToggleMeta}>
-        <Text style={styles.reviewSectionCount}>{count}</Text>
-        <ChevronGlyph direction={expanded ? "up" : "down"} />
+      <View style={styles.reviewSectionToggleMeta} testID={`${toggleTestID}-meta`}>
+        <Text style={styles.reviewSectionCount} testID={`${toggleTestID}-count`}>{count}</Text>
+        <View style={styles.reviewSectionToggleChevron} testID={`${toggleTestID}-chevron`}>
+          <ChevronGlyph direction={expanded ? "up" : "down"} />
+        </View>
       </View>
     </Pressable>
   );
@@ -19247,18 +19249,28 @@ const styles = StyleSheet.create({
   reviewSectionToggle: {
     alignItems: "center",
     flexDirection: "row",
+    height: 44,
     justifyContent: "space-between",
-    minHeight: 44
   },
   reviewSectionToggleMeta: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8
+    gap: 6,
+    height: 18
   },
   reviewSectionCount: {
     color: "#2563EB",
     fontSize: 14,
-    fontWeight: "800"
+    fontWeight: "800",
+    includeFontPadding: false,
+    lineHeight: 18,
+    textAlignVertical: "center"
+  },
+  reviewSectionToggleChevron: {
+    alignItems: "center",
+    height: 18,
+    justifyContent: "center",
+    width: 18
   },
   reviewSectionItems: {
     gap: 8
