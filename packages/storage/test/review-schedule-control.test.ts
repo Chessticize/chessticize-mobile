@@ -7,6 +7,7 @@ import { join } from "node:path";
 process.env.TZ = "UTC";
 
 import { MemoryStore, PracticeService, SQLiteStore } from "../src/index.ts";
+import type { PracticeStore } from "../src/index.ts";
 import { defaultSprintConfig } from "../../core/src/index.ts";
 import type { AttemptEvent, Puzzle, ReviewContext, SprintState } from "../../core/src/index.ts";
 
@@ -19,6 +20,11 @@ const ALTERNATE_CONTEXT: ReviewContext = {
   puzzleId: "review-control-puzzle",
   mode: "custom",
   ratingKey: "fork custom 5/20"
+};
+const ALTERNATE_RATING_CONTEXT: ReviewContext = {
+  puzzleId: "review-control-puzzle",
+  mode: "standard",
+  ratingKey: "standard 10/20"
 };
 
 test("MemoryStore atomically enrolls one Unclear Attempt and preserves other markers", () => {
@@ -150,6 +156,22 @@ test("SQLite rolls back both sides when atomic enrollment or removal fails", () 
   }
 });
 
+test("Review Today derives exact-context history in MemoryStore", () => {
+  const store = seededMemoryStore();
+  assertExactReviewTodayContext(store, (attempt) => store.recordAttempt(attempt));
+});
+
+test("Review Today derives exact-context history in SQLite", () => {
+  const store = new SQLiteStore(":memory:");
+  try {
+    store.migrate();
+    store.seedPuzzles([reviewControlPuzzle()]);
+    assertExactReviewTodayContext(store, (attempt) => recordSQLiteAttempt(store, attempt));
+  } finally {
+    store.close();
+  }
+});
+
 function seededMemoryStore(): MemoryStore {
   const store = new MemoryStore();
   store.seedPuzzles([reviewControlPuzzle()]);
@@ -169,6 +191,35 @@ function correctAttempt(id: string, context: ReviewContext = CONTEXT): AttemptEv
     completedAt: "2026-07-17T12:00:00.000Z",
     ratingBefore: 600
   };
+}
+
+function assertExactReviewTodayContext(
+  store: PracticeStore,
+  recordAttempt: (attempt: AttemptEvent) => void
+): void {
+  const missed = {
+    ...correctAttempt("review-today-missed"),
+    result: "wrong" as const,
+    submittedMove: "e2e3"
+  };
+  recordAttempt(missed);
+  store.scheduleMistakeReview(CONTEXT, missed.completedAt);
+  recordAttempt(correctAttempt("review-today-other-rating", ALTERNATE_RATING_CONTEXT));
+
+  const service = new PracticeService(store);
+  const presentation = service.getReviewTodayPresentation("2026-07-18T12:00:00.000Z");
+
+  assert.equal(service.countHistory({ ratingKey: CONTEXT.ratingKey }), 1);
+  assert.equal(service.countHistory({ ratingKey: ALTERNATE_RATING_CONTEXT.ratingKey }), 1);
+  assert.deepEqual(presentation.dueItems.map((entry) => ({
+    ratingKey: entry.item.review.ratingKey,
+    attempts: entry.history.attemptCount,
+    misses: entry.history.missCount
+  })), [{
+    ratingKey: CONTEXT.ratingKey,
+    attempts: 1,
+    misses: 1
+  }]);
 }
 
 function recordSQLiteAttempt(store: SQLiteStore, attempt: AttemptEvent): void {

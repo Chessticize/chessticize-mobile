@@ -85,6 +85,16 @@ import {
   reconcileRatingWithSprintSessions
 } from "./rating-history.ts";
 import {
+  buildReviewTodayPresentation,
+  reviewTodayContextKey,
+  type CompletedReviewItem,
+  type ReviewTodayPresentation
+} from "./review-today.ts";
+export type {
+  CompletedReviewItem,
+  ReviewTodayPresentation
+} from "./review-today.ts";
+import {
   TacticalProfileService,
   type FocusedRunPreflightResult,
   type PrepareFocusedRunResult,
@@ -156,11 +166,6 @@ export interface RecordReviewAttemptCommand extends ReviewContext {
   expectedMove: string;
   startedAt?: string;
   arrowDuelCandidateOrder?: string[];
-}
-
-export interface CompletedReviewItem {
-  attempt: AttemptHistoryRow;
-  puzzle: Puzzle;
 }
 
 export class PracticeService {
@@ -475,6 +480,36 @@ export class PracticeService {
         return puzzle ? { attempt, puzzle } : undefined;
       })
       .filter((item): item is CompletedReviewItem => Boolean(item));
+  }
+
+  getReviewTodayPresentation(now = new Date().toISOString()): ReviewTodayPresentation {
+    const dueItems = this.store.getDueReviewItems(now);
+    const completedItems = this.listCompletedReviewsForDay(now);
+    const reviews = this.store.listReviewQueue();
+    const contexts = new Map<string, ReviewContext>();
+    for (const item of dueItems) {
+      contexts.set(reviewTodayContextKey(item.review), item.review);
+    }
+    for (const item of completedItems) {
+      contexts.set(reviewTodayContextKey(item.attempt), item.attempt);
+    }
+    const attemptsById = new Map<string, AttemptHistoryRow>();
+    for (const context of contexts.values()) {
+      for (const attempt of this.store.listAttempts({
+        puzzleId: context.puzzleId,
+        mode: context.mode,
+        ratingKey: context.ratingKey
+      })) {
+        attemptsById.set(attempt.id, attempt);
+      }
+    }
+    return buildReviewTodayPresentation({
+      now,
+      dueItems,
+      completedItems,
+      reviews,
+      attempts: [...attemptsById.values()]
+    });
   }
 
   exportLocalData(): LocalDataExport {

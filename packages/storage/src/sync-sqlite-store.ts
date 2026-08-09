@@ -1230,6 +1230,10 @@ export class SyncSQLiteStore implements PracticeStore {
       clauses.push("mode = ?");
       params.push(filter.mode);
     }
+    if (filter.ratingKey !== undefined) {
+      clauses.push("rating_key = ?");
+      params.push(filter.ratingKey);
+    }
     if (filter.since !== undefined) {
       clauses.push("completed_at >= ?");
       params.push(filter.since);
@@ -1266,6 +1270,10 @@ export class SyncSQLiteStore implements PracticeStore {
     if (filter.mode !== undefined) {
       clauses.push("a.mode = ?");
       params.push(filter.mode);
+    }
+    if (filter.ratingKey !== undefined) {
+      clauses.push("a.rating_key = ?");
+      params.push(filter.ratingKey);
     }
     if (filter.since !== undefined) {
       clauses.push("a.completed_at >= ?");

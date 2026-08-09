@@ -65,7 +65,6 @@ import {
   resetSprintGuideProgress,
   resolvePuzzleTimingPolicy,
   reviewAnalysisStartingFen,
-  reviewDueState,
   reviewDueLabel,
   reviewQueueForecast,
   submitArrowDuelChoice,
@@ -114,9 +113,15 @@ import type {
 } from "../../../../packages/core/src/index.ts";
 import {
   FocusedRunUnavailableError,
-  type CompletedReviewItem,
   type PracticeService
 } from "../../../../packages/storage/src/practice-service.ts";
+import {
+  filterReviewTodayPresentation,
+  type CompletedReviewItem,
+  type ReviewTodayDueItemPresentation,
+  type ReviewTodayFilter,
+  type ReviewTodayHistoryPresentation
+} from "../../../../packages/storage/src/review-today.ts";
 import type {
   ReviewQueueDuePromotionResult,
   ReviewReminderPreference
@@ -275,7 +280,6 @@ export type {
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
   arrowDuelTargetCorrect?: number;
-  collapsibleMotionPreview?: CollapsibleMotionPreview;
   customThemeSelection?: CustomThemeSelection;
   themeCatalogPresentation?: ThemeCatalogPresentation;
   customTargetCorrect?: number;
@@ -291,7 +295,6 @@ interface Props {
   };
   puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
-  practiceHomeReviewCardVisible?: boolean;
   runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
   runReorderDesignPreview?: {
@@ -299,7 +302,6 @@ interface Props {
   };
   runReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
   runEloEditingMovedToHome?: boolean;
-  reviewTodayDesignPreview?: ReviewTodayDesignPreview;
   settingsCaptureBottomInset?: number;
   initialTab?: MobileBackPrimaryTab;
   sprintRulesDesignPreview?: SprintRulesDesignPreview;
@@ -311,10 +313,6 @@ interface Props {
 
 export type RunReorderPickupFeedback = {
   haptic: "medium";
-};
-
-export type CollapsibleMotionPreview = {
-  durationMs: number;
 };
 
 export type SprintRulesGuidePresentation = {
@@ -345,35 +343,6 @@ export type SprintResultUnclearPromptPresentation = {
 };
 
 export type SprintResultReplayDesignItem = SessionReplayItem;
-
-export type ReviewTodayDesignPreview = {
-  showTodaySections: boolean;
-  filterControls?: {
-    placement: "before_review_action";
-    summaryVisibility: "when_collapsed";
-  };
-  collapsibleSections: {
-    todayInitiallyExpanded: boolean;
-    completedInitiallyExpanded: boolean;
-  };
-  attemptSummaries: readonly ReviewTodayAttemptSummaryPresentation[];
-  quickFilters?: readonly ReviewTodayQuickFilterPresentation[];
-};
-
-export type ReviewTodayQuickFilterPresentation = {
-  filter: "all" | "overdue" | "failed" | "arrow_duel";
-  label: string;
-  duePuzzleIds: readonly string[];
-  completedPuzzleIds: readonly string[];
-};
-
-export type ReviewTodayAttemptSummaryPresentation = {
-  puzzleId: string;
-  mode: SprintMode;
-  ratingKey: string;
-  attemptCount: number;
-  missCount: number;
-};
 
 export type SprintRulesDesignPreview = {
   arrowDuelReplyChallenge?: ArrowDuelReplyChallengeDesignPreview;
@@ -599,6 +568,7 @@ const ARROW_DUEL_OPTIONAL_SETTINGS_COPY =
   "This extra challenge is optional — turn it off in Settings.";
 // Shared by the practice and review boards so they animate at the same speed.
 const BOARD_MOVE_ANIMATION_MS = 200;
+const DISCLOSURE_MOTION_DURATION_MS = 200;
 const ANALYSIS_DEPTH = 20;
 const CUSTOM_DURATION_OPTIONS = [3 * 60, 5 * 60, 10 * 60] as const;
 const CUSTOM_PER_PUZZLE_OPTIONS = [10, 20, 30] as const;
@@ -703,7 +673,6 @@ const ANALYSIS_DIAGNOSTIC_POSITIONS = [
 export function PracticePocScreen({
   platformCapabilities,
   arrowDuelTargetCorrect,
-  collapsibleMotionPreview,
   customThemeSelection,
   themeCatalogPresentation = SERVER_CURATED_THEME_PRESENTATION,
   customTargetCorrect,
@@ -717,13 +686,11 @@ export function PracticePocScreen({
   moveFeedbackSettings,
   puzzleSelectionId,
   puzzleSelectionSeed,
-  practiceHomeReviewCardVisible = true,
   runManagementEnabled = false,
   runManagementPresentation,
   runReorderDesignPreview,
   runReorderFeedbackPreview,
   runEloEditingMovedToHome = false,
-  reviewTodayDesignPreview,
   settingsCaptureBottomInset,
   initialTab = "practice",
   sprintRulesDesignPreview,
@@ -4757,10 +4724,7 @@ export function PracticePocScreen({
                     currentRating={activeRunManagementPresentation
                       ? selectedManagedRun?.elo ?? RATING_FLOOR
                       : currentRating}
-                    dueReviewCount={dueTodayCount}
-                    overdueReviewCount={overdueCount}
                     progress={practiceProgress}
-                    reviewCardVisible={practiceHomeReviewCardVisible}
                     runManagement={activeRunManagementPresentation}
                     sprintRulesGuide={sprintRulesGuidePresentation}
                     sprintRulesGuideVisible={sprintRulesGuideVisible}
@@ -4776,7 +4740,6 @@ export function PracticePocScreen({
                     onSelectMode={setMode}
                     onStartMode={(nextMode) => startSprint(nextMode)}
                     onResumeSprint={resumeSprint}
-                    onOpenReview={openReviewQueue}
                     onRunReorderDragActiveChange={setRunReorderDragActive}
                     nativeRunReorderScrollController={nativeRunReorderScrollController}
                     runReorderDesignPreview={runReorderDesignPreview}
@@ -4842,7 +4805,6 @@ export function PracticePocScreen({
                         : undefined
                     }
                     presentation={activeRunManagementPresentation}
-                    collapsibleMotionPreview={collapsibleMotionPreview}
                     showSprintRulesSummary={
                       sprintGuidanceEnabled
                       || sprintRulesDesignPreview?.showRunEditorSummary === true
@@ -4999,7 +4961,6 @@ export function PracticePocScreen({
               ) : historyView ? (
                 <HistoryPanel
                   adaptiveLayout={adaptiveLayout}
-                  collapsibleMotionPreview={collapsibleMotionPreview}
                   attempts={visibleHistoryAttempts}
                   nowMs={nowMs}
                   performance={historyPerformanceView?.performance ?? emptyHistoryPerformance()}
@@ -5094,12 +5055,10 @@ export function PracticePocScreen({
               <ReviewPanel
                 adaptiveLayout={adaptiveLayout}
                 boardSize={boardSize}
-                collapsibleMotionPreview={collapsibleMotionPreview}
                 dueReviewItems={dueReviewItems}
                 explicitReplySideCopy={explicitReplySideCopy}
                 opponentReplySettingsHint={opponentReplySettingsHint}
                 nowMs={nowMs}
-                reviewTodayDesignPreview={reviewTodayDesignPreview}
                 reviewQueue={reviewQueue}
                 currentTimeMs={currentTimeMs}
                 deferBackRelevantTransition={deferBackRelevantTransition}
@@ -5107,7 +5066,6 @@ export function PracticePocScreen({
                 service={service}
                 sessionReplayItems={sessionReplayItems}
                 onExitSessionReview={exitSessionReview}
-                onOpenPractice={exitSessionReview}
                 onReviewRecorded={(completedAt) => {
                   const completedAtMs = new Date(completedAt).getTime();
                   if (Number.isFinite(completedAtMs) && completedAtMs > nowMsRef.current) {
@@ -5321,10 +5279,7 @@ function PracticeHome({
   mode,
   modes,
   currentRating,
-  dueReviewCount,
-  overdueReviewCount,
   progress,
-  reviewCardVisible,
   runManagement,
   sprintRulesGuide,
   sprintRulesGuideVisible,
@@ -5335,7 +5290,6 @@ function PracticeHome({
   onSelectMode,
   onStartMode,
   onResumeSprint,
-  onOpenReview,
   onRunReorderDragActiveChange,
   nativeRunReorderScrollController,
   runReorderDesignPreview,
@@ -5345,10 +5299,7 @@ function PracticeHome({
   mode: SprintMode;
   modes: PracticeModeSummary[];
   currentRating: number;
-  dueReviewCount: number;
-  overdueReviewCount: number;
   progress: PracticeProgressSummary;
-  reviewCardVisible: boolean;
   runManagement?: PracticeRunManagementPresentation;
   sprintRulesGuide?: SprintRulesGuidePresentation;
   sprintRulesGuideVisible: boolean;
@@ -5359,7 +5310,6 @@ function PracticeHome({
   onSelectMode: (next: SprintMode) => void;
   onStartMode: (next: SprintMode) => void;
   onResumeSprint: (sprint: SprintState) => void;
-  onOpenReview: () => void;
   onRunReorderDragActiveChange: (active: boolean) => void;
   nativeRunReorderScrollController: NativeRunReorderScrollController;
   runReorderDesignPreview?: Props["runReorderDesignPreview"];
@@ -5367,11 +5317,6 @@ function PracticeHome({
 }): React.JSX.Element {
   const selectedRun = runManagement?.runs.find((run) => run.id === runManagement.selectedRunId) ?? null;
   const progressMode = selectedRun?.mode ?? mode;
-  const reviewStatusLabel = overdueReviewCount > 0
-    ? "Overdue"
-    : dueReviewCount > 0
-      ? "Due today"
-      : "No reviews due";
 
   return (
     <View style={styles.practiceHome} testID="practice-home">
@@ -5449,44 +5394,6 @@ function PracticeHome({
             <TacticalProfileHomeCard presentation={tacticalProfile} />
           ) : null}
 
-          {reviewCardVisible ? (
-            <>
-              <Text style={styles.sectionLabel}>Review</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Open scheduled mistake reviews${dueReviewCount > 0 ? `, ${dueReviewCount} due today` : ""}${overdueReviewCount > 0 ? ", overdue reviews" : ""}`}
-                testID="practice-review-strip"
-                style={styles.practiceReviewStrip}
-                onPress={onOpenReview}
-              >
-                <View style={styles.reviewStripStatusCopy}>
-                  <Text style={styles.listText}>{reviewStatusLabel}</Text>
-                </View>
-                <View
-                  style={styles.practiceSummaryColumnGap}
-                  testID="practice-review-strip-column-gap"
-                />
-                <View
-                  style={styles.reviewStripActionArea}
-                  testID="practice-review-strip-action-area"
-                >
-                  <View
-                    style={styles.reviewStripCounts}
-                    testID="practice-review-strip-counts"
-                  >
-                    {dueReviewCount > 0 ? (
-                      <View style={styles.reviewStripMetric} testID="practice-review-due-count">
-                        <Text style={styles.reviewDueCount}>{dueReviewCount}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <View style={styles.reviewStripChevron} testID="practice-review-strip-chevron">
-                    <ChevronGlyph direction="right" />
-                  </View>
-                </View>
-              </Pressable>
-            </>
-          ) : null}
         </View>
       </View>
     </View>
@@ -8456,7 +8363,6 @@ function RunRemovalConfirmation({
 function PracticeRunEditor({
   arrowDuelOpponentReplyGlobalEnabled,
   arrowDuelReplyChallenge,
-  collapsibleMotionPreview,
   presentation,
   showSprintRulesSummary,
   themeCatalogPresentation,
@@ -8470,7 +8376,6 @@ function PracticeRunEditor({
     onReplySecondsInputChange: (value: string) => void;
     onToggle: () => void;
   };
-  collapsibleMotionPreview?: CollapsibleMotionPreview;
   presentation: PracticeRunManagementPresentation;
   showSprintRulesSummary: boolean;
   themeCatalogPresentation?: ThemeCatalogPresentation;
@@ -8610,7 +8515,6 @@ function PracticeRunEditor({
                   </View>
                 ) : null}
                 <CustomThemeChoiceRow
-                  collapsibleMotionPreview={collapsibleMotionPreview}
                   showDisclosure
                   selectedThemes={draft.themes}
                   themeCatalogPresentation={themeCatalogPresentation}
@@ -9745,14 +9649,12 @@ function CustomValueRow({
 }
 
 function CustomThemeChoiceRow({
-  collapsibleMotionPreview,
   onChange,
   selectedThemes,
   showDisclosure = false,
   themeCatalogPresentation,
   testID,
 }: {
-  collapsibleMotionPreview?: CollapsibleMotionPreview;
   onChange: (next: CustomThemeFilter) => void;
   selectedThemes: readonly CustomThemeFilter[];
   showDisclosure?: boolean;
@@ -9762,7 +9664,6 @@ function CustomThemeChoiceRow({
   if (themeCatalogPresentation) {
     return (
       <ThemeCatalogChoiceRow
-        collapsibleMotionPreview={collapsibleMotionPreview}
         onChange={onChange}
         presentation={themeCatalogPresentation}
         selectedThemes={selectedThemes}
@@ -9791,14 +9692,12 @@ function CustomThemeChoiceRow({
 }
 
 function ThemeCatalogChoiceRow({
-  collapsibleMotionPreview,
   onChange,
   presentation,
   selectedThemes,
   showDisclosure,
   testID
 }: {
-  collapsibleMotionPreview?: CollapsibleMotionPreview;
   onChange: (next: CustomThemeFilter) => void;
   presentation: ThemeCatalogPresentation;
   selectedThemes: readonly CustomThemeFilter[];
@@ -9846,7 +9745,6 @@ function ThemeCatalogChoiceRow({
           </View>
           <DisclosureChevron
             expanded={expanded}
-            motion={collapsibleMotionPreview}
             testID="practice-run-theme-animated-chevron"
           />
         </Pressable>
@@ -9863,7 +9761,6 @@ function ThemeCatalogChoiceRow({
         contentTestID="practice-run-theme-catalog"
         contentStyle={styles.themeCatalogExpandableContent}
         expanded={expanded}
-        motion={collapsibleMotionPreview}
       >
           {showDisclosure ? (
             <View style={styles.historyThemeAllRow}>{allChip}</View>
@@ -11761,7 +11658,6 @@ function ArrowHint({
 function HistoryPanel({
   adaptiveLayout,
   attempts,
-  collapsibleMotionPreview,
   filtersExpanded,
   nowMs,
   performance,
@@ -11796,7 +11692,6 @@ function HistoryPanel({
 }: {
   adaptiveLayout: AdaptiveLayout;
   attempts: HistoryAttemptView[];
-  collapsibleMotionPreview?: CollapsibleMotionPreview;
   filtersExpanded: boolean;
   nowMs: number;
   performance: HistoryPerformance;
@@ -11882,7 +11777,6 @@ function HistoryPanel({
         contentTestID="history-advanced-filters"
         contentStyle={styles.historyAdvancedFilters}
         expanded={filtersExpanded}
-        motion={collapsibleMotionPreview}
       >
           <HistoryRatingFilters
             ratingKeys={ratingKeys}
@@ -11947,7 +11841,6 @@ function HistoryPanel({
           </HistoryChipRow>
           {themeCatalogPresentation ? (
             <HistoryThemeCatalogFilter
-              collapsibleMotionPreview={collapsibleMotionPreview}
               presentation={themeCatalogPresentation}
               selectedThemes={themeFilters}
               onThemeIntent={onThemeFilterIntent}
@@ -12056,12 +11949,10 @@ function HistoryPanel({
 }
 
 function HistoryThemeCatalogFilter({
-  collapsibleMotionPreview,
   onThemeIntent,
   presentation,
   selectedThemes
 }: {
-  collapsibleMotionPreview?: CollapsibleMotionPreview;
   onThemeIntent: (intent: ThemeChoiceIntent) => void;
   presentation: ThemeCatalogPresentation;
   selectedThemes: readonly string[];
@@ -12097,7 +11988,6 @@ function HistoryThemeCatalogFilter({
         </View>
         <DisclosureChevron
           expanded={expanded}
-          motion={collapsibleMotionPreview}
           testID="history-theme-animated-chevron"
         />
       </Pressable>
@@ -12105,7 +11995,6 @@ function HistoryThemeCatalogFilter({
         contentTestID="history-theme-catalog"
         contentStyle={styles.historyThemeCatalogContent}
         expanded={expanded}
-        motion={collapsibleMotionPreview}
       >
           <View style={styles.historyThemeAllRow}>
             <FilterButton
@@ -13005,26 +12894,18 @@ function CollapsibleRegion({
   children,
   contentTestID,
   contentStyle,
-  expanded,
-  motion
+  expanded
 }: {
   children: React.ReactNode;
   contentTestID: string;
   contentStyle?: StyleProp<ViewStyle>;
   expanded: boolean;
-  motion?: CollapsibleMotionPreview;
 }): React.JSX.Element | null {
-  if (!motion) {
-    return expanded ? (
-      <View style={contentStyle} testID={contentTestID}>{children}</View>
-    ) : null;
-  }
   return (
     <AnimatedCollapsibleRegion
       contentTestID={contentTestID}
       contentStyle={contentStyle}
       expanded={expanded}
-      motion={motion}
     >
       {children}
     </AnimatedCollapsibleRegion>
@@ -13035,19 +12916,17 @@ function AnimatedCollapsibleRegion({
   children,
   contentTestID,
   contentStyle,
-  expanded,
-  motion
+  expanded
 }: {
   children: React.ReactNode;
   contentTestID: string;
   contentStyle?: StyleProp<ViewStyle>;
   expanded: boolean;
-  motion: CollapsibleMotionPreview;
 }): React.JSX.Element | null {
   const progress = useRef(new Animated.Value(expanded ? 1 : 0)).current;
   const naturalInitialHeightRef = useRef(expanded);
   const [contentHeight, setContentHeight] = useState(0);
-  const durationMs = Math.max(0, motion.durationMs);
+  const durationMs = DISCLOSURE_MOTION_DURATION_MS;
 
   useEffect(() => {
     naturalInitialHeightRef.current = false;
@@ -13117,19 +12996,13 @@ function AnimatedCollapsibleRegion({
 
 function DisclosureChevron({
   expanded,
-  motion,
   testID
 }: {
   expanded: boolean;
-  motion?: CollapsibleMotionPreview;
   testID?: string;
 }): React.JSX.Element {
-  if (!motion) {
-    return <ChevronGlyph direction={expanded ? "up" : "down"} />;
-  }
   return (
     <AnimatedDisclosureChevron
-      durationMs={motion.durationMs}
       expanded={expanded}
       testID={testID}
     />
@@ -13137,11 +13010,9 @@ function DisclosureChevron({
 }
 
 function AnimatedDisclosureChevron({
-  durationMs,
   expanded,
   testID
 }: {
-  durationMs: number;
   expanded: boolean;
   testID?: string;
 }): React.JSX.Element {
@@ -13149,12 +13020,12 @@ function AnimatedDisclosureChevron({
   useEffect(() => {
     progress.stopAnimation();
     Animated.timing(progress, {
-      duration: Math.max(0, durationMs),
+      duration: DISCLOSURE_MOTION_DURATION_MS,
       easing: Easing.out(Easing.cubic),
       toValue: expanded ? 1 : 0,
       useNativeDriver: false
     }).start();
-  }, [durationMs, expanded, progress]);
+  }, [expanded, progress]);
 
   const rotate = progress.interpolate({
     inputRange: [0, 1],
@@ -13190,96 +13061,40 @@ function SearchGlyph(): React.JSX.Element {
   );
 }
 
-type ReviewEntryGroup = {
-  key: string;
-  mode: SprintMode;
-  ratingKey: string;
-  entries: ReviewEntry[];
-};
-
-function groupReviewEntriesByContext(entries: ReviewEntry[]): ReviewEntryGroup[] {
-  const groups = new Map<string, { key: string; mode: SprintMode; ratingKey: string; entries: ReviewEntry[] }>();
-  for (const entry of entries) {
-    const key = `${entry.mode}:${entry.ratingKey}`;
-    const group = groups.get(key) ?? {
-      key,
-      mode: entry.mode,
-      ratingKey: entry.ratingKey,
-      entries: []
-    };
-    group.entries.push(entry);
-    groups.set(key, group);
-  }
-  return [...groups.values()];
-}
-
-function collectReviewSpeedFilters(items: ReviewQueueItem[]): number[] {
-  const speeds = new Set<number>();
-  for (const item of items) {
-    const speed = reviewItemSpeedSeconds(item);
-    if (speed !== null) {
-      speeds.add(speed);
-    }
-  }
-  return [...speeds].sort((left, right) => left - right);
-}
-
-function reviewItemSpeedSeconds(item: ReviewQueueItem): number | null {
-  const match = item.review.ratingKey.match(/\/(\d+)\b/);
+function reviewItemSpeedSeconds(
+  review: Pick<ReviewQueueState, "ratingKey">
+): number | null {
+  const match = review.ratingKey.match(/\/(\d+)\b/);
   return match ? Number(match[1]) : null;
 }
 
-function reviewItemSourceSprintLabel(item: ReviewQueueItem): string {
-  const speed = reviewItemSpeedSeconds(item);
+function reviewItemSourceSprintLabel(
+  review: Pick<ReviewQueueState, "mode" | "ratingKey">
+): string {
+  const speed = reviewItemSpeedSeconds(review);
   const speedLabel = speed === null ? null : `${speed}s pace`;
-  return `Source sprint: ${modeLabel(item.review.mode)}${speedLabel ? ` · ${speedLabel}` : ""}`;
+  return `Source sprint: ${modeLabel(review.mode)}${speedLabel ? ` · ${speedLabel}` : ""}`;
 }
 
-function filterReviewQueueItems(items: ReviewQueueItem[], filter: ReviewQueueFilter, nowMs: number): ReviewQueueItem[] {
-  return items.filter((item) => {
-    if (filter === "all") {
-      return true;
-    }
-    if (filter === "overdue") {
-      return isReviewOverdue(item.review, nowMs);
-    }
-    if (filter === "failed") {
-      return item.review.lapseCount > 0;
-    }
-    if (filter === "arrow_duel") {
-      return item.review.mode === "arrow_duel";
-    }
-    if (filter.startsWith("mode:")) {
-      return item.review.mode === filter.slice("mode:".length);
-    }
-    if (filter.startsWith("speed:")) {
-      return reviewItemSpeedSeconds(item) === Number(filter.slice("speed:".length));
-    }
-    return true;
-  });
-}
-
-function reviewQueueFilterLabel(filter: ReviewQueueFilter): string {
+function reviewQueueFilterLabel(filter: ReviewTodayFilter): string {
   if (filter === "all") {
-    return "All due";
+    return "All";
   }
   if (filter === "overdue") {
     return "Overdue";
   }
-  if (filter === "failed") {
-    return "Failed again";
+  if (filter === "missed_twice") {
+    return "Missed 2+ times";
   }
-  if (filter === "arrow_duel") {
-    return "Arrow Duel only";
-  }
-  if (filter.startsWith("mode:")) {
-    return modeLabel(filter.slice("mode:".length) as SprintMode);
-  }
-  if (filter.startsWith("speed:")) {
-    return `${filter.slice("speed:".length)}s pace`;
-  }
-  return "All due";
+  return "Arrow Duel";
 }
+
+const REVIEW_TODAY_FILTERS: readonly ReviewTodayFilter[] = [
+  "all",
+  "overdue",
+  "missed_twice",
+  "arrow_duel"
+];
 
 function reviewQueueSummary(queue: ReviewQueueState[], filteredItems: ReviewQueueItem[], nowMs: number): {
   dueStatusLabel: string;
@@ -13334,18 +13149,8 @@ function withAttemptClarity<T extends AttemptEvent | HistoryAttemptView>(
   } as T;
 }
 
-type ReviewQueueFilter =
-  | "all"
-  | "overdue"
-  | "failed"
-  | "arrow_duel"
-  | `mode:${SprintMode}`
-  | `speed:${number}`;
-
-function reviewQuickFilterTestID(
-  filter: ReviewTodayQuickFilterPresentation["filter"]
-): string {
-  if (filter === "failed") {
+function reviewQuickFilterTestID(filter: ReviewTodayFilter): string {
+  if (filter === "missed_twice") {
     return "review-filter-repeat-misses";
   }
   if (filter === "arrow_duel") {
@@ -13387,7 +13192,6 @@ function buildServiceReviewEntry(
 function ReviewPanel({
   adaptiveLayout,
   boardSize,
-  collapsibleMotionPreview,
   currentTimeMs,
   deferBackRelevantTransition,
   dueReviewItems,
@@ -13400,14 +13204,12 @@ function ReviewPanel({
   onBoardTouchActiveChange,
   onExitSessionReview,
   onFiltersExpandedChange,
-  onOpenPractice,
   onPromoteNextFutureReviewsToDue,
   onReviewRecorded,
   onReviewScheduleChanged,
   onSessionAttemptClearUnclear,
   onSessionSourceChange,
   onScheduleTestReviewReminder,
-  reviewTodayDesignPreview,
   reviewQueue,
   reviewReminderScheduleStatus,
   service,
@@ -13417,7 +13219,6 @@ function ReviewPanel({
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
-  collapsibleMotionPreview?: CollapsibleMotionPreview;
   currentTimeMs: () => number;
   deferBackRelevantTransition: DeferBackRelevantTransition;
   dueReviewItems: ReviewQueueItem[];
@@ -13430,14 +13231,12 @@ function ReviewPanel({
   onBoardTouchActiveChange?: (active: boolean) => void;
   onExitSessionReview: () => void;
   onFiltersExpandedChange: (expanded: boolean) => void;
-  onOpenPractice: () => void;
   onPromoteNextFutureReviewsToDue?: () => ReviewQueueDuePromotionResult;
   onReviewRecorded: (completedAt: string) => void;
   onReviewScheduleChanged: (clearedAttemptId?: string) => void;
   onSessionAttemptClearUnclear?: (attemptId: string) => AttemptEvent | null;
   onSessionSourceChange?: (source: ReviewEntry["source"] | null) => void;
   onScheduleTestReviewReminder?: () => Promise<ReviewReminderScheduleResult>;
-  reviewTodayDesignPreview?: ReviewTodayDesignPreview;
   reviewQueue: ReviewQueueState[];
   reviewReminderScheduleStatus?: string;
   service: PracticeService;
@@ -13462,18 +13261,18 @@ function ReviewPanel({
   const [activeEntryInitialIndex, setActiveEntryInitialIndex] = useState(0);
   const activeReviewGenerationRef = useRef(0);
   const appliedPreferredEntriesKeyRef = useRef(preferredEntriesKey);
-  const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
-  const [todayReviewsExpanded, setTodayReviewsExpanded] = useState(
-    reviewTodayDesignPreview?.collapsibleSections.todayInitiallyExpanded ?? true
-  );
-  const [completedReviewsExpanded, setCompletedReviewsExpanded] = useState(
-    reviewTodayDesignPreview?.collapsibleSections.completedInitiallyExpanded ?? true
-  );
+  const [queueFilter, setQueueFilter] = useState<ReviewTodayFilter>("all");
+  const [todayReviewsExpanded, setTodayReviewsExpanded] = useState(true);
+  const [completedReviewsExpanded, setCompletedReviewsExpanded] = useState(true);
   const [devStatus, setDevStatus] = useState<string | null>(null);
-  const reviewRunsByRatingKey = new Map(
-    service.listPracticeRuns().map((run) => [run.ratingKey, run])
-  );
-  const completedReviews = service.listCompletedReviewsForDay(new Date(nowMs).toISOString());
+  const reviewToday = useMemo(() => {
+    // The service owns mutable local storage; these snapshots invalidate its derived presentation.
+    void dueReviewItems;
+    void reviewQueue;
+    return service.getReviewTodayPresentation(new Date(nowMs).toISOString());
+  }, [dueReviewItems, nowMs, reviewQueue, service]);
+  const filteredReviewToday = filterReviewTodayPresentation(reviewToday, queueFilter);
+  const completedReviews = reviewToday.completedItems.map((entry) => entry.item);
   const completedReviewEntries = completedReviews.map((item): ReviewEntry => buildServiceReviewEntry(service, {
     puzzle: item.puzzle,
     mode: item.attempt.mode,
@@ -13481,41 +13280,23 @@ function ReviewPanel({
     source: "history",
     attempt: item.attempt
   }));
-  const dailyReviewTotal = completedReviews.length + dueReviewItems.length;
+  const dailyReviewTotal = completedReviews.length + reviewToday.dueItems.length;
   const dailyReviewProgressLabel = dailyReviewTotal === 0
     ? "0"
     : `${completedReviews.length} / ${dailyReviewTotal}`;
-  const speedFilters = collectReviewSpeedFilters(dueReviewItems);
-  const quickFilterOptions = reviewTodayDesignPreview?.quickFilters;
-  const quickFilterPresentation = quickFilterOptions?.find((option) => option.filter === queueFilter);
-  const quickFiltersEnabled = Boolean(quickFilterOptions && quickFilterOptions.length > 0);
-  const filteredDueReviewItems = quickFilterPresentation
-    ? dueReviewItems.filter((item) => quickFilterPresentation.duePuzzleIds.includes(item.puzzle.id))
-    : filterReviewQueueItems(dueReviewItems, queueFilter, nowMs);
-  const filteredCompletedReviews = quickFilterPresentation
-    ? completedReviews.filter((item) => quickFilterPresentation.completedPuzzleIds.includes(item.puzzle.id))
-    : completedReviews;
+  const filteredDueReviewItems = filteredReviewToday.dueItems.map((entry) => entry.item);
+  const filteredCompletedReviews = filteredReviewToday.completedItems.map((entry) => entry.item);
   const filteredDueEntries = filteredDueReviewItems.map((item): ReviewEntry => buildServiceReviewEntry(service, {
     puzzle: item.puzzle,
     mode: item.review.mode,
     ratingKey: item.review.ratingKey,
     source: "due"
   }));
-  const filteredContextGroups = groupReviewEntriesByContext(filteredDueEntries);
   const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems, nowMs);
-  const selectedReviewFilterLabel = quickFilterPresentation?.label
-    ?? reviewQueueFilterLabel(queueFilter);
-  const activeFilterLabels = quickFiltersEnabled
-    ? [selectedReviewFilterLabel]
-    : reviewActiveFilterLabels(queueFilter, queueSummary);
-  const filterControlsBeforeReviewAction = reviewTodayDesignPreview?.filterControls?.placement
-    === "before_review_action";
-  const filterSummaryWhenCollapsed = reviewTodayDesignPreview?.filterControls?.summaryVisibility
-    === "when_collapsed";
-  const showActiveFilterStrip = filtersExpanded || queueFilter !== "all";
+  const selectedReviewFilterLabel = reviewQueueFilterLabel(queueFilter);
   const reviewDueSummaryLabel = filteredDueEntries.length > 0
     ? queueSummary.dueStatusLabel
-    : dueReviewItems.length === 0
+    : reviewToday.dueItems.length === 0
       ? "You're done for today"
       : "No matching scheduled reviews";
   const reviewDueFilterLabel = filteredDueEntries.length > 0
@@ -13643,55 +13424,33 @@ function ReviewPanel({
       contentContainerStyle={styles.reviewFilterContent}
       testID="review-queue-filters"
     >
-      {quickFiltersEnabled ? quickFilterOptions?.map((option) => (
+      {REVIEW_TODAY_FILTERS.map((filter) => (
         <FilterButton
-          key={option.filter}
-          active={queueFilter === option.filter}
-          label={option.label}
-          testID={reviewQuickFilterTestID(option.filter)}
-          onPress={() => setQueueFilter(option.filter)}
+          key={filter}
+          active={queueFilter === filter}
+          label={reviewQueueFilterLabel(filter)}
+          testID={reviewQuickFilterTestID(filter)}
+          onPress={() => setQueueFilter(filter)}
         />
-      )) : (
-        <>
-          <FilterButton active={queueFilter === "all"} label="All due" testID="review-filter-all" onPress={() => setQueueFilter("all")} />
-          <FilterButton active={queueFilter === "overdue"} label="Overdue" testID="review-filter-overdue" onPress={() => setQueueFilter("overdue")} />
-          <FilterButton active={queueFilter === "failed"} label="Failed again" testID="review-filter-failed" onPress={() => setQueueFilter("failed")} />
-          <FilterButton active={queueFilter === "mode:standard"} label="Standard" testID="review-filter-mode-standard" onPress={() => setQueueFilter("mode:standard")} />
-          <FilterButton active={queueFilter === "arrow_duel"} label="Arrow Duel only" testID="review-filter-arrow-duel" onPress={() => setQueueFilter("arrow_duel")} />
-          {speedFilters.map((speed) => (
-            <FilterButton
-              key={speed}
-              active={queueFilter === `speed:${speed}`}
-              label={`${speed}s pace`}
-              testID={`review-filter-speed-${speed}`}
-              onPress={() => setQueueFilter(`speed:${speed}`)}
-            />
-          ))}
-        </>
-      )}
+      ))}
     </ScrollView>
   );
-  const reviewFilterOptionsRegion = collapsibleMotionPreview ? (
+  const reviewFilterOptionsRegion = (
     <CollapsibleRegion
       contentTestID="review-filter-options"
       expanded={filtersExpanded}
-      motion={collapsibleMotionPreview}
     >
       {reviewFilterOptions}
     </CollapsibleRegion>
-  ) : filtersExpanded ? reviewFilterOptions : null;
-  const reviewActiveFilterStrip = <ReviewActiveFilterStrip labels={activeFilterLabels} />;
-  const reviewFilterSummaryRegion = filterSummaryWhenCollapsed ? (
-    collapsibleMotionPreview ? (
-      <CollapsibleRegion
-        contentTestID="review-filter-summary"
-        expanded={!filtersExpanded}
-        motion={collapsibleMotionPreview}
-      >
-        {reviewActiveFilterStrip}
-      </CollapsibleRegion>
-    ) : !filtersExpanded ? reviewActiveFilterStrip : null
-  ) : showActiveFilterStrip ? reviewActiveFilterStrip : null;
+  );
+  const reviewFilterSummaryRegion = (
+    <CollapsibleRegion
+      contentTestID="review-filter-summary"
+      expanded={!filtersExpanded}
+    >
+      <ReviewFilterSummary label={selectedReviewFilterLabel} />
+    </CollapsibleRegion>
+  );
 
   return (
     <View style={styles.reviewQueuePanel} testID="review-panel">
@@ -13712,7 +13471,7 @@ function ReviewPanel({
       <View
         accessibilityLabel={dailyReviewTotal === 0
           ? `Today, no reviews scheduled, ${queueSummary.tomorrowCount} tomorrow, ${queueSummary.nextSevenDaysCount} in the next 7 days, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`
-          : `Today, ${completedReviews.length} of ${dailyReviewTotal} reviews completed, ${dueReviewItems.length} remaining${queueSummary.overdueCount > 0 ? `, ${queueSummary.overdueCount} overdue` : ""}, ${queueSummary.tomorrowCount} tomorrow, ${queueSummary.nextSevenDaysCount} in the next 7 days, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`}
+          : `Today, ${completedReviews.length} of ${dailyReviewTotal} reviews completed, ${reviewToday.dueItems.length} remaining${queueSummary.overdueCount > 0 ? `, ${queueSummary.overdueCount} overdue` : ""}, ${queueSummary.tomorrowCount} tomorrow, ${queueSummary.nextSevenDaysCount} in the next 7 days, ${queueSummary.totalCount} total, ${reviewDueFilterLabel}`}
         style={styles.reviewDueCard}
         testID="review-due-card"
       >
@@ -13744,12 +13503,10 @@ function ReviewPanel({
         <ReviewForecastMetric label="Total" count={queueSummary.totalCount} countTestID="review-total-count" />
       </View>
 
-      {filterControlsBeforeReviewAction ? (
-        <View style={styles.reviewFilterControlSlot} testID="review-filter-controls">
-          {reviewFilterOptionsRegion}
-          {reviewFilterSummaryRegion}
-        </View>
-      ) : showActiveFilterStrip ? reviewActiveFilterStrip : null}
+      <View style={styles.reviewFilterControlSlot} testID="review-filter-controls">
+        {reviewFilterOptionsRegion}
+        {reviewFilterSummaryRegion}
+      </View>
 
       <Pressable
         accessibilityRole="button"
@@ -13801,141 +13558,65 @@ function ReviewPanel({
         </View>
       ) : null}
 
-      {!filterControlsBeforeReviewAction ? reviewFilterOptionsRegion : null}
-
-      {(filtersExpanded || reviewTodayDesignPreview?.showTodaySections === true)
-        && (filteredDueReviewItems.length > 0 || quickFiltersEnabled) ? (
-        <View style={styles.reviewItemList} testID="review-due-items">
-          {reviewTodayDesignPreview?.collapsibleSections ? (
-            <ReviewSectionToggle
-              count={filteredDueReviewItems.length}
-              collapsibleMotionPreview={collapsibleMotionPreview}
-              expanded={todayReviewsExpanded}
-              label="Today to review"
-              toggleTestID="review-today-to-review-toggle"
-              onPress={() => setTodayReviewsExpanded((expanded) => !expanded)}
+      <View style={styles.reviewItemList} testID="review-due-items">
+        <ReviewSectionToggle
+          count={filteredReviewToday.dueItems.length}
+          expanded={todayReviewsExpanded}
+          label="Today to review"
+          toggleTestID="review-today-to-review-toggle"
+          onPress={() => setTodayReviewsExpanded((expanded) => !expanded)}
+        />
+        <CollapsibleRegion
+          contentTestID="review-today-to-review-items"
+          contentStyle={styles.reviewSectionItems}
+          expanded={todayReviewsExpanded}
+        >
+          {filteredReviewToday.dueItems.length > 0 ? filteredReviewToday.dueItems.map((entry) => (
+            <ReviewQueueItemCard
+              key={`${entry.item.review.puzzleId}:${entry.item.review.mode}:${entry.item.review.ratingKey}`}
+              presentation={entry}
+              nowMs={nowMs}
+              onPress={() => startReviewEntries([buildServiceReviewEntry(service, {
+                puzzle: entry.item.puzzle,
+                mode: entry.item.review.mode,
+                ratingKey: entry.item.review.ratingKey,
+                source: "due"
+              })])}
             />
-          ) : (
-            <Text style={styles.sectionLabel}>
-              {reviewTodayDesignPreview?.showTodaySections === true ? "Today to review" : "Due items"}
+          )) : (
+            <Text style={styles.helperText} testID="review-today-to-review-empty">
+              No reviews match this filter.
             </Text>
           )}
-          <CollapsibleRegion
-            contentTestID="review-today-to-review-items"
-            contentStyle={styles.reviewSectionItems}
-            expanded={!reviewTodayDesignPreview?.collapsibleSections || todayReviewsExpanded}
-            motion={collapsibleMotionPreview}
-          >
-              {filteredDueReviewItems.length > 0 ? filteredDueReviewItems.slice(0, 4).map((item) => (
-                <ReviewQueueItemCard
-                  key={`${item.review.puzzleId}:${item.review.mode}:${item.review.ratingKey}`}
-                  item={item}
-                  nowMs={nowMs}
-                  showTodayPresentation={reviewTodayDesignPreview?.showTodaySections === true}
-                  attemptSummary={reviewTodayDesignPreview?.attemptSummaries.find((summary) => (
-                    summary.puzzleId === item.review.puzzleId
-                      && summary.mode === item.review.mode
-                      && summary.ratingKey === item.review.ratingKey
-                  ))}
-                  onPress={() => startReviewEntries([buildServiceReviewEntry(service, {
-                    puzzle: item.puzzle,
-                    mode: item.review.mode,
-                    ratingKey: item.review.ratingKey,
-                    source: "due"
-                  })])}
-                />
-              )) : (
-                <Text style={styles.helperText} testID="review-today-to-review-empty">
-                  No reviews match this filter.
-                </Text>
-              )}
-          </CollapsibleRegion>
-        </View>
-      ) : null}
+        </CollapsibleRegion>
+      </View>
 
-      {!quickFiltersEnabled && filtersExpanded && filteredContextGroups.length > 0 ? (
-        <View style={styles.reviewContextList} testID="review-context-list">
-          <Text style={styles.sectionLabel}>Review groups</Text>
-          {filteredContextGroups.map((group) => (
-            <Pressable
-              key={group.key}
-              accessibilityRole="button"
-              accessibilityLabel={`Start ${modeLabel(group.mode)} reviews`}
-              testID={`review-context-${safeTestId(group.key)}`}
-              style={styles.reviewContextCard}
-              onPress={() => startReviewEntries(group.entries)}
-            >
-              <View>
-                <Text style={styles.historyRowTitle}>{modeLabel(group.mode)}</Text>
-                <Text style={styles.helperText}>
-                  {historyRatingKeyLabel(
-                    group.ratingKey,
-                    reviewRunsByRatingKey.get(group.ratingKey)?.name,
-                    reviewRunsByRatingKey.get(group.ratingKey)?.perPuzzleSeconds
-                  )}
-                </Text>
-              </View>
-              <View style={styles.reviewContextMeta}>
-                <Text style={styles.reviewContextCount}>{group.entries.length}</Text>
-                <ChevronGlyph direction="right" />
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      ) : !quickFiltersEnabled && filteredDueReviewItems.length === 0 ? (
-        <View style={styles.emptyReviewPanel} testID="review-empty-state">
-          <Text style={styles.listText}>{dueReviewItems.length === 0 ? "You're done for today" : "No matching scheduled reviews"}</Text>
-          <Text style={styles.helperText}>
-            {dueReviewItems.length === 0
-              ? queueSummary.oldestDueLabel
-              : "Adjust filters or start the full due queue."}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Practice while waiting for reviews"
-            testID="review-empty-practice"
-            style={[styles.secondaryButton, styles.emptyReviewPracticeButton]}
-            onPress={onOpenPractice}
-          >
-            <Text style={styles.secondaryButtonText}>Practice now</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {filteredCompletedReviews.length > 0 || quickFiltersEnabled ? (
-        <View style={styles.reviewItemList} testID="review-today-history">
-          {reviewTodayDesignPreview?.collapsibleSections ? (
-            <ReviewSectionToggle
-              count={filteredCompletedReviews.length}
-              collapsibleMotionPreview={collapsibleMotionPreview}
-              expanded={completedReviewsExpanded}
-              label="Completed today"
-              toggleTestID="review-completed-today-toggle"
-              onPress={() => setCompletedReviewsExpanded((expanded) => !expanded)}
+      <View style={styles.reviewItemList} testID="review-today-history">
+        <ReviewSectionToggle
+          count={filteredCompletedReviews.length}
+          expanded={completedReviewsExpanded}
+          label="Completed today"
+          toggleTestID="review-completed-today-toggle"
+          onPress={() => setCompletedReviewsExpanded((expanded) => !expanded)}
+        />
+        <CollapsibleRegion
+          contentTestID="review-today-history-items"
+          contentStyle={styles.reviewSectionItems}
+          expanded={completedReviewsExpanded}
+        >
+          {filteredCompletedReviews.length > 0 ? filteredCompletedReviews.map((item) => (
+            <TodayReviewAttemptRow
+              key={item.attempt.id}
+              item={item}
+              onOpen={() => openCompletedReview(item.attempt.id)}
             />
-          ) : (
-            <Text style={styles.sectionLabel}>Completed today</Text>
+          )) : (
+            <Text style={styles.helperText} testID="review-today-history-empty">
+              No completed reviews match this filter.
+            </Text>
           )}
-          <CollapsibleRegion
-            contentTestID="review-today-history-items"
-            contentStyle={styles.reviewSectionItems}
-            expanded={!reviewTodayDesignPreview?.collapsibleSections || completedReviewsExpanded}
-            motion={collapsibleMotionPreview}
-          >
-              {filteredCompletedReviews.length > 0 ? filteredCompletedReviews.map((item) => (
-                <TodayReviewAttemptRow
-                  key={item.attempt.id}
-                  item={item}
-                  onOpen={() => openCompletedReview(item.attempt.id)}
-                />
-              )) : (
-                <Text style={styles.helperText} testID="review-today-history-empty">
-                  No completed reviews match this filter.
-                </Text>
-              )}
-          </CollapsibleRegion>
-        </View>
-      ) : null}
+        </CollapsibleRegion>
+      </View>
 
     </View>
   );
@@ -13962,47 +13643,33 @@ function reviewDueCardSubline(label: string): string {
   return label;
 }
 
-function reviewActiveFilterLabels(
-  filter: ReviewQueueFilter,
-  queueSummary: ReturnType<typeof reviewQueueSummary>
-): string[] {
-  const labels = [reviewQueueFilterLabel(filter)];
-  if (queueSummary.overdueCount > 0) {
-    labels.push(`${queueSummary.overdueCount} overdue`);
-  }
-  labels.push(`${queueSummary.totalCount} total`);
-  return labels;
-}
-
-function ReviewActiveFilterStrip({ labels }: { labels: string[] }): React.JSX.Element {
+function ReviewFilterSummary({ label }: { label: string }): React.JSX.Element {
   return (
-    <ScrollView
-      accessibilityLabel={`Review filter summary, ${labels.join(", ")}`}
-      horizontal
-      showsHorizontalScrollIndicator={false}
+    <View
+      accessibilityLabel={`Review filter summary, ${label}`}
       testID="review-active-filter-summary"
     >
       <View style={styles.historyChipContent}>
-        {labels.map((label, index) => (
-          <View key={`${label}-${index}`} style={styles.historyActiveFilterChip} testID={`review-active-filter-${index}`}>
-            <Text style={styles.historyActiveFilterText}>{label}</Text>
-          </View>
-        ))}
+        <View style={styles.historyActiveFilterChip} testID="review-active-filter-0">
+          <Text style={styles.historyActiveFilterText}>{label}</Text>
+        </View>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
-function reviewTodayActivityLabel(review: ReviewQueueState, nowMs: number): string {
-  const activityAt = review.lastReviewedAt ?? review.enrolledAt;
-  if (!activityAt) {
+function reviewTodayActivityLabel(
+  history: ReviewTodayHistoryPresentation,
+  nowMs: number
+): string {
+  if (!history.activity.at) {
     return "Scheduled for review";
   }
-  const activity = reviewRelativeDayLabel(activityAt, nowMs);
-  if (review.reviewCount > 0) {
+  const activity = reviewRelativeDayLabel(history.activity.at, nowMs);
+  if (history.activity.kind === "last_retry") {
     return `Last retry ${activity}`;
   }
-  if (review.lastResult === "wrong") {
+  if (history.activity.kind === "first_missed") {
     return `First missed ${activity}`;
   }
   return `Added to Review ${activity}`;
@@ -14027,50 +13694,27 @@ function reviewRelativeDayLabel(value: string, nowMs: number): string {
 }
 
 function ReviewQueueItemCard({
-  item,
+  presentation,
   nowMs,
-  showTodayPresentation,
-  attemptSummary,
   onPress
 }: {
-  item: ReviewQueueItem;
+  presentation: ReviewTodayDueItemPresentation;
   nowMs: number;
-  showTodayPresentation: boolean;
-  attemptSummary?: ReviewTodayAttemptSummaryPresentation;
   onPress: () => void;
 }): React.JSX.Element {
-  const activityLabel = showTodayPresentation
-    ? reviewTodayActivityLabel(item.review, nowMs)
-    : item.review.lastReviewedAt
-      ? `Last wrong ${formatLocalCalendarDate(item.review.lastReviewedAt)}`
-      : `Added manually ${formatLocalCalendarDate(item.review.enrolledAt ?? item.review.dueDay)}`;
-  const dueKind = reviewDueState(item.review, nowMs);
-  const dueState = dueKind === "overdue"
-    ? "Overdue"
-    : dueKind === "due"
-      ? "Due now"
-      : `Due ${formatReviewDay(item.review.dueDay)}`;
-  const source = reviewItemSourceSprintLabel(item);
+  const { history, item } = presentation;
+  const activityLabel = reviewTodayActivityLabel(history, nowMs);
+  const source = reviewItemSourceSprintLabel(item.review);
   const compactSource = source.replace(/^Source sprint: /, "");
-  const nextReviewNumber = item.review.reviewCount + 1;
-  const attemptSummaryLabel = attemptSummary
-    ? `${reviewAttemptMetricLabel(attemptSummary.attemptCount, "attempt")} · ${reviewAttemptMetricLabel(attemptSummary.missCount, "miss")}`
-    : null;
-  const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`;
+  const attemptSummaryLabel = `${reviewAttemptMetricLabel(history.attemptCount, "attempt")} · ${reviewAttemptMetricLabel(history.missCount, "miss")}`;
+  const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}-${safeTestId(item.review.ratingKey)}`;
   const accessibilityLabel = [
     `Start ${modeLabel(item.review.mode)} review`,
-    ...(showTodayPresentation ? ["Scheduled retry"] : []),
+    "Scheduled retry",
     activityLabel,
-    ...(showTodayPresentation
-      ? attemptSummary
-        ? [
-            reviewAttemptMetricLabel(attemptSummary.attemptCount, "attempt"),
-            reviewAttemptMetricLabel(attemptSummary.missCount, "miss")
-          ]
-        : []
-      : [dueState, `${item.review.intervalDays} day interval`]),
-    source,
-    ...(!showTodayPresentation ? [`Review ${nextReviewNumber}`, `Lapses ${item.review.lapseCount}`] : [])
+    reviewAttemptMetricLabel(history.attemptCount, "attempt"),
+    reviewAttemptMetricLabel(history.missCount, "miss"),
+    source
   ].join(", ");
 
   return (
@@ -14081,18 +13725,14 @@ function ReviewQueueItemCard({
       style={styles.reviewItemCard}
       onPress={onPress}
     >
-      {showTodayPresentation ? (
-        <View style={styles.reviewRetryBadge} testID={`${rowTestId}-badge`}>
-          <Text style={styles.reviewRetryGlyph}>↻</Text>
-        </View>
-      ) : null}
+      <View style={styles.reviewRetryBadge} testID={`${rowTestId}-badge`}>
+        <Text style={styles.reviewRetryGlyph}>↻</Text>
+      </View>
       <View style={styles.reviewItemCopy}>
         <Text style={styles.historyRowTitle}>{modeLabel(item.review.mode)}</Text>
         <Text testID={`${rowTestId}-context`} style={styles.helperText}>{activityLabel}</Text>
         <Text testID={`${rowTestId}-meta`} style={styles.helperText}>
-          {showTodayPresentation
-            ? [attemptSummaryLabel, compactSource].filter(Boolean).join(" · ")
-            : `${dueState} · ${item.review.intervalDays}d interval · ${compactSource}`}
+          {[attemptSummaryLabel, compactSource].filter(Boolean).join(" · ")}
         </Text>
       </View>
       <ChevronGlyph direction="right" />
@@ -14106,14 +13746,12 @@ function reviewAttemptMetricLabel(count: number, singular: "attempt" | "miss"): 
 }
 
 function ReviewSectionToggle({
-  collapsibleMotionPreview,
   count,
   expanded,
   label,
   toggleTestID,
   onPress
 }: {
-  collapsibleMotionPreview?: CollapsibleMotionPreview;
   count: number;
   expanded: boolean;
   label: string;
@@ -14135,7 +13773,6 @@ function ReviewSectionToggle({
         <View style={styles.reviewSectionToggleChevron} testID={`${toggleTestID}-chevron`}>
           <DisclosureChevron
             expanded={expanded}
-            motion={collapsibleMotionPreview}
             testID={`${toggleTestID}-animated-chevron`}
           />
         </View>
@@ -19632,30 +19269,6 @@ const styles = StyleSheet.create({
   progressDeltaNeutral: {
     color: "#64748B"
   },
-  practiceReviewStrip: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 58,
-    paddingHorizontal: 14,
-    paddingVertical: 10
-  },
-  reviewStripActionArea: {
-    alignItems: "center",
-    alignSelf: "stretch",
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "center",
-    position: "relative"
-  },
-  reviewStripStatusCopy: {
-    flex: 1,
-    minWidth: 0
-  },
   resumeSprintCard: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
@@ -19693,42 +19306,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10
   },
-  reviewStripCounts: {
-    alignItems: "center",
-    flex: 1,
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "center",
-    paddingHorizontal: 22
-  },
-  reviewStripChevron: {
-    alignItems: "center",
-    bottom: 0,
-    justifyContent: "center",
-    position: "absolute",
-    right: 0,
-    top: 0,
-    width: 18
-  },
-  reviewStripMetric: {
-    alignItems: "center",
-    flexShrink: 1,
-    gap: 3,
-    minWidth: 48
-  },
-  reviewDueCount: {
-    color: "#111827",
-    fontSize: 17,
-    fontWeight: "800",
-    lineHeight: 21,
-    textAlign: "center",
-    width: "100%"
-  },
   reviewQueuePanel: {
     gap: 12
   },
   reviewFilterControlSlot: {
-    minHeight: 32
+    height: 32,
+    overflow: "hidden"
   },
   reviewFilterButton: {
     alignItems: "center",
@@ -19904,41 +19487,6 @@ const styles = StyleSheet.create({
   reviewItemCopy: {
     flex: 1,
     gap: 2
-  },
-  reviewContextCard: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 58,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  reviewContextMeta: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8
-  },
-  reviewContextCount: {
-    color: "#2563EB",
-    fontSize: 16,
-    fontWeight: "800"
-  },
-  emptyReviewPanel: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 12
-  },
-  emptyReviewPracticeButton: {
-    alignSelf: "flex-start",
-    flex: 0,
-    marginTop: 2
   },
   reviewStartButton: {
     flexBasis: "auto",
@@ -22308,9 +21856,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 8
-  },
-  reviewContextList: {
     gap: 8
   },
   settingsPanel: {

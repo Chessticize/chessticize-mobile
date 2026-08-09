@@ -40,7 +40,7 @@ export const DueQueue: Story = {
     await waitForVisibleTestId(canvasElement, "review-start-due");
     await waitForTestId(canvasElement, "review-due-items");
     await waitForTestId(canvasElement, "review-today-to-review-toggle");
-    await waitForTestId(canvasElement, "review-due-item-lab-fork-01-standard-badge");
+    await waitForTestId(canvasElement, "review-due-item-lab-fork-01-standard-standard-5-20-badge");
     await waitForTestId(canvasElement, "review-today-history");
     await waitForTestId(canvasElement, "review-completed-today-toggle");
     await waitForTestId(canvasElement, "review-today-history-items");
@@ -62,12 +62,12 @@ export const DueQueue: Story = {
     await waitForText(canvasElement, "Last retry 3 days ago");
     await expectTestIdText(
       canvasElement,
-      "review-due-item-lab-fork-01-standard-meta",
+      "review-due-item-lab-fork-01-standard-standard-5-20-meta",
       "1 attempt · 1 miss · Standard · 20s pace"
     );
     await expectTestIdText(
       canvasElement,
-      "review-due-item-lab-skewer-03-arrow-duel-meta",
+      "review-due-item-lab-skewer-03-arrow-duel-arrow-duel-5-30-meta",
       "3 attempts · 2 misses · Arrow Duel · 30s pace"
     );
     await expectTestIdsInOrder(canvasElement, [
@@ -142,8 +142,8 @@ export const Filters: Story = {
     await clickTestId(canvasElement, "review-filter-repeat-misses");
     await expectTestIdText(canvasElement, "review-today-to-review-toggle-count", "1");
     await expectTestIdText(canvasElement, "review-completed-today-toggle-count", "1");
-    await waitForTestId(canvasElement, "review-due-item-lab-skewer-03-arrow-duel");
-    expectTestIdAbsent(canvasElement, "review-due-item-lab-fork-01-standard");
+    await waitForTestId(canvasElement, "review-due-item-lab-skewer-03-arrow-duel-arrow-duel-5-30");
+    expectTestIdAbsent(canvasElement, "review-due-item-lab-fork-01-standard-standard-5-20");
     expectTestIdAbsent(canvasElement, "review-context-list");
     await clickTestId(canvasElement, "review-filter-toggle");
     await waitForHiddenTestId(canvasElement, "review-filter-options-motion");
