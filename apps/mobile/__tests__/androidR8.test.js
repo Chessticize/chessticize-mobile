@@ -65,7 +65,10 @@ describe('Android R8 release optimization', () => {
     const rootPackage = JSON.parse(read('package.json'));
     const nativeRunner = read('apps/mobile/scripts/android-r8-native-evidence.sh');
     const nativeTests = read(
-      'apps/mobile/android/app/src/androidTest/java/com/chessticize/mobile/R8NativeBoundariesIntegrationTest.kt',
+      'apps/mobile/android/app/src/androidTest/java/com/chessticize/mobile/R8ValidationInstrumentation.java',
+    );
+    const androidTestManifest = read(
+      'apps/mobile/android/app/src/androidTest/AndroidManifest.xml',
     );
     const validationBlock = build.match(
       /\n\s{8}r8Validation \{([\s\S]*?)\n\s{8}\}\n\s{4}\}/,
@@ -85,12 +88,8 @@ describe('Android R8 release optimization', () => {
     expect(validationRules).toContain(
       '-keep,includedescriptorclasses class com.chessticize.mobile.NativeStockfishEngineModule',
     );
-    expect(validationRules).toContain(
-      '-keep,includedescriptorclasses class kotlin.jvm.internal.Intrinsics',
-    );
-    expect(validationRules).toContain(
-      '-keep,includedescriptorclasses class androidx.tracing.Trace',
-    );
+    expect(validationRules).not.toContain('kotlin.**');
+    expect(validationRules).not.toContain('androidx.tracing.**');
     expect(validationRules).toContain(
       '-keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderAlarmScheduler',
     );
@@ -129,16 +128,18 @@ describe('Android R8 release optimization', () => {
     expect(rootPackage.scripts['mobile:validate:android:r8']).toBe(
       'pnpm --filter ChessticizeMobile validate:android:r8',
     );
-    expect(nativeRunner).toContain('R8NativeBoundariesIntegrationTest');
-    expect(nativeRunner).toContain("'OK (2 tests)'");
-    expect(nativeRunner).toContain("'OK (8 tests)'");
-    expect(nativeRunner).toContain("'OK (1 test)'");
+    expect(nativeRunner).toContain('R8ValidationInstrumentation');
+    expect(nativeRunner).toContain("'R8_VALIDATION_PASS'");
+    expect(androidTestManifest).toContain(
+      'android:name="com.chessticize.mobile.R8ValidationInstrumentation"',
+    );
     expect(nativeRunner).toContain("grep -Fq 'practice-tab'");
+    expect(nativeTests).toContain('extends Instrumentation');
     expect(nativeTests).toContain('ApplicationInfo.FLAG_DEBUGGABLE');
     expect(nativeTests).toContain('getDeclaredField("mBackPressedCallback")');
     expect(nativeTests).toContain('MobilePredictiveBackApi34Delegate');
-    expect(nativeTests).toContain('assertTrue(awaitStart(module))');
-    expect(nativeTests).toContain('assertFalse(awaitStart(module))');
+    expect(nativeTests).toContain('require(awaitStart(module)');
+    expect(nativeTests).toContain('require(!awaitStart(module)');
   });
 
   it('retains R8 diagnostics beside the protected signed release candidate', () => {
