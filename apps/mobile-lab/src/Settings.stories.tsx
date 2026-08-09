@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
 import {
+  centerTestId,
   clickTestId,
   expectTestIdAbsent,
   openSettings,
@@ -63,6 +64,7 @@ export const ArrowDuelOpponentReply: Story = {
       canvasElement,
       "After you choose the better arrow, you’ll go straight to the next puzzle in every Run. If you turn this back on, each Run will use the reply setting and time you previously chose."
     );
+    await centerTestId(canvasElement, "settings-arrow-duel-section");
   }
 };
 
