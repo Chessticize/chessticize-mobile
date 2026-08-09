@@ -1,4 +1,4 @@
-/* global by, describe, device, element, it, waitFor */
+/* global by, describe, device, element, expect, it, waitFor */
 
 const fs = require('node:fs');
 const {
@@ -31,7 +31,6 @@ const deviceLabel = sanitizeAdaptiveScreenshotLabel(
   process.env.CHESSTICIZE_ADAPTIVE_DEVICE_LABEL || 'simulator'
 );
 const includeLandscape = process.env.CHESSTICIZE_ADAPTIVE_INCLUDE_LANDSCAPE === '1';
-const expectReviewStripVisible = process.env.CHESSTICIZE_ADAPTIVE_EXPECT_REVIEW_STRIP === '1';
 const onlyOrientation = process.env.CHESSTICIZE_ADAPTIVE_ONLY_ORIENTATION;
 const archiveAdaptiveScreenshot = createAdaptiveScreenshotArchiver();
 
@@ -270,10 +269,7 @@ async function waitForHomeTopFrame() {
   // screenshot to expose offscreen content.
   await waitFor(element(by.id('practice-run-standard'))).toExist().withTimeout(10000);
   await waitFor(element(by.id('practice-progress-summary'))).toExist().withTimeout(10000);
-
-  if (expectReviewStripVisible) {
-    await waitFor(element(by.id('practice-review-strip'))).toExist().withTimeout(10000);
-  }
+  await expect(element(by.id('practice-review-strip'))).not.toExist();
 }
 
 async function frameForIfPresent(testID) {

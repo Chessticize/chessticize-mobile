@@ -1336,6 +1336,35 @@ describe('Detox suite configuration', () => {
     });
   });
 
+  it('allows a production-only iOS capture to suppress visible test controls', async () => {
+    const targetDevice = {
+      disableSynchronization: jest.fn().mockResolvedValue(undefined),
+      getPlatform: jest.fn(() => 'ios'),
+      launchApp: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await launchWithDisabledSynchronization({
+      delete: false,
+      enableTestControls: false,
+      newInstance: true,
+      launchArgs: {
+        chessticizeStoreAssetCapture: '1',
+        chessticizeTestNowMs: '1784030400000',
+      },
+    }, targetDevice);
+
+    expect(targetDevice.launchApp).toHaveBeenCalledWith({
+      delete: false,
+      newInstance: true,
+      launchArgs: {
+        DTXDisableMainRunLoopSync: 'YES',
+        chessticizeStoreAssetCapture: '1',
+        chessticizeTestNowMs: '1784030400000',
+        detoxEnableSynchronization: 0,
+      },
+    });
+  });
+
   it('foregrounds the attached Android activity with identical launch arguments', () => {
     const run = jest.fn(() => 'Status: ok\nActivity: com.chessticize.mobile/.MainActivity\n');
 

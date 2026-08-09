@@ -47,7 +47,7 @@ describeStoreAssets('App Store screenshot capture', () => {
     await element(by.id('back-practice-button')).tap();
     await waitFor(element(by.id('practice-tab'))).toBeVisible().withTimeout(10000);
     await device.terminateApp();
-    await launchStoreAssetApp(reviewNowMs, false);
+    await launchStoreAssetApp(reviewNowMs, false, false);
 
     await completeOneWrongReview();
     await captureMainTabScenes();
@@ -57,16 +57,18 @@ describeStoreAssets('App Store screenshot capture', () => {
 
 async function captureFirstUseSprintRulesGuide() {
   await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(180000);
+  await expect(element(by.id('test-puzzle-source-control'))).not.toExist();
   await takePortraitScreenshotAtTop('app-store-09-sprint-rules-guide');
   await takeLandscapeScreenshot('app-store-09-sprint-rules-guide');
   await element(by.id('practice-sprint-rules-dismiss')).tap();
   await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
 }
 
-async function launchStoreAssetApp(nowMs, deleteData) {
+async function launchStoreAssetApp(nowMs, deleteData, enableTestControls = true) {
   await launchWithDisabledSynchronization({
     newInstance: true,
     delete: deleteData,
+    enableTestControls,
     launchArgs: {
       chessticizeStoreAssetCapture: '1',
       chessticizeTestNowMs: String(nowMs)
@@ -188,7 +190,8 @@ async function completeOneWrongReview() {
 async function captureMainTabScenes() {
   await openTab('practice-tab', 'practice-run-arrow-duel');
   await element(by.id('practice-run-select-arrow-duel')).tap();
-  await waitForVisibleInPracticeScroll('practice-review-due-count');
+  await expect(element(by.id('practice-review-strip'))).not.toExist();
+  await expect(element(by.id('review-tab-badge'))).toExist();
   const ratingText = textFromAttributes(await element(by.id('practice-mode-arrow-duel-rating')).getAttributes());
   if (ratingText === '600') {
     throw new Error('Expected the Practice screenshot to show a populated Arrow Duel rating');

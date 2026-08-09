@@ -60,33 +60,6 @@ import {
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
 
-const REVIEW_TODAY_QUICK_FILTERS = [
-  {
-    filter: "all",
-    label: "All",
-    duePuzzleIds: ["lab-fork-01", "lab-skewer-03"],
-    completedPuzzleIds: ["lab-pin-02"]
-  },
-  {
-    filter: "overdue",
-    label: "Overdue",
-    duePuzzleIds: ["lab-skewer-03"],
-    completedPuzzleIds: []
-  },
-  {
-    filter: "failed",
-    label: "Missed 2+ times",
-    duePuzzleIds: ["lab-skewer-03"],
-    completedPuzzleIds: ["lab-pin-02"]
-  },
-  {
-    filter: "arrow_duel",
-    label: "Arrow Duel",
-    duePuzzleIds: ["lab-skewer-03"],
-    completedPuzzleIds: []
-  }
-] as const;
-
 const HISTORY_INCOMPLETE_LAB_PUZZLE: Puzzle = {
   ...LAB_PUZZLES[4]!,
   id: "lab-incomplete-06",
@@ -337,7 +310,6 @@ function LabScenarioContent({
           ? historyProgressPresentationFor(scenarioId)
           : undefined}
         platformCapabilities={runtime.platformCapabilities}
-        practiceHomeReviewCardVisible={false}
         runReorderDesignPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
           ? { pickedUpRunId: runReorderPickedUpRunId }
           : undefined}
@@ -864,47 +836,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       ? { kind: "icloud_sync" }
       : { kind: "android_managed_backup" };
   const screenProps: ScreenProps = {
-    collapsibleMotionPreview: [
-      "history-filters",
-      "practice-custom-setup",
-      "review-due",
-      "review-filters"
-    ].includes(scenarioId)
-      ? { durationMs: 200 }
-      : undefined,
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
-    reviewTodayDesignPreview: ["review-due", "review-filters"].includes(scenarioId)
-      ? {
-          showTodaySections: true,
-          filterControls: {
-            placement: "before_review_action",
-            summaryVisibility: "when_collapsed"
-          },
-          collapsibleSections: {
-            todayInitiallyExpanded: true,
-            completedInitiallyExpanded: true
-          },
-          attemptSummaries: [
-            {
-              puzzleId: "lab-fork-01",
-              mode: "standard",
-              ratingKey: "standard 5/20",
-              attemptCount: 1,
-              missCount: 1
-            },
-            {
-              puzzleId: "lab-skewer-03",
-              mode: "arrow_duel",
-              ratingKey: "arrow_duel 5/30",
-              attemptCount: 3,
-              missCount: 2
-            }
-          ],
-          quickFilters: REVIEW_TODAY_QUICK_FILTERS
-        }
-      : undefined,
     sprintGuidanceEnabled: scenarioId.startsWith("settings-"),
     sprintRulesDesignPreview: sprintRulesDesignPreviewFor(scenarioId),
     standardTargetCorrect: 1,
@@ -1443,11 +1377,14 @@ function createReviewService(kind: "due" | "overdue"): PracticeService {
     : "2026-07-17T12:00:00.000Z";
   const retryEnrollmentAt = "2026-07-13T12:00:00.000Z";
   for (const [index, puzzle] of LAB_PUZZLES.slice(0, 3).entries()) {
-    store.scheduleMistakeReview({
+    const context = {
       puzzleId: puzzle.id,
       mode: index === 2 ? "arrow_duel" : "standard",
       ratingKey: index === 2 ? arrowDuelRun.ratingKey : `standard 5/${20 + index * 10}`
-    }, kind === "due" && index === 2 ? retryEnrollmentAt : enrolledAt);
+    } as const;
+    const firstMissedAt = kind === "due" && index > 0 ? retryEnrollmentAt : enrolledAt;
+    recordLabSprintAttempt(store, puzzle, context.mode, context.ratingKey, "wrong", firstMissedAt);
+    store.scheduleMistakeReview(context, firstMissedAt);
   }
   service.updatePracticeRun(arrowDuelRun.id, {
     name: arrowDuelRun.name,
@@ -1462,16 +1399,29 @@ function createReviewService(kind: "due" | "overdue"): PracticeService {
       completedPuzzle,
       "standard",
       "standard 5/30",
+      "wrong",
+      "2026-07-14T15:00:08.000Z"
+    );
+    recordLabReviewAttempt(
+      service,
+      completedPuzzle,
+      "standard",
+      "standard 5/30",
+      "correct",
       "2026-07-18T15:00:08.000Z"
     );
 
     const retryPuzzle = LAB_PUZZLES[2]!;
-    for (const completedAt of ["2026-07-14T15:00:08.000Z", "2026-07-15T15:00:08.000Z"]) {
+    for (const [result, completedAt] of [
+      ["wrong", "2026-07-14T15:00:08.000Z"],
+      ["correct", "2026-07-15T15:00:08.000Z"]
+    ] as const) {
       recordLabReviewAttempt(
         service,
         retryPuzzle,
         "arrow_duel",
         arrowDuelRun.ratingKey,
+        result,
         completedAt
       );
     }
@@ -1484,6 +1434,7 @@ function recordLabReviewAttempt(
   puzzle: Puzzle,
   mode: SprintMode,
   ratingKey: string,
+  result: "correct" | "wrong",
   completedAt: string
 ): void {
   const expectedMove = puzzle.solutionMoves[0]!;
@@ -1491,14 +1442,39 @@ function recordLabReviewAttempt(
     puzzleId: puzzle.id,
     mode,
     ratingKey,
-    result: "correct",
-    submittedMove: expectedMove,
+    result,
+    submittedMove: result === "correct" ? expectedMove : "a1a1",
     expectedMove,
     startedAt: new Date(new Date(completedAt).getTime() - 8_000).toISOString(),
     ...(mode === "arrow_duel"
       ? { arrowDuelCandidateOrder: [expectedMove, puzzle.stockfishBestMove ?? expectedMove] }
       : {})
   }, completedAt);
+}
+
+function recordLabSprintAttempt(
+  store: MemoryStore,
+  puzzle: Puzzle,
+  mode: SprintMode,
+  ratingKey: string,
+  result: AttemptEvent["result"],
+  completedAt: string
+): void {
+  const expectedMove = puzzle.solutionMoves[0]!;
+  store.recordAttempt({
+    id: `lab-sprint-${puzzle.id}-${completedAt}`,
+    source: "sprint",
+    sessionId: `lab-sprint-${puzzle.id}`,
+    puzzleId: puzzle.id,
+    mode,
+    ratingKey,
+    result,
+    submittedMove: result === "correct" ? expectedMove : "a1a1",
+    expectedMove,
+    startedAt: new Date(new Date(completedAt).getTime() - 8_000).toISOString(),
+    completedAt,
+    ratingBefore: 1000
+  });
 }
 
 function createArrowDuelReplayService(): PracticeService {

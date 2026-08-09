@@ -6,6 +6,7 @@ export * from "./progress-sync.ts";
 export * from "./progress-sync-v2.ts";
 export * from "./progress-v2-persistence.ts";
 export * from "./rating-history.ts";
+export * from "./review-today.ts";
 export * from "./query-types.ts";
 export * from "./puzzle-source.ts";
 export * from "./pack-backed-practice-store.ts";

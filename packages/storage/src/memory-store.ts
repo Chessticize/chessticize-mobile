@@ -1037,6 +1037,7 @@ function attemptMatchesHistoryFilter(attempt: AttemptEvent, filter: HistoryFilte
   return (!filter.source || attempt.source === filter.source)
     && (!filter.result || attempt.result === filter.result)
     && (!filter.mode || attempt.mode === filter.mode)
+    && (!filter.ratingKey || attempt.ratingKey === filter.ratingKey)
     && (!filter.since || attempt.completedAt >= filter.since)
     && (!filter.until || attempt.completedAt < filter.until)
     && (!filter.puzzleId || attempt.puzzleId === filter.puzzleId)
