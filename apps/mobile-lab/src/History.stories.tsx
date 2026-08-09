@@ -6,7 +6,9 @@ import {
   expectTestIdText,
   openHistory,
   waitForEnabledTestId,
+  waitForHiddenTestId,
   waitForTestId,
+  waitForVisibleTestId,
   waitForText
 } from "./storyPlay.ts";
 
@@ -50,13 +52,20 @@ export const FiltersAndActiveFilters: Story = {
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);
     await clickTestId(canvasElement, "history-filter-toggle");
+    await waitForVisibleTestId(canvasElement, "history-advanced-filters-motion");
+    await clickTestId(canvasElement, "history-filter-toggle");
+    await waitForHiddenTestId(canvasElement, "history-advanced-filters-motion");
+    await clickTestId(canvasElement, "history-filter-toggle");
+    await waitForVisibleTestId(canvasElement, "history-advanced-filters-motion");
     await waitForTestId(canvasElement, "history-attention-needs-attention");
     await waitForTestId(canvasElement, "history-theme-disclosure");
     await clickTestId(canvasElement, "history-theme-disclosure");
+    await waitForVisibleTestId(canvasElement, "history-theme-catalog-motion");
     await clickTestId(canvasElement, "history-theme-pin");
     await clickTestId(canvasElement, "history-theme-skewer");
     await clickTestId(canvasElement, "history-theme-promotion");
     await clickTestId(canvasElement, "history-theme-disclosure");
+    await waitForHiddenTestId(canvasElement, "history-theme-catalog-motion");
     await clickTestId(canvasElement, "history-result-incomplete");
     await waitForTestId(canvasElement, "history-attempt-history-incomplete-fast");
     expectTestIdAbsent(canvasElement, "history-attempt-history-timeout");

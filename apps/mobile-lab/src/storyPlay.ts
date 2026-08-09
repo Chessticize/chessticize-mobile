@@ -124,9 +124,22 @@ export async function replaceTextTestId(
 export async function waitForVisibleTestId(canvasElement: HTMLElement, testID: string): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
-  if (element.getBoundingClientRect().height <= 0) {
-    throw new Error(`${testID} must have a visible height`);
-  }
+  await waitFor(() => {
+    if (element.getBoundingClientRect().height <= 0) {
+      throw new Error(`${testID} must have a visible height`);
+    }
+  }, { timeout: 4_000 });
+}
+
+export async function waitForHiddenTestId(canvasElement: HTMLElement, testID: string): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    const opacity = Number.parseFloat(element.ownerDocument.defaultView?.getComputedStyle(element).opacity ?? "1");
+    if (element.getBoundingClientRect().height > 0.5 || opacity > 0.05) {
+      throw new Error(`${testID} must finish collapsing`);
+    }
+  }, { timeout: 4_000 });
 }
 
 export function expectTestIdAbsent(canvasElement: HTMLElement, testID: string): void {

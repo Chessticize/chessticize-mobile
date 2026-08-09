@@ -812,6 +812,13 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       ? { kind: "icloud_sync" }
       : { kind: "android_managed_backup" };
   const screenProps: ScreenProps = {
+    collapsibleMotionPreview: [
+      "history-filters",
+      "practice-custom-setup",
+      "review-due"
+    ].includes(scenarioId)
+      ? { durationMs: 200 }
+      : undefined,
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",

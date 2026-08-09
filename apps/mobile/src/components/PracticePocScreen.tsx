@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   AppState,
+  Easing,
   Image,
   LayoutAnimation,
   Linking,
@@ -266,6 +267,7 @@ export type {
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
   arrowDuelTargetCorrect?: number;
+  collapsibleMotionPreview?: CollapsibleMotionPreview;
   customThemeSelection?: CustomThemeSelection;
   themeCatalogPresentation?: ThemeCatalogPresentation;
   customTargetCorrect?: number;
@@ -300,6 +302,10 @@ interface Props {
 
 export type RunReorderPickupFeedback = {
   haptic: "medium";
+};
+
+export type CollapsibleMotionPreview = {
+  durationMs: number;
 };
 
 export type SprintRulesGuidePresentation = {
@@ -670,6 +676,7 @@ const ANALYSIS_DIAGNOSTIC_POSITIONS = [
 export function PracticePocScreen({
   platformCapabilities,
   arrowDuelTargetCorrect,
+  collapsibleMotionPreview,
   customThemeSelection,
   themeCatalogPresentation = SERVER_CURATED_THEME_PRESENTATION,
   customTargetCorrect,
@@ -4694,6 +4701,7 @@ export function PracticePocScreen({
                         : undefined
                     }
                     presentation={activeRunManagementPresentation}
+                    collapsibleMotionPreview={collapsibleMotionPreview}
                     showSprintRulesSummary={
                       sprintGuidanceEnabled
                       || sprintRulesDesignPreview?.showRunEditorSummary === true
@@ -4849,6 +4857,7 @@ export function PracticePocScreen({
               ) : historyView ? (
                 <HistoryPanel
                   adaptiveLayout={adaptiveLayout}
+                  collapsibleMotionPreview={collapsibleMotionPreview}
                   attempts={visibleHistoryAttempts}
                   nowMs={nowMs}
                   performance={historyPerformanceView?.performance ?? emptyHistoryPerformance()}
@@ -4943,6 +4952,7 @@ export function PracticePocScreen({
               <ReviewPanel
                 adaptiveLayout={adaptiveLayout}
                 boardSize={boardSize}
+                collapsibleMotionPreview={collapsibleMotionPreview}
                 dueReviewItems={dueReviewItems}
                 explicitReplySideCopy={explicitReplySideCopy}
                 nowMs={nowMs}
@@ -8254,6 +8264,7 @@ function RunRemovalConfirmation({
 
 function PracticeRunEditor({
   arrowDuelReplyChallenge,
+  collapsibleMotionPreview,
   presentation,
   showSprintRulesSummary,
   themeCatalogPresentation,
@@ -8266,6 +8277,7 @@ function PracticeRunEditor({
     onReplySecondsInputChange: (value: string) => void;
     onToggle: () => void;
   };
+  collapsibleMotionPreview?: CollapsibleMotionPreview;
   presentation: PracticeRunManagementPresentation;
   showSprintRulesSummary: boolean;
   themeCatalogPresentation?: ThemeCatalogPresentation;
@@ -8405,6 +8417,7 @@ function PracticeRunEditor({
                   </View>
                 ) : null}
                 <CustomThemeChoiceRow
+                  collapsibleMotionPreview={collapsibleMotionPreview}
                   showDisclosure
                   selectedThemes={draft.themes}
                   themeCatalogPresentation={themeCatalogPresentation}
@@ -9520,12 +9533,14 @@ function CustomValueRow({
 }
 
 function CustomThemeChoiceRow({
+  collapsibleMotionPreview,
   onChange,
   selectedThemes,
   showDisclosure = false,
   themeCatalogPresentation,
   testID,
 }: {
+  collapsibleMotionPreview?: CollapsibleMotionPreview;
   onChange: (next: CustomThemeFilter) => void;
   selectedThemes: readonly CustomThemeFilter[];
   showDisclosure?: boolean;
@@ -9535,6 +9550,7 @@ function CustomThemeChoiceRow({
   if (themeCatalogPresentation) {
     return (
       <ThemeCatalogChoiceRow
+        collapsibleMotionPreview={collapsibleMotionPreview}
         onChange={onChange}
         presentation={themeCatalogPresentation}
         selectedThemes={selectedThemes}
@@ -9563,12 +9579,14 @@ function CustomThemeChoiceRow({
 }
 
 function ThemeCatalogChoiceRow({
+  collapsibleMotionPreview,
   onChange,
   presentation,
   selectedThemes,
   showDisclosure,
   testID
 }: {
+  collapsibleMotionPreview?: CollapsibleMotionPreview;
   onChange: (next: CustomThemeFilter) => void;
   presentation: ThemeCatalogPresentation;
   selectedThemes: readonly CustomThemeFilter[];
@@ -9614,7 +9632,11 @@ function ThemeCatalogChoiceRow({
               {selectedThemeDetail}
             </Text>
           </View>
-          <ChevronGlyph direction={expanded ? "up" : "down"} />
+          <DisclosureChevron
+            expanded={expanded}
+            motion={collapsibleMotionPreview}
+            testID="practice-run-theme-animated-chevron"
+          />
         </Pressable>
       ) : (
         <View style={styles.themeCatalogHeadingRow}>
@@ -9625,8 +9647,12 @@ function ThemeCatalogChoiceRow({
           {allChip}
         </View>
       )}
-      {expanded ? (
-        <>
+      <CollapsibleRegion
+        contentTestID="practice-run-theme-catalog"
+        contentStyle={styles.themeCatalogExpandableContent}
+        expanded={expanded}
+        motion={collapsibleMotionPreview}
+      >
           {showDisclosure ? (
             <View style={styles.historyThemeAllRow}>{allChip}</View>
           ) : null}
@@ -9647,8 +9673,7 @@ function ThemeCatalogChoiceRow({
               </View>
             ))}
           </View>
-        </>
-      ) : null}
+      </CollapsibleRegion>
     </View>
   );
 }
@@ -11512,6 +11537,7 @@ function ArrowHint({
 function HistoryPanel({
   adaptiveLayout,
   attempts,
+  collapsibleMotionPreview,
   filtersExpanded,
   nowMs,
   performance,
@@ -11546,6 +11572,7 @@ function HistoryPanel({
 }: {
   adaptiveLayout: AdaptiveLayout;
   attempts: HistoryAttemptView[];
+  collapsibleMotionPreview?: CollapsibleMotionPreview;
   filtersExpanded: boolean;
   nowMs: number;
   performance: HistoryPerformance;
@@ -11627,8 +11654,12 @@ function HistoryPanel({
         </View>
       </View>
 
-      {filtersExpanded ? (
-        <View style={styles.historyAdvancedFilters} testID="history-advanced-filters">
+      <CollapsibleRegion
+        contentTestID="history-advanced-filters"
+        contentStyle={styles.historyAdvancedFilters}
+        expanded={filtersExpanded}
+        motion={collapsibleMotionPreview}
+      >
           <HistoryRatingFilters
             ratingKeys={ratingKeys}
             runsByRatingKey={runsByRatingKey}
@@ -11692,6 +11723,7 @@ function HistoryPanel({
           </HistoryChipRow>
           {themeCatalogPresentation ? (
             <HistoryThemeCatalogFilter
+              collapsibleMotionPreview={collapsibleMotionPreview}
               presentation={themeCatalogPresentation}
               selectedThemes={themeFilters}
               onThemeIntent={onThemeFilterIntent}
@@ -11715,8 +11747,7 @@ function HistoryPanel({
               ))}
             </HistoryChipRow>
           ) : null}
-        </View>
-      ) : null}
+      </CollapsibleRegion>
 
       <View style={styles.historyTopFilterStack} testID="history-primary-filters">
         <HistoryAttentionFilter
@@ -11801,10 +11832,12 @@ function HistoryPanel({
 }
 
 function HistoryThemeCatalogFilter({
+  collapsibleMotionPreview,
   onThemeIntent,
   presentation,
   selectedThemes
 }: {
+  collapsibleMotionPreview?: CollapsibleMotionPreview;
   onThemeIntent: (intent: ThemeChoiceIntent) => void;
   presentation: ThemeCatalogPresentation;
   selectedThemes: readonly string[];
@@ -11838,10 +11871,18 @@ function HistoryThemeCatalogFilter({
             {selectedThemeDetail}
           </Text>
         </View>
-        <ChevronGlyph direction={expanded ? "up" : "down"} />
+        <DisclosureChevron
+          expanded={expanded}
+          motion={collapsibleMotionPreview}
+          testID="history-theme-animated-chevron"
+        />
       </Pressable>
-      {expanded ? (
-        <>
+      <CollapsibleRegion
+        contentTestID="history-theme-catalog"
+        contentStyle={styles.historyThemeCatalogContent}
+        expanded={expanded}
+        motion={collapsibleMotionPreview}
+      >
           <View style={styles.historyThemeAllRow}>
             <FilterButton
               active={selectedThemes.includes(ALL_THEMES_FILTER)}
@@ -11872,8 +11913,7 @@ function HistoryThemeCatalogFilter({
               </ScrollView>
             </View>
           ))}
-        </>
-      ) : null}
+      </CollapsibleRegion>
     </View>
   );
 }
@@ -12737,6 +12777,175 @@ function ChevronGlyph({
   );
 }
 
+function CollapsibleRegion({
+  children,
+  contentTestID,
+  contentStyle,
+  expanded,
+  motion
+}: {
+  children: React.ReactNode;
+  contentTestID: string;
+  contentStyle?: StyleProp<ViewStyle>;
+  expanded: boolean;
+  motion?: CollapsibleMotionPreview;
+}): React.JSX.Element | null {
+  if (!motion) {
+    return expanded ? (
+      <View style={contentStyle} testID={contentTestID}>{children}</View>
+    ) : null;
+  }
+  return (
+    <AnimatedCollapsibleRegion
+      contentTestID={contentTestID}
+      contentStyle={contentStyle}
+      expanded={expanded}
+      motion={motion}
+    >
+      {children}
+    </AnimatedCollapsibleRegion>
+  );
+}
+
+function AnimatedCollapsibleRegion({
+  children,
+  contentTestID,
+  contentStyle,
+  expanded,
+  motion
+}: {
+  children: React.ReactNode;
+  contentTestID: string;
+  contentStyle?: StyleProp<ViewStyle>;
+  expanded: boolean;
+  motion: CollapsibleMotionPreview;
+}): React.JSX.Element | null {
+  const progress = useRef(new Animated.Value(expanded ? 1 : 0)).current;
+  const naturalInitialHeightRef = useRef(expanded);
+  const [contentHeight, setContentHeight] = useState(0);
+  const durationMs = Math.max(0, motion.durationMs);
+
+  useEffect(() => {
+    naturalInitialHeightRef.current = false;
+    progress.stopAnimation();
+    Animated.timing(progress, {
+      duration: durationMs,
+      easing: Easing.out(Easing.cubic),
+      toValue: expanded ? 1 : 0,
+      useNativeDriver: false
+    }).start();
+  }, [durationMs, expanded, progress]);
+
+  useEffect(() => {
+    if (!expanded || contentHeight <= 0) {
+      return;
+    }
+    progress.stopAnimation();
+    Animated.timing(progress, {
+      duration: durationMs,
+      easing: Easing.out(Easing.cubic),
+      toValue: 1,
+      useNativeDriver: false
+    }).start();
+  }, [contentHeight, durationMs, expanded, progress]);
+
+  const animatedHeight = contentHeight > 0
+    ? progress.interpolate({ inputRange: [0, 1], outputRange: [0, contentHeight] })
+    : naturalInitialHeightRef.current
+      ? undefined
+      : 0;
+  const opacity = progress.interpolate({
+    inputRange: [0, 0.35, 1],
+    outputRange: [0, 0.55, 1]
+  });
+  const translateY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-4, 0]
+  });
+
+  return (
+    <Animated.View
+      accessibilityElementsHidden={!expanded}
+      importantForAccessibility={expanded ? "auto" : "no-hide-descendants"}
+      pointerEvents={expanded ? "auto" : "none"}
+      style={[
+        styles.collapsibleMotionClip,
+        { height: animatedHeight, opacity, transform: [{ translateY }] }
+      ]}
+      testID={`${contentTestID}-motion`}
+    >
+      <View
+        style={contentStyle}
+        testID={contentTestID}
+        onLayout={(event: LayoutChangeEvent) => {
+          const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+          if (nextHeight > 0 && nextHeight !== contentHeight) {
+            naturalInitialHeightRef.current = false;
+            setContentHeight(nextHeight);
+          }
+        }}
+      >
+        {children}
+      </View>
+    </Animated.View>
+  );
+}
+
+function DisclosureChevron({
+  expanded,
+  motion,
+  testID
+}: {
+  expanded: boolean;
+  motion?: CollapsibleMotionPreview;
+  testID?: string;
+}): React.JSX.Element {
+  if (!motion) {
+    return <ChevronGlyph direction={expanded ? "up" : "down"} />;
+  }
+  return (
+    <AnimatedDisclosureChevron
+      durationMs={motion.durationMs}
+      expanded={expanded}
+      testID={testID}
+    />
+  );
+}
+
+function AnimatedDisclosureChevron({
+  durationMs,
+  expanded,
+  testID
+}: {
+  durationMs: number;
+  expanded: boolean;
+  testID?: string;
+}): React.JSX.Element {
+  const progress = useRef(new Animated.Value(expanded ? 1 : 0)).current;
+  useEffect(() => {
+    progress.stopAnimation();
+    Animated.timing(progress, {
+      duration: Math.max(0, durationMs),
+      easing: Easing.out(Easing.cubic),
+      toValue: expanded ? 1 : 0,
+      useNativeDriver: false
+    }).start();
+  }, [durationMs, expanded, progress]);
+
+  const rotate = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "180deg"]
+  });
+  return (
+    <Animated.View
+      style={[styles.disclosureChevronMotion, { transform: [{ rotate }] }]}
+      testID={testID}
+    >
+      <ChevronGlyph direction="down" />
+    </Animated.View>
+  );
+}
+
 function FlipGlyph(): React.JSX.Element {
   return (
     <View style={styles.flipGlyph} testID="flip-glyph">
@@ -12942,6 +13151,7 @@ function buildServiceReviewEntry(
 function ReviewPanel({
   adaptiveLayout,
   boardSize,
+  collapsibleMotionPreview,
   currentTimeMs,
   deferBackRelevantTransition,
   dueReviewItems,
@@ -12970,6 +13180,7 @@ function ReviewPanel({
 }: {
   adaptiveLayout: AdaptiveLayout;
   boardSize: number;
+  collapsibleMotionPreview?: CollapsibleMotionPreview;
   currentTimeMs: () => number;
   deferBackRelevantTransition: DeferBackRelevantTransition;
   dueReviewItems: ReviewQueueItem[];
@@ -13302,6 +13513,7 @@ function ReviewPanel({
           {reviewTodayDesignPreview?.collapsibleSections ? (
             <ReviewSectionToggle
               count={filteredDueReviewItems.length}
+              collapsibleMotionPreview={collapsibleMotionPreview}
               expanded={todayReviewsExpanded}
               label="Today to review"
               toggleTestID="review-today-to-review-toggle"
@@ -13312,8 +13524,12 @@ function ReviewPanel({
               {reviewTodayDesignPreview?.showTodaySections === true ? "Today to review" : "Due items"}
             </Text>
           )}
-          {!reviewTodayDesignPreview?.collapsibleSections || todayReviewsExpanded ? (
-            <View style={styles.reviewSectionItems} testID="review-today-to-review-items">
+          <CollapsibleRegion
+            contentTestID="review-today-to-review-items"
+            contentStyle={styles.reviewSectionItems}
+            expanded={!reviewTodayDesignPreview?.collapsibleSections || todayReviewsExpanded}
+            motion={collapsibleMotionPreview}
+          >
               {filteredDueReviewItems.slice(0, 4).map((item) => (
                 <ReviewQueueItemCard
                   key={`${item.review.puzzleId}:${item.review.mode}:${item.review.ratingKey}`}
@@ -13333,8 +13549,7 @@ function ReviewPanel({
                   })])}
                 />
               ))}
-            </View>
-          ) : null}
+          </CollapsibleRegion>
         </View>
       ) : null}
 
@@ -13392,6 +13607,7 @@ function ReviewPanel({
           {reviewTodayDesignPreview?.collapsibleSections ? (
             <ReviewSectionToggle
               count={completedReviews.length}
+              collapsibleMotionPreview={collapsibleMotionPreview}
               expanded={completedReviewsExpanded}
               label="Completed today"
               toggleTestID="review-completed-today-toggle"
@@ -13400,8 +13616,12 @@ function ReviewPanel({
           ) : (
             <Text style={styles.sectionLabel}>Completed today</Text>
           )}
-          {!reviewTodayDesignPreview?.collapsibleSections || completedReviewsExpanded ? (
-            <View style={styles.reviewSectionItems} testID="review-today-history-items">
+          <CollapsibleRegion
+            contentTestID="review-today-history-items"
+            contentStyle={styles.reviewSectionItems}
+            expanded={!reviewTodayDesignPreview?.collapsibleSections || completedReviewsExpanded}
+            motion={collapsibleMotionPreview}
+          >
               {completedReviews.map((item) => (
                 <TodayReviewAttemptRow
                   key={item.attempt.id}
@@ -13409,8 +13629,7 @@ function ReviewPanel({
                   onOpen={() => openCompletedReview(item.attempt.id)}
                 />
               ))}
-            </View>
-          ) : null}
+          </CollapsibleRegion>
         </View>
       ) : null}
 
@@ -13582,12 +13801,14 @@ function reviewAttemptMetricLabel(count: number, singular: "attempt" | "miss"): 
 }
 
 function ReviewSectionToggle({
+  collapsibleMotionPreview,
   count,
   expanded,
   label,
   toggleTestID,
   onPress
 }: {
+  collapsibleMotionPreview?: CollapsibleMotionPreview;
   count: number;
   expanded: boolean;
   label: string;
@@ -13607,7 +13828,11 @@ function ReviewSectionToggle({
       <View style={styles.reviewSectionToggleMeta} testID={`${toggleTestID}-meta`}>
         <Text style={styles.reviewSectionCount} testID={`${toggleTestID}-count`}>{count}</Text>
         <View style={styles.reviewSectionToggleChevron} testID={`${toggleTestID}-chevron`}>
-          <ChevronGlyph direction={expanded ? "up" : "down"} />
+          <DisclosureChevron
+            expanded={expanded}
+            motion={collapsibleMotionPreview}
+            testID={`${toggleTestID}-animated-chevron`}
+          />
         </View>
       </View>
     </Pressable>
@@ -20259,6 +20484,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between"
   },
+  themeCatalogExpandableContent: {
+    gap: 10
+  },
   themeCatalogTitle: {
     color: "#1E293B",
     fontSize: 14,
@@ -21234,6 +21462,9 @@ const styles = StyleSheet.create({
     marginLeft: 2
   },
   historyThemeFilterSection: {
+    gap: 8
+  },
+  historyThemeCatalogContent: {
     gap: 8
   },
   historyThemeDisclosure: {
@@ -22293,6 +22524,16 @@ const styles = StyleSheet.create({
     height: 18,
     justifyContent: "center",
     width: 18
+  },
+  disclosureChevronMotion: {
+    alignItems: "center",
+    height: 18,
+    justifyContent: "center",
+    width: 18
+  },
+  collapsibleMotionClip: {
+    overflow: "hidden",
+    width: "100%"
   },
   chevronGlyph: {
     borderColor: "#334155",

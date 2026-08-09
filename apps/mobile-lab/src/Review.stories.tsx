@@ -9,6 +9,7 @@ import {
   expectTestIdsInOrder,
   openReviewQueue,
   waitForEnabledTestId,
+  waitForHiddenTestId,
   waitForTestId,
   waitForText,
   waitForVisibleTestId
@@ -43,6 +44,8 @@ export const DueQueue: Story = {
     await waitForTestId(canvasElement, "review-today-history");
     await waitForTestId(canvasElement, "review-completed-today-toggle");
     await waitForTestId(canvasElement, "review-today-history-items");
+    await waitForVisibleTestId(canvasElement, "review-today-to-review-items-motion");
+    await waitForVisibleTestId(canvasElement, "review-today-history-items-motion");
     await expectTestIdHeight(canvasElement, "review-today-to-review-toggle", 44);
     await expectTestIdHeight(canvasElement, "review-completed-today-toggle", 44);
     await expectTestIdVerticalCentersAligned(
@@ -73,16 +76,16 @@ export const DueQueue: Story = {
       "review-today-history"
     ]);
     await clickTestId(canvasElement, "review-today-to-review-toggle");
-    expectTestIdAbsent(canvasElement, "review-today-to-review-items");
+    await waitForHiddenTestId(canvasElement, "review-today-to-review-items-motion");
     await expectTestIdHeight(canvasElement, "review-today-to-review-toggle", 44);
     await clickTestId(canvasElement, "review-today-to-review-toggle");
-    await waitForTestId(canvasElement, "review-today-to-review-items");
+    await waitForVisibleTestId(canvasElement, "review-today-to-review-items-motion");
     await expectTestIdHeight(canvasElement, "review-today-to-review-toggle", 44);
     await clickTestId(canvasElement, "review-completed-today-toggle");
-    expectTestIdAbsent(canvasElement, "review-today-history-items");
+    await waitForHiddenTestId(canvasElement, "review-today-history-items-motion");
     await expectTestIdHeight(canvasElement, "review-completed-today-toggle", 44);
     await clickTestId(canvasElement, "review-completed-today-toggle");
-    await waitForTestId(canvasElement, "review-today-history-items");
+    await waitForVisibleTestId(canvasElement, "review-today-history-items-motion");
     await expectTestIdHeight(canvasElement, "review-completed-today-toggle", 44);
     expectTestIdAbsent(canvasElement, "review-dev-controls");
   }

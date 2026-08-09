@@ -54,11 +54,13 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
   assert.deepEqual(
     newScenarios.map((scenario) => scenario.id),
-    ["review-due"]
+    ["practice-custom-setup", "review-due", "history-filters"]
   );
-  assert.ok(scenarioRegistry["review-due"].issues?.some(
-    (issue) => issue.issueNumber === 520
-  ) ?? false);
+  for (const scenarioId of ["practice-custom-setup", "review-due", "history-filters"] as const) {
+    assert.ok(scenarioRegistry[scenarioId].issues?.some(
+      (issue) => issue.issueNumber === 520
+    ) ?? false);
+  }
   assert.equal(scenarioRegistry["review-due"].title, "Home");
   assert.equal(scenarioRegistry["review-due"].storyId, "review--due-queue");
 
@@ -78,7 +80,7 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   }
 });
 
-test("closed Issue #482 keeps the production Incomplete states without new markers", () => {
+test("closed Issue #482 keeps the production Incomplete states without Issue #482 markers", () => {
   for (const scenarioId of [
     "history-populated",
     "history-filters",
@@ -89,7 +91,10 @@ test("closed Issue #482 keeps the production Incomplete states without new marke
       scenario.issues?.some((issue) => issue.issueNumber === 482) ?? false,
       false
     );
-    assert.deepEqual(storyTagsForScenario(scenarioId), []);
+    assert.deepEqual(
+      storyTagsForScenario(scenarioId),
+      scenarioId === "history-filters" ? ["new"] : []
+    );
   }
   assert.ok(
     scenarioRegistry["history-populated"].scope.includes.includes("Production Incomplete outcome")

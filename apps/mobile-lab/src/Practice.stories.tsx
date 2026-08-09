@@ -18,6 +18,7 @@ import {
   openPracticeSession,
   replaceTextTestId,
   waitForEnabledTestId,
+  waitForHiddenTestId,
   waitForTestId,
   waitForText,
   waitForVisibleTestId
@@ -228,8 +229,9 @@ export const CustomSetup: Story = {
       "practice-run-theme-selection-detail",
       "All themes"
     );
-    expectTestIdAbsent(canvasElement, "custom-theme-fork");
+    await waitForHiddenTestId(canvasElement, "practice-run-theme-catalog-motion");
     await clickTestId(canvasElement, "practice-run-theme-disclosure");
+    await waitForVisibleTestId(canvasElement, "practice-run-theme-catalog-motion");
     await clickTestId(canvasElement, "custom-theme-fork");
     await clickTestId(canvasElement, "custom-theme-pin");
     await expectTestIdText(
@@ -244,7 +246,7 @@ export const CustomSetup: Story = {
       "All themes"
     );
     await clickTestId(canvasElement, "practice-run-theme-disclosure");
-    expectTestIdAbsent(canvasElement, "custom-theme-fork");
+    await waitForHiddenTestId(canvasElement, "practice-run-theme-catalog-motion");
     await waitForTestId(canvasElement, "practice-run-pass-rules");
     await waitForTestId(canvasElement, "practice-run-slow-warning");
     await waitForTestId(canvasElement, "practice-run-puzzle-timeout");

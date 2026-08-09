@@ -4268,7 +4268,10 @@ describe("PracticePocScreen", () => {
         .filter((testID) => testID.startsWith("history-theme-")
           && testID !== "history-theme-filters"
           && testID !== "history-theme-all"
+          && testID !== "history-theme-catalog"
+          && testID !== "history-theme-catalog-motion"
           && testID !== "history-theme-disclosure"
+          && testID !== "history-theme-animated-chevron"
           && testID !== "history-theme-selection-detail"
           && !testID.startsWith("history-theme-filter-rail-"))
     );
@@ -4296,6 +4299,66 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).not.toContain(
       "Mate in 1"
     );
+  });
+
+  it("previews consistent collapse motion across Review, History, and New Run", async () => {
+    const reviewRenderer = renderLabScenario("review-due");
+    await flushMicrotasks();
+    press(reviewRenderer, "review-tab");
+
+    expect(findByTestId(reviewRenderer, "review-today-to-review-items-motion")).toBeTruthy();
+    expect(findByTestId(reviewRenderer, "review-today-history-items-motion")).toBeTruthy();
+    press(reviewRenderer, "review-today-to-review-toggle");
+    expect(findByTestId(reviewRenderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({
+      expanded: false
+    });
+    expect(findByTestId(reviewRenderer, "review-today-to-review-items")).toBeTruthy();
+    expect(findByTestId(reviewRenderer, "review-today-to-review-items-motion").props).toMatchObject({
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+    press(reviewRenderer, "review-today-to-review-toggle");
+    expect(findByTestId(reviewRenderer, "review-today-to-review-items-motion").props).toMatchObject({
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
+    });
+
+    const historyRenderer = renderLabScenario("history-filters");
+    await flushMicrotasks();
+    press(historyRenderer, "history-tab");
+    press(historyRenderer, "history-filter-toggle");
+    expect(findByTestId(historyRenderer, "history-advanced-filters-motion")).toBeTruthy();
+    press(historyRenderer, "history-filter-toggle");
+    expect(findByTestId(historyRenderer, "history-advanced-filters")).toBeTruthy();
+    expect(findByTestId(historyRenderer, "history-advanced-filters-motion").props).toMatchObject({
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
+
+    press(historyRenderer, "history-filter-toggle");
+    press(historyRenderer, "history-theme-disclosure");
+    expect(findByTestId(historyRenderer, "history-theme-catalog-motion")).toBeTruthy();
+    press(historyRenderer, "history-theme-disclosure");
+    expect(findByTestId(historyRenderer, "history-theme-catalog")).toBeTruthy();
+    expect(findByTestId(historyRenderer, "history-theme-catalog-motion").props).toMatchObject({
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
+
+    const newRunRenderer = renderLabScenario("practice-custom-setup");
+    await flushMicrotasks();
+    press(newRunRenderer, "practice-add-run");
+    press(newRunRenderer, "practice-run-theme-disclosure");
+    expect(findByTestId(newRunRenderer, "practice-run-theme-catalog-motion")).toBeTruthy();
+    press(newRunRenderer, "practice-run-theme-disclosure");
+    expect(findByTestId(newRunRenderer, "practice-run-theme-catalog")).toBeTruthy();
+    expect(findByTestId(newRunRenderer, "practice-run-theme-catalog-motion").props).toMatchObject({
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
   });
 
   it("limits an existing Custom Run editor to Current rating", () => {
