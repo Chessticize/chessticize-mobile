@@ -45,6 +45,12 @@ describe("test launch configuration", () => {
     expect(iosModule).toContain(
       'constants[@"marketingCaptureFrame"] = marketingCaptureFrame;'
     );
+    expect(iosModule).toContain(
+      'hasProcessArgumentNamed:@"chessticizeEnableTestControls"'
+    );
+    expect(iosModule).toContain(
+      'constants[@"testControlsEnabled"] = @YES;'
+    );
   });
 
   it("bridges Android marketing frames only through the debug-gated launch module", () => {

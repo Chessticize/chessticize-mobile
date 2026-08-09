@@ -19,6 +19,7 @@ RCT_EXPORT_MODULE();
   NSString *standardTargetCorrect = [self processArgumentValueForName:@"chessticizeStandardTargetCorrect"];
   NSString *arrowDuelTargetCorrect = [self processArgumentValueForName:@"chessticizeArrowDuelTargetCorrect"];
   NSString *marketingCaptureFrame = [self processArgumentValueForName:@"chessticizeMarketingCaptureFrame"];
+  BOOL testControlsEnabled = [self hasProcessArgumentNamed:@"chessticizeEnableTestControls"];
   BOOL storeAssetCapture = [self hasProcessArgumentNamed:@"chessticizeStoreAssetCapture"];
   if (
     testNowMs == nil
@@ -26,6 +27,7 @@ RCT_EXPORT_MODULE();
     && standardTargetCorrect == nil
     && arrowDuelTargetCorrect == nil
     && marketingCaptureFrame == nil
+    && !testControlsEnabled
     && !storeAssetCapture
   ) {
     return @{};
@@ -45,6 +47,9 @@ RCT_EXPORT_MODULE();
   }
   if (marketingCaptureFrame != nil) {
     constants[@"marketingCaptureFrame"] = marketingCaptureFrame;
+  }
+  if (testControlsEnabled) {
+    constants[@"testControlsEnabled"] = @YES;
   }
   if (storeAssetCapture) {
     constants[@"storeAssetCapture"] = @YES;

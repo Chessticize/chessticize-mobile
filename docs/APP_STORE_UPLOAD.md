@@ -68,6 +68,22 @@ squash-merged candidate may reuse the passing PR-head App bundle when
 `node apps/mobile/scripts/mobile-app-inputs.js compare` proves that its App
 source is an ancestor and the App-input digest is unchanged.
 
+When the selected iOS release scope includes simulator E2E, run each selected
+suite against both the isolated Debug-Dev identity and the production Release
+identity:
+
+```sh
+CHESSTICIZE_E2E_SCOPE=full \
+  CHESSTICIZE_E2E_VARIANTS=both \
+  DETOX_IOS_DEVICE="iPhone 17-Detox" \
+  .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
+```
+
+Replace `full` with the risk-selected `flows` or `practice` scope when bounded.
+Do not install the Release build on a personal iPhone for pre-release checks;
+use `pnpm mobile:ios:dev:device` and the isolated Development CloudKit
+container described in `docs/IOS_DEVELOPMENT_BUILD.md`.
+
 Mobile runtime/domain sources, native/platform projects and native test-bundle
 sources, dependency manifests, lockfiles and patches, build/release
 configuration, and bundled fixtures/resources are App build inputs; a change
@@ -121,7 +137,8 @@ An ordinary delta does not require a fresh full Detox run. The 1.4 candidate is 
 includes the Core Pack v5 bundled database, SQLite schema v16-to-v19
 migrations, shared native E2E inputs, Arrow Duel opponent-reply journeys, and
 native Run pickup feedback, so a fresh Detox build is required. Run both `flows`
-and `practice` once from that build on a dedicated simulator, run the released
+and `practice` once for Debug-Dev and once for Release-Production on a dedicated
+simulator with `CHESSTICIZE_E2E_VARIANTS=both`, run the released
 SQLite fixture and native upgrade evidence, run
 `pnpm mobile:verify:ios:landscape-layout`, and complete the exact-head Release
 visual matrix. Physical-device execution remains optional.

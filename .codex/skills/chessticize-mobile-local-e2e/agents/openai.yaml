@@ -1,4 +1,4 @@
 interface:
   display_name: "Chessticize Risk-Scoped E2E"
-  short_description: "Run risk-scoped reusable iOS Detox evidence"
-  default_prompt: "Use $chessticize-mobile-local-e2e only for a release or native-impacting change, and choose the smallest iOS Detox scope that proves it."
+  short_description: "Run risk-scoped dual-identity iOS Detox evidence"
+  default_prompt: "Use $chessticize-mobile-local-e2e only for a release or native-impacting change, choose the smallest iOS Detox scope that proves it, run release E2E for both Debug-Dev and Release-Production identities, and keep personal-device installs on Debug-Dev."

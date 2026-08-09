@@ -1294,6 +1294,29 @@ describe('Detox suite configuration', () => {
     expect(targetDevice.disableSynchronization).toHaveBeenCalledTimes(1);
   });
 
+  it('enables native test controls only for an iOS Detox launch', async () => {
+    const targetDevice = {
+      disableSynchronization: jest.fn().mockResolvedValue(undefined),
+      getPlatform: jest.fn(() => 'ios'),
+      launchApp: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await launchWithDisabledSynchronization({
+      delete: true,
+      newInstance: true,
+    }, targetDevice);
+
+    expect(targetDevice.launchApp).toHaveBeenCalledWith({
+      delete: true,
+      newInstance: true,
+      launchArgs: {
+        DTXDisableMainRunLoopSync: 'YES',
+        chessticizeEnableTestControls: 1,
+        detoxEnableSynchronization: 0,
+      },
+    });
+  });
+
   it('foregrounds the attached Android activity with identical launch arguments', () => {
     const run = jest.fn(() => 'Status: ok\nActivity: com.chessticize.mobile/.MainActivity\n');
 

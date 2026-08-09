@@ -52,10 +52,13 @@ remaining user-controllable.
    Status: complete. Ratings, history, review queue, and sprint session exports
    merge through the storage boundary before the merged snapshot is written back
    to private iCloud.
-3. Before App Store submission, validate on at least two Apple devices signed
-   into the same iCloud account. Confirm the default enabled sync uploads a
-   snapshot on one device and imports the first device's rating/history/review
-   queue on the second device without deleting local-only progress.
+3. For an optional pre-submission real-CloudKit diagnostic on personal Apple
+   devices, install only `Chessticize Dev` with
+   `pnpm mobile:ios:dev:device`. Use two devices signed into the same test
+   iCloud account when available and confirm the Development-only container
+   uploads on one device and imports rating, History, and Review queue data on
+   the second without deleting local-only progress. Do not sideload the
+   production Release identity onto a daily-use device for this check.
 
 ## Milestone 3 — Functional fixes from the 2026-07-03 audit
 

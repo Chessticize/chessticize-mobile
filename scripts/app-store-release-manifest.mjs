@@ -78,7 +78,15 @@ if (dirtyStatus && !allowDirty) {
 
 if (
   !iosReleaseIdentity.valid ||
-  bundleIdentifiers.length !== 1 ||
+  bundleIdentifiers.length !== 2 ||
+  !bundleIdentifiers.includes("com.chessticize.mobile") ||
+  !bundleIdentifiers.includes("com.chessticize.mobile.dev") ||
+  iosReleaseIdentity.release?.bundleIdentifier !== "com.chessticize.mobile" ||
+  iosReleaseIdentity.release?.displayName !== "Chessticize" ||
+  iosReleaseIdentity.release?.entitlements !== "ChessticizeMobile/ChessticizeMobile.entitlements" ||
+  iosReleaseIdentity.debug?.bundleIdentifier !== "com.chessticize.mobile.dev" ||
+  iosReleaseIdentity.debug?.displayName !== "Chessticize Dev" ||
+  iosReleaseIdentity.debug?.entitlements !== "ChessticizeMobile/ChessticizeMobileDev.entitlements" ||
   deviceFamilies.length !== 1
 ) {
   console.error("Refusing to create a release manifest because iOS identity fields are inconsistent.");
@@ -102,7 +110,7 @@ const manifest = {
   packageManager: rootPackage.packageManager,
   app: {
     displayName: "Chessticize",
-    bundleIdentifier: bundleIdentifiers[0],
+    bundleIdentifier: iosReleaseIdentity.release.bundleIdentifier,
     version,
     build,
     targetedDeviceFamily,
@@ -144,6 +152,8 @@ const manifest = {
     artifact("apps/mobile/ios/ChessticizeMobile.xcodeproj/project.pbxproj", "iOS target identity"),
     artifact("apps/mobile/ios/Config/ReleaseVersion.xcconfig", "generated iOS release version"),
     artifact("apps/mobile/ios/ChessticizeMobile/Info.plist", "iOS app metadata"),
+    artifact("apps/mobile/ios/ChessticizeMobile/ChessticizeMobile.entitlements", "production iOS CloudKit identity"),
+    artifact("apps/mobile/ios/ChessticizeMobile/ChessticizeMobileDev.entitlements", "development iOS CloudKit identity"),
     artifact("apps/mobile/ios/ChessticizeMobile/PrivacyInfo.xcprivacy", "iOS privacy manifest"),
     artifact("LICENSE", "GPL license"),
     artifact("THIRD_PARTY_NOTICES.md", "third-party notices"),
