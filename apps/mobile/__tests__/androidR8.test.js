@@ -54,6 +54,9 @@ describe('Android R8 release optimization', () => {
 
   it('builds and runs Detox against an R8-transformed release-derived APK', () => {
     const build = read('apps/mobile/android/app/build.gradle');
+    const releaseE2eRules = read(
+      'apps/mobile/android/app/proguard-rules-release-e2e.pro',
+    );
     const detox = read('apps/mobile/.detoxrc.js');
     const mobilePackage = JSON.parse(read('apps/mobile/package.json'));
     const rootPackage = JSON.parse(read('package.json'));
@@ -64,11 +67,22 @@ describe('Android R8 release optimization', () => {
     expect(build).toMatch(
       /releaseE2e[\s\S]*proguardFile "\$\{rootProject\.projectDir\}\/\.\.\/node_modules\/detox\/android\/detox\/proguard-rules-app\.pro"/,
     );
+    expect(build).toMatch(
+      /releaseE2e[\s\S]*proguardFile "proguard-rules-release-e2e\.pro"/,
+    );
+    expect(releaseE2eRules).toContain(
+      '-keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderAlarmScheduler',
+    );
+    expect(releaseE2eRules).toContain(
+      '-keep,includedescriptorclasses class com.chessticize.mobile.StoredReviewReminder',
+    );
+    expect(releaseE2eRules).not.toContain('com.chessticize.mobile.**');
     const releaseBlock = build.match(
       /\n\s{8}release \{([\s\S]*?)\n\s{8}\}\n\s{8}\/\/ Exercise/,
     );
     expect(releaseBlock).not.toBeNull();
     expect(releaseBlock?.[1]).not.toContain('detox/proguard-rules-app.pro');
+    expect(releaseBlock?.[1]).not.toContain('proguard-rules-release-e2e.pro');
     expect(detox).toContain("'android.releaseE2e'");
     expect(detox).toContain(
       "binaryPath: 'android/app/build/outputs/apk/releaseE2e/app-releaseE2e.apk'",
@@ -118,6 +132,7 @@ describe('Android R8 release optimization', () => {
     expect(auditMergedConfiguration(appRules, 'release')).toEqual({
       appPackageWideKeep: false,
       detoxRulesIncluded: false,
+      nativeTestRulesIncluded: false,
     });
     expect(() => auditMergedConfiguration(
       `${appRules}\n# node_modules/detox/android/detox/proguard-rules-app.pro`,

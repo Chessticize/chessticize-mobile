@@ -138,6 +138,9 @@ function auditMergedConfiguration(configuration, variant) {
     detoxRulesIncluded: configuration.includes(
       'node_modules/detox/android/detox/proguard-rules-app.pro',
     ),
+    nativeTestRulesIncluded: configuration.includes(
+      'proguard-rules-release-e2e.pro',
+    ),
   };
   if (audit.appPackageWideKeep) {
     throw new Error('Merged R8 configuration contains a package-wide app keep rule.');
@@ -145,8 +148,12 @@ function auditMergedConfiguration(configuration, variant) {
   if (variant === 'release' && audit.detoxRulesIncluded) {
     throw new Error('Production R8 configuration contains Detox-only keep rules.');
   }
-  if (variant === 'releaseE2e' && !audit.detoxRulesIncluded) {
-    throw new Error('Release E2E R8 configuration is missing Detox keep rules.');
+  if (variant === 'release' && audit.nativeTestRulesIncluded) {
+    throw new Error('Production R8 configuration contains native-test-only keep rules.');
+  }
+  if (variant === 'releaseE2e'
+    && (!audit.detoxRulesIncluded || !audit.nativeTestRulesIncluded)) {
+    throw new Error('Release E2E R8 configuration is missing test-only keep rules.');
   }
   return audit;
 }

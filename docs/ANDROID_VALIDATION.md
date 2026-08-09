@@ -157,9 +157,10 @@ pnpm mobile:verify:android:r8 -- \
 
 `releaseE2e` inherits the release optimization graph and is debug-signed only
 for local emulator installation. It adds Detox's test-only keep rules so the
-instrumentation protocol can inspect React Native. Those rules are deliberately
-absent from the production `release` build. Therefore also inspect the
-production `release` mapping directory with `mobile:verify:android:r8`; the
+instrumentation protocol can inspect React Native, plus an exact-class test ABI
+for the separately compiled reminder integration test. Those rules are
+deliberately absent from the production `release` build. Therefore also inspect
+the production `release` mapping directory with `mobile:verify:android:r8`; the
 protected candidate workflow performs that check again on the upload-signed
 AAB and retains `configuration.txt`, `mapping.txt`, `resources.txt`,
 `seeds.txt`, and `usage.txt` beside the candidate for 30 days.
