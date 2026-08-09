@@ -359,7 +359,9 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.ok(arrowDuelGuide.scope.includes.includes("Guide 5: choose the stronger move"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Guide 6: Find the reply for Black"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Legal Qg7 and Qe8 candidate arrows"));
-  assert.ok(arrowDuelGuide.scope.includes.includes("Portrait callout below the board"));
+  assert.ok(arrowDuelGuide.scope.includes.includes(
+    "Portrait reply callout partially overlays the board"
+  ));
   assert.ok(arrowDuelGuide.scope.includes.includes("Landscape callout in the empty board lane"));
   assert.ok(arrowDuelGuide.scope.includes.includes(
     "Always-available direct guide exit without completion"
@@ -367,6 +369,9 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.match(arrowDuelGuide.description, /reply for Black/);
   assert.match(arrowDuelGuide.description, /familiarity-timing internals out/);
   const arrowDuelGuideOnly = scenarioRegistry["practice-arrow-duel-guide-only"];
+  assert.ok(arrowDuelGuideOnly.scope.includes.includes(
+    "Portrait reply callout partially overlays the board"
+  ));
   assert.ok(arrowDuelGuideOnly.scope.includes.includes(
     "Always-available direct guide exit without completion"
   ));
