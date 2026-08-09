@@ -284,7 +284,6 @@ interface Props {
   puzzleSelectionId?: string;
   puzzleSelectionSeed?: string;
   practiceHomeReviewCardVisible?: boolean;
-  reviewActiveFilterSummaryVisible?: boolean;
   runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
   runReorderDesignPreview?: {
@@ -340,6 +339,10 @@ export type SprintResultReplayDesignItem = SessionReplayItem;
 
 export type ReviewTodayDesignPreview = {
   showTodaySections: boolean;
+  filterControls?: {
+    placement: "before_review_action";
+    summaryVisibility: "always";
+  };
   collapsibleSections: {
     todayInitiallyExpanded: boolean;
     completedInitiallyExpanded: boolean;
@@ -701,7 +704,6 @@ export function PracticePocScreen({
   puzzleSelectionId,
   puzzleSelectionSeed,
   practiceHomeReviewCardVisible = true,
-  reviewActiveFilterSummaryVisible = true,
   runManagementEnabled = false,
   runManagementPresentation,
   runReorderDesignPreview,
@@ -4970,7 +4972,6 @@ export function PracticePocScreen({
                 explicitReplySideCopy={explicitReplySideCopy}
                 nowMs={nowMs}
                 reviewTodayDesignPreview={reviewTodayDesignPreview}
-                reviewActiveFilterSummaryVisible={reviewActiveFilterSummaryVisible}
                 reviewQueue={reviewQueue}
                 currentTimeMs={currentTimeMs}
                 deferBackRelevantTransition={deferBackRelevantTransition}
@@ -13203,7 +13204,6 @@ function ReviewPanel({
   onSessionSourceChange,
   onScheduleTestReviewReminder,
   reviewTodayDesignPreview,
-  reviewActiveFilterSummaryVisible,
   reviewQueue,
   reviewReminderScheduleStatus,
   service,
@@ -13233,7 +13233,6 @@ function ReviewPanel({
   onSessionSourceChange?: (source: ReviewEntry["source"] | null) => void;
   onScheduleTestReviewReminder?: () => Promise<ReviewReminderScheduleResult>;
   reviewTodayDesignPreview?: ReviewTodayDesignPreview;
-  reviewActiveFilterSummaryVisible: boolean;
   reviewQueue: ReviewQueueState[];
   reviewReminderScheduleStatus?: string;
   service: PracticeService;
@@ -13299,11 +13298,23 @@ function ReviewPanel({
   }));
   const filteredContextGroups = groupReviewEntriesByContext(filteredDueEntries);
   const queueSummary = reviewQueueSummary(reviewQueue, filteredDueReviewItems, nowMs);
-  const activeFilterLabels = reviewActiveFilterLabels(queueFilter, queueSummary);
-  const showActiveFilterStrip = reviewActiveFilterSummaryVisible
-    && (filtersExpanded || queueFilter !== "all");
   const selectedReviewFilterLabel = quickFilterPresentation?.label
     ?? reviewQueueFilterLabel(queueFilter);
+  const activeFilterLabels = quickFiltersEnabled
+    ? reviewQuickFilterSummaryLabels(
+        selectedReviewFilterLabel,
+        queueFilter,
+        filteredDueReviewItems.length,
+        filteredCompletedReviews.length
+      )
+    : reviewActiveFilterLabels(queueFilter, queueSummary);
+  const filterControlsBeforeReviewAction = reviewTodayDesignPreview?.filterControls?.placement
+    === "before_review_action";
+  const filterSummaryAlwaysVisible = reviewTodayDesignPreview?.filterControls?.summaryVisibility
+    === "always";
+  const showActiveFilterStrip = filterSummaryAlwaysVisible
+    || filtersExpanded
+    || queueFilter !== "all";
   const reviewDueSummaryLabel = filteredDueEntries.length > 0
     ? queueSummary.dueStatusLabel
     : dueReviewItems.length === 0
@@ -13461,6 +13472,15 @@ function ReviewPanel({
       )}
     </ScrollView>
   );
+  const reviewFilterOptionsRegion = collapsibleMotionPreview ? (
+    <CollapsibleRegion
+      contentTestID="review-filter-options"
+      expanded={filtersExpanded}
+      motion={collapsibleMotionPreview}
+    >
+      {reviewFilterOptions}
+    </CollapsibleRegion>
+  ) : filtersExpanded ? reviewFilterOptions : null;
 
   return (
     <View style={styles.reviewQueuePanel} testID="review-panel">
@@ -13512,6 +13532,8 @@ function ReviewPanel({
         <ReviewForecastMetric label="Next 7 days" count={queueSummary.nextSevenDaysCount} countTestID="review-next-seven-days-count" />
         <ReviewForecastMetric label="Total" count={queueSummary.totalCount} countTestID="review-total-count" />
       </View>
+
+      {filterControlsBeforeReviewAction ? reviewFilterOptionsRegion : null}
 
       {showActiveFilterStrip ? <ReviewActiveFilterStrip labels={activeFilterLabels} /> : null}
 
@@ -13565,15 +13587,7 @@ function ReviewPanel({
         </View>
       ) : null}
 
-      {collapsibleMotionPreview ? (
-        <CollapsibleRegion
-          contentTestID="review-filter-options"
-          expanded={filtersExpanded}
-          motion={collapsibleMotionPreview}
-        >
-          {reviewFilterOptions}
-        </CollapsibleRegion>
-      ) : filtersExpanded ? reviewFilterOptions : null}
+      {!filterControlsBeforeReviewAction ? reviewFilterOptionsRegion : null}
 
       {(filtersExpanded || reviewTodayDesignPreview?.showTodaySections === true)
         && (filteredDueReviewItems.length > 0 || quickFiltersEnabled) ? (
@@ -13746,9 +13760,25 @@ function reviewActiveFilterLabels(
   return labels;
 }
 
+function reviewQuickFilterSummaryLabels(
+  label: string,
+  filter: ReviewQueueFilter,
+  dueCount: number,
+  completedCount: number
+): string[] {
+  const matchCount = dueCount + completedCount;
+  return [
+    label,
+    filter === "all"
+      ? `${matchCount} today`
+      : `${matchCount} ${matchCount === 1 ? "match" : "matches"}`
+  ];
+}
+
 function ReviewActiveFilterStrip({ labels }: { labels: string[] }): React.JSX.Element {
   return (
     <ScrollView
+      accessibilityLabel={`Review filter summary, ${labels.join(", ")}`}
       horizontal
       showsHorizontalScrollIndicator={false}
       testID="review-active-filter-summary"

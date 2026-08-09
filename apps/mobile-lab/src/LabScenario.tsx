@@ -325,7 +325,6 @@ function LabScenarioContent({
           : undefined}
         platformCapabilities={runtime.platformCapabilities}
         practiceHomeReviewCardVisible={false}
-        reviewActiveFilterSummaryVisible={false}
         runReorderDesignPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
           ? { pickedUpRunId: runReorderPickedUpRunId }
           : undefined}
@@ -855,6 +854,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     reviewTodayDesignPreview: ["review-due", "review-filters"].includes(scenarioId)
       ? {
           showTodaySections: true,
+          filterControls: {
+            placement: "before_review_action",
+            summaryVisibility: "always"
+          },
           collapsibleSections: {
             todayInitiallyExpanded: true,
             completedInitiallyExpanded: true

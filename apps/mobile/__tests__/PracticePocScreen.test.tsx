@@ -4310,12 +4310,23 @@ describe("PracticePocScreen", () => {
       accessibilityElementsHidden: true,
       pointerEvents: "none"
     });
+    expect(findByTestId(reviewRenderer, "review-active-filter-summary")).toBeTruthy();
+    expect(testIdOrder(
+      reviewRenderer,
+      "review-filter-options-motion",
+      "review-active-filter-summary"
+    )).toBeLessThan(0);
+    expect(testIdOrder(
+      reviewRenderer,
+      "review-active-filter-summary",
+      "review-start-due"
+    )).toBeLessThan(0);
     press(reviewRenderer, "review-filter-toggle");
     expect(findByTestId(reviewRenderer, "review-filter-options-motion").props).toMatchObject({
       accessibilityElementsHidden: false,
       pointerEvents: "auto"
     });
-    expect(() => findByTestId(reviewRenderer, "review-active-filter-summary")).toThrow();
+    expect(findByTestId(reviewRenderer, "review-active-filter-summary")).toBeTruthy();
     act(() => {
       jest.advanceTimersByTime(100);
     });
@@ -4396,6 +4407,17 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-context-list")).toThrow();
     expect(collectText(findByTestId(renderer, "review-panel"))).not.toContain("Due items");
     expect(collectText(findByTestId(renderer, "review-panel"))).not.toContain("Review groups");
+    expect(testIdOrder(renderer, "review-filter-options-motion", "review-active-filter-summary")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "review-active-filter-summary", "review-start-due")).toBeLessThan(0);
+    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("All");
+    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("3 today");
+    expect(findByTestId(renderer, "review-active-filter-summary").props.accessibilityLabel).toBe(
+      "Review filter summary, All, 3 today"
+    );
+    expect(findByTestId(renderer, "review-filter-options-motion").props).toMatchObject({
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
 
     press(renderer, "review-filter-toggle");
     expect([...new Set(
@@ -4432,6 +4454,21 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain(
       "Missed 2+ times"
     );
+    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain(
+      "Missed 2+ times"
+    );
+    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain(
+      "2 matches"
+    );
+    expect(findByTestId(renderer, "review-active-filter-summary").props.accessibilityLabel).toBe(
+      "Review filter summary, Missed 2+ times, 2 matches"
+    );
+    press(renderer, "review-filter-toggle");
+    expect(findByTestId(renderer, "review-filter-options-motion").props).toMatchObject({
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
+    expect(findByTestId(renderer, "review-active-filter-summary")).toBeTruthy();
   });
 
   it("limits an existing Custom Run editor to Current rating", () => {
