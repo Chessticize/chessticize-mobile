@@ -342,6 +342,9 @@ android {
         releaseE2e {
             initWith release
             matchingFallbacks = ["release"]
+            // Detox and released-database fixture setup require instrumentation
+            // attachment and run-as access. Production release stays non-debuggable.
+            debuggable true
             signingConfig signingConfigs.debug
             manifestPlaceholders = [usesCleartextTraffic: false]
             proguardFile "proguard-rules-release-e2e.pro"
