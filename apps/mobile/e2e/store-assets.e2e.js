@@ -188,7 +188,8 @@ async function completeOneWrongReview() {
 async function captureMainTabScenes() {
   await openTab('practice-tab', 'practice-run-arrow-duel');
   await element(by.id('practice-run-select-arrow-duel')).tap();
-  await waitForVisibleInPracticeScroll('practice-review-due-count');
+  await expect(element(by.id('practice-review-strip'))).not.toExist();
+  await expect(element(by.id('review-tab-badge'))).toExist();
   const ratingText = textFromAttributes(await element(by.id('practice-mode-arrow-duel-rating')).getAttributes());
   if (ratingText === '600') {
     throw new Error('Expected the Practice screenshot to show a populated Arrow Duel rating');

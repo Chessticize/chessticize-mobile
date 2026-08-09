@@ -215,6 +215,9 @@ describe("App Store assets document", () => {
     );
     expect(storeAssetsE2e).toContain("by.id('practice-run-theme-row')");
     expect(storeAssetsE2e).not.toContain("by.id('custom-theme-row')");
+    expect(storeAssetsE2e).not.toContain("practice-review-due-count");
+    expect(storeAssetsE2e).toContain("expect(element(by.id('practice-review-strip'))).not.toExist()");
+    expect(storeAssetsE2e).toContain("expect(element(by.id('review-tab-badge'))).toExist()");
     expect(storeAssetsE2e).toContain("toHaveText('1 / 3')");
     expect(storeAssetsE2e).toContain("openTab('history-tab', 'history-filter-toggle')");
     expect(storeAssetsE2e).toContain("by.id('history-page-next')");
