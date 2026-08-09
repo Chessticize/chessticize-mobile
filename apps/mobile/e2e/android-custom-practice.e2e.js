@@ -3,6 +3,7 @@ const {
   openTab,
   playBoardMove,
   startSelectedPracticeRun,
+  tapUntilExists,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
   waitForVisibleInPracticeScroll,
@@ -54,14 +55,15 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await element(by.id('practice-run-name-input')).replaceText(CUSTOM_RUN_NAME);
       await element(by.id('custom-mode-arrow-duel')).tap();
       await waitFor(element(by.id('practice-run-arrow-duel-reply-setting')))
-        .toExist()
+        .not.toExist()
         .withTimeout(10000);
+      await expect(element(by.id('practice-run-puzzle-timing'))).toExist();
       await element(by.id('custom-mode-regular')).tap();
       await waitFor(element(by.id('practice-run-arrow-duel-reply-setting')))
         .not.toExist()
         .withTimeout(10000);
       await expect(element(by.id('practice-run-theme-selection-detail'))).toHaveText('All themes');
-      await expect(element(by.id(CUSTOM_RUN_THEME_TEST_ID))).not.toExist();
+      await expect(element(by.id(CUSTOM_RUN_THEME_TEST_ID))).not.toBeVisible();
       await element(by.id('practice-run-theme-disclosure')).tap();
       await waitForVisibleInPracticeScroll(CUSTOM_RUN_THEME_TEST_ID);
       await element(by.id(CUSTOM_RUN_THEME_TEST_ID)).tap();
@@ -80,8 +82,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await waitFor(element(by.id('practice-run-elo-input'))).toHaveText('600').withTimeout(5000);
 
       await element(by.id('practice-main-scroll')).scrollTo('top');
-      await element(by.id('practice-run-save')).tap();
-      await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
+      await tapUntilExists('practice-run-save', 'practice-run-home-edit', 3);
       await waitFor(element(by.text(CUSTOM_RUN_NAME))).toExist().withTimeout(10000);
       await selectPracticeRunByName(CUSTOM_RUN_NAME);
       await startSelectedPracticeRun();
