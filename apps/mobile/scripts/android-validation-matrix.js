@@ -127,8 +127,10 @@ function createAndroidValidationEvidence({
   appArtifactSha256,
   appInputDigest,
   appSourceSha,
+  appVariant = 'e2e',
   buildResult,
   device,
+  optimizationEvidence,
   steps,
   stepResults,
   testArtifactSha256,
@@ -145,6 +147,9 @@ function createAndroidValidationEvidence({
   }
   if (!/^[0-9a-f]{40}$/i.test(testRunnerSha ?? '')) {
     throw new Error('Android validation evidence requires an exact 40-character test runner SHA.');
+  }
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(appVariant)) {
+    throw new Error('Android validation evidence requires a valid App variant.');
   }
   for (const [label, digest] of [
     ['App input', appInputDigest],
@@ -168,6 +173,18 @@ function createAndroidValidationEvidence({
     || !device.serial) {
     throw new Error('Android validation evidence requires a complete device matrix entry.');
   }
+  if (appVariant === 'releaseE2e') {
+    if (!optimizationEvidence
+      || optimizationEvidence.profile !== 'r8-optimized'
+      || optimizationEvidence.variant !== appVariant
+      || optimizationEvidence.sourceSha !== appSourceSha
+      || optimizationEvidence.apkSha256 !== appArtifactSha256
+      || !/^[0-9a-f]{64}$/i.test(optimizationEvidence.reportSha256 ?? '')) {
+      throw new Error(
+        'R8 release validation requires optimization evidence bound to the App source and APK.',
+      );
+    }
+  }
 
   const expectedStepIds = steps.map(stepId);
   const resultById = new Map(
@@ -183,12 +200,14 @@ function createAndroidValidationEvidence({
     commitSha: testRunnerSha,
     appSourceSha,
     testRunnerSha,
+    appVariant,
     appInputDigest,
     appBuildInputsUnchanged,
     artifacts: {
       appApkSha256: appArtifactSha256,
       testApkSha256: testArtifactSha256,
     },
+    ...(optimizationEvidence ? { optimizationEvidence } : {}),
     reusedAppBuild: appSourceSha !== testRunnerSha,
     buildResult,
     commands: steps.map(renderValidationCommand),
@@ -207,10 +226,12 @@ function runAndroidValidationMatrix({
   appArtifactSha256,
   appInputDigest,
   appSourceSha,
+  appVariant,
   buildResult,
   device,
   expectedTestRunnerSha,
   outputPath,
+  optimizationEvidence,
   readGitHead,
   readTrackedWorktreeStatus,
   runStep,
@@ -301,8 +322,10 @@ function runAndroidValidationMatrix({
     appArtifactSha256,
     appInputDigest,
     appSourceSha,
+    appVariant,
     buildResult,
     device,
+    optimizationEvidence,
     steps,
     stepResults,
     testArtifactSha256,
@@ -330,6 +353,42 @@ function requiredEnvironment(name, environment) {
     throw new Error(`Set ${name} before recording Android validation evidence.`);
   }
   return value;
+}
+
+function readOptimizationEvidence({
+  appArtifactSha256,
+  appSourceSha,
+  appVariant,
+  evidencePath,
+}) {
+  if (!evidencePath) {
+    if (appVariant === 'releaseE2e') {
+      throw new Error(
+        'Set ANDROID_VALIDATION_OPTIMIZATION_EVIDENCE for R8 release validation.',
+      );
+    }
+    return undefined;
+  }
+  if (!fs.existsSync(evidencePath) || !fs.statSync(evidencePath).isFile()) {
+    throw new Error(`Android optimization evidence does not exist: ${evidencePath}`);
+  }
+  const report = JSON.parse(fs.readFileSync(evidencePath, 'utf8'));
+  const normalized = {
+    profile: report.profile,
+    variant: report.variant,
+    sourceSha: report.sourceSha,
+    apkSha256: report.artifacts?.apk?.artifactIdentitySha256,
+    reportSha256: hashArtifactPath(evidencePath),
+  };
+  if (normalized.profile !== 'r8-optimized'
+    || normalized.variant !== appVariant
+    || normalized.sourceSha !== appSourceSha
+    || normalized.apkSha256 !== appArtifactSha256) {
+    throw new Error(
+      'Android optimization evidence does not match the selected App variant, source, and APK.',
+    );
+  }
+  return normalized;
 }
 
 function parseCliArgs(args) {
@@ -376,6 +435,7 @@ function runCli(args = process.argv.slice(2), environment = process.env) {
   const appSourceSha = (
     environment.ANDROID_VALIDATION_APP_SOURCE_SHA || expectedTestRunnerSha
   ).toLowerCase();
+  const appVariant = environment.ANDROID_VALIDATION_APP_VARIANT || 'e2e';
   const comparison = compareMobileAppInputs({
     appSourceSha,
     repoRoot,
@@ -398,16 +458,27 @@ function runCli(args = process.argv.slice(2), environment = process.env) {
     profile: requiredEnvironment('ANDROID_VALIDATION_DEVICE_PROFILE', environment),
     serial: requiredEnvironment('DETOX_ANDROID_DEVICE', environment),
   };
+  const appArtifactSha256 = hashArtifactPath(appApkPath);
+  const optimizationEvidence = readOptimizationEvidence({
+    appArtifactSha256,
+    appSourceSha,
+    appVariant,
+    evidencePath: environment.ANDROID_VALIDATION_OPTIMIZATION_EVIDENCE
+      ? path.resolve(repoRoot, environment.ANDROID_VALIDATION_OPTIMIZATION_EVIDENCE)
+      : undefined,
+  });
   return runAndroidValidationMatrix({
     apiLevel,
     appBuildInputsUnchanged: comparison.appBuildInputsUnchanged,
-    appArtifactSha256: hashArtifactPath(appApkPath),
+    appArtifactSha256,
     appInputDigest: comparison.appInputDigest,
     appSourceSha,
+    appVariant,
     buildResult,
     device,
     expectedTestRunnerSha,
     outputPath: absoluteOutputPath,
+    optimizationEvidence,
     readGitHead: () => runGit(repoRoot, ['rev-parse', 'HEAD']),
     readTrackedWorktreeStatus: () => runGit(
       repoRoot,
@@ -459,6 +530,7 @@ module.exports = {
   createAndroidValidationEvidence,
   parseCliArgs,
   progressPathForEvidence,
+  readOptimizationEvidence,
   renderValidationCommand,
   runAndroidValidationMatrix,
   runCli,

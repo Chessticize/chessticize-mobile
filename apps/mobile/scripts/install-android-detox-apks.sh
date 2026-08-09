@@ -4,8 +4,8 @@ set -eu
 app_dir="$(cd "$(dirname "$0")/.." && pwd)"
 adb_path="${ADB_PATH:-adb}"
 device="${DETOX_ANDROID_DEVICE:-emulator-5554}"
-app_apk="$app_dir/android/app/build/outputs/apk/e2e/app-e2e.apk"
-test_apk="$app_dir/android/app/build/outputs/apk/androidTest/e2e/app-e2e-androidTest.apk"
+app_apk="${CHESSTICIZE_ANDROID_E2E_APK:-$app_dir/android/app/build/outputs/apk/e2e/app-e2e.apk}"
+test_apk="${CHESSTICIZE_ANDROID_E2E_TEST_APK:-$app_dir/android/app/build/outputs/apk/androidTest/e2e/app-e2e-androidTest.apk}"
 
 for apk_path in "$app_apk" "$test_apk"; do
   if [ ! -s "$apk_path" ]; then

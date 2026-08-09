@@ -24,5 +24,7 @@ if [[ "${CHESSTICIZE_DETOX_REUSE_INSTALLED_APP:-0}" == "1" ]]; then
   detox_args+=(--reuse)
 fi
 
+detox_configuration="${CHESSTICIZE_ANDROID_DETOX_CONFIGURATION:-android.attached.e2e}"
+
 DETOX_ACTIVE_SUITE="${DETOX_ACTIVE_SUITE:-android-launch}" \
-  pnpm exec detox test --configuration android.attached.e2e "${detox_args[@]}"
+  pnpm exec detox test --configuration "$detox_configuration" "${detox_args[@]}"

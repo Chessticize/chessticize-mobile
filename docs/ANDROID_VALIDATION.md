@@ -137,6 +137,77 @@ never converts a partial run into a pass. Do not automatically retry a failed
 API 24 or API 36 run. Fix or classify the failure, then rerun only the affected
 local scope.
 
+## R8-optimized release validation
+
+When release minification, resource shrinking, keep rules, or the Android
+Gradle optimization boundary changes, a debug or ordinary `e2e` APK is not
+valid evidence. Build both the production `release` output and the
+`releaseE2e` validation output from the same clean exact source commit:
+
+```sh
+pnpm mobile:e2e:build:android:release
+
+pnpm mobile:verify:android:r8 -- \
+  --variant releaseE2e \
+  --apk apps/mobile/android/app/build/outputs/apk/releaseE2e/app-releaseE2e.apk \
+  --bundle apps/mobile/android/app/build/outputs/bundle/releaseE2e/app-releaseE2e.aab \
+  --mapping-dir apps/mobile/android/app/build/outputs/mapping/releaseE2e \
+  --output apps/mobile/artifacts/android-r8/release-e2e.json
+```
+
+`releaseE2e` inherits the release optimization graph and is debug-signed only
+for local emulator installation. It adds Detox's test-only keep rules so the
+instrumentation protocol can inspect React Native. Those rules are deliberately
+absent from the production `release` build. Therefore also inspect the
+production `release` mapping directory with `mobile:verify:android:r8`; the
+protected candidate workflow performs that check again on the upload-signed
+AAB and retains `configuration.txt`, `mapping.txt`, `resources.txt`,
+`seeds.txt`, and `usage.txt` beside the candidate for 30 days.
+
+Run the full API 36 matrix against the release-derived pair:
+
+```sh
+export DETOX_ANDROID_DEVICE=emulator-5554
+export ANDROID_VALIDATION_DEVICE_ABI="$(
+  adb -s "$DETOX_ANDROID_DEVICE" shell getprop ro.product.cpu.abi | tr -d '\r'
+)"
+ANDROID_VALIDATION_COMMIT_SHA="$(git rev-parse HEAD)" \
+ANDROID_VALIDATION_BUILD_RESULT=success \
+ANDROID_VALIDATION_DEVICE_ABI="$ANDROID_VALIDATION_DEVICE_ABI" \
+ANDROID_VALIDATION_DEVICE_PROFILE=pixel_2 \
+DETOX_ANDROID_DEVICE="$DETOX_ANDROID_DEVICE" \
+pnpm mobile:validate:android:r8 -- --api-level 36 \
+  --output apps/mobile/artifacts/android-validation/r8-api-36.json
+```
+
+The matrix rejects a release-derived run unless its optimization report, App
+source SHA, variant, and APK artifact-identity checksum match. It covers launch and installed
+version metadata, system Back and the API-gated predictive-Back bridge,
+Stockfish start/send/cancel/reuse, reminder scheduling and notification entry,
+and the complete shared `flows` and `practice` journeys. Run the conditional
+Progress Backup policy/restore profile as well when build-wide shrinking could
+affect manifest entry points. The production APK/AAB inspection plus the
+release-derived runtime matrix form one result; neither substitutes for the
+other.
+
+For a reproducible before/after runtime sample, use the same dedicated device,
+fresh-install choice, component, run count, and ART compilation reset:
+
+```sh
+pnpm mobile:benchmark:android:runtime -- \
+  --fresh-install \
+  --variant release \
+  --apk apps/mobile/android/app/build/outputs/apk/release/app-release.apk \
+  --device emulator-5554 \
+  --component com.chessticize.mobile/.MainActivity \
+  --runs 5 \
+  --output apps/mobile/artifacts/android-r8/runtime-release.json
+```
+
+This local APK may use the repository debug keystore only for measurement. It
+is not a signed candidate and must never be uploaded or described as release
+signing evidence.
+
 ## Test-only reruns with retained APKs
 
 During an active RC freeze, first classify the finding under
@@ -264,10 +335,11 @@ local command log plus artifacts with the PR or release record:
 - artifact names/links and screenshot review where visual behavior is in scope.
 
 The automated API evidence JSON uses schema version 2 and records
-`appSourceSha`, `testRunnerSha`, `appInputDigest`, `artifacts`, `buildResult`,
-`commands`, `deviceMatrix`, `suiteResults`, `worktreeClean`, and the overall
-`result`. `commitSha` remains a compatibility alias for `testRunnerSha`. A
-missing required field is not passing evidence.
+`appSourceSha`, `testRunnerSha`, `appVariant`, `appInputDigest`, `artifacts`,
+`buildResult`, `commands`, `deviceMatrix`, `suiteResults`, `worktreeClean`, and
+the overall `result`. R8 runs also record checksum-bound
+`optimizationEvidence`. `commitSha` remains a compatibility alias for
+`testRunnerSha`. A missing required field is not passing evidence.
 
 The two SHAs may differ when
 `node apps/mobile/scripts/mobile-app-inputs.js compare` proves the App build

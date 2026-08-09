@@ -89,6 +89,14 @@ jobs:
           CHESSTICIZE_ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
         run: ./gradlew :app:bundleRelease --no-daemon
 
+      - name: Verify and record R8 optimization outputs
+        run: >-
+          pnpm mobile:verify:android:r8 --
+          --variant release
+          --bundle apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+          --mapping-dir apps/mobile/android/app/build/outputs/mapping/release
+          --output apps/mobile/artifacts/android-r8/release.json
+
       - name: Download pinned bundletool
         run: |
           curl --fail --location --silent --show-error \
@@ -115,7 +123,9 @@ jobs:
           retention-days: 30
           path: |
             apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+            apps/mobile/android/app/build/outputs/mapping/release/
             apps/mobile/artifacts/android-release/android-source-manifest.json
+            apps/mobile/artifacts/android-r8/release.json
 
       - name: Publish exact corresponding source
         env:
