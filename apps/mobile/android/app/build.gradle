@@ -335,6 +335,7 @@ android {
             if (releaseSigningConfigured) {
                 signingConfig signingConfigs.release
             }
+            manifestPlaceholders = [usesCleartextTraffic: false]
             ndk {
                 debugSymbolLevel 'FULL'
             }
@@ -342,17 +343,15 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
-        // Exercise the exact release optimization graph locally with Detox,
-        // while keeping production signing material outside developer builds.
-        releaseE2e {
+        // Exercise the exact non-debuggable release optimization graph locally
+        // with separately compiled native instrumentation. Full public UI
+        // journeys remain on the dedicated E2E build because Detox cannot
+        // attach its ActivityTestRule to this R8-transformed target.
+        r8Validation {
             initWith release
             matchingFallbacks = ["release"]
             signingConfig signingConfigs.debug
-            // Detox connects to its host over a loopback ws:// channel. Keep
-            // production release cleartext-disabled while permitting that test transport.
-            manifestPlaceholders = [usesCleartextTraffic: true]
-            proguardFile "proguard-rules-release-e2e.pro"
-            proguardFile "${rootProject.projectDir}/../node_modules/detox/android/detox/proguard-rules-app.pro"
+            proguardFile "proguard-rules-r8-validation.pro"
         }
     }
 }

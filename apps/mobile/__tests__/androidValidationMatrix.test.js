@@ -5,7 +5,6 @@ const path = require('node:path');
 const {
   createAndroidValidationEvidence,
   parseCliArgs,
-  readOptimizationEvidence,
   runAndroidValidationMatrix,
   validationStepsForApiLevel,
 } = require('../scripts/android-validation-matrix');
@@ -218,56 +217,9 @@ describe('Android validation matrix', () => {
     [{ stepResults: [] }, 'result for every validation step'],
     [{ buildResult: 'unknown' }, 'build result must be success'],
     [{ appVariant: 'release-e2e' }, 'valid App variant'],
-    [{ appVariant: 'releaseE2e' }, 'optimization evidence bound to the App source and APK'],
   ])('fails closed when required evidence is missing: %p', (overrides, message) => {
     expect(() => createAndroidValidationEvidence(passingEvidenceInput(overrides)))
       .toThrow(message);
-  });
-
-  it('binds an R8 release validation result to its optimization report', () => {
-    const optimizationEvidence = {
-      profile: 'r8-optimized',
-      variant: 'releaseE2e',
-      sourceSha: EXACT_SHA,
-      apkSha256: APP_APK_DIGEST,
-      reportSha256: 'd'.repeat(64),
-    };
-
-    expect(createAndroidValidationEvidence(passingEvidenceInput({
-      appVariant: 'releaseE2e',
-      optimizationEvidence,
-    }))).toMatchObject({
-      appVariant: 'releaseE2e',
-      optimizationEvidence,
-      result: 'pass',
-    });
-  });
-
-  it('binds the matrix artifact identity rather than the raw APK byte hash', () => {
-    const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'android-r8-report-'));
-    const evidencePath = path.join(outputRoot, 'release-e2e.json');
-    fs.writeFileSync(evidencePath, JSON.stringify({
-      profile: 'r8-optimized',
-      variant: 'releaseE2e',
-      sourceSha: EXACT_SHA,
-      artifacts: {
-        apk: {
-          sha256: 'e'.repeat(64),
-          artifactIdentitySha256: APP_APK_DIGEST,
-        },
-      },
-    }));
-
-    expect(readOptimizationEvidence({
-      appArtifactSha256: APP_APK_DIGEST,
-      appSourceSha: EXACT_SHA,
-      appVariant: 'releaseE2e',
-      evidencePath,
-    })).toMatchObject({
-      apkSha256: APP_APK_DIGEST,
-      sourceSha: EXACT_SHA,
-      variant: 'releaseE2e',
-    });
   });
 
   it('executes the selected public matrix and writes auditable exact-head evidence', () => {
