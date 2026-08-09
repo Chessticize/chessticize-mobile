@@ -16,6 +16,7 @@ export interface PuzzlePackManifest {
   packFileHash?: string;
   packFileBytes?: number;
   format?: "json" | "sqlite";
+  packSchemaVersion?: number;
   seed?: string;
   targetPuzzleCount?: number;
   puzzleCount: number;
@@ -28,7 +29,31 @@ export interface PuzzlePackManifest {
   ratingBuckets?: PuzzlePackBucketManifest[];
   matePatternCounts?: Record<string, number>;
   tacticalAnalysis?: PuzzlePackTacticalAnalysisManifest;
+  arrowDuelDifficulty?: PuzzlePackArrowDuelDifficultyManifest;
   arrowDuelCount: number;
+}
+
+export interface PuzzlePackArrowDuelDifficultyManifest {
+  schemaVersion: 1;
+  column: "arrow_duel_difficulty";
+  values: readonly ["0", "1", "2", "3", "4+"];
+  definition: string;
+  unavailableCount: number;
+  counts: Record<"0" | "1" | "2" | "3" | "4+", number>;
+  index: string | null;
+  sourceRelease: {
+    repository: string;
+    tag: string;
+    compactArtifact: string;
+    compactSha256: string;
+  };
+  engine: {
+    name: string;
+    depth: number;
+    multiPv: number;
+    evaluationToleranceCp: number;
+    maximumSearchedPlies: number;
+  };
 }
 
 export interface PuzzlePackTacticalAnalysisManifest {

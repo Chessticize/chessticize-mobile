@@ -23,6 +23,7 @@ import {
   practiceRunSprintConfig,
   renamePracticeRun,
   reorderPracticeRuns,
+  restrictedArrowDuelDifficulties,
   resolveOpponentReplyConfig,
   resolvePuzzleTimingPolicy,
   restorePracticeRun,
@@ -38,6 +39,7 @@ import {
 import type {
   AppReviewRequestAttempt,
   AppReviewRequestEligibility,
+  ArrowDuelDifficulty,
   AttemptEvent,
   AttemptResult,
   CustomSprintConfigRecord,
@@ -96,6 +98,7 @@ export interface StartSprintCommand {
   maxMistakes?: number;
   opponentReply?: OpponentReplyConfig;
   themes?: string[];
+  arrowDuelDifficulties?: ArrowDuelDifficulty[];
   /** @deprecated Accept legacy callers, then normalize to themes. */
   theme?: string;
   minRating?: number;
@@ -116,6 +119,7 @@ export interface CreatePracticeRunCommand {
   maxMistakes?: number;
   opponentReply?: OpponentReplyConfig;
   themes?: string[];
+  arrowDuelDifficulties?: ArrowDuelDifficulty[];
   initialRating: number;
 }
 
@@ -124,6 +128,7 @@ export interface UpdatePracticeRunCommand {
   rating: number;
   puzzleTiming?: PuzzleTimingPolicy;
   opponentReply?: OpponentReplyConfig;
+  arrowDuelDifficulties?: ArrowDuelDifficulty[];
 }
 
 export class PracticeRunAvailabilityError extends Error {
@@ -625,6 +630,9 @@ export class PracticeService {
         ? {}
         : { opponentReply: command.opponentReply }),
       ...(command.themes === undefined ? {} : { themes: command.themes }),
+      ...(command.arrowDuelDifficulties === undefined
+        ? {}
+        : { arrowDuelDifficulties: command.arrowDuelDifficulties }),
       homeOrder: activeCount,
       updatedAt: now,
       existingRuns
@@ -691,6 +699,16 @@ export class PracticeService {
         ? resolvePuzzleTimingPolicy(currentRun.puzzleTiming, currentRun.perPuzzleSeconds)
         : validatePuzzleTimingPolicy(command.puzzleTiming)
     };
+    if (currentRun.mode === "arrow_duel") {
+      const arrowDuelDifficulties = command.arrowDuelDifficulties === undefined
+        ? currentRun.arrowDuelDifficulties
+        : restrictedArrowDuelDifficulties(command.arrowDuelDifficulties);
+      if (arrowDuelDifficulties === undefined) {
+        delete updatedRun.arrowDuelDifficulties;
+      } else {
+        updatedRun.arrowDuelDifficulties = arrowDuelDifficulties;
+      }
+    }
     const nextRun = samePracticeRun(currentRun, updatedRun)
       ? clonePracticeRun(currentRun)
       : { ...updatedRun, updatedAt: now };
@@ -935,6 +953,7 @@ export class PracticeService {
       maxMistakes?: number;
       opponentReply?: OpponentReplyConfig;
       themes?: string[];
+      arrowDuelDifficulties?: ArrowDuelDifficulty[];
     } = {
       mode: command.mode,
       durationSeconds: command.durationSeconds ?? 5 * 60,
@@ -948,6 +967,9 @@ export class PracticeService {
     }
     if (command.opponentReply !== undefined) {
       configInput.opponentReply = command.opponentReply;
+    }
+    if (command.arrowDuelDifficulties !== undefined) {
+      configInput.arrowDuelDifficulties = command.arrowDuelDifficulties;
     }
     const themes = normalizeThemeSelection([
       ...(command.themes ?? []),
@@ -979,6 +1001,7 @@ export class PracticeService {
     minRating?: number;
     maxRating?: number;
     themes?: string[];
+    arrowDuelDifficulties?: ArrowDuelDifficulty[];
     includeIds?: string[];
     randomSeed?: string | number;
   } {
@@ -989,6 +1012,7 @@ export class PracticeService {
       minRating?: number;
       maxRating?: number;
       themes?: string[];
+      arrowDuelDifficulties?: ArrowDuelDifficulty[];
       includeIds?: string[];
       randomSeed?: string | number;
     } = {
@@ -1004,6 +1028,9 @@ export class PracticeService {
     }
     if (config.themes !== undefined) {
       puzzleFilter.themes = [...config.themes];
+    }
+    if (config.arrowDuelDifficulties !== undefined) {
+      puzzleFilter.arrowDuelDifficulties = [...config.arrowDuelDifficulties];
     }
     if (this.puzzleSelectionScopeIds !== undefined) {
       puzzleFilter.includeIds = this.puzzleSelectionScopeIds;

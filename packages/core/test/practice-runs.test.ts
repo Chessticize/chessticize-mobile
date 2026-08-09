@@ -116,6 +116,7 @@ test("Arrow Duel Run opponent reply settings persist without changing Rating ide
     targetCorrect: 10,
     maxMistakes: 3,
     opponentReply: { enabled: false, seconds: 10 },
+    arrowDuelDifficulties: [1, 4],
     homeOrder: existingRuns.length,
     updatedAt: NOW,
     existingRuns
@@ -124,6 +125,8 @@ test("Arrow Duel Run opponent reply settings persist without changing Rating ide
 
   assert.deepEqual(run.opponentReply, { enabled: false, seconds: 10 });
   assert.deepEqual(config.opponentReply, { enabled: false, seconds: 10 });
+  assert.deepEqual(run.arrowDuelDifficulties, [1, 4]);
+  assert.deepEqual(config.arrowDuelDifficulties, [1, 4]);
   assert.equal(config.ratingKey, run.ratingKey);
   assert.equal(
     config.ratingKey,

@@ -128,6 +128,9 @@ afterEach(() => {
   (ReactNative as unknown as { __resetScrollView?: () => void }).__resetScrollView?.();
   (ReactNative as unknown as { __resetWindowDimensions?: () => void }).__resetWindowDimensions?.();
   (SafeAreaContext as unknown as { __resetSafeAreaInsets?: () => void }).__resetSafeAreaInsets?.();
+  delete (globalThis as typeof globalThis & {
+    __CHESSTICIZE_PRACTICE_DEBUG__?: boolean;
+  }).__CHESSTICIZE_PRACTICE_DEBUG__;
   jest.useRealTimers();
 });
 
@@ -3272,6 +3275,57 @@ describe("PracticePocScreen", () => {
       renderer,
       "practice-run-arrow-duel-reply-setting"
     ))).toContain("Defaults to 10 seconds. Maximum 30.");
+  });
+
+  it("shows the Arrow Duel difficulty multi-select only in debug builds", () => {
+    const debugGlobals = globalThis as typeof globalThis & {
+      __CHESSTICIZE_PRACTICE_DEBUG__?: boolean;
+    };
+    const onIntent = jest.fn();
+    const presentation = runManagementPresentation({
+      directRunEditing: true,
+      draft: {
+        id: "arrow-duel",
+        name: "Arrow Duel",
+        kind: "arrow_duel",
+        mode: "arrow_duel",
+        elo: 875,
+        durationSeconds: 300,
+        perPuzzleSeconds: 30,
+        puzzleTiming: { slowAfterSeconds: 60, timeoutAfterSeconds: 90 },
+        opponentReply: { enabled: true, seconds: 10 },
+        themes: ["mixed"],
+        arrowDuelDifficulties: [0, 1, 2, 3, 4]
+      },
+      onIntent,
+      screen: "edit"
+    });
+
+    debugGlobals.__CHESSTICIZE_PRACTICE_DEBUG__ = false;
+    const releaseRenderer = renderScreen({ runManagementPresentation: presentation });
+    expect(() => findByTestId(
+      releaseRenderer,
+      "practice-run-arrow-duel-difficulty-setting"
+    )).toThrow();
+
+    debugGlobals.__CHESSTICIZE_PRACTICE_DEBUG__ = true;
+    const debugRenderer = renderScreen({ runManagementPresentation: presentation });
+    expect(collectText(findByTestId(
+      debugRenderer,
+      "practice-run-arrow-duel-difficulty-setting"
+    ))).toContain("Forced puzzle-side follow-ups after the displayed correct move.");
+    for (const label of ["0", "1", "2", "3", "4plus"]) {
+      expect(findByTestId(
+        debugRenderer,
+        `practice-run-arrow-duel-difficulty-${label}`
+      ).props.accessibilityState).toEqual({ checked: true });
+    }
+    press(debugRenderer, "practice-run-arrow-duel-difficulty-2");
+    expect(onIntent).toHaveBeenLastCalledWith({
+      type: "toggle-arrow-duel-difficulty",
+      difficulty: 2
+    });
+    delete debugGlobals.__CHESSTICIZE_PRACTICE_DEBUG__;
   });
 
   it("previews Standard-style outcome feedback and automatic advance", async () => {
@@ -14332,7 +14386,8 @@ function runManagementPresentation(
           slowAfterSeconds: 40,
           timeoutAfterSeconds: 60
         },
-        themes: ["mixed"]
+        themes: ["mixed"],
+        arrowDuelDifficulties: [0, 1, 2, 3, 4]
       },
       {
         id: "tactics-focus",
@@ -14347,7 +14402,8 @@ function runManagementPresentation(
           slowAfterSeconds: 60,
           timeoutAfterSeconds: 90
         },
-        themes: ["fork", "pin"]
+        themes: ["fork", "pin"],
+        arrowDuelDifficulties: [0, 1, 2, 3, 4]
       },
       {
         id: "candidate-sprint",
@@ -14362,7 +14418,8 @@ function runManagementPresentation(
           slowAfterSeconds: 40,
           timeoutAfterSeconds: 60
         },
-        themes: ["mixed"]
+        themes: ["mixed"],
+        arrowDuelDifficulties: [0, 1, 2, 3, 4]
       }
     ],
     screen: "home",

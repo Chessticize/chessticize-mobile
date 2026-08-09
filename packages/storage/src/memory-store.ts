@@ -123,6 +123,9 @@ export class MemoryStore implements PracticeStore {
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
       ...(filter.themes === undefined ? {} : { themes: filter.themes }),
+      ...(filter.arrowDuelDifficulties === undefined
+        ? {}
+        : { arrowDuelDifficulties: filter.arrowDuelDifficulties }),
       ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
@@ -920,7 +923,10 @@ function exportedSprintSessionFromState(session: SprintState): ExportedSprintSes
       ...(session.config.puzzleTiming === undefined
         ? {}
         : { puzzleTiming: { ...session.config.puzzleTiming } }),
-      ...(session.config.themes === undefined ? {} : { themes: [...session.config.themes] })
+      ...(session.config.themes === undefined ? {} : { themes: [...session.config.themes] }),
+      ...(session.config.arrowDuelDifficulties === undefined
+        ? {}
+        : { arrowDuelDifficulties: [...session.config.arrowDuelDifficulties] })
     }
   };
 }

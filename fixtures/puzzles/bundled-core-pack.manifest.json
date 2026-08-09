@@ -1,16 +1,16 @@
 {
   "id": "core",
   "title": "Core Pack",
-  "buildDate": "2026-08-03",
+  "buildDate": "2026-08-09",
   "source": "Lichess puzzle database",
   "sourceLicense": "CC0",
   "sourceSnapshotDate": "2025-07-24",
   "presolve": "Chessticize depth-20 Stockfish presolve",
   "presolveDepth": 20,
   "licenseNote": "Derived from Lichess puzzle data with Chessticize presolve metadata.",
-  "manifestHash": "sha256:8d0d56c2ef2057a6cfd34b4b3c4e72fa49b4950455e5bb740345c1d98e1f7a8a",
-  "packFileHash": "sha256:4f8726cd64c8e490708f9c6b7b411dad3736d5936c0493d71fd42bbe4404a811",
-  "packFileBytes": 164163584,
+  "manifestHash": "sha256:18ff2b9bdccb452d115b3b1d4f45a8070cd952681b4baeafd10da00f45f45afd",
+  "packFileHash": "sha256:7b41e5d2ae61c3121fae03f2d3b98245a9f30bc8a6469f138abca50a93c80870",
+  "packFileBytes": 173125632,
   "format": "sqlite",
   "packSchemaVersion": 2,
   "positionCodec": {
@@ -770,5 +770,39 @@
     "puzzleRatingDeviation": true,
     "featureHash": "sha256:9a4a1613713cfd72da6eb718c717c762b08aa361ec23d88b43e5e029d20fb295"
   },
-  "arrowDuelCount": 1392969
+  "arrowDuelCount": 1392969,
+  "arrowDuelDifficulty": {
+    "schemaVersion": 1,
+    "column": "arrow_duel_difficulty",
+    "values": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4+"
+    ],
+    "definition": "Puzzle-side forced follow-up moves after the displayed correct Arrow Duel move; 4 stores the censored 4+ bucket.",
+    "unavailableCount": 7031,
+    "counts": {
+      "0": 994184,
+      "1": 239524,
+      "2": 82662,
+      "3": 37912,
+      "4+": 38687
+    },
+    "index": "puzzles_arrow_duel_positive_difficulty_idx",
+    "sourceRelease": {
+      "repository": "Chessticize/lichess-presolver",
+      "tag": "arrow-duel-routes-d16-mpv2-2026-08-05",
+      "compactArtifact": "arrow-duel-routes-d16-mpv2.compact.sqlite",
+      "compactSha256": "1b62b084a463bb8bab08322f798fee86d94bdaca12f7531de615aa9e4227d432"
+    },
+    "engine": {
+      "name": "Stockfish 18",
+      "depth": 16,
+      "multiPv": 2,
+      "evaluationToleranceCp": 100,
+      "maximumSearchedPlies": 10
+    }
+  }
 }

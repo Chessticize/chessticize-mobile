@@ -4,6 +4,9 @@ import {
   resolvePuzzleTimingPolicy
 } from "./sprint-config.ts";
 import { normalizeThemeSelection } from "./theme-catalog.ts";
+import {
+  restrictedArrowDuelDifficulties
+} from "./arrow-duel-difficulty.ts";
 import { assertValidManualRating, RATING_FLOOR } from "./ratings.ts";
 import type {
   CustomSprintConfigRecord,
@@ -64,6 +67,7 @@ export function createCustomPracticeRun(input: {
   maxMistakes: number;
   opponentReply?: OpponentReplyConfig;
   themes?: readonly string[];
+  arrowDuelDifficulties?: readonly number[];
   homeOrder: number;
   updatedAt: string;
   existingRuns: readonly PracticeRunRecord[];
@@ -97,6 +101,7 @@ export function createCustomPracticeRun(input: {
     ...(normalizedRunThemes(input.themes).length === 0
       ? {}
       : { themes: normalizedRunThemes(input.themes) }),
+    ...arrowDuelDifficultiesForRun(input.mode, input.arrowDuelDifficulties),
     homeOrder: input.homeOrder,
     archived: false,
     updatedAt: input.updatedAt
@@ -217,7 +222,10 @@ export function practiceRunSprintConfig(run: PracticeRunRecord): SprintConfig {
     maxMistakes: run.maxMistakes,
     ...opponentReplyForRun(run.mode, run.opponentReply),
     ratingKey: run.ratingKey,
-    ...(run.themes === undefined ? {} : { themes: [...run.themes] })
+    ...(run.themes === undefined ? {} : { themes: [...run.themes] }),
+    ...(run.arrowDuelDifficulties === undefined
+      ? {}
+      : { arrowDuelDifficulties: [...run.arrowDuelDifficulties] })
   };
 }
 
@@ -300,7 +308,10 @@ export function clonePracticeRun(run: PracticeRunRecord): PracticeRunRecord {
     ...(run.opponentReply === undefined
       ? {}
       : { opponentReply: { ...run.opponentReply } }),
-    ...(run.themes === undefined ? {} : { themes: [...run.themes] })
+    ...(run.themes === undefined ? {} : { themes: [...run.themes] }),
+    ...(run.arrowDuelDifficulties === undefined
+      ? {}
+      : { arrowDuelDifficulties: [...run.arrowDuelDifficulties] })
   };
 }
 
@@ -339,6 +350,7 @@ function builtInPracticeRun(
       ? {}
       : { opponentReply: { ...config.opponentReply } }),
     ...(config.themes === undefined ? {} : { themes: [...config.themes] }),
+    ...arrowDuelDifficultiesForRun(mode, config.arrowDuelDifficulties),
     homeOrder,
     archived: false,
     updatedAt
@@ -355,6 +367,7 @@ function canonicalizeBuiltInPracticeRun(run: PracticeRunRecord): PracticeRunReco
     name: run.name,
     puzzleTiming: resolvePuzzleTimingPolicy(run.puzzleTiming, canonical.perPuzzleSeconds),
     ...opponentReplyForRun(canonical.mode, run.opponentReply),
+    ...arrowDuelDifficultiesForRun(canonical.mode, run.arrowDuelDifficulties),
     archived: run.archived,
     homeOrder: run.homeOrder,
     updatedAt: run.updatedAt
@@ -428,6 +441,17 @@ function stableTextFingerprint(value: string): string {
 
 function normalizedRunThemes(themes?: readonly string[]): string[] {
   return normalizeThemeSelection(themes).filter((theme) => theme !== "mixed");
+}
+
+function arrowDuelDifficultiesForRun(
+  mode: PracticeRunRecord["mode"],
+  difficulties?: readonly number[]
+): { arrowDuelDifficulties?: NonNullable<PracticeRunRecord["arrowDuelDifficulties"]> } {
+  if (mode !== "arrow_duel") {
+    return {};
+  }
+  const restricted = restrictedArrowDuelDifficulties(difficulties);
+  return restricted === undefined ? {} : { arrowDuelDifficulties: restricted };
 }
 
 function opponentReplyForRun(

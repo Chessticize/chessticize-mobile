@@ -1,3 +1,5 @@
+import type { ArrowDuelDifficulty } from "./arrow-duel-difficulty.ts";
+
 export type SprintMode = "standard" | "blitz" | "arrow_duel" | "custom";
 
 export type SprintStatus = "active" | "paused" | "won" | "failed" | "abandoned";
@@ -33,6 +35,8 @@ export interface Puzzle {
   stockfishEval?: number;
   stockfishBestMove?: string;
   stockfishEvalAfterFirstMove?: number;
+  /** Debug classification: forced puzzle-side follow-up moves, with 4 meaning 4+. */
+  arrowDuelDifficulty?: ArrowDuelDifficulty;
 }
 
 export interface SprintConfig {
@@ -47,6 +51,8 @@ export interface SprintConfig {
   /** Optional only for persisted legacy configs; current Arrow Duel configs populate it. */
   opponentReply?: OpponentReplyConfig;
   themes?: string[];
+  /** Omitted means every Arrow Duel difficulty bucket is eligible. */
+  arrowDuelDifficulties?: ArrowDuelDifficulty[];
   /** A fixed attempt ceiling used by bounded interventions such as Tactical Focus. */
   maxAttempts?: number;
   /** Interventions can reuse a Run's Rating for selection without mutating it. */
@@ -102,6 +108,8 @@ export interface PracticeRunRecord {
   /** Optional only for imported legacy Runs; current Arrow Duel Runs populate it. */
   opponentReply?: OpponentReplyConfig;
   themes?: string[];
+  /** Omitted means every Arrow Duel difficulty bucket is eligible. */
+  arrowDuelDifficulties?: ArrowDuelDifficulty[];
   homeOrder: number;
   archived: boolean;
   updatedAt: string;

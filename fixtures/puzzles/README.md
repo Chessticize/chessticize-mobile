@@ -42,7 +42,10 @@ candidates remain available to Standard.
 The release SQLite schema is intentionally runtime-only: `puzzles` keeps the
 source puzzle ID, compact position, solution moves, rating, and presolved
 Stockfish fields; `themes` and `puzzle_themes` provide the indexed theme
-lookup. Schema version 2 stores positions and moves as versioned BLOBs. The
+lookup. The nullable integer `arrow_duel_difficulty` stores the derived forced
+puzzle-side follow-up bucket (`0`, `1`, `2`, `3`, or `4`, where `4` means
+`4+`) without a per-row text label. Schema version 2 stores positions and moves
+as versioned BLOBs. The
 `chessticize-position` v1 codec combines a 64-bit occupancy mask, side,
 castling and en-passant metadata, and four-bit piece codes. The
 `chessticize-uci16` v1 codec stores each UCI move in two bytes. The
@@ -107,7 +110,26 @@ superseded by the corrected depth-20 `core-pack-v2` artifact. `core-pack-v3`
 adds immutable Puzzle Rating Deviation. `core-pack-v4` preserves the v3 puzzle
 rows while shipping the optimized stable-theme relation index described above.
 `core-pack-v5` preserves all v4 puzzle semantics while replacing the three
-large TEXT payload columns with the versioned binary codecs.
+large TEXT payload columns with the versioned binary codecs. `core-pack-v6`
+preserves the v5 rows and codecs while adding the Arrow Duel difficulty column
+from the immutable depth-16 MultiPV-2 route-analysis release.
+
+To enrich a verified v5 pack without resampling or changing puzzle identities,
+run:
+
+```sh
+pnpm add:arrow-duel-difficulty -- \
+  --metrics-directory scratch/arrow-duel-release-staging \
+  --output-pack scratch/core-pack-v6/bundled-core-pack.sqlite \
+  --output-manifest scratch/core-pack-v6/bundled-core-pack.manifest.json \
+  --build-date YYYY-MM-DD
+```
+
+The transformer verifies both immutable input hashes, decodes the compact
+rowid-aligned metric, validates all bucket counts and SQLite integrity, and
+writes a new artifact/manifest pair. Its partial index covers only the 398,785
+rows in buckets `1` through `4+`; bucket `0` continues to use the existing
+rating index.
 
 To convert a verified older rowid-based pack without changing puzzle rows, run:
 

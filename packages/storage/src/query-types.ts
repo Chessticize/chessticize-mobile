@@ -1,4 +1,5 @@
 import type {
+  ArrowDuelDifficulty,
   AttemptOutcome,
   AttemptSource,
   AttemptTimingStatus,
@@ -13,6 +14,7 @@ export interface PuzzleSelectionFilter {
   minRating?: number;
   maxRating?: number;
   themes?: string[];
+  arrowDuelDifficulties?: ArrowDuelDifficulty[];
   includeIds?: string[];
   excludeIds?: string[];
   randomSeed?: string | number;

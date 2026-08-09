@@ -199,7 +199,10 @@ for (const backend of ["memory", "sqlite"] as const) {
       store.migrate();
     }
     try {
-      store.seedPuzzles(await loadFixturePuzzles());
+      store.seedPuzzles((await loadFixturePuzzles()).map((puzzle) => ({
+        ...puzzle,
+        arrowDuelDifficulty: 4
+      })));
       const service = new PracticeService(store);
       const run = service.createPracticeRun({
         id: `reply-run-${backend}`,
@@ -209,17 +212,21 @@ for (const backend of ["memory", "sqlite"] as const) {
         perPuzzleSeconds: 30,
         targetCorrect: 1,
         opponentReply: { enabled: false, seconds: 8 },
+        arrowDuelDifficulties: [4],
         initialRating: 950
       }, "2026-07-22T12:00:00.000Z");
 
       assert.deepEqual(run.opponentReply, { enabled: false, seconds: 8 });
+      assert.deepEqual(run.arrowDuelDifficulties, [4]);
       const updated = service.updatePracticeRun(run.id, {
         name: run.name,
         rating: 950,
-        opponentReply: { enabled: true, seconds: 30 }
+        opponentReply: { enabled: true, seconds: 30 },
+        arrowDuelDifficulties: [1, 4]
       }, "2026-07-22T12:01:00.000Z");
       assert.equal(updated.run.ratingKey, run.ratingKey);
       assert.deepEqual(updated.run.opponentReply, { enabled: true, seconds: 30 });
+      assert.deepEqual(updated.run.arrowDuelDifficulties, [1, 4]);
       assert.throws(() => service.updatePracticeRun(run.id, {
         name: run.name,
         rating: 950,
@@ -233,6 +240,7 @@ for (const backend of ["memory", "sqlite"] as const) {
       }, "2026-07-22T12:02:00.000Z");
       assert.equal(sprint.config.ratingKey, run.ratingKey);
       assert.deepEqual(sprint.config.opponentReply, { enabled: true, seconds: 30 });
+      assert.deepEqual(sprint.config.arrowDuelDifficulties, [1, 4]);
 
       service.updatePracticeRun(run.id, {
         name: run.name,

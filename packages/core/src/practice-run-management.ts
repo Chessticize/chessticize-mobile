@@ -4,6 +4,12 @@ import {
   normalizeThemeChoiceSelection
 } from "./theme-catalog.ts";
 import {
+  ALL_ARROW_DUEL_DIFFICULTIES,
+  normalizeArrowDuelDifficulties,
+  toggleArrowDuelDifficulty,
+  type ArrowDuelDifficulty
+} from "./arrow-duel-difficulty.ts";
+import {
   DEFAULT_NEW_PRACTICE_RUN_RATING,
   PRACTICE_RUN_RATING_MAX,
   PRACTICE_RUN_RATING_MIN,
@@ -40,6 +46,7 @@ export type PracticeRunManagementRun = {
   puzzleTiming: PuzzleTimingPolicy;
   opponentReply?: PracticeRunRecord["opponentReply"];
   themes: readonly string[];
+  arrowDuelDifficulties?: readonly ArrowDuelDifficulty[];
 };
 
 export type PracticeRunManagementDraft = Omit<PracticeRunManagementRun, "id"> & {
@@ -59,6 +66,7 @@ export type PracticeRunManagementIntent =
   | { type: "change-puzzle-timing"; puzzleTiming: PuzzleTimingPolicy }
   | { type: "step-elo-input"; direction: -1 | 1 }
   | { type: "toggle-theme"; theme: string }
+  | { type: "toggle-arrow-duel-difficulty"; difficulty: ArrowDuelDifficulty }
   | { type: "toggle-opponent-reply" }
   | { type: "confirm-remove" }
   | { type: "dismiss-remove" }
@@ -93,6 +101,7 @@ export type PracticeRunManagementCommand =
     elo: number;
     opponentReply?: NonNullable<PracticeRunManagementDraft["opponentReply"]>;
     puzzleTiming: PuzzleTimingPolicy;
+    arrowDuelDifficulties?: readonly ArrowDuelDifficulty[];
   };
 
 export type PracticeRunManagementCommandResult = {
@@ -210,18 +219,32 @@ export function createPracticeRunManagementController(
         commit(stepEloInput(view, intent.direction));
         return;
       case "change-mode":
-        if (view.screen === "create") {
+        if (view.screen === "create" && view.draft) {
+          const {
+            arrowDuelDifficulties: previousDifficulties,
+            opponentReply: previousOpponentReply,
+            ...modeNeutralDraft
+          } = view.draft;
           const opponentReply = intent.mode === "arrow_duel"
             ? resolveOpponentReplyConfig(
                 "arrow_duel",
-                view.draft?.opponentReply
+                previousOpponentReply
               )
             : undefined;
           commit({
-            ...updateDraft(view, {
+            ...view,
+            draft: {
+              ...modeNeutralDraft,
               mode: intent.mode,
+              ...(intent.mode === "arrow_duel"
+                ? {
+                    arrowDuelDifficulties: normalizeArrowDuelDifficulties(
+                      previousDifficulties
+                    )
+                  }
+                : {}),
               ...(opponentReply === undefined ? {} : { opponentReply })
-            }),
+            },
             opponentReplySecondsError: null,
             opponentReplySecondsInput: opponentReply
               ? String(opponentReply.seconds)
@@ -284,6 +307,19 @@ export function createPracticeRunManagementController(
           }));
         }
         return;
+      case "toggle-arrow-duel-difficulty":
+        if (
+          (view.screen === "create" || view.screen === "edit") &&
+          view.draft?.mode === "arrow_duel"
+        ) {
+          commit(updateDraft(view, {
+            arrowDuelDifficulties: toggleArrowDuelDifficulty(
+              view.draft.arrowDuelDifficulties ?? ALL_ARROW_DUEL_DIFFICULTIES,
+              intent.difficulty
+            )
+          }));
+        }
+        return;
       case "dismiss-remove":
         commit({ ...view, removeCandidateId: null });
         return;
@@ -335,6 +371,7 @@ export function createPracticeRunManagementController(
               ),
               ...(previous.config.mode === "arrow_duel"
                 ? {
+                    arrowDuelDifficulties: [...ALL_ARROW_DUEL_DIFFICULTIES],
                     opponentReply: resolveOpponentReplyConfig(
                       "arrow_duel",
                       undefined
@@ -477,7 +514,14 @@ export function createPracticeRunManagementController(
           ...(draft.opponentReply === undefined
             ? {}
             : { opponentReply: { ...draft.opponentReply } }),
-          puzzleTiming: { ...draft.puzzleTiming }
+          puzzleTiming: { ...draft.puzzleTiming },
+          ...(draft.mode === "arrow_duel"
+            ? {
+                arrowDuelDifficulties: normalizeArrowDuelDifficulties(
+                  draft.arrowDuelDifficulties
+                )
+              }
+            : {})
         });
         const saved = result.catalog.runs.find((run) => run.id === result.changedRunId);
         if (!saved) {
@@ -687,19 +731,28 @@ function cloneView(view: RunManagementViewState): RunManagementViewState {
 function cloneDraft(
   draft: PracticeRunManagementDraft
 ): PracticeRunManagementDraft {
+  const { arrowDuelDifficulties, ...difficultyNeutralDraft } = draft;
   return {
-    ...draft,
+    ...difficultyNeutralDraft,
     ...(draft.opponentReply === undefined
       ? {}
       : { opponentReply: { ...draft.opponentReply } }),
     puzzleTiming: { ...draft.puzzleTiming },
-    themes: [...draft.themes]
+    themes: [...draft.themes],
+    ...(draft.mode === "arrow_duel"
+      ? {
+          arrowDuelDifficulties: normalizeArrowDuelDifficulties(
+            arrowDuelDifficulties
+          )
+        }
+      : {})
   };
 }
 
 function cloneRun(run: PracticeRunManagementRun): PracticeRunManagementRun {
+  const { arrowDuelDifficulties, ...difficultyNeutralRun } = run;
   return {
-    ...run,
+    ...difficultyNeutralRun,
     ...(run.opponentReply === undefined
       ? {}
       : { opponentReply: { ...run.opponentReply } }),
@@ -707,6 +760,13 @@ function cloneRun(run: PracticeRunManagementRun): PracticeRunManagementRun {
       run.puzzleTiming,
       run.perPuzzleSeconds
     ),
-    themes: [...run.themes]
+    themes: [...run.themes],
+    ...(run.mode === "arrow_duel"
+      ? {
+          arrowDuelDifficulties: normalizeArrowDuelDifficulties(
+            arrowDuelDifficulties
+          )
+        }
+      : {})
   };
 }

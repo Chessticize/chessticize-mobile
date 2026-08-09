@@ -200,7 +200,8 @@ test("previous configurations, start effects, and refresh stay outside React", (
       enabled: true,
       seconds: 10
     },
-    themes: ["fork", "pin"]
+    themes: ["fork", "pin"],
+    arrowDuelDifficulties: [0, 1, 2, 3, 4]
   });
   controller.dispatch({ type: "cancel-edit" });
 
@@ -226,6 +227,14 @@ test("Arrow Duel Runs configure opponent reply on create and edit", () => {
     enabled: true,
     seconds: 10
   });
+  assert.deepEqual(controller.getSnapshot().draft?.arrowDuelDifficulties, [0, 1, 2, 3, 4]);
+  controller.dispatch({ type: "change-mode", mode: "custom" });
+  assert.equal(controller.getSnapshot().draft?.arrowDuelDifficulties, undefined);
+  assert.equal(controller.getSnapshot().draft?.opponentReply, undefined);
+  controller.dispatch({ type: "change-mode", mode: "arrow_duel" });
+  controller.dispatch({ type: "toggle-arrow-duel-difficulty", difficulty: 0 });
+  controller.dispatch({ type: "toggle-arrow-duel-difficulty", difficulty: 2 });
+  controller.dispatch({ type: "toggle-arrow-duel-difficulty", difficulty: 3 });
 
   controller.dispatch({
     type: "change-opponent-reply-seconds-input",
@@ -244,10 +253,12 @@ test("Arrow Duel Runs configure opponent reply on create and edit", () => {
     (run) => run.name === "Reply Drill"
   );
   assert.deepEqual(created?.opponentReply, { enabled: false, seconds: 10 });
+  assert.deepEqual(created?.arrowDuelDifficulties, [1, 4]);
 
   assert.ok(created);
   controller.dispatch({ type: "toggle-home-edit" });
   controller.dispatch({ type: "edit-run", runId: created.id });
+  controller.dispatch({ type: "toggle-arrow-duel-difficulty", difficulty: 1 });
   controller.dispatch({ type: "toggle-opponent-reply" });
   controller.dispatch({
     type: "change-opponent-reply-seconds-input",
@@ -265,6 +276,7 @@ test("Arrow Duel Runs configure opponent reply on create and edit", () => {
     name: "Reply Drill",
     elo: 900,
     opponentReply: { enabled: true, seconds: 30 },
+    arrowDuelDifficulties: [4],
     puzzleTiming: {
       slowAfterSeconds: 40,
       timeoutAfterSeconds: 60
@@ -325,7 +337,10 @@ class FakeRunManagementAdapter implements PracticeRunManagementAdapter {
             ...(command.opponentReply === undefined
               ? {}
               : { opponentReply: { ...command.opponentReply } }),
-            puzzleTiming: { ...command.puzzleTiming }
+            puzzleTiming: { ...command.puzzleTiming },
+            ...(command.arrowDuelDifficulties === undefined
+              ? {}
+              : { arrowDuelDifficulties: [...command.arrowDuelDifficulties] })
           }
           : run);
         break;
@@ -419,7 +434,10 @@ function run(
       slowAfterSeconds: perPuzzleSeconds * 2,
       timeoutAfterSeconds: perPuzzleSeconds * 3
     },
-    themes
+    themes,
+    ...(mode === "arrow_duel"
+      ? { arrowDuelDifficulties: [0, 1, 2, 3, 4] as const }
+      : {})
   };
 }
 
@@ -442,6 +460,13 @@ function cloneRun(run: PracticeRunManagementRun): PracticeRunManagementRun {
       ? {}
       : { opponentReply: { ...run.opponentReply } }),
     puzzleTiming: { ...run.puzzleTiming },
-    themes: [...run.themes]
+    themes: [...run.themes],
+    ...(run.mode === "arrow_duel"
+      ? {
+          arrowDuelDifficulties: [
+            ...(run.arrowDuelDifficulties ?? [0, 1, 2, 3, 4])
+          ]
+        }
+      : {})
   };
 }

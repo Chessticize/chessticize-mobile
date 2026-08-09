@@ -22,7 +22,15 @@ export function preferredSprintSession(
     ...(run === undefined ? {} : { run: { ...run } }),
     ...(config === undefined
       ? {}
-      : { config: { ...config, ...(config.themes === undefined ? {} : { themes: [...config.themes] }) } })
+      : {
+          config: {
+            ...config,
+            ...(config.themes === undefined ? {} : { themes: [...config.themes] }),
+            ...(config.arrowDuelDifficulties === undefined
+              ? {}
+              : { arrowDuelDifficulties: [...config.arrowDuelDifficulties] })
+          }
+        })
   };
 }
 

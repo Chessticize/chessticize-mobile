@@ -122,6 +122,46 @@ test("SQLitePuzzlePackSource selects puzzles from a read-only pack schema", asyn
   }
 });
 
+test("SQLitePuzzlePackSource filters compact Arrow Duel difficulty buckets", async () => {
+  const puzzles = (await loadFixturePuzzles()).map((puzzle, index) => ({
+    ...puzzle,
+    ...(index === 0
+      ? { arrowDuelDifficulty: 0 as const }
+      : index === 1
+        ? { arrowDuelDifficulty: 1 as const }
+        : index === 2
+          ? { arrowDuelDifficulty: 4 as const }
+          : {})
+  }));
+  const packDb = buildPackDatabase(puzzles);
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
+      arrowDuelEligibility: "all"
+    });
+    assert.equal(source.getPuzzle(puzzles[2]!.id)?.arrowDuelDifficulty, 4);
+    assert.deepEqual(
+      source.selectPuzzles({
+        mode: "arrow_duel",
+        limit: 10,
+        arrowDuelDifficulties: [1, 4]
+      }).map((puzzle) => puzzle.arrowDuelDifficulty),
+      [1, 4]
+    );
+    assert.equal(source.countPuzzles({
+      mode: "arrow_duel",
+      limit: 10,
+      arrowDuelDifficulties: [4]
+    }), 1);
+    assert.equal(
+      source.selectPuzzles({ mode: "arrow_duel", limit: 10 }).length,
+      puzzles.length,
+      "the default all-bucket selection must not exclude legacy NULL rows"
+    );
+  } finally {
+    packDb.close();
+  }
+});
+
 test("SQLitePuzzlePackSource skips repeated Arrow Duel validation for a manifest-validated pack", async () => {
   const puzzles = await loadFixturePuzzles();
   const packDb = buildPackDatabase(puzzles);
@@ -794,7 +834,8 @@ function buildPackDatabase(puzzles: Puzzle[]): DatabaseSync {
       rating_deviation INTEGER NOT NULL,
       stockfish_eval REAL NOT NULL,
       stockfish_bestmove TEXT NOT NULL,
-      stockfish_eval_after_first_move REAL NOT NULL
+      stockfish_eval_after_first_move REAL NOT NULL,
+      arrow_duel_difficulty INTEGER
     );
     CREATE TABLE themes (
       id INTEGER PRIMARY KEY,
@@ -818,8 +859,9 @@ function buildPackDatabase(puzzles: Puzzle[]): DatabaseSync {
       rating_deviation,
       stockfish_eval,
       stockfish_bestmove,
-      stockfish_eval_after_first_move
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      stockfish_eval_after_first_move,
+      arrow_duel_difficulty
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertThemeName = db.prepare("INSERT INTO themes (name) VALUES (?)");
   const insertTheme = db.prepare("INSERT INTO puzzle_themes (puzzle_id, theme_id, rating) VALUES (?, ?, ?)");
@@ -839,7 +881,8 @@ function buildPackDatabase(puzzles: Puzzle[]): DatabaseSync {
         puzzle.ratingDeviation ?? 100,
         puzzle.stockfishEval ?? 0,
         puzzle.stockfishBestMove ?? "",
-        puzzle.stockfishEvalAfterFirstMove ?? 0
+        puzzle.stockfishEvalAfterFirstMove ?? 0,
+        puzzle.arrowDuelDifficulty ?? null
       );
       for (const theme of puzzle.themes) {
         insertTheme.run(puzzle.id, themeIds.get(theme), puzzle.rating);

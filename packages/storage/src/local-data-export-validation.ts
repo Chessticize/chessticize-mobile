@@ -204,6 +204,7 @@ function isSprintConfig(value: unknown): value is SprintConfig {
     isNonNegativeInteger(value.maxMistakes) &&
     isNonEmptyString(value.ratingKey) &&
     isOptional(value.themes, isStringArray) &&
+    isOptional(value.arrowDuelDifficulties, isArrowDuelDifficultyArray) &&
     isOptional(value.maxAttempts, isPositiveInteger) &&
     isOptional(value.ratingPolicy, (candidate) =>
       candidate === "rated" || candidate === "unrated"
@@ -235,6 +236,7 @@ function isPracticeRunRecord(value: unknown): value is PracticeRunRecord {
     isPositiveInteger(value.targetCorrect) &&
     isNonNegativeInteger(value.maxMistakes) &&
     isOptional(value.themes, isStringArray) &&
+    isOptional(value.arrowDuelDifficulties, isArrowDuelDifficultyArray) &&
     isFiniteNumber(value.homeOrder) &&
     typeof value.archived === "boolean" &&
     isIsoDate(value.updatedAt);
@@ -244,6 +246,18 @@ function isPuzzleTimingPolicy(value: unknown): boolean {
   return isRecord(value) &&
     (value.slowAfterSeconds === null || isPositiveFiniteNumber(value.slowAfterSeconds)) &&
     (value.timeoutAfterSeconds === null || isPositiveFiniteNumber(value.timeoutAfterSeconds));
+}
+
+function isArrowDuelDifficultyArray(value: unknown): boolean {
+  return Array.isArray(value) &&
+    value.length > 0 &&
+    value.every(
+      (difficulty) =>
+        typeof difficulty === "number" &&
+        Number.isInteger(difficulty) &&
+        difficulty >= 0 &&
+        difficulty <= 4
+    );
 }
 
 function isOpponentReplyConfig(value: unknown): boolean {

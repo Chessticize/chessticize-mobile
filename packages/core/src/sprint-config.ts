@@ -5,6 +5,8 @@ import type {
   SprintMode
 } from "./types.ts";
 import { namedThemesForSelection } from "./theme-catalog.ts";
+import { restrictedArrowDuelDifficulties } from "./arrow-duel-difficulty.ts";
+import type { ArrowDuelDifficulty } from "./arrow-duel-difficulty.ts";
 
 const DEFAULT_DURATION_SECONDS = 5 * 60;
 export const PUZZLE_TIMING_MIN_SECONDS = 10;
@@ -40,6 +42,7 @@ export function buildSprintConfig(input: {
   ratingPolicy?: SprintConfig["ratingPolicy"];
   tacticalFocus?: SprintConfig["tacticalFocus"];
   opponentReply?: OpponentReplyConfig;
+  arrowDuelDifficulties?: readonly number[];
 }): SprintConfig {
   if (!Number.isInteger(input.durationSeconds) || input.durationSeconds <= 0) {
     throw new Error("durationSeconds must be a positive integer");
@@ -83,6 +86,13 @@ export function buildSprintConfig(input: {
     input.mode,
     input.opponentReply
   );
+  if (input.mode !== "arrow_duel" && input.arrowDuelDifficulties !== undefined) {
+    throw new Error("Arrow Duel difficulty is available only for Arrow Duel");
+  }
+  const arrowDuelDifficulties: ArrowDuelDifficulty[] | undefined =
+    input.mode === "arrow_duel"
+      ? restrictedArrowDuelDifficulties(input.arrowDuelDifficulties)
+      : undefined;
 
   return {
     mode: input.mode,
@@ -94,6 +104,7 @@ export function buildSprintConfig(input: {
     ratingKey,
     ...(opponentReply === undefined ? {} : { opponentReply }),
     ...(selectedThemes.length === 0 ? {} : { themes: selectedThemes }),
+    ...(arrowDuelDifficulties === undefined ? {} : { arrowDuelDifficulties }),
     ...(input.maxAttempts === undefined ? {} : { maxAttempts: input.maxAttempts }),
     ...(input.ratingPolicy === undefined ? {} : { ratingPolicy: input.ratingPolicy }),
     ...(input.tacticalFocus === undefined

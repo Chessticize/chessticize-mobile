@@ -219,8 +219,9 @@ result may therefore contain fewer puzzles than `targetPuzzleCount`.
 `core-pack-v2` is the historical corrected artifact produced by this workflow.
 The `core-pack-v3` rebuild retains those corrected positions while adding the
 immutable Puzzle Rating Deviation feature required by Tactical Profile. The
-current `core-pack-v5` retains those positions and features in a versioned
-binary row encoding. Publish future updates under new immutable release tags; never
+current `core-pack-v6` retains those positions and features in a versioned
+binary row encoding and adds the compact Arrow Duel forced-follow-up bucket.
+Publish future updates under new immutable release tags; never
 overwrite an existing Core Pack release.
 
 ### Depth-20 correction result (2026-07-10)
@@ -280,6 +281,29 @@ overwrite an existing Core Pack release.
 - Published SHA-256:
   `4f8726cd64c8e490708f9c6b7b411dad3736d5936c0493d71fd42bbe4404a811`.
 - Published release: `core-pack-v5`; the fetch script references its immutable
+  `bundled-core-pack.sqlite` asset.
+
+### Arrow Duel difficulty release (2026-08-09)
+
+- Input puzzle rows and binary payloads preserved from `core-pack-v5`:
+  1,400,000 / 1,400,000.
+- The source Core Pack SHA-256 exactly matches the input recorded by the
+  `arrow-duel-routes-d16-mpv2-2026-08-05` analysis release. Its compact metric
+  artifact SHA-256 is
+  `1b62b084a463bb8bab08322f798fee86d94bdaca12f7531de615aa9e4227d432`.
+- `puzzles.arrow_duel_difficulty` is nullable INTEGER storage: `0` has no
+  forced puzzle-side follow-up after the displayed correct move, `1` through
+  `3` are exact counts, and stored `4` is the censored `4+` bucket. Counts are
+  `0`: 994,184; `1`: 239,524; `2`: 82,662; `3`: 37,912; `4+`: 38,687;
+  unavailable: 7,031.
+- The partial `(arrow_duel_difficulty, rating, id)` index contains only the
+  398,785 rows in buckets `1` through `4+`. Measured single-bucket counts took
+  about 3 ms and a midpoint candidate page about 1.4 ms; bucket `0` continues
+  to use the existing rating index.
+- SQLite integrity: `ok`; artifact size is 173,125,632 bytes, 8,962,048 bytes
+  (8.55 MiB, 5.46%) larger than `core-pack-v5`. Published SHA-256:
+  `7b41e5d2ae61c3121fae03f2d3b98245a9f30bc8a6469f138abca50a93c80870`.
+- Published release: `core-pack-v6`; the fetch script references its immutable
   `bundled-core-pack.sqlite` asset.
 
 ## Regenerating And Publishing The Pack

@@ -20,6 +20,7 @@ import {
   preferredReviewScheduleChange,
   removeReviewContext,
   resetRating as resetRatingRecord,
+  restrictedArrowDuelDifficulties,
   resolveOpponentReplyConfig,
   resolveHistoryRange,
   reviewDayFor,
@@ -29,6 +30,7 @@ import {
   sameReviewContext,
   sideToMoveForHistoryPuzzle,
   isAttemptMistake,
+  isArrowDuelDifficulty,
   updateAttemptUnclearState
 } from "../../core/src/index.ts";
 import type {
@@ -156,6 +158,7 @@ interface PuzzleRow {
   stockfish_eval: number | null;
   stockfish_bestmove: string | null;
   stockfish_eval_after_first_move: number | null;
+  arrow_duel_difficulty?: number | null;
 }
 
 interface RatingRow {
@@ -230,6 +233,7 @@ interface PracticeRunRow {
   opponent_reply_enabled?: number;
   opponent_reply_seconds?: number;
   themes_json: string | null;
+  arrow_duel_difficulties_json?: string | null;
   home_order: number;
   archived: number;
   updated_at: string;
@@ -295,7 +299,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 19;
+export const CURRENT_SCHEMA_VERSION = 20;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -323,7 +327,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 15, to: 16, apply: migrateV15ToV16 },
   { from: 16, to: 17, apply: migrateV16ToV17 },
   { from: 17, to: 18, apply: migrateV17ToV18 },
-  { from: 18, to: 19, apply: migrateV18ToV19 }
+  { from: 18, to: 19, apply: migrateV18ToV19 },
+  { from: 19, to: 20, apply: migrateV19ToV20 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -398,8 +403,9 @@ export class SyncSQLiteStore implements PracticeStore {
         source,
         stockfish_eval,
         stockfish_bestmove,
-        stockfish_eval_after_first_move
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        stockfish_eval_after_first_move,
+        arrow_duel_difficulty
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     for (const puzzle of puzzles) {
@@ -417,7 +423,8 @@ export class SyncSQLiteStore implements PracticeStore {
         puzzle.source,
         puzzle.stockfishEval ?? null,
         puzzle.stockfishBestMove ?? null,
-        puzzle.stockfishEvalAfterFirstMove ?? null
+        puzzle.stockfishEvalAfterFirstMove ?? null,
+        puzzle.arrowDuelDifficulty ?? null
       );
     }
   }
@@ -458,6 +465,9 @@ export class SyncSQLiteStore implements PracticeStore {
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
       ...(filter.themes === undefined ? {} : { themes: filter.themes }),
+      ...(filter.arrowDuelDifficulties === undefined
+        ? {}
+        : { arrowDuelDifficulties: filter.arrowDuelDifficulties }),
       ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
@@ -603,9 +613,9 @@ export class SyncSQLiteStore implements PracticeStore {
       `INSERT INTO practice_runs (
         id, kind, name, mode, rating_key, duration_seconds, per_puzzle_seconds,
         slow_after_seconds, timeout_after_seconds, target_correct, max_mistakes,
-        opponent_reply_enabled, opponent_reply_seconds, themes_json, home_order,
-        archived, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        opponent_reply_enabled, opponent_reply_seconds, themes_json,
+        arrow_duel_difficulties_json, home_order, archived, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         kind = excluded.kind,
         name = excluded.name,
@@ -620,6 +630,7 @@ export class SyncSQLiteStore implements PracticeStore {
         opponent_reply_enabled = excluded.opponent_reply_enabled,
         opponent_reply_seconds = excluded.opponent_reply_seconds,
         themes_json = excluded.themes_json,
+        arrow_duel_difficulties_json = excluded.arrow_duel_difficulties_json,
         home_order = excluded.home_order,
         archived = excluded.archived,
         updated_at = excluded.updated_at`
@@ -638,6 +649,9 @@ export class SyncSQLiteStore implements PracticeStore {
       boolToInt(opponentReply.enabled),
       opponentReply.seconds,
       run.themes === undefined ? null : JSON.stringify(run.themes),
+      run.arrowDuelDifficulties === undefined
+        ? null
+        : JSON.stringify(run.arrowDuelDifficulties),
       run.homeOrder,
       boolToInt(run.archived),
       run.updatedAt
@@ -2554,6 +2568,7 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   if (!hadOpponentReplyColumns) {
     migrateV17ToV18(db);
   }
+  migrateV19ToV20(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -2566,7 +2581,9 @@ function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
     hasColumn(db, "app_settings", "sprint_arrow_duel_reply_cue_stage") &&
     hasTable(db, "app_review_request_state") &&
     hasColumn(db, "practice_runs", "opponent_reply_enabled") &&
-    hasColumn(db, "practice_runs", "opponent_reply_seconds");
+    hasColumn(db, "practice_runs", "opponent_reply_seconds") &&
+    hasColumn(db, "practice_runs", "arrow_duel_difficulties_json") &&
+    hasColumn(db, "puzzles", "arrow_duel_difficulty");
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -3010,6 +3027,22 @@ function migrateV18ToV19(db: SyncSqliteDatabase): void {
   );
 }
 
+function migrateV19ToV20(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "practice_runs",
+    "arrow_duel_difficulties_json",
+    "ALTER TABLE practice_runs ADD COLUMN arrow_duel_difficulties_json TEXT"
+  );
+  ensureColumn(
+    db,
+    "puzzles",
+    "arrow_duel_difficulty",
+    "ALTER TABLE puzzles ADD COLUMN arrow_duel_difficulty INTEGER " +
+      "CHECK (arrow_duel_difficulty IS NULL OR arrow_duel_difficulty BETWEEN 0 AND 4)"
+  );
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -3094,8 +3127,21 @@ function puzzleFromRow(row: PuzzleRow): Puzzle {
     ...(row.stockfish_bestmove ? { stockfishBestMove: row.stockfish_bestmove } : {}),
     ...(row.stockfish_eval_after_first_move === null
       ? {}
-      : { stockfishEvalAfterFirstMove: row.stockfish_eval_after_first_move })
+      : { stockfishEvalAfterFirstMove: row.stockfish_eval_after_first_move }),
+    ...progressPuzzleArrowDuelDifficulty(row)
   };
+}
+
+function progressPuzzleArrowDuelDifficulty(
+  row: PuzzleRow
+): { arrowDuelDifficulty?: NonNullable<Puzzle["arrowDuelDifficulty"]> } {
+  if (row.arrow_duel_difficulty === undefined || row.arrow_duel_difficulty === null) {
+    return {};
+  }
+  if (!isArrowDuelDifficulty(row.arrow_duel_difficulty)) {
+    throw new Error(`Invalid stored Arrow Duel difficulty ${row.arrow_duel_difficulty}`);
+  }
+  return { arrowDuelDifficulty: row.arrow_duel_difficulty };
 }
 
 function ratingFromRow(row: RatingRow): RatingRecord {
@@ -3337,6 +3383,9 @@ function exportedSprintSessionFromRow(row: SprintSessionExportRow): ExportedSpri
 
 function practiceRunFromRow(row: PracticeRunRow): PracticeRunRecord {
   const themes = optionalStringArrayFromJson(row.themes_json);
+  const arrowDuelDifficulties = row.mode === "arrow_duel"
+    ? storedArrowDuelDifficulties(row.arrow_duel_difficulties_json)
+    : undefined;
   const puzzleTiming = row.slow_after_seconds === undefined || row.timeout_after_seconds === undefined
     ? defaultRunPuzzleTiming(row.per_puzzle_seconds)
     : {
@@ -3367,10 +3416,29 @@ function practiceRunFromRow(row: PracticeRunRow): PracticeRunRecord {
     maxMistakes: row.max_mistakes,
     ...(opponentReply === undefined ? {} : { opponentReply }),
     ...(themes === undefined ? {} : { themes }),
+    ...(arrowDuelDifficulties === undefined ? {} : { arrowDuelDifficulties }),
     homeOrder: row.home_order,
     archived: intToBool(row.archived),
     updatedAt: row.updated_at
   };
+}
+
+function storedArrowDuelDifficulties(
+  value: string | null | undefined
+): PracticeRunRecord["arrowDuelDifficulties"] {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("Practice Run Arrow Duel difficulty selection is not valid JSON");
+  }
+  if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === "number")) {
+    throw new Error("Practice Run Arrow Duel difficulty selection must be a number array");
+  }
+  return restrictedArrowDuelDifficulties(parsed);
 }
 
 function normalizedRunOpponentReply(run: PracticeRunRecord): {
@@ -3550,7 +3618,10 @@ CREATE TABLE IF NOT EXISTS puzzles (
   source TEXT NOT NULL,
   stockfish_eval REAL,
   stockfish_bestmove TEXT,
-  stockfish_eval_after_first_move REAL
+  stockfish_eval_after_first_move REAL,
+  arrow_duel_difficulty INTEGER CHECK (
+    arrow_duel_difficulty IS NULL OR arrow_duel_difficulty BETWEEN 0 AND 4
+  )
 );
 
 CREATE TABLE IF NOT EXISTS ratings (

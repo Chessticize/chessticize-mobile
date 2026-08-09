@@ -33,8 +33,10 @@ import {
 } from "./sessionGuideGeometry.ts";
 import {
   analyzeFenWithUciEngine,
+  ALL_ARROW_DUEL_DIFFICULTIES,
   ALL_THEME_SELECTION,
   applyMovesToFen,
+  arrowDuelDifficultyLabel,
   arrowDuelReplyCuePresentationFor,
   beginArrowDuelPuzzle,
   beginLinePuzzle,
@@ -79,6 +81,7 @@ import {
 import type {
   AttemptEvent,
   AttemptSource,
+  ArrowDuelDifficulty,
   ArrowDuelState,
   CurrentPuzzleState,
   CustomSprintConfigRecord,
@@ -4675,6 +4678,7 @@ export function PracticePocScreen({
                         : undefined
                     }
                     presentation={activeRunManagementPresentation}
+                    showArrowDuelDifficulty={isPracticeDebugEnabled()}
                     showSprintRulesSummary={
                       sprintGuidanceEnabled
                       || sprintRulesDesignPreview?.showRunEditorSummary === true
@@ -8235,6 +8239,7 @@ function RunRemovalConfirmation({
 function PracticeRunEditor({
   arrowDuelReplyChallenge,
   presentation,
+  showArrowDuelDifficulty,
   showSprintRulesSummary,
   themeCatalogPresentation,
   timeoutCountsAsMistake
@@ -8247,6 +8252,7 @@ function PracticeRunEditor({
     onToggle: () => void;
   };
   presentation: PracticeRunManagementPresentation;
+  showArrowDuelDifficulty: boolean;
   showSprintRulesSummary: boolean;
   themeCatalogPresentation?: ThemeCatalogPresentation;
   timeoutCountsAsMistake: boolean;
@@ -8461,6 +8467,16 @@ function PracticeRunEditor({
         )}
       </View>
 
+      {showArrowDuelDifficulty && draft.mode === "arrow_duel" ? (
+        <ArrowDuelDifficultySetting
+          selected={draft.arrowDuelDifficulties ?? ALL_ARROW_DUEL_DIFFICULTIES}
+          onToggle={(difficulty) => presentation.onIntent({
+            type: "toggle-arrow-duel-difficulty",
+            difficulty
+          })}
+        />
+      ) : null}
+
       {showSprintRulesSummary ? (
         <SprintPassRulesSummary config={sprintRules} />
       ) : null}
@@ -8502,6 +8518,51 @@ function PracticeRunEditor({
           ))}
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function ArrowDuelDifficultySetting({
+  selected,
+  onToggle
+}: {
+  selected: readonly ArrowDuelDifficulty[];
+  onToggle: (difficulty: ArrowDuelDifficulty) => void;
+}): React.JSX.Element {
+  return (
+    <View style={styles.settingsSection} testID="practice-run-arrow-duel-difficulty-setting">
+      <View style={styles.runTimingSectionCopy}>
+        <Text style={styles.sectionLabel}>Debug difficulty</Text>
+        <Text style={styles.helperText}>
+          Forced puzzle-side follow-ups after the displayed correct move.
+        </Text>
+      </View>
+      <View style={styles.customConfigCard}>
+        <View style={styles.themeCatalogGroupOptions}>
+          {ALL_ARROW_DUEL_DIFFICULTIES.map((difficulty) => {
+            const label = arrowDuelDifficultyLabel(difficulty);
+            const checked = selected.includes(difficulty);
+            return (
+              <Pressable
+                key={difficulty}
+                accessibilityLabel={`Arrow Duel difficulty ${label}`}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked }}
+                style={[styles.customMiniChip, checked ? styles.customMiniChipActive : null]}
+                testID={`practice-run-arrow-duel-difficulty-${label.replace("+", "plus")}`}
+                onPress={() => onToggle(difficulty)}
+              >
+                <Text style={[
+                  styles.customMiniChipText,
+                  checked ? styles.customMiniChipTextActive : null
+                ]}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
     </View>
   );
 }

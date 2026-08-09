@@ -1,4 +1,5 @@
 export * from "./types.ts";
+export * from "./arrow-duel-difficulty.ts";
 export * from "./sprint-config.ts";
 export * from "./theme-catalog.ts";
 export * from "./tactical-profile.ts";

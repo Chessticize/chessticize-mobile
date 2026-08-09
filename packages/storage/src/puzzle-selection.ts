@@ -4,7 +4,7 @@ import {
   namedThemesForSelection,
   puzzleMatchesAnyTheme
 } from "../../core/src/index.ts";
-import type { Puzzle, SprintMode } from "../../core/src/index.ts";
+import type { ArrowDuelDifficulty, Puzzle, SprintMode } from "../../core/src/index.ts";
 import type {
   RatingBandPuzzleSelection,
   RatingBandPuzzleSelectionInput
@@ -19,6 +19,7 @@ export interface SelectUniquePuzzlesInput {
   minRating?: number;
   maxRating?: number;
   themes?: string[];
+  arrowDuelDifficulties?: ArrowDuelDifficulty[];
   includeIds?: string[];
   excludeIds?: string[];
   randomSeed?: string | number;
@@ -93,6 +94,9 @@ function selectPuzzlesByServerEloFallback(input: SelectUniquePuzzlesInput & { ra
         minRating: strategy.minRating,
         maxRating: strategy.maxRating,
         themes: strategy.themes,
+        ...(input.arrowDuelDifficulties === undefined
+          ? {}
+          : { arrowDuelDifficulties: input.arrowDuelDifficulties }),
         ...(input.includeIds === undefined ? {} : { includeIds: input.includeIds }),
         ...(input.randomSeed === undefined
           ? {}
@@ -154,6 +158,15 @@ function isEligiblePuzzle(
   }
   if (filter.mode !== "arrow_duel") {
     return true;
+  }
+  if (
+    filter.arrowDuelDifficulties !== undefined &&
+    (
+      puzzle.arrowDuelDifficulty === undefined ||
+      !filter.arrowDuelDifficulties.includes(puzzle.arrowDuelDifficulty)
+    )
+  ) {
+    return false;
   }
   if (filter.allPuzzlesArrowDuelEligible) {
     return true;

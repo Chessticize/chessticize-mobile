@@ -1212,6 +1212,59 @@ test("SQLite v19 defaults legacy reply-cue familiarity and persists later progre
   }
 });
 
+test("SQLite v20 adds compact Arrow Duel difficulty storage without changing legacy defaults", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-v20-arrow-duel-difficulty-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setup = new SQLiteStore(databasePath);
+    setup.migrate();
+    setup.db.exec(`
+      ALTER TABLE practice_runs DROP COLUMN arrow_duel_difficulties_json;
+      ALTER TABLE puzzles DROP COLUMN arrow_duel_difficulty;
+      PRAGMA user_version = 19;
+    `);
+    setup.close();
+
+    const migrated = new SQLiteStore(databasePath);
+    migrated.migrate();
+    try {
+      assert.equal(
+        migrated.listPracticeRuns().find((run) => run.id === "arrow-duel")
+          ?.arrowDuelDifficulties,
+        undefined
+      );
+      const puzzle = (await loadFixturePuzzles())[0]!;
+      migrated.seedPuzzles([{ ...puzzle, arrowDuelDifficulty: 3 }]);
+      assert.equal(migrated.getPuzzle(puzzle.id)?.arrowDuelDifficulty, 3);
+
+      const run = migrated.listPracticeRuns().find((candidate) => candidate.id === "arrow-duel")!;
+      migrated.savePracticeRun({ ...run, arrowDuelDifficulties: [2, 3] });
+      assert.deepEqual(
+        migrated.listPracticeRuns().find((candidate) => candidate.id === run.id)
+          ?.arrowDuelDifficulties,
+        [2, 3]
+      );
+      assert.equal(schemaVersionForStore(migrated), CURRENT_SCHEMA_VERSION);
+    } finally {
+      migrated.close();
+    }
+
+    const reopened = new SQLiteStore(databasePath);
+    reopened.migrate();
+    try {
+      assert.deepEqual(
+        reopened.listPracticeRuns().find((candidate) => candidate.id === "arrow-duel")
+          ?.arrowDuelDifficulties,
+        [2, 3]
+      );
+    } finally {
+      reopened.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("SQLite v14 applies the quiet move-feedback default once", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-quiet-feedback-migration-"));
   const databasePath = join(directory, "practice.sqlite");

@@ -1,5 +1,6 @@
 import {
   ALL_THEME_SELECTION,
+  normalizeArrowDuelDifficulties,
   namedThemesForSelection,
   resolvePuzzleTimingPolicy,
   type PracticeRunManagementAdapter,
@@ -46,7 +47,10 @@ export function createPracticeRunManagementAdapter(
             ...(command.opponentReply === undefined
               ? {}
               : { opponentReply: command.opponentReply }),
-            puzzleTiming: command.puzzleTiming
+            puzzleTiming: command.puzzleTiming,
+            ...(command.arrowDuelDifficulties === undefined
+              ? {}
+              : { arrowDuelDifficulties: [...command.arrowDuelDifficulties] })
           });
           changedRunId = saved.run.id;
           break;
@@ -91,7 +95,14 @@ function presentationForRun(
       ? {}
       : { opponentReply: { ...run.opponentReply } }),
     puzzleTiming: resolvePuzzleTimingPolicy(run.puzzleTiming, run.perPuzzleSeconds),
-    themes: run.themes ?? [ALL_THEME_SELECTION]
+    themes: run.themes ?? [ALL_THEME_SELECTION],
+    ...(run.mode === "arrow_duel"
+      ? {
+          arrowDuelDifficulties: normalizeArrowDuelDifficulties(
+            run.arrowDuelDifficulties
+          )
+        }
+      : {})
   };
 }
 
@@ -109,6 +120,11 @@ function createPracticeRunCommand(
       ? { opponentReply: { ...draft.opponentReply } }
       : {}),
     initialRating: draft.elo,
-    ...(themes.length === 0 ? {} : { themes })
+    ...(themes.length === 0 ? {} : { themes }),
+    ...(draft.mode === "arrow_duel"
+      ? { arrowDuelDifficulties: normalizeArrowDuelDifficulties(
+          draft.arrowDuelDifficulties
+        ) }
+      : {})
   };
 }

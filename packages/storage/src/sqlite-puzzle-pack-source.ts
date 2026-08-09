@@ -1,8 +1,10 @@
 import {
   buildServerEloPuzzleSelectionStrategies,
   hasArrowDuelPromotionCandidate,
+  isArrowDuelDifficulty,
   isServerCompatibleArrowDuelPuzzle,
   namedThemesForSelection,
+  restrictedArrowDuelDifficulties,
   SERVER_PUZZLE_MAX_RATING,
   SERVER_PUZZLE_MIN_RATING
 } from "../../core/src/index.ts";
@@ -36,6 +38,7 @@ interface PuzzlePackRow {
   stockfish_eval: number;
   stockfish_bestmove: string | PuzzlePackBinaryValue;
   stockfish_eval_after_first_move: number;
+  arrow_duel_difficulty?: number | null;
 }
 
 interface PuzzleCandidateRow {
@@ -77,14 +80,28 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         return this.selectPuzzles(filter).length;
       }
       const selectedThemes = namedThemesForSelection(filter.themes);
+      const arrowDuelDifficulties = filter.mode === "arrow_duel"
+        ? restrictedArrowDuelDifficulties(filter.arrowDuelDifficulties)
+        : undefined;
       const minRating = filter.minRating ?? (filter.rating === undefined ? 0 : SERVER_PUZZLE_MIN_RATING);
       const maxRating = filter.maxRating ?? (filter.rating === undefined ? 4000 : SERVER_PUZZLE_MAX_RATING);
       if (selectedThemes.length === 0) {
         const row = this.db.prepare(
           `SELECT COUNT(*) AS count FROM (
-             SELECT 1 FROM puzzles WHERE rating >= ? AND rating <= ? LIMIT ?
+             SELECT 1 FROM puzzles
+             WHERE rating >= ? AND rating <= ?
+             ${arrowDuelDifficulties === undefined
+               ? ""
+               : `AND arrow_duel_difficulty IN (${arrowDuelDifficulties.map(() => "?").join(", ")})`}
+             ${positiveDifficultyIndexGuard("arrow_duel_difficulty", arrowDuelDifficulties)}
+             LIMIT ?
            )`
-        ).get(minRating, maxRating, filter.limit) as { count: number };
+        ).get(
+          minRating,
+          maxRating,
+          ...(arrowDuelDifficulties ?? []),
+          filter.limit
+        ) as { count: number };
         return row.count;
       }
       const themeIds = selectedThemes
@@ -96,14 +113,27 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       const row = this.db.prepare(`
         SELECT COUNT(*) AS count
         FROM (
-          SELECT DISTINCT puzzle_id
+          SELECT DISTINCT puzzle_themes.puzzle_id
           FROM puzzle_themes
-          WHERE theme_id IN (${themeIds.map(() => "?").join(", ")})
-            AND rating >= ?
-            AND rating <= ?
-          LIMIT ?
+          ${arrowDuelDifficulties === undefined
+            ? ""
+            : "JOIN puzzles ON puzzles.id = puzzle_themes.puzzle_id"}
+          WHERE puzzle_themes.theme_id IN (${themeIds.map(() => "?").join(", ")})
+            AND puzzle_themes.rating >= ?
+            AND puzzle_themes.rating <= ?
+            ${arrowDuelDifficulties === undefined
+              ? ""
+              : `AND puzzles.arrow_duel_difficulty IN (${arrowDuelDifficulties.map(() => "?").join(", ")})`}
+            ${positiveDifficultyIndexGuard("puzzles.arrow_duel_difficulty", arrowDuelDifficulties)}
+           LIMIT ?
         )
-      `).get(...themeIds, minRating, maxRating, filter.limit) as { count: number };
+      `).get(
+        ...themeIds,
+        minRating,
+        maxRating,
+        ...(arrowDuelDifficulties ?? []),
+        filter.limit
+      ) as { count: number };
       return row.count;
     }
     const row = this.db.prepare("SELECT COUNT(*) AS count FROM puzzles").get() as { count: number };
@@ -148,6 +178,9 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
       ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
       ...(filter.themes === undefined ? {} : { themes: filter.themes }),
+      ...(filter.arrowDuelDifficulties === undefined
+        ? {}
+        : { arrowDuelDifficulties: filter.arrowDuelDifficulties }),
       ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
@@ -190,6 +223,9 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       return this.selectPuzzles(filter);
     }
     const excludedIds = new Set(filter.excludeIds ?? []);
+    const arrowDuelDifficulties = filter.mode === "arrow_duel"
+      ? restrictedArrowDuelDifficulties(filter.arrowDuelDifficulties)
+      : undefined;
     const shouldFilterPromotionCandidates =
       filter.mode === "arrow_duel"
       && this.arrowDuelEligibility === "all_non_promotion";
@@ -216,6 +252,9 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         ...(filter.rating === undefined ? {} : { rating: filter.rating }),
         ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
         ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
+        ...(filter.arrowDuelDifficulties === undefined
+          ? {}
+          : { arrowDuelDifficulties: filter.arrowDuelDifficulties }),
         includeIds: filter.includeIds,
         excludeIds: [...excludedIds],
         ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
@@ -251,6 +290,9 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         ...(filter.rating === undefined ? {} : { rating: filter.rating }),
         ...(filter.minRating === undefined ? {} : { minRating: filter.minRating }),
         ...(filter.maxRating === undefined ? {} : { maxRating: filter.maxRating }),
+        ...(filter.arrowDuelDifficulties === undefined
+          ? {}
+          : { arrowDuelDifficulties: filter.arrowDuelDifficulties }),
         ...(filter.includeIds === undefined ? {} : { includeIds: filter.includeIds }),
         excludeIds: [...excludedIds],
         ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
@@ -272,6 +314,10 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         FROM puzzles
         WHERE puzzles.rating >= ?
           AND puzzles.rating <= ?
+          ${arrowDuelDifficulties === undefined
+            ? ""
+            : `AND puzzles.arrow_duel_difficulty IN (${arrowDuelDifficulties.map(() => "?").join(", ")})`}
+          ${positiveDifficultyIndexGuard("puzzles.arrow_duel_difficulty", arrowDuelDifficulties)}
           ${idClauses.map((clause) => `AND ${clause}`).join("\n          ")}
           AND NOT EXISTS (
             SELECT 1
@@ -285,6 +331,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       `).all(
         filter.minRating ?? 0,
         filter.maxRating ?? 4000,
+        ...(arrowDuelDifficulties ?? []),
         ...idParams,
         ...excludedThemeIds,
         preferredRating,
@@ -308,6 +355,10 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         FROM puzzles
         WHERE puzzles.rating >= ?
           AND puzzles.rating <= ?
+          ${arrowDuelDifficulties === undefined
+            ? ""
+            : `AND puzzles.arrow_duel_difficulty IN (${arrowDuelDifficulties.map(() => "?").join(", ")})`}
+          ${positiveDifficultyIndexGuard("puzzles.arrow_duel_difficulty", arrowDuelDifficulties)}
           ${idClauses.map((clause) => `AND ${clause}`).join("\n          ")}
           AND NOT EXISTS (
             SELECT 1
@@ -330,6 +381,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       const page = queryPage.all(
         filter.minRating ?? 0,
         filter.maxRating ?? 4000,
+        ...(arrowDuelDifficulties ?? []),
         ...idParams,
         ...excludedThemeIds,
         pageSize,
@@ -361,6 +413,9 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
         minRating: strategy.minRating,
         maxRating: strategy.maxRating,
         themes: strategy.themes,
+        ...(filter.arrowDuelDifficulties === undefined
+          ? {}
+          : { arrowDuelDifficulties: filter.arrowDuelDifficulties }),
         excludeIds: [...excludedIds],
         limit: filter.limit - selected.length
       };
@@ -477,8 +532,13 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     let selectedColumns = "puzzles.*";
     let ratingColumn = "puzzles.rating";
     let idColumn = "puzzles.id";
+    const arrowDuelDifficulties = filter.mode === "arrow_duel"
+      ? restrictedArrowDuelDifficulties(filter.arrowDuelDifficulties)
+      : undefined;
     if (themeId !== undefined) {
-      from = "puzzle_themes";
+      from = arrowDuelDifficulties === undefined
+        ? "puzzle_themes"
+        : "puzzle_themes JOIN puzzles ON puzzles.id = puzzle_themes.puzzle_id";
       selectedColumns =
         "puzzle_themes.puzzle_id AS id, puzzle_themes.rating AS rating";
       ratingColumn = "puzzle_themes.rating";
@@ -488,6 +548,19 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     }
     clauses.push(`${ratingColumn} >= ?`, `${ratingColumn} <= ?`);
     params.push(filter.minRating ?? 0, filter.maxRating ?? 4000);
+    if (arrowDuelDifficulties !== undefined) {
+      clauses.push(
+        `puzzles.arrow_duel_difficulty IN (${arrowDuelDifficulties.map(() => "?").join(", ")})`
+      );
+      params.push(...arrowDuelDifficulties);
+      const indexGuard = positiveDifficultyIndexPredicate(
+        "puzzles.arrow_duel_difficulty",
+        arrowDuelDifficulties
+      );
+      if (indexGuard !== undefined) {
+        clauses.push(indexGuard);
+      }
+    }
     if (filter.includeIds !== undefined && filter.includeIds.length > 0 && filter.includeIds.length <= MAX_SQL_ID_FILTER_VALUES) {
       clauses.push(`${idColumn} IN (${filter.includeIds.map(() => "?").join(", ")})`);
       params.push(...filter.includeIds);
@@ -661,7 +734,8 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       stockfishBestMove: binary
         ? decodeUciMove(binaryField(row.stockfish_bestmove, "stockfish_bestmove"))
         : textField(row.stockfish_bestmove, "stockfish_bestmove"),
-      stockfishEvalAfterFirstMove: row.stockfish_eval_after_first_move
+      stockfishEvalAfterFirstMove: row.stockfish_eval_after_first_move,
+      ...arrowDuelDifficultyFromRow(row)
     };
   }
 
@@ -709,6 +783,37 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     }
     return Math.max(limit * this.candidateMultiplier, limit + this.candidateFloor);
   }
+}
+
+function arrowDuelDifficultyFromRow(
+  row: PuzzlePackRow
+): { arrowDuelDifficulty?: NonNullable<Puzzle["arrowDuelDifficulty"]> } {
+  if (row.arrow_duel_difficulty === undefined || row.arrow_duel_difficulty === null) {
+    return {};
+  }
+  if (!isArrowDuelDifficulty(row.arrow_duel_difficulty)) {
+    throw new Error(
+      `Invalid Arrow Duel difficulty ${row.arrow_duel_difficulty} for puzzle ${row.id}`
+    );
+  }
+  return { arrowDuelDifficulty: row.arrow_duel_difficulty };
+}
+
+function positiveDifficultyIndexGuard(
+  column: string,
+  difficulties: readonly number[] | undefined
+): string {
+  const predicate = positiveDifficultyIndexPredicate(column, difficulties);
+  return predicate === undefined ? "" : `AND ${predicate}`;
+}
+
+function positiveDifficultyIndexPredicate(
+  column: string,
+  difficulties: readonly number[] | undefined
+): string | undefined {
+  return difficulties !== undefined && !difficulties.includes(0)
+    ? `${column} BETWEEN 1 AND 4`
+    : undefined;
 }
 
 function binaryField(
