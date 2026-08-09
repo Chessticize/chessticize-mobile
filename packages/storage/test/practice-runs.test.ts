@@ -233,6 +233,7 @@ for (const backend of ["memory", "sqlite"] as const) {
       }, "2026-07-22T12:02:00.000Z");
       assert.equal(sprint.config.ratingKey, run.ratingKey);
       assert.deepEqual(sprint.config.opponentReply, { enabled: true, seconds: 30 });
+      service.abandonSprint("2026-07-22T12:02:01.000Z");
 
       service.updatePracticeRun(run.id, {
         name: run.name,
@@ -251,6 +252,64 @@ for (const backend of ["memory", "sqlite"] as const) {
         mode: "arrow_duel",
         ratingKey: run.ratingKey
       }), { enabled: false, seconds: 12 });
+
+      service.saveSettings({
+        ...service.getSettings(),
+        arrowDuel: { opponentReplyEnabled: false }
+      });
+      assert.deepEqual(service.getActivePracticeRun(run.id).opponentReply, {
+        enabled: false,
+        seconds: 12
+      });
+      assert.deepEqual(service.opponentReplyForReview({
+        mode: "arrow_duel",
+        ratingKey: run.ratingKey,
+        attempt: {
+          source: "sprint",
+          sessionId: sprint.id
+        }
+      }), { enabled: false, seconds: 30 });
+
+      const globallyDisabledRun = service.createPracticeRun({
+        id: `globally-disabled-reply-run-${backend}`,
+        name: `Globally Disabled Reply Run ${backend}`,
+        mode: "arrow_duel",
+        durationSeconds: 300,
+        perPuzzleSeconds: 30,
+        targetCorrect: 1,
+        opponentReply: { enabled: true, seconds: 12 },
+        initialRating: 950
+      }, "2026-07-22T12:04:00.000Z");
+      const globallyDisabledSprint = service.startSprint({
+        mode: "arrow_duel",
+        practiceRunId: globallyDisabledRun.id,
+        puzzleSelectionSeed: "globally-disabled-reply-run"
+      }, "2026-07-22T12:05:00.000Z");
+      assert.equal(globallyDisabledSprint.config.ratingKey, globallyDisabledRun.ratingKey);
+      assert.deepEqual(globallyDisabledSprint.config.opponentReply, {
+        enabled: false,
+        seconds: 12
+      });
+      assert.deepEqual(service.getActivePracticeRun(globallyDisabledRun.id).opponentReply, {
+        enabled: true,
+        seconds: 12
+      });
+      service.abandonSprint("2026-07-22T12:05:01.000Z");
+
+      service.saveSettings({
+        ...service.getSettings(),
+        arrowDuel: { opponentReplyEnabled: true }
+      });
+      const restoredSprint = service.startSprint({
+        mode: "arrow_duel",
+        practiceRunId: globallyDisabledRun.id,
+        puzzleSelectionSeed: "restored-reply-run"
+      }, "2026-07-22T12:06:00.000Z");
+      assert.equal(restoredSprint.config.ratingKey, globallyDisabledRun.ratingKey);
+      assert.deepEqual(restoredSprint.config.opponentReply, {
+        enabled: true,
+        seconds: 12
+      });
     } finally {
       if (store instanceof SQLiteStore) {
         store.close();

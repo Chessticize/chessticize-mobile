@@ -126,7 +126,7 @@ test("a transient V1 metadata failure is not remembered as a missing legacy reco
   }
 });
 
-test("a V2-only second device imports incremental records and keeps iCloudEnabled local", async () => {
+test("a V2-only second device imports incremental records and keeps device-local settings", async () => {
   const first = new SQLiteStore(":memory:");
   const second = new SQLiteStore(":memory:");
   first.migrate();
@@ -138,6 +138,7 @@ test("a V2-only second device imports incremental records and keeps iCloudEnable
     firstService.saveSettings({
       ...firstService.getSettings(),
       sync: { iCloudEnabled: true },
+      arrowDuel: { opponentReplyEnabled: true },
       moveFeedback: { soundEnabled: false, hapticsEnabled: false }
     });
     await syncPracticeProgressV2(firstService, transport, {
@@ -148,6 +149,7 @@ test("a V2-only second device imports incremental records and keeps iCloudEnable
     secondService.saveSettings({
       ...secondService.getSettings(),
       sync: { iCloudEnabled: true },
+      arrowDuel: { opponentReplyEnabled: false },
       moveFeedback: { soundEnabled: true, hapticsEnabled: true }
     });
     const result = await syncPracticeProgressV2(secondService, transport, {
@@ -161,6 +163,7 @@ test("a V2-only second device imports incremental records and keeps iCloudEnable
       hapticsEnabled: false
     });
     assert.equal(secondService.getSettings().sync.iCloudEnabled, true);
+    assert.equal(secondService.getSettings().arrowDuel.opponentReplyEnabled, false);
     assert.equal(transport.legacyWriteCount, 0);
   } finally {
     first.close();
@@ -215,12 +218,14 @@ test("changing local-only settings does not enqueue a cloud preferences write", 
     service.saveSettings({
       ...service.getSettings(),
       sync: { iCloudEnabled: false },
+      arrowDuel: { opponentReplyEnabled: false },
       sprintGuides: {
         ...service.getSettings().sprintGuides,
         rulesSeen: true
       }
     });
 
+    assert.equal(service.getSettings().arrowDuel.opponentReplyEnabled, false);
     assert.equal(service.getProgressV2Diagnostics().pendingOutboxCount, 0);
     assert.equal(transport.modifyBatches.length, batchCount);
   } finally {

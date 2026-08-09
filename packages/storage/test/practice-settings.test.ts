@@ -13,6 +13,38 @@ test("move feedback settings default to sound off and haptics enabled", () => {
   });
 });
 
+test("Arrow Duel opponent replies default on and legacy settings normalize to that default", () => {
+  assert.deepEqual(defaultPracticeSettings().arrowDuel, {
+    opponentReplyEnabled: true
+  });
+
+  const legacySettings = {
+    sync: { iCloudEnabled: true },
+    notifications: { reviewReminder: { mode: "smart" as const } },
+    moveFeedback: {
+      soundEnabled: false,
+      hapticsEnabled: true
+    },
+    sprintGuides: defaultPracticeSettings().sprintGuides
+  } as PracticeSettings;
+
+  assert.deepEqual(clonePracticeSettings(legacySettings).arrowDuel, {
+    opponentReplyEnabled: true
+  });
+});
+
+test("Arrow Duel settings are cloned independently", () => {
+  const settings = defaultPracticeSettings();
+  settings.arrowDuel.opponentReplyEnabled = false;
+
+  const cloned = clonePracticeSettings(settings);
+  settings.arrowDuel.opponentReplyEnabled = true;
+
+  assert.deepEqual(cloned.arrowDuel, {
+    opponentReplyEnabled: false
+  });
+});
+
 test("Sprint guide progress defaults unseen and legacy settings normalize safely", () => {
   assert.deepEqual(defaultPracticeSettings().sprintGuides, {
     rulesSeen: false,

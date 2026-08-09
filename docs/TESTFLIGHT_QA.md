@@ -111,6 +111,8 @@ result. Unchecked items do not block App Store submission.
       other move?` preparation is shown for 1.5 seconds, the board does not
       flip, and the reply countdown begins only when the opponent pieces can be
       moved.
+- [ ] Confirm first-use guidance and both reply-prompt stages say the challenge
+      is optional and can be turned off in Settings.
 - [ ] Select the weaker move on another puzzle and confirm the attempt is marked
       wrong before the Sprint advances without extra result copy.
 - [ ] Confirm the Analysis panel can be opened from Arrow Duel review.
@@ -128,7 +130,8 @@ result. Unchecked items do not block App Store submission.
       have been played.
 - [ ] Choose the wrong Replay candidate and confirm the red snapshot still
       transitions into the stored blue-arrow punishment line.
-- [ ] Turn Opponent reply off and confirm Replay returns to the one-choice flow.
+- [ ] Turn the global reply preference off in Settings and confirm Replay
+      returns to the one-choice flow.
 - [ ] Tap an analysis candidate row and confirm it makes the candidate move.
 - [ ] Exit the post-sprint review and confirm the app returns to Practice ready
       to start another sprint.
@@ -156,8 +159,8 @@ result. Unchecked items do not block App Store submission.
       reply with the Run's configured countdown; verify the countdown starts
       after the 1.5-second handoff and that a wrong reply or timeout fails the
       Review.
-- [ ] Turn Opponent reply off and confirm Arrow Duel Review returns to the
-      one-choice flow.
+- [ ] Turn the global reply preference off in Settings and confirm Arrow Duel
+      Review returns to the one-choice flow.
 - [ ] Complete the visible due queue without corrupting sprint ratings.
 
 ### Settings
@@ -168,6 +171,13 @@ On a personal daily-use iPhone, perform this pre-release CloudKit checklist in
 the production Release identity for this diagnostic.
 
 - [ ] Open Settings.
+- [ ] Confirm **Find the opponent’s best reply** defaults to On under Arrow
+      Duel and explains what happens after choosing the better arrow.
+- [ ] Turn it Off and confirm Arrow Duel proceeds directly to the next puzzle,
+      Edit Run hides the individual reply controls, and saved Run times are not
+      changed.
+- [ ] Turn it On again and confirm Edit Run restores each Run's previous reply
+      choice and time without changing that Run's Rating.
 - [ ] Confirm Settings shows iCloud Sync, Notifications, Profile, and About
       sections, with iCloud Sync defaulting on.
 - [ ] While signed into iCloud, confirm the default sync state reaches a

@@ -123,6 +123,21 @@ export function resolveOpponentReplyConfig(
   });
 }
 
+export function resolveEffectiveOpponentReplyConfig(
+  mode: SprintMode,
+  savedConfig: OpponentReplyConfig | undefined,
+  globallyEnabled: boolean
+): OpponentReplyConfig | undefined {
+  const saved = resolveOpponentReplyConfig(mode, savedConfig);
+  if (saved === undefined || globallyEnabled) {
+    return saved;
+  }
+  return {
+    ...saved,
+    enabled: false
+  };
+}
+
 export function validateOpponentReplyConfig(
   config: OpponentReplyConfig
 ): OpponentReplyConfig {
