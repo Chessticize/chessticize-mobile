@@ -6685,7 +6685,7 @@ function SessionCoachmarkDemo({
             ? {
                 left: "50%" as const,
                 position: "absolute" as const,
-                top: Math.round(boardSize * 0.36),
+                top: Math.round(boardSize * 0.4),
                 transform: [{
                   translateX: -portraitArrowDuelCalloutWidth / 2
                 }],
