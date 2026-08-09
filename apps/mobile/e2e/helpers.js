@@ -976,6 +976,17 @@ async function openTab(tabTestID, contentTestID) {
   await waitForVisibleInPracticeScroll(contentTestID);
 }
 
+async function waitForHistoryFiltersCollapsed() {
+  await waitForElementAccessibilityLabelContaining(
+    'history-filter-toggle',
+    'Show history filters',
+    10000
+  );
+  await waitFor(element(by.id('history-advanced-filters')))
+    .not.toBeVisible()
+    .withTimeout(10000);
+}
+
 async function openStandardHistoryTrend() {
   await openTab('history-tab', 'history-filter-toggle');
   if (!(await detoxElementExists('history-rating-standard 5/20'))) {
@@ -1055,6 +1066,7 @@ module.exports = {
   startSelectedPracticeRun,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
+  waitForHistoryFiltersCollapsed,
   tapUntilAnyExists,
   tapUntilExists,
   waitForElementAccessibilityLabelContaining,

@@ -1730,7 +1730,10 @@ describe('Detox suite configuration', () => {
       "waitFor(element(by.id('sprint-unclear-toggle'))).toBeVisible().withTimeout(10000)"
     );
     expect(practiceSpec).toContain("element(by.id('history-filter-toggle')).tap()");
-    expect(practiceSpec).toContain("waitFor(element(by.id('history-advanced-filters'))).not.toExist()");
+    expect(practiceSpec).toContain('waitForHistoryFiltersCollapsed()');
+    expect(helpers).toContain("by.id('history-advanced-filters')");
+    expect(helpers).toContain('not.toBeVisible()');
+    expect(helpers).toContain("'Show history filters'");
     expect(practiceSpec).toContain("element(by.text('Correct')).atIndex(0)");
     expect(practiceSpec).toContain("expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible()");
     expect(practiceSpec).toContain("historyAttemptRowTestIDForResult('Correct')");
