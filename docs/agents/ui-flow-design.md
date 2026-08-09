@@ -46,19 +46,22 @@ rollout, or release integration yet.
 3. Exercise public actions in the Story play function where useful. Keep board
    and native boundaries behind the conspicuous Lab placeholders or maintained
    fakes.
-4. Add the scenario to `newScenarioMarkers.json` with an `issues` array. Give
-   each owning issue its own `issueNumber` and concise `changeNote`; a scenario
-   changed by multiple open issues retains every ownership entry. The registry
-   derives `isNew: true` from the non-empty array.
-5. Run `pnpm mobile:lab:validate`, the relevant component tests, and browser
-   checks at the viewports affected by the design.
-6. Deploy the full Storybook from the exact reviewed commit. Share its manager
-   URL and the direct story URL, with the delta highlighted by the `new` tag and
-   What's New page.
+4. Reset `newScenarioMarkers.json`, then add only the current issue's changed
+   scenarios with an `issues` array, `issueNumber`, and concise `changeNote`.
+   Starting a new issue-scoped Storybook design removes every marker from
+   earlier design tracks, even when an earlier issue remains open. The registry
+   derives `isNew: true` from the current non-empty array.
+5. Run `pnpm mobile:lab:validate` and the relevant component tests without
+   launching a local Storybook server. Localhost is not a design-review surface.
+6. Push the exact reviewed commit, open or update the issue-scoped PR, and wait
+   for the Mobile Interaction Lab GitHub Actions workflow to deploy the full Storybook.
+   Perform browser checks at the affected viewports on that branch's
+   stable Vercel alias. Share its manager URL and direct story URL, with the
+   current delta highlighted by the `new` tag and What's New page.
 7. Record explicit design approval in the issue or PR before product wiring.
 
-When remote preview publication is authorized, push the reviewed exact commit
-and let the Mobile Interaction Lab GitHub Actions workflow deploy the complete
+Every requested Storybook design is a remote preview request. Push the reviewed
+exact commit and let the Mobile Interaction Lab GitHub Actions workflow deploy the complete
 `apps/mobile-lab` Storybook to the repository's existing shared Vercel project.
 GitHub Actions is the only deployment writer: feature work must not create a
 Vercel project or run `vercel link` or `vercel deploy` locally. Each feature
@@ -88,22 +91,10 @@ When the current interaction increment is coherent and checks pass, the design
 PR may become ready and merge to `main` before approval or implementation.
 Continue later feedback rounds from current `main`, update the same scenario,
 and let CI publish the new branch's stable Preview alias inside the shared
-Vercel project. Keep each issue ownership entry on `main` until the linked GitHub issue is closed;
-then remove only that entry in a cleanup change. Remove the marker only when no
-open issue ownership remains, and retain the scenario as living UI
-documentation. Pull-request CI checks each removed ownership's issue state.
-
-If an open issue's marker was attached to a mistaken parallel prototype,
-consolidate that prototype into the existing product-clone scenario and move
-the same issue ownership to it only as an unambiguous one-to-one correction.
-This is a marker correction, not marker cleanup; the issue must remain
-represented by a `new` marker until it closes.
-If the destination scenario already owns the same issue, keep its single
-visible ownership and declare the retired ownership count with
-`absorbedIssueMarkers` on that destination marker. CI consumes only the
-declared count; any additional removal still requires its linked issue to be
-closed. This metadata consolidates review ownership and does not create a
-second Storybook scenario.
+Vercel project. Retain every approved scenario as living UI documentation. When
+the next issue-scoped Storybook design begins, reset all prior marker entries
+before adding that design's current issue markers. Pull-request CI rejects a
+new issue marker while any earlier issue marker remains.
 
 Do not infer approval from a passing test, an open PR, or the absence of
 comments. Approval must be an affirmative user or designer decision recorded in
@@ -120,7 +111,9 @@ Only after explicit design approval:
    do not replace them with a separate mock implementation.
 4. Add the appropriate core, storage, component, integration, and native
    validation from the development-loop skill.
-5. Keep the issue-owned New Scenario Marker until the linked issue closes.
+5. Keep the approved Storybook scenario as living documentation. Its `new`
+   marker remains only until the next issue-scoped Storybook design resets the
+   manifest.
 
 Product implementation normally begins in a later feature-scoped PR from the
 approved design on `main`. Keep any PR draft while its stated goal is incomplete,

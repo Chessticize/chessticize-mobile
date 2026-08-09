@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  assertRemovedScenarioMarkerIssuesClosed,
-  createGitHubIssueStateReader,
-  findRemovedScenarioMarkers,
+  validateNewDesignMarkerReset,
   validateScenarioMarkers
 } from "./scenarioMarkerPolicy.ts";
 
@@ -69,229 +67,61 @@ test("New Scenario Marker records require registered scenarios and complete issu
   );
 });
 
-test("marker cleanup follows issue ownership across a corrective scenario move", () => {
-  const baseMarkers = {
-    "practice-home": { issueNumber: 245, changeNote: "First" },
-    "review-due": { issueNumber: 246, changeNote: "Second" }
-  };
-  const currentMarkers = {
-    "practice-custom-setup": {
-      issues: [{ issueNumber: 245, changeNote: "Moved to the existing product screen" }]
-    },
-    "review-due": {
-      issues: [{ issueNumber: 247, changeNote: "Reassigned" }]
-    }
-  };
-
-  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), [
-    { scenarioId: "review-due", issueNumber: 246 }
-  ]);
-  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, {}), [
-    { scenarioId: "practice-home", issueNumber: 245 },
-    { scenarioId: "review-due", issueNumber: 246 }
-  ]);
-});
-
-test("one marker may move between scenarios while the same issue owns other scenarios", () => {
-  const baseMarkers = {
-    "practice-arrow-duel-guide": {
-      issues: [{ issueNumber: 489, changeNote: "Existing guide" }]
-    },
-    "practice-retired-implementation-detail": {
-      issues: [{ issueNumber: 489, changeNote: "Implementation-only edge case" }]
-    }
-  };
-  const currentMarkers = {
-    "practice-arrow-duel-guide": {
-      issues: [{ issueNumber: 489, changeNote: "Existing guide" }]
-    },
-    "practice-arrow-duel-guide-only": {
-      issues: [{ issueNumber: 489, changeNote: "Replacement product guide" }]
-    }
-  };
-
-  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), []);
-});
-
-test("an existing scenario may explicitly absorb one retired marker for the same issue", () => {
-  const baseMarkers = {
-    "practice-arrow-duel-guide": {
-      issues: [{ issueNumber: 489, changeNote: "Existing guide" }]
-    },
-    "practice-retired-implementation-detail": {
-      issues: [{ issueNumber: 489, changeNote: "Not an independent interaction" }]
-    }
-  };
-  const currentMarkers = {
-    "practice-arrow-duel-guide": {
-      issues: [{ issueNumber: 489, changeNote: "Existing guide" }],
-      absorbedIssueMarkers: [{ issueNumber: 489, count: 1 }]
-    }
-  };
-
-  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), []);
-});
-
-test("an absorbed marker count cannot hide additional removals", () => {
-  const baseMarkers = {
-    "practice-arrow-duel-guide": {
-      issues: [{ issueNumber: 489, changeNote: "Existing guide" }]
-    },
-    "practice-first-implementation-detail": {
-      issues: [{ issueNumber: 489, changeNote: "First detail" }]
-    },
-    "practice-second-implementation-detail": {
-      issues: [{ issueNumber: 489, changeNote: "Second detail" }]
-    }
-  };
-  const currentMarkers = {
-    "practice-arrow-duel-guide": {
-      issues: [{ issueNumber: 489, changeNote: "Existing guide" }],
-      absorbedIssueMarkers: [{ issueNumber: 489, count: 1 }]
-    }
-  };
-
-  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), [
-    { scenarioId: "practice-second-implementation-detail", issueNumber: 489 }
-  ]);
-});
-
-test("one replacement marker cannot hide two removals for the same open issue", () => {
-  const baseMarkers = {
-    "practice-arrow-duel-guide": {
-      issues: [{ issueNumber: 489, changeNote: "Existing guide" }]
-    },
-    "practice-first-implementation-detail": {
-      issues: [{ issueNumber: 489, changeNote: "First implementation detail" }]
-    },
-    "practice-second-implementation-detail": {
-      issues: [{ issueNumber: 489, changeNote: "Second implementation detail" }]
-    }
-  };
-  const currentMarkers = {
-    "practice-arrow-duel-guide": {
-      issues: [{ issueNumber: 489, changeNote: "Existing guide" }]
-    },
-    "practice-arrow-duel-guide-only": {
-      issues: [{ issueNumber: 489, changeNote: "One replacement product guide" }]
-    }
-  };
-
-  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), [
-    { scenarioId: "practice-second-implementation-detail", issueNumber: 489 }
-  ]);
-});
-
-test("one remaining marker cannot hide partial cleanup for the same open issue", () => {
+test("a new Storybook design rejects every retained marker from earlier issues", () => {
   const baseMarkers = {
     "practice-home": {
-      issues: [{ issueNumber: 245, changeNote: "First changed scenario" }]
+      issues: [{ issueNumber: 245, changeNote: "Earlier Practice design" }]
     },
-    "practice-custom-setup": {
-      issues: [{ issueNumber: 245, changeNote: "Second changed scenario" }]
+    "review-overdue": {
+      issues: [{ issueNumber: 246, changeNote: "Earlier Review design" }]
     }
   };
   const currentMarkers = {
-    "practice-custom-setup": {
-      issues: [{ issueNumber: 245, changeNote: "Still under review" }]
+    "practice-home": {
+      issues: [{ issueNumber: 245, changeNote: "Stale marker" }]
+    },
+    "review-due": {
+      issues: [{ issueNumber: 520, changeNote: "Current Review Home design" }]
     }
   };
 
-  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), [
-    { scenarioId: "practice-home", issueNumber: 245 }
+  assert.deepEqual(validateNewDesignMarkerReset(baseMarkers, currentMarkers), [
+    "practice-home: reset prior issue #245 before starting the new Storybook design for #520."
   ]);
 });
 
-test("shared scenarios retain each issue ownership independently", () => {
+test("a new Storybook design passes after all earlier markers are reset", () => {
   const baseMarkers = {
-    "practice-custom-setup": {
-      issues: [
-        { issueNumber: 253, changeNote: "Named runs" },
-        { issueNumber: 273, changeNote: "Curated themes" }
-      ]
+    "practice-home": {
+      issues: [{ issueNumber: 245, changeNote: "Earlier Practice design" }]
+    },
+    "review-overdue": {
+      issues: [{ issueNumber: 246, changeNote: "Earlier Review design" }]
     }
   };
   const currentMarkers = {
-    "practice-custom-setup": {
-      issues: [{ issueNumber: 253, changeNote: "Named runs" }]
+    "review-due": {
+      issues: [{ issueNumber: 520, changeNote: "Current Review Home design" }]
     }
   };
 
-  assert.deepEqual(findRemovedScenarioMarkers(baseMarkers, currentMarkers), [
-    { scenarioId: "practice-custom-setup", issueNumber: 273 }
-  ]);
+  assert.deepEqual(validateNewDesignMarkerReset(baseMarkers, currentMarkers), []);
 });
 
-test("marker removal passes only when every linked issue is closed", async () => {
-  const reads: number[] = [];
-  const messages = await assertRemovedScenarioMarkerIssuesClosed(
-    [
-      { scenarioId: "practice-home", issueNumber: 245 },
-      { scenarioId: "practice-retry", issueNumber: 245 }
-    ],
-    async (issueNumber) => {
-      reads.push(issueNumber);
-      return "closed";
+test("same-issue Storybook follow-ups may move or remove their current markers", () => {
+  const baseMarkers = {
+    "review-overdue": {
+      issues: [{ issueNumber: 520, changeNote: "Initial placement" }]
     }
+  };
+
+  assert.deepEqual(
+    validateNewDesignMarkerReset(baseMarkers, {
+      "review-due": {
+        issues: [{ issueNumber: 520, changeNote: "Corrected Review Home placement" }]
+      }
+    }),
+    []
   );
-
-  assert.deepEqual(reads, [245]);
-  assert.deepEqual(messages, [
-    "Verified marker cleanup for practice-home: issue #245 is closed.",
-    "Verified marker cleanup for practice-retry: issue #245 is closed."
-  ]);
-});
-
-test("marker removal fails closed for open and unknown issue states", async () => {
-  await assert.rejects(
-    assertRemovedScenarioMarkerIssuesClosed(
-      [
-        { scenarioId: "practice-home", issueNumber: 245 },
-        { scenarioId: "review-due", issueNumber: 246 }
-      ],
-      async (issueNumber) => (issueNumber === 245 ? "open" : "unknown")
-    ),
-    /practice-home: issue #245 is open[\s\S]*review-due: issue #246 is unknown/
-  );
-});
-
-test("GitHub issue-state reader requires auth and fails on API errors", async () => {
-  assert.throws(
-    () => createGitHubIssueStateReader({ token: "", repository: "owner/repo" }),
-    /require GITHUB_TOKEN and GITHUB_REPOSITORY/
-  );
-
-  const readIssueState = createGitHubIssueStateReader({
-    token: "secret",
-    repository: "owner/repo",
-    fetchIssue: async () => ({
-      ok: false,
-      status: 503,
-      json: async () => ({})
-    })
-  });
-  await assert.rejects(readIssueState(245), /issue #245: GitHub returned 503/);
-});
-
-test("GitHub issue-state reader maps absent response state to unknown", async () => {
-  const requests: Array<{ input: string; authorization: string }> = [];
-  const readIssueState = createGitHubIssueStateReader({
-    token: "secret",
-    repository: "owner/repo",
-    fetchIssue: async (input, init) => {
-      requests.push({
-        input,
-        authorization: init.headers.Authorization ?? ""
-      });
-      return { ok: true, status: 200, json: async () => ({}) };
-    }
-  });
-
-  assert.equal(await readIssueState(245), "unknown");
-  assert.deepEqual(requests, [
-    {
-      input: "https://api.github.com/repos/owner/repo/issues/245",
-      authorization: "Bearer secret"
-    }
-  ]);
+  assert.deepEqual(validateNewDesignMarkerReset(baseMarkers, {}), []);
 });

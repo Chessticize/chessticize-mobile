@@ -60,6 +60,33 @@ import {
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
 
+const REVIEW_TODAY_QUICK_FILTERS = [
+  {
+    filter: "all",
+    label: "All",
+    duePuzzleIds: ["lab-fork-01", "lab-skewer-03"],
+    completedPuzzleIds: ["lab-pin-02"]
+  },
+  {
+    filter: "overdue",
+    label: "Overdue",
+    duePuzzleIds: ["lab-skewer-03"],
+    completedPuzzleIds: []
+  },
+  {
+    filter: "failed",
+    label: "Missed 2+ times",
+    duePuzzleIds: ["lab-skewer-03"],
+    completedPuzzleIds: ["lab-pin-02"]
+  },
+  {
+    filter: "arrow_duel",
+    label: "Arrow Duel",
+    duePuzzleIds: ["lab-skewer-03"],
+    completedPuzzleIds: []
+  }
+] as const;
+
 const HISTORY_INCOMPLETE_LAB_PUZZLE: Puzzle = {
   ...LAB_PUZZLES[4]!,
   id: "lab-incomplete-06",
@@ -310,6 +337,7 @@ function LabScenarioContent({
           ? historyProgressPresentationFor(scenarioId)
           : undefined}
         platformCapabilities={runtime.platformCapabilities}
+        practiceHomeReviewCardVisible={false}
         runReorderDesignPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
           ? { pickedUpRunId: runReorderPickedUpRunId }
           : undefined}
@@ -836,11 +864,46 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       ? { kind: "icloud_sync" }
       : { kind: "android_managed_backup" };
   const screenProps: ScreenProps = {
+    collapsibleMotionPreview: [
+      "history-filters",
+      "practice-custom-setup",
+      "review-due",
+      "review-filters"
+    ].includes(scenarioId)
+      ? { durationMs: 200 }
+      : undefined,
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
-    reviewTodayDesignPreview: scenarioId === "review-due"
-      ? { showTodaySections: true }
+    reviewTodayDesignPreview: ["review-due", "review-filters"].includes(scenarioId)
+      ? {
+          showTodaySections: true,
+          filterControls: {
+            placement: "before_review_action",
+            summaryVisibility: "when_collapsed"
+          },
+          collapsibleSections: {
+            todayInitiallyExpanded: true,
+            completedInitiallyExpanded: true
+          },
+          attemptSummaries: [
+            {
+              puzzleId: "lab-fork-01",
+              mode: "standard",
+              ratingKey: "standard 5/20",
+              attemptCount: 1,
+              missCount: 1
+            },
+            {
+              puzzleId: "lab-skewer-03",
+              mode: "arrow_duel",
+              ratingKey: "arrow_duel 5/30",
+              attemptCount: 3,
+              missCount: 2
+            }
+          ],
+          quickFilters: REVIEW_TODAY_QUICK_FILTERS
+        }
       : undefined,
     sprintGuidanceEnabled: scenarioId.startsWith("settings-"),
     sprintRulesDesignPreview: sprintRulesDesignPreviewFor(scenarioId),
@@ -894,6 +957,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       notificationStatus = "not_determined";
       break;
     case "review-due":
+    case "review-filters":
     case "review-session":
     case "review-arrow-duel-reply":
     case "review-feedback-analysis":
@@ -904,7 +968,6 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       configurePuzzleSource = false;
       break;
     case "review-overdue":
-    case "review-filters":
       service = createReviewService("overdue");
       break;
     case "history-populated":

@@ -2,11 +2,14 @@ import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
 import {
   clickTestId,
-  expectTestIdText,
   expectTestIdAbsent,
+  expectTestIdHeight,
+  expectTestIdVerticalCentersAligned,
+  expectTestIdText,
   expectTestIdsInOrder,
   openReviewQueue,
   waitForEnabledTestId,
+  waitForHiddenTestId,
   waitForTestId,
   waitForText,
   waitForVisibleTestId
@@ -30,20 +33,73 @@ export const EmptyQueue: Story = {
 };
 
 export const DueQueue: Story = {
-  name: "Due queue",
+  name: "Home",
   args: { scenarioId: "review-due" },
   play: async ({ canvasElement }) => {
     await openReviewQueue(canvasElement);
     await waitForVisibleTestId(canvasElement, "review-start-due");
     await waitForTestId(canvasElement, "review-due-items");
+    await waitForTestId(canvasElement, "review-today-to-review-toggle");
     await waitForTestId(canvasElement, "review-due-item-lab-fork-01-standard-badge");
     await waitForTestId(canvasElement, "review-today-history");
+    await waitForTestId(canvasElement, "review-completed-today-toggle");
+    await waitForTestId(canvasElement, "review-today-history-items");
+    await waitForVisibleTestId(canvasElement, "review-today-to-review-items-motion");
+    await waitForVisibleTestId(canvasElement, "review-today-history-items-motion");
+    await expectTestIdHeight(canvasElement, "review-today-to-review-toggle", 44);
+    await expectTestIdHeight(canvasElement, "review-completed-today-toggle", 44);
+    await expectTestIdVerticalCentersAligned(
+      canvasElement,
+      "review-today-to-review-toggle-count",
+      "review-today-to-review-toggle-chevron"
+    );
+    await expectTestIdVerticalCentersAligned(
+      canvasElement,
+      "review-completed-today-toggle-count",
+      "review-completed-today-toggle-chevron"
+    );
     await waitForText(canvasElement, "First missed 1 day ago");
     await waitForText(canvasElement, "Last retry 3 days ago");
+    await expectTestIdText(
+      canvasElement,
+      "review-due-item-lab-fork-01-standard-meta",
+      "1 attempt · 1 miss · Standard · 20s pace"
+    );
+    await expectTestIdText(
+      canvasElement,
+      "review-due-item-lab-skewer-03-arrow-duel-meta",
+      "3 attempts · 2 misses · Arrow Duel · 30s pace"
+    );
     await expectTestIdsInOrder(canvasElement, [
+      "review-filter-options-motion",
+      "review-filter-summary-motion",
+      "review-start-due",
       "review-due-items",
       "review-today-history"
     ]);
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 32);
+    await expectTestIdText(canvasElement, "review-active-filter-0", "All");
+    expectTestIdAbsent(canvasElement, "review-active-filter-1");
+    await clickTestId(canvasElement, "review-today-to-review-toggle");
+    await waitForHiddenTestId(canvasElement, "review-today-to-review-items-motion");
+    await expectTestIdHeight(canvasElement, "review-today-to-review-toggle", 44);
+    await clickTestId(canvasElement, "review-today-to-review-toggle");
+    await waitForVisibleTestId(canvasElement, "review-today-to-review-items-motion");
+    await expectTestIdHeight(canvasElement, "review-today-to-review-toggle", 44);
+    await clickTestId(canvasElement, "review-completed-today-toggle");
+    await waitForHiddenTestId(canvasElement, "review-today-history-items-motion");
+    await expectTestIdHeight(canvasElement, "review-completed-today-toggle", 44);
+    await clickTestId(canvasElement, "review-completed-today-toggle");
+    await waitForVisibleTestId(canvasElement, "review-today-history-items-motion");
+    await expectTestIdHeight(canvasElement, "review-completed-today-toggle", 44);
+    await clickTestId(canvasElement, "review-filter-toggle");
+    await waitForVisibleTestId(canvasElement, "review-filter-options-motion");
+    await waitForHiddenTestId(canvasElement, "review-filter-summary-motion");
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 32);
+    await clickTestId(canvasElement, "review-filter-toggle");
+    await waitForHiddenTestId(canvasElement, "review-filter-options-motion");
+    await waitForVisibleTestId(canvasElement, "review-filter-summary-motion");
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 32);
     expectTestIdAbsent(canvasElement, "review-dev-controls");
   }
 };
@@ -61,9 +117,40 @@ export const Filters: Story = {
   args: { scenarioId: "review-filters" },
   play: async ({ canvasElement }) => {
     await openReviewQueue(canvasElement);
+    await waitForTestId(canvasElement, "review-today-to-review-toggle");
+    await waitForTestId(canvasElement, "review-completed-today-toggle");
+    await expectTestIdsInOrder(canvasElement, [
+      "review-filter-options-motion",
+      "review-filter-summary-motion",
+      "review-start-due",
+      "review-due-items",
+      "review-today-history"
+    ]);
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 32);
+    await expectTestIdText(canvasElement, "review-active-filter-0", "All");
+    expectTestIdAbsent(canvasElement, "review-active-filter-1");
     await clickTestId(canvasElement, "review-filter-toggle");
-    await clickTestId(canvasElement, "review-filter-overdue");
-    await waitForTestId(canvasElement, "review-active-filter-summary");
+    await waitForVisibleTestId(canvasElement, "review-filter-options-motion");
+    await waitForHiddenTestId(canvasElement, "review-filter-summary-motion");
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 32);
+    await expectTestIdText(canvasElement, "review-filter-all", "All");
+    await expectTestIdText(canvasElement, "review-filter-overdue", "Overdue");
+    await expectTestIdText(canvasElement, "review-filter-repeat-misses", "Missed 2+ times");
+    await expectTestIdText(canvasElement, "review-filter-arrow-duel", "Arrow Duel");
+    expectTestIdAbsent(canvasElement, "review-filter-mode-standard");
+    expectTestIdAbsent(canvasElement, "review-filter-speed-20");
+    await clickTestId(canvasElement, "review-filter-repeat-misses");
+    await expectTestIdText(canvasElement, "review-today-to-review-toggle-count", "1");
+    await expectTestIdText(canvasElement, "review-completed-today-toggle-count", "1");
+    await waitForTestId(canvasElement, "review-due-item-lab-skewer-03-arrow-duel");
+    expectTestIdAbsent(canvasElement, "review-due-item-lab-fork-01-standard");
+    expectTestIdAbsent(canvasElement, "review-context-list");
+    await clickTestId(canvasElement, "review-filter-toggle");
+    await waitForHiddenTestId(canvasElement, "review-filter-options-motion");
+    await waitForVisibleTestId(canvasElement, "review-filter-summary-motion");
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 32);
+    await expectTestIdText(canvasElement, "review-active-filter-0", "Missed 2+ times");
+    expectTestIdAbsent(canvasElement, "review-active-filter-1");
   }
 };
 

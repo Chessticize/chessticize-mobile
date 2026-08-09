@@ -85,31 +85,30 @@ analytics, rollout, or release wiring.
 
 ## Storybook Preview Gate
 
-For an authorized preview:
+For a requested Storybook preview:
 
 - Use `codex/storybook-issue-<number>-<goal>` for exactly one issue.
 - Follow `docs/agents/ui-flow-design.md`: modify the existing product-clone
   story incrementally whenever it exists, preserve its stable URL, and expose
   the issue-owned delta inside the complete product catalog.
-- Add every new or materially changed scenario for that issue to
-  `newScenarioMarkers.json`. Add an ownership record with its `issueNumber` and
-  concise `changeNote` to the scenario's `issues` array without removing other
-  open issue owners; the registry derives `isNew: true` from that array.
+- Reset `newScenarioMarkers.json` before adding every new or materially changed
+  scenario for the current issue. Do not carry `new` markers from an earlier
+  Storybook design track, even when its issue remains open. Add the current
+  issue's `issueNumber` and concise `changeNote`; the registry derives
+  `isNew: true` from that array.
 - Link the issue in the PR and link the PR back from the issue.
 - Run `pnpm mobile:lab:validate` plus focused component or type checks required
   by the presentation boundary.
-- Inspect affected phone and wide viewports and exercise stable URL state.
-- Push the exact reviewed commit, verify the Interaction Lab check, and deploy
-  the full Storybook so the complete catalog remains browsable and the `new`
-  tag highlights the issue-owned delta.
+- Do not launch a local Storybook server. Push the exact reviewed commit, open
+  or update its PR, wait for the Interaction Lab Vercel deployment, then inspect
+  affected phone and wide viewports and exercise the stable hosted URL.
 - A coherent design increment may become ready and merge to `main`; merging is
   not explicit approval and does not begin implementation. Continue later
   feedback from current `main`, update the same scenario, and use the new
   branch's stable Preview alias in the shared Interaction Lab Vercel project.
-- Keep each New Scenario Marker ownership on `main` until its linked GitHub
-  issue is closed. Pull-request CI verifies closure before accepting ownership
-  removal; remove the marker only after no ownership remains. Retain the scenario
-  as living UI documentation.
+- Retain each scenario as living UI documentation. The next new issue-scoped
+  Storybook design resets all earlier `new` markers before adding its own; CI
+  rejects a new issue marker while any earlier issue marker remains.
 - Stop after the design handoff. Do not mark the product issue
   `ready-for-agent` for implementation until the design decision and remaining
   acceptance criteria are explicit.
@@ -123,7 +122,7 @@ visible. Triage completion never implies approval to consolidate tickets.
 
 ## Hosted Preview Handoff
 
-When the request authorizes remote preview publication:
+Every requested Storybook design is published for review:
 
 - Push the issue branch's exact reviewed commit and let the Mobile Interaction
   Lab GitHub Actions workflow build and deploy the complete
@@ -131,6 +130,9 @@ When the request authorizes remote preview publication:
   project. GitHub Actions is the only deployment writer. Never create a Vercel
   or Sites project for a branch, and never run `vercel link` or `vercel deploy`
   locally.
+- Do not use `pnpm mobile:storybook` or a localhost URL as the review handoff.
+  Local work is limited to headless validation and static builds; visual review
+  waits for the branch-owned Vercel preview.
 - Use the stable Preview alias assigned to that branch inside the shared
   project. Never reuse a URL owned by another branch; later pushes to the same
   branch advance its alias.

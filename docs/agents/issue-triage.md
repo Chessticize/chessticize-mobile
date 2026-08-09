@@ -5,7 +5,7 @@ decision-ready backlog. The repo-local execution guide is
 `.codex/skills/chessticize-issue-triage/SKILL.md`.
 
 Triage evaluates and routes work. It does not begin product implementation.
-Storybook prototypes created during authorized preview work are design
+Storybook previews created during requested design work are design
 artifacts under `docs/agents/ui-flow-design.md`, not production wiring.
 For any UI/UX or functional ticket with a presentation change, use that flow
 from the existing product-clone story and preserve its stable Storybook URL.
@@ -21,7 +21,8 @@ First identify both the issue set and the allowed writes:
 - Relationship suggestions are advisory. Do not consolidate tickets, close one
   as a duplicate, move its scope, or create a shared handling track without
   explicit human approval for that exact action.
-- Prototype publication requires explicit branch or preview authorization.
+- A request to create a Storybook design authorizes its issue branch, PR, and
+  GitHub Actions-managed Vercel preview. Triage-only requests remain read-only.
 - Product implementation requires a later explicit request. For a new UI flow,
   it also requires recorded design approval.
 
@@ -138,7 +139,7 @@ closable.
 
 ## 8. Prototype UI And Functional Feedback
 
-When preview work is explicitly authorized:
+When Storybook design work is requested:
 
 1. Represent every UI or functional-feature issue in a Storybook design slice.
    For native-only behavior, show its reachable presentation states and mark
@@ -149,17 +150,21 @@ When preview work is explicitly authorized:
    represent the expected product after implementation, with `new` highlighting
    the delta.
 2. Create a branch named `codex/storybook-issue-<number>-<goal>` for one issue.
-3. Add every new or materially changed scenario owned by that issue to
-   `newScenarioMarkers.json`. Add its `issueNumber` and concise `changeNote` to
-   the scenario's `issues` array without removing any other open issue owner;
-   the registry derives `isNew: true` from the non-empty array.
+3. Reset `newScenarioMarkers.json`, then add every new or materially changed
+   scenario owned by the current issue. Do not retain `new` markers from an
+   earlier design track, even when its issue remains open. Add the current
+   `issueNumber` and concise `changeNote`; the registry derives `isNew: true`
+   from the non-empty array.
 4. Add deterministic variants and important states to the complete Interaction
    Lab catalog.
    Prefer two or three structurally different directions when the decision is
    genuinely open.
-5. Validate the Interaction Lab and inspect affected phone and wide viewports.
-6. Deploy the full Storybook from the exact reviewed commit and make the
-   issue-owned scenarios easy to find through the `new` tag and What's New page.
+5. Run headless Interaction Lab validation. Do not launch a local Storybook
+   server or use localhost for review.
+6. Push the exact reviewed commit, open or update the issue PR, wait for the
+   GitHub Actions-managed Vercel deployment, and inspect affected phone and wide
+   viewports there. Make the current issue's scenarios easy to find through the
+   `new` tag and What's New page.
 7. Link the issue, PR, deployment, exact commit, and design rationale in both
    directions.
 
@@ -170,11 +175,10 @@ feedback rounds from current `main`, update the same issue-owned scenarios, and
 deploy through the new branch's isolated Vercel Preview and stable branch URL
 until the design is approved for implementation.
 
-Each New Scenario Marker ownership remains on `main` for as long as its linked
-issue is open. Remove only that ownership in a cleanup change after GitHub
-records the issue as closed; remove the marker only when no ownership remains.
-Pull-request CI verifies every removed ownership. Retain the scenario itself as
-living UI documentation.
+Retain every scenario itself as living UI documentation. When the next
+issue-scoped Storybook design begins, reset all prior New Scenario Markers
+before adding the current issue. Pull-request CI rejects a newly introduced
+issue marker while an earlier design marker remains.
 
 The Storybook phase must not add production navigation, persistent storage or
 backend mutation, native-module wiring, analytics, rollout, or release logic.
@@ -183,7 +187,7 @@ record those as later diagnostic or validation work.
 
 ### Hosted preview handoff
 
-When remote preview publication is authorized, push the reviewed branch's exact
+Every requested Storybook design uses a hosted preview. Push the reviewed branch's exact
 commit and let the Mobile Interaction Lab GitHub Actions workflow deploy the
 complete `apps/mobile-lab` Storybook to the dedicated Vercel project. Each
 branch owns an isolated Preview deployment and stable branch URL; later pushes
@@ -192,6 +196,8 @@ recorded source branch or commit does not match the reviewed application
 branch. Every Storybook deployment is public and must not require
 authentication. Require the workflow's unauthenticated HTTP 200 check at
 `/storybook/` before handoff. Follow `docs/STORYBOOK_DEPLOYMENT.md`.
+Do not run `pnpm mobile:storybook` or hand off localhost; local execution is
+limited to headless validation and static builds.
 
 Do not commit `storybook-static`, copied bundles, a preview manifest, or hosting
 result files to the application branch. Generate deployment input in ignored or

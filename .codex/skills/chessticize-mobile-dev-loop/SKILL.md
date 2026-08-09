@@ -23,23 +23,28 @@ Lab design phase first. Follow `docs/agents/ui-flow-design.md`.
    permission states that apply.
 3. Keep this phase isolated from production navigation entries, backend or
    storage mutations, native-module wiring, analytics, and rollout logic.
-4. Add the issue-owned New Scenario Marker, run the Lab checks, and push the
-   exact commit. Let the GitHub Actions workflow deploy the full Storybook to
+4. Reset `newScenarioMarkers.json` before adding the current issue's marker.
+   Starting a new issue-scoped Storybook design must remove every marker from
+   earlier design tracks, even when an earlier issue remains open.
+5. Run `pnpm mobile:lab:validate` and focused component checks without launching
+   a local Storybook server. Push the exact commit, open or update the
+   issue-scoped PR, and wait for GitHub Actions to deploy the full Storybook to
    the repository's existing shared Interaction Lab Vercel project. GitHub
    Actions is the only deployment writer: do not create a Vercel project or run
-   `vercel link` or `vercel deploy` locally. Use only the stable branch alias
-   inside that shared project; later pushes advance it, while `main` owns
-   Production. Stop if the deployment metadata names a different branch or
-   commit.
+   `pnpm mobile:storybook`, `vercel link`, or `vercel deploy` locally. Design
+   review always uses the stable branch alias inside that shared project; later
+   pushes advance it, while `main` owns Production. Stop if the deployment
+   metadata names a different branch or commit.
    Generated Storybook bundles and Vercel link files stay outside the
    application branch. Every Storybook review deployment is public and must not
    require authentication. Verify an unauthenticated request to `/storybook/`
    returns HTTP 200 before handoff. Follow `docs/STORYBOOK_DEPLOYMENT.md`.
-5. Merge coherent design increments to `main` and iterate from current `main`;
-   retain the marker until the linked issue closes.
-6. Record explicit design approval in the issue or PR before starting product
+6. Merge coherent design increments to `main` and iterate from current `main`.
+   Keep the scenario as living UI documentation; the next new Storybook design
+   resets the previous `new` marker before adding its own.
+7. Record explicit design approval in the issue or PR before starting product
    wiring.
-7. After approval, retain the Storybook scenario as living UI documentation and
+8. After approval, retain the Storybook scenario as living UI documentation and
    continue with the implementation and validation order below.
 
 This gate applies to a new screen, navigation destination, stateful modal or

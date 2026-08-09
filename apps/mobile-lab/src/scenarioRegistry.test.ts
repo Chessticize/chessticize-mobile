@@ -104,7 +104,21 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   }
 });
 
-test("closed Issue #482 keeps the production Incomplete states without new markers", () => {
+test("approved Issue #520 Review design keeps its stable living-documentation URLs", () => {
+  assert.equal(scenarioRegistry["review-due"].title, "Home");
+  assert.equal(scenarioRegistry["review-due"].storyId, "review--due-queue");
+  assert.equal(scenarioRegistry["review-filters"].storyId, "review--filters");
+  assert.ok(scenarioRegistry["review-due"].scope.includes.includes(
+    "Collapsed selected-filter summary"
+  ));
+  assert.ok(scenarioRegistry["review-filters"].scope.includes.includes(
+    "Same Today sections after filtering"
+  ));
+  assert.deepEqual(storyTagsForScenario("review-due"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("review-filters"), []);
+});
+
+test("closed Issue #482 keeps the production Incomplete states without Issue #482 markers", () => {
   for (const scenarioId of [
     "history-populated",
     "history-filters",
@@ -365,16 +379,15 @@ test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab s
   assert.deepEqual(storyTagsForScenario(settingsGuidance.id), []);
 });
 
-test("Practice home keeps its merged value polish in the baseline scenario", () => {
+test("Practice home delegates Review workload to the dedicated tab", () => {
   const home = scenarioRegistry["practice-home"];
 
   assert.ok(home.scope.includes.includes("Numeric trailing Ratings"));
-  assert.ok(home.scope.includes.includes("Single Review status label"));
-  assert.ok(home.scope.includes.includes("Centered Review workload count"));
+  assert.ok(home.scope.includes.includes("No duplicate Review card"));
   assert.ok(home.scope.includes.includes("Training Focus card"));
   assert.ok(home.scope.includes.includes("Collecting-evidence state"));
   assert.ok(home.scope.includes.includes("Tactical Profile entry"));
-  assert.match(home.description, /Training Focus collecting-evidence state/);
+  assert.match(home.description, /dedicated Review tab/);
   assert.deepEqual(storyTagsForScenario("practice-home"), []);
 });
 

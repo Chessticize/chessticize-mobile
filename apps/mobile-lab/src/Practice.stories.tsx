@@ -18,6 +18,7 @@ import {
   openPracticeSession,
   replaceTextTestId,
   waitForEnabledTestId,
+  waitForHiddenTestId,
   waitForTestId,
   waitForText,
   waitForVisibleTestId
@@ -124,14 +125,9 @@ export const Home: Story = {
   play: async ({ canvasElement }) => {
     await expectTestIdText(canvasElement, "practice-mode-standard-rating", "925");
     await expectTestIdText(canvasElement, "practice-mode-arrow-duel-rating", "875");
-    await expectTestIdText(canvasElement, "practice-review-due-count", "28");
+    expectTestIdAbsent(canvasElement, "practice-review-strip");
     await waitForTestId(canvasElement, "training-focus-card");
     await waitForText(canvasElement, "More information needed");
-    await expectTestIdHorizontalCentersAligned(
-      canvasElement,
-      "practice-progress-weekly-metric",
-      "practice-review-due-count"
-    );
   }
 };
 
@@ -233,8 +229,9 @@ export const CustomSetup: Story = {
       "practice-run-theme-selection-detail",
       "All themes"
     );
-    expectTestIdAbsent(canvasElement, "custom-theme-fork");
+    await waitForHiddenTestId(canvasElement, "practice-run-theme-catalog-motion");
     await clickTestId(canvasElement, "practice-run-theme-disclosure");
+    await waitForVisibleTestId(canvasElement, "practice-run-theme-catalog-motion");
     await clickTestId(canvasElement, "custom-theme-fork");
     await clickTestId(canvasElement, "custom-theme-pin");
     await expectTestIdText(
@@ -251,7 +248,7 @@ export const CustomSetup: Story = {
       "All themes"
     );
     await clickTestId(canvasElement, "practice-run-theme-disclosure");
-    expectTestIdAbsent(canvasElement, "custom-theme-fork");
+    await waitForHiddenTestId(canvasElement, "practice-run-theme-catalog-motion");
     await waitForTestId(canvasElement, "practice-run-pass-rules");
     await waitForTestId(canvasElement, "practice-run-slow-warning");
     await waitForTestId(canvasElement, "practice-run-puzzle-timeout");

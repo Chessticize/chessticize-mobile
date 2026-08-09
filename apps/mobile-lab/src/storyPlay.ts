@@ -70,6 +70,46 @@ export async function expectTestIdHorizontalCentersAligned(
   });
 }
 
+export async function expectTestIdVerticalCentersAligned(
+  canvasElement: HTMLElement,
+  firstTestID: string,
+  secondTestID: string,
+  tolerance = 0.5
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const first = await page.findByTestId(firstTestID, {}, { timeout: 4_000 });
+  const second = await page.findByTestId(secondTestID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    const firstRect = first.getBoundingClientRect();
+    const secondRect = second.getBoundingClientRect();
+    const offset = secondRect.top + secondRect.height / 2
+      - (firstRect.top + firstRect.height / 2);
+    if (Math.abs(offset) > tolerance) {
+      throw new Error(
+        `Expected ${firstTestID} and ${secondTestID} vertical centers within ${tolerance}px; offset ${offset.toFixed(2)}px`
+      );
+    }
+  });
+}
+
+export async function expectTestIdHeight(
+  canvasElement: HTMLElement,
+  testID: string,
+  expectedHeight: number,
+  tolerance = 0.5
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    const actualHeight = element.getBoundingClientRect().height;
+    if (Math.abs(actualHeight - expectedHeight) > tolerance) {
+      throw new Error(
+        `Expected ${testID} height within ${tolerance}px of ${expectedHeight}px; received ${actualHeight.toFixed(2)}px`
+      );
+    }
+  });
+}
+
 export async function replaceTextTestId(
   canvasElement: HTMLElement,
   testID: string,
@@ -84,9 +124,22 @@ export async function replaceTextTestId(
 export async function waitForVisibleTestId(canvasElement: HTMLElement, testID: string): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
-  if (element.getBoundingClientRect().height <= 0) {
-    throw new Error(`${testID} must have a visible height`);
-  }
+  await waitFor(() => {
+    if (element.getBoundingClientRect().height <= 0) {
+      throw new Error(`${testID} must have a visible height`);
+    }
+  }, { timeout: 4_000 });
+}
+
+export async function waitForHiddenTestId(canvasElement: HTMLElement, testID: string): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    const opacity = Number.parseFloat(element.ownerDocument.defaultView?.getComputedStyle(element).opacity ?? "1");
+    if (element.getBoundingClientRect().height > 0.5 || opacity > 0.05) {
+      throw new Error(`${testID} must finish collapsing`);
+    }
+  }, { timeout: 4_000 });
 }
 
 export function expectTestIdAbsent(canvasElement: HTMLElement, testID: string): void {

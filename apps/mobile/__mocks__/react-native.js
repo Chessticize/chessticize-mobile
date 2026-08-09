@@ -67,13 +67,27 @@ function MockView(props) {
 class AnimatedValue {
   constructor(value) {
     this.value = value;
+    this.animationTimer = null;
   }
 
   setValue(value) {
     this.value = value;
   }
 
-  stopAnimation() {}
+  interpolate(configuration) {
+    return {
+      __animatedValue: this,
+      configuration
+    };
+  }
+
+  stopAnimation(callback) {
+    if (this.animationTimer !== null) {
+      clearTimeout(this.animationTimer);
+      this.animationTimer = null;
+    }
+    callback?.(this.value);
+  }
 }
 
 module.exports = {
@@ -88,6 +102,26 @@ module.exports = {
           callback?.();
         }
       };
+    },
+    timing(value, configuration) {
+      return {
+        start(callback) {
+          value.stopAnimation();
+          value.animationTimer = setTimeout(() => {
+            value.animationTimer = null;
+            value.setValue(configuration.toValue);
+            callback?.({ finished: true });
+          }, configuration.duration ?? 0);
+        }
+      };
+    }
+  },
+  Easing: {
+    cubic(value) {
+      return value * value * value;
+    },
+    out(easing) {
+      return easing;
     }
   },
   NativeModules: {},
