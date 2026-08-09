@@ -73,7 +73,7 @@
     "mobile:e2e:adaptive-layout:ios": "pnpm --filter ChessticizeMobile e2e:adaptive-layout:ios",
     "mobile:e2e:adaptive-layout:android": "pnpm --filter ChessticizeMobile e2e:adaptive-layout:android",
     "mobile:e2e:build:android": "pnpm --filter ChessticizeMobile e2e:build:android",
-    "mobile:e2e:build:android:release": "pnpm --filter ChessticizeMobile e2e:build:android:release",
+    "mobile:build:android:r8-validation": "pnpm --filter ChessticizeMobile build:android:r8-validation",
     "mobile:e2e:test:android": "pnpm --filter ChessticizeMobile e2e:test:android",
     "mobile:e2e:test:android:ci": "pnpm --filter ChessticizeMobile e2e:test:android:ci",
     "mobile:validate:android:matrix": "pnpm --filter ChessticizeMobile validate:android:matrix",

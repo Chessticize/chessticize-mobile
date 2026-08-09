@@ -1,11 +1,7 @@
-# The API 36 instrumentation suite is compiled separately from the optimized
-# target APK and directly calls these exact native reminder contracts. Keep
-# only that test ABI stable; production release builds do not load this file.
-# Detox's separately compiled instrumentation APK includes Material test UI
-# classes that extend AppCompat. Keep that dependency ABI stable across APKs;
-# production release builds remain free to optimize AppCompat.
--keep class androidx.appcompat.** { *; }
-
+# Android instrumentation is compiled separately from the optimized target APK
+# and directly calls these exact contracts. Keep only that test ABI stable;
+# production release builds do not load this file.
+-keep,includedescriptorclasses class com.chessticize.mobile.NativeStockfishEngineModule { *; }
 -keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderAlarmContract { *; }
 -keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderAlarmReceiver { *; }
 -keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderAlarmScheduler { *; }

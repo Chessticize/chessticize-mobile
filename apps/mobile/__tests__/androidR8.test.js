@@ -52,74 +52,70 @@ describe('Android R8 release optimization', () => {
     );
   });
 
-  it('builds and runs Detox against an R8-transformed release-derived APK', () => {
+  it('validates the non-debuggable R8 target without widening production keeps', () => {
     const build = read('apps/mobile/android/app/build.gradle');
-    const releaseE2eRules = read(
-      'apps/mobile/android/app/proguard-rules-release-e2e.pro',
+    const validationRules = read(
+      'apps/mobile/android/app/proguard-rules-r8-validation.pro',
     );
     const mainManifest = read(
       'apps/mobile/android/app/src/main/AndroidManifest.xml',
     );
-    const releaseE2eManifest = read(
-      'apps/mobile/android/app/src/releaseE2e/AndroidManifest.xml',
-    );
     const detox = read('apps/mobile/.detoxrc.js');
     const mobilePackage = JSON.parse(read('apps/mobile/package.json'));
     const rootPackage = JSON.parse(read('package.json'));
-    const detoxRunner = read('apps/mobile/scripts/android-test-for-detox.sh');
+    const nativeRunner = read('apps/mobile/scripts/android-r8-native-evidence.sh');
+    const nativeTests = read(
+      'apps/mobile/android/app/src/androidTest/java/com/chessticize/mobile/R8NativeBoundariesIntegrationTest.kt',
+    );
+    const validationBlock = build.match(
+      /\n\s{8}r8Validation \{([\s\S]*?)\n\s{8}\}\n\s{4}\}/,
+    );
 
-    expect(build).toMatch(/releaseE2e\s*\{\s*initWith release/);
-    expect(build).toMatch(
-      /releaseE2e[\s\S]*manifestPlaceholders = \[usesCleartextTraffic: true\]/,
-    );
-    expect(build).not.toMatch(/releaseE2e\s*\{[^}]*debuggable true/);
-    expect(releaseE2eManifest).toContain('android.permission.INTERNET');
+    expect(validationBlock).not.toBeNull();
+    expect(validationBlock?.[1]).toContain('initWith release');
+    expect(validationBlock?.[1]).not.toContain('debuggable true');
+    expect(validationBlock?.[1]).not.toContain('usesCleartextTraffic: true');
     expect(mainManifest).not.toContain('android.permission.INTERNET');
-    expect(build).toMatch(/releaseE2e[\s\S]*signingConfig signingConfigs\.debug/);
-    expect(build).toMatch(
-      /releaseE2e[\s\S]*proguardFile "\$\{rootProject\.projectDir\}\/\.\.\/node_modules\/detox\/android\/detox\/proguard-rules-app\.pro"/,
+    expect(build).toMatch(/release[\s\S]*manifestPlaceholders = \[usesCleartextTraffic: false\]/);
+    expect(validationBlock?.[1]).toContain('signingConfig signingConfigs.debug');
+    expect(validationBlock?.[1]).not.toContain('detox/proguard-rules-app.pro');
+    expect(validationBlock?.[1]).toContain(
+      'proguardFile "proguard-rules-r8-validation.pro"',
     );
-    expect(build).toMatch(
-      /releaseE2e[\s\S]*proguardFile "proguard-rules-release-e2e\.pro"/,
+    expect(validationRules).toContain(
+      '-keep,includedescriptorclasses class com.chessticize.mobile.NativeStockfishEngineModule',
     );
-    expect(releaseE2eRules).toContain(
+    expect(validationRules).toContain(
       '-keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderAlarmScheduler',
     );
-    expect(releaseE2eRules).toContain(
+    expect(validationRules).toContain(
       '-keep,includedescriptorclasses class com.chessticize.mobile.StoredReviewReminder',
     );
-    expect(releaseE2eRules).toContain(
+    expect(validationRules).toContain(
       '-keep,includedescriptorclasses class com.chessticize.mobile.MainActivityKt',
     );
-    expect(releaseE2eRules).toContain('-keep class androidx.appcompat.** { *; }');
-    expect(releaseE2eRules).not.toContain('com.chessticize.mobile.**');
+    expect(validationRules).not.toContain('androidx.appcompat.**');
+    expect(validationRules).not.toContain('com.chessticize.mobile.**');
     const releaseBlock = build.match(
       /\n\s{8}release \{([\s\S]*?)\n\s{8}\}\n\s{8}\/\/ Exercise/,
     );
     expect(releaseBlock).not.toBeNull();
     expect(releaseBlock?.[1]).not.toContain('debuggable true');
     expect(releaseBlock?.[1]).not.toContain('detox/proguard-rules-app.pro');
-    expect(releaseBlock?.[1]).not.toContain('proguard-rules-release-e2e.pro');
-    expect(detox).toContain("'android.releaseE2e'");
-    expect(detox).toContain(
-      "binaryPath: 'android/app/build/outputs/apk/releaseE2e/app-releaseE2e.apk'",
-    );
-    expect(detox).toContain(
-      'assembleReleaseE2e bundleReleaseE2e assembleAndroidTest -DtestBuildType=releaseE2e',
-    );
-    expect(detox).toContain("'android.attached.releaseE2e'");
-    expect(detoxRunner).toContain('CHESSTICIZE_ANDROID_DETOX_CONFIGURATION');
-    expect(mobilePackage.scripts['e2e:build:android:release']).toBe(
-      'detox build --configuration android.attached.releaseE2e',
+    expect(releaseBlock?.[1]).not.toContain('proguard-rules-r8-validation.pro');
+    expect(detox).not.toContain('r8Validation');
+    expect(detox).not.toContain('releaseE2e');
+    expect(mobilePackage.scripts['build:android:r8-validation']).toBe(
+      'cd android && ./gradlew assembleR8Validation bundleR8Validation assembleR8ValidationAndroidTest -DtestBuildType=r8Validation',
     );
     expect(mobilePackage.scripts['verify:android:r8']).toBe(
       'node scripts/android-r8-evidence.js',
     );
-    expect(mobilePackage.scripts['validate:android:r8']).toContain(
-      'ANDROID_VALIDATION_APP_VARIANT=releaseE2e',
+    expect(mobilePackage.scripts['validate:android:r8']).toBe(
+      'scripts/android-r8-native-evidence.sh',
     );
-    expect(rootPackage.scripts['mobile:e2e:build:android:release']).toBe(
-      'pnpm --filter ChessticizeMobile e2e:build:android:release',
+    expect(rootPackage.scripts['mobile:build:android:r8-validation']).toBe(
+      'pnpm --filter ChessticizeMobile build:android:r8-validation',
     );
     expect(rootPackage.scripts['mobile:verify:android:r8']).toBe(
       'pnpm --filter ChessticizeMobile verify:android:r8',
@@ -127,6 +123,16 @@ describe('Android R8 release optimization', () => {
     expect(rootPackage.scripts['mobile:validate:android:r8']).toBe(
       'pnpm --filter ChessticizeMobile validate:android:r8',
     );
+    expect(nativeRunner).toContain('R8NativeBoundariesIntegrationTest');
+    expect(nativeRunner).toContain("'OK (2 tests)'");
+    expect(nativeRunner).toContain("'OK (8 tests)'");
+    expect(nativeRunner).toContain("'OK (1 test)'");
+    expect(nativeRunner).toContain("grep -Fq 'practice-tab'");
+    expect(nativeTests).toContain('ApplicationInfo.FLAG_DEBUGGABLE');
+    expect(nativeTests).toContain('getDeclaredField("mBackPressedCallback")');
+    expect(nativeTests).toContain('MobilePredictiveBackApi34Delegate');
+    expect(nativeTests).toContain('assertTrue(awaitStart(module))');
+    expect(nativeTests).toContain('assertFalse(awaitStart(module))');
   });
 
   it('retains R8 diagnostics beside the protected signed release candidate', () => {
@@ -183,7 +189,7 @@ describe('Android R8 release optimization', () => {
 
   it('parses an explicit fail-closed optimization evidence command', () => {
     expect(parseArguments([
-      '--variant', 'releaseE2e',
+      '--variant', 'r8Validation',
       '--apk', 'app.apk',
       '--bundle', 'app.aab',
       '--mapping-dir', 'mapping',
@@ -191,14 +197,14 @@ describe('Android R8 release optimization', () => {
       '--build-duration-ms', '1234',
     ])).toEqual({
       allowDirty: false,
-      variant: 'releaseE2e',
+      variant: 'r8Validation',
       apk: 'app.apk',
       bundle: 'app.aab',
       mappingDirectory: 'mapping',
       output: 'report.json',
       buildDurationMs: 1234,
     });
-    expect(() => parseArguments(['--variant', 'releaseE2e']))
+    expect(() => parseArguments(['--variant', 'r8Validation']))
       .toThrow('requires --mapping-directory');
   });
 

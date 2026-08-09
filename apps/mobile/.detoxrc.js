@@ -42,12 +42,6 @@ module.exports = {
       testBinaryPath: 'android/app/build/outputs/apk/androidTest/e2e/app-e2e-androidTest.apk',
       build: 'cd android && ./gradlew assembleE2e assembleAndroidTest -DtestBuildType=e2e',
     },
-    'android.releaseE2e': {
-      type: 'android.apk',
-      binaryPath: 'android/app/build/outputs/apk/releaseE2e/app-releaseE2e.apk',
-      testBinaryPath: 'android/app/build/outputs/apk/androidTest/releaseE2e/app-releaseE2e-androidTest.apk',
-      build: 'cd android && ./gradlew assembleReleaseE2e bundleReleaseE2e assembleAndroidTest -DtestBuildType=releaseE2e',
-    },
   },
   devices: {
     simulator: {
@@ -73,10 +67,6 @@ module.exports = {
     'android.attached.e2e': {
       device: 'android.attached',
       app: 'android.e2e',
-    },
-    'android.attached.releaseE2e': {
-      device: 'android.attached',
-      app: 'android.releaseE2e',
     },
     'android.attached.debug': {
       device: 'android.attached',

@@ -393,7 +393,7 @@ describe('Android launch baseline', () => {
     expect(debugSigningReferences).toHaveLength(2);
     expect(releaseBlock).not.toBeNull();
     expect(releaseBlock?.[1]).not.toContain('signingConfigs.debug');
-    expect(appGradle).toMatch(/releaseE2e[\s\S]*signingConfig signingConfigs\.debug/);
+    expect(appGradle).toMatch(/r8Validation[\s\S]*signingConfig signingConfigs\.debug/);
     expect(appGradle).toContain('Production Android signing material is required for release packaging.');
     expect(appGradle).toContain('CHESSTICIZE_ANDROID_RELEASE_STORE_FILE');
     expect(appGradle).toContain('signingConfig signingConfigs.release');

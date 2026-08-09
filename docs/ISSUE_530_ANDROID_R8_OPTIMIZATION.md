@@ -15,10 +15,12 @@ upload-signed build or the final clean-head Android validation record.
   API 34 predictive-Back reflection delegate constructor, and Stockfish JNI
   method names
 - no package-wide `com.chessticize.mobile.**` keep rule is present
-- Detox's broader React Native inspection rules are isolated to
-  `releaseE2e`; an exact-class reminder test ABI is also isolated there because
-  Android instrumentation compiles separately from the target app. Neither
-  rule set appears in the production merged configuration
+- the non-debuggable `r8Validation` variant inherits the release graph and has
+  no INTERNET, cleartext, or Detox exception; narrowly scoped Stockfish and
+  reminder test ABIs are isolated there because Android instrumentation
+  compiles separately from the target app
+- Detox remains on the ordinary exact-head `e2e` pair for complete public
+  journeys; no package-wide keep workaround is present in either R8 rule set
 
 The production verifier requires non-empty `configuration.txt`, `mapping.txt`,
 `resources.txt`, `seeds.txt`, and `usage.txt`, confirms that application code
@@ -70,8 +72,11 @@ debug symbols dominate total archive size and are not R8 inputs.
 
 - build and inspect production `release` from the clean exact implementation
   commit;
-- run the full API 36 `releaseE2e` matrix, including system Back, predictive
-  Back, Stockfish lifecycle, reminders, `flows`, and `practice`;
+- run the non-debuggable API 36 `r8Validation` native suite for reflection,
+  Stockfish JNI lifecycle, reminders, migration installation, cold launch,
+  public UI rendering, installed version, and manifest entry points;
+- run the full exact-head API 36 `e2e` matrix for system Back, predictive Back,
+  Stockfish lifecycle, reminders, `flows`, and `practice`;
 - run the conditional Progress Backup policy entry-point check;
 - pass current-head fast checks and code review;
 - let the protected candidate workflow rebuild with upload signing, retain the

@@ -139,7 +139,7 @@ function auditMergedConfiguration(configuration, variant) {
       'node_modules/detox/android/detox/proguard-rules-app.pro',
     ),
     nativeTestRulesIncluded: configuration.includes(
-      'proguard-rules-release-e2e.pro',
+      'proguard-rules-r8-validation.pro',
     ),
   };
   if (audit.appPackageWideKeep) {
@@ -151,9 +151,11 @@ function auditMergedConfiguration(configuration, variant) {
   if (variant === 'release' && audit.nativeTestRulesIncluded) {
     throw new Error('Production R8 configuration contains native-test-only keep rules.');
   }
-  if (variant === 'releaseE2e'
-    && (!audit.detoxRulesIncluded || !audit.nativeTestRulesIncluded)) {
-    throw new Error('Release E2E R8 configuration is missing test-only keep rules.');
+  if (variant === 'r8Validation' && !audit.nativeTestRulesIncluded) {
+    throw new Error('R8 validation configuration is missing native-test-only keep rules.');
+  }
+  if (variant === 'r8Validation' && audit.detoxRulesIncluded) {
+    throw new Error('R8 validation configuration contains Detox-only keep rules.');
   }
   return audit;
 }

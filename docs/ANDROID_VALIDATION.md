@@ -141,55 +141,66 @@ local scope.
 
 When release minification, resource shrinking, keep rules, or the Android
 Gradle optimization boundary changes, a debug or ordinary `e2e` APK is not
-valid evidence. Build both the production `release` output and the
-`releaseE2e` validation output from the same clean exact source commit:
+valid evidence for the transformed bytecode. Build both the production
+`release` output and the `r8Validation` output from the same clean exact source
+commit:
 
 ```sh
-pnpm mobile:e2e:build:android:release
+pnpm mobile:build:android:r8-validation
 
 pnpm mobile:verify:android:r8 -- \
-  --variant releaseE2e \
-  --apk apps/mobile/android/app/build/outputs/apk/releaseE2e/app-releaseE2e.apk \
-  --bundle apps/mobile/android/app/build/outputs/bundle/releaseE2e/app-releaseE2e.aab \
-  --mapping-dir apps/mobile/android/app/build/outputs/mapping/releaseE2e \
-  --output apps/mobile/artifacts/android-r8/release-e2e.json
+  --variant r8Validation \
+  --apk apps/mobile/android/app/build/outputs/apk/r8Validation/app-r8Validation.apk \
+  --bundle apps/mobile/android/app/build/outputs/bundle/r8Validation/app-r8Validation.aab \
+  --mapping-dir apps/mobile/android/app/build/outputs/mapping/r8Validation \
+  --output apps/mobile/artifacts/android-r8/r8-validation.json
 ```
 
-`releaseE2e` inherits the release optimization graph and is debug-signed only
-for local emulator installation. It adds Detox's test-only keep rules so the
-instrumentation protocol can inspect React Native, plus an exact-class test ABI
-for the separately compiled reminder integration test. Those rules are
-deliberately absent from the production `release` build. Therefore also inspect
-the production `release` mapping directory with `mobile:verify:android:r8`; the
-protected candidate workflow performs that check again on the upload-signed
-AAB and retains `configuration.txt`, `mapping.txt`, `resources.txt`,
-`seeds.txt`, and `usage.txt` beside the candidate for 30 days.
+`r8Validation` inherits the non-debuggable release optimization graph and is
+debug-signed only for local emulator installation. It has no INTERNET
+permission, cleartext exception, or Detox keep rules. Its separate
+instrumentation APK uses a narrow exact-class ABI only for native boundary
+tests. Those test rules are deliberately absent from the production `release`
+build. Therefore also inspect the production `release` mapping directory with
+`mobile:verify:android:r8`; the protected candidate workflow performs that
+check again on the upload-signed AAB and retains `configuration.txt`,
+`mapping.txt`, `resources.txt`, `seeds.txt`, and `usage.txt` beside the
+candidate for 30 days.
 
-Run the full API 36 matrix against the release-derived pair:
+Run the native R8 boundary suite on API 36:
 
 ```sh
 export DETOX_ANDROID_DEVICE=emulator-5554
-export ANDROID_VALIDATION_DEVICE_ABI="$(
-  adb -s "$DETOX_ANDROID_DEVICE" shell getprop ro.product.cpu.abi | tr -d '\r'
-)"
-ANDROID_VALIDATION_COMMIT_SHA="$(git rev-parse HEAD)" \
-ANDROID_VALIDATION_BUILD_RESULT=success \
-ANDROID_VALIDATION_DEVICE_ABI="$ANDROID_VALIDATION_DEVICE_ABI" \
-ANDROID_VALIDATION_DEVICE_PROFILE=pixel_2 \
 DETOX_ANDROID_DEVICE="$DETOX_ANDROID_DEVICE" \
-pnpm mobile:validate:android:r8 -- --api-level 36 \
-  --output apps/mobile/artifacts/android-validation/r8-api-36.json
+pnpm mobile:validate:android:r8
 ```
 
-The matrix rejects a release-derived run unless its optimization report, App
-source SHA, variant, and APK artifact-identity checksum match. It covers launch and installed
-version metadata, system Back and the API-gated predictive-Back bridge,
-Stockfish start/send/cancel/reuse, reminder scheduling and notification entry,
-and the complete shared `flows` and `practice` journeys. Run the conditional
-Progress Backup policy/restore profile as well when build-wide shrinking could
-affect manifest entry points. The production APK/AAB inspection plus the
-release-derived runtime matrix form one result; neither substitutes for the
-other.
+The runner fails closed on a dirty tracked worktree and regenerates the R8
+report for the exact APK. It proves that the installed target is non-debuggable,
+that the ReactActivity field and API-gated predictive-Back constructor survive
+reflection, that Stockfish can start, receive a command, stop, and restart
+through JNI, and that reminder and migration instrumentation still cross the
+optimized APK boundary. It also checks launch, public Practice UI rendering,
+installed version metadata, native packaging, and the manifest-owned reminder
+and Progress Backup entry points.
+
+Detox cannot attach its ActivityTestRule to this non-debuggable optimized
+target, so it must not be enabled by adding `debuggable`, cleartext, INTERNET,
+Detox keep rules, or a package-wide keep workaround. Build the ordinary exact-
+head `e2e` pair and run the full API 36 matrix separately:
+
+```sh
+pnpm mobile:e2e:build:android
+pnpm mobile:validate:android:matrix -- --api-level 36 \
+  --output apps/mobile/artifacts/android-validation/api-36.json
+```
+
+That matrix owns the complete public `flows` and `practice` journeys,
+including system and predictive Back, Stockfish lifecycle, and reminders. Run
+the conditional Progress Backup policy/restore profile separately when the
+changed boundary requires it. The production APK/AAB inspection,
+non-debuggable R8 native suite, and exact-head public E2E matrix form one
+result; none substitutes for another.
 
 For a reproducible before/after runtime sample, use the same dedicated device,
 fresh-install choice, component, run count, and ART compilation reset:
