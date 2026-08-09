@@ -839,7 +839,8 @@ export function PracticePocScreen({
   );
   const [arrowDuelOpponentReplyGlobalEnabled, setArrowDuelOpponentReplyGlobalEnabled] =
     useState(
-      () => sprintRulesDesignPreview?.arrowDuelOpponentReplyGlobalSetting?.enabled ?? true
+      () => sprintRulesDesignPreview?.arrowDuelOpponentReplyGlobalSetting?.enabled
+        ?? service.getSettings().arrowDuel.opponentReplyEnabled
     );
   const initialArrowDuelReplySeconds = (() => {
     const configured = sprintRulesDesignPreview?.arrowDuelReplyChallenge?.replySeconds
@@ -1884,6 +1885,7 @@ export function PracticePocScreen({
   ): SprintRulesGuidePresentation & {
     arrowDuelReplyChallenge?: boolean;
     arrowDuelReplyOnboarding?: "choice_then_reply";
+    opponentReplySettingsHint?: boolean;
   } {
     const config = practiceRunId === undefined
       ? sprintConfigFor(
@@ -1899,8 +1901,10 @@ export function PracticePocScreen({
       : nextMode === "standard"
         ? standardTargetCorrect
         : arrowDuelTargetCorrect;
-    const hasOpponentReply = nextMode === "arrow_duel"
-      && config.opponentReply?.enabled === true;
+    const hasOpponentReply = service.effectiveOpponentReplyConfig(
+      nextMode,
+      config.opponentReply
+    )?.enabled === true;
     return {
       durationLabel: formatSprintDurationLabel(config.durationSeconds),
       maxMistakes: config.maxMistakes,
@@ -1908,10 +1912,24 @@ export function PracticePocScreen({
       ...(hasOpponentReply
         ? {
             arrowDuelReplyChallenge: true,
-            arrowDuelReplyOnboarding: "choice_then_reply" as const
+            arrowDuelReplyOnboarding: "choice_then_reply" as const,
+            opponentReplySettingsHint: true
           }
         : {})
     };
+  }
+
+  function saveArrowDuelOpponentReplyGlobalEnabled(enabled: boolean): void {
+    setArrowDuelOpponentReplyGlobalEnabled(enabled);
+    if (arrowDuelOpponentReplyGlobalSettingDesign) {
+      return;
+    }
+    const settings = service.getSettings();
+    service.saveSettings({
+      ...settings,
+      arrowDuel: { opponentReplyEnabled: enabled }
+    });
+    setSettingsRevision((current) => current + 1);
   }
 
   function saveSprintGuideSeen(guide: SprintGuideKey): void {
@@ -1933,6 +1951,7 @@ export function PracticePocScreen({
       arrowDuelReplyOnboarding?: "choice_then_reply";
       focusedRun?: boolean;
       maxAttempts?: number;
+      opponentReplySettingsHint?: boolean;
     }
   ): boolean {
     if (!sprintGuidanceEnabled || pendingGuidedStartRef.current) {
@@ -2034,7 +2053,8 @@ export function PracticePocScreen({
             && prepared.prepared.config.opponentReply?.enabled === true
             ? {
                 arrowDuelReplyChallenge: true,
-                arrowDuelReplyOnboarding: "choice_then_reply" as const
+                arrowDuelReplyOnboarding: "choice_then_reply" as const,
+                opponentReplySettingsHint: true
               }
             : {})
         }
@@ -3490,12 +3510,9 @@ export function PracticePocScreen({
     sprintRulesDesignPreview?.arrowDuelReplyChallenge;
   const arrowDuelOpponentReplyGlobalSettingDesign =
     sprintRulesDesignPreview?.arrowDuelOpponentReplyGlobalSetting;
-  const opponentReplySettingsHint = arrowDuelOpponentReplyGlobalSettingDesign
-    ? "Optional · Turn off in Settings"
-    : undefined;
+  const opponentReplySettingsHint = "Optional · Turn off in Settings";
   const arrowDuelOpponentReplyGloballyAvailable =
-    arrowDuelOpponentReplyGlobalSettingDesign === undefined
-    || arrowDuelOpponentReplyGlobalEnabled;
+    arrowDuelOpponentReplyGlobalEnabled;
   const arrowDuelReplyAutoTimeoutMs = arrowDuelReplyChallengeDesign?.autoTimeoutMs;
   const arrowDuelReplyChallengePreviewVisible = Boolean(
     arrowDuelReplyChallengeDesign?.enabled
@@ -4750,9 +4767,7 @@ export function PracticePocScreen({
                 {!isSessionGuideVisible && !isOpenSession && state === null && activeRunManagementPresentation && activeRunManagementPresentation.screen !== "home" ? (
                   <PracticeRunEditor
                     arrowDuelOpponentReplyGlobalEnabled={
-                      arrowDuelOpponentReplyGlobalSettingDesign
-                        ? arrowDuelOpponentReplyGlobalEnabled
-                        : undefined
+                      arrowDuelOpponentReplyGlobalEnabled
                     }
                     arrowDuelReplyChallenge={
                       activeRunManagementPresentation.draft?.mode === "arrow_duel"
@@ -5106,12 +5121,10 @@ export function PracticePocScreen({
                 adaptiveLayout={adaptiveLayout}
                 applicationMetadata={platformCapabilities.applicationMetadata}
                 arrowDuelOpponentReplyGlobalSetting={
-                  arrowDuelOpponentReplyGlobalSettingDesign
-                    ? {
-                        enabled: arrowDuelOpponentReplyGlobalEnabled,
-                        onChange: setArrowDuelOpponentReplyGlobalEnabled
-                      }
-                    : undefined
+                  {
+                    enabled: arrowDuelOpponentReplyGlobalEnabled,
+                    onChange: saveArrowDuelOpponentReplyGlobalEnabled
+                  }
                 }
                 feedbackIssuesOpener={feedbackIssuesOpener}
                 progressProtection={progressProtection}

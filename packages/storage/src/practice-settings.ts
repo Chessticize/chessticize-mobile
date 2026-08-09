@@ -10,6 +10,9 @@ export function defaultPracticeSettings(): PracticeSettings {
     sync: {
       iCloudEnabled: true
     },
+    arrowDuel: {
+      opponentReplyEnabled: true
+    },
     notifications: {
       reviewReminder: {
         mode: "smart"
@@ -27,6 +30,9 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
   return normalizePracticeSettings({
     sync: {
       iCloudEnabled: settings.sync.iCloudEnabled
+    },
+    arrowDuel: {
+      opponentReplyEnabled: settings.arrowDuel?.opponentReplyEnabled ?? true
     },
     notifications: {
       reviewReminder: settings.notifications.reviewReminder
@@ -51,6 +57,9 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
   return {
     sync: {
       iCloudEnabled: Boolean(settings.sync.iCloudEnabled)
+    },
+    arrowDuel: {
+      opponentReplyEnabled: settings.arrowDuel?.opponentReplyEnabled ?? true
     },
     notifications: {
       reviewReminder: normalizeReviewReminderPreference(settings.notifications.reviewReminder)

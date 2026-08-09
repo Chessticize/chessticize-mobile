@@ -80,6 +80,7 @@ for (const label of STORE_LABELS) {
     try {
       const service = new PracticeService(store);
       const updated = service.saveSettings({
+        arrowDuel: { opponentReplyEnabled: false },
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "09:45" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },
@@ -94,6 +95,7 @@ for (const label of STORE_LABELS) {
 
       assert.deepEqual(updated, service.getSettings());
       assert.deepEqual(service.getSettings(), {
+        arrowDuel: { opponentReplyEnabled: false },
         sync: { iCloudEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "09:45" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },

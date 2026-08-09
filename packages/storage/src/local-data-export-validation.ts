@@ -54,6 +54,7 @@ export function normalizeLegacyProgressSyncSnapshot(
       ...data,
       settings: {
         sync: settings.sync,
+        arrowDuel: defaults.arrowDuel,
         notifications: settings.notifications,
         moveFeedback: settings.moveFeedback ?? defaults.moveFeedback,
         sprintGuides: settings.sprintGuides ?? defaults.sprintGuides
@@ -82,12 +83,15 @@ export function isCanonicalLocalDataExport(
 function isPracticeSettings(value: unknown): value is PracticeSettings {
   if (!isRecord(value)) return false;
   const sync = value.sync;
+  const arrowDuel = value.arrowDuel;
   const notifications = value.notifications;
   const moveFeedback = value.moveFeedback;
   const sprintGuides = value.sprintGuides;
   if (
     !isRecord(sync) ||
     typeof sync.iCloudEnabled !== "boolean" ||
+    !isRecord(arrowDuel) ||
+    typeof arrowDuel.opponentReplyEnabled !== "boolean" ||
     !isRecord(notifications) ||
     !isReviewReminder(notifications.reviewReminder) ||
     !isRecord(moveFeedback) ||

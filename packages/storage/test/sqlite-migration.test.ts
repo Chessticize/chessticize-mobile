@@ -333,6 +333,7 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
       });
       assert.deepEqual(service.getSettings(), {
         sync: { iCloudEnabled: true },
+        arrowDuel: { opponentReplyEnabled: true },
         notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "20:30" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },
         sprintGuides: {
@@ -432,6 +433,7 @@ test("SQLite migrates the released iOS 1.0.0 database without losing user semant
       assert.ok(service.listReviewQueue().every((review) => review.enrolledAt === undefined));
 
       service.saveSettings({
+        arrowDuel: { opponentReplyEnabled: true },
         sync: { iCloudEnabled: false },
         notifications: { reviewReminder: { mode: "off" } },
         moveFeedback: { soundEnabled: false, hapticsEnabled: true },
@@ -581,6 +583,7 @@ test("SQLite migrates the released iOS 1.2.1 database without losing user semant
 
       assert.deepEqual(service.getSettings(), {
         sync: { iCloudEnabled: false },
+        arrowDuel: { opponentReplyEnabled: true },
         notifications: {
           reviewReminder: { mode: "fixed", fixedLocalTime: "07:35" }
         },
@@ -1345,6 +1348,49 @@ test("SQLite repairs an early v20 outbox without losing pending work", async () 
       assert.equal(integrityResultForStore(migrated), "ok");
     } finally {
       migrated.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("SQLite v21 defaults the global Arrow Duel reply preference on and persists later opt-out", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-v21-opponent-reply-setting-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setup = new SQLiteStore(databasePath);
+    setup.migrate();
+    setup.getSettings();
+    setup.db.exec(`
+      ALTER TABLE app_settings DROP COLUMN arrow_duel_opponent_reply_enabled;
+      PRAGMA user_version = 20;
+    `);
+    setup.close();
+
+    const migrated = new SQLiteStore(databasePath);
+    migrated.migrate();
+    try {
+      assert.equal(migrated.getSettings().arrowDuel.opponentReplyEnabled, true);
+      migrated.saveSettings({
+        ...migrated.getSettings(),
+        arrowDuel: { opponentReplyEnabled: false }
+      });
+      assert.throws(() => {
+        migrated.db.prepare(
+          "UPDATE app_settings SET arrow_duel_opponent_reply_enabled = 2 WHERE id = 'default'"
+        ).run();
+      }, /constraint/i);
+      assert.equal(schemaVersionForStore(migrated), CURRENT_SCHEMA_VERSION);
+    } finally {
+      migrated.close();
+    }
+
+    const reopened = new SQLiteStore(databasePath);
+    reopened.migrate();
+    try {
+      assert.equal(reopened.getSettings().arrowDuel.opponentReplyEnabled, false);
+    } finally {
+      reopened.close();
     }
   } finally {
     await rm(directory, { recursive: true, force: true });

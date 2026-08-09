@@ -256,6 +256,7 @@ function progressExport(attemptId, sessionId) {
     schemaVersion: 1,
     settings: {
       sync: { iCloudEnabled: true },
+      arrowDuel: { opponentReplyEnabled: true },
       notifications: { reviewReminder: { mode: "smart" } },
       moveFeedback: { soundEnabled: true, hapticsEnabled: true },
       sprintGuides: {

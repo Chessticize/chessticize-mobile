@@ -23,6 +23,7 @@ import {
   practiceRunSprintConfig,
   renamePracticeRun,
   reorderPracticeRuns,
+  resolveEffectiveOpponentReplyConfig,
   resolveOpponentReplyConfig,
   resolvePuzzleTimingPolicy,
   restorePracticeRun,
@@ -558,8 +559,18 @@ export class PracticeService {
     now = new Date().toISOString(),
     randomSeed: string | number = now
   ): PrepareFocusedRunResult {
-    return this.tacticalProfile?.prepareFocusedRun(taskFamily, now, randomSeed) ??
-      { status: "unavailable", reason: "policy_unavailable" };
+    const result = this.tacticalProfile?.prepareFocusedRun(taskFamily, now, randomSeed) ??
+      { status: "unavailable" as const, reason: "policy_unavailable" as const };
+    if (result.status !== "ready") {
+      return result;
+    }
+    return {
+      status: "ready",
+      prepared: {
+        ...result.prepared,
+        config: this.effectiveSprintConfig(result.prepared.config)
+      }
+    };
   }
 
   startFocusedRun(
@@ -675,6 +686,17 @@ export class PracticeService {
     return this.store.listPracticeRuns().map(clonePracticeRun);
   }
 
+  effectiveOpponentReplyConfig(
+    mode: SprintMode,
+    savedConfig?: OpponentReplyConfig
+  ): OpponentReplyConfig | undefined {
+    return resolveEffectiveOpponentReplyConfig(
+      mode,
+      savedConfig,
+      this.store.getSettings().arrowDuel.opponentReplyEnabled
+    );
+  }
+
   opponentReplyForReview(input: {
     mode: SprintMode;
     ratingKey: string;
@@ -686,7 +708,7 @@ export class PracticeService {
     if (input.attempt?.source === "sprint") {
       const originalSession = this.store.getSprintSessions([input.attempt.sessionId])[0];
       if (originalSession?.config?.mode === "arrow_duel") {
-        return resolveOpponentReplyConfig(
+        return this.effectiveOpponentReplyConfig(
           "arrow_duel",
           originalSession.config.opponentReply
         );
@@ -695,7 +717,7 @@ export class PracticeService {
     const run = this.store.listPracticeRuns().find(
       (candidate) => candidate.ratingKey === input.ratingKey
     );
-    return resolveOpponentReplyConfig("arrow_duel", run?.opponentReply);
+    return this.effectiveOpponentReplyConfig("arrow_duel", run?.opponentReply);
   }
 
   createPracticeRun(
@@ -1057,12 +1079,25 @@ export class PracticeService {
     practiceRun: PracticeRunRecord | undefined
   ): SprintConfig {
     const storedRunConfig = practiceRun ? practiceRunSprintConfig(practiceRun) : undefined;
-    return storedRunConfig
+    const config = storedRunConfig
       ? {
           ...storedRunConfig,
           ...(command.targetCorrect === undefined ? {} : { targetCorrect: command.targetCorrect })
         }
       : this.sprintConfigForCommand(command);
+    return this.effectiveSprintConfig(config);
+  }
+
+  private effectiveSprintConfig(config: SprintConfig): SprintConfig {
+    const opponentReply = this.effectiveOpponentReplyConfig(
+      config.mode,
+      config.opponentReply
+    );
+    const { opponentReply: _savedOpponentReply, ...baseConfig } = config;
+    return {
+      ...baseConfig,
+      ...(opponentReply === undefined ? {} : { opponentReply })
+    };
   }
 
   private puzzleFilterForCommand(command: StartSprintCommand, config: SprintConfig, rating: number): {
