@@ -310,6 +310,7 @@ export type SprintRulesGuidePresentation = {
 export type SprintSessionGuidePresentation = SprintRulesGuidePresentation & {
   arrowDuelReplyChallenge?: boolean;
   arrowDuelReplyOnboarding?: "choice_then_reply";
+  opponentReplySettingsHint?: boolean;
   focusedRun?: boolean;
   guideKey?: Exclude<SprintGuideKey, "rules">;
   maxAttempts?: number;
@@ -331,6 +332,9 @@ export type SprintResultReplayDesignItem = SessionReplayItem;
 
 export type SprintRulesDesignPreview = {
   arrowDuelReplyChallenge?: ArrowDuelReplyChallengeDesignPreview;
+  arrowDuelOpponentReplyGlobalSetting?: {
+    enabled: boolean;
+  };
   firstRunGuide?: SprintRulesGuidePresentation;
   firstRunGuideInitiallyVisible?: boolean;
   initialActiveState?: SprintState;
@@ -815,6 +819,10 @@ export function PracticePocScreen({
   const [arrowDuelReplyChallengeEnabled, setArrowDuelReplyChallengeEnabled] = useState(
     () => sprintRulesDesignPreview?.arrowDuelReplyChallenge?.enabled ?? true
   );
+  const [arrowDuelOpponentReplyGlobalEnabled, setArrowDuelOpponentReplyGlobalEnabled] =
+    useState(
+      () => sprintRulesDesignPreview?.arrowDuelOpponentReplyGlobalSetting?.enabled ?? true
+    );
   const initialArrowDuelReplySeconds = (() => {
     const configured = sprintRulesDesignPreview?.arrowDuelReplyChallenge?.replySeconds
       ?? DEFAULT_OPPONENT_REPLY_SECONDS;
@@ -3372,15 +3380,25 @@ export function PracticePocScreen({
   const currentPuzzle = state?.currentPuzzle;
   const arrowDuelReplyChallengeDesign =
     sprintRulesDesignPreview?.arrowDuelReplyChallenge;
+  const arrowDuelOpponentReplyGlobalSettingDesign =
+    sprintRulesDesignPreview?.arrowDuelOpponentReplyGlobalSetting;
+  const opponentReplySettingsHint = arrowDuelOpponentReplyGlobalSettingDesign
+    ? "Optional · Turn off in Settings"
+    : undefined;
+  const arrowDuelOpponentReplyGloballyAvailable =
+    arrowDuelOpponentReplyGlobalSettingDesign === undefined
+    || arrowDuelOpponentReplyGlobalEnabled;
   const arrowDuelReplyAutoTimeoutMs = arrowDuelReplyChallengeDesign?.autoTimeoutMs;
   const arrowDuelReplyChallengePreviewVisible = Boolean(
     arrowDuelReplyChallengeDesign?.enabled
       && arrowDuelReplyChallengeDesign.resolveMove
       && arrowDuelReplyChallengeEnabled
+      && arrowDuelOpponentReplyGloballyAvailable
       && currentPuzzle?.kind === "arrow_duel"
   );
   const arrowDuelReplyChallengeProductionVisible = Boolean(
     !arrowDuelReplyChallengePreviewVisible &&
+      arrowDuelOpponentReplyGloballyAvailable &&
       state?.config.opponentReply?.enabled &&
       currentPuzzle?.kind === "arrow_duel"
   );
@@ -4152,6 +4170,7 @@ export function PracticePocScreen({
               : undefined}
             compactTitle={boardSize < 300}
             detail={arrowDuelWhatIfDetail}
+            optionalSettingsHint={opponentReplySettingsHint}
             onAction={() => {
               if (productionReplyCuePresentation?.confirmationRequired === true) {
                 service.acknowledgeArrowDuelReplyCue();
@@ -4245,6 +4264,7 @@ export function PracticePocScreen({
             promptSide={arrowDuelPromptSide}
             replyReady={arrowDuelReplyReady}
             replySeconds={arrowDuelReplySecondsRemaining}
+            settingsHint={opponentReplySettingsHint}
           />
       ) : (
         <PracticePrompt
@@ -4624,6 +4644,11 @@ export function PracticePocScreen({
 
                 {!isSessionGuideVisible && !isOpenSession && state === null && activeRunManagementPresentation && activeRunManagementPresentation.screen !== "home" ? (
                   <PracticeRunEditor
+                    arrowDuelOpponentReplyGlobalEnabled={
+                      arrowDuelOpponentReplyGlobalSettingDesign
+                        ? arrowDuelOpponentReplyGlobalEnabled
+                        : undefined
+                    }
                     arrowDuelReplyChallenge={
                       activeRunManagementPresentation.draft?.mode === "arrow_duel"
                         ? {
@@ -4801,6 +4826,7 @@ export function PracticePocScreen({
                   deferBackRelevantTransition={deferBackRelevantTransition}
                   entries={historyReviewEntries}
                   explicitReplySideCopy={explicitReplySideCopy}
+                  opponentReplySettingsHint={opponentReplySettingsHint}
                   initialIndex={historyReviewInitialIndex}
                   moveFeedbackClient={moveFeedbackClient}
                   service={service}
@@ -4926,6 +4952,7 @@ export function PracticePocScreen({
                 boardSize={boardSize}
                 dueReviewItems={dueReviewItems}
                 explicitReplySideCopy={explicitReplySideCopy}
+                opponentReplySettingsHint={opponentReplySettingsHint}
                 nowMs={nowMs}
                 reviewQueue={reviewQueue}
                 currentTimeMs={currentTimeMs}
@@ -4969,6 +4996,14 @@ export function PracticePocScreen({
               <SettingsPanel
                 adaptiveLayout={adaptiveLayout}
                 applicationMetadata={platformCapabilities.applicationMetadata}
+                arrowDuelOpponentReplyGlobalSetting={
+                  arrowDuelOpponentReplyGlobalSettingDesign
+                    ? {
+                        enabled: arrowDuelOpponentReplyGlobalEnabled,
+                        onChange: setArrowDuelOpponentReplyGlobalEnabled
+                      }
+                    : undefined
+                }
                 feedbackIssuesOpener={feedbackIssuesOpener}
                 progressProtection={progressProtection}
                 standardRating={readRating(service, defaultSprintConfig("standard").ratingKey)}
@@ -5959,7 +5994,8 @@ function sessionGuideCallout(
   coachStep: number,
   focusedRun = false,
   arrowDuelReplyChallenge = false,
-  arrowDuelReplyOnboarding = false
+  arrowDuelReplyOnboarding = false,
+  opponentReplySettingsHint = false
 ): SessionGuideCallout {
   if (mode === "arrow_duel") {
     if (arrowDuelReplyChallenge && arrowDuelReplyOnboarding) {
@@ -5973,7 +6009,9 @@ function sessionGuideCallout(
           }
         : {
             badge: "FIND THE REPLY · 2 OF 2",
-            detail: "After you choose correctly, we’ll test your understanding of the counterplay by playing the move you didn’t choose. You’ll then have 10 seconds to find Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review.",
+            detail: opponentReplySettingsHint
+              ? "After a correct choice, we play the other move and give you 10 seconds to find Black’s best reply. Sprint time stays paused. This extra challenge is optional — turn it off in Settings. A miss or timeout is one mistake and goes to Review."
+              : "After you choose correctly, we’ll test your understanding of the counterplay by playing the move you didn’t choose. You’ll then have 10 seconds to find Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review.",
             id: "arrow-duel-reply",
             title: "Then reply for Black",
             tone: "info"
@@ -6102,7 +6140,8 @@ function ActiveSessionGuide({
     coachStep,
     isFocusedRun,
     presentation.arrowDuelReplyChallenge === true,
-    presentation.arrowDuelReplyOnboarding === "choice_then_reply"
+    presentation.arrowDuelReplyOnboarding === "choice_then_reply",
+    presentation.opponentReplySettingsHint === true
   );
 
   return (
@@ -6320,6 +6359,9 @@ function SessionCoachmarkDemo({
   const isArrowDuelReplyStep = isArrowDuel
     && presentation.arrowDuelReplyOnboarding === "choice_then_reply"
     && coachStep === 1;
+  const opponentReplySettingsHint = presentation.opponentReplySettingsHint
+    ? "Optional · Turn off in Settings"
+    : undefined;
   const [measuredLayouts, setMeasuredLayouts] = useState<
     Partial<Record<SessionGuideMeasuredLayoutKey, SessionGuideMeasuredLayout>>
   >({});
@@ -6433,7 +6475,8 @@ function SessionCoachmarkDemo({
     coachStep,
     presentation.focusedRun === true,
     presentation.arrowDuelReplyChallenge === true,
-    presentation.arrowDuelReplyOnboarding === "choice_then_reply"
+    presentation.arrowDuelReplyOnboarding === "choice_then_reply",
+    presentation.opponentReplySettingsHint === true
   );
   const calloutUsesBoard = adaptiveLayout.usesSessionRail
     && !isArrowDuel
@@ -6851,6 +6894,7 @@ function SessionCoachmarkDemo({
                 replyReady
                 replySeconds={10}
                 rootTestID="practice-prompt"
+                settingsHint={opponentReplySettingsHint}
                 testIDPrefix="practice-arrow-duel-guide"
               />
             ) : (
@@ -7127,6 +7171,7 @@ function SessionCoachmarkDemo({
                     replyReady
                     replySeconds={10}
                     rootTestID="practice-prompt"
+                    settingsHint={opponentReplySettingsHint}
                     testIDPrefix="practice-arrow-duel-guide"
                   />
                 ) : (
@@ -8233,12 +8278,14 @@ function RunRemovalConfirmation({
 }
 
 function PracticeRunEditor({
+  arrowDuelOpponentReplyGlobalEnabled,
   arrowDuelReplyChallenge,
   presentation,
   showSprintRulesSummary,
   themeCatalogPresentation,
   timeoutCountsAsMistake
 }: {
+  arrowDuelOpponentReplyGlobalEnabled?: boolean;
   arrowDuelReplyChallenge?: {
     enabled: boolean;
     replySecondsError: string | null;
@@ -8465,9 +8512,13 @@ function PracticeRunEditor({
         <SprintPassRulesSummary config={sprintRules} />
       ) : null}
 
-      {(isCreate || directRunEditing) && draft.mode === "arrow_duel" && arrowDuelReplyChallenge ? (
+      {(arrowDuelOpponentReplyGlobalEnabled === undefined
+        ? isCreate || directRunEditing
+        : !isCreate && directRunEditing && arrowDuelOpponentReplyGlobalEnabled)
+        && draft.mode === "arrow_duel" && arrowDuelReplyChallenge ? (
         <ArrowDuelReplyChallengeSetting
           enabled={arrowDuelReplyChallenge.enabled}
+          individualRunCopy={arrowDuelOpponentReplyGlobalEnabled !== undefined}
           replySecondsError={arrowDuelReplyChallenge.replySecondsError}
           replySecondsInput={arrowDuelReplyChallenge.replySecondsInput}
           onReplySecondsInputChange={arrowDuelReplyChallenge.onReplySecondsInputChange}
@@ -8508,12 +8559,14 @@ function PracticeRunEditor({
 
 function ArrowDuelReplyChallengeSetting({
   enabled,
+  individualRunCopy = false,
   replySecondsError,
   replySecondsInput,
   onReplySecondsInputChange,
   onToggle
 }: {
   enabled: boolean;
+  individualRunCopy?: boolean;
   replySecondsError: string | null;
   replySecondsInput: string;
   onReplySecondsInputChange: (value: string) => void;
@@ -8527,9 +8580,13 @@ function ArrowDuelReplyChallengeSetting({
       <View style={styles.customConfigCard}>
         <View style={styles.runTimingRow}>
           <View style={styles.runTimingRowCopy}>
-            <Text style={styles.listText}>Opponent reply</Text>
+            <Text style={styles.listText}>
+              {individualRunCopy ? "Opponent reply for this Run" : "Opponent reply"}
+            </Text>
             <Text style={styles.helperText}>
-              Ask for the opponent's reply after a correct choice.
+              {individualRunCopy
+                ? "Controls this Run only. Turn it off to keep Arrow Duel to one choice."
+                : "Ask for the opponent's reply after a correct choice."}
             </Text>
           </View>
           <View style={styles.arrowDuelReplySettingControl}>
@@ -8564,6 +8621,11 @@ function ArrowDuelReplyChallengeSetting({
               The Sprint and puzzle clocks pause when the reply begins. Find the reply quickly to
               show you understand the opponent's counterattack.
             </Text>
+            {individualRunCopy ? (
+              <Text style={styles.helperText}>
+                The global Opponent reply challenge setting is on.
+              </Text>
+            ) : null}
             {replySecondsError ? (
               <Text
                 accessibilityLiveRegion="polite"
@@ -10575,6 +10637,7 @@ function ArrowDuelWhatIfOverlay({
   compactTitle = false,
   detail,
   onAction,
+  optionalSettingsHint,
   testIDPrefix,
   title = "What if you made\nthe other move?",
   titleSide,
@@ -10584,6 +10647,7 @@ function ArrowDuelWhatIfOverlay({
   compactTitle?: boolean;
   detail: string;
   onAction?: () => void;
+  optionalSettingsHint?: string;
   testIDPrefix: string;
   title?: string;
   titleSide?: MoveSide;
@@ -10598,7 +10662,7 @@ function ArrowDuelWhatIfOverlay({
     >
       <View
         accessible
-        accessibilityLabel={`${accessibilityTitle} ${detail}`}
+        accessibilityLabel={`${accessibilityTitle} ${detail}${optionalSettingsHint ? ` ${optionalSettingsHint}` : ""}`}
         accessibilityLiveRegion="polite"
         accessibilityRole="alert"
         style={styles.arrowDuelWhatIfAnnouncement}
@@ -10663,6 +10727,14 @@ function ArrowDuelWhatIfOverlay({
         >
           {detail}
         </Text>
+        {optionalSettingsHint ? (
+          <Text
+            style={styles.arrowDuelWhatIfSettingsHint}
+            testID={`${testIDPrefix}-what-if-settings-hint`}
+          >
+            {optionalSettingsHint}
+          </Text>
+        ) : null}
       </View>
       {actionLabel && onAction ? (
         <Pressable
@@ -10691,6 +10763,7 @@ function ArrowDuelReplyChallengePrompt({
   replyReady,
   replySeconds,
   rootTestID,
+  settingsHint,
   showReplyTimer = true,
   testIDPrefix = "arrow-duel"
 }: {
@@ -10705,6 +10778,7 @@ function ArrowDuelReplyChallengePrompt({
   replyReady: boolean;
   replySeconds: number;
   rootTestID?: string;
+  settingsHint?: string;
   showReplyTimer?: boolean;
   testIDPrefix?: string;
 }): React.JSX.Element {
@@ -10723,7 +10797,7 @@ function ArrowDuelReplyChallengePrompt({
         context: explicitReplySideCopy
           ? "The other move was played."
           : "If the tempting move was played, what happens next?",
-        hint: null,
+        hint: settingsHint ?? null,
         title: explicitReplySideCopy ? `Find ${sideName}’s reply` : "Find the reply",
         tone: "reply" as const
       };
@@ -12926,6 +13000,7 @@ function ReviewPanel({
   deferBackRelevantTransition,
   dueReviewItems,
   explicitReplySideCopy,
+  opponentReplySettingsHint,
   filtersExpanded,
   moveFeedbackClient,
   nowMs,
@@ -12953,6 +13028,7 @@ function ReviewPanel({
   deferBackRelevantTransition: DeferBackRelevantTransition;
   dueReviewItems: ReviewQueueItem[];
   explicitReplySideCopy?: boolean;
+  opponentReplySettingsHint?: string;
   filtersExpanded: boolean;
   moveFeedbackClient: MoveFeedbackClient | null;
   nowMs: number;
@@ -13119,6 +13195,7 @@ function ReviewPanel({
         deferBackRelevantTransition={deferBackRelevantTransition}
         entries={activeEntries}
         explicitReplySideCopy={explicitReplySideCopy}
+        opponentReplySettingsHint={opponentReplySettingsHint}
         initialIndex={activeEntryInitialIndex}
         moveFeedbackClient={moveFeedbackClient}
         scheduledReviewCompletedCount={completedReviews.length}
@@ -13531,6 +13608,7 @@ function ReviewSession({
   deferBackRelevantTransition,
   entries,
   explicitReplySideCopy = false,
+  opponentReplySettingsHint,
   initialIndex = 0,
   moveFeedbackClient,
   onAnalysisActiveChange,
@@ -13555,6 +13633,7 @@ function ReviewSession({
   deferBackRelevantTransition: DeferBackRelevantTransition;
   entries: ReviewEntry[];
   explicitReplySideCopy?: boolean;
+  opponentReplySettingsHint?: string;
   initialIndex?: number;
   moveFeedbackClient: MoveFeedbackClient | null;
   onAnalysisActiveChange?: (active: boolean) => void;
@@ -14538,6 +14617,7 @@ function ReviewSession({
           replyReady={reviewReplyStartedAtMs !== null}
           replySeconds={reviewReplyRemainingSeconds ?? reviewReplySeconds}
           rootTestID="practice-prompt"
+          settingsHint={opponentReplySettingsHint}
           showReplyTimer={currentEntry.source === "due"}
           testIDPrefix="review-arrow-duel"
         />
@@ -14917,6 +14997,7 @@ function ReviewSession({
               <ArrowDuelWhatIfOverlay
                 compactTitle={boardSize < 300}
                 detail={reviewWhatIfDetail}
+                optionalSettingsHint={opponentReplySettingsHint}
                 testIDPrefix="review-arrow-duel"
                 title={explicitReplySideCopy
                   ? `What would ${moveSideDisplayName(reviewPromptSide)} play after the other move?`
@@ -15486,6 +15567,7 @@ function SettingsPanel({
   advancedRatingsOpen,
   adaptiveLayout,
   applicationMetadata,
+  arrowDuelOpponentReplyGlobalSetting,
   captureBottomInset,
   feedbackIssuesOpener,
   progressProtection,
@@ -15517,6 +15599,10 @@ function SettingsPanel({
   advancedRatingsOpen: boolean;
   adaptiveLayout: AdaptiveLayout;
   applicationMetadata: MobileApplicationMetadata;
+  arrowDuelOpponentReplyGlobalSetting?: {
+    enabled: boolean;
+    onChange: (enabled: boolean) => void;
+  };
   captureBottomInset?: number;
   feedbackIssuesOpener: (url: string) => Promise<void>;
   progressProtection: MobilePlatformCapabilities["progressProtection"];
@@ -15624,6 +15710,46 @@ function SettingsPanel({
           />
         </SettingsSection>
       )}
+
+      {arrowDuelOpponentReplyGlobalSetting ? (
+        <SettingsSection
+          title="Arrow Duel"
+          testID="settings-arrow-duel-section"
+          wide={adaptiveLayout.usesWideContent}
+        >
+          <SettingsRow
+            label="Opponent reply challenge"
+            value={arrowDuelOpponentReplyGlobalSetting.enabled ? "On" : "Off"}
+            detail={arrowDuelOpponentReplyGlobalSetting.enabled
+              ? "Optional after a correct choice. Each Run can turn it off or choose its reply time in Edit Run."
+              : "Every Run uses one choice. Saved per-Run choices and reply times stay unchanged."}
+            testID="settings-arrow-duel-opponent-reply"
+          />
+          <View
+            style={styles.settingsInlineControls}
+            testID="settings-arrow-duel-opponent-reply-controls"
+          >
+            <SettingsPreferenceButton
+              active={arrowDuelOpponentReplyGlobalSetting.enabled}
+              label="On"
+              testID="settings-arrow-duel-opponent-reply-on"
+              onPress={() => {
+                arrowDuelOpponentReplyGlobalSetting.onChange(true);
+                setStatusMessage("Opponent reply challenge enabled");
+              }}
+            />
+            <SettingsPreferenceButton
+              active={!arrowDuelOpponentReplyGlobalSetting.enabled}
+              label="Off"
+              testID="settings-arrow-duel-opponent-reply-off"
+              onPress={() => {
+                arrowDuelOpponentReplyGlobalSetting.onChange(false);
+                setStatusMessage("Opponent reply challenge disabled for every Run");
+              }}
+            />
+          </View>
+        </SettingsSection>
+      ) : null}
 
       <SettingsSection title="Notifications" testID="settings-notifications-section" wide={adaptiveLayout.usesWideContent}>
         <SettingsRow
@@ -19479,6 +19605,22 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 19,
     marginTop: 8,
+    textAlign: "center"
+  },
+  arrowDuelWhatIfSettingsHint: {
+    alignSelf: "center",
+    backgroundColor: "rgba(219, 234, 254, 0.14)",
+    borderColor: "rgba(147, 197, 253, 0.48)",
+    borderRadius: 999,
+    borderWidth: 1,
+    color: "#DBEAFE",
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 16,
+    marginTop: 8,
+    overflow: "hidden",
+    paddingHorizontal: 9,
+    paddingVertical: 3,
     textAlign: "center"
   },
   arrowDuelWhatIfAction: {

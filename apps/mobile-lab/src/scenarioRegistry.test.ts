@@ -55,22 +55,19 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   assert.deepEqual(
     newScenarios.map((scenario) => scenario.id),
     [
-      "practice-home-edit",
       "practice-custom-setup",
       "practice-run-arrow-duel-editor",
       "practice-arrow-duel-guide",
       "practice-arrow-duel-guide-only",
       "practice-arrow-duel-prompt",
       "review-arrow-duel-reply",
-      "history-arrow-duel-replay"
+      "settings-ios-sync",
+      "settings-android-backup"
     ]
   );
-  assert.ok(scenarioRegistry["practice-home-edit"].issues?.some(
-    (issue) => issue.issueNumber === 498
-  ) ?? false);
-  assert.ok(scenarioRegistry["practice-arrow-duel-prompt"].issues?.some(
-    (issue) => issue.issueNumber === 489
-  ) ?? false);
+  assert.ok(newScenarios.every((scenario) => scenario.issues.some(
+    (issue) => issue.issueNumber === 523
+  )));
 
   for (const scenario of scenarios) {
     assert.deepEqual(
@@ -136,16 +133,21 @@ test("the issue #272 preview hands the board to White after the blunder", () => 
   assert.equal(chess.fen(), "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2");
 });
 
-test("the closed Issue #247 clone keeps its approved Settings scope without a new marker", () => {
+test("the closed Issue #247 clone keeps its approved scope while Issue #523 reuses its stable URL", () => {
   assert.deepEqual(
     newScenarios
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 247))
       .map((scenario) => scenario.id),
     []
   );
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), []);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), ["new"]);
   assert.deepEqual(scenarioRegistry["settings-ios-sync"].scope.includes, [
     "iCloud Sync",
+    "Global Arrow Duel opponent-reply control",
+    "Optional explanation",
+    "Per-Run Edit Run handoff",
+    "One-choice fallback",
+    "Saved Run intent preserved",
     "Notifications",
     "Sound and haptic toggles",
     "Move and capture audio previews",

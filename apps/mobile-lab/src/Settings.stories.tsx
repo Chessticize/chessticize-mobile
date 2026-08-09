@@ -34,9 +34,36 @@ export const IosSync: Story = {
     await waitForTestId(canvasElement, "settings-move-feedback-preview-capture");
     await waitForTestId(canvasElement, "settings-guidance-section");
     await waitForText(canvasElement, "Reset guides");
+    await waitForTestId(canvasElement, "settings-arrow-duel-section");
+    await waitForText(canvasElement, "Opponent reply challenge");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-success");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-mistake");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-device-note");
+  }
+};
+
+export const ArrowDuelOpponentReply: Story = {
+  name: "Arrow Duel · opponent reply",
+  args: {
+    scenarioId: "settings-ios-sync",
+    storyPresentation: {
+      storyId: "settings--arrow-duel-opponent-reply",
+      title: "Arrow Duel · opponent reply"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await waitForTestId(canvasElement, "settings-arrow-duel-section");
+    await waitForText(
+      canvasElement,
+      "Optional after a correct choice. Each Run can turn it off or choose its reply time in Edit Run."
+    );
+    await waitForText(canvasElement, "On");
+    await clickTestId(canvasElement, "settings-arrow-duel-opponent-reply-off");
+    await waitForText(
+      canvasElement,
+      "Every Run uses one choice. Saved per-Run choices and reply times stay unchanged."
+    );
   }
 };
 
@@ -116,6 +143,7 @@ export const AndroidBackup: Story = {
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-android-backup-section");
+    await waitForTestId(canvasElement, "settings-arrow-duel-section");
     await waitForTestId(canvasElement, "settings-move-feedback-section");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-previews");
     await clickTestId(canvasElement, "settings-sync-support-bundle-entry");
