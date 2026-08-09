@@ -444,10 +444,12 @@ Build 16 is the proposed Android 1.4.1 release:
   pack after app updates;
 - validation scope: full native validation because the accumulated delta spans
   SQLite migrations, shared navigation and Review journeys, Android native and
-  release inputs, and the bundled puzzle-pack cache boundary. Run exact-head
-  fast checks, both local shared suites, the released-fixture upgrade boundary,
-  the applicable adaptive and tablet visual matrix, and the protected
-  signed-artifact/source job.
+  release inputs, R8 optimization, and the bundled puzzle-pack cache boundary.
+  Run exact-head fast checks, the R8-optimized release-derived Android matrix,
+  both local shared suites, the released-fixture upgrade boundary, the
+  applicable adaptive and tablet visual matrix, and the protected
+  signed-artifact/source job. Retain the production R8 mapping and merged-rule
+  diagnostics with the protected candidate.
 
 Build 16 is not yet tagged, signed, uploaded, or distributed.
 
@@ -510,8 +512,10 @@ dispatching another full native run.
 3. Dispatch `Mobile Android release candidate` on that exact ref. The workflow
    installs only the pinned SDK packages required for the AAB, runs the
    artifact-only build doctor, materializes the upload keystore only in runner
-   temp, builds one signed AAB, verifies every non-signature AAB entry is
-   covered by exactly one approved JAR signer, and retains the AAB plus
+   temp, builds one R8-optimized signed AAB, verifies the merged R8
+   configuration and non-empty mapping/resource-usage outputs, verifies every
+   non-signature AAB entry is covered by exactly one approved JAR signer, and
+   retains the AAB, R8 diagnostics, optimization report, and
    `android-source-manifest.json` for 30 days.
 4. The verifier requires `com.chessticize.mobile`, the canonical version name
    and version code, only the two approved ABIs, `PAGE_ALIGNMENT_16K`, at least

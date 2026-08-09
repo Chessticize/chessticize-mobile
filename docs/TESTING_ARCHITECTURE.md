@@ -165,6 +165,10 @@ risk-scoped layer selected for the change. The fail-closed runner is
 is a bounded launch, production SQLite persistence/migration, Standard
 practice, and packaged Stockfish compatibility smoke. Adaptive and backup
 profiles run locally only when their boundary changed.
+Android release minification, resource shrinking, or keep-rule changes instead
+use the release-derived `releaseE2e` APK pair and
+`pnpm mobile:validate:android:r8`, bound to production R8 output inspection.
+The test variant's Detox-only keep rules are not production App inputs.
 `docs/ANDROID_VALIDATION.md` defines the evidence schema and exact commands.
 When only a host-side Android test-runner input changes, prove the App-input
 digest and locally retained APK bytes are unchanged, then rerun one affected

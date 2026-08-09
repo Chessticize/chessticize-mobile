@@ -1,10 +1,19 @@
-# Add project specific ProGuard rules here.
-# By default, the flags in this file are appended to flags specified
-# in /usr/local/Cellar/android-sdk/24.3.3/tools/proguard/proguard-android.txt
-# You can edit the include path and order by changing the proguardFiles
-# directive in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# React Native 0.86 keeps this callback private while Chessticize temporarily
+# coordinates it with the typed predictive-Back bridge by field name.
+-keepclassmembers,allowoptimization class com.facebook.react.ReactActivity {
+    androidx.activity.OnBackPressedCallback mBackPressedCallback;
+}
 
-# Add any project specific keep options here:
+# API-gated loading deliberately avoids verifying API 34 classes on older
+# Android versions. Preserve only the class name and constructor used by that
+# reflection boundary; the implementation remains optimizable.
+-keep,allowoptimization class com.chessticize.mobile.MobilePredictiveBackApi34Delegate {
+    <init>(com.chessticize.mobile.MobilePredictiveBackEventSink);
+}
+
+# Stockfish exports name-based JNI entry points for exactly these native
+# methods. Keep their containing class and native names without retaining the
+# rest of the application package.
+-keepclasseswithmembernames,includedescriptorclasses,allowoptimization class com.chessticize.mobile.NativeStockfishEngineModule {
+    native <methods>;
+}
