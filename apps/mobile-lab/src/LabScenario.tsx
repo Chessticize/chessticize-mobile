@@ -818,6 +818,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     reviewTodayDesignPreview: scenarioId === "review-due"
       ? {
           showTodaySections: true,
+          collapsibleSections: {
+            todayInitiallyExpanded: true,
+            completedInitiallyExpanded: false
+          },
           attemptSummaries: [
             {
               puzzleId: "lab-fork-01",

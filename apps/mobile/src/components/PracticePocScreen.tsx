@@ -332,6 +332,10 @@ export type SprintResultReplayDesignItem = SessionReplayItem;
 
 export type ReviewTodayDesignPreview = {
   showTodaySections: boolean;
+  collapsibleSections: {
+    todayInitiallyExpanded: boolean;
+    completedInitiallyExpanded: boolean;
+  };
   attemptSummaries: readonly ReviewTodayAttemptSummaryPresentation[];
 };
 
@@ -13010,6 +13014,12 @@ function ReviewPanel({
   const activeReviewGenerationRef = useRef(0);
   const appliedPreferredEntriesKeyRef = useRef(preferredEntriesKey);
   const [queueFilter, setQueueFilter] = useState<ReviewQueueFilter>("all");
+  const [todayReviewsExpanded, setTodayReviewsExpanded] = useState(
+    reviewTodayDesignPreview?.collapsibleSections.todayInitiallyExpanded ?? true
+  );
+  const [completedReviewsExpanded, setCompletedReviewsExpanded] = useState(
+    reviewTodayDesignPreview?.collapsibleSections.completedInitiallyExpanded ?? true
+  );
   const [devStatus, setDevStatus] = useState<string | null>(null);
   const reviewRunsByRatingKey = new Map(
     service.listPracticeRuns().map((run) => [run.ratingKey, run])
@@ -13289,28 +13299,42 @@ function ReviewPanel({
       {(filtersExpanded || reviewTodayDesignPreview?.showTodaySections === true)
         && filteredDueReviewItems.length > 0 ? (
         <View style={styles.reviewItemList} testID="review-due-items">
-          <Text style={styles.sectionLabel}>
-            {reviewTodayDesignPreview?.showTodaySections === true ? "Today to review" : "Due items"}
-          </Text>
-          {filteredDueReviewItems.slice(0, 4).map((item) => (
-            <ReviewQueueItemCard
-              key={`${item.review.puzzleId}:${item.review.mode}:${item.review.ratingKey}`}
-              item={item}
-              nowMs={nowMs}
-              showTodayPresentation={reviewTodayDesignPreview?.showTodaySections === true}
-              attemptSummary={reviewTodayDesignPreview?.attemptSummaries.find((summary) => (
-                summary.puzzleId === item.review.puzzleId
-                  && summary.mode === item.review.mode
-                  && summary.ratingKey === item.review.ratingKey
-              ))}
-              onPress={() => startReviewEntries([buildServiceReviewEntry(service, {
-                puzzle: item.puzzle,
-                mode: item.review.mode,
-                ratingKey: item.review.ratingKey,
-                source: "due"
-              })])}
+          {reviewTodayDesignPreview?.collapsibleSections ? (
+            <ReviewSectionToggle
+              count={filteredDueReviewItems.length}
+              expanded={todayReviewsExpanded}
+              label="Today to review"
+              toggleTestID="review-today-to-review-toggle"
+              onPress={() => setTodayReviewsExpanded((expanded) => !expanded)}
             />
-          ))}
+          ) : (
+            <Text style={styles.sectionLabel}>
+              {reviewTodayDesignPreview?.showTodaySections === true ? "Today to review" : "Due items"}
+            </Text>
+          )}
+          {!reviewTodayDesignPreview?.collapsibleSections || todayReviewsExpanded ? (
+            <View style={styles.reviewSectionItems} testID="review-today-to-review-items">
+              {filteredDueReviewItems.slice(0, 4).map((item) => (
+                <ReviewQueueItemCard
+                  key={`${item.review.puzzleId}:${item.review.mode}:${item.review.ratingKey}`}
+                  item={item}
+                  nowMs={nowMs}
+                  showTodayPresentation={reviewTodayDesignPreview?.showTodaySections === true}
+                  attemptSummary={reviewTodayDesignPreview?.attemptSummaries.find((summary) => (
+                    summary.puzzleId === item.review.puzzleId
+                      && summary.mode === item.review.mode
+                      && summary.ratingKey === item.review.ratingKey
+                  ))}
+                  onPress={() => startReviewEntries([buildServiceReviewEntry(service, {
+                    puzzle: item.puzzle,
+                    mode: item.review.mode,
+                    ratingKey: item.review.ratingKey,
+                    source: "due"
+                  })])}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -13365,14 +13389,28 @@ function ReviewPanel({
 
       {completedReviews.length > 0 ? (
         <View style={styles.reviewItemList} testID="review-today-history">
-          <Text style={styles.sectionLabel}>Completed today</Text>
-          {completedReviews.map((item) => (
-            <TodayReviewAttemptRow
-              key={item.attempt.id}
-              item={item}
-              onOpen={() => openCompletedReview(item.attempt.id)}
+          {reviewTodayDesignPreview?.collapsibleSections ? (
+            <ReviewSectionToggle
+              count={completedReviews.length}
+              expanded={completedReviewsExpanded}
+              label="Completed today"
+              toggleTestID="review-completed-today-toggle"
+              onPress={() => setCompletedReviewsExpanded((expanded) => !expanded)}
             />
-          ))}
+          ) : (
+            <Text style={styles.sectionLabel}>Completed today</Text>
+          )}
+          {!reviewTodayDesignPreview?.collapsibleSections || completedReviewsExpanded ? (
+            <View style={styles.reviewSectionItems} testID="review-today-history-items">
+              {completedReviews.map((item) => (
+                <TodayReviewAttemptRow
+                  key={item.attempt.id}
+                  item={item}
+                  onOpen={() => openCompletedReview(item.attempt.id)}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -13541,6 +13579,37 @@ function ReviewQueueItemCard({
 function reviewAttemptMetricLabel(count: number, singular: "attempt" | "miss"): string {
   const plural = singular === "attempt" ? "attempts" : "misses";
   return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function ReviewSectionToggle({
+  count,
+  expanded,
+  label,
+  toggleTestID,
+  onPress
+}: {
+  count: number;
+  expanded: boolean;
+  label: string;
+  toggleTestID: string;
+  onPress: () => void;
+}): React.JSX.Element {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${expanded ? "Collapse" : "Expand"} ${label}, ${reviewCountLabel(count)}`}
+      accessibilityState={{ expanded }}
+      testID={toggleTestID}
+      style={styles.reviewSectionToggle}
+      onPress={onPress}
+    >
+      <Text style={styles.sectionLabel}>{label}</Text>
+      <View style={styles.reviewSectionToggleMeta}>
+        <Text style={styles.reviewSectionCount}>{count}</Text>
+        <ChevronGlyph direction={expanded ? "up" : "down"} />
+      </View>
+    </Pressable>
+  );
 }
 
 function TodayReviewAttemptRow({
@@ -19173,6 +19242,25 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   reviewItemList: {
+    gap: 8
+  },
+  reviewSectionToggle: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 44
+  },
+  reviewSectionToggleMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
+  },
+  reviewSectionCount: {
+    color: "#2563EB",
+    fontSize: 14,
+    fontWeight: "800"
+  },
+  reviewSectionItems: {
     gap: 8
   },
   reviewItemCard: {

@@ -36,8 +36,11 @@ export const DueQueue: Story = {
     await openReviewQueue(canvasElement);
     await waitForVisibleTestId(canvasElement, "review-start-due");
     await waitForTestId(canvasElement, "review-due-items");
+    await waitForTestId(canvasElement, "review-today-to-review-toggle");
     await waitForTestId(canvasElement, "review-due-item-lab-fork-01-standard-badge");
     await waitForTestId(canvasElement, "review-today-history");
+    await waitForTestId(canvasElement, "review-completed-today-toggle");
+    expectTestIdAbsent(canvasElement, "review-today-history-items");
     await waitForText(canvasElement, "First missed 1 day ago");
     await waitForText(canvasElement, "Last retry 3 days ago");
     await expectTestIdText(
@@ -55,6 +58,14 @@ export const DueQueue: Story = {
       "review-due-items",
       "review-today-history"
     ]);
+    await clickTestId(canvasElement, "review-today-to-review-toggle");
+    expectTestIdAbsent(canvasElement, "review-today-to-review-items");
+    await clickTestId(canvasElement, "review-today-to-review-toggle");
+    await waitForTestId(canvasElement, "review-today-to-review-items");
+    await clickTestId(canvasElement, "review-completed-today-toggle");
+    await waitForTestId(canvasElement, "review-today-history-items");
+    await clickTestId(canvasElement, "review-completed-today-toggle");
+    expectTestIdAbsent(canvasElement, "review-today-history-items");
     expectTestIdAbsent(canvasElement, "review-dev-controls");
   }
 };

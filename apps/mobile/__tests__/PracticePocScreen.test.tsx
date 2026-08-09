@@ -11541,6 +11541,10 @@ describe("PracticePocScreen", () => {
       practiceService: service,
       reviewTodayDesignPreview: {
         showTodaySections: true,
+        collapsibleSections: {
+          todayInitiallyExpanded: true,
+          completedInitiallyExpanded: false
+        },
         attemptSummaries: [
           {
             puzzleId: "review-badge-0",
@@ -11564,9 +11568,14 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-filter-toggle").props.accessibilityState).toEqual({ expanded: false });
     expect(collectText(findByTestId(renderer, "review-due-items"))).toContain("Today to review");
+    expect(collectText(findByTestId(renderer, "review-today-to-review-toggle"))).toContain("2");
+    expect(findByTestId(renderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({ expanded: true });
     expect(collectText(findByTestId(renderer, "review-due-items"))).toContain("First missed 2 days ago");
     expect(collectText(findByTestId(renderer, "review-due-items"))).toContain("Last retry 1 day ago");
     expect(collectText(findByTestId(renderer, "review-today-history"))).toContain("Completed today");
+    expect(collectText(findByTestId(renderer, "review-completed-today-toggle"))).toContain("1");
+    expect(findByTestId(renderer, "review-completed-today-toggle").props.accessibilityState).toEqual({ expanded: false });
+    expect(() => findByTestId(renderer, "review-today-history-items")).toThrow();
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1 / 3");
 
     const firstRetryRow = findByTestId(renderer, "review-due-item-review-badge-0-standard");
@@ -11587,6 +11596,17 @@ describe("PracticePocScreen", () => {
       "backgroundColor",
       "#2563EB"
     )).toBe(true);
+
+    press(renderer, "review-today-to-review-toggle");
+    expect(findByTestId(renderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({ expanded: false });
+    expect(() => findByTestId(renderer, "review-due-item-review-badge-0-standard")).toThrow();
+
+    press(renderer, "review-completed-today-toggle");
+    expect(findByTestId(renderer, "review-completed-today-toggle").props.accessibilityState).toEqual({ expanded: true });
+    expect(findByTestId(renderer, "review-today-history-items")).toBeTruthy();
+
+    press(renderer, "review-today-to-review-toggle");
+    expect(findByTestId(renderer, "review-due-item-review-badge-0-standard")).toBeTruthy();
   });
 
   it("counts reviews as overdue after the next 4 AM review-day rollover", () => {

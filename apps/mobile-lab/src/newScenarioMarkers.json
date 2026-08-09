@@ -3,7 +3,7 @@
     "issues": [
       {
         "issueNumber": 520,
-        "changeNote": "On Review Home, show scheduled retries between the main Review action and completed reviews, with a distinct retry icon, attempt and miss counts, and concise history recency."
+        "changeNote": "On Review Home, show scheduled retries with a distinct retry icon, attempt and miss counts, concise history recency, and collapsible Today and Completed sections."
       }
     ]
   }
