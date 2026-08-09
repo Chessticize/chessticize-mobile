@@ -70,6 +70,9 @@ describe('Android Progress Backup', () => {
     const deviceStore = read('src/platform/deviceSQLiteStore.ts');
     const mobilePractice = read('src/platform/mobilePractice.ts');
     const migrationJourney = read('e2e/android-migration.e2e.js');
+    const fixtureInstaller = read(
+      'android/app/src/androidTest/java/com/chessticize/mobile/ReleasedDatabaseFixtureInstallerTest.kt',
+    );
 
     expect(databaseLayout).toContain('progressDatabaseName: "chessticize-mobile.sqlite"');
     expect(databaseLayout).toContain(
@@ -85,9 +88,9 @@ describe('Android Progress Backup', () => {
     expect(mobilePractice).toContain(
       'DeviceSQLiteStore.open(MOBILE_DATABASE_LAYOUT.progressDatabaseName)',
     );
-    expect(migrationJourney).toContain(
-      "const PROGRESS_DATABASE_PATH = 'databases/chessticize-mobile.sqlite'",
-    );
+    expect(migrationJourney).toContain('ReleasedDatabaseFixtureInstallerTest');
+    expect(fixtureInstaller).toContain('const val DATABASE_NAME = "chessticize-mobile.sqlite"');
+    expect(fixtureInstaller).toContain('targetContext.getDatabasePath(DATABASE_NAME)');
     expect(PROGRESS_DATABASE_FILES).toEqual([
       'chessticize-mobile.sqlite',
       'chessticize-mobile.sqlite-journal',

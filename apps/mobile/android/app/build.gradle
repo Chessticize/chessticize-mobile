@@ -290,6 +290,11 @@ android {
             }
         }
     }
+    sourceSets {
+        androidTest.assets.srcDir file(
+            "$rootDir/../../../packages/storage/test/fixtures/migrations"
+        )
+    }
     externalNativeBuild {
         cmake {
             path file("src/main/cpp/CMakeLists.txt")
@@ -342,11 +347,10 @@ android {
         releaseE2e {
             initWith release
             matchingFallbacks = ["release"]
-            // Detox and released-database fixture setup require instrumentation
-            // attachment and run-as access. Production release stays non-debuggable.
-            debuggable true
             signingConfig signingConfigs.debug
-            manifestPlaceholders = [usesCleartextTraffic: false]
+            // Detox connects to its host over a loopback ws:// channel. Keep
+            // production release cleartext-disabled while permitting that test transport.
+            manifestPlaceholders = [usesCleartextTraffic: true]
             proguardFile "proguard-rules-release-e2e.pro"
             proguardFile "${rootProject.projectDir}/../node_modules/detox/android/detox/proguard-rules-app.pro"
         }
