@@ -20,7 +20,11 @@ import type {
   RatingBandPuzzleSelection,
   RatingBandPuzzleSelectionInput
 } from "../../../../packages/storage/src/puzzle-source.ts";
-import { MOBILE_DATABASE_LAYOUT } from "../backend/mobileDatabaseLayout.ts";
+import {
+  MOBILE_DATABASE_LAYOUT,
+  bundledPuzzlePackDatabaseName,
+  obsoleteBundledPuzzlePackDatabaseNames
+} from "../backend/mobileDatabaseLayout.ts";
 import { productionTacticalProfileCalibration } from "../backend/tacticalProfileCalibration.ts";
 
 const bundledCoreManifest = require("../../../../fixtures/puzzles/bundled-core-pack.manifest.json") as PuzzlePackManifest;
@@ -29,6 +33,11 @@ const familiar15Manifest = require("../../../../fixtures/puzzles/familiar-15-e2e
   puzzles: Array<{ arrowDuelFixture?: Puzzle; fixture?: Puzzle; id: string }>;
   sourceFixture: string;
 };
+const bundledCorePackVersion = requiredBundledCorePackVersion(bundledCoreManifest);
+const bundledCorePackDatabaseName = bundledPuzzlePackDatabaseName(bundledCorePackVersion);
+const obsoleteBundledCorePackDatabaseNames = obsoleteBundledPuzzlePackDatabaseNames(
+  bundledCorePackVersion
+);
 
 export type MobilePuzzleSource = "bundledCore" | "familiar15" | "random1000";
 const DEFAULT_PUZZLE_SOURCE: MobilePuzzleSource = "bundledCore";
@@ -93,8 +102,9 @@ export function createPersistentMobilePracticeServiceSync(): PracticeService | u
     userStore,
     new LazyPuzzleSource(() => {
       const source = DeviceSQLiteStore.openBundledReadOnlyPuzzlePack(
-        MOBILE_DATABASE_LAYOUT.bundledPuzzlePackDatabaseName,
-        BUNDLED_CORE_PACK_OPTIONS
+        bundledCorePackDatabaseName,
+        BUNDLED_CORE_PACK_OPTIONS,
+        obsoleteBundledCorePackDatabaseNames
       );
       if (!source) {
         throw new Error("Bundled puzzle pack is unavailable");
@@ -116,8 +126,9 @@ async function createPersistentMobilePracticeServiceImpl(): Promise<PracticeServ
   const userStore = DeviceSQLiteStore.open(MOBILE_DATABASE_LAYOUT.progressDatabaseName);
   userStore.migrate();
   const packSource = await DeviceSQLiteStore.openReadOnlyPuzzlePack(
-    MOBILE_DATABASE_LAYOUT.bundledPuzzlePackDatabaseName,
-    BUNDLED_CORE_PACK_OPTIONS
+    bundledCorePackDatabaseName,
+    BUNDLED_CORE_PACK_OPTIONS,
+    obsoleteBundledCorePackDatabaseNames
   );
   return createPersistentService(
     userStore,
@@ -126,6 +137,15 @@ async function createPersistentMobilePracticeServiceImpl(): Promise<PracticeServ
       () => DeviceSQLiteStore.openTacticalProfileRepository()
     )
   );
+}
+
+function requiredBundledCorePackVersion(manifest: PuzzlePackManifest): number {
+  if (!Number.isSafeInteger(manifest.packVersion) || (manifest.packVersion ?? 0) < 1) {
+    throw new Error(
+      `Bundled Core Pack manifest must declare a positive packVersion; received ${String(manifest.packVersion)}`
+    );
+  }
+  return manifest.packVersion as number;
 }
 
 export function openTacticalProfileRepositoryWithFallback(

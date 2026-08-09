@@ -21,10 +21,11 @@ describe('Android Standard Practice release slice', () => {
     const appGradle = read('android/app/build.gradle');
 
     expect(databaseLayout).toContain('chessticize-mobile.sqlite');
-    expect(databaseLayout).toContain('bundled-core-pack.sqlite');
+    expect(databaseLayout).toContain('legacyBundledPuzzlePackDatabaseName: "bundled-core-pack.sqlite"');
+    expect(databaseLayout).toContain('`bundled-core-pack-v${packVersion}.sqlite`');
     expect(databaseLayout).toContain('puzzle-packs');
     expect(deviceStore).toContain('MOBILE_DATABASE_LAYOUT.progressDatabaseName');
-    expect(deviceStore).toContain('MOBILE_DATABASE_LAYOUT.bundledPuzzlePackDatabaseName');
+    expect(deviceStore).toContain('MOBILE_DATABASE_LAYOUT.androidPuzzlePackAssetDirectory');
     expect(appGradle).toContain('puzzlePack.set(puzzlePackSource)');
     expect(appGradle).toContain('variant.sources.assets.addGeneratedSourceDirectory');
     expect(appGradle).toContain('puzzle-packs');

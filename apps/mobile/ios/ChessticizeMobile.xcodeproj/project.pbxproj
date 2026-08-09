@@ -166,6 +166,7 @@
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
+				58A3D47C2D58A00100A00001 /* Version bundled Core Pack resource */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */,
 				E235C05ADACE081382539298 /* [CP] Copy Pods Resources */,
@@ -264,6 +265,24 @@
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-ChessticizeMobile/Pods-ChessticizeMobile-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
+		};
+		58A3D47C2D58A00100A00001 /* Version bundled Core Pack resource */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../scripts/ios-version-core-pack-resource.sh",
+				"$(SRCROOT)/../../../fixtures/puzzles/bundled-core-pack.manifest.json",
+				"$(SRCROOT)/../../../fixtures/puzzles/bundled-core-pack.sqlite",
+			);
+			name = "Version bundled Core Pack resource";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/bash \"${SRCROOT}/../scripts/ios-version-core-pack-resource.sh\"\n";
 		};
 		C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
