@@ -86,6 +86,12 @@ describe('Android R8 release optimization', () => {
       '-keep,includedescriptorclasses class com.chessticize.mobile.NativeStockfishEngineModule',
     );
     expect(validationRules).toContain(
+      '-keep,includedescriptorclasses class kotlin.jvm.internal.Intrinsics',
+    );
+    expect(validationRules).toContain(
+      '-keep,includedescriptorclasses class androidx.tracing.Trace',
+    );
+    expect(validationRules).toContain(
       '-keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderAlarmScheduler',
     );
     expect(validationRules).toContain(

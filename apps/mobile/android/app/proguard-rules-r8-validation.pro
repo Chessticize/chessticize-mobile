@@ -1,6 +1,13 @@
 # Android instrumentation is compiled separately from the optimized target APK
 # and directly calls these exact contracts. Keep only that test ABI stable;
 # production release builds do not load this file.
+# AndroidX Test's separately compiled AppComponentFactoryRegistry calls Kotlin
+# Intrinsics and tracing classes from the target APK before any test begins.
+-keep,includedescriptorclasses class kotlin.jvm.internal.Intrinsics { *; }
+-keep,includedescriptorclasses class androidx.tracing.Trace { *; }
+-keep,includedescriptorclasses class androidx.tracing.TraceApi18Impl { *; }
+-keep,includedescriptorclasses class androidx.tracing.TraceApi29Impl { *; }
+
 -keep,includedescriptorclasses class com.chessticize.mobile.NativeStockfishEngineModule { *; }
 -keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderAlarmContract { *; }
 -keep,includedescriptorclasses class com.chessticize.mobile.ReviewReminderAlarmReceiver { *; }
