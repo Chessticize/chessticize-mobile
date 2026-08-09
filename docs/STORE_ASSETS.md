@@ -1,6 +1,6 @@
 # App Store Assets
 
-This document is the 1.4 source of truth for App Store Connect metadata and
+This document is the 1.4.1 source of truth for App Store Connect metadata and
 store screenshot capture. Recheck Apple's live documentation before upload:
 
 - Screenshot specifications:
@@ -116,25 +116,25 @@ model-derived improvement.
 
 ### What's New
 
-For iOS 1.4, review this proposed ready-to-paste copy:
+For iOS 1.4.1, review this proposed ready-to-paste copy:
 
 ```text
-• After choosing the stronger move, find the opponent’s best reply in Arrow Duel.
-• Reorder saved Runs with smoother drag feedback and haptics, and scan Add Run themes faster.
-• Keep all 1.4 million offline puzzles with a smaller bundled puzzle library.
+• See today’s due and completed puzzles together in a clearer Review screen.
+• Turn the Arrow Duel reply challenge on or off for every Run in Settings.
+• Sync progress across your Apple devices more reliably with improved iCloud updates.
 ```
 
-This proposed copy is 253 / 300 Unicode characters, including line breaks.
+This proposed copy is 237 / 300 Unicode characters, including line breaks.
 Future versions must use the reusable template in
 [`docs/releases/RELEASE_NOTES_TEMPLATE.md`](releases/RELEASE_NOTES_TEMPLATE.md):
 lead with user benefits, use two or three short bullets, omit raw URLs, and do
 not call stable features experimental unless that qualification is an
 intentional product promise.
 
-This copy belongs to the proposed `ios-v1.4.0-build-1` release identity and
-must match `docs/releases/ios-v1.4.0-build-1.md` before the owner marks that
-note Approved. Issue #417 must retain a screenshot or exported metadata record
-showing the exact submitted text.
+This copy belongs to the proposed `ios-v1.4.1-build-1` release identity and
+must match `docs/releases/ios-v1.4.1-build-1.md` before the owner marks that
+note Approved. The release PR must retain a screenshot or exported metadata
+record showing the exact submitted text.
 
 ## Accessibility Metadata
 
@@ -160,7 +160,7 @@ the resulting feature is declared.
 
 ## Screenshot Requirements
 
-The app targets iPhone and iPad for 1.4. The current automated capture plan
+The app targets iPhone and iPad for 1.4.1. The current automated capture plan
 covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
 The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
 Apple's current screenshot reference, rechecked on 2026-07-28, lists 6.9" as
@@ -187,8 +187,8 @@ Release rule:
 5. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
 
-The 1.4 changes add the Arrow Duel opponent-reply handoff and improve Run
-management, neither of which changes the selected six-frame marketing moments.
+The 1.4.1 changes clarify Review and add a global Arrow Duel reply preference,
+neither of which changes the selected six-frame marketing moments.
 The prior approved marketing compositions may be reused only after the current
 metadata and screenshot audit passes. The separate release-delta workflow must
 still recapture and inspect its exact-head product baseline.
