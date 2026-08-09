@@ -4004,7 +4004,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "practice-arrow-duel-guide-candidates")).toThrow();
   });
 
-  it("overlays the Arrow Duel reply guide on the board in the maintained iPhone portrait viewport", () => {
+  it("keeps the Arrow Duel reply guide below the demonstrated white piece on iPhone portrait", () => {
     setPracticeViewport({
       width: 402,
       height: 874,
@@ -4029,7 +4029,7 @@ describe("PracticePocScreen", () => {
     expect(calloutStyle).toMatchObject({
       left: "50%",
       position: "absolute",
-      top: Math.round(boardHeight * 0.36)
+      top: Math.round(boardHeight * 0.4 + boardHeight / 8)
     });
     expect(calloutStyle.transform).toEqual([
       { translateX: -calloutWidth / 2 }
