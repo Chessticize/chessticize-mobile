@@ -20,6 +20,12 @@ const landingPageDoc = read("docs/LANDING_PAGE.md");
 const pagesWorkflow = read(".github/workflows/pages.yml");
 const assetGenerator = read("scripts/prepare-landing-page-assets.mjs");
 const manifest = JSON.parse(read("site/assets/marketing-assets.json"));
+const appStoreBadge = readBuffer(
+  "site/assets/download-on-the-app-store.svg"
+);
+const googlePlayBadge = readBuffer(
+  "site/assets/get-it-on-google-play.png"
+);
 
 const appStoreUrl =
   "https://apps.apple.com/us/app/chessticize/id6788610123";
@@ -106,13 +112,27 @@ describe("public landing page", () => {
 
     expect(homepage).toContain("./android/");
     expect(homepage).toContain(googlePlayUrl);
-    expect(homepage).toContain("<strong>Google Play</strong>");
+    expect(homepage).toContain(
+      'aria-label="Download Chessticize on the App Store"'
+    );
+    expect(homepage).toContain(
+      'src="./assets/download-on-the-app-store.svg"'
+    );
+    expect(homepage).toContain(
+      'aria-label="Get Chessticize on Google Play"'
+    );
+    expect(homepage).toContain(
+      'src="./assets/get-it-on-google-play.png"'
+    );
     expect(homepage).toContain("./support/");
     expect(homepage).toContain("./accessibility/");
     expect(homepage).toContain("docs/PRIVACY_POLICY.md");
     expect(homepage).toContain("/LICENSE");
     expect(androidPage).toContain(apkUrl);
     expect(androidPage).toContain(googlePlayUrl);
+    expect(androidPage).toContain(
+      'src="../assets/get-it-on-google-play.png"'
+    );
     expect(androidPage).toContain("Google Play is the recommended install path");
     expect(androidPage).toContain("Google Play installations update through Google Play");
     expect(androidPage).toContain(checksum);
@@ -202,6 +222,24 @@ describe("public landing page", () => {
     }, 0);
 
     expect(totalBytes).toBeLessThan(5_000_000);
+  });
+
+  it("ships unmodified official store badges as local assets", () => {
+    expect(
+      crypto.createHash("sha256").update(appStoreBadge).digest("hex")
+    ).toBe(
+      "a26fc5b38380272c92e9019a2eb8b45542a66814b3e2b203772db8904b9fb99f"
+    );
+    expect(
+      crypto.createHash("sha256").update(googlePlayBadge).digest("hex")
+    ).toBe(
+      "f72611e2df8e88204009fd896d05d5e8e83c77009c63943bbffa169559934849"
+    );
+    expect(appStoreBadge.toString("utf8")).toContain('height="40"');
+    expect(googlePlayBadge.subarray(0, 8)).toEqual(
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+    );
+    expect(landingPageDoc).toContain("unmodified, locally served vendor artwork");
   });
 
   it("keeps the marketing images responsive at their intrinsic proportions", () => {
