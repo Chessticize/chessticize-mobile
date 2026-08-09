@@ -3159,6 +3159,31 @@ describe("PracticePocScreen", () => {
     ))).toContain("Then reply for Black");
     expect(collectText(findByTestId(
       firstEverArrowDuel,
+      "practice-session-guide-coach-copy-arrow-duel-reply"
+    ))).toContain(
+      "After you choose correctly, we play the other move. You have 10 seconds to find Black’s best reply while your Sprint time is paused. A miss or timeout counts as one mistake and goes to Review."
+    );
+    expect(collectText(findByTestId(
+      firstEverArrowDuel,
+      "practice-session-guide-optional-settings-notice"
+    ))).toBe("This extra challenge is optional — turn it off in Settings.");
+    expect(flattenTestStyle(findByTestId(
+      firstEverArrowDuel,
+      "practice-session-guide-optional-settings-notice"
+    ).props.style)).toMatchObject({
+      backgroundColor: "#DBEAFE",
+      borderWidth: 1
+    });
+    expect(flattenTestStyle(findByTestId(
+      firstEverArrowDuel,
+      "practice-session-guide-optional-settings-label"
+    ).props.style).fontWeight).toBe("900");
+    expect(collectText(findByTestId(
+      firstEverArrowDuel,
+      "practice-arrow-duel-guide-reply-hint"
+    ))).toBe("Optional · Turn off in Settings");
+    expect(collectText(findByTestId(
+      firstEverArrowDuel,
       "practice-session-guide-coach-progress"
     ))).toBe("6 of 6");
 
@@ -3209,17 +3234,35 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(
       renderer,
       "practice-run-arrow-duel-reply-setting"
-    ))).toContain("Defaults to 10 seconds. Maximum 30.");
+    ))).toContain("You’ll have 10 seconds by default. Choose up to 30 seconds.");
     expect(collectText(findByTestId(
       renderer,
       "practice-run-arrow-duel-reply-setting"
-    ))).toContain("The Sprint and puzzle clocks pause when the reply begins.");
+    ))).toContain("Find the opponent’s best reply");
     expect(collectText(findByTestId(
       renderer,
       "practice-run-arrow-duel-reply-setting"
     ))).toContain(
-      "Find the reply quickly to show you understand the opponent's counterattack."
+      "After you choose the better arrow, we play the other move so you can find the opponent’s best reply."
     );
+    expect(collectText(findByTestId(
+      renderer,
+      "practice-run-arrow-duel-reply-setting"
+    ))).toContain(
+      "This setting only changes this Run. Turn it off to go straight to the next puzzle."
+    );
+    expect(collectText(findByTestId(
+      renderer,
+      "practice-run-arrow-duel-reply-setting"
+    ))).toContain("Your Sprint and puzzle timers pause while you find the reply.");
+    expect(collectText(findByTestId(
+      renderer,
+      "practice-run-arrow-duel-reply-setting"
+    ))).toContain("To turn this extra challenge off for every Run, go to Settings.");
+    expect(collectText(findByTestId(
+      renderer,
+      "practice-run-arrow-duel-reply-setting"
+    ))).not.toContain("one choice");
     expect(collectText(findByTestId(
       renderer,
       "practice-run-arrow-duel-reply-setting"
@@ -3229,6 +3272,10 @@ describe("PracticePocScreen", () => {
       "practice-run-arrow-duel-reply-setting"
     ))).not.toContain("On and Off keep separate ratings");
     expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("10");
+    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-toggle").props.accessibilityLabel)
+      .toBe("Find the opponent’s best reply");
+    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.accessibilityLabel)
+      .toBe("Time to find the opponent’s reply in seconds");
     expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.maxLength)
       .toBe(2);
 
@@ -3258,21 +3305,74 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-run-save").props.disabled).toBe(false);
   });
 
-  it("offers the default-on Arrow Duel reply setting while creating a Run", () => {
+  it("lets a new Arrow Duel Run inherit the global default without a duplicate override", () => {
     const renderer = renderLabScenario("practice-custom-setup");
 
     press(renderer, "practice-add-run");
     press(renderer, "custom-mode-arrow-duel");
 
-    expect(collectText(findByTestId(
-      renderer,
-      "practice-run-arrow-duel-reply-value"
-    ))).toBe("On");
-    expect(findByTestId(renderer, "practice-run-arrow-duel-reply-seconds").props.value).toBe("10");
-    expect(collectText(findByTestId(
-      renderer,
-      "practice-run-arrow-duel-reply-setting"
-    ))).toContain("Defaults to 10 seconds. Maximum 30.");
+    expect(() => findByTestId(renderer, "practice-run-arrow-duel-reply-setting")).toThrow();
+    expect(findByTestId(renderer, "practice-run-puzzle-timing")).toBeTruthy();
+  });
+
+  it("explains the visible global on and off behavior before saved Run preferences", () => {
+    const renderer = renderLabScenario("settings-ios-sync");
+
+    press(renderer, "settings-tab");
+    expect(collectText(findByTestId(renderer, "settings-arrow-duel-opponent-reply")))
+      .toContain(
+        "After you choose the better arrow, we play the other move so you can find the opponent’s best reply. Your Sprint and puzzle timers pause while you reply. You can turn this off or change the time for each Run in Edit Run."
+      );
+    expect(collectText(findByTestId(renderer, "settings-arrow-duel-opponent-reply")))
+      .toContain("Find the opponent’s best reply");
+    expect(collectText(findByTestId(renderer, "settings-arrow-duel-opponent-reply")))
+      .toContain("On");
+
+    press(renderer, "settings-arrow-duel-opponent-reply-off");
+    expect(collectText(findByTestId(renderer, "settings-arrow-duel-opponent-reply")))
+      .toContain("Off");
+    expect(collectText(findByTestId(renderer, "settings-arrow-duel-opponent-reply")))
+      .toContain(
+        "After you choose the better arrow, you’ll go straight to the next puzzle in every Run. If you turn this back on, each Run will use the reply setting and time you previously chose."
+      );
+    expect(collectText(findByTestId(renderer, "settings-arrow-duel-opponent-reply")))
+      .not.toContain("one choice");
+    expect(collectText(findByTestId(renderer, "settings-status-message")))
+      .toBe("Runs will now go straight to the next puzzle");
+
+    press(renderer, "settings-arrow-duel-opponent-reply-on");
+    expect(collectText(findByTestId(renderer, "settings-status-message")))
+      .toBe("Runs will now include the opponent’s best reply");
+  });
+
+  it("hides the individual Run override while the global setting is off", () => {
+    const renderer = renderLabScenario(
+      "practice-run-arrow-duel-editor",
+      { arrowDuelOpponentReplyGlobalEnabled: false }
+    );
+
+    press(renderer, "practice-run-home-edit");
+    press(renderer, "practice-run-edit-arrow-duel");
+
+    expect(() => findByTestId(renderer, "practice-run-arrow-duel-reply-setting")).toThrow();
+    expect(findByTestId(renderer, "practice-run-puzzle-timing")).toBeTruthy();
+  });
+
+  it("moves to the next puzzle after the better arrow while the global setting is off", async () => {
+    const renderer = renderLabScenario(
+      "practice-arrow-duel-prompt",
+      { arrowDuelOpponentReplyGlobalEnabled: false }
+    );
+    startArrowDuelSprint(renderer);
+    const puzzleId = collectText(findByTestId(renderer, "session-current-puzzle-id"));
+
+    await boardMove(renderer, ARROW_DUEL_REPLY_LAB_MOVES.default.correctChoice);
+
+    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+    expect(() => findByTestId(renderer, "arrow-duel-what-if-overlay")).toThrow();
+    expect(() => findByTestId(renderer, "arrow-duel-reply-timer")).toThrow();
+    await settleFeedbackSnapshot();
+    expect(collectText(findByTestId(renderer, "session-current-puzzle-id"))).not.toBe(puzzleId);
   });
 
   it("previews Standard-style outcome feedback and automatic advance", async () => {
@@ -3309,11 +3409,13 @@ describe("PracticePocScreen", () => {
       findByTestId(correct, "arrow-duel-reply-copy-layer").props.style
     )).toEqual(expect.objectContaining({ position: "absolute" }));
     expect(findByTestId(correct, "mock-chessboard").props.flipped).toBe(initialPerspective);
-    expect(collectVisibleText(findByTestId(correct, "arrow-duel-reply-hint"))).toBe("");
+    expect(collectVisibleText(findByTestId(correct, "arrow-duel-reply-hint"))).toBe(
+      "Optional · Turn off in Settings"
+    );
     expect(findByTestId(correct, "arrow-duel-reply-hint").props.accessibilityElementsHidden)
-      .toBe(true);
+      .toBe(false);
     expect(flattenTestStyle(findByTestId(correct, "arrow-duel-reply-hint").props.style))
-      .toEqual(expect.objectContaining({ opacity: 0, position: "absolute" }));
+      .not.toEqual(expect.objectContaining({ opacity: 0, position: "absolute" }));
     await boardMove(correct, ARROW_DUEL_REPLY_LAB_MOVES.default.expectedReply);
     expect(collectText(correct.root)).not.toContain("Solved");
     expect(findByTestId(correct, "move-feedback-overlay")).toBeTruthy();
@@ -3449,7 +3551,7 @@ describe("PracticePocScreen", () => {
     expect(announcement.props.accessible).toBe(true);
     expect(announcement.props.accessibilityRole).toBe("alert");
     expect(announcement.props.accessibilityLabel).toBe(
-      "What would White play after the other move? You’ll have 10 seconds to play the best reply."
+      "What would White play after the other move? You’ll have 10 seconds to play the best reply. Optional · Turn off in Settings"
     );
     expect(flattenTestStyle(action.props.style).minHeight).toBeGreaterThanOrEqual(44);
     const visibleTitle = collectText(findByTestId(renderer, "arrow-duel-what-if-title"));
@@ -3463,7 +3565,7 @@ describe("PracticePocScreen", () => {
     }));
     expect(findByTestId(renderer, "arrow-duel-what-if-side-king")).toBeTruthy();
     expect(findByTestId(renderer, "arrow-duel-what-if-announcement").props.accessibilityLabel).toBe(
-      "What would White play after the other move? You’ll have 10 seconds to play the best reply."
+      "What would White play after the other move? You’ll have 10 seconds to play the best reply. Optional · Turn off in Settings"
     );
     expect(collectText(findByTestId(renderer, "arrow-duel-what-if-detail"))).toBe(
       "You’ll have 10 seconds to play the best reply."
@@ -3596,13 +3698,16 @@ describe("PracticePocScreen", () => {
     expect(collectText(
       findByTestId(arrowDuel, "practice-session-guide-coach-copy-arrow-duel-reply")
     )).toBe(
-      "FIND THE REPLY · 2 OF 2Then reply for BlackAfter you choose correctly, we’ll test your understanding of the counterplay by playing the move you didn’t choose. You’ll then have 10 seconds to find Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review."
+      "FIND THE REPLY · 2 OF 2Then reply for BlackAfter you choose correctly, we play the other move. You have 10 seconds to find Black’s best reply while your Sprint time is paused. A miss or timeout counts as one mistake and goes to Review.This extra challenge is optional — turn it off in Settings."
     );
+    expect(collectText(
+      findByTestId(arrowDuel, "practice-session-guide-optional-settings-notice")
+    )).toBe("This extra challenge is optional — turn it off in Settings.");
     expect(findByTestId(
       arrowDuel,
       "practice-arrow-duel-guide"
     ).props.accessibilityLabel).toBe(
-      "Guide 2 of 2. Then reply for Black. After you choose correctly, we’ll test your understanding of the counterplay by playing the move you didn’t choose. You’ll then have 10 seconds to find Black’s best reply. Sprint time stays paused. A miss or timeout is one mistake and goes to Review."
+      "Guide 2 of 2. Then reply for Black. After you choose correctly, we play the other move. You have 10 seconds to find Black’s best reply while your Sprint time is paused. A miss or timeout counts as one mistake and goes to Review. This extra challenge is optional — turn it off in Settings."
     );
 
     const rules = renderLabScenario("practice-first-sprint-guide");

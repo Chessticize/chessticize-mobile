@@ -1,55 +1,41 @@
 {
-  "practice-arrow-duel-guide": {
-    "issues": [
-      {
-        "issueNumber": 489,
-        "changeNote": "Add a dedicated Find the reply guide step and explicit side-to-move copy without exposing familiarity-timing internals."
-      }
-    ]
-  },
-  "practice-arrow-duel-guide-only": {
-    "issues": [
-      {
-        "issueNumber": 489,
-        "changeNote": "Show both Arrow Duel onboarding steps for users who already know the shared Sprint guide."
-      }
-    ]
-  },
-  "practice-arrow-duel-prompt": {
-    "issues": [
-      {
-        "issueNumber": 489,
-        "changeNote": "Preview explicit White or Black reply copy before and after the preparation handoff."
-      }
-    ],
-    "absorbedIssueMarkers": [
-      {
-        "issueNumber": 489,
-        "count": 1
-      }
-    ]
-  },
   "practice-custom-setup": {
     "issues": [
       {
-        "issueNumber": 489,
-        "changeNote": "Preview the default-on Opponent reply setting when creating an Arrow Duel Run."
-      }
-    ]
-  },
-  "practice-home-edit": {
-    "issues": [
-      {
-        "issueNumber": 498,
-        "changeNote": "Preview medium haptic intent, a full-size pointer-following card, and a card-sized dashed insertion outline while reordering."
+        "issueNumber": 523,
+        "changeNote": "Let new Arrow Duel Runs inherit the global default without repeating the per-Run override before save."
       }
     ]
   },
   "practice-run-arrow-duel-editor": {
     "issues": [
       {
-        "issueNumber": 489,
-        "changeNote": "Preview the default-on Opponent reply setting in Edit Run with a thirty-second maximum."
+        "issueNumber": 523,
+        "changeNote": "Clarify the individual-Run override and hide it completely while the global setting is off."
+      }
+    ]
+  },
+  "practice-arrow-duel-guide": {
+    "issues": [
+      {
+        "issueNumber": 523,
+        "changeNote": "Tell first-time players that the reply challenge is optional and can be turned off in Settings."
+      }
+    ]
+  },
+  "practice-arrow-duel-guide-only": {
+    "issues": [
+      {
+        "issueNumber": 523,
+        "changeNote": "Repeat the optional Settings escape hatch in the Arrow Duel-only first-use guide."
+      }
+    ]
+  },
+  "practice-arrow-duel-prompt": {
+    "issues": [
+      {
+        "issueNumber": 523,
+        "changeNote": "Show a compact optional Settings cue in every Sprint reply handoff and ready prompt."
       }
     ]
   },
@@ -64,16 +50,24 @@
   "review-arrow-duel-reply": {
     "issues": [
       {
-        "issueNumber": 489,
-        "changeNote": "Require the same configured opponent reply and countdown in scheduled Review."
+        "issueNumber": 523,
+        "changeNote": "Use the same compact optional Settings cue in scheduled Review reply prompts."
       }
     ]
   },
-  "history-arrow-duel-replay": {
+  "settings-ios-sync": {
     "issues": [
       {
-        "issueNumber": 489,
-        "changeNote": "Keep Replay untimed and unassisted from the reply side until the complete stored line is solved."
+        "issueNumber": 523,
+        "changeNote": "Add the global Arrow Duel opponent-reply control and explain per-Run overrides and saved intent."
+      }
+    ]
+  },
+  "settings-android-backup": {
+    "issues": [
+      {
+        "issueNumber": 523,
+        "changeNote": "Share the same global Arrow Duel opponent-reply control in Android Settings."
       }
     ]
   },
