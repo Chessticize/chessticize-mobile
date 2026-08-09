@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario } from "./LabScenario.tsx";
 import {
+  centerTestId,
   clickTestId,
   expectTestIdAbsent,
   openSettings,
@@ -34,9 +35,36 @@ export const IosSync: Story = {
     await waitForTestId(canvasElement, "settings-move-feedback-preview-capture");
     await waitForTestId(canvasElement, "settings-guidance-section");
     await waitForText(canvasElement, "Reset guides");
+    await waitForTestId(canvasElement, "settings-arrow-duel-section");
+    await waitForText(canvasElement, "Find the opponent’s best reply");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-success");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-mistake");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-device-note");
+  }
+};
+
+export const ArrowDuelOpponentReply: Story = {
+  name: "Arrow Duel · opponent reply",
+  args: {
+    scenarioId: "settings-ios-sync",
+    storyPresentation: {
+      storyId: "settings--arrow-duel-opponent-reply",
+      title: "Arrow Duel · opponent reply"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await waitForTestId(canvasElement, "settings-arrow-duel-section");
+    await waitForText(
+      canvasElement,
+      "After you choose the better arrow, we play the other move so you can find the opponent’s best reply. Your Sprint and puzzle timers pause while you reply. You can turn this off or change the time for each Run in Edit Run."
+    );
+    await clickTestId(canvasElement, "settings-arrow-duel-opponent-reply-off");
+    await waitForText(
+      canvasElement,
+      "After you choose the better arrow, you’ll go straight to the next puzzle in every Run. If you turn this back on, each Run will use the reply setting and time you previously chose."
+    );
+    await centerTestId(canvasElement, "settings-arrow-duel-section");
   }
 };
 
@@ -116,6 +144,7 @@ export const AndroidBackup: Story = {
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-android-backup-section");
+    await waitForTestId(canvasElement, "settings-arrow-duel-section");
     await waitForTestId(canvasElement, "settings-move-feedback-section");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-previews");
     await clickTestId(canvasElement, "settings-sync-support-bundle-entry");

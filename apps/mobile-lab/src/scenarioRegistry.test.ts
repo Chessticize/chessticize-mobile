@@ -54,15 +54,20 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
   assert.deepEqual(
     newScenarios.map((scenario) => scenario.id),
-    ["practice-home", "practice-custom-setup", "review-due", "review-filters", "history-filters"]
+    [
+      "practice-custom-setup",
+      "practice-run-arrow-duel-editor",
+      "practice-arrow-duel-guide",
+      "practice-arrow-duel-guide-only",
+      "practice-arrow-duel-prompt",
+      "review-arrow-duel-reply",
+      "settings-ios-sync",
+      "settings-android-backup"
+    ]
   );
-  for (const scenarioId of ["practice-home", "practice-custom-setup", "review-due", "review-filters", "history-filters"] as const) {
-    assert.ok(scenarioRegistry[scenarioId].issues?.some(
-      (issue) => issue.issueNumber === 520
-    ) ?? false);
-  }
-  assert.equal(scenarioRegistry["review-due"].title, "Home");
-  assert.equal(scenarioRegistry["review-due"].storyId, "review--due-queue");
+  assert.ok(newScenarios.every((scenario) => scenario.issues.some(
+    (issue) => issue.issueNumber === 523
+  )));
 
   for (const scenario of scenarios) {
     assert.deepEqual(
@@ -80,6 +85,20 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   }
 });
 
+test("approved Issue #520 Review design keeps its stable living-documentation URLs", () => {
+  assert.equal(scenarioRegistry["review-due"].title, "Home");
+  assert.equal(scenarioRegistry["review-due"].storyId, "review--due-queue");
+  assert.equal(scenarioRegistry["review-filters"].storyId, "review--filters");
+  assert.ok(scenarioRegistry["review-due"].scope.includes.includes(
+    "Collapsed selected-filter summary"
+  ));
+  assert.ok(scenarioRegistry["review-filters"].scope.includes.includes(
+    "Same Today sections after filtering"
+  ));
+  assert.deepEqual(storyTagsForScenario("review-due"), []);
+  assert.deepEqual(storyTagsForScenario("review-filters"), []);
+});
+
 test("closed Issue #482 keeps the production Incomplete states without Issue #482 markers", () => {
   for (const scenarioId of [
     "history-populated",
@@ -91,10 +110,7 @@ test("closed Issue #482 keeps the production Incomplete states without Issue #48
       scenario.issues?.some((issue) => issue.issueNumber === 482) ?? false,
       false
     );
-    assert.deepEqual(
-      storyTagsForScenario(scenarioId),
-      scenarioId === "history-filters" ? ["new"] : []
-    );
+    assert.deepEqual(storyTagsForScenario(scenarioId), []);
   }
   assert.ok(
     scenarioRegistry["history-populated"].scope.includes.includes("Production Incomplete outcome")
@@ -131,16 +147,22 @@ test("the issue #272 preview hands the board to White after the blunder", () => 
   assert.equal(chess.fen(), "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2");
 });
 
-test("the closed Issue #247 clone keeps its approved Settings scope without a new marker", () => {
+test("the closed Issue #247 clone keeps its approved scope while Issue #523 reuses its stable URL", () => {
   assert.deepEqual(
     newScenarios
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 247))
       .map((scenario) => scenario.id),
     []
   );
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), []);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), ["new"]);
   assert.deepEqual(scenarioRegistry["settings-ios-sync"].scope.includes, [
     "iCloud Sync",
+    "Global Arrow Duel reply control",
+    "User-first On explanation",
+    "Paused Sprint and puzzle timers",
+    "Per-Run Edit Run handoff",
+    "Straight-to-next-puzzle Off explanation",
+    "Previously chosen Run settings restored on re-enable",
     "Notifications",
     "Sound and haptic toggles",
     "Move and capture audio previews",
@@ -338,7 +360,7 @@ test("Practice home delegates Review workload to the dedicated tab", () => {
   assert.ok(home.scope.includes.includes("Collecting-evidence state"));
   assert.ok(home.scope.includes.includes("Tactical Profile entry"));
   assert.match(home.description, /dedicated Review tab/);
-  assert.deepEqual(storyTagsForScenario("practice-home"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("practice-home"), []);
 });
 
 test("post-attempt handoffs explain Timeout, Wrong, and Slow-correct results", () => {

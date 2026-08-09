@@ -1,41 +1,65 @@
 {
-  "practice-home": {
-    "issues": [
-      {
-        "issueNumber": 520,
-        "changeNote": "Remove the duplicate Review card from Practice Home now that Review has its own dedicated tab."
-      }
-    ]
-  },
-  "history-filters": {
-    "issues": [
-      {
-        "issueNumber": 520,
-        "changeNote": "Preview the shared short height-and-fade disclosure motion on History filters and its nested Themes catalog."
-      }
-    ]
-  },
   "practice-custom-setup": {
     "issues": [
       {
-        "issueNumber": 520,
-        "changeNote": "Preview the shared disclosure motion when New Run expands or collapses its grouped Themes catalog."
+        "issueNumber": 523,
+        "changeNote": "Let new Arrow Duel Runs inherit the global default without repeating the per-Run override before save."
       }
     ]
   },
-  "review-due": {
+  "practice-run-arrow-duel-editor": {
     "issues": [
       {
-        "issueNumber": 520,
-        "changeNote": "Keep filter options above the Review action, then show only the selected filter when the options collapse while retaining the same default-open Today sections and shared disclosure motion."
+        "issueNumber": 523,
+        "changeNote": "Clarify the individual-Run override and hide it completely while the global setting is off."
       }
     ]
   },
-  "review-filters": {
+  "practice-arrow-duel-guide": {
     "issues": [
       {
-        "issueNumber": 520,
-        "changeNote": "Use four action-focused quick filters above the Review action, with a selected-filter-only summary that appears only while the options are collapsed and no alternate Due items or Review groups interface."
+        "issueNumber": 523,
+        "changeNote": "Tell first-time players that the reply challenge is optional and can be turned off in Settings."
+      }
+    ]
+  },
+  "practice-arrow-duel-guide-only": {
+    "issues": [
+      {
+        "issueNumber": 523,
+        "changeNote": "Repeat the optional Settings escape hatch in the Arrow Duel-only first-use guide."
+      }
+    ]
+  },
+  "practice-arrow-duel-prompt": {
+    "issues": [
+      {
+        "issueNumber": 523,
+        "changeNote": "Show a compact optional Settings cue in every Sprint reply handoff and ready prompt."
+      }
+    ]
+  },
+  "review-arrow-duel-reply": {
+    "issues": [
+      {
+        "issueNumber": 523,
+        "changeNote": "Use the same compact optional Settings cue in scheduled Review reply prompts."
+      }
+    ]
+  },
+  "settings-ios-sync": {
+    "issues": [
+      {
+        "issueNumber": 523,
+        "changeNote": "Add the global Arrow Duel opponent-reply control and explain per-Run overrides and saved intent."
+      }
+    ]
+  },
+  "settings-android-backup": {
+    "issues": [
+      {
+        "issueNumber": 523,
+        "changeNote": "Share the same global Arrow Duel opponent-reply control in Android Settings."
       }
     ]
   }

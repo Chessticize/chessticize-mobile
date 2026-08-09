@@ -176,6 +176,11 @@ export const ArrowDuelReply: Story = {
     await waitForEnabledTestId(canvasElement, "lab-board-correct");
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForTestId(canvasElement, "review-arrow-duel-reply-timer");
+    await expectTestIdText(
+      canvasElement,
+      "review-arrow-duel-reply-hint",
+      "Optional · Turn off in Settings"
+    );
   }
 };
 

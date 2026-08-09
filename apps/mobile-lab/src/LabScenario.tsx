@@ -128,6 +128,7 @@ export type LabStoryPresentation = {
 };
 
 export function LabScenario({
+  arrowDuelOpponentReplyGlobalEnabled,
   arrowDuelReplyAutoTimeoutMs,
   arrowDuelReplyPreparationConfirmationRequired,
   arrowDuelReplyPreparationHoldMs,
@@ -136,6 +137,7 @@ export function LabScenario({
   scenarioId,
   storyPresentation
 }: {
+  arrowDuelOpponentReplyGlobalEnabled?: boolean;
   arrowDuelReplyAutoTimeoutMs?: number;
   arrowDuelReplyPreparationConfirmationRequired?: boolean;
   arrowDuelReplyPreparationHoldMs?: number;
@@ -149,6 +151,7 @@ export function LabScenario({
   return (
     <LabScenarioContent
       key={scenarioId}
+      arrowDuelOpponentReplyGlobalEnabled={arrowDuelOpponentReplyGlobalEnabled}
       arrowDuelReplyAutoTimeoutMs={arrowDuelReplyAutoTimeoutMs}
       arrowDuelReplyPreparationConfirmationRequired={
         arrowDuelReplyPreparationConfirmationRequired
@@ -164,6 +167,7 @@ export function LabScenario({
 }
 
 function LabScenarioContent({
+  arrowDuelOpponentReplyGlobalEnabled,
   arrowDuelReplyAutoTimeoutMs,
   arrowDuelReplyPreparationConfirmationRequired,
   arrowDuelReplyPreparationHoldMs,
@@ -173,6 +177,7 @@ function LabScenarioContent({
   scenarioId,
   storyPresentation
 }: {
+  arrowDuelOpponentReplyGlobalEnabled?: boolean;
   arrowDuelReplyAutoTimeoutMs?: number;
   arrowDuelReplyPreparationConfirmationRequired?: boolean;
   arrowDuelReplyPreparationHoldMs?: number;
@@ -273,6 +278,7 @@ function LabScenarioContent({
       }
     : screenProps;
   const effectiveScreenProps = arrowDuelReplyAutoTimeoutMs === undefined
+    && arrowDuelOpponentReplyGlobalEnabled === undefined
     && arrowDuelReplyPreparationConfirmationRequired === undefined
     && arrowDuelReplyPreparationHoldMs === undefined
     && arrowDuelReplySeconds === undefined
@@ -281,6 +287,13 @@ function LabScenarioContent({
         ...screenPropsWithReplyFixture,
         sprintRulesDesignPreview: {
           ...screenPropsWithReplyFixture.sprintRulesDesignPreview,
+          ...(arrowDuelOpponentReplyGlobalEnabled === undefined
+            ? {}
+            : {
+                arrowDuelOpponentReplyGlobalSetting: {
+                  enabled: arrowDuelOpponentReplyGlobalEnabled
+                }
+              }),
           arrowDuelReplyChallenge: {
             ...screenPropsWithReplyFixture.sprintRulesDesignPreview?.arrowDuelReplyChallenge,
             enabled: true,
@@ -385,7 +398,10 @@ function sprintRulesDesignPreviewFor(
   ) {
     return {
       ...(scenarioId === "practice-custom-setup" || scenarioId === "practice-run-arrow-duel-editor"
-        ? { arrowDuelReplyChallenge: { enabled: true } }
+        ? {
+            arrowDuelOpponentReplyGlobalSetting: { enabled: true },
+            arrowDuelReplyChallenge: { enabled: true }
+          }
         : {}),
       firstRunGuide,
       showRunEditorSummary: true,
@@ -409,9 +425,11 @@ function sprintRulesDesignPreviewFor(
       arrowDuelReplyChallenge: true,
       arrowDuelReplyOnboarding: "choice_then_reply" as const,
       guideKey: "arrow_duel" as const,
-      mode: "arrow_duel" as const
+      mode: "arrow_duel" as const,
+      opponentReplySettingsHint: true
     };
     return {
+      arrowDuelOpponentReplyGlobalSetting: { enabled: true },
       initialSessionGuides: scenarioId === "practice-arrow-duel-guide"
         ? [sharedGuide, arrowDuelGuide]
         : [scenarioId === "practice-arrow-duel-guide-only" ? arrowDuelGuide : sharedGuide],
@@ -437,6 +455,7 @@ function sprintRulesDesignPreviewFor(
     || scenarioId === "review-arrow-duel-reply"
   ) {
     return {
+      arrowDuelOpponentReplyGlobalSetting: { enabled: true },
       arrowDuelReplyChallenge: {
         enabled: true,
         explicitReplySideCopy: true
@@ -546,6 +565,11 @@ function sprintRulesDesignPreviewFor(
           }
         }
       }
+    };
+  }
+  if (scenarioId === "settings-ios-sync" || scenarioId === "settings-android-backup") {
+    return {
+      arrowDuelOpponentReplyGlobalSetting: { enabled: true }
     };
   }
   if (scenarioId === "settings-sprint-guidance") {
