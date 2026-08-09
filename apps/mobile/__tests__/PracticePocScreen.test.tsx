@@ -11539,7 +11539,25 @@ describe("PracticePocScreen", () => {
     }, "2026-06-21T11:00:05.000Z");
     const renderer = renderScreen({
       practiceService: service,
-      reviewTodayDesignPreview: { showTodaySections: true }
+      reviewTodayDesignPreview: {
+        showTodaySections: true,
+        attemptSummaries: [
+          {
+            puzzleId: "review-badge-0",
+            mode: "standard",
+            ratingKey: "standard 5/20",
+            attemptCount: 1,
+            missCount: 1
+          },
+          {
+            puzzleId: "review-badge-1",
+            mode: "standard",
+            ratingKey: "standard 5/20",
+            attemptCount: 2,
+            missCount: 1
+          }
+        ]
+      }
     });
 
     press(renderer, "review-tab");
@@ -11554,6 +11572,15 @@ describe("PracticePocScreen", () => {
     const firstRetryRow = findByTestId(renderer, "review-due-item-review-badge-0-standard");
     expect(firstRetryRow.props.accessibilityLabel).toContain("Scheduled retry");
     expect(firstRetryRow.props.accessibilityLabel).toContain("First missed 2 days ago");
+    expect(firstRetryRow.props.accessibilityLabel).toContain("1 attempt, 1 miss");
+    expect(firstRetryRow.props.accessibilityLabel).not.toContain("Due now");
+    expect(firstRetryRow.props.accessibilityLabel).not.toContain("Overdue");
+    expect(collectText(findByTestId(renderer, "review-due-item-review-badge-0-standard-meta"))).toBe(
+      "1 attempt · 1 miss · Standard · 20s pace"
+    );
+    expect(collectText(findByTestId(renderer, "review-due-item-review-badge-1-standard-meta"))).toBe(
+      "2 attempts · 1 miss · Standard · 20s pace"
+    );
     expect(collectText(findByTestId(renderer, "review-due-item-review-badge-0-standard-badge"))).toBe("↻");
     expect(hasStyleEntry(
       findByTestId(renderer, "review-due-item-review-badge-0-standard-badge"),

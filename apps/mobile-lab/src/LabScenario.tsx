@@ -816,7 +816,25 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
     reviewTodayDesignPreview: scenarioId === "review-due"
-      ? { showTodaySections: true }
+      ? {
+          showTodaySections: true,
+          attemptSummaries: [
+            {
+              puzzleId: "lab-fork-01",
+              mode: "standard",
+              ratingKey: "standard 5/20",
+              attemptCount: 1,
+              missCount: 1
+            },
+            {
+              puzzleId: "lab-skewer-03",
+              mode: "arrow_duel",
+              ratingKey: "arrow_duel 5/30",
+              attemptCount: 3,
+              missCount: 2
+            }
+          ]
+        }
       : undefined,
     sprintGuidanceEnabled: scenarioId.startsWith("settings-"),
     sprintRulesDesignPreview: sprintRulesDesignPreviewFor(scenarioId),

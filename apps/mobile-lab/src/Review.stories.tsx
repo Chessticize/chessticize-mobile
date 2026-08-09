@@ -3,6 +3,7 @@ import { LabScenario } from "./LabScenario.tsx";
 import {
   clickTestId,
   expectTestIdAbsent,
+  expectTestIdText,
   expectTestIdsInOrder,
   openReviewQueue,
   waitForEnabledTestId,
@@ -39,6 +40,16 @@ export const DueQueue: Story = {
     await waitForTestId(canvasElement, "review-today-history");
     await waitForText(canvasElement, "First missed 1 day ago");
     await waitForText(canvasElement, "Last retry 3 days ago");
+    await expectTestIdText(
+      canvasElement,
+      "review-due-item-lab-fork-01-standard-meta",
+      "1 attempt · 1 miss · Standard · 20s pace"
+    );
+    await expectTestIdText(
+      canvasElement,
+      "review-due-item-lab-skewer-03-arrow-duel-meta",
+      "3 attempts · 2 misses · Arrow Duel · 30s pace"
+    );
     await expectTestIdsInOrder(canvasElement, [
       "review-start-due",
       "review-due-items",

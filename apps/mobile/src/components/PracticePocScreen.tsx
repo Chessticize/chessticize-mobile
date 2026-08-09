@@ -332,6 +332,15 @@ export type SprintResultReplayDesignItem = SessionReplayItem;
 
 export type ReviewTodayDesignPreview = {
   showTodaySections: boolean;
+  attemptSummaries: readonly ReviewTodayAttemptSummaryPresentation[];
+};
+
+export type ReviewTodayAttemptSummaryPresentation = {
+  puzzleId: string;
+  mode: SprintMode;
+  ratingKey: string;
+  attemptCount: number;
+  missCount: number;
 };
 
 export type SprintRulesDesignPreview = {
@@ -13289,6 +13298,11 @@ function ReviewPanel({
               item={item}
               nowMs={nowMs}
               showTodayPresentation={reviewTodayDesignPreview?.showTodaySections === true}
+              attemptSummary={reviewTodayDesignPreview?.attemptSummaries.find((summary) => (
+                summary.puzzleId === item.review.puzzleId
+                  && summary.mode === item.review.mode
+                  && summary.ratingKey === item.review.ratingKey
+              ))}
               onPress={() => startReviewEntries([buildServiceReviewEntry(service, {
                 puzzle: item.puzzle,
                 mode: item.review.mode,
@@ -13454,11 +13468,13 @@ function ReviewQueueItemCard({
   item,
   nowMs,
   showTodayPresentation,
+  attemptSummary,
   onPress
 }: {
   item: ReviewQueueItem;
   nowMs: number;
   showTodayPresentation: boolean;
+  attemptSummary?: ReviewTodayAttemptSummaryPresentation;
   onPress: () => void;
 }): React.JSX.Element {
   const activityLabel = showTodayPresentation
@@ -13475,16 +13491,24 @@ function ReviewQueueItemCard({
   const source = reviewItemSourceSprintLabel(item);
   const compactSource = source.replace(/^Source sprint: /, "");
   const nextReviewNumber = item.review.reviewCount + 1;
+  const attemptSummaryLabel = attemptSummary
+    ? `${reviewAttemptMetricLabel(attemptSummary.attemptCount, "attempt")} · ${reviewAttemptMetricLabel(attemptSummary.missCount, "miss")}`
+    : null;
   const rowTestId = `review-due-item-${item.puzzle.id}-${safeTestId(item.review.mode)}`;
   const accessibilityLabel = [
     `Start ${modeLabel(item.review.mode)} review`,
     ...(showTodayPresentation ? ["Scheduled retry"] : []),
     activityLabel,
-    dueState,
-    `${item.review.intervalDays} day interval`,
+    ...(showTodayPresentation
+      ? attemptSummary
+        ? [
+            reviewAttemptMetricLabel(attemptSummary.attemptCount, "attempt"),
+            reviewAttemptMetricLabel(attemptSummary.missCount, "miss")
+          ]
+        : []
+      : [dueState, `${item.review.intervalDays} day interval`]),
     source,
-    `Review ${nextReviewNumber}`,
-    `Lapses ${item.review.lapseCount}`
+    ...(!showTodayPresentation ? [`Review ${nextReviewNumber}`, `Lapses ${item.review.lapseCount}`] : [])
   ].join(", ");
 
   return (
@@ -13504,12 +13528,19 @@ function ReviewQueueItemCard({
         <Text style={styles.historyRowTitle}>{modeLabel(item.review.mode)}</Text>
         <Text testID={`${rowTestId}-context`} style={styles.helperText}>{activityLabel}</Text>
         <Text testID={`${rowTestId}-meta`} style={styles.helperText}>
-          {dueState} · {item.review.intervalDays}d interval · {compactSource}
+          {showTodayPresentation
+            ? [attemptSummaryLabel, compactSource].filter(Boolean).join(" · ")
+            : `${dueState} · ${item.review.intervalDays}d interval · ${compactSource}`}
         </Text>
       </View>
       <ChevronGlyph direction="right" />
     </Pressable>
   );
+}
+
+function reviewAttemptMetricLabel(count: number, singular: "attempt" | "miss"): string {
+  const plural = singular === "attempt" ? "attempts" : "misses";
+  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 function TodayReviewAttemptRow({
