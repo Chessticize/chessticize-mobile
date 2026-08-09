@@ -57,6 +57,12 @@ describe('Android R8 release optimization', () => {
     const releaseE2eRules = read(
       'apps/mobile/android/app/proguard-rules-release-e2e.pro',
     );
+    const mainManifest = read(
+      'apps/mobile/android/app/src/main/AndroidManifest.xml',
+    );
+    const releaseE2eManifest = read(
+      'apps/mobile/android/app/src/releaseE2e/AndroidManifest.xml',
+    );
     const detox = read('apps/mobile/.detoxrc.js');
     const mobilePackage = JSON.parse(read('apps/mobile/package.json'));
     const rootPackage = JSON.parse(read('package.json'));
@@ -67,6 +73,8 @@ describe('Android R8 release optimization', () => {
       /releaseE2e[\s\S]*manifestPlaceholders = \[usesCleartextTraffic: true\]/,
     );
     expect(build).not.toMatch(/releaseE2e\s*\{[^}]*debuggable true/);
+    expect(releaseE2eManifest).toContain('android.permission.INTERNET');
+    expect(mainManifest).not.toContain('android.permission.INTERNET');
     expect(build).toMatch(/releaseE2e[\s\S]*signingConfig signingConfigs\.debug/);
     expect(build).toMatch(
       /releaseE2e[\s\S]*proguardFile "\$\{rootProject\.projectDir\}\/\.\.\/node_modules\/detox\/android\/detox\/proguard-rules-app\.pro"/,
