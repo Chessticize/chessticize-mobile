@@ -57,6 +57,7 @@ describeStoreAssets('App Store screenshot capture', () => {
 
 async function captureFirstUseSprintRulesGuide() {
   await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(180000);
+  await expect(element(by.id('test-puzzle-source-control'))).not.toExist();
   await takePortraitScreenshotAtTop('app-store-09-sprint-rules-guide');
   await takeLandscapeScreenshot('app-store-09-sprint-rules-guide');
   await element(by.id('practice-sprint-rules-dismiss')).tap();

@@ -4901,7 +4901,12 @@ export function PracticePocScreen({
                   </>
                 ) : null}
 
-                {!isSessionGuideVisible && !isActive && state === null && arePracticeTestControlsEnabled() && configurePuzzleSource ? (
+                {!isSessionGuideVisible
+                  && !isActive
+                  && state === null
+                  && arePracticeTestControlsEnabled()
+                  && !isStoreAssetCaptureEnabled()
+                  && configurePuzzleSource ? (
                   <TestPuzzleSourceControl
                     source={puzzleSource}
                     onChange={changePuzzleSource}

@@ -7540,6 +7540,22 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "test-puzzle-source-control")).toThrow();
   });
 
+  it("keeps visible puzzle-source controls out of deterministic store captures", () => {
+    const nativeModules = ReactNative.NativeModules as typeof ReactNative.NativeModules & {
+      ChessticizeTestLaunchConfig?: { storeAssetCapture?: boolean };
+    };
+    const previousLaunchConfig = nativeModules.ChessticizeTestLaunchConfig;
+    nativeModules.ChessticizeTestLaunchConfig = { storeAssetCapture: true };
+
+    try {
+      const renderer = renderScreen();
+
+      expect(() => findByTestId(renderer, "test-puzzle-source-control")).toThrow();
+    } finally {
+      nativeModules.ChessticizeTestLaunchConfig = previousLaunchConfig;
+    }
+  });
+
   it("can switch test builds between core and familiar puzzle sources", () => {
     const renderer = renderScreen();
     const familiarService = createMobilePracticeService("familiar15");
