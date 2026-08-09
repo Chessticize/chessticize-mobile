@@ -27,7 +27,7 @@
     "issues": [
       {
         "issueNumber": 520,
-        "changeNote": "Keep filter options and their persistent summary together above the Review action while retaining the same default-open Today sections and shared disclosure motion."
+        "changeNote": "Keep filter options above the Review action, then show only the selected filter when the options collapse while retaining the same default-open Today sections and shared disclosure motion."
       }
     ]
   },
@@ -35,7 +35,7 @@
     "issues": [
       {
         "issueNumber": 520,
-        "changeNote": "Use four action-focused quick filters plus a persistent match summary above the Review action, without the alternate Due items or Review groups interface."
+        "changeNote": "Use four action-focused quick filters above the Review action, with a selected-filter-only summary that appears only while the options are collapsed and no alternate Due items or Review groups interface."
       }
     ]
   }

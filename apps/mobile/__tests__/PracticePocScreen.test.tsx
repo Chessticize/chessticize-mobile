@@ -4310,15 +4310,18 @@ describe("PracticePocScreen", () => {
       accessibilityElementsHidden: true,
       pointerEvents: "none"
     });
-    expect(findByTestId(reviewRenderer, "review-active-filter-summary")).toBeTruthy();
+    expect(findByTestId(reviewRenderer, "review-filter-summary-motion").props).toMatchObject({
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
+    });
     expect(testIdOrder(
       reviewRenderer,
       "review-filter-options-motion",
-      "review-active-filter-summary"
+      "review-filter-summary-motion"
     )).toBeLessThan(0);
     expect(testIdOrder(
       reviewRenderer,
-      "review-active-filter-summary",
+      "review-filter-summary-motion",
       "review-start-due"
     )).toBeLessThan(0);
     press(reviewRenderer, "review-filter-toggle");
@@ -4326,7 +4329,10 @@ describe("PracticePocScreen", () => {
       accessibilityElementsHidden: false,
       pointerEvents: "auto"
     });
-    expect(findByTestId(reviewRenderer, "review-active-filter-summary")).toBeTruthy();
+    expect(findByTestId(reviewRenderer, "review-filter-summary-motion").props).toMatchObject({
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
     act(() => {
       jest.advanceTimersByTime(100);
     });
@@ -4334,6 +4340,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(reviewRenderer, "review-filter-options-motion").props).toMatchObject({
       accessibilityElementsHidden: true,
       pointerEvents: "none"
+    });
+    expect(findByTestId(reviewRenderer, "review-filter-summary-motion").props).toMatchObject({
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
     });
 
     expect(findByTestId(reviewRenderer, "review-today-to-review-items-motion")).toBeTruthy();
@@ -4407,19 +4417,27 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-context-list")).toThrow();
     expect(collectText(findByTestId(renderer, "review-panel"))).not.toContain("Due items");
     expect(collectText(findByTestId(renderer, "review-panel"))).not.toContain("Review groups");
-    expect(testIdOrder(renderer, "review-filter-options-motion", "review-active-filter-summary")).toBeLessThan(0);
-    expect(testIdOrder(renderer, "review-active-filter-summary", "review-start-due")).toBeLessThan(0);
-    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("All");
-    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain("3 today");
+    expect(testIdOrder(renderer, "review-filter-options-motion", "review-filter-summary-motion")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "review-filter-summary-motion", "review-start-due")).toBeLessThan(0);
+    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toBe("All");
+    expect(() => findByTestId(renderer, "review-active-filter-1")).toThrow();
     expect(findByTestId(renderer, "review-active-filter-summary").props.accessibilityLabel).toBe(
-      "Review filter summary, All, 3 today"
+      "Review filter summary, All"
     );
     expect(findByTestId(renderer, "review-filter-options-motion").props).toMatchObject({
       accessibilityElementsHidden: true,
       pointerEvents: "none"
     });
+    expect(findByTestId(renderer, "review-filter-summary-motion").props).toMatchObject({
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
+    });
 
     press(renderer, "review-filter-toggle");
+    expect(findByTestId(renderer, "review-filter-summary-motion").props).toMatchObject({
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
     expect([...new Set(
       collectTestIds(findByTestId(renderer, "review-queue-filters"))
         .filter((testID) => testID.startsWith("review-filter-"))
@@ -4454,21 +4472,22 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain(
       "Missed 2+ times"
     );
-    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain(
+    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toBe(
       "Missed 2+ times"
     );
-    expect(collectText(findByTestId(renderer, "review-active-filter-summary"))).toContain(
-      "2 matches"
-    );
+    expect(() => findByTestId(renderer, "review-active-filter-1")).toThrow();
     expect(findByTestId(renderer, "review-active-filter-summary").props.accessibilityLabel).toBe(
-      "Review filter summary, Missed 2+ times, 2 matches"
+      "Review filter summary, Missed 2+ times"
     );
     press(renderer, "review-filter-toggle");
     expect(findByTestId(renderer, "review-filter-options-motion").props).toMatchObject({
       accessibilityElementsHidden: true,
       pointerEvents: "none"
     });
-    expect(findByTestId(renderer, "review-active-filter-summary")).toBeTruthy();
+    expect(findByTestId(renderer, "review-filter-summary-motion").props).toMatchObject({
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
+    });
   });
 
   it("limits an existing Custom Run editor to Current rating", () => {

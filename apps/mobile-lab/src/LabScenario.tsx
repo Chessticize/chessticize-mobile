@@ -856,7 +856,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
           showTodaySections: true,
           filterControls: {
             placement: "before_review_action",
-            summaryVisibility: "always"
+            summaryVisibility: "when_collapsed"
           },
           collapsibleSections: {
             todayInitiallyExpanded: true,

@@ -341,7 +341,7 @@ export type ReviewTodayDesignPreview = {
   showTodaySections: boolean;
   filterControls?: {
     placement: "before_review_action";
-    summaryVisibility: "always";
+    summaryVisibility: "when_collapsed";
   };
   collapsibleSections: {
     todayInitiallyExpanded: boolean;
@@ -13301,20 +13301,13 @@ function ReviewPanel({
   const selectedReviewFilterLabel = quickFilterPresentation?.label
     ?? reviewQueueFilterLabel(queueFilter);
   const activeFilterLabels = quickFiltersEnabled
-    ? reviewQuickFilterSummaryLabels(
-        selectedReviewFilterLabel,
-        queueFilter,
-        filteredDueReviewItems.length,
-        filteredCompletedReviews.length
-      )
+    ? [selectedReviewFilterLabel]
     : reviewActiveFilterLabels(queueFilter, queueSummary);
   const filterControlsBeforeReviewAction = reviewTodayDesignPreview?.filterControls?.placement
     === "before_review_action";
-  const filterSummaryAlwaysVisible = reviewTodayDesignPreview?.filterControls?.summaryVisibility
-    === "always";
-  const showActiveFilterStrip = filterSummaryAlwaysVisible
-    || filtersExpanded
-    || queueFilter !== "all";
+  const filterSummaryWhenCollapsed = reviewTodayDesignPreview?.filterControls?.summaryVisibility
+    === "when_collapsed";
+  const showActiveFilterStrip = filtersExpanded || queueFilter !== "all";
   const reviewDueSummaryLabel = filteredDueEntries.length > 0
     ? queueSummary.dueStatusLabel
     : dueReviewItems.length === 0
@@ -13481,6 +13474,18 @@ function ReviewPanel({
       {reviewFilterOptions}
     </CollapsibleRegion>
   ) : filtersExpanded ? reviewFilterOptions : null;
+  const reviewActiveFilterStrip = <ReviewActiveFilterStrip labels={activeFilterLabels} />;
+  const reviewFilterSummaryRegion = filterSummaryWhenCollapsed ? (
+    collapsibleMotionPreview ? (
+      <CollapsibleRegion
+        contentTestID="review-filter-summary"
+        expanded={!filtersExpanded}
+        motion={collapsibleMotionPreview}
+      >
+        {reviewActiveFilterStrip}
+      </CollapsibleRegion>
+    ) : !filtersExpanded ? reviewActiveFilterStrip : null
+  ) : showActiveFilterStrip ? reviewActiveFilterStrip : null;
 
   return (
     <View style={styles.reviewQueuePanel} testID="review-panel">
@@ -13533,9 +13538,12 @@ function ReviewPanel({
         <ReviewForecastMetric label="Total" count={queueSummary.totalCount} countTestID="review-total-count" />
       </View>
 
-      {filterControlsBeforeReviewAction ? reviewFilterOptionsRegion : null}
-
-      {showActiveFilterStrip ? <ReviewActiveFilterStrip labels={activeFilterLabels} /> : null}
+      {filterControlsBeforeReviewAction ? (
+        <View testID="review-filter-controls">
+          {reviewFilterOptionsRegion}
+          {reviewFilterSummaryRegion}
+        </View>
+      ) : showActiveFilterStrip ? reviewActiveFilterStrip : null}
 
       <Pressable
         accessibilityRole="button"
@@ -13758,21 +13766,6 @@ function reviewActiveFilterLabels(
   }
   labels.push(`${queueSummary.totalCount} total`);
   return labels;
-}
-
-function reviewQuickFilterSummaryLabels(
-  label: string,
-  filter: ReviewQueueFilter,
-  dueCount: number,
-  completedCount: number
-): string[] {
-  const matchCount = dueCount + completedCount;
-  return [
-    label,
-    filter === "all"
-      ? `${matchCount} today`
-      : `${matchCount} ${matchCount === 1 ? "match" : "matches"}`
-  ];
 }
 
 function ReviewActiveFilterStrip({ labels }: { labels: string[] }): React.JSX.Element {
