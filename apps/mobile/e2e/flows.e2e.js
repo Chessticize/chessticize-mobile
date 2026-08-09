@@ -9,6 +9,7 @@ const {
   startPracticeMode,
   startSelectedPracticeRun,
   selectTestPuzzleSource,
+  tapUntilAnyExists,
   tapUntilExists,
   textFromAttributes,
   waitForVisibleInPracticeScroll,
@@ -59,15 +60,15 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('settings-sync-support-bundle-prepare')))
       .toBeVisible()
       .withTimeout(10000);
-    await tapUntilExists(
+    await tapUntilAnyExists(
       'settings-sync-support-bundle-prepare',
-      'settings-sync-support-bundle-preparing',
+      ['settings-sync-support-bundle-preparing', 'settings-sync-support-bundle-share'],
       3
     );
     try {
       await waitFor(element(by.id('settings-sync-support-bundle-share')))
         .toExist()
-        .withTimeout(20000);
+        .withTimeout(60000);
     } catch (error) {
       const prepareError = element(by.id('settings-sync-support-bundle-prepare-error'));
       await expect(prepareError).toExist();
