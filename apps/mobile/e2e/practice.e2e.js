@@ -61,7 +61,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('practice-add-run'))).toBeVisible().withTimeout(10000);
     await tapUntilExists('practice-add-run', 'practice-run-editor', 3);
     await expect(element(by.id('practice-run-theme-selection-detail'))).toHaveText('All themes');
-    await expect(element(by.id('custom-theme-mixed'))).not.toExist();
+    await expect(element(by.id('practice-run-theme-catalog-motion'))).not.toBeVisible();
     await element(by.id('practice-run-theme-disclosure')).tap();
     await waitFor(element(by.id('custom-theme-mixed').and(by.traits(['selected']))))
       .toExist()
@@ -311,7 +311,7 @@ describe('Practice POC', () => {
     await waitForVisibleInPracticeScroll('history-attention-flag-in-review');
     await element(by.id('history-attention-flag-in-review')).tap();
     await element(by.id('history-filter-toggle')).tap();
-    await waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-advanced-filters-motion'))).not.toBeVisible().withTimeout(10000);
     await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
     const resultRowIdentifier = await historyAttemptRowTestIDForResult('Correct');
     await waitForVisibleInPracticeScroll(resultRowIdentifier);

@@ -66,10 +66,10 @@ describe('Android product-aware system Back', () => {
 
       await openTab('history-tab', 'history-action-header');
       await element(by.id('history-filter-toggle')).tap();
-      await waitFor(element(by.id('history-advanced-filters'))).toExist().withTimeout(10000);
+      await waitFor(element(by.id('history-advanced-filters-motion'))).toBeVisible().withTimeout(10000);
 
       await device.pressBack();
-      await waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000);
+      await waitFor(element(by.id('history-advanced-filters-motion'))).not.toBeVisible().withTimeout(10000);
       await expect(element(by.id('history-panel'))).toExist();
 
       await device.pressBack();

@@ -156,5 +156,5 @@ async function openArrowDuelHistory() {
   await element(by.id('history-attention-all')).tap();
   await waitForVisibleInPracticeScroll('history-filter-toggle');
   await element(by.id('history-filter-toggle')).tap();
-  await waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000);
+  await waitFor(element(by.id('history-advanced-filters-motion'))).not.toBeVisible().withTimeout(10000);
 }

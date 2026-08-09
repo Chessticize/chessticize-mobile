@@ -68,7 +68,7 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain("by.id('history-rating-arrow_duel 5/30')");
     expect(journey).toContain("waitForVisibleInPracticeScroll('history-attention-all')");
     expect(journey).toContain(
-      "waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000)"
+      "waitFor(element(by.id('history-advanced-filters-motion'))).not.toBeVisible().withTimeout(10000)"
     );
     expect(journey).not.toContain("by.id('history-rating-arrow duel 5/30')");
     expect(journey).toContain("by.id('review-analysis-button')");
