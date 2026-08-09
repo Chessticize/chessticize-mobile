@@ -281,7 +281,7 @@ check(
     appStoreMetadata.description.includes("chess puzzle trainer") &&
     !appStoreMetadata.description.includes("Tactical Profile") &&
     !appStoreMetadata.description.includes("weakness") &&
-    appStoreMetadata.currentVersionWhatsNew?.sourceTag === "ios-v1.4.0-build-1" &&
+    appStoreMetadata.currentVersionWhatsNew?.sourceTag === iosReleaseTag &&
     appStoreMetadata.currentVersionWhatsNew?.status === "release-candidate" &&
     Array.from(appStoreMetadata.currentVersionWhatsNew.storeCopy).length <=
       appStoreMetadata.limits.chessticizeWhatsNewCharacters &&
