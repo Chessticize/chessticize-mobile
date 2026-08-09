@@ -290,7 +290,7 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "settings--i-cloud-sync-support-bundle",
     "The always-available iOS Settings entry under Help & Feedback for preparing support diagnostics even when no sync failure was captured.",
     "settings",
-    ["Help & Feedback placement", "Email Support final row", "Persistent Settings entry", "Sensitive-data confirmation", "Consistent local SQLite snapshot", "CloudKit JSON snapshot", "Diagnostic manifest", "iOS Share Sheet handoff"],
+    ["Help & Feedback placement", "Email Support final row", "Persistent Settings entry", "Sensitive-data confirmation", "Consistent local SQLite snapshot", "Progress V2 NDJSON capture", "Optional read-only V1 JSON snapshot", "Diagnostic manifest", "iOS Share Sheet handoff"],
     ["User-controlled support handoff", "Native database snapshot and Share Sheet"],
     "contained"
   ),
@@ -301,7 +301,7 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "settings--i-cloud-sync-support-bundle-partial",
     "The support-bundle recovery branch when the local SQLite snapshot is available but CloudKit cannot return its JSON progress snapshot.",
     "settings",
-    ["Sensitive-data confirmation", "CloudKit snapshot unavailable", "Explicit partial-bundle warning", "Included-file inventory", "iOS Share Sheet handoff"],
+    ["Sensitive-data confirmation", "CloudKit V2 capture unavailable", "Explicit partial-bundle warning", "Included-file inventory", "iOS Share Sheet handoff"],
     ["iCloud sync error details", "Native database snapshot and Share Sheet"],
     "contained"
   ),

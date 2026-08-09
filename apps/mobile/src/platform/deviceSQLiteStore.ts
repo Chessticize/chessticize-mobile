@@ -145,10 +145,137 @@ export class OPSqliteDatabase implements SyncSqliteDatabase {
 }
 
 function splitSqlStatements(sql: string): string[] {
-  return sql
-    .split(";")
-    .map((statement) => statement.trim())
-    .filter(Boolean);
+  const statements: string[] = [];
+  let current = "";
+  let token = "";
+  let statementTokens: string[] = [];
+  let isTrigger = false;
+  let triggerBodyStarted = false;
+  let triggerCaseDepth = 0;
+  let triggerEnded = false;
+  let quote: "'" | '"' | "`" | "]" | undefined;
+  let lineComment = false;
+  let blockComment = false;
+
+  const resetStatement = () => {
+    current = "";
+    token = "";
+    statementTokens = [];
+    isTrigger = false;
+    triggerBodyStarted = false;
+    triggerCaseDepth = 0;
+    triggerEnded = false;
+  };
+  const consumeToken = () => {
+    if (!token) {
+      return;
+    }
+    const normalized = token.toUpperCase();
+    statementTokens.push(normalized);
+    token = "";
+    isTrigger = statementTokens[0] === "CREATE"
+      && (
+        statementTokens[1] === "TRIGGER"
+        || ((statementTokens[1] === "TEMP" || statementTokens[1] === "TEMPORARY")
+          && statementTokens[2] === "TRIGGER")
+      );
+    if (!isTrigger) {
+      return;
+    }
+    if (!triggerBodyStarted && normalized === "BEGIN") {
+      triggerBodyStarted = true;
+    } else if (triggerBodyStarted && normalized === "CASE") {
+      triggerCaseDepth += 1;
+    } else if (triggerBodyStarted && normalized === "END") {
+      if (triggerCaseDepth > 0) {
+        triggerCaseDepth -= 1;
+      } else {
+        triggerEnded = true;
+      }
+    }
+  };
+  const finishStatement = () => {
+    consumeToken();
+    const statement = current.trim();
+    if (statement && statementTokens.length > 0) {
+      statements.push(statement);
+    }
+    resetStatement();
+  };
+
+  for (let index = 0; index < sql.length; index += 1) {
+    const character = sql[index]!;
+    const next = sql[index + 1];
+    current += character;
+
+    if (lineComment) {
+      if (character === "\n") {
+        lineComment = false;
+      }
+      continue;
+    }
+    if (blockComment) {
+      if (character === "*" && next === "/") {
+        current += next;
+        index += 1;
+        blockComment = false;
+      }
+      continue;
+    }
+    if (quote) {
+      const closingQuote = quote === "]" ? "]" : quote;
+      if (character !== closingQuote) {
+        continue;
+      }
+      if (quote !== "]" && next === closingQuote) {
+        current += next;
+        index += 1;
+        continue;
+      }
+      quote = undefined;
+      continue;
+    }
+    if (character === "-" && next === "-") {
+      consumeToken();
+      current += next;
+      index += 1;
+      lineComment = true;
+      continue;
+    }
+    if (character === "/" && next === "*") {
+      consumeToken();
+      current += next;
+      index += 1;
+      blockComment = true;
+      continue;
+    }
+    if (character === "'" || character === '"' || character === "`") {
+      consumeToken();
+      quote = character;
+      continue;
+    }
+    if (character === "[") {
+      consumeToken();
+      quote = "]";
+      continue;
+    }
+    if (/[A-Za-z0-9_]/.test(character)) {
+      token += character;
+      continue;
+    }
+
+    consumeToken();
+    if (character === ";") {
+      current = current.slice(0, -1);
+      if (!isTrigger || triggerEnded) {
+        finishStatement();
+      } else {
+        current += ";";
+      }
+    }
+  }
+  finishStatement();
+  return statements;
 }
 
 function createLocalId(): string {

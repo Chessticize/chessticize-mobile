@@ -232,7 +232,7 @@ export function ICloudSyncErrorDetails({
             {entryVariant === "support"
               ? isAndroidSupportBundle
                 ? "Share a local SQLite snapshot and diagnostic details."
-                : "Share a local database snapshot, iCloud snapshot, and diagnostic details."
+                : "Share a local database snapshot, iCloud progress records, and diagnostic details."
               : `Last failed ${presentation.occurredAtLabel}. Copy technical information for support.`}
           </Text>
         </View>
@@ -251,7 +251,10 @@ export function ICloudSyncErrorDetails({
         <View style={styles.backdrop}>
           <View
             accessibilityViewIsModal
-            style={styles.modal}
+            style={[
+              styles.modal,
+              entryVariant === "support" ? styles.supportModal : null
+            ]}
             testID={entryVariant === "support"
               ? "settings-sync-support-bundle-modal"
               : "settings-sync-error-details-modal"}
@@ -259,6 +262,7 @@ export function ICloudSyncErrorDetails({
             <ScrollView
               contentContainerStyle={styles.modalContent}
               showsVerticalScrollIndicator
+              style={styles.modalScroll}
               testID={entryVariant === "support"
                 ? "settings-sync-support-bundle-scroll"
                 : "settings-sync-error-details-scroll"}
@@ -277,7 +281,7 @@ export function ICloudSyncErrorDetails({
                         : panel === "preparing"
                           ? isAndroidSupportBundle
                             ? "Creating a consistent local SQLite snapshot and checking its integrity."
-                            : "Creating a consistent local database snapshot and fetching the latest iCloud progress snapshot."
+                            : "Creating a consistent local database snapshot and a full read-only iCloud progress capture."
                           : isAndroidSupportBundle
                             ? "Review what was included before opening Android share options."
                             : "Review what was included before opening the iOS Share Sheet."}
@@ -388,7 +392,7 @@ export function ICloudSyncErrorDetails({
                         <Text style={styles.exportCopy}>
                           {isAndroidSupportBundle
                             ? "Export the local SQLite database and this diagnostic in one support bundle."
-                            : "Export the local database, iCloud progress snapshot, and this diagnostic in one support bundle."}
+                            : "Export the local database, iCloud progress records, and this diagnostic in one support bundle."}
                         </Text>
                       </View>
                       <Pressable
@@ -418,6 +422,39 @@ export function ICloudSyncErrorDetails({
                     </Text>
                   </View>
 
+                  <View style={styles.actions}>
+                    <Pressable
+                      accessibilityLabel={entryVariant === "support"
+                        ? "Cancel support diagnostics export"
+                        : "Back to iCloud sync error details"}
+                      accessibilityRole="button"
+                      onPress={() => {
+                        if (entryVariant === "support") {
+                          close();
+                          return;
+                        }
+                        setPanel("details");
+                      }}
+                      style={styles.secondaryButton}
+                      testID="settings-sync-support-bundle-back"
+                    >
+                      <Text style={styles.secondaryButtonText}>
+                        {entryVariant === "support" ? "Cancel" : "Back"}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel="Prepare support diagnostics bundle"
+                      accessibilityRole="button"
+                      onPress={() => {
+                        void prepareSupportBundle();
+                      }}
+                      style={styles.primaryButton}
+                      testID="settings-sync-support-bundle-prepare"
+                    >
+                      <Text style={styles.primaryButtonText}>Prepare Support Bundle</Text>
+                    </Pressable>
+                  </View>
+
                   <View style={styles.fileSection}>
                     <Text style={styles.technicalTitle}>Files prepared</Text>
                     <BundleFile
@@ -426,8 +463,14 @@ export function ICloudSyncErrorDetails({
                     />
                     {isAndroidSupportBundle ? null : (
                       <BundleFile
-                        description="The latest progress snapshot downloaded from CloudKit, when available."
-                        name="icloud-progress-snapshot.json"
+                        description="A full read-only capture of V2 records and deletions, stored as one line-delimited file."
+                        name="icloud-progress-v2.ndjson"
+                      />
+                    )}
+                    {isAndroidSupportBundle ? null : (
+                      <BundleFile
+                        description="The legacy V1 snapshot, included only during bridging when it exists."
+                        name="icloud-progress-v1.json (optional)"
                       />
                     )}
                     <BundleFile
@@ -469,38 +512,6 @@ export function ICloudSyncErrorDetails({
                     </Text>
                   ) : null}
 
-                  <View style={styles.actions}>
-                    <Pressable
-                      accessibilityLabel={entryVariant === "support"
-                        ? "Cancel support diagnostics export"
-                        : "Back to iCloud sync error details"}
-                      accessibilityRole="button"
-                      onPress={() => {
-                        if (entryVariant === "support") {
-                          close();
-                          return;
-                        }
-                        setPanel("details");
-                      }}
-                      style={styles.secondaryButton}
-                      testID="settings-sync-support-bundle-back"
-                    >
-                      <Text style={styles.secondaryButtonText}>
-                        {entryVariant === "support" ? "Cancel" : "Back"}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityLabel="Prepare support diagnostics bundle"
-                      accessibilityRole="button"
-                      onPress={() => {
-                        void prepareSupportBundle();
-                      }}
-                      style={styles.primaryButton}
-                      testID="settings-sync-support-bundle-prepare"
-                    >
-                      <Text style={styles.primaryButtonText}>Prepare Support Bundle</Text>
-                    </Pressable>
-                  </View>
                 </>
               ) : null}
 
@@ -529,13 +540,13 @@ export function ICloudSyncErrorDetails({
                       <Text style={styles.partialTitle}>
                         {isAndroidSupportBundle
                           ? "Local SQLite snapshot couldn't be included"
-                          : "iCloud snapshot couldn't be included"}
+                          : "iCloud progress capture couldn't be completed"}
                       </Text>
                       <Text style={styles.partialCopy}>
                         {bundleResult.unavailableReason
                           ?? (isAndroidSupportBundle
                             ? "The local progress snapshot was unavailable."
-                            : "CloudKit did not return a progress snapshot.")}
+                            : "CloudKit did not return a complete progress capture.")}
                       </Text>
                       <Text style={styles.partialHelp}>
                         {isAndroidSupportBundle
@@ -556,52 +567,10 @@ export function ICloudSyncErrorDetails({
                       <Text style={styles.completeCopy}>
                         {isAndroidSupportBundle
                           ? "The consistent local SQLite snapshot and diagnostic details are included."
-                          : "Both the local database and the downloaded iCloud progress snapshot are included."}
+                          : "The local database and a complete read-only V2 CloudKit capture are included."}
                       </Text>
                     </View>
                   )}
-
-                  <View style={styles.fileSection}>
-                    <Text style={styles.technicalTitle}>Included files</Text>
-                    {bundleResult.files.map((file) => (
-                      <View key={file} style={styles.readyFileRow}>
-                        <Text style={styles.readyFileCheck}>✓</Text>
-                        <Text style={styles.readyFileName}>{file}</Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  <View style={styles.privacyCard}>
-                    <Text style={styles.privacyTitle}>You control the handoff</Text>
-                    <Text style={styles.privacyCopy}>
-                      {isAndroidSupportBundle
-                        ? "The next action asks Android to open its share options. Chessticize does not choose a recipient or upload the bundle."
-                        : "The next action asks iOS to open its Share Sheet. Chessticize does not choose a recipient or upload the bundle."}
-                    </Text>
-                  </View>
-
-                  {shareState === "shared" ? (
-                    <Text
-                      accessibilityLiveRegion="polite"
-                      style={styles.copySuccess}
-                      testID="settings-sync-support-bundle-shared"
-                    >
-                      {isAndroidSupportBundle
-                        ? "Android share options opened. The temporary bundle expires automatically."
-                        : "Share Sheet closed. The temporary bundle was removed."}
-                    </Text>
-                  ) : null}
-                  {shareState === "failed" ? (
-                    <Text
-                      accessibilityLiveRegion="polite"
-                      style={styles.copyFailure}
-                      testID="settings-sync-support-bundle-share-error"
-                    >
-                      {isAndroidSupportBundle
-                        ? "Android share options couldn't be opened. Your prepared bundle remains available while this window is open."
-                        : "The Share Sheet couldn't be opened. Your prepared bundle remains available while this window is open."}
-                    </Text>
-                  ) : null}
 
                   <View style={styles.actions}>
                     <Pressable
@@ -652,6 +621,49 @@ export function ICloudSyncErrorDetails({
                       </Text>
                     </Pressable>
                   </View>
+
+                  <View style={styles.fileSection}>
+                    <Text style={styles.technicalTitle}>Included files</Text>
+                    {bundleResult.files.map((file) => (
+                      <View key={file} style={styles.readyFileRow}>
+                        <Text style={styles.readyFileCheck}>✓</Text>
+                        <Text style={styles.readyFileName}>{file}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View style={styles.privacyCard}>
+                    <Text style={styles.privacyTitle}>You control the handoff</Text>
+                    <Text style={styles.privacyCopy}>
+                      {isAndroidSupportBundle
+                        ? "The next action asks Android to open its share options. Chessticize does not choose a recipient or upload the bundle."
+                        : "The next action asks iOS to open its Share Sheet. Chessticize does not choose a recipient or upload the bundle."}
+                    </Text>
+                  </View>
+
+                  {shareState === "shared" ? (
+                    <Text
+                      accessibilityLiveRegion="polite"
+                      style={styles.copySuccess}
+                      testID="settings-sync-support-bundle-shared"
+                    >
+                      {isAndroidSupportBundle
+                        ? "Android share options opened. The temporary bundle expires automatically."
+                        : "Share Sheet closed. The temporary bundle was removed."}
+                    </Text>
+                  ) : null}
+                  {shareState === "failed" ? (
+                    <Text
+                      accessibilityLiveRegion="polite"
+                      style={styles.copyFailure}
+                      testID="settings-sync-support-bundle-share-error"
+                    >
+                      {isAndroidSupportBundle
+                        ? "Android share options couldn't be opened. Your prepared bundle remains available while this window is open."
+                        : "The Share Sheet couldn't be opened. Your prepared bundle remains available while this window is open."}
+                    </Text>
+                  ) : null}
+
                 </>
               ) : null}
             </ScrollView>
@@ -783,9 +795,15 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     width: "100%"
   },
+  supportModal: {
+    height: "92%"
+  },
   modalContent: {
     gap: 16,
     padding: 20
+  },
+  modalScroll: {
+    flex: 1
   },
   header: {
     alignItems: "flex-start",

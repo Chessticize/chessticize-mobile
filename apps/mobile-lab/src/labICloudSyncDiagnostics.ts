@@ -25,7 +25,7 @@ export function createLabICloudSyncDiagnosticsClient(
           ]
         : [
             "local-progress.sqlite",
-            "icloud-progress-snapshot.json",
+            "icloud-progress-v2.ndjson",
             "diagnostic.txt",
             "manifest.json"
           ],

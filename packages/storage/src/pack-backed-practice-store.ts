@@ -18,7 +18,7 @@ import type {
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type {
-  ClearLocalHistoryResult,
+  ClearSyncedHistoryResult,
   ExportedSprintSession,
   LocalDataImport,
   LocalDataImportObserver,
@@ -31,6 +31,7 @@ import type {
 } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
 import type { PuzzleSource } from "./puzzle-source.ts";
+import type { ProgressV2Persistence } from "./progress-v2-persistence.ts";
 
 export class PackBackedPracticeStore implements PracticeStore {
   private readonly userStore: PracticeStore;
@@ -39,6 +40,14 @@ export class PackBackedPracticeStore implements PracticeStore {
   constructor(userStore: PracticeStore, puzzleSource: PuzzleSource) {
     this.userStore = userStore;
     this.puzzleSource = puzzleSource;
+  }
+
+  get progressV2(): ProgressV2Persistence {
+    const persistence = this.userStore.progressV2;
+    if (!persistence) {
+      throw new Error("Progress V2 persistence is unavailable for the user store");
+    }
+    return persistence;
   }
 
   seedPuzzles(puzzles: Puzzle[]): void {
@@ -218,8 +227,8 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.importLocalData(data, observer);
   }
 
-  clearLocalHistory(): ClearLocalHistoryResult {
-    return this.userStore.clearLocalHistory();
+  clearSyncedHistory(now: string): ClearSyncedHistoryResult {
+    return this.userStore.clearSyncedHistory(now);
   }
 
   getSessionMistakeReview(sessionId: string): SessionMistakeReviewItem[] {

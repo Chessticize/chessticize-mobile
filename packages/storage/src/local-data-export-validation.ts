@@ -13,6 +13,7 @@ import {
   type SprintConfig
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow } from "./query-types.ts";
+import { defaultPracticeSettings } from "./practice-settings.ts";
 
 const SPRINT_MODES = new Set(["standard", "blitz", "arrow_duel", "custom"]);
 const SPRINT_STATUSES = new Set(["active", "paused", "won", "failed", "abandoned"]);
@@ -29,6 +30,39 @@ export function isCanonicalProgressSyncSnapshot(
     isNonEmptyString(value.deviceId) &&
     isIsoDate(value.updatedAt) &&
     isCanonicalLocalDataExport(value.data);
+}
+
+/**
+ * V1 snapshots predate some optional progress families and settings fields.
+ * Normalize only those known additions, then run the current strict validator
+ * before allowing the payload across the storage boundary.
+ */
+export function normalizeLegacyProgressSyncSnapshot(
+  value: unknown
+): ProgressSyncSnapshot | undefined {
+  if (!isRecord(value) || value.schemaVersion !== 1 || !isNonEmptyString(value.deviceId) ||
+      !isIsoDate(value.updatedAt) || !isRecord(value.data)) {
+    return undefined;
+  }
+  const data = value.data;
+  if (!isRecord(data.settings)) return undefined;
+  const defaults = defaultPracticeSettings();
+  const settings = data.settings;
+  const normalized = {
+    ...value,
+    data: {
+      ...data,
+      settings: {
+        sync: settings.sync,
+        notifications: settings.notifications,
+        moveFeedback: settings.moveFeedback ?? defaults.moveFeedback,
+        sprintGuides: settings.sprintGuides ?? defaults.sprintGuides
+      },
+      reviewRemovals: data.reviewRemovals ?? [],
+      practiceRuns: data.practiceRuns ?? []
+    }
+  };
+  return isCanonicalProgressSyncSnapshot(normalized) ? normalized : undefined;
 }
 
 export function isCanonicalLocalDataExport(

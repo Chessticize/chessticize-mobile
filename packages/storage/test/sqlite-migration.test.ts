@@ -38,6 +38,9 @@ const SNAPSHOT_TABLES = [
   "attempts",
   "custom_sprint_configs",
   "practice_runs",
+  "progress_v2_outbox",
+  "progress_v2_sync_state",
+  "progress_v2_tombstones",
   "review_queue",
   "review_schedule_removals",
   "review_events",
@@ -1212,6 +1215,142 @@ test("SQLite v19 defaults legacy reply-cue familiarity and persists later progre
   }
 });
 
+test("SQLite v20 seeds the V2 outbox and commits business writes with their outbox entries", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-v20-sync-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setup = new SQLiteStore(databasePath);
+    setup.migrate();
+    setup.getSettings();
+    const triggers = setup.db.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'progress_v2_%' ORDER BY name"
+    ).all() as Array<{ name: string }>;
+    for (const trigger of triggers) {
+      setup.db.exec(`DROP TRIGGER ${trigger.name}`);
+    }
+    setup.db.exec(`
+      DROP TABLE progress_v2_outbox;
+      DROP TABLE progress_v2_tombstones;
+      DROP TABLE progress_v2_sync_state;
+      PRAGMA user_version = 19;
+    `);
+    setup.close();
+
+    const migrated = new SQLiteStore(databasePath);
+    migrated.migrate();
+    try {
+      assert.equal(schemaVersionForStore(migrated), CURRENT_SCHEMA_VERSION);
+      assert.deepEqual(
+        (migrated.db.prepare(
+          "SELECT kind FROM progress_v2_outbox GROUP BY kind ORDER BY kind"
+        ).all() as Array<{ kind: string }>).map((row) => row.kind),
+        ["manifest", "practice_run", "preferences"]
+      );
+      const beforeOutbox = rowCountForStore(migrated, "progress_v2_outbox");
+      assert.throws(() => {
+        migrated.transaction(() => {
+          migrated.saveRating({
+            key: "rollback 5/20",
+            generation: 0,
+            rating: 777,
+            games: 0
+          });
+          throw new Error("forced V2 write rollback");
+        });
+      }, /forced V2 write rollback/);
+      assert.equal(
+        (migrated.db.prepare("SELECT COUNT(*) AS count FROM ratings WHERE key = 'rollback 5/20'").get() as { count: number }).count,
+        0
+      );
+      assert.equal(rowCountForStore(migrated, "progress_v2_outbox"), beforeOutbox);
+
+      migrated.saveRating({
+        key: "committed 5/20",
+        generation: 0,
+        rating: 888,
+        games: 0
+      });
+      assert.deepEqual(
+        migrated.db.prepare(
+          "SELECT kind, entity_key FROM progress_v2_outbox WHERE kind = 'rating'"
+        ).all().map(sqliteRow),
+        [{ kind: "rating", entity_key: "committed 5/20\u001f0" }]
+      );
+      assert.equal(integrityResultForStore(migrated), "ok");
+      assert.deepEqual(migrated.db.prepare("PRAGMA foreign_key_check").all(), []);
+    } finally {
+      migrated.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("SQLite repairs an early v20 outbox without losing pending work", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-v20-outbox-repair-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setup = new SQLiteStore(databasePath);
+    setup.migrate();
+    const triggers = setup.db.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'progress_v2_%' ORDER BY name"
+    ).all() as Array<{ name: string }>;
+    for (const trigger of triggers) {
+      setup.db.exec(`DROP TRIGGER ${trigger.name}`);
+    }
+    setup.db.exec(`
+      ALTER TABLE progress_v2_outbox RENAME TO progress_v2_outbox_with_revision;
+      CREATE TABLE progress_v2_outbox (
+        kind TEXT NOT NULL,
+        entity_key TEXT NOT NULL,
+        enqueued_at TEXT NOT NULL,
+        PRIMARY KEY (kind, entity_key)
+      );
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      SELECT kind, entity_key, enqueued_at FROM progress_v2_outbox_with_revision;
+      DROP TABLE progress_v2_outbox_with_revision;
+      PRAGMA user_version = 20;
+    `);
+    const pendingBefore = rowCountForStore(setup, "progress_v2_outbox");
+    setup.close();
+
+    const migrated = new SQLiteStore(databasePath);
+    migrated.migrate();
+    try {
+      assert.equal(rowCountForStore(migrated, "progress_v2_outbox"), pendingBefore);
+      assert.equal(
+        (migrated.db.prepare(
+          "SELECT revision FROM progress_v2_outbox WHERE kind = 'manifest' AND entity_key = 'default'"
+        ).get() as { revision: number }).revision,
+        1
+      );
+      migrated.saveRating({
+        key: "revision 5/20",
+        generation: 0,
+        rating: 800,
+        games: 0
+      });
+      migrated.saveRating({
+        key: "revision 5/20",
+        generation: 0,
+        rating: 825,
+        games: 0
+      });
+      assert.equal(
+        (migrated.db.prepare(
+          "SELECT revision FROM progress_v2_outbox WHERE kind = 'rating' AND entity_key = ?"
+        ).get("revision 5/20\u001f0") as { revision: number }).revision,
+        2
+      );
+      assert.equal(integrityResultForStore(migrated), "ok");
+    } finally {
+      migrated.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("SQLite v14 applies the quiet move-feedback default once", async () => {
   const directory = await mkdtemp(join(tmpdir(), "chessticize-quiet-feedback-migration-"));
   const databasePath = join(directory, "practice.sqlite");
@@ -1276,6 +1415,8 @@ test("SQLite repairs divergent timing schemas that omitted move feedback columns
 
       const divergentDatabase = new DatabaseSync(databasePath);
       divergentDatabase.exec(`
+        DROP TRIGGER progress_v2_settings_insert;
+        DROP TRIGGER progress_v2_settings_update;
         ALTER TABLE app_settings DROP COLUMN move_feedback_sound_enabled;
         ALTER TABLE app_settings DROP COLUMN move_feedback_haptics_enabled;
         PRAGMA user_version = ${divergentVersion};
@@ -1389,6 +1530,10 @@ function integrityResultForStore(store: SQLiteStore): string {
 
 function rowCount(db: DatabaseSync, table: string): number {
   return (db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count;
+}
+
+function rowCountForStore(store: SQLiteStore, table: string): number {
+  return (store.db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count;
 }
 
 function rowName(row: unknown): string {

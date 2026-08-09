@@ -835,7 +835,7 @@ function iCloudSyncErrorDetailsPresentation(
             kind: "complete",
             files: [
               "local-progress.sqlite",
-              "icloud-progress-snapshot.json",
+              "icloud-progress-v2.ndjson",
               "diagnostic.txt",
               "manifest.json"
             ]
@@ -847,7 +847,7 @@ function iCloudSyncErrorDetailsPresentation(
               "diagnostic.txt",
               "manifest.json"
             ],
-            unavailableReason: "CloudKit snapshot unavailable: The request was rate limited."
+            unavailableReason: "CloudKit Progress V2 capture unavailable: The request was rate limited."
           },
       onShare: async () => {}
     }
