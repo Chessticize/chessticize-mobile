@@ -7,6 +7,7 @@ const {
   selectTestPuzzleSource,
   sleep,
   startPracticeMode,
+  waitForHistoryFiltersCollapsed,
   waitForVisibleInPracticeScroll,
   withAndroidUiDiagnostics
 } = require('./helpers');
@@ -69,7 +70,7 @@ describe('Android product-aware system Back', () => {
       await waitFor(element(by.id('history-advanced-filters'))).toExist().withTimeout(10000);
 
       await device.pressBack();
-      await waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000);
+      await waitForHistoryFiltersCollapsed();
       await expect(element(by.id('history-panel'))).toExist();
 
       await device.pressBack();

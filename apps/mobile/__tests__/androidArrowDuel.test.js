@@ -26,6 +26,7 @@ describe('Android Arrow Duel release slice', () => {
 
   it('runs the complete offline Arrow Duel journey through Android public UI', () => {
     const fixture = require('../../../fixtures/puzzles/android-arrow-duel.fixture.json');
+    const helpers = read('e2e/helpers.js');
     const journey = read('e2e/android-arrow-duel.e2e.js');
     const suiteConfig = read('e2e/suiteConfig.js');
 
@@ -67,9 +68,13 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain("element(by.id('history-filter-toggle')).tap()");
     expect(journey).toContain("by.id('history-rating-arrow_duel 5/30')");
     expect(journey).toContain("waitForVisibleInPracticeScroll('history-attention-all')");
-    expect(journey).toContain(
-      "waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000)"
+    expect(journey).toContain('waitForHistoryFiltersCollapsed()');
+    expect(journey).not.toContain(
+      "waitFor(element(by.id('history-advanced-filters'))).not.toExist()"
     );
+    expect(helpers).toContain("by.id('history-advanced-filters')");
+    expect(helpers).toContain('not.toBeVisible()');
+    expect(helpers).toContain("'Show history filters'");
     expect(journey).not.toContain("by.id('history-rating-arrow duel 5/30')");
     expect(journey).toContain("by.id('review-analysis-button')");
     expect(journey).toContain("expect(element(by.id('history-attempt-detail'))).not.toExist()");

@@ -17,6 +17,7 @@ const {
   textFromAttributes,
   selectTestPuzzleSource,
   waitForVisibleInPracticeScroll,
+  waitForHistoryFiltersCollapsed,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
   waitForRunningStockfishDepth,
@@ -311,7 +312,7 @@ describe('Practice POC', () => {
     await waitForVisibleInPracticeScroll('history-attention-flag-in-review');
     await element(by.id('history-attention-flag-in-review')).tap();
     await element(by.id('history-filter-toggle')).tap();
-    await waitFor(element(by.id('history-advanced-filters'))).not.toExist().withTimeout(10000);
+    await waitForHistoryFiltersCollapsed();
     await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
     const resultRowIdentifier = await historyAttemptRowTestIDForResult('Correct');
     await waitForVisibleInPracticeScroll(resultRowIdentifier);
