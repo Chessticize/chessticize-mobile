@@ -63,7 +63,10 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       "practice-arrow-duel-prompt",
       "review-due",
       "review-arrow-duel-reply",
-      "history-arrow-duel-replay"
+      "history-arrow-duel-replay",
+      "settings-ios-sync-error-details",
+      "settings-ios-sync-support-bundle",
+      "settings-ios-sync-support-bundle-partial"
     ]
   );
   assert.ok(scenarioRegistry["practice-home-edit"].issues?.some(
@@ -162,16 +165,25 @@ test("the closed Issue #247 clone keeps its approved Settings scope without a ne
   );
 });
 
-test("the closed Issue #353 scenarios keep their stable URLs without new markers", () => {
+test("the Issue #353 scenarios keep stable URLs while Issue #522 owns the V2 diagnosis updates", () => {
   assert.deepEqual(
     newScenarios
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 353))
       .map((scenario) => scenario.id),
     []
   );
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync-error-details"), []);
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle"), []);
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle-partial"), []);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-error-details"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle-partial"), ["new"]);
+  for (const scenarioId of [
+    "settings-ios-sync-error-details",
+    "settings-ios-sync-support-bundle",
+    "settings-ios-sync-support-bundle-partial"
+  ] as const) {
+    assert.ok(
+      scenarioRegistry[scenarioId].issues?.some((issue) => issue.issueNumber === 522) ?? false
+    );
+  }
   assert.equal(
     scenarioRegistry["settings-ios-sync-error-details"].storyId,
     "settings--i-cloud-sync-error-details"

@@ -50,7 +50,7 @@ test("PracticeService derives eligibility from local Sprint history and records 
     "appReviewRequestAttempt" in service.exportLocalData(),
     false
   );
-  service.clearLocalHistory();
+  service.clearSyncedHistory("2026-07-29T12:00:00.000Z");
   assert.deepEqual(service.getAppReviewRequestAttempt(), {
     appVersion: "1.4.0",
     attemptedAt: "2026-07-29T12:00:00.000Z"

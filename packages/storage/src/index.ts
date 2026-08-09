@@ -3,6 +3,8 @@ export * from "./practice-store.ts";
 export * from "./practice-settings.ts";
 export * from "./local-data-export-validation.ts";
 export * from "./progress-sync.ts";
+export * from "./progress-sync-v2.ts";
+export * from "./progress-v2-persistence.ts";
 export * from "./rating-history.ts";
 export * from "./query-types.ts";
 export * from "./puzzle-source.ts";

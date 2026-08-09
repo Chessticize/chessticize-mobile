@@ -120,8 +120,12 @@ import type {
   ReviewQueueDuePromotionResult,
   ReviewReminderPreference
 } from "../../../../packages/storage/src/practice-store.ts";
-import { syncPracticeProgress } from "../../../../packages/storage/src/progress-sync.ts";
-import type { ProgressSyncResult } from "../../../../packages/storage/src/progress-sync.ts";
+import {
+  ProgressV2SyncCancelledError,
+  fingerprintOpaqueToken,
+  syncPracticeProgressV2,
+  type ProgressV2SyncResult
+} from "../../../../packages/storage/src/progress-sync-v2.ts";
 import type { PracticeProgressSummary } from "../../../../packages/storage/src/rating-history.ts";
 import {
   getBundledCorePackManifest,
@@ -135,7 +139,10 @@ import {
   type ReviewReminderPermissionStatus,
   type ReviewReminderScheduleResult
 } from "../platform/reviewReminderScheduler.ts";
-import type { ICloudAccountStatus } from "../platform/iCloudProgressSync.ts";
+import {
+  captureProgressForSupport,
+  type ICloudAccountStatus
+} from "../platform/iCloudProgressSync.ts";
 import {
   captureICloudSyncFailure,
   formatAndroidSupportOverviewDiagnostic,
@@ -143,6 +150,7 @@ import {
   formatICloudSyncOverviewDiagnostic,
   iCloudSyncAttemptLabel,
   type ICloudSyncFailureDiagnostic,
+  type ICloudSyncDiagnosticMetadata,
   type SupportDiagnosticMetadata
 } from "../platform/iCloudSyncDiagnostics.ts";
 import type {
@@ -794,6 +802,7 @@ export function PracticePocScreen({
   const scheduledReviewAttemptCountRef = useRef<number | null>(null);
   const reviewReminderPromptDismissedRef = useRef(false);
   const iCloudSyncInFlightRef = useRef<Promise<string> | null>(null);
+  const iCloudSyncGenerationRef = useRef(0);
   const stateRef = useRef<SprintState | null>(null);
   const boardFenRef = useRef<string | null>(null);
   const feedbackSnapshotRef = useRef<FeedbackBoardSnapshot | null>(null);
@@ -970,6 +979,7 @@ export function PracticePocScreen({
     [fontScale, height, insets, width]
   );
   const boardSize = adaptiveLayout.boardSize;
+  const progressV2Diagnostics = service.getProgressV2Diagnostics();
   const syncDiagnosticMetadata = {
     appVersion: platformCapabilities.applicationMetadata.versionName,
     ...(platformCapabilities.applicationMetadata.buildNumber
@@ -977,7 +987,41 @@ export function PracticePocScreen({
       : {}),
     iCloudAccountStatus: iCloudAccountStatusRef.current,
     iCloudSyncEnabled,
-    latestSyncStatus: iCloudSyncStatus
+    latestSyncStatus: iCloudSyncStatus,
+    progressV2: {
+      phase: progressV2Diagnostics.phase,
+      zoneInitialized: progressV2Diagnostics.zoneInitialized,
+      ...(progressV2Diagnostics.serverChangeTokenFingerprint === undefined
+        ? {}
+        : { serverChangeTokenFingerprint: progressV2Diagnostics.serverChangeTokenFingerprint }),
+      pendingOutboxCount: progressV2Diagnostics.pendingOutboxCount,
+      ...(progressV2Diagnostics.oldestPendingOutboxAt === undefined
+        ? {}
+        : { oldestPendingOutboxAt: progressV2Diagnostics.oldestPendingOutboxAt }),
+      ...(progressV2Diagnostics.lastPullAt === undefined
+        ? {}
+        : { lastPullAt: progressV2Diagnostics.lastPullAt }),
+      ...(progressV2Diagnostics.lastPushAt === undefined
+        ? {}
+        : { lastPushAt: progressV2Diagnostics.lastPushAt }),
+      legacyImportPending: progressV2Diagnostics.pendingV1ChangeTag !== undefined,
+      ...(progressV2Diagnostics.lastV1ChangeTag === undefined
+        ? {}
+        : {
+            lastV1ChangeTagFingerprint: fingerprintOpaqueToken(
+              progressV2Diagnostics.lastV1ChangeTag
+            )
+          }),
+      ...(progressV2Diagnostics.lastV1ImportAt === undefined
+        ? {}
+        : { lastV1ImportAt: progressV2Diagnostics.lastV1ImportAt }),
+      ...(progressV2Diagnostics.lastV1CheckAt === undefined
+        ? {}
+        : { lastV1CheckAt: progressV2Diagnostics.lastV1CheckAt }),
+      ...(progressV2Diagnostics.lastV1CheckStatus === undefined
+        ? {}
+        : { lastV1CheckStatus: progressV2Diagnostics.lastV1CheckStatus })
+    }
   };
   const supportDiagnosticMetadata: SupportDiagnosticMetadata =
     progressProtection.kind === "android_managed_backup"
@@ -999,18 +1043,56 @@ export function PracticePocScreen({
         },
         onPrepare: async () => {
           const createdAt = new Date(currentTimeMs()).toISOString();
+          const cloudCapture = progressProtection.kind === "android_managed_backup"
+            ? undefined
+            : iCloudSyncClient
+              ? await captureProgressForSupport(
+                  iCloudSyncClient,
+                  progressV2Diagnostics.phase
+                )
+              : {
+                  formatVersion: 2 as const,
+                  accountStatus: "unavailable" as const,
+                  v2: {
+                    status: "unavailable" as const,
+                    ndjson: "",
+                    recordCount: 0,
+                    deletionCount: 0,
+                    familyCounts: {},
+                    bytes: 0,
+                    startedAt: createdAt,
+                    completedAt: createdAt,
+                    unavailableReason: "icloud_v2_transport_unavailable"
+                  },
+                  v1: {
+                    status: progressV2Diagnostics.phase === "sealed"
+                      ? "skipped_sealed" as const
+                      : "unavailable" as const,
+                    ...(progressV2Diagnostics.phase === "sealed"
+                      ? {}
+                      : { unavailableReason: "icloud_v1_transport_unavailable" })
+                  }
+                };
+          const preparedMetadata: SupportDiagnosticMetadata =
+            progressProtection.kind === "android_managed_backup"
+              ? supportDiagnosticMetadata
+              : {
+                  ...syncDiagnosticMetadata,
+                  iCloudAccountStatus: cloudCapture?.accountStatus ?? "unavailable"
+                };
           const prepared = await iCloudSyncDiagnosticsClient.prepareSupportBundle({
+            ...(cloudCapture === undefined ? {} : { cloudCapture }),
             diagnosticText: progressProtection.kind === "android_managed_backup"
               ? formatAndroidSupportOverviewDiagnostic(
-                  supportDiagnosticMetadata,
+                  preparedMetadata,
                   createdAt
                 )
               : formatICloudSyncOverviewDiagnostic(
-                  syncDiagnosticMetadata,
+                  preparedMetadata as ICloudSyncDiagnosticMetadata,
                   createdAt,
                   lastICloudSyncFailure
                 ),
-            metadata: supportDiagnosticMetadata
+            metadata: preparedMetadata
           });
           return prepared;
         },
@@ -1468,6 +1550,8 @@ export function PracticePocScreen({
   }
 
   function saveICloudSyncEnabled(enabled: boolean): void {
+    iCloudSyncGenerationRef.current += 1;
+    iCloudSyncInFlightRef.current = null;
     service.saveSettings({
       ...service.getSettings(),
       sync: {
@@ -1542,19 +1626,29 @@ export function PracticePocScreen({
       return iCloudSyncInFlightRef.current;
     }
 
+    const generation = iCloudSyncGenerationRef.current;
+    const isCurrent = () =>
+      generation === iCloudSyncGenerationRef.current &&
+      service.getSettings().sync.iCloudEnabled;
+
     const work = (async () => {
       setICloudSyncStatus("Syncing");
       try {
         const accountStatus = await iCloudSyncClient.getAccountStatus();
+        if (!isCurrent()) {
+          setICloudSyncStatus("Off");
+          return "iCloud sync is off";
+        }
         iCloudAccountStatusRef.current = accountStatus;
         if (accountStatus !== "available") {
           const message = iCloudAccountStatusMessage(accountStatus);
           setICloudSyncStatus(message);
           return message;
         }
-        const result = await syncPracticeProgress(service, iCloudSyncClient, {
+        const result = await syncPracticeProgressV2(service, iCloudSyncClient, {
           deviceId: "ios-mobile",
-          now: nowIso
+          now: nowIso,
+          isCurrent
         });
         refreshState();
         setICloudSyncEnabled(service.getSettings().sync.iCloudEnabled);
@@ -1563,6 +1657,11 @@ export function PracticePocScreen({
         setICloudSyncStatus(message);
         return message;
       } catch (caught) {
+        if (caught instanceof ProgressV2SyncCancelledError) {
+          const message = service.getSettings().sync.iCloudEnabled ? "Ready" : "Off";
+          setICloudSyncStatus(message);
+          return message === "Off" ? "iCloud sync is off" : "iCloud sync was superseded";
+        }
         const message = "iCloud sync failed";
         setLastICloudSyncFailure(captureICloudSyncFailure(caught, {
           attempt: iCloudSyncAttemptLabel(reason),
@@ -15509,14 +15608,15 @@ function localReminderTarget(date: Date): string {
   return `${String(date.getFullYear()).padStart(4, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-function progressSyncStatusMessage(result: ProgressSyncResult): string {
+function progressSyncStatusMessage(result: ProgressV2SyncResult): string {
   if (result.status === "disabled") {
     return "iCloud sync is off";
   }
   const importedCount = result.imported.ratings +
     result.imported.attempts +
     result.imported.reviewQueue +
-    result.imported.sprintSessions;
+    result.imported.sprintSessions +
+    result.imported.practiceRuns;
   if (importedCount === 0) {
     return "Synced";
   }

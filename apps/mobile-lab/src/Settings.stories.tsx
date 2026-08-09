@@ -55,7 +55,7 @@ export const ICloudSyncErrorDetails: Story = {
     await clickTestId(canvasElement, "settings-sync-support-bundle-open");
     await waitForText(canvasElement, "This bundle contains progress data");
     await waitForText(canvasElement, "local-progress.sqlite");
-    await waitForText(canvasElement, "icloud-progress-snapshot.json");
+    await waitForText(canvasElement, "icloud-progress-v2.ndjson");
     await clickTestId(canvasElement, "settings-sync-support-bundle-prepare");
     await waitForTestId(canvasElement, "settings-sync-support-bundle-complete");
     await waitForTestId(canvasElement, "settings-sync-support-bundle-share");
@@ -72,7 +72,7 @@ export const ICloudSyncSupportBundle: Story = {
     await clickTestId(canvasElement, "settings-sync-support-bundle-entry");
     await waitForText(canvasElement, "This bundle contains progress data");
     await waitForText(canvasElement, "local-progress.sqlite");
-    await waitForText(canvasElement, "icloud-progress-snapshot.json");
+    await waitForText(canvasElement, "icloud-progress-v2.ndjson");
     await clickTestId(canvasElement, "settings-sync-support-bundle-prepare");
     await waitForTestId(canvasElement, "settings-sync-support-bundle-complete");
     await waitForTestId(canvasElement, "settings-sync-support-bundle-share");
@@ -90,7 +90,7 @@ export const ICloudSyncSupportBundlePartial: Story = {
     await waitForTestId(canvasElement, "settings-sync-support-bundle-partial");
     await waitForText(
       canvasElement,
-      "CloudKit snapshot unavailable: The request was rate limited."
+      "CloudKit Progress V2 capture unavailable: The request was rate limited."
     );
     await waitForText(
       canvasElement,

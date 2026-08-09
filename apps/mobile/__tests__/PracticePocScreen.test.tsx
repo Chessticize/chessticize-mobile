@@ -36,6 +36,7 @@ import { TacticalProfileService } from "../../../packages/storage/src/tactical-p
 import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, isServerCompatibleArrowDuelPuzzle, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, startSprint, type ArrowDuelState, type AttemptEvent, type Puzzle, type PuzzleTimingPolicy, type SprintState, type TacticalProfileCalibrationArtifact, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/platform/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/platform/iCloudProgressSync";
+import { decodeProgressV2Record } from "../../../packages/storage/src/progress-sync-v2";
 import { FakeMoveFeedbackClient } from "../src/platform/moveFeedback";
 import { FakeAppStoreReviewRequestClient } from "../src/platform/appStoreReviewRequest";
 import type { MobilePlatformCapabilities } from "../src/platform/mobilePlatformCapabilities";
@@ -6000,13 +6001,10 @@ describe("PracticePocScreen", () => {
     service.setRating(defaultSprintConfig("standard").ratingKey, 1_106);
     service.setRating(defaultSprintConfig("arrow_duel").ratingKey, 775);
     let resolveAccountStatus: (() => void) | undefined;
-    const client = {
-      getAccountStatus: () => new Promise<"available">((resolve) => {
+    const client = new FakeICloudProgressSyncClient();
+    client.getAccountStatus = () => new Promise<"available">((resolve) => {
         resolveAccountStatus = () => resolve("available");
-      }),
-      fetchSnapshot: async () => undefined,
-      saveSnapshot: async () => {}
-    };
+      });
     const renderer = renderScreen({
       practiceService: service,
       iCloudProgressSyncClient: client
@@ -13424,7 +13422,7 @@ describe("PracticePocScreen", () => {
     const modal = findByTestId(renderer, "settings-sync-support-bundle-modal");
     expect(collectText(modal)).toContain("Android lets you choose where to send the bundle");
     expect(collectText(modal)).toContain("local-progress.sqlite");
-    expect(collectText(modal)).not.toContain("icloud-progress-snapshot.json");
+    expect(collectText(modal)).not.toContain("icloud-progress-v2.ndjson");
     await pressAsyncWithin(modal, "settings-sync-support-bundle-prepare");
     expect(collectText(findByTestId(renderer, "settings-sync-support-bundle-complete")))
       .toContain("Android diagnostics bundle ready");
@@ -13529,22 +13527,29 @@ describe("PracticePocScreen", () => {
     });
 
     await waitForAssertion(() => {
-      expect(client.fetchCount).toBe(1);
-      expect(client.saveCount).toBe(1);
+      expect(client.zoneChangeFetchCount).toBe(1);
+      expect(client.modifyBatches.length).toBe(1);
     });
 
     expect(service.getSettings().sync.iCloudEnabled).toBe(true);
     press(renderer, "settings-tab");
     expect(findByTestId(renderer, "settings-sync-now")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Synced");
-    expect(client.savedSnapshots[0]?.data.attempts.length).toBe(1);
-    expect(client.savedSnapshots[0]?.data.reviewQueue.length).toBe(1);
-    expect(client.savedSnapshots[0]?.data.ratings.find((rating) => rating.key === "standard 5/20")?.games).toBe(1);
+    expect(client.records.filter((record) => record.kind === "attempt")).toHaveLength(1);
+    expect(client.records.filter((record) => record.kind === "review_schedule")).toHaveLength(1);
+    const rating = client.records
+      .filter((record) => record.kind === "rating")
+      .map(decodeProgressV2Record)
+      .find((payload) => payload.state === "present" &&
+        typeof payload.value === "object" && payload.value !== null &&
+        "key" in payload.value && payload.value.key === "standard 5/20");
+    expect(rating?.state === "present" && typeof rating.value === "object" &&
+      rating.value !== null && "games" in rating.value ? rating.value.games : undefined).toBe(1);
 
     await pressAsync(renderer, "settings-sync-now");
     await waitForAssertion(() => {
-      expect(client.fetchCount).toBe(2);
-      expect(client.saveCount).toBe(2);
+      expect(client.zoneChangeFetchCount).toBe(2);
+      expect(client.modifyBatches.length).toBe(1);
     });
   });
 
@@ -13559,12 +13564,10 @@ describe("PracticePocScreen", () => {
       }
     });
     const copyText = jest.fn(async (_text: string) => undefined);
+    const failingClient = new FakeICloudProgressSyncClient();
+    failingClient.fetchZoneChanges = jest.fn(async () => Promise.reject(nativeFailure));
     const renderer = renderScreen({
-      iCloudProgressSyncClient: {
-        getAccountStatus: jest.fn(async () => "available"),
-        fetchSnapshot: jest.fn(async () => Promise.reject(nativeFailure)),
-        saveSnapshot: jest.fn(async () => undefined)
-      },
+      iCloudProgressSyncClient: failingClient,
       iCloudSyncDiagnosticsClient: {
         copyText,
         discardSupportBundle: jest.fn(async () => undefined),
@@ -13608,7 +13611,7 @@ describe("PracticePocScreen", () => {
       bundleUrl: "file:///tmp/chessticize-support.zip",
       files: [
         "local-progress.sqlite",
-        "icloud-progress-snapshot.json",
+        "icloud-progress-v2.ndjson",
         "diagnostic.txt",
         "manifest.json"
       ],
@@ -13721,7 +13724,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "settings-sync-support-bundle-open");
     expect(collectText(modal)).toContain("This bundle contains progress data");
     expect(collectText(modal)).toContain("local-progress.sqlite");
-    expect(collectText(modal)).toContain("icloud-progress-snapshot.json");
+    expect(collectText(modal)).toContain("icloud-progress-v2.ndjson");
+    expect(collectText(modal)).toContain("icloud-progress-v1.json (optional)");
 
     await pressAsyncWithin(modal, "settings-sync-support-bundle-prepare");
 
@@ -13751,13 +13755,13 @@ describe("PracticePocScreen", () => {
     await pressAsyncWithin(modal, "settings-sync-support-bundle-prepare");
 
     const partial = findByTestId(renderer, "settings-sync-support-bundle-partial");
-    expect(collectText(partial)).toContain("iCloud snapshot couldn't be included");
+    expect(collectText(partial)).toContain("iCloud progress capture couldn't be completed");
     expect(collectText(partial)).toContain(
-      "CloudKit snapshot unavailable: The request was rate limited."
+      "CloudKit Progress V2 capture unavailable: The request was rate limited."
     );
     expect(collectText(partial)).toContain("not a complete reproduction");
     expect(collectText(findByTestId(renderer, "settings-sync-error-details-modal"))).not.toContain(
-      "icloud-progress-snapshot.json"
+      "icloud-progress-v2.ndjson"
     );
     expect(findByTestId(renderer, "settings-sync-support-bundle-share")).toBeTruthy();
   });
@@ -13777,16 +13781,16 @@ describe("PracticePocScreen", () => {
     });
     await act(async () => {});
 
-    expect(client.fetchCount).toBe(0);
-    expect(client.saveCount).toBe(0);
+    expect(client.zoneChangeFetchCount).toBe(0);
+    expect(client.modifyBatches.length).toBe(0);
     press(renderer, "settings-tab");
     expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off");
     expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
 
     press(renderer, "settings-icloud-sync-on");
     await waitForAssertion(() => {
-      expect(client.fetchCount).toBe(1);
-      expect(client.saveCount).toBe(1);
+      expect(client.zoneChangeFetchCount).toBe(1);
+      expect(client.modifyBatches.length).toBe(1);
     });
     expect(service.getSettings().sync.iCloudEnabled).toBe(true);
     expect(findByTestId(renderer, "settings-sync-now")).toBeTruthy();
@@ -13797,8 +13801,63 @@ describe("PracticePocScreen", () => {
     expect(service.getSettings().sync.iCloudEnabled).toBe(false);
     expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off");
     expect(() => findByTestId(renderer, "settings-sync-now")).toThrow();
-    expect(client.fetchCount).toBe(1);
-    expect(client.saveCount).toBe(1);
+    expect(client.zoneChangeFetchCount).toBe(1);
+    expect(client.modifyBatches.length).toBe(1);
+  });
+
+  it("turns Sync Off without importing or pushing an in-flight V2 pull", async () => {
+    const service = createMobilePracticeService("random1000");
+    const client = new FakeICloudProgressSyncClient();
+    let releaseFetch!: () => void;
+    const fetchGate = new Promise<void>((resolve) => {
+      releaseFetch = resolve;
+    });
+    const fetchZoneChanges = jest.fn(async () => {
+      await fetchGate;
+      return {
+        records: [{
+          recordName: "v2|preferences|default",
+          kind: "preferences" as const,
+          schemaVersion: 2 as const,
+          payload: JSON.stringify({
+            entityKey: "default",
+            formatVersion: 2,
+            kind: "preferences",
+            state: "present",
+            value: {
+              moveFeedback: { soundEnabled: true, hapticsEnabled: false },
+              notifications: { reviewReminder: { mode: "off" } }
+            }
+          })
+        }],
+        deletedRecords: [],
+        nextToken: "remote-token",
+        moreComing: false
+      };
+    });
+    client.fetchZoneChanges = fetchZoneChanges;
+    const renderer = renderScreen({
+      practiceService: service,
+      iCloudProgressSyncClient: client
+    });
+
+    await waitForAssertion(() => expect(fetchZoneChanges).toHaveBeenCalledTimes(1));
+    press(renderer, "settings-tab");
+    press(renderer, "settings-icloud-sync-off");
+    await act(async () => {
+      releaseFetch();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(service.getSettings().sync.iCloudEnabled).toBe(false);
+    expect(service.getSettings().moveFeedback).toEqual({
+      soundEnabled: false,
+      hapticsEnabled: true
+    });
+    expect(client.modifyBatches).toHaveLength(0);
+    expect(client.legacyMetadataFetchCount).toBe(0);
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Off");
   });
 
   it("opens difficulty controls from the Edit rating row", () => {

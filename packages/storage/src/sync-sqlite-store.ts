@@ -57,7 +57,7 @@ import type {
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type {
-  ClearLocalHistoryResult,
+  ClearSyncedHistoryResult,
   ExportedSprintSession,
   LocalDataImport,
   LocalDataImportObserver,
@@ -87,6 +87,15 @@ import { cloneAttemptHistoryRow, preferredAttemptHistoryRow, sameAttemptHistoryR
 import {
   compatiblePracticeRunMergeInputs
 } from "./practice-run-sync.ts";
+import type {
+  ProgressV2LocalState,
+  ProgressV2OutboxEntry,
+  ProgressV2OutboxStats,
+  ProgressV2Persistence,
+  ProgressV2RecordIdentity,
+  ProgressV2StatePatch,
+  ProgressV2Tombstone
+} from "./progress-v2-persistence.ts";
 
 interface AttemptHistoryDbRow extends Omit<
   AttemptHistoryRow,
@@ -273,6 +282,35 @@ interface SprintSessionExportRow {
   runName?: string | null;
 }
 
+interface ProgressV2StateRow {
+  phase: ProgressV2LocalState["phase"];
+  zone_initialized: number;
+  server_change_token: string | null;
+  server_change_token_fingerprint: string | null;
+  seeded_at: string | null;
+  last_pull_at: string | null;
+  last_push_at: string | null;
+  last_v1_change_tag: string | null;
+  pending_v1_change_tag: string | null;
+  last_v1_import_at: string | null;
+  last_v1_check_at: string | null;
+  last_v1_check_status: "available" | "missing" | null;
+  sealed_at: string | null;
+}
+
+interface ProgressV2OutboxRow {
+  kind: ProgressV2RecordIdentity["kind"];
+  entity_key: string;
+  enqueued_at: string;
+  revision: number;
+}
+
+interface ProgressV2TombstoneRow {
+  kind: ProgressV2RecordIdentity["kind"];
+  entity_key: string;
+  deleted_at: string;
+}
+
 export type SyncSqliteValue =
   | string
   | number
@@ -295,7 +333,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 19;
+export const CURRENT_SCHEMA_VERSION = 20;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -323,16 +361,34 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 15, to: 16, apply: migrateV15ToV16 },
   { from: 16, to: 17, apply: migrateV16ToV17 },
   { from: 17, to: 18, apply: migrateV17ToV18 },
-  { from: 18, to: 19, apply: migrateV18ToV19 }
+  { from: 18, to: 19, apply: migrateV18ToV19 },
+  { from: 19, to: 20, apply: migrateV19ToV20 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
   readonly db: SyncSqliteDatabase;
+  readonly progressV2: ProgressV2Persistence;
   private readonly options: SyncSQLiteStoreOptions;
+  private transactionDepth = 0;
 
   constructor(db: SyncSqliteDatabase, options: SyncSQLiteStoreOptions) {
     this.db = db;
     this.options = options;
+    this.progressV2 = {
+      exportData: () => this.exportProgressV2Data(),
+      readState: () => this.readProgressV2State(),
+      writeState: (patch) => this.writeProgressV2State(patch),
+      stageOutbox: (entries, enqueuedAt) => this.stageProgressV2Outbox(entries, enqueuedAt),
+      listOutbox: (limit) => this.listProgressV2Outbox(limit),
+      hasOutbox: (identity) => this.hasProgressV2Outbox(identity),
+      getOutboxStats: () => this.getProgressV2OutboxStats(),
+      acknowledgeOutbox: (entries, pushedAt) => this.acknowledgeProgressV2Outbox(entries, pushedAt),
+      listTombstones: () => this.listProgressV2Tombstones(),
+      applyTombstones: (tombstones) => this.applyProgressV2Tombstones(tombstones),
+      applyRemoteBatch: (patch, work) => this.applyProgressV2RemoteBatch(patch, work),
+      commitStateAndStage: (patch, entries, enqueuedAt) =>
+        this.commitProgressV2StateAndStage(patch, entries, enqueuedAt)
+    };
   }
 
   migrate(): void {
@@ -345,7 +401,8 @@ export class SyncSQLiteStore implements PracticeStore {
     }
     if (
       startingVersion === CURRENT_SCHEMA_VERSION &&
-      hasCurrentSettingsColumns(this.db)
+      hasCurrentSettingsColumns(this.db) &&
+      hasProgressV2Schema(this.db)
     ) {
       return;
     }
@@ -371,7 +428,16 @@ export class SyncSQLiteStore implements PracticeStore {
   }
 
   transaction<T>(work: () => T): T {
+    if (this.transactionDepth > 0) {
+      this.transactionDepth += 1;
+      try {
+        return work();
+      } finally {
+        this.transactionDepth -= 1;
+      }
+    }
     this.db.exec("BEGIN IMMEDIATE");
+    this.transactionDepth = 1;
     try {
       const result = work();
       this.db.exec("COMMIT");
@@ -379,7 +445,226 @@ export class SyncSQLiteStore implements PracticeStore {
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
+    } finally {
+      this.transactionDepth = 0;
     }
+  }
+
+  private readProgressV2State(): ProgressV2LocalState {
+    const row = this.db.prepare(
+      "SELECT * FROM progress_v2_sync_state WHERE id = 'default'"
+    ).get() as ProgressV2StateRow | undefined;
+    if (!row) {
+      throw new Error("Progress V2 SQLite state is not initialized");
+    }
+    return {
+      phase: row.phase,
+      zoneInitialized: intToBool(row.zone_initialized),
+      ...(row.server_change_token === null ? {} : { serverChangeToken: row.server_change_token }),
+      ...(row.server_change_token_fingerprint === null
+        ? {}
+        : { serverChangeTokenFingerprint: row.server_change_token_fingerprint }),
+      ...(row.seeded_at === null ? {} : { seededAt: row.seeded_at }),
+      ...(row.last_pull_at === null ? {} : { lastPullAt: row.last_pull_at }),
+      ...(row.last_push_at === null ? {} : { lastPushAt: row.last_push_at }),
+      ...(row.last_v1_change_tag === null ? {} : { lastV1ChangeTag: row.last_v1_change_tag }),
+      ...(row.pending_v1_change_tag === null ? {} : { pendingV1ChangeTag: row.pending_v1_change_tag }),
+      ...(row.last_v1_import_at === null ? {} : { lastV1ImportAt: row.last_v1_import_at }),
+      ...(row.last_v1_check_at === null ? {} : { lastV1CheckAt: row.last_v1_check_at }),
+      ...(row.last_v1_check_status === null ? {} : { lastV1CheckStatus: row.last_v1_check_status }),
+      ...(row.sealed_at === null ? {} : { sealedAt: row.sealed_at })
+    };
+  }
+
+  private writeProgressV2State(patch: ProgressV2StatePatch): void {
+    const current = this.readProgressV2State();
+    const value = <K extends keyof ProgressV2StatePatch>(key: K): ProgressV2StatePatch[K] =>
+      patch[key] === undefined ? current[key as keyof ProgressV2LocalState] as ProgressV2StatePatch[K] : patch[key];
+    this.db.prepare(
+      `UPDATE progress_v2_sync_state
+       SET phase = ?,
+           zone_initialized = ?,
+           server_change_token = ?,
+           server_change_token_fingerprint = ?,
+           seeded_at = ?,
+           last_pull_at = ?,
+           last_push_at = ?,
+           last_v1_change_tag = ?,
+           pending_v1_change_tag = ?,
+           last_v1_import_at = ?,
+           last_v1_check_at = ?,
+           last_v1_check_status = ?,
+           sealed_at = ?
+       WHERE id = 'default'`
+    ).run(
+      value("phase") ?? "bridging",
+      boolToInt(value("zoneInitialized") ?? false),
+      value("serverChangeToken") ?? null,
+      value("serverChangeTokenFingerprint") ?? null,
+      value("seededAt") ?? null,
+      value("lastPullAt") ?? null,
+      value("lastPushAt") ?? null,
+      value("lastV1ChangeTag") ?? null,
+      value("pendingV1ChangeTag") ?? null,
+      value("lastV1ImportAt") ?? null,
+      value("lastV1CheckAt") ?? null,
+      value("lastV1CheckStatus") ?? null,
+      value("sealedAt") ?? null
+    );
+  }
+
+  private stageProgressV2Outbox(
+    entries: readonly ProgressV2RecordIdentity[],
+    enqueuedAt: string
+  ): void {
+    const statement = this.db.prepare(
+      `INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at, revision)
+       VALUES (?, ?, ?, 1)
+       ON CONFLICT(kind, entity_key) DO UPDATE SET
+         enqueued_at = excluded.enqueued_at,
+         revision = progress_v2_outbox.revision + 1`
+    );
+    this.transaction(() => {
+      for (const entry of entries) {
+        statement.run(entry.kind, entry.entityKey, enqueuedAt);
+      }
+    });
+  }
+
+  private listProgressV2Outbox(limit = 400): ProgressV2OutboxEntry[] {
+    const boundedLimit = Math.max(1, Math.min(400, Math.trunc(limit)));
+    return (this.db.prepare(
+      `SELECT kind, entity_key, enqueued_at, revision
+       FROM progress_v2_outbox
+       ORDER BY CASE WHEN kind = 'manifest' THEN 1 ELSE 0 END ASC,
+                enqueued_at ASC,
+                kind ASC,
+                entity_key ASC
+       LIMIT ?`
+    ).all(boundedLimit) as ProgressV2OutboxRow[]).map((row) => ({
+      kind: row.kind,
+      entityKey: row.entity_key,
+      enqueuedAt: row.enqueued_at,
+      revision: row.revision
+    }));
+  }
+
+  private getProgressV2OutboxStats(): ProgressV2OutboxStats {
+    const row = this.db.prepare(
+      `SELECT COUNT(*) AS pending_count, MIN(enqueued_at) AS oldest_enqueued_at
+       FROM progress_v2_outbox`
+    ).get() as { pending_count: number; oldest_enqueued_at: string | null };
+    return {
+      pendingCount: row.pending_count,
+      ...(row.oldest_enqueued_at === null ? {} : { oldestEnqueuedAt: row.oldest_enqueued_at })
+    };
+  }
+
+  private hasProgressV2Outbox(identity: ProgressV2RecordIdentity): boolean {
+    return this.db.prepare(
+      "SELECT 1 FROM progress_v2_outbox WHERE kind = ? AND entity_key = ?"
+    ).get(identity.kind, identity.entityKey) !== undefined;
+  }
+
+  private acknowledgeProgressV2Outbox(
+    entries: readonly ProgressV2OutboxEntry[],
+    pushedAt: string
+  ): void {
+    const statement = this.db.prepare(
+      `DELETE FROM progress_v2_outbox
+       WHERE kind = ? AND entity_key = ? AND revision = ?`
+    );
+    this.transaction(() => {
+      for (const entry of entries) {
+        statement.run(entry.kind, entry.entityKey, entry.revision);
+      }
+      this.writeProgressV2State({ lastPushAt: pushedAt });
+    });
+  }
+
+  private listProgressV2Tombstones(): ProgressV2Tombstone[] {
+    return (this.db.prepare(
+      `SELECT kind, entity_key, deleted_at
+       FROM progress_v2_tombstones
+       ORDER BY kind ASC, entity_key ASC`
+    ).all() as ProgressV2TombstoneRow[]).map((row) => ({
+      kind: row.kind,
+      entityKey: row.entity_key,
+      deletedAt: row.deleted_at
+    }));
+  }
+
+  private applyProgressV2Tombstones(tombstones: readonly ProgressV2Tombstone[]): void {
+    const save = this.db.prepare(
+      `INSERT INTO progress_v2_tombstones (kind, entity_key, deleted_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(kind, entity_key) DO UPDATE SET deleted_at = excluded.deleted_at
+       WHERE excluded.deleted_at > progress_v2_tombstones.deleted_at`
+    );
+    this.transaction(() => {
+      for (const tombstone of [...tombstones].sort(compareProgressV2Tombstones)) {
+        save.run(tombstone.kind, tombstone.entityKey, tombstone.deletedAt);
+        switch (tombstone.kind) {
+          case "attempt":
+            this.db.prepare("DELETE FROM attempts WHERE id = ?").run(tombstone.entityKey);
+            break;
+          case "sprint_session":
+            this.db.prepare(
+              `DELETE FROM sprint_sessions
+               WHERE id = ?
+                 AND NOT EXISTS (SELECT 1 FROM attempts WHERE attempts.session_id = sprint_sessions.id)`
+            ).run(tombstone.entityKey);
+            break;
+          case "practice_run":
+            this.db.prepare("DELETE FROM practice_runs WHERE id = ?").run(tombstone.entityKey);
+            break;
+          case "review_schedule": {
+            const [puzzleId, mode, ratingKey] = tombstone.entityKey.split("\u001f");
+            if (puzzleId && mode && ratingKey) {
+              this.saveReviewRemoval({
+                puzzleId,
+                mode: mode as SprintMode,
+                ratingKey,
+                removedAt: tombstone.deletedAt
+              });
+              this.db.prepare(
+                "DELETE FROM review_queue WHERE puzzle_id = ? AND mode = ? AND rating_key = ?"
+              ).run(puzzleId, mode, ratingKey);
+            }
+            break;
+          }
+          case "manifest":
+          case "preferences":
+          case "rating":
+            throw new Error(`Progress V2 does not support deleting ${tombstone.kind} records`);
+        }
+      }
+    });
+  }
+
+  private applyProgressV2RemoteBatch<T>(patch: ProgressV2StatePatch, work: () => T): T {
+    return this.transaction(() => {
+      this.db.prepare(
+        "UPDATE progress_v2_sync_state SET outbox_suppressed = 1 WHERE id = 'default'"
+      ).run();
+      const result = work();
+      this.writeProgressV2State(patch);
+      this.db.prepare(
+        "UPDATE progress_v2_sync_state SET outbox_suppressed = 0 WHERE id = 'default'"
+      ).run();
+      return result;
+    });
+  }
+
+  private commitProgressV2StateAndStage(
+    patch: ProgressV2StatePatch,
+    entries: readonly ProgressV2RecordIdentity[],
+    enqueuedAt: string
+  ): void {
+    this.transaction(() => {
+      this.writeProgressV2State(patch);
+      this.stageProgressV2Outbox(entries, enqueuedAt);
+    });
   }
 
   seedPuzzles(puzzles: Puzzle[]): void {
@@ -536,6 +821,19 @@ export class SyncSQLiteStore implements PracticeStore {
     return rows.map((row) => ratingFromRow(row));
   }
 
+  private listAllRatingGenerations(): RatingRecord[] {
+    return (this.db.prepare(
+      "SELECT * FROM ratings ORDER BY key ASC, generation ASC"
+    ).all() as RatingRow[]).map(ratingFromRow);
+  }
+
+  private getRatingGeneration(key: string, generation: number): RatingRecord | undefined {
+    const row = this.db.prepare(
+      "SELECT * FROM ratings WHERE key = ? AND generation = ?"
+    ).get(key, generation) as RatingRow | undefined;
+    return row ? ratingFromRow(row) : undefined;
+  }
+
   saveRating(record: RatingRecord): void {
     const normalized = normalizeRatingRecord(record);
     this.db
@@ -665,7 +963,7 @@ export class SyncSQLiteStore implements PracticeStore {
     const cloned = clonePracticeSettings(settings);
     this.db
       .prepare(
-        `INSERT OR REPLACE INTO app_settings (
+        `INSERT INTO app_settings (
           id,
           sync_icloud_enabled,
           sync_upload_allowed,
@@ -678,7 +976,19 @@ export class SyncSQLiteStore implements PracticeStore {
           sprint_arrow_duel_guide_seen,
           sprint_focused_run_guide_seen,
           sprint_arrow_duel_reply_cue_stage
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          sync_icloud_enabled = excluded.sync_icloud_enabled,
+          sync_upload_allowed = excluded.sync_upload_allowed,
+          review_reminder_mode = excluded.review_reminder_mode,
+          review_reminder_fixed_local_time = excluded.review_reminder_fixed_local_time,
+          move_feedback_sound_enabled = excluded.move_feedback_sound_enabled,
+          move_feedback_haptics_enabled = excluded.move_feedback_haptics_enabled,
+          sprint_rules_guide_seen = excluded.sprint_rules_guide_seen,
+          sprint_active_session_guide_seen = excluded.sprint_active_session_guide_seen,
+          sprint_arrow_duel_guide_seen = excluded.sprint_arrow_duel_guide_seen,
+          sprint_focused_run_guide_seen = excluded.sprint_focused_run_guide_seen,
+          sprint_arrow_duel_reply_cue_stage = excluded.sprint_arrow_duel_reply_cue_stage`
       )
       .run(
         boolToInt(cloned.sync.iCloudEnabled),
@@ -1142,6 +1452,13 @@ export class SyncSQLiteStore implements PracticeStore {
     };
   }
 
+  private exportProgressV2Data(): LocalDataExport {
+    return {
+      ...this.exportLocalData(),
+      ratings: this.listAllRatingGenerations()
+    };
+  }
+
   importLocalData(
     data: LocalDataImport,
     observer?: LocalDataImportObserver
@@ -1203,9 +1520,9 @@ export class SyncSQLiteStore implements PracticeStore {
         result.practiceRuns = changedRunCount;
       }
       for (const rating of data.ratings) {
-        const previous = this.getRating(rating.key);
-        const next = preferredRating(previous, rating);
-        if (!sameRating(previous, next)) {
+        const previous = this.getRatingGeneration(rating.key, rating.generation);
+        const next = previous === undefined ? rating : preferredRating(previous, rating);
+        if (previous === undefined || !sameRating(previous, next)) {
           this.saveRating(next);
           result.ratings += 1;
         }
@@ -1250,7 +1567,11 @@ export class SyncSQLiteStore implements PracticeStore {
     return result;
   }
 
-  clearLocalHistory(): ClearLocalHistoryResult {
+  clearSyncedHistory(now: string): ClearSyncedHistoryResult {
+    return this.transaction(() => this.clearSyncedHistoryInTransaction(now));
+  }
+
+  private clearSyncedHistoryInTransaction(now: string): ClearSyncedHistoryResult {
     const hadTacticalProfileEvidence = this
       .listSprintSessions()
       .some(
@@ -1261,16 +1582,42 @@ export class SyncSQLiteStore implements PracticeStore {
             sessionId: session.id
           }) > 0
       );
-    const result: ClearLocalHistoryResult = {
+    const result: ClearSyncedHistoryResult = {
       attempts: countRows(this.db, "attempts"),
       reviewEvents: countRows(this.db, "review_events"),
       reviewQueue: countRows(this.db, "review_queue"),
       sprintSessions: countRows(this.db, "sprint_sessions", "status NOT IN ('active', 'paused')")
     };
+    const attemptIds = (this.db.prepare("SELECT id FROM attempts ORDER BY id").all() as Array<{ id: string }>).map((row) => row.id);
+    const terminalSessionIds = (this.db.prepare(
+      "SELECT id FROM sprint_sessions WHERE status NOT IN ('active', 'paused') ORDER BY id"
+    ).all() as Array<{ id: string }>).map((row) => row.id);
+    const tombstone = this.db.prepare(
+      `INSERT INTO progress_v2_tombstones (kind, entity_key, deleted_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(kind, entity_key) DO UPDATE SET deleted_at = excluded.deleted_at`
+    );
+    for (const id of attemptIds) {
+      tombstone.run("attempt", id, now);
+    }
+    for (const id of terminalSessionIds) {
+      tombstone.run("sprint_session", id, now);
+    }
+    this.stageProgressV2Outbox([
+      ...attemptIds.map((entityKey) => ({ kind: "attempt" as const, entityKey })),
+      ...terminalSessionIds.map((entityKey) => ({ kind: "sprint_session" as const, entityKey }))
+    ], now);
+    for (const review of this.listReviewQueue()) {
+      this.saveReviewRemoval({
+        puzzleId: review.puzzleId,
+        mode: review.mode,
+        ratingKey: review.ratingKey,
+        removedAt: now
+      });
+    }
     this.db.prepare("DELETE FROM attempts").run();
     this.db.prepare("DELETE FROM review_events").run();
     this.db.prepare("DELETE FROM review_queue").run();
-    this.db.prepare("DELETE FROM review_schedule_removals").run();
     this.db.prepare("DELETE FROM sprint_sessions WHERE status NOT IN ('active', 'paused')").run();
     if (hadTacticalProfileEvidence) {
       this.bumpTacticalProfileSourceRevision();
@@ -2367,6 +2714,15 @@ function hasTable(db: SyncSqliteDatabase, table: string): boolean {
   return row?.name === table;
 }
 
+function hasTrigger(db: SyncSqliteDatabase, trigger: string): boolean {
+  const row = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = ?"
+    )
+    .get(trigger) as { name?: unknown } | undefined;
+  return row?.name === trigger;
+}
+
 function migrateV4ToV5(db: SyncSqliteDatabase): void {
   db.exec(`
     ALTER TABLE attempts
@@ -2554,6 +2910,9 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   if (!hadOpponentReplyColumns) {
     migrateV17ToV18(db);
   }
+  if (!hasProgressV2Schema(db)) {
+    migrateV19ToV20(db);
+  }
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -2567,6 +2926,20 @@ function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
     hasTable(db, "app_review_request_state") &&
     hasColumn(db, "practice_runs", "opponent_reply_enabled") &&
     hasColumn(db, "practice_runs", "opponent_reply_seconds");
+}
+
+function hasProgressV2Schema(db: SyncSqliteDatabase): boolean {
+  return hasTable(db, "progress_v2_sync_state") &&
+    hasTable(db, "progress_v2_outbox") &&
+    hasTable(db, "progress_v2_tombstones") &&
+    hasColumn(db, "progress_v2_outbox", "revision") &&
+    hasColumn(db, "progress_v2_sync_state", "outbox_suppressed") &&
+    hasColumn(db, "progress_v2_sync_state", "last_v1_check_at") &&
+    hasColumn(db, "progress_v2_sync_state", "last_v1_check_status") &&
+    hasColumn(db, "progress_v2_sync_state", "sealed_at") &&
+    hasTrigger(db, "progress_v2_settings_insert") &&
+    hasTrigger(db, "progress_v2_settings_update") &&
+    hasTrigger(db, "progress_v2_outbox_revision_update");
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -3010,6 +3383,348 @@ function migrateV18ToV19(db: SyncSqliteDatabase): void {
   );
 }
 
+function migrateV19ToV20(db: SyncSqliteDatabase): void {
+  if (hasTable(db, "progress_v2_outbox")) {
+    ensureColumn(
+      db,
+      "progress_v2_outbox",
+      "revision",
+      "ALTER TABLE progress_v2_outbox ADD COLUMN revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0)"
+    );
+  }
+  if (hasTable(db, "progress_v2_sync_state")) {
+    ensureColumn(
+      db,
+      "progress_v2_sync_state",
+      "last_v1_check_at",
+      "ALTER TABLE progress_v2_sync_state ADD COLUMN last_v1_check_at TEXT"
+    );
+    ensureColumn(
+      db,
+      "progress_v2_sync_state",
+      "last_v1_check_status",
+      "ALTER TABLE progress_v2_sync_state ADD COLUMN last_v1_check_status TEXT CHECK (last_v1_check_status IN ('available', 'missing'))"
+    );
+  }
+  db.exec(`
+    DROP TRIGGER IF EXISTS progress_v2_ratings_insert;
+    DROP TRIGGER IF EXISTS progress_v2_ratings_update;
+    DROP TRIGGER IF EXISTS progress_v2_attempts_insert;
+    DROP TRIGGER IF EXISTS progress_v2_attempts_update;
+    DROP TRIGGER IF EXISTS progress_v2_sprint_sessions_insert;
+    DROP TRIGGER IF EXISTS progress_v2_sprint_sessions_update;
+    DROP TRIGGER IF EXISTS progress_v2_review_queue_insert;
+    DROP TRIGGER IF EXISTS progress_v2_review_queue_update;
+    DROP TRIGGER IF EXISTS progress_v2_review_removals_insert;
+    DROP TRIGGER IF EXISTS progress_v2_review_removals_update;
+    DROP TRIGGER IF EXISTS progress_v2_practice_runs_insert;
+    DROP TRIGGER IF EXISTS progress_v2_practice_runs_update;
+    DROP TRIGGER IF EXISTS progress_v2_settings_insert;
+    DROP TRIGGER IF EXISTS progress_v2_settings_update;
+    DROP TRIGGER IF EXISTS progress_v2_outbox_revision_update;
+
+    -- Some supported historical/repair fixtures intentionally contain only
+    -- the tables needed by their feature boundary. Restore the three V2
+    -- source families that older forward migrations did not need to touch so
+    -- trigger creation and initial outbox seeding remain total.
+    CREATE TABLE IF NOT EXISTS ratings (
+      key TEXT NOT NULL,
+      generation INTEGER NOT NULL,
+      rating INTEGER NOT NULL,
+      rating_deviation REAL NOT NULL DEFAULT 350,
+      volatility REAL NOT NULL DEFAULT 0.06,
+      games INTEGER NOT NULL,
+      PRIMARY KEY (key, generation)
+    );
+
+    CREATE TABLE IF NOT EXISTS review_queue (
+      puzzle_id TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'standard',
+      rating_key TEXT NOT NULL DEFAULT 'standard 5/20',
+      due_day TEXT NOT NULL,
+      interval_days INTEGER NOT NULL,
+      review_count INTEGER NOT NULL,
+      success_streak INTEGER NOT NULL,
+      lapse_count INTEGER NOT NULL,
+      last_result TEXT,
+      last_reviewed_at TEXT,
+      enrolled_at TEXT,
+      PRIMARY KEY (puzzle_id, mode, rating_key),
+      FOREIGN KEY (puzzle_id) REFERENCES puzzles(id),
+      CHECK (
+        (last_result IS NOT NULL AND last_reviewed_at IS NOT NULL)
+        OR
+        (last_result IS NULL AND last_reviewed_at IS NULL AND enrolled_at IS NOT NULL)
+      )
+    );
+
+    CREATE INDEX IF NOT EXISTS review_queue_due_day_order_idx
+      ON review_queue(due_day, puzzle_id, mode, rating_key);
+
+    CREATE TABLE IF NOT EXISTS review_schedule_removals (
+      puzzle_id TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      rating_key TEXT NOT NULL,
+      removed_at TEXT NOT NULL,
+      PRIMARY KEY (puzzle_id, mode, rating_key),
+      FOREIGN KEY (puzzle_id) REFERENCES puzzles(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS review_schedule_removals_removed_at_idx
+      ON review_schedule_removals(removed_at, puzzle_id, mode, rating_key);
+
+    CREATE TABLE IF NOT EXISTS progress_v2_sync_state (
+      id TEXT PRIMARY KEY CHECK (id = 'default'),
+      phase TEXT NOT NULL DEFAULT 'bridging' CHECK (phase IN ('bridging', 'sealed')),
+      zone_initialized INTEGER NOT NULL DEFAULT 0 CHECK (zone_initialized IN (0, 1)),
+      server_change_token TEXT,
+      server_change_token_fingerprint TEXT,
+      seeded_at TEXT,
+      last_pull_at TEXT,
+      last_push_at TEXT,
+      last_v1_change_tag TEXT,
+      pending_v1_change_tag TEXT,
+      last_v1_import_at TEXT,
+      last_v1_check_at TEXT,
+      last_v1_check_status TEXT CHECK (last_v1_check_status IN ('available', 'missing')),
+      sealed_at TEXT,
+      outbox_suppressed INTEGER NOT NULL DEFAULT 0 CHECK (outbox_suppressed IN (0, 1))
+    );
+
+    INSERT OR IGNORE INTO progress_v2_sync_state (id, seeded_at)
+    VALUES ('default', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+
+    CREATE TABLE IF NOT EXISTS progress_v2_outbox (
+      kind TEXT NOT NULL,
+      entity_key TEXT NOT NULL,
+      enqueued_at TEXT NOT NULL,
+      revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0),
+      PRIMARY KEY (kind, entity_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS progress_v2_outbox_enqueued_at_idx
+      ON progress_v2_outbox(enqueued_at, kind, entity_key);
+
+    CREATE TRIGGER progress_v2_outbox_revision_update
+    AFTER UPDATE OF enqueued_at ON progress_v2_outbox
+    WHEN NEW.revision = OLD.revision
+    BEGIN
+      UPDATE progress_v2_outbox
+      SET revision = OLD.revision + 1
+      WHERE kind = NEW.kind AND entity_key = NEW.entity_key;
+    END;
+
+    CREATE TABLE IF NOT EXISTS progress_v2_tombstones (
+      kind TEXT NOT NULL,
+      entity_key TEXT NOT NULL,
+      deleted_at TEXT NOT NULL,
+      PRIMARY KEY (kind, entity_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS progress_v2_tombstones_deleted_at_idx
+      ON progress_v2_tombstones(deleted_at, kind, entity_key);
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_ratings_insert
+    AFTER INSERT ON ratings
+    WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('rating', NEW.key || char(31) || NEW.generation,
+              strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+      DELETE FROM progress_v2_tombstones
+      WHERE kind = 'rating' AND entity_key = NEW.key || char(31) || NEW.generation;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_ratings_update
+    AFTER UPDATE ON ratings
+    WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('rating', NEW.key || char(31) || NEW.generation,
+              strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_attempts_insert
+    AFTER INSERT ON attempts
+    WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('attempt', NEW.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+      DELETE FROM progress_v2_tombstones WHERE kind = 'attempt' AND entity_key = NEW.id;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_attempts_update
+    AFTER UPDATE ON attempts
+    WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('attempt', NEW.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_sprint_sessions_insert
+    AFTER INSERT ON sprint_sessions
+    WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('sprint_session', NEW.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+      DELETE FROM progress_v2_tombstones WHERE kind = 'sprint_session' AND entity_key = NEW.id;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_sprint_sessions_update
+    AFTER UPDATE ON sprint_sessions
+    WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('sprint_session', NEW.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_review_queue_insert
+    AFTER INSERT ON review_queue
+    WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('review_schedule', NEW.puzzle_id || char(31) || NEW.mode || char(31) || NEW.rating_key,
+              strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_review_queue_update
+    AFTER UPDATE ON review_queue
+    WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('review_schedule', NEW.puzzle_id || char(31) || NEW.mode || char(31) || NEW.rating_key,
+              strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_review_removals_insert
+    AFTER INSERT ON review_schedule_removals
+    WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('review_schedule', NEW.puzzle_id || char(31) || NEW.mode || char(31) || NEW.rating_key,
+              strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_review_removals_update
+    AFTER UPDATE ON review_schedule_removals
+    WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('review_schedule', NEW.puzzle_id || char(31) || NEW.mode || char(31) || NEW.rating_key,
+              strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_practice_runs_insert
+    AFTER INSERT ON practice_runs
+    WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('practice_run', NEW.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+      DELETE FROM progress_v2_tombstones WHERE kind = 'practice_run' AND entity_key = NEW.id;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_practice_runs_update
+    AFTER UPDATE ON practice_runs
+    WHEN (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('practice_run', NEW.id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_settings_insert
+    AFTER INSERT ON app_settings
+    WHEN NEW.id = 'default'
+      AND (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('preferences', 'default', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS progress_v2_settings_update
+    AFTER UPDATE ON app_settings
+    WHEN NEW.id = 'default'
+      AND (SELECT outbox_suppressed FROM progress_v2_sync_state WHERE id = 'default') = 0
+      AND (
+        NEW.review_reminder_mode IS NOT OLD.review_reminder_mode
+        OR NEW.review_reminder_fixed_local_time IS NOT OLD.review_reminder_fixed_local_time
+        OR NEW.move_feedback_sound_enabled IS NOT OLD.move_feedback_sound_enabled
+        OR NEW.move_feedback_haptics_enabled IS NOT OLD.move_feedback_haptics_enabled
+      )
+    BEGIN
+      INSERT INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+      VALUES ('preferences', 'default', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(kind, entity_key) DO UPDATE SET enqueued_at = excluded.enqueued_at;
+    END;
+
+    INSERT OR IGNORE INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+    VALUES ('manifest', 'default', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+
+    INSERT OR IGNORE INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+    SELECT 'preferences', 'default', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    FROM app_settings WHERE id = 'default';
+
+    INSERT OR IGNORE INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+    SELECT 'rating', key || char(31) || generation, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    FROM ratings;
+
+    INSERT OR IGNORE INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+    SELECT 'attempt', id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM attempts;
+
+    INSERT OR IGNORE INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+    SELECT 'sprint_session', id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM sprint_sessions;
+
+    INSERT OR IGNORE INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+    SELECT 'practice_run', id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') FROM practice_runs;
+
+    INSERT OR IGNORE INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+    SELECT 'review_schedule', puzzle_id || char(31) || mode || char(31) || rating_key,
+           strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    FROM review_queue;
+
+    INSERT OR IGNORE INTO progress_v2_outbox (kind, entity_key, enqueued_at)
+    SELECT 'review_schedule', puzzle_id || char(31) || mode || char(31) || rating_key,
+           strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    FROM review_schedule_removals;
+  `);
+  ensureColumn(
+    db,
+    "progress_v2_sync_state",
+    "last_v1_check_at",
+    "ALTER TABLE progress_v2_sync_state ADD COLUMN last_v1_check_at TEXT"
+  );
+  ensureColumn(
+    db,
+    "progress_v2_sync_state",
+    "last_v1_check_status",
+    "ALTER TABLE progress_v2_sync_state ADD COLUMN last_v1_check_status TEXT CHECK (last_v1_check_status IN ('available', 'missing'))"
+  );
+  ensureColumn(
+    db,
+    "progress_v2_outbox",
+    "revision",
+    "ALTER TABLE progress_v2_outbox ADD COLUMN revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0)"
+  );
+  ensureColumn(
+    db,
+    "progress_v2_sync_state",
+    "sealed_at",
+    "ALTER TABLE progress_v2_sync_state ADD COLUMN sealed_at TEXT"
+  );
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -3201,6 +3916,17 @@ function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueS
 
 function reviewContextForChange(change: ReviewScheduleChange): ReviewContext {
   return change.kind === "scheduled" ? change.review : change.removal;
+}
+
+function compareProgressV2Tombstones(
+  left: ProgressV2Tombstone,
+  right: ProgressV2Tombstone
+): number {
+  const priority = (kind: ProgressV2Tombstone["kind"]): number =>
+    kind === "attempt" ? 0 : kind === "review_schedule" ? 1 : 2;
+  return priority(left.kind) - priority(right.kind) ||
+    left.kind.localeCompare(right.kind) ||
+    left.entityKey.localeCompare(right.entityKey);
 }
 
 function sameReviewScheduleChange(

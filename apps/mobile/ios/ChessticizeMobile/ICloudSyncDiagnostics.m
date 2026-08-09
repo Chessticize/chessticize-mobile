@@ -5,11 +5,9 @@
 #import <UIKit/UIKit.h>
 #import <sqlite3.h>
 
-static NSString * const ChessticizeDiagnosticRecordName = @"default";
-static NSString * const ChessticizeDiagnosticPayloadField = @"payload";
 static NSString * const ChessticizeSupportArchivePrefix = @"Chessticize-Support-";
 static NSString * const ChessticizeSupportWorkingDirectoryPrefix = @"chessticize-support-work-";
-static NSTimeInterval const ChessticizeCloudKitSnapshotTimeoutSeconds = 8.0;
+static NSString * const ChessticizeProgressV2CapturePrefix = @"chessticize-progress-v2-capture-";
 static NSTimeInterval const ChessticizeSupportArchiveLifetimeSeconds = 60.0 * 60.0;
 
 @interface ICloudSyncDiagnostics : NSObject <RCTBridgeModule>
@@ -41,14 +39,17 @@ RCT_EXPORT_METHOD(copyText:(NSString *)text
 RCT_EXPORT_METHOD(prepareSupportBundle:(NSString *)databasePath
                   diagnosticText:(NSString *)diagnosticText
                   metadata:(NSDictionary *)metadata
+                  cloudCapture:(NSDictionary *)cloudCapture
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
   if (![databasePath isKindOfClass:[NSString class]] || databasePath.length == 0) {
+    [self removeProgressV2CaptureFromCloudCapture:cloudCapture];
     reject(@"support_database_path_missing", @"The local progress database path is unavailable.", nil);
     return;
   }
   if (![diagnosticText isKindOfClass:[NSString class]]) {
+    [self removeProgressV2CaptureFromCloudCapture:cloudCapture];
     reject(@"support_diagnostic_invalid", @"The support diagnostic text is invalid.", nil);
     return;
   }
@@ -59,6 +60,7 @@ RCT_EXPORT_METHOD(prepareSupportBundle:(NSString *)databasePath
   NSError *directoryError = nil;
   NSURL *workingDirectory = [self createWorkingDirectory:&directoryError];
   if (workingDirectory == nil) {
+    [self removeProgressV2CaptureFromCloudCapture:cloudCapture];
     reject(@"support_directory_failed", directoryError.localizedDescription, directoryError);
     return;
   }
@@ -69,6 +71,7 @@ RCT_EXPORT_METHOD(prepareSupportBundle:(NSString *)databasePath
                             toURL:databaseURL
                             error:&backupError]) {
     [[NSFileManager defaultManager] removeItemAtURL:workingDirectory error:nil];
+    [self removeProgressV2CaptureFromCloudCapture:cloudCapture];
     reject(@"support_database_backup_failed", backupError.localizedDescription, backupError);
     return;
   }
@@ -80,21 +83,33 @@ RCT_EXPORT_METHOD(prepareSupportBundle:(NSString *)databasePath
                          encoding:NSUTF8StringEncoding
                             error:&writeError]) {
     [[NSFileManager defaultManager] removeItemAtURL:workingDirectory error:nil];
+    [self removeProgressV2CaptureFromCloudCapture:cloudCapture];
     reject(@"support_diagnostic_write_failed", writeError.localizedDescription, writeError);
     return;
   }
 
-  [self fetchCloudSnapshot:^(NSData *payload,
-                             NSString *accountStatus,
-                             NSString *unavailableReason) {
-    [self finishSupportBundleInDirectory:workingDirectory
-                            cloudPayload:payload
-                    cloudAccountStatus:accountStatus
-                      unavailableReason:unavailableReason
-                             metadata:metadata ?: @{}
-                             resolver:resolve
-                             rejecter:reject];
-  }];
+  NSDictionary *effectiveCloudCapture = [cloudCapture isKindOfClass:[NSDictionary class]]
+    ? cloudCapture
+    : @{};
+  if ([[self processArgumentValueForName:@"chessticizeICloudDiagnosticsFixture"]
+        isEqualToString:@"unavailable"]) {
+    [self removeProgressV2CaptureFromCloudCapture:cloudCapture];
+    effectiveCloudCapture = @{
+      @"v2": @{
+        @"status": @"unavailable",
+        @"unavailableReason": @"CloudKit capture unavailable in the deterministic test fixture."
+      },
+      @"v1": @{
+        @"status": @"unavailable",
+        @"unavailableReason": @"CloudKit capture unavailable in the deterministic test fixture."
+      }
+    };
+  }
+  [self finishSupportBundleInDirectory:workingDirectory
+                          cloudCapture:effectiveCloudCapture
+                              metadata:metadata ?: @{}
+                              resolver:resolve
+                              rejecter:reject];
 }
 
 RCT_EXPORT_METHOD(shareSupportBundle:(NSString *)bundleUrl
@@ -165,110 +180,11 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
   resolve(@YES);
 }
 
-- (void)fetchCloudSnapshot:(void (^)(NSData *payload,
-                                     NSString *accountStatus,
-                                     NSString *unavailableReason))completion
-{
-  NSString *fixture = [self processArgumentValueForName:
-    @"chessticizeICloudDiagnosticsFixture"];
-  if ([fixture isEqualToString:@"unavailable"]) {
-    completion(nil,
-               @"could_not_determine",
-               @"CloudKit snapshot unavailable in the deterministic test fixture.");
-    return;
-  }
-
-  NSObject *completionLock = [NSObject new];
-  __block BOOL didFinish = NO;
-  BOOL (^isFinished)(void) = ^BOOL {
-    @synchronized(completionLock) {
-      return didFinish;
-    }
-  };
-  void (^finish)(NSData *, NSString *, NSString *) =
-    ^(NSData *payload, NSString *accountStatus, NSString *unavailableReason) {
-      @synchronized(completionLock) {
-        if (didFinish) {
-          return;
-        }
-        didFinish = YES;
-      }
-      completion(payload, accountStatus, unavailableReason);
-    };
-
-  dispatch_after(
-    dispatch_time(DISPATCH_TIME_NOW,
-                  (int64_t)(ChessticizeCloudKitSnapshotTimeoutSeconds * NSEC_PER_SEC)),
-    dispatch_get_global_queue(QOS_CLASS_UTILITY, 0),
-    ^{
-      finish(nil,
-             @"could_not_determine",
-             @"CloudKit snapshot unavailable: the request timed out after 8 seconds.");
-    });
-
-  CKContainer *container = [CKContainer defaultContainer];
-  [container accountStatusWithCompletionHandler:^(CKAccountStatus status, NSError *statusError) {
-    if (isFinished()) {
-      return;
-    }
-    NSString *statusString = [self stringFromAccountStatus:status];
-    if (statusError != nil) {
-      finish(nil,
-             @"could_not_determine",
-             [self unavailableReasonForError:statusError
-                                      prefix:@"CloudKit account status unavailable"]);
-      return;
-    }
-    if (status != CKAccountStatusAvailable) {
-      finish(nil,
-             statusString,
-             [NSString stringWithFormat:@"CloudKit snapshot unavailable: iCloud account status is %@.",
-                                        statusString]);
-      return;
-    }
-
-    CKRecordID *recordID = [[CKRecordID alloc] initWithRecordName:ChessticizeDiagnosticRecordName];
-    [container.privateCloudDatabase fetchRecordWithID:recordID
-                                    completionHandler:^(CKRecord *record, NSError *fetchError) {
-      if (isFinished()) {
-        return;
-      }
-      if (fetchError != nil) {
-        if ([fetchError.domain isEqualToString:CKErrorDomain] &&
-            fetchError.code == CKErrorUnknownItem) {
-          finish(nil,
-                 statusString,
-                 @"CloudKit snapshot unavailable: no progress snapshot exists yet.");
-          return;
-        }
-        finish(nil,
-               statusString,
-               [self unavailableReasonForError:fetchError
-                                        prefix:@"CloudKit snapshot unavailable"]);
-        return;
-      }
-
-      NSError *payloadError = nil;
-      NSData *payload = [self payloadDataFromRecord:record error:&payloadError];
-      if (payloadError != nil || payload.length == 0) {
-        finish(nil,
-               statusString,
-               [self unavailableReasonForError:payloadError
-                                        prefix:@"CloudKit snapshot payload unavailable"]);
-        return;
-      }
-      finish(payload, statusString, nil);
-    }];
-  }];
-}
-
 - (void)finishSupportBundleInDirectory:(NSURL *)workingDirectory
-                          cloudPayload:(NSData *)cloudPayload
-                    cloudAccountStatus:(NSString *)cloudAccountStatus
-                      unavailableReason:(NSString *)unavailableReason
-                              metadata:(NSDictionary *)metadata
-                              resolver:(RCTPromiseResolveBlock)resolve
-                              rejecter:(RCTPromiseRejectBlock)reject
+                           cloudCapture:(NSDictionary *)cloudCapture
+                                metadata:(NSDictionary *)metadata
+                                resolver:(RCTPromiseResolveBlock)resolve
+                                rejecter:(RCTPromiseRejectBlock)reject
 {
   NSMutableArray<NSString *> *filenames = [NSMutableArray arrayWithObjects:
     @"local-progress.sqlite",
@@ -280,38 +196,102 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
   NSDictionary *localDatabaseHealth = [self databaseHealthForURL:localDatabaseURL];
   if (![localDatabaseHealth[@"integrityCheckPassed"] boolValue]) {
     [[NSFileManager defaultManager] removeItemAtURL:workingDirectory error:nil];
+    [self removeProgressV2CaptureFromCloudCapture:cloudCapture];
     reject(@"support_database_integrity_failed",
            @"The local database snapshot did not pass SQLite integrity checks.",
            nil);
     return;
   }
 
-  if (cloudPayload.length > 0) {
-    NSURL *cloudURL = [workingDirectory URLByAppendingPathComponent:@"icloud-progress-snapshot.json"];
+  NSDictionary *v2 = [cloudCapture[@"v2"] isKindOfClass:[NSDictionary class]]
+    ? cloudCapture[@"v2"]
+    : @{};
+  NSDictionary *v1 = [cloudCapture[@"v1"] isKindOfClass:[NSDictionary class]]
+    ? cloudCapture[@"v1"]
+    : @{};
+  NSString *v2Status = [self safeString:v2[@"status"] fallback:@"unavailable"];
+  NSString *v1Status = [self safeString:v1[@"status"] fallback:@"unavailable"];
+  NSString *unavailableReason = nil;
+
+  if ([v2Status isEqualToString:@"complete"] || [v2Status isEqualToString:@"not_initialized"]) {
+    NSURL *v2Destination =
+      [workingDirectory URLByAppendingPathComponent:@"icloud-progress-v2.ndjson"];
+    NSString *ndjsonFileUrl = [v2[@"ndjsonFileUrl"] isKindOfClass:[NSString class]]
+      ? v2[@"ndjsonFileUrl"]
+      : nil;
     NSError *cloudWriteError = nil;
-    if (![cloudPayload writeToURL:cloudURL
-                          options:NSDataWritingAtomic
-                            error:&cloudWriteError]) {
-      unavailableReason = [self unavailableReasonForError:cloudWriteError
-                                                   prefix:@"CloudKit snapshot payload could not be written"];
+    BOOL wroteV2 = NO;
+    if (ndjsonFileUrl.length > 0) {
+      NSURL *sourceURL = [self fileURLFromInput:ndjsonFileUrl];
+      if (![self isManagedProgressV2Capture:sourceURL] ||
+          ![[NSFileManager defaultManager] fileExistsAtPath:sourceURL.path]) {
+        cloudWriteError = [NSError errorWithDomain:@"ChessticizeSupportBundle"
+                                               code:31
+                                           userInfo:@{
+          NSLocalizedDescriptionKey: @"The Progress V2 capture file path is invalid."
+        }];
+      } else {
+        wroteV2 = [[NSFileManager defaultManager] moveItemAtURL:sourceURL
+                                                          toURL:v2Destination
+                                                          error:&cloudWriteError];
+      }
     } else {
-      [filenames addObject:@"icloud-progress-snapshot.json"];
+      NSString *ndjson = [v2[@"ndjson"] isKindOfClass:[NSString class]] ? v2[@"ndjson"] : @"";
+      wroteV2 = [ndjson writeToURL:v2Destination
+                        atomically:YES
+                          encoding:NSUTF8StringEncoding
+                             error:&cloudWriteError];
     }
+    if (!wroteV2) {
+      v2Status = @"unavailable";
+      unavailableReason = [self unavailableReasonForError:cloudWriteError
+                                                    prefix:@"Progress V2 capture could not be written"];
+    } else {
+      [filenames addObject:@"icloud-progress-v2.ndjson"];
+    }
+  } else {
+    [self removeProgressV2CaptureFromCloudCapture:cloudCapture];
+    unavailableReason = [self safeString:v2[@"unavailableReason"]
+                                fallback:@"Progress V2 capture unavailable."];
   }
 
-  NSString *kind = [filenames containsObject:@"icloud-progress-snapshot.json"]
-    ? @"complete"
-    : @"partial";
+  if ([v1Status isEqualToString:@"captured"]) {
+    NSString *snapshotJson = [v1[@"snapshotJson"] isKindOfClass:[NSString class]]
+      ? v1[@"snapshotJson"]
+      : nil;
+    NSError *v1WriteError = nil;
+    if (snapshotJson.length == 0 ||
+        ![snapshotJson writeToURL:[workingDirectory URLByAppendingPathComponent:@"icloud-progress-v1.json"]
+                        atomically:YES
+                          encoding:NSUTF8StringEncoding
+                             error:&v1WriteError]) {
+      v1Status = @"unavailable";
+      unavailableReason = [self unavailableReasonForError:v1WriteError
+                                                    prefix:@"Progress V1 capture could not be written"];
+    } else {
+      [filenames addObject:@"icloud-progress-v1.json"];
+    }
+  } else if ([v1Status isEqualToString:@"unavailable"] && unavailableReason == nil) {
+    unavailableReason = [self safeString:v1[@"unavailableReason"]
+                                fallback:@"Progress V1 capture unavailable."];
+  }
+
+  BOOL cloudCaptureComplete = ![v2Status isEqualToString:@"unavailable"] &&
+    ![v1Status isEqualToString:@"unavailable"];
+  NSString *kind = cloudCaptureComplete ? @"complete" : @"partial";
   NSError *manifestError = nil;
   if (![self writeManifestInDirectory:workingDirectory
                             filenames:filenames
                                  kind:kind
-                   cloudAccountStatus:cloudAccountStatus
+                             v2Status:v2Status
+                             v1Status:v1Status
                     unavailableReason:unavailableReason
                   localDatabaseHealth:localDatabaseHealth
+                          cloudCapture:cloudCapture
                              metadata:metadata
                                 error:&manifestError]) {
     [[NSFileManager defaultManager] removeItemAtURL:workingDirectory error:nil];
+    [self removeProgressV2CaptureFromCloudCapture:cloudCapture];
     reject(@"support_manifest_failed", manifestError.localizedDescription, manifestError);
     return;
   }
@@ -324,6 +304,7 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
                         filenames:filenames
                             error:&archiveError]) {
     [[NSFileManager defaultManager] removeItemAtURL:workingDirectory error:nil];
+    [self removeProgressV2CaptureFromCloudCapture:cloudCapture];
     reject(@"support_archive_failed", archiveError.localizedDescription, archiveError);
     return;
   }
@@ -347,9 +328,11 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
 - (BOOL)writeManifestInDirectory:(NSURL *)directory
                        filenames:(NSArray<NSString *> *)filenames
                             kind:(NSString *)kind
-              cloudAccountStatus:(NSString *)cloudAccountStatus
+                        v2Status:(NSString *)v2Status
+                        v1Status:(NSString *)v1Status
                unavailableReason:(NSString *)unavailableReason
              localDatabaseHealth:(NSDictionary *)localDatabaseHealth
+                    cloudCapture:(NSDictionary *)cloudCapture
                         metadata:(NSDictionary *)metadata
                            error:(NSError **)error
 {
@@ -374,8 +357,14 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
   }
 
   NSString *containerIdentifier = [CKContainer defaultContainer].containerIdentifier ?: @"unavailable";
+  NSDictionary *v2 = [cloudCapture[@"v2"] isKindOfClass:[NSDictionary class]]
+    ? cloudCapture[@"v2"]
+    : @{};
+  NSDictionary *progressV2 = [metadata[@"progressV2"] isKindOfClass:[NSDictionary class]]
+    ? metadata[@"progressV2"]
+    : @{};
   NSDictionary *manifest = @{
-    @"bundleFormatVersion": @1,
+    @"bundleFormatVersion": @2,
     @"createdAt": [self iso8601StringForDate:[NSDate date]],
     @"kind": kind,
     @"app": @{
@@ -384,12 +373,33 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
       @"build": [self safeString:metadata[@"buildNumber"] fallback:@"unavailable"]
     },
     @"sync": @{
+      @"activeFormat": @"v2",
       @"enabled": [metadata[@"iCloudSyncEnabled"] isKindOfClass:[NSNumber class]]
         ? metadata[@"iCloudSyncEnabled"]
         : @NO,
       @"latestStatus": [self safeString:metadata[@"latestSyncStatus"] fallback:@"unavailable"],
-      @"accountStatusAtExport": cloudAccountStatus ?: @"could_not_determine",
-      @"containerIdentifier": containerIdentifier
+      @"accountStatusAtExport": [self safeString:metadata[@"iCloudAccountStatus"]
+                                             fallback:@"could_not_determine"],
+      @"containerIdentifier": containerIdentifier,
+      @"progressV2": @{
+        @"phase": [self safeString:progressV2[@"phase"] fallback:@"bridging"],
+        @"zoneInitializedLocally": [progressV2[@"zoneInitialized"] isKindOfClass:[NSNumber class]]
+          ? progressV2[@"zoneInitialized"] : @NO,
+        @"pendingOutboxCount": [progressV2[@"pendingOutboxCount"] isKindOfClass:[NSNumber class]]
+          ? progressV2[@"pendingOutboxCount"] : @0,
+        @"oldestPendingOutboxAt": [self nullableSafeString:progressV2[@"oldestPendingOutboxAt"]],
+        @"lastPullAt": [self nullableSafeString:progressV2[@"lastPullAt"]],
+        @"lastPushAt": [self nullableSafeString:progressV2[@"lastPushAt"]],
+        @"serverChangeTokenFingerprint":
+          [self nullableSafeString:progressV2[@"serverChangeTokenFingerprint"]],
+        @"legacyImportPending": [progressV2[@"legacyImportPending"] isKindOfClass:[NSNumber class]]
+          ? progressV2[@"legacyImportPending"] : @NO,
+        @"lastV1ChangeTagFingerprint":
+          [self nullableSafeString:progressV2[@"lastV1ChangeTagFingerprint"]],
+        @"lastV1ImportAt": [self nullableSafeString:progressV2[@"lastV1ImportAt"]],
+        @"lastV1CheckAt": [self nullableSafeString:progressV2[@"lastV1CheckAt"]],
+        @"lastV1CheckStatus": [self nullableSafeString:progressV2[@"lastV1CheckStatus"]]
+      }
     },
     @"environment": @{
       @"platform": @"iOS",
@@ -397,9 +407,24 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
       @"deviceFamily": [self deviceFamily]
     },
     @"localDatabase": localDatabaseHealth,
-    @"cloudSnapshot": @{
-      @"available": @([kind isEqualToString:@"complete"]),
-      @"unavailableReason": unavailableReason ?: [NSNull null]
+    @"cloudProgress": @{
+      @"complete": @([kind isEqualToString:@"complete"]),
+      @"unavailableReason": unavailableReason ?: [NSNull null],
+      @"v2": @{
+        @"status": v2Status,
+        @"captureStartedAt": [self nullableSafeString:v2[@"startedAt"]],
+        @"captureCompletedAt": [self nullableSafeString:v2[@"completedAt"]],
+        @"bytes": [v2[@"bytes"] isKindOfClass:[NSNumber class]]
+          ? v2[@"bytes"] : @0,
+        @"recordCount": [v2[@"recordCount"] isKindOfClass:[NSNumber class]]
+          ? v2[@"recordCount"] : @0,
+        @"deletionCount": [v2[@"deletionCount"] isKindOfClass:[NSNumber class]]
+          ? v2[@"deletionCount"] : @0,
+        @"familyCounts": [v2[@"familyCounts"] isKindOfClass:[NSDictionary class]]
+          ? v2[@"familyCounts"] : @{},
+        @"finalTokenFingerprint": [self nullableSafeString:v2[@"finalTokenFingerprint"]]
+      },
+      @"v1": @{ @"status": v1Status }
     },
     @"files": files,
     @"privacy": @{
@@ -625,38 +650,6 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
   return [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:name]];
 }
 
-- (NSData *)payloadDataFromRecord:(CKRecord *)record error:(NSError **)error
-{
-  id value = record[ChessticizeDiagnosticPayloadField];
-  if ([value isKindOfClass:[CKAsset class]]) {
-    NSURL *fileURL = ((CKAsset *)value).fileURL;
-    if (fileURL == nil) {
-      if (error != NULL) {
-        *error = [NSError errorWithDomain:@"ChessticizeSupportBundle"
-                                     code:10
-                                 userInfo:@{
-          NSLocalizedDescriptionKey: @"CloudKit payload asset is missing its file URL."
-        }];
-      }
-      return nil;
-    }
-    return [NSData dataWithContentsOfURL:fileURL
-                                 options:NSDataReadingMappedIfSafe
-                                   error:error];
-  }
-  if ([value isKindOfClass:[NSString class]]) {
-    return [value dataUsingEncoding:NSUTF8StringEncoding];
-  }
-  if (error != NULL) {
-    *error = [NSError errorWithDomain:@"ChessticizeSupportBundle"
-                                 code:11
-                             userInfo:@{
-      NSLocalizedDescriptionKey: @"CloudKit payload field is missing or invalid."
-    }];
-  }
-  return nil;
-}
-
 - (NSDictionary *)databaseHealthForURL:(NSURL *)url
 {
   sqlite3 *database = NULL;
@@ -871,6 +864,36 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
          [url.lastPathComponent hasPrefix:ChessticizeSupportWorkingDirectoryPrefix];
 }
 
+- (BOOL)isManagedProgressV2Capture:(NSURL *)url
+{
+  if (url == nil) {
+    return NO;
+  }
+  NSString *temporaryPath = [NSURL fileURLWithPath:NSTemporaryDirectory()
+                                        isDirectory:YES].standardizedURL.path;
+  NSString *path = url.standardizedURL.path;
+  return [path hasPrefix:[temporaryPath stringByAppendingString:@"/"]] &&
+         [url.lastPathComponent hasPrefix:ChessticizeProgressV2CapturePrefix] &&
+         [url.pathExtension.lowercaseString isEqualToString:@"ndjson"];
+}
+
+- (void)removeProgressV2CaptureFromCloudCapture:(NSDictionary *)cloudCapture
+{
+  if (![cloudCapture isKindOfClass:[NSDictionary class]]) {
+    return;
+  }
+  NSDictionary *v2 = [cloudCapture[@"v2"] isKindOfClass:[NSDictionary class]]
+    ? cloudCapture[@"v2"]
+    : nil;
+  NSString *input = [v2[@"ndjsonFileUrl"] isKindOfClass:[NSString class]]
+    ? v2[@"ndjsonFileUrl"]
+    : nil;
+  NSURL *url = [self fileURLFromInput:input];
+  if ([self isManagedProgressV2Capture:url]) {
+    [[NSFileManager defaultManager] removeItemAtURL:url error:nil];
+  }
+}
+
 - (void)removeManagedSupportArtifactsBeforeDate:(NSDate *)cutoffDate
 {
   NSURL *temporaryDirectory = [NSURL fileURLWithPath:NSTemporaryDirectory()
@@ -882,7 +905,8 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
                        error:nil];
   for (NSURL *url in contents) {
     if (![self isManagedSupportArchive:url] &&
-        ![self isManagedSupportWorkingDirectory:url]) {
+        ![self isManagedSupportWorkingDirectory:url] &&
+        ![self isManagedProgressV2Capture:url]) {
       continue;
     }
     if (cutoffDate != nil) {
@@ -927,6 +951,13 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
     : fallback;
 }
 
+- (id)nullableSafeString:(id)value
+{
+  return [value isKindOfClass:[NSString class]] && [value length] > 0
+    ? value
+    : [NSNull null];
+}
+
 - (NSString *)unavailableReasonForError:(NSError *)error prefix:(NSString *)prefix
 {
   if (error == nil) {
@@ -946,22 +977,6 @@ RCT_EXPORT_METHOD(discardSupportBundle:(NSString *)bundleUrl
                                     prefix,
                                     domain,
                                     (long)error.code];
-}
-
-- (NSString *)stringFromAccountStatus:(CKAccountStatus)status
-{
-  switch (status) {
-    case CKAccountStatusAvailable:
-      return @"available";
-    case CKAccountStatusNoAccount:
-      return @"no_account";
-    case CKAccountStatusRestricted:
-      return @"restricted";
-    case CKAccountStatusCouldNotDetermine:
-      return @"could_not_determine";
-    default:
-      return @"unavailable";
-  }
 }
 
 - (void)assignSQLiteError:(NSError **)error
