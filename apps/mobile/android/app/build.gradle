@@ -266,6 +266,7 @@ def stockfishRoot = file("$rootDir/../${stockfishArtifacts.root}")
 def stockfishNnueFiles = stockfishArtifacts.nnue.collect { relativePath ->
     file("$stockfishRoot/$relativePath")
 }
+def androidTestBuildType = System.getProperty("testBuildType", "debug")
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -279,8 +280,10 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode releaseVersion.androidVersionCode
         versionName releaseVersion.publicVersion
-        testBuildType System.getProperty("testBuildType", "debug")
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testBuildType androidTestBuildType
+        testInstrumentationRunner androidTestBuildType == "r8Validation"
+            ? "com.chessticize.mobile.R8ValidationInstrumentation"
+            : "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters(*supportedAndroidAbis)
         }

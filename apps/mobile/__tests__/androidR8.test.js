@@ -67,9 +67,6 @@ describe('Android R8 release optimization', () => {
     const nativeTests = read(
       'apps/mobile/android/app/src/androidTest/java/com/chessticize/mobile/R8ValidationInstrumentation.java',
     );
-    const androidTestManifest = read(
-      'apps/mobile/android/app/src/androidTest/AndroidManifest.xml',
-    );
     const validationBlock = build.match(
       /\n\s{8}r8Validation \{([\s\S]*?)\n\s{8}\}\n\s{4}\}/,
     );
@@ -130,8 +127,14 @@ describe('Android R8 release optimization', () => {
     );
     expect(nativeRunner).toContain('R8ValidationInstrumentation');
     expect(nativeRunner).toContain("'R8_VALIDATION_PASS'");
-    expect(androidTestManifest).toContain(
-      'android:name="com.chessticize.mobile.R8ValidationInstrumentation"',
+    expect(build).toContain(
+      'def androidTestBuildType = System.getProperty("testBuildType", "debug")',
+    );
+    expect(build).toContain(
+      'testInstrumentationRunner androidTestBuildType == "r8Validation"',
+    );
+    expect(build).toContain(
+      '? "com.chessticize.mobile.R8ValidationInstrumentation"',
     );
     expect(nativeRunner).toContain("grep -Fq 'practice-tab'");
     expect(nativeTests).toContain('extends Instrumentation');
