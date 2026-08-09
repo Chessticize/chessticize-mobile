@@ -3,6 +3,8 @@ import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
@@ -16,6 +18,9 @@ abstract class GenerateChessticizeAssets extends DefaultTask {
     @InputFile
     @PathSensitive(PathSensitivity.RELATIVE)
     abstract RegularFileProperty getPuzzlePack()
+
+    @Input
+    abstract Property<String> getPuzzlePackFileName()
 
     @InputFiles
     @PathSensitive(PathSensitivity.RELATIVE)
@@ -68,6 +73,7 @@ abstract class GenerateChessticizeAssets extends DefaultTask {
             spec.into(outputDirectory)
             spec.from(puzzlePack.get().asFile) {
                 into "puzzle-packs"
+                rename { puzzlePackFileName.get() }
             }
             spec.from(nnueFiles) {
                 into "stockfish"
@@ -246,6 +252,13 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 def puzzlePackSource = file("$rootDir/../../../fixtures/puzzles/bundled-core-pack.sqlite")
+def puzzlePackManifest = new JsonSlurper().parse(
+    file("$rootDir/../../../fixtures/puzzles/bundled-core-pack.manifest.json")
+)
+if (!(puzzlePackManifest.packVersion instanceof Integer) || puzzlePackManifest.packVersion < 1) {
+    throw new GradleException("Bundled Core Pack manifest must declare a positive integer packVersion")
+}
+def puzzlePackAssetFileName = "bundled-core-pack-v${puzzlePackManifest.packVersion}.sqlite"
 def stockfishArtifactsFile = file("$rootDir/../stockfish-artifacts.json")
 def stockfishArtifacts = new JsonSlurper().parse(stockfishArtifactsFile)
 def stockfishRoot = file("$rootDir/../${stockfishArtifacts.root}")
@@ -333,6 +346,7 @@ androidComponents {
             GenerateChessticizeAssets
         ) {
             puzzlePack.set(puzzlePackSource)
+            puzzlePackFileName.set(puzzlePackAssetFileName)
             nnueFiles.from(stockfishNnueFiles)
             stockfishManifest.set(stockfishArtifactsFile)
             projectLicense.set(file("$rootDir/../../../LICENSE"))

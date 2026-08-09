@@ -9,6 +9,7 @@ import {
   addArrowDuelDifficultyToCorePack,
   DIFFICULTY_INDEX_PREDICATE,
   DIFFICULTY_INDEX_NAME,
+  OUTPUT_PACK_VERSION,
   OUTPUT_PACK_SCHEMA_VERSION
 } from "../../../scripts/add-arrow-duel-difficulty-to-core-pack.mjs";
 
@@ -57,6 +58,7 @@ test("adds compact Arrow Duel difficulty buckets without a per-puzzle text field
 
   const manifest = JSON.parse(await readFile(fixture.outputManifestPath, "utf8"));
   assert.equal(manifest.buildDate, "2026-08-09");
+  assert.equal(manifest.packVersion, OUTPUT_PACK_VERSION);
   assert.equal(manifest.packSchemaVersion, OUTPUT_PACK_SCHEMA_VERSION);
   assert.equal(manifest.packFileBytes, (await stat(fixture.outputPackPath)).size);
   assert.equal(manifest.arrowDuelDifficulty.index, null);

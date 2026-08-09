@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 
 const SOURCE_PACK_SCHEMA_VERSION = 2;
 const OUTPUT_PACK_SCHEMA_VERSION = 2;
+const OUTPUT_PACK_VERSION = 6;
 const COMPACT_ARTIFACT_NAME = "arrow-duel-routes-d16-mpv2.compact.sqlite";
 const RELEASE_MANIFEST_NAME = "manifest.json";
 const DIFFICULTY_INDEX_NAME = "puzzles_arrow_duel_positive_difficulty_idx";
@@ -72,6 +73,7 @@ export async function addArrowDuelDifficultyToCorePack(input) {
       buildDate: input.buildDate,
       packFileHash,
       packFileBytes,
+      packVersion: OUTPUT_PACK_VERSION,
       packSchemaVersion: OUTPUT_PACK_SCHEMA_VERSION,
       arrowDuelDifficulty: difficultyManifest,
       manifestHash: "pending"
@@ -413,5 +415,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
 export {
   DIFFICULTY_INDEX_PREDICATE,
   DIFFICULTY_INDEX_NAME,
+  OUTPUT_PACK_VERSION,
   OUTPUT_PACK_SCHEMA_VERSION
 };

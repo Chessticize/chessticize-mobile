@@ -13,6 +13,7 @@ const {
 } = require('../../../scripts/lib/google-play-listing-contract.cjs');
 const { ANDROID_REQUIREMENTS } = require('./android-requirements');
 const stockfishArtifacts = require('../stockfish-artifacts.json');
+const puzzlePackManifest = require('../../../fixtures/puzzles/bundled-core-pack.manifest.json');
 const {
   MINIMUM_LOAD_ALIGNMENT,
   REQUIRED_NATIVE_LIBRARIES,
@@ -28,7 +29,7 @@ const REQUIRED_NOTICES = [
   'base/assets/licenses/stockfish/AUTHORS',
 ];
 const REQUIRED_RUNTIME_ASSETS = [
-  'base/assets/puzzle-packs/bundled-core-pack.sqlite',
+  `base/assets/puzzle-packs/bundled-core-pack-v${puzzlePackManifest.packVersion}.sqlite`,
   'base/assets/stockfish/stockfish-artifacts.json',
   ...stockfishArtifacts.nnue.map(
     relativePath => `base/assets/stockfish/${path.basename(relativePath)}`,

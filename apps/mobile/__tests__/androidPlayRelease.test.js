@@ -402,7 +402,7 @@ function validOwnerEvidence(overrides = {}) {
         largestContributors: [
           { path: 'base/assets/stockfish/nn-1c0000000000.nnue', bytes: 110_000_000 },
           { path: 'base/lib/arm64-v8a/libstockfish.so', bytes: 65_000_000 },
-          { path: 'base/assets/puzzle-packs/bundled-core-pack.sqlite', bytes: 8_000_000 },
+          { path: 'base/assets/puzzle-packs/bundled-core-pack-v6.sqlite', bytes: 8_000_000 },
         ],
         universalApkExpectation: {
           minimumBytes: 300_000_000,
@@ -1021,7 +1021,7 @@ describe('Android Play release contract', () => {
       'base/lib/arm64-v8a/libstockfish.so',
       'base/lib/x86_64/libappmodules.so',
       'base/lib/x86_64/libstockfish.so',
-      'base/assets/puzzle-packs/bundled-core-pack.sqlite',
+      'base/assets/puzzle-packs/bundled-core-pack-v6.sqlite',
       'base/assets/stockfish/stockfish-artifacts.json',
       'base/assets/stockfish/nn-c288c895ea92.nnue',
       'base/assets/stockfish/nn-37f18f62d772.nnue',
@@ -1043,12 +1043,12 @@ describe('Android Play release contract', () => {
 
     const missingRuntimeAssets = inspectBundleEntries(entries.filter(
       entry => !entry.includes('/assets/stockfish/') &&
-        entry !== 'base/assets/puzzle-packs/bundled-core-pack.sqlite',
+        entry !== 'base/assets/puzzle-packs/bundled-core-pack-v6.sqlite',
     ), {
       pageAlignment: 'PAGE_ALIGNMENT_16K',
     });
     expect(missingRuntimeAssets.errors).toEqual(expect.arrayContaining([
-      expect.stringContaining('base/assets/puzzle-packs/bundled-core-pack.sqlite'),
+      expect.stringContaining('base/assets/puzzle-packs/bundled-core-pack-v6.sqlite'),
       expect.stringContaining('base/assets/stockfish/stockfish-artifacts.json'),
       expect.stringContaining('base/assets/stockfish/nn-c288c895ea92.nnue'),
       expect.stringContaining('base/assets/stockfish/nn-37f18f62d772.nnue'),

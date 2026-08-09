@@ -55,6 +55,15 @@ export interface SQLitePuzzlePackSourceOptions {
   candidateFloor?: number;
   /** Controls repeated validation for a manifest-qualified pack. */
   arrowDuelEligibility?: SQLitePuzzlePackArrowDuelEligibility;
+  /** Columns declared by the bundled manifest that this app build requires. */
+  requiredPuzzleColumns?: readonly string[];
+}
+
+export class SQLitePuzzlePackCompatibilityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SQLitePuzzlePackCompatibilityError";
+  }
 }
 
 export class SQLitePuzzlePackSource implements PuzzleSource {
@@ -69,6 +78,7 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     this.candidateMultiplier = options.candidateMultiplier ?? 50;
     this.candidateFloor = options.candidateFloor ?? 200;
     this.arrowDuelEligibility = options.arrowDuelEligibility ?? "validate";
+    assertRequiredPuzzleColumns(db, options.requiredPuzzleColumns ?? []);
     this.rowEncoding = readPuzzlePackRowEncoding(db);
   }
 
@@ -782,6 +792,26 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       return limit;
     }
     return Math.max(limit * this.candidateMultiplier, limit + this.candidateFloor);
+  }
+}
+
+function assertRequiredPuzzleColumns(
+  db: SyncSqliteDatabase,
+  requiredColumns: readonly string[]
+): void {
+  if (requiredColumns.length === 0) {
+    return;
+  }
+  const availableColumns = new Set(
+    (db.prepare("PRAGMA table_info(puzzles)").all() as Array<{ name?: unknown }>)
+      .flatMap((row) => typeof row.name === "string" ? [row.name] : [])
+  );
+  const missingColumns = [...new Set(requiredColumns)]
+    .filter((column) => !availableColumns.has(column));
+  if (missingColumns.length > 0) {
+    throw new SQLitePuzzlePackCompatibilityError(
+      `Puzzle pack is missing required puzzles columns: ${missingColumns.join(", ")}`
+    );
   }
 }
 

@@ -68,6 +68,22 @@ test("SQLitePuzzlePackSource rejects unknown binary pack versions before hydrati
   }
 });
 
+test("SQLitePuzzlePackSource rejects a cached pack missing an app-required puzzle column", async () => {
+  const packDb = buildPackDatabase(await loadFixturePuzzles());
+  try {
+    packDb.exec("ALTER TABLE puzzles DROP COLUMN arrow_duel_difficulty");
+
+    assert.throws(
+      () => new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
+        requiredPuzzleColumns: ["arrow_duel_difficulty"]
+      }),
+      /Puzzle pack is missing required puzzles columns: arrow_duel_difficulty/u
+    );
+  } finally {
+    packDb.close();
+  }
+});
+
 test("SQLitePuzzlePackSource rejects a corrupt binary row instead of returning partial puzzle data", async () => {
   const packDb = buildBinaryPackDatabase(await loadFixturePuzzles());
   try {

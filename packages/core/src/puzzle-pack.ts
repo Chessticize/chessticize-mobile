@@ -13,6 +13,8 @@ export interface PuzzlePackManifest {
   presolveDepth?: number;
   licenseNote: string;
   manifestHash: string;
+  /** Monotonic content version used by mobile runtime cache filenames. */
+  packVersion?: number;
   packFileHash?: string;
   packFileBytes?: number;
   format?: "json" | "sqlite";
@@ -86,6 +88,7 @@ export interface BuildPuzzlePackManifestInput {
   presolveDepth?: number;
   licenseNote: string;
   manifestHash: string;
+  packVersion?: number;
   packFileHash?: string;
   packFileBytes?: number;
   format?: "json" | "sqlite";
@@ -114,6 +117,7 @@ export function buildPuzzlePackManifest(
     ...(input.presolveDepth === undefined ? {} : { presolveDepth: input.presolveDepth }),
     licenseNote: input.licenseNote,
     manifestHash: input.manifestHash,
+    ...(input.packVersion === undefined ? {} : { packVersion: input.packVersion }),
     ...(input.packFileHash === undefined ? {} : { packFileHash: input.packFileHash }),
     ...(input.packFileBytes === undefined ? {} : { packFileBytes: input.packFileBytes }),
     ...(input.format === undefined ? {} : { format: input.format }),

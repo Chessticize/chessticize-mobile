@@ -114,6 +114,16 @@ large TEXT payload columns with the versioned binary codecs. `core-pack-v6`
 preserves the v5 rows and codecs while adding the Arrow Duel difficulty column
 from the immutable depth-16 MultiPV-2 route-analysis release.
 
+`packVersion` is the monotonic Core Pack content version and is independent of
+the SQLite schema and codec versions. Mobile builds bind their packaged and
+runtime filenames to it, for example `bundled-core-pack-v6.sqlite`. iOS opens
+that read-only resource directly from the application bundle. Android first
+extracts the versioned APK asset into its database directory; after the current
+pack opens successfully, the runtime deletes only older
+`bundled-core-pack-v*.sqlite` caches and the legacy unversioned cache. Any Core
+Pack content replacement must increment `packVersion`, even when its SQLite
+schema is unchanged.
+
 To enrich a verified v5 pack without resampling or changing puzzle identities,
 run:
 
