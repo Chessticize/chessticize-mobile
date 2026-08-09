@@ -147,6 +147,8 @@ import {
 } from "../platform/reviewReminderScheduler.ts";
 import {
   captureProgressForSupport,
+  PROGRESS_V2_RELEASE_PHASE,
+  resolveProgressV2ActivePhase,
   type ICloudAccountStatus
 } from "../platform/iCloudProgressSync.ts";
 import {
@@ -992,6 +994,7 @@ export function PracticePocScreen({
   );
   const boardSize = adaptiveLayout.boardSize;
   const progressV2Diagnostics = service.getProgressV2Diagnostics();
+  const activeProgressV2Phase = resolveProgressV2ActivePhase(progressV2Diagnostics.phase);
   const syncDiagnosticMetadata = {
     appVersion: platformCapabilities.applicationMetadata.versionName,
     ...(platformCapabilities.applicationMetadata.buildNumber
@@ -1001,7 +1004,7 @@ export function PracticePocScreen({
     iCloudSyncEnabled,
     latestSyncStatus: iCloudSyncStatus,
     progressV2: {
-      phase: progressV2Diagnostics.phase,
+      phase: activeProgressV2Phase,
       zoneInitialized: progressV2Diagnostics.zoneInitialized,
       ...(progressV2Diagnostics.serverChangeTokenFingerprint === undefined
         ? {}
@@ -1060,7 +1063,7 @@ export function PracticePocScreen({
             : iCloudSyncClient
               ? await captureProgressForSupport(
                   iCloudSyncClient,
-                  progressV2Diagnostics.phase
+                  activeProgressV2Phase
                 )
               : {
                   formatVersion: 2 as const,
@@ -1077,10 +1080,10 @@ export function PracticePocScreen({
                     unavailableReason: "icloud_v2_transport_unavailable"
                   },
                   v1: {
-                    status: progressV2Diagnostics.phase === "sealed"
+                    status: activeProgressV2Phase === "sealed"
                       ? "skipped_sealed" as const
                       : "unavailable" as const,
-                    ...(progressV2Diagnostics.phase === "sealed"
+                    ...(activeProgressV2Phase === "sealed"
                       ? {}
                       : { unavailableReason: "icloud_v1_transport_unavailable" })
                   }
@@ -1658,6 +1661,7 @@ export function PracticePocScreen({
           return message;
         }
         const result = await syncPracticeProgressV2(service, iCloudSyncClient, {
+          desiredPhase: PROGRESS_V2_RELEASE_PHASE,
           deviceId: "ios-mobile",
           now: nowIso,
           isCurrent

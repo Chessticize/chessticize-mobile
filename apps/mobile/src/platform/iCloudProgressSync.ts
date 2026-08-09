@@ -8,6 +8,7 @@ import {
   type ProgressV1MetadataResult,
   type ProgressV2ChangePage,
   type ProgressV2ModifyResult,
+  type ProgressV2Phase,
   type ProgressV2Record,
   type ProgressV2Transport
 } from "../../../../packages/storage/src/progress-sync-v2.ts";
@@ -20,6 +21,14 @@ export type ICloudAccountStatus =
   | "restricted"
   | "could_not_determine"
   | "unavailable";
+
+export const PROGRESS_V2_RELEASE_PHASE: ProgressV2Phase = "sealed";
+
+export function resolveProgressV2ActivePhase(
+  persistedPhase: ProgressV2Phase
+): ProgressV2Phase {
+  return persistedPhase === "sealed" ? "sealed" : PROGRESS_V2_RELEASE_PHASE;
+}
 
 export interface ICloudProgressSyncClient extends ProgressV2Transport {
   getAccountStatus(): Promise<ICloudAccountStatus>;

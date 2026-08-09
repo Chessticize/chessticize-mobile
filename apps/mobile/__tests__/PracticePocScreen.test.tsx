@@ -13950,6 +13950,9 @@ describe("PracticePocScreen", () => {
     });
 
     expect(service.getSettings().sync.iCloudEnabled).toBe(true);
+    expect(service.getProgressV2Diagnostics().phase).toBe("sealed");
+    expect(client.legacyMetadataFetchCount).toBe(0);
+    expect(client.legacySnapshotFetchCount).toBe(0);
     press(renderer, "settings-tab");
     expect(findByTestId(renderer, "settings-sync-now")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Synced");
@@ -13969,6 +13972,17 @@ describe("PracticePocScreen", () => {
       expect(client.zoneChangeFetchCount).toBe(2);
       expect(client.modifyBatches.length).toBe(1);
     });
+    expect(client.legacyMetadataFetchCount).toBe(0);
+    expect(client.legacySnapshotFetchCount).toBe(0);
+
+    act(() => {
+      (AppState as unknown as { __emit: (nextState: string) => void }).__emit("background");
+    });
+    await waitForAssertion(() => {
+      expect(client.zoneChangeFetchCount).toBe(3);
+    });
+    expect(client.legacyMetadataFetchCount).toBe(0);
+    expect(client.legacySnapshotFetchCount).toBe(0);
   });
 
   it("captures a real sync failure and copies only the bounded diagnostic", async () => {
@@ -14037,8 +14051,20 @@ describe("PracticePocScreen", () => {
     }));
     const shareSupportBundle = jest.fn(async () => undefined);
     const discardSupportBundle = jest.fn(async () => undefined);
+    const client = new FakeICloudProgressSyncClient({
+      legacy: {
+        changeTag: "must-not-read-after-seal",
+        snapshot: {
+          schemaVersion: 1,
+          deviceId: "legacy-device",
+          updatedAt: "2026-08-09T12:00:00.000Z",
+          data: service.exportLocalData()
+        }
+      }
+    });
     const renderer = renderScreen({
       practiceService: service,
+      iCloudProgressSyncClient: client,
       iCloudSyncDiagnosticsClient: {
         copyText: jest.fn(async () => undefined),
         discardSupportBundle,
@@ -14066,6 +14092,16 @@ describe("PracticePocScreen", () => {
     expect(prepareSupportBundle.mock.calls[0]![0].diagnosticText).toContain(
       "iCloud sync setting: Off"
     );
+    expect(prepareSupportBundle.mock.calls[0]![0]).toMatchObject({
+      cloudCapture: {
+        v1: { status: "skipped_sealed" }
+      },
+      metadata: {
+        progressV2: { phase: "sealed" }
+      }
+    });
+    expect(client.legacyMetadataFetchCount).toBe(0);
+    expect(client.legacySnapshotFetchCount).toBe(0);
     await pressAsync(renderer, "settings-sync-support-bundle-share");
     expect(shareSupportBundle).toHaveBeenCalledWith(
       "file:///tmp/chessticize-support.zip"
@@ -14211,8 +14247,11 @@ describe("PracticePocScreen", () => {
       expect(client.modifyBatches.length).toBe(1);
     });
     expect(service.getSettings().sync.iCloudEnabled).toBe(true);
+    expect(service.getProgressV2Diagnostics().phase).toBe("sealed");
     expect(findByTestId(renderer, "settings-sync-now")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Synced");
+    expect(client.legacyMetadataFetchCount).toBe(0);
+    expect(client.legacySnapshotFetchCount).toBe(0);
 
     press(renderer, "settings-icloud-sync-off");
     await flushMicrotasks();

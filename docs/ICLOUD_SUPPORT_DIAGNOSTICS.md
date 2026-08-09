@@ -26,6 +26,10 @@ app's persisted sync token. Once the migration marker is sealed, diagnostics
 does not query V1. A missing V1 record during bridging is a complete, normal
 result rather than a partial export.
 
+The 1.4.2 app release policy is sealed even before a fresh installation has
+persisted its first local marker. Diagnostics therefore reports the active
+sealed phase and skips V1 when Sync is off or before the first successful sync.
+
 The app never uploads this bundle. The user chooses any handoff through the iOS
 Share Sheet. The temporary ZIP is deleted when the Share Sheet closes or the
 diagnostics window closes, is swept on the next app launch, and expires after

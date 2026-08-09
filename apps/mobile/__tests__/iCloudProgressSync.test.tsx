@@ -2,9 +2,11 @@ import { NativeModules } from "react-native";
 import {
   createNativeICloudProgressSyncClient,
   FakeICloudProgressSyncClient,
+  PROGRESS_V2_RELEASE_PHASE,
   ProgressV2ZoneNotInitializedError,
   captureProgressForSupport,
-  parseProgressSyncSnapshot
+  parseProgressSyncSnapshot,
+  resolveProgressV2ActivePhase
 } from "../src/platform/iCloudProgressSync";
 import {
   PROGRESS_V2_FORMAT_VERSION,
@@ -18,6 +20,12 @@ import type { ProgressSyncSnapshot } from "../../../packages/storage/src/progres
 describe("iCloud progress V2 bridge", () => {
   afterEach(() => {
     delete (NativeModules as Record<string, unknown>).ICloudProgressSync;
+  });
+
+  it("pins the 1.4.2 release policy to a monotonic sealed phase", () => {
+    expect(PROGRESS_V2_RELEASE_PHASE).toBe("sealed");
+    expect(resolveProgressV2ActivePhase("bridging")).toBe("sealed");
+    expect(resolveProgressV2ActivePhase("sealed")).toBe("sealed");
   });
 
   it("falls back when the complete V2 native module is absent", () => {
