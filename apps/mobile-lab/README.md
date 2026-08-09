@@ -17,16 +17,20 @@ product boundaries.
 The complete definition, exceptions, approval record, and handoff checklist are
 in [`docs/agents/ui-flow-design.md`](../../docs/agents/ui-flow-design.md).
 
-## Start the lab
+## Publish and review the lab
 
-From the repository root:
+Do not start a local Storybook server for design review. From the repository
+root, run the headless validation:
 
 ```sh
 pnpm install
-pnpm mobile:storybook
+pnpm mobile:lab:validate
 ```
 
-Storybook listens on `0.0.0.0:6006` and prints both local and network URLs. Connect a phone to the same Wi-Fi network and open the network URL. The Storybook manager is useful on desktop; on a phone, expand the small scenario control at the bottom-left and use **Full-screen URL** to open or bookmark the direct story.
+Then push the issue branch, open or update its PR, and wait for the Mobile
+Interaction Lab GitHub Actions workflow to publish that branch's stable Vercel
+Preview. Use the hosted manager and direct story URLs for desktop and phone
+review. Localhost is never the review or handoff surface.
 
 Each scenario reloads with the same fixed clock, puzzle selection, memory state, platform capabilities, and play-function setup. Use **Reset scenario** to reload that deterministic state.
 
@@ -93,9 +97,9 @@ Whole-screen stories are currently marked `free-roam`, matching the monolithic `
 3. Seed starting data through `PracticeService`, `MemoryStore`, or an interface-compatible native-boundary fake in `LabScenario.tsx`.
 4. Add or update the typed definition and navigation coverage in `scenarioRegistry.ts`.
 5. Export or update the Storybook story in the appropriate product group. A short play function may drive public UI actions after seeding. The complete catalog should show the expected post-implementation product; the `new` tag highlights the issue-owned delta.
-6. Add the scenario ID and a non-empty `issues` array to `newScenarioMarkers.json` for each new or materially changed scenario. Each owning issue gets its own `issueNumber` and one-line `changeNote`; preserve every owner when issues share a scenario. This adds `isNew: true`, the Storybook `new` tag, and the What's New card.
-7. Push the issue's exact commit and let the Mobile Interaction Lab workflow deploy the full Storybook through the current branch's stable Vercel Preview URL. Later pushes advance only that branch URL; another branch, including one for the same issue, receives a different Preview deployment and URL, while `main` owns Production. Every deployment is public and must not require authentication. Verify the recorded branch and commit, stop rather than substitute another branch's URL, and require the workflow's unauthenticated HTTP 200 check at `/storybook/`. Record the branch, stable manager URL, direct story URL, source commit, and workflow run in the issue and PR; generated bundles, `.vercel/` project-link metadata, and hosting result files stay untracked.
+6. Reset `newScenarioMarkers.json`, then add the current issue's scenario IDs and non-empty `issues` arrays for each new or materially changed scenario. Do not retain markers from an earlier design track, even when its issue remains open. Each current entry gets the issue's `issueNumber` and one-line `changeNote`. This adds `isNew: true`, the Storybook `new` tag, and the What's New card.
+7. Run headless validation without starting `pnpm mobile:storybook`. Push the issue's exact commit, open or update its PR, and wait for the Mobile Interaction Lab workflow to deploy the full Storybook through the current branch's stable Vercel Preview URL. Later pushes advance only that branch URL; another branch, including one for the same issue, receives a different Preview deployment and URL, while `main` owns Production. Every deployment is public and must not require authentication. Verify the recorded branch and commit, stop rather than substitute another branch's URL, and require the workflow's unauthenticated HTTP 200 check at `/storybook/`. Record the branch, stable manager URL, direct story URL, source commit, and workflow run in the issue and PR; generated bundles, `.vercel/` project-link metadata, and hosting result files stay untracked.
 8. A coherent design increment may merge to `main` before implementation. Continue later feedback in a new PR from `main`, updating the same issue-owned scenario through the new branch's dedicated deployment.
-9. Keep each ownership entry while its linked issue remains open. Pull-request CI verifies GitHub records an issue as closed before accepting removal of its ownership; remove the marker only when no ownership remains, and retain the scenario as living UI documentation. An unambiguous one-to-one correction from a mistaken parallel prototype to the existing product-clone scenario is allowed only when the same open issue remains marked.
+9. Retain each scenario as living UI documentation. The next new issue-scoped Storybook design resets all earlier `new` markers before adding its own; pull-request CI rejects a newly introduced issue marker while any earlier design marker remains.
 10. Record explicit design approval before product wiring starts.
 11. Keep focused mobile component tests for shared production UI changes. Use native validation only when the changed boundary requires it under the repository risk rules.

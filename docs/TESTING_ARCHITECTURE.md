@@ -35,7 +35,7 @@ real boundary is part of the risk.
 | Storage integration | Real persistence and repository contracts | SQLite migrations, reopen behavior, transactions, review queue, ratings, sync merge | `pnpm test:integration` |
 | CLI E2E | Real process and public protocol boundary | Standard sprint, Arrow Duel, serialized history/review/rating state | `pnpm test:e2e` |
 | Mobile component | Rendered public UI behavior with native rendering boundaries replaced | Navigation, timers, filters, settings, injected sync/notification clients, board callback wiring | `pnpm mobile:test` |
-| Interaction Lab | Browser design alignment and living UI documentation using real shared React Native components | Responsive layout, copy, hierarchy, deterministic page/state flows, Board Placeholder callbacks | `pnpm mobile:storybook` |
+| Interaction Lab | Browser design alignment and living UI documentation using real shared React Native components | Responsive layout, copy, hierarchy, deterministic page/state flows, Board Placeholder callbacks | `pnpm mobile:lab:validate` locally, then branch Vercel preview |
 | Mobile Detox | Full app, real simulator, real writable SQLite, real native rendering/modules | Critical journeys, relaunch persistence, chessboard gestures, Stockfish, native frame geometry, screenshots | `pnpm mobile:e2e:test:ios` |
 | Release/manual native | Optional external-account or hardware diagnosis | Real iCloud account/container, delivered notification taps, TestFlight upgrade, device-specific behavior | Platform runbook |
 
@@ -263,9 +263,13 @@ in component, Detox, integration, and release/manual validation as applicable.
 Every Lab Scenario declares its Scenario Scope and has a stable Storybook URL.
 The typed registry exhaustively maps the mobile navigation unions to a scenario
 or an explicit not-cataloged reason. An issue-owned New Scenario Marker records
-the linked GitHub issue and remains valid on ready pull requests and `main`
-until that issue closes. Pull-request CI compares the marker manifest to the
-base commit and verifies GitHub issue state before allowing removal.
+the current Storybook design's linked GitHub issue. Starting a new issue-scoped
+design resets every prior marker while retaining the scenarios as living UI
+documentation. Pull-request CI compares the marker manifest to the base commit
+and rejects a newly introduced issue marker when any earlier marker remains.
+Local headless validation may build the catalog, but visual review always uses
+the pushed branch's GitHub Actions-managed Vercel preview rather than a local
+Storybook server.
 
 New UI flows must pass the Storybook-first design gate before production
 navigation, backend, storage, native-module, analytics, or rollout wiring

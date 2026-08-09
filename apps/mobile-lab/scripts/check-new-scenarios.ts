@@ -2,9 +2,7 @@ import { execFileSync } from "node:child_process";
 import newScenarioMarkerData from "../src/newScenarioMarkers.json" with { type: "json" };
 import { newScenarios, scenarioRegistry } from "../src/scenarioRegistry.ts";
 import {
-  assertRemovedScenarioMarkerIssuesClosed,
-  createGitHubIssueStateReader,
-  findRemovedScenarioMarkers,
+  validateNewDesignMarkerReset,
   validateScenarioMarkers,
   type ScenarioMarkerRecord
 } from "../src/scenarioMarkerPolicy.ts";
@@ -31,16 +29,19 @@ for (const scenario of newScenarios) {
 const baseRef = process.env.BASE_REF;
 if (baseRef) {
   const baseMarkers = readBaseMarkers(baseRef);
-  const removedMarkers = findRemovedScenarioMarkers(
+  const resetErrors = validateNewDesignMarkerReset(
     baseMarkers,
     newScenarioMarkerData as ScenarioMarkerRecord
   );
 
-  if (removedMarkers.length === 0) {
-    console.log("No New Scenario Markers were removed.");
-  } else {
-    await verifyRemovedMarkerIssuesAreClosed(removedMarkers);
+  if (resetErrors.length > 0) {
+    console.error("Previous New Scenario Markers must be reset:");
+    for (const error of resetErrors) {
+      console.error(`- ${error}`);
+    }
+    process.exit(1);
   }
+  console.log("Validated New Scenario Marker reset for the current Storybook design.");
 }
 
 function readBaseMarkers(baseRef: string): ScenarioMarkerRecord {
@@ -60,21 +61,5 @@ function readBaseMarkers(baseRef: string): ScenarioMarkerRecord {
       return {};
     }
     throw error;
-  }
-}
-
-async function verifyRemovedMarkerIssuesAreClosed(
-  removedMarkers: readonly { scenarioId: string; issueNumber: number }[]
-): Promise<void> {
-  const readIssueState = createGitHubIssueStateReader({
-    token: process.env.GITHUB_TOKEN,
-    repository: process.env.GITHUB_REPOSITORY
-  });
-  const messages = await assertRemovedScenarioMarkerIssuesClosed(
-    removedMarkers,
-    readIssueState
-  );
-  for (const message of messages) {
-    console.log(message);
   }
 }

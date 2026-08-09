@@ -316,7 +316,8 @@ assert.match(uiFlowDesign, /must not begin\s+production wiring/i);
 assert.match(uiFlowDesign, /stable Storybook URL/);
 assert.match(uiFlowDesign, /explicit design approval/);
 assert.match(uiFlowDesign, /full Storybook/i);
-assert.match(uiFlowDesign, /linked GitHub issue is closed/i);
+assert.match(uiFlowDesign, /Reset `newScenarioMarkers\.json`/i);
+assert.match(uiFlowDesign, /without\s+launching a local Storybook server/i);
 assert.match(uiFlowDesign, /Do not commit generated\s+Storybook bundles/i);
 assert.match(uiFlowDesign, /modify that existing\s+story incrementally/i);
 assert.match(uiFlowDesign, /post-implementation product/i);
@@ -325,7 +326,8 @@ assert.match(labReadme, /Do not add a parallel standalone page/i);
 assert.match(prTemplate, /Storybook-first design approved before product wiring/);
 assert.match(prTemplate, /Storybook-only design increment/);
 assert.match(prTemplate, /Stable branch Storybook manager URL:/);
-assert.match(prTemplate, /Removed after the linked issue was closed/);
+assert.match(prTemplate, /Reset every previous design marker/);
+assert.match(prTemplate, /not a local Storybook server/);
 assert.match(prTemplate, /Design approval record:/);
 assert.match(agents, /Storybook-only PR[\s\S]*may merge while the linked product issue remains open/);
 
@@ -361,7 +363,7 @@ for (const triageContract of [issueTriage, issueTriageSkill]) {
   assert.match(triageContract, /issueNumber/);
   assert.match(triageContract, /explicit\s+(design\s+)?approval/i);
   assert.match(triageContract, /merge to `main`/i);
-  assert.match(triageContract, /issue\s+(?:is|as)\s+closed/i);
+  assert.match(triageContract, /reset[\s\S]*marker/i);
 }
 
 assert.match(issueTriage, /0\.5–2 engineering days/);
@@ -493,12 +495,12 @@ assert.match(scenarioRegistry, /newScenarioMarkerData/);
 assert.match(markerPolicy, /Number\.isInteger\(issueNumber\)/);
 assert.match(markerPolicy, /issues must be a non-empty array/);
 assert.match(markerPolicy, /markerOwnerships/);
-assert.match(markerCheck, /verifyRemovedMarkerIssuesAreClosed/);
-assert.match(markerPolicy, /issueStates\.get\(issueNumber\) !== "closed"/);
-assert.match(markerPolicy, /createGitHubIssueStateReader/);
+assert.match(markerCheck, /validateNewDesignMarkerReset/);
+assert.match(markerPolicy, /introducedIssueNumbers/);
+assert.match(markerPolicy, /reset prior issue/);
 assert.doesNotMatch(markerCheck, /ALLOW_NEW_SCENARIOS/);
 assert.match(mobileLabWorkflow, /Validate issue-owned New Scenario Markers/);
-assert.match(mobileLabWorkflow, /issues: read/);
+assert.doesNotMatch(mobileLabWorkflow, /issues: read/);
 assert.match(mobileLabWorkflow, /BASE_REF:/);
 assert.doesNotMatch(mobileLabWorkflow, /ALLOW_NEW_SCENARIOS|Reject stale New Scenario Markers/);
 assert.equal(typeof markerManifest, "object");

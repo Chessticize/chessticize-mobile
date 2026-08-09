@@ -18,24 +18,6 @@ export type ScenarioMarkerRecord = Record<
   } | LegacyScenarioMarker
 >;
 
-export type RemovedScenarioMarker = {
-  scenarioId: string;
-  issueNumber: number;
-};
-
-export type IssueStateReader = (issueNumber: number) => Promise<string>;
-
-type FetchIssueResponse = {
-  ok: boolean;
-  status: number;
-  json(): Promise<unknown>;
-};
-
-type FetchIssue = (
-  input: string,
-  init: { headers: Record<string, string> }
-) => Promise<FetchIssueResponse>;
-
 export function validateScenarioMarkers(
   value: unknown,
   knownScenarioIds: ReadonlySet<string>
@@ -115,131 +97,44 @@ export function validateScenarioMarkers(
   return errors;
 }
 
-export function findRemovedScenarioMarkers(
+export function validateNewDesignMarkerReset(
   baseMarkers: ScenarioMarkerRecord,
   currentMarkers: ScenarioMarkerRecord
-): RemovedScenarioMarker[] {
-  const baseIssueNumbersByScenario = new Map(
-    Object.entries(baseMarkers).map(([scenarioId, marker]) => [
-      scenarioId,
-      new Set(markerOwnerships(marker).map(({ issueNumber }) => issueNumber))
-    ])
-  );
-  const replacementCreditsByIssue = new Map<number, number>();
-  for (const [scenarioId, marker] of Object.entries(currentMarkers)) {
-    const baseIssueNumbers = baseIssueNumbersByScenario.get(scenarioId);
-    for (const { issueNumber } of markerOwnerships(marker)) {
-      if (!baseIssueNumbers?.has(issueNumber)) {
-        replacementCreditsByIssue.set(
-          issueNumber,
-          (replacementCreditsByIssue.get(issueNumber) ?? 0) + 1
-        );
-      }
-    }
-    for (const { issueNumber, count } of absorbedIssueMarkers(marker)) {
-      replacementCreditsByIssue.set(
-        issueNumber,
-        (replacementCreditsByIssue.get(issueNumber) ?? 0) + count
-      );
-    }
+): string[] {
+  const baseIssueNumbers = issueNumbersFor(baseMarkers);
+  const currentIssueNumbers = issueNumbersFor(currentMarkers);
+  const introducedIssueNumbers = [...currentIssueNumbers]
+    .filter((issueNumber) => !baseIssueNumbers.has(issueNumber))
+    .sort((left, right) => left - right);
+
+  if (introducedIssueNumbers.length === 0) {
+    return [];
   }
 
-  return Object.entries(baseMarkers).flatMap(([scenarioId, marker]) => {
-    const currentMarker = currentMarkers[scenarioId];
-    const currentIssueNumbers = new Set(
-      currentMarker ? markerOwnerships(currentMarker).map(({ issueNumber }) => issueNumber) : []
-    );
-    return markerOwnerships(marker).flatMap(({ issueNumber }) => {
-      if (currentIssueNumbers.has(issueNumber)) {
-        return [];
-      }
-      const replacementCount = replacementCreditsByIssue.get(issueNumber) ?? 0;
-      if (replacementCount > 0) {
-        replacementCreditsByIssue.set(issueNumber, replacementCount - 1);
-        return [];
-      }
-      return [{ scenarioId, issueNumber }];
-    });
-  });
+  const introducedLabel = introducedIssueNumbers
+    .map((issueNumber) => `#${issueNumber}`)
+    .join(", ");
+  return Object.entries(currentMarkers).flatMap(([scenarioId, marker]) =>
+    markerOwnerships(marker).flatMap(({ issueNumber }) =>
+      baseIssueNumbers.has(issueNumber)
+        ? [
+            `${scenarioId}: reset prior issue #${issueNumber} before starting the new Storybook design for ${introducedLabel}.`
+          ]
+        : []
+    )
+  );
+}
+
+function issueNumbersFor(markers: ScenarioMarkerRecord): Set<number> {
+  return new Set(
+    Object.values(markers).flatMap((marker) =>
+      markerOwnerships(marker).map(({ issueNumber }) => issueNumber)
+    )
+  );
 }
 
 function markerOwnerships(
   marker: ScenarioMarkerRecord[string]
 ): readonly ScenarioMarkerOwnership[] {
   return "issues" in marker ? marker.issues : [marker];
-}
-
-function absorbedIssueMarkers(
-  marker: ScenarioMarkerRecord[string]
-): readonly AbsorbedIssueMarker[] {
-  return "issues" in marker ? marker.absorbedIssueMarkers ?? [] : [];
-}
-
-export function createGitHubIssueStateReader({
-  token,
-  repository,
-  fetchIssue = fetch
-}: {
-  token?: string | undefined;
-  repository?: string | undefined;
-  fetchIssue?: FetchIssue;
-}): IssueStateReader {
-  if (!token || !repository) {
-    throw new Error(
-      "BASE_REF marker-removal checks require GITHUB_TOKEN and GITHUB_REPOSITORY."
-    );
-  }
-
-  return async (issueNumber) => {
-    const response = await fetchIssue(
-      `https://api.github.com/repos/${repository}/issues/${issueNumber}`,
-      {
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${token}`,
-          "X-GitHub-Api-Version": "2022-11-28"
-        }
-      }
-    );
-    if (!response.ok) {
-      throw new Error(
-        `Unable to verify issue #${issueNumber}: GitHub returned ${response.status}.`
-      );
-    }
-
-    const issue = (await response.json()) as { state?: unknown };
-    return typeof issue.state === "string" ? issue.state : "unknown";
-  };
-}
-
-export async function assertRemovedScenarioMarkerIssuesClosed(
-  removedMarkers: readonly RemovedScenarioMarker[],
-  readIssueState: IssueStateReader
-): Promise<string[]> {
-  const issueStates = new Map<number, string>();
-  for (const { issueNumber } of removedMarkers) {
-    if (!issueStates.has(issueNumber)) {
-      issueStates.set(issueNumber, await readIssueState(issueNumber));
-    }
-  }
-
-  const blocked = removedMarkers.filter(
-    ({ issueNumber }) => issueStates.get(issueNumber) !== "closed"
-  );
-  if (blocked.length > 0) {
-    throw new Error(
-      [
-        "New Scenario Markers may be removed only after their linked issues close:",
-        ...blocked.map(
-          ({ scenarioId, issueNumber }) =>
-            `- ${scenarioId}: issue #${issueNumber} is ${issueStates.get(issueNumber)}.`
-        )
-      ].join("\n")
-    );
-  }
-
-  return removedMarkers.map(
-    ({ scenarioId, issueNumber }) =>
-      `Verified marker cleanup for ${scenarioId}: issue #${issueNumber} is closed.`
-  );
 }

@@ -44,16 +44,19 @@ full-screen iPhone rotation.
 ### 1. Establish the Storybook contract
 
 For a new UI flow, follow `docs/agents/ui-flow-design.md` before production
-wiring. Start the Interaction Lab and review the affected scenario at the
-relevant viewport:
+wiring. Run the headless Lab validation, push the exact reviewed commit, open or
+update its issue-scoped PR, and wait for GitHub Actions to publish that branch's
+Vercel preview:
 
 ```sh
-pnpm mobile:storybook
+pnpm mobile:lab:validate
 ```
 
-Record the stable story URL. For an existing flow regression, use its current
-story as the comparison reference and add or update component assertions before
-changing the product UI.
+Do not start `pnpm mobile:storybook` or use localhost as the review surface.
+Inspect the affected scenario at the relevant viewport on the stable branch
+Vercel URL and record that URL. For an existing flow regression, use its current
+hosted story as the comparison reference and add or update component assertions
+before changing the product UI.
 
 ### 2. Capture the exact-head Release baseline
 

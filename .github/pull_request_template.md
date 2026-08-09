@@ -26,8 +26,10 @@ Storybook anonymous access verification (the site is public and must not require
 New Scenario Marker lifecycle (select one):
 
 - [ ] Not applicable
-- [ ] Added or retained for an open linked issue
-- [ ] Removed after the linked issue was closed
+- [ ] Reset every previous design marker and added only the current issue marker(s)
+- [ ] Same-issue follow-up retained, moved, or removed only the current marker(s)
+
+Storybook review used the branch Vercel preview, not a local Storybook server:
 
 Design approval record:
 

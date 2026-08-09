@@ -35,6 +35,9 @@ that product clone incrementally and preserve its stable story URL. Do not
 create a standalone prototype page that repeats existing product context. The
 full Storybook should show the expected post-implementation product, while the
 issue-owned `new` marker identifies the changed scenario.
+At the start of every new issue-scoped Storybook design, reset
+`newScenarioMarkers.json` before adding the current issue so no `new` tag from
+an earlier design track remains in the catalog.
 
 Treat Sprint onboarding as part of the Sprint UI contract: whenever a Sprint
 screen, rule, term, status, timing behavior, or control changes, update the
@@ -48,6 +51,10 @@ branch URL per feature branch; never substitute a URL owned by another branch.
 Later commits on the same branch advance that branch URL, while `main` owns the
 long-lived Production catalog. GitHub Actions is the single deployment writer;
 the committed Vercel configuration disables duplicate provider-side Git builds.
+Every new Storybook request goes through a pushed issue branch and PR, then
+waits for that workflow's Vercel deployment. Do not launch
+`pnpm mobile:storybook` or hand off a localhost URL for design review; local
+headless validation and static builds remain required before push.
 Every Storybook review deployment, including the main catalog and every branch
 preview, is public and must not require authentication. Verify that an
 unauthenticated request to `/storybook/` returns HTTP 200 after every deployment
@@ -58,9 +65,9 @@ failed publication result, the site's resulting access state, the owner's
 authorization, and the follow-up needed in the PR before marking it ready or
 merging it. Keep any usable owner-only deployment in place; never substitute or
 overwrite another branch's review deployment.
-A coherent design increment may merge to `main` before implementation; its
-New Scenario Marker retains one ownership entry per linked issue until that
-issue is closed. A scenario changed by multiple open issues retains every owner.
+A coherent design increment may merge to `main` before implementation. Its
+scenario remains living UI documentation, while its `new` marker remains only
+until the next issue-scoped Storybook design resets the manifest.
 Generated Storybook bundles and Vercel link files are not committed to the
 application branch.
 

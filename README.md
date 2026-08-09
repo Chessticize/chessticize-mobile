@@ -75,12 +75,13 @@ The repository now includes the GUI-independent backend core, a plain stdio CLI,
 - `apps/mobile` contains the React Native app shell and Practice screen that reuses `react-native-chessboard`.
 - `apps/mobile-lab` renders those real React Native components through React Native Web for fast, deterministic design review.
 
-## Local Mobile Preview
+## Mobile Interaction Lab Preview
 
-For browser-based UI proposals and flow review, start the Interaction Lab:
+For browser-based UI proposals and flow review, validate the Interaction Lab
+without starting a local Storybook server:
 
 ```sh
-pnpm mobile:storybook
+pnpm mobile:lab:validate
 ```
 
 New UI flows are Storybook-first. Before production navigation, backend,
@@ -88,7 +89,12 @@ storage, native-module, analytics, or rollout wiring begins, publish the
 interactive design slice in the Interaction Lab and record explicit design
 approval. See [UI Flow Design Gate](docs/agents/ui-flow-design.md).
 
-Storybook prints the local and LAN URLs. A phone on the same Wi-Fi network can open the LAN URL, and every scenario exposes a reset action and a direct full-screen permalink. The lab uses deterministic in-memory data and a clearly marked Board Placeholder; it does not read local SQLite or replace native simulator/device acceptance.
+Every requested Storybook design resets the previous `new` markers, pushes an
+issue-scoped branch and PR, and waits for GitHub Actions to publish that
+branch's Vercel preview. Use the hosted manager and direct story URLs for
+review; do not use localhost or a LAN URL as the review surface. The lab uses
+deterministic in-memory data and a clearly marked Board Placeholder; it does
+not read local SQLite or replace native simulator/device acceptance.
 
 For normal UI work, do not use the iOS simulator as the default validation loop. Run component tests and type checks first:
 
