@@ -27,7 +27,7 @@
     "issues": [
       {
         "issueNumber": 520,
-        "changeNote": "On Review Home, add the shared disclosure motion to the Filter panel and synchronized height, fade, and chevron motion to the default-open Today sections."
+        "changeNote": "Keep quick filtering inside the same default-open Today sections while retaining shared disclosure, height, fade, and chevron motion."
       }
     ]
   },
@@ -35,7 +35,7 @@
     "issues": [
       {
         "issueNumber": 520,
-        "changeNote": "Preview the shared short height-and-fade disclosure motion without the redundant active-filter summary chips."
+        "changeNote": "Use four action-focused quick filters that update the existing Today sections without Due items, Review groups, or redundant summary chips."
       }
     ]
   }

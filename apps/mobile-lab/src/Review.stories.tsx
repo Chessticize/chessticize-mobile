@@ -109,9 +109,27 @@ export const Filters: Story = {
   args: { scenarioId: "review-filters" },
   play: async ({ canvasElement }) => {
     await openReviewQueue(canvasElement);
+    await waitForTestId(canvasElement, "review-today-to-review-toggle");
+    await waitForTestId(canvasElement, "review-completed-today-toggle");
+    await expectTestIdsInOrder(canvasElement, [
+      "review-start-due",
+      "review-due-items",
+      "review-today-history"
+    ]);
     await clickTestId(canvasElement, "review-filter-toggle");
     await waitForVisibleTestId(canvasElement, "review-filter-options-motion");
-    await clickTestId(canvasElement, "review-filter-overdue");
+    await expectTestIdText(canvasElement, "review-filter-all", "All");
+    await expectTestIdText(canvasElement, "review-filter-overdue", "Overdue");
+    await expectTestIdText(canvasElement, "review-filter-repeat-misses", "Missed 2+ times");
+    await expectTestIdText(canvasElement, "review-filter-arrow-duel", "Arrow Duel");
+    expectTestIdAbsent(canvasElement, "review-filter-mode-standard");
+    expectTestIdAbsent(canvasElement, "review-filter-speed-20");
+    await clickTestId(canvasElement, "review-filter-repeat-misses");
+    await expectTestIdText(canvasElement, "review-today-to-review-toggle-count", "1");
+    await expectTestIdText(canvasElement, "review-completed-today-toggle-count", "1");
+    await waitForTestId(canvasElement, "review-due-item-lab-skewer-03-arrow-duel");
+    expectTestIdAbsent(canvasElement, "review-due-item-lab-fork-01-standard");
+    expectTestIdAbsent(canvasElement, "review-context-list");
     expectTestIdAbsent(canvasElement, "review-active-filter-summary");
   }
 };

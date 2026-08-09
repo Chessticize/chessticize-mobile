@@ -345,6 +345,14 @@ export type ReviewTodayDesignPreview = {
     completedInitiallyExpanded: boolean;
   };
   attemptSummaries: readonly ReviewTodayAttemptSummaryPresentation[];
+  quickFilters?: readonly ReviewTodayQuickFilterPresentation[];
+};
+
+export type ReviewTodayQuickFilterPresentation = {
+  filter: "all" | "overdue" | "failed" | "arrow_duel";
+  label: string;
+  duePuzzleIds: readonly string[];
+  completedPuzzleIds: readonly string[];
 };
 
 export type ReviewTodayAttemptSummaryPresentation = {
@@ -13130,6 +13138,18 @@ type ReviewQueueFilter =
   | `mode:${SprintMode}`
   | `speed:${number}`;
 
+function reviewQuickFilterTestID(
+  filter: ReviewTodayQuickFilterPresentation["filter"]
+): string {
+  if (filter === "failed") {
+    return "review-filter-repeat-misses";
+  }
+  if (filter === "arrow_duel") {
+    return "review-filter-arrow-duel";
+  }
+  return `review-filter-${filter}`;
+}
+
 type ReviewPuzzleState =
   | {
       kind: "line";
@@ -13262,7 +13282,15 @@ function ReviewPanel({
     ? "0"
     : `${completedReviews.length} / ${dailyReviewTotal}`;
   const speedFilters = collectReviewSpeedFilters(dueReviewItems);
-  const filteredDueReviewItems = filterReviewQueueItems(dueReviewItems, queueFilter, nowMs);
+  const quickFilterOptions = reviewTodayDesignPreview?.quickFilters;
+  const quickFilterPresentation = quickFilterOptions?.find((option) => option.filter === queueFilter);
+  const quickFiltersEnabled = Boolean(quickFilterOptions && quickFilterOptions.length > 0);
+  const filteredDueReviewItems = quickFilterPresentation
+    ? dueReviewItems.filter((item) => quickFilterPresentation.duePuzzleIds.includes(item.puzzle.id))
+    : filterReviewQueueItems(dueReviewItems, queueFilter, nowMs);
+  const filteredCompletedReviews = quickFilterPresentation
+    ? completedReviews.filter((item) => quickFilterPresentation.completedPuzzleIds.includes(item.puzzle.id))
+    : completedReviews;
   const filteredDueEntries = filteredDueReviewItems.map((item): ReviewEntry => buildServiceReviewEntry(service, {
     puzzle: item.puzzle,
     mode: item.review.mode,
@@ -13274,15 +13302,18 @@ function ReviewPanel({
   const activeFilterLabels = reviewActiveFilterLabels(queueFilter, queueSummary);
   const showActiveFilterStrip = reviewActiveFilterSummaryVisible
     && (filtersExpanded || queueFilter !== "all");
+  const selectedReviewFilterLabel = quickFilterPresentation?.label
+    ?? reviewQueueFilterLabel(queueFilter);
   const reviewDueSummaryLabel = filteredDueEntries.length > 0
     ? queueSummary.dueStatusLabel
     : dueReviewItems.length === 0
       ? "You're done for today"
       : "No matching scheduled reviews";
   const reviewDueFilterLabel = filteredDueEntries.length > 0
-    ? `${reviewQueueFilterLabel(queueFilter)} · ${queueSummary.dueStatusLabel}`
+    ? `${selectedReviewFilterLabel} · ${queueSummary.dueStatusLabel}`
     : "No matching scheduled reviews";
   const reviewDueSubline = reviewDueCardSubline(queueSummary.oldestDueLabel);
+  const reviewFilterControlActive = filtersExpanded || queueFilter !== "all";
 
   useEffect(() => {
     if (appliedPreferredEntriesKeyRef.current === preferredEntriesKey) {
@@ -13402,20 +13433,32 @@ function ReviewPanel({
       contentContainerStyle={styles.reviewFilterContent}
       testID="review-queue-filters"
     >
-      <FilterButton active={queueFilter === "all"} label="All due" testID="review-filter-all" onPress={() => setQueueFilter("all")} />
-      <FilterButton active={queueFilter === "overdue"} label="Overdue" testID="review-filter-overdue" onPress={() => setQueueFilter("overdue")} />
-      <FilterButton active={queueFilter === "failed"} label="Failed again" testID="review-filter-failed" onPress={() => setQueueFilter("failed")} />
-      <FilterButton active={queueFilter === "mode:standard"} label="Standard" testID="review-filter-mode-standard" onPress={() => setQueueFilter("mode:standard")} />
-      <FilterButton active={queueFilter === "arrow_duel"} label="Arrow Duel only" testID="review-filter-arrow-duel" onPress={() => setQueueFilter("arrow_duel")} />
-      {speedFilters.map((speed) => (
+      {quickFiltersEnabled ? quickFilterOptions?.map((option) => (
         <FilterButton
-          key={speed}
-          active={queueFilter === `speed:${speed}`}
-          label={`${speed}s pace`}
-          testID={`review-filter-speed-${speed}`}
-          onPress={() => setQueueFilter(`speed:${speed}`)}
+          key={option.filter}
+          active={queueFilter === option.filter}
+          label={option.label}
+          testID={reviewQuickFilterTestID(option.filter)}
+          onPress={() => setQueueFilter(option.filter)}
         />
-      ))}
+      )) : (
+        <>
+          <FilterButton active={queueFilter === "all"} label="All due" testID="review-filter-all" onPress={() => setQueueFilter("all")} />
+          <FilterButton active={queueFilter === "overdue"} label="Overdue" testID="review-filter-overdue" onPress={() => setQueueFilter("overdue")} />
+          <FilterButton active={queueFilter === "failed"} label="Failed again" testID="review-filter-failed" onPress={() => setQueueFilter("failed")} />
+          <FilterButton active={queueFilter === "mode:standard"} label="Standard" testID="review-filter-mode-standard" onPress={() => setQueueFilter("mode:standard")} />
+          <FilterButton active={queueFilter === "arrow_duel"} label="Arrow Duel only" testID="review-filter-arrow-duel" onPress={() => setQueueFilter("arrow_duel")} />
+          {speedFilters.map((speed) => (
+            <FilterButton
+              key={speed}
+              active={queueFilter === `speed:${speed}`}
+              label={`${speed}s pace`}
+              testID={`review-filter-speed-${speed}`}
+              onPress={() => setQueueFilter(`speed:${speed}`)}
+            />
+          ))}
+        </>
+      )}
     </ScrollView>
   );
 
@@ -13425,13 +13468,13 @@ function ReviewPanel({
         <Text style={styles.screenTitle}>Review</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={filtersExpanded ? "Hide review filters" : "Show review filters"}
+          accessibilityLabel={`${filtersExpanded ? "Hide" : "Show"} review filters${queueFilter === "all" ? "" : `, ${selectedReviewFilterLabel} selected`}`}
           accessibilityState={{ expanded: filtersExpanded }}
           testID="review-filter-toggle"
-          style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
+          style={[styles.reviewFilterButton, reviewFilterControlActive ? styles.reviewFilterButtonActive : null]}
           onPress={() => onFiltersExpandedChange(!filtersExpanded)}
         >
-          <FilterGlyph active={filtersExpanded} />
+          <FilterGlyph active={reviewFilterControlActive} />
         </Pressable>
       </View>
 
@@ -13533,7 +13576,7 @@ function ReviewPanel({
       ) : filtersExpanded ? reviewFilterOptions : null}
 
       {(filtersExpanded || reviewTodayDesignPreview?.showTodaySections === true)
-        && filteredDueReviewItems.length > 0 ? (
+        && (filteredDueReviewItems.length > 0 || quickFiltersEnabled) ? (
         <View style={styles.reviewItemList} testID="review-due-items">
           {reviewTodayDesignPreview?.collapsibleSections ? (
             <ReviewSectionToggle
@@ -13555,7 +13598,7 @@ function ReviewPanel({
             expanded={!reviewTodayDesignPreview?.collapsibleSections || todayReviewsExpanded}
             motion={collapsibleMotionPreview}
           >
-              {filteredDueReviewItems.slice(0, 4).map((item) => (
+              {filteredDueReviewItems.length > 0 ? filteredDueReviewItems.slice(0, 4).map((item) => (
                 <ReviewQueueItemCard
                   key={`${item.review.puzzleId}:${item.review.mode}:${item.review.ratingKey}`}
                   item={item}
@@ -13573,12 +13616,16 @@ function ReviewPanel({
                     source: "due"
                   })])}
                 />
-              ))}
+              )) : (
+                <Text style={styles.helperText} testID="review-today-to-review-empty">
+                  No reviews match this filter.
+                </Text>
+              )}
           </CollapsibleRegion>
         </View>
       ) : null}
 
-      {filtersExpanded && filteredContextGroups.length > 0 ? (
+      {!quickFiltersEnabled && filtersExpanded && filteredContextGroups.length > 0 ? (
         <View style={styles.reviewContextList} testID="review-context-list">
           <Text style={styles.sectionLabel}>Review groups</Text>
           {filteredContextGroups.map((group) => (
@@ -13607,7 +13654,7 @@ function ReviewPanel({
             </Pressable>
           ))}
         </View>
-      ) : filteredDueReviewItems.length === 0 ? (
+      ) : !quickFiltersEnabled && filteredDueReviewItems.length === 0 ? (
         <View style={styles.emptyReviewPanel} testID="review-empty-state">
           <Text style={styles.listText}>{dueReviewItems.length === 0 ? "You're done for today" : "No matching scheduled reviews"}</Text>
           <Text style={styles.helperText}>
@@ -13627,11 +13674,11 @@ function ReviewPanel({
         </View>
       ) : null}
 
-      {completedReviews.length > 0 ? (
+      {filteredCompletedReviews.length > 0 || quickFiltersEnabled ? (
         <View style={styles.reviewItemList} testID="review-today-history">
           {reviewTodayDesignPreview?.collapsibleSections ? (
             <ReviewSectionToggle
-              count={completedReviews.length}
+              count={filteredCompletedReviews.length}
               collapsibleMotionPreview={collapsibleMotionPreview}
               expanded={completedReviewsExpanded}
               label="Completed today"
@@ -13647,13 +13694,17 @@ function ReviewPanel({
             expanded={!reviewTodayDesignPreview?.collapsibleSections || completedReviewsExpanded}
             motion={collapsibleMotionPreview}
           >
-              {completedReviews.map((item) => (
+              {filteredCompletedReviews.length > 0 ? filteredCompletedReviews.map((item) => (
                 <TodayReviewAttemptRow
                   key={item.attempt.id}
                   item={item}
                   onOpen={() => openCompletedReview(item.attempt.id)}
                 />
-              ))}
+              )) : (
+                <Text style={styles.helperText} testID="review-today-history-empty">
+                  No completed reviews match this filter.
+                </Text>
+              )}
           </CollapsibleRegion>
         </View>
       ) : null}

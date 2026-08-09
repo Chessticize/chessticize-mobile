@@ -60,6 +60,33 @@ import {
 
 export const LAB_NOW_MS = new Date("2026-07-18T18:00:00.000Z").getTime();
 
+const REVIEW_TODAY_QUICK_FILTERS = [
+  {
+    filter: "all",
+    label: "All",
+    duePuzzleIds: ["lab-fork-01", "lab-skewer-03"],
+    completedPuzzleIds: ["lab-pin-02"]
+  },
+  {
+    filter: "overdue",
+    label: "Overdue",
+    duePuzzleIds: ["lab-skewer-03"],
+    completedPuzzleIds: []
+  },
+  {
+    filter: "failed",
+    label: "Missed 2+ times",
+    duePuzzleIds: ["lab-skewer-03"],
+    completedPuzzleIds: ["lab-pin-02"]
+  },
+  {
+    filter: "arrow_duel",
+    label: "Arrow Duel",
+    duePuzzleIds: ["lab-skewer-03"],
+    completedPuzzleIds: []
+  }
+] as const;
+
 const HISTORY_INCOMPLETE_LAB_PUZZLE: Puzzle = {
   ...LAB_PUZZLES[4]!,
   id: "lab-incomplete-06",
@@ -825,7 +852,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     currentTimeMs: () => LAB_NOW_MS,
     moveFeedbackSettings: {},
     puzzleSelectionSeed: "interaction-lab",
-    reviewTodayDesignPreview: scenarioId === "review-due"
+    reviewTodayDesignPreview: ["review-due", "review-filters"].includes(scenarioId)
       ? {
           showTodaySections: true,
           collapsibleSections: {
@@ -847,7 +874,8 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
               attemptCount: 3,
               missCount: 2
             }
-          ]
+          ],
+          quickFilters: REVIEW_TODAY_QUICK_FILTERS
         }
       : undefined,
     sprintGuidanceEnabled: scenarioId.startsWith("settings-"),
@@ -902,6 +930,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       notificationStatus = "not_determined";
       break;
     case "review-due":
+    case "review-filters":
     case "review-session":
     case "review-arrow-duel-reply":
     case "review-feedback-analysis":
@@ -912,7 +941,6 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       configurePuzzleSource = false;
       break;
     case "review-overdue":
-    case "review-filters":
       service = createReviewService("overdue");
       break;
     case "history-populated":

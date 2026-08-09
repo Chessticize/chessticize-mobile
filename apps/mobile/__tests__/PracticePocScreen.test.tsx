@@ -4384,6 +4384,56 @@ describe("PracticePocScreen", () => {
     });
   });
 
+  it("keeps Review quick filters inside the same Today sections", async () => {
+    const renderer = renderLabScenario("review-filters");
+    await flushMicrotasks();
+    press(renderer, "review-tab");
+
+    expect(findByTestId(renderer, "review-today-to-review-toggle")).toBeTruthy();
+    expect(findByTestId(renderer, "review-completed-today-toggle")).toBeTruthy();
+    expect(testIdOrder(renderer, "review-start-due", "review-due-items")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "review-due-items", "review-today-history")).toBeLessThan(0);
+    expect(() => findByTestId(renderer, "review-context-list")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-panel"))).not.toContain("Due items");
+    expect(collectText(findByTestId(renderer, "review-panel"))).not.toContain("Review groups");
+
+    press(renderer, "review-filter-toggle");
+    expect([...new Set(
+      collectTestIds(findByTestId(renderer, "review-queue-filters"))
+        .filter((testID) => testID.startsWith("review-filter-"))
+    )]).toEqual([
+      "review-filter-all",
+      "review-filter-overdue",
+      "review-filter-repeat-misses",
+      "review-filter-arrow-duel"
+    ]);
+    expect(collectText(findByTestId(renderer, "review-queue-filters"))).toContain("Missed 2+ times");
+    expect(() => findByTestId(renderer, "review-filter-mode-standard")).toThrow();
+    expect(() => findByTestId(renderer, "review-filter-speed-20")).toThrow();
+
+    press(renderer, "review-filter-repeat-misses");
+    const repeatedMissesFilter = renderer.root.findAllByProps({
+      testID: "review-filter-repeat-misses"
+    }).find((node) => node.props.accessibilityState !== undefined);
+    expect(repeatedMissesFilter?.props.accessibilityState).toEqual({
+      selected: true
+    });
+    expect(collectText(findByTestId(renderer, "review-today-to-review-toggle"))).toContain("1");
+    expect(collectText(findByTestId(renderer, "review-completed-today-toggle"))).toContain("1");
+    expect(findByTestId(renderer, "review-due-item-lab-skewer-03-arrow-duel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-due-item-lab-fork-01-standard")).toThrow();
+    expect(collectText(findByTestId(renderer, "review-today-history-items"))).toContain(
+      "Puzzle lab-pin-02"
+    );
+    expect(() => findByTestId(renderer, "review-context-list")).toThrow();
+    expect(findByTestId(renderer, "review-filter-toggle").props.accessibilityLabel).toContain(
+      "Missed 2+ times selected"
+    );
+    expect(findByTestId(renderer, "review-due-card").props.accessibilityLabel).toContain(
+      "Missed 2+ times"
+    );
+  });
+
   it("limits an existing Custom Run editor to Current rating", () => {
     const onIntent = jest.fn();
     const renderer = renderScreen({
