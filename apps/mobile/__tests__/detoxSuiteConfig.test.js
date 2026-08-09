@@ -1097,8 +1097,8 @@ describe('Detox suite configuration', () => {
     const collapsedSummary = runManagementCase.indexOf(
       "element(by.id('practice-run-theme-selection-detail'))"
     );
-    const absentTheme = runManagementCase.indexOf(
-      "expect(element(by.id('custom-theme-mixed'))).not.toExist()"
+    const hiddenThemeCatalog = runManagementCase.indexOf(
+      "expect(element(by.id('practice-run-theme-catalog-motion'))).not.toBeVisible()"
     );
     const expandThemes = runManagementCase.indexOf(
       "element(by.id('practice-run-theme-disclosure')).tap()"
@@ -1108,8 +1108,8 @@ describe('Detox suite configuration', () => {
     );
 
     expect(collapsedSummary).toBeGreaterThan(0);
-    expect(absentTheme).toBeGreaterThan(collapsedSummary);
-    expect(expandThemes).toBeGreaterThan(absentTheme);
+    expect(hiddenThemeCatalog).toBeGreaterThan(collapsedSummary);
+    expect(expandThemes).toBeGreaterThan(hiddenThemeCatalog);
     expect(selectedTheme).toBeGreaterThan(expandThemes);
   });
 
@@ -1730,7 +1730,7 @@ describe('Detox suite configuration', () => {
       "waitFor(element(by.id('sprint-unclear-toggle'))).toBeVisible().withTimeout(10000)"
     );
     expect(practiceSpec).toContain("element(by.id('history-filter-toggle')).tap()");
-    expect(practiceSpec).toContain("waitFor(element(by.id('history-advanced-filters'))).not.toExist()");
+    expect(practiceSpec).toContain("waitFor(element(by.id('history-advanced-filters-motion'))).not.toBeVisible()");
     expect(practiceSpec).toContain("element(by.text('Correct')).atIndex(0)");
     expect(practiceSpec).toContain("expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible()");
     expect(practiceSpec).toContain("historyAttemptRowTestIDForResult('Correct')");

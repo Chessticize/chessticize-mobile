@@ -61,7 +61,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
         .not.toExist()
         .withTimeout(10000);
       await expect(element(by.id('practice-run-theme-selection-detail'))).toHaveText('All themes');
-      await expect(element(by.id(CUSTOM_RUN_THEME_TEST_ID))).not.toExist();
+      await expect(element(by.id('practice-run-theme-catalog-motion'))).not.toBeVisible();
       await element(by.id('practice-run-theme-disclosure')).tap();
       await waitForVisibleInPracticeScroll(CUSTOM_RUN_THEME_TEST_ID);
       await element(by.id(CUSTOM_RUN_THEME_TEST_ID)).tap();
