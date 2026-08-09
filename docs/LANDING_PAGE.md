@@ -59,6 +59,18 @@ published site remains plain static files.
   privacy policy remains the repository-hosted `docs/PRIVACY_POLICY.md`; the
   landing page links to that canonical policy.
 
+The install actions use unmodified, locally served vendor artwork. Keep the
+App Store badge first when both stores appear, render it at least 40 pixels
+high, and preserve the transparent clear space supplied with the Google Play
+badge. Do not redraw, crop, recolor, or add copy inside either badge.
+
+- Apple source: `https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg`
+  (`site/assets/download-on-the-app-store.svg`, SHA-256
+  `a26fc5b38380272c92e9019a2eb8b45542a66814b3e2b203772db8904b9fb99f`).
+- Google source: `https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png`
+  (`site/assets/get-it-on-google-play.png`, SHA-256
+  `f72611e2df8e88204009fd896d05d5e8e83c77009c63943bbffa169559934849`).
+
 Run the focused landing-page test and development-process validation after any
 content, asset, route, or deployment change:
 
