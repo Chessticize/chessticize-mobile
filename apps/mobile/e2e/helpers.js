@@ -615,16 +615,18 @@ async function launchWithDisabledSynchronization(
   targetDevice = device,
   foregroundAndroidApp = bringAndroidAppToForeground
 ) {
+  const platform = targetDevice.getPlatform();
   const launchOptions = {
     ...options,
     launchArgs: {
       DTXDisableMainRunLoopSync: 'YES',
       detoxEnableSynchronization: 0,
+      ...(platform === 'ios' ? { chessticizeEnableTestControls: 1 } : {}),
       ...(options.launchArgs ?? {})
     }
   };
   await targetDevice.launchApp(launchOptions);
-  if (targetDevice.getPlatform() === 'android') {
+  if (platform === 'android') {
     await foregroundAndroidApp(launchOptions.launchArgs);
   }
   await targetDevice.disableSynchronization();

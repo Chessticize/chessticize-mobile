@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 DEVICE_NAME="${DETOX_IOS_DEVICE:-iPhone 17-Detox}"
 E2E_SCOPE="${CHESSTICIZE_E2E_SCOPE:-}"
+E2E_VARIANTS="${CHESSTICIZE_E2E_VARIANTS:-debug}"
 REUSE_APP_SOURCE_SHA="${CHESSTICIZE_E2E_REUSE_APP_SOURCE_SHA:-}"
 
 fail() {
@@ -17,6 +18,21 @@ case "$E2E_SCOPE" in
     ;;
   *)
     fail "Set CHESSTICIZE_E2E_SCOPE to flows, practice, or full. Choose the smallest scope required by the PR risk matrix."
+    ;;
+esac
+
+case "$E2E_VARIANTS" in
+  debug)
+    E2E_VARIANT_LIST=(debug)
+    ;;
+  release)
+    E2E_VARIANT_LIST=(release)
+    ;;
+  both)
+    E2E_VARIANT_LIST=(debug release)
+    ;;
+  *)
+    fail "Set CHESSTICIZE_E2E_VARIANTS to debug|release|both. Release candidates must use both."
     ;;
 esac
 
@@ -35,9 +51,6 @@ done
 cd "$REPO_ROOT"
 [[ -z "$(git status --porcelain --untracked-files=all)" ]] || fail "Commit or remove all worktree changes before recording release evidence."
 HEAD_BEFORE="$(git rev-parse HEAD)"
-APP_BUNDLE="apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/Chessticize.app"
-APP_MANIFEST="apps/mobile/ios/build/chessticize-e2e-app-manifest.json"
-REUSE_COMPARISON="apps/mobile/ios/build/chessticize-e2e-reuse.json"
 
 verify_nnue_asset() {
   local asset_path="$1"
@@ -70,8 +83,41 @@ run_doctor() {
   pnpm mobile:doctor:ios
 }
 
+set_variant_paths() {
+  local variant="$1"
+
+  case "$variant" in
+    debug)
+      APP_BUNDLE="apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/Chessticize.app"
+      APP_MANIFEST="apps/mobile/ios/build/chessticize-e2e-app-manifest.json"
+      REUSE_COMPARISON="apps/mobile/ios/build/chessticize-e2e-reuse.json"
+      DETOX_CONFIGURATION="ios.sim.debug"
+      ;;
+    release)
+      APP_BUNDLE="apps/mobile/ios/build-release/Build/Products/Release-iphonesimulator/Chessticize.app"
+      APP_MANIFEST="apps/mobile/ios/build-release/chessticize-e2e-app-manifest.json"
+      REUSE_COMPARISON="apps/mobile/ios/build-release/chessticize-e2e-reuse.json"
+      DETOX_CONFIGURATION="ios.sim.release"
+      ;;
+    *)
+      fail "Unsupported iOS E2E variant '$variant'."
+      ;;
+  esac
+}
+
 run_build() {
-  DETOX_IOS_DEVICE="$DEVICE_NAME" pnpm mobile:e2e:build:ios
+  local variant="$1"
+
+  case "$variant" in
+    debug)
+      DETOX_IOS_DEVICE="$DEVICE_NAME" pnpm mobile:e2e:build:ios
+      ;;
+    release)
+      CHESSTICIZE_IOS_PREPARE=1 \
+        DETOX_IOS_DEVICE="$DEVICE_NAME" \
+        pnpm mobile:e2e:build:ios:release
+      ;;
+  esac
   test -f "$APP_BUNDLE/main.jsbundle"
 }
 
@@ -106,7 +152,7 @@ run_suite() {
     DETOX_IOS_DEVICE="$DEVICE_NAME" \
       DETOX_ACTIVE_SUITE="$suite" \
       DETOX_MAX_WORKERS=1 \
-      ./node_modules/.bin/detox test --configuration ios.sim.debug --cleanup
+      ./node_modules/.bin/detox test --configuration "$DETOX_CONFIGURATION" --cleanup
   )
 }
 
@@ -115,56 +161,78 @@ DOCTOR_STARTED=$SECONDS
 run_doctor
 DOCTOR_SECONDS=$((SECONDS - DOCTOR_STARTED))
 
-BUILD_STARTED=$SECONDS
-if [[ -n "$REUSE_APP_SOURCE_SHA" ]]; then
-  [[ -d "$APP_BUNDLE" ]] || fail "The reusable iOS App bundle is missing; run one normal build first."
-  [[ -f "$APP_MANIFEST" ]] || fail "The reusable iOS App manifest is missing; run one normal build first."
-  node apps/mobile/scripts/mobile-app-inputs.js verify-artifact \
-    --app-source-sha "$REUSE_APP_SOURCE_SHA" \
-    --test-runner-sha "$HEAD_BEFORE" \
-    --artifact "$APP_BUNDLE" \
-    --manifest "$APP_MANIFEST" \
-    --output "$REUSE_COMPARISON"
-  APP_SOURCE_SHA="$REUSE_APP_SOURCE_SHA"
-  BUILD_RESULT="REUSED"
-  IDENTITY_RECORD="$REUSE_COMPARISON"
-else
-  run_build
-  normalize_worktree_cocoapods_checksum
-  node apps/mobile/scripts/mobile-app-inputs.js record-artifact \
-    --app-source-sha "$HEAD_BEFORE" \
-    --artifact "$APP_BUNDLE" \
-    --output "$APP_MANIFEST"
-  APP_SOURCE_SHA="$HEAD_BEFORE"
-  BUILD_RESULT="PASS"
-  IDENTITY_RECORD="$APP_MANIFEST"
-fi
-BUILD_SECONDS=$((SECONDS - BUILD_STARTED))
-APP_INPUT_DIGEST="$(
-  node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).appInputDigest);' \
-    "$IDENTITY_RECORD"
-)"
-APP_ARTIFACT_SHA256="$(
-  node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).artifactSha256);' \
-    "$IDENTITY_RECORD"
-)"
+EVIDENCE_VARIANTS=()
+EVIDENCE_APP_SOURCES=()
+EVIDENCE_BUILD_RESULTS=()
+EVIDENCE_BUILD_SECONDS=()
+EVIDENCE_MANIFESTS=()
+EVIDENCE_INPUT_DIGESTS=()
+EVIDENCE_ARTIFACT_SHA256S=()
+EVIDENCE_FLOWS_SECONDS=()
+EVIDENCE_PRACTICE_SECONDS=()
 
-[[ -z "$(git status --porcelain --untracked-files=all)" ]] || fail "The build changed tracked or untracked files before the selected suites ran."
+for variant in "${E2E_VARIANT_LIST[@]}"; do
+  set_variant_paths "$variant"
+  BUILD_STARTED=$SECONDS
+  if [[ -n "$REUSE_APP_SOURCE_SHA" ]]; then
+    [[ -d "$APP_BUNDLE" ]] || fail "The reusable $variant iOS App bundle is missing; run one normal $variant build first."
+    [[ -f "$APP_MANIFEST" ]] || fail "The reusable $variant iOS App manifest is missing; run one normal $variant build first."
+    node apps/mobile/scripts/mobile-app-inputs.js verify-artifact \
+      --app-source-sha "$REUSE_APP_SOURCE_SHA" \
+      --test-runner-sha "$HEAD_BEFORE" \
+      --artifact "$APP_BUNDLE" \
+      --manifest "$APP_MANIFEST" \
+      --output "$REUSE_COMPARISON"
+    APP_SOURCE_SHA="$REUSE_APP_SOURCE_SHA"
+    BUILD_RESULT="REUSED"
+    IDENTITY_RECORD="$REUSE_COMPARISON"
+  else
+    run_build "$variant"
+    normalize_worktree_cocoapods_checksum
+    node apps/mobile/scripts/mobile-app-inputs.js record-artifact \
+      --app-source-sha "$HEAD_BEFORE" \
+      --artifact "$APP_BUNDLE" \
+      --output "$APP_MANIFEST"
+    APP_SOURCE_SHA="$HEAD_BEFORE"
+    BUILD_RESULT="PASS"
+    IDENTITY_RECORD="$APP_MANIFEST"
+  fi
+  BUILD_SECONDS=$((SECONDS - BUILD_STARTED))
+  APP_INPUT_DIGEST="$(
+    node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).appInputDigest);' \
+      "$IDENTITY_RECORD"
+  )"
+  APP_ARTIFACT_SHA256="$(
+    node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(process.argv[1], "utf8")).artifactSha256);' \
+      "$IDENTITY_RECORD"
+  )"
 
-FLOWS_SECONDS=""
-PRACTICE_SECONDS=""
+  [[ -z "$(git status --porcelain --untracked-files=all)" ]] || fail "The $variant build changed tracked or untracked files before the selected suites ran."
 
-if [[ "$E2E_SCOPE" == "flows" || "$E2E_SCOPE" == "full" ]]; then
-  FLOWS_STARTED=$SECONDS
-  run_suite flows
-  FLOWS_SECONDS=$((SECONDS - FLOWS_STARTED))
-fi
+  FLOWS_SECONDS=""
+  PRACTICE_SECONDS=""
+  if [[ "$E2E_SCOPE" == "flows" || "$E2E_SCOPE" == "full" ]]; then
+    FLOWS_STARTED=$SECONDS
+    run_suite flows
+    FLOWS_SECONDS=$((SECONDS - FLOWS_STARTED))
+  fi
+  if [[ "$E2E_SCOPE" == "practice" || "$E2E_SCOPE" == "full" ]]; then
+    PRACTICE_STARTED=$SECONDS
+    run_suite practice
+    PRACTICE_SECONDS=$((SECONDS - PRACTICE_STARTED))
+  fi
 
-if [[ "$E2E_SCOPE" == "practice" || "$E2E_SCOPE" == "full" ]]; then
-  PRACTICE_STARTED=$SECONDS
-  run_suite practice
-  PRACTICE_SECONDS=$((SECONDS - PRACTICE_STARTED))
-fi
+  evidence_index=${#EVIDENCE_VARIANTS[@]}
+  EVIDENCE_VARIANTS[$evidence_index]="$variant"
+  EVIDENCE_APP_SOURCES[$evidence_index]="$APP_SOURCE_SHA"
+  EVIDENCE_BUILD_RESULTS[$evidence_index]="$BUILD_RESULT"
+  EVIDENCE_BUILD_SECONDS[$evidence_index]="$BUILD_SECONDS"
+  EVIDENCE_MANIFESTS[$evidence_index]="$APP_MANIFEST"
+  EVIDENCE_INPUT_DIGESTS[$evidence_index]="$APP_INPUT_DIGEST"
+  EVIDENCE_ARTIFACT_SHA256S[$evidence_index]="$APP_ARTIFACT_SHA256"
+  EVIDENCE_FLOWS_SECONDS[$evidence_index]="$FLOWS_SECONDS"
+  EVIDENCE_PRACTICE_SECONDS[$evidence_index]="$PRACTICE_SECONDS"
+done
 TOTAL_SECONDS=$((SECONDS - STARTED_AT))
 
 HEAD_AFTER="$(git rev-parse HEAD)"
@@ -173,22 +241,25 @@ HEAD_AFTER="$(git rev-parse HEAD)"
 
 echo
 echo "Local Detox evidence"
-echo "App source: $APP_SOURCE_SHA"
 echo "Test runner: $HEAD_BEFORE"
 echo "Scope: $E2E_SCOPE"
+echo "Variants: $E2E_VARIANTS"
 echo "Device: $DEVICE_NAME"
 echo "Xcode: $(xcodebuild -version | tr '\n' ' ')"
 echo "Ruby: $(ruby --version)"
 echo "Doctor: PASS (${DOCTOR_SECONDS}s)"
-echo "Build: $BUILD_RESULT (${BUILD_SECONDS}s)"
-echo "App manifest: $APP_MANIFEST"
-echo "App input digest: $APP_INPUT_DIGEST"
-echo "App artifact SHA-256: $APP_ARTIFACT_SHA256"
-if [[ -n "$FLOWS_SECONDS" ]]; then
-  echo "Flows: PASS (${FLOWS_SECONDS}s)"
-fi
-if [[ -n "$PRACTICE_SECONDS" ]]; then
-  echo "Practice: PASS (${PRACTICE_SECONDS}s)"
-fi
+for evidence_index in "${!EVIDENCE_VARIANTS[@]}"; do
+  echo "${EVIDENCE_VARIANTS[$evidence_index]} App source: ${EVIDENCE_APP_SOURCES[$evidence_index]}"
+  echo "${EVIDENCE_VARIANTS[$evidence_index]} build: ${EVIDENCE_BUILD_RESULTS[$evidence_index]} (${EVIDENCE_BUILD_SECONDS[$evidence_index]}s)"
+  echo "${EVIDENCE_VARIANTS[$evidence_index]} App manifest: ${EVIDENCE_MANIFESTS[$evidence_index]}"
+  echo "${EVIDENCE_VARIANTS[$evidence_index]} App input digest: ${EVIDENCE_INPUT_DIGESTS[$evidence_index]}"
+  echo "${EVIDENCE_VARIANTS[$evidence_index]} App artifact SHA-256: ${EVIDENCE_ARTIFACT_SHA256S[$evidence_index]}"
+  if [[ -n "${EVIDENCE_FLOWS_SECONDS[$evidence_index]}" ]]; then
+    echo "${EVIDENCE_VARIANTS[$evidence_index]} flows: PASS (${EVIDENCE_FLOWS_SECONDS[$evidence_index]}s)"
+  fi
+  if [[ -n "${EVIDENCE_PRACTICE_SECONDS[$evidence_index]}" ]]; then
+    echo "${EVIDENCE_VARIANTS[$evidence_index]} practice: PASS (${EVIDENCE_PRACTICE_SECONDS[$evidence_index]}s)"
+  fi
+done
 echo "Total: ${TOTAL_SECONDS}s"
 echo "Worktree: clean; HEAD unchanged"

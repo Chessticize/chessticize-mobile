@@ -174,7 +174,9 @@ Before any release, run exact-head fast checks and select the same no-native,
 targeted, or full scope used for PRs. An ordinary delta does not rerun complete
 Detox and does not require physical-device installation. Run one
 affected simulator/emulator suite for targeted risk and both suites only for
-broad native risk. Passing native evidence may be reused after a later commit
+broad native risk. Whenever the selected iOS release scope includes simulator
+E2E, run that scope against both Debug-Dev and Release-Production with
+`CHESSTICIZE_E2E_VARIANTS=both`. Passing native evidence may be reused after a later commit
 or squash merge when the App-input comparison above passes; the commit SHA and
 full Git tree may differ. Test-runner changes rerun only their affected scope
 against the retained validation App artifact. Record the App source and
@@ -187,7 +189,10 @@ Physical-device checks are optional diagnostic evidence, not a feature-PR or
 release gate. They may help diagnose install, real board input, Stockfish
 lifecycle, background/resume, reminders, backup-sensitive storage, CloudKit,
 notification delivery, or upgrade behavior, but store submission and APK
-mirroring do not wait for them.
+mirroring do not wait for them. Any pre-release install on a personal iPhone
+must use `pnpm mobile:ios:dev:device`, which installs the isolated Debug bundle
+and its Development-only CloudKit container. Do not sideload the production
+Release identity for routine device testing.
 
 ## What Must Be Exhaustive
 
@@ -319,8 +324,9 @@ branch when those behaviors are already proven below the native boundary.
 - CI must use maintained deterministic fakes or native launch fixtures for
   notification and CloudKit states.
 - Real iCloud account/container behavior may receive an optional staging or
-  signed physical/TestFlight diagnostic check. Simulator CI must not depend on
-  a logged-in personal account and remains the release gate.
+  signed physical diagnostic check. On a personal iPhone, use only
+  `pnpm mobile:ios:dev:device` and the Dev CloudKit container. Simulator E2E
+  must not depend on a logged-in personal account and remains the release gate.
 - Real notification delivery and tap routing may receive an optional
   physical-device diagnostic check, but deterministic CI/native fixtures are
   the release gate. CI should not wait for wall-clock notification delivery

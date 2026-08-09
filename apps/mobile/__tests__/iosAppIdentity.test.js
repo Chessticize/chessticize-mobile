@@ -22,10 +22,14 @@ describe("iOS App Store identity artifacts", () => {
     const infoPlist = readText(join(iosRoot, "Info.plist"));
     const project = readText(join(appRoot, "ios", "ChessticizeMobile.xcodeproj", "project.pbxproj"));
 
-    expect(infoPlist).toContain("<key>CFBundleDisplayName</key>\n\t<string>Chessticize</string>");
+    expect(infoPlist).toContain(
+      "<key>CFBundleDisplayName</key>\n\t<string>$(INFOPLIST_KEY_CFBundleDisplayName)</string>"
+    );
     expect(infoPlist).toContain("<key>CFBundleShortVersionString</key>\n\t<string>$(MARKETING_VERSION)</string>");
     expect(infoPlist).toContain("<key>CFBundleVersion</key>\n\t<string>$(CURRENT_PROJECT_VERSION)</string>");
     expect(project).toContain("PRODUCT_BUNDLE_IDENTIFIER = com.chessticize.mobile;");
+    expect(project).toContain("PRODUCT_BUNDLE_IDENTIFIER = com.chessticize.mobile.dev;");
+    expect(project).toContain('INFOPLIST_KEY_CFBundleDisplayName = "Chessticize Dev";');
     expect(project).toContain("PRODUCT_NAME = Chessticize;");
     expect(project).toContain("productName = Chessticize;");
     expect(project).toContain("Config/Debug.xcconfig");

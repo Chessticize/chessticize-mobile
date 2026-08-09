@@ -91,6 +91,7 @@ const pbxproj = readText("apps/mobile/ios/ChessticizeMobile.xcodeproj/project.pb
 const infoPlist = readText("apps/mobile/ios/ChessticizeMobile/Info.plist");
 const privacyManifest = readText("apps/mobile/ios/ChessticizeMobile/PrivacyInfo.xcprivacy");
 const entitlements = readText("apps/mobile/ios/ChessticizeMobile/ChessticizeMobile.entitlements");
+const devEntitlements = readText("apps/mobile/ios/ChessticizeMobile/ChessticizeMobileDev.entitlements");
 const exportOptions = readText("apps/mobile/ios/ExportOptions.app-store-connect.plist");
 const thirdPartyAudit = spawnSync(
   process.execPath,
@@ -212,14 +213,21 @@ check(
 check(
   `iOS release identity is fixed for ${iosReleaseIdentity.version}`,
   iosReleaseIdentity.valid &&
-    bundleIdentifiers.length === 1 &&
-    bundleIdentifiers[0] === "com.chessticize.mobile" &&
+    bundleIdentifiers.length === 2 &&
+    bundleIdentifiers.includes("com.chessticize.mobile") &&
+    bundleIdentifiers.includes("com.chessticize.mobile.dev") &&
+    iosReleaseIdentity.release?.bundleIdentifier === "com.chessticize.mobile" &&
+    iosReleaseIdentity.release?.displayName === "Chessticize" &&
+    iosReleaseIdentity.release?.entitlements === "ChessticizeMobile/ChessticizeMobile.entitlements" &&
+    iosReleaseIdentity.debug?.bundleIdentifier === "com.chessticize.mobile.dev" &&
+    iosReleaseIdentity.debug?.displayName === "Chessticize Dev" &&
+    iosReleaseIdentity.debug?.entitlements === "ChessticizeMobile/ChessticizeMobileDev.entitlements" &&
     deviceFamilies.length === 1 &&
     targetedDeviceFamily === "1,2" &&
     !fullScreenLocked &&
     stringArrayEquals(iphoneOrientations, expectedIphoneOrientations) &&
     stringArrayEquals(ipadOrientations, expectedIpadOrientations),
-  `Found canonicalVersion=${iosReleaseIdentity.version}, canonicalBuild=${iosReleaseIdentity.build}, configMatchesCanonical=${iosReleaseIdentity.configMatchesCanonical}, projectUsesGeneratedConfig=${iosReleaseIdentity.projectUsesGeneratedConfig}, bundleIdentifiers=${bundleIdentifiers.join(",")}, deviceFamilies=${deviceFamilies.join(",")}, fullScreenLocked=${fullScreenLocked}, iphoneOrientations=${iphoneOrientations.join("|")}, ipadOrientations=${ipadOrientations.join("|")}.`
+  `Found canonicalVersion=${iosReleaseIdentity.version}, canonicalBuild=${iosReleaseIdentity.build}, configMatchesCanonical=${iosReleaseIdentity.configMatchesCanonical}, projectUsesGeneratedConfig=${iosReleaseIdentity.projectUsesGeneratedConfig}, debugIdentity=${JSON.stringify(iosReleaseIdentity.debug)}, releaseIdentity=${JSON.stringify(iosReleaseIdentity.release)}, bundleIdentifiers=${bundleIdentifiers.join(",")}, deviceFamilies=${deviceFamilies.join(",")}, fullScreenLocked=${fullScreenLocked}, iphoneOrientations=${iphoneOrientations.join("|")}, ipadOrientations=${ipadOrientations.join("|")}.`
 );
 
 check(
@@ -243,10 +251,16 @@ check(
     privacyManifest.includes("<key>NSPrivacyCollectedDataTypes</key>") &&
     privacyManifest.includes("<array/>") &&
     entitlements.includes("iCloud.com.chessticize.mobile") &&
+    !entitlements.includes("iCloud.com.chessticize.mobile.dev") &&
+    devEntitlements.includes("iCloud.com.chessticize.mobile.dev") &&
+    devEntitlements.includes("com.apple.developer.icloud-container-environment") &&
+    devEntitlements.includes("<string>Development</string>") &&
+    !devEntitlements.includes("<string>iCloud.com.chessticize.mobile</string>") &&
     entitlements.includes("<string>CloudKit</string>") &&
+    devEntitlements.includes("<string>CloudKit</string>") &&
     pbxproj.includes("ICloudProgressSync.m in Sources") &&
     pbxproj.includes("CloudKit.framework in Frameworks"),
-  "Privacy disclosure, public privacy policy, iOS privacy manifest, and CloudKit entitlement must describe no collection, no tracking, and optional private iCloud sync."
+  "Privacy disclosure, public privacy policy, iOS privacy manifest, and isolated production/Development CloudKit entitlements must describe no collection, no tracking, and optional private iCloud sync."
 );
 
 check(

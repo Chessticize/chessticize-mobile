@@ -1,6 +1,6 @@
 ---
 name: chessticize-mobile-local-e2e
-description: Prepare and validate the Chessticize Mobile macOS/iOS environment and fresh Git worktrees, run risk-scoped local Detox evidence for flows, practice, or the full suite, diagnose Xcode, Ruby, CocoaPods, Git LFS, Simulator, or Detox failures, and record auditable reusable results. Use when a PR changes an iOS native boundary, when release validation needs a native suite, when setting up a Mac or worktree for Detox, or when measuring local E2E duration.
+description: Prepare and validate the Chessticize Mobile macOS/iOS environment and fresh Git worktrees, run risk-scoped local Detox evidence for flows, practice, or the full suite across Debug-Dev and Release-Production identities, keep physical-device installs on the isolated Dev identity, diagnose Xcode, Ruby, CocoaPods, Git LFS, Simulator, or Detox failures, and record auditable reusable results. Use when a PR changes an iOS native boundary, when release validation needs a native suite, when setting up a Mac or worktree for Detox, or when measuring local E2E duration.
 ---
 
 # Chessticize Mobile Local E2E
@@ -14,6 +14,15 @@ as separate phases.
 
 - Run only on macOS with full Xcode and an installed iOS Simulator runtime.
 - Use a dedicated simulator such as `iPhone 17-Detox`. Never use the simulator that holds manual-test data: Detox launches with `delete: true` and wipes the app sandbox.
+- Treat Debug as `Chessticize Dev` with bundle ID
+  `com.chessticize.mobile.dev` and CloudKit container
+  `iCloud.com.chessticize.mobile.dev`, using the visually distinct
+  `AppIconDev` asset. Treat Release as the production app with
+  `com.chessticize.mobile`, `iCloud.com.chessticize.mobile`, and the production
+  `AppIcon` asset.
+- Install only Debug on a personal physical device before release. Use
+  `pnpm mobile:ios:dev:device`; do not use a Release device build for routine
+  testing.
 - Commit the intended code first and require a clean worktree before producing merge evidence.
 - Rebuild and rerun the selected scope after an App build input changes. Those
   inputs include mobile runtime/domain sources, native/platform projects and
@@ -24,6 +33,10 @@ as separate phases.
   reuse the checksummed App bundle, and rerun only the affected scope.
   Documentation, review metadata, and merge-parent changes force neither.
 - Choose `flows`, `practice`, or `full` from the repository risk matrix. Do not default a routine PR to `full` without a broad native reason.
+- Use `CHESSTICIZE_E2E_VARIANTS=debug` for ordinary native-impacting PR
+  evidence. When an iOS release candidate requires simulator E2E, use
+  `CHESSTICIZE_E2E_VARIANTS=both`; the same selected scope must pass once on
+  Debug-Dev and once on Release-Production.
 - GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
   validation is required only for releases and native-impacting changes. All
   relevant fast CI checks must still pass on the current head.
@@ -169,11 +182,15 @@ Prefer the bundled runner from the repository root:
 
 ```sh
 CHESSTICIZE_E2E_SCOPE=practice \
+  CHESSTICIZE_E2E_VARIANTS=debug \
   DETOX_IOS_DEVICE="iPhone 17-Detox" \
   .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
 ```
 
-Replace `practice` with `flows` or `full`. The runner requires an explicit scope so a routine PR cannot accidentally pay for the complete suite.
+Replace `practice` with `flows` or `full`. The runner defaults to `debug` for
+ordinary PR evidence. For release-candidate simulator E2E, set
+`CHESSTICIZE_E2E_VARIANTS=both`. The runner requires an explicit scope so a
+routine PR cannot accidentally pay for the complete suite.
 
 The runner:
 
@@ -181,11 +198,13 @@ The runner:
 2. Requires a clean git worktree and records `HEAD`.
 3. Rejects unhydrated Git LFS pointer files for the Stockfish NNUE networks.
 4. Verifies the dedicated simulator and iOS environment.
-5. Builds the app with bundled JavaScript, or verifies and reuses a checksummed
-   existing App bundle when `CHESSTICIZE_E2E_REUSE_APP_SOURCE_SHA` names an
-   ancestor whose App-input digest matches the current test runner.
+5. Builds the selected Debug, Release, or both App variants with bundled
+   JavaScript, or verifies and reuses each checksummed existing App bundle when
+   `CHESSTICIZE_E2E_REUSE_APP_SOURCE_SHA` names an ancestor whose App-input
+   digest matches the current test runner.
 6. Normalizes only the known worktree-dependent Hermes checksum when that is the build's sole tracked change; any other tracked or untracked build output fails the gate.
-7. Runs the selected suite, or both suites for `full`, with one worker.
+7. Runs the selected suite, or both suites for `full`, with one worker against
+   each selected App identity.
 8. Verifies the commit and worktree did not change.
 9. Prints per-step timing plus separate App source and test-runner identities.
 
@@ -194,15 +213,17 @@ scope without rebuilding:
 
 ```sh
 CHESSTICIZE_E2E_SCOPE=practice \
+  CHESSTICIZE_E2E_VARIANTS=debug \
   CHESSTICIZE_E2E_REUSE_APP_SOURCE_SHA=<app-source-sha> \
   DETOX_IOS_DEVICE="iPhone 17-Detox" \
   .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
 ```
 
-The normal build writes an ignored artifact manifest containing the App source
-SHA, App-input digest, and App-bundle checksum. Reuse fails closed if the
-manifest is absent, the artifact bytes changed, an App build input changed, or
-the App source is not an ancestor of the test runner.
+Each normal build writes an ignored, variant-specific artifact manifest
+containing the App source SHA, App-input digest, and App-bundle checksum. Reuse
+fails closed if either required manifest is absent, the artifact bytes changed,
+an App build input changed, or the App source is not an ancestor of the test
+runner.
 
 To run commands manually, use the same order and run only the selected scope. This example shows `practice`:
 
@@ -213,13 +234,19 @@ export DETOX_MAX_WORKERS=1
 
 pnpm mobile:doctor:ios
 pnpm mobile:e2e:build:ios
+pnpm mobile:e2e:build:ios:release
 
 cd apps/mobile
 DETOX_ACTIVE_SUITE=practice ./node_modules/.bin/detox test \
   --configuration ios.sim.debug --cleanup
+DETOX_ACTIVE_SUITE=practice ./node_modules/.bin/detox test \
+  --configuration ios.sim.release --cleanup
 ```
 
-For `full`, run the same command once with `DETOX_ACTIVE_SUITE=flows` and once with `DETOX_ACTIVE_SUITE=practice`; reuse the same build.
+For an ordinary PR, run only the risk-selected Debug command. For a release
+candidate whose selected scope includes simulator E2E, run the same scope for
+both configurations. For `full`, run `flows` and `practice` for both
+configurations; reuse each configuration's build.
 
 The build must create:
 
@@ -228,6 +255,12 @@ apps/mobile/ios/build/Build/Products/Debug-iphonesimulator/Chessticize.app/main.
 ```
 
 Its presence proves the Detox app does not depend on Metro.
+
+The Release counterpart is:
+
+```text
+apps/mobile/ios/build-release/Build/Products/Release-iphonesimulator/Chessticize.app/main.jsbundle
+```
 
 ## Diagnose Failures
 
@@ -250,6 +283,8 @@ containing:
 - Full App source SHA and test-runner SHA.
 - App-input digest and App-bundle checksum.
 - Selected scope and rationale.
+- Selected identities: Debug-Dev for ordinary PR evidence, or both Debug-Dev
+  and Release-Production for release-candidate simulator E2E.
 - Xcode version and simulator name.
 - Build command and success.
 - Each required suite command, pass count, and duration.
@@ -263,4 +298,6 @@ App-input comparison. Rebuild after any runtime, native/platform, native
 test-bundle, dependency, build/release, or bundled fixture/resource change.
 Rerun only affected test evidence after a host-side spec, selector, assertion,
 collector, or non-bundled fixture change. Release runs use delta, targeted, or
-full scope and require both suites only for broad native risk.
+full scope and require both suites only for broad native risk; whenever that
+scope includes iOS simulator E2E, run it for both identities with
+`CHESSTICIZE_E2E_VARIANTS=both`.

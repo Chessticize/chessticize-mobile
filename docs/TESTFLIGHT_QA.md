@@ -162,6 +162,11 @@ result. Unchecked items do not block App Store submission.
 
 ### Settings
 
+On a personal daily-use iPhone, perform this pre-release CloudKit checklist in
+`Chessticize Dev`, installed with `pnpm mobile:ios:dev:device`. It uses
+`iCloud.com.chessticize.mobile.dev` in the Development environment. Do not use
+the production Release identity for this diagnostic.
+
 - [ ] Open Settings.
 - [ ] Confirm Settings shows iCloud Sync, Notifications, Profile, and About
       sections, with iCloud Sync defaulting on.

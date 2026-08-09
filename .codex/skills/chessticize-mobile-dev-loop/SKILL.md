@@ -1,6 +1,6 @@
 ---
 name: chessticize-mobile-dev-loop
-description: Use when developing Chessticize Mobile features, choosing the right validation layer, testing core/backend logic, running CLI end-to-end checks, testing React Native UI, or deciding when to use iOS simulator, Detox, and screenshots.
+description: Use when developing Chessticize Mobile features, choosing the right validation layer, testing core/backend logic, running CLI end-to-end checks, testing React Native UI, or deciding when to use iOS simulator, isolated Dev-device installs, dual-identity release Detox, and screenshots.
 ---
 
 # Chessticize Mobile Dev Loop
@@ -124,6 +124,21 @@ Do not start the simulator for every UI text/layout/state change. If `react-nati
 Use this as a required gate for native-impacting changes and releases, or as an
 optional acceptance tool for non-native visual work:
 
+Keep the iOS identities fail-closed:
+
+- Debug is `Chessticize Dev` (`com.chessticize.mobile.dev`) and uses only
+  `iCloud.com.chessticize.mobile.dev` in the CloudKit Development environment.
+- Debug uses the visually distinct `AppIconDev` asset. Release must continue
+  to use the production `AppIcon` asset.
+- Release is `Chessticize` (`com.chessticize.mobile`) and uses the production
+  `iCloud.com.chessticize.mobile` container.
+- Install only Debug on a personal physical device before release. Use
+  `pnpm mobile:ios:dev:device`; never sideload a Release build for routine
+  device testing.
+- When an iOS release candidate requires simulator E2E, run every selected
+  suite against both identities with `CHESSTICIZE_E2E_VARIANTS=both`. The
+  risk-selected suite remains `flows`, `practice`, or `full`.
+
 Before booting or creating a simulator, inspect the existing simulator devices
 and reuse a compatible device whenever it satisfies the required runtime,
 device profile, and test-isolation boundary. Start a different simulator only
@@ -241,13 +256,17 @@ Use the risk-scoped runner for suite-level evidence:
 
 ```sh
 CHESSTICIZE_E2E_SCOPE=practice \
+  CHESSTICIZE_E2E_VARIANTS=debug \
   DETOX_IOS_DEVICE="iPhone 17-Detox" \
   .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
 ```
 
 Replace `practice` with `flows` or `full` as required. Record the scope, App
 source SHA, test-runner SHA, App-input digest, artifact checksum, build result,
-commands, results, and clean-worktree confirmation in the PR. The two SHAs may
+configuration identity, commands, results, and clean-worktree confirmation in
+the PR. For a release-candidate run, replace `debug` with `both`; the runner
+builds and runs the selected scope once for Debug-Dev and once for
+Release-Production. The two SHAs may
 differ when `node apps/mobile/scripts/mobile-app-inputs.js compare` proves that
 App build inputs are unchanged. Those inputs include mobile runtime/domain
 sources, native/platform
@@ -264,7 +283,8 @@ iOS Detox. Local native validation is required only for releases and native-impa
 changes. Release candidates use the same risk scopes: a delta needs exact-head
 fast checks plus the platform's signed-artifact checks, targeted native risk
 needs the affected local simulator/emulator suite, and only broad native risk
-requires both suites locally.
+requires both suites locally. Whenever an iOS release scope includes simulator
+E2E, use `CHESSTICIZE_E2E_VARIANTS=both` for that selected scope.
 Physical-device testing is optional and does not block App Store or Play
 submission, or the post-Play APK mirror. After a later commit or squash merge,
 reuse passing native App evidence when the fail-closed App-input comparison
@@ -357,6 +377,10 @@ Before finalizing:
   for the current App build inputs or a fail-closed reuse comparison;
   test-runner-only changes rerun only their affected evidence.
 - Keep iOS native validation local; GitHub CI runs only the fast non-native jobs.
+- For release-candidate iOS simulator E2E, record both Debug-Dev and
+  Release-Production results from `CHESSTICIZE_E2E_VARIANTS=both`.
+- For pre-release physical-device checks, install only with
+  `pnpm mobile:ios:dev:device` so local SQLite and CloudKit data remain isolated.
 - Keep Android emulator and Detox validation local; GitHub Actions is reserved
   for protected Android signing/source publication, source recovery, and the
   post-Play APK mirror.

@@ -66,6 +66,10 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('custom-theme-mixed').and(by.traits(['selected']))))
       .toExist()
       .withTimeout(10000);
+    // Theme expansion can leave the text field one pixel under the clipped
+    // scroll boundary in optimized Release layout. Normalize it before the
+    // native replaceText action, which requires full hit-point visibility.
+    await waitForVisibleInPracticeScroll('practice-run-name-input');
     await element(by.id('practice-run-name-input')).replaceText('Calculation Lab');
     await dismissRunNameKeyboard();
     await element(by.id('practice-main-scroll')).scrollTo('top');
@@ -125,6 +129,7 @@ describe('Practice POC', () => {
 
     await element(by.text('Calculation Lab')).tap();
     await waitFor(element(by.id('practice-run-name-input'))).toHaveText('Calculation Lab').withTimeout(10000);
+    await waitForVisibleInPracticeScroll('practice-run-name-input');
     await element(by.id('practice-run-name-input')).replaceText('Calculation Focus');
     await dismissRunNameKeyboard();
     await element(by.id('practice-run-elo-input')).replaceText('1000');

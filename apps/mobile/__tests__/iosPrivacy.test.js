@@ -64,13 +64,22 @@ describe("iOS App Store privacy artifacts", () => {
 
   it("enables only the CloudKit iCloud entitlement needed for optional progress sync", () => {
     const entitlements = readText(join(iosRoot, "ChessticizeMobile.entitlements"));
+    const devEntitlements = readText(join(iosRoot, "ChessticizeMobileDev.entitlements"));
     const pbxproj = readText(join(appRoot, "ios", "ChessticizeMobile.xcodeproj", "project.pbxproj"));
 
     expect(entitlements).toContain("com.apple.developer.icloud-container-identifiers");
     expect(entitlements).toContain("iCloud.com.chessticize.mobile");
     expect(entitlements).toContain("com.apple.developer.icloud-services");
     expect(entitlements).toContain("<string>CloudKit</string>");
+    expect(entitlements).not.toContain("iCloud.com.chessticize.mobile.dev");
+    expect(devEntitlements).toContain("com.apple.developer.icloud-container-identifiers");
+    expect(devEntitlements).toContain("iCloud.com.chessticize.mobile.dev");
+    expect(devEntitlements).toContain("com.apple.developer.icloud-container-environment");
+    expect(devEntitlements).toContain("<string>Development</string>");
+    expect(devEntitlements).toContain("<string>CloudKit</string>");
+    expect(devEntitlements).not.toContain("<string>iCloud.com.chessticize.mobile</string>");
     expect(pbxproj).toContain("CODE_SIGN_ENTITLEMENTS = ChessticizeMobile/ChessticizeMobile.entitlements;");
+    expect(pbxproj).toContain("CODE_SIGN_ENTITLEMENTS = ChessticizeMobile/ChessticizeMobileDev.entitlements;");
     expect(pbxproj).toContain("ICloudProgressSync.m in Sources");
     expect(pbxproj).toContain("CloudKit.framework in Frameworks");
   });

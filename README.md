@@ -56,6 +56,7 @@ harness (`apps/cli`), and bundled puzzle fixtures (`fixtures/puzzles`).
 - [App Store Upload](docs/APP_STORE_UPLOAD.md) — owner-executed archive and App Store Connect upload runbook
 - [TestFlight Diagnostics](docs/TESTFLIGHT_QA.md) — optional post-build device diagnostics and evidence log
 - [Privacy Policy](docs/PRIVACY_POLICY.md) — current data, user-controllable iCloud Sync, Android backup, and tracking disclosure
+- [iOS Development Build](docs/IOS_DEVELOPMENT_BUILD.md) — isolated Dev install, Development CloudKit setup, and dual-identity simulator E2E
 - [iOS Device Targets](docs/DEVICE_TARGETS.md) — iPhone portrait and adaptive iPad/window release target
 - [Android Validation](docs/ANDROID_VALIDATION.md) — exact-head API, adaptive, backup, and optional hardware-diagnostic evidence contract
 - [UI Flow Design Gate](docs/agents/ui-flow-design.md) — required Storybook-first approval workflow for new UI flows
