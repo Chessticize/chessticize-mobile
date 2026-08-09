@@ -334,6 +334,7 @@ export const ArrowDuelReplySetting: Story = {
       "To turn this extra challenge off for every Run, go to Settings."
     );
     await waitForTestId(canvasElement, "practice-run-arrow-duel-reply-seconds");
+    await centerTestId(canvasElement, "practice-run-arrow-duel-reply-setting");
   }
 };
 
@@ -354,6 +355,7 @@ export const ArrowDuelReplyCustomTime: Story = {
       "practice-run-arrow-duel-reply-seconds",
       "30"
     );
+    await centerTestId(canvasElement, "practice-run-arrow-duel-reply-setting");
   }
 };
 
@@ -371,6 +373,7 @@ export const ArrowDuelRunEditorReplyOff: Story = {
     await clickTestId(canvasElement, "practice-run-edit-arrow-duel");
     await clickTestId(canvasElement, "practice-run-arrow-duel-reply-toggle");
     await expectTestIdText(canvasElement, "practice-run-arrow-duel-reply-value", "Off");
+    await centerTestId(canvasElement, "practice-run-arrow-duel-reply-setting");
   }
 };
 
