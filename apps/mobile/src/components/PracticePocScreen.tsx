@@ -12985,6 +12985,7 @@ function AnimatedCollapsibleRegion({
 
   return (
     <Animated.View
+      aria-hidden={!expanded}
       accessibilityElementsHidden={!expanded}
       importantForAccessibility={expanded ? "auto" : "no-hide-descendants"}
       pointerEvents={expanded ? "auto" : "none"}

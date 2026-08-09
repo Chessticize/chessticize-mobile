@@ -4488,10 +4488,12 @@ describe("PracticePocScreen", () => {
     press(reviewRenderer, "review-tab");
 
     expect(findByTestId(reviewRenderer, "review-filter-options-motion").props).toMatchObject({
+      "aria-hidden": true,
       accessibilityElementsHidden: true,
       pointerEvents: "none"
     });
     expect(findByTestId(reviewRenderer, "review-filter-summary-motion").props).toMatchObject({
+      "aria-hidden": false,
       accessibilityElementsHidden: false,
       pointerEvents: "auto"
     });
@@ -4518,10 +4520,12 @@ describe("PracticePocScreen", () => {
     )).toBeLessThan(0);
     press(reviewRenderer, "review-filter-toggle");
     expect(findByTestId(reviewRenderer, "review-filter-options-motion").props).toMatchObject({
+      "aria-hidden": false,
       accessibilityElementsHidden: false,
       pointerEvents: "auto"
     });
     expect(findByTestId(reviewRenderer, "review-filter-summary-motion").props).toMatchObject({
+      "aria-hidden": true,
       accessibilityElementsHidden: true,
       pointerEvents: "none"
     });
@@ -4530,10 +4534,12 @@ describe("PracticePocScreen", () => {
     });
     press(reviewRenderer, "review-filter-toggle");
     expect(findByTestId(reviewRenderer, "review-filter-options-motion").props).toMatchObject({
+      "aria-hidden": true,
       accessibilityElementsHidden: true,
       pointerEvents: "none"
     });
     expect(findByTestId(reviewRenderer, "review-filter-summary-motion").props).toMatchObject({
+      "aria-hidden": false,
       accessibilityElementsHidden: false,
       pointerEvents: "auto"
     });
@@ -15998,6 +16004,7 @@ function expectDisclosureClosed(
     ? "history-advanced-filters-motion"
     : "review-filter-options-motion";
   expect(findByTestId(renderer, motionTestID).props).toMatchObject({
+    "aria-hidden": true,
     accessibilityElementsHidden: true,
     pointerEvents: "none"
   });
