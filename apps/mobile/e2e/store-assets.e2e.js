@@ -47,7 +47,7 @@ describeStoreAssets('App Store screenshot capture', () => {
     await element(by.id('back-practice-button')).tap();
     await waitFor(element(by.id('practice-tab'))).toBeVisible().withTimeout(10000);
     await device.terminateApp();
-    await launchStoreAssetApp(reviewNowMs, false);
+    await launchStoreAssetApp(reviewNowMs, false, false);
 
     await completeOneWrongReview();
     await captureMainTabScenes();
@@ -63,10 +63,11 @@ async function captureFirstUseSprintRulesGuide() {
   await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
 }
 
-async function launchStoreAssetApp(nowMs, deleteData) {
+async function launchStoreAssetApp(nowMs, deleteData, enableTestControls = true) {
   await launchWithDisabledSynchronization({
     newInstance: true,
     delete: deleteData,
+    enableTestControls,
     launchArgs: {
       chessticizeStoreAssetCapture: '1',
       chessticizeTestNowMs: String(nowMs)

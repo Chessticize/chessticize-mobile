@@ -12924,12 +12924,10 @@ function AnimatedCollapsibleRegion({
   expanded: boolean;
 }): React.JSX.Element | null {
   const progress = useRef(new Animated.Value(expanded ? 1 : 0)).current;
-  const naturalInitialHeightRef = useRef(expanded);
   const [contentHeight, setContentHeight] = useState(0);
   const durationMs = DISCLOSURE_MOTION_DURATION_MS;
 
   useEffect(() => {
-    naturalInitialHeightRef.current = false;
     progress.stopAnimation();
     Animated.timing(progress, {
       duration: durationMs,
@@ -12954,9 +12952,10 @@ function AnimatedCollapsibleRegion({
 
   const animatedHeight = contentHeight > 0
     ? progress.interpolate({ inputRange: [0, 1], outputRange: [0, contentHeight] })
-    : naturalInitialHeightRef.current
+    : expanded
       ? undefined
       : 0;
+  const shouldMeasureInFlow = expanded && contentHeight === 0;
   const opacity = progress.interpolate({
     inputRange: [0, 0.35, 1],
     outputRange: [0, 0.55, 1]
@@ -12978,12 +12977,14 @@ function AnimatedCollapsibleRegion({
       testID={`${contentTestID}-motion`}
     >
       <View
-        style={contentStyle}
+        style={[
+          contentStyle,
+          shouldMeasureInFlow ? null : styles.collapsibleMotionContent
+        ]}
         testID={contentTestID}
         onLayout={(event: LayoutChangeEvent) => {
           const nextHeight = Math.ceil(event.nativeEvent.layout.height);
           if (nextHeight > 0 && nextHeight !== contentHeight) {
-            naturalInitialHeightRef.current = false;
             setContentHeight(nextHeight);
           }
         }}
@@ -22469,6 +22470,12 @@ const styles = StyleSheet.create({
   collapsibleMotionClip: {
     overflow: "hidden",
     width: "100%"
+  },
+  collapsibleMotionContent: {
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
   },
   chevronGlyph: {
     borderColor: "#334155",

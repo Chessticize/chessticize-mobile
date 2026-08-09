@@ -4434,6 +4434,17 @@ describe("PracticePocScreen", () => {
       accessibilityElementsHidden: false,
       pointerEvents: "auto"
     });
+    expect(flattenTestStyle(
+      findByTestId(reviewRenderer, "review-filter-options").props.style
+    ).position).toBe("absolute");
+    act(() => {
+      findByTestId(reviewRenderer, "review-filter-options").props.onLayout({
+        nativeEvent: { layout: { height: 32 } }
+      });
+    });
+    expect(flattenTestStyle(
+      findByTestId(reviewRenderer, "review-filter-options-motion").props.style
+    ).height).not.toBe(0);
     expect(testIdOrder(
       reviewRenderer,
       "review-filter-options-motion",
@@ -4468,6 +4479,20 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(reviewRenderer, "review-today-to-review-items-motion")).toBeTruthy();
     expect(findByTestId(reviewRenderer, "review-today-history-items-motion")).toBeTruthy();
+    expect(flattenTestStyle(
+      findByTestId(reviewRenderer, "review-today-to-review-items").props.style
+    ).position).toBeUndefined();
+    act(() => {
+      findByTestId(reviewRenderer, "review-today-to-review-items").props.onLayout({
+        nativeEvent: { layout: { height: 180 } }
+      });
+    });
+    expect(flattenTestStyle(
+      findByTestId(reviewRenderer, "review-today-to-review-items").props.style
+    ).position).toBe("absolute");
+    expect(flattenTestStyle(
+      findByTestId(reviewRenderer, "review-today-to-review-items-motion").props.style
+    ).height).not.toBe(0);
     press(reviewRenderer, "review-today-to-review-toggle");
     expect(findByTestId(reviewRenderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({
       expanded: false
