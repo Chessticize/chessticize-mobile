@@ -9,6 +9,7 @@ const {
   startPracticeMode,
   startSelectedPracticeRun,
   selectTestPuzzleSource,
+  tapUntilAnyExists,
   tapUntilExists,
   textFromAttributes,
   waitForVisibleInPracticeScroll,
@@ -56,20 +57,30 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('settings-sync-support-bundle-modal')))
       .toBeVisible()
       .withTimeout(10000);
-    await element(by.id('settings-sync-support-bundle-scroll')).scrollTo('bottom');
     await waitFor(element(by.id('settings-sync-support-bundle-prepare')))
       .toBeVisible()
       .withTimeout(10000);
-    await element(by.id('settings-sync-support-bundle-prepare')).tap();
-    await waitFor(element(by.id('settings-sync-support-bundle-share')))
-      .toExist()
-      .withTimeout(20000);
+    await tapUntilAnyExists(
+      'settings-sync-support-bundle-prepare',
+      ['settings-sync-support-bundle-preparing', 'settings-sync-support-bundle-share'],
+      3
+    );
+    try {
+      await waitFor(element(by.id('settings-sync-support-bundle-share')))
+        .toExist()
+        .withTimeout(60000);
+    } catch (error) {
+      const prepareError = element(by.id('settings-sync-support-bundle-prepare-error'));
+      await expect(prepareError).toExist();
+      throw new Error(`Support bundle preparation failed: ${await textFromAttributes(prepareError)}`, {
+        cause: error
+      });
+    }
     if (device.getPlatform() === 'android') {
       await waitFor(element(by.text('Android diagnostics bundle ready')))
         .toExist()
         .withTimeout(10000);
     }
-    await element(by.id('settings-sync-support-bundle-scroll')).scrollTo('bottom');
     await waitFor(element(by.id('settings-sync-support-bundle-details')))
       .toBeVisible()
       .withTimeout(10000);

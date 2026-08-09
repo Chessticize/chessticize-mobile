@@ -615,6 +615,7 @@ describe('screenshot assertions', () => {
       screenshotLabel: 'pending-capture',
     }, {
       cancelTimeout,
+      now: () => 0,
       scheduleTimeout,
     });
 

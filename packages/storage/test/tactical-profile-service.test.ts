@@ -1983,7 +1983,7 @@ for (const storeKind of ["memory", "sqlite"] as const) {
         });
       });
       assert.equal(store.getTacticalProfileSourceRevision(), before);
-      store.clearLocalHistory();
+      store.clearSyncedHistory("2026-07-29T12:00:00.000Z");
       assert.equal(
         store.getTacticalProfileSourceRevision(),
         before,
@@ -2010,7 +2010,7 @@ for (const storeKind of ["memory", "sqlite"] as const) {
         endReason: "abandoned"
       });
       assert.equal(store.getTacticalProfileSourceRevision(), before);
-      store.clearLocalHistory();
+      store.clearSyncedHistory("2026-07-29T12:00:00.000Z");
       assert.equal(
         store.getTacticalProfileSourceRevision(),
         before,
@@ -2042,7 +2042,7 @@ for (const storeKind of ["memory", "sqlite"] as const) {
         });
       });
       assert.equal(store.getTacticalProfileSourceRevision(), before + 1);
-      store.clearLocalHistory();
+      store.clearSyncedHistory("2026-07-29T12:00:00.000Z");
       assert.equal(
         store.getTacticalProfileSourceRevision(),
         before + 2,
