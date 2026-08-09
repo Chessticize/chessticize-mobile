@@ -1035,8 +1035,14 @@ test("an upload confirmation cannot acknowledge a newer local write to the same 
       batch.saving.filter((record) => record.kind === "preferences")
     );
     assert.equal(preferenceSaves.length, 2);
+    const cloudPreferences = decodeProgressV2Record(
+      transport.records.find((record) => record.kind === "preferences")!
+    );
+    if (cloudPreferences.state !== "present") {
+      assert.fail("expected present cloud preferences");
+    }
     assert.deepEqual(
-      decodeProgressV2Record(transport.records.find((record) => record.kind === "preferences")!).value,
+      cloudPreferences.value,
       {
         notifications: service.getSettings().notifications,
         moveFeedback: { soundEnabled: false, hapticsEnabled: false }
