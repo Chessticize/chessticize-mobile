@@ -174,6 +174,7 @@ describe('Android Standard Practice release slice', () => {
     expect(migrationFixtureInstaller).toContain('schema-v0-ios-1.0.0.sqlite');
     expect(migrationJourney).toContain('ReleasedDatabaseFixtureInstallerTest');
     expect(migrationJourney).toContain("'am', 'instrument'");
+    expect(migrationJourney).toContain("instrumentation.includes('OK (1 test)')");
     expect(migrationJourney).not.toContain('run-as');
     expect(migrationJourney).not.toContain("'push'");
     expect(migrationJourney).toContain("const { androidAdbPath } = require('./androidNetwork');");
