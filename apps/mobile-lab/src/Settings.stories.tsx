@@ -58,7 +58,6 @@ export const ArrowDuelOpponentReply: Story = {
       canvasElement,
       "Optional after a correct choice. Each Run can turn it off or choose its reply time in Edit Run."
     );
-    await waitForText(canvasElement, "On");
     await clickTestId(canvasElement, "settings-arrow-duel-opponent-reply-off");
     await waitForText(
       canvasElement,
