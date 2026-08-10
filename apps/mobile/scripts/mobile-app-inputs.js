@@ -31,6 +31,7 @@ const TEST_RUNNER_PATHS = new Set([
   'apps/mobile/scripts/android-validation-matrix.js',
   'apps/mobile/scripts/install-android-detox-apks.sh',
   'apps/mobile/scripts/prepare-android-offline-e2e.sh',
+  'apps/mobile/scripts/run-command-with-timeout.js',
   'scripts/validate-development-process.mjs',
 ]);
 
