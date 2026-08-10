@@ -94,7 +94,8 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
         // was removed from the product.
         await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
         await playBoardMove('session-board', 'c2b3');
-        await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
+        // The transient feedback overlay can finish before Detox begins its
+        // next poll. The persistent public score proves the real board move.
         await waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist().withTimeout(10000);
         await waitFor(element(by.id('move-feedback-overlay'))).not.toExist().withTimeout(10000);
 
@@ -104,7 +105,6 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
         // board to retain coordinate-mapping evidence on every display profile.
         await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
         await playBoardMove('session-board', 'c4b5');
-        await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
         await waitFor(element(by.label('Mistakes 2 of 3')).atIndex(0)).toExist().withTimeout(10000);
         await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);
       });

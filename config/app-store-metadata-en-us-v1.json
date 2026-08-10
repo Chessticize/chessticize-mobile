@@ -48,8 +48,8 @@
     ]
   },
   "currentVersionWhatsNew": {
-    "sourceTag": "ios-v1.4.0-build-1",
+    "sourceTag": "ios-v1.4.1-build-1",
     "status": "release-candidate",
-    "storeCopy": "• After choosing the stronger move, find the opponent’s best reply in Arrow Duel.\n• Reorder saved Runs with smoother drag feedback and haptics, and scan Add Run themes faster.\n• Keep all 1.4 million offline puzzles with a smaller bundled puzzle library."
+    "storeCopy": "• See today’s due and completed puzzles together in a clearer Review screen.\n• Turn the Arrow Duel reply challenge on or off for every Run in Settings.\n• Sync progress across your Apple devices more reliably with improved iCloud updates."
   }
 }

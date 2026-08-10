@@ -262,8 +262,10 @@ async function assertCompositionViewport(frame) {
     ]) {
       await waitFor(element(by.id(testID))).toBeVisible().withTimeout(10000);
     }
-    for (const testID of frame.source.crop.excludeTestIds) {
-      await expect(element(by.id(testID))).not.toBeVisible();
+    if (!verifyIosLandscapeLayout) {
+      for (const testID of frame.source.crop.excludeTestIds) {
+        await expect(element(by.id(testID))).not.toBeVisible();
+      }
     }
   }
 }

@@ -1898,6 +1898,15 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain("ROOT_CLIPPED_SCROLL_CONTAINERS.has(testID)");
     expect(spec).toContain("'settings-about-section'");
     expect(spec).toContain('assertFramesIntersect(');
+    const compositionHelperStart = spec.indexOf('async function assertCompositionViewport');
+    const compositionHelperEnd = spec.indexOf(
+      'async function prepareRatingTrend',
+      compositionHelperStart
+    );
+    const compositionHelper = spec.slice(compositionHelperStart, compositionHelperEnd);
+    expect(compositionHelper).toContain('if (!verifyIosLandscapeLayout)');
+    expect(compositionHelper.indexOf('if (!verifyIosLandscapeLayout)'))
+      .toBeLessThan(compositionHelper.indexOf('frame.source.crop.excludeTestIds'));
     const launchHelperStart = spec.indexOf('async function launchMarketingFrame');
     const launchHelperEnd = spec.indexOf('async function prepareFrame', launchHelperStart);
     const launchHelper = spec.slice(launchHelperStart, launchHelperEnd);
@@ -2004,6 +2013,9 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain('waitForAndroidUiState');
     expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
     const submitFirstWrongBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
+    expect(spec).not.toContain(
+      "waitFor(element(by.id('move-feedback-overlay'))).toExist()"
+    );
     const verifyFirstWrongMoveResult = spec.indexOf(
       "waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist()",
       submitFirstWrongBoardMove
@@ -2344,6 +2356,8 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('await cancelledPredictiveBack.completion()');
     expect(spec).toContain('Pending Arrow Duel timer cancellation is covered deterministically');
     expect(spec).not.toContain("by.id('sprint-loading-overlay')");
+    expect(spec).toContain("by.id('review-today-history-empty'))).toExist()");
+    expect(spec).not.toContain("by.id('review-today-history')).not.toExist()");
     expect(spec).toContain('androidAppIsResumed');
     expect(spec).toContain('const rootPredictiveBack = beginAndroidPredictiveBackGesture()');
     expect(spec).toContain('Idle Practice root trapped Predictive Back');

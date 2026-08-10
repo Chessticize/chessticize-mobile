@@ -677,7 +677,7 @@ function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false 
 }
 
 describe('Android Play release contract', () => {
-  it('pins the proposed Play release to public version 1.4 build 15', () => {
+  it('pins the proposed Play release to public version 1.4.1 build 16', () => {
     const sourceTag = canonicalAndroidSourceTag(
       releaseVersion.publicVersion,
       releaseVersion.androidVersionCode,
@@ -707,11 +707,11 @@ describe('Android Play release contract', () => {
 
     expect(releaseVersion).toEqual(
       expect.objectContaining({
-        publicVersion: '1.4',
-        androidVersionCode: 15,
+        publicVersion: '1.4.1',
+        androidVersionCode: 16,
       }),
     );
-    expect(sourceTag).toBe('android-v1.4.0-build-15');
+    expect(sourceTag).toBe('android-v1.4.1-build-16');
     expect(ownerEvidenceExample.candidate).toEqual(
       expect.objectContaining(expectedIdentityBinding),
     );
@@ -724,10 +724,10 @@ describe('Android Play release contract', () => {
       ownerEvidenceExample.sourceRelease.reference.endsWith(sourceTag),
     ).toBe(true);
     expect(runbook).toContain(
-      'Android version code: `apps/mobile/release-version.json` (`15`)',
+      'Android version code: `apps/mobile/release-version.json` (`16`)',
     );
-    expect(releaseNote).toContain('Public version: `1.4`');
-    expect(releaseNote).toContain('Build or version code: `15`');
+    expect(releaseNote).toContain('Public version: `1.4.1`');
+    expect(releaseNote).toContain('Build or version code: `16`');
     expect(releaseNote).toContain(`Source tag: \`${sourceTag}\``);
     const storeCopy = releaseNote.match(
       /## Store copy \(`en-US`\)\n\n```text\n([\s\S]+?)\n```/,
@@ -735,11 +735,11 @@ describe('Android Play release contract', () => {
     expect(storeCopy).toBeDefined();
     expect(Array.from(storeCopy).length).toBeLessThanOrEqual(300);
     expect(storeCopy).not.toMatch(/https?:\/\//u);
-    expect(storeCopy).toContain('opponent’s best reply');
-    expect(storeCopy).toContain('Reorder saved Runs');
-    expect(storeCopy).toContain('haptics');
-    expect(storeCopy).toContain('1.4 million offline puzzles');
-    expect(storeCopy).toContain('smaller bundled puzzle library');
+    expect(storeCopy).toContain('clearer Review screen');
+    expect(storeCopy).toContain('reply challenge');
+    expect(storeCopy).toContain('every Run in Settings');
+    expect(storeCopy).toContain('bundled offline puzzle pack');
+    expect(storeCopy).toContain('App updates');
     expect(storeCopy).not.toContain('Progress Backup');
     expect(releaseNote).not.toMatch(/Rating history/i);
     expect(storeCopy).not.toMatch(/across devices|cross-platform sync/i);
@@ -782,7 +782,8 @@ describe('Android Play release contract', () => {
       'Build 12 is the retained Android 1.3.4 candidate',
       'Build 13 is the invalidated Android 1.3.5 RC1 source identity',
       'Build 14 is the immutable Android 1.3.5 release',
-      'Build 15 is the proposed Android 1.4 release',
+      'Build 15 is the immutable Android 1.4 release',
+      'Build 16 is the proposed Android 1.4.1 release',
     ]) {
       expect(runbook).toContain(value);
     }
