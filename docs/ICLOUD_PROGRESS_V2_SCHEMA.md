@@ -14,7 +14,7 @@ remain aligned with this contract.
 The additive record schema below was verified in the Development environment
 of the Dev container and deployed to the Production environment of the
 production container on 2026-08-09. This does not seal the V1 bridge; sealing
-is a separate 1.5 release decision.
+is a separate 1.4.2 release decision.
 
 ## Private custom zone
 
@@ -76,6 +76,20 @@ The native adapter must reject records whose CloudKit record type, record name,
 field types, declared schema version, or decoded payload identity does not match
 this contract.
 
+## 1.4.2 seal policy
+
+Version 1.4.2 sets the app release phase to `sealed`. Every sync trigger first
+reads V2 changes, advances `SyncManifest/default` to `sealed` when needed, and
+then continues with V2 only. Startup, background, enable, and manual sync never
+request V1 metadata or its payload. Support diagnostics also use the active
+release phase, so a fresh 1.4.2 install or a device with Sync Off does not read
+V1 before its local marker has been persisted.
+
+The transition is monotonic: an observed or locally persisted `sealed` phase
+cannot return to `bridging`, and a later V1 write cannot modify V2. The legacy
+V1 record is retained unchanged as an archive. A new device restores retained
+history entirely from the V2 custom zone.
+
 ## Deployment checklist
 
 Before distributing any future writer that changes this contract:
@@ -88,4 +102,4 @@ Before distributing any future writer that changes this contract:
 
 CloudKit schema deployment is additive and distinct from changing the manifest
 phase. A late V1 writer remains importable during `bridging`; after the approved
-1.5 gate advances the manifest to `sealed`, clients must not query V1.
+1.4.2 gate advances the manifest to `sealed`, clients must not query V1.

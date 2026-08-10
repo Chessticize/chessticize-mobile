@@ -464,6 +464,178 @@ test("bridging normalizes V1 snapshots created before newer settings and record 
   }
 });
 
+test("the 1.4.2 seal advances the manifest before legacy reads and ignores every later V1 write", async () => {
+  const store = new SQLiteStore(":memory:");
+  const legacyStore = new SQLiteStore(":memory:");
+  store.migrate();
+  legacyStore.migrate();
+  const service = new PracticeService(store);
+  const legacyService = new PracticeService(legacyStore);
+  service.saveSettings({ ...service.getSettings(), sync: { iCloudEnabled: true } });
+  legacyService.setRating("standard 5/20", 1_111);
+  const transport = new FakeProgressV2Transport({
+    legacy: {
+      changeTag: "legacy-before-seal",
+      snapshot: {
+        schemaVersion: 1,
+        deviceId: "legacy-device",
+        updatedAt: "2026-08-09T12:00:00.000Z",
+        data: legacyService.exportLocalData()
+      }
+    }
+  });
+
+  try {
+    const sealed = await syncPracticeProgressV2(service, transport, {
+      desiredPhase: "sealed",
+      deviceId: "seal-device",
+      now: () => "2026-08-09T12:01:00.000Z"
+    });
+
+    assert.equal(sealed.phase, "sealed");
+    assert.equal(sealed.legacy.status, "skipped_sealed");
+    assert.equal(service.getRating("standard 5/20").rating, 600);
+    assert.equal(service.progressV2.readState().sealedAt, "2026-08-09T12:01:00.000Z");
+    assert.equal(transport.legacyMetadataFetchCount, 0);
+    assert.equal(transport.legacySnapshotFetchCount, 0);
+    const manifest = decodeProgressV2Record(
+      transport.records.find((record) => record.kind === "manifest")!
+    );
+    assert.equal(
+      manifest.state === "present" && manifest.kind === "manifest" &&
+        typeof manifest.value === "object" && manifest.value !== null &&
+        "phase" in manifest.value
+        ? manifest.value.phase
+        : undefined,
+      "sealed"
+    );
+
+    legacyService.setRating("standard 5/20", 1_222);
+    transport.setLegacy({
+      changeTag: "legacy-after-seal",
+      snapshot: {
+        schemaVersion: 1,
+        deviceId: "late-legacy-device",
+        updatedAt: "2026-08-09T12:02:00.000Z",
+        data: legacyService.exportLocalData()
+      }
+    });
+    const repeated = await syncPracticeProgressV2(service, transport, {
+      desiredPhase: "sealed",
+      deviceId: "seal-device",
+      now: () => "2026-08-09T12:03:00.000Z"
+    });
+
+    assert.equal(repeated.phase, "sealed");
+    assert.equal(repeated.legacy.status, "skipped_sealed");
+    assert.equal(service.getRating("standard 5/20").rating, 600);
+    assert.equal(transport.legacyMetadataFetchCount, 0);
+    assert.equal(transport.legacySnapshotFetchCount, 0);
+  } finally {
+    store.close();
+    legacyStore.close();
+  }
+});
+
+test("a new sealed device restores every retained V2 record family without V1", async () => {
+  const sourceStore = new SQLiteStore(":memory:");
+  const restoredStore = new SQLiteStore(":memory:");
+  sourceStore.migrate();
+  restoredStore.migrate();
+  const puzzles = await loadFixturePuzzles();
+  sourceStore.seedPuzzles(puzzles);
+  restoredStore.seedPuzzles(puzzles);
+  const source = new PracticeService(sourceStore);
+  const restored = new PracticeService(restoredStore);
+  source.saveSettings({
+    ...source.getSettings(),
+    sync: { iCloudEnabled: true },
+    moveFeedback: { soundEnabled: true, hapticsEnabled: false }
+  });
+  source.createPracticeRun({
+    id: "sealed-custom-run",
+    name: "Sealed Custom Run",
+    mode: "custom",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20,
+    targetCorrect: 3,
+    themes: ["hangingPiece"],
+    initialRating: 900
+  }, "2026-08-09T12:00:00.000Z");
+  source.startSprint(
+    { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 1 },
+    "2026-08-09T12:01:00.000Z"
+  );
+  source.submitMove("c4b5", "2026-08-09T12:01:05.000Z");
+  const transport = new FakeProgressV2Transport({
+    legacy: {
+      changeTag: "must-not-read-on-restore",
+      snapshot: { invalid: "must-not-read-on-restore" }
+    }
+  });
+
+  try {
+    await syncPracticeProgressV2(source, transport, {
+      desiredPhase: "sealed",
+      deviceId: "source-device",
+      now: () => "2026-08-09T12:02:00.000Z"
+    });
+    restored.saveSettings({
+      ...restored.getSettings(),
+      sync: { iCloudEnabled: true },
+      arrowDuel: { opponentReplyEnabled: false }
+    });
+    const result = await syncPracticeProgressV2(restored, transport, {
+      desiredPhase: "sealed",
+      deviceId: "new-device",
+      now: () => "2026-08-09T12:03:00.000Z"
+    });
+
+    assert.equal(result.phase, "sealed");
+    assert.equal(result.legacy.status, "skipped_sealed");
+    assert.deepEqual(
+      restored.listHistory().map((attempt) => attempt.id),
+      source.listHistory().map((attempt) => attempt.id)
+    );
+    assert.deepEqual(
+      restored.listSprintSessions().map((session) => session.id),
+      source.listSprintSessions().map((session) => session.id)
+    );
+    assert.deepEqual(restored.listReviewQueue(), source.listReviewQueue());
+    assert.deepEqual(
+      restored.listPracticeRuns().find((run) => run.id === "sealed-custom-run"),
+      source.listPracticeRuns().find((run) => run.id === "sealed-custom-run")
+    );
+    assert.deepEqual(
+      restored.getRating("standard 5/20"),
+      source.getRating("standard 5/20")
+    );
+    assert.deepEqual(restored.getSettings().moveFeedback, {
+      soundEnabled: true,
+      hapticsEnabled: false
+    });
+    assert.equal(restored.getSettings().sync.iCloudEnabled, true);
+    assert.equal(restored.getSettings().arrowDuel.opponentReplyEnabled, false);
+    assert.deepEqual(
+      new Set(transport.records.map((record) => record.kind)),
+      new Set([
+        "attempt",
+        "manifest",
+        "practice_run",
+        "preferences",
+        "rating",
+        "review_schedule",
+        "sprint_session"
+      ])
+    );
+    assert.equal(transport.legacyMetadataFetchCount, 0);
+    assert.equal(transport.legacySnapshotFetchCount, 0);
+  } finally {
+    sourceStore.close();
+    restoredStore.close();
+  }
+});
+
 test("a sealed V2 manifest prevents every V1 metadata and payload request", async () => {
   const manifestIdentity = { kind: "manifest" as const, entityKey: "default" };
   const transport = new FakeProgressV2Transport({
@@ -482,7 +654,7 @@ test("a sealed V2 manifest prevents every V1 metadata and payload request", asyn
         state: "present",
         value: {
           phase: "sealed",
-          minimumWriterVersion: "1.5",
+          minimumWriterVersion: "1.4.2-v2",
           migrationStartedAt: "2026-08-01T00:00:00.000Z",
           sealedAt: "2026-08-09T00:00:00.000Z"
         }
@@ -530,7 +702,7 @@ test("a stale bridging manifest cannot reopen a device that already observed sea
       state: "present",
       value: {
         phase,
-        minimumWriterVersion: phase === "sealed" ? "1.5" : "1.4-v2",
+        minimumWriterVersion: phase === "sealed" ? "1.4.2-v2" : "1.4-v2",
         migrationStartedAt: "2026-08-01T00:00:00.000Z",
         ...(phase === "sealed" ? { sealedAt: timestamp } : {})
       }

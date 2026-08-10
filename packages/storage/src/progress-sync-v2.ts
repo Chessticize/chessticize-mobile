@@ -25,10 +25,12 @@ import type {
   ProgressV2Tombstone
 } from "./progress-v2-persistence.ts";
 
+export type { ProgressV2Phase } from "./progress-v2-persistence.ts";
+
 export const PROGRESS_V2_FORMAT_VERSION = 2 as const;
 export const PROGRESS_V2_ZONE_NAME = "ProgressV2";
 export const PROGRESS_V2_RECORD_TYPE = "ProgressV2Record";
-export const PROGRESS_V2_WRITER_VERSION = "1.4-v2";
+export const PROGRESS_V2_WRITER_VERSION = "1.4.2-v2";
 
 export interface ProgressV2Record {
   recordName: string;
