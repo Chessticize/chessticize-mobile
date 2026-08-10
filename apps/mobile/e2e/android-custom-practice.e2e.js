@@ -185,8 +185,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
 
 async function openNewRunEditor() {
   await waitForVisibleInPracticeScroll('practice-add-run');
-  await element(by.id('practice-add-run')).tap();
-  await waitFor(element(by.id('practice-run-editor'))).toExist().withTimeout(10000);
+  await tapUntilExists('practice-add-run', 'practice-run-editor', 3);
   await element(by.id('practice-main-scroll')).scrollTo('top');
   await waitFor(element(by.id('custom-mode-regular'))).toBeVisible().withTimeout(10000);
 }
