@@ -18,6 +18,10 @@ describe('Android Standard Practice release slice', () => {
   it('keeps progress, puzzle-pack assets, and migration fixtures in distinguishable locations', () => {
     const databaseLayout = read('src/backend/mobileDatabaseLayout.ts');
     const deviceStore = read('src/platform/deviceSQLiteStore.ts');
+    const application = read('android/app/src/main/java/com/chessticize/mobile/MainApplication.kt');
+    const installer = read(
+      'android/app/src/main/java/com/chessticize/mobile/BundledPuzzlePackInstallerModule.kt',
+    );
     const appGradle = read('android/app/build.gradle');
     const productionAssetTask = appGradle.slice(0, appGradle.indexOf('apply plugin:'));
 
@@ -27,6 +31,13 @@ describe('Android Standard Practice release slice', () => {
     expect(databaseLayout).toContain('puzzle-packs');
     expect(deviceStore).toContain('MOBILE_DATABASE_LAYOUT.progressDatabaseName');
     expect(deviceStore).toContain('MOBILE_DATABASE_LAYOUT.androidPuzzlePackAssetDirectory');
+    expect(deviceStore).toContain('NativeModules.BundledPuzzlePackInstaller');
+    expect(application).toContain('BundledPuzzlePackInstallerPackage()');
+    expect(installer).toContain('@Synchronized');
+    expect(installer).toContain('"$filename.installing"');
+    expect(installer).toContain('output.fd.sync()');
+    expect(installer).toContain('staging.renameTo(destination)');
+    expect(installer).not.toContain('FileOutputStream(destination)');
     expect(appGradle).toContain('puzzlePack.set(puzzlePackSource)');
     expect(appGradle).toContain('variant.sources.assets.addGeneratedSourceDirectory');
     expect(appGradle).toContain('puzzle-packs');
