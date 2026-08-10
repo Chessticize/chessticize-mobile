@@ -159,6 +159,34 @@ describe('Detox suite configuration', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('opens collapsed History filters based on visibility instead of mounted existence', () => {
+    const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
+    const helperStart = helpers.indexOf('async function openStandardHistoryTrend');
+    const helperEnd = helpers.indexOf('async function historyAttemptRowTestIDForResult', helperStart);
+    const helper = helpers.slice(helperStart, helperEnd);
+
+    expect(helper).toContain("detoxElementIsVisible('history-rating-standard 5/20')");
+    expect(helper).not.toContain("detoxElementExists('history-rating-standard 5/20')");
+    expect(helper).toContain("by.id('history-advanced-filters'))).toBeVisible()");
+  });
+
+  it('validates the stable Review Today empty sections instead of the removed empty screen', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const caseStart = flowsSpec.indexOf(
+      "it('schedules failed sprint mistakes into the review queue'"
+    );
+    const caseEnd = flowsSpec.indexOf('\n  });', caseStart);
+    const reviewQueueCase = flowsSpec.slice(caseStart, caseEnd);
+
+    expect(reviewQueueCase).toContain("openTab('review-tab', 'review-due-card')");
+    expect(reviewQueueCase).toContain("by.id('review-today-to-review-empty')");
+    expect(reviewQueueCase).toContain("by.id('review-today-history-empty')");
+    expect(reviewQueueCase).not.toContain('review-empty-state');
+    expect(reviewQueueCase).not.toContain('review-empty-practice');
+    expect(flowsSpec).not.toContain('review-empty-state');
+    expect(flowsSpec).not.toContain('review-empty-practice');
+  });
+
   it('owns Android public hierarchy evidence behind one focused interface', () => {
     const androidPublicUiEvidence = require('../e2e/androidPublicUiEvidence');
     const helpersSource = fs.readFileSync(
@@ -1097,8 +1125,8 @@ describe('Detox suite configuration', () => {
     const collapsedSummary = runManagementCase.indexOf(
       "element(by.id('practice-run-theme-selection-detail'))"
     );
-    const absentTheme = runManagementCase.indexOf(
-      "expect(element(by.id('custom-theme-mixed'))).not.toExist()"
+    const hiddenTheme = runManagementCase.indexOf(
+      "expect(element(by.id('custom-theme-mixed'))).not.toBeVisible()"
     );
     const expandThemes = runManagementCase.indexOf(
       "element(by.id('practice-run-theme-disclosure')).tap()"
@@ -1108,8 +1136,8 @@ describe('Detox suite configuration', () => {
     );
 
     expect(collapsedSummary).toBeGreaterThan(0);
-    expect(absentTheme).toBeGreaterThan(collapsedSummary);
-    expect(expandThemes).toBeGreaterThan(absentTheme);
+    expect(hiddenTheme).toBeGreaterThan(collapsedSummary);
+    expect(expandThemes).toBeGreaterThan(hiddenTheme);
     expect(selectedTheme).toBeGreaterThan(expandThemes);
   });
 
