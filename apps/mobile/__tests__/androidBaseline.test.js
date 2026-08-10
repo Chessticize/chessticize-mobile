@@ -506,6 +506,10 @@ describe('Android launch baseline', () => {
     });
   });
 
+  it('allows enough Detox setup time for the packaged Android E2E app', () => {
+    expect(detoxConfig.testRunner.jest.setupTimeout).toBeGreaterThanOrEqual(300000);
+  });
+
   it('keeps Android emulator and Detox validation local-only', () => {
     const validation = read('../../docs/ANDROID_VALIDATION.md');
 
