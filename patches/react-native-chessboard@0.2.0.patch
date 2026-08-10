@@ -1,25 +1,9 @@
 diff --git a/lib/commonjs/components/promotion-dialog.js b/lib/commonjs/components/promotion-dialog.js
-index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..0bccb0fcd4305c749f11e01b738087a4e023e7b0 100644
+index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..4a783e56313b78da32dee0d5be67d275f9f47df6 100644
 --- a/lib/commonjs/components/promotion-dialog.js
 +++ b/lib/commonjs/components/promotion-dialog.js
-@@ -6,35 +6,52 @@ Object.defineProperty(exports, "__esModule", {
- exports.PromotionDialog = void 0;
- var _react = _interopRequireDefault(require("react"));
- var _reactNative = require("react-native");
-+var _reactNativeSkia = require("@shopify/react-native-skia");
- var _reactNativeReanimated = _interopRequireWildcard(require("react-native-reanimated"));
- var _pieceImages = require("../assets/piece-images");
- function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
- function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
+@@ -13,28 +13,36 @@ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e
  const PROMOTION_PIECES = ['q', 'r', 'b', 'n'];
-+const SPRITE_CELL_SIZE = 128;
-+const PROMOTION_ICON_SIZE = 48;
-+const SPRITE_FILE_INDEX = {
-+  n: 1,
-+  b: 2,
-+  r: 3,
-+  q: 4
-+};
  const styles = _reactNative.StyleSheet.create({
    overlay: {
 -    ..._reactNative.StyleSheet.absoluteFillObject,
@@ -64,35 +48,16 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..0bccb0fcd4305c749f11e01b738087a4
      marginHorizontal: 4
    },
    pieceImage: {
-@@ -42,6 +59,25 @@ const styles = _reactNative.StyleSheet.create({
-     height: 48
-   }
- });
-+const PromotionPieceIcon = ({
-+  color,
-+  piece
-+}) => {
-+  const {
-+    image: spriteImage
-+  } = (0, _pieceImages.usePieceSpriteSheet)();
-+  const sourceRect = (0, _reactNativeSkia.rect)(SPRITE_FILE_INDEX[piece] * SPRITE_CELL_SIZE, color === 'w' ? 0 : SPRITE_CELL_SIZE, SPRITE_CELL_SIZE, SPRITE_CELL_SIZE);
-+  const scale = PROMOTION_ICON_SIZE / SPRITE_CELL_SIZE;
-+  const transform = _reactNativeSkia.Skia.RSXform(scale, 0, 0, 0);
-+  return /*#__PURE__*/_react.default.createElement(_reactNativeSkia.Canvas, {
-+    style: styles.pieceImage,
-+    testID: `promotion-choice-${piece}-image`
-+  }, spriteImage ? /*#__PURE__*/_react.default.createElement(_reactNativeSkia.Atlas, {
-+    image: spriteImage,
-+    sprites: [sourceRect],
-+    transforms: [transform]
-+  }) : null);
-+};
- const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.memo(({
-   color,
-   onSelect,
-@@ -56,26 +92,30 @@ const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.me
+@@ -51,31 +59,38 @@ const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.me
+   const {
+     colors
+   } = config;
++  const animatePresentation = _reactNative.Platform.OS !== 'android';
+   return /*#__PURE__*/_react.default.createElement(_reactNative.Modal, {
+     transparent: true,
      visible: true,
-     animationType: "fade",
+-    animationType: "fade",
++    animationType: animatePresentation ? "fade" : "none",
      onRequestClose: onCancel
 -  }, /*#__PURE__*/_react.default.createElement(_reactNative.Pressable, {
 +  }, /*#__PURE__*/_react.default.createElement(_reactNative.View, {
@@ -102,14 +67,16 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..0bccb0fcd4305c749f11e01b738087a4
 +    style: _reactNative.StyleSheet.absoluteFillObject,
      onPress: onCancel
 -  }, /*#__PURE__*/_react.default.createElement(_reactNativeReanimated.default.View, {
-+  }), /*#__PURE__*/_react.default.createElement(_reactNativeReanimated.default.View, {
-     entering: _reactNativeReanimated.FadeIn.duration(200),
-     exiting: _reactNativeReanimated.FadeOut.duration(200),
+-    entering: _reactNativeReanimated.FadeIn.duration(200),
+-    exiting: _reactNativeReanimated.FadeOut.duration(200),
 -    style: styles.container
++  }), /*#__PURE__*/_react.default.createElement(_reactNativeReanimated.default.View, {
++    entering: animatePresentation ? _reactNativeReanimated.FadeIn.duration(200) : undefined,
++    exiting: animatePresentation ? _reactNativeReanimated.FadeOut.duration(200) : undefined,
 +    style: styles.container,
 +    testID: "promotion-dialog-container"
    }, PROMOTION_PIECES.map(piece => {
--    const pieceCode = `${color}${piece}`;
+     const pieceCode = `${color}${piece}`;
 -    const source = _pieceImages.PIECE_SOURCES[pieceCode];
      return /*#__PURE__*/_react.default.createElement(_reactNative.TouchableOpacity, {
        key: piece,
@@ -119,14 +86,14 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..0bccb0fcd4305c749f11e01b738087a4
 +      testID: `promotion-choice-${piece}`,
        onPress: () => onSelect(piece),
 -      activeOpacity: 0.7
--    }, /*#__PURE__*/_react.default.createElement(_reactNative.Image, {
--      source: source,
--      style: styles.pieceImage
 +      activeOpacity: 0.7,
 +      accessibilityLabel: `Promote to ${piece}`
-+    }, /*#__PURE__*/_react.default.createElement(PromotionPieceIcon, {
-+      color: color,
-+      piece: piece
+     }, /*#__PURE__*/_react.default.createElement(_reactNative.Image, {
+-      source: source,
+-      style: styles.pieceImage
++      source: _pieceImages.PIECE_SOURCES[pieceCode],
++      style: styles.pieceImage,
++      testID: `promotion-choice-${piece}-image`
      }));
    }))));
  });
@@ -618,7 +585,7 @@ index cfd52d5394e32d3972be93c85977c62f4ad30885..297972ef10bbda6a19b00c88166ac3a9
      boardState,
      chess
 diff --git a/lib/commonjs/state/move-executor.js b/lib/commonjs/state/move-executor.js
-index 983112b3bfd62a93c150077851c9cdc0e6fc5c48..3c117941118282a7ff561c7b2e9186739a489b9d 100644
+index 983112b3bfd62a93c150077851c9cdc0e6fc5c48..446849742b8d9ba500fc8d6b11cfb2cc3fb70abb 100644
 --- a/lib/commonjs/state/move-executor.js
 +++ b/lib/commonjs/state/move-executor.js
 @@ -61,51 +61,56 @@ const createMoveExecutor = (chess, boardState, config, callbacks) => {
@@ -745,7 +712,7 @@ index 983112b3bfd62a93c150077851c9cdc0e6fc5c48..3c117941118282a7ff561c7b2e918673
      // Handle en passant - remove the captured pawn
 @@ -250,8 +255,10 @@ const createMoveExecutor = (chess, boardState, config, callbacks) => {
      const board = chess.board();
-
+ 
      // Update every square. When `slide` is given, the piece landing on
 -    // `slide.to` starts at `slide.from` and springs home — so stepping through
 -    // a game's history animates the moved piece instead of snapping.
@@ -757,7 +724,7 @@ index 983112b3bfd62a93c150077851c9cdc0e6fc5c48..3c117941118282a7ff561c7b2e918673
        for (let col = 0; col < 8; col++) {
          const colChar = String.fromCharCode('a'.charCodeAt(0) + col);
 @@ -277,8 +284,11 @@ const createMoveExecutor = (chess, boardState, config, callbacks) => {
-
+ 
              sq.zIndex.set(0);
            };
 -          sq.translateX.set((0, _reactNativeReanimated.withSpring)(pos.x, animations.move, slidesVertically ? undefined : dropZIndex));
@@ -812,26 +779,16 @@ index 0a6faf6b1ec0b5ac518104d513f3e1a0a9c1a9b6..4a9ba5a255d44f8f9a140019f6f351a2
        chess.reset();
      } else {
 diff --git a/lib/module/components/promotion-dialog.js b/lib/module/components/promotion-dialog.js
-index 5bf64b655079b16368383257bc53bc3bce4d8418..6313910ecd52f23830722b3bd69ceb29e1991268 100644
+index 5bf64b655079b16368383257bc53bc3bce4d8418..d451c67e216a56d8d93e9d09aaef03bcba8cd943 100644
 --- a/lib/module/components/promotion-dialog.js
 +++ b/lib/module/components/promotion-dialog.js
-@@ -1,32 +1,49 @@
+@@ -1,32 +1,40 @@
  import React from 'react';
 -import { StyleSheet, TouchableOpacity, Image, Modal, Pressable } from 'react-native';
-+import { StyleSheet, TouchableOpacity, Modal, Pressable, View } from 'react-native';
-+import { Atlas, Canvas, rect, Skia } from '@shopify/react-native-skia';
++import { StyleSheet, TouchableOpacity, Image, Modal, Platform, Pressable, View } from 'react-native';
  import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
--import { PIECE_SOURCES } from '../assets/piece-images';
-+import { usePieceSpriteSheet } from '../assets/piece-images';
+ import { PIECE_SOURCES } from '../assets/piece-images';
  const PROMOTION_PIECES = ['q', 'r', 'b', 'n'];
-+const SPRITE_CELL_SIZE = 128;
-+const PROMOTION_ICON_SIZE = 48;
-+const SPRITE_FILE_INDEX = {
-+  n: 1,
-+  b: 2,
-+  r: 3,
-+  q: 4
-+};
  const styles = StyleSheet.create({
    overlay: {
 -    ...StyleSheet.absoluteFillObject,
@@ -876,35 +833,16 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..6313910ecd52f23830722b3bd69ceb29
      marginHorizontal: 4
    },
    pieceImage: {
-@@ -34,6 +51,25 @@ const styles = StyleSheet.create({
-     height: 48
-   }
- });
-+const PromotionPieceIcon = ({
-+  color,
-+  piece
-+}) => {
-+  const {
-+    image: spriteImage
-+  } = usePieceSpriteSheet();
-+  const sourceRect = rect(SPRITE_FILE_INDEX[piece] * SPRITE_CELL_SIZE, color === 'w' ? 0 : SPRITE_CELL_SIZE, SPRITE_CELL_SIZE, SPRITE_CELL_SIZE);
-+  const scale = PROMOTION_ICON_SIZE / SPRITE_CELL_SIZE;
-+  const transform = Skia.RSXform(scale, 0, 0, 0);
-+  return /*#__PURE__*/React.createElement(Canvas, {
-+    style: styles.pieceImage,
-+    testID: `promotion-choice-${piece}-image`
-+  }, spriteImage ? /*#__PURE__*/React.createElement(Atlas, {
-+    image: spriteImage,
-+    sprites: [sourceRect],
-+    transforms: [transform]
-+  }) : null);
-+};
- export const PromotionDialog = /*#__PURE__*/React.memo(({
-   color,
-   onSelect,
-@@ -48,26 +84,30 @@ export const PromotionDialog = /*#__PURE__*/React.memo(({
+@@ -43,31 +51,38 @@ export const PromotionDialog = /*#__PURE__*/React.memo(({
+   const {
+     colors
+   } = config;
++  const animatePresentation = Platform.OS !== 'android';
+   return /*#__PURE__*/React.createElement(Modal, {
+     transparent: true,
      visible: true,
-     animationType: "fade",
+-    animationType: "fade",
++    animationType: animatePresentation ? "fade" : "none",
      onRequestClose: onCancel
 -  }, /*#__PURE__*/React.createElement(Pressable, {
 +  }, /*#__PURE__*/React.createElement(View, {
@@ -914,14 +852,16 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..6313910ecd52f23830722b3bd69ceb29
 +    style: StyleSheet.absoluteFillObject,
      onPress: onCancel
 -  }, /*#__PURE__*/React.createElement(Animated.View, {
-+  }), /*#__PURE__*/React.createElement(Animated.View, {
-     entering: FadeIn.duration(200),
-     exiting: FadeOut.duration(200),
+-    entering: FadeIn.duration(200),
+-    exiting: FadeOut.duration(200),
 -    style: styles.container
++  }), /*#__PURE__*/React.createElement(Animated.View, {
++    entering: animatePresentation ? FadeIn.duration(200) : undefined,
++    exiting: animatePresentation ? FadeOut.duration(200) : undefined,
 +    style: styles.container,
 +    testID: "promotion-dialog-container"
    }, PROMOTION_PIECES.map(piece => {
--    const pieceCode = `${color}${piece}`;
+     const pieceCode = `${color}${piece}`;
 -    const source = PIECE_SOURCES[pieceCode];
      return /*#__PURE__*/React.createElement(TouchableOpacity, {
        key: piece,
@@ -931,14 +871,14 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..6313910ecd52f23830722b3bd69ceb29
 +      testID: `promotion-choice-${piece}`,
        onPress: () => onSelect(piece),
 -      activeOpacity: 0.7
--    }, /*#__PURE__*/React.createElement(Image, {
--      source: source,
--      style: styles.pieceImage
 +      activeOpacity: 0.7,
 +      accessibilityLabel: `Promote to ${piece}`
-+    }, /*#__PURE__*/React.createElement(PromotionPieceIcon, {
-+      color: color,
-+      piece: piece
+     }, /*#__PURE__*/React.createElement(Image, {
+-      source: source,
+-      style: styles.pieceImage
++      source: PIECE_SOURCES[pieceCode],
++      style: styles.pieceImage,
++      testID: `promotion-choice-${piece}-image`
      }));
    }))));
  });
@@ -1437,7 +1377,7 @@ index 9c5fc37c72a09fa6a338aba03bd0433d0c09573e..9c781af9859d91627effe7113c653689
      boardState,
      chess
 diff --git a/lib/module/state/move-executor.js b/lib/module/state/move-executor.js
-index f2f179f71c94846c9cbe456e5889ac1b5c0714d9..977a7c6ba3f9fc9bd3d96d18ff35e1e1adb59e5e 100644
+index f2f179f71c94846c9cbe456e5889ac1b5c0714d9..019a2829e5b16822543d08c9f2b0eebedb5e71c5 100644
 --- a/lib/module/state/move-executor.js
 +++ b/lib/module/state/move-executor.js
 @@ -1,4 +1,4 @@
@@ -1570,7 +1510,7 @@ index f2f179f71c94846c9cbe456e5889ac1b5c0714d9..977a7c6ba3f9fc9bd3d96d18ff35e1e1
      // Handle en passant - remove the captured pawn
 @@ -244,8 +249,10 @@ export const createMoveExecutor = (chess, boardState, config, callbacks) => {
      const board = chess.board();
-
+ 
      // Update every square. When `slide` is given, the piece landing on
 -    // `slide.to` starts at `slide.from` and springs home — so stepping through
 -    // a game's history animates the moved piece instead of snapping.
@@ -1582,7 +1522,7 @@ index f2f179f71c94846c9cbe456e5889ac1b5c0714d9..977a7c6ba3f9fc9bd3d96d18ff35e1e1
        for (let col = 0; col < 8; col++) {
          const colChar = String.fromCharCode('a'.charCodeAt(0) + col);
 @@ -271,8 +278,11 @@ export const createMoveExecutor = (chess, boardState, config, callbacks) => {
-
+ 
              sq.zIndex.set(0);
            };
 -          sq.translateX.set(withSpring(pos.x, animations.move, slidesVertically ? undefined : dropZIndex));
@@ -1730,41 +1670,20 @@ index eaac9e98118247d6e6776fe990fa7e10aa5b9227..2f896b9f44846bf23b0cbac42e69da01
      durations: {
          move: number;
 diff --git a/src/components/promotion-dialog.tsx b/src/components/promotion-dialog.tsx
-index a3f67bf02f45b674772813bdf03f4b25c56f070e..5771815c93dae8f4c11b4bef4599c37c41e193e9 100644
+index a3f67bf02f45b674772813bdf03f4b25c56f070e..133a12df3289ac45a55b3cce5c717b778f0455e0 100644
 --- a/src/components/promotion-dialog.tsx
 +++ b/src/components/promotion-dialog.tsx
-@@ -2,16 +2,27 @@ import React from 'react';
- import {
-   StyleSheet,
+@@ -4,7 +4,9 @@ import {
    TouchableOpacity,
--  Image,
+   Image,
    Modal,
++  Platform,
    Pressable,
 +  View,
  } from 'react-native';
  import type { PieceSymbol } from 'chess.js';
-+import { Atlas, Canvas, rect, Skia } from '@shopify/react-native-skia';
  import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
- import type { BoardConfig } from '../state';
--import { PIECE_SOURCES } from '../assets/piece-images';
-+import { usePieceSpriteSheet } from '../assets/piece-images';
- 
--const PROMOTION_PIECES: PieceSymbol[] = ['q', 'r', 'b', 'n'];
-+type PromotionPiece = 'q' | 'r' | 'b' | 'n';
-+
-+const PROMOTION_PIECES: PromotionPiece[] = ['q', 'r', 'b', 'n'];
-+const SPRITE_CELL_SIZE = 128;
-+const PROMOTION_ICON_SIZE = 48;
-+const SPRITE_FILE_INDEX: Record<PromotionPiece, number> = {
-+  n: 1,
-+  b: 2,
-+  r: 3,
-+  q: 4,
-+};
- 
- interface PromotionDialogProps {
-   color: 'w' | 'b';
-@@ -20,27 +31,45 @@ interface PromotionDialogProps {
+@@ -20,27 +22,45 @@ interface PromotionDialogProps {
    config: BoardConfig;
  }
  
@@ -1818,57 +1737,39 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..5771815c93dae8f4c11b4bef4599c37c
      marginHorizontal: 4,
    },
    pieceImage: {
-@@ -49,23 +78,44 @@ const styles = StyleSheet.create({
-   },
- });
- 
-+const PromotionPieceIcon: React.FC<{
-+  color: 'w' | 'b';
-+  piece: PromotionPiece;
-+}> = ({ color, piece }) => {
-+  const { image: spriteImage } = usePieceSpriteSheet();
-+  const sourceRect = rect(
-+    SPRITE_FILE_INDEX[piece] * SPRITE_CELL_SIZE,
-+    color === 'w' ? 0 : SPRITE_CELL_SIZE,
-+    SPRITE_CELL_SIZE,
-+    SPRITE_CELL_SIZE
-+  );
-+  const scale = PROMOTION_ICON_SIZE / SPRITE_CELL_SIZE;
-+  const transform = Skia.RSXform(scale, 0, 0, 0);
-+
-+  return (
-+    <Canvas style={styles.pieceImage} testID={`promotion-choice-${piece}-image`}>
-+      {spriteImage ? (
-+        <Atlas image={spriteImage} sprites={[sourceRect]} transforms={[transform]} />
-+      ) : null}
-+    </Canvas>
-+  );
-+};
-+
+@@ -52,19 +72,26 @@ const styles = StyleSheet.create({
  export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
    ({ color, onSelect, onCancel, config }) => {
      const { colors } = config;
++    const animatePresentation = Platform.OS !== 'android';
  
      return (
-       <Modal transparent visible animationType="fade" onRequestClose={onCancel}>
+-      <Modal transparent visible animationType="fade" onRequestClose={onCancel}>
 -        <Pressable style={styles.overlay} onPress={onCancel}>
++      <Modal
++        transparent
++        visible
++        animationType={animatePresentation ? 'fade' : 'none'}
++        onRequestClose={onCancel}
++      >
 +        <View style={styles.overlay} testID="promotion-dialog-overlay">
 +          <Pressable style={StyleSheet.absoluteFillObject} onPress={onCancel} />
            <Animated.View
-             entering={FadeIn.duration(200)}
-             exiting={FadeOut.duration(200)}
+-            entering={FadeIn.duration(200)}
+-            exiting={FadeOut.duration(200)}
++            entering={animatePresentation ? FadeIn.duration(200) : undefined}
++            exiting={animatePresentation ? FadeOut.duration(200) : undefined}
              style={styles.container}
 +            testID="promotion-dialog-container"
            >
              {PROMOTION_PIECES.map((piece) => {
--              const pieceCode =
--                `${color}${piece}` as keyof typeof PIECE_SOURCES;
+               const pieceCode =
+                 `${color}${piece}` as keyof typeof PIECE_SOURCES;
 -              const source = PIECE_SOURCES[pieceCode];
--
+ 
                return (
                  <TouchableOpacity
-                   key={piece}
-@@ -73,15 +123,20 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
+@@ -73,15 +100,24 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
                      styles.pieceButton,
                      { backgroundColor: colors.promotionPieceButton },
                    ]}
@@ -1882,7 +1783,11 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..5771815c93dae8f4c11b4bef4599c37c
 +                  accessibilityLabel={`Promote to ${piece}`}
                  >
 -                  <Image source={source} style={styles.pieceImage} />
-+                  <PromotionPieceIcon color={color} piece={piece} />
++                  <Image
++                    source={PIECE_SOURCES[pieceCode]}
++                    style={styles.pieceImage}
++                    testID={`promotion-choice-${piece}-image`}
++                  />
                  </TouchableOpacity>
                );
              })}
@@ -2772,7 +2677,7 @@ index 5957db9d36a2d7ab8800c7b171b0c8ef79052d8d..05ad043abddac2fc2a8db68f0fac8180
        lastMove?: { from: Square; to: Square } | null;
 @@ -334,8 +338,10 @@ export const createMoveExecutor = (
      const board = chess.board();
-
+ 
      // Update every square. When `slide` is given, the piece landing on
 -    // `slide.to` starts at `slide.from` and springs home — so stepping through
 -    // a game's history animates the moved piece instead of snapping.

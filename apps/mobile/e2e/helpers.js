@@ -23,6 +23,23 @@ async function frameFor(detoxElement) {
   return attributes.frame;
 }
 
+async function boardTapTargets(testID, move, flipped = false) {
+  const board = element(by.id(testID));
+  const boardFrame = await frameFor(board);
+  const androidMetrics = device.getPlatform() === 'android' ? androidDisplayMetrics() : null;
+  const pointForSquare = (square) => {
+    if (!androidMetrics) {
+      return boardPoint(boardFrame, square, flipped);
+    }
+    return androidBoardTapPoint(boardFrame, square, flipped, androidMetrics).point;
+  };
+  return {
+    board,
+    from: pointForSquare(move.slice(0, 2)),
+    to: pointForSquare(move.slice(2, 4)),
+  };
+}
+
 async function playBoardMove(testID, move, flipped = false) {
   // Practice and Review render the same public blocker while a blunder entry,
   // reply, or reset animation owns the real board. Coordinate gestures must
@@ -1092,6 +1109,7 @@ module.exports = {
   accessibilityLabelFromAttributes,
   textFromAttributes,
   boardPoint,
+  boardTapTargets,
   androidBoardTapPoint,
   parseAndroidDisplayDensity,
   parseAndroidDisplaySize,

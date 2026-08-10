@@ -16,6 +16,7 @@ RCT_EXPORT_MODULE();
 {
   NSString *testNowMs = [self processArgumentValueForName:@"chessticizeTestNowMs"];
   NSString *puzzleSelectionSeed = [self processArgumentValueForName:@"chessticizePuzzleSelectionSeed"];
+  NSString *puzzleSelectionId = [self processArgumentValueForName:@"chessticizePuzzleSelectionId"];
   NSString *standardTargetCorrect = [self processArgumentValueForName:@"chessticizeStandardTargetCorrect"];
   NSString *arrowDuelTargetCorrect = [self processArgumentValueForName:@"chessticizeArrowDuelTargetCorrect"];
   NSString *marketingCaptureFrame = [self processArgumentValueForName:@"chessticizeMarketingCaptureFrame"];
@@ -24,6 +25,7 @@ RCT_EXPORT_MODULE();
   if (
     testNowMs == nil
     && puzzleSelectionSeed == nil
+    && puzzleSelectionId == nil
     && standardTargetCorrect == nil
     && arrowDuelTargetCorrect == nil
     && marketingCaptureFrame == nil
@@ -38,6 +40,9 @@ RCT_EXPORT_MODULE();
   }
   if (puzzleSelectionSeed != nil) {
     constants[@"puzzleSelectionSeed"] = puzzleSelectionSeed;
+  }
+  if (puzzleSelectionId != nil) {
+    constants[@"puzzleSelectionId"] = puzzleSelectionId;
   }
   if (standardTargetCorrect != nil) {
     constants[@"standardTargetCorrect"] = standardTargetCorrect;
