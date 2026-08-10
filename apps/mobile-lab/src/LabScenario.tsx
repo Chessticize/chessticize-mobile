@@ -9,6 +9,7 @@ import type {
 } from "../../../packages/core/src/index.ts";
 import {
   beginArrowDuelPuzzle,
+  beginLinePuzzle,
   defaultSprintConfig,
   startSprint
 } from "../../../packages/core/src/index.ts";
@@ -309,6 +310,7 @@ function LabScenarioContent({
         historyProgressPresentation={isHistoryProgressScenario(scenarioId)
           ? historyProgressPresentationFor(scenarioId)
           : undefined}
+        personalBestChallengeDesignPreview={personalBestChallengePreviewFor(scenarioId)}
         platformCapabilities={runtime.platformCapabilities}
         runReorderDesignPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
           ? { pickedUpRunId: runReorderPickedUpRunId }
@@ -335,6 +337,9 @@ function LabScenarioContent({
 function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
   return isTacticalProfileScenario(scenarioId) || [
     "practice-home",
+    "practice-personal-best-guide",
+    "practice-personal-best-active",
+    "practice-personal-best-result",
     "practice-first-sprint-guide",
     "practice-home-edit",
     "practice-custom-setup",
@@ -355,6 +360,17 @@ function sprintRulesDesignPreviewFor(
     maxMistakes: 3,
     targetCorrect: 15
   };
+  if (scenarioId === "practice-personal-best-active") {
+    return {
+      initialActiveState: personalBestActiveState(14, 1)
+    };
+  }
+  if (scenarioId === "practice-personal-best-result") {
+    return {
+      initialResultState: personalBestResultState(),
+      resultReplayItems: personalBestReplayDesignItems()
+    };
+  }
   if (scenarioId === "practice-first-sprint-guide") {
     return {
       firstRunGuide,
@@ -551,6 +567,161 @@ function sprintRulesDesignPreviewFor(
     return { firstRunGuide, timeoutCountsAsMistake: true };
   }
   return undefined;
+}
+
+const PERSONAL_BEST_BAND = {
+  currentRating: 925,
+  minRating: 900,
+  maxRating: 999
+} as const;
+
+function personalBestChallengePreviewFor(
+  scenarioId: LabScenarioId
+): React.ComponentProps<typeof PracticePocScreen>["personalBestChallengeDesignPreview"] {
+  const common = {
+    band: PERSONAL_BEST_BAND,
+    bestScore: 18,
+    completedRunCount: 6,
+    showActivePresentation: true,
+    startState: personalBestActiveState(0, 0)
+  } as const;
+  if (scenarioId === "practice-home") {
+    return common;
+  }
+  if (scenarioId === "practice-personal-best-guide") {
+    return {
+      ...common,
+      guideInitiallyVisible: true
+    };
+  }
+  if (scenarioId === "practice-personal-best-active") {
+    return common;
+  }
+  if (scenarioId === "practice-personal-best-result") {
+    return {
+      ...common,
+      result: {
+        activeElapsedMs: 12 * 60 * 1000 + 48 * 1000,
+        isNewBest: true,
+        previousBestScore: 18
+      }
+    };
+  }
+  if (scenarioId === "history-personal-best") {
+    return {
+      ...common,
+      bestScore: 19,
+      completedRunCount: 7,
+      recentScores: [
+        { completedAtLabel: "Jul 10", score: 9 },
+        { completedAtLabel: "Jul 12", score: 12 },
+        { completedAtLabel: "Jul 14", score: 11 },
+        { completedAtLabel: "Jul 16", score: 14 },
+        { completedAtLabel: "Jul 18", score: 19 }
+      ],
+      showHistoryCard: true
+    };
+  }
+  return undefined;
+}
+
+function personalBestActiveState(
+  correctCount: number,
+  mistakeCount: number
+): SprintState {
+  const startedAt = new Date(LAB_NOW_MS - 4 * 60 * 1000).toISOString();
+  const deadlineAt = new Date(LAB_NOW_MS + 24 * 60 * 60 * 1000).toISOString();
+  const puzzles = personalBestPuzzles();
+  const currentPuzzleIndex = Math.min(
+    correctCount + mistakeCount,
+    puzzles.length - 1
+  );
+  const currentPuzzle = beginLinePuzzle(puzzles[currentPuzzleIndex]!);
+  return {
+    bestStreak: Math.min(7, correctCount),
+    config: personalBestConfig(),
+    correctCount,
+    currentPuzzle,
+    currentPuzzleIndex,
+    currentPuzzleStartedAt: new Date(LAB_NOW_MS - 34 * 1000).toISOString(),
+    currentStreak: Math.min(4, correctCount),
+    deadlineAt,
+    hasUserSubmittedMove: correctCount + mistakeCount > 0,
+    id: `personal-best-active-${correctCount}-${mistakeCount}`,
+    mistakeCount,
+    puzzles,
+    ratingBefore: PERSONAL_BEST_BAND.currentRating,
+    startedAt,
+    status: "active"
+  };
+}
+
+function personalBestResultState(): SprintState {
+  const startedAt = new Date(LAB_NOW_MS - (12 * 60 + 48) * 1000).toISOString();
+  const completedAt = new Date(LAB_NOW_MS).toISOString();
+  return {
+    bestStreak: 9,
+    completedAt,
+    config: personalBestConfig(),
+    correctCount: 19,
+    currentPuzzleIndex: 21,
+    currentStreak: 0,
+    deadlineAt: new Date(LAB_NOW_MS + 24 * 60 * 60 * 1000).toISOString(),
+    endReason: "max_mistakes",
+    hasUserSubmittedMove: true,
+    id: "personal-best-result-new-record",
+    mistakeCount: 3,
+    puzzles: personalBestPuzzles(),
+    ratingBefore: PERSONAL_BEST_BAND.currentRating,
+    startedAt,
+    status: "failed"
+  };
+}
+
+function personalBestConfig(): SprintState["config"] {
+  return {
+    ...defaultSprintConfig("standard"),
+    durationSeconds: 24 * 60 * 60,
+    maxMistakes: 3,
+    puzzleTiming: {
+      slowAfterSeconds: null,
+      timeoutAfterSeconds: null
+    },
+    ratingPolicy: "unrated",
+    targetCorrect: 92_839
+  };
+}
+
+function personalBestPuzzles(): Puzzle[] {
+  return Array.from({ length: 32 }, (_, index) => {
+    const puzzle = LAB_PUZZLES[index % LAB_PUZZLES.length]!;
+    return {
+      ...puzzle,
+      id: `personal-best-${index + 1}-${puzzle.id}`,
+      rating: PERSONAL_BEST_BAND.minRating + (index * 7) % 100
+    };
+  });
+}
+
+function personalBestReplayDesignItems(): NonNullable<
+  NonNullable<
+    React.ComponentProps<typeof PracticePocScreen>["sprintRulesDesignPreview"]
+  >["resultReplayItems"]
+> {
+  const completedAt = new Date(LAB_NOW_MS).toISOString();
+  return LAB_PUZZLES.slice(0, 3).map((puzzle, index) => ({
+    attempt: historyAttempt({
+      completedAt,
+      elapsedMs: (38 + index * 11) * 1000,
+      id: `personal-best-review-${index + 1}`,
+      puzzleId: puzzle.id,
+      ratingAfter: PERSONAL_BEST_BAND.currentRating,
+      ratingBefore: PERSONAL_BEST_BAND.currentRating,
+      result: "wrong"
+    }),
+    inReview: true,
+    puzzle
+  }));
 }
 
 function tacticalFocusActiveState(
@@ -905,6 +1076,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       service = createReviewService("overdue");
       break;
     case "history-populated":
+    case "history-personal-best":
     case "history-filters":
       service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
       configurePuzzleSource = false;

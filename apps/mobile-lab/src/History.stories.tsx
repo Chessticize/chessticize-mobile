@@ -46,6 +46,18 @@ export const PopulatedHistory: Story = {
   }
 };
 
+export const PersonalBestRecords: Story = {
+  name: "Personal Best records",
+  args: { scenarioId: "history-personal-best" },
+  play: async ({ canvasElement }) => {
+    await openHistory(canvasElement);
+    await waitForTestId(canvasElement, "personal-best-history-card");
+    await expectTestIdText(canvasElement, "personal-best-history-score", "19");
+    await waitForTestId(canvasElement, "personal-best-history-chart");
+    await waitForText(canvasElement, "Runs ended early stay in History but do not set a best.");
+  }
+};
+
 export const FiltersAndActiveFilters: Story = {
   name: "Filters and active filters",
   args: { scenarioId: "history-filters" },

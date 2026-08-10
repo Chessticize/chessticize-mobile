@@ -55,36 +55,26 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   assert.deepEqual(
     newScenarios.map((scenario) => scenario.id),
     [
-      "practice-custom-setup",
-      "practice-run-arrow-duel-editor",
-      "practice-arrow-duel-guide",
-      "practice-arrow-duel-guide-only",
-      "practice-arrow-duel-prompt",
-      "review-due",
-      "review-arrow-duel-reply",
-      "settings-ios-sync",
-      "settings-ios-sync-error-details",
-      "settings-ios-sync-support-bundle",
-      "settings-ios-sync-support-bundle-partial",
-      "settings-android-backup"
+      "practice-home",
+      "practice-personal-best-guide",
+      "practice-personal-best-active",
+      "practice-personal-best-result",
+      "history-personal-best"
     ]
   );
-  assert.ok(scenarioRegistry["review-due"].issues?.some(
-    (issue) => issue.issueNumber === 520
+  assert.ok(scenarioRegistry["practice-home"].issues?.some(
+    (issue) => issue.issueNumber === 492
   ) ?? false);
   assert.deepEqual(
     newScenarios
-      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 523))
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 492))
       .map((scenario) => scenario.id),
     [
-      "practice-custom-setup",
-      "practice-run-arrow-duel-editor",
-      "practice-arrow-duel-guide",
-      "practice-arrow-duel-guide-only",
-      "practice-arrow-duel-prompt",
-      "review-arrow-duel-reply",
-      "settings-ios-sync",
-      "settings-android-backup"
+      "practice-home",
+      "practice-personal-best-guide",
+      "practice-personal-best-active",
+      "practice-personal-best-result",
+      "history-personal-best"
     ]
   );
 
@@ -114,7 +104,7 @@ test("approved Issue #520 Review design keeps its stable living-documentation UR
   assert.ok(scenarioRegistry["review-filters"].scope.includes.includes(
     "Same Today sections after filtering"
   ));
-  assert.deepEqual(storyTagsForScenario("review-due"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("review-due"), []);
   assert.deepEqual(storyTagsForScenario("review-filters"), []);
 });
 
@@ -173,7 +163,7 @@ test("the closed Issue #247 clone keeps its approved scope while Issue #523 reus
       .map((scenario) => scenario.id),
     []
   );
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), []);
   assert.deepEqual(scenarioRegistry["settings-ios-sync"].scope.includes, [
     "iCloud Sync",
     "Global Arrow Duel reply control",
@@ -201,16 +191,17 @@ test("the Issue #353 scenarios keep stable URLs while Issue #522 owns the V2 dia
       .map((scenario) => scenario.id),
     []
   );
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync-error-details"), ["new"]);
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle"), ["new"]);
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle-partial"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-error-details"), []);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle"), []);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-support-bundle-partial"), []);
   for (const scenarioId of [
     "settings-ios-sync-error-details",
     "settings-ios-sync-support-bundle",
     "settings-ios-sync-support-bundle-partial"
   ] as const) {
-    assert.ok(
-      scenarioRegistry[scenarioId].issues?.some((issue) => issue.issueNumber === 522) ?? false
+    assert.equal(
+      scenarioRegistry[scenarioId].issues?.some((issue) => issue.issueNumber === 522) ?? false,
+      false
     );
   }
   assert.equal(
@@ -393,7 +384,7 @@ test("Practice home delegates Review workload to the dedicated tab", () => {
   assert.ok(home.scope.includes.includes("Collecting-evidence state"));
   assert.ok(home.scope.includes.includes("Tactical Profile entry"));
   assert.match(home.description, /dedicated Review tab/);
-  assert.deepEqual(storyTagsForScenario("practice-home"), []);
+  assert.deepEqual(storyTagsForScenario("practice-home"), ["new"]);
 });
 
 test("post-attempt handoffs explain Timeout, Wrong, and Slow-correct results", () => {

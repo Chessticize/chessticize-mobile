@@ -7833,6 +7833,85 @@ describe("PracticePocScreen", () => {
     );
   });
 
+  it("starts the Personal Best preview through its public first-use contract", () => {
+    const renderer = renderLabScenario("practice-home");
+
+    expect(collectText(findByTestId(renderer, "personal-best-home-card"))).toContain(
+      "No timer · Three mistakes end the Run"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-home-score"))).toBe("18");
+    press(renderer, "personal-best-start");
+
+    expect(findByTestId(renderer, "personal-best-guide")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Marking a puzzle Unclear does not count as a mistake."
+    );
+    press(renderer, "personal-best-guide-start");
+
+    expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No timer");
+    expect(collectText(findByTestId(renderer, "personal-best-unrated"))).toBe("Unrated");
+    expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
+      "Mistakes 0 of 3"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
+      "19 more to beat 18"
+    );
+  });
+
+  it("keeps Personal Best score, mistakes, and no-timer status glanceable during play", () => {
+    const renderer = renderLabScenario("practice-personal-best-active");
+
+    expect(collectText(findByTestId(renderer, "active-session-shell"))).toContain(
+      "Personal Best"
+    );
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No timer");
+    expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
+      "Mistakes 1 of 3"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-mistakes"))).toBe("×1/3");
+    expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
+      "5 more to beat 18"
+    );
+  });
+
+  it("treats the third Personal Best mistake as a normal result and preserves the record context", () => {
+    const renderer = renderLabScenario("practice-personal-best-result");
+
+    expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("19");
+    expect(collectText(findByTestId(renderer, "personal-best-result-comparison"))).toBe(
+      "Previous best 18"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "The Run ended after 3 mistakes."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "Rating 925 unchanged"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result-replay"))).toBe(
+      "Replay 3 mistakes"
+    );
+    expect(collectText(renderer.root)).not.toContain("Sprint failed");
+  });
+
+  it("shows a band-specific Personal Best record above existing History", () => {
+    const renderer = renderLabScenario("history-personal-best");
+
+    press(renderer, "history-tab");
+
+    expect(collectText(findByTestId(renderer, "personal-best-history-score"))).toBe("19");
+    expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
+      "900–999"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
+      "7 completed Runs"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
+      "Runs ended early stay in History but do not set a best."
+    );
+    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
+  });
+
   it("explains a completed Tactical Focus Run as fixed, unrated training", () => {
     const renderer = renderLabScenario("practice-tactical-focus-result");
 

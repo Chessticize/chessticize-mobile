@@ -128,6 +128,24 @@ export const Home: Story = {
     expectTestIdAbsent(canvasElement, "practice-review-strip");
     await waitForTestId(canvasElement, "training-focus-card");
     await waitForText(canvasElement, "More information needed");
+    await waitForTestId(canvasElement, "personal-best-home-card");
+    await expectTestIdText(canvasElement, "personal-best-home-score", "18");
+    await clickTestId(canvasElement, "personal-best-how-it-works");
+    await waitForTestId(canvasElement, "personal-best-guide");
+    await clickTestId(canvasElement, "personal-best-guide-not-now");
+    await waitForTestId(canvasElement, "personal-best-home-card");
+  }
+};
+
+export const PersonalBestGuide: Story = {
+  name: "Personal Best · first-use guide",
+  args: { scenarioId: "practice-personal-best-guide" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "personal-best-guide");
+    await expectTestIdText(canvasElement, "personal-best-guide-score", "18");
+    await waitForText(canvasElement, "Same level for the whole Run");
+    await waitForText(canvasElement, "Three mistakes end the Run");
+    await waitForText(canvasElement, "No timer");
   }
 };
 
@@ -448,6 +466,19 @@ export const ActiveSession: Story = {
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
     await waitForText(canvasElement, "Puzzle 0:24");
+  }
+};
+
+export const PersonalBestActive: Story = {
+  name: "Personal Best · active Run",
+  args: { scenarioId: "practice-personal-best-active" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "active-session-shell");
+    await waitForText(canvasElement, "Personal Best");
+    await expectTestIdText(canvasElement, "session-timer", "No timer");
+    await waitForTestId(canvasElement, "personal-best-mistakes");
+    await expectTestIdText(canvasElement, "personal-best-progress-title", "5 more to beat 18");
+    await waitForTestId(canvasElement, "session-puzzle-timing");
   }
 };
 
@@ -952,6 +983,18 @@ export const SprintSummary: Story = {
     await openPracticeSession(canvasElement);
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForTestId(canvasElement, "sprint-summary-panel");
+  }
+};
+
+export const PersonalBestResult: Story = {
+  name: "Personal Best · new record",
+  args: { scenarioId: "practice-personal-best-result" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "personal-best-result");
+    await expectTestIdText(canvasElement, "personal-best-result-score", "19");
+    await expectTestIdText(canvasElement, "personal-best-result-comparison", "Previous best 18");
+    await waitForTestId(canvasElement, "personal-best-result-review");
+    await expectTestIdText(canvasElement, "personal-best-result-replay", "Replay 3 mistakes");
   }
 };
 
