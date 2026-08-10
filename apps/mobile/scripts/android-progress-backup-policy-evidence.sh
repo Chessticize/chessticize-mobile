@@ -71,6 +71,21 @@ adb_cmd() {
 
 source "$APP_DIR/scripts/android-device-inspection.sh"
 
+host_file_size() {
+  local file_path="$1"
+  local measured_size
+
+  if ! measured_size="$(wc -c < "$file_path" | tr -d '[:space:]')"; then
+    echo "Unable to measure host file size: $file_path" >&2
+    return 1
+  fi
+  if [[ ! "$measured_size" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Host file has an invalid size: $file_path (${measured_size:-<empty>})" >&2
+    return 1
+  fi
+  printf '%s' "$measured_size"
+}
+
 assert_app_process_absent() {
   local label="$1"
   local process_output
@@ -542,7 +557,7 @@ WORKFLOW_APK_HASH=''
 RETAINED_APK_SIZE=''
 
 prepare_retained_apk_install_source() {
-  WORKFLOW_APK_SIZE="$(stat -c %s "$APK")"
+  WORKFLOW_APK_SIZE="$(host_file_size "$APK")"
   if [[ ! "$WORKFLOW_APK_SIZE" =~ ^[1-9][0-9]*$ ]]; then
     echo "Exact-head workflow APK has an invalid size: ${WORKFLOW_APK_SIZE:-<empty>}" >&2
     exit 1
@@ -792,7 +807,7 @@ assert_app_data_archive_paths() {
     archive_path="$(cat "$archive_paths_file")"
     adb_cmd pull "$archive_path" "$archive" >/dev/null
     sha256sum "$archive" > "$ARTIFACT_DIR/$case_name-transport-archive-sha256.txt"
-    archive_size="$(stat -c %s "$archive")"
+    archive_size="$(host_file_size "$archive")"
     printf '%s %s\n' "$archive" "$archive_size" \
       > "$ARTIFACT_DIR/$case_name-transport-archive-stat.txt"
     tar -tf "$archive" | sort > "$archive_entries"

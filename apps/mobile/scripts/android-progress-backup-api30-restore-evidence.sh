@@ -61,6 +61,19 @@ adb_cmd() {
 
 source "$APP_DIR/scripts/android-device-inspection.sh"
 
+host_file_size() {
+  local file_path="$1"
+  local measured_size
+
+  if ! measured_size="$(wc -c < "$file_path" | tr -d '[:space:]')"; then
+    fail "Unable to measure host file size: $file_path"
+  fi
+  if [[ ! "$measured_size" =~ ^[1-9][0-9]*$ ]]; then
+    fail "Host file has an invalid size: $file_path (${measured_size:-<empty>})"
+  fi
+  printf '%s' "$measured_size"
+}
+
 fail() {
   echo "$1" >&2
   exit 1
@@ -294,7 +307,7 @@ if [[ "$(git -C "$REPO_ROOT" rev-parse HEAD)" != "$GITHUB_SHA" ]]; then
   fail "Checked-out commit does not match exact head $GITHUB_SHA."
 fi
 
-stat -c %s "$APK" > "$ARTIFACT_DIR/api30-restore-workflow-apk-size.txt"
+host_file_size "$APK" > "$ARTIFACT_DIR/api30-restore-workflow-apk-size.txt"
 sha256sum "$APK" > "$ARTIFACT_DIR/api30-restore-workflow-apk-sha256.txt"
 if [[ ! -s "$ARTIFACT_DIR/retained-install-source-apk-size.txt" \
     || ! -s "$ARTIFACT_DIR/installed-apk-size.txt" \

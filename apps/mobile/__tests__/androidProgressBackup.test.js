@@ -525,6 +525,9 @@ describe('Android Progress Backup', () => {
     expect(policyEvidenceScript).toContain('retained-apk-push.txt');
     expect(policyEvidenceScript).toContain('retained-apk-install.txt');
     expect(policyEvidenceScript).toContain('retained-apk-cleanup.txt');
+    expect(policyEvidenceScript).toContain('wc -c < "$file_path"');
+    expect(policyEvidenceScript).not.toContain('stat -c %s "$APK"');
+    expect(policyEvidenceScript).not.toContain('stat -c %s "$archive"');
     expect(policyEvidenceScript).toContain(
       'apk-provenance=host-sha256+retained-device-size+installed-device-size+device-cmp',
     );
@@ -542,6 +545,10 @@ describe('Android Progress Backup', () => {
     expect(restoreEvidenceScript).not.toContain('adb_cmd pull');
     expect(restoreEvidenceScript).not.toContain('install-multiple');
     expect(restoreEvidenceScript).toContain('CHESSTICIZE_ANDROID_E2E_APK');
+    expect(restoreEvidenceScript).toContain('wc -c < "$APK"');
+    expect(restoreEvidenceScript).not.toContain('stat -c %s "$APK"');
+    expect(api30RestoreScript).toContain('host_file_size "$APK"');
+    expect(api30RestoreScript).not.toContain('stat -c %s "$APK"');
     expect(restoreEvidenceScript).toContain(
       'push_host_file_to_device "$APK" "$RETAINED_APK_PATH"',
     );
