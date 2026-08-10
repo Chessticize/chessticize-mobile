@@ -95,6 +95,7 @@ describe('mobile App input identity', () => {
     ['apps/mobile/scripts/android-validation-matrix.js', 'test-runner'],
     ['apps/mobile/scripts/android-r8-evidence.js', 'test-runner'],
     ['apps/mobile/scripts/android-runtime-benchmark.js', 'test-runner'],
+    ['apps/mobile/scripts/run-command-with-timeout.js', 'test-runner'],
     ['apps/mobile/scripts/mobile-app-inputs.js', 'app-build'],
     ['scripts/validate-development-process.mjs', 'test-runner'],
     ['apps/mobile/src/components/Practice.tsx', 'app-build'],
