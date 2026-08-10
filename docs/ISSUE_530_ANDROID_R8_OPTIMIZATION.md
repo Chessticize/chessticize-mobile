@@ -2,7 +2,9 @@
 
 This report records the controlled implementation and local evidence for
 enabling Android release optimization. It does not replace the protected
-upload-signed build or the final clean-head Android validation record.
+upload-signed build or the final clean-head Android validation record. The
+feature targets `main` and is intentionally excluded from the Android 1.4.1
+release branch.
 
 ## Configuration
 
@@ -38,7 +40,9 @@ pack, puzzle-pack manifest, Stockfish manifest, and NNUE inputs. Both builds
 materialized the 164,163,584-byte Core Pack and the 3,519,630-byte and
 108,919,594-byte NNUE files before packaging. Local release APKs were signed
 with the same repository debug certificate only so they could be installed on
-the dedicated API 36 emulator; they are not distribution candidates.
+the dedicated API 36 emulator; they are not distribution candidates. Build 16
+is a historical controlled-measurement identity only and does not make this
+change part of the Android 1.4.1 release.
 
 Archive component values are uncompressed entry totals from `unzip -l`.
 Runtime measurements use the same `emulator-5554`, a device reboot before each
@@ -100,12 +104,12 @@ inputs.
   archives on a root-capable emulator.
 - Final fast checks passed: 71 Mobile Jest suites / 1,329 tests, Mobile
   typecheck, development-process validation, and lint with zero errors and four
-  pre-existing warnings. Review of the release-branch diff found no blocking
-  issue.
-- The protected candidate workflow must still rebuild the integrated release-
-  branch head with upload signing, retain the R8 diagnostics, and verify Android
-  1.4.1 version code 16. A locally debug-signed artifact does not satisfy that
-  gate.
+  pre-existing warnings. Review of the issue implementation diff found no
+  blocking issue.
+- When a future release branch includes this change, the protected candidate
+  workflow must rebuild that future exact release head with upload signing,
+  retain the R8 diagnostics, and verify its actual release identity. A locally
+  debug-signed artifact does not satisfy that gate.
 
 Until the remaining gates pass, this report is implementation evidence, not
 release approval.
