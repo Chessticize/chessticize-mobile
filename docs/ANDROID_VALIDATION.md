@@ -349,8 +349,9 @@ local command log plus artifacts with the PR or release record:
 The automated API evidence JSON uses schema version 2 and records
 `appSourceSha`, `testRunnerSha`, `appVariant`, `appInputDigest`, `artifacts`,
 `buildResult`, `commands`, `deviceMatrix`, `suiteResults`, `worktreeClean`, and
-the overall `result`. R8 runs also record checksum-bound
-`optimizationEvidence`. `commitSha` remains a compatibility alias for
+the overall `result`. The separate R8 optimization report records the
+checksum-bound production APK/AAB, mapping outputs, merged-rule audit, and
+toolchain identity. `commitSha` remains a compatibility alias for
 `testRunnerSha`. A missing required field is not passing evidence.
 
 The two SHAs may differ when
