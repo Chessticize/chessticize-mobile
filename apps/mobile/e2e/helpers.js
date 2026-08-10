@@ -944,9 +944,14 @@ function classifyAndroidBoardFrameUnits(frame, metrics) {
   const displayShortDp = displayShortPixels / (densityDpi / 160);
   const pixelRatio = frame.width / displayShortPixels;
   const dpRatio = frame.width / displayShortDp;
-  const isBoardSized = (ratio) => ratio >= 0.65 && ratio <= 1.05;
-  const couldBePixels = isBoardSized(pixelRatio);
-  const couldBeDp = isBoardSized(dpRatio);
+  // Compare both interpretations in physical display space. Maintained
+  // large-screen profiles center a bounded board that may occupy less than
+  // 65% of the short edge (for example, 1106 px on a 1768 px foldable), while
+  // still remaining substantially larger than an accidentally pixel-scaled
+  // dp frame. Exactly one interpretation must remain plausible.
+  const isPhysicalBoardSized = (ratio) => ratio >= 0.45 && ratio <= 1.05;
+  const couldBePixels = isPhysicalBoardSized(pixelRatio);
+  const couldBeDp = isPhysicalBoardSized(dpRatio);
 
   if (couldBePixels !== couldBeDp) {
     return couldBePixels ? 'pixels' : 'dp';
