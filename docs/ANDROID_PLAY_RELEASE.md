@@ -445,11 +445,11 @@ Build 16 is the proposed Android 1.4.1 release:
 - validation scope: full native validation because the accumulated delta spans
   SQLite migrations, shared navigation and Review journeys, Android native and
   release inputs, R8 optimization, and the bundled puzzle-pack cache boundary.
-  Run exact-head fast checks, the R8-optimized release-derived Android matrix,
-  both local shared suites, the released-fixture upgrade boundary, the
-  applicable adaptive and tablet visual matrix, and the protected
-  signed-artifact/source job. Retain the production R8 mapping and merged-rule
-  diagnostics with the protected candidate.
+  Run exact-head fast checks, production release/R8 output inspection, the
+  non-debuggable R8 native boundary probe, both local shared suites, the
+  released-fixture upgrade boundary, the applicable adaptive and tablet visual
+  matrix, and the protected signed-artifact/source job. Retain the production
+  R8 mapping and merged-rule diagnostics with the protected candidate.
 
 Build 16 is not yet tagged, signed, uploaded, or distributed.
 
