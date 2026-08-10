@@ -53,8 +53,10 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await openNewRunEditor();
       await element(by.id('practice-run-name-input')).replaceText(CUSTOM_RUN_NAME);
       await element(by.id('custom-mode-arrow-duel')).tap();
+      // New Arrow Duel Runs inherit the global reply-challenge default. The
+      // per-Run override appears only when editing a previously saved Run.
       await waitFor(element(by.id('practice-run-arrow-duel-reply-setting')))
-        .toExist()
+        .not.toExist()
         .withTimeout(10000);
       await element(by.id('custom-mode-regular')).tap();
       await waitFor(element(by.id('practice-run-arrow-duel-reply-setting')))
