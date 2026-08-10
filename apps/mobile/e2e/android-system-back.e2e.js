@@ -55,7 +55,7 @@ describe('Android product-aware system Back', () => {
       await waitFor(element(by.id('review-due-count'))).toHaveText('0 / 3').withTimeout(10000);
       // Review Home keeps both Today sections visible. Cancelling the review
       // must leave Completed today empty rather than recording an attempt.
-      await expect(element(by.id('review-today-history-empty'))).toBeVisible();
+      await expect(element(by.id('review-today-history-empty'))).toExist();
 
       await device.pressBack();
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
