@@ -157,8 +157,7 @@ gradle.taskGraph.whenReady { taskGraph ->
         task.project.path == appProjectPath && (
             task.name == "assembleRelease" ||
             task.name == "bundleRelease" ||
-            task.name == "packageRelease" ||
-            task.name == "packageReleaseBundle"
+            task.name.startsWith("packageRelease")
         )
     }
 

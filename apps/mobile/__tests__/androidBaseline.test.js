@@ -399,6 +399,7 @@ describe('Android launch baseline', () => {
     expect(appGradle).toContain('signingConfig signingConfigs.release');
     expect(appGradle).toContain('gradle.taskGraph.whenReady');
     expect(appGradle).toContain('taskGraph.allTasks');
+    expect(appGradle).toContain('task.name.startsWith("packageRelease")');
     expect(appGradle).not.toContain('gradle.startParameter.taskNames');
   });
 
