@@ -115,6 +115,7 @@ async function failArrowDuelSprint() {
   await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
   await element(by.id('practice-run-start')).tap();
 
+  let expectedGuideStep = 1;
   for (const scene of [
     'app-store-10-active-session-guide-header',
     'app-store-11-active-session-guide-slow',
@@ -122,17 +123,27 @@ async function failArrowDuelSprint() {
     'app-store-13-active-session-guide-unclear'
   ]) {
     await waitFor(element(by.id('practice-active-session-guide'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('practice-session-guide-coach-progress')))
+      .toHaveText(`${expectedGuideStep} of 6`)
+      .withTimeout(10000);
     await takePortraitScreenshotAtTop(scene);
     await takeLandscapeScreenshot(scene);
     await element(by.id('practice-session-guide-start')).tap();
+    expectedGuideStep += 1;
   }
 
   await waitFor(element(by.id('practice-arrow-duel-guide'))).toExist().withTimeout(10000);
+  await waitFor(element(by.id('practice-session-guide-coach-progress')))
+    .toHaveText('5 of 6')
+    .withTimeout(10000);
   await takePortraitScreenshotAtTop('app-store-14-arrow-duel-guide');
   await takeLandscapeScreenshot('app-store-14-arrow-duel-guide');
   await element(by.id('practice-session-guide-start')).tap();
   await waitFor(element(by.id('practice-session-guide-coach-copy-arrow-duel-reply')))
     .toExist()
+    .withTimeout(10000);
+  await waitFor(element(by.id('practice-session-guide-coach-progress')))
+    .toHaveText('6 of 6')
     .withTimeout(10000);
   await element(by.id('practice-session-guide-start')).tap();
   await waitForVisibleInPracticeScroll('session-board');
