@@ -62,7 +62,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('practice-add-run'))).toBeVisible().withTimeout(10000);
     await tapUntilExists('practice-add-run', 'practice-run-editor', 3);
     await expect(element(by.id('practice-run-theme-selection-detail'))).toHaveText('All themes');
-    await expect(element(by.id('custom-theme-mixed'))).not.toExist();
+    await expect(element(by.id('custom-theme-mixed'))).not.toBeVisible();
     await element(by.id('practice-run-theme-disclosure')).tap();
     await waitFor(element(by.id('custom-theme-mixed').and(by.traits(['selected']))))
       .toExist()

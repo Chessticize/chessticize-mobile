@@ -183,6 +183,15 @@ async function detoxElementExists(testID) {
   }
 }
 
+async function detoxElementIsVisible(testID) {
+  try {
+    await expect(element(by.id(testID))).toBeVisible();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function bringAndroidAppToForeground(
   launchArgs = {},
   environment = process.env,
@@ -989,10 +998,10 @@ async function waitForHistoryFiltersCollapsed() {
 
 async function openStandardHistoryTrend() {
   await openTab('history-tab', 'history-filter-toggle');
-  if (!(await detoxElementExists('history-rating-standard 5/20'))) {
+  if (!(await detoxElementIsVisible('history-rating-standard 5/20'))) {
     await waitFor(element(by.id('history-filter-toggle'))).toBeVisible().withTimeout(10000);
     await element(by.id('history-filter-toggle')).tap();
-    await waitFor(element(by.id('history-advanced-filters'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-advanced-filters'))).toBeVisible().withTimeout(10000);
   }
   await waitFor(element(by.id('history-rating-standard 5/20')))
     .toBeVisible()

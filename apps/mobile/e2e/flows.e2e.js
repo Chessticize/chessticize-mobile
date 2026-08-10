@@ -137,14 +137,17 @@ describe('Key user flows', () => {
     await failStandardSprint();
     await dismissSprintSummary();
 
-    // Mistakes schedule for the next day, so nothing is due yet: the empty
-    // state must surface the next due estimate and offer practice instead.
-    await openTab('review-tab', 'review-empty-state');
+    // Mistakes schedule for the next day, so nothing is due yet: the stable
+    // Today view must surface the next due estimate and both inline empty
+    // sections without replacing the queue with a separate empty screen.
+    await openTab('review-tab', 'review-due-card');
     await waitFor(element(by.id('review-tomorrow-count'))).toHaveText('3').withTimeout(10000);
     await waitFor(element(by.id('review-next-seven-days-count'))).toHaveText('3').withTimeout(10000);
     await waitFor(element(by.id('review-total-count'))).toHaveText('3').withTimeout(10000);
     await waitForElementTextContaining('review-next-due', 'Next:', 10000);
-    await expect(element(by.id('review-empty-practice'))).toBeVisible();
+    await expect(element(by.id('review-start-due'))).toBeVisible();
+    await expect(element(by.id('review-today-to-review-empty'))).toBeVisible();
+    await expect(element(by.id('review-today-history-empty'))).toBeVisible();
   });
 
   it('shows scheduled due reviews after relaunch', async () => {
@@ -411,8 +414,9 @@ describe('Key user flows', () => {
 
     await openStandardHistoryTrend();
 
-    await openTab('review-tab', 'review-empty-state');
-    await expect(element(by.id('review-empty-practice'))).toBeVisible();
+    await openTab('review-tab', 'review-due-card');
+    await expect(element(by.id('review-today-to-review-empty'))).toBeVisible();
+    await expect(element(by.id('review-today-history-empty'))).toBeVisible();
 
     await openTab('settings-tab', 'settings-app-version');
     await expect(element(by.id('settings-standard-elo-row'))).not.toExist();
@@ -439,7 +443,7 @@ async function createSavedCustomRun(name, { shorterDuration = false, themes = []
   }
   if (themes.length > 0) {
     await expect(element(by.id('practice-run-theme-selection-detail'))).toHaveText('All themes');
-    await expect(element(by.id(`custom-theme-${themes[0]}`))).not.toExist();
+    await expect(element(by.id(`custom-theme-${themes[0]}`))).not.toBeVisible();
     await element(by.id('practice-run-theme-disclosure')).tap();
   }
   for (const theme of themes) {
