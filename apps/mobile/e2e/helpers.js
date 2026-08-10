@@ -953,9 +953,14 @@ function classifyAndroidBoardFrameUnits(frame, metrics) {
   const displayShortDp = displayShortPixels / (densityDpi / 160);
   const pixelRatio = frame.width / displayShortPixels;
   const dpRatio = frame.width / displayShortDp;
-  const isBoardSized = (ratio) => ratio >= 0.65 && ratio <= 1.05;
-  const couldBePixels = isBoardSized(pixelRatio);
-  const couldBeDp = isBoardSized(dpRatio);
+  // Compare both interpretations in physical display space. Maintained
+  // large-screen profiles center a bounded board that may occupy less than
+  // 65% of the short edge (for example, 1106 px on a 1768 px foldable), while
+  // still remaining substantially larger than an accidentally pixel-scaled
+  // dp frame. Exactly one interpretation must remain plausible.
+  const isPhysicalBoardSized = (ratio) => ratio >= 0.45 && ratio <= 1.05;
+  const couldBePixels = isPhysicalBoardSized(pixelRatio);
+  const couldBeDp = isPhysicalBoardSized(dpRatio);
 
   if (couldBePixels !== couldBeDp) {
     return couldBePixels ? 'pixels' : 'dp';
@@ -991,7 +996,7 @@ async function waitForHistoryFiltersCollapsed() {
     'Show history filters',
     10000
   );
-  await waitFor(element(by.id('history-advanced-filters')))
+  await waitFor(element(by.id('history-advanced-filters-motion')))
     .not.toBeVisible()
     .withTimeout(10000);
 }
@@ -1001,7 +1006,9 @@ async function openStandardHistoryTrend() {
   if (!(await detoxElementIsVisible('history-rating-standard 5/20'))) {
     await waitFor(element(by.id('history-filter-toggle'))).toBeVisible().withTimeout(10000);
     await element(by.id('history-filter-toggle')).tap();
-    await waitFor(element(by.id('history-advanced-filters'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('history-advanced-filters-motion')))
+      .toBeVisible()
+      .withTimeout(10000);
   }
   await waitFor(element(by.id('history-rating-standard 5/20')))
     .toBeVisible()

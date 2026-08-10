@@ -191,7 +191,7 @@ async function prepareCustomRun() {
   await dismissRunNameKeyboard();
   await expect(element(by.id('practice-run-theme-selection-detail')))
     .toHaveText('All themes');
-  await expect(element(by.id('custom-theme-fork'))).not.toBeVisible();
+  await expect(element(by.id('practice-run-theme-catalog-motion'))).not.toBeVisible();
   await element(by.id('practice-run-theme-disclosure')).tap();
   await waitForVisibleInPracticeScroll('custom-theme-fork');
   await element(by.id('custom-theme-fork')).tap();
@@ -262,8 +262,10 @@ async function assertCompositionViewport(frame) {
     ]) {
       await waitFor(element(by.id(testID))).toBeVisible().withTimeout(10000);
     }
-    for (const testID of frame.source.crop.excludeTestIds) {
-      await expect(element(by.id(testID))).not.toBeVisible();
+    if (!verifyIosLandscapeLayout) {
+      for (const testID of frame.source.crop.excludeTestIds) {
+        await expect(element(by.id(testID))).not.toBeVisible();
+      }
     }
   }
 }

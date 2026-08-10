@@ -35,16 +35,15 @@ describe('Android Custom Practice release slice', () => {
       .toContainEqual({ kind: 'detox', suite: 'android-custom-practice' });
     expect(spec).toContain("by.id('practice-add-run')");
     expect(spec).toContain("by.id('practice-run-name-input')");
-    expect(spec).toContain(
-      "waitFor(element(by.id('practice-run-arrow-duel-reply-setting')))\n        .not.toExist()"
-    );
-    expect(spec).not.toContain(
-      "waitFor(element(by.id('practice-run-arrow-duel-reply-setting')))\n        .toExist()"
+    expect(spec).toMatch(
+      /custom-mode-arrow-duel'[\s\S]*practice-run-arrow-duel-reply-setting'[\s\S]*\.not\.toExist\(\)/
     );
     expect(spec).toContain("by.id('practice-run-puzzle-timing')");
     expect(spec).toContain("by.id('practice-run-theme-selection-detail')");
     expect(spec).toContain("by.id('practice-run-theme-disclosure')");
-    expect(spec).toContain('expect(element(by.id(CUSTOM_RUN_THEME_TEST_ID))).not.toBeVisible()');
+    expect(spec).toContain(
+      "expect(element(by.id('practice-run-theme-catalog-motion'))).not.toBeVisible()"
+    );
     expect(spec).not.toContain('expect(element(by.id(CUSTOM_RUN_THEME_TEST_ID))).not.toExist()');
     expect(spec).toContain("tapUntilExists('practice-run-save', 'practice-run-home-edit', 3)");
     expect(spec).not.toContain("element(by.id('practice-run-save')).tap()");

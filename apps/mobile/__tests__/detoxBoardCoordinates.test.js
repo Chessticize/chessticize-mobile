@@ -100,9 +100,21 @@ describe('Detox Android board coordinates', () => {
     })).toEqual({ point: { x: 360, y: 120 }, units: 'dp' });
   });
 
-  it('fails closed when Android board frame units are ambiguous', () => {
-    expect(() => androidBoardTapPoint({ width: 600, height: 600 }, 'a3', true, {
+  it('accepts a centered large-screen board frame reported in pixels', () => {
+    const result = androidBoardTapPoint({ width: 1106, height: 1105 }, 'a3', true, {
       densityDpi: 420,
+      heightPixels: 2208,
+      widthPixels: 1768,
+    });
+
+    expect(result.units).toBe('pixels');
+    expect(result.point.x).toBeCloseTo(395, 5);
+    expect(result.point.y).toBeCloseTo(131.666667, 5);
+  });
+
+  it('fails closed when Android board frame units are genuinely ambiguous', () => {
+    expect(() => androidBoardTapPoint({ width: 600, height: 600 }, 'a3', true, {
+      densityDpi: 160,
       heightPixels: 1920,
       widthPixels: 1080,
     })).toThrow('Unable to classify Android board frame units');

@@ -167,7 +167,8 @@ describe('Detox suite configuration', () => {
 
     expect(helper).toContain("detoxElementIsVisible('history-rating-standard 5/20')");
     expect(helper).not.toContain("detoxElementExists('history-rating-standard 5/20')");
-    expect(helper).toContain("by.id('history-advanced-filters'))).toBeVisible()");
+    expect(helper).toContain("by.id('history-advanced-filters-motion')");
+    expect(helper).toContain('.toBeVisible()');
   });
 
   it('validates the stable Review Today empty sections instead of the removed empty screen', () => {
@@ -178,8 +179,7 @@ describe('Detox suite configuration', () => {
     const caseEnd = flowsSpec.indexOf('\n  });', caseStart);
     const reviewQueueCase = flowsSpec.slice(caseStart, caseEnd);
 
-    expect(reviewQueueCase).toContain("openTab('review-tab', 'review-due-card')");
-    expect(reviewQueueCase).toContain("by.id('review-today-to-review-empty')");
+    expect(reviewQueueCase).toContain("openTab('review-tab', 'review-today-to-review-empty')");
     expect(reviewQueueCase).toContain("by.id('review-today-history-empty')");
     expect(reviewQueueCase).not.toContain('review-empty-state');
     expect(reviewQueueCase).not.toContain('review-empty-practice');
@@ -1125,8 +1125,8 @@ describe('Detox suite configuration', () => {
     const collapsedSummary = runManagementCase.indexOf(
       "element(by.id('practice-run-theme-selection-detail'))"
     );
-    const hiddenTheme = runManagementCase.indexOf(
-      "expect(element(by.id('custom-theme-mixed'))).not.toBeVisible()"
+    const hiddenThemeCatalog = runManagementCase.indexOf(
+      "expect(element(by.id('practice-run-theme-catalog-motion'))).not.toBeVisible()"
     );
     const expandThemes = runManagementCase.indexOf(
       "element(by.id('practice-run-theme-disclosure')).tap()"
@@ -1136,8 +1136,8 @@ describe('Detox suite configuration', () => {
     );
 
     expect(collapsedSummary).toBeGreaterThan(0);
-    expect(hiddenTheme).toBeGreaterThan(collapsedSummary);
-    expect(expandThemes).toBeGreaterThan(hiddenTheme);
+    expect(hiddenThemeCatalog).toBeGreaterThan(collapsedSummary);
+    expect(expandThemes).toBeGreaterThan(hiddenThemeCatalog);
     expect(selectedTheme).toBeGreaterThan(expandThemes);
   });
 
@@ -1759,7 +1759,7 @@ describe('Detox suite configuration', () => {
     );
     expect(practiceSpec).toContain("element(by.id('history-filter-toggle')).tap()");
     expect(practiceSpec).toContain('waitForHistoryFiltersCollapsed()');
-    expect(helpers).toContain("by.id('history-advanced-filters')");
+    expect(helpers).toContain("by.id('history-advanced-filters-motion')");
     expect(helpers).toContain('not.toBeVisible()');
     expect(helpers).toContain("'Show history filters'");
     expect(practiceSpec).toContain("element(by.text('Correct')).atIndex(0)");
@@ -1898,6 +1898,15 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain("ROOT_CLIPPED_SCROLL_CONTAINERS.has(testID)");
     expect(spec).toContain("'settings-about-section'");
     expect(spec).toContain('assertFramesIntersect(');
+    const compositionHelperStart = spec.indexOf('async function assertCompositionViewport');
+    const compositionHelperEnd = spec.indexOf(
+      'async function prepareRatingTrend',
+      compositionHelperStart
+    );
+    const compositionHelper = spec.slice(compositionHelperStart, compositionHelperEnd);
+    expect(compositionHelper).toContain('if (!verifyIosLandscapeLayout)');
+    expect(compositionHelper.indexOf('if (!verifyIosLandscapeLayout)'))
+      .toBeLessThan(compositionHelper.indexOf('frame.source.crop.excludeTestIds'));
     const launchHelperStart = spec.indexOf('async function launchMarketingFrame');
     const launchHelperEnd = spec.indexOf('async function prepareFrame', launchHelperStart);
     const launchHelper = spec.slice(launchHelperStart, launchHelperEnd);
@@ -2004,6 +2013,9 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain('waitForAndroidUiState');
     expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
     const submitFirstWrongBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
+    expect(spec).not.toContain(
+      "waitFor(element(by.id('move-feedback-overlay'))).toExist()"
+    );
     const verifyFirstWrongMoveResult = spec.indexOf(
       "waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist()",
       submitFirstWrongBoardMove
@@ -2344,6 +2356,8 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('await cancelledPredictiveBack.completion()');
     expect(spec).toContain('Pending Arrow Duel timer cancellation is covered deterministically');
     expect(spec).not.toContain("by.id('sprint-loading-overlay')");
+    expect(spec).toContain("by.id('review-today-history-empty'))).toExist()");
+    expect(spec).not.toContain("by.id('review-today-history')).not.toExist()");
     expect(spec).toContain('androidAppIsResumed');
     expect(spec).toContain('const rootPredictiveBack = beginAndroidPredictiveBackGesture()');
     expect(spec).toContain('Idle Practice root trapped Predictive Back');

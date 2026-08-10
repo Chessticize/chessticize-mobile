@@ -54,6 +54,8 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await openNewRunEditor();
       await element(by.id('practice-run-name-input')).replaceText(CUSTOM_RUN_NAME);
       await element(by.id('custom-mode-arrow-duel')).tap();
+      // New Arrow Duel Runs inherit the global reply-challenge default. The
+      // per-Run override appears only when editing a previously saved Run.
       await waitFor(element(by.id('practice-run-arrow-duel-reply-setting')))
         .not.toExist()
         .withTimeout(10000);
@@ -63,7 +65,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
         .not.toExist()
         .withTimeout(10000);
       await expect(element(by.id('practice-run-theme-selection-detail'))).toHaveText('All themes');
-      await expect(element(by.id(CUSTOM_RUN_THEME_TEST_ID))).not.toBeVisible();
+      await expect(element(by.id('practice-run-theme-catalog-motion'))).not.toBeVisible();
       await element(by.id('practice-run-theme-disclosure')).tap();
       await waitForVisibleInPracticeScroll(CUSTOM_RUN_THEME_TEST_ID);
       await element(by.id(CUSTOM_RUN_THEME_TEST_ID)).tap();
