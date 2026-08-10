@@ -9,6 +9,8 @@ LOCAL_TRANSPORT="com.android.localtransport/.LocalTransport"
 APP_DATA_DOMAINS='r|f|db|sp|d_r|d_f|d_db|d_sp|ef'
 SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 ADB="${ADB_PATH:-${SDK_ROOT:+$SDK_ROOT/platform-tools/adb}}"
+NODE_BINARY="${NODE_BINARY:-$(command -v node || true)}"
+COMMAND_TIMEOUT_RUNNER="$APP_DIR/scripts/run-command-with-timeout.js"
 DEVICE="${DETOX_ANDROID_DEVICE:-emulator-5554}"
 APK="${CHESSTICIZE_ANDROID_E2E_APK:-$APP_DIR/android/app/build/outputs/apk/e2e/app-e2e.apk}"
 ARTIFACT_ROOT="${ANDROID_BACKUP_POLICY_ARTIFACT_DIR:-$APP_DIR/artifacts/android-progress-backup-policy}"
@@ -32,6 +34,10 @@ if [[ -z "$ADB" || ! -x "$ADB" ]]; then
   echo "Set ADB_PATH, ANDROID_HOME, or ANDROID_SDK_ROOT to an executable adb." >&2
   exit 69
 fi
+if [[ -z "$NODE_BINARY" || ! -x "$NODE_BINARY" || ! -f "$COMMAND_TIMEOUT_RUNNER" ]]; then
+  echo "Android policy evidence requires Node.js and $COMMAND_TIMEOUT_RUNNER." >&2
+  exit 69
+fi
 if [[ ! -f "$APK" ]]; then
   echo "Android policy evidence APK does not exist: $APK" >&2
   exit 66
@@ -42,7 +48,7 @@ adb_cmd() {
   local diagnostic_file
   local status=0
 
-  if timeout --foreground "${ADB_OPERATION_TIMEOUT_SECONDS}s" \
+  if "$NODE_BINARY" "$COMMAND_TIMEOUT_RUNNER" "$ADB_OPERATION_TIMEOUT_SECONDS" \
       "$ADB" -s "$DEVICE" "$@"; then
     return 0
   else

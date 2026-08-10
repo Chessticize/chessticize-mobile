@@ -1327,10 +1327,13 @@ describe('Android Progress Backup', () => {
 
   it('bounds policy ADB operations and records timeout diagnostics', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const api30RestoreEvidenceScript = read(
+      'scripts/android-progress-backup-api30-restore-evidence.sh',
+    );
 
     expect(policyEvidenceScript).toContain('ADB_OPERATION_TIMEOUT_SECONDS');
     expect(policyEvidenceScript).toContain(
-      'timeout --foreground "${ADB_OPERATION_TIMEOUT_SECONDS}s"',
+      '"$NODE_BINARY" "$COMMAND_TIMEOUT_RUNNER" "$ADB_OPERATION_TIMEOUT_SECONDS"',
     );
     expect(policyEvidenceScript).toContain('adb-timeout-diagnostic-');
     expect(policyEvidenceScript).toContain('timed-out-command=');
@@ -1339,6 +1342,31 @@ describe('Android Progress Backup', () => {
     );
     expect(policyEvidenceScript).toContain('Android policy ADB operation timed out');
     expect(policyEvidenceScript).toContain('ADB_CLEANUP_TIMEOUT_SECONDS');
+    expect(api30RestoreEvidenceScript).toContain(
+      '"$NODE_BINARY" "$COMMAND_TIMEOUT_RUNNER" "$ADB_OPERATION_TIMEOUT_SECONDS"',
+    );
+  });
+
+  it('provides a host-portable bounded command runner for backup evidence', () => {
+    const runner = join(appRoot, 'scripts/run-command-with-timeout.js');
+    const success = spawnSync(process.execPath, [
+      runner,
+      '1',
+      process.execPath,
+      '-e',
+      'process.stdout.write("ready")',
+    ], { encoding: 'utf8' });
+    const timeout = spawnSync(process.execPath, [
+      runner,
+      '0.05',
+      process.execPath,
+      '-e',
+      'setTimeout(() => {}, 1000)',
+    ], { encoding: 'utf8' });
+
+    expect(success.status).toBe(0);
+    expect(success.stdout).toBe('ready');
+    expect(timeout.status).toBe(124);
   });
 
   it('recovers only transient adb root restarts and proves root before policy mutation', () => {
