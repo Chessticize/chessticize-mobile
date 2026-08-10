@@ -1982,6 +1982,9 @@ describe('Detox suite configuration', () => {
     expect(spec).not.toContain('waitForAndroidUiState');
     expect(spec).not.toContain("playBoardMove('session-board', 'e2e6')");
     const submitFirstWrongBoardMove = spec.indexOf("playBoardMove('session-board', 'c2b3')");
+    expect(spec).not.toContain(
+      "waitFor(element(by.id('move-feedback-overlay'))).toExist()"
+    );
     const verifyFirstWrongMoveResult = spec.indexOf(
       "waitFor(element(by.label('Mistakes 1 of 3')).atIndex(0)).toExist()",
       submitFirstWrongBoardMove
