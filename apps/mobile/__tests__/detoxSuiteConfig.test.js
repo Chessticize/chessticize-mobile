@@ -1867,6 +1867,15 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain("ROOT_CLIPPED_SCROLL_CONTAINERS.has(testID)");
     expect(spec).toContain("'settings-about-section'");
     expect(spec).toContain('assertFramesIntersect(');
+    const compositionHelperStart = spec.indexOf('async function assertCompositionViewport');
+    const compositionHelperEnd = spec.indexOf(
+      'async function prepareRatingTrend',
+      compositionHelperStart
+    );
+    const compositionHelper = spec.slice(compositionHelperStart, compositionHelperEnd);
+    expect(compositionHelper).toContain('if (!verifyIosLandscapeLayout)');
+    expect(compositionHelper.indexOf('if (!verifyIosLandscapeLayout)'))
+      .toBeLessThan(compositionHelper.indexOf('frame.source.crop.excludeTestIds'));
     const launchHelperStart = spec.indexOf('async function launchMarketingFrame');
     const launchHelperEnd = spec.indexOf('async function prepareFrame', launchHelperStart);
     const launchHelper = spec.slice(launchHelperStart, launchHelperEnd);
