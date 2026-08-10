@@ -39,15 +39,17 @@ describe("DeviceSQLiteStore bundled puzzle-pack cache", () => {
     (Platform as { OS: string }).OS = "android";
     delete (NativeModules as Record<string, unknown>).SourceCode;
     delete (NativeModules as Record<string, unknown>).ApplicationMetadata;
-    delete (NativeModules as Record<string, unknown>).OPSQLite;
+    delete (NativeModules as Record<string, unknown>).BundledPuzzlePackInstaller;
   });
 
   it("opens the versioned Android asset before deleting obsolete caches", async () => {
     const currentDb = fakePuzzlePackDatabase();
     const obsoleteNames = obsoleteBundledPuzzlePackDatabaseNames(5);
     const obsoleteDbs = obsoleteNames.map(() => fakePuzzlePackDatabase());
-    const moveAssetsDatabase = jest.fn().mockResolvedValue(true);
-    (NativeModules as Record<string, unknown>).OPSQLite = { moveAssetsDatabase };
+    const installBundledPuzzlePack = jest.fn().mockResolvedValue(true);
+    (NativeModules as Record<string, unknown>).BundledPuzzlePackInstaller = {
+      installBundledPuzzlePack
+    };
     mockOpen.mockReturnValueOnce(currentDb);
     for (const database of obsoleteDbs) {
       mockOpen.mockReturnValueOnce(database);
@@ -55,13 +57,15 @@ describe("DeviceSQLiteStore bundled puzzle-pack cache", () => {
 
     await DeviceSQLiteStore.openReadOnlyPuzzlePack(
       "bundled-core-pack-v5.sqlite",
+      164_163_584,
       {},
       obsoleteNames
     );
 
-    expect(moveAssetsDatabase).toHaveBeenCalledTimes(1);
-    expect(moveAssetsDatabase).toHaveBeenCalledWith({
+    expect(installBundledPuzzlePack).toHaveBeenCalledTimes(1);
+    expect(installBundledPuzzlePack).toHaveBeenCalledWith({
       filename: "bundled-core-pack-v5.sqlite",
+      expectedBytes: 164_163_584,
       path: "puzzle-packs"
     });
     expect(mockOpen).toHaveBeenNthCalledWith(1, {
@@ -75,14 +79,17 @@ describe("DeviceSQLiteStore bundled puzzle-pack cache", () => {
 
   it("does not delete the previous cache when the current pack cannot open", async () => {
     const obsoleteDb = fakePuzzlePackDatabase();
-    const moveAssetsDatabase = jest.fn().mockResolvedValue(true);
-    (NativeModules as Record<string, unknown>).OPSQLite = { moveAssetsDatabase };
+    const installBundledPuzzlePack = jest.fn().mockResolvedValue(true);
+    (NativeModules as Record<string, unknown>).BundledPuzzlePackInstaller = {
+      installBundledPuzzlePack
+    };
     mockOpen.mockImplementationOnce(() => {
       throw new Error("current pack failed to open");
     }).mockReturnValueOnce(obsoleteDb);
 
     await expect(DeviceSQLiteStore.openReadOnlyPuzzlePack(
       "bundled-core-pack-v5.sqlite",
+      164_163_584,
       {},
       ["bundled-core-pack.sqlite"]
     )).rejects.toThrow("current pack failed to open");
@@ -92,16 +99,19 @@ describe("DeviceSQLiteStore bundled puzzle-pack cache", () => {
   });
 
   it("refuses to delete a database outside the bounded Core Pack cache names", async () => {
-    const moveAssetsDatabase = jest.fn().mockResolvedValue(true);
-    (NativeModules as Record<string, unknown>).OPSQLite = { moveAssetsDatabase };
+    const installBundledPuzzlePack = jest.fn().mockResolvedValue(true);
+    (NativeModules as Record<string, unknown>).BundledPuzzlePackInstaller = {
+      installBundledPuzzlePack
+    };
 
     await expect(DeviceSQLiteStore.openReadOnlyPuzzlePack(
       "bundled-core-pack-v5.sqlite",
+      164_163_584,
       {},
       ["chessticize-mobile.sqlite"]
     )).rejects.toThrow("Refusing to delete unexpected bundled puzzle-pack cache");
 
-    expect(moveAssetsDatabase).not.toHaveBeenCalled();
+    expect(installBundledPuzzlePack).not.toHaveBeenCalled();
     expect(mockOpen).not.toHaveBeenCalled();
   });
 
@@ -123,6 +133,7 @@ describe("DeviceSQLiteStore bundled puzzle-pack cache", () => {
 
     await DeviceSQLiteStore.openReadOnlyPuzzlePack(
       "bundled-core-pack-v5.sqlite",
+      164_163_584,
       {},
       obsoleteNames
     );

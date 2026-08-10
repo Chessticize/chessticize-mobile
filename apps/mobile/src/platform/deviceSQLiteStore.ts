@@ -40,6 +40,7 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
 
   static async openReadOnlyPuzzlePack(
     name: string,
+    expectedAssetBytes: number,
     options: SQLitePuzzlePackSourceOptions = {},
     obsoleteCacheNames: readonly string[] = []
   ): Promise<SQLitePuzzlePackSource> {
@@ -57,6 +58,7 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
 
     const copied = await moveBundledDatabaseAsset({
       filename: name,
+      expectedBytes: expectedAssetBytes,
       path: MOBILE_DATABASE_LAYOUT.androidPuzzlePackAssetDirectory
     });
     if (!copied) {
@@ -129,14 +131,18 @@ function tacticalProfileCacheLocation(): string | undefined {
   return libraryPath ? `${libraryPath}/Caches` : undefined;
 }
 
-function moveBundledDatabaseAsset(args: { filename: string; path: string }): Promise<boolean> {
-  const module = NativeModules.OPSQLite as
-    | { moveAssetsDatabase?: (input: { filename: string; path: string; overwrite?: boolean }) => Promise<boolean> }
+function moveBundledDatabaseAsset(args: {
+  filename: string;
+  expectedBytes: number;
+  path: string;
+}): Promise<boolean> {
+  const module = NativeModules.BundledPuzzlePackInstaller as
+    | { installBundledPuzzlePack?: (input: typeof args) => Promise<boolean> }
     | undefined;
-  if (!module?.moveAssetsDatabase) {
-    return Promise.reject(new Error("OPSQLite asset copy API is unavailable"));
+  if (!module?.installBundledPuzzlePack) {
+    return Promise.reject(new Error("Bundled puzzle-pack installer is unavailable"));
   }
-  return module.moveAssetsDatabase(args);
+  return module.installBundledPuzzlePack(args);
 }
 
 function validateObsoleteBundledPuzzlePackCacheNames(names: readonly string[]): string[] {

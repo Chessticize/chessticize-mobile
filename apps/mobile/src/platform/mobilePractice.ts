@@ -34,6 +34,7 @@ const familiar15Manifest = require("../../../../fixtures/puzzles/familiar-15-e2e
   sourceFixture: string;
 };
 const bundledCorePackVersion = requiredBundledCorePackVersion(bundledCoreManifest);
+const bundledCorePackBytes = requiredBundledCorePackBytes(bundledCoreManifest);
 const bundledCorePackDatabaseName = bundledPuzzlePackDatabaseName(bundledCorePackVersion);
 const obsoleteBundledCorePackDatabaseNames = obsoleteBundledPuzzlePackDatabaseNames(
   bundledCorePackVersion
@@ -127,6 +128,7 @@ async function createPersistentMobilePracticeServiceImpl(): Promise<PracticeServ
   userStore.migrate();
   const packSource = await DeviceSQLiteStore.openReadOnlyPuzzlePack(
     bundledCorePackDatabaseName,
+    bundledCorePackBytes,
     BUNDLED_CORE_PACK_OPTIONS,
     obsoleteBundledCorePackDatabaseNames
   );
@@ -146,6 +148,15 @@ function requiredBundledCorePackVersion(manifest: PuzzlePackManifest): number {
     );
   }
   return manifest.packVersion as number;
+}
+
+function requiredBundledCorePackBytes(manifest: PuzzlePackManifest): number {
+  if (!Number.isSafeInteger(manifest.packFileBytes) || (manifest.packFileBytes ?? 0) < 1) {
+    throw new Error(
+      `Bundled Core Pack manifest must declare a positive integer packFileBytes; received ${String(manifest.packFileBytes)}`
+    );
+  }
+  return manifest.packFileBytes as number;
 }
 
 export function openTacticalProfileRepositoryWithFallback(
