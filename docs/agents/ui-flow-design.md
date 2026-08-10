@@ -37,6 +37,15 @@ production wiring: do not add the production navigation entry, persistent
 storage or backend mutation, native-module integration, analytics, feature
 rollout, or release integration yet.
 
+A current request to create, show, or deliver a Storybook or visual UI design
+includes authorization for the complete review handoff: create the issue
+branch, push the reviewed commit, open or update its PR, publish the
+branch-owned public Storybook preview, and link that preview from the issue.
+It does not authorize merge or product implementation. Treat older issue text
+such as “no branch/PR at this stage” as historical scope once the current user
+requests the design; only a current instruction such as “local only”, “do not
+push”, or “do not open a PR” stops publication.
+
 1. Locate the existing product-clone scenario first. Update it in place and
    retain its stable Storybook URL. Add a typed scenario only when no existing
    product destination or state can represent the proposed change.

@@ -25,8 +25,16 @@ similar label.
 - For review or reporting requests, keep GitHub and the repository read-only.
 - For triage requests that authorize tracker updates, apply labels and post the
   durable triage comment described in `docs/agents/issue-triage.md`.
-- Create branches, Storybook scenarios, or PRs only when the request also
-  authorizes prototypes or preview publication.
+- Treat a current request to create, show, or deliver a Storybook or visual UI
+  design as authorization to create its issue branch, push the reviewed commit,
+  open or update the PR, publish the branch-owned public Storybook preview, and
+  add the preview handoff to the issue. The request does not authorize merge or
+  product implementation.
+- Current user instructions control the publication scope. Historical issue
+  text such as “no branch/PR at this stage” records the earlier phase and does
+  not override a later Storybook or visual-design request. Still honor a
+  current instruction such as “local only”, “do not push”, or “do not open a
+  PR”.
 - Never infer authorization to close, mark `wontfix`, or start product
   implementation.
 - Relationship suggestions are advisory. Do not consolidate tickets, close one
