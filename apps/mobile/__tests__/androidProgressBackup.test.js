@@ -70,6 +70,9 @@ describe('Android Progress Backup', () => {
     const deviceStore = read('src/platform/deviceSQLiteStore.ts');
     const mobilePractice = read('src/platform/mobilePractice.ts');
     const migrationJourney = read('e2e/android-migration.e2e.js');
+    const fixtureInstaller = read(
+      'android/app/src/androidTest/java/com/chessticize/mobile/ReleasedDatabaseFixtureInstallerTest.kt',
+    );
 
     expect(databaseLayout).toContain('progressDatabaseName: "chessticize-mobile.sqlite"');
     expect(databaseLayout).toContain(
@@ -85,9 +88,9 @@ describe('Android Progress Backup', () => {
     expect(mobilePractice).toContain(
       'DeviceSQLiteStore.open(MOBILE_DATABASE_LAYOUT.progressDatabaseName)',
     );
-    expect(migrationJourney).toContain(
-      "const PROGRESS_DATABASE_PATH = 'databases/chessticize-mobile.sqlite'",
-    );
+    expect(migrationJourney).toContain('ReleasedDatabaseFixtureInstallerTest');
+    expect(fixtureInstaller).toContain('const val DATABASE_NAME = "chessticize-mobile.sqlite"');
+    expect(fixtureInstaller).toContain('targetContext.getDatabasePath(DATABASE_NAME)');
     expect(PROGRESS_DATABASE_FILES).toEqual([
       'chessticize-mobile.sqlite',
       'chessticize-mobile.sqlite-journal',
@@ -522,6 +525,9 @@ describe('Android Progress Backup', () => {
     expect(policyEvidenceScript).toContain('retained-apk-push.txt');
     expect(policyEvidenceScript).toContain('retained-apk-install.txt');
     expect(policyEvidenceScript).toContain('retained-apk-cleanup.txt');
+    expect(policyEvidenceScript).toContain('wc -c < "$file_path"');
+    expect(policyEvidenceScript).not.toContain('stat -c %s "$APK"');
+    expect(policyEvidenceScript).not.toContain('stat -c %s "$archive"');
     expect(policyEvidenceScript).toContain(
       'apk-provenance=host-sha256+retained-device-size+installed-device-size+device-cmp',
     );
@@ -539,6 +545,10 @@ describe('Android Progress Backup', () => {
     expect(restoreEvidenceScript).not.toContain('adb_cmd pull');
     expect(restoreEvidenceScript).not.toContain('install-multiple');
     expect(restoreEvidenceScript).toContain('CHESSTICIZE_ANDROID_E2E_APK');
+    expect(restoreEvidenceScript).toContain('wc -c < "$APK"');
+    expect(restoreEvidenceScript).not.toContain('stat -c %s "$APK"');
+    expect(api30RestoreScript).toContain('host_file_size "$APK"');
+    expect(api30RestoreScript).not.toContain('stat -c %s "$APK"');
     expect(restoreEvidenceScript).toContain(
       'push_host_file_to_device "$APK" "$RETAINED_APK_PATH"',
     );
@@ -1324,10 +1334,13 @@ describe('Android Progress Backup', () => {
 
   it('bounds policy ADB operations and records timeout diagnostics', () => {
     const policyEvidenceScript = read('scripts/android-progress-backup-policy-evidence.sh');
+    const api30RestoreEvidenceScript = read(
+      'scripts/android-progress-backup-api30-restore-evidence.sh',
+    );
 
     expect(policyEvidenceScript).toContain('ADB_OPERATION_TIMEOUT_SECONDS');
     expect(policyEvidenceScript).toContain(
-      'timeout --foreground "${ADB_OPERATION_TIMEOUT_SECONDS}s"',
+      '"$NODE_BINARY" "$COMMAND_TIMEOUT_RUNNER" "$ADB_OPERATION_TIMEOUT_SECONDS"',
     );
     expect(policyEvidenceScript).toContain('adb-timeout-diagnostic-');
     expect(policyEvidenceScript).toContain('timed-out-command=');
@@ -1336,6 +1349,31 @@ describe('Android Progress Backup', () => {
     );
     expect(policyEvidenceScript).toContain('Android policy ADB operation timed out');
     expect(policyEvidenceScript).toContain('ADB_CLEANUP_TIMEOUT_SECONDS');
+    expect(api30RestoreEvidenceScript).toContain(
+      '"$NODE_BINARY" "$COMMAND_TIMEOUT_RUNNER" "$ADB_OPERATION_TIMEOUT_SECONDS"',
+    );
+  });
+
+  it('provides a host-portable bounded command runner for backup evidence', () => {
+    const runner = join(appRoot, 'scripts/run-command-with-timeout.js');
+    const success = spawnSync(process.execPath, [
+      runner,
+      '1',
+      process.execPath,
+      '-e',
+      'process.stdout.write("ready")',
+    ], { encoding: 'utf8' });
+    const timeout = spawnSync(process.execPath, [
+      runner,
+      '0.05',
+      process.execPath,
+      '-e',
+      'setTimeout(() => {}, 1000)',
+    ], { encoding: 'utf8' });
+
+    expect(success.status).toBe(0);
+    expect(success.stdout).toBe('ready');
+    expect(timeout.status).toBe(124);
   });
 
   it('recovers only transient adb root restarts and proves root before policy mutation', () => {

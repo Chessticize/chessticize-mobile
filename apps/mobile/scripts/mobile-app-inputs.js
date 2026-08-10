@@ -25,10 +25,13 @@ const TEST_RUNNER_PATHS = new Set([
   'apps/mobile/scripts/android-progress-backup-policy-evidence.sh',
   'apps/mobile/scripts/android-progress-backup-restore-evidence.sh',
   'apps/mobile/scripts/android-review-reminder-native-evidence.sh',
+  'apps/mobile/scripts/android-r8-evidence.js',
+  'apps/mobile/scripts/android-runtime-benchmark.js',
   'apps/mobile/scripts/android-test-for-detox.sh',
   'apps/mobile/scripts/android-validation-matrix.js',
   'apps/mobile/scripts/install-android-detox-apks.sh',
   'apps/mobile/scripts/prepare-android-offline-e2e.sh',
+  'apps/mobile/scripts/run-command-with-timeout.js',
   'scripts/validate-development-process.mjs',
 ]);
 

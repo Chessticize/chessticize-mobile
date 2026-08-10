@@ -386,8 +386,14 @@ describe('Android launch baseline', () => {
   it('keeps debug signing isolated and fails release packaging closed', () => {
     const appGradle = read('android/app/build.gradle');
     const debugSigningReferences = appGradle.match(/signingConfig signingConfigs\.debug/g) || [];
+    const releaseBlock = appGradle.match(
+      /\n\s{8}release \{([\s\S]*?)\n\s{8}\}\n\s{8}\/\/ Exercise/,
+    );
 
-    expect(debugSigningReferences).toHaveLength(1);
+    expect(debugSigningReferences).toHaveLength(2);
+    expect(releaseBlock).not.toBeNull();
+    expect(releaseBlock?.[1]).not.toContain('signingConfigs.debug');
+    expect(appGradle).toMatch(/r8Validation[\s\S]*signingConfig signingConfigs\.debug/);
     expect(appGradle).toContain('Production Android signing material is required for release packaging.');
     expect(appGradle).toContain('CHESSTICIZE_ANDROID_RELEASE_STORE_FILE');
     expect(appGradle).toContain('signingConfig signingConfigs.release');
@@ -695,7 +701,10 @@ describe('Android launch baseline', () => {
 
     expect(androidDetoxScript).toContain('ANDROID_HOME');
     expect(androidDetoxScript).toContain('export ADB_PATH=');
-    expect(androidDetoxScript).toContain('--configuration android.attached.e2e');
+    expect(androidDetoxScript).toContain(
+      'CHESSTICIZE_ANDROID_DETOX_CONFIGURATION:-android.attached.e2e',
+    );
+    expect(androidDetoxScript).toContain('--configuration "$detox_configuration"');
     expect(androidDetoxScript).not.toContain('react-native start');
     expect(androidDetoxScript).not.toContain('"$ADB_PATH" reverse');
     expect(androidDetoxScript).not.toMatch(/^adb reverse/m);

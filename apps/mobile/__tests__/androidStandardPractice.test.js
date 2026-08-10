@@ -18,7 +18,12 @@ describe('Android Standard Practice release slice', () => {
   it('keeps progress, puzzle-pack assets, and migration fixtures in distinguishable locations', () => {
     const databaseLayout = read('src/backend/mobileDatabaseLayout.ts');
     const deviceStore = read('src/platform/deviceSQLiteStore.ts');
+    const application = read('android/app/src/main/java/com/chessticize/mobile/MainApplication.kt');
+    const installer = read(
+      'android/app/src/main/java/com/chessticize/mobile/BundledPuzzlePackInstallerModule.kt',
+    );
     const appGradle = read('android/app/build.gradle');
+    const productionAssetTask = appGradle.slice(0, appGradle.indexOf('apply plugin:'));
 
     expect(databaseLayout).toContain('chessticize-mobile.sqlite');
     expect(databaseLayout).toContain('legacyBundledPuzzlePackDatabaseName: "bundled-core-pack.sqlite"');
@@ -26,10 +31,19 @@ describe('Android Standard Practice release slice', () => {
     expect(databaseLayout).toContain('puzzle-packs');
     expect(deviceStore).toContain('MOBILE_DATABASE_LAYOUT.progressDatabaseName');
     expect(deviceStore).toContain('MOBILE_DATABASE_LAYOUT.androidPuzzlePackAssetDirectory');
+    expect(deviceStore).toContain('NativeModules.BundledPuzzlePackInstaller');
+    expect(application).toContain('BundledPuzzlePackInstallerPackage()');
+    expect(installer).toContain('@Synchronized');
+    expect(installer).toContain('"$filename.installing"');
+    expect(installer).toContain('output.fd.sync()');
+    expect(installer).toContain('staging.renameTo(destination)');
+    expect(installer).not.toContain('FileOutputStream(destination)');
     expect(appGradle).toContain('puzzlePack.set(puzzlePackSource)');
     expect(appGradle).toContain('variant.sources.assets.addGeneratedSourceDirectory');
     expect(appGradle).toContain('puzzle-packs');
-    expect(appGradle).not.toContain('fixtures/migrations');
+    expect(productionAssetTask).not.toContain('fixtures/migrations');
+    expect(appGradle).toContain('androidTest.assets.srcDir');
+    expect(appGradle).toContain('packages/storage/test/fixtures/migrations');
   });
 
   it('selects the native platform capability composition at the application root', () => {
@@ -91,6 +105,9 @@ describe('Android Standard Practice release slice', () => {
     const androidNetwork = read('e2e/androidNetwork.js');
     const offlineSetup = read('scripts/prepare-android-offline-e2e.sh');
     const migrationJourney = read('e2e/android-migration.e2e.js');
+    const migrationFixtureInstaller = read(
+      'android/app/src/androidTest/java/com/chessticize/mobile/ReleasedDatabaseFixtureInstallerTest.kt',
+    );
     const standardFixture = require('../../../fixtures/puzzles/android-standard-practice.fixture.json');
     const storageContract = readRepo('packages/storage/test/puzzle-pack-source.test.ts');
     const componentContract = read('__tests__/PracticePocScreen.test.tsx');
@@ -165,13 +182,12 @@ describe('Android Standard Practice release slice', () => {
     expect(androidNetwork).toContain("'connectivity',");
     expect(androidNetwork).toContain("'dumpsys', 'connectivity'");
     expect(androidNetwork).not.toContain("'svc'");
-    expect(migrationJourney).toContain('schema-v0-ios-1.0.0.sqlite');
-    expect(migrationJourney).toContain('run-as');
-    expect(migrationJourney).toContain("'push'");
-    expect(migrationJourney).toContain("'mkdir', '-p', 'databases'");
-    expect(migrationJourney).toContain("'cp', DEVICE_FIXTURE_PATH, PROGRESS_DATABASE_PATH");
-    expect(migrationJourney).not.toContain("'sh',");
-    expect(migrationJourney).not.toContain('cat >');
+    expect(migrationFixtureInstaller).toContain('schema-v0-ios-1.0.0.sqlite');
+    expect(migrationJourney).toContain('ReleasedDatabaseFixtureInstallerTest');
+    expect(migrationJourney).toContain("'am', 'instrument'");
+    expect(migrationJourney).toContain("instrumentation.includes('OK (1 test)')");
+    expect(migrationJourney).not.toContain('run-as');
+    expect(migrationJourney).not.toContain("'push'");
     expect(migrationJourney).toContain("const { androidAdbPath } = require('./androidNetwork');");
     expect(migrationJourney).not.toContain('function androidAdbPath()');
     expect(migrationJourney).toContain('legacy-attempt-standard-wrong');

@@ -180,6 +180,7 @@ describe('Android validation matrix', () => {
       commitSha: EXACT_SHA,
       appSourceSha: EXACT_SHA,
       testRunnerSha: EXACT_SHA,
+      appVariant: 'e2e',
       appInputDigest: APP_INPUT_DIGEST,
       appBuildInputsUnchanged: true,
       artifacts: {
@@ -215,6 +216,7 @@ describe('Android validation matrix', () => {
     [{ trackedWorktreeStatus: ' M apps/mobile/App.tsx' }, 'tracked worktree must be clean'],
     [{ stepResults: [] }, 'result for every validation step'],
     [{ buildResult: 'unknown' }, 'build result must be success'],
+    [{ appVariant: 'release-e2e' }, 'valid App variant'],
   ])('fails closed when required evidence is missing: %p', (overrides, message) => {
     expect(() => createAndroidValidationEvidence(passingEvidenceInput(overrides)))
       .toThrow(message);

@@ -1,5 +1,4 @@
 const { execFileSync } = require('node:child_process');
-const { resolve } = require('node:path');
 const {
   launchWithDisabledSynchronization,
   openTab,
@@ -9,12 +8,10 @@ const {
 const { androidAdbPath } = require('./androidNetwork');
 
 const APP_ID = 'com.chessticize.mobile';
-const FIXTURE_PATH = resolve(
-  __dirname,
-  '../../../packages/storage/test/fixtures/migrations/schema-v0-ios-1.0.0.sqlite',
-);
-const DEVICE_FIXTURE_PATH = '/data/local/tmp/chessticize-mobile-migration.sqlite';
-const PROGRESS_DATABASE_PATH = 'databases/chessticize-mobile.sqlite';
+const FIXTURE_INSTALLER_CLASS =
+  'com.chessticize.mobile.ReleasedDatabaseFixtureInstallerTest';
+const TEST_RUNNER =
+  'com.chessticize.mobile.test/androidx.test.runner.AndroidJUnitRunner';
 
 describe('Android released SQLite migration', () => {
   beforeAll(async () => {
@@ -42,15 +39,21 @@ function installReleasedProgressFixture() {
   const adb = androidAdbPath();
   const serial = process.env.DETOX_ANDROID_DEVICE || 'emulator-5554';
   execFileSync(adb, ['-s', serial, 'shell', 'pm', 'clear', APP_ID], { stdio: 'inherit' });
-  execFileSync(adb, ['-s', serial, 'push', FIXTURE_PATH, DEVICE_FIXTURE_PATH], { stdio: 'inherit' });
-  try {
-    runAs(adb, serial, ['mkdir', '-p', 'databases']);
-    runAs(adb, serial, ['cp', DEVICE_FIXTURE_PATH, PROGRESS_DATABASE_PATH]);
-  } finally {
-    execFileSync(adb, ['-s', serial, 'shell', 'rm', '-f', DEVICE_FIXTURE_PATH], { stdio: 'inherit' });
+  const instrumentation = execFileSync(
+    adb,
+    [
+      '-s', serial,
+      'shell', 'am', 'instrument', '-w', '-r',
+      '-e', 'class', FIXTURE_INSTALLER_CLASS,
+      TEST_RUNNER,
+    ],
+    { encoding: 'utf8' },
+  );
+  process.stdout.write(instrumentation);
+  if (!instrumentation.includes('OK (1 test)')) {
+    throw new Error('Released database fixture installer did not pass.');
   }
-}
-
-function runAs(adb, serial, command) {
-  execFileSync(adb, ['-s', serial, 'shell', 'run-as', APP_ID, ...command], { stdio: 'inherit' });
+  execFileSync(adb, ['-s', serial, 'shell', 'am', 'force-stop', APP_ID], {
+    stdio: 'inherit',
+  });
 }

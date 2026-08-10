@@ -157,7 +157,8 @@ gradle.taskGraph.whenReady { taskGraph ->
         task.project.path == appProjectPath && (
             task.name == "assembleRelease" ||
             task.name == "bundleRelease" ||
-            task.name.startsWith("packageRelease")
+            task.name == "packageRelease" ||
+            task.name == "packageReleaseBundle"
         )
     }
 
@@ -237,7 +238,7 @@ react {
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -265,6 +266,7 @@ def stockfishRoot = file("$rootDir/../${stockfishArtifacts.root}")
 def stockfishNnueFiles = stockfishArtifacts.nnue.collect { relativePath ->
     file("$stockfishRoot/$relativePath")
 }
+def androidTestBuildType = System.getProperty("testBuildType", "debug")
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -278,8 +280,10 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode releaseVersion.androidVersionCode
         versionName releaseVersion.publicVersion
-        testBuildType System.getProperty("testBuildType", "debug")
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testBuildType androidTestBuildType
+        testInstrumentationRunner androidTestBuildType == "r8Validation"
+            ? "com.chessticize.mobile.R8ValidationInstrumentation"
+            : "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters(*supportedAndroidAbis)
         }
@@ -288,6 +292,11 @@ android {
                 arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
             }
         }
+    }
+    sourceSets {
+        androidTest.assets.srcDir file(
+            "$rootDir/../../../packages/storage/test/fixtures/migrations"
+        )
     }
     externalNativeBuild {
         cmake {
@@ -329,12 +338,23 @@ android {
             if (releaseSigningConfigured) {
                 signingConfig signingConfigs.release
             }
+            manifestPlaceholders = [usesCleartextTraffic: false]
             ndk {
                 debugSymbolLevel 'FULL'
             }
             minifyEnabled enableProguardInReleaseBuilds
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-            proguardFile "${rootProject.projectDir}/../node_modules/detox/android/detox/proguard-rules-app.pro"
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+        // Exercise the exact non-debuggable release optimization graph locally
+        // with separately compiled native instrumentation. Full public UI
+        // journeys remain on the dedicated E2E build because Detox cannot
+        // attach its ActivityTestRule to this R8-transformed target.
+        r8Validation {
+            initWith release
+            matchingFallbacks = ["release"]
+            signingConfig signingConfigs.debug
+            proguardFile "proguard-rules-r8-validation.pro"
         }
     }
 }

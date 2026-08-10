@@ -14,6 +14,7 @@ class MainApplication : Application(), ReactApplication {
       PackageList(this).packages.apply {
         add(AndroidSupportDiagnosticsPackage())
         add(ApplicationMetadataPackage())
+        add(BundledPuzzlePackInstallerPackage())
         add(ChessticizeTestLaunchConfigPackage())
         add(MobilePredictiveBackPackage())
         add(MoveFeedbackPackage())

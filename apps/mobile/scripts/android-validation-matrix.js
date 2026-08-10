@@ -127,6 +127,7 @@ function createAndroidValidationEvidence({
   appArtifactSha256,
   appInputDigest,
   appSourceSha,
+  appVariant = 'e2e',
   buildResult,
   device,
   steps,
@@ -145,6 +146,9 @@ function createAndroidValidationEvidence({
   }
   if (!/^[0-9a-f]{40}$/i.test(testRunnerSha ?? '')) {
     throw new Error('Android validation evidence requires an exact 40-character test runner SHA.');
+  }
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(appVariant)) {
+    throw new Error('Android validation evidence requires a valid App variant.');
   }
   for (const [label, digest] of [
     ['App input', appInputDigest],
@@ -168,7 +172,6 @@ function createAndroidValidationEvidence({
     || !device.serial) {
     throw new Error('Android validation evidence requires a complete device matrix entry.');
   }
-
   const expectedStepIds = steps.map(stepId);
   const resultById = new Map(
     (stepResults ?? []).map((stepResult) => [stepResult.id, stepResult.result])
@@ -183,6 +186,7 @@ function createAndroidValidationEvidence({
     commitSha: testRunnerSha,
     appSourceSha,
     testRunnerSha,
+    appVariant,
     appInputDigest,
     appBuildInputsUnchanged,
     artifacts: {
@@ -207,6 +211,7 @@ function runAndroidValidationMatrix({
   appArtifactSha256,
   appInputDigest,
   appSourceSha,
+  appVariant,
   buildResult,
   device,
   expectedTestRunnerSha,
@@ -301,6 +306,7 @@ function runAndroidValidationMatrix({
     appArtifactSha256,
     appInputDigest,
     appSourceSha,
+    appVariant,
     buildResult,
     device,
     steps,
@@ -376,6 +382,7 @@ function runCli(args = process.argv.slice(2), environment = process.env) {
   const appSourceSha = (
     environment.ANDROID_VALIDATION_APP_SOURCE_SHA || expectedTestRunnerSha
   ).toLowerCase();
+  const appVariant = environment.ANDROID_VALIDATION_APP_VARIANT || 'e2e';
   const comparison = compareMobileAppInputs({
     appSourceSha,
     repoRoot,
@@ -398,12 +405,14 @@ function runCli(args = process.argv.slice(2), environment = process.env) {
     profile: requiredEnvironment('ANDROID_VALIDATION_DEVICE_PROFILE', environment),
     serial: requiredEnvironment('DETOX_ANDROID_DEVICE', environment),
   };
+  const appArtifactSha256 = hashArtifactPath(appApkPath);
   return runAndroidValidationMatrix({
     apiLevel,
     appBuildInputsUnchanged: comparison.appBuildInputsUnchanged,
-    appArtifactSha256: hashArtifactPath(appApkPath),
+    appArtifactSha256,
     appInputDigest: comparison.appInputDigest,
     appSourceSha,
+    appVariant,
     buildResult,
     device,
     expectedTestRunnerSha,

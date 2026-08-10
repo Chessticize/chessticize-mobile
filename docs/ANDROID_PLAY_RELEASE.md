@@ -470,8 +470,10 @@ dispatching another full native run.
 3. Dispatch `Mobile Android release candidate` on that exact ref. The workflow
    installs only the pinned SDK packages required for the AAB, runs the
    artifact-only build doctor, materializes the upload keystore only in runner
-   temp, builds one signed AAB, verifies every non-signature AAB entry is
-   covered by exactly one approved JAR signer, and retains the AAB plus
+   temp, builds one R8-optimized signed AAB, verifies the merged R8
+   configuration and non-empty mapping/resource-usage outputs, verifies every
+   non-signature AAB entry is covered by exactly one approved JAR signer, and
+   retains the AAB, R8 diagnostics, optimization report, and
    `android-source-manifest.json` for 30 days.
 4. The verifier requires `com.chessticize.mobile`, the canonical version name
    and version code, only the two approved ABIs, `PAGE_ALIGNMENT_16K`, at least
