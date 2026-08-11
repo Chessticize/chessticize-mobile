@@ -586,7 +586,11 @@ function sprintRulesDesignPreviewFor(
       }
     };
   }
-  if (scenarioId === "settings-ios-sync" || scenarioId === "settings-android-backup") {
+  if (
+    scenarioId === "settings-ios-sync"
+    || scenarioId === "settings-ios-sync-syncing"
+    || scenarioId === "settings-android-backup"
+  ) {
     return {
       arrowDuelOpponentReplyGlobalSetting: { enabled: true }
     };
@@ -1398,6 +1402,7 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       service = createHistoryService(true);
       break;
     case "settings-ios-sync":
+    case "settings-ios-sync-syncing":
       notificationStatus = "not_determined";
       screenProps.moveFeedbackSettings = {
         preview: previewBrowserMoveFeedback
@@ -1468,7 +1473,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     reminderPlatform,
     progressProtection,
     iCloudProgressSyncClient: reminderPlatform === "ios"
-      ? new FakeICloudProgressSyncClient(undefined, "no_account")
+      ? scenarioId === "settings-ios-sync-syncing"
+        ? new PendingManualICloudProgressSyncClient()
+        : new FakeICloudProgressSyncClient(undefined, "no_account")
       : null,
     iCloudSyncDiagnosticsClient: createLabICloudSyncDiagnosticsClient(reminderPlatform)
   };
@@ -2248,6 +2255,18 @@ function completedSprint({
     ratingBefore,
     ratingAfter
   };
+}
+
+class PendingManualICloudProgressSyncClient extends FakeICloudProgressSyncClient {
+  private accountStatusRequestCount = 0;
+
+  override async getAccountStatus(): Promise<"no_account"> {
+    this.accountStatusRequestCount += 1;
+    if (this.accountStatusRequestCount === 1) {
+      return "no_account";
+    }
+    return new Promise<"no_account">(() => undefined);
+  }
 }
 
 class LabNotificationClient implements ReviewReminderNotificationClient {

@@ -3394,6 +3394,29 @@ describe("PracticePocScreen", () => {
       .toBe("Runs will now include the opponent’s best reply");
   });
 
+  it("keeps the manual iCloud sync pending for deterministic Interaction Lab review", async () => {
+    const renderer = renderLabScenario("settings-ios-sync-syncing");
+
+    press(renderer, "settings-tab");
+    await waitForAssertion(() => {
+      expect(collectText(findByTestId(renderer, "settings-sync-status")))
+        .toContain("Sign in to iCloud to sync");
+    });
+    press(renderer, "settings-sync-now");
+    await waitForAssertion(() => {
+      expect(collectText(findByTestId(renderer, "settings-sync-now-label"))).toBe("Syncing…");
+    });
+
+    expect(collectText(findByTestId(renderer, "settings-sync-status")))
+      .toContain("Sign in to iCloud to sync");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).not.toContain("Syncing");
+    const syncingButton = renderer.root.findAllByProps({ testID: "settings-sync-now" })
+      .find((node) => String(node.type) === "Pressable");
+    expect(syncingButton?.props.disabled).toBe(true);
+    expect(collectText(findByTestId(renderer, "settings-sync-now-label"))).toBe("Syncing…");
+    expect(findByTestId(renderer, "settings-sync-now-spinner")).toBeTruthy();
+  });
+
   it("persists the production global setting and hides the individual Run override", () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({
@@ -14362,6 +14385,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-icloud-sync-on")).toBeTruthy();
     expect(findByTestId(renderer, "settings-icloud-sync-off")).toBeTruthy();
     expect(findByTestId(renderer, "settings-sync-now")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-sync-now-label"))).toBe("Sync Now");
+    expect(collectText(findByTestId(renderer, "settings-sync-now-detail"))).toBe(
+      "Merge ratings, history, and review queue with your private iCloud."
+    );
     expect(testIdOrder(renderer, "settings-sync-section", "settings-notifications-section")).toBeLessThan(0);
     expect(testIdOrder(renderer, "settings-notifications-section", "settings-profile-section")).toBeLessThan(0);
     expect(collectText(findByTestId(renderer, "settings-notifications-section"))).toContain("Notifications");
@@ -14877,6 +14904,61 @@ describe("PracticePocScreen", () => {
     expect(client.legacySnapshotFetchCount).toBe(0);
   });
 
+  it("disables Sync Now and shows progress until the manual sync finishes", async () => {
+    const client = new FakeICloudProgressSyncClient();
+    const renderer = renderScreen({ iCloudProgressSyncClient: client });
+
+    await waitForAssertion(() => {
+      expect(client.zoneChangeFetchCount).toBe(1);
+    });
+    press(renderer, "settings-tab");
+    await waitForAssertion(() => {
+      expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Synced");
+    });
+    await flushMicrotasks();
+
+    let releaseFetch!: () => void;
+    const fetchGate = new Promise<void>((resolve) => {
+      releaseFetch = resolve;
+    });
+    const fetchZoneChanges = client.fetchZoneChanges.bind(client);
+    client.fetchZoneChanges = jest.fn(async (previousToken) => {
+      await fetchGate;
+      return fetchZoneChanges(previousToken);
+    });
+
+    press(renderer, "settings-sync-now");
+    await waitForAssertion(() => {
+      expect(client.fetchZoneChanges).toHaveBeenCalledTimes(1);
+    });
+
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).toContain("Synced");
+    expect(collectText(findByTestId(renderer, "settings-sync-status"))).not.toContain("Syncing");
+    const syncingButton = renderer.root.findAllByProps({ testID: "settings-sync-now" })
+      .find((node) => String(node.type) === "Pressable");
+    expect(syncingButton?.props.disabled).toBe(true);
+    expect(syncingButton?.props.accessibilityState).toEqual({
+      busy: true,
+      disabled: true
+    });
+    expect(collectText(findByTestId(renderer, "settings-sync-now-label"))).toBe("Syncing…");
+    expect(findByTestId(renderer, "settings-sync-now-spinner")).toBeTruthy();
+
+    await act(async () => {
+      releaseFetch();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitForAssertion(() => {
+      const readyButton = renderer.root.findAllByProps({ testID: "settings-sync-now" })
+        .find((node) => String(node.type) === "Pressable");
+      expect(readyButton?.props.disabled).toBe(false);
+    });
+
+    expect(collectText(findByTestId(renderer, "settings-sync-now-label"))).toBe("Sync Now");
+    expect(() => findByTestId(renderer, "settings-sync-now-spinner")).toThrow();
+  });
+
   it("captures a real sync failure and copies only the bounded diagnostic", async () => {
     const nativeFailure = Object.assign(new Error("Request rate limited"), {
       code: "icloud_fetch_failed",
@@ -14910,6 +14992,11 @@ describe("PracticePocScreen", () => {
         "iCloud sync failed"
       );
     });
+    const retryButton = renderer.root.findAllByProps({ testID: "settings-sync-now" })
+      .find((node) => String(node.type) === "Pressable");
+    expect(retryButton?.props.disabled).toBe(false);
+    expect(collectText(findByTestId(renderer, "settings-sync-now-label"))).toBe("Sync Now");
+    expect(() => findByTestId(renderer, "settings-sync-now-spinner")).toThrow();
     press(renderer, "settings-sync-error-details");
     await pressAsync(renderer, "settings-sync-error-copy");
 
