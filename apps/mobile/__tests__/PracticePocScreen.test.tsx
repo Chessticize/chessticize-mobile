@@ -1110,6 +1110,43 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
   });
 
+  it("claims a native Run drag from touch elapsed time when the JS hold timer is delayed", () => {
+    const runReorderFeedbackPreview = jest.fn();
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ homeEditing: true }),
+      runReorderFeedbackPreview
+    });
+    const standardRun = findNativeRunDragSurface(renderer, "practice-run-standard");
+
+    act(() => {
+      standardRun.props.onTouchStart({ nativeEvent: { timestamp: 1_000 } });
+    });
+    expect(standardRun.props.onMoveShouldSetPanResponder(
+      { nativeEvent: { timestamp: 1_179 } },
+      { dx: 0, dy: 12 }
+    )).toBe(false);
+
+    act(() => {
+      standardRun.props.onTouchStart({ nativeEvent: { timestamp: 2_000 } });
+    });
+
+    expect(standardRun.props.onMoveShouldSetPanResponder(
+      { nativeEvent: { timestamp: 2_180 } },
+      { dx: 0, dy: 12 }
+    )).toBe(true);
+
+    act(() => {
+      standardRun.props.onPanResponderGrant();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+    expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      standardRun.props.onPanResponderRelease();
+    });
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+  });
+
   it("previews a native card-sized insertion slot and commits the reorder only on drop", () => {
     const onIntent = jest.fn();
     const renderer = renderScreen({
