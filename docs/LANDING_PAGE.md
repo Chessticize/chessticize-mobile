@@ -1,6 +1,6 @@
 # Landing Page
 
-The public Chessticize website is a zero-cost static GitHub Pages site served
+The public Chessticize website is a zero-cost static GitHub Pages site generated
 from [`site/`](../site/). It uses no analytics, database, CDN, remote fonts, or
 runtime JavaScript. The deployment workflow publishes that directory after a
 change reaches `main`.
@@ -51,9 +51,27 @@ published site remains plain static files.
   `https://play.google.com/store/apps/details?id=com.chessticize.mobile` as the
   primary install action after Production publication is verified. The Pages
   route `android/` remains the stable installation guide and manual APK entry
-  point. Keep Google Play primary there, and update the fallback APK, checksum,
-  version, size, and source-release links together after the protected Android
-  release workflow publishes a new Play-signed APK mirror.
+  point. Keep Google Play primary there. The Pages workflow renders
+  `site/android/index.template.html` from the highest-versionCode public
+  Android Release that contains exactly the source manifest, Play-signed APK,
+  and checksum. A source-only candidate is deliberately skipped.
+
+After `Publish Play-generated Android APK` completes successfully, its
+`workflow_run` event triggers the Pages deployment automatically. Ordinary
+Pages deployments resolve the same public Release state, so a later marketing
+site update cannot roll the Android download page back to a hard-coded older
+APK. If release lookup, asset identity, or checksum validation fails, the Pages
+job fails and leaves the previously deployed page in place.
+
+To render the current public mirror for local preview:
+
+```sh
+pnpm landing-page:android:render
+python3 -m http.server 4173 --directory site
+```
+
+The generated `site/android/index.html` is ignored; the template and renderer
+are the committed sources.
 - App Store Connect uses the homepage as the Marketing URL, `support/` as the
   Support URL, and `accessibility/` as the Accessibility URL. The complete
   privacy policy remains the repository-hosted `docs/PRIVACY_POLICY.md`; the

@@ -52,6 +52,7 @@ harness (`apps/cli`), and bundled puzzle fixtures (`fixtures/puzzles`).
 - [Accessibility Audit](docs/ACCESSIBILITY_AUDIT.md) — evidence-backed iPhone and iPad accessibility declaration decisions
 - [App Store Screenshot Story](docs/marketing/APP_STORE_SCREENSHOT_STORY.md) — canonical six-frame marketing sequence, copy, and fictional-user contract
 - [Landing Page](docs/LANDING_PAGE.md) — public routes, static deployment, marketing images, and install-link updates
+- [Mobile Versioning](docs/RELEASE_VERSIONING.md) — separate development targets, release identities, and bump timing
 - [Release Notes](docs/RELEASE_NOTES.md) — per-binary customer-facing notes, review, and publication contract
 - [App Store Upload](docs/APP_STORE_UPLOAD.md) — owner-executed archive and App Store Connect upload runbook
 - [TestFlight Diagnostics](docs/TESTFLIGHT_QA.md) — optional post-build device diagnostics and evidence log

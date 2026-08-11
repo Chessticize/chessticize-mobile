@@ -76,6 +76,13 @@ The operation is idempotent. A retry accepts exact existing assets and fills in
 only missing state. Conflicting source, APK, checksum, tag, version, signer, or
 Release notes fail without deleting or replacing the public artifact.
 
+After this workflow succeeds, `Deploy landing page` runs automatically. It
+selects the highest-version-code complete Android Release, verifies the source
+manifest, APK name, asset set, and checksum, then renders the stable
+`/android/` route. Do not hand-edit a version-specific APK URL in the site. A
+source-only or incomplete candidate is skipped, and a failed lookup leaves the
+previous Pages deployment live. See `docs/LANDING_PAGE.md`.
+
 ## Customer release notes
 
 Before creating the annotated tag, approve the exact Android customer note

@@ -435,9 +435,10 @@ Build 15 is the immutable Android 1.4 release:
 Do not move the build-15 tag, rebuild its AAB, replace its public artifacts, or
 reuse version code 15.
 
-Build 16 is the proposed Android 1.4.1 release:
+Build 16 is the immutable Android 1.4.1 release:
 
-- intended annotated tag: `android-v1.4.1-build-16`;
+- annotated tag: `android-v1.4.1-build-16`, targeting
+  `e487c9f0adddd005f137b03733549cc46ca3acf3`;
 - primary user-visible changes: bring today's due and completed puzzles
   together in a clearer Review screen, add a global Settings control for the
   Arrow Duel reply challenge, and reliably refresh the bundled offline puzzle
@@ -447,9 +448,27 @@ Build 16 is the proposed Android 1.4.1 release:
   release inputs, and the bundled puzzle-pack cache boundary. Run exact-head
   fast checks, both local shared suites, the released-fixture upgrade boundary,
   the applicable adaptive and tablet visual matrix, and the protected
-  signed-artifact/source job.
+  signed-artifact/source job;
+- successful protected candidate workflow run:
+  [`31406623278`](https://github.com/Chessticize/chessticize-mobile/actions/runs/31406623278);
+- signed AAB: 322,871,149 bytes, SHA-256
+  `1560067a855baf64df86afe8074e9ff3241e6a36f465a565c0a40c41726eb517`;
+- public corresponding-source release:
+  [`android-v1.4.1-build-16`](https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.4.1-build-16);
+- public source-manifest SHA-256:
+  `58ffdf7845baf1fbc139e183799920fe77d610e6423d96f3726f7acdae078276`;
+- successful APK-mirror workflow run:
+  [`31409382422`](https://github.com/Chessticize/chessticize-mobile/actions/runs/31409382422);
+- Play-signed universal APK: 242,476,151 bytes, SHA-256
+  `baf45d9ab1e45317dbb4d4ab54873007fc028b9f3611d691c0e4694ced5a5969`;
+- Play app-signing certificate SHA-256:
+  `318a4453d4052c90364d3abfe376dce9c06a04ab70db7ce1d5d43ba995cff900`;
+- current GitHub state: the binary release is complete with exactly the source
+  manifest, Play-signed APK, and checksum.
 
-Build 16 is not yet tagged, signed, uploaded, or distributed.
+Do not move the build-16 tag, rebuild its AAB, replace its public artifacts, or
+reuse version code 16. Refresh the live Play track before reporting its current
+store publication state.
 
 ## Canonical identity
 
@@ -457,6 +476,8 @@ Build 16 is not yet tagged, signed, uploaded, or distributed.
 - Public version: `apps/mobile/release-version.json` (`1.4.1`)
 - Android version code: `apps/mobile/release-version.json` (`16`)
 - iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
+- Open-development target: `apps/mobile/development-version.json` (`1.4.2`;
+  Debug/E2E only, not a store identity)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
 - Required source tag before any Play track upload: `android-v1.4.1-build-16`
@@ -465,6 +486,9 @@ Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
 `versionCode` from the installed Android artifact and the corresponding bundle
 keys on iOS; no user-visible version fallback is hardcoded in JavaScript.
+Prepare candidate identities only on the coordinated release branch and advance
+the development target only on `main`, as defined by
+`docs/RELEASE_VERSIONING.md`.
 
 ## Protected inputs
 

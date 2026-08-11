@@ -3,7 +3,10 @@ import { createRequire } from "node:module";
 import test from "node:test";
 
 import sharedRenderer from "./lib/ios-release-version.cjs";
-import { renderCanonicalIOSReleaseConfig } from "./lib/ios-release-identity.mjs";
+import {
+  renderCanonicalIOSDevelopmentConfig,
+  renderCanonicalIOSReleaseConfig,
+} from "./lib/ios-release-identity.mjs";
 
 const require = createRequire(import.meta.url);
 const generator = require("../apps/mobile/scripts/ios-release-version.js");
@@ -14,8 +17,35 @@ test("the iOS generator and verifier use one shared release renderer", () => {
     sharedRenderer.renderIOSReleaseVersion
   );
   assert.equal(
+    generator.renderIOSDevelopmentVersion,
+    sharedRenderer.renderIOSDevelopmentVersion
+  );
+  assert.equal(
+    renderCanonicalIOSDevelopmentConfig,
+    sharedRenderer.renderIOSDevelopmentVersion
+  );
+  assert.equal(
     renderCanonicalIOSReleaseConfig,
     sharedRenderer.renderIOSReleaseVersion
+  );
+});
+
+test("the shared iOS renderer keeps Debug on the development target", () => {
+  assert.equal(
+    sharedRenderer.renderIOSDevelopmentVersion(
+      {
+        schemaVersion: 1,
+        plannedPublicVersion: "1.5.0"
+      },
+      {
+        schemaVersion: 1,
+        iosPublicVersion: "1.4.1",
+        iosBuildNumber: 7
+      }
+    ),
+    "// Generated from apps/mobile/development-version.json. Do not edit.\n" +
+      "MARKETING_VERSION = 1.5.0\n" +
+      "CURRENT_PROJECT_VERSION = 7\n"
   );
 });
 

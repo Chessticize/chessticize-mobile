@@ -6,7 +6,14 @@ on:
       - main
     paths:
       - ".github/workflows/pages.yml"
+      - "scripts/lib/android-download-page.mjs"
+      - "scripts/render-android-download-page.mjs"
       - "site/**"
+  workflow_run:
+    workflows:
+      - Publish Play-generated Android APK
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -18,10 +25,14 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          ref: main
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -29,10 +40,19 @@ jobs:
       - name: Validate landing page contract
         run: node scripts/validate-development-process.mjs
 
+      - name: Render the latest completed Android APK mirror
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          cp -R site "$RUNNER_TEMP/pages-site"
+          node scripts/render-android-download-page.mjs \
+            --template site/android/index.template.html \
+            --output "$RUNNER_TEMP/pages-site/android/index.html"
+
       - name: Upload static site
         uses: actions/upload-pages-artifact@v4
         with:
-          path: site
+          path: ${{ runner.temp }}/pages-site
 
   deploy:
     environment:

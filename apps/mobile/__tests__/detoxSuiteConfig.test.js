@@ -1716,10 +1716,11 @@ describe('Detox suite configuration', () => {
     expect(reminderCase).toContain("settings-review-reminder-off");
     expect(flowsSpec).toContain('expectedInstalledBuildNumber()');
     expect(flowsSpec).toContain('expectedInstalledPublicVersion()');
-    expect(flowsSpec).toContain('releaseVersion.publicVersion');
+    expect(flowsSpec).toContain('developmentVersion.plannedPublicVersion');
     expect(flowsSpec).toContain('releaseVersion.iosPublicVersion');
     expect(flowsSpec).toContain('releaseVersion.androidVersionCode');
     expect(flowsSpec).toContain('releaseVersion.iosBuildNumber');
+    expect(flowsSpec).toContain('CHESSTICIZE_E2E_EXPECTED_VERSION_SOURCE');
     expect(flowsSpec).toContain("waitForVisibleInPracticeScroll('play-again-button')");
     expect(helpers).toContain("by.id('history-filter-toggle')");
     expect(helpers).toContain("by.id('history-rating-filters')");

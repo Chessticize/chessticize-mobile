@@ -1,10 +1,14 @@
 const { existsSync, readFileSync } = require("node:fs");
 const { dirname, join } = require("node:path");
-const { renderIOSReleaseVersion } = require("../scripts/ios-release-version");
+const {
+  renderIOSDevelopmentVersion,
+  renderIOSReleaseVersion,
+} = require("../scripts/ios-release-version");
 
 const appRoot = process.cwd();
 const iosRoot = join(appRoot, "ios", "ChessticizeMobile");
 const releaseVersion = JSON.parse(readText(join(appRoot, "release-version.json")));
+const developmentVersion = JSON.parse(readText(join(appRoot, "development-version.json")));
 
 function readText(path) {
   return readFileSync(path, "utf8");
@@ -40,9 +44,20 @@ describe("iOS App Store identity artifacts", () => {
     expect(project).not.toContain("ChessticizeMobile.app");
   });
 
-  it("derives installed iOS version and build settings from the canonical release version", () => {
+  it("derives Debug and Release settings from separate canonical versions", () => {
+    const debugConfig = readText(join(appRoot, "ios", "Config", "Debug.xcconfig"));
+    const releaseConfig = readText(join(appRoot, "ios", "Config", "Release.xcconfig"));
+    const generatedDevelopmentConfig = readText(
+      join(appRoot, "ios", "Config", "DevelopmentVersion.xcconfig")
+    );
     const generatedConfig = readText(join(appRoot, "ios", "Config", "ReleaseVersion.xcconfig"));
 
+    expect(debugConfig).toContain('#include "DevelopmentVersion.xcconfig"');
+    expect(debugConfig).not.toContain('#include "ReleaseVersion.xcconfig"');
+    expect(releaseConfig).toContain('#include "ReleaseVersion.xcconfig"');
+    expect(generatedDevelopmentConfig).toBe(
+      renderIOSDevelopmentVersion(developmentVersion, releaseVersion)
+    );
     expect(generatedConfig).toBe(renderIOSReleaseVersion(releaseVersion));
     expect(renderIOSReleaseVersion({
       ...releaseVersion,

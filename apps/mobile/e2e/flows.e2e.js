@@ -24,6 +24,7 @@ const {
   tapAndroidUiNode,
 } = require('./androidPublicUiEvidence');
 const releaseVersion = require('../release-version.json');
+const developmentVersion = require('../development-version.json');
 
 const APP_ID = 'com.chessticize.mobile';
 const NOTIFICATION_PERMISSION = 'android.permission.POST_NOTIFICATIONS';
@@ -480,9 +481,12 @@ function expectedInstalledBuildNumber() {
 }
 
 function expectedInstalledPublicVersion() {
-  return device.getPlatform() === 'android'
-    ? releaseVersion.publicVersion
-    : releaseVersion.iosPublicVersion;
+  if (device.getPlatform() === 'android') {
+    return developmentVersion.plannedPublicVersion;
+  }
+  return process.env.CHESSTICIZE_E2E_EXPECTED_VERSION_SOURCE === 'release'
+    ? releaseVersion.iosPublicVersion
+    : developmentVersion.plannedPublicVersion;
 }
 
 async function dismissSprintSummary() {

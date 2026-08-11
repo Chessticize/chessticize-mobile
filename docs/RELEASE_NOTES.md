@@ -60,9 +60,12 @@ localization task explicitly adds another one.
 
 ## Preparation workflow
 
-1. **Open the release-note file with the release/version change.** Do not wait
-   until the store submission screen. Record the exact platform, public
-   version, build or version code, source tag, and previous public source tag.
+1. **Prepare the candidate identity and release-note file together.** Follow
+   `docs/RELEASE_VERSIONING.md`, then create the note from the resulting
+   `apps/mobile/release-version.json` on the release branch. Do not use the
+   advancing development target and do not wait until the store submission
+   screen. Record the exact platform, public version, build or version code,
+   source tag, and previous public source tag.
 2. **Collect candidate changes.** Review merged feature and fix PRs between the
    previous public tag and the candidate, their acceptance evidence, and the
    current product/listing docs. The Interaction Lab’s temporary New Scenario

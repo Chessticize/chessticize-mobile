@@ -122,6 +122,12 @@ and absence of raw URLs. Verify the file's separate release-details link opens
 the exact iOS GitHub Release. The approved file must be present in the clean
 commit that is tagged and archived.
 
+The Release-Production archive always reads its public version and build number
+from `apps/mobile/release-version.json`. Prepare that file on the coordinated
+release branch with `pnpm mobile:version:prepare-release`; do not archive using
+`apps/mobile/development-version.json`, which belongs to Debug-Dev and the open
+`main` development line. See `docs/RELEASE_VERSIONING.md`.
+
 For 1.4.1, `config/app-store-metadata-en-us-v1.json` records the release
 candidate's exact `currentVersionWhatsNew` copy. It must match
 `docs/releases/ios-v1.4.1-build-1.md` before owner approval and tagging. Retain

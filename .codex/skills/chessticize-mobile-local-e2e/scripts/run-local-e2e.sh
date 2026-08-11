@@ -151,6 +151,7 @@ run_suite() {
     cd apps/mobile
     DETOX_IOS_DEVICE="$DEVICE_NAME" \
       DETOX_ACTIVE_SUITE="$suite" \
+      CHESSTICIZE_E2E_EXPECTED_VERSION_SOURCE="$variant" \
       DETOX_MAX_WORKERS=1 \
       ./node_modules/.bin/detox test --configuration "$DETOX_CONFIGURATION" --cleanup
   )
