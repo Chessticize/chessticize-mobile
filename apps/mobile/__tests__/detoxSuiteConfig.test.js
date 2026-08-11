@@ -1747,6 +1747,15 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).not.toContain('toHaveToggleValue');
   });
 
+  it('waits for the stable Sprint summary boundary after confirmed abandonment', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const confirmedAbandonments = flowsSpec.match(
+      /element\(by\.id\('session-abandon-confirm'\)\)\.tap\(\);[\s\S]{0,180}?waitFor\(element\(by\.id\('sprint-summary-panel'\)\)\)\.toExist\(\)\.withTimeout\(30000\);/g
+    ) ?? [];
+
+    expect(confirmedAbandonments).toHaveLength(3);
+  });
+
   it('targets current public controls in the practice suite', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');

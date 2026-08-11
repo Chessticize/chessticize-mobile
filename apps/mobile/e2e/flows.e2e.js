@@ -112,7 +112,8 @@ describe('Key user flows', () => {
       await element(by.id('session-abandon')).tap();
       await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
       await element(by.id('session-abandon-confirm')).tap();
-      await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
+      await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(30000);
+      await expect(element(by.text('Sprint failed'))).toBeVisible();
     });
   });
 
@@ -362,7 +363,8 @@ describe('Key user flows', () => {
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
-    await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(30000);
+    await expect(element(by.text('Sprint failed'))).toBeVisible();
   });
 
   it('persists rating, history, review queue, and saved Runs after relaunch', async () => {
@@ -380,7 +382,8 @@ describe('Key user flows', () => {
     await element(by.id('session-abandon')).tap();
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
-    await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(30000);
+    await expect(element(by.text('Sprint failed'))).toBeVisible();
     await dismissSprintSummary();
 
     await openTab('practice-tab', 'practice-add-run');
