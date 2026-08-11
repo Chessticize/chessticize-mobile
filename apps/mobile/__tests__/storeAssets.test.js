@@ -87,13 +87,13 @@ describe("App Store assets document", () => {
       limits
     } = appStoreMetadata;
 
-    expect(appName.decision).toBe("keep");
-    expect(appName.value).toBe("Chessticize");
+    expect(appName.decision).toBe("expand");
+    expect(appName.value).toBe("Chessticize: Chess Puzzles");
     expect(appName.evaluatedCandidates).toContain("Chessticize: Chess Tactics");
     expect(appName.evaluatedCandidates).toContain("Chessticize: Chess Puzzles");
-    expect(Array.from(appName.value)).toHaveLength(11);
+    expect(Array.from(appName.value)).toHaveLength(26);
     expect(Array.from(appName.value).length).toBeLessThanOrEqual(limits.appNameCharacters);
-    expect(subtitle).toBe("Offline Chess Puzzle Trainer");
+    expect(subtitle).toBe("Build Tactical Intuition");
     expect(Array.from(subtitle).length).toBeLessThanOrEqual(limits.subtitleCharacters);
     expect(Array.from(promotionalText).length).toBeLessThanOrEqual(
       limits.promotionalTextCharacters

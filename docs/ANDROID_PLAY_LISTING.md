@@ -1,6 +1,6 @@
 # Android Play Listing and Declarations
 
-Status date: 2026-07-30
+Status date: 2026-08-10
 
 This is the English source of truth for the Android Play listing. The
 machine-readable contract is
@@ -12,7 +12,7 @@ in the owner evidence described by `docs/ANDROID_PLAY_RELEASE.md`.
 
 ## Listing copy
 
-- App name: `Chessticize`
+- App name: `Chessticize: Chess Puzzles`
 - Default language: English (United States)
 - App or game: Game
 - Category: Board
