@@ -135,6 +135,16 @@ if (releaseVersion.schemaVersion != 1 ||
     releaseVersion.androidVersionCode.intValue() < 1) {
     throw new GradleException("apps/mobile/release-version.json is invalid")
 }
+def developmentVersionFile = file("$rootDir/../development-version.json")
+if (!developmentVersionFile.isFile()) {
+    throw new GradleException("Canonical mobile development version is missing: ${developmentVersionFile}")
+}
+def developmentVersion = new JsonSlurper().parse(developmentVersionFile)
+if (developmentVersion.schemaVersion != 1 ||
+    !(developmentVersion.plannedPublicVersion instanceof String) ||
+    !(developmentVersion.plannedPublicVersion ==~ /[0-9]+\.[0-9]+\.[0-9]+/)) {
+    throw new GradleException("apps/mobile/development-version.json is invalid")
+}
 
 def validateReleaseSigning = {
     if (!missingReleaseSigningValues.isEmpty()) {
@@ -361,6 +371,11 @@ android {
 
 androidComponents {
     onVariants(selector().all()) { variant ->
+        if (variant.buildType == "debug" || variant.buildType == "e2e") {
+            variant.outputs.each { output ->
+                output.versionName.set(developmentVersion.plannedPublicVersion)
+            }
+        }
         def generatedAssets = tasks.register(
             "generate${variant.name.capitalize()}ChessticizeAssets",
             GenerateChessticizeAssets

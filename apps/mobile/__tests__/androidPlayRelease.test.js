@@ -783,7 +783,10 @@ describe('Android Play release contract', () => {
       'Build 13 is the invalidated Android 1.3.5 RC1 source identity',
       'Build 14 is the immutable Android 1.3.5 release',
       'Build 15 is the immutable Android 1.4 release',
-      'Build 16 is the proposed Android 1.4.1 release',
+      'Build 16 is the immutable Android 1.4.1 release',
+      '31406623278',
+      '31409382422',
+      'baf45d9ab1e45317dbb4d4ab54873007fc028b9f3611d691c0e4694ced5a5969',
     ]) {
       expect(runbook).toContain(value);
     }
@@ -825,6 +828,9 @@ describe('Android Play release contract', () => {
 
   it('uses one public semantic version while Android keeps an independent version code', () => {
     const appGradle = read('apps/mobile/android/app/build.gradle');
+    const developmentVersion = JSON.parse(
+      read('apps/mobile/development-version.json'),
+    );
     const iosProject = read(
       'apps/mobile/ios/ChessticizeMobile.xcodeproj/project.pbxproj',
     );
@@ -832,9 +838,12 @@ describe('Android Play release contract', () => {
     expect(releaseVersion.schemaVersion).toBe(1);
     expect(releaseVersion.publicVersion).toMatch(/^\d+\.\d+(?:\.\d+)?$/);
     expect(releaseVersion.androidVersionCode).toBeGreaterThan(0);
+    expect(developmentVersion.plannedPublicVersion).toMatch(/^\d+\.\d+\.\d+$/);
     expect(appGradle).toContain('release-version.json');
+    expect(appGradle).toContain('development-version.json');
     expect(appGradle).toContain('versionCode releaseVersion.androidVersionCode');
     expect(appGradle).toContain('versionName releaseVersion.publicVersion');
+    expect(appGradle).toContain('output.versionName.set(developmentVersion.plannedPublicVersion)');
     expect(iosProject).not.toMatch(/MARKETING_VERSION = \d/);
   });
 

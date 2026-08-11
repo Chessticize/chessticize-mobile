@@ -35,7 +35,9 @@
 
     <main id="main" class="simple-page section-shell">
       <div class="simple-page-header">
-        <p class="eyebrow">Android · Version 1.4</p>
+        <p class="eyebrow">
+          Android · Version {{ANDROID_PUBLIC_VERSION}} · Build {{ANDROID_VERSION_CODE}}
+        </p>
         <h1>Install Chessticize from Google Play.</h1>
         <p>
           Google Play is the recommended install path and provides automatic
@@ -68,16 +70,17 @@
         <section class="info-card">
           <h2>Manual APK</h2>
           <p>
-            Universal APK · 231 MiB · Package
+            Universal APK · {{ANDROID_APK_SIZE_MIB}} MiB · Package
             <code>com.chessticize.mobile</code>
           </p>
-          <a
-            class="button button-primary"
-            href="https://github.com/Chessticize/chessticize-mobile/releases/download/android-v1.4.0-build-15/Chessticize-Android-1.4.apk"
-          >
+          <a class="button button-primary" href="{{ANDROID_APK_URL}}">
             <span class="button-kicker">Download</span>
-            <strong>Chessticize 1.4 APK</strong>
+            <strong>Chessticize {{ANDROID_PUBLIC_VERSION}} APK</strong>
           </a>
+          <p>
+            This APK works on compatible Android devices without Google Play or
+            Google Play Services when the device permits manual app installation.
+          </p>
           <p>
             Android may ask you to allow this browser to install an app from
             outside the Play Store. You can turn that permission off again
@@ -88,21 +91,11 @@
         <section class="info-card">
           <h2>Verify the download</h2>
           <p>APK SHA-256</p>
-          <p class="checksum">
-            1f7387fbc1098515fec83f2e02161445839e127613afd2278098d01bb0dedbb5
-          </p>
+          <p class="checksum">{{ANDROID_APK_SHA256}}</p>
           <p>
-            <a
-              href="https://github.com/Chessticize/chessticize-mobile/releases/download/android-v1.4.0-build-15/Chessticize-Android-1.4.apk.sha256"
-            >
-              Download the checksum file
-            </a>
+            <a href="{{ANDROID_CHECKSUM_URL}}">Download the checksum file</a>
             or inspect the
-            <a
-              href="https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.4.0-build-15"
-            >
-              complete release record
-            </a>.
+            <a href="{{ANDROID_RELEASE_URL}}">complete release record</a>.
           </p>
         </section>
 
@@ -124,7 +117,7 @@
           </p>
           <p>
             Your local progress database is preserved when a compatible newer
-            signed APK is installed over this version.
+            Play-signed APK is installed over this version.
           </p>
         </section>
       </div>

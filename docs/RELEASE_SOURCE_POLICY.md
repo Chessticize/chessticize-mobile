@@ -58,6 +58,15 @@ Prepare each coordinated mobile release on
 `codex/mobile-<version>-release`, created from current `main`, with one draft
 release PR targeting `main`.
 
+Before the cut, `apps/mobile/development-version.json` on `main` must name the
+version being released. On the new release branch, run
+`pnpm mobile:version:prepare-release` to allocate the candidate's Android and
+iOS build identities in `apps/mobile/release-version.json`. Immediately after
+the cut, advance only `main` with `pnpm mobile:version:advance-development` or
+an explicit next minor/major target. Do not change the development-version file
+on the release branch. Follow [`RELEASE_VERSIONING.md`](RELEASE_VERSIONING.md)
+for the complete identity lifecycle and recovery commands.
+
 After that cut, `main` remains open for the next version's feature work. Do not
 merge or rebase advancing `main` back into the release branch by default.
 Selectively backport only changes approved for the current release through

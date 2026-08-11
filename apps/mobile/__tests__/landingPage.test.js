@@ -9,7 +9,7 @@ const readBuffer = (relativePath) =>
   fs.readFileSync(path.join(repoRoot, relativePath));
 
 const homepage = read("site/index.html");
-const androidPage = read("site/android/index.html");
+const androidPage = read("site/android/index.template.html");
 const supportPage = read("site/support/index.html");
 const accessibilityPage = read("site/accessibility/index.html");
 const accessibilityPageText = accessibilityPage.replace(/\s+/gu, " ");
@@ -35,14 +35,6 @@ const websiteUrl = "https://chessticize.github.io/chessticize-mobile/";
 const androidUrl = `${websiteUrl}android/`;
 const supportUrl = `${websiteUrl}support/`;
 const accessibilityUrl = `${websiteUrl}accessibility/`;
-const androidReleaseBase =
-  "https://github.com/Chessticize/chessticize-mobile/releases";
-const androidReleaseTag = "android-v1.4.0-build-15";
-const apkUrl =
-  `${androidReleaseBase}/download/${androidReleaseTag}/` +
-  "Chessticize-Android-1.4.apk";
-const checksum =
-  "1f7387fbc1098515fec83f2e02161445839e127613afd2278098d01bb0dedbb5";
 
 describe("public landing page", () => {
   it("uses concrete puzzle language without unshipped personalization claims", () => {
@@ -128,15 +120,17 @@ describe("public landing page", () => {
     expect(homepage).toContain("./accessibility/");
     expect(homepage).toContain("docs/PRIVACY_POLICY.md");
     expect(homepage).toContain("/LICENSE");
-    expect(androidPage).toContain(apkUrl);
+    expect(androidPage).toContain("{{ANDROID_APK_URL}}");
     expect(androidPage).toContain(googlePlayUrl);
     expect(androidPage).toContain(
       'src="../assets/get-it-on-google-play.png"'
     );
     expect(androidPage).toContain("Google Play is the recommended install path");
     expect(androidPage).toContain("Google Play installations update through Google Play");
-    expect(androidPage).toContain(checksum);
+    expect(androidPage).toContain("{{ANDROID_APK_SHA256}}");
     expect(androidPage).toContain("does not update itself");
+    expect(androidPage).toContain("without Google Play or");
+    expect(androidPage).toContain("Google Play Services");
     expect(supportPage).toContain("support@chessticize.com");
     expect(supportPage).toContain("/issues/new?title=Bug");
     expect(supportPage).toContain("/issues/new?title=Feature");
@@ -155,12 +149,11 @@ describe("public landing page", () => {
     expect(readme).toContain(accessibilityUrl);
     expect(readme).toContain("site/assets/screenshots/contact-sheet.webp");
 
-    expect(androidPage).toContain("Android · Version 1.4");
-    expect(androidPage).toContain("Universal APK · 231 MiB");
-    expect(androidPage).toContain(`${apkUrl}.sha256`);
-    expect(androidPage).toContain(
-      `${androidReleaseBase}/tag/${androidReleaseTag}`
-    );
+    expect(androidPage).toContain("Android · Version {{ANDROID_PUBLIC_VERSION}}");
+    expect(androidPage).toContain("Build {{ANDROID_VERSION_CODE}}");
+    expect(androidPage).toContain("Universal APK · {{ANDROID_APK_SIZE_MIB}} MiB");
+    expect(androidPage).toContain("{{ANDROID_CHECKSUM_URL}}");
+    expect(androidPage).toContain("{{ANDROID_RELEASE_URL}}");
   });
 
   it("is static, local-asset-only, and free of analytics", () => {
@@ -290,7 +283,10 @@ describe("public landing page", () => {
     expect(pagesWorkflow).toContain("actions/configure-pages@v5");
     expect(pagesWorkflow).toContain("actions/upload-pages-artifact@v4");
     expect(pagesWorkflow).toContain("actions/deploy-pages@v4");
-    expect(pagesWorkflow).toContain("path: site");
+    expect(pagesWorkflow).toContain("workflow_run:");
+    expect(pagesWorkflow).toContain("Publish Play-generated Android APK");
+    expect(pagesWorkflow).toContain("render-android-download-page.mjs");
+    expect(pagesWorkflow).toContain("path: ${{ runner.temp }}/pages-site");
     expect(pagesWorkflow).toContain("pages: write");
     expect(pagesWorkflow).toContain("id-token: write");
     expect(pagesWorkflow).toContain("name: github-pages");

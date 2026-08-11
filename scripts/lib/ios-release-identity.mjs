@@ -4,6 +4,8 @@ import iosReleaseVersionRenderer from "./ios-release-version.cjs";
 
 export const renderCanonicalIOSReleaseConfig =
   iosReleaseVersionRenderer.renderIOSReleaseVersion;
+export const renderCanonicalIOSDevelopmentConfig =
+  iosReleaseVersionRenderer.renderIOSDevelopmentVersion;
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
@@ -44,9 +46,20 @@ function loadTargetBuildConfiguration(project, configurationName) {
 
 export function loadIOSReleaseIdentity(repoRoot) {
   const readText = (path) => readFileSync(join(repoRoot, path), "utf8");
+  const developmentVersion = JSON.parse(
+    readText("apps/mobile/development-version.json")
+  );
   const releaseVersion = JSON.parse(readText("apps/mobile/release-version.json"));
+  const generatedDevelopmentConfig = readText(
+    "apps/mobile/ios/Config/DevelopmentVersion.xcconfig"
+  );
   const generatedConfig = readText("apps/mobile/ios/Config/ReleaseVersion.xcconfig");
+  const debugConfig = readText("apps/mobile/ios/Config/Debug.xcconfig");
+  const releaseConfig = readText("apps/mobile/ios/Config/Release.xcconfig");
   const project = readText("apps/mobile/ios/ChessticizeMobile.xcodeproj/project.pbxproj");
+  const expectedDevelopmentConfig = renderCanonicalIOSDevelopmentConfig(
+    developmentVersion
+  );
   const expectedConfig = renderCanonicalIOSReleaseConfig(releaseVersion);
   const projectUsesGeneratedConfig =
     project.includes("Config/Debug.xcconfig") &&
@@ -55,14 +68,26 @@ export function loadIOSReleaseIdentity(repoRoot) {
     !/CURRENT_PROJECT_VERSION = \d/u.test(project);
   const debug = loadTargetBuildConfiguration(project, "Debug");
   const release = loadTargetBuildConfiguration(project, "Release");
+  const configRoutingMatchesCanonical =
+    debugConfig.includes('#include "DevelopmentVersion.xcconfig"') &&
+    !debugConfig.includes('#include "ReleaseVersion.xcconfig"') &&
+    releaseConfig.includes('#include "ReleaseVersion.xcconfig"') &&
+    !releaseConfig.includes('#include "DevelopmentVersion.xcconfig"');
 
   return {
     version: releaseVersion.iosPublicVersion,
     build: String(releaseVersion.iosBuildNumber),
+    developmentConfigMatchesCanonical:
+      generatedDevelopmentConfig === expectedDevelopmentConfig,
     configMatchesCanonical: generatedConfig === expectedConfig,
+    configRoutingMatchesCanonical,
     projectUsesGeneratedConfig,
     debug,
     release,
-    valid: generatedConfig === expectedConfig && projectUsesGeneratedConfig
+    valid:
+      generatedDevelopmentConfig === expectedDevelopmentConfig &&
+      generatedConfig === expectedConfig &&
+      configRoutingMatchesCanonical &&
+      projectUsesGeneratedConfig
   };
 }

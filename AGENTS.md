@@ -113,6 +113,13 @@ ADR is not itself a defect.
   created from current `main`, named `codex/mobile-<version>-release`. Open its
   release PR to `main` as a draft immediately so the branch, intended release
   identity, accumulated checks, and remaining gates stay visible.
+- Before cutting that branch, make
+  `apps/mobile/development-version.json` on `main` name the intended public
+  version. Allocate the candidate on the release branch with
+  `pnpm mobile:version:prepare-release`, then immediately advance only `main`
+  with `pnpm mobile:version:advance-development` or an explicit next
+  minor/major target. The release branch must not change the development
+  version. Follow `docs/RELEASE_VERSIONING.md`.
 - After the release branch is cut, `main` remains open for the next version's
   feature development. Do not merge or rebase advancing `main` back into the
   release branch by default. Bring over only a change explicitly selected for

@@ -69,6 +69,7 @@ const pngOrientationValidator = path.join(
 );
 const prTemplate = read(".github/pull_request_template.md");
 const releaseNotes = read("docs/RELEASE_NOTES.md");
+const releaseVersioning = read("docs/RELEASE_VERSIONING.md");
 const releaseNotesTemplate = read("docs/releases/RELEASE_NOTES_TEMPLATE.md");
 const releaseSourcePolicy = read("docs/RELEASE_SOURCE_POLICY.md");
 const androidValidation = read("docs/ANDROID_VALIDATION.md");
@@ -78,11 +79,13 @@ const storybookDeployment = read("docs/STORYBOOK_DEPLOYMENT.md");
 const vercelConfig = JSON.parse(read("vercel.json"));
 const gitignore = read(".gitignore");
 const landingPage = read("site/index.html");
-const landingPageAndroid = read("site/android/index.html");
+const landingPageAndroid = read("site/android/index.template.html");
 const landingPageSupport = read("site/support/index.html");
 const landingPageStyles = read("site/styles.css");
 const landingPageTest = read("apps/mobile/__tests__/landingPage.test.js");
 const landingPageAssetGenerator = read("scripts/prepare-landing-page-assets.mjs");
+const androidDownloadPageRenderer = read("scripts/render-android-download-page.mjs");
+const androidDownloadPageModule = read("scripts/lib/android-download-page.mjs");
 const landingPageAssetManifest = JSON.parse(
   read("site/assets/marketing-assets.json")
 );
@@ -95,6 +98,7 @@ const releaseDocs = [
 ];
 
 const releaseVersion = JSON.parse(read("apps/mobile/release-version.json"));
+const developmentVersion = JSON.parse(read("apps/mobile/development-version.json"));
 const androidPlayRunbook = read("docs/ANDROID_PLAY_RELEASE.md");
 const androidReleasePlan = read("apps/mobile/docs/ANDROID_RELEASE_PLAN.md");
 const androidOwnerEvidence = JSON.parse(
@@ -235,6 +239,7 @@ assert.equal(count(processWorkflow, '- "docs/agents/**"'), 2);
 assert.equal(count(processWorkflow, '- "README.md"'), 2);
 assert.equal(count(processWorkflow, '- "apps/mobile-lab/README.md"'), 2);
 assert.equal(count(processWorkflow, '- "docs/RELEASE_NOTES.md"'), 2);
+assert.equal(count(processWorkflow, '- "docs/RELEASE_VERSIONING.md"'), 2);
 assert.equal(count(processWorkflow, '- "docs/releases/**"'), 2);
 assert.equal(count(processWorkflow, '- "docs/LANDING_PAGE.md"'), 2);
 assert.equal(count(processWorkflow, '- "docs/STORYBOOK_DEPLOYMENT.md"'), 2);
@@ -248,6 +253,17 @@ assert.equal(
   count(processWorkflow, '- "scripts/prepare-landing-page-assets.mjs"'),
   2
 );
+for (const versioningPath of [
+  "apps/mobile/development-version.json",
+  "apps/mobile/release-version.json",
+  "apps/mobile/ios/Config/DevelopmentVersion.xcconfig",
+  "apps/mobile/ios/Config/ReleaseVersion.xcconfig",
+  "scripts/lib/mobile-versioning.mjs",
+  "scripts/mobile-version.mjs",
+  "scripts/mobile-versioning.test.mjs",
+]) {
+  assert.equal(count(processWorkflow, `- "${versioningPath}"`), 2);
+}
 
 for (const action of [
   "actions/checkout@v6",
@@ -258,7 +274,13 @@ for (const action of [
   assert.match(pagesWorkflow, new RegExp(action.replace("/", "\\/")));
 }
 assert.match(pagesWorkflow, /run: node scripts\/validate-development-process\.mjs/);
-assert.match(pagesWorkflow, /path: site/);
+assert.match(pagesWorkflow, /workflow_run:/);
+assert.match(pagesWorkflow, /Publish Play-generated Android APK/);
+assert.match(pagesWorkflow, /render-android-download-page\.mjs/);
+assert.match(pagesWorkflow, /ref: main/);
+assert.match(pagesWorkflow, /workflow_run\.conclusion == 'success'/);
+assert.match(pagesWorkflow, /cp -R site "\$RUNNER_TEMP\/pages-site"/);
+assert.match(pagesWorkflow, /path: \$\{\{ runner\.temp \}\}\/pages-site/);
 assert.match(pagesWorkflow, /pages: write/);
 assert.match(pagesWorkflow, /id-token: write/);
 assert.match(pagesWorkflow, /name: github-pages/);
@@ -298,6 +320,13 @@ assert.match(rootReadme, /https:\/\/chessticize\.github\.io\/chessticize-mobile\
 assert.match(rootReadme, /site\/assets\/screenshots\/contact-sheet\.webp/);
 assert.match(rootReadme, /docs\/STORYBOOK_DEPLOYMENT\.md/);
 assert.match(landingPageDoc, /pnpm landing-page:assets/);
+assert.match(landingPageDoc, /workflow_run/);
+assert.match(landingPageDoc, /highest-versionCode public/);
+assert.match(androidDownloadPageRenderer, /parseAndroidSourceManifest/);
+assert.match(androidDownloadPageRenderer, /parseAndroidApkChecksum/);
+assert.match(androidDownloadPageRenderer, /AbortSignal\.timeout\(30_000\)/);
+assert.match(androidDownloadPageModule, /assets\.length !== 3/);
+assert.match(androidDownloadPageModule, /com\.chessticize\.mobile/);
 assert.match(landingPageAssetGenerator, /--source-root/);
 assert.equal(landingPageAssetManifest.schemaVersion, 1);
 assert.equal(landingPageAssetManifest.assets.length, 11);
@@ -656,6 +685,10 @@ const localE2eRunnerSource = read(
 assert.match(localE2eRunnerSource, /normalize_worktree_cocoapods_checksum/);
 assert.match(localE2eRunnerSource, /hermes-engine: \[0-9a-f\]\{40\}/);
 assert.match(localE2eRunnerSource, /git apply --reverse/);
+assert.match(
+  localE2eRunnerSource,
+  /CHESSTICIZE_E2E_EXPECTED_VERSION_SOURCE="\$variant"/
+);
 
 for (const option of [
   "- [ ] No mobile Detox",
@@ -701,6 +734,30 @@ for (const releaseDoc of releaseDocs) {
 
 assert.equal(releaseVersion.publicVersion, "1.4.1");
 assert.equal(releaseVersion.androidVersionCode, 16);
+assert.deepEqual(developmentVersion, {
+  schemaVersion: 1,
+  plannedPublicVersion: "1.4.2"
+});
+assert.match(releaseVersioning, /development-version\.json` is the public version/);
+assert.match(releaseVersioning, /release-version\.json` is the exact cross-platform candidate/);
+assert.match(releaseVersioning, /mobile:version:prepare-release/);
+assert.match(releaseVersioning, /mobile:version:advance-development/);
+assert.match(releaseVersioning, /mobile:version:set-development/);
+assert.match(releaseVersioning, /1\.5\.0/);
+assert.match(releaseVersioning, /2\.0\.0/);
+assert.match(releaseVersioning, /Do not bump either file merely because a store changes/);
+assert.match(agents, /docs\/RELEASE_VERSIONING\.md/);
+assert.match(releaseSourcePolicy, /mobile:version:prepare-release/);
+assert.match(releaseSourcePolicy, /mobile:version:advance-development/);
+for (const command of [
+  "mobile:version:status",
+  "mobile:version:check",
+  "mobile:version:prepare-release",
+  "mobile:version:advance-development",
+  "mobile:version:set-development"
+]) {
+  assert.equal(typeof rootPackage.scripts[command], "string");
+}
 assert.ok(
   androidPlayRunbook.includes(
     `Android version code: \`apps/mobile/release-version.json\` ` +
@@ -757,6 +814,11 @@ assertAndroidCandidateBindings(androidOwnerEvidence);
 
 const syntaxCheck = spawnSync("bash", ["-n", localE2eRunner], { encoding: "utf8" });
 assert.equal(syntaxCheck.status, 0, syntaxCheck.stderr);
+const versionCheck = spawnSync(process.execPath, ["scripts/mobile-version.mjs", "check"], {
+  cwd: repoRoot,
+  encoding: "utf8"
+});
+assert.equal(versionCheck.status, 0, versionCheck.stderr);
 const uiCalibrationSyntaxCheck = spawnSync("bash", ["-n", uiCalibrationRunner], { encoding: "utf8" });
 assert.equal(uiCalibrationSyntaxCheck.status, 0, uiCalibrationSyntaxCheck.stderr);
 const simulatorOrientationSyntaxCheck = spawnSync("bash", ["-n", simulatorOrientationRunner], {
