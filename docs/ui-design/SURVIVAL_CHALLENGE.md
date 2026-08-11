@@ -56,6 +56,8 @@ time.
 - `Leave paused` returns Home while saving the exact hidden puzzle, board/ply
   state, Puzzle or Arrow Duel phase, score, mistakes, selection cursor, active
   time, level, and rule version.
+- The header pause action appears only while the puzzle is active. It is hidden
+  on the paused surface, where `Resume` and `Leave paused` are the only actions.
 - Active time stops while paused or backgrounded. A paused Run has no expiry.
 - Backgrounding derives the same puzzle-hidden `Resume` / `Leave paused`
   surface from the authoritative paused Run state; foregrounding never leaves
@@ -71,6 +73,10 @@ time.
 - There is no manual `End Run` or `End & start over` action. Selecting the same
   type and level continues its existing Run, preserving its mistakes.
 - Only the third mistake or a full-pool `Perfect clear` ends a Run.
+
+The active header uses the same shared mistake-mark presentation as Sprint;
+Survival does not introduce a second icon or count treatment for the same
+`count / max` state.
 
 V1 persistence is local to one device. Cross-device resume remains out of
 scope until a conflict contract is designed.

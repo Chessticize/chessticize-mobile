@@ -834,40 +834,6 @@ export function PersonalBestProgressBanner({
   );
 }
 
-export function PersonalBestMistakeIndicator({
-  count,
-  max
-}: {
-  count: number;
-  max: number;
-}): React.JSX.Element {
-  return (
-    <View
-      accessibilityLabel={`Mistakes ${count} of ${max}`}
-      style={styles.mistakeIndicator}
-      testID="personal-best-mistakes"
-    >
-      <View style={styles.mistakeDots}>
-        {Array.from({ length: max }, (_, index) => {
-          const used = index < count;
-          return (
-            <View
-              key={index}
-              style={[styles.mistakeDot, used ? styles.mistakeDotUsed : null]}
-              testID={`personal-best-mistake-${index}`}
-            >
-              <Text style={[styles.mistakeDotText, used ? styles.mistakeDotTextUsed : null]}>
-                {used ? "×" : ""}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-      <Text style={styles.mistakeCount}>{count}/{max}</Text>
-    </View>
-  );
-}
-
 export function PersonalBestResult({
   activeElapsedMs,
   band,
@@ -1599,42 +1565,6 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     fontSize: 18,
     fontWeight: "900"
-  },
-  mistakeCount: {
-    color: "#991B1B",
-    fontSize: 11,
-    fontWeight: "900"
-  },
-  mistakeDot: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
-    borderRadius: 9,
-    borderWidth: 1.5,
-    height: 18,
-    justifyContent: "center",
-    width: 18
-  },
-  mistakeDotText: {
-    color: "transparent",
-    fontSize: 13,
-    fontWeight: "900",
-    lineHeight: 15
-  },
-  mistakeDotTextUsed: {
-    color: "#FFFFFF"
-  },
-  mistakeDotUsed: {
-    backgroundColor: "#DC2626",
-    borderColor: "#B91C1C"
-  },
-  mistakeDots: {
-    flexDirection: "row",
-    gap: 4
-  },
-  mistakeIndicator: {
-    alignItems: "center",
-    gap: 3
   },
   primaryAction: {
     alignItems: "center",

@@ -269,13 +269,13 @@ import {
   PersonalBestChallengeHub,
   PersonalBestGuide,
   PersonalBestHomeCard,
-  PersonalBestMistakeIndicator,
   PersonalBestProgressBanner,
   PersonalBestResult,
   type PersonalBestChallengeDesignPreview,
   type PersonalBestChallengeSelection,
   type PersonalBestPausedRunPresentation
 } from "./PersonalBestChallengeDesign.tsx";
+import { SessionMistakeIndicator } from "./SessionMistakeIndicator.tsx";
 import {
   buildSurvivalChallengePresentation,
   survivalSelectionLevel
@@ -10632,10 +10632,12 @@ function SessionStatusBar({
   const savedSurvivalBest = Math.max(state.correctCount, previousSurvivalBest ?? 0);
   const completedAttempts = state.correctCount + state.mistakeCount;
   const plannedAttempts = state.config.maxAttempts ?? state.config.targetCorrect;
+  const showsSessionHeaderAction = Boolean(onClose || onAbandon)
+    && !(isPersonalBest && confirmAbandon);
   return (
     <View style={styles.activeSessionShell} testID="active-session-shell">
       <View style={styles.sessionNavRow} testID="session-shell-nav">
-        {onClose || onAbandon ? (
+        {showsSessionHeaderAction ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={closeAccessibilityLabel}
@@ -10747,18 +10749,7 @@ function SessionStatusBar({
             {timerText}
           </Text>
         </View>
-        {isPersonalBest ? (
-          <View
-            accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
-            style={[styles.sessionMetricBlock, styles.personalBestSideMetricBlock]}
-            testID="session-mistakes-block"
-          >
-            <PersonalBestMistakeIndicator
-              count={state.mistakeCount}
-              max={state.config.maxMistakes}
-            />
-          </View>
-        ) : isTacticalFocus ? (
+        {isTacticalFocus ? (
           <View
             accessibilityLabel="Rating unchanged"
             style={styles.sessionMetricBlock}
@@ -10779,10 +10770,13 @@ function SessionStatusBar({
         ) : (
           <View
             accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
-            style={styles.sessionMetricBlock}
+            style={[
+              styles.sessionMetricBlock,
+              isPersonalBest ? styles.personalBestSideMetricBlock : null
+            ]}
             testID="session-mistakes-block"
           >
-            <ActiveMistakeIndicator
+            <SessionMistakeIndicator
               count={state.mistakeCount}
               max={state.config.maxMistakes}
             />
@@ -10867,35 +10861,6 @@ function SessionStatusBar({
           </View>
         </View>
       ) : null}
-    </View>
-  );
-}
-
-function ActiveMistakeIndicator({
-  count,
-  max
-}: {
-  count: number;
-  max: number;
-}): React.JSX.Element {
-  return (
-    <View
-      accessibilityLabel={`Mistakes ${count} of ${max}`}
-      style={styles.activeMistakeIndicator}
-      testID="session-mistakes"
-    >
-      <View style={styles.activeMistakeDots}>
-        {Array.from({ length: max }, (_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.activeMistakeDot,
-              index < count ? styles.activeMistakeDotUsed : null
-            ]}
-            testID={`session-mistake-dot-${index}`}
-          />
-        ))}
-      </View>
     </View>
   );
 }
@@ -20304,27 +20269,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     letterSpacing: 0,
     textAlign: "center"
-  },
-  activeMistakeIndicator: {
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 42
-  },
-  activeMistakeDots: {
-    flexDirection: "row",
-    gap: 3
-  },
-  activeMistakeDot: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#94A3B8",
-    borderRadius: 3,
-    borderWidth: 1,
-    height: 9,
-    width: 9
-  },
-  activeMistakeDotUsed: {
-    backgroundColor: "#DC2626",
-    borderColor: "#DC2626"
   },
   sessionAbandonConfirm: {
     alignItems: "center",

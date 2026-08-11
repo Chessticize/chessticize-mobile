@@ -8534,7 +8534,16 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
       "Mistakes 1 of 3"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-mistakes"))).toBe("×1/3");
+    expect(findByTestId(renderer, "session-mistakes").props.accessibilityLabel).toBe(
+      "Mistakes 1 of 3"
+    );
+    expect(collectText(findByTestId(renderer, "session-mistakes"))).toBe("");
+    expect(hasStyleEntry(
+      findByTestId(renderer, "session-mistake-dot-0"),
+      "backgroundColor",
+      "#DC2626"
+    )).toBe(true);
+    expect(() => findByTestId(renderer, "personal-best-mistakes")).toThrow();
     expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
       "5 more to beat 18"
     );
@@ -8624,6 +8633,20 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
       "Mistakes 2 of 3"
     );
+    expect(findByTestId(renderer, "session-mistakes").props.accessibilityLabel).toBe(
+      "Mistakes 2 of 3"
+    );
+    expect(hasStyleEntry(
+      findByTestId(renderer, "session-mistake-dot-1"),
+      "backgroundColor",
+      "#DC2626"
+    )).toBe(true);
+    expect(hasStyleEntry(
+      findByTestId(renderer, "session-mistake-dot-2"),
+      "backgroundColor",
+      "#FFFFFF"
+    )).toBe(true);
+    expect(() => findByTestId(renderer, "personal-best-mistakes")).toThrow();
   });
 
   it("starts the selected Arrow Duel Survival directly", () => {
@@ -10817,6 +10840,19 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "Custom");
     expectText(renderer, "0 / 15");
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
+  });
+
+  it("removes the redundant Pause action from the Survival paused surface", () => {
+    const renderer = renderLabScenario("practice-personal-best-active");
+
+    expect(findByTestId(renderer, "session-abandon")).toBeTruthy();
+    press(renderer, "session-abandon");
+
+    expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-abandon")).toThrow();
+
+    press(renderer, "session-abandon-cancel");
+    expect(findByTestId(renderer, "session-abandon")).toBeTruthy();
   });
 
   it("starts an Arrow Duel sprint from the custom mode selector", () => {
