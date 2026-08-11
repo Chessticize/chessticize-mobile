@@ -1022,6 +1022,8 @@ export function PersonalBestRecordsScreen({
   onBack: () => void;
   presentation: PersonalBestChallengeDesignPreview;
 }): React.JSX.Element {
+  const { width: viewportWidth } = useWindowDimensions();
+  const usesWideRecordGrid = viewportWidth >= 700;
   const records = presentation.levelRecords ?? [];
   const pausedRuns = presentation.pausedRuns ?? [];
   const recordSummary = records.map((record) => {
@@ -1069,7 +1071,10 @@ export function PersonalBestRecordsScreen({
                   <View
                     key={`${type}-${record.minRating}`}
                     accessibilityLabel={`${challengeTypeLabel(type)} ${levelLabel(record)}, best ${best}`}
-                    style={styles.historyRecordRow}
+                    style={[
+                      styles.historyRecordRow,
+                      usesWideRecordGrid ? styles.historyRecordRowWide : null
+                    ]}
                     testID={`personal-best-record-${type}-${record.minRating}`}
                   >
                     <Text style={styles.historyRecordTitle}>{levelLabel(record)}</Text>
@@ -1991,6 +1996,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     width: "48.5%"
+  },
+  historyRecordRowWide: {
+    width: "24%"
   },
   historyRecordScore: {
     color: "#0F172A",

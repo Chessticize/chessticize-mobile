@@ -208,7 +208,8 @@ History remains focused on individual puzzle attempts, filters, and replay.
 The Challenge Hub opens a dedicated `Survival records` page that owns:
 
 - Separate Puzzle and Arrow Duel sections.
-- Compact two-column cards for played levels, showing only level and best.
+- Compact cards for played levels, showing only level and best: two columns in
+  portrait and four columns at landscape or regular width.
 - A higher live best already reached by a paused Run, without a status label.
 - No recommended-level label or styling; records do not imply which level the
   player should choose next.
