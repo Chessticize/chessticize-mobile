@@ -116,7 +116,7 @@ export function PersonalBestHomeCard({
   return (
     <Pressable
       accessibilityLabel="Open Survival Challenge. See how far you can go, at your own pace."
-      accessibilityHint="Opens the Survival Hub"
+      accessibilityHint="Opens Survival setup"
       accessibilityRole="button"
       style={styles.homeCard}
       testID="personal-best-home-card"

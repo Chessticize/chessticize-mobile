@@ -8148,6 +8148,9 @@ describe("PracticePocScreen", () => {
       runManagementEnabled: true
     });
 
+    expect(findByTestId(renderer, "personal-best-home-card").props.accessibilityHint).toBe(
+      "Opens Survival setup"
+    );
     press(renderer, "personal-best-home-card");
     expect(findByTestId(renderer, "personal-best-guide")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "personal-best-guide-start"))).toBe("Got it");
@@ -8163,6 +8166,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
 
     press(renderer, "personal-best-hub-close");
+    expect(findByTestId(renderer, "personal-best-home-card").props.accessibilityHint).toBe(
+      "Opens Survival setup"
+    );
     press(renderer, "personal-best-home-card");
     expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
     expect(() => findByTestId(renderer, "personal-best-guide")).toThrow();
@@ -8210,7 +8216,11 @@ describe("PracticePocScreen", () => {
       runManagementEnabled: true
     });
 
-    openSurvivalHubFromHome(renderer);
+    press(renderer, "personal-best-home-card");
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Candidate and reply make one puzzle"
+    );
+    press(renderer, "personal-best-guide-start");
 
     expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
       "Candidate + required reply · No time limit · 3 mistakes"

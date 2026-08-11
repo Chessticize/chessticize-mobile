@@ -240,8 +240,6 @@ export const PersonalBestArrowDuelGlobalOff: Story = {
     await clickTestId(canvasElement, "personal-best-guide-start");
     await waitForTestId(canvasElement, "personal-best-hub");
     await clickTestId(canvasElement, "personal-best-hub-start");
-    await waitForTestId(canvasElement, "personal-best-guide");
-    await clickTestId(canvasElement, "personal-best-guide-start");
     await expectTestIdText(canvasElement, "session-progress", "1 solved");
     expectTestIdAbsent(canvasElement, "arrow-duel-reply-challenge");
     expectTestIdAbsent(canvasElement, "arrow-duel-what-if-overlay");

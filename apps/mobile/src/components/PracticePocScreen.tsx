@@ -5251,7 +5251,7 @@ export function PracticePocScreen({
                         : !service.getSurvivalPreferences().guideSeen;
                       if (showFirstEntryGuide) {
                         setPersonalBestGuideOpponentReplyEnabled(
-                          arrowDuelOpponentReplyGlobalEnabled
+                          run?.opponentReplyEnabled ?? arrowDuelOpponentReplyGlobalEnabled
                         );
                         setPersonalBestHubVisible(false);
                         setPersonalBestGuideIntent("first-entry");
