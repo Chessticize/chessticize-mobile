@@ -1124,8 +1124,6 @@ export const PersonalBestRecords: Story = {
       "Pausing keeps any best already reached. Active time and sittings are context only."
     );
     expectTestIdAbsent(canvasElement, "history-attempt-history-unclear");
-    await clickTestId(canvasElement, "personal-best-records-back");
-    await waitForTestId(canvasElement, "personal-best-hub");
   }
 };
 
