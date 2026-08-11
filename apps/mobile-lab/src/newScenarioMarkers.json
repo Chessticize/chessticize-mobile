@@ -107,7 +107,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Keep only type, level, and best on the dedicated records page, without in-progress sections, status labels, or completed-Run counts."
+        "changeNote": "Use compact two-column cards for level and best without recommendation cues, statuses, or completed-Run counts."
       }
     ]
   },

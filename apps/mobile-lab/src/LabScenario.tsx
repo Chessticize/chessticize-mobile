@@ -913,6 +913,16 @@ function personalBestChallengePreviewFor(
       ...common,
       bestScore: 19,
       completedRunCount: 7,
+      levelRecords: [
+        ...levelRecords,
+        {
+          challengeType: "arrow_duel",
+          completedRunCount: 1,
+          maxRating: 1099,
+          minRating: 1000,
+          score: 3
+        }
+      ],
       recordsInitiallyVisible: true
     };
   }

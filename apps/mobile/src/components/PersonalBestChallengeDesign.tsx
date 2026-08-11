@@ -1061,37 +1061,26 @@ export function PersonalBestRecordsScreen({
         }
         return (
           <View key={type} style={styles.historyRecordSection} testID={`personal-best-records-${type}`}>
-            <View style={styles.historyRecordSectionHeader}>
-              <Text style={styles.historyRecordSectionTitle}>{challengeTypeLabel(type)}</Text>
-              <Text style={styles.historyRecordSectionHint}>
-                {type === "puzzle" ? "Standard recommends a level" : "Arrow Duel recommends a level"}
-              </Text>
+            <Text style={styles.historyRecordSectionTitle}>{challengeTypeLabel(type)}</Text>
+            <View style={styles.historyRecordGrid}>
+              {typeRecords.map((record) => {
+                const best = survivalBestForLevel(record, pausedRuns);
+                return (
+                  <View
+                    key={`${type}-${record.minRating}`}
+                    accessibilityLabel={`${challengeTypeLabel(type)} ${levelLabel(record)}, best ${best}`}
+                    style={styles.historyRecordRow}
+                    testID={`personal-best-record-${type}-${record.minRating}`}
+                  >
+                    <Text style={styles.historyRecordTitle}>{levelLabel(record)}</Text>
+                    <View style={styles.historyRecordBestRow}>
+                      <Text style={styles.historyRecordScoreLabel}>Best</Text>
+                      <Text style={styles.historyRecordScore}>{best}</Text>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
-            {typeRecords.map((record) => {
-              const best = survivalBestForLevel(record, pausedRuns);
-              return (
-                <View
-                  key={`${type}-${record.minRating}`}
-                  style={[styles.historyRecordRow, record.isRecommended ? styles.historyRecordRowRecommended : null]}
-                  testID={`personal-best-record-${type}-${record.minRating}`}
-                >
-                  <View>
-                    <Text style={styles.historyRecordTitle}>
-                      {levelLabel(record)}{record.isRecommended ? " · Recommended" : ""}
-                    </Text>
-                  </View>
-                  <View style={styles.historyRecordScoreBlock}>
-                    <Text
-                      style={styles.historyRecordScore}
-                      testID={record.isRecommended && type === "puzzle" ? "personal-best-records-score" : undefined}
-                    >
-                      {best}
-                    </Text>
-                    <Text style={styles.historyRecordScoreLabel}>best</Text>
-                  </View>
-                </View>
-              );
-            })}
           </View>
         );
       })}
@@ -1981,51 +1970,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800"
   },
-  historyRecordDetail: {
-    color: "#64748B",
-    fontSize: 11,
-    marginTop: 3
+  historyRecordBestRow: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 6
+  },
+  historyRecordGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8
   },
   historyRecordRow: {
-    alignItems: "center",
     borderColor: "#E2E8F0",
     borderRadius: 12,
     borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-    padding: 11
-  },
-  historyRecordRowRecommended: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD"
+    justifyContent: "center",
+    minHeight: 68,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    width: "48.5%"
   },
   historyRecordScore: {
     color: "#0F172A",
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "900"
-  },
-  historyRecordScoreBlock: {
-    alignItems: "flex-end"
   },
   historyRecordScoreLabel: {
     color: "#64748B",
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "700"
   },
   historyRecordSection: {
     marginTop: 16
-  },
-  historyRecordSectionHeader: {
-    alignItems: "baseline",
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "space-between"
-  },
-  historyRecordSectionHint: {
-    color: "#64748B",
-    fontSize: 10,
-    fontWeight: "600"
   },
   historyRecordSectionTitle: {
     color: "#0F172A",

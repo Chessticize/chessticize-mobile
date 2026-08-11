@@ -8813,7 +8813,9 @@ describe("PracticePocScreen", () => {
     press(renderer, "personal-best-hub-records");
 
     const recordsScreen = findByTestId(renderer, "personal-best-records-screen");
-    expect(collectText(findByTestId(renderer, "personal-best-records-score"))).toBe("19");
+    expect(collectText(findByTestId(renderer, "personal-best-record-puzzle-900"))).toBe(
+      "900–999Best19"
+    );
     expect(collectText(recordsScreen)).toContain(
       "900–999"
     );
@@ -8823,6 +8825,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(recordsScreen)).toContain(
       "Arrow Duel"
     );
+    expect(collectText(recordsScreen)).not.toContain("Recommended");
+    expect(collectText(recordsScreen)).not.toContain("recommends a level");
     expect(collectText(findByTestId(renderer, "personal-best-records-comparison-note"))).toContain(
       "A best of 42 at 600–699 never outranks or replaces a best of 19 at 900–999."
     );
