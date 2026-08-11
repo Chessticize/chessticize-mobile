@@ -19,8 +19,8 @@
     "screenshotsPerDeviceType": 8
   },
   "appName": "Chessticize: Chess Puzzles",
-  "shortDescription": "Offline chess puzzle trainer with rating-matched Sprints and focused practice.",
-  "fullDescription": "Practice chess puzzles with purpose—without ads or an account.\n\nChessticize is an open-source chess puzzle trainer designed to work offline. Solve short, rating-matched puzzle Sprints to build pattern recognition. Arrow Duel turns each puzzle into a choice between two candidate moves, helping you notice and reject the tempting blunder before you play it.\n\nSolve puzzles with intent\n\n• Puzzle Sprint: solve a compact set of rating-matched chess puzzles against the clock.\n• Arrow Duel: compare two candidate moves in the same position and choose the better one.\n• Custom Runs: choose puzzle themes, pace, and difficulty for what you want to practice.\n\nMake every mistake count\n\nMissed and unclear puzzles enter scheduled Review, bringing them back when they are due. Replay lets you revisit completed puzzles and explore positions with on-device Stockfish analysis—without changing your Rating or Review schedule.\n\nSee your puzzle practice\n\nFollow separate Ratings for Standard and Arrow Duel, review recent Runs, and filter History to revisit individual puzzles.\n\nPrivate by design\n\n• Solve bundled puzzles without a network connection.\n• No ads and no Chessticize account.\n• No analytics or tracking, and no puzzle activity sent to Chessticize.\n• Progress is stored on your device. Android Progress Backup can restore eligible local progress after reinstall or device transfer when Android backup is enabled; it restores progress rather than keeping multiple devices continuously synchronized.\n• Review reminders use local notifications.\n\nOpen source\n\nChessticize is published under GPL-3.0-or-later. The app includes bundled puzzle data and Stockfish for on-device analysis, with source and licenses available from the app's Settings screen and public project page.\n\nAlso included\n\n• Curated puzzle themes\n• Adjustable pace, duration, and difficulty\n• Optional move sounds and haptic feedback\n• Phone, tablet, foldable, and compatible Chromebook layouts",
+  "shortDescription": "Build Tactical Intuition",
+  "fullDescription": "Build tactical intuition with focused chess practice—completely free, with no ads or paywalls.\n\nPractice. Review. Improve.\n\nPuzzle Sprints\n\nSolve short, rating-matched puzzle sets against the clock. Build pattern recognition one focused Sprint at a time.\n\nArrow Duel\n\nCompare two candidate moves in the same position. Choose the better move, reject the tempting blunder, and practice the opponent's reply.\n\nCustom Practice\n\nCreate a Custom Run with the puzzle themes, pace, duration, and difficulty you want to train.\n\nReview what you miss\n\nMissed and unclear puzzles enter scheduled Review so they return when due. Replay completed puzzles and explore positions with on-device Stockfish analysis—without changing your Rating or Review schedule.\n\nTrack your progress\n\nFollow separate Ratings for Standard and Arrow Duel, review recent Runs, and filter History to revisit individual puzzles.\n\nCompletely free\n\n• No ads\n• No subscriptions, paid unlocks, or paywalls\n• No Chessticize account required\n\nPractice offline\n\nBundled puzzles and Stockfish analysis work on your device. Progress is stored locally, with Android-managed backup available for eligible restore or device transfer when Android backup is enabled.\n\nOpen source\n\nChessticize is published under GPL-3.0-or-later. Source code, Stockfish, puzzle-data attribution, and licenses are available from Settings and the public project page.\n\nAlso included\n\n• Curated puzzle themes\n• Adjustable pace, duration, and difficulty\n• Scheduled Review and Replay\n• Optional move sounds and haptic feedback\n• Phone, tablet, foldable, and compatible Chromebook layouts",
   "listingSettings": {
     "defaultLanguage": "English (United States)",
     "appOrGame": "Game",
@@ -120,6 +120,23 @@
         "does not create a Chessticize account",
         "no analytics, crash-reporting, advertising, tracking",
         "remote telemetry SDK"
+      ]
+    },
+    {
+      "id": "no-js-monetization-sdk",
+      "source": "apps/mobile/package.json",
+      "mustNotContain": [
+        "react-native-google-mobile-ads",
+        "react-native-iap",
+        "@revenuecat/purchases-react-native"
+      ]
+    },
+    {
+      "id": "no-native-billing-or-ads",
+      "source": "apps/mobile/android/app/build.gradle",
+      "mustNotContain": [
+        "com.android.billingclient",
+        "com.google.android.gms:play-services-ads"
       ]
     },
     {

@@ -17,44 +17,53 @@ in the owner evidence described by `docs/ANDROID_PLAY_RELEASE.md`.
 - App or game: Game
 - Category: Board
 - Pricing: Free
-- Short description: `Offline chess puzzle trainer with rating-matched Sprints and focused practice.`
+- Short description: `Build Tactical Intuition`
 - Full description:
 
 ```text
-Practice chess puzzles with purpose—without ads or an account.
+Build tactical intuition with focused chess practice—completely free, with no ads or paywalls.
 
-Chessticize is an open-source chess puzzle trainer designed to work offline. Solve short, rating-matched puzzle Sprints to build pattern recognition. Arrow Duel turns each puzzle into a choice between two candidate moves, helping you notice and reject the tempting blunder before you play it.
+Practice. Review. Improve.
 
-Solve puzzles with intent
+Puzzle Sprints
 
-• Puzzle Sprint: solve a compact set of rating-matched chess puzzles against the clock.
-• Arrow Duel: compare two candidate moves in the same position and choose the better one.
-• Custom Runs: choose puzzle themes, pace, and difficulty for what you want to practice.
+Solve short, rating-matched puzzle sets against the clock. Build pattern recognition one focused Sprint at a time.
 
-Make every mistake count
+Arrow Duel
 
-Missed and unclear puzzles enter scheduled Review, bringing them back when they are due. Replay lets you revisit completed puzzles and explore positions with on-device Stockfish analysis—without changing your Rating or Review schedule.
+Compare two candidate moves in the same position. Choose the better move, reject the tempting blunder, and practice the opponent's reply.
 
-See your puzzle practice
+Custom Practice
+
+Create a Custom Run with the puzzle themes, pace, duration, and difficulty you want to train.
+
+Review what you miss
+
+Missed and unclear puzzles enter scheduled Review so they return when due. Replay completed puzzles and explore positions with on-device Stockfish analysis—without changing your Rating or Review schedule.
+
+Track your progress
 
 Follow separate Ratings for Standard and Arrow Duel, review recent Runs, and filter History to revisit individual puzzles.
 
-Private by design
+Completely free
 
-• Solve bundled puzzles without a network connection.
-• No ads and no Chessticize account.
-• No analytics or tracking, and no puzzle activity sent to Chessticize.
-• Progress is stored on your device. Android Progress Backup can restore eligible local progress after reinstall or device transfer when Android backup is enabled; it restores progress rather than keeping multiple devices continuously synchronized.
-• Review reminders use local notifications.
+• No ads
+• No subscriptions, paid unlocks, or paywalls
+• No Chessticize account required
+
+Practice offline
+
+Bundled puzzles and Stockfish analysis work on your device. Progress is stored locally, with Android-managed backup available for eligible restore or device transfer when Android backup is enabled.
 
 Open source
 
-Chessticize is published under GPL-3.0-or-later. The app includes bundled puzzle data and Stockfish for on-device analysis, with source and licenses available from the app's Settings screen and public project page.
+Chessticize is published under GPL-3.0-or-later. Source code, Stockfish, puzzle-data attribution, and licenses are available from Settings and the public project page.
 
 Also included
 
 • Curated puzzle themes
 • Adjustable pace, duration, and difficulty
+• Scheduled Review and Replay
 • Optional move sounds and haptic feedback
 • Phone, tablet, foldable, and compatible Chromebook layouts
 ```

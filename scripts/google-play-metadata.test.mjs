@@ -43,6 +43,7 @@ test("Google Play en-US copy is canonical, paste-ready, and within Unicode limit
   assert.equal(metadata.listingSettings.defaultLanguage, "English (United States)");
   assert.equal(metadata.listingSettings.appOrGame, "Game");
   assert.equal(metadata.listingSettings.category, "Board");
+  assert.equal(metadata.listingSettings.pricing, "Free");
 
   assert.ok(
     characterCount(metadata.appName) <= metadata.limits.appNameCharacters
@@ -57,10 +58,23 @@ test("Google Play en-US copy is canonical, paste-ready, and within Unicode limit
   );
   assert.notEqual(metadata.shortDescription.trim(), "");
   assert.notEqual(metadata.fullDescription.trim(), "");
-  assert.ok(
-    metadata.shortDescription.startsWith("Offline chess puzzle trainer"),
+  assert.equal(
+    metadata.shortDescription,
+    "Build Tactical Intuition",
   );
-  assert.ok(metadata.fullDescription.startsWith("Practice chess puzzles with purpose"));
+  assert.ok(metadata.fullDescription.startsWith("Build tactical intuition"));
+  for (const requiredCopy of [
+    "Practice. Review. Improve.",
+    "Puzzle Sprints",
+    "Arrow Duel",
+    "Custom Practice",
+    "Track your progress",
+    "Completely free",
+    "No ads",
+    "No subscriptions, paid unlocks, or paywalls",
+  ]) {
+    assert.ok(metadata.fullDescription.includes(requiredCopy));
+  }
   assert.ok(!metadata.fullDescription.includes(metadata.shortDescription));
 
   const storeCopy = `${metadata.appName}\n${metadata.shortDescription}\n${metadata.fullDescription}`;
