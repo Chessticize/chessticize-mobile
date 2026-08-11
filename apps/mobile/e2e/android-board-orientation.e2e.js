@@ -48,6 +48,13 @@ describe('Android board orientation integrity', () => {
       await waitFor(element(by.text(flipped ? 'For black.' : 'For white.')))
         .toExist()
         .withTimeout(10000);
+      const entryMove = puzzle.solutionMoves[0];
+      await waitForElementAccessibilityLabelContaining(
+        'session-board',
+        `Last move ${entryMove.slice(0, 2)} to ${entryMove.slice(2, 4)}`,
+        15000,
+        25
+      );
 
       if (previousFlipped === false && flipped === true) {
         unflippedToFlipped += 1;
@@ -65,7 +72,8 @@ describe('Android board orientation integrity', () => {
         boardFrame,
         occupiedSquares(startingPosition),
         flipped,
-        screenFrame
+        screenFrame,
+        [entryMove.slice(0, 2)]
       );
 
       // The final fixture contains promotion moves, which require a separate

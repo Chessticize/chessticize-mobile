@@ -4962,7 +4962,7 @@ describe("PracticePocScreen", () => {
     }
   });
 
-  it("counts down, locks the board under Timed out, then resets for the next puzzle", () => {
+  it("counts down, locks the board under Timed out, then resets for the next puzzle", async () => {
     const renderer = renderLabScenario("practice-timing-timeout");
 
     startStandardSprint(renderer);
@@ -4996,8 +4996,17 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
     expectSessionMistakes(renderer, 1);
 
+    const timedOutBoard = findByTestId(renderer, "mock-chessboard");
+    (timedOutBoard.props.mockDeferNextReset as jest.Mock)();
     act(() => {
       jest.advanceTimersByTime(800);
+    });
+    expect(findByTestId(renderer, "session-puzzle-timeout-overlay")).toBeTruthy();
+
+    await act(async () => {
+      (timedOutBoard.props.mockCompleteReset as jest.Mock)();
+      await Promise.resolve();
+      await Promise.resolve();
     });
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
     expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:00");
@@ -5051,9 +5060,7 @@ describe("PracticePocScreen", () => {
     });
     expect(service.listHistory()[0]?.unclear).toBeUndefined();
 
-    act(() => {
-      jest.advanceTimersByTime(800);
-    });
+    await settleFeedbackSnapshot();
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
     expect(findByTestId(renderer, "mock-chessboard").props.fen).not.toBe(firstPuzzleFen);
   });
@@ -7430,6 +7437,53 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "1 / 15");
   });
 
+  it("reveals the next puzzle only after its native board position commits", async () => {
+    const service = createMobilePracticeService("random1000");
+    const renderer = renderScreen({ practiceService: service });
+
+    startStandardSprint(renderer);
+    await boardMove(renderer, "e2e6");
+    await settleFeedbackSnapshot();
+
+    const board = findByTestId(renderer, "mock-chessboard");
+    const submittedPuzzleId = collectText(findByTestId(renderer, "session-current-puzzle-id"));
+    (board.props.mockDeferNextReset as jest.Mock)();
+
+    await boardMove(renderer, "e6f7");
+    const nextPuzzle = activeSprintForTest(service).currentPuzzle;
+    if (!nextPuzzle) {
+      throw new Error("Expected the completed move to select a next puzzle");
+    }
+    expect(nextPuzzle.puzzle.id).not.toBe(submittedPuzzleId);
+    expect(board.props.mockResetBoard as jest.Mock).not.toHaveBeenCalledWith(
+      nextPuzzle.puzzle.initialFen,
+      expect.anything()
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(800);
+      await Promise.resolve();
+    });
+
+    expect(collectText(findByTestId(renderer, "session-current-puzzle-id")))
+      .toBe(submittedPuzzleId);
+
+    await act(async () => {
+      (board.props.mockCompleteReset as jest.Mock)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(collectText(findByTestId(renderer, "session-current-puzzle-id")))
+      .toBe(nextPuzzle.puzzle.id);
+    expect(findByTestId(renderer, "mock-chessboard").props.flipped)
+      .toBe(nextPuzzle.currentFen.split(" ")[1] === "b");
+    expect(board.props.mockResetBoard as jest.Mock).toHaveBeenCalledWith(
+      nextPuzzle.puzzle.initialFen,
+      { flipped: nextPuzzle.currentFen.split(" ")[1] === "b" }
+    );
+  });
+
   it("keeps the native board mounted across an adaptive size change without replacing the active puzzle", () => {
     const windowDimensions = ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: {
@@ -7541,18 +7595,18 @@ describe("PracticePocScreen", () => {
     startStandardSprint(renderer);
     const stableBoardReset = findByTestId(renderer, "mock-chessboard").props.mockResetBoard;
     await boardMove(renderer, "c2b3");
-    const secondPuzzleFen = activeSprintForTest(service).currentPuzzle?.currentFen;
+    const secondPuzzleFen = activeSprintForTest(service).currentPuzzle?.puzzle.initialFen;
     expect(secondPuzzleFen).toBeTruthy();
-    expect(stableBoardReset).not.toHaveBeenCalledWith(secondPuzzleFen);
+    expect(stableBoardReset.mock.calls.map(([fen]: [string]) => fen)).not.toContain(secondPuzzleFen);
     await settleFeedbackSnapshot();
-    expect(stableBoardReset).toHaveBeenCalledWith(secondPuzzleFen);
+    expect(stableBoardReset.mock.calls.map(([fen]: [string]) => fen)).toContain(secondPuzzleFen);
     expect(stableBoardReset).toHaveBeenCalledTimes(1);
     await boardMove(renderer, "c4b5");
-    const thirdPuzzleFen = activeSprintForTest(service).currentPuzzle?.currentFen;
+    const thirdPuzzleFen = activeSprintForTest(service).currentPuzzle?.puzzle.initialFen;
     expect(thirdPuzzleFen).toBeTruthy();
-    expect(stableBoardReset).not.toHaveBeenCalledWith(thirdPuzzleFen);
+    expect(stableBoardReset.mock.calls.map(([fen]: [string]) => fen)).not.toContain(thirdPuzzleFen);
     await settleFeedbackSnapshot();
-    expect(stableBoardReset).toHaveBeenCalledWith(thirdPuzzleFen);
+    expect(stableBoardReset.mock.calls.map(([fen]: [string]) => fen)).toContain(thirdPuzzleFen);
     expect(stableBoardReset).toHaveBeenCalledTimes(2);
 
     expect(findByTestId(renderer, "session-board")).toBeTruthy();

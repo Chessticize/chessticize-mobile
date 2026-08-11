@@ -242,6 +242,7 @@ import {
   consumeSuppressedBoardMove
 } from "./boardMoveSuppression.ts";
 import { usePuzzleEntryPreview } from "./usePuzzleEntryPreview.ts";
+import { puzzleEntryPreviewPlan } from "./puzzleEntryPreview.ts";
 import {
   TacticalProfileFlow,
   TacticalProfileHomeCard
@@ -1925,22 +1926,28 @@ export function PracticePocScreen({
     reason: string,
     puzzleId?: string | null,
     move?: string,
-    slide?: BoardResetSlide | null
-  ): void {
+    slide?: BoardResetSlide | null,
+    targetFlipped?: boolean
+  ): Promise<void> | null {
     if (!fen) {
-      return;
+      return null;
     }
+    let completion: Promise<void> | undefined;
     if (slide) {
-      boardRef.current?.resetBoard(fen, {
+      completion = boardRef.current?.resetBoard(fen, {
         lastMove: null,
         slide: {
           ...(slide.durationMs === undefined ? {} : { durationMs: slide.durationMs }),
           from: slide.from as Square,
           to: slide.to as Square
-        }
+        },
+        ...(targetFlipped === undefined ? {} : { flipped: targetFlipped })
       });
     } else {
-      boardRef.current?.resetBoard(fen);
+      completion = boardRef.current?.resetBoard(
+        fen,
+        targetFlipped === undefined ? undefined : { flipped: targetFlipped }
+      );
     }
     emitTrace({
       type: "board-reset",
@@ -1949,6 +1956,7 @@ export function PracticePocScreen({
       puzzleId,
       submittedFen: fen
     });
+    return completion ?? null;
   }
 
   function emitTrace(event: PracticeDebugTraceEvent): void {
@@ -3650,13 +3658,27 @@ export function PracticePocScreen({
         // instance before revealing the next puzzle. Relying on the fen-prop
         // effect alone leaves the stable native board holding the submitted
         // position during the render that changes puzzle orientation/state.
-        resetBoardToFen(
-          nextPuzzle?.currentFen,
+        const completion = resetBoardToFen(
+          puzzleEntryPreviewPlan(nextPuzzle)?.initialFen ?? nextPuzzle?.currentFen,
           "feedback-snapshot-complete",
-          nextPuzzle?.puzzle.id ?? null
+          nextPuzzle?.puzzle.id ?? null,
+          undefined,
+          undefined,
+          nextPuzzle ? shouldFlipBoard(nextPuzzle) : undefined
         );
-        commitFeedbackSnapshot(null);
-        commitBoardInputLocked(false, "feedback-snapshot-complete", nextPuzzle?.puzzle.id ?? null);
+        const revealNextPuzzle = (): void => {
+          const activeSnapshot = feedbackSnapshotRef.current;
+          if (activeSnapshot?.puzzleId !== submittedPuzzle.puzzle.id) {
+            return;
+          }
+          commitFeedbackSnapshot(null);
+          commitBoardInputLocked(false, "feedback-snapshot-complete", nextPuzzle?.puzzle.id ?? null);
+        };
+        if (completion) {
+          void completion.then(revealNextPuzzle);
+        } else {
+          revealNextPuzzle();
+        }
       }
       feedbackSnapshotTimerRef.current = null;
     }, FEEDBACK_SNAPSHOT_MS);
@@ -3687,15 +3709,32 @@ export function PracticePocScreen({
     feedbackSnapshotTimerRef.current = setTimeout(() => {
       const current = feedbackSnapshotRef.current;
       if (current?.kind === "timed_out" && current.puzzleId === timedOutPuzzle.puzzle.id) {
-        resetBoardToFen(
-          nextPuzzle?.currentFen,
+        const completion = resetBoardToFen(
+          puzzleEntryPreviewPlan(nextPuzzle)?.initialFen ?? nextPuzzle?.currentFen,
           "puzzle-timeout-complete",
-          nextPuzzle?.puzzle.id ?? null
+          nextPuzzle?.puzzle.id ?? null,
+          undefined,
+          undefined,
+          nextPuzzle ? shouldFlipBoard(nextPuzzle) : undefined
         );
-        commitBoardFen(nextPuzzle?.currentFen ?? null);
-        commitFeedbackSnapshot(null);
-        puzzleTimeoutInFlightRef.current = null;
-        commitBoardInputLocked(false, "puzzle-timeout-complete", nextPuzzle?.puzzle.id ?? null);
+        const revealNextPuzzle = (): void => {
+          const activeSnapshot = feedbackSnapshotRef.current;
+          if (
+            activeSnapshot?.kind !== "timed_out"
+            || activeSnapshot.puzzleId !== timedOutPuzzle.puzzle.id
+          ) {
+            return;
+          }
+          commitBoardFen(nextPuzzle?.currentFen ?? null);
+          commitFeedbackSnapshot(null);
+          puzzleTimeoutInFlightRef.current = null;
+          commitBoardInputLocked(false, "puzzle-timeout-complete", nextPuzzle?.puzzle.id ?? null);
+        };
+        if (completion) {
+          void completion.then(revealNextPuzzle);
+        } else {
+          revealNextPuzzle();
+        }
       }
       feedbackSnapshotTimerRef.current = null;
     }, FEEDBACK_SNAPSHOT_MS);
