@@ -24,6 +24,8 @@ export const IosSync: Story = {
     await openSettings(canvasElement);
     await waitForTestId(canvasElement, "settings-sync-section");
     await waitForText(canvasElement, "Sign in to iCloud to sync");
+    await waitForTestId(canvasElement, "settings-sync-now-detail");
+    await waitForTestId(canvasElement, "settings-sync-now-label");
     await waitForText(canvasElement, "Permission not requested");
     await waitForTestId(canvasElement, "settings-move-feedback-section");
     await waitForTestId(canvasElement, "settings-move-feedback-previews");
@@ -40,6 +42,7 @@ export const IosSync: Story = {
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-success");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-mistake");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-device-note");
+    await centerTestId(canvasElement, "settings-sync-section");
   }
 };
 

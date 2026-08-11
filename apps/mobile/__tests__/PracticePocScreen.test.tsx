@@ -13927,6 +13927,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-icloud-sync-on")).toBeTruthy();
     expect(findByTestId(renderer, "settings-icloud-sync-off")).toBeTruthy();
     expect(findByTestId(renderer, "settings-sync-now")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "settings-sync-now-label"))).toBe("Sync Now");
+    expect(collectText(findByTestId(renderer, "settings-sync-now-detail"))).toBe(
+      "Merge ratings, history, and review queue with your private iCloud."
+    );
     expect(testIdOrder(renderer, "settings-sync-section", "settings-notifications-section")).toBeLessThan(0);
     expect(testIdOrder(renderer, "settings-notifications-section", "settings-profile-section")).toBeLessThan(0);
     expect(collectText(findByTestId(renderer, "settings-notifications-section"))).toContain("Notifications");

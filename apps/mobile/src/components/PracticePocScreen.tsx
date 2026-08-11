@@ -16344,7 +16344,7 @@ function SettingsPanel({
           </View>
           {iCloudSyncEnabled ? (
             <>
-              <SettingsActionRow
+              <SettingsActionButton
                 label="Sync Now"
                 detail="Merge ratings, history, and review queue with your private iCloud."
                 testID="settings-sync-now"
@@ -16894,6 +16894,37 @@ function SettingsActionRow({
       </View>
       <ChevronGlyph direction="right" />
     </Pressable>
+  );
+}
+
+function SettingsActionButton({
+  detail,
+  label,
+  onPress,
+  testID
+}: {
+  detail: string;
+  label: string;
+  onPress: () => void;
+  testID: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.settingsActionButtonRow}>
+      <Text style={[styles.helperText, styles.settingsActionButtonDetail]} testID={`${testID}-detail`}>
+        {detail}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        testID={testID}
+        style={styles.settingsActionButton}
+        onPress={onPress}
+      >
+        <Text style={styles.settingsActionButtonText} testID={`${testID}-label`}>
+          {label}
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -22619,6 +22650,36 @@ const styles = StyleSheet.create({
     minHeight: 58,
     paddingHorizontal: 12,
     paddingVertical: 10
+  },
+  settingsActionButtonRow: {
+    alignItems: "center",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  settingsActionButtonDetail: {
+    flex: 1,
+    minWidth: 200
+  },
+  settingsActionButton: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+    justifyContent: "center",
+    marginLeft: "auto",
+    minHeight: 40,
+    minWidth: 104,
+    paddingHorizontal: 16
+  },
+  settingsActionButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800"
   },
   settingsDestructiveText: {
     color: "#DC2626"

@@ -293,9 +293,9 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "Settings",
     "iOS sync",
     "settings--ios-sync",
-    "The stable iOS Settings clone adds the global Find the opponent's best reply control alongside iCloud Sync, Notifications, Move Feedback, and Guidance. Its On copy explains the other-move follow-up, paused timers, and Edit Run options. Its Off copy says every Run goes straight to the next puzzle and explains what returns when the setting is turned back on.",
+    "The stable iOS Settings clone presents Sync Now as an explicit button instead of a disclosure row, so the action no longer implies another page. It retains the global Find the opponent's best reply control alongside Notifications, Move Feedback, and Guidance. Its On copy explains the other-move follow-up, paused timers, and Edit Run options. Its Off copy says every Run goes straight to the next puzzle and explains what returns when the setting is turned back on.",
     "settings",
-    ["iCloud Sync", "Global Arrow Duel reply control", "User-first On explanation", "Paused Sprint and puzzle timers", "Per-Run Edit Run handoff", "Straight-to-next-puzzle Off explanation", "Previously chosen Run settings restored on re-enable", "Notifications", "Sound and haptic toggles", "Move and capture audio previews", "Guidance reset", "About"],
+    ["iCloud Sync", "Explicit Sync Now button", "No disclosure chevron", "Global Arrow Duel reply control", "User-first On explanation", "Paused Sprint and puzzle timers", "Per-Run Edit Run handoff", "Straight-to-next-puzzle Off explanation", "Previously chosen Run settings restored on re-enable", "Notifications", "Sound and haptic toggles", "Move and capture audio previews", "Guidance reset", "About"],
     ["Run editor", "Native audio and haptic validation", "Stockfish diagnostics"]
   ),
   "settings-ios-sync-error-details": defineScenario(
