@@ -1992,6 +1992,26 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("practice-home");
 
     expect(findByTestId(renderer, "training-focus-section")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-run-management"))).toContain(
+      "Choose a run, then start when you are ready."
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-management"))).not.toContain(
+      "saved run"
+    );
+    expect(flattenTestStyle(
+      findByTestId(renderer, "practice-run-home-utilities").props.style
+    )).toMatchObject({
+      alignItems: "center",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between"
+    });
+    expect(collectText(findByTestId(renderer, "practice-run-home-utilities"))).toContain(
+      "Edit"
+    );
+    expect(collectText(findByTestId(renderer, "practice-run-home-utilities"))).toContain(
+      "+ Add Run"
+    );
     expect(() => findByTestId(renderer, "practice-sprint-rules-guide")).toThrow();
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-open"))).toContain(
       "How Sprint works"

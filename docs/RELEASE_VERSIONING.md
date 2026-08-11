@@ -23,7 +23,7 @@ modifying an identity that has already shipped.
 The expected state while the coordinated 1.4.2 release branch is open is
 therefore:
 
-- development target on `main`: `1.4.3`;
+- development target on `main`: `1.5.0`;
 - latest integrated release identity: `1.4.1`, Android version code `16`, iOS
   build `1`;
 - proposed release-branch identity: `1.4.2`, Android version code `17`, iOS
