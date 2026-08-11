@@ -108,7 +108,7 @@ describe('Practice POC', () => {
 
   it('creates, reorders, edits, archives, restores, and relaunches a saved Run', async () => {
     await waitFor(element(by.id('practice-run-management'))).toExist().withTimeout(180000);
-    await waitFor(element(by.id('practice-run-standard'))).toBeVisible().withTimeout(10000);
+    await waitForVisibleInPracticeScroll('practice-run-standard');
     await waitFor(element(by.id('practice-run-arrow-duel'))).toExist().withTimeout(10000);
 
     await element(by.id('practice-main-scroll')).scrollTo('top');
@@ -366,12 +366,14 @@ describe('Practice POC', () => {
     const resultRowIdentifier = await historyAttemptRowTestIDForResult('Correct');
     await waitForVisibleInPracticeScroll(resultRowIdentifier);
     await element(by.id(resultRowIdentifier)).tap();
-    await waitForVisibleInPracticeScroll('review-schedule-add');
-    await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
+    await waitFor(element(by.id('review-schedule-add'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('history-attempt-clear-unclear'))).toExist().withTimeout(10000);
     await expect(element(by.id('history-attempt-detail'))).not.toExist();
     await expect(element(by.id('bookmark-glyph'))).not.toExist();
 
     if (expectsRegularLayout) {
+      await waitForVisibleInPracticeScroll('review-schedule-add');
+      await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
       await waitForElementAccessibilityLabelContaining(
         'adaptive-layout',
         'regularLandscape',
@@ -411,6 +413,15 @@ describe('Practice POC', () => {
         10000
       );
       await waitFor(element(by.id('review-context-actions-bottom'))).toExist().withTimeout(10000);
+      try {
+        await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
+      } catch {
+        // On compact Android the trailing action can sit only a few pixels
+        // below the viewport. A bounded public swipe reaches it reliably;
+        // Detox's stale-at-edge auto-scroll can otherwise wait indefinitely.
+        await element(by.id('practice-main-scroll')).swipe('up', 'fast', 0.75, 0.5, 0.9);
+        await sleep(500);
+      }
       await expect(element(by.id('review-schedule-control'))).toBeVisible();
       await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
     }
