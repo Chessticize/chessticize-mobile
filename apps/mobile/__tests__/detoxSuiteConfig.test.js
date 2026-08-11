@@ -1099,7 +1099,7 @@ describe('Detox suite configuration', () => {
     expect(runManagementCase).toContain(
       "element(by.id('practice-run-standard')).swipe('up', 'fast', 0.1, 0.5, 0.5)"
     );
-    expect(runManagementCase).toContain(
+    expect(runManagementCase).not.toContain(
       "element(by.id('practice-main-scroll')).scroll(20, 'up')"
     );
     expect(runManagementCase).toContain("frameFor(element(by.id('adaptive-layout')))");
@@ -1112,7 +1112,7 @@ describe('Detox suite configuration', () => {
     );
     expect(runManagementCase).toContain('.longPressAndDrag(\n        2000,');
     expect(runManagementCase).toContain(
-      "0.03,\n        0.4,\n        element(by.id('practice-run-arrow-duel')),\n        0.03,\n        0.65"
+      "0.03,\n        0.8,\n        element(by.id('practice-run-arrow-duel')),\n        0.03,\n        0.65"
     );
     expect(runManagementCase).not.toContain('practice-run-move-down-standard');
   });
