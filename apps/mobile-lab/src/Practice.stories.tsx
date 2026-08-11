@@ -168,7 +168,7 @@ export const PersonalBestRatingSource: Story = {
   }
 };
 
-export const PersonalBestUnavailableRatingSource: Story = {
+export const SurvivalUnavailableRatingSource: Story = {
   name: "Survival · unavailable Rating source",
   args: { scenarioId: "practice-personal-best-unavailable-source" },
   play: async ({ canvasElement }) => {
@@ -1119,7 +1119,7 @@ export const PersonalBestResult: Story = {
   }
 };
 
-export const PersonalBestPoolCleared: Story = {
+export const SurvivalPerfectClear: Story = {
   name: "Survival · perfect clear",
   args: { scenarioId: "practice-personal-best-pool-cleared" },
   play: async ({ canvasElement }) => {
