@@ -36,8 +36,8 @@ Waiting for the third mistake would add delay without improving integrity:
 future play can never reduce the already reached score.
 
 - Active and paused Runs may own the current best.
-- The dedicated Survival records page labels a best owned by a resumable Run
-  as `best · in progress`.
+- The dedicated Survival records page shows that saved best like every other
+  type-and-level best, without a paused or in-progress status label.
 - Pausing, leaving through Back, or restarting the app never revokes a best
   already reached.
 - A solved-puzzle transaction must save the attempt, incremented score, and any
@@ -139,14 +139,16 @@ Survival does not synthesize a global Rating.
 
 Practice Home keeps one Survival module.
 
-- With no paused Run, it introduces Survival and opens the setup Hub.
-- With paused Runs, it shows the most recently touched Run plus an explicit
-  count for the others.
-- A newly reached best is labeled `New best saved` even while the Run remains
-  paused and resumable.
-- The paused summary is one whole-card button into the Hub. Home never resumes
-  Survival directly; `Continue` appears only beside the exact saved Run inside
-  the Hub.
+- Home always shows the same calm, whole-card `Survival Challenge` entry with
+  the invitation `See how far you can go, at your own pace.` and one chevron.
+- Home does not expose paused state, score, record, level, mistakes, active
+  time, sittings, or a resume action. Those details appear only after the user
+  chooses to enter the Hub.
+- The entry opens the Hub on the most recently touched paused Run when one
+  exists, but its visible and accessible Home copy never frames that Run as an
+  unfinished task.
+- Home never resumes Survival directly; `Continue` appears only beside the
+  exact saved Run inside the Hub.
 
 The full-page Survival Hub starts at the top, uses Back rather than Close, and
 contains:
@@ -156,7 +158,8 @@ contains:
 3. Recommended Rating source, with `Use another Run` only when useful.
 4. Supported adjacent levels and every remaining level under `More levels`.
 5. One compact summary with no time limit and a three-mistake end condition.
-6. One `Survival records` entry summarizing completed and in-progress Runs.
+6. One `Survival records` entry for Puzzle and Arrow Duel bests by level. The
+   Hub's separate `In progress` section owns every resume detail.
 
 The adjacent selected level uses the short label `Recommended`, avoiding
 character-level wrapping on supported phone widths.
@@ -170,22 +173,25 @@ Rules and first-use-guide detours preserve the selected type, Rating source,
 and level when the user returns to the Hub. Back from the Rating-source picker
 dismisses only that picker before Back can leave the Hub.
 
-`How it works` on Home and `?` in the Hub are informational entries. Their
-primary action is `Got it`; it returns to the originating Home or Hub without
-starting or resuming a Run. Only an unseen first-use guide reached after an
-explicit `Start Survival` intent retains `Start Survival` and `Not now`.
+`?` in the Hub is the informational rules entry. Its primary action is `Got
+it`; it returns to the Hub without starting or resuming a Run. Only an unseen
+first-use guide reached after an explicit `Start Survival` intent retains
+`Start Survival` and `Not now`.
 
 All Survival disclosures use the same short motion contract instead of
 appearing or disappearing abruptly:
 
-- Hub `In progress`, records-page `In progress`, and `More levels` are expanded
-  or collapsed by a full-width labeled control with an animated chevron.
-- Both `In progress` sections default open so resumable Runs remain prominent;
-  `More levels` defaults closed unless the current deterministic design state
+- Hub `In progress` and `More levels` are expanded or collapsed by a full-width
+  labeled control with an animated chevron.
+- Hub `In progress` defaults open so resumable Runs remain prominent; `More
+  levels` defaults closed unless the current deterministic design state
   explicitly demonstrates the full inventory.
 - The content animates height, fade, and a subtle upward offset over 200 ms with
   an ease-out curve. Collapsed content remains mounted for a smooth transition
   but is hidden from accessibility and pointer input.
+- `Survival records` has no in-progress section or paused/in-progress labels.
+  It includes already-saved live best values in the ordinary type-and-level
+  rows while the Hub remains the only place that manages resumable Runs.
 - The `More levels` control keeps spacing above its focus outline so browser and
   keyboard focus never touches the selected level card. The deterministic Hub
   preview opens the full inventory without a synthetic click, so it never leaves

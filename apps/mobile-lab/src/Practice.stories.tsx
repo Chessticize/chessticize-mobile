@@ -129,9 +129,13 @@ export const Home: Story = {
     await waitForTestId(canvasElement, "training-focus-card");
     await waitForText(canvasElement, "More information needed");
     await waitForTestId(canvasElement, "personal-best-home-card");
-    await expectTestIdText(canvasElement, "personal-best-home-score", "19");
-    await expectTestIdText(canvasElement, "personal-best-more-paused-count", "2 more paused");
-    await waitForText(canvasElement, "Open Survival");
+    await expectTestIdText(
+      canvasElement,
+      "personal-best-home-card",
+      "Survival ChallengeSee how far you can go, at your own pace.›"
+    );
+    expectTestIdAbsent(canvasElement, "personal-best-home-score");
+    expectTestIdAbsent(canvasElement, "personal-best-more-paused-count");
     expectTestIdAbsent(canvasElement, "personal-best-continue");
     await clickTestId(canvasElement, "personal-best-home-card");
     await waitForTestId(canvasElement, "personal-best-hub");
@@ -1211,15 +1215,10 @@ export const PersonalBestRecords: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-records-screen");
     await expectTestIdText(canvasElement, "personal-best-records-score", "19");
-    await waitForTestId(canvasElement, "personal-best-records-in-progress");
-    await waitForVisibleTestId(canvasElement, "personal-best-records-in-progress-content-motion");
+    expectTestIdAbsent(canvasElement, "personal-best-records-in-progress");
     await waitForTestId(canvasElement, "personal-best-records-puzzle");
     await waitForTestId(canvasElement, "personal-best-records-arrow_duel");
     await waitForText(canvasElement, "Every level stands on its own");
-    await waitForText(
-      canvasElement,
-      "Pausing keeps any best already reached. Active time and sittings are context only."
-    );
     expectTestIdAbsent(canvasElement, "history-attempt-history-unclear");
   }
 };

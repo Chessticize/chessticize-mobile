@@ -5245,12 +5245,6 @@ export function PracticePocScreen({
                       }
                     }}
                     onOpenSprintRulesGuide={() => setSprintRulesGuideVisible(true)}
-                    onOpenPersonalBestGuide={() => {
-                      setPersonalBestGuideOpponentReplyEnabled(
-                        arrowDuelOpponentReplyGlobalEnabled
-                      );
-                      setPersonalBestGuideIntent("learn-home");
-                    }}
                     onOpenPersonalBestHub={(run) => {
                       if (run) {
                         selectPersonalBestPausedRun(run);
@@ -5837,7 +5831,6 @@ function PracticeHome({
   resumableSprint,
   onDismissSprintRulesGuide,
   onOpenPersonalBestHub,
-  onOpenPersonalBestGuide,
   onOpenSprintRulesGuide,
   onSelectMode,
   onStartMode,
@@ -5860,7 +5853,6 @@ function PracticeHome({
   resumableSprint: SprintState | null;
   onDismissSprintRulesGuide: () => void;
   onOpenPersonalBestHub: (run?: PersonalBestPausedRunPresentation) => void;
-  onOpenPersonalBestGuide: () => void;
   onOpenSprintRulesGuide: () => void;
   onSelectMode: (next: SprintMode) => void;
   onStartMode: (next: SprintMode) => void;
@@ -5908,7 +5900,6 @@ function PracticeHome({
               {personalBestChallenge ? (
                 <PersonalBestHomeCard
                   presentation={personalBestChallenge}
-                  onHowItWorks={onOpenPersonalBestGuide}
                   onOpenHub={onOpenPersonalBestHub}
                 />
               ) : null}

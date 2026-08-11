@@ -7953,7 +7953,7 @@ describe("PracticePocScreen", () => {
     });
 
     expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
-    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-home-card");
     expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe("900–999");
     press(renderer, "personal-best-hub-start");
     expect(findByTestId(renderer, "personal-best-guide")).toBeTruthy();
@@ -7977,7 +7977,9 @@ describe("PracticePocScreen", () => {
     expect(service.getActiveSprint()).toBeUndefined();
     const pausedRun = service.listResumableSurvivalRuns()[0];
     expect(pausedRun?.currentPuzzle?.puzzle.id).toBe(pausedPuzzleId);
-    expect(collectText(findByTestId(renderer, "personal-best-home-score"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "personal-best-home-card"))).toBe(
+      "Survival ChallengeSee how far you can go, at your own pace.›"
+    );
 
     press(renderer, "personal-best-home-card");
     press(renderer, `personal-best-paused-continue-${pausedRun?.id}`);
@@ -8001,7 +8003,7 @@ describe("PracticePocScreen", () => {
       runManagementEnabled: true
     });
 
-    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-home-card");
     press(renderer, "personal-best-hub-start");
     press(renderer, "personal-best-guide-start");
     await settleEntryPreview();
@@ -8047,7 +8049,7 @@ describe("PracticePocScreen", () => {
       runManagementEnabled: true
     });
 
-    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-home-card");
     press(renderer, "personal-best-hub-start");
     press(renderer, "personal-best-guide-start");
     await boardMove(renderer, "e6e7");
@@ -8082,7 +8084,7 @@ describe("PracticePocScreen", () => {
       systemBack
     });
 
-    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-home-card");
     press(renderer, "personal-best-hub-start");
     press(renderer, "personal-best-guide-start");
 
@@ -8106,7 +8108,7 @@ describe("PracticePocScreen", () => {
       systemBack
     });
 
-    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-home-card");
     press(renderer, "personal-best-hub-start");
     press(renderer, "personal-best-guide-start");
 
@@ -8128,13 +8130,20 @@ describe("PracticePocScreen", () => {
   it("opens the Survival Hub from the paused Home card before a Run can resume", () => {
     const renderer = renderLabScenario("practice-home");
 
-    expect(collectText(findByTestId(renderer, "personal-best-home-score"))).toBe("19");
-    expect(collectText(findByTestId(renderer, "personal-best-home-card"))).toContain(
-      "New best saved"
+    const homeCard = findByTestId(renderer, "personal-best-home-card");
+    expect(homeCard.props.accessibilityRole).toBe("button");
+    expect(homeCard.props.accessibilityLabel).toBe(
+      "Open Survival Challenge. See how far you can go, at your own pace."
     );
-    expect(findByTestId(renderer, "personal-best-home-card").props.accessibilityRole).toBe("button");
-    expect(collectText(findByTestId(renderer, "personal-best-home-card"))).toContain("Open Survival");
-    expect(collectText(findByTestId(renderer, "personal-best-more-paused-count"))).toBe("2 more paused");
+    expect(collectText(homeCard)).toBe(
+      "Survival ChallengeSee how far you can go, at your own pace.›"
+    );
+    expect(collectText(homeCard)).not.toContain("paused");
+    expect(collectText(homeCard)).not.toContain("mistakes");
+    expect(collectText(homeCard)).not.toContain("active");
+    expect(collectText(homeCard)).not.toContain("sittings");
+    expect(() => findByTestId(renderer, "personal-best-home-score")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-more-paused-count")).toThrow();
     expect(() => findByTestId(renderer, "personal-best-continue")).toThrow();
     expect(() => findByTestId(renderer, "personal-best-more-paused")).toThrow();
     press(renderer, "personal-best-home-card");
@@ -8222,7 +8231,7 @@ describe("PracticePocScreen", () => {
       runManagementEnabled: true
     });
 
-    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-home-card");
     press(renderer, "personal-best-type-arrow_duel");
     press(renderer, "personal-best-level-1000");
     press(renderer, "personal-best-hub-help");
@@ -8234,7 +8243,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "settings-tab");
     press(renderer, "settings-arrow-duel-opponent-reply-on");
     press(renderer, "practice-tab");
-    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-home-card");
 
     expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
       "Candidate + required reply · No time limit · 3 mistakes"
@@ -8276,7 +8285,7 @@ describe("PracticePocScreen", () => {
       systemBack
     });
 
-    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-home-card");
     press(renderer, "personal-best-hub-records");
     expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe(
       "Survival records. Puzzle and Arrow Duel bests are listed separately by level."
@@ -8345,7 +8354,7 @@ describe("PracticePocScreen", () => {
       mainScroll.props.onScroll({ nativeEvent: { contentOffset: { y: 640 } } });
     });
 
-    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-home-card");
 
     expect(nativeScrollMock.__getScrollViewCommands?.()).toContainEqual({
       animated: false,
@@ -8353,7 +8362,7 @@ describe("PracticePocScreen", () => {
     });
   });
 
-  it("acknowledges Survival rules opened from Home without starting a Run", () => {
+  it("routes the Home entry through the Hub before informational rules", () => {
     const service = createProductionSurvivalService();
     const renderer = renderScreen({
       currentTimeMs: () => Date.parse("2026-08-11T12:00:00.000Z"),
@@ -8361,16 +8370,17 @@ describe("PracticePocScreen", () => {
       runManagementEnabled: true
     });
 
-    press(renderer, "personal-best-how-it-works");
+    press(renderer, "personal-best-home-card");
+    expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
+    press(renderer, "personal-best-hub-help");
     expect(collectText(findByTestId(renderer, "personal-best-guide-start"))).toBe("Got it");
     expect(() => findByTestId(renderer, "personal-best-guide-not-now")).toThrow();
     press(renderer, "personal-best-guide-start");
 
     expect(service.getActiveSprint()).toBeUndefined();
-    expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
+    expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
     expect(() => findByTestId(renderer, "personal-best-guide")).toThrow();
 
-    press(renderer, "personal-best-start");
     press(renderer, "personal-best-hub-start");
     expect(service.getActiveSprint()?.status).toBe("active");
     expect(() => findByTestId(renderer, "personal-best-guide")).toThrow();
@@ -8384,9 +8394,9 @@ describe("PracticePocScreen", () => {
       runManagementEnabled: true
     });
 
-    press(renderer, "personal-best-how-it-works");
+    press(renderer, "personal-best-home-card");
+    press(renderer, "personal-best-hub-help");
     press(renderer, "personal-best-guide-close");
-    press(renderer, "personal-best-start");
     press(renderer, "personal-best-hub-start");
 
     expect(service.getActiveSprint()).toBeUndefined();
@@ -8402,7 +8412,7 @@ describe("PracticePocScreen", () => {
       runManagementEnabled: true
     });
 
-    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-home-card");
     press(renderer, "personal-best-hub-help");
     expect(collectText(findByTestId(renderer, "personal-best-guide-start"))).toBe("Got it");
     press(renderer, "personal-best-guide-start");
@@ -8500,17 +8510,9 @@ describe("PracticePocScreen", () => {
     });
 
     const recordsRenderer = renderLabScenario("practice-personal-best-records");
-    expect(findByTestId(recordsRenderer, "personal-best-records-in-progress-toggle").props.accessibilityState).toEqual({
-      expanded: true
-    });
-    press(recordsRenderer, "personal-best-records-in-progress-toggle");
-    expect(findByTestId(recordsRenderer, "personal-best-records-in-progress-content-motion").props).toMatchObject({
-      "aria-hidden": true,
-      accessibilityElementsHidden: true,
-      pointerEvents: "none"
-    });
+    expect(() => findByTestId(recordsRenderer, "personal-best-records-in-progress")).toThrow();
     expect(findByTestId(hubRenderer, "personal-best-in-progress-chevron")).toBeTruthy();
-    expect(findByTestId(recordsRenderer, "personal-best-records-in-progress-chevron")).toBeTruthy();
+    expect(() => findByTestId(recordsRenderer, "personal-best-records-in-progress-chevron")).toThrow();
     expect(findByTestId(collapsedLevelsRenderer, "personal-best-more-levels-chevron")).toBeTruthy();
   });
 
@@ -8646,7 +8648,7 @@ describe("PracticePocScreen", () => {
       runManagementEnabled: true
     });
 
-    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-home-card");
     press(renderer, "personal-best-type-arrow_duel");
     expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
       "Choose the better arrow · No time limit · 3 mistakes"
@@ -8685,7 +8687,7 @@ describe("PracticePocScreen", () => {
       runManagementEnabled: true
     });
 
-    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-home-card");
     press(renderer, "personal-best-type-arrow_duel");
     press(renderer, "personal-best-hub-start");
     press(renderer, "personal-best-guide-start");
@@ -8721,6 +8723,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "personal-best-level-availability"))).toBe(
       "Showing every Survival level in this Core Pack: 600–2200."
     );
+    expect(flattenTestStyle(findByTestId(renderer, "personal-best-level-availability").props.style).paddingBottom)
+      .toBeGreaterThanOrEqual(4);
     expect(collectText(findByTestId(renderer, "personal-best-more-level-options"))).not.toContain(
       "2300"
     );
@@ -8804,27 +8808,28 @@ describe("PracticePocScreen", () => {
   it("opens dedicated Survival records from the Challenge Hub without taking over History", () => {
     const renderer = renderLabScenario("practice-personal-best-hub");
 
+    expect(collectText(findByTestId(renderer, "personal-best-hub-records"))).toBe(
+      "Survival recordsPuzzle and Arrow Duel bests by level›"
+    );
     press(renderer, "personal-best-hub-records");
 
+    const recordsScreen = findByTestId(renderer, "personal-best-records-screen");
     expect(collectText(findByTestId(renderer, "personal-best-records-score"))).toBe("19");
-    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
+    expect(collectText(recordsScreen)).toContain(
       "900–999"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
+    expect(collectText(recordsScreen)).toContain(
       "Puzzle"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
+    expect(collectText(recordsScreen)).toContain(
       "Arrow Duel"
     );
     expect(collectText(findByTestId(renderer, "personal-best-records-comparison-note"))).toContain(
       "A best of 42 at 600–699 never outranks or replaces a best of 19 at 900–999."
     );
-    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
-      "A new high is saved immediately while its Run stays in progress."
-    );
-    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
-      "best · in progress"
-    );
+    expect(collectText(recordsScreen).toLowerCase()).not.toContain("in progress");
+    expect(collectText(recordsScreen).toLowerCase()).not.toContain("paused");
+    expect(() => findByTestId(renderer, "personal-best-records-in-progress")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-unclear")).toThrow();
     expect(() => findByTestId(renderer, "personal-best-unrated")).toThrow();
     press(renderer, "personal-best-records-back");

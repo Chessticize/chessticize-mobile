@@ -107,132 +107,27 @@ export type PersonalBestChallengeDesignPreview = {
 
 export function PersonalBestHomeCard({
   presentation,
-  onHowItWorks,
   onOpenHub
 }: {
   presentation: PersonalBestChallengeDesignPreview;
-  onHowItWorks: () => void;
   onOpenHub: (run?: PersonalBestPausedRunPresentation) => void;
 }): React.JSX.Element {
-  const pausedRuns = presentation.pausedRuns ?? [];
-  const latestPaused = pausedRuns[0] ?? null;
-  const morePausedCount = Math.max(0, pausedRuns.length - 1);
-  if (latestPaused) {
-    const typeLabel = challengeTypeLabel(latestPaused.challengeType);
-    const reachedNewBest = presentation.bestScore === null
-      || latestPaused.score > presentation.bestScore;
-    return (
-      <Pressable
-        accessibilityLabel={`Survival paused. ${typeLabel}. Level ${latestPaused.minRating} to ${latestPaused.maxRating}. ${latestPaused.score} solved. ${latestPaused.mistakeCount} of 3 mistakes. ${morePausedCount} more paused ${morePausedCount === 1 ? "Run" : "Runs"}.`}
-        accessibilityHint="Opens the Survival Hub"
-        accessibilityRole="button"
-        style={styles.homeCard}
-        testID="personal-best-home-card"
-        onPress={() => onOpenHub(latestPaused)}
-      >
-        <View style={styles.homeCardHeader}>
-          <View style={styles.homeTitleBlock}>
-            <Text style={styles.eyebrow}>SURVIVAL PAUSED</Text>
-            <Text style={styles.homeTitle}>{typeLabel} · {levelLabel(latestPaused)}</Text>
-          </View>
-        </View>
-        <View style={styles.pausedHomeSummary}>
-          <View>
-            <Text style={styles.homeScore} testID="personal-best-home-score">
-              {latestPaused.score}
-            </Text>
-            <Text style={styles.homeScoreLabel}>solved</Text>
-          </View>
-          <View style={styles.pausedHomeMeta}>
-            {reachedNewBest ? (
-              <Text style={styles.pausedHomeBest}>New best saved</Text>
-            ) : null}
-            <Text style={styles.pausedHomeMetaStrong}>{latestPaused.mistakeCount} of 3 mistakes</Text>
-            <Text style={styles.pausedHomeMetaText}>
-              {formatElapsed(latestPaused.activeElapsedMs)} active · {latestPaused.sittings} sittings
-            </Text>
-            <Text style={styles.pausedHomeMetaText}>{latestPaused.lastTouchedLabel}</Text>
-          </View>
-        </View>
-        <View style={styles.pausedHomeOpenRow}>
-          {morePausedCount > 0 ? (
-            <Text style={styles.pausedHomeMoreText} testID="personal-best-more-paused-count">
-              {morePausedCount} more paused
-            </Text>
-          ) : <View />}
-          <View style={styles.pausedHomeOpenAction}>
-            <Text style={styles.pausedHomeOpenText}>Open Survival</Text>
-            <Text style={styles.pausedHomeOpenChevron}>›</Text>
-          </View>
-        </View>
-      </Pressable>
-    );
-  }
-  const bestLabel = presentation.bestScore === null
-    ? "Set your first best"
-    : `Best ${presentation.bestScore} at ${levelLabel(presentation.band)}`;
+  const latestPaused = presentation.pausedRuns?.[0];
   return (
-    <View
-      accessibilityLabel={`Survival. ${bestLabel}. Choose Puzzle or Arrow Duel and a fixed level. No time limit. The Run ends after three mistakes.`}
+    <Pressable
+      accessibilityLabel="Open Survival Challenge. See how far you can go, at your own pace."
+      accessibilityHint="Opens the Survival Hub"
+      accessibilityRole="button"
       style={styles.homeCard}
       testID="personal-best-home-card"
+      onPress={() => onOpenHub(latestPaused)}
     >
-      <View style={styles.homeCardHeader}>
-        <View style={styles.homeTitleBlock}>
-          <Text style={styles.eyebrow}>THREE-MISTAKE CHALLENGE</Text>
-          <Text style={styles.homeTitle}>Survival</Text>
-        </View>
+      <View style={styles.homeEntryCopy}>
+        <Text style={styles.homeTitle}>Survival Challenge</Text>
+        <Text style={styles.homeDescription}>See how far you can go, at your own pace.</Text>
       </View>
-
-      <View style={styles.homeScoreRow}>
-        {presentation.bestScore === null ? (
-          <Text style={styles.homeScoreEmpty}>Set your first best</Text>
-        ) : (
-          <>
-            <Text style={styles.homeScore} testID="personal-best-home-score">
-              {presentation.bestScore}
-            </Text>
-            <View style={styles.homeScoreCopy}>
-              <Text style={styles.homeScoreLabel}>Best solved</Text>
-              <Text style={styles.homeScoreHint}>at {levelLabel(presentation.band)}</Text>
-            </View>
-          </>
-        )}
-      </View>
-
-      <View style={styles.detailRow}>
-        <View style={styles.detailChip}>
-          <Text style={styles.detailChipText}>Rating {presentation.band.currentRating}</Text>
-        </View>
-        <View style={styles.detailChip}>
-          <Text style={styles.detailChipText}>
-            Recommended {presentation.band.minRating}–{presentation.band.maxRating}
-          </Text>
-        </View>
-      </View>
-      <Text style={styles.homeRule}>No time limit · Puzzle and Arrow Duel records stay separate</Text>
-
-      <View style={styles.actionRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="How Survival works"
-          style={styles.secondaryAction}
-          testID="personal-best-how-it-works"
-          onPress={onHowItWorks}
-        >
-          <Text style={styles.secondaryActionText}>How it works</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Choose a Survival Run"
-          style={styles.primaryAction}
-          testID="personal-best-start"
-          onPress={() => onOpenHub()}
-        >
-          <Text style={styles.primaryActionText}>Choose a challenge</Text>
-        </Pressable>
-      </View>
-    </View>
+      <Text accessibilityElementsHidden style={styles.homeChevron}>›</Text>
+    </Pressable>
   );
 }
 
@@ -550,16 +445,14 @@ export function PersonalBestChallengeHub({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Open Survival records. ${presentation.completedRunCount} completed Runs and ${pausedRuns.length} in progress.`}
+        accessibilityLabel="Open Survival records. Puzzle and Arrow Duel bests by level."
         style={styles.recordsEntry}
         testID="personal-best-hub-records"
         onPress={onOpenRecords}
       >
         <View style={styles.recordsEntryCopy}>
           <Text style={styles.recordsEntryTitle}>Survival records</Text>
-          <Text style={styles.recordsEntryDetail}>
-            {presentation.completedRunCount} completed · {pausedRuns.length} in progress
-          </Text>
+          <Text style={styles.recordsEntryDetail}>Puzzle and Arrow Duel bests by level</Text>
         </View>
         <Text style={styles.recordsEntryChevron}>›</Text>
       </Pressable>
@@ -1146,14 +1039,13 @@ export function PersonalBestRecordsScreen({
 }): React.JSX.Element {
   const records = presentation.levelRecords ?? [];
   const pausedRuns = presentation.pausedRuns ?? [];
-  const [inProgressVisible, setInProgressVisible] = React.useState(true);
   const recordSummary = records.map((record) => {
     const best = survivalBestForLevel(record, pausedRuns);
-    return `${challengeTypeLabel(record.challengeType)} ${levelLabel(record)} best ${best.score}${best.inProgress ? ", in progress" : ""}`;
+    return `${challengeTypeLabel(record.challengeType)} ${levelLabel(record)} best ${best}`;
   }).join(", ");
   return (
     <View
-      accessibilityLabel={`Survival bests by level. ${pausedRuns.length} Runs in progress. ${recordSummary}. Puzzle and Arrow Duel records are separate. Pausing keeps any best already reached.`}
+      accessibilityLabel={`Survival bests by level. ${recordSummary}. Puzzle and Arrow Duel records are separate.`}
       style={styles.recordsScreen}
       testID="personal-best-records-screen"
     >
@@ -1177,42 +1069,6 @@ export function PersonalBestRecordsScreen({
           Puzzle and Arrow Duel keep separate records. A higher score at an easier level never replaces a best at a harder one.
         </Text>
       </View>
-      {pausedRuns.length > 0 ? (
-        <View style={styles.historyInProgress} testID="personal-best-records-in-progress">
-          <Pressable
-            accessibilityLabel={`${inProgressVisible ? "Hide" : "Show"} ${pausedRuns.length} Survival Runs in progress`}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: inProgressVisible }}
-            style={styles.survivalDisclosureHeader}
-            testID="personal-best-records-in-progress-toggle"
-            onPress={() => setInProgressVisible((visible) => !visible)}
-          >
-            <View style={styles.hubSectionTitleRow}>
-              <Text style={styles.hubSectionTitle}>In progress</Text>
-              <Text style={styles.hubSectionCount}>{pausedRuns.length}</Text>
-            </View>
-            <SurvivalDisclosureChevron
-              expanded={inProgressVisible}
-              testID="personal-best-records-in-progress-chevron"
-            />
-          </Pressable>
-          <SurvivalCollapsibleRegion
-            contentTestID="personal-best-records-in-progress-content"
-            expanded={inProgressVisible}
-          >
-            {pausedRuns.map((run) => (
-              <View key={run.id} style={styles.historyPausedRow}>
-                <View>
-                  <Text style={styles.historyRecordTitle}>{challengeTypeLabel(run.challengeType)} · {levelLabel(run)}</Text>
-                  <Text style={styles.historyRecordDetail}>{run.score} solved · {run.mistakeCount} of 3 mistakes</Text>
-                </View>
-                <Text style={styles.historyPausedStatus}>Paused</Text>
-              </View>
-            ))}
-            <Text style={styles.historyEligibilityNote}>A new high is saved immediately while its Run stays in progress.</Text>
-          </SurvivalCollapsibleRegion>
-        </View>
-      ) : null}
       {(["puzzle", "arrow_duel"] as const).map((type) => {
         const typeRecords = records.filter((record) => record.challengeType === type);
         if (typeRecords.length === 0) {
@@ -1245,11 +1101,9 @@ export function PersonalBestRecordsScreen({
                       style={styles.historyRecordScore}
                       testID={record.isRecommended && type === "puzzle" ? "personal-best-records-score" : undefined}
                     >
-                      {best.score}
+                      {best}
                     </Text>
-                    <Text style={styles.historyRecordScoreLabel}>
-                      {best.inProgress ? "best · in progress" : "best"}
-                    </Text>
+                    <Text style={styles.historyRecordScoreLabel}>best</Text>
                   </View>
                 </View>
               );
@@ -1263,9 +1117,6 @@ export function PersonalBestRecordsScreen({
           A best of 42 at 600–699 never outranks or replaces a best of 19 at 900–999. Puzzle and Arrow Duel also keep separate records.
         </Text>
       </View>
-      <Text style={styles.historyFootnote}>
-        Pausing keeps any best already reached. Active time and sittings are context only.
-      </Text>
     </View>
   );
 }
@@ -1441,7 +1292,7 @@ function defaultSurvivalLevels(): PersonalBestAvailableLevelPresentation[] {
 function survivalBestForLevel(
   record: PersonalBestLevelRecordPresentation,
   pausedRuns: readonly PersonalBestPausedRunPresentation[]
-): { inProgress: boolean; score: number } {
+): number {
   const inProgressScore = pausedRuns
     .filter((run) => (
       run.challengeType === record.challengeType
@@ -1449,10 +1300,7 @@ function survivalBestForLevel(
       && run.maxRating === record.maxRating
     ))
     .reduce((best, run) => Math.max(best, run.score), -1);
-  return {
-    inProgress: inProgressScore > record.score,
-    score: Math.max(record.score, inProgressScore)
-  };
+  return Math.max(record.score, inProgressScore);
 }
 
 function survivalBestScoreForLevel({
@@ -1570,25 +1418,6 @@ const styles = StyleSheet.create({
     color: "#334155",
     fontSize: 26,
     fontWeight: "400"
-  },
-  detailChip: {
-    backgroundColor: "rgba(255,255,255,0.76)",
-    borderColor: "#BFDBFE",
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6
-  },
-  detailChipText: {
-    color: "#1E3A8A",
-    fontSize: 12,
-    fontWeight: "700"
-  },
-  detailRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 12
   },
   eyebrow: {
     color: "#2563EB",
@@ -1743,12 +1572,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 0.9
   },
-  historyFootnote: {
-    color: "#64748B",
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 14
-  },
   historyHeader: {
     alignItems: "center",
     flexDirection: "row",
@@ -1781,62 +1604,38 @@ const styles = StyleSheet.create({
     marginTop: 2
   },
   homeCard: {
+    alignItems: "center",
     backgroundColor: "#EFF6FF",
     borderColor: "#93C5FD",
     borderRadius: 18,
     borderWidth: 1,
+    flexDirection: "row",
+    gap: 14,
     marginTop: 14,
-    padding: 16
+    minHeight: 92,
+    paddingHorizontal: 18,
+    paddingVertical: 17
   },
-  homeCardHeader: {
-    alignItems: "center",
-    flexDirection: "row"
+  homeChevron: {
+    color: "#2563EB",
+    fontSize: 30,
+    fontWeight: "400",
+    lineHeight: 32
   },
-  homeRule: {
+  homeDescription: {
     color: "#475569",
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 19,
-    marginTop: 10
+    marginTop: 5
   },
-  homeScore: {
-    color: "#1D4ED8",
-    fontSize: 40,
-    fontWeight: "900",
-    letterSpacing: -1.2
-  },
-  homeScoreCopy: {
-    gap: 2
-  },
-  homeScoreEmpty: {
-    color: "#1E3A8A",
-    fontSize: 22,
-    fontWeight: "900"
-  },
-  homeScoreHint: {
-    color: "#64748B",
-    fontSize: 12,
-    fontWeight: "600"
-  },
-  homeScoreLabel: {
-    color: "#0F172A",
-    fontSize: 14,
-    fontWeight: "800"
-  },
-  homeScoreRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 14
+  homeEntryCopy: {
+    flex: 1
   },
   homeTitle: {
     color: "#0F172A",
     fontSize: 20,
-    fontWeight: "900",
-    marginTop: 1
-  },
-  homeTitleBlock: {
-    flex: 1
+    fontWeight: "900"
   },
   mistakeCount: {
     color: "#991B1B",
@@ -2207,39 +2006,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800"
   },
-  historyEligibilityNote: {
-    color: "#64748B",
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 8
-  },
-  historyInProgress: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 14,
-    padding: 12
-  },
-  historyPausedRow: {
-    alignItems: "center",
-    borderTopColor: "#E2E8F0",
-    borderTopWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 9,
-    paddingTop: 9
-  },
-  historyPausedStatus: {
-    backgroundColor: "#FEF3C7",
-    borderRadius: 999,
-    color: "#92400E",
-    fontSize: 11,
-    fontWeight: "800",
-    overflow: "hidden",
-    paddingHorizontal: 9,
-    paddingVertical: 5
-  },
   historyRecordDetail: {
     color: "#64748B",
     fontSize: 11,
@@ -2446,6 +2212,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     marginTop: 3,
+    paddingBottom: 6,
     width: "100%"
   },
   moreLevelsButton: {
@@ -2466,62 +2233,6 @@ const styles = StyleSheet.create({
     color: "#1D4ED8",
     fontSize: 13,
     fontWeight: "800"
-  },
-  pausedHomeMeta: {
-    alignItems: "flex-end",
-    flex: 1,
-    gap: 3
-  },
-  pausedHomeBest: {
-    color: "#1D4ED8",
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  pausedHomeMetaStrong: {
-    color: "#991B1B",
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  pausedHomeMetaText: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "600"
-  },
-  pausedHomeOpenChevron: {
-    color: "#1D4ED8",
-    fontSize: 24,
-    fontWeight: "500",
-    lineHeight: 26
-  },
-  pausedHomeMoreText: {
-    color: "#64748B",
-    fontSize: 13,
-    fontWeight: "700"
-  },
-  pausedHomeOpenAction: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 4
-  },
-  pausedHomeOpenRow: {
-    alignItems: "center",
-    borderTopColor: "#BFDBFE",
-    borderTopWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 16,
-    paddingTop: 12
-  },
-  pausedHomeOpenText: {
-    color: "#1D4ED8",
-    fontSize: 14,
-    fontWeight: "800"
-  },
-  pausedHomeSummary: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 16,
-    marginTop: 14
   },
   pausedRunCard: {
     alignItems: "stretch",
