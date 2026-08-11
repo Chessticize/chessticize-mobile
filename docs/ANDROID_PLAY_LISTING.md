@@ -182,7 +182,8 @@ Candidate listing assets are checked in at:
 
 - `apps/mobile/store-assets/android/play-icon-512.png`
 - `apps/mobile/store-assets/android/feature-graphic-1024x500.png`
-- `apps/mobile/store-assets/android/feature-graphic-source.png` (approved high-resolution source)
+- `apps/mobile/store-assets/android/feature-graphic-source.png` (approved high-resolution background)
+- `apps/mobile/store-assets/android/feature-graphic-arrow-duel-capture.png` (immutable Android product capture)
 - `apps/mobile/store-assets/android/render-feature-graphic.swift` (reproducible source)
 
 Regenerate the feature graphic with:
@@ -192,8 +193,9 @@ Regenerate the feature graphic with:
   apps/mobile/store-assets/android/feature-graphic-1024x500.png
 ```
 
-The renderer center-crops and scales the approved high-resolution source, then
-emits the required 1024 x 500, 8-bit RGB PNG without an alpha channel. The
+The renderer center-crops and scales the approved background, inserts the
+immutable portrait capture inside a deterministic generic Android handset,
+then emits the required 1024 x 500, 8-bit RGB PNG without an alpha channel. The
 release regression executes the renderer, checks the source and output IHDRs,
 and compares decoded RGB output with the checked-in candidate. The comparison
 allows only a tightly bounded amount of image-rasterization drift so that macOS

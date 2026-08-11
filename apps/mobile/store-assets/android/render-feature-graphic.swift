@@ -6,6 +6,9 @@ let height = 500
 let sourceURL = URL(fileURLWithPath: #filePath)
   .deletingLastPathComponent()
   .appendingPathComponent("feature-graphic-source.png")
+let captureURL = URL(fileURLWithPath: #filePath)
+  .deletingLastPathComponent()
+  .appendingPathComponent("feature-graphic-arrow-duel-capture.png")
 
 guard CommandLine.arguments.count == 2 else {
   fputs("Usage: swift render-feature-graphic.swift <output.png>\n", stderr)
@@ -22,6 +25,21 @@ let sourceWidth = CGFloat(sourceRepresentation.pixelsWide)
 let sourceHeight = CGFloat(sourceRepresentation.pixelsHigh)
 let sourceImage = NSImage(size: NSSize(width: sourceWidth, height: sourceHeight))
 sourceImage.addRepresentation(sourceRepresentation)
+
+guard
+  let captureData = try? Data(contentsOf: captureURL),
+  let captureRepresentation = NSBitmapImageRep(data: captureData)
+else {
+  fatalError("Could not load Arrow Duel capture at \(captureURL.path)")
+}
+guard
+  captureRepresentation.pixelsWide == 1080,
+  captureRepresentation.pixelsHigh == 1920
+else {
+  fatalError("Expected the verified Android capture to be 1080 x 1920")
+}
+let captureImage = NSImage(size: NSSize(width: 1080, height: 1920))
+captureImage.addRepresentation(captureRepresentation)
 
 guard let bitmap = NSBitmapImageRep(
   bitmapDataPlanes: nil,
@@ -68,6 +86,57 @@ sourceImage.draw(
   operation: NSCompositingOperation.copy,
   fraction: 1
 )
+
+// Present the immutable product capture inside a generic Android handset. The
+// frame uses one small centered circular punch hole and no Apple-specific cue.
+let deviceRect = NSRect(x: 630, y: 11, width: 278, height: 478)
+let screenHeight = CGFloat(458)
+let screenWidth = screenHeight * 1080 / 1920
+let screenRect = NSRect(
+  x: deviceRect.midX - screenWidth / 2,
+  y: deviceRect.midY - screenHeight / 2,
+  width: screenWidth,
+  height: screenHeight
+)
+
+NSGraphicsContext.saveGraphicsState()
+let shadow = NSShadow()
+shadow.shadowColor = NSColor(calibratedWhite: 0.05, alpha: 0.28)
+shadow.shadowBlurRadius = 13
+shadow.shadowOffset = NSSize(width: 0, height: -4)
+shadow.set()
+NSColor(calibratedRed: 0.025, green: 0.045, blue: 0.075, alpha: 1).setFill()
+NSBezierPath(roundedRect: deviceRect, xRadius: 25, yRadius: 25).fill()
+NSGraphicsContext.restoreGraphicsState()
+
+NSGraphicsContext.saveGraphicsState()
+NSBezierPath(roundedRect: screenRect, xRadius: 18, yRadius: 18).addClip()
+captureImage.draw(
+  in: screenRect,
+  from: NSRect(x: 0, y: 0, width: 1080, height: 1920),
+  operation: .copy,
+  fraction: 1
+)
+NSGraphicsContext.restoreGraphicsState()
+
+NSColor(calibratedWhite: 1, alpha: 0.24).setStroke()
+let deviceHighlight = NSBezierPath(
+  roundedRect: deviceRect.insetBy(dx: 1, dy: 1),
+  xRadius: 24,
+  yRadius: 24
+)
+deviceHighlight.lineWidth = 1
+deviceHighlight.stroke()
+
+NSColor(calibratedWhite: 0.02, alpha: 1).setFill()
+NSBezierPath(
+  ovalIn: NSRect(
+    x: screenRect.midX - 4,
+    y: screenRect.maxY - 12,
+    width: 8,
+    height: 8
+  )
+).fill()
 
 NSGraphicsContext.restoreGraphicsState()
 

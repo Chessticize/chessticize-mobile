@@ -43,7 +43,7 @@
     },
     "featureGraphic": {
       "path": "apps/mobile/store-assets/android/feature-graphic-1024x500.png",
-      "altText": "Chessticize and Build Tactical Intuition over a blue chessboard with a knight, rook, pawns, and a blue move arrow."
+      "altText": "Chessticize: Build Tactical Intuition, with practice features and an Android phone showing an Arrow Duel tactic with two candidate arrows."
     },
     "screenshots": {
       "sharedStoryContract": "config/app-store-marketing-story-v1.json",
