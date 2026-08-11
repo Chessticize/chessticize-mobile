@@ -7833,6 +7833,367 @@ describe("PracticePocScreen", () => {
     );
   });
 
+  it("starts Survival through its public first-use contract", () => {
+    const renderer = renderLabScenario("practice-personal-best-empty-home-source");
+
+    expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
+      "No time limit · 3 mistakes"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe("900–999");
+    press(renderer, "personal-best-hub-start");
+
+    expect(findByTestId(renderer, "personal-best-guide")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Marking it Unclear does not add another mistake."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Pause now, continue later"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Your Rating stays unchanged."
+    );
+    press(renderer, "personal-best-guide-start");
+
+    expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No time limit");
+    expect(() => findByTestId(renderer, "personal-best-unrated")).toThrow();
+    expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
+      "Mistakes 0 of 3"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
+      "19 more to beat 18"
+    );
+  });
+
+  it("resumes the latest paused Survival Run directly from Home", () => {
+    const renderer = renderLabScenario("practice-home");
+
+    expect(collectText(findByTestId(renderer, "personal-best-home-score"))).toBe("19");
+    expect(collectText(findByTestId(renderer, "personal-best-home-card"))).toContain(
+      "New best saved"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-more-paused"))).toBe("2 more paused");
+    press(renderer, "personal-best-continue");
+
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("19 solved");
+    expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
+      "Mistakes 1 of 3"
+    );
+  });
+
+  it("continues an existing Survival level without an End or reset action", () => {
+    const renderer = renderLabScenario("practice-personal-best-hub");
+
+    expect(collectText(findByTestId(renderer, "personal-best-hub-start"))).toBe(
+      "Continue Survival"
+    );
+    expect(() => findByTestId(renderer, "personal-best-paused-end-puzzle-900")).toThrow();
+    press(renderer, "personal-best-hub-start");
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("19 solved");
+  });
+
+  it("animates Survival disclosures and removes collapsed content from interaction", () => {
+    const hubRenderer = renderLabScenario("practice-personal-best-hub");
+
+    expect(findByTestId(hubRenderer, "personal-best-in-progress-toggle").props.accessibilityState).toEqual({
+      expanded: true
+    });
+    expect(findByTestId(hubRenderer, "personal-best-in-progress-content-motion").props).toMatchObject({
+      "aria-hidden": false,
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
+    });
+    press(hubRenderer, "personal-best-in-progress-toggle");
+    expect(findByTestId(hubRenderer, "personal-best-in-progress-toggle").props.accessibilityState).toEqual({
+      expanded: false
+    });
+    expect(findByTestId(hubRenderer, "personal-best-in-progress-content-motion").props).toMatchObject({
+      "aria-hidden": true,
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
+
+    expect(findByTestId(hubRenderer, "personal-best-more-levels").props.accessibilityState).toEqual({
+      expanded: true
+    });
+
+    const collapsedLevelsRenderer = renderLabScenario("practice-personal-best-starting-level");
+    expect(findByTestId(collapsedLevelsRenderer, "personal-best-more-levels").props.accessibilityState).toEqual({
+      expanded: false
+    });
+    expect(findByTestId(collapsedLevelsRenderer, "personal-best-more-level-options-motion").props).toMatchObject({
+      "aria-hidden": true,
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
+    press(collapsedLevelsRenderer, "personal-best-more-levels");
+    expect(findByTestId(collapsedLevelsRenderer, "personal-best-more-levels").props.accessibilityState).toEqual({
+      expanded: true
+    });
+    expect(findByTestId(collapsedLevelsRenderer, "personal-best-more-level-options-motion").props).toMatchObject({
+      "aria-hidden": false,
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
+    });
+
+    const recordsRenderer = renderLabScenario("practice-personal-best-records");
+    expect(findByTestId(recordsRenderer, "personal-best-records-in-progress-toggle").props.accessibilityState).toEqual({
+      expanded: true
+    });
+    press(recordsRenderer, "personal-best-records-in-progress-toggle");
+    expect(findByTestId(recordsRenderer, "personal-best-records-in-progress-content-motion").props).toMatchObject({
+      "aria-hidden": true,
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
+    expect(findByTestId(hubRenderer, "personal-best-in-progress-chevron")).toBeTruthy();
+    expect(findByTestId(recordsRenderer, "personal-best-records-in-progress-chevron")).toBeTruthy();
+    expect(findByTestId(collapsedLevelsRenderer, "personal-best-more-levels-chevron")).toBeTruthy();
+  });
+
+  it("hides the Survival puzzle while paused and offers only Resume or Leave paused", () => {
+    const renderer = renderLabScenario("practice-personal-best-active");
+
+    expect(collectText(findByTestId(renderer, "active-session-shell"))).toContain(
+      "Survival"
+    );
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No time limit");
+    expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
+      "Mistakes 1 of 3"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-mistakes"))).toBe("×1/3");
+    expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
+      "5 more to beat 18"
+    );
+    expect(findByTestId(renderer, "session-puzzle-timing")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:34");
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(() => findByTestId(renderer, "personal-best-end-run")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-unrated")).toThrow();
+    press(renderer, "session-abandon");
+    expect(collectText(findByTestId(renderer, "session-abandon-confirmation"))).toContain(
+      "Your puzzle is hidden"
+    );
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+    expect(() => findByTestId(renderer, "practice-prompt")).toThrow();
+    expect(() => findByTestId(renderer, "session-puzzle-timing")).toThrow();
+    expect(() => findByTestId(renderer, "session-abandon-confirm")).toThrow();
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+    press(renderer, "session-abandon-cancel");
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:34");
+    press(renderer, "session-abandon");
+    press(renderer, "personal-best-pause-and-leave");
+    expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
+  });
+
+  it("uses only the explicitly selected compatible Run to suggest a Survival level", () => {
+    const renderer = renderLabScenario("practice-personal-best-source-run");
+
+    expect(findByTestId(renderer, "personal-best-source-picker")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "personal-best-source-standard"))).toContain(
+      "Rating 925 · 900–999"
+    );
+    press(renderer, "personal-best-source-balanced-practice");
+    expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe("800–899");
+    expect(collectText(findByTestId(renderer, "personal-best-reference-source"))).toContain(
+      "Based on Balanced Practice · Rating 842"
+    );
+    press(renderer, "personal-best-hub-start");
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Puzzle · 800–899"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Best at 800–899"
+    );
+  });
+
+  it("preserves an unavailable saved Survival source until the user chooses a replacement", () => {
+    const renderer = renderLabScenario("practice-personal-best-unavailable-source");
+
+    expect(collectText(findByTestId(renderer, "personal-best-source-unavailable-message"))).toContain(
+      "Your saved Rating source is no longer available."
+    );
+    expect(findByTestId(renderer, "personal-best-hub-start").props.accessibilityState).toEqual({
+      disabled: true
+    });
+    press(renderer, "personal-best-use-another-run");
+    expect(findByTestId(renderer, "personal-best-source-unavailable")).toBeTruthy();
+    press(renderer, "personal-best-source-standard");
+    expect(collectText(findByTestId(renderer, "personal-best-reference-source"))).toContain(
+      "Based on Standard · Rating 925"
+    );
+    expect(findByTestId(renderer, "personal-best-hub-start").props.accessibilityState).toEqual({
+      disabled: false
+    });
+  });
+
+  it("uses Standard's default Rating as a clearly labeled starting level when it has no games", () => {
+    const renderer = renderLabScenario("practice-personal-best-starting-level");
+
+    expect(collectText(findByTestId(renderer, "personal-best-hub"))).toContain("Starting level");
+    expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe("600–699");
+    expect(collectText(findByTestId(renderer, "personal-best-reference-source"))).toContain(
+      "Based on Standard’s starting Rating"
+    );
+  });
+
+  it("keeps Arrow Duel recommendation and candidate-plus-reply rules separate", () => {
+    const renderer = renderLabScenario("practice-personal-best-arrow-duel");
+
+    expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe("800–899");
+    expect(collectText(findByTestId(renderer, "personal-best-reference-source"))).toContain(
+      "Based on Arrow Duel · Rating 875"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
+      "Candidate + required reply"
+    );
+    press(renderer, "personal-best-paused-continue-arrow-800");
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("7 solved");
+    expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
+      "Mistakes 2 of 3"
+    );
+  });
+
+  it("starts the selected Arrow Duel Survival type and level", () => {
+    const renderer = renderLabScenario("practice-personal-best-hub");
+
+    press(renderer, "personal-best-type-arrow_duel");
+    press(renderer, "personal-best-level-900");
+    press(renderer, "personal-best-hub-start");
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Arrow Duel · 900–999"
+    );
+    press(renderer, "personal-best-guide-start");
+    expect(collectText(renderer.root)).toContain("Choose the best move");
+    expect(collectText(renderer.root)).toContain("between the two arrows");
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 solved");
+  });
+
+  it("shows every Core Pack Survival level and clamps a higher Rating to 2100–2200", () => {
+    const renderer = renderLabScenario("practice-personal-best-highest-level");
+
+    expect(collectText(findByTestId(renderer, "personal-best-hub"))).toContain(
+      "Highest available level"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe(
+      "2100–2200"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-level-availability"))).toBe(
+      "Showing every Survival level in this Core Pack: 600–2200."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-more-level-options"))).not.toContain(
+      "2300"
+    );
+  });
+
+  it("keeps Standard as the Survival source when Home is empty and hides the redundant source action", () => {
+    const renderer = renderLabScenario("practice-personal-best-empty-home-source");
+
+    expect(collectText(findByTestId(renderer, "personal-best-reference-source"))).toContain(
+      "Based on Standard · Rating 925"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-hub"))).toContain(
+      "Standard remains your Rating source even when hidden from Home."
+    );
+    expect(() => findByTestId(renderer, "personal-best-use-another-run")).toThrow();
+  });
+
+  it("shows a saved live best on the puzzle-hidden Survival pause surface", () => {
+    const renderer = renderLabScenario("practice-personal-best-leave");
+
+    expect(collectText(findByTestId(renderer, "personal-best-exit-best"))).toBe(
+      "New best 19 · already saved"
+    );
+    expect(collectText(findByTestId(renderer, "session-abandon-confirmation"))).toContain(
+      "Your puzzle is hidden. Resume here, or leave it paused and continue any time."
+    );
+    expect(findByTestId(renderer, "personal-best-pause-and-leave")).toBeTruthy();
+    expect(findByTestId(renderer, "session-abandon-cancel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+    expect(() => findByTestId(renderer, "session-abandon-confirm")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-end-run")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-unrated")).toThrow();
+  });
+
+  it("presents true Survival puzzle-pool exhaustion as a Perfect clear", () => {
+    const renderer = renderLabScenario("practice-personal-best-pool-cleared");
+
+    expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("88,894");
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "Perfect clear at 2100–2200"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "You cleared every available Puzzle in this level."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "Loading and selection errors never count as a clear."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "51:12:00 active"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "All 88,894 solved"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).not.toContain(
+      "ended normally after"
+    );
+  });
+
+  it("treats the third Survival mistake as a normal result and preserves the record context", () => {
+    const renderer = renderLabScenario("practice-personal-best-result");
+
+    expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("19");
+    expect(collectText(findByTestId(renderer, "personal-best-result-comparison"))).toBe(
+      "Previous best 18"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "The Run ended normally after 3 mistakes."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "This level keeps its own best"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "19 solved · 12:48 active · 3 sittings"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result-replay"))).toBe(
+      "Replay 3 mistakes"
+    );
+    expect(collectText(renderer.root)).not.toContain("Sprint failed");
+  });
+
+  it("opens dedicated Survival records from the Challenge Hub without taking over History", () => {
+    const renderer = renderLabScenario("practice-personal-best-hub");
+
+    press(renderer, "personal-best-hub-records");
+
+    expect(collectText(findByTestId(renderer, "personal-best-records-score"))).toBe("19");
+    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
+      "900–999"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
+      "Puzzle"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
+      "Arrow Duel"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-records-comparison-note"))).toContain(
+      "A best of 42 at 600–699 never outranks or replaces a best of 19 at 900–999."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
+      "A new high is saved immediately while its Run stays in progress."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
+      "best · in progress"
+    );
+    expect(() => findByTestId(renderer, "history-attempt-history-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-unrated")).toThrow();
+    press(renderer, "personal-best-records-back");
+    expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
+  });
+
   it("explains a completed Tactical Focus Run as fixed, unrated training", () => {
     const renderer = renderLabScenario("practice-tactical-focus-result");
 
