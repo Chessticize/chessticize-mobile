@@ -21,6 +21,8 @@ one fixed level before the third mistake?
   mistakes, best eligibility, tie-breaking, or `Unclear`.
 - `Slow` is not a Survival scoring state. `Unclear` remains independent and
   does not add a mistake by itself.
+- Survival has no decorative `S` icon or repeated `Unrated` badge. The
+  first-use guide explains once that Rating stays unchanged.
 
 ## Best updates while a Run continues
 
@@ -34,29 +36,32 @@ Waiting for the third mistake would add delay without improving integrity:
 future play can never reduce the already reached score.
 
 - Active and paused Runs may own the current best.
-- History labels a best owned by a resumable Run as `best · in progress`.
-- Pausing, leaving through Back, restarting the app, or intentionally ending
-  the Run never revokes a best already reached.
+- The dedicated Survival records page labels a best owned by a resumable Run
+  as `best · in progress`.
+- Pausing, leaving through Back, or restarting the app never revokes a best
+  already reached.
 - A solved-puzzle transaction must save the attempt, incremented score, and any
   new best atomically in the later production implementation.
 - Puzzle and Arrow Duel bests remain separate, and different levels are never
   ranked against each other.
 
-## Pause, leave, and end
+## Pause and leave
 
-Back, Close, and the pause control open one Survival leave sheet instead of
-discarding progress immediately.
+Back, Close, and the pause control pause Survival instead of discarding
+progress immediately. Like an ordinary paused Sprint, the paused surface hides
+the current puzzle and board so stopped active time cannot become free analysis
+time.
 
-- `Pause & leave` is the primary action. It saves the exact puzzle, board/ply
+- `Resume` reveals the same puzzle and continues active time.
+- `Leave paused` returns Home while saving the exact hidden puzzle, board/ply
   state, Puzzle or Arrow Duel phase, score, mistakes, selection cursor, active
   time, level, and rule version.
-- `Keep playing` closes the sheet.
-- `End Run` is an explicit separate action. It closes the resumable Run but
-  keeps its attempts, History, and any best already reached.
 - Active time stops while paused or backgrounded. A paused Run has no expiry.
 - Resume returns to the same unresolved puzzle and phase, so pause cannot be
   used as a free skip.
-- The third mistake is terminal and cannot be resumed.
+- There is no manual `End Run` or `End & start over` action. Selecting the same
+  type and level continues its existing Run, preserving its mistakes.
+- Only the third mistake or a full-pool `Perfect clear` ends a Run.
 
 V1 persistence is local to one device. Cross-device resume remains out of
 scope until a conflict contract is designed.
@@ -102,7 +107,7 @@ Survival does not synthesize a global Rating.
 - Puzzle defaults to the built-in Standard Rating profile.
 - Arrow Duel defaults to the built-in Arrow Duel Rating profile.
 - Home visibility does not delete a built-in profile, its Rating, or its
-  History. Survival therefore remains usable when every saved Run is hidden
+  results. Survival therefore remains usable when every saved Run is hidden
   from Home.
 - If Standard has no completed games, Puzzle Survival uses Standard's starting
   Rating 600 and says `Starting level 600–699`.
@@ -136,11 +141,28 @@ The one-page Survival Hub contains:
 2. Puzzle or Arrow Duel.
 3. Recommended Rating source, with `Use another Run` only when useful.
 4. Supported adjacent levels and every remaining level under `More levels`.
-5. One compact summary of the no-time-limit, three-mistake, unrated rules.
+5. One compact summary with no time limit and a three-mistake end condition.
+6. One `Survival records` entry summarizing completed and in-progress Runs.
+
+If the selected type and level already has an in-progress Run, the Hub action
+says `Continue Survival`; it never offers a reset that discards mistakes.
 
 At most one Run may be in progress for each
 `challenge type + level + rule version` combination. Different combinations
 may coexist without an arbitrary global cap.
+
+Survival records do not appear as a large module inside general History.
+History remains focused on individual puzzle attempts, filters, and replay.
+The Challenge Hub opens a dedicated `Survival records` page that owns:
+
+- In-progress Runs and any live best already reached.
+- Separate Puzzle and Arrow Duel sections.
+- One row per played level, including its completed-Run count and best.
+- Recommended-level emphasis without ranking different levels against one
+  another.
+
+Back from records returns to the Challenge Hub, preserving the user's current
+type, Rating source, and level selection.
 
 ## Arrow Duel
 
@@ -168,7 +190,7 @@ Persist enough information to resume exactly and audit every best:
   per-puzzle active elapsed time, pause count, sittings, pause timestamps, and
   wall-clock span.
 - Best milestone ownership, including whether the owning Run remains active,
-  paused, completed, ended, or pool-cleared.
+  paused, completed by three mistakes, or pool-cleared.
 - Per attempt: puzzle ID/Rating/themes, outcome, submitted and expected moves,
   active elapsed time, `Unclear`, and Review context.
 
@@ -179,7 +201,9 @@ first empty batch proved full-pool exhaustion.
 ## Storybook boundary
 
 The Interaction Lab demonstrates the expected Home, Hub, Rating-source,
-highest-level, empty-Home, first-use, active, leave, result, and History states.
+highest-level, empty-Home, first-use, active, puzzle-hidden pause, result, and
+dedicated Survival records states. General History deliberately has no
+Survival summary module.
 It remains presentation-only: no production navigation, domain selection,
 persistence, best transaction, backend, sync, analytics, or native behavior is
 wired in this design PR.

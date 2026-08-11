@@ -7834,10 +7834,10 @@ describe("PracticePocScreen", () => {
   });
 
   it("starts Survival through its public first-use contract", () => {
-    const renderer = renderLabScenario("practice-personal-best-hub");
+    const renderer = renderLabScenario("practice-personal-best-empty-home-source");
 
     expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
-      "No time limit · 3 mistakes · Rating unchanged"
+      "No time limit · 3 mistakes"
     );
     expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe("900–999");
     press(renderer, "personal-best-hub-start");
@@ -7849,11 +7849,14 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
       "Pause now, continue later"
     );
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Your Rating stays unchanged."
+    );
     press(renderer, "personal-best-guide-start");
 
     expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No time limit");
-    expect(collectText(findByTestId(renderer, "personal-best-unrated"))).toBe("Unrated");
+    expect(() => findByTestId(renderer, "personal-best-unrated")).toThrow();
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
       "Mistakes 0 of 3"
     );
@@ -7878,7 +7881,18 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("keeps Survival score, mistakes, elapsed context, pause, and explicit early ending clear", () => {
+  it("continues an existing Survival level without an End or reset action", () => {
+    const renderer = renderLabScenario("practice-personal-best-hub");
+
+    expect(collectText(findByTestId(renderer, "personal-best-hub-start"))).toBe(
+      "Continue Survival"
+    );
+    expect(() => findByTestId(renderer, "personal-best-paused-end-puzzle-900")).toThrow();
+    press(renderer, "personal-best-hub-start");
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("19 solved");
+  });
+
+  it("hides the Survival puzzle while paused and offers only Resume or Leave paused", () => {
     const renderer = renderLabScenario("practice-personal-best-active");
 
     expect(collectText(findByTestId(renderer, "active-session-shell"))).toContain(
@@ -7893,13 +7907,20 @@ describe("PracticePocScreen", () => {
       "5 more to beat 18"
     );
     expect(findByTestId(renderer, "session-puzzle-timing")).toBeTruthy();
-    press(renderer, "personal-best-end-run");
-    expect(collectText(findByTestId(renderer, "session-abandon-confirmation"))).toContain(
-      "keeps the best you already reached"
-    );
-    press(renderer, "session-abandon-cancel");
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(() => findByTestId(renderer, "personal-best-end-run")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-unrated")).toThrow();
     press(renderer, "session-abandon");
-    expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-abandon-confirmation"))).toContain(
+      "Your puzzle is hidden"
+    );
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+    expect(() => findByTestId(renderer, "practice-prompt")).toThrow();
+    expect(() => findByTestId(renderer, "session-puzzle-timing")).toThrow();
+    expect(() => findByTestId(renderer, "session-abandon-confirm")).toThrow();
+    press(renderer, "session-abandon-cancel");
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    press(renderer, "session-abandon");
     press(renderer, "personal-best-pause-and-leave");
     expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
   });
@@ -7974,17 +7995,21 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "personal-best-use-another-run")).toThrow();
   });
 
-  it("saves a new Survival best before pause or an intentional early end", () => {
+  it("shows a saved live best on the puzzle-hidden Survival pause surface", () => {
     const renderer = renderLabScenario("practice-personal-best-leave");
 
     expect(collectText(findByTestId(renderer, "personal-best-exit-best"))).toBe(
       "New best 19 · already saved"
     );
     expect(collectText(findByTestId(renderer, "session-abandon-confirmation"))).toContain(
-      "Ending closes this Run, but keeps the best you already reached."
+      "Your puzzle is hidden. Resume here, or leave it paused and continue any time."
     );
     expect(findByTestId(renderer, "personal-best-pause-and-leave")).toBeTruthy();
-    expect(findByTestId(renderer, "session-abandon-confirm")).toBeTruthy();
+    expect(findByTestId(renderer, "session-abandon-cancel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+    expect(() => findByTestId(renderer, "session-abandon-confirm")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-end-run")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-unrated")).toThrow();
   });
 
   it("treats the third Survival mistake as a normal result and preserves the record context", () => {
@@ -7998,7 +8023,7 @@ describe("PracticePocScreen", () => {
       "The Run ended normally after 3 mistakes."
     );
     expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
-      "This level has its own record · Rating unchanged"
+      "This level keeps its own best"
     );
     expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
       "19 solved · 12:48 active · 3 sittings"
@@ -8009,31 +8034,34 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("Sprint failed");
   });
 
-  it("shows in-progress and completed Survival records without cross-level comparison", () => {
-    const renderer = renderLabScenario("history-personal-best");
+  it("opens dedicated Survival records from the Challenge Hub without taking over History", () => {
+    const renderer = renderLabScenario("practice-personal-best-hub");
 
-    press(renderer, "history-tab");
+    press(renderer, "personal-best-hub-records");
 
-    expect(collectText(findByTestId(renderer, "personal-best-history-score"))).toBe("19");
-    expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
+    expect(collectText(findByTestId(renderer, "personal-best-records-score"))).toBe("19");
+    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
       "900–999"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
+    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
       "Puzzle"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
+    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
       "Arrow Duel"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-history-comparison-note"))).toContain(
+    expect(collectText(findByTestId(renderer, "personal-best-records-comparison-note"))).toContain(
       "A best of 42 at 600–699 never outranks or replaces a best of 19 at 900–999."
     );
-    expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
+    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
       "A new high is saved immediately while its Run stays in progress."
     );
-    expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
+    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).toContain(
       "best · in progress"
     );
-    expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
+    expect(() => findByTestId(renderer, "history-attempt-history-unclear")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-unrated")).toThrow();
+    press(renderer, "personal-best-records-back");
+    expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
   });
 
   it("explains a completed Tactical Focus Run as fixed, unrated training", () => {

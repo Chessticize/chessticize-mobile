@@ -260,12 +260,10 @@ import {
 import {
   PersonalBestChallengeHub,
   PersonalBestGuide,
-  PersonalBestHistoryCard,
   PersonalBestHomeCard,
   PersonalBestMistakeIndicator,
   PersonalBestProgressBanner,
   PersonalBestResult,
-  UnratedPill,
   type PersonalBestChallengeDesignPreview
 } from "./PersonalBestChallengeDesign.tsx";
 
@@ -895,6 +893,10 @@ export function PracticePocScreen({
   const [personalBestHubVisible, setPersonalBestHubVisible] = useState(
     () => personalBestChallengeDesignPreview?.hubInitiallyVisible === true
       || personalBestChallengeDesignPreview?.sourcePickerInitiallyVisible === true
+      || personalBestChallengeDesignPreview?.recordsInitiallyVisible === true
+  );
+  const [personalBestRecordsVisible, setPersonalBestRecordsVisible] = useState(
+    () => personalBestChallengeDesignPreview?.recordsInitiallyVisible === true
   );
   const [boardFen, setBoardFen] = useState<string | null>(null);
   const [lastBoardMove, setLastBoardMove] = useState<BoardMove | null>(null);
@@ -1189,7 +1191,11 @@ export function PracticePocScreen({
   const sprintReplayItems = sprintRulesDesignPreview?.resultReplayItems
     ?? storedSprintReplayItems;
   const isShowingFeedbackSnapshot = feedbackSnapshot !== null;
-  const shouldShowSessionBoard = isActive || isShowingFeedbackSnapshot;
+  const isSurvivalPauseVisible = personalBestChallengeDesignPreview
+    ?.showActivePresentation === true
+    && practiceExitConfirmationVisible;
+  const shouldShowSessionBoard = (isActive || isShowingFeedbackSnapshot)
+    && !isSurvivalPauseVisible;
   const sessionGuidePresentation = sessionGuideIndex === null
     ? undefined
     : sessionGuidePresentations[sessionGuideIndex];
@@ -3861,7 +3867,10 @@ export function PracticePocScreen({
   const predictiveBackEnabled = resolveMobileBackIntent(mobileBackState, "button").kind !== "delegate-platform";
   const appReviewRequestBlocked = isAppReviewRequestSurfaceBlocked({
     hasError: error !== null,
-    hasModalOrGuide: topBackTransient !== null || personalBestGuideVisible || personalBestHubVisible,
+    hasModalOrGuide: topBackTransient !== null
+      || personalBestGuideVisible
+      || personalBestHubVisible
+      || personalBestRecordsVisible,
     hasNavigationPreview: mobileBackPreview !== null,
     isAnalysisOpen: reviewAnalysisOpen,
     isPracticeTab: tab === "practice"
@@ -4106,6 +4115,7 @@ export function PracticePocScreen({
     && !isSessionGuideVisible
     && !personalBestGuideVisible
     && !personalBestHubVisible
+    && !personalBestRecordsVisible
     && !reviewSurfaceOpen;
   const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
   const sideNavigationVisible = appChromeVisible && adaptiveLayout.usesSideNavigation;
@@ -4234,7 +4244,7 @@ export function PracticePocScreen({
       state={state}
       timerText={personalBestActivePresentation ? "No time limit" : timerText}
       confirmAbandon={practiceExitConfirmationVisible}
-      onAbandon={isOpenSession ? abandonSprint : undefined}
+      onAbandon={isOpenSession && !personalBestActivePresentation ? abandonSprint : undefined}
       onClose={personalBestActivePresentation
         ? () => setPracticeExitConfirmationVisible(true)
         : undefined}
@@ -4246,7 +4256,7 @@ export function PracticePocScreen({
       onResume={isPaused && state ? () => resumeSprint(state) : undefined}
     />
   ) : null;
-  const sessionScoreNode = state?.status === "active" ? (
+  const sessionScoreNode = shouldShowSessionBoard && state?.status === "active" ? (
     personalBestActivePresentation ? (
       <PersonalBestProgressBanner
         bestScore={personalBestActivePresentation.bestScore}
@@ -4490,6 +4500,8 @@ export function PracticePocScreen({
       ? "Survival first-use guide. The Run has not started."
     : personalBestHubVisible
       ? "Survival setup. Choose Puzzle or Arrow Duel and a level."
+    : personalBestRecordsVisible
+      ? "Survival records. Puzzle and Arrow Duel bests are listed separately by level."
     : isSessionGuideVisible
       ? `${sessionGuidePresentation?.focusedRun
         ? "Focused Run"
@@ -4622,6 +4634,7 @@ export function PracticePocScreen({
                   <PersonalBestChallengeHub
                     presentation={personalBestChallengeDesignPreview}
                     onClose={() => setPersonalBestHubVisible(false)}
+                    onCloseRecords={() => setPersonalBestRecordsVisible(false)}
                     onContinue={(runId) => {
                       const pausedRun = personalBestChallengeDesignPreview.pausedRuns?.find((run) => run.id === runId);
                       const nextState = pausedRun?.resumeState;
@@ -4633,6 +4646,10 @@ export function PracticePocScreen({
                       commitState(nextState);
                       commitBoardFen(nextState.currentPuzzle?.currentFen ?? null);
                     }}
+                    onOpenRecords={() => {
+                      setPersonalBestRecordsVisible(true);
+                    }}
+                    recordsVisible={personalBestRecordsVisible}
                     onStart={() => {
                       setPersonalBestHubVisible(false);
                       setPersonalBestGuideVisible(true);
@@ -4818,7 +4835,8 @@ export function PracticePocScreen({
                   <TacticalProfileFlow presentation={resolvedTacticalProfilePresentation} />
                 ) : null}
 
-                {!personalBestGuideVisible && !personalBestHubVisible && !isSessionGuideVisible && !isOpenSession && state === null
+                {!personalBestGuideVisible && !personalBestHubVisible && !personalBestRecordsVisible
+                && !isSessionGuideVisible && !isOpenSession && state === null
                 && (resolvedTacticalProfilePresentation?.screen ?? "home") === "home" && (
                   activeRunManagementPresentation?.screen === "home"
                   || (!activeRunManagementPresentation && mode !== "custom")
@@ -5115,9 +5133,6 @@ export function PracticePocScreen({
                   adaptiveLayout={adaptiveLayout}
                   attempts={visibleHistoryAttempts}
                   nowMs={nowMs}
-                  personalBestHistory={personalBestChallengeDesignPreview?.showHistoryCard
-                    ? personalBestChallengeDesignPreview
-                    : undefined}
                   performance={historyPerformanceView?.performance ?? emptyHistoryPerformance()}
                   ratingKeys={historyRatingKeys}
                   runsByRatingKey={historyRunsByRatingKey}
@@ -10273,20 +10288,7 @@ function SessionStatusBar({
           testID="session-nav-actions"
         >
           {isPersonalBest ? (
-            <>
-              <UnratedPill />
-              {onAbandon ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="End Survival Run"
-                  testID="personal-best-end-run"
-                  style={styles.sessionNavButton}
-                  onPress={() => onConfirmAbandonChange(true)}
-                >
-                  <MoreGlyph />
-                </Pressable>
-              ) : null}
-            </>
+            <View style={styles.sessionNavButton} />
           ) : onPause ? (
             <Pressable
               accessibilityRole="button"
@@ -10414,51 +10416,39 @@ function SessionStatusBar({
       {confirmAbandon && isPersonalBest ? (
         <View style={styles.survivalExitSheet} testID="session-abandon-confirmation">
           <View style={styles.sessionAbandonCopy}>
-            <Text style={styles.survivalExitTitle}>Leave Survival?</Text>
+            <Text style={styles.survivalExitTitle}>Survival paused</Text>
             <Text style={styles.survivalExitBest} testID="personal-best-exit-best">
               {hasNewSurvivalBest
                 ? `New best ${savedSurvivalBest} · already saved`
                 : `Best ${savedSurvivalBest} · saved`}
             </Text>
             <Text style={styles.helperText}>
-              Pause to keep this exact puzzle and continue any time. Ending closes this Run, but keeps the best you already reached.
+              Your puzzle is hidden. Resume here, or leave it paused and continue any time.
             </Text>
           </View>
           <View style={styles.survivalExitPrimaryActions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Keep playing Survival"
-              testID="session-abandon-cancel"
-              style={[styles.secondaryButton, styles.survivalExitAction]}
-              onPress={() => onConfirmAbandonChange(false)}
-            >
-              <Text style={styles.secondaryButtonText}>Keep playing</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Pause Survival and leave"
+              accessibilityLabel="Leave Survival paused"
               testID="personal-best-pause-and-leave"
-              style={[styles.primaryButton, styles.survivalExitAction]}
+              style={[styles.secondaryButton, styles.survivalExitAction]}
               onPress={() => {
                 onConfirmAbandonChange(false);
                 onPauseAndLeave?.();
               }}
             >
-              <Text style={styles.primaryButtonText}>Pause & leave</Text>
+              <Text style={styles.secondaryButtonText}>Leave paused</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Resume Survival"
+              testID="session-abandon-cancel"
+              style={[styles.primaryButton, styles.survivalExitAction]}
+              onPress={() => onConfirmAbandonChange(false)}
+            >
+              <Text style={styles.primaryButtonText}>Resume</Text>
             </Pressable>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="End Survival Run"
-            testID="session-abandon-confirm"
-            style={styles.survivalExitEndAction}
-            onPress={() => {
-              onConfirmAbandonChange(false);
-              onAbandon?.();
-            }}
-          >
-            <Text style={styles.survivalExitEndText}>End Run</Text>
-          </Pressable>
         </View>
       ) : confirmAbandon ? (
         <View style={styles.sessionAbandonConfirm} testID="session-abandon-confirmation">
@@ -11930,7 +11920,6 @@ function HistoryPanel({
   attempts,
   filtersExpanded,
   nowMs,
-  personalBestHistory,
   performance,
   ratingKeys,
   runsByRatingKey,
@@ -11965,7 +11954,6 @@ function HistoryPanel({
   attempts: HistoryAttemptView[];
   filtersExpanded: boolean;
   nowMs: number;
-  personalBestHistory?: PersonalBestChallengeDesignPreview;
   performance: HistoryPerformance;
   ratingKeys: string[];
   runsByRatingKey: ReadonlyMap<string, { name: string; perPuzzleSeconds: number }>;
@@ -12044,10 +12032,6 @@ function HistoryPanel({
           </Pressable>
         </View>
       </View>
-
-      {personalBestHistory ? (
-        <PersonalBestHistoryCard presentation={personalBestHistory} />
-      ) : null}
 
       <CollapsibleRegion
         contentTestID="history-advanced-filters"
@@ -19935,16 +19919,6 @@ const styles = StyleSheet.create({
     color: "#1D4ED8",
     fontSize: 14,
     fontWeight: "900"
-  },
-  survivalExitEndAction: {
-    alignItems: "center",
-    minHeight: 34,
-    justifyContent: "center"
-  },
-  survivalExitEndText: {
-    color: "#B91C1C",
-    fontSize: 13,
-    fontWeight: "800"
   },
   survivalExitPrimaryActions: {
     flexDirection: "row",

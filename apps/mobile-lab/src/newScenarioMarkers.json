@@ -3,7 +3,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Show the latest paused Survival Run, save a newly reached best while it remains in progress, and keep the full paused list in the Survival Hub."
+        "changeNote": "Show the latest paused Survival Run and its live best without adding an abstract S icon or repeated Unrated badge."
       }
     ]
   },
@@ -11,7 +11,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Name the feature Survival and show every Core Pack-supported level from 600–699 through the capped 2100–2200 level."
+        "changeNote": "Show every Core Pack-supported level, continue an existing type-and-level Run without a reset, and open dedicated Survival records."
       }
     ]
   },
@@ -67,7 +67,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Show that a new best is already saved, make Pause and leave primary, and keep intentional End Run separate without revoking the best."
+        "changeNote": "Hide the puzzle while Survival is paused, confirm the live best is saved, and offer only Resume or Leave paused."
       }
     ]
   },
@@ -75,7 +75,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Keep per-puzzle active elapsed time as context, save new bests while the Run continues, and expose Pause and End Run clearly."
+        "changeNote": "Keep per-puzzle active elapsed time as context, save new bests while the Run continues, and remove manual End Run."
       }
     ]
   },
@@ -87,11 +87,11 @@
       }
     ]
   },
-  "history-personal-best": {
+  "practice-personal-best-records": {
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Show live Survival bests from in-progress Runs alongside separate Puzzle and Arrow Duel records by level, with no cross-level comparison."
+        "changeNote": "Move live Survival bests to a dedicated page reached from the Challenge Hub so ordinary History stays focused on puzzle attempts."
       }
     ]
   },

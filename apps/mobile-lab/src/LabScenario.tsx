@@ -347,6 +347,7 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-personal-best-leave",
     "practice-personal-best-active",
     "practice-personal-best-result",
+    "practice-personal-best-records",
     "practice-first-sprint-guide",
     "practice-home-edit",
     "practice-custom-setup",
@@ -806,12 +807,12 @@ function personalBestChallengePreviewFor(
       }
     };
   }
-  if (scenarioId === "history-personal-best") {
+  if (scenarioId === "practice-personal-best-records") {
     return {
       ...common,
       bestScore: 19,
       completedRunCount: 7,
-      showHistoryCard: true
+      recordsInitiallyVisible: true
     };
   }
   return undefined;
@@ -1299,7 +1300,6 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       service = createReviewService("overdue");
       break;
     case "history-populated":
-    case "history-personal-best":
     case "history-filters":
       service = createHistoryService(false, THEME_CATALOG_LAB_PUZZLES);
       configurePuzzleSource = false;

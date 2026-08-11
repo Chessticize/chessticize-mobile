@@ -66,8 +66,8 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       "practice-personal-best-leave",
       "practice-personal-best-active",
       "practice-personal-best-result",
+      "practice-personal-best-records",
       "practice-runs-empty",
-      "history-personal-best"
     ]
   );
   assert.ok(scenarioRegistry["practice-home"].issues?.some(
@@ -89,8 +89,8 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       "practice-personal-best-leave",
       "practice-personal-best-active",
       "practice-personal-best-result",
+      "practice-personal-best-records",
       "practice-runs-empty",
-      "history-personal-best"
     ]
   );
 

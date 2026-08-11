@@ -46,24 +46,6 @@ export const PopulatedHistory: Story = {
   }
 };
 
-export const PersonalBestRecords: Story = {
-  name: "Survival records",
-  args: { scenarioId: "history-personal-best" },
-  play: async ({ canvasElement }) => {
-    await openHistory(canvasElement);
-    await waitForTestId(canvasElement, "personal-best-history-card");
-    await expectTestIdText(canvasElement, "personal-best-history-score", "19");
-    await waitForTestId(canvasElement, "personal-best-history-in-progress");
-    await waitForTestId(canvasElement, "personal-best-history-puzzle");
-    await waitForTestId(canvasElement, "personal-best-history-arrow_duel");
-    await waitForText(canvasElement, "Every level stands on its own");
-    await waitForText(
-      canvasElement,
-      "Runs ended early stay in History but do not set a best. Active time and sittings are context only."
-    );
-  }
-};
-
 export const FiltersAndActiveFilters: Story = {
   name: "Filters and active filters",
   args: { scenarioId: "history-filters" },
