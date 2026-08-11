@@ -364,6 +364,7 @@ export function PersonalBestChallengeHub({
   onClose,
   onCloseRecords,
   onContinue,
+  onHowItWorks,
   onOpenRecords,
   recordsVisible,
   onStart
@@ -372,6 +373,7 @@ export function PersonalBestChallengeHub({
   onClose: () => void;
   onCloseRecords: () => void;
   onContinue: (runId: string) => void;
+  onHowItWorks: (selection: PersonalBestChallengeSelection) => void;
   onOpenRecords: () => void;
   recordsVisible: boolean;
   onStart: (selection: PersonalBestChallengeSelection) => void;
@@ -465,18 +467,32 @@ export function PersonalBestChallengeHub({
     setSourcePickerVisible(false);
   }
 
-  function startSelection(): void {
+  function selectedChallenge(): PersonalBestChallengeSelection | null {
     if (!source) {
       setSourcePickerVisible(true);
-      return;
+      return null;
     }
-    onStart({
+    return {
       band: selectedBand,
       bestScore: selectedBest,
       challengeType,
       sourceId: source.id,
       sourceRating: source.rating
-    });
+    };
+  }
+
+  function startSelection(): void {
+    const selection = selectedChallenge();
+    if (selection) {
+      onStart(selection);
+    }
+  }
+
+  function showGuide(): void {
+    const selection = selectedChallenge();
+    if (selection) {
+      onHowItWorks(selection);
+    }
   }
 
   if (recordsVisible) {
@@ -509,7 +525,7 @@ export function PersonalBestChallengeHub({
           accessibilityLabel="How Survival works"
           style={styles.hubHelpButton}
           testID="personal-best-hub-help"
-          onPress={startSelection}
+          onPress={showGuide}
         >
           <Text style={styles.hubHelpButtonText}>?</Text>
         </Pressable>

@@ -2,7 +2,7 @@
 
 Status date: 2026-08-10  
 Issue: [#492](https://github.com/Chessticize/chessticize-mobile/issues/492)  
-Phase: Approved Storybook design contract; production behavior is not implemented.
+Phase: Approved Storybook design contract; production implementation in review.
 
 ## Product name and promise
 
@@ -231,6 +231,7 @@ unavailable saved source, highest-level, empty-Home, first-use, active,
 puzzle-hidden pause, third-mistake result, full-pool `Perfect clear`, and
 dedicated Survival records states. General History deliberately has no
 Survival summary module.
-It remains presentation-only: no production navigation, domain selection,
-persistence, best transaction, backend, sync, analytics, or native behavior is
-wired in this design PR.
+The Interaction Lab remains presentation-only and continues to document the
+approved states with deterministic fixtures. Production wiring lives outside
+the Lab in the shared domain, storage, service, and mobile presentation layers;
+V1 still adds no cross-device resume, analytics, or native-module behavior.

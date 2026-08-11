@@ -7865,6 +7865,48 @@ describe("PracticePocScreen", () => {
     );
   });
 
+  it("runs production Survival through the service and resumes its exact saved puzzle", async () => {
+    const service = createProductionSurvivalService();
+    const currentTimeMs = () => Date.parse("2026-08-11T12:00:00.000Z");
+    const ratingBefore = service.getRating("standard 5/20");
+    const renderer = renderScreen({
+      currentTimeMs,
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
+    press(renderer, "personal-best-start");
+    expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe("900–999");
+    press(renderer, "personal-best-hub-start");
+    expect(findByTestId(renderer, "personal-best-guide")).toBeTruthy();
+    press(renderer, "personal-best-guide-start");
+
+    expect(service.getActiveSprint()?.config.survival).toMatchObject({
+      challengeType: "puzzle",
+      minRating: 900,
+      maxRating: 999
+    });
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No time limit");
+    await boardMove(renderer, "e6e7");
+    await settleFeedbackSnapshot();
+    expect(service.listSurvivalBests()[0]?.score).toBe(1);
+    expect(service.getRating("standard 5/20")).toEqual(ratingBefore);
+
+    press(renderer, "session-abandon");
+    const pausedPuzzleId = service.getActiveSprint()?.currentPuzzle?.puzzle.id;
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+    press(renderer, "personal-best-pause-and-leave");
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(service.listResumableSurvivalRuns()[0]?.currentPuzzle?.puzzle.id).toBe(pausedPuzzleId);
+    expect(collectText(findByTestId(renderer, "personal-best-home-score"))).toBe("1");
+
+    press(renderer, "personal-best-continue");
+    expect(service.getActiveSprint()?.currentPuzzle?.puzzle.id).toBe(pausedPuzzleId);
+    expect(service.getActiveSprint()?.survival?.sittings).toBe(2);
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 solved");
+  });
+
   it("resumes the latest paused Survival Run directly from Home", () => {
     const renderer = renderLabScenario("practice-home");
 
@@ -15356,6 +15398,30 @@ function createPlayedCustomService(): PracticeService {
     ratingAfter: 900
   }));
   return new PracticeService(store);
+}
+
+function createProductionSurvivalService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles(Array.from({ length: 6 }, (_, index) => ({
+    id: `component-survival-${index}`,
+    initialFen: "r6k/pp2r2p/4Rp1Q/3p4/8/1N1P2R1/PqP2bPP/7K b - - 0 24",
+    solutionMoves: ["f2g3", "e6e7"],
+    rating: 900 + index,
+    themes: ["crushing"],
+    source: "synthetic"
+  } satisfies Puzzle)));
+  store.saveRating({
+    key: "standard 5/20",
+    generation: 0,
+    games: 18,
+    rating: 925,
+    ratingDeviation: 100,
+    volatility: 0.05
+  });
+  return new PracticeService(store, undefined, {
+    survivalPackVersion: 5,
+    survivalPackHash: "sha256:component-survival"
+  });
 }
 
 function createMultiContextDueReviewService(): PracticeService {

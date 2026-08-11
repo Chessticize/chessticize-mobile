@@ -16,7 +16,59 @@ export type SprintEndReason =
   | "max_mistakes"
   | "time_expired"
   | "puzzles_exhausted"
+  | "pool_cleared"
   | "abandoned";
+
+export type SurvivalChallengeType = "puzzle" | "arrow_duel";
+
+export interface SurvivalLevel {
+  minRating: number;
+  maxRating: number;
+}
+
+export interface SurvivalSprintConfig {
+  challengeType: SurvivalChallengeType;
+  ruleVersion: number;
+  minRating: number;
+  maxRating: number;
+  ratingSourceRunId: string;
+  ratingSourceRating: number;
+  ratingSourceGeneration: number;
+  ratingSourceDeviation?: number;
+  packVersion: number;
+  packHash: string;
+  eligibleCount: number;
+  selectionSeed: string;
+}
+
+export interface SurvivalTraversalState {
+  selectionStartPuzzleId: string;
+  selectionCursorPuzzleId: string;
+  selectionWrapped: boolean;
+  poolExhaustedAfterBuffer: boolean;
+  loadedPuzzleCount: number;
+  consumedPuzzleCount: number;
+  pauseCount: number;
+  sittings: number;
+  lastTouchedAt: string;
+  bestBefore: number | null;
+}
+
+export interface SurvivalBestRecord {
+  challengeType: SurvivalChallengeType;
+  minRating: number;
+  maxRating: number;
+  ruleVersion: number;
+  score: number;
+  sessionId: string;
+  reachedAt: string;
+}
+
+export interface SurvivalPreferences {
+  puzzleRatingSourceRunId?: string;
+  arrowDuelRatingSourceRunId?: string;
+  guideSeen: boolean;
+}
 
 export interface Puzzle {
   id: string;
@@ -60,6 +112,8 @@ export interface SprintConfig {
     minRating: number;
     maxRating: number;
   };
+  /** Fixed-level, locally resumable Survival challenge identity. */
+  survival?: SurvivalSprintConfig;
 }
 
 export interface PuzzleTimingPolicy {
@@ -201,6 +255,8 @@ export interface SprintState {
   ratingDeviationAfter?: number;
   volatilityBefore?: number;
   volatilityAfter?: number;
+  /** Mutable bounded-batch traversal state for a Survival Run. */
+  survival?: SurvivalTraversalState;
 }
 
 export interface AttemptEvent {

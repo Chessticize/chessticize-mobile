@@ -141,6 +141,9 @@ export function advanceSprintTime(state: SprintState, now: string): SprintComman
     state.currentPuzzle?.kind === "arrow_duel" &&
     state.currentPuzzle.phase === "reply"
   ) {
+    if (state.config.survival) {
+      return { state };
+    }
     const replyDeadlineAt = state.currentPuzzle.replyDeadlineAt;
     if (!replyDeadlineAt) {
       throw new Error("Arrow Duel reply has no deadline");
@@ -150,7 +153,7 @@ export function advanceSprintTime(state: SprintState, now: string): SprintComman
     }
     return applyOpponentReplyTimeout(state, now);
   }
-  if (new Date(now).getTime() >= new Date(state.deadlineAt).getTime()) {
+  if (!state.config.survival && new Date(now).getTime() >= new Date(state.deadlineAt).getTime()) {
     return {
       state: completeSprintForPolicy(state, "failed", "time_expired", state.deadlineAt),
       attempt: buildIncompleteAttempt(state)
@@ -223,9 +226,13 @@ export function beginArrowDuelReply(state: SprintState, now: string): SprintStat
       ...state.currentPuzzle,
       phase: "reply",
       replyStartedAt,
-      replyDeadlineAt: new Date(
-        startedAtMs + opponentReply.seconds * 1000
-      ).toISOString()
+      ...(state.config.survival
+        ? {}
+        : {
+            replyDeadlineAt: new Date(
+              startedAtMs + opponentReply.seconds * 1000
+            ).toISOString()
+          })
     }
   };
 }
@@ -235,11 +242,21 @@ export function pauseSprint(state: SprintState, now: string): SprintCommandResul
   if (advanced.state.status !== "active") {
     return advanced;
   }
+  const pausedAt = new Date(now).toISOString();
   return {
     state: {
       ...advanced.state,
       status: "paused",
-      pausedAt: new Date(now).toISOString()
+      pausedAt,
+      ...(advanced.state.survival === undefined
+        ? {}
+        : {
+            survival: {
+              ...advanced.state.survival,
+              pauseCount: advanced.state.survival.pauseCount + 1,
+              lastTouchedAt: pausedAt
+            }
+          })
     },
     ...(advanced.attempt === undefined ? {} : { attempt: advanced.attempt })
   };
@@ -259,7 +276,9 @@ export function resumeSprint(state: SprintState, now: string): SprintState {
   return {
     ...withoutPausedAt,
     status: "active",
-    deadlineAt: shiftIso(state.deadlineAt, pausedMs),
+    deadlineAt: state.config.survival
+      ? state.deadlineAt
+      : shiftIso(state.deadlineAt, pausedMs),
     ...(state.currentPuzzleStartedAt
       ? { currentPuzzleStartedAt: shiftIso(state.currentPuzzleStartedAt, pausedMs) }
       : {}),
@@ -480,7 +499,12 @@ function applyPuzzleFeedback(state: SprintState, feedback: PuzzleFeedback, now: 
 
   if (nextCorrectCount >= state.config.targetCorrect) {
     return {
-      state: completeSprintForPolicy(updated, "won", "target_reached", now),
+      state: completeSprintForPolicy(
+        updated,
+        "won",
+        state.config.survival ? "pool_cleared" : "target_reached",
+        now
+      ),
       feedback,
       attempt
     };
@@ -488,7 +512,12 @@ function applyPuzzleFeedback(state: SprintState, feedback: PuzzleFeedback, now: 
 
   if (nextMistakeCount >= state.config.maxMistakes) {
     return {
-      state: completeSprintForPolicy(updated, "failed", "max_mistakes", now),
+      state: completeSprintForPolicy(
+        updated,
+        state.config.survival ? "won" : "failed",
+        "max_mistakes",
+        now
+      ),
       feedback,
       attempt
     };
@@ -497,7 +526,12 @@ function applyPuzzleFeedback(state: SprintState, feedback: PuzzleFeedback, now: 
   const nextPuzzleIndex = state.currentPuzzleIndex + 1;
   if (nextPuzzleIndex >= state.puzzles.length) {
     return {
-      state: completeSprintForPolicy(updated, "won", "puzzles_exhausted", now),
+      state: completeSprintForPolicy(
+        updated,
+        "won",
+        state.config.survival ? "pool_cleared" : "puzzles_exhausted",
+        now
+      ),
       feedback,
       attempt
     };

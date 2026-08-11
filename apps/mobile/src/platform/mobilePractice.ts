@@ -18,7 +18,9 @@ import { TacticalProfileService } from "../../../../packages/storage/src/tactica
 import type {
   PuzzleSource,
   RatingBandPuzzleSelection,
-  RatingBandPuzzleSelectionInput
+  RatingBandPuzzleSelectionInput,
+  SurvivalPuzzleBatch,
+  SurvivalPuzzleBatchInput
 } from "../../../../packages/storage/src/puzzle-source.ts";
 import {
   MOBILE_DATABASE_LAYOUT,
@@ -60,7 +62,7 @@ export function createMobilePracticeService(source: MobilePuzzleSource = DEFAULT
     store,
     store,
     new MemoryTacticalProfileRepository()
-  ));
+  ), survivalPracticeServiceOptions());
   configureMobilePracticePuzzleSource(service, source);
   return service;
 }
@@ -177,13 +179,24 @@ function createPersistentService(
   const store = new PackBackedPracticeStore(userStore, packSource);
   const service = new PracticeService(
     store,
-    createTacticalProfileService(store, packSource, tacticalProfileRepository)
+    createTacticalProfileService(store, packSource, tacticalProfileRepository),
+    survivalPracticeServiceOptions()
   );
   persistentProgressDatabasePath = userStore.databasePath();
   packBackedServices.add(service);
   configureMobilePracticePuzzleSource(service, DEFAULT_PUZZLE_SOURCE);
   persistentPracticeService = service;
   return service;
+}
+
+function survivalPracticeServiceOptions(): {
+  survivalPackVersion: number;
+  survivalPackHash: string;
+} {
+  return {
+    survivalPackVersion: bundledCorePackVersion,
+    survivalPackHash: bundledCoreManifest.packFileHash ?? bundledCoreManifest.manifestHash
+  };
 }
 
 export function getPersistentMobileProgressDatabasePath(): string | undefined {
@@ -216,6 +229,16 @@ class LazyPuzzleSource implements PuzzleSource {
 
   selectPuzzles(filter: Parameters<PuzzleSource["selectPuzzles"]>[0]): Puzzle[] {
     return this.current.selectPuzzles(filter);
+  }
+
+  countSurvivalPuzzles(
+    input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
+  ): number {
+    return this.current.countSurvivalPuzzles(input);
+  }
+
+  selectSurvivalPuzzleBatch(input: SurvivalPuzzleBatchInput): SurvivalPuzzleBatch {
+    return this.current.selectSurvivalPuzzleBatch(input);
   }
 
   selectPuzzlesForRatingBands(

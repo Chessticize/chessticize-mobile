@@ -53,7 +53,9 @@ import type {
   ReviewScheduleRemoval,
   SessionMistakeReviewItem,
   SprintMode,
-  SprintState
+  SprintState,
+  SurvivalBestRecord,
+  SurvivalPreferences
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type {
@@ -76,8 +78,14 @@ import {
 } from "./puzzle-selection.ts";
 import type {
   RatingBandPuzzleSelection,
-  RatingBandPuzzleSelectionInput
+  RatingBandPuzzleSelectionInput,
+  SurvivalPuzzleBatch,
+  SurvivalPuzzleBatchInput
 } from "./puzzle-source.ts";
+import {
+  eligibleSurvivalPuzzles,
+  selectSurvivalPuzzleBatchFromPuzzles
+} from "./survival-puzzle-selection.ts";
 import { preferredSprintSession, sameSprintSession } from "./sprint-session-sync.ts";
 import { assignLegacyRatingGenerations } from "./rating-history.ts";
 import type { PracticeProgressSummary } from "./rating-history.ts";
@@ -283,6 +291,27 @@ interface SprintSessionExportRow {
   runName?: string | null;
 }
 
+interface SurvivalResumeRow {
+  id: string;
+  resumeJson: string;
+}
+
+interface SurvivalBestRow {
+  challenge_type: SurvivalBestRecord["challengeType"];
+  min_rating: number;
+  max_rating: number;
+  rule_version: number;
+  score: number;
+  session_id: string;
+  reached_at: string;
+}
+
+interface SurvivalPreferencesRow {
+  puzzle_rating_source_run_id: string | null;
+  arrow_duel_rating_source_run_id: string | null;
+  guide_seen: number;
+}
+
 interface ProgressV2StateRow {
   phase: ProgressV2LocalState["phase"];
   zone_initialized: number;
@@ -334,7 +363,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 21;
+export const CURRENT_SCHEMA_VERSION = 22;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -364,7 +393,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 17, to: 18, apply: migrateV17ToV18 },
   { from: 18, to: 19, apply: migrateV18ToV19 },
   { from: 19, to: 20, apply: migrateV19ToV20 },
-  { from: 20, to: 21, apply: migrateV20ToV21 }
+  { from: 20, to: 21, apply: migrateV20ToV21 },
+  { from: 21, to: 22, apply: migrateV21ToV22 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -404,7 +434,8 @@ export class SyncSQLiteStore implements PracticeStore {
     if (
       startingVersion === CURRENT_SCHEMA_VERSION &&
       hasCurrentSettingsColumns(this.db) &&
-      hasProgressV2Schema(this.db)
+      hasProgressV2Schema(this.db) &&
+      hasSurvivalSchema(this.db)
     ) {
       return;
     }
@@ -751,6 +782,24 @@ export class SyncSQLiteStore implements PracticeStore {
     });
   }
 
+  countSurvivalPuzzles(
+    input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
+  ): number {
+    return eligibleSurvivalPuzzles(this.survivalPuzzleRows(input), input).length;
+  }
+
+  selectSurvivalPuzzleBatch(input: SurvivalPuzzleBatchInput): SurvivalPuzzleBatch {
+    return selectSurvivalPuzzleBatchFromPuzzles(this.survivalPuzzleRows(input), input);
+  }
+
+  private survivalPuzzleRows(
+    input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
+  ): Puzzle[] {
+    return (this.db.prepare(
+      "SELECT * FROM puzzles WHERE rating >= ? AND rating <= ? ORDER BY id ASC"
+    ).all(input.level.minRating, input.level.maxRating) as PuzzleRow[]).map(puzzleFromRow);
+  }
+
   selectPuzzlesForRatingBands(
     input: RatingBandPuzzleSelectionInput
   ): RatingBandPuzzleSelection[] {
@@ -1078,13 +1127,14 @@ export class SyncSQLiteStore implements PracticeStore {
           run_kind,
           run_name,
           config_json,
+          resume_json,
           started_at,
           deadline_at,
           status,
           correct_count,
           mistake_count,
           rating_before
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         state.id,
@@ -1099,6 +1149,7 @@ export class SyncSQLiteStore implements PracticeStore {
           ...(state.ratingDeviationBefore === undefined ? {} : { ratingDeviationBefore: state.ratingDeviationBefore }),
           ...(state.volatilityBefore === undefined ? {} : { volatilityBefore: state.volatilityBefore })
         }),
+        survivalResumeJson(state),
         state.startedAt,
         state.deadlineAt,
         state.status,
@@ -1122,7 +1173,8 @@ export class SyncSQLiteStore implements PracticeStore {
              end_reason = ?,
              correct_count = ?,
              mistake_count = ?,
-             rating_after = ?
+             rating_after = ?,
+             resume_json = ?
          WHERE id = ?`
       )
       .run(
@@ -1133,6 +1185,7 @@ export class SyncSQLiteStore implements PracticeStore {
         state.correctCount,
         state.mistakeCount,
         state.ratingAfter ?? null,
+        survivalResumeJson(state),
         state.id
       );
     const isNowEligible =
@@ -1141,6 +1194,109 @@ export class SyncSQLiteStore implements PracticeStore {
     if (!previouslyEligible && isNowEligible) {
       this.bumpTacticalProfileSourceRevision();
     }
+  }
+
+  getResumableSurvivalSprint(id: string): SprintState | undefined {
+    const row = this.db.prepare(
+      `SELECT id, resume_json AS resumeJson
+       FROM sprint_sessions
+       WHERE id = ?
+         AND status IN ('active', 'paused')
+         AND resume_json IS NOT NULL`
+    ).get(id) as SurvivalResumeRow | undefined;
+    return row ? survivalStateFromResumeJson(row.resumeJson, row.id) : undefined;
+  }
+
+  listResumableSurvivalSprints(): SprintState[] {
+    const rows = this.db.prepare(
+      `SELECT id, resume_json AS resumeJson
+       FROM sprint_sessions
+       WHERE status IN ('active', 'paused')
+         AND resume_json IS NOT NULL`
+    ).all() as SurvivalResumeRow[];
+    return rows
+      .map((row) => survivalStateFromResumeJson(row.resumeJson, row.id))
+      .sort((left, right) => (
+        (right.survival?.lastTouchedAt ?? right.startedAt).localeCompare(
+          left.survival?.lastTouchedAt ?? left.startedAt
+        ) || right.id.localeCompare(left.id)
+      ));
+  }
+
+  listSurvivalBests(): SurvivalBestRecord[] {
+    return (this.db.prepare(
+      `SELECT challenge_type, min_rating, max_rating, rule_version,
+              score, session_id, reached_at
+       FROM survival_bests
+       ORDER BY challenge_type ASC, min_rating ASC, rule_version ASC`
+    ).all() as SurvivalBestRow[]).map((row) => ({
+      challengeType: row.challenge_type,
+      minRating: row.min_rating,
+      maxRating: row.max_rating,
+      ruleVersion: row.rule_version,
+      score: row.score,
+      sessionId: row.session_id,
+      reachedAt: row.reached_at
+    }));
+  }
+
+  saveSurvivalBest(record: SurvivalBestRecord): void {
+    this.db.prepare(
+      `INSERT INTO survival_bests (
+         challenge_type, min_rating, max_rating, rule_version,
+         score, session_id, reached_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(challenge_type, min_rating, max_rating, rule_version)
+       DO UPDATE SET
+         score = excluded.score,
+         session_id = excluded.session_id,
+         reached_at = excluded.reached_at
+       WHERE excluded.score > survival_bests.score`
+    ).run(
+      record.challengeType,
+      record.minRating,
+      record.maxRating,
+      record.ruleVersion,
+      record.score,
+      record.sessionId,
+      record.reachedAt
+    );
+  }
+
+  getSurvivalPreferences(): SurvivalPreferences {
+    const row = this.db.prepare(
+      `SELECT puzzle_rating_source_run_id, arrow_duel_rating_source_run_id, guide_seen
+       FROM survival_preferences
+       WHERE singleton_id = 1`
+    ).get() as SurvivalPreferencesRow | undefined;
+    return row
+      ? {
+          ...(row.puzzle_rating_source_run_id === null
+            ? {}
+            : { puzzleRatingSourceRunId: row.puzzle_rating_source_run_id }),
+          ...(row.arrow_duel_rating_source_run_id === null
+            ? {}
+            : { arrowDuelRatingSourceRunId: row.arrow_duel_rating_source_run_id }),
+          guideSeen: intToBool(row.guide_seen)
+        }
+      : { guideSeen: false };
+  }
+
+  saveSurvivalPreferences(preferences: SurvivalPreferences): void {
+    this.db.prepare(
+      `INSERT INTO survival_preferences (
+         singleton_id, puzzle_rating_source_run_id,
+         arrow_duel_rating_source_run_id, guide_seen
+       ) VALUES (1, ?, ?, ?)
+       ON CONFLICT(singleton_id) DO UPDATE SET
+         puzzle_rating_source_run_id = excluded.puzzle_rating_source_run_id,
+         arrow_duel_rating_source_run_id = excluded.arrow_duel_rating_source_run_id,
+         guide_seen = excluded.guide_seen`
+    ).run(
+      preferences.puzzleRatingSourceRunId ?? null,
+      preferences.arrowDuelRatingSourceRunId ?? null,
+      boolToInt(preferences.guideSeen)
+    );
   }
 
   recordAttempt(attempt: AttemptEvent): void {
@@ -2118,6 +2274,34 @@ export class SyncSQLiteStore implements PracticeStore {
     return rows.map(exportedSprintSessionFromRow);
   }
 
+  listSurvivalSessions(): ExportedSprintSession[] {
+    const rows = this.db
+      .prepare(
+        `SELECT
+          id,
+          mode,
+          rating_key AS ratingKey,
+          rating_generation AS ratingGeneration,
+          config_json AS configJson,
+          run_id AS runId,
+          run_kind AS runKind,
+          run_name AS runName,
+          started_at AS startedAt,
+          completed_at AS completedAt,
+          status,
+          correct_count AS correctCount,
+          mistake_count AS mistakeCount,
+          rating_before AS ratingBefore,
+          rating_after AS ratingAfter
+         FROM sprint_sessions
+         WHERE config_json LIKE '%"survival":%'
+         ORDER BY started_at DESC, id DESC`
+      )
+      .all() as SprintSessionExportRow[];
+
+    return rows.map(exportedSprintSessionFromRow);
+  }
+
   getSprintSessions(ids: readonly string[]): ExportedSprintSession[] {
     const uniqueIds = [...new Set(ids)];
     const sessions: ExportedSprintSession[] = [];
@@ -2927,6 +3111,7 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
     migrateV19ToV20(db);
   }
   migrateV20ToV21(db);
+  migrateV21ToV22(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
@@ -2955,6 +3140,12 @@ function hasProgressV2Schema(db: SyncSqliteDatabase): boolean {
     hasTrigger(db, "progress_v2_settings_insert") &&
     hasTrigger(db, "progress_v2_settings_update") &&
     hasTrigger(db, "progress_v2_outbox_revision_update");
+}
+
+function hasSurvivalSchema(db: SyncSqliteDatabase): boolean {
+  return hasColumn(db, "sprint_sessions", "resume_json") &&
+    hasTable(db, "survival_bests") &&
+    hasTable(db, "survival_preferences");
 }
 
 function ensureMoveFeedbackColumns(db: SyncSqliteDatabase): void {
@@ -3750,6 +3941,44 @@ function migrateV20ToV21(db: SyncSqliteDatabase): void {
   );
 }
 
+function migrateV21ToV22(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "sprint_sessions",
+    "resume_json",
+    "ALTER TABLE sprint_sessions ADD COLUMN resume_json TEXT"
+  );
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS survival_bests (
+      challenge_type TEXT NOT NULL CHECK (challenge_type IN ('puzzle', 'arrow_duel')),
+      min_rating INTEGER NOT NULL,
+      max_rating INTEGER NOT NULL,
+      rule_version INTEGER NOT NULL CHECK (rule_version > 0),
+      score INTEGER NOT NULL CHECK (score >= 0),
+      session_id TEXT NOT NULL,
+      reached_at TEXT NOT NULL,
+      PRIMARY KEY (challenge_type, min_rating, max_rating, rule_version)
+    );
+
+    CREATE TABLE IF NOT EXISTS survival_preferences (
+      singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+      puzzle_rating_source_run_id TEXT,
+      arrow_duel_rating_source_run_id TEXT,
+      guide_seen INTEGER NOT NULL DEFAULT 0 CHECK (guide_seen IN (0, 1))
+    );
+
+    INSERT OR IGNORE INTO survival_preferences (singleton_id, guide_seen)
+    VALUES (1, 0);
+  `);
+  if (hasColumn(db, "sprint_sessions", "status") && hasColumn(db, "sprint_sessions", "started_at")) {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS sprint_sessions_survival_resume_idx
+        ON sprint_sessions(status, started_at DESC, id DESC)
+        WHERE resume_json IS NOT NULL;
+    `);
+  }
+}
+
 function readSchemaVersion(db: SyncSqliteDatabase): number {
   const row = db.prepare("PRAGMA user_version").get() as { user_version?: unknown } | undefined;
   const version = row?.user_version;
@@ -4089,6 +4318,33 @@ function exportedSprintSessionFromRow(row: SprintSessionExportRow): ExportedSpri
   };
 }
 
+function survivalResumeJson(state: SprintState): string | null {
+  return state.config.survival !== undefined &&
+    state.survival !== undefined &&
+    (state.status === "active" || state.status === "paused")
+    ? JSON.stringify(state)
+    : null;
+}
+
+function survivalStateFromResumeJson(value: string, expectedId: string): SprintState {
+  const parsed = JSON.parse(value) as unknown;
+  if (!isJsonObject(parsed)) {
+    throw new Error(`Stored Survival Run ${expectedId} is not an object`);
+  }
+  const state = parsed as unknown as SprintState;
+  if (
+    state.id !== expectedId ||
+    (state.status !== "active" && state.status !== "paused") ||
+    !state.config?.survival ||
+    !state.survival ||
+    !Array.isArray(state.puzzles) ||
+    !state.currentPuzzle
+  ) {
+    throw new Error(`Stored Survival Run ${expectedId} is incomplete`);
+  }
+  return state;
+}
+
 function practiceRunFromRow(row: PracticeRunRow): PracticeRunRecord {
   const themes = optionalStringArrayFromJson(row.themes_json);
   const puzzleTiming = row.slow_after_seconds === undefined || row.timeout_after_seconds === undefined
@@ -4161,6 +4417,7 @@ function isTacticalProfileEvidenceSession(
     session?.completedAt &&
     session.config &&
     session.config.tacticalFocus === undefined &&
+    session.config.survival === undefined &&
     namedThemesForSelection(session.config.themes).length === 0
   );
 }

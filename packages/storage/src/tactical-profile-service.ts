@@ -1313,7 +1313,11 @@ function ordinaryMixedSessions(
   return sessions
     .filter((session) => session.completedAt !== undefined)
     .filter((session) => {
-      if (!session.config || session.config.tacticalFocus !== undefined) {
+      if (
+        !session.config ||
+        session.config.tacticalFocus !== undefined ||
+        session.config.survival !== undefined
+      ) {
         return false;
       }
       const family = session.config.mode === "arrow_duel" ? "arrow_duel" : "line";

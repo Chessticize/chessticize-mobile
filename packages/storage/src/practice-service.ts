@@ -1,5 +1,6 @@
 import {
   acknowledgeArrowDuelReplyCue,
+  appendSurvivalPuzzleBatch,
   abandonSprint as abandonSprintCore,
   advanceArrowDuelReplyCueSprint,
   advanceSprintTime as advanceSprintTimeCore,
@@ -10,8 +11,10 @@ import {
   buildSessionReplay,
   buildSprintConfig,
   buildSprintResultSummary,
+  beginSurvivalSitting,
   beginArrowDuelReply as beginArrowDuelReplyCore,
   clonePracticeRun,
+  compactSurvivalPuzzleBuffer,
   createCustomPracticeRun,
   createDefaultRating,
   DEFAULT_RATING_DEVIATION,
@@ -32,8 +35,14 @@ import {
   reviewDayFor,
   resumeSprint as resumeSprintCore,
   serializeSprintView,
+  startSurvival as startSurvivalCore,
   startSprint,
   submitSprintMove,
+  SURVIVAL_PUZZLE_BATCH_SIZE,
+  SURVIVAL_RULE_VERSION,
+  survivalLevelForRating,
+  survivalRunKey,
+  touchSurvivalState,
   validatePuzzleTimingPolicy
 } from "../../core/src/index.ts";
 import type {
@@ -59,7 +68,11 @@ import type {
   SprintCommandResult,
   SprintMode,
   SprintResultSummary,
-  SprintState
+  SprintState,
+  SurvivalBestRecord,
+  SurvivalChallengeType,
+  SurvivalLevel,
+  SurvivalPreferences
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter } from "./query-types.ts";
 import type {
@@ -105,6 +118,24 @@ import {
 import type { TacticalProfileTaskFamily } from "../../core/src/index.ts";
 
 const MANUAL_RATING_DEVIATION_CAP = 100;
+
+export interface PracticeServiceOptions {
+  survivalPackVersion?: number;
+  survivalPackHash?: string;
+}
+
+export interface StartSurvivalCommand {
+  challengeType: SurvivalChallengeType;
+  level: SurvivalLevel;
+  ratingSourceRunId: string;
+  selectionSeed?: string;
+}
+
+export interface SurvivalRatingSource {
+  run: PracticeRunRecord;
+  rating: RatingRecord;
+  isOnHome: boolean;
+}
 
 export interface StartSprintCommand {
   mode: SprintMode;
@@ -174,10 +205,19 @@ export class PracticeService {
   private puzzleSelectionScopeIds: string[] | undefined;
   private readonly store: PracticeStore;
   private readonly tacticalProfile: TacticalProfileService | undefined;
+  private readonly options: Required<PracticeServiceOptions>;
 
-  constructor(store: PracticeStore, tacticalProfile?: TacticalProfileService) {
+  constructor(
+    store: PracticeStore,
+    tacticalProfile?: TacticalProfileService,
+    options: PracticeServiceOptions = {}
+  ) {
     this.store = store;
     this.tacticalProfile = tacticalProfile;
+    this.options = {
+      survivalPackVersion: options.survivalPackVersion ?? 0,
+      survivalPackHash: options.survivalPackHash ?? "unversioned-local-pack"
+    };
     this.reconcilePersistedRatings();
   }
 
@@ -283,8 +323,14 @@ export class PracticeService {
     if (!this.activeSprint) {
       throw new Error("No active sprint");
     }
-    const previousSprint = this.activeSprint;
-    const result = submitSprintMove(previousSprint, move, now);
+    const previousSprint = this.prepareSurvivalBufferForMove(this.activeSprint, now);
+    const coreResult = submitSprintMove(previousSprint, move, now);
+    const state = previousSprint.config.survival
+      ? isOpenSprint(coreResult.state) && coreResult.attempt
+        ? compactSurvivalPuzzleBuffer(coreResult.state, now, true)
+        : touchSurvivalState(coreResult.state, now, coreResult.attempt !== undefined)
+      : coreResult.state;
+    const result = { ...coreResult, state };
     let attemptToReturn = result.attempt;
 
     if (result.attempt) {
@@ -295,6 +341,7 @@ export class PracticeService {
       attemptToReturn = attempt;
     }
 
+    const survivalBest = this.newSurvivalBestFor(state, now);
     this.store.transaction(() => {
       if (attemptToReturn) {
         this.recordSprintAttempt(attemptToReturn);
@@ -302,8 +349,11 @@ export class PracticeService {
 
       if (!isOpenSprint(result.state)) {
         this.persistCompletedSprint(result.state);
-      } else if (attemptToReturn) {
+      } else if (attemptToReturn || result.state.config.survival) {
         this.store.updateSprintSession(result.state);
+      }
+      if (survivalBest) {
+        this.store.saveSurvivalBest(survivalBest);
       }
     });
 
@@ -334,7 +384,10 @@ export class PracticeService {
     if (!this.activeSprint) {
       throw new Error("No active sprint");
     }
-    const next = beginArrowDuelReplyCore(this.activeSprint, now);
+    const coreNext = beginArrowDuelReplyCore(this.activeSprint, now);
+    const next = coreNext.config.survival
+      ? touchSurvivalState(coreNext, now)
+      : coreNext;
     this.activeSprint = next;
     this.store.updateSprintSession(next);
     return next;
@@ -374,6 +427,9 @@ export class PracticeService {
     if (!this.activeSprint) {
       throw new Error("No active sprint");
     }
+    if (this.activeSprint.config.survival) {
+      throw new Error("Survival can only end after three mistakes or a pool clear");
+    }
     const opponentReplyClocksPaused =
       this.activeSprint.currentPuzzle?.kind === "arrow_duel" &&
       this.activeSprint.currentPuzzle.phase !== "choice";
@@ -397,7 +453,10 @@ export class PracticeService {
     if (!this.activeSprint) {
       throw new Error("No active sprint");
     }
-    const result = pauseSprintCore(this.activeSprint, now);
+    const coreResult = pauseSprintCore(this.activeSprint, now);
+    const result = coreResult.state.config.survival
+      ? { ...coreResult, state: touchSurvivalState(coreResult.state, now, coreResult.attempt !== undefined) }
+      : coreResult;
     this.store.transaction(() => {
       if (result.attempt) {
         this.recordSprintAttempt(result.attempt);
@@ -419,7 +478,10 @@ export class PracticeService {
     if (!this.activeSprint) {
       throw new Error("No active sprint");
     }
-    const resumed = resumeSprintCore(this.activeSprint, now);
+    const coreResumed = resumeSprintCore(this.activeSprint, now);
+    const resumed = coreResumed.config.survival
+      ? touchSurvivalState(coreResumed, now)
+      : coreResumed;
     this.activeSprint = resumed;
     this.store.updateSprintSession(resumed);
     return resumed;
@@ -431,6 +493,183 @@ export class PracticeService {
 
   getActiveSprint(): SprintState | undefined {
     return this.activeSprint;
+  }
+
+  startSurvival(
+    command: StartSurvivalCommand,
+    now = new Date().toISOString()
+  ): SprintState {
+    const level = survivalLevelForRating(command.level.minRating);
+    if (
+      level.minRating !== command.level.minRating ||
+      level.maxRating !== command.level.maxRating
+    ) {
+      throw new Error(`Unsupported Survival level ${command.level.minRating}-${command.level.maxRating}`);
+    }
+    const existing = this.store.listResumableSurvivalSprints().find((state) => (
+      state.config.survival !== undefined &&
+      survivalRunKey({
+        challengeType: state.config.survival.challengeType,
+        level: {
+          minRating: state.config.survival.minRating,
+          maxRating: state.config.survival.maxRating
+        },
+        ruleVersion: state.config.survival.ruleVersion
+      }) === survivalRunKey({ challengeType: command.challengeType, level })
+    ));
+    if (existing) {
+      return this.resumeSurvival(existing.id, now);
+    }
+    if (this.activeSprint && isOpenSprint(this.activeSprint)) {
+      throw new Error("Cannot start Survival while another Run is active");
+    }
+    const source = this.requireSurvivalRatingSource(
+      command.challengeType,
+      command.ratingSourceRunId
+    );
+    const eligibleCount = this.store.countSurvivalPuzzles({
+      challengeType: command.challengeType,
+      level
+    });
+    if (eligibleCount < 1) {
+      throw new Error("No eligible puzzles are available for this Survival level");
+    }
+    const selectionSeed = command.selectionSeed ?? `${now}:${command.challengeType}:${level.minRating}`;
+    const initialBatch = this.store.selectSurvivalPuzzleBatch({
+      challengeType: command.challengeType,
+      level,
+      limit: Math.min(SURVIVAL_PUZZLE_BATCH_SIZE, eligibleCount),
+      selectionSeed
+    });
+    if (initialBatch.puzzles.length < 1 || !initialBatch.cursor) {
+      throw new Error("Survival puzzle selection returned an incomplete initial batch");
+    }
+    const bestBefore = this.getSurvivalBest(command.challengeType, level)?.score ?? null;
+    const state = startSurvivalCore({
+      challengeType: command.challengeType,
+      level,
+      ratingSourceRunId: source.run.id,
+      ratingSource: source.rating,
+      packVersion: this.options.survivalPackVersion,
+      packHash: this.options.survivalPackHash,
+      eligibleCount,
+      selectionSeed,
+      initialPuzzles: initialBatch.puzzles,
+      selectionStartPuzzleId: initialBatch.cursor.startPuzzleId,
+      selectionCursorPuzzleId: initialBatch.cursor.afterPuzzleId,
+      selectionWrapped: initialBatch.cursor.wrapped,
+      poolExhaustedAfterBuffer: initialBatch.puzzles.length === eligibleCount,
+      bestBefore,
+      now
+    });
+    this.store.transaction(() => {
+      this.store.createSprintSession(state);
+      this.saveSurvivalRatingSourcePreference(command.challengeType, source.run.id);
+    });
+    this.activeSprint = state;
+    return state;
+  }
+
+  resumeSurvival(id: string, now = new Date().toISOString()): SprintState {
+    if (this.activeSprint && isOpenSprint(this.activeSprint) && this.activeSprint.id !== id) {
+      throw new Error("Cannot resume Survival while another Run is active");
+    }
+    let stored = this.store.getResumableSurvivalSprint(id);
+    if (!stored?.config.survival || !stored.survival) {
+      throw new Error(`Survival Run ${id} is not resumable`);
+    }
+    if (stored.status === "active") {
+      stored = pauseSprintCore(
+        stored,
+        stored.survival.lastTouchedAt
+      ).state;
+    }
+    const resumed = beginSurvivalSitting(resumeSprintCore(stored, now), now);
+    this.store.updateSprintSession(resumed);
+    this.activeSprint = resumed;
+    return resumed;
+  }
+
+  leavePausedSurvival(): SprintState {
+    if (
+      !this.activeSprint?.config.survival ||
+      this.activeSprint.status !== "paused"
+    ) {
+      throw new Error("No paused Survival Run is active");
+    }
+    const paused = this.activeSprint;
+    this.activeSprint = undefined;
+    return paused;
+  }
+
+  listResumableSurvivalRuns(): SprintState[] {
+    return this.store.listResumableSurvivalSprints();
+  }
+
+  listSurvivalBests(): SurvivalBestRecord[] {
+    return this.store.listSurvivalBests();
+  }
+
+  getSurvivalBest(
+    challengeType: SurvivalChallengeType,
+    level: SurvivalLevel
+  ): SurvivalBestRecord | undefined {
+    const key = survivalRunKey({ challengeType, level });
+    return this.store.listSurvivalBests().find((record) => (
+      survivalRunKey({
+        challengeType: record.challengeType,
+        level: { minRating: record.minRating, maxRating: record.maxRating },
+        ruleVersion: record.ruleVersion
+      }) === key
+    ));
+  }
+
+  listSurvivalSessions(): ExportedSprintSession[] {
+    return this.store.listSurvivalSessions();
+  }
+
+  listSurvivalRatingSources(challengeType: SurvivalChallengeType): SurvivalRatingSource[] {
+    return this.store.listPracticeRuns()
+      .filter((run) => this.isCompatibleSurvivalRatingSource(run, challengeType))
+      .filter((run) => !run.archived || isBuiltInPracticeRun(run.id))
+      .map((run) => ({
+        run: clonePracticeRun(run),
+        rating: { ...this.store.getRating(run.ratingKey) },
+        isOnHome: !run.archived
+      }));
+  }
+
+  getSurvivalPreferences(): SurvivalPreferences {
+    return this.store.getSurvivalPreferences();
+  }
+
+  selectedSurvivalRatingSourceId(challengeType: SurvivalChallengeType): string {
+    const preferences = this.store.getSurvivalPreferences();
+    return challengeType === "puzzle"
+      ? preferences.puzzleRatingSourceRunId ?? "standard"
+      : preferences.arrowDuelRatingSourceRunId ?? "arrow-duel";
+  }
+
+  saveSurvivalRatingSourcePreference(
+    challengeType: SurvivalChallengeType,
+    runId: string
+  ): SurvivalPreferences {
+    this.requireSurvivalRatingSource(challengeType, runId);
+    const current = this.store.getSurvivalPreferences();
+    const next: SurvivalPreferences = {
+      ...current,
+      ...(challengeType === "puzzle"
+        ? { puzzleRatingSourceRunId: runId }
+        : { arrowDuelRatingSourceRunId: runId })
+    };
+    this.store.saveSurvivalPreferences(next);
+    return this.store.getSurvivalPreferences();
+  }
+
+  markSurvivalGuideSeen(): SurvivalPreferences {
+    const current = this.store.getSurvivalPreferences();
+    this.store.saveSurvivalPreferences({ ...current, guideSeen: true });
+    return this.store.getSurvivalPreferences();
   }
 
   listHistory(filter: HistoryFilter = {}): AttemptHistoryRow[] {
@@ -841,6 +1080,98 @@ export class PracticeService {
     return this.store.getSettings();
   }
 
+  private prepareSurvivalBufferForMove(state: SprintState, now: string): SprintState {
+    const config = state.config.survival;
+    const progress = state.survival;
+    if (
+      !config ||
+      !progress ||
+      state.status !== "active" ||
+      state.currentPuzzleIndex < state.puzzles.length - 1 ||
+      progress.poolExhaustedAfterBuffer
+    ) {
+      return state;
+    }
+    const remaining = config.eligibleCount - progress.loadedPuzzleCount;
+    if (remaining < 1) {
+      return {
+        ...state,
+        survival: { ...progress, poolExhaustedAfterBuffer: true }
+      };
+    }
+    const batch = this.store.selectSurvivalPuzzleBatch({
+      challengeType: config.challengeType,
+      level: { minRating: config.minRating, maxRating: config.maxRating },
+      limit: Math.min(SURVIVAL_PUZZLE_BATCH_SIZE, remaining),
+      selectionSeed: config.selectionSeed,
+      cursor: {
+        startPuzzleId: progress.selectionStartPuzzleId,
+        afterPuzzleId: progress.selectionCursorPuzzleId,
+        wrapped: progress.selectionWrapped
+      }
+    });
+    if (batch.puzzles.length < 1 || !batch.cursor) {
+      throw new Error("Survival puzzle refill failed before the eligible pool was consumed");
+    }
+    return appendSurvivalPuzzleBatch({
+      state,
+      puzzles: batch.puzzles,
+      selectionCursorPuzzleId: batch.cursor.afterPuzzleId,
+      selectionWrapped: batch.cursor.wrapped,
+      poolExhaustedAfterBuffer: progress.loadedPuzzleCount + batch.puzzles.length === config.eligibleCount,
+      now
+    });
+  }
+
+  private newSurvivalBestFor(state: SprintState, reachedAt: string): SurvivalBestRecord | undefined {
+    const config = state.config.survival;
+    if (!config || state.correctCount < 1) {
+      return undefined;
+    }
+    const previous = this.getSurvivalBest(config.challengeType, {
+      minRating: config.minRating,
+      maxRating: config.maxRating
+    });
+    if (previous && previous.score >= state.correctCount) {
+      return undefined;
+    }
+    return {
+      challengeType: config.challengeType,
+      minRating: config.minRating,
+      maxRating: config.maxRating,
+      ruleVersion: config.ruleVersion,
+      score: state.correctCount,
+      sessionId: state.id,
+      reachedAt: new Date(reachedAt).toISOString()
+    };
+  }
+
+  private requireSurvivalRatingSource(
+    challengeType: SurvivalChallengeType,
+    runId: string
+  ): SurvivalRatingSource {
+    const source = this.listSurvivalRatingSources(challengeType).find((candidate) => (
+      candidate.run.id === runId
+    ));
+    if (!source) {
+      throw new Error(`Survival Rating source ${runId} is unavailable`);
+    }
+    return source;
+  }
+
+  private isCompatibleSurvivalRatingSource(
+    run: PracticeRunRecord,
+    challengeType: SurvivalChallengeType
+  ): boolean {
+    if (namedThemesForSelection(run.themes).length > 0) {
+      return false;
+    }
+    if (challengeType === "puzzle") {
+      return run.mode === "standard" || run.mode === "custom";
+    }
+    return run.mode === "arrow_duel" && run.opponentReply?.enabled !== false;
+  }
+
   private advanceReplyCueForStartedSprint(config: SprintConfig): void {
     if (config.mode !== "arrow_duel" || config.opponentReply?.enabled !== true) {
       return;
@@ -1161,7 +1492,8 @@ export class PracticeService {
   private markTacticalProfileForCompletedSprint(state: SprintState): void {
     if (
       !this.tacticalProfile ||
-      state.completedAt === undefined
+      state.completedAt === undefined ||
+      state.config.survival !== undefined
     ) {
       return;
     }
@@ -1242,6 +1574,10 @@ function defaultPerPuzzleSeconds(mode: SprintMode): number {
 
 function isOpenSprint(state: SprintState): boolean {
   return state.status === "active" || state.status === "paused";
+}
+
+function isBuiltInPracticeRun(runId: string): boolean {
+  return runId === "standard" || runId === "arrow-duel";
 }
 
 function buildCustomSprintConfigRecord(input: {
