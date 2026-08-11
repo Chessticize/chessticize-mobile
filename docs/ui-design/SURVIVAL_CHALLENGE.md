@@ -147,6 +147,22 @@ The one-page Survival Hub contains:
 If the selected type and level already has an in-progress Run, the Hub action
 says `Continue Survival`; it never offers a reset that discards mistakes.
 
+All Survival disclosures use the same short motion contract instead of
+appearing or disappearing abruptly:
+
+- Hub `In progress`, records-page `In progress`, and `More levels` are expanded
+  or collapsed by a full-width labeled control with an animated chevron.
+- Both `In progress` sections default open so resumable Runs remain prominent;
+  `More levels` defaults closed unless the current deterministic design state
+  explicitly demonstrates the full inventory.
+- The content animates height, fade, and a subtle upward offset over 200 ms with
+  an ease-out curve. Collapsed content remains mounted for a smooth transition
+  but is hidden from accessibility and pointer input.
+- The `More levels` control keeps spacing above its focus outline so browser and
+  keyboard focus never touches the selected level card. Storybook interactions
+  remove their synthetic click focus after verification; real keyboard focus
+  remains available.
+
 At most one Run may be in progress for each
 `challenge type + level + rule version` combination. Different combinations
 may coexist without an arbitrary global cap.

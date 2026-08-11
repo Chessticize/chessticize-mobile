@@ -11,7 +11,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Show every Core Pack-supported level, continue an existing type-and-level Run without a reset, and open dedicated Survival records."
+        "changeNote": "Animate collapsible in-progress Runs and More levels, preserve comfortable focus spacing, continue existing Runs, and open dedicated Survival records."
       }
     ]
   },
@@ -91,7 +91,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Move live Survival bests to a dedicated page reached from the Challenge Hub so ordinary History stays focused on puzzle attempts."
+        "changeNote": "Keep live Survival bests on a dedicated page and animate its collapsible in-progress Run section."
       }
     ]
   },

@@ -144,6 +144,12 @@ export const PersonalBestHub: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-hub");
     await waitForTestId(canvasElement, "personal-best-in-progress");
+    await waitForVisibleTestId(canvasElement, "personal-best-in-progress-content-motion");
+    await clickTestId(canvasElement, "personal-best-in-progress-toggle");
+    await waitForHiddenTestId(canvasElement, "personal-best-in-progress-content-motion");
+    await clickTestId(canvasElement, "personal-best-in-progress-toggle");
+    await waitForVisibleTestId(canvasElement, "personal-best-in-progress-content-motion");
+    (canvasElement.querySelector('[data-testid="personal-best-in-progress-toggle"]') as HTMLElement | null)?.blur();
     await expectTestIdText(canvasElement, "personal-best-recommended-level", "900–999");
     await waitForTestId(canvasElement, "personal-best-level-options");
     await waitForTestId(canvasElement, "personal-best-hub-records");
@@ -151,7 +157,12 @@ export const PersonalBestHub: Story = {
     expectTestIdAbsent(canvasElement, "personal-best-paused-end-puzzle-900");
     await waitForText(canvasElement, "No time limit · 3 mistakes");
     await clickTestId(canvasElement, "personal-best-more-levels");
-    await waitForTestId(canvasElement, "personal-best-more-level-options");
+    await waitForVisibleTestId(canvasElement, "personal-best-more-level-options-motion");
+    await clickTestId(canvasElement, "personal-best-more-levels");
+    await waitForHiddenTestId(canvasElement, "personal-best-more-level-options-motion");
+    await clickTestId(canvasElement, "personal-best-more-levels");
+    await waitForVisibleTestId(canvasElement, "personal-best-more-level-options-motion");
+    (canvasElement.querySelector('[data-testid="personal-best-more-levels"]') as HTMLElement | null)?.blur();
   }
 };
 
@@ -1116,6 +1127,12 @@ export const PersonalBestRecords: Story = {
     await waitForTestId(canvasElement, "personal-best-records-screen");
     await expectTestIdText(canvasElement, "personal-best-records-score", "19");
     await waitForTestId(canvasElement, "personal-best-records-in-progress");
+    await waitForVisibleTestId(canvasElement, "personal-best-records-in-progress-content-motion");
+    await clickTestId(canvasElement, "personal-best-records-in-progress-toggle");
+    await waitForHiddenTestId(canvasElement, "personal-best-records-in-progress-content-motion");
+    await clickTestId(canvasElement, "personal-best-records-in-progress-toggle");
+    await waitForVisibleTestId(canvasElement, "personal-best-records-in-progress-content-motion");
+    (canvasElement.querySelector('[data-testid="personal-best-records-in-progress-toggle"]') as HTMLElement | null)?.blur();
     await waitForTestId(canvasElement, "personal-best-records-puzzle");
     await waitForTestId(canvasElement, "personal-best-records-arrow_duel");
     await waitForText(canvasElement, "Every level stands on its own");

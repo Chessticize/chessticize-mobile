@@ -1,12 +1,17 @@
 import React from "react";
 import {
+  Animated,
+  Easing,
   Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
   View
 } from "react-native";
+import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native";
 import type { SprintState } from "../../../../packages/core/src/types.ts";
+
+const SURVIVAL_DISCLOSURE_MOTION_DURATION_MS = 200;
 
 export type PersonalBestRatingBandPresentation = {
   currentRating: number;
@@ -387,6 +392,7 @@ export function PersonalBestChallengeHub({
   const [moreLevelsVisible, setMoreLevelsVisible] = React.useState(
     presentation.moreLevelsInitiallyVisible === true
   );
+  const [inProgressVisible, setInProgressVisible] = React.useState(true);
   const source = referenceRunFor(presentation, challengeType, selectedSourceIds[challengeType]);
   const requestedRecommendedBand = source ? canonicalBandFor(source.rating) : selectedBand;
   const recommendedBand = closestAvailableBand(availableLevels, requestedRecommendedBand);
@@ -531,32 +537,50 @@ export function PersonalBestChallengeHub({
 
       {inProgress.length > 0 ? (
         <View style={styles.hubSection} testID="personal-best-in-progress">
-          <View style={styles.hubSectionTitleRow}>
-            <Text style={styles.hubSectionTitle}>In progress</Text>
-            <Text style={styles.hubSectionCount}>{inProgress.length}</Text>
-          </View>
-          {inProgress.map((run) => (
-            <View key={run.id} style={styles.pausedRunCard} testID={`personal-best-paused-${run.id}`}>
-              <View style={styles.pausedRunCopy}>
-                <Text style={styles.pausedRunTitle}>{challengeTypeLabel(run.challengeType)} · {levelLabel(run)}</Text>
-                <Text style={styles.pausedRunDetail}>
-                  {run.score} solved · {run.mistakeCount} of 3 mistakes · {run.phaseLabel ?? "Puzzle saved"}
-                </Text>
-                <Text style={styles.pausedRunMeta}>
-                  {formatElapsed(run.activeElapsedMs)} active · {run.sittings} sittings · {run.lastTouchedLabel}
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Continue ${challengeTypeLabel(run.challengeType)} ${levelLabel(run)}`}
-                style={styles.pausedRunContinue}
-                testID={`personal-best-paused-continue-${run.id}`}
-                onPress={() => onContinue(run.id)}
-              >
-                <Text style={styles.pausedRunContinueText}>Continue</Text>
-              </Pressable>
+          <Pressable
+            accessibilityLabel={`${inProgressVisible ? "Hide" : "Show"} ${inProgress.length} ${challengeTypeLabel(challengeType)} Runs in progress`}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: inProgressVisible }}
+            style={styles.survivalDisclosureHeader}
+            testID="personal-best-in-progress-toggle"
+            onPress={() => setInProgressVisible((visible) => !visible)}
+          >
+            <View style={styles.hubSectionTitleRow}>
+              <Text style={styles.hubSectionTitle}>In progress</Text>
+              <Text style={styles.hubSectionCount}>{inProgress.length}</Text>
             </View>
-          ))}
+            <SurvivalDisclosureChevron
+              expanded={inProgressVisible}
+              testID="personal-best-in-progress-chevron"
+            />
+          </Pressable>
+          <SurvivalCollapsibleRegion
+            contentTestID="personal-best-in-progress-content"
+            expanded={inProgressVisible}
+          >
+            {inProgress.map((run) => (
+              <View key={run.id} style={styles.pausedRunCard} testID={`personal-best-paused-${run.id}`}>
+                <View style={styles.pausedRunCopy}>
+                  <Text style={styles.pausedRunTitle}>{challengeTypeLabel(run.challengeType)} · {levelLabel(run)}</Text>
+                  <Text style={styles.pausedRunDetail}>
+                    {run.score} solved · {run.mistakeCount} of 3 mistakes · {run.phaseLabel ?? "Puzzle saved"}
+                  </Text>
+                  <Text style={styles.pausedRunMeta}>
+                    {formatElapsed(run.activeElapsedMs)} active · {run.sittings} sittings · {run.lastTouchedLabel}
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Continue ${challengeTypeLabel(run.challengeType)} ${levelLabel(run)}`}
+                  style={styles.pausedRunContinue}
+                  testID={`personal-best-paused-continue-${run.id}`}
+                  onPress={() => onContinue(run.id)}
+                >
+                  <Text style={styles.pausedRunContinueText}>Continue</Text>
+                </Pressable>
+              </View>
+            ))}
+          </SurvivalCollapsibleRegion>
         </View>
       ) : null}
 
@@ -672,10 +696,16 @@ export function PersonalBestChallengeHub({
               onPress={() => setMoreLevelsVisible((visible) => !visible)}
             >
               <Text style={styles.moreLevelsText}>{moreLevelsVisible ? "Hide more levels" : "More levels"}</Text>
-              <Text style={styles.moreLevelsChevron}>{moreLevelsVisible ? "⌃" : "⌄"}</Text>
+              <SurvivalDisclosureChevron
+                expanded={moreLevelsVisible}
+                testID="personal-best-more-levels-chevron"
+              />
             </Pressable>
-            {moreLevelsVisible ? (
-              <View style={styles.moreLevelGrid} testID="personal-best-more-level-options">
+            <SurvivalCollapsibleRegion
+              contentTestID="personal-best-more-level-options"
+              contentStyle={styles.moreLevelGrid}
+              expanded={moreLevelsVisible}
+            >
                 {otherLevels.map((level) => (
                   <Pressable
                     key={level.minRating}
@@ -693,8 +723,7 @@ export function PersonalBestChallengeHub({
                 <Text style={styles.moreLevelsAvailability} testID="personal-best-level-availability">
                   Showing every Survival level in this Core Pack: {availableLevels[0]?.minRating}–{availableLevels[availableLevels.length - 1]?.maxRating}.
                 </Text>
-              </View>
-            ) : null}
+            </SurvivalCollapsibleRegion>
           </View>
 
           <View style={styles.rulesSummary} testID="personal-best-rules-summary">
@@ -1007,6 +1036,7 @@ export function PersonalBestRecordsScreen({
 }): React.JSX.Element {
   const records = presentation.levelRecords ?? [];
   const pausedRuns = presentation.pausedRuns ?? [];
+  const [inProgressVisible, setInProgressVisible] = React.useState(true);
   const recordSummary = records.map((record) => {
     const best = survivalBestForLevel(record, pausedRuns);
     return `${challengeTypeLabel(record.challengeType)} ${levelLabel(record)} best ${best.score}${best.inProgress ? ", in progress" : ""}`;
@@ -1039,20 +1069,38 @@ export function PersonalBestRecordsScreen({
       </View>
       {pausedRuns.length > 0 ? (
         <View style={styles.historyInProgress} testID="personal-best-records-in-progress">
-          <View style={styles.hubSectionTitleRow}>
-            <Text style={styles.hubSectionTitle}>In progress</Text>
-            <Text style={styles.hubSectionCount}>{pausedRuns.length}</Text>
-          </View>
-          {pausedRuns.map((run) => (
-            <View key={run.id} style={styles.historyPausedRow}>
-              <View>
-                <Text style={styles.historyRecordTitle}>{challengeTypeLabel(run.challengeType)} · {levelLabel(run)}</Text>
-                <Text style={styles.historyRecordDetail}>{run.score} solved · {run.mistakeCount} of 3 mistakes</Text>
-              </View>
-              <Text style={styles.historyPausedStatus}>Paused</Text>
+          <Pressable
+            accessibilityLabel={`${inProgressVisible ? "Hide" : "Show"} ${pausedRuns.length} Survival Runs in progress`}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: inProgressVisible }}
+            style={styles.survivalDisclosureHeader}
+            testID="personal-best-records-in-progress-toggle"
+            onPress={() => setInProgressVisible((visible) => !visible)}
+          >
+            <View style={styles.hubSectionTitleRow}>
+              <Text style={styles.hubSectionTitle}>In progress</Text>
+              <Text style={styles.hubSectionCount}>{pausedRuns.length}</Text>
             </View>
-          ))}
-          <Text style={styles.historyEligibilityNote}>A new high is saved immediately while its Run stays in progress.</Text>
+            <SurvivalDisclosureChevron
+              expanded={inProgressVisible}
+              testID="personal-best-records-in-progress-chevron"
+            />
+          </Pressable>
+          <SurvivalCollapsibleRegion
+            contentTestID="personal-best-records-in-progress-content"
+            expanded={inProgressVisible}
+          >
+            {pausedRuns.map((run) => (
+              <View key={run.id} style={styles.historyPausedRow}>
+                <View>
+                  <Text style={styles.historyRecordTitle}>{challengeTypeLabel(run.challengeType)} · {levelLabel(run)}</Text>
+                  <Text style={styles.historyRecordDetail}>{run.score} solved · {run.mistakeCount} of 3 mistakes</Text>
+                </View>
+                <Text style={styles.historyPausedStatus}>Paused</Text>
+              </View>
+            ))}
+            <Text style={styles.historyEligibilityNote}>A new high is saved immediately while its Run stays in progress.</Text>
+          </SurvivalCollapsibleRegion>
         </View>
       ) : null}
       {(["puzzle", "arrow_duel"] as const).map((type) => {
@@ -1109,6 +1157,123 @@ export function PersonalBestRecordsScreen({
         Pausing keeps any best already reached. Active time and sittings are context only.
       </Text>
     </View>
+  );
+}
+
+function SurvivalCollapsibleRegion({
+  children,
+  contentStyle,
+  contentTestID,
+  expanded
+}: {
+  children: React.ReactNode;
+  contentStyle?: StyleProp<ViewStyle>;
+  contentTestID: string;
+  expanded: boolean;
+}): React.JSX.Element {
+  const progress = React.useRef(new Animated.Value(expanded ? 1 : 0)).current;
+  const [contentHeight, setContentHeight] = React.useState(0);
+
+  React.useEffect(() => {
+    progress.stopAnimation();
+    Animated.timing(progress, {
+      duration: SURVIVAL_DISCLOSURE_MOTION_DURATION_MS,
+      easing: Easing.out(Easing.cubic),
+      toValue: expanded ? 1 : 0,
+      useNativeDriver: false
+    }).start();
+  }, [expanded, progress]);
+
+  React.useEffect(() => {
+    if (!expanded || contentHeight <= 0) {
+      return;
+    }
+    progress.stopAnimation();
+    Animated.timing(progress, {
+      duration: SURVIVAL_DISCLOSURE_MOTION_DURATION_MS,
+      easing: Easing.out(Easing.cubic),
+      toValue: 1,
+      useNativeDriver: false
+    }).start();
+  }, [contentHeight, expanded, progress]);
+
+  const animatedHeight = contentHeight > 0
+    ? progress.interpolate({ inputRange: [0, 1], outputRange: [0, contentHeight] })
+    : expanded
+      ? undefined
+      : 0;
+  const shouldMeasureInFlow = expanded && contentHeight === 0;
+  const opacity = progress.interpolate({
+    inputRange: [0, 0.35, 1],
+    outputRange: [0, 0.55, 1]
+  });
+  const translateY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-4, 0]
+  });
+
+  return (
+    <Animated.View
+      aria-hidden={!expanded}
+      accessibilityElementsHidden={!expanded}
+      importantForAccessibility={expanded ? "auto" : "no-hide-descendants"}
+      pointerEvents={expanded ? "auto" : "none"}
+      style={[
+        styles.survivalDisclosureMotionClip,
+        { height: animatedHeight, opacity, transform: [{ translateY }] }
+      ]}
+      testID={`${contentTestID}-motion`}
+    >
+      <View
+        style={[
+          contentStyle,
+          shouldMeasureInFlow ? null : styles.survivalDisclosureMotionContent
+        ]}
+        testID={contentTestID}
+        onLayout={(event: LayoutChangeEvent) => {
+          const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+          if (nextHeight > 0 && nextHeight !== contentHeight) {
+            setContentHeight(nextHeight);
+          }
+        }}
+      >
+        {children}
+      </View>
+    </Animated.View>
+  );
+}
+
+function SurvivalDisclosureChevron({
+  expanded,
+  testID
+}: {
+  expanded: boolean;
+  testID: string;
+}): React.JSX.Element {
+  const progress = React.useRef(new Animated.Value(expanded ? 1 : 0)).current;
+
+  React.useEffect(() => {
+    progress.stopAnimation();
+    Animated.timing(progress, {
+      duration: SURVIVAL_DISCLOSURE_MOTION_DURATION_MS,
+      easing: Easing.out(Easing.cubic),
+      toValue: expanded ? 1 : 0,
+      useNativeDriver: false
+    }).start();
+  }, [expanded, progress]);
+
+  const rotate = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "180deg"]
+  });
+
+  return (
+    <Animated.View
+      style={[styles.survivalDisclosureChevronMotion, { transform: [{ rotate }] }]}
+      testID={testID}
+    >
+      <Text style={styles.moreLevelsChevron}>⌄</Text>
+    </Animated.View>
   );
 }
 
@@ -2170,11 +2335,13 @@ const styles = StyleSheet.create({
   },
   moreLevelsButton: {
     alignItems: "center",
+    borderRadius: 10,
     flexDirection: "row",
     justifyContent: "space-between",
+    marginTop: 8,
     minHeight: 42,
-    paddingHorizontal: 3,
-    paddingTop: 7
+    paddingHorizontal: 8,
+    paddingVertical: 7
   },
   moreLevelsChevron: {
     color: "#64748B",
@@ -2459,6 +2626,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     marginTop: 3
+  },
+  survivalDisclosureChevronMotion: {
+    alignItems: "center",
+    height: 24,
+    justifyContent: "center",
+    width: 24
+  },
+  survivalDisclosureHeader: {
+    alignItems: "center",
+    borderRadius: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 40,
+    paddingHorizontal: 4
+  },
+  survivalDisclosureMotionClip: {
+    overflow: "hidden",
+    width: "100%"
+  },
+  survivalDisclosureMotionContent: {
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
   },
   typeOption: {
     alignItems: "center",

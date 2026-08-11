@@ -7892,6 +7892,60 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("19 solved");
   });
 
+  it("animates Survival disclosures and removes collapsed content from interaction", () => {
+    const hubRenderer = renderLabScenario("practice-personal-best-hub");
+
+    expect(findByTestId(hubRenderer, "personal-best-in-progress-toggle").props.accessibilityState).toEqual({
+      expanded: true
+    });
+    expect(findByTestId(hubRenderer, "personal-best-in-progress-content-motion").props).toMatchObject({
+      "aria-hidden": false,
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
+    });
+    press(hubRenderer, "personal-best-in-progress-toggle");
+    expect(findByTestId(hubRenderer, "personal-best-in-progress-toggle").props.accessibilityState).toEqual({
+      expanded: false
+    });
+    expect(findByTestId(hubRenderer, "personal-best-in-progress-content-motion").props).toMatchObject({
+      "aria-hidden": true,
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
+
+    expect(findByTestId(hubRenderer, "personal-best-more-levels").props.accessibilityState).toEqual({
+      expanded: false
+    });
+    expect(findByTestId(hubRenderer, "personal-best-more-level-options-motion").props).toMatchObject({
+      "aria-hidden": true,
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
+    press(hubRenderer, "personal-best-more-levels");
+    expect(findByTestId(hubRenderer, "personal-best-more-levels").props.accessibilityState).toEqual({
+      expanded: true
+    });
+    expect(findByTestId(hubRenderer, "personal-best-more-level-options-motion").props).toMatchObject({
+      "aria-hidden": false,
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
+    });
+
+    const recordsRenderer = renderLabScenario("practice-personal-best-records");
+    expect(findByTestId(recordsRenderer, "personal-best-records-in-progress-toggle").props.accessibilityState).toEqual({
+      expanded: true
+    });
+    press(recordsRenderer, "personal-best-records-in-progress-toggle");
+    expect(findByTestId(recordsRenderer, "personal-best-records-in-progress-content-motion").props).toMatchObject({
+      "aria-hidden": true,
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
+    expect(findByTestId(hubRenderer, "personal-best-in-progress-chevron")).toBeTruthy();
+    expect(findByTestId(recordsRenderer, "personal-best-records-in-progress-chevron")).toBeTruthy();
+    expect(findByTestId(hubRenderer, "personal-best-more-levels-chevron")).toBeTruthy();
+  });
+
   it("hides the Survival puzzle while paused and offers only Resume or Leave paused", () => {
     const renderer = renderLabScenario("practice-personal-best-active");
 
