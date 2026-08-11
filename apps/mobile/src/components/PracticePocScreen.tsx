@@ -6047,14 +6047,32 @@ function PracticeRunHome({
         })}
       />
 
-      <View style={styles.runManagementToolbar}>
-        <Text style={styles.helperText}>
-          {presentation.homeEditing
-            ? Platform.OS === "web"
-              ? "Drag a card to reorder, or use the arrow buttons."
-              : "Touch and hold a card to drag, or use the arrow buttons."
-            : "Choose a saved run, then start when you are ready."}
-        </Text>
+      <Text style={styles.helperText}>
+        {presentation.homeEditing
+          ? Platform.OS === "web"
+            ? "Drag a card to reorder, or use the arrow buttons."
+            : "Touch and hold a card to drag, or use the arrow buttons."
+          : "Choose a run, then start when you are ready."}
+      </Text>
+
+      <View
+        style={styles.runManagementToolbar}
+        testID="practice-run-home-utilities"
+      >
+        {sprintRulesGuide && !presentation.homeEditing && !sprintRulesGuideVisible ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="How Sprint works"
+            style={styles.sprintRulesHelpLink}
+            testID="practice-sprint-rules-open"
+            onPress={onOpenSprintRulesGuide}
+          >
+            <View style={styles.sprintRulesHelpIcon}>
+              <Text style={styles.sprintRulesHelpIconText}>?</Text>
+            </View>
+            <Text style={styles.sprintRulesHelpLinkText}>How Sprint works</Text>
+          </Pressable>
+        ) : null}
         <View style={styles.runManagementToolbarActions}>
           {!presentation.homeEditing ? (
             <Pressable
@@ -6079,26 +6097,11 @@ function PracticeRunHome({
         </View>
       </View>
 
-      {sprintRulesGuide && !presentation.homeEditing ? (
-        sprintRulesGuideVisible ? (
-          <SprintRulesGuide
-            presentation={sprintRulesGuide}
-            onDismiss={onDismissSprintRulesGuide}
-          />
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="How Sprint works"
-            style={styles.sprintRulesHelpLink}
-            testID="practice-sprint-rules-open"
-            onPress={onOpenSprintRulesGuide}
-          >
-            <View style={styles.sprintRulesHelpIcon}>
-              <Text style={styles.sprintRulesHelpIconText}>?</Text>
-            </View>
-            <Text style={styles.sprintRulesHelpLinkText}>How Sprint works</Text>
-          </Pressable>
-        )
+      {sprintRulesGuide && !presentation.homeEditing && sprintRulesGuideVisible ? (
+        <SprintRulesGuide
+          presentation={sprintRulesGuide}
+          onDismiss={onDismissSprintRulesGuide}
+        />
       ) : null}
 
       {presentation.notice ? (
@@ -18638,7 +18641,8 @@ const styles = StyleSheet.create({
   runManagementToolbarActions: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8
+    gap: 8,
+    marginLeft: "auto"
   },
   sprintRulesHelpLink: {
     alignItems: "center",
