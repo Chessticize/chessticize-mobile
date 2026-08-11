@@ -98,10 +98,10 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..4a783e56313b78da32dee0d5be67d275
    }))));
  });
 diff --git a/lib/commonjs/components/skia/gesture-board.js b/lib/commonjs/components/skia/gesture-board.js
-index 7ddc0516545a4e1e16774f520123aaa883c235c0..62d6ce8f22d199c860824eb7221bb8722b32e607 100644
+index 7ddc0516545a4e1e16774f520123aaa883c235c0..27d149d7ca551d664b50a42876e6feaa0834fdbb 100644
 --- a/lib/commonjs/components/skia/gesture-board.js
 +++ b/lib/commonjs/components/skia/gesture-board.js
-@@ -20,13 +20,16 @@ var _promotionDialog = require("../promotion-dialog");
+@@ -20,13 +20,17 @@ var _promotionDialog = require("../promotion-dialog");
  function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
  const styles = _reactNative.StyleSheet.create({
    container: {
@@ -115,11 +115,12 @@ index 7ddc0516545a4e1e16774f520123aaa883c235c0..62d6ce8f22d199c860824eb7221bb872
    onIllegalMove,
    renderEffect,
 +  onReady,
++  blocksExternalGesture,
 +  positionKey,
    spriteSource
  }, ref) => {
    const {
-@@ -37,6 +40,21 @@ const GestureBoard = exports.GestureBoard = /*#__PURE__*/(0, _react.forwardRef)(
+@@ -37,6 +41,21 @@ const GestureBoard = exports.GestureBoard = /*#__PURE__*/(0, _react.forwardRef)(
    const {
      image: spriteImage
    } = (0, _pieceImages.usePieceSpriteSheet)(spriteSource);
@@ -141,6 +142,14 @@ index 7ddc0516545a4e1e16774f520123aaa883c235c0..62d6ce8f22d199c860824eb7221bb872
  
    // Effect state for shader effects (all SharedValues for reactivity)
    const effectCenterX = (0, _reactNativeReanimated.useSharedValue)(0);
+@@ -144,6 +163,7 @@ const GestureBoard = exports.GestureBoard = /*#__PURE__*/(0, _react.forwardRef)(
+     // Lock the board while the promotion picker is open so a second drag
+     // can't start (and re-trigger) another promotion.
+     gestureEnabled: config.gestureEnabled && !showPromotion,
++    blocksExternalGesture,
+     onIllegalMove
+   });
+   const containerStyle = (0, _react.useMemo)(() => [styles.container, {
 diff --git a/lib/commonjs/components/skia/skia-dots.js b/lib/commonjs/components/skia/skia-dots.js
 index 99152d0e193c3ff32b49cb57c78a5b09799a8617..27bd528cb50e65fefa778afe525945ca29584669 100644
 --- a/lib/commonjs/components/skia/skia-dots.js
@@ -248,10 +257,16 @@ index d4a7146591891ed0ac8381633f06b668cb1b7ad0..83fc26beae5f0e14a951d3e88a55ac1e
        sprites,
        transforms
 diff --git a/lib/commonjs/hooks/use-board-gesture.js b/lib/commonjs/hooks/use-board-gesture.js
-index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a297f4ce985 100644
+index 26deda8bb43c022624db07d6ea463a1028f082f9..a747cbf139cd160c8afc38b17680297e082f2f10 100644
 --- a/lib/commonjs/hooks/use-board-gesture.js
 +++ b/lib/commonjs/hooks/use-board-gesture.js
-@@ -19,7 +19,8 @@ const useBoardGesture = ({
+@@ -14,12 +14,14 @@ const useBoardGesture = ({
+   config,
+   moveExecutor,
+   gestureEnabled,
++  blocksExternalGesture,
+   onIllegalMove
+ }) => {
    const {
      pieceSize,
      animations,
@@ -261,7 +276,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a29
    } = config;
  
    // Track the currently dragged piece
-@@ -29,11 +30,25 @@ const useBoardGesture = ({
+@@ -29,11 +31,25 @@ const useBoardGesture = ({
    // Offset between touch point and piece position (to follow finger exactly)
    const touchOffsetX = (0, _reactNativeReanimated.useSharedValue)(0);
    const touchOffsetY = (0, _reactNativeReanimated.useSharedValue)(0);
@@ -290,7 +305,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a29
  
    // Stable callback for selectPiece
    const handleSelectPiece = (0, _react.useCallback)(square => {
-@@ -55,17 +70,32 @@ const useBoardGesture = ({
+@@ -55,17 +71,32 @@ const useBoardGesture = ({
          y
        } = event;
        const square = (0, _useBoardState.positionToSquare)(x, y, pieceSize, flipped);
@@ -332,7 +347,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a29
        }
      }).onStart(() => {
        'worklet';
-@@ -76,16 +106,23 @@ const useBoardGesture = ({
+@@ -76,16 +107,23 @@ const useBoardGesture = ({
        const squareState = boardState.squares[square];
        const piece = squareState.piece.get();
        const turn = boardState.turn.get();
@@ -360,7 +375,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a29
      }).onUpdate(event => {
        'worklet';
  
-@@ -97,25 +134,45 @@ const useBoardGesture = ({
+@@ -97,25 +135,45 @@ const useBoardGesture = ({
        // Subtracting pieceSize/2 converts from center back to top-left (translateX/Y)
        squareState.translateX.set(event.x - touchOffsetX.get() - pieceSize / 2);
        squareState.translateY.set(event.y - touchOffsetY.get() - pieceSize / 2);
@@ -410,7 +425,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a29
  
        // If not own piece, just snap back (can't make moves with opponent's pieces)
        if (!isOwnPiece) {
-@@ -147,6 +204,17 @@ const useBoardGesture = ({
+@@ -147,6 +205,17 @@ const useBoardGesture = ({
          draggedSquare.set(null);
          return;
        }
@@ -428,7 +443,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a29
  
        // Invalid move - snap back to original position and clear selection
        const originalPos = (0, _useBoardState.squareToPosition)(square, pieceSize, flipped);
-@@ -172,6 +240,7 @@ const useBoardGesture = ({
+@@ -172,6 +241,7 @@ const useBoardGesture = ({
            squareState.zIndex.set(0);
          }
        }
@@ -436,7 +451,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a29
        draggedSquare.set(null);
      });
  
-@@ -187,20 +256,30 @@ const useBoardGesture = ({
+@@ -187,20 +257,30 @@ const useBoardGesture = ({
        const selectedSquare = boardState.selectedSquare.get();
        const piece = boardState.squares[square].piece.get();
        const turn = boardState.turn.get();
@@ -471,7 +486,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a29
          return;
        }
  
-@@ -213,18 +292,31 @@ const useBoardGesture = ({
+@@ -213,18 +293,38 @@ const useBoardGesture = ({
  
        // Case 4: Tapped on another own piece - switch selection
        if (isOwnPiece) {
@@ -500,15 +515,22 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..ac8d79cbc8b97162d79bbd06ee463a29
 -    // Combine gestures - pan takes precedence
 -    return _reactNativeGestureHandler.Gesture.Simultaneous(tapGesture, panGesture);
 -  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, animations, gestureEnabled, handleTryMove, handleSelectPiece, handleIllegalMove]);
++    // Relations attached to a composed Race are not propagated to its raw
++    // gestures. Block the parent scroll from both candidates before composing.
++    if (blocksExternalGesture) {
++      tapGesture.blocksExternalGesture(blocksExternalGesture);
++      panGesture.blocksExternalGesture(blocksExternalGesture);
++    }
++
 +    // Tap should not wait for the pan candidate to settle. A real drag still
 +    // wins once it crosses minDistance before the tap can activate on release.
 +    return _reactNativeGestureHandler.Gesture.Race(tapGesture, panGesture);
-+  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, selectedAtTouchStart, dragActivated, animations, gestureEnabled, draggableColor, handleTryMove, handleSelectPiece, handleIllegalMove]);
++  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, selectedAtTouchStart, dragActivated, animations, gestureEnabled, blocksExternalGesture, draggableColor, handleTryMove, handleSelectPiece, handleIllegalMove]);
    return gesture;
  };
  exports.useBoardGesture = useBoardGesture;
 diff --git a/lib/commonjs/index.js b/lib/commonjs/index.js
-index 360d75d327324795ca72a43b37965b1ea2bc19d9..f7a5a82061069d45db82d72ac05ecec7561dcd78 100644
+index 360d75d327324795ca72a43b37965b1ea2bc19d9..0273c3633b1dabecabdeceea5bf76d394a84681c 100644
 --- a/lib/commonjs/index.js
 +++ b/lib/commonjs/index.js
 @@ -12,6 +12,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
@@ -519,15 +541,16 @@ index 360d75d327324795ca72a43b37965b1ea2bc19d9..f7a5a82061069d45db82d72ac05ecec7
    flipped,
    withLetters,
    withNumbers,
-@@ -20,6 +21,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
+@@ -20,6 +21,8 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
    onMove,
    onIllegalMove,
    renderEffect,
 +  onReady,
++  blocksExternalGesture,
    spriteSource,
    fontSource
  }, ref) => {
-@@ -27,6 +29,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
+@@ -27,6 +30,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
      fen: fen,
      boardSize: boardSize,
      gestureEnabled: gestureEnabled,
@@ -535,11 +558,12 @@ index 360d75d327324795ca72a43b37965b1ea2bc19d9..f7a5a82061069d45db82d72ac05ecec7
      flipped: flipped,
      withLetters: withLetters,
      withNumbers: withNumbers,
-@@ -38,6 +41,8 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
+@@ -38,6 +42,9 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
      onMove: onMove,
      onIllegalMove: onIllegalMove,
      renderEffect: renderEffect,
 +    onReady: onReady,
++    blocksExternalGesture: blocksExternalGesture,
 +    positionKey: fen,
      spriteSource: spriteSource
    }));
@@ -883,7 +907,7 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..d451c67e216a56d8d93e9d09aaef03bc
    }))));
  });
 diff --git a/lib/module/components/skia/gesture-board.js b/lib/module/components/skia/gesture-board.js
-index 79598f3cce08d079d2a004ed0563f1194fd7d31c..01aeda5e79f1d30b95eb3dcfff4ba8c402080ffd 100644
+index 79598f3cce08d079d2a004ed0563f1194fd7d31c..2bb1c9e504ba4da013672cffc660995f52d32c96 100644
 --- a/lib/module/components/skia/gesture-board.js
 +++ b/lib/module/components/skia/gesture-board.js
 @@ -1,4 +1,4 @@
@@ -892,7 +916,7 @@ index 79598f3cce08d079d2a004ed0563f1194fd7d31c..01aeda5e79f1d30b95eb3dcfff4ba8c4
  import { View, StyleSheet } from 'react-native';
  import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
  import { useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
-@@ -13,13 +13,16 @@ import { SkiaBoard } from './skia-board';
+@@ -13,13 +13,17 @@ import { SkiaBoard } from './skia-board';
  import { PromotionDialog } from '../promotion-dialog';
  const styles = StyleSheet.create({
    container: {
@@ -906,11 +930,12 @@ index 79598f3cce08d079d2a004ed0563f1194fd7d31c..01aeda5e79f1d30b95eb3dcfff4ba8c4
    onIllegalMove,
    renderEffect,
 +  onReady,
++  blocksExternalGesture,
 +  positionKey,
    spriteSource
  }, ref) => {
    const {
-@@ -30,6 +33,21 @@ export const GestureBoard = /*#__PURE__*/forwardRef(({
+@@ -30,6 +34,21 @@ export const GestureBoard = /*#__PURE__*/forwardRef(({
    const {
      image: spriteImage
    } = usePieceSpriteSheet(spriteSource);
@@ -932,6 +957,14 @@ index 79598f3cce08d079d2a004ed0563f1194fd7d31c..01aeda5e79f1d30b95eb3dcfff4ba8c4
  
    // Effect state for shader effects (all SharedValues for reactivity)
    const effectCenterX = useSharedValue(0);
+@@ -137,6 +156,7 @@ export const GestureBoard = /*#__PURE__*/forwardRef(({
+     // Lock the board while the promotion picker is open so a second drag
+     // can't start (and re-trigger) another promotion.
+     gestureEnabled: config.gestureEnabled && !showPromotion,
++    blocksExternalGesture,
+     onIllegalMove
+   });
+   const containerStyle = useMemo(() => [styles.container, {
 diff --git a/lib/module/components/skia/skia-dots.js b/lib/module/components/skia/skia-dots.js
 index 120f116f938d6bf19ed350321959c9c5a860b48a..863f4f5380a90afb2c2f1ed1508efe197b54782b 100644
 --- a/lib/module/components/skia/skia-dots.js
@@ -1039,10 +1072,16 @@ index efa0ca0d342d28c1d44eed586d831d294159c2d9..61a50214e449b4e31e358704aa703a3f
        sprites,
        transforms
 diff --git a/lib/module/hooks/use-board-gesture.js b/lib/module/hooks/use-board-gesture.js
-index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacccee94e68 100644
+index 504126e4dc0a469cf5b00913e176e360322a1194..a1d699fb83ef4f17ec1ff90315d5ee8e67035164 100644
 --- a/lib/module/hooks/use-board-gesture.js
 +++ b/lib/module/hooks/use-board-gesture.js
-@@ -13,7 +13,8 @@ export const useBoardGesture = ({
+@@ -8,12 +8,14 @@ export const useBoardGesture = ({
+   config,
+   moveExecutor,
+   gestureEnabled,
++  blocksExternalGesture,
+   onIllegalMove
+ }) => {
    const {
      pieceSize,
      animations,
@@ -1052,7 +1091,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacc
    } = config;
  
    // Track the currently dragged piece
-@@ -23,11 +24,25 @@ export const useBoardGesture = ({
+@@ -23,11 +25,25 @@ export const useBoardGesture = ({
    // Offset between touch point and piece position (to follow finger exactly)
    const touchOffsetX = useSharedValue(0);
    const touchOffsetY = useSharedValue(0);
@@ -1081,7 +1120,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacc
  
    // Stable callback for selectPiece
    const handleSelectPiece = useCallback(square => {
-@@ -49,17 +64,32 @@ export const useBoardGesture = ({
+@@ -49,17 +65,32 @@ export const useBoardGesture = ({
          y
        } = event;
        const square = positionToSquare(x, y, pieceSize, flipped);
@@ -1123,7 +1162,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacc
        }
      }).onStart(() => {
        'worklet';
-@@ -70,16 +100,23 @@ export const useBoardGesture = ({
+@@ -70,16 +101,23 @@ export const useBoardGesture = ({
        const squareState = boardState.squares[square];
        const piece = squareState.piece.get();
        const turn = boardState.turn.get();
@@ -1151,7 +1190,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacc
      }).onUpdate(event => {
        'worklet';
  
-@@ -91,25 +128,45 @@ export const useBoardGesture = ({
+@@ -91,25 +129,45 @@ export const useBoardGesture = ({
        // Subtracting pieceSize/2 converts from center back to top-left (translateX/Y)
        squareState.translateX.set(event.x - touchOffsetX.get() - pieceSize / 2);
        squareState.translateY.set(event.y - touchOffsetY.get() - pieceSize / 2);
@@ -1201,7 +1240,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacc
  
        // If not own piece, just snap back (can't make moves with opponent's pieces)
        if (!isOwnPiece) {
-@@ -141,6 +198,17 @@ export const useBoardGesture = ({
+@@ -141,6 +199,17 @@ export const useBoardGesture = ({
          draggedSquare.set(null);
          return;
        }
@@ -1219,7 +1258,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacc
  
        // Invalid move - snap back to original position and clear selection
        const originalPos = squareToPosition(square, pieceSize, flipped);
-@@ -166,6 +234,7 @@ export const useBoardGesture = ({
+@@ -166,6 +235,7 @@ export const useBoardGesture = ({
            squareState.zIndex.set(0);
          }
        }
@@ -1227,7 +1266,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacc
        draggedSquare.set(null);
      });
  
-@@ -181,20 +250,30 @@ export const useBoardGesture = ({
+@@ -181,20 +251,30 @@ export const useBoardGesture = ({
        const selectedSquare = boardState.selectedSquare.get();
        const piece = boardState.squares[square].piece.get();
        const turn = boardState.turn.get();
@@ -1262,7 +1301,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacc
          return;
        }
  
-@@ -207,18 +286,31 @@ export const useBoardGesture = ({
+@@ -207,18 +287,38 @@ export const useBoardGesture = ({
  
        // Case 4: Tapped on another own piece - switch selection
        if (isOwnPiece) {
@@ -1291,16 +1330,22 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..fc26fec8d6204ea4c07e4c6978ccbacc
 -    // Combine gestures - pan takes precedence
 -    return Gesture.Simultaneous(tapGesture, panGesture);
 -  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, animations, gestureEnabled, handleTryMove, handleSelectPiece, handleIllegalMove]);
++    // Relations attached to a composed Race are not propagated to its raw
++    // gestures. Block the parent scroll from both candidates before composing.
++    if (blocksExternalGesture) {
++      tapGesture.blocksExternalGesture(blocksExternalGesture);
++      panGesture.blocksExternalGesture(blocksExternalGesture);
++    }
++
 +    // Tap should not wait for the pan candidate to settle. A real drag still
 +    // wins once it crosses minDistance before the tap can activate on release.
 +    return Gesture.Race(tapGesture, panGesture);
-+  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, selectedAtTouchStart, dragActivated, animations, gestureEnabled, draggableColor, handleTryMove, handleSelectPiece, handleIllegalMove]);
++  }, [boardState, pieceSize, flipped, draggedSquare, dragStartX, dragStartY, touchOffsetX, touchOffsetY, selectedAtTouchStart, dragActivated, animations, gestureEnabled, blocksExternalGesture, draggableColor, handleTryMove, handleSelectPiece, handleIllegalMove]);
    return gesture;
  };
  //# sourceMappingURL=use-board-gesture.js.map
-\ No newline at end of file
 diff --git a/lib/module/index.js b/lib/module/index.js
-index 7cee33e75529b83bea5c7216e4b89be54c9fb520..c7046d081e266d2ba4bdee6fc4874027989fc037 100644
+index 7cee33e75529b83bea5c7216e4b89be54c9fb520..5d8d14e88ffe29c99a8c5cc9432bcb49ee70f3c6 100644
 --- a/lib/module/index.js
 +++ b/lib/module/index.js
 @@ -5,6 +5,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
@@ -1311,15 +1356,16 @@ index 7cee33e75529b83bea5c7216e4b89be54c9fb520..c7046d081e266d2ba4bdee6fc4874027
    flipped,
    withLetters,
    withNumbers,
-@@ -13,6 +14,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
+@@ -13,6 +14,8 @@ const Chessboard = /*#__PURE__*/forwardRef(({
    onMove,
    onIllegalMove,
    renderEffect,
 +  onReady,
++  blocksExternalGesture,
    spriteSource,
    fontSource
  }, ref) => {
-@@ -20,6 +22,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
+@@ -20,6 +23,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
      fen: fen,
      boardSize: boardSize,
      gestureEnabled: gestureEnabled,
@@ -1327,11 +1373,12 @@ index 7cee33e75529b83bea5c7216e4b89be54c9fb520..c7046d081e266d2ba4bdee6fc4874027
      flipped: flipped,
      withLetters: withLetters,
      withNumbers: withNumbers,
-@@ -31,6 +34,8 @@ const Chessboard = /*#__PURE__*/forwardRef(({
+@@ -31,6 +35,9 @@ const Chessboard = /*#__PURE__*/forwardRef(({
      onMove: onMove,
      onIllegalMove: onIllegalMove,
      renderEffect: renderEffect,
 +    onReady: onReady,
++    blocksExternalGesture: blocksExternalGesture,
 +    positionKey: fen,
      spriteSource: spriteSource
    }));
@@ -1577,18 +1624,47 @@ index 70c2cecb9088e81c71bbda522458e5602b3ccfe6..5445a48d5e9faf642f4462debe9b0989
        chess.reset();
      } else {
 diff --git a/lib/typescript/components/skia/gesture-board.d.ts b/lib/typescript/components/skia/gesture-board.d.ts
-index 879929871b8cf9abe7953a6992f7c038f0592d5f..7df54abc3cec6977f8a1813bef09e8860fc2667b 100644
+index 879929871b8cf9abe7953a6992f7c038f0592d5f..0cf3fb49da52ead8bed993476d48d67e0b0884ee 100644
 --- a/lib/typescript/components/skia/gesture-board.d.ts
 +++ b/lib/typescript/components/skia/gesture-board.d.ts
-@@ -8,6 +8,8 @@ export interface GestureBoardProps {
+@@ -1,5 +1,6 @@
+ import React from 'react';
+ import type { ImageSourcePropType } from 'react-native';
++import type { GestureType } from 'react-native-gesture-handler';
+ import type { Square } from 'chess.js';
+ import { MoveResult } from '../../state/move-executor';
+ import { ChessboardRef } from '../../hooks/use-chessboard-ref';
+@@ -8,6 +9,9 @@ export interface GestureBoardProps {
      onMove?: (result: MoveResult) => void;
      onIllegalMove?: (from: Square, to: Square) => void;
      renderEffect?: (params: EffectParams) => React.ReactNode;
 +    onReady?: () => void;
++    blocksExternalGesture?: React.RefObject<GestureType | undefined>;
 +    positionKey?: string;
      spriteSource?: ImageSourcePropType;
  }
  export declare const GestureBoard: React.ForwardRefExoticComponent<GestureBoardProps & React.RefAttributes<ChessboardRef>>;
+diff --git a/lib/typescript/hooks/use-board-gesture.d.ts b/lib/typescript/hooks/use-board-gesture.d.ts
+index fd3bbda6ebc9d343270cc92a0e1c37023849b8b8..89f80d19e89890f8619dfdbfc0a813950466b7ed 100644
+--- a/lib/typescript/hooks/use-board-gesture.d.ts
++++ b/lib/typescript/hooks/use-board-gesture.d.ts
+@@ -1,12 +1,15 @@
+ import type { Square } from 'chess.js';
++import type { RefObject } from 'react';
+ import type { BoardState, BoardConfig } from '../state/types';
+ import type { MoveExecutor } from '../state/move-executor';
++import type { GestureType } from 'react-native-gesture-handler';
+ interface UseBoardGestureProps {
+     boardState: BoardState;
+     config: BoardConfig;
+     moveExecutor: MoveExecutor;
+     gestureEnabled: boolean;
++    blocksExternalGesture?: RefObject<GestureType | undefined>;
+     onIllegalMove?: (from: Square, to: Square) => void;
+ }
+-export declare const useBoardGesture: ({ boardState, config, moveExecutor, gestureEnabled, onIllegalMove, }: UseBoardGestureProps) => import("react-native-gesture-handler/lib/typescript/handlers/gestures/gestureComposition").SimultaneousGesture;
++export declare const useBoardGesture: ({ boardState, config, moveExecutor, gestureEnabled, blocksExternalGesture, onIllegalMove, }: UseBoardGestureProps) => import("react-native-gesture-handler/lib/typescript/handlers/gestures/gestureComposition").SimultaneousGesture;
+ export {};
 diff --git a/lib/typescript/hooks/use-chessboard-ref.d.ts b/lib/typescript/hooks/use-chessboard-ref.d.ts
 index b3a8a75fde04559b7e81ef8b8aef53d9081e5924..07f2d673bad1d39034023e5dc2925304a0eea9f8 100644
 --- a/lib/typescript/hooks/use-chessboard-ref.d.ts
@@ -1602,10 +1678,17 @@ index b3a8a75fde04559b7e81ef8b8aef53d9081e5924..07f2d673bad1d39034023e5dc2925304
          lastMove?: {
              from: Square;
 diff --git a/lib/typescript/index.d.ts b/lib/typescript/index.d.ts
-index ac1a1357c8b5352dd97d856282ef96f056f45622..3b5cb5cb1739751552b97e7a7321474148bf898c 100644
+index ac1a1357c8b5352dd97d856282ef96f056f45622..dff5c745aaa140b59141673e76365c033f9dac95 100644
 --- a/lib/typescript/index.d.ts
 +++ b/lib/typescript/index.d.ts
-@@ -10,6 +10,11 @@ export interface ChessboardProps extends Omit<BoardStateProviderProps, 'children
+@@ -1,5 +1,6 @@
+ import React from 'react';
+ import type { ImageSourcePropType } from 'react-native';
++import type { GestureType } from 'react-native-gesture-handler';
+ import type { Move, Square } from 'chess.js';
+ import type { BoardStateProviderProps } from './state';
+ import type { MoveResult } from './state/move-executor';
+@@ -10,6 +11,13 @@ export interface ChessboardProps extends Omit<BoardStateProviderProps, 'children
      onMove?: (result: MoveResult) => void;
      onIllegalMove?: (from: Square, to: Square) => void;
      renderEffect?: (params: EffectParams) => React.ReactNode;
@@ -1614,6 +1697,8 @@ index ac1a1357c8b5352dd97d856282ef96f056f45622..3b5cb5cb1739751552b97e7a73214741
 +     * to paint. Called again when the `fen` prop changes.
 +     */
 +    onReady?: () => void;
++    /** Native gesture that the board's tap and pan gestures must block. */
++    blocksExternalGesture?: React.RefObject<GestureType | undefined>;
      /**
       * Optional custom piece sprite sheet. Must match the standard
       * 6×2 / 128px-cell layout (row 0 = white p,n,b,r,q,k; row 1 =
@@ -1798,10 +1883,10 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..133a12df3289ac45a55b3cce5c717b77
      );
    }
 diff --git a/src/components/skia/gesture-board.tsx b/src/components/skia/gesture-board.tsx
-index b4a278cc2ada84715a4916324b459952ab33c942..d383e6fb9c30b05a78d6fda0a0a354fa95b913c8 100644
+index b4a278cc2ada84715a4916324b459952ab33c942..63ed266ae8e58e72d96d70757422f0c3887a9165 100644
 --- a/src/components/skia/gesture-board.tsx
 +++ b/src/components/skia/gesture-board.tsx
-@@ -2,6 +2,7 @@ import React, {
+@@ -2,11 +2,13 @@ import React, {
    useMemo,
    useCallback,
    useState,
@@ -1809,7 +1894,13 @@ index b4a278cc2ada84715a4916324b459952ab33c942..d383e6fb9c30b05a78d6fda0a0a354fa
    forwardRef,
    useRef,
  } from 'react';
-@@ -38,9 +39,20 @@ import type { EffectParams, EffectTrigger } from '../../types';
+ import { View, StyleSheet } from 'react-native';
+ import type { ImageSourcePropType } from 'react-native';
++import type { GestureType } from 'react-native-gesture-handler';
+ import {
+   GestureDetector,
+   GestureHandlerRootView,
+@@ -38,9 +40,20 @@ import type { EffectParams, EffectTrigger } from '../../types';
  const styles = StyleSheet.create({
    container: {
      aspectRatio: 1,
@@ -1830,11 +1921,12 @@ index b4a278cc2ada84715a4916324b459952ab33c942..d383e6fb9c30b05a78d6fda0a0a354fa
  interface PromotionInfo {
    from: Square;
    to: Square;
-@@ -53,16 +65,49 @@ export interface GestureBoardProps {
+@@ -53,16 +66,51 @@ export interface GestureBoardProps {
    onMove?: (result: MoveResult) => void;
    onIllegalMove?: (from: Square, to: Square) => void;
    renderEffect?: (params: EffectParams) => React.ReactNode;
 +  onReady?: () => void;
++  blocksExternalGesture?: React.RefObject<GestureType | undefined>;
 +  positionKey?: string;
    spriteSource?: ImageSourcePropType;
  }
@@ -1847,6 +1939,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..d383e6fb9c30b05a78d6fda0a0a354fa
 +      onIllegalMove,
 +      renderEffect,
 +      onReady,
++      blocksExternalGesture,
 +      positionKey,
 +      spriteSource,
 +    },
@@ -1881,7 +1974,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..d383e6fb9c30b05a78d6fda0a0a354fa
      // Effect state for shader effects (all SharedValues for reactivity)
      const effectCenterX = useSharedValue(0);
      const effectCenterY = useSharedValue(0);
-@@ -71,30 +116,46 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -71,30 +119,46 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
        'checkmate' | 'check' | 'stalemate' | ''
      >('');
  
@@ -1933,7 +2026,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..d383e6fb9c30b05a78d6fda0a0a354fa
        // The drag gesture animated the pawn into the back-rank target square
        // and raised its zIndex; chess.move() was deferred until the user picked
        // a promotion piece. Cancel means we never execute the move, so snap
-@@ -121,9 +182,19 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -121,9 +185,19 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
          info.cancel();
        }
        promotionInfoRef.current = null;
@@ -1954,7 +2047,15 @@ index b4a278cc2ada84715a4916324b459952ab33c942..d383e6fb9c30b05a78d6fda0a0a354fa
      // Trigger effect on game events
      const triggerEffect = useCallback(
        (trigger: EffectTrigger, kingColor: 'w' | 'b') => {
-@@ -244,25 +315,27 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -217,6 +291,7 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+       // Lock the board while the promotion picker is open so a second drag
+       // can't start (and re-trigger) another promotion.
+       gestureEnabled: config.gestureEnabled && !showPromotion,
++      blocksExternalGesture,
+       onIllegalMove,
+     });
+
+@@ -244,25 +319,27 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
  
      return (
        <GestureHandlerRootView style={containerStyle}>
@@ -2119,11 +2220,30 @@ index 4cc6f383a6d248943def00bc914cbe572f991f36..95b14879b7ed4f3375aacde96b06a472
      });
  
 diff --git a/src/hooks/use-board-gesture.ts b/src/hooks/use-board-gesture.ts
-index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee697673b44c194 100644
+index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8863c68e2567a43612554da49ec7f2d26a8f10ef 100644
 --- a/src/hooks/use-board-gesture.ts
 +++ b/src/hooks/use-board-gesture.ts
-@@ -22,7 +22,7 @@ export const useBoardGesture = ({
+@@ -1,5 +1,7 @@
+ import { useMemo, useCallback } from 'react';
++import type { RefObject } from 'react';
+ import { Gesture } from 'react-native-gesture-handler';
++import type { GestureType } from 'react-native-gesture-handler';
+ import { useSharedValue, withSpring } from 'react-native-reanimated';
+ import { scheduleOnRN } from 'react-native-worklets';
+ import type { Square } from 'chess.js';
+@@ -12,6 +14,7 @@ interface UseBoardGestureProps {
+   config: BoardConfig;
+   moveExecutor: MoveExecutor;
+   gestureEnabled: boolean;
++  blocksExternalGesture?: RefObject<GestureType | undefined>;
+   onIllegalMove?: (from: Square, to: Square) => void;
+ }
+
+@@ -20,9 +23,10 @@ export const useBoardGesture = ({
+   config,
+   moveExecutor,
    gestureEnabled,
++  blocksExternalGesture,
    onIllegalMove,
  }: UseBoardGestureProps) => {
 -  const { pieceSize, animations, flipped } = config;
@@ -2131,7 +2251,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee69767
  
    // Track the currently dragged piece
    const draggedSquare = useSharedValue<Square | null>(null);
-@@ -31,13 +31,27 @@ export const useBoardGesture = ({
+@@ -31,13 +35,27 @@ export const useBoardGesture = ({
    // Offset between touch point and piece position (to follow finger exactly)
    const touchOffsetX = useSharedValue(0);
    const touchOffsetY = useSharedValue(0);
@@ -2162,7 +2282,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee69767
    );
  
    // Stable callback for selectPiece
-@@ -65,19 +79,34 @@ export const useBoardGesture = ({
+@@ -65,19 +83,34 @@ export const useBoardGesture = ({
          // Just prepare for potential drag - store touch info
          const { x, y } = event;
          const square = positionToSquare(x, y, pieceSize, flipped);
@@ -2206,7 +2326,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee69767
          }
        })
        .onStart(() => {
-@@ -89,16 +118,23 @@ export const useBoardGesture = ({
+@@ -89,16 +122,23 @@ export const useBoardGesture = ({
          const squareState = boardState.squares[square];
          const piece = squareState.piece.get();
          const turn = boardState.turn.get();
@@ -2234,7 +2354,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee69767
        })
        .onUpdate((event) => {
          'worklet';
-@@ -116,15 +152,19 @@ export const useBoardGesture = ({
+@@ -116,15 +156,19 @@ export const useBoardGesture = ({
            event.y - touchOffsetY.get() - pieceSize / 2
          );
        })
@@ -2257,7 +2377,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee69767
          if (!wasDragged) {
            draggedSquare.set(null);
            return;
-@@ -132,10 +172,30 @@ export const useBoardGesture = ({
+@@ -132,10 +176,30 @@ export const useBoardGesture = ({
  
          squareState.scale.set(withSpring(1, animations.scale));
  
@@ -2289,7 +2409,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee69767
  
          // If not own piece, just snap back (can't make moves with opponent's pieces)
          if (!isOwnPiece) {
-@@ -180,6 +240,18 @@ export const useBoardGesture = ({
+@@ -180,6 +244,18 @@ export const useBoardGesture = ({
            return;
          }
  
@@ -2308,7 +2428,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee69767
          // Invalid move - snap back to original position and clear selection
          const originalPos = squareToPosition(square, pieceSize, flipped);
          squareState.translateX.set(
-@@ -208,6 +280,7 @@ export const useBoardGesture = ({
+@@ -208,6 +284,7 @@ export const useBoardGesture = ({
              squareState.zIndex.set(0);
            }
          }
@@ -2316,7 +2436,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee69767
          draggedSquare.set(null);
        });
  
-@@ -221,20 +294,30 @@ export const useBoardGesture = ({
+@@ -221,20 +298,30 @@ export const useBoardGesture = ({
          const selectedSquare = boardState.selectedSquare.get();
          const piece = boardState.squares[square].piece.get();
          const turn = boardState.turn.get();
@@ -2351,7 +2471,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee69767
            return;
          }
  
-@@ -247,17 +330,30 @@ export const useBoardGesture = ({
+@@ -247,17 +334,37 @@ export const useBoardGesture = ({
  
          // Case 4: Tapped on another own piece - switch selection
          if (isOwnPiece) {
@@ -2379,13 +2499,20 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee69767
  
 -    // Combine gestures - pan takes precedence
 -    return Gesture.Simultaneous(tapGesture, panGesture);
++    // Relations attached to a composed Race are not propagated to its raw
++    // gestures. Block the parent scroll from both candidates before composing.
++    if (blocksExternalGesture) {
++      tapGesture.blocksExternalGesture(blocksExternalGesture);
++      panGesture.blocksExternalGesture(blocksExternalGesture);
++    }
++
 +    // Tap should not wait for the pan candidate to settle. A real drag still
 +    // wins once it crosses minDistance before the tap can activate on release.
 +    return Gesture.Race(tapGesture, panGesture);
    }, [
      boardState,
      pieceSize,
-@@ -267,8 +363,11 @@ export const useBoardGesture = ({
+@@ -267,8 +374,12 @@ export const useBoardGesture = ({
      dragStartY,
      touchOffsetX,
      touchOffsetY,
@@ -2393,6 +2520,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8b7eaf249e2805d8ec5246da8ee69767
 +    dragActivated,
      animations,
      gestureEnabled,
++    blocksExternalGesture,
 +    draggableColor,
      handleTryMove,
      handleSelectPiece,
@@ -2420,10 +2548,17 @@ index e1a1653b60bc39a2ac617a9d8b0e0c5c1399dd35..f35837e4fe7173af67846f1535168d88
        }
      ) => {
 diff --git a/src/index.tsx b/src/index.tsx
-index a50f36cba22769b8a484a1c4429a3135e661dcf3..3bdd04eaceacc2e8b0cab630f823b89aad2ac4c0 100644
+index a50f36cba22769b8a484a1c4429a3135e661dcf3..cfc883fb8cab34b3e13120c18e2dee4f258029ec 100644
 --- a/src/index.tsx
 +++ b/src/index.tsx
-@@ -14,6 +14,11 @@ export interface ChessboardProps
+@@ -1,5 +1,6 @@
+ import React, { forwardRef } from 'react';
+ import type { ImageSourcePropType } from 'react-native';
++import type { GestureType } from 'react-native-gesture-handler';
+ import type { Move, Square } from 'chess.js';
+ import { BoardStateProvider } from './state';
+ import type { BoardStateProviderProps } from './state';
+@@ -14,6 +15,13 @@ export interface ChessboardProps
    onMove?: (result: MoveResult) => void;
    onIllegalMove?: (from: Square, to: Square) => void;
    renderEffect?: (params: EffectParams) => React.ReactNode;
@@ -2432,10 +2567,12 @@ index a50f36cba22769b8a484a1c4429a3135e661dcf3..3bdd04eaceacc2e8b0cab630f823b89a
 +   * to paint. Called again when the `fen` prop changes.
 +   */
 +  onReady?: () => void;
++  /** Native gesture that the board's tap and pan gestures must block. */
++  blocksExternalGesture?: React.RefObject<GestureType | undefined>;
    /**
     * Optional custom piece sprite sheet. Must match the standard
     * 6×2 / 128px-cell layout (row 0 = white p,n,b,r,q,k; row 1 =
-@@ -34,6 +39,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+@@ -34,6 +42,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
        fen,
        boardSize,
        gestureEnabled,
@@ -2443,15 +2580,16 @@ index a50f36cba22769b8a484a1c4429a3135e661dcf3..3bdd04eaceacc2e8b0cab630f823b89a
        flipped,
        withLetters,
        withNumbers,
-@@ -42,6 +48,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+@@ -42,6 +51,8 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
        onMove,
        onIllegalMove,
        renderEffect,
 +      onReady,
++      blocksExternalGesture,
        spriteSource,
        fontSource,
      },
-@@ -52,6 +59,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+@@ -52,6 +63,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
          fen={fen}
          boardSize={boardSize}
          gestureEnabled={gestureEnabled}
@@ -2459,11 +2597,12 @@ index a50f36cba22769b8a484a1c4429a3135e661dcf3..3bdd04eaceacc2e8b0cab630f823b89a
          flipped={flipped}
          withLetters={withLetters}
          withNumbers={withNumbers}
-@@ -64,6 +72,8 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+@@ -64,6 +76,9 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
            onMove={onMove}
            onIllegalMove={onIllegalMove}
            renderEffect={renderEffect}
 +          onReady={onReady}
++          blocksExternalGesture={blocksExternalGesture}
 +          positionKey={fen}
            spriteSource={spriteSource}
          />

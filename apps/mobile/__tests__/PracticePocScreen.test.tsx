@@ -11567,6 +11567,16 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
   });
 
+  it("makes Replay analysis board gestures block the surrounding native scroll gesture", () => {
+    const renderer = renderLabScenario("practice-sprint-result-replay");
+
+    press(renderer, "review-mistakes-button");
+    press(renderer, "review-analysis-button");
+
+    expect(findByTestId(renderer, "practice-gesture-root")).toBeTruthy();
+    expect(findByTestId(renderer, "mock-chessboard").props.blocksExternalGesture.current.handlerTag).toBe(1);
+  });
+
   it("keeps a scheduled Review fixed while a board drag is active", () => {
     const renderer = renderScreen({
       currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
