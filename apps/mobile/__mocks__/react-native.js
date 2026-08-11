@@ -124,6 +124,11 @@ module.exports = {
       return easing;
     }
   },
+  Dimensions: {
+    get() {
+      return { ...windowDimensions };
+    }
+  },
   NativeModules: {},
   Platform: {
     OS: 'ios',

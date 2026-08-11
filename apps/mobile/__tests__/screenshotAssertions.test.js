@@ -82,6 +82,22 @@ describe('screenshot assertions', () => {
     )).toThrow('Board piece positions differ; missing=a1; unexpected=h8');
   });
 
+  it('can exclude a known empty square covered by a board-level visual marker', () => {
+    const screenshotPath = writeSyntheticBoard('highlighted-empty-square.png', [
+      [7, 0, [245, 245, 245, 255]],
+      [6, 1, [60, 90, 150, 255]],
+    ]);
+
+    expect(() => expectBoardScreenshotMatchesOccupiedSquares(
+      screenshotPath,
+      fullBoardFrame(),
+      ['a1'],
+      false,
+      undefined,
+      ['b2']
+    )).not.toThrow();
+  });
+
   it('maps density-independent board frames onto physical screenshot pixels', () => {
     const screenshotPath = writeRenderedBoard('two-times-density.png');
     const densityIndependentFrame = { height: 400, width: 400, x: 0, y: 0 };

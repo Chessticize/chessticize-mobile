@@ -29,12 +29,16 @@ function expectBoardScreenshotMatchesOccupiedSquares(
   boardFrame,
   expectedOccupiedSquares,
   flipped = false,
-  screenFrame
+  screenFrame,
+  ignoredOccupiedSquares = []
 ) {
   const png = readRgbaPng(screenshotPath);
   const boardPixels = pixelFrameForElement(png, boardFrame, screenFrame);
   const actual = new Set(detectOccupiedBoardSquares(png, boardPixels, flipped));
   const expected = new Set(expectedOccupiedSquares);
+  for (const square of ignoredOccupiedSquares) {
+    actual.delete(square);
+  }
   const missing = [...expected].filter((square) => !actual.has(square)).sort();
   const unexpected = [...actual].filter((square) => !expected.has(square)).sort();
 
