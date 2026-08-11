@@ -94,6 +94,15 @@ describe(`Promotion responsiveness (${PROMOTION_PUZZLE_ID})`, () => {
     // fade transition is visibly ready for interaction. Measure and tap the
     // user-visible control, not that intermediate native mounting state.
     await waitFor(queenChoice).toBeVisible().withTimeout(10000);
+    for (const [piece, pieceName] of [
+      ['q', 'queen'],
+      ['r', 'rook'],
+      ['b', 'bishop'],
+      ['n', 'knight'],
+    ]) {
+      await expect(element(by.id(`promotion-choice-${piece}`)))
+        .toHaveLabel(`Promote to ${pieceName}`);
+    }
     const pickerReadyMs = Date.now() - pickerStartedAt;
     console.log(
       `[promotion-performance] platform=${device.getPlatform()} pickerReadyMs=${pickerReadyMs}`
