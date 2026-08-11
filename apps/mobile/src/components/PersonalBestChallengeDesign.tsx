@@ -431,6 +431,7 @@ export function PersonalBestChallengeHub({
             : "Your level"
     }))
     .filter((level) => Math.abs(level.index - recommendedIndex) <= 1);
+  const compactFourDigitLevelRanges = viewportWidth < 480 && adjacentLevels.length === 3;
   const otherLevels = availableLevels
     .filter((level) => !adjacentLevels.some((adjacent) => adjacent.minRating === level.minRating));
 
@@ -633,7 +634,13 @@ export function PersonalBestChallengeHub({
                       adjustsFontSizeToFit
                       minimumFontScale={0.75}
                       numberOfLines={1}
-                      style={[styles.levelCardRange, selected ? styles.levelCardRangeSelected : null]}
+                      style={[
+                        styles.levelCardRange,
+                        compactFourDigitLevelRanges && level.minRating >= 1000
+                          ? styles.levelCardRangeCompact
+                          : null,
+                        selected ? styles.levelCardRangeSelected : null
+                      ]}
                     >
                       {levelLabel(level)}
                     </Text>
@@ -2111,6 +2118,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "900",
     marginTop: 5
+  },
+  levelCardRangeCompact: {
+    fontSize: 14,
+    letterSpacing: -0.25
   },
   levelCardRangeSelected: {
     color: "#1E3A8A"
