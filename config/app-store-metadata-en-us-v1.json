@@ -50,6 +50,6 @@
   "currentVersionWhatsNew": {
     "sourceTag": "ios-v1.4.2-build-1",
     "status": "release-candidate",
-    "storeCopy": "• Restore synced progress more reliably when setting up another Apple device.\n• Open the pawn-promotion chooser more quickly.\n• Move pieces in Replay Analysis and Review without scrolling the surrounding screen."
+    "storeCopy": "• Restore synced progress more reliably when setting up another Apple device.\n• Open the pawn-promotion chooser more quickly."
   }
 }

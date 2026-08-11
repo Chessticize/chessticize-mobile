@@ -117,10 +117,9 @@ For iOS 1.4.2, review this proposed ready-to-paste copy:
 ```text
 • Restore synced progress more reliably when setting up another Apple device.
 • Open the pawn-promotion chooser more quickly.
-• Move pieces in Replay Analysis and Review without scrolling the surrounding screen.
 ```
 
-This proposed copy is 211 / 300 Unicode characters, including line breaks.
+This proposed copy is 125 / 300 Unicode characters, including line breaks.
 Future versions must use the reusable template in
 [`docs/releases/RELEASE_NOTES_TEMPLATE.md`](releases/RELEASE_NOTES_TEMPLATE.md):
 lead with user benefits, use two or three short bullets, omit raw URLs, and do
