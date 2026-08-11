@@ -6,6 +6,7 @@ import type {
   SurvivalLevel,
   SurvivalSprintConfig
 } from "./types.ts";
+import { DEFAULT_OPPONENT_REPLY_SECONDS } from "./sprint-config.ts";
 import { startSprint } from "./sprint-session.ts";
 
 export const SURVIVAL_RULE_VERSION = 1;
@@ -37,6 +38,7 @@ export interface StartSurvivalInput {
   selectionCursorPuzzleId: string;
   selectionWrapped: boolean;
   poolExhaustedAfterBuffer: boolean;
+  opponentReplyEnabled: boolean;
   bestBefore: number | null;
   now: string;
 }
@@ -79,6 +81,9 @@ export function survivalRunKey(input: {
 
 export function startSurvival(input: StartSurvivalInput): SprintState {
   const level = assertSurvivalLevel(input.level);
+  if (typeof input.opponentReplyEnabled !== "boolean") {
+    throw new Error("Survival opponent-reply setting must be a boolean");
+  }
   if (!Number.isSafeInteger(input.eligibleCount) || input.eligibleCount < 1) {
     throw new Error("Survival requires a positive eligible puzzle count");
   }
@@ -124,7 +129,12 @@ export function startSurvival(input: StartSurvivalInput): SprintState {
       ratingKey: input.ratingSource.key,
       ratingPolicy: "unrated",
       ...(challengeType === "arrow_duel"
-        ? { opponentReply: { enabled: true, seconds: 1 } }
+        ? {
+            opponentReply: {
+              enabled: input.opponentReplyEnabled,
+              seconds: DEFAULT_OPPONENT_REPLY_SECONDS
+            }
+          }
         : {}),
       survival
     },

@@ -228,6 +228,51 @@ test("Arrow Duel candidate and required reply each add at most one mistake for t
   assert.equal(service.listHistory({ sessionId: state.id }).length, 2);
 });
 
+test("Arrow Duel Survival inherits the global opponent-reply setting without its own override", () => {
+  const enabled = survivalService(6, true).service;
+  const enabledState = enabled.startSurvival({
+    challengeType: "arrow_duel",
+    level: LEVEL,
+    ratingSourceRunId: "arrow-duel",
+    selectionSeed: "reply-enabled"
+  }, NOW);
+  assert.equal(enabledState.config.opponentReply?.enabled, true);
+  enabled.pauseSprint("2026-08-11T12:00:01.000Z");
+  enabled.leavePausedSurvival();
+  enabled.saveSettings({
+    ...enabled.getSettings(),
+    arrowDuel: { opponentReplyEnabled: false }
+  });
+  const resumedEnabledState = enabled.startSurvival({
+    challengeType: "arrow_duel",
+    level: LEVEL,
+    ratingSourceRunId: "arrow-duel",
+    selectionSeed: "ignored-after-setting-change"
+  }, "2026-08-11T12:30:00.000Z");
+  assert.equal(resumedEnabledState.id, enabledState.id);
+  assert.equal(resumedEnabledState.config.opponentReply?.enabled, true);
+
+  const disabled = survivalService(6, true).service;
+  disabled.saveSettings({
+    ...disabled.getSettings(),
+    arrowDuel: { opponentReplyEnabled: false }
+  });
+  let disabledState = disabled.startSurvival({
+    challengeType: "arrow_duel",
+    level: LEVEL,
+    ratingSourceRunId: "arrow-duel",
+    selectionSeed: "reply-disabled"
+  }, NOW);
+  assert.equal(disabledState.config.opponentReply?.enabled, false);
+
+  const firstPuzzleId = disabledState.currentPuzzle?.puzzle.id;
+  disabledState = disabled.submitMove("b2b1", "2026-08-11T12:00:01.000Z").state;
+  assert.equal(disabledState.correctCount, 1);
+  assert.equal(disabledState.currentPuzzle?.kind, "arrow_duel");
+  assert.equal(disabledState.currentPuzzle?.phase, "choice");
+  assert.notEqual(disabledState.currentPuzzle?.puzzle.id, firstPuzzleId);
+});
+
 test("an unavailable saved Rating source is preserved and cannot silently fall back", () => {
   const { service } = survivalService(5);
   const custom = service.createPracticeRun({

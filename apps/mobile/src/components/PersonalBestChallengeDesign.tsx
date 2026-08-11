@@ -46,6 +46,7 @@ export type PersonalBestChallengeSelection = {
   band: PersonalBestAvailableLevelPresentation;
   bestScore: number | null;
   challengeType: PersonalBestChallengeType;
+  opponentReplyEnabled?: boolean;
   sourceId: string;
   sourceRating: number;
 };
@@ -58,6 +59,7 @@ export type PersonalBestPausedRunPresentation = {
   maxRating: number;
   minRating: number;
   mistakeCount: number;
+  opponentReplyEnabled?: boolean;
   phaseLabel?: string;
   resumeState?: SprintState;
   score: number;
@@ -84,6 +86,7 @@ export type PersonalBestChallengeDesignPreview = {
   hubInitiallyVisible?: boolean;
   levelRecords?: readonly PersonalBestLevelRecordPresentation[];
   moreLevelsInitiallyVisible?: boolean;
+  opponentReplyEnabled?: boolean;
   pausedRuns?: readonly PersonalBestPausedRunPresentation[];
   referenceRuns?: readonly PersonalBestReferenceRunPresentation[];
   selectedReferenceRunIds?: Partial<Record<PersonalBestChallengeType, string>>;
@@ -250,6 +253,7 @@ export function PersonalBestGuide({
 }): React.JSX.Element {
   const challengeType = presentation.challengeType ?? "puzzle";
   const typeLabel = challengeTypeLabel(challengeType);
+  const opponentReplyEnabled = presentation.opponentReplyEnabled !== false;
   const rules = [
     {
       marker: "1",
@@ -258,9 +262,15 @@ export function PersonalBestGuide({
     },
     {
       marker: "×3",
-      title: challengeType === "arrow_duel" ? "Candidate and reply make one puzzle" : "Three mistakes end the Run",
+      title: challengeType === "arrow_duel"
+        ? opponentReplyEnabled
+          ? "Candidate and reply make one puzzle"
+          : "Choose the better arrow"
+        : "Three mistakes end the Run",
       detail: challengeType === "arrow_duel"
-        ? "Choose the candidate, then play the required opponent reply. A wrong candidate or reply adds one mistake, never two."
+        ? opponentReplyEnabled
+          ? "Choose the candidate, then play the required opponent reply. A wrong candidate or reply adds one mistake, never two."
+          : "Choose the better arrow. A wrong choice adds one mistake and enters Review. A correct choice completes the puzzle. Turn on opponent replies in Settings to add the reply step to Survival and restore each Run’s saved choice."
         : "Every wrong puzzle adds one mistake and enters Review. Marking it Unclear does not add another mistake."
     },
     {
@@ -420,6 +430,9 @@ export function PersonalBestChallengeHub({
     run.minRating === selectedBand.minRating
     && run.maxRating === selectedBand.maxRating
   ));
+  const selectedOpponentReplyEnabled = selectedInProgress?.opponentReplyEnabled
+    ?? presentation.opponentReplyEnabled
+    ?? true;
   const selectedBest = survivalBestScoreForLevel({
     band: selectedBand,
     challengeType,
@@ -472,6 +485,7 @@ export function PersonalBestChallengeHub({
       band: selectedBand,
       bestScore: selectedBest,
       challengeType,
+      opponentReplyEnabled: selectedOpponentReplyEnabled,
       sourceId: source.id,
       sourceRating: source.rating
     };
@@ -782,7 +796,11 @@ export function PersonalBestChallengeHub({
           <View style={styles.rulesSummary} testID="personal-best-rules-summary">
             <Text style={styles.rulesSummaryTitle}>{challengeTypeLabel(challengeType)} · {levelLabel(selectedBand)}</Text>
             <Text style={styles.rulesSummaryLine}>
-              {challengeType === "arrow_duel" ? "Candidate + required reply · " : ""}No time limit · 3 mistakes
+              {challengeType === "arrow_duel"
+                ? !selectedOpponentReplyEnabled
+                  ? "Choose the better arrow · "
+                  : "Candidate + required reply · "
+                : ""}No time limit · 3 mistakes
             </Text>
             <Text style={styles.rulesSummaryHint}>
               {selectedInProgress

@@ -3370,7 +3370,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "settings-tab");
     expect(collectText(findByTestId(renderer, "settings-arrow-duel-opponent-reply")))
       .toContain(
-        "After you choose the better arrow, we play the other move so you can find the opponent’s best reply. Your Sprint and puzzle timers pause while you reply. You can turn this off or change the time for each Run in Edit Run."
+        "After a correct arrow choice, we play the other move so you can find the opponent’s best reply. New Survival Runs use this setting with no reply timer; paused sessions keep their existing rule. Other Runs follow the reply choice and time saved in Edit Run, and their timers pause during the reply."
       );
     expect(collectText(findByTestId(renderer, "settings-arrow-duel-opponent-reply")))
       .toContain("Find the opponent’s best reply");
@@ -3382,16 +3382,16 @@ describe("PracticePocScreen", () => {
       .toContain("Off");
     expect(collectText(findByTestId(renderer, "settings-arrow-duel-opponent-reply")))
       .toContain(
-        "After you choose the better arrow, you’ll go straight to the next puzzle in every Run. If you turn this back on, each Run will use the reply setting and time you previously chose."
+        "New Arrow Duel play checks only your arrow choice, including Survival. A correct choice completes the puzzle; a wrong choice enters Review. Paused sessions keep their existing rule. Turning this back on restores each saved Run’s reply choice and time."
       );
     expect(collectText(findByTestId(renderer, "settings-arrow-duel-opponent-reply")))
       .not.toContain("one choice");
     expect(collectText(findByTestId(renderer, "settings-status-message")))
-      .toBe("Runs will now go straight to the next puzzle");
+      .toBe("Arrow Duel now checks only your arrow choice");
 
     press(renderer, "settings-arrow-duel-opponent-reply-on");
     expect(collectText(findByTestId(renderer, "settings-status-message")))
-      .toBe("Runs will now include the opponent’s best reply");
+      .toBe("Opponent replies are available, including in Survival");
   });
 
   it("keeps the manual iCloud sync pending for deterministic Interaction Lab review", async () => {
@@ -8169,6 +8169,36 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, `personal-best-paused-continue-${started.id}`)).toBeTruthy();
   });
 
+  it("shows the saved reply rule for a paused Survival Run after the global setting changes", () => {
+    const service = createProductionArrowSurvivalService();
+    service.startSurvival({
+      challengeType: "arrow_duel",
+      level: { minRating: 900, maxRating: 999 },
+      ratingSourceRunId: "arrow-duel"
+    }, "2026-08-11T12:00:00.000Z");
+    service.pauseSprint("2026-08-11T12:00:05.000Z");
+    service.leavePausedSurvival();
+    service.saveSettings({
+      ...service.getSettings(),
+      arrowDuel: { opponentReplyEnabled: false }
+    });
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-08-11T12:01:00.000Z"),
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "personal-best-home-card");
+
+    expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
+      "Candidate + required reply · No time limit · 3 mistakes"
+    );
+    press(renderer, "personal-best-hub-help");
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Candidate and reply make one puzzle"
+    );
+  });
+
   it("continues an existing Survival level without an End or reset action", () => {
     const renderer = renderLabScenario("practice-personal-best-hub");
 
@@ -8559,7 +8589,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 solved");
   });
 
-  it("requires the Arrow Duel reply in Survival even when ordinary Runs disable it", async () => {
+  it("uses the global Arrow Duel reply setting in Survival without a separate override", async () => {
     const service = createProductionArrowSurvivalService();
     service.saveSettings({
       ...service.getSettings(),
@@ -8572,16 +8602,30 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "personal-best-start");
     press(renderer, "personal-best-type-arrow_duel");
+    expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
+      "Choose the better arrow · No time limit · 3 mistakes"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-hub"))).not.toContain(
+      "required reply"
+    );
     press(renderer, "personal-best-hub-start");
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "A correct choice completes the puzzle."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).not.toContain(
+      "required opponent reply"
+    );
     press(renderer, "personal-best-guide-start");
     const arrow = requireArrowDuelState(service.getActiveSprint());
+    const puzzleId = arrow.puzzle.id;
     await boardMove(renderer, arrow.correctMove);
-    await settleArrowDuelReplyHandoff();
 
-    expect(findByTestId(renderer, "arrow-duel-reply-challenge")).toBeTruthy();
+    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+    expect(() => findByTestId(renderer, "arrow-duel-what-if-overlay")).toThrow();
     expect(() => findByTestId(renderer, "arrow-duel-reply-timer")).toThrow();
-    expect(collectVisibleText(renderer.root)).not.toContain("Optional · Turn off in Settings");
-    expect(collectVisibleText(renderer.root)).not.toContain("1 second");
+    await settleFeedbackSnapshot();
+    expect(collectText(findByTestId(renderer, "session-current-puzzle-id"))).not.toBe(puzzleId);
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 solved");
   });
 
   it("shows every Core Pack Survival level and clamps a higher Rating to 2100–2200", () => {

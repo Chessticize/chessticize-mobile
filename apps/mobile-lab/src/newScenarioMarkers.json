@@ -1,17 +1,121 @@
 {
-  "settings-ios-sync": {
+  "practice-home": {
     "issues": [
       {
-        "issueNumber": 522,
-        "changeNote": "Present Sync Now as an explicit button without a disclosure chevron, while preserving the existing sync explanation and behavior."
+        "issueNumber": 492,
+        "changeNote": "Show the latest paused Survival Run and its live best without adding an abstract S icon or repeated Unrated badge."
       }
     ]
   },
-  "settings-ios-sync-syncing": {
+  "practice-personal-best-hub": {
     "issues": [
       {
-        "issueNumber": 522,
-        "changeNote": "Disable Sync Now and show Syncing with visible progress until the current sync finishes, while the status row keeps its previous stable result."
+        "issueNumber": 492,
+        "changeNote": "Animate collapsible in-progress Runs and More levels, preserve comfortable focus spacing, continue existing Runs, and open dedicated Survival records."
+      }
+    ]
+  },
+  "practice-personal-best-source-run": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Let the user explicitly choose a compatible mixed Run as the Survival recommendation source without importing its timing or changing its Rating."
+      }
+    ]
+  },
+  "practice-personal-best-unavailable-source": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Preserve a missing saved Rating source as unavailable and require an explicit compatible replacement instead of silently falling back."
+      }
+    ]
+  },
+  "practice-personal-best-starting-level": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "When Standard has no completed games, use its default Rating 600 as Starting level 600–699 without silently falling back to a custom Run."
+      }
+    ]
+  },
+  "practice-personal-best-arrow-duel": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Keep Arrow Duel Survival as a separate record type while inheriting the single global opponent-reply preference without a Survival-specific override."
+      }
+    ]
+  },
+  "practice-personal-best-empty-home-source": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Keep the built-in Standard Rating profile available when Home is empty and omit Use another Run when no compatible alternative exists."
+      }
+    ]
+  },
+  "practice-personal-best-guide": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Teach Survival, fixed-level records, three mistakes, no time limit, persistent pause, immediate best updates, Review, and unchanged Rating."
+      }
+    ]
+  },
+  "practice-personal-best-highest-level": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Clamp Ratings above the Core Pack to 2100–2200 and show all 16 supported levels without fake disabled 2300+ options."
+      }
+    ]
+  },
+  "practice-personal-best-leave": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Hide the puzzle while Survival is paused, confirm the live best is saved, and offer only Resume or Leave paused."
+      }
+    ]
+  },
+  "practice-personal-best-active": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Keep per-puzzle active elapsed time as context, save new bests while the Run continues, and remove manual End Run."
+      }
+    ]
+  },
+  "practice-personal-best-result": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Celebrate a record at one named level, show active time and sittings only as context, repeat the same setup with Play again, and route changes through the Hub."
+      }
+    ]
+  },
+  "practice-personal-best-pool-cleared": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Show true puzzle-pool exhaustion as a normal Perfect clear result distinct from selection or loading failures."
+      }
+    ]
+  },
+  "practice-personal-best-records": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Keep live Survival bests on a dedicated page and animate its collapsible in-progress Run section."
+      }
+    ]
+  },
+  "practice-runs-empty": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Keep Survival available when every saved Run is hidden from Home by retaining Standard as its built-in Rating source."
       }
     ]
   }

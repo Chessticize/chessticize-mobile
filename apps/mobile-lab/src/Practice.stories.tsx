@@ -203,6 +203,29 @@ export const PersonalBestArrowDuel: Story = {
   }
 };
 
+export const PersonalBestArrowDuelGlobalOff: Story = {
+  name: "Survival · Arrow Duel global reply off",
+  args: {
+    arrowDuelOpponentReplyGlobalEnabled: false,
+    scenarioId: "practice-personal-best-arrow-duel",
+    storyPresentation: {
+      storyId: "practice--survival-arrow-duel-global-reply-off",
+      title: "Survival · Arrow Duel global reply off"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "personal-best-hub");
+    await expectTestIdText(canvasElement, "personal-best-recommended-level", "800–899");
+    await clickTestId(canvasElement, "personal-best-level-900");
+    await waitForText(canvasElement, "Choose the better arrow · No time limit · 3 mistakes");
+    await clickTestId(canvasElement, "personal-best-hub-help");
+    await waitForText(
+      canvasElement,
+      "Choose the better arrow. A wrong choice adds one mistake and enters Review. A correct choice completes the puzzle. Turn on opponent replies in Settings to add the reply step to Survival and restore each Run’s saved choice."
+    );
+  }
+};
+
 export const PersonalBestArrowDuelRequiredReply: Story = {
   name: "Survival · Arrow Duel required reply",
   args: {

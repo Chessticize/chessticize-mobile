@@ -91,6 +91,7 @@ export function buildSurvivalChallengePresentation(input: {
     challengeType: defaultChallengeType,
     completedRunCount: completedSessions.length,
     levelRecords,
+    opponentReplyEnabled: service.getSettings().arrowDuel.opponentReplyEnabled,
     pausedRuns,
     referenceRuns: sources,
     selectedReferenceRunIds,
@@ -173,6 +174,7 @@ function pausedRunPresentation(
     maxRating: survival.maxRating,
     minRating: survival.minRating,
     mistakeCount: state.mistakeCount,
+    opponentReplyEnabled: state.config.opponentReply?.enabled ?? false,
     phaseLabel: survivalPhaseLabel(state),
     score: state.correctCount,
     sittings: state.survival.sittings

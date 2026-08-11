@@ -76,12 +76,12 @@ export const ArrowDuelOpponentReply: Story = {
     await waitForTestId(canvasElement, "settings-arrow-duel-section");
     await waitForText(
       canvasElement,
-      "After you choose the better arrow, we play the other move so you can find the opponent’s best reply. Your Sprint and puzzle timers pause while you reply. You can turn this off or change the time for each Run in Edit Run."
+      "After a correct arrow choice, we play the other move so you can find the opponent’s best reply. New Survival Runs use this setting with no reply timer; paused sessions keep their existing rule. Other Runs follow the reply choice and time saved in Edit Run, and their timers pause during the reply."
     );
     await clickTestId(canvasElement, "settings-arrow-duel-opponent-reply-off");
     await waitForText(
       canvasElement,
-      "After you choose the better arrow, you’ll go straight to the next puzzle in every Run. If you turn this back on, each Run will use the reply setting and time you previously chose."
+      "New Arrow Duel play checks only your arrow choice, including Survival. A correct choice completes the puzzle; a wrong choice enters Review. Paused sessions keep their existing rule. Turning this back on restores each saved Run’s reply choice and time."
     );
     await centerTestId(canvasElement, "settings-arrow-duel-section");
   }

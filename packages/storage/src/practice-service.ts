@@ -559,6 +559,9 @@ export class PracticeService {
       selectionCursorPuzzleId: initialBatch.cursor.afterPuzzleId,
       selectionWrapped: initialBatch.cursor.wrapped,
       poolExhaustedAfterBuffer: initialBatch.puzzles.length === eligibleCount,
+      opponentReplyEnabled: command.challengeType === "arrow_duel"
+        ? this.store.getSettings().arrowDuel.opponentReplyEnabled
+        : false,
       bestBefore,
       now
     });

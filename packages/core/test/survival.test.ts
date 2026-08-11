@@ -116,13 +116,31 @@ test("Arrow Duel Survival requires the reply but never times it out", () => {
   assert.equal(solved.state.correctCount, 1);
 });
 
+test("Arrow Duel Survival completes after the candidate when opponent replies are globally off", () => {
+  const started = survivalState(
+    "arrow_duel",
+    [arrowPuzzle("p1"), arrowPuzzle("p2")],
+    4,
+    false
+  );
+  const solved = submitSprintMove(started, "b2b1", "2026-08-11T12:00:03.000Z");
+
+  assert.equal(solved.attempt?.result, "correct");
+  assert.equal(solved.state.correctCount, 1);
+  assert.equal(solved.state.currentPuzzle?.kind, "arrow_duel");
+  assert.equal(solved.state.currentPuzzle?.phase, "choice");
+  assert.equal(solved.state.currentPuzzle?.puzzle.id, "p2");
+});
+
 function survivalState(
   challengeType: SurvivalChallengeType,
   puzzles: Puzzle[],
-  eligibleCount = Math.max(4, puzzles.length)
+  eligibleCount = Math.max(4, puzzles.length),
+  opponentReplyEnabled = true
 ): SprintState {
   return startSurvival({
     challengeType,
+    opponentReplyEnabled,
     level: { minRating: 900, maxRating: 999 },
     ratingSourceRunId: challengeType === "arrow_duel" ? "arrow-duel" : "standard",
     ratingSource: RATING,

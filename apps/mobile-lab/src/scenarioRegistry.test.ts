@@ -54,16 +54,48 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
   assert.deepEqual(
     newScenarios.map((scenario) => scenario.id),
-    ["settings-ios-sync", "settings-ios-sync-syncing"]
+    [
+      "practice-home",
+      "practice-personal-best-hub",
+      "practice-personal-best-source-run",
+      "practice-personal-best-unavailable-source",
+      "practice-personal-best-starting-level",
+      "practice-personal-best-arrow-duel",
+      "practice-personal-best-empty-home-source",
+      "practice-personal-best-guide",
+      "practice-personal-best-highest-level",
+      "practice-personal-best-leave",
+      "practice-personal-best-active",
+      "practice-personal-best-result",
+      "practice-personal-best-pool-cleared",
+      "practice-personal-best-records",
+      "practice-runs-empty"
+    ]
   );
-  assert.ok(scenarioRegistry["settings-ios-sync"].issues?.some(
-    (issue) => issue.issueNumber === 522
+  assert.ok(scenarioRegistry["practice-home"].issues?.some(
+    (issue) => issue.issueNumber === 492
   ) ?? false);
   assert.deepEqual(
     newScenarios
-      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 522))
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 492))
       .map((scenario) => scenario.id),
-    ["settings-ios-sync", "settings-ios-sync-syncing"]
+    [
+      "practice-home",
+      "practice-personal-best-hub",
+      "practice-personal-best-source-run",
+      "practice-personal-best-unavailable-source",
+      "practice-personal-best-starting-level",
+      "practice-personal-best-arrow-duel",
+      "practice-personal-best-empty-home-source",
+      "practice-personal-best-guide",
+      "practice-personal-best-highest-level",
+      "practice-personal-best-leave",
+      "practice-personal-best-active",
+      "practice-personal-best-result",
+      "practice-personal-best-pool-cleared",
+      "practice-personal-best-records",
+      "practice-runs-empty"
+    ]
   );
 
   for (const scenario of scenarios) {
@@ -144,24 +176,25 @@ test("the issue #272 preview hands the board to White after the blunder", () => 
   assert.equal(chess.fen(), "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2");
 });
 
-test("the approved Settings clone keeps its scope while Issue #522 highlights the Sync Now button", () => {
+test("the approved Settings clone keeps the merged Sync Now scope without Issue #492 markers", () => {
   assert.deepEqual(
     newScenarios
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 247))
       .map((scenario) => scenario.id),
     []
   );
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), ["new"]);
-  assert.deepEqual(storyTagsForScenario("settings-ios-sync-syncing"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync"), []);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-syncing"), []);
   assert.deepEqual(scenarioRegistry["settings-ios-sync"].scope.includes, [
     "iCloud Sync",
     "Explicit Sync Now button",
     "No disclosure chevron",
     "Global Arrow Duel reply control",
-    "User-first On explanation",
+    "Survival follows global preference",
+    "Untimed Survival reply",
     "Paused Sprint and puzzle timers",
     "Per-Run Edit Run handoff",
-    "Straight-to-next-puzzle Off explanation",
+    "Candidate-only Off explanation",
     "Previously chosen Run settings restored on re-enable",
     "Notifications",
     "Sound and haptic toggles",
@@ -384,7 +417,7 @@ test("Practice home delegates Review workload to the dedicated tab", () => {
   assert.ok(home.scope.includes.includes("Collecting-evidence state"));
   assert.ok(home.scope.includes.includes("Tactical Profile entry"));
   assert.match(home.description, /dedicated Review tab/);
-  assert.deepEqual(storyTagsForScenario("practice-home"), []);
+  assert.deepEqual(storyTagsForScenario("practice-home"), ["new"]);
 });
 
 test("post-attempt handoffs explain Timeout, Wrong, and Slow-correct results", () => {

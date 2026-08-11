@@ -953,7 +953,10 @@ export function PracticePocScreen({
     ?? livePersonalBestPresentation;
   const personalBestPresentation = useMemo<PersonalBestChallengeDesignPreview | undefined>(() => {
     if (!personalBestSelectedSetup) {
-      return basePersonalBestPresentation;
+      return {
+        ...basePersonalBestPresentation,
+        opponentReplyEnabled: arrowDuelOpponentReplyGlobalEnabled
+      };
     }
     return {
       ...basePersonalBestPresentation,
@@ -964,6 +967,8 @@ export function PracticePocScreen({
       },
       bestScore: personalBestSelectedSetup.bestScore,
       challengeType: personalBestSelectedSetup.challengeType,
+      opponentReplyEnabled: personalBestSelectedSetup.opponentReplyEnabled
+        ?? arrowDuelOpponentReplyGlobalEnabled,
       selectedReferenceRunIds: {
         ...basePersonalBestPresentation.selectedReferenceRunIds,
         [personalBestSelectedSetup.challengeType]: personalBestSelectedSetup.sourceId
@@ -971,7 +976,11 @@ export function PracticePocScreen({
       startState: basePersonalBestPresentation.startStates?.[personalBestSelectedSetup.challengeType]
         ?? basePersonalBestPresentation.startState
     };
-  }, [basePersonalBestPresentation, personalBestSelectedSetup]);
+  }, [
+    arrowDuelOpponentReplyGlobalEnabled,
+    basePersonalBestPresentation,
+    personalBestSelectedSetup
+  ]);
   const [boardFen, setBoardFen] = useState<string | null>(null);
   const [lastBoardMove, setLastBoardMove] = useState<BoardMove | null>(null);
   const [feedbackPuzzleId, setFeedbackPuzzleId] = useState<string | null>(null);
@@ -3826,25 +3835,19 @@ export function PracticePocScreen({
     sprintRulesDesignPreview?.arrowDuelReplyChallenge;
   const arrowDuelOpponentReplyGlobalSettingDesign =
     sprintRulesDesignPreview?.arrowDuelOpponentReplyGlobalSetting;
-  const survivalRequiresOpponentReply = isSurvivalState;
-  const opponentReplySettingsHint = survivalRequiresOpponentReply
+  const opponentReplySettingsHint = isSurvivalState
     ? undefined
     : "Optional · Turn off in Settings";
-  const arrowDuelOpponentReplyGloballyAvailable =
-    arrowDuelOpponentReplyGlobalEnabled;
-  const arrowDuelOpponentReplyAvailableForCurrentRun =
-    survivalRequiresOpponentReply || arrowDuelOpponentReplyGloballyAvailable;
   const arrowDuelReplyAutoTimeoutMs = arrowDuelReplyChallengeDesign?.autoTimeoutMs;
   const arrowDuelReplyChallengePreviewVisible = Boolean(
     arrowDuelReplyChallengeDesign?.enabled
       && arrowDuelReplyChallengeDesign.resolveMove
       && arrowDuelReplyChallengeEnabled
-      && arrowDuelOpponentReplyAvailableForCurrentRun
+      && arrowDuelOpponentReplyGlobalEnabled
       && currentPuzzle?.kind === "arrow_duel"
   );
   const arrowDuelReplyChallengeProductionVisible = Boolean(
     !arrowDuelReplyChallengePreviewVisible &&
-      arrowDuelOpponentReplyAvailableForCurrentRun &&
       state?.config.opponentReply?.enabled &&
       currentPuzzle?.kind === "arrow_duel"
   );
@@ -3959,7 +3962,7 @@ export function PracticePocScreen({
     : null;
   const explicitReplySideCopy = sprintGuidanceEnabled
     || arrowDuelReplyChallengeDesign?.explicitReplySideCopy === true;
-  const arrowDuelWhatIfDetail = survivalRequiresOpponentReply
+  const arrowDuelWhatIfDetail = isSurvivalState
     ? "Find the opponent’s reply. There is no time limit."
     : explicitReplySideCopy
       ? replyPreparationInstruction(arrowDuelReplySecondsRemaining)
@@ -4779,7 +4782,7 @@ export function PracticePocScreen({
             replyReady={arrowDuelReplyReady}
             replySeconds={arrowDuelReplySecondsRemaining}
             settingsHint={opponentReplySettingsHint}
-            showReplyTimer={!survivalRequiresOpponentReply}
+            showReplyTimer={!isSurvivalState}
           />
       ) : (
         <PracticePrompt
@@ -16594,8 +16597,8 @@ function SettingsPanel({
             label="Find the opponent’s best reply"
             value={arrowDuelOpponentReplyGlobalSetting.enabled ? "On" : "Off"}
             detail={arrowDuelOpponentReplyGlobalSetting.enabled
-              ? "After you choose the better arrow, we play the other move so you can find the opponent’s best reply. Your Sprint and puzzle timers pause while you reply. You can turn this off or change the time for each Run in Edit Run."
-              : "After you choose the better arrow, you’ll go straight to the next puzzle in every Run. If you turn this back on, each Run will use the reply setting and time you previously chose."}
+              ? "After a correct arrow choice, we play the other move so you can find the opponent’s best reply. New Survival Runs use this setting with no reply timer; paused sessions keep their existing rule. Other Runs follow the reply choice and time saved in Edit Run, and their timers pause during the reply."
+              : "New Arrow Duel play checks only your arrow choice, including Survival. A correct choice completes the puzzle; a wrong choice enters Review. Paused sessions keep their existing rule. Turning this back on restores each saved Run’s reply choice and time."}
             testID="settings-arrow-duel-opponent-reply"
           />
           <View
@@ -16608,7 +16611,7 @@ function SettingsPanel({
               testID="settings-arrow-duel-opponent-reply-on"
               onPress={() => {
                 arrowDuelOpponentReplyGlobalSetting.onChange(true);
-                setStatusMessage("Runs will now include the opponent’s best reply");
+                setStatusMessage("Opponent replies are available, including in Survival");
               }}
             />
             <SettingsPreferenceButton
@@ -16617,7 +16620,7 @@ function SettingsPanel({
               testID="settings-arrow-duel-opponent-reply-off"
               onPress={() => {
                 arrowDuelOpponentReplyGlobalSetting.onChange(false);
-                setStatusMessage("Runs will now go straight to the next puzzle");
+                setStatusMessage("Arrow Duel now checks only your arrow choice");
               }}
             />
           </View>

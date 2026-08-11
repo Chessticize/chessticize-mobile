@@ -212,18 +212,23 @@ type, Rating source, and level selection.
 
 Arrow Duel is a separate Survival type and best namespace.
 
-- Every puzzle includes the candidate choice and required opponent reply.
-- The ordinary Arrow Duel opponent-reply setting does not apply to Survival;
-  Survival always renders and scores its required reply without optional
-  Settings copy.
-- The required reply has no countdown or timeout, matching Survival's
+- Survival uses the global `Find the opponent's best reply` setting and does
+  not add a second Survival-specific override.
+- A new Run snapshots that global setting. Resuming a paused Run preserves the
+  rule it started with so the exact puzzle state does not change underneath
+  the user.
+- When the setting is off, a correct candidate completes the puzzle and a
+  wrong candidate adds one mistake and enters Review immediately.
+- When the setting is on, a correct candidate continues to the required
+  opponent reply. That reply has no countdown or timeout, matching Survival's
   no-time-limit contract.
-- The puzzle scores only after both stages are correct.
-- A wrong candidate or wrong reply adds exactly one mistake for that puzzle,
-  never two.
+- With the reply enabled, the puzzle scores only after both stages are correct.
+  A wrong candidate or wrong reply adds exactly one mistake for that puzzle,
+  never two; a wrong candidate never opens the reply step.
 - Pause restores the exact candidate or reply phase.
-- Candidate-only play would require a separate future challenge type rather
-  than silently sharing these records.
+- Candidate-only and candidate-plus-reply Runs share the same Survival level
+  record because the global preference changes the interaction, not the
+  challenge type.
 
 ## Data required by later implementation
 
