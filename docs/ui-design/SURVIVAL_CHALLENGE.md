@@ -22,7 +22,7 @@ one fixed level before the third mistake?
 - `Slow` is not a Survival scoring state. `Unclear` remains independent and
   does not add a mistake by itself.
 - Survival has no decorative `S` icon or repeated `Unrated` badge. The
-  first-use guide explains once that Rating stays unchanged.
+  informational guide explains once that Rating stays unchanged.
 
 ## Best updates while a Run continues
 
@@ -139,14 +139,18 @@ Survival does not synthesize a global Rating.
 
 Practice Home keeps one Survival module.
 
-- Home always shows the same calm, whole-card `Survival Challenge` entry with
-  the invitation `See how far you can go, at your own pace.` and one chevron.
+- Home always shows the same compact, calm, whole-card `Survival Challenge`
+  entry with the invitation `See how far you can go, at your own pace.` and
+  one chevron. It stays visually secondary to the saved Run cards.
 - Home does not expose paused state, score, record, level, mistakes, active
   time, sittings, or a resume action. Those details appear only after the user
   chooses to enter the Hub.
-- The entry opens the Hub on the most recently touched paused Run when one
-  exists, but its visible and accessible Home copy never frames that Run as an
-  unfinished task.
+- The first entry opens the informational rules. `Got it` acknowledges them
+  and continues into the Hub without starting a Run. Back returns to Practice
+  without acknowledging them, so the next entry explains the rules again.
+- Later entries open the Hub on the most recently touched paused Run when one
+  exists, but visible and accessible Home copy never frames that Run as an
+  unfinished task. The Hub's `?` opens the same informational rules any time.
 - Home never resumes Survival directly; `Continue` appears only beside the
   exact saved Run inside the Hub.
 
@@ -167,16 +171,14 @@ character-level wrapping on supported phone widths.
 If the selected type and level already has an in-progress Run, the Hub action
 says `Continue Survival`; it never offers a reset that discards mistakes.
 Otherwise, Start carries the exact selected challenge type, level, Rating
-source, source Rating snapshot, and level-specific best into the first-use
-guide and the active Run. The guide never reverts to the Hub defaults.
-Rules and first-use-guide detours preserve the selected type, Rating source,
-and level when the user returns to the Hub. Back from the Rating-source picker
-dismisses only that picker before Back can leave the Hub.
+source, source Rating snapshot, and level-specific best directly into the
+active Run. Rules detours preserve the selected type, Rating source, and level
+when the user returns to the Hub. Back from the Rating-source picker dismisses
+only that picker before Back can leave the Hub.
 
 `?` in the Hub is the informational rules entry. Its primary action is `Got
-it`; it returns to the Hub without starting or resuming a Run. Only an unseen
-first-use guide reached after an explicit `Start Survival` intent retains
-`Start Survival` and `Not now`.
+it`; it returns to the Hub without starting or resuming a Run. An explicit
+`Start Survival` action in the Hub begins the selected Run directly.
 
 All Survival disclosures use the same short motion contract instead of
 appearing or disappearing abruptly:
@@ -205,9 +207,9 @@ Survival records do not appear as a large module inside general History.
 History remains focused on individual puzzle attempts, filters, and replay.
 The Challenge Hub opens a dedicated `Survival records` page that owns:
 
-- In-progress Runs and any live best already reached.
 - Separate Puzzle and Arrow Duel sections.
-- One row per played level, including its completed-Run count and best.
+- One row per played level, showing only its best.
+- A higher live best already reached by a paused Run, without a status label.
 - Recommended-level emphasis without ranking different levels against one
   another.
 
@@ -262,7 +264,7 @@ first empty batch proved full-pool exhaustion.
 
 The Interaction Lab demonstrates the expected Home, full-page Hub,
 informational rules, Rating-source, unavailable saved source, highest-level,
-empty-Home, first-use start, active,
+empty-Home, first-entry help, active,
 puzzle-hidden pause, third-mistake result, full-pool `Perfect clear`, and
 dedicated Survival records states. General History deliberately has no
 Survival summary module.

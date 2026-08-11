@@ -3,7 +3,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Keep Survival as a calm whole-card mode entry; move every paused, score, mistake, time, and resume detail into the Hub."
+        "changeNote": "Keep Survival as a compact, calm whole-card entry; explain the rules on first entry, then keep every paused, score, mistake, time, and resume detail inside the Hub."
       }
     ]
   },
@@ -107,7 +107,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Keep saved bests on a dedicated page without duplicating the Hub's in-progress Run section or status labels."
+        "changeNote": "Keep only type, level, and best on the dedicated records page, without in-progress sections, status labels, or completed-Run counts."
       }
     ]
   },

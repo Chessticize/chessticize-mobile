@@ -781,7 +781,10 @@ function personalBestChallengePreviewFor(
     }
   };
   if (scenarioId === "practice-home") {
-    return common;
+    return {
+      ...common,
+      homeGuideOnFirstEntry: true
+    };
   }
   if (scenarioId === "practice-runs-empty") {
     return {
@@ -865,7 +868,7 @@ function personalBestChallengePreviewFor(
   if (scenarioId === "practice-personal-best-guide") {
     return {
       ...common,
-      guideInitiallyVisible: true
+      hubInitiallyVisible: true
     };
   }
   if (scenarioId === "practice-personal-best-active") {

@@ -341,7 +341,7 @@ export type RunReorderPickupFeedback = {
   haptic: "medium";
 };
 
-type PersonalBestGuideIntent = "learn-home" | "learn-hub" | "start-hub";
+type PersonalBestGuideIntent = "first-entry" | "learn-hub";
 
 export type SprintRulesGuidePresentation = {
   durationLabel: string;
@@ -915,11 +915,9 @@ export function PracticePocScreen({
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => currentTimeMs());
   const [resumableSprint, setResumableSprint] = useState<SprintState | null>(null);
-  const [personalBestGuideIntent, setPersonalBestGuideIntent] = useState<PersonalBestGuideIntent | null>(
-    () => personalBestChallengeDesignPreview?.guideInitiallyVisible === true
-      ? "learn-home"
-      : null
-  );
+  const [personalBestGuideIntent, setPersonalBestGuideIntent] = useState<PersonalBestGuideIntent | null>(null);
+  const [personalBestFirstEntryGuideAcknowledged, setPersonalBestFirstEntryGuideAcknowledged] =
+    useState(false);
   const [personalBestGuideOpponentReplyEnabled, setPersonalBestGuideOpponentReplyEnabled] =
     useState<boolean | null>(null);
   const personalBestGuideVisible = personalBestGuideIntent !== null;
@@ -2502,8 +2500,7 @@ export function PracticePocScreen({
   }
 
   function closePersonalBestGuide(): void {
-    const returnsToHub = personalBestGuideIntent === "learn-hub"
-      || personalBestGuideIntent === "start-hub";
+    const returnsToHub = personalBestGuideIntent === "learn-hub";
     setPersonalBestGuideIntent(null);
     setPersonalBestGuideOpponentReplyEnabled(null);
     if (returnsToHub) {
@@ -2512,11 +2509,17 @@ export function PracticePocScreen({
   }
 
   function acknowledgePersonalBestGuide(): void {
+    const opensHub = personalBestGuideIntent === "first-entry";
     try {
       if (!personalBestChallengeDesignPreview) {
         service.markSurvivalGuideSeen();
+      } else if (opensHub) {
+        setPersonalBestFirstEntryGuideAcknowledged(true);
       }
       closePersonalBestGuide();
+      if (opensHub) {
+        setPersonalBestHubVisible(true);
+      }
     } catch (caught) {
       setError(errorMessage(caught));
     }
@@ -2618,7 +2621,8 @@ export function PracticePocScreen({
         service.markSurvivalGuideSeen();
       }
       const startState = personalBestChallengeDesignPreview
-        ? personalBestPresentation.startState
+        ? basePersonalBestPresentation.startStates?.[effectiveSelection.challengeType]
+          ?? basePersonalBestPresentation.startState
         : service.startSurvival({
             challengeType: effectiveSelection.challengeType,
             level: survivalSelectionLevel(effectiveSelection),
@@ -4112,7 +4116,7 @@ export function PracticePocScreen({
   const survivalBackTransient: MobileBackTransient | null = personalBestRecordsVisible
     ? "survival-records"
     : personalBestGuideVisible
-      ? personalBestGuideIntent === "learn-home"
+      ? personalBestGuideIntent === "first-entry"
         ? "survival-guide-to-practice"
         : "survival-guide-to-hub"
       : personalBestSourcePickerVisible
@@ -5016,7 +5020,13 @@ export function PracticePocScreen({
                     onSourcePickerVisibilityChange={setPersonalBestSourcePickerVisible}
                     recordsVisible={personalBestRecordsVisible}
                     onStart={(selection) => {
-                      const { opponentReplyEnabled, ...selectedSetup } = selection;
+                      const selectedSetup: PersonalBestChallengeSelection = {
+                        band: selection.band,
+                        bestScore: selection.bestScore,
+                        challengeType: selection.challengeType,
+                        sourceId: selection.sourceId,
+                        sourceRating: selection.sourceRating
+                      };
                       setPersonalBestSelectedSetup(selectedSetup);
                       if (!personalBestChallengeDesignPreview) {
                         service.saveSurvivalRatingSourcePreference(
@@ -5025,32 +5035,18 @@ export function PracticePocScreen({
                         );
                       }
                       setPersonalBestHubVisible(false);
-                      if (
-                        !personalBestChallengeDesignPreview
-                        && service.getSurvivalPreferences().guideSeen
-                      ) {
-                        startPersonalBestChallenge(selectedSetup);
-                        return;
-                      }
-                      setPersonalBestGuideOpponentReplyEnabled(
-                        opponentReplyEnabled ?? arrowDuelOpponentReplyGlobalEnabled
-                      );
-                      setPersonalBestGuideIntent("start-hub");
+                      startPersonalBestChallenge(selectedSetup);
                     }}
                   />
                 ) : null}
                 {personalBestGuideVisible && personalBestGuidePresentation ? (
                   <PersonalBestGuide
-                    acknowledgementOnly={personalBestGuideIntent !== "start-hub"}
-                    backAccessibilityLabel={personalBestGuideIntent === "learn-home"
+                    backAccessibilityLabel={personalBestGuideIntent === "first-entry"
                       ? "Back to Practice"
                       : "Back to Survival Hub"}
                     presentation={personalBestGuidePresentation}
                     onAcknowledge={acknowledgePersonalBestGuide}
                     onClose={closePersonalBestGuide}
-                    onStart={() => {
-                      startPersonalBestChallenge();
-                    }}
                   />
                 ) : null}
                 {isSessionGuideVisible && sessionGuidePresentation ? (
@@ -5248,6 +5244,18 @@ export function PracticePocScreen({
                     onOpenPersonalBestHub={(run) => {
                       if (run) {
                         selectPersonalBestPausedRun(run);
+                      }
+                      const showFirstEntryGuide = personalBestChallengeDesignPreview
+                        ? personalBestChallengeDesignPreview.homeGuideOnFirstEntry === true
+                          && !personalBestFirstEntryGuideAcknowledged
+                        : !service.getSurvivalPreferences().guideSeen;
+                      if (showFirstEntryGuide) {
+                        setPersonalBestGuideOpponentReplyEnabled(
+                          arrowDuelOpponentReplyGlobalEnabled
+                        );
+                        setPersonalBestHubVisible(false);
+                        setPersonalBestGuideIntent("first-entry");
+                        return;
                       }
                       setPersonalBestHubVisible(true);
                     }}

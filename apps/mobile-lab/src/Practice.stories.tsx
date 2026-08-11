@@ -138,9 +138,18 @@ export const Home: Story = {
     expectTestIdAbsent(canvasElement, "personal-best-more-paused-count");
     expectTestIdAbsent(canvasElement, "personal-best-continue");
     await clickTestId(canvasElement, "personal-best-home-card");
+    await waitForTestId(canvasElement, "personal-best-guide");
+    await expectTestIdText(canvasElement, "personal-best-guide-start", "Got it");
+    await clickTestId(canvasElement, "personal-best-guide-close");
+    await waitForTestId(canvasElement, "personal-best-home-card");
+    await clickTestId(canvasElement, "personal-best-home-card");
+    await waitForTestId(canvasElement, "personal-best-guide");
+    await clickTestId(canvasElement, "personal-best-guide-start");
     await waitForTestId(canvasElement, "personal-best-hub");
     await clickTestId(canvasElement, "personal-best-hub-close");
     await waitForTestId(canvasElement, "personal-best-home-card");
+    await clickTestId(canvasElement, "personal-best-home-card");
+    await waitForTestId(canvasElement, "personal-best-hub");
   }
 };
 
@@ -288,6 +297,7 @@ export const PersonalBestGuide: Story = {
   name: "Survival · rules",
   args: { scenarioId: "practice-personal-best-guide" },
   play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "personal-best-hub-help");
     await waitForTestId(canvasElement, "personal-best-guide");
     await expectTestIdText(canvasElement, "personal-best-guide-score", "18");
     await waitForText(canvasElement, "One level for the whole Run");
@@ -296,24 +306,6 @@ export const PersonalBestGuide: Story = {
     await waitForText(canvasElement, "Pause now, continue later");
     await expectTestIdText(canvasElement, "personal-best-guide-start", "Got it");
     expectTestIdAbsent(canvasElement, "personal-best-guide-not-now");
-  }
-};
-
-export const PersonalBestFirstUseGuide: Story = {
-  name: "Survival · first-use start guide",
-  args: {
-    scenarioId: "practice-personal-best-hub",
-    storyPresentation: {
-      storyId: "practice--survival-first-use-start-guide",
-      title: "Survival · first-use start guide"
-    }
-  },
-  play: async ({ canvasElement }) => {
-    await clickTestId(canvasElement, "personal-best-level-800");
-    await clickTestId(canvasElement, "personal-best-hub-start");
-    await waitForTestId(canvasElement, "personal-best-guide");
-    await expectTestIdText(canvasElement, "personal-best-guide-start", "Start Survival");
-    await expectTestIdText(canvasElement, "personal-best-guide-not-now", "Not now");
   }
 };
 

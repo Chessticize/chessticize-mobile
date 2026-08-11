@@ -82,7 +82,7 @@ export type PersonalBestChallengeDesignPreview = {
   challengeType?: PersonalBestChallengeType;
   completedRunCount: number;
   exitConfirmationInitiallyVisible?: boolean;
-  guideInitiallyVisible?: boolean;
+  homeGuideOnFirstEntry?: boolean;
   hubInitiallyVisible?: boolean;
   levelRecords?: readonly PersonalBestLevelRecordPresentation[];
   moreLevelsInitiallyVisible?: boolean;
@@ -132,19 +132,15 @@ export function PersonalBestHomeCard({
 }
 
 export function PersonalBestGuide({
-  acknowledgementOnly = false,
   backAccessibilityLabel = "Back from Survival guide",
   presentation,
   onAcknowledge,
-  onClose,
-  onStart
+  onClose
 }: {
-  acknowledgementOnly?: boolean;
   backAccessibilityLabel?: string;
   presentation: PersonalBestChallengeDesignPreview;
   onAcknowledge: () => void;
   onClose: () => void;
-  onStart: () => void;
 }): React.JSX.Element {
   const challengeType = presentation.challengeType ?? "puzzle";
   const typeLabel = challengeTypeLabel(challengeType);
@@ -230,24 +226,13 @@ export function PersonalBestGuide({
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={acknowledgementOnly ? "Acknowledge Survival rules" : "Start Survival"}
+        accessibilityLabel="Acknowledge Survival rules"
         style={styles.guideStartAction}
         testID="personal-best-guide-start"
-        onPress={acknowledgementOnly ? onAcknowledge : onStart}
+        onPress={onAcknowledge}
       >
-        <Text style={styles.primaryActionText}>{acknowledgementOnly ? "Got it" : "Start Survival"}</Text>
+        <Text style={styles.primaryActionText}>Got it</Text>
       </Pressable>
-      {!acknowledgementOnly ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Not now"
-          style={styles.guideNotNowAction}
-          testID="personal-best-guide-not-now"
-          onPress={onClose}
-        >
-          <Text style={styles.secondaryActionText}>Not now</Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 }
@@ -1094,7 +1079,6 @@ export function PersonalBestRecordsScreen({
                     <Text style={styles.historyRecordTitle}>
                       {levelLabel(record)}{record.isRecommended ? " · Recommended" : ""}
                     </Text>
-                    <Text style={styles.historyRecordDetail}>{record.completedRunCount} completed Runs</Text>
                   </View>
                   <View style={styles.historyRecordScoreBlock}>
                     <Text
@@ -1481,15 +1465,6 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     textAlign: "center"
   },
-  guideNotNowAction: {
-    alignItems: "center",
-    borderRadius: 12,
-    minHeight: 44,
-    justifyContent: "center",
-    marginTop: 8,
-    paddingHorizontal: 18,
-    paddingVertical: 11
-  },
   guideScreen: {
     alignSelf: "center",
     backgroundColor: "#FFFFFF",
@@ -1607,34 +1582,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#EFF6FF",
     borderColor: "#93C5FD",
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: "row",
-    gap: 14,
-    marginTop: 14,
-    minHeight: 92,
-    paddingHorizontal: 18,
-    paddingVertical: 17
+    gap: 10,
+    marginTop: 12,
+    minHeight: 76,
+    paddingHorizontal: 16,
+    paddingVertical: 12
   },
   homeChevron: {
     color: "#2563EB",
-    fontSize: 30,
+    fontSize: 25,
     fontWeight: "400",
-    lineHeight: 32
+    lineHeight: 27
   },
   homeDescription: {
     color: "#475569",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
-    lineHeight: 19,
-    marginTop: 5
+    lineHeight: 17,
+    marginTop: 3
   },
   homeEntryCopy: {
     flex: 1
   },
   homeTitle: {
     color: "#0F172A",
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "900"
   },
   mistakeCount: {
