@@ -6626,6 +6626,26 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it("keeps Home in two columns inside the maintained phone landscape Safe Area", () => {
+    setPracticeViewport({
+      width: 874,
+      height: 402,
+      scale: 3,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 }
+    });
+
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+
+    expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel)
+      .toBe("Layout compactLandscape");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-home-layout").props.style).flexDirection)
+      .toBe("row");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-home-primary-column").props.style).width)
+      .toBe("auto");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-home-secondary-column").props.style).width)
+      .toBe("auto");
+  });
+
   it("keeps expanded navigation labels on one line in an iPad-on-Mac wide-short window", () => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
