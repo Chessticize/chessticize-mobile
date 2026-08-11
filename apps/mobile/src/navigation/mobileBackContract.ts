@@ -14,6 +14,7 @@ export type MobileBackTransient =
   | "survival-hub"
   | "survival-pause"
   | "survival-records"
+  | "survival-source-picker"
   | "starting-practice";
 
 export type MobileBackOwner = MobileBackPrimaryTab;
@@ -30,6 +31,7 @@ export type MobileBackDetail =
 
 export type MobileBackState = {
   activePractice: boolean;
+  activeSurvival: boolean;
   detail: MobileBackDetail | null;
   tab: MobileBackTab;
   topTransient: MobileBackTransient | null;
@@ -41,6 +43,7 @@ export type MobileBackIntent =
   | { kind: "dismiss-transient"; transient: MobileBackTransient }
   | { kind: "close-analysis"; owner: "history" | "review" }
   | { kind: "return-to-owner"; owner: MobileBackOwner }
+  | { kind: "pause-survival" }
   | { kind: "request-practice-exit" }
   | { kind: "return-to-practice" }
   | { kind: "delegate-platform" };
@@ -69,6 +72,10 @@ export function resolveMobileBackIntent(
 
   if (state.detail) {
     return { kind: "return-to-owner", owner: state.detail.owner };
+  }
+
+  if (state.activePractice && state.activeSurvival) {
+    return { kind: "pause-survival" };
   }
 
   if (state.activePractice) {
@@ -101,6 +108,7 @@ export function mobileBackDestination(
       if (
         intent.transient === "survival-guide-to-hub"
         || intent.transient === "survival-records"
+        || intent.transient === "survival-source-picker"
       ) {
         return { label: "Survival Hub", testID: "personal-best-hub" };
       }
@@ -128,6 +136,8 @@ export function mobileBackDestination(
         label: destinationLabelForTab(intent.owner),
         testID: `tab-${intent.owner}`
       };
+    case "pause-survival":
+      return { label: "Survival pause", testID: "session-abandon-confirmation" };
     case "request-practice-exit":
       return { label: "Leave sprint confirmation", testID: "practice-exit-confirmation" };
     case "return-to-practice":

@@ -929,6 +929,9 @@ export function PracticePocScreen({
   const [personalBestRecordsVisible, setPersonalBestRecordsVisible] = useState(
     () => personalBestChallengeDesignPreview?.recordsInitiallyVisible === true
   );
+  const [personalBestSourcePickerVisible, setPersonalBestSourcePickerVisible] = useState(
+    () => personalBestChallengeDesignPreview?.sourcePickerInitiallyVisible === true
+  );
   useEffect(() => {
     if (!personalBestGuideVisible && !personalBestHubVisible && !personalBestRecordsVisible) {
       return;
@@ -4093,11 +4096,13 @@ export function PracticePocScreen({
       ? personalBestGuideIntent === "learn-home"
         ? "survival-guide-to-practice"
         : "survival-guide-to-hub"
-      : personalBestHubVisible
-        ? "survival-hub"
-        : isSurvivalPauseVisible
-          ? "survival-pause"
-          : null;
+      : personalBestSourcePickerVisible
+        ? "survival-source-picker"
+        : personalBestHubVisible
+          ? "survival-hub"
+          : isSurvivalPauseVisible
+            ? "survival-pause"
+            : null;
   const topBackTransient: MobileBackTransient | null = isSessionGuideVisible
     ? "sprint-session-guide"
     : startingMode
@@ -4157,6 +4162,7 @@ export function PracticePocScreen({
   );
   const mobileBackState: MobileBackState = {
     activePractice: isOpenSession,
+    activeSurvival: isOpenSession && isSurvivalState,
     detail: backDetail,
     tab,
     topTransient: topBackTransient
@@ -4283,6 +4289,8 @@ export function PracticePocScreen({
           dismissSessionGuide();
         } else if (intent.transient === "survival-records") {
           setPersonalBestRecordsVisible(false);
+        } else if (intent.transient === "survival-source-picker") {
+          setPersonalBestSourcePickerVisible(false);
         } else if (
           intent.transient === "survival-guide-to-hub"
           || intent.transient === "survival-guide-to-practice"
@@ -4321,12 +4329,11 @@ export function PracticePocScreen({
           resetToIdle();
         }
         return true;
+      case "pause-survival":
+        pausePersonalBestChallenge();
+        return true;
       case "request-practice-exit":
-        if (stateRef.current?.config.survival) {
-          pausePersonalBestChallenge();
-        } else {
-          setPracticeExitConfirmationVisible(true);
-        }
+        setPracticeExitConfirmationVisible(true);
         return true;
       case "return-to-practice":
         setSessionReplayItems([]);
@@ -4817,10 +4824,10 @@ export function PracticePocScreen({
     ? `Error. ${error}`
     : personalBestGuideVisible
       ? "Survival rules. The Run has not started."
-    : personalBestHubVisible
-      ? "Survival setup. Choose Puzzle or Arrow Duel and a level."
     : personalBestRecordsVisible
       ? "Survival records. Puzzle and Arrow Duel bests are listed separately by level."
+    : personalBestHubVisible
+      ? "Survival setup. Choose Puzzle or Arrow Duel and a level."
     : isSessionGuideVisible
       ? `${sessionGuidePresentation?.focusedRun
         ? "Focused Run"
@@ -4954,8 +4961,13 @@ export function PracticePocScreen({
               <>
                 {personalBestHubVisible && personalBestPresentation ? (
                   <PersonalBestChallengeHub
+                    initialSelection={personalBestSelectedSetup}
                     presentation={personalBestPresentation}
-                    onClose={() => setPersonalBestHubVisible(false)}
+                    sourcePickerVisible={personalBestSourcePickerVisible}
+                    onClose={() => {
+                      setPersonalBestSourcePickerVisible(false);
+                      setPersonalBestHubVisible(false);
+                    }}
                     onCloseRecords={() => setPersonalBestRecordsVisible(false)}
                     onContinue={(runId) => {
                       const pausedRun = personalBestPresentation.pausedRuns?.find((run) => run.id === runId);
@@ -4978,6 +4990,7 @@ export function PracticePocScreen({
                     onOpenRecords={() => {
                       setPersonalBestRecordsVisible(true);
                     }}
+                    onSourcePickerVisibilityChange={setPersonalBestSourcePickerVisible}
                     recordsVisible={personalBestRecordsVisible}
                     onStart={(selection) => {
                       setPersonalBestSelectedSetup(selection);

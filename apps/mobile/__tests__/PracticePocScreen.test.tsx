@@ -8074,6 +8074,34 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
   });
 
+  it("previews and commits the Survival pause destination with Android Predictive Back", () => {
+    const service = createProductionSurvivalService();
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true,
+      systemBack
+    });
+
+    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-hub-start");
+    press(renderer, "personal-best-guide-start");
+
+    systemBack.startPredictive();
+    systemBack.progressPredictive(0.5);
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe(
+      "Survival pause"
+    );
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-id"))).toBe(
+      "session-abandon-confirmation"
+    );
+
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(service.getActiveSprint()?.status).toBe("paused");
+    expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+  });
+
   it("opens the Survival Hub from the paused Home card before a Run can resume", () => {
     const renderer = renderLabScenario("practice-home");
 
@@ -8151,6 +8179,9 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "personal-best-start");
     press(renderer, "personal-best-hub-records");
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe(
+      "Survival records. Puzzle and Arrow Duel bests are listed separately by level."
+    );
     expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
     expect(() => findByTestId(renderer, "personal-best-records-screen")).toThrow();
@@ -8163,6 +8194,30 @@ describe("PracticePocScreen", () => {
     expect(systemBack.invoke()).toBe(true);
     expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
     expect(() => findByTestId(renderer, "personal-best-hub")).toThrow();
+  });
+
+  it("dismisses the Rating source picker before the Hub with Android Back", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderLabScenario("practice-personal-best-hub", { systemBack });
+
+    press(renderer, "personal-best-use-another-run");
+    expect(findByTestId(renderer, "personal-best-source-picker")).toBeTruthy();
+    expect(systemBack.invoke()).toBe(true);
+    expect(() => findByTestId(renderer, "personal-best-source-picker")).toThrow();
+    expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
+
+    press(renderer, "personal-best-use-another-run");
+    systemBack.startPredictive();
+    systemBack.progressPredictive(0.5);
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-label"))).toBe(
+      "Survival Hub"
+    );
+    expect(collectText(findByTestId(renderer, "mobile-back-destination-preview-id"))).toBe(
+      "personal-best-hub"
+    );
+    expect(systemBack.commitPredictive()).toBe(true);
+    expect(() => findByTestId(renderer, "personal-best-source-picker")).toThrow();
+    expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
   });
 
   it("scrolls every Survival page entry back to the top", () => {
@@ -8247,6 +8302,27 @@ describe("PracticePocScreen", () => {
     press(renderer, "personal-best-hub-start");
     expect(service.getActiveSprint()?.status).toBe("active");
     expect(() => findByTestId(renderer, "personal-best-guide")).toThrow();
+  });
+
+  it("preserves a non-recommended level across rules and first-use guide detours", () => {
+    const rulesRenderer = renderLabScenario("practice-personal-best-hub");
+    press(rulesRenderer, "personal-best-level-800");
+    press(rulesRenderer, "personal-best-hub-help");
+    press(rulesRenderer, "personal-best-guide-start");
+    expect(findByTestId(rulesRenderer, "personal-best-level-800").props.accessibilityState).toEqual({
+      selected: true
+    });
+
+    const firstUseRenderer = renderLabScenario("practice-personal-best-hub");
+    press(firstUseRenderer, "personal-best-level-800");
+    press(firstUseRenderer, "personal-best-hub-start");
+    expect(collectText(findByTestId(firstUseRenderer, "personal-best-guide-start"))).toBe(
+      "Start Survival"
+    );
+    press(firstUseRenderer, "personal-best-guide-not-now");
+    expect(findByTestId(firstUseRenderer, "personal-best-level-800").props.accessibilityState).toEqual({
+      selected: true
+    });
   });
 
   it("animates Survival disclosures and removes collapsed content from interaction", () => {

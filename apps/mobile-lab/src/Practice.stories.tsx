@@ -206,6 +206,7 @@ export const PersonalBestArrowDuel: Story = {
 export const PersonalBestArrowDuelRequiredReply: Story = {
   name: "Survival · Arrow Duel required reply",
   args: {
+    arrowDuelReplyPreparationConfirmationRequired: true,
     scenarioId: "practice-personal-best-arrow-duel",
     storyPresentation: {
       storyId: "practice--survival-arrow-duel-required-reply",
@@ -213,6 +214,7 @@ export const PersonalBestArrowDuelRequiredReply: Story = {
     }
   },
   play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "personal-best-level-900");
     await clickTestId(canvasElement, "personal-best-hub-start");
     await clickTestId(canvasElement, "personal-best-guide-start");
     await waitForTestId(canvasElement, "arrow-duel-reply-challenge");
@@ -224,6 +226,10 @@ export const PersonalBestArrowDuelRequiredReply: Story = {
       "arrow-duel-what-if-detail",
       "Find the opponent’s reply. There is no time limit."
     );
+    expectTestIdAbsent(canvasElement, "arrow-duel-what-if-settings-hint");
+    expectTestIdAbsent(canvasElement, "arrow-duel-reply-timer");
+    await clickTestId(canvasElement, "arrow-duel-what-if-action");
+    await expectTestIdText(canvasElement, "arrow-duel-reply-title", "Find the reply");
     expectTestIdAbsent(canvasElement, "arrow-duel-what-if-settings-hint");
     expectTestIdAbsent(canvasElement, "arrow-duel-reply-timer");
   }
@@ -267,6 +273,24 @@ export const PersonalBestGuide: Story = {
     await waitForText(canvasElement, "Pause now, continue later");
     await expectTestIdText(canvasElement, "personal-best-guide-start", "Got it");
     expectTestIdAbsent(canvasElement, "personal-best-guide-not-now");
+  }
+};
+
+export const PersonalBestFirstUseGuide: Story = {
+  name: "Survival · first-use start guide",
+  args: {
+    scenarioId: "practice-personal-best-hub",
+    storyPresentation: {
+      storyId: "practice--survival-first-use-start-guide",
+      title: "Survival · first-use start guide"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "personal-best-level-800");
+    await clickTestId(canvasElement, "personal-best-hub-start");
+    await waitForTestId(canvasElement, "personal-best-guide");
+    await expectTestIdText(canvasElement, "personal-best-guide-start", "Start Survival");
+    await expectTestIdText(canvasElement, "personal-best-guide-not-now", "Not now");
   }
 };
 

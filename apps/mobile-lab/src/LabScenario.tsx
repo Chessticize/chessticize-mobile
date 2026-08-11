@@ -20,6 +20,7 @@ import { MemoryTacticalProfileRepository } from "../../../packages/storage/src/t
 import { TacticalProfileService } from "../../../packages/storage/src/tactical-profile-service.ts";
 import { PracticePocScreen } from "../../mobile/src/components/PracticePocScreen.tsx";
 import type { MobilePlatformCapabilities } from "../../mobile/src/platform/mobilePlatformCapabilities.ts";
+import type { MobileSystemBackSource } from "../../mobile/src/navigation/mobileSystemBack.ts";
 import type {
   ReviewReminderNotificationClient,
   ReviewReminderNotificationRoute,
@@ -110,7 +111,8 @@ export function LabScenario({
   arrowDuelReplySeconds,
   runReorderPickedUpRunId,
   scenarioId,
-  storyPresentation
+  storyPresentation,
+  systemBack
 }: {
   arrowDuelOpponentReplyGlobalEnabled?: boolean;
   arrowDuelReplyAutoTimeoutMs?: number;
@@ -120,6 +122,7 @@ export function LabScenario({
   runReorderPickedUpRunId?: string;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
+  systemBack?: MobileSystemBackSource;
 }): React.JSX.Element {
   const runtime = useMemo(() => createScenarioRuntime(scenarioId), [scenarioId]);
 
@@ -137,6 +140,7 @@ export function LabScenario({
       runtime={runtime}
       scenarioId={scenarioId}
       storyPresentation={storyPresentation}
+      systemBack={systemBack}
     />
   );
 }
@@ -150,7 +154,8 @@ function LabScenarioContent({
   runReorderPickedUpRunId,
   runtime,
   scenarioId,
-  storyPresentation
+  storyPresentation,
+  systemBack
 }: {
   arrowDuelOpponentReplyGlobalEnabled?: boolean;
   arrowDuelReplyAutoTimeoutMs?: number;
@@ -161,6 +166,7 @@ function LabScenarioContent({
   runtime: ScenarioRuntime;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
+  systemBack?: MobileSystemBackSource;
 }): React.JSX.Element {
   const tacticalProfileScenarioId = isTacticalProfileScenario(scenarioId)
     ? scenarioId
@@ -313,6 +319,7 @@ function LabScenarioContent({
           : undefined}
         personalBestChallengeDesignPreview={personalBestChallengePreviewFor(scenarioId)}
         platformCapabilities={runtime.platformCapabilities}
+        systemBack={systemBack}
         runReorderDesignPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
           ? { pickedUpRunId: runReorderPickedUpRunId }
           : undefined}

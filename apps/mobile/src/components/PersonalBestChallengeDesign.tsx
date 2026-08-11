@@ -348,33 +348,39 @@ export function PersonalBestGuide({
 }
 
 export function PersonalBestChallengeHub({
+  initialSelection,
   presentation,
+  sourcePickerVisible,
   onClose,
   onCloseRecords,
   onContinue,
   onHowItWorks,
   onOpenRecords,
+  onSourcePickerVisibilityChange,
   recordsVisible,
   onStart
 }: {
+  initialSelection?: PersonalBestChallengeSelection | null;
   presentation: PersonalBestChallengeDesignPreview;
+  sourcePickerVisible: boolean;
   onClose: () => void;
   onCloseRecords: () => void;
   onContinue: (runId: string) => void;
   onHowItWorks: (selection: PersonalBestChallengeSelection) => void;
   onOpenRecords: () => void;
+  onSourcePickerVisibilityChange: (visible: boolean) => void;
   recordsVisible: boolean;
   onStart: (selection: PersonalBestChallengeSelection) => void;
 }): React.JSX.Element {
   const { width: viewportWidth } = useWindowDimensions();
-  const initialType = presentation.challengeType ?? "puzzle";
+  const initialType = initialSelection?.challengeType ?? presentation.challengeType ?? "puzzle";
   const [challengeType, setChallengeType] = React.useState<PersonalBestChallengeType>(initialType);
   const pausedRuns = presentation.pausedRuns ?? [];
-  const [sourcePickerVisible, setSourcePickerVisible] = React.useState(
-    presentation.sourcePickerInitiallyVisible === true
-  );
   const [selectedSourceIds, setSelectedSourceIds] = React.useState<Partial<Record<PersonalBestChallengeType, string>>>(
-    () => ({ ...presentation.selectedReferenceRunIds })
+    () => ({
+      ...presentation.selectedReferenceRunIds,
+      ...(initialSelection ? { [initialSelection.challengeType]: initialSelection.sourceId } : {})
+    })
   );
   const initialSource = referenceRunFor(
     presentation,
@@ -384,9 +390,11 @@ export function PersonalBestChallengeHub({
   const availableLevels = presentation.availableLevels?.length
     ? [...presentation.availableLevels].sort((left, right) => left.minRating - right.minRating)
     : defaultSurvivalLevels();
-  const requestedInitialBand = initialSource
-    ? canonicalBandFor(initialSource.rating)
-    : { minRating: presentation.band.minRating, maxRating: presentation.band.maxRating };
+  const requestedInitialBand = initialSelection?.challengeType === initialType
+    ? initialSelection.band
+    : initialSource
+      ? canonicalBandFor(initialSource.rating)
+      : { minRating: presentation.band.minRating, maxRating: presentation.band.maxRating };
   const initialBand = closestAvailableBand(availableLevels, requestedInitialBand);
   const [selectedBand, setSelectedBand] = React.useState(initialBand);
   const [moreLevelsVisible, setMoreLevelsVisible] = React.useState(
@@ -452,12 +460,12 @@ export function PersonalBestChallengeHub({
   function chooseSource(nextSource: PersonalBestReferenceRunPresentation): void {
     setSelectedSourceIds((current) => ({ ...current, [challengeType]: nextSource.id }));
     setSelectedBand(closestAvailableBand(availableLevels, canonicalBandFor(nextSource.rating)));
-    setSourcePickerVisible(false);
+    onSourcePickerVisibilityChange(false);
   }
 
   function selectedChallenge(): PersonalBestChallengeSelection | null {
     if (!source) {
-      setSourcePickerVisible(true);
+      onSourcePickerVisibilityChange(true);
       return null;
     }
     return {
@@ -619,7 +627,7 @@ export function PersonalBestChallengeHub({
           challengeType={challengeType}
           presentation={presentation}
           selectedSourceId={selectedSourceId}
-          onCancel={() => setSourcePickerVisible(false)}
+          onCancel={() => onSourcePickerVisibilityChange(false)}
           onSelect={chooseSource}
         />
       ) : (
@@ -665,7 +673,7 @@ export function PersonalBestChallengeHub({
                   accessibilityLabel={`Use another ${challengeTypeLabel(challengeType)} Run`}
                   style={styles.sourceChangeButton}
                   testID="personal-best-use-another-run"
-                  onPress={() => setSourcePickerVisible(true)}
+                  onPress={() => onSourcePickerVisibilityChange(true)}
                 >
                   <Text style={styles.sourceChangeText}>Use another Run</Text>
                 </Pressable>

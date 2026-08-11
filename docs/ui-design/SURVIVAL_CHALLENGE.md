@@ -60,6 +60,8 @@ time.
 - Backgrounding derives the same puzzle-hidden `Resume` / `Leave paused`
   surface from the authoritative paused Run state; foregrounding never leaves
   an unexplained blank session shell.
+- Android Back and Predictive Back both preview and commit that same Survival
+  pause surface while a Run is active.
 - The Storybook interaction uses the same domain pause/resume transition as a
   Sprint: opening the puzzle-hidden pause surface freezes both Run and
   per-puzzle active time, and resuming shifts the active deadlines by exactly
@@ -164,6 +166,9 @@ says `Continue Survival`; it never offers a reset that discards mistakes.
 Otherwise, Start carries the exact selected challenge type, level, Rating
 source, source Rating snapshot, and level-specific best into the first-use
 guide and the active Run. The guide never reverts to the Hub defaults.
+Rules and first-use-guide detours preserve the selected type, Rating source,
+and level when the user returns to the Hub. Back from the Rating-source picker
+dismisses only that picker before Back can leave the Hub.
 
 `How it works` on Home and `?` in the Hub are informational entries. Their
 primary action is `Got it`; it returns to the originating Home or Hub without
