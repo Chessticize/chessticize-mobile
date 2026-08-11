@@ -194,7 +194,8 @@ if (!supportedAndroidAbis) {
 react {
     // E2E inherits debug signing and native behavior but deliberately bundles
     // JavaScript so the installed APK can run with Metro and networking off.
-    debuggableVariants = ["debug"]
+    // deviceDev is the isolated, Metro-backed identity for personal hardware.
+    debuggableVariants = ["debug", "deviceDev"]
     // pnpm keeps React Native's compiler dependency in its virtual store. A
     // direct mobile dependency gives Gradle one stable cross-platform path.
     hermesCommand = "$rootDir/../node_modules/hermes-compiler/hermesc/%OS-BIN%/hermesc"
@@ -339,6 +340,12 @@ android {
         debug {
             signingConfig signingConfigs.debug
         }
+        deviceDev {
+            initWith debug
+            applicationIdSuffix ".dev"
+            matchingFallbacks = ["debug"]
+            manifestPlaceholders = [usesCleartextTraffic: true]
+        }
         e2e {
             initWith debug
             matchingFallbacks = ["debug"]
@@ -371,7 +378,11 @@ android {
 
 androidComponents {
     onVariants(selector().all()) { variant ->
-        if (variant.buildType == "debug" || variant.buildType == "e2e") {
+        if (
+            variant.buildType == "debug" ||
+            variant.buildType == "deviceDev" ||
+            variant.buildType == "e2e"
+        ) {
             variant.outputs.each { output ->
                 output.versionName.set(developmentVersion.plannedPublicVersion)
             }

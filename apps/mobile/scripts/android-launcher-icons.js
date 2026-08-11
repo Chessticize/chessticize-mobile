@@ -230,18 +230,25 @@ function imagesEqual(left, right) {
     && left.pixels.equals(right.pixels);
 }
 
-function launcherPaths(mobileRoot) {
+function launcherPaths(mobileRoot, identity = 'production') {
+  if (!['production', 'dev'].includes(identity)) {
+    throw new Error(`Unsupported Android launcher identity: ${identity}`);
+  }
+  const isDev = identity === 'dev';
   return {
     canonical: path.join(
       mobileRoot,
-      'ios/ChessticizeMobile/Images.xcassets/AppIcon.appiconset/AppIcon-ios-marketing-1024.png',
+      `ios/ChessticizeMobile/Images.xcassets/${isDev ? 'AppIconDev' : 'AppIcon'}.appiconset/AppIcon-ios-marketing-1024.png`,
     ),
-    resources: path.join(mobileRoot, 'android/app/src/main/res'),
+    resources: path.join(
+      mobileRoot,
+      `android/app/src/${isDev ? 'deviceDev' : 'main'}/res`,
+    ),
   };
 }
 
-function synchronizeLauncherIcons(mobileRoot, checkOnly = false) {
-  const paths = launcherPaths(mobileRoot);
+function synchronizeLauncherIcons(mobileRoot, checkOnly = false, identity = 'production') {
+  const paths = launcherPaths(mobileRoot, identity);
   const expected = expectedLauncherResources(fs.readFileSync(paths.canonical));
   const mismatches = [];
   for (const [relativePath, png] of expected) {
@@ -260,7 +267,11 @@ function synchronizeLauncherIcons(mobileRoot, checkOnly = false) {
 
 if (require.main === module) {
   const mobileRoot = path.resolve(__dirname, '..');
-  synchronizeLauncherIcons(mobileRoot, process.argv.includes('--check'));
+  synchronizeLauncherIcons(
+    mobileRoot,
+    process.argv.includes('--check'),
+    process.argv.includes('--dev') ? 'dev' : 'production',
+  );
 }
 
 module.exports = {
@@ -274,5 +285,6 @@ module.exports = {
   decodePng,
   expectedLauncherResources,
   imagesEqual,
+  launcherPaths,
   synchronizeLauncherIcons,
 };
