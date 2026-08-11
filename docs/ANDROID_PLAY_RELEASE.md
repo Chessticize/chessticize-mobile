@@ -27,7 +27,9 @@ RC1 source identity that was invalidated before signing or Play upload. Version
 code 14 completed the Android 1.3.5 source, signed-candidate, Play-generated APK,
 and GitHub mirror path. Version code 15 completed the Android 1.4 source,
 signed-candidate, Production, Play-generated APK, and GitHub mirror path.
-Version code 16 is reserved for Android 1.4.1.
+Version code 16 completed the Android 1.4.1 source, signed-candidate,
+Play-generated APK, and GitHub mirror path. Version code 17 is reserved for
+Android 1.4.2.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -470,17 +472,23 @@ Do not move the build-16 tag, rebuild its AAB, replace its public artifacts, or
 reuse version code 16. Refresh the live Play track before reporting its current
 store publication state.
 
+Build 17 is the proposed Android 1.4.2 candidate identity. It currently has no
+annotated source tag, signed AAB, corresponding-source Release, Play upload, or
+APK mirror. Do not report it as candidate-ready until the exact release-branch
+head is frozen, its approved build-specific note and required validation are
+recorded, and the protected candidate/source workflow succeeds.
+
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.4.1`)
-- Android version code: `apps/mobile/release-version.json` (`16`)
+- Public version: `apps/mobile/release-version.json` (`1.4.2`)
+- Android version code: `apps/mobile/release-version.json` (`17`)
 - iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
 - Open-development target: `apps/mobile/development-version.json` (`1.4.2`;
   Debug/E2E only, not a store identity)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.4.1-build-16`
+- Required source tag before any Play track upload: `android-v1.4.2-build-17`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -590,8 +598,8 @@ the mirror and Play track states independently until both are complete.
 
 For a bounded follow-up release:
 
-For Android version `1.4.1` build `16`, release notes and this support document must
-name the canonical source tag `android-v1.4.1-build-16` and the public source
+For Android version `1.4.2` build `17`, release notes and this support document must
+name the canonical source tag `android-v1.4.2-build-17` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 must bind the annotated tag, commit, application ID, version, version code, and
 AAB SHA-256 before Play distribution. A missing or lightweight public tag, a
