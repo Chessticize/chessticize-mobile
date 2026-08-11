@@ -31,6 +31,8 @@ jest.mock('react-native-chessboard', () => {
     const chessRef = React.useRef(new Chess(props.fen));
     const latestFenRef = React.useRef(props.fen);
     const playMoveRef = React.useRef(null);
+    const deferNextResetRef = React.useRef(false);
+    const pendingResetCompletionsRef = React.useRef([]);
     const [pendingPromotion, setPendingPromotion] = React.useState(null);
     const resetBoardMock = React.useMemo(() => jest.fn((fen) => {
       try {
@@ -38,6 +40,19 @@ jest.mock('react-native-chessboard', () => {
       } catch {
         chessRef.current = new Chess(latestFenRef.current);
       }
+      if (deferNextResetRef.current) {
+        deferNextResetRef.current = false;
+        return new Promise((resolve) => {
+          pendingResetCompletionsRef.current.push(resolve);
+        });
+      }
+      return Promise.resolve();
+    }), []);
+    const deferNextResetMock = React.useMemo(() => jest.fn(() => {
+      deferNextResetRef.current = true;
+    }), []);
+    const completeResetMock = React.useMemo(() => jest.fn(() => {
+      pendingResetCompletionsRef.current.shift()?.();
     }), []);
 
     React.useEffect(() => {
@@ -95,6 +110,8 @@ jest.mock('react-native-chessboard', () => {
       {
         ...props,
         mockImperativeMove: imperativeMoveMock,
+        mockCompleteReset: completeResetMock,
+        mockDeferNextReset: deferNextResetMock,
         mockMove: playMove,
         mockResetBoard: resetBoardMock,
         testID: 'mock-chessboard'

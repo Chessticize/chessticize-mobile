@@ -32,7 +32,8 @@ jest.mock("react-native-reanimated", () => ({
 }));
 
 jest.mock("react-native-worklets", () => ({
-  scheduleOnRN: (fn, ...args) => fn(...args)
+  scheduleOnRN: (fn, ...args) => fn(...args),
+  scheduleOnUI: (fn, ...args) => fn(...args)
 }));
 
 const { Chess } = require("chess.js");

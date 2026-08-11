@@ -7,15 +7,21 @@
 jest.mock("react-native-reanimated", () => {
   const React = require("react");
   const queuedWrites = [];
+  let runningOnUI = false;
 
   function mutable(initial) {
     const value = {
       current: initial,
       get: () => value.current,
       set: (next) => {
-        queuedWrites.push(() => {
+        const commit = () => {
           value.current = next;
-        });
+        };
+        if (runningOnUI) {
+          commit();
+        } else {
+          queuedWrites.push(commit);
+        }
       }
     };
     return value;
@@ -31,16 +37,32 @@ jest.mock("react-native-reanimated", () => {
       return ref.current;
     },
     withSpring: (target) => target,
+    __flushNextSharedValueWrite: () => {
+      queuedWrites.shift()?.();
+    },
     __flushSharedValueWrites: () => {
       while (queuedWrites.length > 0) {
         queuedWrites.shift()();
       }
+    },
+    __runAsUITransaction: (worklet, args) => {
+      queuedWrites.push(() => {
+        runningOnUI = true;
+        try {
+          worklet(...args);
+        } finally {
+          runningOnUI = false;
+        }
+      });
     }
   };
 });
 
 jest.mock("react-native-worklets", () => ({
-  scheduleOnRN: (fn, ...args) => fn(...args)
+  scheduleOnRN: (fn, ...args) => fn(...args),
+  scheduleOnUI: (worklet, ...args) => {
+    require("react-native-reanimated").__runAsUITransaction(worklet, args);
+  }
 }));
 
 const React = require("react");
@@ -48,7 +70,10 @@ const TestRenderer = require("react-test-renderer");
 const { act } = TestRenderer;
 const { createMoveExecutor } = require("react-native-chessboard/lib/commonjs/state/move-executor");
 const { useBoardState } = require("react-native-chessboard/lib/commonjs/state/use-board-state");
-const { __flushSharedValueWrites } = require("react-native-reanimated");
+const {
+  __flushNextSharedValueWrite,
+  __flushSharedValueWrites
+} = require("react-native-reanimated");
 
 const PIECE_SIZE = 10;
 const OLD_UNFLIPPED_FEN = "8/p2R1nkp/p1N1R1p1/8/8/2p5/8/4K3 w - - 0 1";
@@ -111,6 +136,24 @@ const NEXT_UNFLIPPED_RESIZED_COORDINATES = {
   h7: [140, 20]
 };
 
+const NEXT_PIECES = {
+  a1: "wk",
+  a2: "wp",
+  b3: "wp",
+  c3: "bp",
+  h3: "br",
+  f4: "wp",
+  a6: "bp",
+  c6: "wn",
+  e6: "wr",
+  g6: "bp",
+  a7: "bp",
+  d7: "wr",
+  f7: "bn",
+  g7: "bk",
+  h7: "bp"
+};
+
 function HookProbe({ fen, pieceSize, flipped, onState }) {
   const value = useBoardState(fen, pieceSize, flipped);
   onState(value);
@@ -126,7 +169,14 @@ function misplacedSquares(boardState, expectedCoordinates) {
     .map(([square]) => square);
 }
 
+function mismatchedPieces(boardState) {
+  return Object.entries(boardState.squares)
+    .filter(([square, state]) => state.piece.get() !== (NEXT_PIECES[square] ?? null))
+    .map(([square]) => square);
+}
+
 function renderDelayedResetTransition({
+  flushWrites = true,
   initialFlipped,
   nextFlipped,
   initialPieceSize = PIECE_SIZE,
@@ -160,7 +210,7 @@ function renderDelayedResetTransition({
   );
 
   act(() => {
-    executor.resetBoard(NEXT_FLIPPED_FEN);
+    executor.resetBoard(NEXT_FLIPPED_FEN, { flipped: nextFlipped });
     renderer.update(
       React.createElement(HookProbe, {
         fen: NEXT_FLIPPED_FEN,
@@ -172,12 +222,27 @@ function renderDelayedResetTransition({
       })
     );
   });
-  __flushSharedValueWrites();
+  if (flushWrites) {
+    __flushSharedValueWrites();
+  }
 
   return current.boardState;
 }
 
 describe("react-native-chessboard cross-puzzle orientation", () => {
+  it("publishes a cross-puzzle FEN and orientation as one UI transaction", () => {
+    const boardState = renderDelayedResetTransition({
+      flushWrites: false,
+      initialFlipped: false,
+      nextFlipped: true
+    });
+
+    __flushNextSharedValueWrite();
+
+    expect(mismatchedPieces(boardState)).toEqual([]);
+    expect(misplacedSquares(boardState, NEXT_FLIPPED_COORDINATES)).toEqual([]);
+  });
+
   it("places every new-FEN piece correctly when reset writes land after an unflipped-to-flipped transition", () => {
     const boardState = renderDelayedResetTransition({
       initialFlipped: false,
