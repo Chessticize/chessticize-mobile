@@ -60,6 +60,7 @@ import {
   normalizeHistoryAttemptDetail,
   OPPONENT_REPLY_MAX_SECONDS,
   OPPONENT_REPLY_MIN_SECONDS,
+  pauseSprint as pauseSprintState,
   PRACTICE_RUN_NAME_MAX_LENGTH,
   RATING_FLOOR,
   resetSprintGuideProgress,
@@ -67,6 +68,7 @@ import {
   reviewAnalysisStartingFen,
   reviewDueLabel,
   reviewQueueForecast,
+  resumeSprint as resumeSprintState,
   submitArrowDuelChoice,
   submitArrowDuelFollowUpMove,
   submitArrowDuelReply,
@@ -264,7 +266,9 @@ import {
   PersonalBestMistakeIndicator,
   PersonalBestProgressBanner,
   PersonalBestResult,
-  type PersonalBestChallengeDesignPreview
+  type PersonalBestChallengeDesignPreview,
+  type PersonalBestChallengeSelection,
+  type PersonalBestPausedRunPresentation
 } from "./PersonalBestChallengeDesign.tsx";
 
 export type {
@@ -898,6 +902,28 @@ export function PracticePocScreen({
   const [personalBestRecordsVisible, setPersonalBestRecordsVisible] = useState(
     () => personalBestChallengeDesignPreview?.recordsInitiallyVisible === true
   );
+  const [personalBestSelectedSetup, setPersonalBestSelectedSetup] = useState<PersonalBestChallengeSelection | null>(null);
+  const personalBestPresentation = useMemo<PersonalBestChallengeDesignPreview | undefined>(() => {
+    if (!personalBestChallengeDesignPreview || !personalBestSelectedSetup) {
+      return personalBestChallengeDesignPreview;
+    }
+    return {
+      ...personalBestChallengeDesignPreview,
+      band: {
+        currentRating: personalBestSelectedSetup.sourceRating,
+        minRating: personalBestSelectedSetup.band.minRating,
+        maxRating: personalBestSelectedSetup.band.maxRating
+      },
+      bestScore: personalBestSelectedSetup.bestScore,
+      challengeType: personalBestSelectedSetup.challengeType,
+      selectedReferenceRunIds: {
+        ...personalBestChallengeDesignPreview.selectedReferenceRunIds,
+        [personalBestSelectedSetup.challengeType]: personalBestSelectedSetup.sourceId
+      },
+      startState: personalBestChallengeDesignPreview.startStates?.[personalBestSelectedSetup.challengeType]
+        ?? personalBestChallengeDesignPreview.startState
+    };
+  }, [personalBestChallengeDesignPreview, personalBestSelectedSetup]);
   const [boardFen, setBoardFen] = useState<string | null>(null);
   const [lastBoardMove, setLastBoardMove] = useState<BoardMove | null>(null);
   const [feedbackPuzzleId, setFeedbackPuzzleId] = useState<string | null>(null);
@@ -2368,6 +2394,53 @@ export function PracticePocScreen({
     } catch (caught) {
       setError(errorMessage(caught));
     }
+  }
+
+  function pausePersonalBestPreview(): void {
+    const activeState = stateRef.current;
+    if (activeState?.status === "active") {
+      const paused = pauseSprintState(activeState, captureLiveNowIso()).state;
+      commitState(paused);
+      commitBoardInputLocked(
+        true,
+        "pause-survival-preview",
+        paused.currentPuzzle?.puzzle.id ?? null
+      );
+      clearFeedbackSnapshot();
+      setFeedback(null);
+      setFeedbackPuzzleId(null);
+    }
+    setPracticeExitConfirmationVisible(true);
+  }
+
+  function resumePersonalBestPreview(nextSprint: SprintState): void {
+    if (nextSprint.status !== "paused") {
+      setPracticeExitConfirmationVisible(false);
+      return;
+    }
+    const resumed = resumeSprintState(nextSprint, captureLiveNowIso());
+    commitState(resumed);
+    commitBoardFen(resumed.currentPuzzle?.currentFen ?? null);
+    commitBoardInputLocked(false, "resume-survival-preview", resumed.currentPuzzle?.puzzle.id ?? null);
+    setPracticeExitConfirmationVisible(false);
+  }
+
+  function selectPersonalBestPausedRun(run: PersonalBestPausedRunPresentation): void {
+    const sourceId = personalBestChallengeDesignPreview?.selectedReferenceRunIds?.[run.challengeType];
+    const source = personalBestChallengeDesignPreview?.referenceRuns?.find((candidate) => (
+      candidate.challengeType === run.challengeType && candidate.id === sourceId
+    ));
+    setPersonalBestSelectedSetup({
+      band: { minRating: run.minRating, maxRating: run.maxRating },
+      bestScore: Math.max(run.score, personalBestChallengeDesignPreview?.levelRecords?.find((record) => (
+        record.challengeType === run.challengeType
+        && record.minRating === run.minRating
+        && record.maxRating === run.maxRating
+      ))?.score ?? -1),
+      challengeType: run.challengeType,
+      sourceId: source?.id ?? sourceId ?? "standard",
+      sourceRating: source?.rating ?? run.minRating
+    });
   }
 
   async function onBoardMove(result: MoveResult, context: BoardMoveContext): Promise<void> {
@@ -4229,9 +4302,9 @@ export function PracticePocScreen({
       timeoutSeconds={resolvedPuzzleTiming?.timeoutAfterSeconds ?? null}
     />
   ) : null;
-  const personalBestActivePresentation = personalBestChallengeDesignPreview
+  const personalBestActivePresentation = personalBestPresentation
     ?.showActivePresentation === true
-    ? personalBestChallengeDesignPreview
+    ? personalBestPresentation
     : undefined;
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
@@ -4246,14 +4319,18 @@ export function PracticePocScreen({
       confirmAbandon={practiceExitConfirmationVisible}
       onAbandon={isOpenSession && !personalBestActivePresentation ? abandonSprint : undefined}
       onClose={personalBestActivePresentation
-        ? () => setPracticeExitConfirmationVisible(true)
+        ? pausePersonalBestPreview
         : undefined}
       onPauseAndLeave={personalBestActivePresentation ? resetToIdle : undefined}
       onConfirmAbandonChange={setPracticeExitConfirmationVisible}
       onPause={isActive && !personalBestActivePresentation
         ? () => pauseActiveSprint("manual")
         : undefined}
-      onResume={isPaused && state ? () => resumeSprint(state) : undefined}
+      onResume={isPaused && state
+        ? personalBestActivePresentation
+          ? () => resumePersonalBestPreview(state)
+          : () => resumeSprint(state)
+        : undefined}
     />
   ) : null;
   const sessionScoreNode = shouldShowSessionBoard && state?.status === "active" ? (
@@ -4267,7 +4344,7 @@ export function PracticePocScreen({
       <SessionScoreStrip compact={sessionUsesRail} state={state} />
     )
   ) : null;
-  const pausedSessionNode = isPaused && state ? (
+  const pausedSessionNode = isPaused && state && !personalBestActivePresentation ? (
     <PausedSessionPanel
       state={state}
       onAbandon={() => setPracticeExitConfirmationVisible(true)}
@@ -4630,17 +4707,18 @@ export function PracticePocScreen({
             ) : null}
             {tab === "practice" ? (
               <>
-                {personalBestHubVisible && personalBestChallengeDesignPreview ? (
+                {personalBestHubVisible && personalBestPresentation ? (
                   <PersonalBestChallengeHub
-                    presentation={personalBestChallengeDesignPreview}
+                    presentation={personalBestPresentation}
                     onClose={() => setPersonalBestHubVisible(false)}
                     onCloseRecords={() => setPersonalBestRecordsVisible(false)}
                     onContinue={(runId) => {
-                      const pausedRun = personalBestChallengeDesignPreview.pausedRuns?.find((run) => run.id === runId);
+                      const pausedRun = personalBestPresentation.pausedRuns?.find((run) => run.id === runId);
                       const nextState = pausedRun?.resumeState;
-                      if (!nextState) {
+                      if (!pausedRun || !nextState) {
                         return;
                       }
+                      selectPersonalBestPausedRun(pausedRun);
                       setPersonalBestHubVisible(false);
                       setMode(nextState.config.mode);
                       commitState(nextState);
@@ -4650,22 +4728,24 @@ export function PracticePocScreen({
                       setPersonalBestRecordsVisible(true);
                     }}
                     recordsVisible={personalBestRecordsVisible}
-                    onStart={() => {
+                    onStart={(selection) => {
+                      setPersonalBestSelectedSetup(selection);
                       setPersonalBestHubVisible(false);
                       setPersonalBestGuideVisible(true);
                     }}
                   />
                 ) : null}
-                {personalBestGuideVisible && personalBestChallengeDesignPreview ? (
+                {personalBestGuideVisible && personalBestPresentation ? (
                   <PersonalBestGuide
-                    presentation={personalBestChallengeDesignPreview}
+                    presentation={personalBestPresentation}
                     onClose={() => setPersonalBestGuideVisible(false)}
                     onStart={() => {
                       setPersonalBestGuideVisible(false);
-                      const startState = personalBestChallengeDesignPreview.startState;
+                      const startState = personalBestPresentation.startState;
                       if (startState) {
                         setMode(startState.config.mode);
                         commitState(startState);
+                        commitBoardFen(startState.currentPuzzle?.currentFen ?? null);
                       }
                     }}
                   />
@@ -4849,7 +4929,7 @@ export function PracticePocScreen({
                       ? selectedManagedRun?.elo ?? RATING_FLOOR
                       : currentRating}
                     progress={practiceProgress}
-                    personalBestChallenge={personalBestChallengeDesignPreview}
+                    personalBestChallenge={personalBestPresentation}
                     runManagement={activeRunManagementPresentation}
                     sprintRulesGuide={sprintRulesGuidePresentation}
                     sprintRulesGuideVisible={sprintRulesGuideVisible}
@@ -4863,12 +4943,13 @@ export function PracticePocScreen({
                     }}
                     onOpenSprintRulesGuide={() => setSprintRulesGuideVisible(true)}
                     onContinuePersonalBest={(runId) => {
-                      const pausedRun = personalBestChallengeDesignPreview?.pausedRuns?.find((run) => run.id === runId);
+                      const pausedRun = personalBestPresentation?.pausedRuns?.find((run) => run.id === runId);
                       const nextState = pausedRun?.resumeState;
-                      if (!nextState) {
+                      if (!pausedRun || !nextState) {
                         setPersonalBestHubVisible(true);
                         return;
                       }
+                      selectPersonalBestPausedRun(pausedRun);
                       setMode(nextState.config.mode);
                       commitState(nextState);
                       commitBoardFen(nextState.currentPuzzle?.currentFen ?? null);
@@ -4993,17 +5074,18 @@ export function PracticePocScreen({
                 ) : null}
 
                 {isFinished && !isShowingFeedbackSnapshot ? (
-                  personalBestChallengeDesignPreview?.result ? (
+                  personalBestPresentation?.result ? (
                     <PersonalBestResult
-                      activeElapsedMs={personalBestChallengeDesignPreview.result.activeElapsedMs}
-                      band={personalBestChallengeDesignPreview.band}
+                      activeElapsedMs={personalBestPresentation.result.activeElapsedMs}
+                      band={personalBestPresentation.band}
                       bestStreak={state.bestStreak}
-                      challengeType={personalBestChallengeDesignPreview.challengeType ?? "puzzle"}
-                      isNewBest={personalBestChallengeDesignPreview.result.isNewBest}
+                      challengeType={personalBestPresentation.challengeType ?? "puzzle"}
+                      endReason={personalBestPresentation.result.endReason}
+                      isNewBest={personalBestPresentation.result.isNewBest}
                       mistakeCount={state.mistakeCount}
-                      previousBestScore={personalBestChallengeDesignPreview.result.previousBestScore}
+                      previousBestScore={personalBestPresentation.result.previousBestScore}
                       score={state.correctCount}
-                      sittings={personalBestChallengeDesignPreview.result.sittings}
+                      sittings={personalBestPresentation.result.sittings}
                       onChangeChallenge={() => {
                         resetToIdle();
                         setPersonalBestHubVisible(true);
@@ -5013,13 +5095,14 @@ export function PracticePocScreen({
                         ? showSessionReplay
                         : undefined}
                       onTryAgain={() => {
-                        const startState = personalBestChallengeDesignPreview.startState;
+                        const startState = personalBestPresentation.startState;
                         if (!startState) {
                           resetToIdle();
                           return;
                         }
                         setMode(startState.config.mode);
                         commitState(startState);
+                        commitBoardFen(startState.currentPuzzle?.currentFen ?? null);
                       }}
                     />
                   ) : (
@@ -10444,7 +10527,10 @@ function SessionStatusBar({
               accessibilityLabel="Resume Survival"
               testID="session-abandon-cancel"
               style={[styles.primaryButton, styles.survivalExitAction]}
-              onPress={() => onConfirmAbandonChange(false)}
+              onPress={() => {
+                onResume?.();
+                onConfirmAbandonChange(false);
+              }}
             >
               <Text style={styles.primaryButtonText}>Resume</Text>
             </Pressable>

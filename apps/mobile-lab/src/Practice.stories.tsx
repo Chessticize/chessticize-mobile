@@ -168,6 +168,16 @@ export const PersonalBestRatingSource: Story = {
   }
 };
 
+export const PersonalBestUnavailableRatingSource: Story = {
+  name: "Survival · unavailable Rating source",
+  args: { scenarioId: "practice-personal-best-unavailable-source" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "personal-best-source-unavailable-message");
+    await waitForTestId(canvasElement, "personal-best-use-another-run");
+    await waitForText(canvasElement, "Choose a replacement before starting Survival.");
+  }
+};
+
 export const PersonalBestStartingLevel: Story = {
   name: "Survival · Standard has no games",
   args: { scenarioId: "practice-personal-best-starting-level" },
@@ -1106,6 +1116,18 @@ export const PersonalBestResult: Story = {
     await expectTestIdText(canvasElement, "personal-best-result-replay", "Replay 3 mistakes");
     await expectTestIdText(canvasElement, "personal-best-result-try-again", "Play again");
     await expectTestIdText(canvasElement, "personal-best-result-change-challenge", "Change challenge");
+  }
+};
+
+export const PersonalBestPoolCleared: Story = {
+  name: "Survival · perfect clear",
+  args: { scenarioId: "practice-personal-best-pool-cleared" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "personal-best-result");
+    await expectTestIdText(canvasElement, "personal-best-result-score", "47980");
+    await waitForText(canvasElement, "Perfect clear at 2100–2200");
+    await waitForText(canvasElement, "You cleared every available Puzzle in this level.");
+    await waitForText(canvasElement, "Loading and selection errors never count as a clear.");
   }
 };
 

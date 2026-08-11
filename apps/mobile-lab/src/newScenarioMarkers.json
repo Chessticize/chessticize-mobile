@@ -23,6 +23,14 @@
       }
     ]
   },
+  "practice-personal-best-unavailable-source": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Preserve a missing saved Rating source as unavailable and require an explicit compatible replacement instead of silently falling back."
+      }
+    ]
+  },
   "practice-personal-best-starting-level": {
     "issues": [
       {
@@ -84,6 +92,14 @@
       {
         "issueNumber": 492,
         "changeNote": "Celebrate a record at one named level, show active time and sittings only as context, repeat the same setup with Play again, and route changes through the Hub."
+      }
+    ]
+  },
+  "practice-personal-best-pool-cleared": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Show true puzzle-pool exhaustion as a normal Perfect clear result distinct from selection or loading failures."
       }
     ]
   },

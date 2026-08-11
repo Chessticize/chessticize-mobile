@@ -58,6 +58,7 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       "practice-home",
       "practice-personal-best-hub",
       "practice-personal-best-source-run",
+      "practice-personal-best-unavailable-source",
       "practice-personal-best-starting-level",
       "practice-personal-best-arrow-duel",
       "practice-personal-best-empty-home-source",
@@ -66,6 +67,7 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       "practice-personal-best-leave",
       "practice-personal-best-active",
       "practice-personal-best-result",
+      "practice-personal-best-pool-cleared",
       "practice-personal-best-records",
       "practice-runs-empty",
     ]
@@ -81,6 +83,7 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       "practice-home",
       "practice-personal-best-hub",
       "practice-personal-best-source-run",
+      "practice-personal-best-unavailable-source",
       "practice-personal-best-starting-level",
       "practice-personal-best-arrow-duel",
       "practice-personal-best-empty-home-source",
@@ -89,6 +92,7 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       "practice-personal-best-leave",
       "practice-personal-best-active",
       "practice-personal-best-result",
+      "practice-personal-best-pool-cleared",
       "practice-personal-best-records",
       "practice-runs-empty",
     ]

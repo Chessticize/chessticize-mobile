@@ -2,7 +2,7 @@
 
 Status date: 2026-08-10  
 Issue: [#492](https://github.com/Chessticize/chessticize-mobile/issues/492)  
-Phase: Storybook design contract only; production behavior is not implemented.
+Phase: Approved Storybook design contract; production behavior is not implemented.
 
 ## Product name and promise
 
@@ -57,6 +57,10 @@ time.
   state, Puzzle or Arrow Duel phase, score, mistakes, selection cursor, active
   time, level, and rule version.
 - Active time stops while paused or backgrounded. A paused Run has no expiry.
+- The Storybook interaction uses the same domain pause/resume transition as a
+  Sprint: opening the puzzle-hidden pause surface freezes both Run and
+  per-puzzle active time, and resuming shifts the active deadlines by exactly
+  the paused duration.
 - Resume returns to the same unresolved puzzle and phase, so pause cannot be
   used as a free skip.
 - There is no manual `End Run` or `End & start over` action. Selecting the same
@@ -118,6 +122,9 @@ Survival does not synthesize a global Rating.
 - An explicit alternate source is remembered separately for Puzzle and Arrow
   Duel. If that saved source later becomes unavailable, preserve the choice
   and ask for a replacement instead of silently selecting another Run.
+- While that source is unavailable, the Hub labels the saved choice as
+  unavailable, disables `Start Survival`, and opens an explicit compatible-Run
+  replacement picker. Choosing a replacement re-enables Start.
 - The source changes only the suggested level. Survival does not inherit its
   timer and does not change its Rating.
 - The source is not part of the best key. Different sources recommending the
@@ -146,6 +153,9 @@ The one-page Survival Hub contains:
 
 If the selected type and level already has an in-progress Run, the Hub action
 says `Continue Survival`; it never offers a reset that discards mistakes.
+Otherwise, Start carries the exact selected challenge type, level, Rating
+source, source Rating snapshot, and level-specific best into the first-use
+guide and the active Run. The guide never reverts to the Hub defaults.
 
 All Survival disclosures use the same short motion contract instead of
 appearing or disappearing abruptly:
@@ -217,7 +227,8 @@ first empty batch proved full-pool exhaustion.
 ## Storybook boundary
 
 The Interaction Lab demonstrates the expected Home, Hub, Rating-source,
-highest-level, empty-Home, first-use, active, puzzle-hidden pause, result, and
+unavailable saved source, highest-level, empty-Home, first-use, active,
+puzzle-hidden pause, third-mistake result, full-pool `Perfect clear`, and
 dedicated Survival records states. General History deliberately has no
 Survival summary module.
 It remains presentation-only: no production navigation, domain selection,

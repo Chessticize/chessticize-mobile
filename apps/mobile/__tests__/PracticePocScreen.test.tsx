@@ -7966,6 +7966,7 @@ describe("PracticePocScreen", () => {
       "5 more to beat 18"
     );
     expect(findByTestId(renderer, "session-puzzle-timing")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:34");
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
     expect(() => findByTestId(renderer, "personal-best-end-run")).toThrow();
     expect(() => findByTestId(renderer, "personal-best-unrated")).toThrow();
@@ -7977,8 +7978,12 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "practice-prompt")).toThrow();
     expect(() => findByTestId(renderer, "session-puzzle-timing")).toThrow();
     expect(() => findByTestId(renderer, "session-abandon-confirm")).toThrow();
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
     press(renderer, "session-abandon-cancel");
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:34");
     press(renderer, "session-abandon");
     press(renderer, "personal-best-pause-and-leave");
     expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
@@ -7996,6 +8001,33 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "personal-best-reference-source"))).toContain(
       "Based on Balanced Practice · Rating 842"
     );
+    press(renderer, "personal-best-hub-start");
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Puzzle · 800–899"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Best at 800–899"
+    );
+  });
+
+  it("preserves an unavailable saved Survival source until the user chooses a replacement", () => {
+    const renderer = renderLabScenario("practice-personal-best-unavailable-source");
+
+    expect(collectText(findByTestId(renderer, "personal-best-source-unavailable-message"))).toContain(
+      "Your saved Rating source is no longer available."
+    );
+    expect(findByTestId(renderer, "personal-best-hub-start").props.accessibilityState).toEqual({
+      disabled: true
+    });
+    press(renderer, "personal-best-use-another-run");
+    expect(findByTestId(renderer, "personal-best-source-unavailable")).toBeTruthy();
+    press(renderer, "personal-best-source-standard");
+    expect(collectText(findByTestId(renderer, "personal-best-reference-source"))).toContain(
+      "Based on Standard · Rating 925"
+    );
+    expect(findByTestId(renderer, "personal-best-hub-start").props.accessibilityState).toEqual({
+      disabled: false
+    });
   });
 
   it("uses Standard's default Rating as a clearly labeled starting level when it has no games", () => {
@@ -8023,6 +8055,21 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
       "Mistakes 2 of 3"
     );
+  });
+
+  it("starts the selected Arrow Duel Survival type and level", () => {
+    const renderer = renderLabScenario("practice-personal-best-hub");
+
+    press(renderer, "personal-best-type-arrow_duel");
+    press(renderer, "personal-best-level-900");
+    press(renderer, "personal-best-hub-start");
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Arrow Duel · 900–999"
+    );
+    press(renderer, "personal-best-guide-start");
+    expect(collectText(renderer.root)).toContain("Choose the best move");
+    expect(collectText(renderer.root)).toContain("between the two arrows");
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 solved");
   });
 
   it("shows every Core Pack Survival level and clamps a higher Rating to 2100–2200", () => {
@@ -8069,6 +8116,27 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "session-abandon-confirm")).toThrow();
     expect(() => findByTestId(renderer, "personal-best-end-run")).toThrow();
     expect(() => findByTestId(renderer, "personal-best-unrated")).toThrow();
+  });
+
+  it("presents true Survival puzzle-pool exhaustion as a Perfect clear", () => {
+    const renderer = renderLabScenario("practice-personal-best-pool-cleared");
+
+    expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("47980");
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "Perfect clear at 2100–2200"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "You cleared every available Puzzle in this level."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "Loading and selection errors never count as a clear."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "51:12:00 active"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).not.toContain(
+      "ended normally after"
+    );
   });
 
   it("treats the third Survival mistake as a normal result and preserves the record context", () => {

@@ -42,6 +42,14 @@ export type PersonalBestAvailableLevelPresentation = {
   minRating: number;
 };
 
+export type PersonalBestChallengeSelection = {
+  band: PersonalBestAvailableLevelPresentation;
+  bestScore: number | null;
+  challengeType: PersonalBestChallengeType;
+  sourceId: string;
+  sourceRating: number;
+};
+
 export type PersonalBestPausedRunPresentation = {
   activeElapsedMs: number;
   challengeType: PersonalBestChallengeType;
@@ -83,8 +91,10 @@ export type PersonalBestChallengeDesignPreview = {
   recordsInitiallyVisible?: boolean;
   sourcePickerInitiallyVisible?: boolean;
   startState?: SprintState;
+  startStates?: Partial<Record<PersonalBestChallengeType, SprintState>>;
   result?: {
     activeElapsedMs: number;
+    endReason?: "max_mistakes" | "pool_cleared";
     isNewBest: boolean;
     previousBestScore: number | null;
     sittings: number;
@@ -364,7 +374,7 @@ export function PersonalBestChallengeHub({
   onContinue: (runId: string) => void;
   onOpenRecords: () => void;
   recordsVisible: boolean;
-  onStart: () => void;
+  onStart: (selection: PersonalBestChallengeSelection) => void;
 }): React.JSX.Element {
   const { width: viewportWidth } = useWindowDimensions();
   const initialType = presentation.challengeType ?? "puzzle";
@@ -393,7 +403,9 @@ export function PersonalBestChallengeHub({
     presentation.moreLevelsInitiallyVisible === true
   );
   const [inProgressVisible, setInProgressVisible] = React.useState(true);
-  const source = referenceRunFor(presentation, challengeType, selectedSourceIds[challengeType]);
+  const selectedSourceId = selectedSourceIds[challengeType];
+  const source = referenceRunFor(presentation, challengeType, selectedSourceId);
+  const sourceUnavailable = selectedSourceId !== undefined && source === undefined;
   const requestedRecommendedBand = source ? canonicalBandFor(source.rating) : selectedBand;
   const recommendedBand = closestAvailableBand(availableLevels, requestedRecommendedBand);
   const recommendedIndex = availableLevels.findIndex((level) => (
@@ -453,6 +465,20 @@ export function PersonalBestChallengeHub({
     setSourcePickerVisible(false);
   }
 
+  function startSelection(): void {
+    if (!source) {
+      setSourcePickerVisible(true);
+      return;
+    }
+    onStart({
+      band: selectedBand,
+      bestScore: selectedBest,
+      challengeType,
+      sourceId: source.id,
+      sourceRating: source.rating
+    });
+  }
+
   if (recordsVisible) {
     return (
       <PersonalBestRecordsScreen
@@ -483,7 +509,7 @@ export function PersonalBestChallengeHub({
           accessibilityLabel="How Survival works"
           style={styles.hubHelpButton}
           testID="personal-best-hub-help"
-          onPress={onStart}
+          onPress={startSelection}
         >
           <Text style={styles.hubHelpButtonText}>?</Text>
         </Pressable>
@@ -588,7 +614,7 @@ export function PersonalBestChallengeHub({
         <PersonalBestSourcePicker
           challengeType={challengeType}
           presentation={presentation}
-          selectedSourceId={source?.id}
+          selectedSourceId={selectedSourceId}
           onCancel={() => setSourcePickerVisible(false)}
           onSelect={chooseSource}
         />
@@ -596,7 +622,9 @@ export function PersonalBestChallengeHub({
         <>
           <View style={styles.hubSection}>
             <Text style={styles.hubSectionTitle}>
-              {sourceAboveAvailableLevels
+              {sourceUnavailable
+                ? "Rating source unavailable"
+                : sourceAboveAvailableLevels
                 ? "Highest available level"
                 : source?.games === 0
                   ? "Starting level"
@@ -604,19 +632,30 @@ export function PersonalBestChallengeHub({
             </Text>
             <View style={styles.sourceCard} testID="personal-best-reference-source">
               <View style={styles.sourceCardCopy}>
-                <Text style={styles.sourceLevel} testID="personal-best-recommended-level">
-                  {levelLabel(recommendedBand)}
-                </Text>
-                <Text style={styles.sourceTitle}>
-                  {source?.games === 0
-                    ? `Based on ${source.name}’s starting Rating`
-                    : `Based on ${source?.name ?? "default Run"} · Rating ${source?.rating ?? presentation.band.currentRating}`}
-                </Text>
-                {source ? (
-                  <Text style={styles.sourceTiming}>{source.durationLabel} · {source.perPuzzleLabel}</Text>
-                ) : null}
+                {sourceUnavailable ? (
+                  <>
+                    <Text style={styles.sourceTitle} testID="personal-best-source-unavailable-message">
+                      Your saved Rating source is no longer available.
+                    </Text>
+                    <Text style={styles.sourceTiming}>Choose a replacement before starting Survival.</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.sourceLevel} testID="personal-best-recommended-level">
+                      {levelLabel(recommendedBand)}
+                    </Text>
+                    <Text style={styles.sourceTitle}>
+                      {source?.games === 0
+                        ? `Based on ${source.name}’s starting Rating`
+                        : `Based on ${source?.name ?? "default Run"} · Rating ${source?.rating ?? presentation.band.currentRating}`}
+                    </Text>
+                    {source ? (
+                      <Text style={styles.sourceTiming}>{source.durationLabel} · {source.perPuzzleLabel}</Text>
+                    ) : null}
+                  </>
+                )}
               </View>
-              {hasAlternativeSource ? (
+              {hasAlternativeSource || sourceUnavailable ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Use another ${challengeTypeLabel(challengeType)} Run`}
@@ -629,7 +668,9 @@ export function PersonalBestChallengeHub({
               ) : null}
             </View>
             <Text style={styles.sourceHelper}>
-              {sourceAboveAvailableLevels
+              {sourceUnavailable
+                ? "Your saved choice is preserved until you replace it."
+                : sourceAboveAvailableLevels
                 ? "This is the highest level in your installed Core Pack. Survival has no time limit."
                 : source?.isOnHome === false
                   ? `${source.name} remains your Rating source even when hidden from Home.`
@@ -744,9 +785,11 @@ export function PersonalBestChallengeHub({
             accessibilityLabel={selectedInProgress
               ? `Continue ${challengeTypeLabel(challengeType)} Survival at ${levelLabel(selectedBand)}`
               : `Start ${challengeTypeLabel(challengeType)} Survival at ${levelLabel(selectedBand)}`}
-            style={styles.hubStartButton}
+            style={[styles.hubStartButton, sourceUnavailable ? styles.hubStartButtonDisabled : null]}
             testID="personal-best-hub-start"
-            onPress={() => selectedInProgress ? onContinue(selectedInProgress.id) : onStart()}
+            accessibilityState={{ disabled: sourceUnavailable }}
+            disabled={sourceUnavailable}
+            onPress={() => selectedInProgress ? onContinue(selectedInProgress.id) : startSelection()}
           >
             <Text style={styles.primaryActionText}>
               {selectedInProgress ? "Continue Survival" : "Start Survival"}
@@ -775,6 +818,8 @@ function PersonalBestSourcePicker({
     source.challengeType === challengeType
     && (source.isOnHome !== false || source.id === selectedSourceId)
   ));
+  const selectedSourceUnavailable = selectedSourceId !== undefined
+    && !sources.some((source) => source.id === selectedSourceId);
   return (
     <View style={styles.sourcePicker} testID="personal-best-source-picker">
       <View style={styles.sourcePickerHeader}>
@@ -792,6 +837,21 @@ function PersonalBestSourcePicker({
           <Text style={styles.closeButtonText}>×</Text>
         </Pressable>
       </View>
+      {selectedSourceUnavailable ? (
+        <View
+          accessibilityLabel="Saved Rating source unavailable"
+          style={[styles.sourceOption, styles.sourceOptionUnavailable]}
+          testID="personal-best-source-unavailable"
+        >
+          <View style={styles.sourceOptionCheck}>
+            <Text style={styles.sourceOptionCheckText}>!</Text>
+          </View>
+          <View style={styles.sourceOptionCopy}>
+            <Text style={styles.sourceOptionTitle}>Saved Run unavailable</Text>
+            <Text style={styles.sourceOptionDetail}>Choose one of the available Runs below.</Text>
+          </View>
+        </View>
+      ) : null}
       {sources.map((source) => {
         const selected = source.id === selectedSourceId;
         const band = canonicalBandFor(source.rating);
@@ -905,6 +965,7 @@ export function PersonalBestResult({
   band,
   bestStreak,
   challengeType,
+  endReason = "max_mistakes",
   isNewBest,
   mistakeCount,
   onChangeChallenge,
@@ -919,6 +980,7 @@ export function PersonalBestResult({
   band: PersonalBestRatingBandPresentation;
   bestStreak: number;
   challengeType: PersonalBestChallengeType;
+  endReason?: "max_mistakes" | "pool_cleared";
   isNewBest: boolean;
   mistakeCount: number;
   onChangeChallenge: () => void;
@@ -931,7 +993,12 @@ export function PersonalBestResult({
 }): React.JSX.Element {
   const attemptCount = score + mistakeCount;
   const accuracy = Math.round((score / Math.max(1, attemptCount)) * 100);
-  const resultTitle = isNewBest ? `New best at ${levelLabel(band)}` : "Run complete";
+  const isPerfectClear = endReason === "pool_cleared";
+  const resultTitle = isPerfectClear
+    ? `Perfect clear at ${levelLabel(band)}`
+    : isNewBest
+      ? `New best at ${levelLabel(band)}`
+      : "Run complete";
   const comparison = previousBestScore === null
     ? "First score at this level"
     : isNewBest
@@ -955,7 +1022,9 @@ export function PersonalBestResult({
 
       <View style={[styles.resultHero, isNewBest ? styles.resultHeroBest : null]}>
         <View style={styles.resultBadge}>
-          <Text style={styles.resultBadgeText}>{isNewBest ? "NEW BEST" : "COMPLETE"}</Text>
+          <Text style={styles.resultBadgeText}>
+            {isPerfectClear ? "PERFECT CLEAR" : isNewBest ? "NEW BEST" : "COMPLETE"}
+          </Text>
         </View>
         <Text style={styles.resultTitle}>{resultTitle}</Text>
         <View style={styles.resultScoreRow}>
@@ -968,7 +1037,16 @@ export function PersonalBestResult({
         <Text style={styles.resultEndReason}>
           {score} solved · {formatElapsed(activeElapsedMs)} active · {sittings} sittings
         </Text>
-        <Text style={styles.resultEndReason}>The Run ended normally after {mistakeCount} mistakes.</Text>
+        {isPerfectClear ? (
+          <>
+            <Text style={styles.resultEndReason}>
+              You cleared every available {challengeTypeLabel(challengeType)} in this level.
+            </Text>
+            <Text style={styles.resultEndReason}>Loading and selection errors never count as a clear.</Text>
+          </>
+        ) : (
+          <Text style={styles.resultEndReason}>The Run ended normally after {mistakeCount} mistakes.</Text>
+        )}
       </View>
 
       <View style={styles.resultBandCard}>
@@ -1288,7 +1366,11 @@ function ResultMetric({ label, value }: { label: string; value: string }): React
 
 function formatElapsed(elapsedMs: number): string {
   const seconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor(seconds / 60);
+  if (hours > 0) {
+    return `${hours}:${String(minutes % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  }
   return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
@@ -1376,7 +1458,10 @@ function referenceRunFor(
   const compatible = (presentation.referenceRuns ?? []).filter((source) => (
     source.challengeType === challengeType
   ));
-  return compatible.find((source) => source.id === selectedSourceId) ?? compatible[0];
+  if (selectedSourceId !== undefined) {
+    return compatible.find((source) => source.id === selectedSourceId);
+  }
+  return compatible[0];
 }
 
 const styles = StyleSheet.create({
@@ -2243,6 +2328,9 @@ const styles = StyleSheet.create({
     minHeight: 50,
     padding: 13
   },
+  hubStartButtonDisabled: {
+    opacity: 0.45
+  },
   hubTitle: {
     color: "#0F172A",
     fontSize: 24,
@@ -2571,6 +2659,10 @@ const styles = StyleSheet.create({
   sourceOptionSelected: {
     backgroundColor: "#EFF6FF",
     borderColor: "#2563EB"
+  },
+  sourceOptionUnavailable: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FCA5A5"
   },
   sourceOptionTiming: {
     color: "#64748B",

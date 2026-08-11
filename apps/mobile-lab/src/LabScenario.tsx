@@ -11,6 +11,7 @@ import {
   beginArrowDuelPuzzle,
   beginLinePuzzle,
   defaultSprintConfig,
+  pauseSprint,
   startSprint
 } from "../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../packages/storage/src/memory-store.ts";
@@ -339,6 +340,7 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-home",
     "practice-personal-best-hub",
     "practice-personal-best-source-run",
+    "practice-personal-best-unavailable-source",
     "practice-personal-best-starting-level",
     "practice-personal-best-arrow-duel",
     "practice-personal-best-empty-home-source",
@@ -347,6 +349,7 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-personal-best-leave",
     "practice-personal-best-active",
     "practice-personal-best-result",
+    "practice-personal-best-pool-cleared",
     "practice-personal-best-records",
     "practice-first-sprint-guide",
     "practice-home-edit",
@@ -375,13 +378,21 @@ function sprintRulesDesignPreviewFor(
   }
   if (scenarioId === "practice-personal-best-leave") {
     return {
-      initialActiveState: personalBestActiveState(19, 1)
+      initialActiveState: pauseSprint(
+        personalBestActiveState(19, 1),
+        new Date(LAB_NOW_MS).toISOString()
+      ).state
     };
   }
   if (scenarioId === "practice-personal-best-result") {
     return {
       initialResultState: personalBestResultState(),
       resultReplayItems: personalBestReplayDesignItems()
+    };
+  }
+  if (scenarioId === "practice-personal-best-pool-cleared") {
+    return {
+      initialResultState: personalBestPoolClearedState()
     };
   }
   if (scenarioId === "practice-first-sprint-guide") {
@@ -709,7 +720,11 @@ function personalBestChallengePreviewFor(
       puzzle: "standard"
     },
     showActivePresentation: true,
-    startState: personalBestActiveState(0, 0)
+    startState: personalBestActiveState(0, 0),
+    startStates: {
+      arrow_duel: personalBestArrowDuelStartState(),
+      puzzle: personalBestActiveState(0, 0)
+    }
   };
   if (scenarioId === "practice-home") {
     return common;
@@ -736,6 +751,17 @@ function personalBestChallengePreviewFor(
       ...common,
       hubInitiallyVisible: true,
       sourcePickerInitiallyVisible: true
+    };
+  }
+  if (scenarioId === "practice-personal-best-unavailable-source") {
+    return {
+      ...common,
+      hubInitiallyVisible: true,
+      pausedRuns: [],
+      selectedReferenceRunIds: {
+        ...common.selectedReferenceRunIds,
+        puzzle: "retired-long-game"
+      }
     };
   }
   if (scenarioId === "practice-personal-best-starting-level") {
@@ -802,9 +828,26 @@ function personalBestChallengePreviewFor(
       ...common,
       result: {
         activeElapsedMs: 12 * 60 * 1000 + 48 * 1000,
+        endReason: "max_mistakes",
         isNewBest: true,
         previousBestScore: 18,
         sittings: 3
+      }
+    };
+  }
+  if (scenarioId === "practice-personal-best-pool-cleared") {
+    return {
+      ...common,
+      band: { currentRating: 2200, minRating: 2100, maxRating: 2200 },
+      bestScore: 47_000,
+      challengeType: "puzzle",
+      pausedRuns: [],
+      result: {
+        activeElapsedMs: 51 * 60 * 60 * 1000 + 12 * 60 * 1000,
+        endReason: "pool_cleared",
+        isNewBest: true,
+        previousBestScore: 47_000,
+        sittings: 84
       }
     };
   }
@@ -872,6 +915,19 @@ function personalBestResultState(): SprintState {
   };
 }
 
+function personalBestPoolClearedState(): SprintState {
+  const result = personalBestResultState();
+  const { endReason: _endReason, ...withoutEndReason } = result;
+  return {
+    ...withoutEndReason,
+    bestStreak: 312,
+    correctCount: 47_980,
+    id: "personal-best-result-pool-cleared",
+    mistakeCount: 2,
+    status: "won"
+  };
+}
+
 function personalBestArrowDuelResumeState(): SprintState {
   const base = tacticalFocusActiveState("arrow_duel");
   const currentPuzzle = base.currentPuzzle?.kind === "arrow_duel"
@@ -900,6 +956,21 @@ function personalBestArrowDuelResumeState(): SprintState {
     id: "personal-best-arrow-duel-resume",
     mistakeCount: 2,
     ratingBefore: 875
+  };
+}
+
+function personalBestArrowDuelStartState(): SprintState {
+  const base = personalBestArrowDuelResumeState();
+  const freshPuzzle = base.puzzles[base.currentPuzzleIndex];
+  return {
+    ...base,
+    bestStreak: 0,
+    correctCount: 0,
+    currentPuzzle: freshPuzzle ? beginArrowDuelPuzzle(freshPuzzle, "personal-best-arrow-duel-start") : undefined,
+    currentStreak: 0,
+    hasUserSubmittedMove: false,
+    id: "personal-best-arrow-duel-start",
+    mistakeCount: 0
   };
 }
 
@@ -1379,6 +1450,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     );
     screenProps.standardTargetCorrect = 2;
   }
+  if (scenarioId === "practice-personal-best-active") {
+    screenProps.currentTimeMs = createPersonalBestLiveClock();
+  }
 
   const notificationClient = new LabNotificationClient(notificationStatus);
   const capabilityOverrides: TestMobilePlatformCapabilityOverrides = {
@@ -1463,6 +1537,11 @@ function createLivePuzzleClock(
       + scenarioOffsetMs
       + Math.max(0, Date.now() - activePuzzleObservedAtMs);
   };
+}
+
+function createPersonalBestLiveClock(): () => number {
+  const observedAtMs = Date.now();
+  return () => LAB_NOW_MS + Math.max(0, Date.now() - observedAtMs);
 }
 
 function isPuzzleEntryPreviewScenario(scenarioId: LabScenarioId): boolean {
