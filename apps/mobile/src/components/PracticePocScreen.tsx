@@ -920,6 +920,8 @@ export function PracticePocScreen({
       ? "learn-home"
       : null
   );
+  const [personalBestGuideOpponentReplyEnabled, setPersonalBestGuideOpponentReplyEnabled] =
+    useState<boolean | null>(null);
   const personalBestGuideVisible = personalBestGuideIntent !== null;
   const [personalBestHubVisible, setPersonalBestHubVisible] = useState(
     () => personalBestChallengeDesignPreview?.hubInitiallyVisible === true
@@ -967,8 +969,7 @@ export function PracticePocScreen({
       },
       bestScore: personalBestSelectedSetup.bestScore,
       challengeType: personalBestSelectedSetup.challengeType,
-      opponentReplyEnabled: personalBestSelectedSetup.opponentReplyEnabled
-        ?? arrowDuelOpponentReplyGlobalEnabled,
+      opponentReplyEnabled: arrowDuelOpponentReplyGlobalEnabled,
       selectedReferenceRunIds: {
         ...basePersonalBestPresentation.selectedReferenceRunIds,
         [personalBestSelectedSetup.challengeType]: personalBestSelectedSetup.sourceId
@@ -981,6 +982,15 @@ export function PracticePocScreen({
     basePersonalBestPresentation,
     personalBestSelectedSetup
   ]);
+  const personalBestGuidePresentation = useMemo<PersonalBestChallengeDesignPreview | undefined>(
+    () => personalBestPresentation && personalBestGuideOpponentReplyEnabled !== null
+      ? {
+          ...personalBestPresentation,
+          opponentReplyEnabled: personalBestGuideOpponentReplyEnabled
+        }
+      : personalBestPresentation,
+    [personalBestGuideOpponentReplyEnabled, personalBestPresentation]
+  );
   const [boardFen, setBoardFen] = useState<string | null>(null);
   const [lastBoardMove, setLastBoardMove] = useState<BoardMove | null>(null);
   const [feedbackPuzzleId, setFeedbackPuzzleId] = useState<string | null>(null);
@@ -2495,6 +2505,7 @@ export function PracticePocScreen({
     const returnsToHub = personalBestGuideIntent === "learn-hub"
       || personalBestGuideIntent === "start-hub";
     setPersonalBestGuideIntent(null);
+    setPersonalBestGuideOpponentReplyEnabled(null);
     if (returnsToHub) {
       setPersonalBestHubVisible(true);
     }
@@ -2618,6 +2629,7 @@ export function PracticePocScreen({
       }
       setPersonalBestSelectedSetup(effectiveSelection);
       setPersonalBestGuideIntent(null);
+      setPersonalBestGuideOpponentReplyEnabled(null);
       setPersonalBestHubVisible(false);
       setMode(startState.config.mode);
       commitState(startState);
@@ -4984,7 +4996,11 @@ export function PracticePocScreen({
                       continuePersonalBestRun(pausedRun);
                     }}
                     onHowItWorks={(selection) => {
-                      setPersonalBestSelectedSetup(selection);
+                      const { opponentReplyEnabled, ...selectedSetup } = selection;
+                      setPersonalBestSelectedSetup(selectedSetup);
+                      setPersonalBestGuideOpponentReplyEnabled(
+                        opponentReplyEnabled ?? arrowDuelOpponentReplyGlobalEnabled
+                      );
                       if (!personalBestChallengeDesignPreview) {
                         service.saveSurvivalRatingSourcePreference(
                           selection.challengeType,
@@ -5000,7 +5016,8 @@ export function PracticePocScreen({
                     onSourcePickerVisibilityChange={setPersonalBestSourcePickerVisible}
                     recordsVisible={personalBestRecordsVisible}
                     onStart={(selection) => {
-                      setPersonalBestSelectedSetup(selection);
+                      const { opponentReplyEnabled, ...selectedSetup } = selection;
+                      setPersonalBestSelectedSetup(selectedSetup);
                       if (!personalBestChallengeDesignPreview) {
                         service.saveSurvivalRatingSourcePreference(
                           selection.challengeType,
@@ -5012,20 +5029,23 @@ export function PracticePocScreen({
                         !personalBestChallengeDesignPreview
                         && service.getSurvivalPreferences().guideSeen
                       ) {
-                        startPersonalBestChallenge(selection);
+                        startPersonalBestChallenge(selectedSetup);
                         return;
                       }
+                      setPersonalBestGuideOpponentReplyEnabled(
+                        opponentReplyEnabled ?? arrowDuelOpponentReplyGlobalEnabled
+                      );
                       setPersonalBestGuideIntent("start-hub");
                     }}
                   />
                 ) : null}
-                {personalBestGuideVisible && personalBestPresentation ? (
+                {personalBestGuideVisible && personalBestGuidePresentation ? (
                   <PersonalBestGuide
                     acknowledgementOnly={personalBestGuideIntent !== "start-hub"}
                     backAccessibilityLabel={personalBestGuideIntent === "learn-home"
                       ? "Back to Practice"
                       : "Back to Survival Hub"}
-                    presentation={personalBestPresentation}
+                    presentation={personalBestGuidePresentation}
                     onAcknowledge={acknowledgePersonalBestGuide}
                     onClose={closePersonalBestGuide}
                     onStart={() => {
@@ -5225,7 +5245,12 @@ export function PracticePocScreen({
                       }
                     }}
                     onOpenSprintRulesGuide={() => setSprintRulesGuideVisible(true)}
-                    onOpenPersonalBestGuide={() => setPersonalBestGuideIntent("learn-home")}
+                    onOpenPersonalBestGuide={() => {
+                      setPersonalBestGuideOpponentReplyEnabled(
+                        arrowDuelOpponentReplyGlobalEnabled
+                      );
+                      setPersonalBestGuideIntent("learn-home");
+                    }}
                     onOpenPersonalBestHub={(run) => {
                       if (run) {
                         selectPersonalBestPausedRun(run);

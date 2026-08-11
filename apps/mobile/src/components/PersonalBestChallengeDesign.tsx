@@ -270,7 +270,7 @@ export function PersonalBestGuide({
       detail: challengeType === "arrow_duel"
         ? opponentReplyEnabled
           ? "Choose the candidate, then play the required opponent reply. A wrong candidate or reply adds one mistake, never two."
-          : "Choose the better arrow. A wrong choice adds one mistake and enters Review. A correct choice completes the puzzle. Turn on opponent replies in Settings to add the reply step to Survival and restore each Run’s saved choice."
+          : "Choose the better arrow. A wrong choice adds one mistake and enters Review. A correct choice completes the puzzle. Turn on opponent replies in Settings to add the reply step to new Survival Runs. Other Arrow Duel Runs return to their saved choice; paused sessions keep the rule they started with."
         : "Every wrong puzzle adds one mistake and enters Review. Marking it Unclear does not add another mistake."
     },
     {

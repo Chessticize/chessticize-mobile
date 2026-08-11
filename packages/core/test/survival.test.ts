@@ -132,6 +132,23 @@ test("Arrow Duel Survival completes after the candidate when opponent replies ar
   assert.equal(solved.state.currentPuzzle?.puzzle.id, "p2");
 });
 
+test("Arrow Duel Survival rejects a wrong candidate without opening a reply when globally off", () => {
+  const started = survivalState(
+    "arrow_duel",
+    [arrowPuzzle("p1"), arrowPuzzle("p2")],
+    4,
+    false
+  );
+  const failed = submitSprintMove(started, "f2g3", "2026-08-11T12:00:03.000Z");
+
+  assert.equal(failed.attempt?.result, "wrong");
+  assert.equal(failed.state.correctCount, 0);
+  assert.equal(failed.state.mistakeCount, 1);
+  assert.equal(failed.state.currentPuzzle?.kind, "arrow_duel");
+  assert.equal(failed.state.currentPuzzle?.phase, "choice");
+  assert.equal(failed.state.currentPuzzle?.puzzle.id, "p2");
+});
+
 function survivalState(
   challengeType: SurvivalChallengeType,
   puzzles: Puzzle[],

@@ -207,6 +207,7 @@ export const PersonalBestArrowDuelGlobalOff: Story = {
   name: "Survival · Arrow Duel global reply off",
   args: {
     arrowDuelOpponentReplyGlobalEnabled: false,
+    personalBestArrowDuelPostCorrectCandidate: true,
     scenarioId: "practice-personal-best-arrow-duel",
     storyPresentation: {
       storyId: "practice--survival-arrow-duel-global-reply-off",
@@ -221,8 +222,17 @@ export const PersonalBestArrowDuelGlobalOff: Story = {
     await clickTestId(canvasElement, "personal-best-hub-help");
     await waitForText(
       canvasElement,
-      "Choose the better arrow. A wrong choice adds one mistake and enters Review. A correct choice completes the puzzle. Turn on opponent replies in Settings to add the reply step to Survival and restore each Run’s saved choice."
+      "Choose the better arrow. A wrong choice adds one mistake and enters Review. A correct choice completes the puzzle. Turn on opponent replies in Settings to add the reply step to new Survival Runs. Other Arrow Duel Runs return to their saved choice; paused sessions keep the rule they started with."
     );
+    await clickTestId(canvasElement, "personal-best-guide-start");
+    await waitForTestId(canvasElement, "personal-best-hub");
+    await clickTestId(canvasElement, "personal-best-hub-start");
+    await waitForTestId(canvasElement, "personal-best-guide");
+    await clickTestId(canvasElement, "personal-best-guide-start");
+    await expectTestIdText(canvasElement, "session-progress", "1 solved");
+    expectTestIdAbsent(canvasElement, "arrow-duel-reply-challenge");
+    expectTestIdAbsent(canvasElement, "arrow-duel-what-if-overlay");
+    expectTestIdAbsent(canvasElement, "arrow-duel-reply-timer");
   }
 };
 

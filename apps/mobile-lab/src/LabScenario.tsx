@@ -10,9 +10,11 @@ import type {
 import {
   beginArrowDuelPuzzle,
   beginLinePuzzle,
+  DEFAULT_OPPONENT_REPLY_SECONDS,
   defaultSprintConfig,
   pauseSprint,
-  startSprint
+  startSprint,
+  submitSprintMove
 } from "../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../packages/storage/src/memory-store.ts";
 import { PracticeService } from "../../../packages/storage/src/practice-service.ts";
@@ -109,6 +111,7 @@ export function LabScenario({
   arrowDuelReplyPreparationConfirmationRequired,
   arrowDuelReplyPreparationHoldMs,
   arrowDuelReplySeconds,
+  personalBestArrowDuelPostCorrectCandidate,
   runReorderPickedUpRunId,
   scenarioId,
   storyPresentation,
@@ -119,6 +122,7 @@ export function LabScenario({
   arrowDuelReplyPreparationConfirmationRequired?: boolean;
   arrowDuelReplyPreparationHoldMs?: number;
   arrowDuelReplySeconds?: number;
+  personalBestArrowDuelPostCorrectCandidate?: boolean;
   runReorderPickedUpRunId?: string;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
@@ -136,6 +140,7 @@ export function LabScenario({
       }
       arrowDuelReplyPreparationHoldMs={arrowDuelReplyPreparationHoldMs}
       arrowDuelReplySeconds={arrowDuelReplySeconds}
+      personalBestArrowDuelPostCorrectCandidate={personalBestArrowDuelPostCorrectCandidate}
       runReorderPickedUpRunId={runReorderPickedUpRunId}
       runtime={runtime}
       scenarioId={scenarioId}
@@ -151,6 +156,7 @@ function LabScenarioContent({
   arrowDuelReplyPreparationConfirmationRequired,
   arrowDuelReplyPreparationHoldMs,
   arrowDuelReplySeconds,
+  personalBestArrowDuelPostCorrectCandidate,
   runReorderPickedUpRunId,
   runtime,
   scenarioId,
@@ -162,6 +168,7 @@ function LabScenarioContent({
   arrowDuelReplyPreparationConfirmationRequired?: boolean;
   arrowDuelReplyPreparationHoldMs?: number;
   arrowDuelReplySeconds?: number;
+  personalBestArrowDuelPostCorrectCandidate?: boolean;
   runReorderPickedUpRunId?: string;
   runtime: ScenarioRuntime;
   scenarioId: LabScenarioId;
@@ -297,6 +304,42 @@ function LabScenarioContent({
           }
         }
       };
+  const personalBestChallengePreview = useMemo(() => {
+    const preview = personalBestChallengePreviewFor(scenarioId);
+    if (!preview || arrowDuelOpponentReplyGlobalEnabled === undefined) {
+      return preview;
+    }
+    const arrowDuelStart = preview.startStates?.arrow_duel
+      ? personalBestArrowDuelStateWithOpponentReply(
+          preview.startStates.arrow_duel,
+          arrowDuelOpponentReplyGlobalEnabled
+        )
+      : undefined;
+    const effectiveArrowDuelStart = arrowDuelStart
+      && personalBestArrowDuelPostCorrectCandidate === true
+      ? personalBestArrowDuelAfterCorrectCandidate(arrowDuelStart)
+      : arrowDuelStart;
+    return {
+      ...preview,
+      opponentReplyEnabled: arrowDuelOpponentReplyGlobalEnabled,
+      pausedRuns: preview.pausedRuns?.map((run) => run.challengeType === "arrow_duel"
+        ? {
+            ...run,
+            opponentReplyEnabled: run.resumeState?.config.opponentReply?.enabled ?? true
+          }
+        : run),
+      startStates: {
+        ...preview.startStates,
+        ...(effectiveArrowDuelStart === undefined
+          ? {}
+          : { arrow_duel: effectiveArrowDuelStart })
+      }
+    };
+  }, [
+    arrowDuelOpponentReplyGlobalEnabled,
+    personalBestArrowDuelPostCorrectCandidate,
+    scenarioId
+  ]);
 
   return (
     <LabScenarioShell
@@ -317,7 +360,7 @@ function LabScenarioContent({
         historyProgressPresentation={isHistoryProgressScenario(scenarioId)
           ? historyProgressPresentationFor(scenarioId)
           : undefined}
-        personalBestChallengeDesignPreview={personalBestChallengePreviewFor(scenarioId)}
+        personalBestChallengeDesignPreview={personalBestChallengePreview}
         platformCapabilities={runtime.platformCapabilities}
         systemBack={systemBack}
         runReorderDesignPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
@@ -983,6 +1026,33 @@ function personalBestArrowDuelStartState(): SprintState {
     id: "personal-best-arrow-duel-start",
     mistakeCount: 0
   };
+}
+
+function personalBestArrowDuelStateWithOpponentReply(
+  state: SprintState,
+  enabled: boolean
+): SprintState {
+  return {
+    ...state,
+    config: {
+      ...state.config,
+      opponentReply: {
+        enabled,
+        seconds: state.config.opponentReply?.seconds ?? DEFAULT_OPPONENT_REPLY_SECONDS
+      }
+    }
+  };
+}
+
+function personalBestArrowDuelAfterCorrectCandidate(state: SprintState): SprintState {
+  if (state.currentPuzzle?.kind !== "arrow_duel") {
+    throw new Error("Arrow Duel global-off fixture requires an Arrow Duel puzzle");
+  }
+  return submitSprintMove(
+    state,
+    state.currentPuzzle.correctMove,
+    new Date(LAB_NOW_MS).toISOString()
+  ).state;
 }
 
 function personalBestConfig(): SprintState["config"] {

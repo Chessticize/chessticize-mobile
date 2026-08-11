@@ -266,11 +266,23 @@ test("Arrow Duel Survival inherits the global opponent-reply setting without its
   assert.equal(disabledState.config.opponentReply?.enabled, false);
 
   const firstPuzzleId = disabledState.currentPuzzle?.puzzle.id;
+  disabledState = disabled.submitMove("f2g3", "2026-08-11T12:00:01.000Z").state;
+  assert.equal(disabledState.correctCount, 0);
+  assert.equal(disabledState.mistakeCount, 1);
+  assert.equal(disabledState.currentPuzzle?.kind, "arrow_duel");
+  assert.equal(disabledState.currentPuzzle?.phase, "choice");
+  assert.notEqual(disabledState.currentPuzzle?.puzzle.id, firstPuzzleId);
+  const wrongHistory = disabled.listHistory({ sessionId: disabledState.id });
+  assert.equal(wrongHistory.length, 1);
+  assert.equal(wrongHistory[0]?.result, "wrong");
+  assert.equal(wrongHistory[0]?.submittedMove, "f2g3");
+
+  const secondPuzzleId = disabledState.currentPuzzle?.puzzle.id;
   disabledState = disabled.submitMove("b2b1", "2026-08-11T12:00:01.000Z").state;
   assert.equal(disabledState.correctCount, 1);
   assert.equal(disabledState.currentPuzzle?.kind, "arrow_duel");
   assert.equal(disabledState.currentPuzzle?.phase, "choice");
-  assert.notEqual(disabledState.currentPuzzle?.puzzle.id, firstPuzzleId);
+  assert.notEqual(disabledState.currentPuzzle?.puzzle.id, secondPuzzleId);
 });
 
 test("an unavailable saved Rating source is preserved and cannot silently fall back", () => {

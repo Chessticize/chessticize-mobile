@@ -8197,6 +8197,52 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
       "Candidate and reply make one puzzle"
     );
+    press(renderer, "personal-best-guide-start");
+    press(renderer, "personal-best-level-1000");
+    expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
+      "Choose the better arrow · No time limit · 3 mistakes"
+    );
+    press(renderer, "personal-best-hub-help");
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "A correct choice completes the puzzle."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).not.toContain(
+      "Candidate and reply make one puzzle"
+    );
+  });
+
+  it("refreshes an unpaused Survival selection after the global reply setting changes", () => {
+    const service = createProductionArrowSurvivalService();
+    service.saveSettings({
+      ...service.getSettings(),
+      arrowDuel: { opponentReplyEnabled: false }
+    });
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-type-arrow_duel");
+    press(renderer, "personal-best-level-1000");
+    press(renderer, "personal-best-hub-help");
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "A correct choice completes the puzzle."
+    );
+    press(renderer, "personal-best-guide-start");
+    press(renderer, "personal-best-hub-close");
+    press(renderer, "settings-tab");
+    press(renderer, "settings-arrow-duel-opponent-reply-on");
+    press(renderer, "practice-tab");
+    press(renderer, "personal-best-start");
+
+    expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
+      "Candidate + required reply · No time limit · 3 mistakes"
+    );
+    press(renderer, "personal-best-hub-help");
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Candidate and reply make one puzzle"
+    );
   });
 
   it("continues an existing Survival level without an End or reset action", () => {
@@ -8626,6 +8672,41 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
     expect(collectText(findByTestId(renderer, "session-current-puzzle-id"))).not.toBe(puzzleId);
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 solved");
+  });
+
+  it("marks a wrong Arrow Duel Survival candidate immediately when the global reply is off", async () => {
+    const service = createProductionArrowSurvivalService();
+    service.saveSettings({
+      ...service.getSettings(),
+      arrowDuel: { opponentReplyEnabled: false }
+    });
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-type-arrow_duel");
+    press(renderer, "personal-best-hub-start");
+    press(renderer, "personal-best-guide-start");
+    const arrow = requireArrowDuelState(service.getActiveSprint());
+    const puzzleId = arrow.puzzle.id;
+    await boardMove(renderer, arrow.wrongMove);
+
+    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+    expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expect(service.getActiveSprint()?.mistakeCount).toBe(1);
+    expect(service.listHistory({ sessionId: service.getActiveSprint()?.id })).toEqual([
+      expect.objectContaining({ result: "wrong", submittedMove: arrow.wrongMove })
+    ]);
+    expect(() => findByTestId(renderer, "arrow-duel-what-if-overlay")).toThrow();
+    expect(() => findByTestId(renderer, "arrow-duel-reply-challenge")).toThrow();
+    await settleFeedbackSnapshot();
+    expect(collectText(findByTestId(renderer, "session-current-puzzle-id"))).not.toBe(puzzleId);
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 solved");
+    expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
+      "Mistakes 1 of 3"
+    );
   });
 
   it("shows every Core Pack Survival level and clamps a higher Rating to 2100–2200", () => {
