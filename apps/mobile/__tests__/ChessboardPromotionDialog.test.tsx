@@ -1,8 +1,33 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 
+jest.mock("react-native-gesture-handler", () => {
+  const React = require("react");
+  return {
+    GestureDetector: (props: { children?: React.ReactNode }) =>
+      React.createElement("GestureDetector", props, props.children),
+    GestureHandlerRootView: (props: { children?: React.ReactNode }) =>
+      React.createElement("GestureHandlerRootView", props, props.children)
+  };
+});
+
 jest.mock("react-native-reanimated", () => {
   const React = require("react");
+  const mutable = (initial: unknown) => {
+    let current = initial;
+    return {
+      get value() {
+        return current;
+      },
+      set value(next) {
+        current = next;
+      },
+      get: () => current,
+      set: (next: unknown) => {
+        current = next;
+      }
+    };
+  };
 
   const AnimatedView = (props: { children?: React.ReactNode }) =>
     React.createElement("Animated.View", props, props.children);
@@ -17,9 +42,24 @@ jest.mock("react-native-reanimated", () => {
     },
     FadeOut: {
       duration: () => ({})
+    },
+    makeMutable: mutable,
+    useSharedValue: mutable,
+    withSpring: (target: unknown, _config: unknown, callback?: (finished: boolean) => void) => {
+      callback?.(true);
+      return target;
+    },
+    withTiming: (target: unknown, _config: unknown, callback?: (finished: boolean) => void) => {
+      callback?.(true);
+      return target;
     }
   };
 });
+
+jest.mock("react-native-worklets", () => ({
+  scheduleOnRN: (worklet: (...args: unknown[]) => unknown, ...args: unknown[]) => worklet(...args),
+  scheduleOnUI: (worklet: (...args: unknown[]) => unknown, ...args: unknown[]) => worklet(...args)
+}));
 
 jest.mock("@shopify/react-native-skia", () => {
   const React = require("react");
@@ -55,7 +95,63 @@ jest.mock("react-native-chessboard/src/assets/piece-images", () => ({
   })
 }));
 
+jest.mock("react-native-chessboard/src/components/skia/skia-board", () => {
+  const React = require("react");
+  return {
+    SkiaBoard: (props: { children?: React.ReactNode }) =>
+      React.createElement("SkiaBoard", props, props.children)
+  };
+});
+
+jest.mock("react-native-chessboard/src/components/skia", () => ({
+  get GestureBoard() {
+    return require("react-native-chessboard/src/components/skia/gesture-board").GestureBoard;
+  }
+}));
+
+jest.mock("react-native-chessboard/src/hooks/use-board-gesture", () => ({
+  useBoardGesture: () => ({})
+}));
+
 describe("react-native-chessboard promotion dialog patch", () => {
+  it("cancels a pending promotion when the public board reset changes position", async () => {
+    const { Chessboard } = require("react-native-chessboard/src/index");
+    const boardRef = React.createRef<{
+      move: (move: { from: string; to: string }) => Promise<unknown>;
+      resetBoard: (fen: string) => Promise<void>;
+    }>();
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    act(() => {
+      renderer = TestRenderer.create(
+        <Chessboard
+          ref={boardRef}
+          fen="7k/4P3/8/8/8/8/8/7K w - - 0 1"
+          boardSize={320}
+          gestureEnabled
+          flipped={false}
+        />
+      );
+    });
+    if (!renderer || !boardRef.current) {
+      throw new Error("Chessboard did not render");
+    }
+
+    let pendingMove: Promise<unknown> | undefined;
+    await act(async () => {
+      pendingMove = boardRef.current?.move({ from: "e7", to: "e8" });
+      await Promise.resolve();
+    });
+    expect(renderer.root.findByProps({ testID: "promotion-dialog-overlay" })).toBeTruthy();
+
+    await act(async () => {
+      await boardRef.current?.resetBoard("7k/8/8/8/8/8/8/7K w - - 0 1");
+      await Promise.resolve();
+    });
+
+    expect(renderer.root.findAllByProps({ testID: "promotion-dialog-overlay" })).toHaveLength(0);
+    await expect(pendingMove).resolves.toBeUndefined();
+  });
+
   it("renders selectable native images without mounting Skia surfaces", () => {
     const { PromotionDialog } = require("react-native-chessboard/src/components/promotion-dialog");
     const { StyleSheet } = require("react-native");

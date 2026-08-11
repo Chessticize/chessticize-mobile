@@ -1,5 +1,5 @@
 diff --git a/lib/commonjs/components/promotion-dialog.js b/lib/commonjs/components/promotion-dialog.js
-index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..4a783e56313b78da32dee0d5be67d275f9f47df6 100644
+index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..36f900ad0525e8a0385464295e7ece6daf730988 100644
 --- a/lib/commonjs/components/promotion-dialog.js
 +++ b/lib/commonjs/components/promotion-dialog.js
 @@ -13,28 +13,36 @@ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e
@@ -98,7 +98,7 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..4a783e56313b78da32dee0d5be67d275
    }))));
  });
 diff --git a/lib/commonjs/components/skia/gesture-board.js b/lib/commonjs/components/skia/gesture-board.js
-index 7ddc0516545a4e1e16774f520123aaa883c235c0..27d149d7ca551d664b50a42876e6feaa0834fdbb 100644
+index 7ddc0516545a4e1e16774f520123aaa883c235c0..0c1eeb4b952cfea643b9ae9422a56809a34f512d 100644
 --- a/lib/commonjs/components/skia/gesture-board.js
 +++ b/lib/commonjs/components/skia/gesture-board.js
 @@ -20,13 +20,17 @@ var _promotionDialog = require("../promotion-dialog");
@@ -142,7 +142,30 @@ index 7ddc0516545a4e1e16774f520123aaa883c235c0..27d149d7ca551d664b50a42876e6feaa
  
    // Effect state for shader effects (all SharedValues for reactivity)
    const effectCenterX = (0, _reactNativeReanimated.useSharedValue)(0);
-@@ -144,6 +163,7 @@ const GestureBoard = exports.GestureBoard = /*#__PURE__*/(0, _react.forwardRef)(
+@@ -86,6 +105,12 @@ const GestureBoard = exports.GestureBoard = /*#__PURE__*/(0, _react.forwardRef)(
+     promotionInfoRef.current = null;
+     setShowPromotion(false);
+   }, [boardState, config]);
++  const handleBoardReset = (0, _react.useCallback)(() => {
++    const info = promotionInfoRef.current;
++    info === null || info === void 0 || info.cancel();
++    promotionInfoRef.current = null;
++    setShowPromotion(false);
++  }, []);
+ 
+   // Trigger effect on game events
+   const triggerEffect = (0, _react.useCallback)((trigger, kingColor) => {
+@@ -135,7 +160,8 @@ const GestureBoard = exports.GestureBoard = /*#__PURE__*/(0, _react.forwardRef)(
+     chess,
+     boardState,
+     moveExecutor,
+-    defaultHighlightColor: config.colors.lastMoveHighlight
++    defaultHighlightColor: config.colors.lastMoveHighlight,
++    onBeforeReset: handleBoardReset
+   });
+   const gesture = (0, _useBoardGesture.useBoardGesture)({
+     boardState,
+@@ -144,6 +170,7 @@ const GestureBoard = exports.GestureBoard = /*#__PURE__*/(0, _react.forwardRef)(
      // Lock the board while the promotion picker is open so a second drag
      // can't start (and re-trigger) another promotion.
      gestureEnabled: config.gestureEnabled && !showPromotion,
@@ -257,7 +280,7 @@ index d4a7146591891ed0ac8381633f06b668cb1b7ad0..83fc26beae5f0e14a951d3e88a55ac1e
        sprites,
        transforms
 diff --git a/lib/commonjs/hooks/use-board-gesture.js b/lib/commonjs/hooks/use-board-gesture.js
-index 26deda8bb43c022624db07d6ea463a1028f082f9..a747cbf139cd160c8afc38b17680297e082f2f10 100644
+index 26deda8bb43c022624db07d6ea463a1028f082f9..3f254c3319f5f012d0a48506936b13cb8aa1181d 100644
 --- a/lib/commonjs/hooks/use-board-gesture.js
 +++ b/lib/commonjs/hooks/use-board-gesture.js
 @@ -14,12 +14,14 @@ const useBoardGesture = ({
@@ -529,8 +552,34 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..a747cbf139cd160c8afc38b17680297e
    return gesture;
  };
  exports.useBoardGesture = useBoardGesture;
+diff --git a/lib/commonjs/hooks/use-chessboard-ref.js b/lib/commonjs/hooks/use-chessboard-ref.js
+index 759528090f2fb7b1e3ddc0bdc47841ceea24c1ab..5a2285f370efed55ab7c50f303161db1735060f1 100644
+--- a/lib/commonjs/hooks/use-chessboard-ref.js
++++ b/lib/commonjs/hooks/use-chessboard-ref.js
+@@ -12,7 +12,8 @@ const useChessboardRef = ({
+   chess,
+   boardState,
+   moveExecutor,
+-  defaultHighlightColor = 'rgba(255, 255, 0, 0.5)'
++  defaultHighlightColor = 'rgba(255, 255, 0, 0.5)',
++  onBeforeReset
+ }) => {
+   const move = (0, _react.useCallback)(async params => {
+     return moveExecutor.tryMove(params.from, params.to, params.promotion);
+@@ -36,8 +37,9 @@ const useChessboardRef = ({
+     boardState.kingInCheckSquare.set(null);
+   }, [boardState.highlights, boardState.squares, boardState.lastMove, boardState.kingInCheckSquare]);
+   const resetBoard = (0, _react.useCallback)((fen, opts) => {
+-    moveExecutor.resetBoard(fen, opts);
+-  }, [moveExecutor]);
++    onBeforeReset === null || onBeforeReset === void 0 || onBeforeReset();
++    return moveExecutor.resetBoard(fen, opts);
++  }, [moveExecutor, onBeforeReset]);
+   const getState = (0, _react.useCallback)(() => {
+     return (0, _getChessboardState.getChessboardState)(chess);
+   }, [chess]);
 diff --git a/lib/commonjs/index.js b/lib/commonjs/index.js
-index 360d75d327324795ca72a43b37965b1ea2bc19d9..0273c3633b1dabecabdeceea5bf76d394a84681c 100644
+index 360d75d327324795ca72a43b37965b1ea2bc19d9..b72d8157424094f16b0d79a66fa6228180328b85 100644
 --- a/lib/commonjs/index.js
 +++ b/lib/commonjs/index.js
 @@ -12,6 +12,7 @@ const Chessboard = exports.Chessboard = /*#__PURE__*/(0, _react.forwardRef)(({
@@ -609,7 +658,7 @@ index cfd52d5394e32d3972be93c85977c62f4ad30885..297972ef10bbda6a19b00c88166ac3a9
      boardState,
      chess
 diff --git a/lib/commonjs/state/move-executor.js b/lib/commonjs/state/move-executor.js
-index 983112b3bfd62a93c150077851c9cdc0e6fc5c48..446849742b8d9ba500fc8d6b11cfb2cc3fb70abb 100644
+index 983112b3bfd62a93c150077851c9cdc0e6fc5c48..57fccec6ee15028cd1d4bcd74e158734eeb05559 100644
 --- a/lib/commonjs/state/move-executor.js
 +++ b/lib/commonjs/state/move-executor.js
 @@ -61,51 +61,56 @@ const createMoveExecutor = (chess, boardState, config, callbacks) => {
@@ -734,33 +783,157 @@ index 983112b3bfd62a93c150077851c9cdc0e6fc5c48..446849742b8d9ba500fc8d6b11cfb2cc
      }
  
      // Handle en passant - remove the captured pawn
-@@ -250,8 +255,10 @@ const createMoveExecutor = (chess, boardState, config, callbacks) => {
+@@ -240,82 +245,92 @@ const createMoveExecutor = (chess, boardState, config, callbacks) => {
+       } catch {
+         // Invalid FEN — leave the chess instance untouched and bail out so
+         // the board state stays consistent with what's actually on screen.
+-        return;
++        return Promise.resolve();
+       }
+     } else {
+       chess.reset();
+     }
+     const slide = opts === null || opts === void 0 ? void 0 : opts.slide;
+     const lastMove = (opts === null || opts === void 0 ? void 0 : opts.lastMove) ?? null;
++    const targetFlipped = (opts === null || opts === void 0 ? void 0 : opts.flipped) ?? flipped;
      const board = chess.board();
- 
-     // Update every square. When `slide` is given, the piece landing on
+-
+-    // Update every square. When `slide` is given, the piece landing on
 -    // `slide.to` starts at `slide.from` and springs home — so stepping through
 -    // a game's history animates the moved piece instead of snapping.
-+    // `slide.to` starts at `slide.from` and glides home — so stepping through
-+    // a game's history animates the moved piece instead of snapping. Callers
-+    // may request a deterministic duration for a deliberately paced rewind;
-+    // ordinary history slides retain the board's move spring.
++    const squareSnapshots = [];
      for (let row = 0; row < 8; row++) {
        for (let col = 0; col < 8; col++) {
          const colChar = String.fromCharCode('a'.charCodeAt(0) + col);
-@@ -277,8 +284,11 @@ const createMoveExecutor = (chess, boardState, config, callbacks) => {
- 
-             sq.zIndex.set(0);
-           };
+         const rowNum = 8 - row;
+         const square = `${colChar}${rowNum}`;
+-        const sq = boardState.squares[square];
+         const piece = board[row][col];
+-        sq.piece.set(piece ? `${piece.color}${piece.type}` : null);
+-        sq.scale.set(1);
+-        sq.lastMove.set(!!lastMove && (square === lastMove.from || square === lastMove.to));
+-        sq.inCheck.set(false);
+-        const pos = (0, _useBoardState.squareToPosition)(square, pieceSize, flipped);
+-        if (slide && square === slide.to) {
+-          const fromPos = (0, _useBoardState.squareToPosition)(slide.from, pieceSize, flipped);
+-          sq.zIndex.set(100);
+-          sq.translateX.set(fromPos.x);
+-          sq.translateY.set(fromPos.y);
+-          // zIndex drop rides the axis that actually travels (a no-travel
+-          // spring settles instantly — see commitMove in executeMove).
+-          const slidesVertically = pos.y !== fromPos.y;
+-          const dropZIndex = () => {
+-            'worklet';
+-
+-            sq.zIndex.set(0);
+-          };
 -          sq.translateX.set((0, _reactNativeReanimated.withSpring)(pos.x, animations.move, slidesVertically ? undefined : dropZIndex));
 -          sq.translateY.set((0, _reactNativeReanimated.withSpring)(pos.y, animations.move, slidesVertically ? dropZIndex : undefined));
-+          const timing = slide.durationMs === undefined ? null : {
-+            duration: slide.durationMs
-+          };
-+          sq.translateX.set(timing ? (0, _reactNativeReanimated.withTiming)(pos.x, timing, slidesVertically ? undefined : dropZIndex) : (0, _reactNativeReanimated.withSpring)(pos.x, animations.move, slidesVertically ? undefined : dropZIndex));
-+          sq.translateY.set(timing ? (0, _reactNativeReanimated.withTiming)(pos.y, timing, slidesVertically ? dropZIndex : undefined) : (0, _reactNativeReanimated.withSpring)(pos.y, animations.move, slidesVertically ? dropZIndex : undefined));
-         } else {
-           sq.translateX.set(pos.x);
-           sq.translateY.set(pos.y);
+-        } else {
+-          sq.translateX.set(pos.x);
+-          sq.translateY.set(pos.y);
+-          sq.zIndex.set(0);
+-        }
++        const pos = (0, _useBoardState.squareToPosition)(square, pieceSize, targetFlipped);
++        squareSnapshots.push({
++          square,
++          piece: piece ? `${piece.color}${piece.type}` : null,
++          x: pos.x,
++          y: pos.y
++        });
+       }
+     }
+-
+-    // Reset other state
+-    boardState.turn.set(chess.turn());
+-    boardState.selectedSquare.set(null);
+-    boardState.validMoves.set([]);
+-    boardState.lastMove.set(lastMove);
+-
+-    // Check / checkmate highlight for the resulting position.
++    const turn = chess.turn();
+     const isInCheck = chess.isCheck();
+-    const kingSquare = isInCheck || chess.isCheckmate() ? (0, _findKingSquare.findKingSquare)(chess, chess.turn()) : null;
+-    if (kingSquare) {
+-      boardState.squares[kingSquare].inCheck.set(true);
+-    }
+-    boardState.isCheck.set(isInCheck);
+-    boardState.kingInCheckSquare.set(kingSquare);
++    const kingSquare = isInCheck || chess.isCheckmate() ? (0, _findKingSquare.findKingSquare)(chess, turn) : null;
++    const slideFromPosition = slide ? (0, _useBoardState.squareToPosition)(slide.from, pieceSize, targetFlipped) : null;
+ 
+-    // Clear highlights
+-    for (const square of Object.keys(boardState.highlights)) {
+-      boardState.highlights[square].color.set(null);
+-    }
++    // A reset is one visual position change. Run every SharedValue write in a
++    // single UI task so Android cannot paint a partly rewritten board between
++    // individual JS-to-UI writes. `flipped` lets a caller publish the next FEN
++    // in its target orientation before React reveals the next puzzle.
++    return new Promise(resolve => {
++      (0, _reactNativeWorklets.scheduleOnUI)((state, snapshots, nextTurn, nextLastMove, nextKingSquare, nextIsInCheck, nextSlide, nextSlideFromPosition, moveAnimation, effects, onCommitted) => {
++        'worklet';
+ 
+-    // Reset shader effect SharedValues so a fresh game's first check or
+-    // checkmate doesn't trigger a ripple at the previous game's king
+-    // square (centerX/centerY were last written by triggerEffect).
+-    if (callbacks.effectSharedValues) {
+-      callbacks.effectSharedValues.centerX.set(0);
+-      callbacks.effectSharedValues.centerY.set(0);
+-      callbacks.effectSharedValues.progress.set(0);
+-      callbacks.effectSharedValues.trigger.set('');
+-    }
++        for (const snapshot of snapshots) {
++          const sq = state.squares[snapshot.square];
++          sq.piece.set(snapshot.piece);
++          sq.scale.set(1);
++          sq.lastMove.set(!!nextLastMove && (snapshot.square === nextLastMove.from || snapshot.square === nextLastMove.to));
++          sq.inCheck.set(snapshot.square === nextKingSquare);
++          if (nextSlide && snapshot.square === nextSlide.to) {
++            const fromPos = nextSlideFromPosition;
++            sq.zIndex.set(100);
++            sq.translateX.set(fromPos.x);
++            sq.translateY.set(fromPos.y);
++            // zIndex drop rides the axis that actually travels (a no-travel
++            // spring settles instantly — see commitMove in executeMove).
++            const slidesVertically = snapshot.y !== fromPos.y;
++            const dropZIndex = () => {
++              'worklet';
++
++              sq.zIndex.set(0);
++            };
++            const timing = nextSlide.durationMs === undefined ? null : {
++              duration: nextSlide.durationMs
++            };
++            sq.translateX.set(timing ? (0, _reactNativeReanimated.withTiming)(snapshot.x, timing, slidesVertically ? undefined : dropZIndex) : (0, _reactNativeReanimated.withSpring)(snapshot.x, moveAnimation, slidesVertically ? undefined : dropZIndex));
++            sq.translateY.set(timing ? (0, _reactNativeReanimated.withTiming)(snapshot.y, timing, slidesVertically ? dropZIndex : undefined) : (0, _reactNativeReanimated.withSpring)(snapshot.y, moveAnimation, slidesVertically ? dropZIndex : undefined));
++          } else {
++            sq.translateX.set(snapshot.x);
++            sq.translateY.set(snapshot.y);
++            sq.zIndex.set(0);
++          }
++        }
++        state.turn.set(nextTurn);
++        state.selectedSquare.set(null);
++        state.validMoves.set([]);
++        state.lastMove.set(nextLastMove);
++        state.isCheck.set(nextIsInCheck);
++        state.kingInCheckSquare.set(nextKingSquare);
++        for (const square of Object.keys(state.highlights)) {
++          state.highlights[square].color.set(null);
++        }
++        if (effects) {
++          effects.centerX.set(0);
++          effects.centerY.set(0);
++          effects.progress.set(0);
++          effects.trigger.set('');
++        }
++        (0, _reactNativeWorklets.scheduleOnRN)(onCommitted);
++      }, boardState, squareSnapshots, turn, lastMove, kingSquare, isInCheck, slide, slideFromPosition, animations.move, callbacks.effectSharedValues, resolve);
++    });
+   };
+   const undo = () => {
+     const move = chess.undo();
 diff --git a/lib/commonjs/state/use-board-state.js b/lib/commonjs/state/use-board-state.js
 index 0a6faf6b1ec0b5ac518104d513f3e1a0a9c1a9b6..4a9ba5a255d44f8f9a140019f6f351a2263f57c8 100644
 --- a/lib/commonjs/state/use-board-state.js
@@ -803,7 +976,7 @@ index 0a6faf6b1ec0b5ac518104d513f3e1a0a9c1a9b6..4a9ba5a255d44f8f9a140019f6f351a2
        chess.reset();
      } else {
 diff --git a/lib/module/components/promotion-dialog.js b/lib/module/components/promotion-dialog.js
-index 5bf64b655079b16368383257bc53bc3bce4d8418..d451c67e216a56d8d93e9d09aaef03bcba8cd943 100644
+index 5bf64b655079b16368383257bc53bc3bce4d8418..14f6c9229a38e371517b7655e11f4c58ffd5df38 100644
 --- a/lib/module/components/promotion-dialog.js
 +++ b/lib/module/components/promotion-dialog.js
 @@ -1,32 +1,40 @@
@@ -907,7 +1080,7 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..d451c67e216a56d8d93e9d09aaef03bc
    }))));
  });
 diff --git a/lib/module/components/skia/gesture-board.js b/lib/module/components/skia/gesture-board.js
-index 79598f3cce08d079d2a004ed0563f1194fd7d31c..2bb1c9e504ba4da013672cffc660995f52d32c96 100644
+index 79598f3cce08d079d2a004ed0563f1194fd7d31c..abd5a388b3146bf82650c6de75e346b1093ac8fb 100644
 --- a/lib/module/components/skia/gesture-board.js
 +++ b/lib/module/components/skia/gesture-board.js
 @@ -1,4 +1,4 @@
@@ -957,7 +1130,30 @@ index 79598f3cce08d079d2a004ed0563f1194fd7d31c..2bb1c9e504ba4da013672cffc660995f
  
    // Effect state for shader effects (all SharedValues for reactivity)
    const effectCenterX = useSharedValue(0);
-@@ -137,6 +156,7 @@ export const GestureBoard = /*#__PURE__*/forwardRef(({
+@@ -79,6 +98,12 @@ export const GestureBoard = /*#__PURE__*/forwardRef(({
+     promotionInfoRef.current = null;
+     setShowPromotion(false);
+   }, [boardState, config]);
++  const handleBoardReset = useCallback(() => {
++    const info = promotionInfoRef.current;
++    info === null || info === void 0 || info.cancel();
++    promotionInfoRef.current = null;
++    setShowPromotion(false);
++  }, []);
+ 
+   // Trigger effect on game events
+   const triggerEffect = useCallback((trigger, kingColor) => {
+@@ -128,7 +153,8 @@ export const GestureBoard = /*#__PURE__*/forwardRef(({
+     chess,
+     boardState,
+     moveExecutor,
+-    defaultHighlightColor: config.colors.lastMoveHighlight
++    defaultHighlightColor: config.colors.lastMoveHighlight,
++    onBeforeReset: handleBoardReset
+   });
+   const gesture = useBoardGesture({
+     boardState,
+@@ -137,6 +163,7 @@ export const GestureBoard = /*#__PURE__*/forwardRef(({
      // Lock the board while the promotion picker is open so a second drag
      // can't start (and re-trigger) another promotion.
      gestureEnabled: config.gestureEnabled && !showPromotion,
@@ -1072,7 +1268,7 @@ index efa0ca0d342d28c1d44eed586d831d294159c2d9..61a50214e449b4e31e358704aa703a3f
        sprites,
        transforms
 diff --git a/lib/module/hooks/use-board-gesture.js b/lib/module/hooks/use-board-gesture.js
-index 504126e4dc0a469cf5b00913e176e360322a1194..a1d699fb83ef4f17ec1ff90315d5ee8e67035164 100644
+index 504126e4dc0a469cf5b00913e176e360322a1194..c09174430003ba109c895bb474aad9eb484e6765 100644
 --- a/lib/module/hooks/use-board-gesture.js
 +++ b/lib/module/hooks/use-board-gesture.js
 @@ -8,12 +8,14 @@ export const useBoardGesture = ({
@@ -1344,8 +1540,35 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..a1d699fb83ef4f17ec1ff90315d5ee8e
    return gesture;
  };
  //# sourceMappingURL=use-board-gesture.js.map
+\ No newline at end of file
+diff --git a/lib/module/hooks/use-chessboard-ref.js b/lib/module/hooks/use-chessboard-ref.js
+index 0c7aa00855119b0b99285596e024cf51f18409ce..ffb0af8cf082f8d5383f579fa62b5482b8e4e783 100644
+--- a/lib/module/hooks/use-chessboard-ref.js
++++ b/lib/module/hooks/use-chessboard-ref.js
+@@ -6,7 +6,8 @@ export const useChessboardRef = ({
+   chess,
+   boardState,
+   moveExecutor,
+-  defaultHighlightColor = 'rgba(255, 255, 0, 0.5)'
++  defaultHighlightColor = 'rgba(255, 255, 0, 0.5)',
++  onBeforeReset
+ }) => {
+   const move = useCallback(async params => {
+     return moveExecutor.tryMove(params.from, params.to, params.promotion);
+@@ -30,8 +31,9 @@ export const useChessboardRef = ({
+     boardState.kingInCheckSquare.set(null);
+   }, [boardState.highlights, boardState.squares, boardState.lastMove, boardState.kingInCheckSquare]);
+   const resetBoard = useCallback((fen, opts) => {
+-    moveExecutor.resetBoard(fen, opts);
+-  }, [moveExecutor]);
++    onBeforeReset === null || onBeforeReset === void 0 || onBeforeReset();
++    return moveExecutor.resetBoard(fen, opts);
++  }, [moveExecutor, onBeforeReset]);
+   const getState = useCallback(() => {
+     return getChessboardState(chess);
+   }, [chess]);
 diff --git a/lib/module/index.js b/lib/module/index.js
-index 7cee33e75529b83bea5c7216e4b89be54c9fb520..5d8d14e88ffe29c99a8c5cc9432bcb49ee70f3c6 100644
+index 7cee33e75529b83bea5c7216e4b89be54c9fb520..ad70cac42f9a03c9934ec526a71a19339680a629 100644
 --- a/lib/module/index.js
 +++ b/lib/module/index.js
 @@ -5,6 +5,7 @@ const Chessboard = /*#__PURE__*/forwardRef(({
@@ -1424,15 +1647,17 @@ index 9c5fc37c72a09fa6a338aba03bd0433d0c09573e..9c781af9859d91627effe7113c653689
      boardState,
      chess
 diff --git a/lib/module/state/move-executor.js b/lib/module/state/move-executor.js
-index f2f179f71c94846c9cbe456e5889ac1b5c0714d9..019a2829e5b16822543d08c9f2b0eebedb5e71c5 100644
+index f2f179f71c94846c9cbe456e5889ac1b5c0714d9..d3768a64a1c06447481b8febd223bec9d38ae9f8 100644
 --- a/lib/module/state/move-executor.js
 +++ b/lib/module/state/move-executor.js
-@@ -1,4 +1,4 @@
+@@ -1,5 +1,5 @@
 -import { withSpring } from 'react-native-reanimated';
+-import { scheduleOnRN } from 'react-native-worklets';
 +import { withSpring, withTiming } from 'react-native-reanimated';
- import { scheduleOnRN } from 'react-native-worklets';
++import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
  import { squareToPosition } from './use-board-state';
  import { getChessboardState } from '../helpers/get-chessboard-state';
+ import { findKingSquare } from '../helpers/find-king-square';
 @@ -55,51 +55,56 @@ export const createMoveExecutor = (chess, boardState, config, callbacks) => {
      if (!move) return null;
      const fromState = boardState.squares[from];
@@ -1555,33 +1780,150 @@ index f2f179f71c94846c9cbe456e5889ac1b5c0714d9..019a2829e5b16822543d08c9f2b0eebe
      }
  
      // Handle en passant - remove the captured pawn
-@@ -244,8 +249,10 @@ export const createMoveExecutor = (chess, boardState, config, callbacks) => {
+@@ -234,82 +239,85 @@ export const createMoveExecutor = (chess, boardState, config, callbacks) => {
+       } catch {
+         // Invalid FEN — leave the chess instance untouched and bail out so
+         // the board state stays consistent with what's actually on screen.
+-        return;
++        return Promise.resolve();
+       }
+     } else {
+       chess.reset();
+     }
+     const slide = opts === null || opts === void 0 ? void 0 : opts.slide;
+     const lastMove = (opts === null || opts === void 0 ? void 0 : opts.lastMove) ?? null;
++    const targetFlipped = (opts === null || opts === void 0 ? void 0 : opts.flipped) ?? flipped;
      const board = chess.board();
- 
-     // Update every square. When `slide` is given, the piece landing on
+-
+-    // Update every square. When `slide` is given, the piece landing on
 -    // `slide.to` starts at `slide.from` and springs home — so stepping through
 -    // a game's history animates the moved piece instead of snapping.
-+    // `slide.to` starts at `slide.from` and glides home — so stepping through
-+    // a game's history animates the moved piece instead of snapping. Callers
-+    // may request a deterministic duration for a deliberately paced rewind;
-+    // ordinary history slides retain the board's move spring.
++    const squareSnapshots = [];
      for (let row = 0; row < 8; row++) {
        for (let col = 0; col < 8; col++) {
          const colChar = String.fromCharCode('a'.charCodeAt(0) + col);
-@@ -271,8 +278,11 @@ export const createMoveExecutor = (chess, boardState, config, callbacks) => {
- 
-             sq.zIndex.set(0);
-           };
+         const rowNum = 8 - row;
+         const square = `${colChar}${rowNum}`;
+-        const sq = boardState.squares[square];
+         const piece = board[row][col];
+-        sq.piece.set(piece ? `${piece.color}${piece.type}` : null);
+-        sq.scale.set(1);
+-        sq.lastMove.set(!!lastMove && (square === lastMove.from || square === lastMove.to));
+-        sq.inCheck.set(false);
+-        const pos = squareToPosition(square, pieceSize, flipped);
+-        if (slide && square === slide.to) {
+-          const fromPos = squareToPosition(slide.from, pieceSize, flipped);
+-          sq.zIndex.set(100);
+-          sq.translateX.set(fromPos.x);
+-          sq.translateY.set(fromPos.y);
+-          // zIndex drop rides the axis that actually travels (a no-travel
+-          // spring settles instantly — see commitMove in executeMove).
+-          const slidesVertically = pos.y !== fromPos.y;
+-          const dropZIndex = () => {
+-            'worklet';
+-
+-            sq.zIndex.set(0);
+-          };
 -          sq.translateX.set(withSpring(pos.x, animations.move, slidesVertically ? undefined : dropZIndex));
 -          sq.translateY.set(withSpring(pos.y, animations.move, slidesVertically ? dropZIndex : undefined));
-+          const timing = slide.durationMs === undefined ? null : {
-+            duration: slide.durationMs
-+          };
-+          sq.translateX.set(timing ? withTiming(pos.x, timing, slidesVertically ? undefined : dropZIndex) : withSpring(pos.x, animations.move, slidesVertically ? undefined : dropZIndex));
-+          sq.translateY.set(timing ? withTiming(pos.y, timing, slidesVertically ? dropZIndex : undefined) : withSpring(pos.y, animations.move, slidesVertically ? dropZIndex : undefined));
-         } else {
-           sq.translateX.set(pos.x);
-           sq.translateY.set(pos.y);
+-        } else {
+-          sq.translateX.set(pos.x);
+-          sq.translateY.set(pos.y);
+-          sq.zIndex.set(0);
+-        }
++        const pos = squareToPosition(square, pieceSize, targetFlipped);
++        squareSnapshots.push({
++          square,
++          piece: piece ? `${piece.color}${piece.type}` : null,
++          x: pos.x,
++          y: pos.y
++        });
+       }
+     }
+-
+-    // Reset other state
+-    boardState.turn.set(chess.turn());
+-    boardState.selectedSquare.set(null);
+-    boardState.validMoves.set([]);
+-    boardState.lastMove.set(lastMove);
+-
+-    // Check / checkmate highlight for the resulting position.
++    const turn = chess.turn();
+     const isInCheck = chess.isCheck();
+-    const kingSquare = isInCheck || chess.isCheckmate() ? findKingSquare(chess, chess.turn()) : null;
+-    if (kingSquare) {
+-      boardState.squares[kingSquare].inCheck.set(true);
+-    }
+-    boardState.isCheck.set(isInCheck);
+-    boardState.kingInCheckSquare.set(kingSquare);
++    const kingSquare = isInCheck || chess.isCheckmate() ? findKingSquare(chess, turn) : null;
++    const slideFromPosition = slide ? squareToPosition(slide.from, pieceSize, targetFlipped) : null;
++    return new Promise(resolve => {
++      scheduleOnUI((state, snapshots, nextTurn, nextLastMove, nextKingSquare, nextIsInCheck, nextSlide, nextSlideFromPosition, moveAnimation, effects, onCommitted) => {
++        'worklet';
+ 
+-    // Clear highlights
+-    for (const square of Object.keys(boardState.highlights)) {
+-      boardState.highlights[square].color.set(null);
+-    }
++        for (const snapshot of snapshots) {
++          const sq = state.squares[snapshot.square];
++          sq.piece.set(snapshot.piece);
++          sq.scale.set(1);
++          sq.lastMove.set(!!nextLastMove && (snapshot.square === nextLastMove.from || snapshot.square === nextLastMove.to));
++          sq.inCheck.set(snapshot.square === nextKingSquare);
++          if (nextSlide && nextSlideFromPosition && snapshot.square === nextSlide.to) {
++            const fromPos = nextSlideFromPosition;
++            sq.zIndex.set(100);
++            sq.translateX.set(fromPos.x);
++            sq.translateY.set(fromPos.y);
++            const slidesVertically = snapshot.y !== fromPos.y;
++            const dropZIndex = () => {
++              'worklet';
+ 
+-    // Reset shader effect SharedValues so a fresh game's first check or
+-    // checkmate doesn't trigger a ripple at the previous game's king
+-    // square (centerX/centerY were last written by triggerEffect).
+-    if (callbacks.effectSharedValues) {
+-      callbacks.effectSharedValues.centerX.set(0);
+-      callbacks.effectSharedValues.centerY.set(0);
+-      callbacks.effectSharedValues.progress.set(0);
+-      callbacks.effectSharedValues.trigger.set('');
+-    }
++              sq.zIndex.set(0);
++            };
++            const timing = nextSlide.durationMs === undefined ? null : {
++              duration: nextSlide.durationMs
++            };
++            sq.translateX.set(timing ? withTiming(snapshot.x, timing, slidesVertically ? undefined : dropZIndex) : withSpring(snapshot.x, moveAnimation, slidesVertically ? undefined : dropZIndex));
++            sq.translateY.set(timing ? withTiming(snapshot.y, timing, slidesVertically ? dropZIndex : undefined) : withSpring(snapshot.y, moveAnimation, slidesVertically ? dropZIndex : undefined));
++          } else {
++            sq.translateX.set(snapshot.x);
++            sq.translateY.set(snapshot.y);
++            sq.zIndex.set(0);
++          }
++        }
++        state.turn.set(nextTurn);
++        state.selectedSquare.set(null);
++        state.validMoves.set([]);
++        state.lastMove.set(nextLastMove);
++        state.isCheck.set(nextIsInCheck);
++        state.kingInCheckSquare.set(nextKingSquare);
++        for (const square of Object.keys(state.highlights)) {
++          state.highlights[square].color.set(null);
++        }
++        if (effects) {
++          effects.centerX.set(0);
++          effects.centerY.set(0);
++          effects.progress.set(0);
++          effects.trigger.set('');
++        }
++        scheduleOnRN(onCommitted);
++      }, boardState, squareSnapshots, turn, lastMove, kingSquare, isInCheck, slide, slideFromPosition, animations.move, callbacks.effectSharedValues, resolve);
++    });
+   };
+   const undo = () => {
+     const move = chess.undo();
 diff --git a/lib/module/state/use-board-state.js b/lib/module/state/use-board-state.js
 index 70c2cecb9088e81c71bbda522458e5602b3ccfe6..5445a48d5e9faf642f4462debe9b09893f0a0c5f 100644
 --- a/lib/module/state/use-board-state.js
@@ -1666,10 +2008,10 @@ index fd3bbda6ebc9d343270cc92a0e1c37023849b8b8..89f80d19e89890f8619dfdbfc0a81395
 +export declare const useBoardGesture: ({ boardState, config, moveExecutor, gestureEnabled, blocksExternalGesture, onIllegalMove, }: UseBoardGestureProps) => import("react-native-gesture-handler/lib/typescript/handlers/gestures/gestureComposition").SimultaneousGesture;
  export {};
 diff --git a/lib/typescript/hooks/use-chessboard-ref.d.ts b/lib/typescript/hooks/use-chessboard-ref.d.ts
-index b3a8a75fde04559b7e81ef8b8aef53d9081e5924..07f2d673bad1d39034023e5dc2925304a0eea9f8 100644
+index b3a8a75fde04559b7e81ef8b8aef53d9081e5924..2891ce73615664cb9c791ee6d3e813ced02e89eb 100644
 --- a/lib/typescript/hooks/use-chessboard-ref.d.ts
 +++ b/lib/typescript/hooks/use-chessboard-ref.d.ts
-@@ -20,6 +20,7 @@ export interface ChessboardRef {
+@@ -20,12 +20,14 @@ export interface ChessboardRef {
          slide?: {
              from: Square;
              to: Square;
@@ -1677,6 +2019,14 @@ index b3a8a75fde04559b7e81ef8b8aef53d9081e5924..07f2d673bad1d39034023e5dc2925304
          };
          lastMove?: {
              from: Square;
+             to: Square;
+         } | null;
+-    }) => void;
++        flipped?: boolean;
++    }) => Promise<void>;
+     getState: () => ChessboardState;
+ }
+ interface UseChessboardRefProps {
 diff --git a/lib/typescript/index.d.ts b/lib/typescript/index.d.ts
 index ac1a1357c8b5352dd97d856282ef96f056f45622..dff5c745aaa140b59141673e76365c033f9dac95 100644
 --- a/lib/typescript/index.d.ts
@@ -1722,10 +2072,10 @@ index 9df5d29a4e894d52f6ff4c7036342a60eb2529f7..a1179eda7258a44362521fceb030b5a2
      withLetters?: boolean;
      withNumbers?: boolean;
 diff --git a/lib/typescript/state/move-executor.d.ts b/lib/typescript/state/move-executor.d.ts
-index 6bef8348a4fd8cde7955491eaca48e8da844d89b..cd3650514851981e0353283376fb6b3e658f866d 100644
+index 6bef8348a4fd8cde7955491eaca48e8da844d89b..7651fa22d9200ee42f6c719c5a7bcb9b4122951e 100644
 --- a/lib/typescript/state/move-executor.d.ts
 +++ b/lib/typescript/state/move-executor.d.ts
-@@ -36,6 +36,7 @@ export declare const createMoveExecutor: (chess: Chess, boardState: BoardState,
+@@ -36,12 +36,14 @@ export declare const createMoveExecutor: (chess: Chess, boardState: BoardState,
          slide?: {
              from: Square;
              to: Square;
@@ -1733,6 +2083,14 @@ index 6bef8348a4fd8cde7955491eaca48e8da844d89b..cd3650514851981e0353283376fb6b3e
          };
          lastMove?: {
              from: Square;
+             to: Square;
+         } | null;
+-    }) => void;
++        flipped?: boolean;
++    }) => Promise<void>;
+     undo: () => Move | null;
+ };
+ export type MoveExecutor = ReturnType<typeof createMoveExecutor>;
 diff --git a/lib/typescript/state/types.d.ts b/lib/typescript/state/types.d.ts
 index eaac9e98118247d6e6776fe990fa7e10aa5b9227..2f896b9f44846bf23b0cbac42e69da0176304d9a 100644
 --- a/lib/typescript/state/types.d.ts
@@ -1883,7 +2241,7 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..133a12df3289ac45a55b3cce5c717b77
      );
    }
 diff --git a/src/components/skia/gesture-board.tsx b/src/components/skia/gesture-board.tsx
-index b4a278cc2ada84715a4916324b459952ab33c942..63ed266ae8e58e72d96d70757422f0c3887a9165 100644
+index b4a278cc2ada84715a4916324b459952ab33c942..4b9b85bedfec21907e498f2fa422fad90655f917 100644
 --- a/src/components/skia/gesture-board.tsx
 +++ b/src/components/skia/gesture-board.tsx
 @@ -2,11 +2,13 @@ import React, {
@@ -2026,7 +2384,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..63ed266ae8e58e72d96d70757422f0c3
        // The drag gesture animated the pawn into the back-rank target square
        // and raised its zIndex; chess.move() was deferred until the user picked
        // a promotion piece. Cancel means we never execute the move, so snap
-@@ -121,9 +185,19 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -121,9 +185,31 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
          info.cancel();
        }
        promotionInfoRef.current = null;
@@ -2034,6 +2392,18 @@ index b4a278cc2ada84715a4916324b459952ab33c942..63ed266ae8e58e72d96d70757422f0c3
 +      setPromotionInfo(null);
      }, [boardState, config]);
  
++    const handleBoardReset = useCallback(() => {
++      const info = promotionInfoRef.current;
++      debugChessboard('promotionBoard:reset', {
++        hasInfo: !!info,
++        from: info?.from,
++        to: info?.to,
++      });
++      info?.cancel();
++      promotionInfoRef.current = null;
++      setPromotionInfo(null);
++    }, []);
++
 +    useEffect(() => {
 +      debugChessboard('promotionBoard:state', {
 +        showPromotion,
@@ -2047,15 +2417,23 @@ index b4a278cc2ada84715a4916324b459952ab33c942..63ed266ae8e58e72d96d70757422f0c3
      // Trigger effect on game events
      const triggerEffect = useCallback(
        (trigger: EffectTrigger, kingColor: 'w' | 'b') => {
-@@ -217,6 +291,7 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -208,6 +294,7 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+       boardState,
+       moveExecutor,
+       defaultHighlightColor: config.colors.lastMoveHighlight,
++      onBeforeReset: handleBoardReset,
+     });
+ 
+     const gesture = useBoardGesture({
+@@ -217,6 +304,7 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
        // Lock the board while the promotion picker is open so a second drag
        // can't start (and re-trigger) another promotion.
        gestureEnabled: config.gestureEnabled && !showPromotion,
 +      blocksExternalGesture,
        onIllegalMove,
      });
-
-@@ -244,25 +319,27 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+ 
+@@ -244,25 +332,27 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
  
      return (
        <GestureHandlerRootView style={containerStyle}>
@@ -2238,7 +2616,7 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8863c68e2567a43612554da49ec7f2d2
 +  blocksExternalGesture?: RefObject<GestureType | undefined>;
    onIllegalMove?: (from: Square, to: Square) => void;
  }
-
+ 
 @@ -20,9 +23,10 @@ export const useBoardGesture = ({
    config,
    moveExecutor,
@@ -2526,27 +2904,59 @@ index 92df972f7ec3c671308e8cc0e6cd275469a7144d..8863c68e2567a43612554da49ec7f2d2
      handleSelectPiece,
      handleIllegalMove,
 diff --git a/src/hooks/use-chessboard-ref.ts b/src/hooks/use-chessboard-ref.ts
-index e1a1653b60bc39a2ac617a9d8b0e0c5c1399dd35..f35837e4fe7173af67846f1535168d88000b00ce 100644
+index e1a1653b60bc39a2ac617a9d8b0e0c5c1399dd35..d9040314b24f129923a913a07ca7387114b2432a 100644
 --- a/src/hooks/use-chessboard-ref.ts
 +++ b/src/hooks/use-chessboard-ref.ts
-@@ -22,7 +22,7 @@ export interface ChessboardRef {
+@@ -22,10 +22,11 @@ export interface ChessboardRef {
    resetBoard: (
      fen?: string,
      opts?: {
 -      slide?: { from: Square; to: Square };
 +      slide?: { from: Square; to: Square; durationMs?: number };
        lastMove?: { from: Square; to: Square } | null;
++      flipped?: boolean;
      }
-   ) => void;
-@@ -88,7 +88,7 @@ export const useChessboardRef = ({
+-  ) => void;
++  ) => Promise<void>;
+   getState: () => ChessboardState;
+ }
+ 
+@@ -35,6 +36,7 @@ interface UseChessboardRefProps {
+   boardState: BoardState;
+   moveExecutor: MoveExecutor;
+   defaultHighlightColor?: string;
++  onBeforeReset?: () => void;
+ }
+ 
+ export const useChessboardRef = ({
+@@ -43,6 +45,7 @@ export const useChessboardRef = ({
+   boardState,
+   moveExecutor,
+   defaultHighlightColor = 'rgba(255, 255, 0, 0.5)',
++  onBeforeReset,
+ }: UseChessboardRefProps) => {
+   const move = useCallback(
+     async (params: {
+@@ -88,13 +91,15 @@ export const useChessboardRef = ({
      (
        fen?: string,
        opts?: {
 -        slide?: { from: Square; to: Square };
 +        slide?: { from: Square; to: Square; durationMs?: number };
          lastMove?: { from: Square; to: Square } | null;
++        flipped?: boolean;
        }
-     ) => {
+-    ) => {
+-      moveExecutor.resetBoard(fen, opts);
++    ): Promise<void> => {
++      onBeforeReset?.();
++      return moveExecutor.resetBoard(fen, opts);
+     },
+-    [moveExecutor]
++    [moveExecutor, onBeforeReset]
+   );
+ 
+   const getState = useCallback((): ChessboardState => {
 diff --git a/src/index.tsx b/src/index.tsx
 index a50f36cba22769b8a484a1c4429a3135e661dcf3..cfc883fb8cab34b3e13120c18e2dee4f258029ec 100644
 --- a/src/index.tsx
@@ -2661,15 +3071,17 @@ index 2f2990b96a62e49047a101e225317ab1a01b20ae..222650a2f245f85e9f15eab121943056
        withLetters,
        withNumbers,
 diff --git a/src/state/move-executor.ts b/src/state/move-executor.ts
-index 5957db9d36a2d7ab8800c7b171b0c8ef79052d8d..05ad043abddac2fc2a8db68f0fac8180293bcae5 100644
+index 5957db9d36a2d7ab8800c7b171b0c8ef79052d8d..16ee21ed3efa4b8bac663e633a288964f7be2d17 100644
 --- a/src/state/move-executor.ts
 +++ b/src/state/move-executor.ts
-@@ -1,4 +1,4 @@
+@@ -1,5 +1,5 @@
 -import { withSpring } from 'react-native-reanimated';
+-import { scheduleOnRN } from 'react-native-worklets';
 +import { withSpring, withTiming } from 'react-native-reanimated';
- import { scheduleOnRN } from 'react-native-worklets';
++import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
  import type { SharedValue } from 'react-native-reanimated';
  import type { Chess, Move, Square, PieceSymbol } from 'chess.js';
+ import type { BoardState, PieceCode } from './types';
 @@ -104,59 +104,65 @@ export const createMoveExecutor = (
  
      const fromState = boardState.squares[from];
@@ -2805,7 +3217,7 @@ index 5957db9d36a2d7ab8800c7b171b0c8ef79052d8d..05ad043abddac2fc2a8db68f0fac8180
      }
  
      // Handle en passant - remove the captured pawn
-@@ -311,7 +315,7 @@ export const createMoveExecutor = (
+@@ -311,19 +315,22 @@ export const createMoveExecutor = (
        // Animate the piece that ends on `to` sliding in from `from` (e.g. when
        // stepping through a game's history). Caller supplies the move; only a
        // single piece is animated.
@@ -2814,64 +3226,248 @@ index 5957db9d36a2d7ab8800c7b171b0c8ef79052d8d..05ad043abddac2fc2a8db68f0fac8180
        // From/to squares to highlight as the last move (the move that produced
        // this position). Pass null to clear.
        lastMove?: { from: Square; to: Square } | null;
-@@ -334,8 +338,10 @@ export const createMoveExecutor = (
-     const board = chess.board();
++      // Target orientation for this position. Supplying it lets a caller
++      // prepare a cross-puzzle position before React publishes new props.
++      flipped?: boolean;
+     }
+-  ) => {
++  ): Promise<void> => {
+     if (fen) {
+       try {
+         chess.load(fen);
+       } catch {
+         // Invalid FEN — leave the chess instance untouched and bail out so
+         // the board state stays consistent with what's actually on screen.
+-        return;
++        return Promise.resolve();
+       }
+     } else {
+       chess.reset();
+@@ -331,95 +338,150 @@ export const createMoveExecutor = (
  
-     // Update every square. When `slide` is given, the piece landing on
+     const slide = opts?.slide;
+     const lastMove = opts?.lastMove ?? null;
++    const targetFlipped = opts?.flipped ?? flipped;
+     const board = chess.board();
++    const squareSnapshots: Array<{
++      piece: PieceCode | null;
++      square: Square;
++      x: number;
++      y: number;
++    }> = [];
+ 
+-    // Update every square. When `slide` is given, the piece landing on
 -    // `slide.to` starts at `slide.from` and springs home — so stepping through
 -    // a game's history animates the moved piece instead of snapping.
-+    // `slide.to` starts at `slide.from` and glides home — so stepping through
-+    // a game's history animates the moved piece instead of snapping. Callers
-+    // may request a deterministic duration for a deliberately paced rewind;
-+    // ordinary history slides retain the board's move spring.
      for (let row = 0; row < 8; row++) {
        for (let col = 0; col < 8; col++) {
          const colChar = String.fromCharCode('a'.charCodeAt(0) + col);
-@@ -366,19 +372,34 @@ export const createMoveExecutor = (
-             'worklet';
-             sq.zIndex.set(0);
-           };
-+          const timing = slide.durationMs === undefined
-+            ? null
-+            : { duration: slide.durationMs };
-           sq.translateX.set(
+         const rowNum = 8 - row;
+         const square = `${colChar}${rowNum}` as Square;
+-        const sq = boardState.squares[square];
+-
+         const piece = board[row][col];
+-        sq.piece.set(
+-          piece ? (`${piece.color}${piece.type}` as PieceCode) : null
+-        );
+-        sq.scale.set(1);
+-        sq.lastMove.set(
+-          !!lastMove && (square === lastMove.from || square === lastMove.to)
+-        );
+-        sq.inCheck.set(false);
+-
+-        const pos = squareToPosition(square, pieceSize, flipped);
+-        if (slide && square === slide.to) {
+-          const fromPos = squareToPosition(slide.from, pieceSize, flipped);
+-          sq.zIndex.set(100);
+-          sq.translateX.set(fromPos.x);
+-          sq.translateY.set(fromPos.y);
+-          // zIndex drop rides the axis that actually travels (a no-travel
+-          // spring settles instantly — see commitMove in executeMove).
+-          const slidesVertically = pos.y !== fromPos.y;
+-          const dropZIndex = () => {
+-            'worklet';
+-            sq.zIndex.set(0);
+-          };
+-          sq.translateX.set(
 -            withSpring(
 -              pos.x,
 -              animations.move,
 -              slidesVertically ? undefined : dropZIndex
 -            )
-+            timing
-+              ? withTiming(
-+                  pos.x,
-+                  timing,
-+                  slidesVertically ? undefined : dropZIndex
-+                )
-+              : withSpring(
-+                  pos.x,
-+                  animations.move,
-+                  slidesVertically ? undefined : dropZIndex
-+                )
-           );
-           sq.translateY.set(
+-          );
+-          sq.translateY.set(
 -            withSpring(
 -              pos.y,
 -              animations.move,
 -              slidesVertically ? dropZIndex : undefined
 -            )
-+            timing
-+              ? withTiming(
-+                  pos.y,
-+                  timing,
-+                  slidesVertically ? dropZIndex : undefined
-+                )
-+              : withSpring(
-+                  pos.y,
-+                  animations.move,
-+                  slidesVertically ? dropZIndex : undefined
-+                )
-           );
-         } else {
-           sq.translateX.set(pos.x);
+-          );
+-        } else {
+-          sq.translateX.set(pos.x);
+-          sq.translateY.set(pos.y);
+-          sq.zIndex.set(0);
+-        }
++        const pos = squareToPosition(square, pieceSize, targetFlipped);
++        squareSnapshots.push({
++          piece: piece ? (`${piece.color}${piece.type}` as PieceCode) : null,
++          square,
++          x: pos.x,
++          y: pos.y,
++        });
+       }
+     }
+-
+-    // Reset other state
+-    boardState.turn.set(chess.turn());
+-    boardState.selectedSquare.set(null);
+-    boardState.validMoves.set([]);
+-    boardState.lastMove.set(lastMove);
+-
+-    // Check / checkmate highlight for the resulting position.
++    const turn = chess.turn();
+     const isInCheck = chess.isCheck();
+     const kingSquare =
+       isInCheck || chess.isCheckmate()
+-        ? findKingSquare(chess, chess.turn())
++        ? findKingSquare(chess, turn)
+         : null;
+-    if (kingSquare) {
+-      boardState.squares[kingSquare].inCheck.set(true);
+-    }
+-    boardState.isCheck.set(isInCheck);
+-    boardState.kingInCheckSquare.set(kingSquare);
+-
+-    // Clear highlights
+-    for (const square of Object.keys(boardState.highlights) as Square[]) {
+-      boardState.highlights[square].color.set(null);
+-    }
++    const slideFromPosition = slide
++      ? squareToPosition(slide.from, pieceSize, targetFlipped)
++      : null;
++
++    // A reset is one visual position change. Run every SharedValue write in a
++    // single UI task so Android cannot paint a partly rewritten board between
++    // individual JS-to-UI writes. The Promise resolves only after that task,
++    // allowing the caller to reveal matching prompt/orientation props.
++    return new Promise<void>((resolve) => {
++      scheduleOnUI(
++        (
++          state: BoardState,
++          snapshots: typeof squareSnapshots,
++          nextTurn: 'w' | 'b',
++          nextLastMove: { from: Square; to: Square } | null,
++          nextKingSquare: Square | null,
++          nextIsInCheck: boolean,
++          nextSlide: typeof slide,
++          nextSlideFromPosition: { x: number; y: number } | null,
++          moveAnimation: BoardConfig['animations']['move'],
++          effects: EffectSharedValues | undefined,
++          onCommitted: () => void
++        ) => {
++          'worklet';
+ 
+-    // Reset shader effect SharedValues so a fresh game's first check or
+-    // checkmate doesn't trigger a ripple at the previous game's king
+-    // square (centerX/centerY were last written by triggerEffect).
+-    if (callbacks.effectSharedValues) {
+-      callbacks.effectSharedValues.centerX.set(0);
+-      callbacks.effectSharedValues.centerY.set(0);
+-      callbacks.effectSharedValues.progress.set(0);
+-      callbacks.effectSharedValues.trigger.set('');
+-    }
++          for (const snapshot of snapshots) {
++            const sq = state.squares[snapshot.square];
++            sq.piece.set(snapshot.piece);
++            sq.scale.set(1);
++            sq.lastMove.set(
++              !!nextLastMove
++                && (snapshot.square === nextLastMove.from
++                  || snapshot.square === nextLastMove.to)
++            );
++            sq.inCheck.set(snapshot.square === nextKingSquare);
++            if (
++              nextSlide
++              && nextSlideFromPosition
++              && snapshot.square === nextSlide.to
++            ) {
++              const fromPos = nextSlideFromPosition;
++              sq.zIndex.set(100);
++              sq.translateX.set(fromPos.x);
++              sq.translateY.set(fromPos.y);
++              const slidesVertically = snapshot.y !== fromPos.y;
++              const dropZIndex = () => {
++                'worklet';
++                sq.zIndex.set(0);
++              };
++              const timing = nextSlide.durationMs === undefined
++                ? null
++                : { duration: nextSlide.durationMs };
++              sq.translateX.set(
++                timing
++                  ? withTiming(
++                      snapshot.x,
++                      timing,
++                      slidesVertically ? undefined : dropZIndex
++                    )
++                  : withSpring(
++                      snapshot.x,
++                      moveAnimation,
++                      slidesVertically ? undefined : dropZIndex
++                    )
++              );
++              sq.translateY.set(
++                timing
++                  ? withTiming(
++                      snapshot.y,
++                      timing,
++                      slidesVertically ? dropZIndex : undefined
++                    )
++                  : withSpring(
++                      snapshot.y,
++                      moveAnimation,
++                      slidesVertically ? dropZIndex : undefined
++                    )
++              );
++            } else {
++              sq.translateX.set(snapshot.x);
++              sq.translateY.set(snapshot.y);
++              sq.zIndex.set(0);
++            }
++          }
++          state.turn.set(nextTurn);
++          state.selectedSquare.set(null);
++          state.validMoves.set([]);
++          state.lastMove.set(nextLastMove);
++          state.isCheck.set(nextIsInCheck);
++          state.kingInCheckSquare.set(nextKingSquare);
++          for (const square of Object.keys(state.highlights) as Square[]) {
++            state.highlights[square].color.set(null);
++          }
++          if (effects) {
++            effects.centerX.set(0);
++            effects.centerY.set(0);
++            effects.progress.set(0);
++            effects.trigger.set('');
++          }
++          scheduleOnRN(onCommitted);
++        },
++        boardState,
++        squareSnapshots,
++        turn,
++        lastMove,
++        kingSquare,
++        isInCheck,
++        slide,
++        slideFromPosition,
++        animations.move,
++        callbacks.effectSharedValues,
++        resolve
++      );
++    });
+   };
+ 
+   const undo = (): Move | null => {
 diff --git a/src/state/types.ts b/src/state/types.ts
 index 2b02a76df0c9b736fe0c9f1089787dac919ae336..9b7139a692e2bdd344cc08284d36c4ab072fc6a2 100644
 --- a/src/state/types.ts
