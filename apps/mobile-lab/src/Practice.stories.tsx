@@ -216,7 +216,7 @@ export const PersonalBestArrowDuelRequiredReply: Story = {
     await clickTestId(canvasElement, "personal-best-paused-continue-arrow-800");
     await waitForTestId(canvasElement, "arrow-duel-reply-challenge");
     await expectTestIdText(canvasElement, "arrow-duel-reply-title", "Find the reply");
-    expectTestIdAbsent(canvasElement, "arrow-duel-what-if-settings-hint");
+    await expectTestIdText(canvasElement, "arrow-duel-reply-hint", "");
     expectTestIdAbsent(canvasElement, "arrow-duel-reply-timer");
   }
 };
