@@ -20,7 +20,11 @@ import {
   View
 } from "react-native";
 import type { ImageSourcePropType } from "react-native";
-import type { LayoutChangeEvent, PanResponderGestureState } from "react-native";
+import type {
+  GestureResponderEvent,
+  LayoutChangeEvent,
+  PanResponderGestureState
+} from "react-native";
 import type { StyleProp, ViewStyle } from "react-native";
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
@@ -8011,6 +8015,8 @@ type WebTouchMoveElement = {
   ) => void;
 };
 
+const NATIVE_RUN_DRAG_HOLD_MS = 180;
+
 function RunCardDropSurface({
   children,
   committedDropSettling,
@@ -8061,6 +8067,7 @@ function RunCardDropSurface({
   const nativeDragCompensationRef = useRef(0);
   const nativeDragDyRef = useRef(0);
   const nativeDragArmedRef = useRef(false);
+  const nativeDragTouchStartTimestampRef = useRef<number | null>(null);
   const nativeDragArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nativeAutoScrollSpeedRef = useRef(0);
   const nativeAutoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -8085,6 +8092,7 @@ function RunCardDropSurface({
       nativeDragArmTimerRef.current = null;
     }
     nativeDragArmedRef.current = false;
+    nativeDragTouchStartTimestampRef.current = null;
   }, []);
   const stopNativeAutoScroll = useCallback((): void => {
     if (nativeAutoScrollTimerRef.current) {
@@ -8093,11 +8101,16 @@ function RunCardDropSurface({
     }
     nativeAutoScrollSpeedRef.current = 0;
   }, []);
-  const armNativeDrag = useCallback((): void => {
+  const armNativeDrag = useCallback((event?: GestureResponderEvent): void => {
     disarmNativeDrag();
     if (!draggable) {
       return;
     }
+    const touchStartTimestamp = event?.nativeEvent?.timestamp;
+    nativeDragTouchStartTimestampRef.current = typeof touchStartTimestamp === "number"
+      && Number.isFinite(touchStartTimestamp)
+      ? touchStartTimestamp
+      : null;
     nativeDragArmTimerRef.current = setTimeout(() => {
       nativeDragArmTimerRef.current = null;
       nativeDragArmedRef.current = true;
@@ -8109,7 +8122,7 @@ function RunCardDropSurface({
         nativeRunReorderScrollController.refreshBounds();
         onDragStart(runId);
       }
-    }, 180);
+    }, NATIVE_RUN_DRAG_HOLD_MS);
   }, [
     disarmNativeDrag,
     draggable,
@@ -8344,8 +8357,23 @@ function RunCardDropSurface({
     }, 16);
   }, [applyNativeDragPosition, nativeRunReorderScrollController, stopNativeAutoScroll]);
   const nativePanResponder = useMemo(() => {
-    const shouldClaimNativeDrag = (_event: unknown, gesture: PanResponderGestureState): boolean => {
+    const shouldClaimNativeDrag = (
+      event: GestureResponderEvent,
+      gesture: PanResponderGestureState
+    ): boolean => {
       const movedPastThreshold = Math.abs(gesture.dy) > 6 || Math.abs(gesture.dx) > 6;
+      const touchStartTimestamp = nativeDragTouchStartTimestampRef.current;
+      const moveTimestamp = event?.nativeEvent?.timestamp;
+      const heldPastThreshold = touchStartTimestamp !== null
+        && typeof moveTimestamp === "number"
+        && Number.isFinite(moveTimestamp)
+        && (moveTimestamp - touchStartTimestamp) >= NATIVE_RUN_DRAG_HOLD_MS;
+      // The native event stream can cross the hold threshold while the JS
+      // timer callback is delayed. Event timestamps preserve the user's real
+      // press duration, so the first later move can still claim the drag.
+      if (!nativeDragArmedRef.current && heldPastThreshold) {
+        nativeDragArmedRef.current = true;
+      }
       if (!nativeDragArmedRef.current) {
         if (movedPastThreshold) {
           disarmNativeDrag();
