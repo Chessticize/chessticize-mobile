@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "android:dev:device": "bash scripts/android-run-dev-device.sh",
     "ios": "node scripts/ios-release-version.js && react-native run-ios",
     "ios:dev:device": "bash scripts/ios-run-dev-device.sh",
     "lint": "eslint .",
@@ -47,7 +48,9 @@
     "verify:android:release": "node scripts/android-play-release.js",
     "verify:android:github-release": "node scripts/android-github-release-cli.js",
     "generate:android:launcher-icons": "node scripts/android-launcher-icons.js",
+    "generate:android:launcher-icons:dev": "node scripts/android-launcher-icons.js --dev",
     "check:android:launcher-icons": "node scripts/android-launcher-icons.js --check",
+    "check:android:launcher-icons:dev": "node scripts/android-launcher-icons.js --dev --check",
     "version:ios:sync": "node scripts/ios-release-version.js",
     "version:ios:check": "node scripts/ios-release-version.js --check"
   },
