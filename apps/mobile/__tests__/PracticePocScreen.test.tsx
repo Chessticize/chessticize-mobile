@@ -8827,9 +8827,8 @@ describe("PracticePocScreen", () => {
     );
     expect(collectText(recordsScreen)).not.toContain("Recommended");
     expect(collectText(recordsScreen)).not.toContain("recommends a level");
-    expect(collectText(findByTestId(renderer, "personal-best-records-comparison-note"))).toContain(
-      "A best of 42 at 600–699 never outranks or replaces a best of 19 at 900–999."
-    );
+    expect(collectText(recordsScreen)).not.toContain("How records compare");
+    expect(() => findByTestId(renderer, "personal-best-records-comparison-note")).toThrow();
     expect(collectText(recordsScreen).toLowerCase()).not.toContain("in progress");
     expect(collectText(recordsScreen).toLowerCase()).not.toContain("paused");
     expect(collectText(recordsScreen).toLowerCase()).not.toContain("completed runs");

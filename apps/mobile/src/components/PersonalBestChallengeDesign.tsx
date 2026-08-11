@@ -1089,12 +1089,6 @@ export function PersonalBestRecordsScreen({
           </View>
         );
       })}
-      <View style={styles.historyComparisonNote} testID="personal-best-records-comparison-note">
-        <Text style={styles.historyComparisonTitle}>How records compare</Text>
-        <Text style={styles.historyComparisonText}>
-          A best of 42 at 600–699 never outranks or replaces a best of 19 at 900–999. Puzzle and Arrow Duel also keep separate records.
-        </Text>
-      </View>
     </View>
   );
 }
@@ -1956,29 +1950,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800"
   },
-  historyComparisonNote: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 14,
-    padding: 13
-  },
-  historyComparisonText: {
-    color: "#475569",
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 4
-  },
-  historyComparisonTitle: {
-    color: "#1E3A8A",
-    fontSize: 13,
-    fontWeight: "800"
-  },
   historyRecordBestRow: {
     alignItems: "baseline",
     flexDirection: "row",
-    gap: 4,
+    justifyContent: "space-between",
     marginTop: 6
   },
   historyRecordGrid: {

@@ -1207,6 +1207,7 @@ export const PersonalBestRecords: Story = {
     await expectTestIdText(canvasElement, "personal-best-record-puzzle-900", "900–999Best19");
     await expectTestIdText(canvasElement, "personal-best-record-arrow_duel-1000", "1000–1099Best3");
     expectTestIdAbsent(canvasElement, "personal-best-records-in-progress");
+    expectTestIdAbsent(canvasElement, "personal-best-records-comparison-note");
     await waitForTestId(canvasElement, "personal-best-records-puzzle");
     await waitForTestId(canvasElement, "personal-best-records-arrow_duel");
     await waitForText(canvasElement, "Every level stands on its own");
