@@ -411,6 +411,28 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('review-analysis-reset'))).toBeVisible().withTimeout(5000);
     await waitFor(element(by.id('review-analysis-flip'))).toBeVisible().withTimeout(5000);
 
+    const boardBeforeSwipe = await frameFor(element(by.id('review-board')));
+    await element(by.id('review-board')).swipe('up', 'fast', 0.65);
+    await sleep(500);
+    const boardAfterBoardSwipe = await frameFor(element(by.id('review-board')));
+    if (Math.abs(boardAfterBoardSwipe.y - boardBeforeSwipe.y) > 2) {
+      throw new Error(
+        `Expected an Analysis board swipe to keep the Replay page fixed; before=${JSON.stringify(boardBeforeSwipe)} `
+        + `after=${JSON.stringify(boardAfterBoardSwipe)}`
+      );
+    }
+
+    await element(by.id('practice-prompt')).swipe('up', 'fast', 0.75);
+    await sleep(500);
+    const boardAfterPromptSwipe = await frameFor(element(by.id('review-board')));
+    if (boardAfterPromptSwipe.y >= boardAfterBoardSwipe.y - 20) {
+      throw new Error(
+        `Expected a swipe outside the board to scroll Replay; before=${JSON.stringify(boardAfterBoardSwipe)} `
+        + `after=${JSON.stringify(boardAfterPromptSwipe)}`
+      );
+    }
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+
     // Preserve the active native engine across an ordinary interruption and
     // confirm that analysis remains usable when the application returns.
     await device.sendToHome();

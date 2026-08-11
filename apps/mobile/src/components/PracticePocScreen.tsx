@@ -25,6 +25,11 @@ import type { StyleProp, ViewStyle } from "react-native";
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
+  GestureHandlerRootView,
+  LegacyScrollView,
+  type GestureType
+} from "react-native-gesture-handler";
+import {
   buildArrowDuelLandscapeGuideGeometry,
   buildPortraitGuideCalloutTop,
   buildPortraitGuidePointerLeft,
@@ -715,6 +720,18 @@ export function PracticePocScreen({
   const iCloudSyncDiagnosticsClient = platformCapabilities.progressSync.diagnostics;
   const boardRef = useRef<ChessboardRef | null>(null);
   const practiceMainScrollRef = useRef<ScrollView | null>(null);
+  const [practiceScrollHandler, setPracticeScrollHandler] = useState<ScrollView | null>(null);
+  const setPracticeMainScrollRef = useCallback((scrollView: ScrollView | null) => {
+    practiceMainScrollRef.current = scrollView;
+    if (scrollView) {
+      setPracticeScrollHandler((current) => current === scrollView ? current : scrollView);
+    }
+  }, []);
+  const practiceScrollGestureRef = useMemo<React.RefObject<GestureType | undefined>>(() => ({
+    current: practiceScrollHandler
+      ? practiceScrollHandler as unknown as GestureType
+      : undefined
+  }), [practiceScrollHandler]);
   const practiceMainScrollMetricsRef = useRef({
     contentHeight: 0,
     offsetY: 0,
@@ -4453,7 +4470,10 @@ export function PracticePocScreen({
         : `${screenTitle} screen`;
 
   return (
-    <View style={styles.predictiveBackStage}>
+    <GestureHandlerRootView
+      style={styles.predictiveBackStage}
+      testID="practice-gesture-root"
+    >
       {mobileBackPreview ? (
         <View
           accessible={false}
@@ -4533,8 +4553,8 @@ export function PracticePocScreen({
             </View>
           ) : null}
 
-          <ScrollView
-            ref={practiceMainScrollRef}
+          <LegacyScrollView
+            ref={setPracticeMainScrollRef}
             keyboardShouldPersistTaps="handled"
             testID="practice-main-scroll"
             scrollEnabled={!practiceScrollLocked}
@@ -4950,6 +4970,7 @@ export function PracticePocScreen({
                 <ReviewSession
                   key={`history:${historyReviewEntries.map((entry) => entry.attempt?.id ?? entry.puzzle.id).join("|")}:${historyReviewInitialIndex}`}
                   adaptiveLayout={adaptiveLayout}
+                  boardBlocksExternalGesture={practiceScrollGestureRef}
                   boardSize={boardSize}
                   currentTimeMs={currentTimeMs}
                   deferBackRelevantTransition={deferBackRelevantTransition}
@@ -5078,6 +5099,7 @@ export function PracticePocScreen({
             {tab === "review" ? (
               <ReviewPanel
                 adaptiveLayout={adaptiveLayout}
+                boardBlocksExternalGesture={practiceScrollGestureRef}
                 boardSize={boardSize}
                 dueReviewItems={dueReviewItems}
                 explicitReplySideCopy={explicitReplySideCopy}
@@ -5181,7 +5203,7 @@ export function PracticePocScreen({
             {tab === "analysis" && arePracticeTestControlsEnabled() ? (
               <StockfishDiagnosticsPanel stockfish={stockfish} />
             ) : null}
-          </ScrollView>
+          </LegacyScrollView>
           {bottomTabsVisible ? (
             <View style={styles.bottomTabs}>
               {PRIMARY_TABS.map((item) => (
@@ -5228,7 +5250,7 @@ export function PracticePocScreen({
         ) : null}
       </View>
       </View>
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -13225,6 +13247,7 @@ function buildServiceReviewEntry(
 
 function ReviewPanel({
   adaptiveLayout,
+  boardBlocksExternalGesture,
   boardSize,
   currentTimeMs,
   deferBackRelevantTransition,
@@ -13252,6 +13275,7 @@ function ReviewPanel({
   systemBackCommand
 }: {
   adaptiveLayout: AdaptiveLayout;
+  boardBlocksExternalGesture: React.RefObject<GestureType | undefined>;
   boardSize: number;
   currentTimeMs: () => number;
   deferBackRelevantTransition: DeferBackRelevantTransition;
@@ -13423,6 +13447,7 @@ function ReviewPanel({
       <ReviewSession
         key={`${activeReviewGeneration}:${activeEntryInitialIndex}:${activeEntries.map((entry) => `${entry.source}:${entry.puzzle.id}:${entry.mode}:${entry.ratingKey}`).join("|")}`}
         adaptiveLayout={adaptiveLayout}
+        boardBlocksExternalGesture={boardBlocksExternalGesture}
         boardSize={boardSize}
         currentTimeMs={currentTimeMs}
         deferBackRelevantTransition={deferBackRelevantTransition}
@@ -13885,6 +13910,7 @@ function reviewCountLabel(count: number): string {
 
 function ReviewSession({
   adaptiveLayout,
+  boardBlocksExternalGesture,
   boardSize,
   currentTimeMs,
   deferBackRelevantTransition,
@@ -13910,6 +13936,7 @@ function ReviewSession({
   systemBackCommand,
 }: {
   adaptiveLayout: AdaptiveLayout;
+  boardBlocksExternalGesture: React.RefObject<GestureType | undefined>;
   boardSize: number;
   currentTimeMs: () => number;
   deferBackRelevantTransition: DeferBackRelevantTransition;
@@ -15229,6 +15256,7 @@ function ReviewSession({
             <Chessboard
               key={`${currentEntry.puzzle.id}-${entryIndex}`}
               ref={boardRef}
+              blocksExternalGesture={boardBlocksExternalGesture}
               fen={displayFen}
               onMove={(result) => {
                 void onReviewBoardMove(result);

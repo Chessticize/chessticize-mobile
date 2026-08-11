@@ -135,6 +135,29 @@ describe("react-native-chessboard gesture patch", () => {
     expect(patch).not.toContain("+    return _reactNativeGestureHandler.Gesture.Simultaneous(tapGesture, panGesture)");
   });
 
+  it("blocks an external scroll from both raw board gestures before composing them", () => {
+    const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
+    const sources = [
+      resolve(packageRoot, "src/hooks/use-board-gesture.ts"),
+      resolve(packageRoot, "lib/module/hooks/use-board-gesture.js"),
+      resolve(packageRoot, "lib/commonjs/hooks/use-board-gesture.js")
+    ];
+
+    for (const sourcePath of sources) {
+      expectGestureSourceBlocksExternalScroll(readFileSync(sourcePath, "utf8"), sourcePath);
+    }
+  });
+
+  it("keeps the raw-gesture external-scroll block in the durable package patch", () => {
+    const patch = readFileSync(
+      resolve(__dirname, "../../../patches/react-native-chessboard@0.2.0.patch"),
+      "utf8"
+    );
+
+    expect(patch).toContain("tapGesture.blocksExternalGesture(blocksExternalGesture)");
+    expect(patch).toContain("panGesture.blocksExternalGesture(blocksExternalGesture)");
+  });
+
   it("dispatches drops even when a board reset wiped zIndex mid-drag", () => {
     const packageRoot = dirname(require.resolve("react-native-chessboard/package.json"));
     const sources = [
@@ -292,6 +315,21 @@ function expectAtlasSourcePadsParallelArrays(source, sourcePath) {
   expect(transformPushIndex).toBeGreaterThan(spritePushIndex);
   expect(returnIndex).toBeGreaterThan(transformPushIndex);
   expect(sourcePath).toContain("skia-pieces-atlas");
+}
+
+function expectGestureSourceBlocksExternalScroll(source, sourcePath) {
+  const tapBlockIndex = source.indexOf(
+    "tapGesture.blocksExternalGesture(blocksExternalGesture)"
+  );
+  const panBlockIndex = source.indexOf(
+    "panGesture.blocksExternalGesture(blocksExternalGesture)"
+  );
+  const raceIndex = source.indexOf("Gesture.Race(tapGesture, panGesture)");
+
+  expect(tapBlockIndex).toBeGreaterThanOrEqual(0);
+  expect(panBlockIndex).toBeGreaterThan(tapBlockIndex);
+  expect(raceIndex).toBeGreaterThan(panBlockIndex);
+  expect(sourcePath).toContain("use-board-gesture");
 }
 
 function expectGestureSourceRejectsOpponentPiecesBeforeRaise(source, sourcePath) {

@@ -1,3 +1,28 @@
+jest.mock('react-native-gesture-handler', () => {
+  const React = require('react');
+  const ReactNative = require('react-native');
+
+  const GestureScrollView = React.forwardRef(function GestureScrollViewMock(props, ref) {
+    const { children, ...scrollProps } = props;
+    const scrollViewRef = React.useRef(null);
+
+    React.useImperativeHandle(ref, () => {
+      const scrollView = scrollViewRef.current ?? {};
+      scrollView.handlerTag = 1;
+      return scrollView;
+    }, []);
+
+    return React.createElement(ReactNative.ScrollView, { ...scrollProps, ref: scrollViewRef }, children);
+  });
+
+  return {
+    GestureHandlerRootView(props) {
+      return React.createElement('GestureHandlerRootView', props, props.children);
+    },
+    LegacyScrollView: GestureScrollView
+  };
+});
+
 jest.mock('react-native-chessboard', () => {
   const React = require('react');
   const { Chess } = require('chess.js');
