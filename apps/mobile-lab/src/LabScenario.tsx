@@ -727,7 +727,8 @@ function personalBestChallengePreviewFor(
   if (scenarioId === "practice-personal-best-hub") {
     return {
       ...common,
-      hubInitiallyVisible: true
+      hubInitiallyVisible: true,
+      moreLevelsInitiallyVisible: true
     };
   }
   if (scenarioId === "practice-personal-best-source-run") {

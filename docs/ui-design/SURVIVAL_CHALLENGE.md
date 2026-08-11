@@ -159,9 +159,9 @@ appearing or disappearing abruptly:
   an ease-out curve. Collapsed content remains mounted for a smooth transition
   but is hidden from accessibility and pointer input.
 - The `More levels` control keeps spacing above its focus outline so browser and
-  keyboard focus never touches the selected level card. Storybook interactions
-  remove their synthetic click focus after verification; real keyboard focus
-  remains available.
+  keyboard focus never touches the selected level card. The deterministic Hub
+  preview opens the full inventory without a synthetic click, so it never leaves
+  a review-only focus ring; real keyboard focus remains available.
 
 At most one Run may be in progress for each
 `challenge type + level + rule version` combination. Different combinations

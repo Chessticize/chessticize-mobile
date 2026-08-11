@@ -7914,18 +7914,23 @@ describe("PracticePocScreen", () => {
     });
 
     expect(findByTestId(hubRenderer, "personal-best-more-levels").props.accessibilityState).toEqual({
+      expanded: true
+    });
+
+    const collapsedLevelsRenderer = renderLabScenario("practice-personal-best-starting-level");
+    expect(findByTestId(collapsedLevelsRenderer, "personal-best-more-levels").props.accessibilityState).toEqual({
       expanded: false
     });
-    expect(findByTestId(hubRenderer, "personal-best-more-level-options-motion").props).toMatchObject({
+    expect(findByTestId(collapsedLevelsRenderer, "personal-best-more-level-options-motion").props).toMatchObject({
       "aria-hidden": true,
       accessibilityElementsHidden: true,
       pointerEvents: "none"
     });
-    press(hubRenderer, "personal-best-more-levels");
-    expect(findByTestId(hubRenderer, "personal-best-more-levels").props.accessibilityState).toEqual({
+    press(collapsedLevelsRenderer, "personal-best-more-levels");
+    expect(findByTestId(collapsedLevelsRenderer, "personal-best-more-levels").props.accessibilityState).toEqual({
       expanded: true
     });
-    expect(findByTestId(hubRenderer, "personal-best-more-level-options-motion").props).toMatchObject({
+    expect(findByTestId(collapsedLevelsRenderer, "personal-best-more-level-options-motion").props).toMatchObject({
       "aria-hidden": false,
       accessibilityElementsHidden: false,
       pointerEvents: "auto"
@@ -7943,7 +7948,7 @@ describe("PracticePocScreen", () => {
     });
     expect(findByTestId(hubRenderer, "personal-best-in-progress-chevron")).toBeTruthy();
     expect(findByTestId(recordsRenderer, "personal-best-records-in-progress-chevron")).toBeTruthy();
-    expect(findByTestId(hubRenderer, "personal-best-more-levels-chevron")).toBeTruthy();
+    expect(findByTestId(collapsedLevelsRenderer, "personal-best-more-levels-chevron")).toBeTruthy();
   });
 
   it("hides the Survival puzzle while paused and offers only Resume or Leave paused", () => {
