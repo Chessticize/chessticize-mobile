@@ -1074,7 +1074,7 @@ describe('Detox suite configuration', () => {
     );
   });
 
-  it('drives Android Run reordering through a black-box system touch stream', () => {
+  it('drives native Run reordering through black-box system touch streams', () => {
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const helperStart = helpers.indexOf('async function dragAndroidElementToElement');
@@ -1110,7 +1110,11 @@ describe('Detox suite configuration', () => {
     expect(runManagementCase).not.toContain(
       "element(by.id('practice-run-standard')).swipe('up', 'slow'"
     );
-    expect(runManagementCase).toContain('.longPressAndDrag(\n        750,');
+    expect(runManagementCase).toContain('.longPressAndDrag(\n        2000,');
+    expect(runManagementCase).toContain(
+      "0.03,\n        0.4,\n        element(by.id('practice-run-arrow-duel')),\n        0.03,\n        0.65"
+    );
+    expect(runManagementCase).not.toContain('practice-run-move-down-standard');
   });
 
   it('expands the collapsed theme picker before selecting the default Run theme', () => {
