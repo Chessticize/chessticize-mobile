@@ -248,6 +248,17 @@ candidate whose selected scope includes simulator E2E, run the same scope for
 both configurations. For `full`, run `flows` and `practice` for both
 configurations; reuse each configuration's build.
 
+## Release Host Resources After Validation
+
+When simulator or emulator work completes, fails, or is interrupted, shut down
+every test device started by the task so it does not continue consuming host
+memory. Use the exact iOS simulator UDID or Android emulator serial captured by
+the run. Never use a blanket `simctl shutdown all`, and never stop a device that
+belongs to manual testing or another active task. Verify the booted iOS and
+attached Android device lists after cleanup. Leave a task-owned device running
+only when the repository owner explicitly requests it, and record that
+exception in the evidence handoff.
+
 The build must create:
 
 ```text
