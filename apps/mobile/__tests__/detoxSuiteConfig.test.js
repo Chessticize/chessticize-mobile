@@ -1097,6 +1097,9 @@ describe('Detox suite configuration', () => {
       "dragAndroidElementToElement('practice-run-standard', 'practice-run-arrow-duel')"
     );
     expect(runManagementCase).toContain(
+      "waitForVisibleInPracticeScroll('practice-run-standard')"
+    );
+    expect(runManagementCase).toContain(
       "element(by.id('practice-run-standard')).swipe('up', 'fast', 0.1, 0.5, 0.5)"
     );
     expect(runManagementCase).not.toContain(
@@ -1248,6 +1251,31 @@ describe('Detox suite configuration', () => {
     expect(normalizeOuterScroll).toBeGreaterThan(0);
     expect(scrollControlRail).toBeGreaterThan(normalizeOuterScroll);
     expect(requireUnclearVisible).toBeGreaterThan(scrollControlRail);
+  });
+
+  it('uses a bounded public swipe for compact History review actions', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const caseStart = practiceSpec.indexOf(
+      "it('persists Unclear, places its History actions responsively"
+    );
+    const caseEnd = practiceSpec.indexOf(
+      "it('opens last sprint mistake review",
+      caseStart
+    );
+    const responsiveHistoryCase = practiceSpec.slice(caseStart, caseEnd);
+    const compactBranch = responsiveHistoryCase.indexOf("'compactPortrait'");
+    const boundedSwipe = responsiveHistoryCase.indexOf(
+      "element(by.id('practice-main-scroll')).swipe('up', 'fast', 0.75, 0.5, 0.9)",
+      compactBranch
+    );
+    const requireUnclearVisible = responsiveHistoryCase.indexOf(
+      "expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible()",
+      boundedSwipe
+    );
+
+    expect(compactBranch).toBeGreaterThan(0);
+    expect(boundedSwipe).toBeGreaterThan(compactBranch);
+    expect(requireUnclearVisible).toBeGreaterThan(boundedSwipe);
   });
 
   it('checks the visible Sprint result boundary after first-use guidance', () => {
