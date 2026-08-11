@@ -47,7 +47,7 @@ export const PopulatedHistory: Story = {
 };
 
 export const PersonalBestRecords: Story = {
-  name: "Personal Best records",
+  name: "Survival records",
   args: { scenarioId: "history-personal-best" },
   play: async ({ canvasElement }) => {
     await openHistory(canvasElement);

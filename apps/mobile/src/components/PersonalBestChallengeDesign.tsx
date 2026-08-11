@@ -26,9 +26,15 @@ export type PersonalBestReferenceRunPresentation = {
   durationLabel: string;
   games: number;
   id: string;
+  isOnHome?: boolean;
   name: string;
   perPuzzleLabel: string;
   rating: number;
+};
+
+export type PersonalBestAvailableLevelPresentation = {
+  maxRating: number;
+  minRating: number;
 };
 
 export type PersonalBestPausedRunPresentation = {
@@ -55,13 +61,16 @@ export type PersonalBestLevelRecordPresentation = {
 };
 
 export type PersonalBestChallengeDesignPreview = {
+  availableLevels?: readonly PersonalBestAvailableLevelPresentation[];
   band: PersonalBestRatingBandPresentation;
   bestScore: number | null;
   challengeType?: PersonalBestChallengeType;
   completedRunCount: number;
+  exitConfirmationInitiallyVisible?: boolean;
   guideInitiallyVisible?: boolean;
   hubInitiallyVisible?: boolean;
   levelRecords?: readonly PersonalBestLevelRecordPresentation[];
+  moreLevelsInitiallyVisible?: boolean;
   pausedRuns?: readonly PersonalBestPausedRunPresentation[];
   referenceRuns?: readonly PersonalBestReferenceRunPresentation[];
   selectedReferenceRunIds?: Partial<Record<PersonalBestChallengeType, string>>;
@@ -94,18 +103,20 @@ export function PersonalBestHomeCard({
   const morePausedCount = Math.max(0, pausedRuns.length - 1);
   if (latestPaused) {
     const typeLabel = challengeTypeLabel(latestPaused.challengeType);
+    const reachedNewBest = presentation.bestScore === null
+      || latestPaused.score > presentation.bestScore;
     return (
       <View
-        accessibilityLabel={`Personal Best paused. ${typeLabel}. Level ${latestPaused.minRating} to ${latestPaused.maxRating}. ${latestPaused.score} solved. ${latestPaused.mistakeCount} of 3 mistakes. ${morePausedCount} more paused challenges.`}
+        accessibilityLabel={`Survival paused. ${typeLabel}. Level ${latestPaused.minRating} to ${latestPaused.maxRating}. ${latestPaused.score} solved. ${latestPaused.mistakeCount} of 3 mistakes. ${morePausedCount} more paused Runs.`}
         style={styles.homeCard}
         testID="personal-best-home-card"
       >
         <View style={styles.homeCardHeader}>
           <View style={styles.medal}>
-            <Text style={styles.medalText}>PB</Text>
+            <Text style={styles.medalText}>S</Text>
           </View>
           <View style={styles.homeTitleBlock}>
-            <Text style={styles.eyebrow}>PERSONAL BEST PAUSED</Text>
+            <Text style={styles.eyebrow}>SURVIVAL PAUSED</Text>
             <Text style={styles.homeTitle}>{typeLabel} · {levelLabel(latestPaused)}</Text>
           </View>
           <UnratedPill />
@@ -118,6 +129,9 @@ export function PersonalBestHomeCard({
             <Text style={styles.homeScoreLabel}>solved</Text>
           </View>
           <View style={styles.pausedHomeMeta}>
+            {reachedNewBest ? (
+              <Text style={styles.pausedHomeBest}>New best saved</Text>
+            ) : null}
             <Text style={styles.pausedHomeMetaStrong}>{latestPaused.mistakeCount} of 3 mistakes</Text>
             <Text style={styles.pausedHomeMetaText}>
               {formatElapsed(latestPaused.activeElapsedMs)} active · {latestPaused.sittings} sittings
@@ -129,7 +143,7 @@ export function PersonalBestHomeCard({
           {morePausedCount > 0 ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Open ${morePausedCount} more paused challenges`}
+              accessibilityLabel={`Open ${morePausedCount} more paused Survival Runs`}
               style={styles.secondaryAction}
               testID="personal-best-more-paused"
               onPress={onOpenHub}
@@ -139,7 +153,7 @@ export function PersonalBestHomeCard({
           ) : (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Choose another Personal Best challenge"
+              accessibilityLabel="Choose another Survival Run"
               style={styles.secondaryAction}
               testID="personal-best-choose-another"
               onPress={onOpenHub}
@@ -149,7 +163,7 @@ export function PersonalBestHomeCard({
           )}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Continue ${typeLabel} Personal Best`}
+            accessibilityLabel={`Continue ${typeLabel} Survival`}
             style={styles.primaryAction}
             testID="personal-best-continue"
             onPress={() => onContinue(latestPaused.id)}
@@ -165,17 +179,17 @@ export function PersonalBestHomeCard({
     : `Best ${presentation.bestScore} at ${levelLabel(presentation.band)}`;
   return (
     <View
-      accessibilityLabel={`Personal Best challenge. ${bestLabel}. Choose Puzzle or Arrow Duel and a fixed level. No time limit. The Run ends after three mistakes. Rating unchanged.`}
+      accessibilityLabel={`Survival. ${bestLabel}. Choose Puzzle or Arrow Duel and a fixed level. No time limit. The Run ends after three mistakes. Rating unchanged.`}
       style={styles.homeCard}
       testID="personal-best-home-card"
     >
       <View style={styles.homeCardHeader}>
         <View style={styles.medal}>
-          <Text style={styles.medalText}>PB</Text>
+          <Text style={styles.medalText}>S</Text>
         </View>
         <View style={styles.homeTitleBlock}>
-          <Text style={styles.eyebrow}>FIXED-LEVEL CHALLENGE</Text>
-          <Text style={styles.homeTitle}>Personal Best</Text>
+          <Text style={styles.eyebrow}>THREE-MISTAKE CHALLENGE</Text>
+          <Text style={styles.homeTitle}>Survival</Text>
         </View>
         <UnratedPill />
       </View>
@@ -211,7 +225,7 @@ export function PersonalBestHomeCard({
       <View style={styles.actionRow}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="How Personal Best works"
+          accessibilityLabel="How Survival works"
           style={styles.secondaryAction}
           testID="personal-best-how-it-works"
           onPress={onHowItWorks}
@@ -220,7 +234,7 @@ export function PersonalBestHomeCard({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Start Personal Best challenge"
+          accessibilityLabel="Choose a Survival Run"
           style={styles.primaryAction}
           testID="personal-best-start"
           onPress={onOpenHub}
@@ -264,7 +278,7 @@ export function PersonalBestGuide({
     {
       marker: "Ⅱ",
       title: "Pause now, continue later",
-      detail: "Leaving pauses this exact puzzle and stops active time. Continue after restarting the app or playing another mode; the Run remains eligible for a personal best."
+      detail: "Every new high is saved immediately. Leaving pauses this exact puzzle and stops active time; continue after restarting the app or playing another mode."
     }
   ];
   return (
@@ -272,24 +286,24 @@ export function PersonalBestGuide({
       <View style={styles.guideTopBar}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Close Personal Best guide"
+          accessibilityLabel="Close Survival guide"
           style={styles.closeButton}
           testID="personal-best-guide-close"
           onPress={onClose}
         >
           <Text style={styles.closeButtonText}>×</Text>
         </Pressable>
-        <Text style={styles.guideTopBarTitle}>Personal Best</Text>
+        <Text style={styles.guideTopBarTitle}>Survival</Text>
         <View style={styles.closeButton} />
       </View>
 
       <View style={styles.guideHero}>
         <View style={styles.guideMedal}>
-          <Text style={styles.guideMedalText}>PB</Text>
+          <Text style={styles.guideMedalText}>S</Text>
         </View>
-        <Text style={styles.guideTitle}>Set a personal best</Text>
+        <Text style={styles.guideTitle}>How far can you go?</Text>
         <Text style={styles.guideIntro}>
-          Solve as many {typeLabel} puzzles as you can at one fixed level. Your Rating stays unchanged.
+          Solve as many as you can at one fixed level. Your Rating stays unchanged.
         </Text>
         <View style={styles.guideBandRow}>
           <Text style={styles.guideBandPrimary}>{typeLabel} · {levelLabel(presentation.band)}</Text>
@@ -321,12 +335,12 @@ export function PersonalBestGuide({
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Start Personal Best"
+        accessibilityLabel="Start Survival"
         style={styles.guideStartAction}
         testID="personal-best-guide-start"
         onPress={onStart}
       >
-        <Text style={styles.primaryActionText}>Start Personal Best</Text>
+        <Text style={styles.primaryActionText}>Start Survival</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"
@@ -369,45 +383,69 @@ export function PersonalBestChallengeHub({
     initialType,
     presentation.selectedReferenceRunIds?.[initialType]
   );
-  const initialBand = initialSource
+  const availableLevels = presentation.availableLevels?.length
+    ? [...presentation.availableLevels].sort((left, right) => left.minRating - right.minRating)
+    : defaultSurvivalLevels();
+  const requestedInitialBand = initialSource
     ? canonicalBandFor(initialSource.rating)
     : { minRating: presentation.band.minRating, maxRating: presentation.band.maxRating };
+  const initialBand = closestAvailableBand(availableLevels, requestedInitialBand);
   const [selectedBand, setSelectedBand] = React.useState(initialBand);
-  const [moreLevelsVisible, setMoreLevelsVisible] = React.useState(false);
-  const source = referenceRunFor(presentation, challengeType, selectedSourceIds[challengeType]);
-  const recommendedBand = source ? canonicalBandFor(source.rating) : selectedBand;
-  const selectedBest = presentation.levelRecords?.find((record) => (
-    record.challengeType === challengeType
-    && record.minRating === selectedBand.minRating
-    && record.maxRating === selectedBand.maxRating
-  ))?.score ?? (
-    challengeType === initialType
-    && selectedBand.minRating === presentation.band.minRating
-    && selectedBand.maxRating === presentation.band.maxRating
-      ? presentation.bestScore
-      : null
+  const [moreLevelsVisible, setMoreLevelsVisible] = React.useState(
+    presentation.moreLevelsInitiallyVisible === true
   );
+  const source = referenceRunFor(presentation, challengeType, selectedSourceIds[challengeType]);
+  const requestedRecommendedBand = source ? canonicalBandFor(source.rating) : selectedBand;
+  const recommendedBand = closestAvailableBand(availableLevels, requestedRecommendedBand);
+  const recommendedIndex = availableLevels.findIndex((level) => (
+    level.minRating === recommendedBand.minRating
+  ));
+  const sourceAboveAvailableLevels = requestedRecommendedBand.minRating > recommendedBand.minRating;
+  const compatibleReferenceRuns = (presentation.referenceRuns ?? []).filter((referenceRun) => (
+    referenceRun.challengeType === challengeType
+    && (referenceRun.isOnHome !== false || referenceRun.id === source?.id)
+  ));
+  const hasAlternativeSource = compatibleReferenceRuns.some((referenceRun) => referenceRun.id !== source?.id);
   const inProgress = pausedRuns.filter((run) => run.challengeType === challengeType);
-  const adjacentLevels = [
-    { label: "Easier", minRating: Math.max(0, recommendedBand.minRating - 100) },
-    { label: "Your level", minRating: recommendedBand.minRating },
-    { label: "Harder", minRating: recommendedBand.minRating + 100 }
-  ].map((level) => ({ ...level, maxRating: level.minRating + 99 }));
-  const otherLevels = [600, 700, 800, 900, 1000, 1100, 1200]
-    .filter((minRating) => !adjacentLevels.some((level) => level.minRating === minRating));
+  const selectedBest = survivalBestScoreForLevel({
+    band: selectedBand,
+    challengeType,
+    fallbackBest: challengeType === initialType
+      && selectedBand.minRating === presentation.band.minRating
+      && selectedBand.maxRating === presentation.band.maxRating
+        ? presentation.bestScore
+        : null,
+    pausedRuns,
+    records: presentation.levelRecords ?? []
+  });
+  const adjacentLevels = availableLevels
+    .map((level, index) => ({
+      ...level,
+      index,
+      label: index < recommendedIndex
+        ? "Easier"
+        : index > recommendedIndex
+          ? "Harder"
+          : sourceAboveAvailableLevels
+            ? "Highest available"
+            : "Your level"
+    }))
+    .filter((level) => Math.abs(level.index - recommendedIndex) <= 1);
+  const otherLevels = availableLevels
+    .filter((level) => !adjacentLevels.some((adjacent) => adjacent.minRating === level.minRating));
 
   function chooseChallengeType(nextType: PersonalBestChallengeType): void {
     setChallengeType(nextType);
     const nextSource = referenceRunFor(presentation, nextType, selectedSourceIds[nextType]);
     if (nextSource) {
-      setSelectedBand(canonicalBandFor(nextSource.rating));
+      setSelectedBand(closestAvailableBand(availableLevels, canonicalBandFor(nextSource.rating)));
     }
     setMoreLevelsVisible(false);
   }
 
   function chooseSource(nextSource: PersonalBestReferenceRunPresentation): void {
     setSelectedSourceIds((current) => ({ ...current, [challengeType]: nextSource.id }));
-    setSelectedBand(canonicalBandFor(nextSource.rating));
+    setSelectedBand(closestAvailableBand(availableLevels, canonicalBandFor(nextSource.rating)));
     setSourcePickerVisible(false);
   }
 
@@ -419,17 +457,17 @@ export function PersonalBestChallengeHub({
       <View style={styles.guideTopBar}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Close Personal Best challenges"
+          accessibilityLabel="Close Survival"
           style={styles.closeButton}
           testID="personal-best-hub-close"
           onPress={onClose}
         >
           <Text style={styles.closeButtonText}>×</Text>
         </Pressable>
-        <Text style={styles.hubTopBarTitle}>Personal Best</Text>
+        <Text style={styles.hubTopBarTitle}>Survival</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="How Personal Best works"
+          accessibilityLabel="How Survival works"
           style={styles.hubHelpButton}
           testID="personal-best-hub-help"
           onPress={onStart}
@@ -439,9 +477,9 @@ export function PersonalBestChallengeHub({
       </View>
 
       <View style={styles.hubIntro}>
-        <Text style={styles.hubTitle}>Choose your challenge</Text>
+        <Text style={styles.hubTitle}>Choose your Survival Run</Text>
         <Text style={styles.hubIntroText}>
-          Stay at one level, stop after three mistakes, and build a separate best for every level.
+          Stay at one level. Solve as many as you can before your third mistake.
         </Text>
       </View>
 
@@ -522,7 +560,11 @@ export function PersonalBestChallengeHub({
         <>
           <View style={styles.hubSection}>
             <Text style={styles.hubSectionTitle}>
-              {source?.games === 0 ? "Starting level" : "Recommended level"}
+              {sourceAboveAvailableLevels
+                ? "Highest available level"
+                : source?.games === 0
+                  ? "Starting level"
+                  : "Recommended level"}
             </Text>
             <View style={styles.sourceCard} testID="personal-best-reference-source">
               <View style={styles.sourceCardCopy}>
@@ -538,18 +580,24 @@ export function PersonalBestChallengeHub({
                   <Text style={styles.sourceTiming}>{source.durationLabel} · {source.perPuzzleLabel}</Text>
                 ) : null}
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Use another ${challengeTypeLabel(challengeType)} Run`}
-                style={styles.sourceChangeButton}
-                testID="personal-best-use-another-run"
-                onPress={() => setSourcePickerVisible(true)}
-              >
-                <Text style={styles.sourceChangeText}>Use another Run</Text>
-              </Pressable>
+              {hasAlternativeSource ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Use another ${challengeTypeLabel(challengeType)} Run`}
+                  style={styles.sourceChangeButton}
+                  testID="personal-best-use-another-run"
+                  onPress={() => setSourcePickerVisible(true)}
+                >
+                  <Text style={styles.sourceChangeText}>Use another Run</Text>
+                </Pressable>
+              ) : null}
             </View>
             <Text style={styles.sourceHelper}>
-              This only changes the suggested level. Your challenge has no time limit and will not change this Run’s Rating.
+              {sourceAboveAvailableLevels
+                ? "This is the highest level in your installed Core Pack. Survival has no time limit and will not change this Run’s Rating."
+                : source?.isOnHome === false
+                  ? `${source.name} remains your Rating source even when hidden from Home. Survival has no time limit and will not change its Rating.`
+                  : "This only changes the suggested level. Survival has no time limit and will not change this Run’s Rating."}
             </Text>
           </View>
 
@@ -558,9 +606,17 @@ export function PersonalBestChallengeHub({
             <View style={styles.levelGrid} testID="personal-best-level-options">
               {adjacentLevels.map((level) => {
                 const selected = selectedBand.minRating === level.minRating;
-                const record = presentation.levelRecords?.find((item) => (
-                  item.challengeType === challengeType && item.minRating === level.minRating
-                ));
+                const best = survivalBestScoreForLevel({
+                  band: level,
+                  challengeType,
+                  fallbackBest: challengeType === initialType
+                    && level.minRating === presentation.band.minRating
+                    && level.maxRating === presentation.band.maxRating
+                      ? presentation.bestScore
+                      : null,
+                  pausedRuns,
+                  records: presentation.levelRecords ?? []
+                });
                 return (
                   <Pressable
                     key={level.label}
@@ -582,7 +638,7 @@ export function PersonalBestChallengeHub({
                       {levelLabel(level)}
                     </Text>
                     <Text style={styles.levelCardBest}>
-                      {record ? `Best ${record.score}` : "No best yet"}
+                      {best === null ? "No best yet" : `Best ${best}`}
                     </Text>
                   </Pressable>
                 );
@@ -600,20 +656,23 @@ export function PersonalBestChallengeHub({
             </Pressable>
             {moreLevelsVisible ? (
               <View style={styles.moreLevelGrid} testID="personal-best-more-level-options">
-                {otherLevels.map((minRating) => (
+                {otherLevels.map((level) => (
                   <Pressable
-                    key={minRating}
+                    key={level.minRating}
                     accessibilityRole="button"
-                    accessibilityState={{ selected: selectedBand.minRating === minRating }}
+                    accessibilityState={{ selected: selectedBand.minRating === level.minRating }}
                     style={[
                       styles.moreLevelChip,
-                      selectedBand.minRating === minRating ? styles.moreLevelChipSelected : null
+                      selectedBand.minRating === level.minRating ? styles.moreLevelChipSelected : null
                     ]}
-                    onPress={() => setSelectedBand({ minRating, maxRating: minRating + 99 })}
+                    onPress={() => setSelectedBand(level)}
                   >
-                    <Text style={styles.moreLevelChipText}>{minRating}–{minRating + 99}</Text>
+                    <Text style={styles.moreLevelChipText}>{levelLabel(level)}</Text>
                   </Pressable>
                 ))}
+                <Text style={styles.moreLevelsAvailability} testID="personal-best-level-availability">
+                  Showing every Survival level in this Core Pack: {availableLevels[0]?.minRating}–{availableLevels[availableLevels.length - 1]?.maxRating}.
+                </Text>
               </View>
             ) : null}
           </View>
@@ -629,12 +688,12 @@ export function PersonalBestChallengeHub({
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Start ${challengeTypeLabel(challengeType)} challenge at ${levelLabel(selectedBand)}`}
+            accessibilityLabel={`Start ${challengeTypeLabel(challengeType)} Survival at ${levelLabel(selectedBand)}`}
             style={styles.hubStartButton}
             testID="personal-best-hub-start"
             onPress={onStart}
           >
-            <Text style={styles.primaryActionText}>Start {challengeTypeLabel(challengeType)}</Text>
+            <Text style={styles.primaryActionText}>Start Survival</Text>
           </Pressable>
         </>
       )}
@@ -657,6 +716,7 @@ function PersonalBestSourcePicker({
 }): React.JSX.Element {
   const sources = (presentation.referenceRuns ?? []).filter((source) => (
     source.challengeType === challengeType
+    && (source.isOnHome !== false || source.id === selectedSourceId)
   ));
   return (
     <View style={styles.sourcePicker} testID="personal-best-source-picker">
@@ -701,7 +761,7 @@ function PersonalBestSourcePicker({
         );
       })}
       <Text style={styles.sourcePickerFootnote}>
-        Focused, themed, and candidate-only Runs are excluded. Your choice is remembered for future {challengeTypeLabel(challengeType)} challenges; paused Runs never change level.
+        Focused, themed, and candidate-only Runs are excluded. Your choice is remembered for future {challengeTypeLabel(challengeType)} Survival Runs; paused Runs never change level.
       </Text>
     </View>
   );
@@ -726,8 +786,8 @@ export function PersonalBestProgressBanner({
   return (
     <View
       accessibilityLabel={isNewBest
-        ? `New personal best, ${score} solved`
-        : `${score} solved, ${remaining} more to beat personal best ${bestScore}`}
+        ? `New best, ${score} solved`
+        : `${score} solved, ${remaining} more to beat best ${bestScore}`}
       style={[styles.progressBanner, compact ? styles.progressBannerCompact : null]}
       testID="personal-best-progress"
     >
@@ -899,7 +959,7 @@ export function PersonalBestResult({
       ) : null}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Play the same Personal Best challenge again"
+        accessibilityLabel="Play the same Survival Run again"
         style={styles.resultSecondaryAction}
         testID="personal-best-result-try-again"
         onPress={onTryAgain}
@@ -908,7 +968,7 @@ export function PersonalBestResult({
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Change Personal Best challenge"
+        accessibilityLabel="Change Survival Run"
         style={styles.resultSecondaryAction}
         testID="personal-best-result-change-challenge"
         onPress={onChangeChallenge}
@@ -926,19 +986,20 @@ export function PersonalBestHistoryCard({
 }): React.JSX.Element {
   const records = presentation.levelRecords ?? [];
   const pausedRuns = presentation.pausedRuns ?? [];
-  const recordSummary = records.map((record) => (
-    `${challengeTypeLabel(record.challengeType)} ${levelLabel(record)} best ${record.score}`
-  )).join(", ");
+  const recordSummary = records.map((record) => {
+    const best = survivalBestForLevel(record, pausedRuns);
+    return `${challengeTypeLabel(record.challengeType)} ${levelLabel(record)} best ${best.score}${best.inProgress ? ", in progress" : ""}`;
+  }).join(", ");
   return (
     <View
-      accessibilityLabel={`Personal Bests by level. ${pausedRuns.length} challenges in progress. ${recordSummary}. Puzzle and Arrow Duel records are separate. Runs ended early stay in History but do not set a best.`}
+      accessibilityLabel={`Survival bests by level. ${pausedRuns.length} Runs in progress. ${recordSummary}. Puzzle and Arrow Duel records are separate. Pausing or ending a Run keeps any best already reached.`}
       style={styles.historyCard}
       testID="personal-best-history-card"
     >
       <View style={styles.historyHeader}>
         <View>
-          <Text style={styles.historyEyebrow}>CHALLENGE RECORDS</Text>
-          <Text style={styles.historyTitle}>Personal Bests by level</Text>
+          <Text style={styles.historyEyebrow}>SURVIVAL RECORDS</Text>
+          <Text style={styles.historyTitle}>Survival bests by level</Text>
         </View>
         <UnratedPill />
       </View>
@@ -957,7 +1018,7 @@ export function PersonalBestHistoryCard({
               <Text style={styles.historyPausedStatus}>Paused</Text>
             </View>
           ))}
-          <Text style={styles.historyEligibilityNote}>Paused Runs remain eligible, but do not become records until completed.</Text>
+          <Text style={styles.historyEligibilityNote}>A new high is saved immediately while its Run stays in progress.</Text>
         </View>
       ) : null}
       {(["puzzle", "arrow_duel"] as const).map((type) => {
@@ -973,29 +1034,34 @@ export function PersonalBestHistoryCard({
                 {type === "puzzle" ? "Standard recommends a level" : "Arrow Duel recommends a level"}
               </Text>
             </View>
-            {typeRecords.map((record) => (
-              <View
-                key={`${type}-${record.minRating}`}
-                style={[styles.historyRecordRow, record.isRecommended ? styles.historyRecordRowRecommended : null]}
-                testID={`personal-best-record-${type}-${record.minRating}`}
-              >
-                <View>
-                  <Text style={styles.historyRecordTitle}>
-                    {levelLabel(record)}{record.isRecommended ? " · Recommended" : ""}
-                  </Text>
-                  <Text style={styles.historyRecordDetail}>{record.completedRunCount} completed Runs</Text>
+            {typeRecords.map((record) => {
+              const best = survivalBestForLevel(record, pausedRuns);
+              return (
+                <View
+                  key={`${type}-${record.minRating}`}
+                  style={[styles.historyRecordRow, record.isRecommended ? styles.historyRecordRowRecommended : null]}
+                  testID={`personal-best-record-${type}-${record.minRating}`}
+                >
+                  <View>
+                    <Text style={styles.historyRecordTitle}>
+                      {levelLabel(record)}{record.isRecommended ? " · Recommended" : ""}
+                    </Text>
+                    <Text style={styles.historyRecordDetail}>{record.completedRunCount} completed Runs</Text>
+                  </View>
+                  <View style={styles.historyRecordScoreBlock}>
+                    <Text
+                      style={styles.historyRecordScore}
+                      testID={record.isRecommended && type === "puzzle" ? "personal-best-history-score" : undefined}
+                    >
+                      {best.score}
+                    </Text>
+                    <Text style={styles.historyRecordScoreLabel}>
+                      {best.inProgress ? "best · in progress" : "best"}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.historyRecordScoreBlock}>
-                  <Text
-                    style={styles.historyRecordScore}
-                    testID={record.isRecommended && type === "puzzle" ? "personal-best-history-score" : undefined}
-                  >
-                    {record.score}
-                  </Text>
-                  <Text style={styles.historyRecordScoreLabel}>best</Text>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         );
       })}
@@ -1006,7 +1072,7 @@ export function PersonalBestHistoryCard({
         </Text>
       </View>
       <Text style={styles.historyFootnote}>
-        Runs ended early stay in History but do not set a best. Active time and sittings are context only.
+        Pausing or ending a Run keeps any best already reached. Active time and sittings are context only.
       </Text>
     </View>
   );
@@ -1038,6 +1104,69 @@ function levelLabel(level: { minRating: number; maxRating: number }): string {
 function canonicalBandFor(rating: number): { minRating: number; maxRating: number } {
   const minRating = Math.max(0, Math.floor(rating / 100) * 100);
   return { minRating, maxRating: minRating + 99 };
+}
+
+function closestAvailableBand(
+  availableLevels: readonly PersonalBestAvailableLevelPresentation[],
+  requestedBand: PersonalBestAvailableLevelPresentation
+): PersonalBestAvailableLevelPresentation {
+  return availableLevels.reduce((closest, level) => (
+    Math.abs(level.minRating - requestedBand.minRating)
+      < Math.abs(closest.minRating - requestedBand.minRating)
+      ? level
+      : closest
+  ), availableLevels[0] ?? requestedBand);
+}
+
+function defaultSurvivalLevels(): PersonalBestAvailableLevelPresentation[] {
+  return Array.from({ length: 16 }, (_, index) => {
+    const minRating = 600 + index * 100;
+    return { minRating, maxRating: index === 15 ? 2200 : minRating + 99 };
+  });
+}
+
+function survivalBestForLevel(
+  record: PersonalBestLevelRecordPresentation,
+  pausedRuns: readonly PersonalBestPausedRunPresentation[]
+): { inProgress: boolean; score: number } {
+  const inProgressScore = pausedRuns
+    .filter((run) => (
+      run.challengeType === record.challengeType
+      && run.minRating === record.minRating
+      && run.maxRating === record.maxRating
+    ))
+    .reduce((best, run) => Math.max(best, run.score), -1);
+  return {
+    inProgress: inProgressScore > record.score,
+    score: Math.max(record.score, inProgressScore)
+  };
+}
+
+function survivalBestScoreForLevel({
+  band,
+  challengeType,
+  fallbackBest,
+  pausedRuns,
+  records
+}: {
+  band: PersonalBestAvailableLevelPresentation;
+  challengeType: PersonalBestChallengeType;
+  fallbackBest: number | null;
+  pausedRuns: readonly PersonalBestPausedRunPresentation[];
+  records: readonly PersonalBestLevelRecordPresentation[];
+}): number | null {
+  const recordScore = records.find((record) => (
+    record.challengeType === challengeType
+    && record.minRating === band.minRating
+    && record.maxRating === band.maxRating
+  ))?.score ?? fallbackBest;
+  return pausedRuns
+    .filter((run) => (
+      run.challengeType === challengeType
+      && run.minRating === band.minRating
+      && run.maxRating === band.maxRating
+    ))
+    .reduce<number | null>((best, run) => Math.max(best ?? -1, run.score), recordScore);
 }
 
 function referenceRunFor(
@@ -2021,6 +2150,13 @@ const styles = StyleSheet.create({
     gap: 7,
     marginTop: 9
   },
+  moreLevelsAvailability: {
+    color: "#64748B",
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 3,
+    width: "100%"
+  },
   moreLevelsButton: {
     alignItems: "center",
     flexDirection: "row",
@@ -2042,6 +2178,11 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     flex: 1,
     gap: 3
+  },
+  pausedHomeBest: {
+    color: "#1D4ED8",
+    fontSize: 12,
+    fontWeight: "900"
   },
   pausedHomeMetaStrong: {
     color: "#991B1B",

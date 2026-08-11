@@ -7833,7 +7833,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("starts the Personal Best preview through its public first-use contract", () => {
+  it("starts Survival through its public first-use contract", () => {
     const renderer = renderLabScenario("practice-personal-best-hub");
 
     expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
@@ -7862,24 +7862,27 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("resumes the latest paused Personal Best directly from Home", () => {
+  it("resumes the latest paused Survival Run directly from Home", () => {
     const renderer = renderLabScenario("practice-home");
 
-    expect(collectText(findByTestId(renderer, "personal-best-home-score"))).toBe("14");
+    expect(collectText(findByTestId(renderer, "personal-best-home-score"))).toBe("19");
+    expect(collectText(findByTestId(renderer, "personal-best-home-card"))).toContain(
+      "New best saved"
+    );
     expect(collectText(findByTestId(renderer, "personal-best-more-paused"))).toBe("2 more paused");
     press(renderer, "personal-best-continue");
 
-    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("14 solved");
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("19 solved");
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
       "Mistakes 1 of 3"
     );
   });
 
-  it("keeps Personal Best score, mistakes, elapsed context, pause, and explicit early ending clear", () => {
+  it("keeps Survival score, mistakes, elapsed context, pause, and explicit early ending clear", () => {
     const renderer = renderLabScenario("practice-personal-best-active");
 
     expect(collectText(findByTestId(renderer, "active-session-shell"))).toContain(
-      "Personal Best"
+      "Survival"
     );
     expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No time limit");
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
@@ -7892,14 +7895,16 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-puzzle-timing")).toBeTruthy();
     press(renderer, "personal-best-end-run");
     expect(collectText(findByTestId(renderer, "session-abandon-confirmation"))).toContain(
-      "ending early will not set a personal best"
+      "keeps the best you already reached"
     );
     press(renderer, "session-abandon-cancel");
     press(renderer, "session-abandon");
+    expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    press(renderer, "personal-best-pause-and-leave");
     expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
   });
 
-  it("uses only the explicitly selected compatible Run to suggest a Personal Best level", () => {
+  it("uses only the explicitly selected compatible Run to suggest a Survival level", () => {
     const renderer = renderLabScenario("practice-personal-best-source-run");
 
     expect(findByTestId(renderer, "personal-best-source-picker")).toBeTruthy();
@@ -7940,7 +7945,49 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("treats the third Personal Best mistake as a normal result and preserves the record context", () => {
+  it("shows every Core Pack Survival level and clamps a higher Rating to 2100–2200", () => {
+    const renderer = renderLabScenario("practice-personal-best-highest-level");
+
+    expect(collectText(findByTestId(renderer, "personal-best-hub"))).toContain(
+      "Highest available level"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe(
+      "2100–2200"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-level-availability"))).toBe(
+      "Showing every Survival level in this Core Pack: 600–2200."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-more-level-options"))).not.toContain(
+      "2300"
+    );
+  });
+
+  it("keeps Standard as the Survival source when Home is empty and hides the redundant source action", () => {
+    const renderer = renderLabScenario("practice-personal-best-empty-home-source");
+
+    expect(collectText(findByTestId(renderer, "personal-best-reference-source"))).toContain(
+      "Based on Standard · Rating 925"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-hub"))).toContain(
+      "Standard remains your Rating source even when hidden from Home."
+    );
+    expect(() => findByTestId(renderer, "personal-best-use-another-run")).toThrow();
+  });
+
+  it("saves a new Survival best before pause or an intentional early end", () => {
+    const renderer = renderLabScenario("practice-personal-best-leave");
+
+    expect(collectText(findByTestId(renderer, "personal-best-exit-best"))).toBe(
+      "New best 19 · already saved"
+    );
+    expect(collectText(findByTestId(renderer, "session-abandon-confirmation"))).toContain(
+      "Ending closes this Run, but keeps the best you already reached."
+    );
+    expect(findByTestId(renderer, "personal-best-pause-and-leave")).toBeTruthy();
+    expect(findByTestId(renderer, "session-abandon-confirm")).toBeTruthy();
+  });
+
+  it("treats the third Survival mistake as a normal result and preserves the record context", () => {
     const renderer = renderLabScenario("practice-personal-best-result");
 
     expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("19");
@@ -7962,7 +8009,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("Sprint failed");
   });
 
-  it("shows paused and completed Personal Best records without cross-level comparison", () => {
+  it("shows in-progress and completed Survival records without cross-level comparison", () => {
     const renderer = renderLabScenario("history-personal-best");
 
     press(renderer, "history-tab");
@@ -7981,7 +8028,10 @@ describe("PracticePocScreen", () => {
       "A best of 42 at 600–699 never outranks or replaces a best of 19 at 900–999."
     );
     expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
-      "Paused Runs remain eligible, but do not become records until completed."
+      "A new high is saved immediately while its Run stays in progress."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
+      "best · in progress"
     );
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
   });

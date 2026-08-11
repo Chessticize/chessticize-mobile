@@ -341,7 +341,10 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-personal-best-source-run",
     "practice-personal-best-starting-level",
     "practice-personal-best-arrow-duel",
+    "practice-personal-best-empty-home-source",
     "practice-personal-best-guide",
+    "practice-personal-best-highest-level",
+    "practice-personal-best-leave",
     "practice-personal-best-active",
     "practice-personal-best-result",
     "practice-first-sprint-guide",
@@ -367,6 +370,11 @@ function sprintRulesDesignPreviewFor(
   if (scenarioId === "practice-personal-best-active") {
     return {
       initialActiveState: personalBestActiveState(14, 1)
+    };
+  }
+  if (scenarioId === "practice-personal-best-leave") {
+    return {
+      initialActiveState: personalBestActiveState(19, 1)
     };
   }
   if (scenarioId === "practice-personal-best-result") {
@@ -579,6 +587,14 @@ const PERSONAL_BEST_BAND = {
   maxRating: 999
 } as const;
 
+const SURVIVAL_AVAILABLE_LEVELS = Array.from({ length: 16 }, (_, index) => {
+  const minRating = 600 + index * 100;
+  return {
+    minRating,
+    maxRating: index === 15 ? 2200 : minRating + 99
+  };
+});
+
 function personalBestChallengePreviewFor(
   scenarioId: LabScenarioId
 ): React.ComponentProps<typeof PracticePocScreen>["personalBestChallengeDesignPreview"] {
@@ -638,9 +654,9 @@ function personalBestChallengePreviewFor(
       maxRating: 999,
       minRating: 900,
       mistakeCount: 1,
-      phaseLabel: "Puzzle 16 saved",
-      resumeState: personalBestActiveState(14, 1),
-      score: 14,
+      phaseLabel: "Puzzle 21 saved",
+      resumeState: personalBestActiveState(19, 1),
+      score: 19,
       sittings: 2
     },
     {
@@ -673,12 +689,13 @@ function personalBestChallengePreviewFor(
   const levelRecords = [
     { challengeType: "puzzle" as const, completedRunCount: 8, maxRating: 699, minRating: 600, score: 42 },
     { challengeType: "puzzle" as const, completedRunCount: 4, maxRating: 899, minRating: 800, score: 23 },
-    { challengeType: "puzzle" as const, completedRunCount: 7, isRecommended: true, maxRating: 999, minRating: 900, score: 19 },
+    { challengeType: "puzzle" as const, completedRunCount: 7, isRecommended: true, maxRating: 999, minRating: 900, score: 18 },
     { challengeType: "puzzle" as const, completedRunCount: 2, maxRating: 1099, minRating: 1000, score: 8 },
     { challengeType: "arrow_duel" as const, completedRunCount: 5, isRecommended: true, maxRating: 899, minRating: 800, score: 11 },
     { challengeType: "arrow_duel" as const, completedRunCount: 2, maxRating: 999, minRating: 900, score: 6 }
   ];
   const common = {
+    availableLevels: SURVIVAL_AVAILABLE_LEVELS,
     band: PERSONAL_BEST_BAND,
     bestScore: 18,
     challengeType: "puzzle" as const,
@@ -695,6 +712,16 @@ function personalBestChallengePreviewFor(
   };
   if (scenarioId === "practice-home") {
     return common;
+  }
+  if (scenarioId === "practice-runs-empty") {
+    return {
+      ...common,
+      bestScore: 18,
+      pausedRuns: [],
+      referenceRuns: referenceRuns
+        .filter((source) => source.id === "standard")
+        .map((source) => ({ ...source, isOnHome: false }))
+    };
   }
   if (scenarioId === "practice-personal-best-hub") {
     return {
@@ -730,6 +757,29 @@ function personalBestChallengePreviewFor(
       hubInitiallyVisible: true
     };
   }
+  if (scenarioId === "practice-personal-best-empty-home-source") {
+    return {
+      ...common,
+      hubInitiallyVisible: true,
+      pausedRuns: [],
+      referenceRuns: referenceRuns
+        .filter((source) => source.id === "standard")
+        .map((source) => ({ ...source, isOnHome: false }))
+    };
+  }
+  if (scenarioId === "practice-personal-best-highest-level") {
+    return {
+      ...common,
+      band: { currentRating: 2348, minRating: 2100, maxRating: 2200 },
+      bestScore: 5,
+      hubInitiallyVisible: true,
+      moreLevelsInitiallyVisible: true,
+      pausedRuns: [],
+      referenceRuns: referenceRuns.map((source) => source.id === "standard"
+        ? { ...source, rating: 2348 }
+        : source)
+    };
+  }
   if (scenarioId === "practice-personal-best-guide") {
     return {
       ...common,
@@ -738,6 +788,12 @@ function personalBestChallengePreviewFor(
   }
   if (scenarioId === "practice-personal-best-active") {
     return common;
+  }
+  if (scenarioId === "practice-personal-best-leave") {
+    return {
+      ...common,
+      exitConfirmationInitiallyVisible: true
+    };
   }
   if (scenarioId === "practice-personal-best-result") {
     return {

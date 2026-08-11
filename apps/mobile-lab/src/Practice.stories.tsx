@@ -129,7 +129,7 @@ export const Home: Story = {
     await waitForTestId(canvasElement, "training-focus-card");
     await waitForText(canvasElement, "More information needed");
     await waitForTestId(canvasElement, "personal-best-home-card");
-    await expectTestIdText(canvasElement, "personal-best-home-score", "14");
+    await expectTestIdText(canvasElement, "personal-best-home-score", "19");
     await expectTestIdText(canvasElement, "personal-best-more-paused", "2 more paused");
     await clickTestId(canvasElement, "personal-best-more-paused");
     await waitForTestId(canvasElement, "personal-best-hub");
@@ -139,7 +139,7 @@ export const Home: Story = {
 };
 
 export const PersonalBestHub: Story = {
-  name: "Personal Best · Challenge Hub",
+  name: "Survival · Challenge Hub",
   args: { scenarioId: "practice-personal-best-hub" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-hub");
@@ -153,7 +153,7 @@ export const PersonalBestHub: Story = {
 };
 
 export const PersonalBestRatingSource: Story = {
-  name: "Personal Best · Rating source",
+  name: "Survival · Rating source",
   args: { scenarioId: "practice-personal-best-source-run" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-source-picker");
@@ -166,7 +166,7 @@ export const PersonalBestRatingSource: Story = {
 };
 
 export const PersonalBestStartingLevel: Story = {
-  name: "Personal Best · Standard has no games",
+  name: "Survival · Standard has no games",
   args: { scenarioId: "practice-personal-best-starting-level" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-hub");
@@ -178,7 +178,7 @@ export const PersonalBestStartingLevel: Story = {
 };
 
 export const PersonalBestArrowDuel: Story = {
-  name: "Personal Best · Arrow Duel setup",
+  name: "Survival · Arrow Duel setup",
   args: { scenarioId: "practice-personal-best-arrow-duel" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-hub");
@@ -188,8 +188,34 @@ export const PersonalBestArrowDuel: Story = {
   }
 };
 
+export const SurvivalEmptyHomeSource: Story = {
+  name: "Survival · Empty Home source",
+  args: { scenarioId: "practice-personal-best-empty-home-source" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "personal-best-hub");
+    await expectTestIdText(canvasElement, "personal-best-recommended-level", "900–999");
+    await waitForText(canvasElement, "Standard remains your Rating source even when hidden from Home.");
+    expectTestIdAbsent(canvasElement, "personal-best-use-another-run");
+  }
+};
+
+export const SurvivalHighestLevel: Story = {
+  name: "Survival · Highest available level",
+  args: { scenarioId: "practice-personal-best-highest-level" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "personal-best-hub");
+    await waitForText(canvasElement, "Highest available level");
+    await expectTestIdText(canvasElement, "personal-best-recommended-level", "2100–2200");
+    await expectTestIdText(
+      canvasElement,
+      "personal-best-level-availability",
+      "Showing every Survival level in this Core Pack: 600–2200."
+    );
+  }
+};
+
 export const PersonalBestGuide: Story = {
-  name: "Personal Best · first-use guide",
+  name: "Survival · first-use guide",
   args: { scenarioId: "practice-personal-best-guide" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-guide");
@@ -499,7 +525,12 @@ export const RemoveRunConfirmation: Story = {
 
 export const EmptyHomeAndRestore: Story = {
   name: "Empty Home and restore",
-  args: { scenarioId: "practice-runs-empty" }
+  args: { scenarioId: "practice-runs-empty" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-empty-state");
+    await waitForTestId(canvasElement, "personal-best-home-card");
+    await waitForText(canvasElement, "Survival");
+  }
 };
 
 export const Preparing: Story = {
@@ -522,15 +553,26 @@ export const ActiveSession: Story = {
 };
 
 export const PersonalBestActive: Story = {
-  name: "Personal Best · active Run",
+  name: "Survival · active Run",
   args: { scenarioId: "practice-personal-best-active" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "active-session-shell");
-    await waitForText(canvasElement, "Personal Best");
+    await waitForText(canvasElement, "Survival");
     await expectTestIdText(canvasElement, "session-timer", "No time limit");
     await waitForTestId(canvasElement, "personal-best-mistakes");
     await expectTestIdText(canvasElement, "personal-best-progress-title", "5 more to beat 18");
     await waitForTestId(canvasElement, "session-puzzle-timing");
+  }
+};
+
+export const SurvivalLeaveOptions: Story = {
+  name: "Survival · pause or end Run",
+  args: { scenarioId: "practice-personal-best-leave" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "session-abandon-confirmation");
+    await expectTestIdText(canvasElement, "personal-best-exit-best", "New best 19 · already saved");
+    await waitForTestId(canvasElement, "personal-best-pause-and-leave");
+    await waitForTestId(canvasElement, "session-abandon-confirm");
   }
 };
 
@@ -1039,7 +1081,7 @@ export const SprintSummary: Story = {
 };
 
 export const PersonalBestResult: Story = {
-  name: "Personal Best · new record",
+  name: "Survival · new record",
   args: { scenarioId: "practice-personal-best-result" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-result");

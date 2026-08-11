@@ -950,7 +950,9 @@ export function PracticePocScreen({
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<ReviewReminderPermissionStatus>("unavailable");
   const [reviewReminderScheduleStatus, setReviewReminderScheduleStatus] = useState("unavailable");
   const [reviewReminderPermissionPromptVisible, setReviewReminderPermissionPromptVisible] = useState(false);
-  const [practiceExitConfirmationVisible, setPracticeExitConfirmationVisible] = useState(false);
+  const [practiceExitConfirmationVisible, setPracticeExitConfirmationVisible] = useState(
+    () => personalBestChallengeDesignPreview?.exitConfirmationInitiallyVisible === true
+  );
   const [sprintRulesGuideVisible, setSprintRulesGuideVisible] = useState(
     () => sprintRulesDesignPreview?.firstRunGuideInitiallyVisible === true
       || (sprintGuidanceEnabled && !service.getSettings().sprintGuides.rulesSeen)
@@ -4224,7 +4226,7 @@ export function PracticePocScreen({
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
       closeAccessibilityLabel={personalBestActivePresentation
-        ? "Pause Personal Best and return to Practice"
+        ? "Open Survival leave options"
         : "Abandon sprint"}
       compactMetrics={sessionUsesRail}
       mode={mode}
@@ -4233,7 +4235,10 @@ export function PracticePocScreen({
       timerText={personalBestActivePresentation ? "No time limit" : timerText}
       confirmAbandon={practiceExitConfirmationVisible}
       onAbandon={isOpenSession ? abandonSprint : undefined}
-      onClose={personalBestActivePresentation ? resetToIdle : undefined}
+      onClose={personalBestActivePresentation
+        ? () => setPracticeExitConfirmationVisible(true)
+        : undefined}
+      onPauseAndLeave={personalBestActivePresentation ? resetToIdle : undefined}
       onConfirmAbandonChange={setPracticeExitConfirmationVisible}
       onPause={isActive && !personalBestActivePresentation
         ? () => pauseActiveSprint("manual")
@@ -4482,9 +4487,9 @@ export function PracticePocScreen({
   const practiceAnnouncement = error
     ? `Error. ${error}`
     : personalBestGuideVisible
-      ? "Personal Best first-use guide. The Run has not started."
+      ? "Survival first-use guide. The Run has not started."
     : personalBestHubVisible
-      ? "Personal Best challenge setup. Choose a challenge type and level."
+      ? "Survival setup. Choose Puzzle or Arrow Duel and a level."
     : isSessionGuideVisible
       ? `${sessionGuidePresentation?.focusedRun
         ? "Focused Run"
@@ -4494,7 +4499,7 @@ export function PracticePocScreen({
     : boardFeedback
       ? `${boardFeedback.result === "correct" ? "Correct move" : "Wrong move"}. ${boardFeedback.puzzleSolved ? "Puzzle complete." : "Continue the puzzle."}`
       : isActive && displayedSideToMove
-        ? `${personalBestActivePresentation ? "Personal Best" : `${modeLabel(mode)} sprint`}. ${sideToMoveAccessibilityLabel(displayedSideToMove)}. ${state?.correctCount ?? 0} solved, ${state?.mistakeCount ?? 0} mistakes.`
+        ? `${personalBestActivePresentation ? "Survival" : `${modeLabel(mode)} sprint`}. ${sideToMoveAccessibilityLabel(displayedSideToMove)}. ${state?.correctCount ?? 0} solved, ${state?.mistakeCount ?? 0} mistakes.`
         : `${screenTitle} screen`;
 
   return (
@@ -10208,6 +10213,7 @@ function SessionStatusBar({
   onAbandon,
   onClose,
   onConfirmAbandonChange,
+  onPauseAndLeave,
   onPause,
   onResume
 }: {
@@ -10222,11 +10228,16 @@ function SessionStatusBar({
   onAbandon?: () => void;
   onClose?: () => void;
   onConfirmAbandonChange: (visible: boolean) => void;
+  onPauseAndLeave?: () => void;
   onPause?: () => void;
   onResume?: () => void;
 }): React.JSX.Element {
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
   const isPersonalBest = personalBest !== undefined;
+  const previousSurvivalBest = personalBest?.bestScore;
+  const hasNewSurvivalBest = isPersonalBest
+    && (previousSurvivalBest === null || state.correctCount > (previousSurvivalBest ?? -1));
+  const savedSurvivalBest = Math.max(state.correctCount, previousSurvivalBest ?? 0);
   const completedAttempts = state.correctCount + state.mistakeCount;
   const plannedAttempts = state.config.maxAttempts ?? state.config.targetCorrect;
   return (
@@ -10252,7 +10263,7 @@ function SessionStatusBar({
             dimmedExceptClose ? styles.sessionGuideCoachDimmed : null
           ]}
         >
-          {isPersonalBest ? "Personal Best" : isTacticalFocus ? "Focused Run" : modeLabel(mode)}
+          {isPersonalBest ? "Survival" : isTacticalFocus ? "Focused Run" : modeLabel(mode)}
         </Text>
         <View
           style={[
@@ -10267,7 +10278,7 @@ function SessionStatusBar({
               {onAbandon ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="End Personal Best Run"
+                  accessibilityLabel="End Survival Run"
                   testID="personal-best-end-run"
                   style={styles.sessionNavButton}
                   onPress={() => onConfirmAbandonChange(true)}
@@ -10400,18 +10411,63 @@ function SessionStatusBar({
         )}
       </View>
 
-      {confirmAbandon ? (
+      {confirmAbandon && isPersonalBest ? (
+        <View style={styles.survivalExitSheet} testID="session-abandon-confirmation">
+          <View style={styles.sessionAbandonCopy}>
+            <Text style={styles.survivalExitTitle}>Leave Survival?</Text>
+            <Text style={styles.survivalExitBest} testID="personal-best-exit-best">
+              {hasNewSurvivalBest
+                ? `New best ${savedSurvivalBest} · already saved`
+                : `Best ${savedSurvivalBest} · saved`}
+            </Text>
+            <Text style={styles.helperText}>
+              Pause to keep this exact puzzle and continue any time. Ending closes this Run, but keeps the best you already reached.
+            </Text>
+          </View>
+          <View style={styles.survivalExitPrimaryActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Keep playing Survival"
+              testID="session-abandon-cancel"
+              style={[styles.secondaryButton, styles.survivalExitAction]}
+              onPress={() => onConfirmAbandonChange(false)}
+            >
+              <Text style={styles.secondaryButtonText}>Keep playing</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Pause Survival and leave"
+              testID="personal-best-pause-and-leave"
+              style={[styles.primaryButton, styles.survivalExitAction]}
+              onPress={() => {
+                onConfirmAbandonChange(false);
+                onPauseAndLeave?.();
+              }}
+            >
+              <Text style={styles.primaryButtonText}>Pause & leave</Text>
+            </Pressable>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="End Survival Run"
+            testID="session-abandon-confirm"
+            style={styles.survivalExitEndAction}
+            onPress={() => {
+              onConfirmAbandonChange(false);
+              onAbandon?.();
+            }}
+          >
+            <Text style={styles.survivalExitEndText}>End Run</Text>
+          </Pressable>
+        </View>
+      ) : confirmAbandon ? (
         <View style={styles.sessionAbandonConfirm} testID="session-abandon-confirmation">
           <View style={styles.sessionAbandonCopy}>
             <Text style={styles.listText}>
-              {isPersonalBest
-                ? "End this Personal Best Run?"
-                : isTacticalFocus ? "Abandon focused Run?" : "Abandon sprint?"}
+              {isTacticalFocus ? "Abandon focused Run?" : "Abandon sprint?"}
             </Text>
             <Text style={styles.helperText}>
-              {isPersonalBest
-                ? "Solved puzzles stay in History, but ending early will not set a personal best. Your Rating stays unchanged."
-                : isTacticalFocus
+              {isTacticalFocus
                 ? "This ends the focused Run. Completed puzzles stay in History and your Rating stays unchanged."
                 : "This ends the run and records a failed sprint."}
             </Text>
@@ -10419,7 +10475,7 @@ function SessionStatusBar({
           <View style={styles.sessionAbandonActions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={isPersonalBest ? "Keep playing Personal Best" : "Cancel abandon sprint"}
+              accessibilityLabel="Cancel abandon sprint"
               testID="session-abandon-cancel"
               style={styles.secondaryButton}
               onPress={() => onConfirmAbandonChange(false)}
@@ -10428,7 +10484,7 @@ function SessionStatusBar({
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={isPersonalBest ? "End Personal Best Run" : "Confirm abandon sprint"}
+              accessibilityLabel="Confirm abandon sprint"
               testID="session-abandon-confirm"
               style={styles.destructiveButton}
               onPress={() => {
@@ -10436,7 +10492,7 @@ function SessionStatusBar({
                 onAbandon?.();
               }}
             >
-              <Text style={styles.destructiveButtonText}>{isPersonalBest ? "End Run" : "Abandon"}</Text>
+              <Text style={styles.destructiveButtonText}>Abandon</Text>
             </Pressable>
           </View>
         </View>
@@ -19871,6 +19927,41 @@ const styles = StyleSheet.create({
   sessionAbandonActions: {
     flexDirection: "row",
     gap: 8
+  },
+  survivalExitAction: {
+    flex: 1
+  },
+  survivalExitBest: {
+    color: "#1D4ED8",
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  survivalExitEndAction: {
+    alignItems: "center",
+    minHeight: 34,
+    justifyContent: "center"
+  },
+  survivalExitEndText: {
+    color: "#B91C1C",
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  survivalExitPrimaryActions: {
+    flexDirection: "row",
+    gap: 8
+  },
+  survivalExitSheet: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#93C5FD",
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 11,
+    padding: 12
+  },
+  survivalExitTitle: {
+    color: "#0F172A",
+    fontSize: 17,
+    fontWeight: "900"
   },
   sessionProgressValue: {
     color: "#111827",

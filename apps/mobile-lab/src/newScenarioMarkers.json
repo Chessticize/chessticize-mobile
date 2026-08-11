@@ -3,7 +3,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Show the latest paused challenge, its exact progress, and a visible count for other paused challenges without turning Home into a full list."
+        "changeNote": "Show the latest paused Survival Run, save a newly reached best while it remains in progress, and keep the full paused list in the Survival Hub."
       }
     ]
   },
@@ -11,7 +11,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Add the dedicated Challenge Hub for all paused Runs, Puzzle or Arrow Duel choice, recommended adjacent levels, canonical More levels, and fixed no-time-limit rules."
+        "changeNote": "Name the feature Survival and show every Core Pack-supported level from 600–699 through the capped 2100–2200 level."
       }
     ]
   },
@@ -19,7 +19,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Let the user explicitly choose a compatible mixed Run as the recommendation source while explaining that its timing and Rating are not imported into the challenge."
+        "changeNote": "Let the user explicitly choose a compatible mixed Run as the Survival recommendation source without importing its timing or changing its Rating."
       }
     ]
   },
@@ -35,7 +35,15 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Keep Arrow Duel as a separate record type with its own Rating source and the fixed candidate-plus-required-reply contract."
+        "changeNote": "Keep Arrow Duel Survival as a separate record type with its own Rating source and fixed candidate-plus-required-reply contract."
+      }
+    ]
+  },
+  "practice-personal-best-empty-home-source": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Keep the built-in Standard Rating profile available when Home is empty and omit Use another Run when no compatible alternative exists."
       }
     ]
   },
@@ -43,7 +51,23 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Teach fixed-level records, three mistakes, no time limit, persistent pause, Review, Unclear independence, and unchanged Rating before play."
+        "changeNote": "Teach Survival, fixed-level records, three mistakes, no time limit, persistent pause, immediate best updates, Review, and unchanged Rating."
+      }
+    ]
+  },
+  "practice-personal-best-highest-level": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Clamp Ratings above the Core Pack to 2100–2200 and show all 16 supported levels without fake disabled 2300+ options."
+      }
+    ]
+  },
+  "practice-personal-best-leave": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Show that a new best is already saved, make Pause and leave primary, and keep intentional End Run separate without revoking the best."
       }
     ]
   },
@@ -51,7 +75,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Keep per-puzzle active elapsed time as context, pause on leave, and expose early End Run separately from the no-time-limit scoring contract."
+        "changeNote": "Keep per-puzzle active elapsed time as context, save new bests while the Run continues, and expose Pause and End Run clearly."
       }
     ]
   },
@@ -67,7 +91,15 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Show paused Runs separately from completed Puzzle and Arrow Duel records by level, with no cross-level or global score comparison."
+        "changeNote": "Show live Survival bests from in-progress Runs alongside separate Puzzle and Arrow Duel records by level, with no cross-level comparison."
+      }
+    ]
+  },
+  "practice-runs-empty": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Keep Survival available when every saved Run is hidden from Home by retaining Standard as its built-in Rating source."
       }
     ]
   }

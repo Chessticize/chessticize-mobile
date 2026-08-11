@@ -60,9 +60,13 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       "practice-personal-best-source-run",
       "practice-personal-best-starting-level",
       "practice-personal-best-arrow-duel",
+      "practice-personal-best-empty-home-source",
       "practice-personal-best-guide",
+      "practice-personal-best-highest-level",
+      "practice-personal-best-leave",
       "practice-personal-best-active",
       "practice-personal-best-result",
+      "practice-runs-empty",
       "history-personal-best"
     ]
   );
@@ -79,9 +83,13 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       "practice-personal-best-source-run",
       "practice-personal-best-starting-level",
       "practice-personal-best-arrow-duel",
+      "practice-personal-best-empty-home-source",
       "practice-personal-best-guide",
+      "practice-personal-best-highest-level",
+      "practice-personal-best-leave",
       "practice-personal-best-active",
       "practice-personal-best-result",
+      "practice-runs-empty",
       "history-personal-best"
     ]
   );
