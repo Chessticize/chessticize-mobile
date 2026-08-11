@@ -839,14 +839,14 @@ function personalBestChallengePreviewFor(
     return {
       ...common,
       band: { currentRating: 2200, minRating: 2100, maxRating: 2200 },
-      bestScore: 47_000,
+      bestScore: 88_000,
       challengeType: "puzzle",
       pausedRuns: [],
       result: {
         activeElapsedMs: 51 * 60 * 60 * 1000 + 12 * 60 * 1000,
         endReason: "pool_cleared",
         isNewBest: true,
-        previousBestScore: 47_000,
+        previousBestScore: 88_000,
         sittings: 84
       }
     };
@@ -921,7 +921,7 @@ function personalBestPoolClearedState(): SprintState {
   return {
     ...withoutEndReason,
     bestStreak: 312,
-    correctCount: 47_980,
+    correctCount: 88_894,
     id: "personal-best-result-pool-cleared",
     mistakeCount: 2,
     status: "won"

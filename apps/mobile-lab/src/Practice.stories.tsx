@@ -1124,7 +1124,8 @@ export const SurvivalPerfectClear: Story = {
   args: { scenarioId: "practice-personal-best-pool-cleared" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-result");
-    await expectTestIdText(canvasElement, "personal-best-result-score", "47980");
+    await expectTestIdText(canvasElement, "personal-best-result-score", "88,894");
+    await waitForText(canvasElement, "All 88,894 solved · 51:12:00 active · 84 sittings");
     await waitForText(canvasElement, "Perfect clear at 2100–2200");
     await waitForText(canvasElement, "You cleared every available Puzzle in this level.");
     await waitForText(canvasElement, "Loading and selection errors never count as a clear.");

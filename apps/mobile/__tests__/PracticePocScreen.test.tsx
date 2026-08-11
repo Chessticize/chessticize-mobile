@@ -8121,7 +8121,7 @@ describe("PracticePocScreen", () => {
   it("presents true Survival puzzle-pool exhaustion as a Perfect clear", () => {
     const renderer = renderLabScenario("practice-personal-best-pool-cleared");
 
-    expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("47980");
+    expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("88,894");
     expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
       "Perfect clear at 2100–2200"
     );
@@ -8133,6 +8133,9 @@ describe("PracticePocScreen", () => {
     );
     expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
       "51:12:00 active"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "All 88,894 solved"
     );
     expect(collectText(findByTestId(renderer, "personal-best-result"))).not.toContain(
       "ended normally after"

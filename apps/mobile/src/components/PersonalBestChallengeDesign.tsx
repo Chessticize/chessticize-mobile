@@ -1028,14 +1028,16 @@ export function PersonalBestResult({
         </View>
         <Text style={styles.resultTitle}>{resultTitle}</Text>
         <View style={styles.resultScoreRow}>
-          <Text style={styles.resultScore} testID="personal-best-result-score">{score}</Text>
+          <Text style={styles.resultScore} testID="personal-best-result-score">
+            {isPerfectClear ? score.toLocaleString("en-US") : score}
+          </Text>
           <Text style={styles.resultScoreLabel}>solved</Text>
         </View>
         <Text style={styles.resultComparison} testID="personal-best-result-comparison">
           {comparison}
         </Text>
         <Text style={styles.resultEndReason}>
-          {score} solved · {formatElapsed(activeElapsedMs)} active · {sittings} sittings
+          {isPerfectClear ? `All ${score.toLocaleString("en-US")}` : score} solved · {formatElapsed(activeElapsedMs)} active · {sittings} sittings
         </Text>
         {isPerfectClear ? (
           <>
