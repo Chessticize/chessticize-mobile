@@ -3,7 +3,39 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Add the Personal Best entry with its current Rating band, current-band record, three-mistake ending, no-timer rule, and Unrated promise."
+        "changeNote": "Show the latest paused challenge, its exact progress, and a visible count for other paused challenges without turning Home into a full list."
+      }
+    ]
+  },
+  "practice-personal-best-hub": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Add the dedicated Challenge Hub for all paused Runs, Puzzle or Arrow Duel choice, recommended adjacent levels, canonical More levels, and fixed no-time-limit rules."
+      }
+    ]
+  },
+  "practice-personal-best-source-run": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Let the user explicitly choose a compatible mixed Run as the recommendation source while explaining that its timing and Rating are not imported into the challenge."
+      }
+    ]
+  },
+  "practice-personal-best-starting-level": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "When Standard has no completed games, use its default Rating 600 as Starting level 600–699 without silently falling back to a custom Run."
+      }
+    ]
+  },
+  "practice-personal-best-arrow-duel": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Keep Arrow Duel as a separate record type with its own Rating source and the fixed candidate-plus-required-reply contract."
       }
     ]
   },
@@ -11,7 +43,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Teach the fixed-band, three-mistake, no-timer, Review, Unclear, and unchanged-Rating contract before the first Run."
+        "changeNote": "Teach fixed-level records, three mistakes, no time limit, persistent pause, Review, Unclear independence, and unchanged Rating before play."
       }
     ]
   },
@@ -19,7 +51,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Keep solved count, the score to beat, three explicit mistake marks, and no-timer status glanceable around the existing board."
+        "changeNote": "Keep per-puzzle active elapsed time as context, pause on leave, and expose early End Run separately from the no-time-limit scoring contract."
       }
     ]
   },
@@ -27,7 +59,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Celebrate a new band-specific record after the normal third-mistake ending while confirming Rating is unchanged and prioritizing Review."
+        "changeNote": "Celebrate a record at one named level, show active time and sittings only as context, repeat the same setup with Play again, and route changes through the Hub."
       }
     ]
   },
@@ -35,7 +67,7 @@
     "issues": [
       {
         "issueNumber": 492,
-        "changeNote": "Show the current-band best, completed-Run count, recent score trend, and ended-early eligibility rule above attempt History."
+        "changeNote": "Show paused Runs separately from completed Puzzle and Arrow Duel records by level, with no cross-level or global score comparison."
       }
     ]
   }

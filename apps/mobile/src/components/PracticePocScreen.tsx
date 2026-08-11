@@ -258,6 +258,7 @@ import {
   useHistoryProgressPresentation
 } from "./useHistoryProgressPresentation.ts";
 import {
+  PersonalBestChallengeHub,
   PersonalBestGuide,
   PersonalBestHistoryCard,
   PersonalBestHomeCard,
@@ -890,6 +891,10 @@ export function PracticePocScreen({
   const [resumableSprint, setResumableSprint] = useState<SprintState | null>(null);
   const [personalBestGuideVisible, setPersonalBestGuideVisible] = useState(
     () => personalBestChallengeDesignPreview?.guideInitiallyVisible === true
+  );
+  const [personalBestHubVisible, setPersonalBestHubVisible] = useState(
+    () => personalBestChallengeDesignPreview?.hubInitiallyVisible === true
+      || personalBestChallengeDesignPreview?.sourcePickerInitiallyVisible === true
   );
   const [boardFen, setBoardFen] = useState<string | null>(null);
   const [lastBoardMove, setLastBoardMove] = useState<BoardMove | null>(null);
@@ -3854,7 +3859,7 @@ export function PracticePocScreen({
   const predictiveBackEnabled = resolveMobileBackIntent(mobileBackState, "button").kind !== "delegate-platform";
   const appReviewRequestBlocked = isAppReviewRequestSurfaceBlocked({
     hasError: error !== null,
-    hasModalOrGuide: topBackTransient !== null || personalBestGuideVisible,
+    hasModalOrGuide: topBackTransient !== null || personalBestGuideVisible || personalBestHubVisible,
     hasNavigationPreview: mobileBackPreview !== null,
     isAnalysisOpen: reviewAnalysisOpen,
     isPracticeTab: tab === "practice"
@@ -4098,6 +4103,7 @@ export function PracticePocScreen({
     && !isShowingFeedbackSnapshot
     && !isSessionGuideVisible
     && !personalBestGuideVisible
+    && !personalBestHubVisible
     && !reviewSurfaceOpen;
   const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
   const sideNavigationVisible = appChromeVisible && adaptiveLayout.usesSideNavigation;
@@ -4218,15 +4224,16 @@ export function PracticePocScreen({
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar
       closeAccessibilityLabel={personalBestActivePresentation
-        ? "End Personal Best Run"
+        ? "Pause Personal Best and return to Practice"
         : "Abandon sprint"}
       compactMetrics={sessionUsesRail}
       mode={mode}
       personalBest={personalBestActivePresentation}
       state={state}
-      timerText={personalBestActivePresentation ? "No timer" : timerText}
+      timerText={personalBestActivePresentation ? "No time limit" : timerText}
       confirmAbandon={practiceExitConfirmationVisible}
       onAbandon={isOpenSession ? abandonSprint : undefined}
+      onClose={personalBestActivePresentation ? resetToIdle : undefined}
       onConfirmAbandonChange={setPracticeExitConfirmationVisible}
       onPause={isActive && !personalBestActivePresentation
         ? () => pauseActiveSprint("manual")
@@ -4476,6 +4483,8 @@ export function PracticePocScreen({
     ? `Error. ${error}`
     : personalBestGuideVisible
       ? "Personal Best first-use guide. The Run has not started."
+    : personalBestHubVisible
+      ? "Personal Best challenge setup. Choose a challenge type and level."
     : isSessionGuideVisible
       ? `${sessionGuidePresentation?.focusedRun
         ? "Focused Run"
@@ -4604,6 +4613,27 @@ export function PracticePocScreen({
             ) : null}
             {tab === "practice" ? (
               <>
+                {personalBestHubVisible && personalBestChallengeDesignPreview ? (
+                  <PersonalBestChallengeHub
+                    presentation={personalBestChallengeDesignPreview}
+                    onClose={() => setPersonalBestHubVisible(false)}
+                    onContinue={(runId) => {
+                      const pausedRun = personalBestChallengeDesignPreview.pausedRuns?.find((run) => run.id === runId);
+                      const nextState = pausedRun?.resumeState;
+                      if (!nextState) {
+                        return;
+                      }
+                      setPersonalBestHubVisible(false);
+                      setMode(nextState.config.mode);
+                      commitState(nextState);
+                      commitBoardFen(nextState.currentPuzzle?.currentFen ?? null);
+                    }}
+                    onStart={() => {
+                      setPersonalBestHubVisible(false);
+                      setPersonalBestGuideVisible(true);
+                    }}
+                  />
+                ) : null}
                 {personalBestGuideVisible && personalBestChallengeDesignPreview ? (
                   <PersonalBestGuide
                     presentation={personalBestChallengeDesignPreview}
@@ -4783,7 +4813,7 @@ export function PracticePocScreen({
                   <TacticalProfileFlow presentation={resolvedTacticalProfilePresentation} />
                 ) : null}
 
-                {!personalBestGuideVisible && !isSessionGuideVisible && !isOpenSession && state === null
+                {!personalBestGuideVisible && !personalBestHubVisible && !isSessionGuideVisible && !isOpenSession && state === null
                 && (resolvedTacticalProfilePresentation?.screen ?? "home") === "home" && (
                   activeRunManagementPresentation?.screen === "home"
                   || (!activeRunManagementPresentation && mode !== "custom")
@@ -4809,7 +4839,19 @@ export function PracticePocScreen({
                       }
                     }}
                     onOpenSprintRulesGuide={() => setSprintRulesGuideVisible(true)}
+                    onContinuePersonalBest={(runId) => {
+                      const pausedRun = personalBestChallengeDesignPreview?.pausedRuns?.find((run) => run.id === runId);
+                      const nextState = pausedRun?.resumeState;
+                      if (!nextState) {
+                        setPersonalBestHubVisible(true);
+                        return;
+                      }
+                      setMode(nextState.config.mode);
+                      commitState(nextState);
+                      commitBoardFen(nextState.currentPuzzle?.currentFen ?? null);
+                    }}
                     onOpenPersonalBestGuide={() => setPersonalBestGuideVisible(true)}
+                    onOpenPersonalBestHub={() => setPersonalBestHubVisible(true)}
                     onSelectMode={setMode}
                     onStartMode={(nextMode) => startSprint(nextMode)}
                     onResumeSprint={resumeSprint}
@@ -4933,10 +4975,16 @@ export function PracticePocScreen({
                       activeElapsedMs={personalBestChallengeDesignPreview.result.activeElapsedMs}
                       band={personalBestChallengeDesignPreview.band}
                       bestStreak={state.bestStreak}
+                      challengeType={personalBestChallengeDesignPreview.challengeType ?? "puzzle"}
                       isNewBest={personalBestChallengeDesignPreview.result.isNewBest}
                       mistakeCount={state.mistakeCount}
                       previousBestScore={personalBestChallengeDesignPreview.result.previousBestScore}
                       score={state.correctCount}
+                      sittings={personalBestChallengeDesignPreview.result.sittings}
+                      onChangeChallenge={() => {
+                        resetToIdle();
+                        setPersonalBestHubVisible(true);
+                      }}
                       onDone={resetToIdle}
                       onReplayMistakes={sprintReplayItems.length > 0
                         ? showSessionReplay
@@ -5386,7 +5434,9 @@ function PracticeHome({
   sprintRulesGuideVisible,
   tacticalProfile,
   resumableSprint,
+  onContinuePersonalBest,
   onDismissSprintRulesGuide,
+  onOpenPersonalBestHub,
   onOpenPersonalBestGuide,
   onOpenSprintRulesGuide,
   onSelectMode,
@@ -5408,7 +5458,9 @@ function PracticeHome({
   sprintRulesGuideVisible: boolean;
   tacticalProfile?: TacticalProfilePresentation;
   resumableSprint: SprintState | null;
+  onContinuePersonalBest: (runId: string) => void;
   onDismissSprintRulesGuide: () => void;
+  onOpenPersonalBestHub: () => void;
   onOpenPersonalBestGuide: () => void;
   onOpenSprintRulesGuide: () => void;
   onSelectMode: (next: SprintMode) => void;
@@ -5457,8 +5509,9 @@ function PracticeHome({
               {personalBestChallenge ? (
                 <PersonalBestHomeCard
                   presentation={personalBestChallenge}
+                  onContinue={onContinuePersonalBest}
                   onHowItWorks={onOpenPersonalBestGuide}
-                  onStart={onOpenPersonalBestGuide}
+                  onOpenHub={onOpenPersonalBestHub}
                 />
               ) : null}
             </>
@@ -10187,7 +10240,7 @@ function SessionStatusBar({
             style={styles.sessionNavButton}
             onPress={onClose ?? (() => onConfirmAbandonChange(true))}
           >
-            <CloseGlyph />
+            {isPersonalBest ? <PauseGlyph /> : <CloseGlyph />}
           </Pressable>
         ) : (
           <View style={styles.sessionNavButton} />
@@ -10208,7 +10261,22 @@ function SessionStatusBar({
           ]}
           testID="session-nav-actions"
         >
-          {onPause ? (
+          {isPersonalBest ? (
+            <>
+              <UnratedPill />
+              {onAbandon ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="End Personal Best Run"
+                  testID="personal-best-end-run"
+                  style={styles.sessionNavButton}
+                  onPress={() => onConfirmAbandonChange(true)}
+                >
+                  <MoreGlyph />
+                </Pressable>
+              ) : null}
+            </>
+          ) : onPause ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Pause sprint"
@@ -10228,8 +10296,6 @@ function SessionStatusBar({
             >
               <PlayGlyph />
             </Pressable>
-          ) : isPersonalBest ? (
-            <UnratedPill />
           ) : (
             <View style={styles.sessionNavButton} testID="session-overflow">
               <MoreGlyph />
@@ -10252,7 +10318,7 @@ function SessionStatusBar({
             : isTacticalFocus
             ? `Puzzles ${completedAttempts} of ${plannedAttempts}`
             : `Progress ${state.correctCount} of ${state.config.targetCorrect}`}
-          style={styles.sessionMetricBlock}
+          style={[styles.sessionMetricBlock, isPersonalBest ? styles.personalBestSideMetricBlock : null]}
           testID="session-progress-block"
         >
           <Text
@@ -10274,7 +10340,7 @@ function SessionStatusBar({
         </View>
         <View
           accessibilityLabel={`Timer ${timerText}`}
-          style={styles.sessionMetricBlock}
+          style={[styles.sessionMetricBlock, isPersonalBest ? styles.personalBestTimerMetricBlock : null]}
           testID="session-timer-block"
         >
           <Text
@@ -10284,6 +10350,7 @@ function SessionStatusBar({
             testID="session-timer"
             style={[
               styles.timerText,
+              isPersonalBest ? styles.personalBestTimerText : null,
               compactMetrics ? styles.sessionMetricTextCompact : null
             ]}
           >
@@ -10293,7 +10360,7 @@ function SessionStatusBar({
         {isPersonalBest ? (
           <View
             accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
-            style={styles.sessionMetricBlock}
+            style={[styles.sessionMetricBlock, styles.personalBestSideMetricBlock]}
             testID="session-mistakes-block"
           >
             <PersonalBestMistakeIndicator
@@ -19751,6 +19818,18 @@ const styles = StyleSheet.create({
     gap: 3,
     justifyContent: "center",
     minWidth: 0
+  },
+  personalBestSideMetricBlock: {
+    flex: 0.9
+  },
+  personalBestTimerMetricBlock: {
+    flex: 1.2
+  },
+  personalBestTimerText: {
+    fontFamily: "System",
+    fontSize: 16,
+    letterSpacing: 0,
+    textAlign: "center"
   },
   activeMistakeIndicator: {
     alignItems: "center",

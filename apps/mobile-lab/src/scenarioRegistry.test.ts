@@ -56,6 +56,10 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
     newScenarios.map((scenario) => scenario.id),
     [
       "practice-home",
+      "practice-personal-best-hub",
+      "practice-personal-best-source-run",
+      "practice-personal-best-starting-level",
+      "practice-personal-best-arrow-duel",
       "practice-personal-best-guide",
       "practice-personal-best-active",
       "practice-personal-best-result",
@@ -71,6 +75,10 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       .map((scenario) => scenario.id),
     [
       "practice-home",
+      "practice-personal-best-hub",
+      "practice-personal-best-source-run",
+      "practice-personal-best-starting-level",
+      "practice-personal-best-arrow-duel",
       "practice-personal-best-guide",
       "practice-personal-best-active",
       "practice-personal-best-result",

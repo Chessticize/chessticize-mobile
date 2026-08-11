@@ -337,6 +337,10 @@ function LabScenarioContent({
 function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
   return isTacticalProfileScenario(scenarioId) || [
     "practice-home",
+    "practice-personal-best-hub",
+    "practice-personal-best-source-run",
+    "practice-personal-best-starting-level",
+    "practice-personal-best-arrow-duel",
     "practice-personal-best-guide",
     "practice-personal-best-active",
     "practice-personal-best-result",
@@ -578,15 +582,153 @@ const PERSONAL_BEST_BAND = {
 function personalBestChallengePreviewFor(
   scenarioId: LabScenarioId
 ): React.ComponentProps<typeof PracticePocScreen>["personalBestChallengeDesignPreview"] {
+  const referenceRuns = [
+    {
+      challengeType: "puzzle" as const,
+      durationLabel: "5 min",
+      games: 18,
+      id: "standard",
+      name: "Standard",
+      perPuzzleLabel: "20 sec per puzzle",
+      rating: 925
+    },
+    {
+      challengeType: "puzzle" as const,
+      durationLabel: "10 min",
+      games: 9,
+      id: "balanced-practice",
+      name: "Balanced Practice",
+      perPuzzleLabel: "30 sec per puzzle",
+      rating: 842
+    },
+    {
+      challengeType: "puzzle" as const,
+      durationLabel: "No overall timer",
+      games: 14,
+      id: "deep-practice",
+      name: "Deep Practice",
+      perPuzzleLabel: "No puzzle timeout",
+      rating: 1031
+    },
+    {
+      challengeType: "arrow_duel" as const,
+      durationLabel: "5 min",
+      games: 12,
+      id: "arrow-duel",
+      name: "Arrow Duel",
+      perPuzzleLabel: "30 sec per puzzle",
+      rating: 875
+    },
+    {
+      challengeType: "arrow_duel" as const,
+      durationLabel: "8 min",
+      games: 7,
+      id: "arrow-duel-study",
+      name: "Arrow Duel Study",
+      perPuzzleLabel: "45 sec per puzzle",
+      rating: 936
+    }
+  ];
+  const pausedRuns = [
+    {
+      activeElapsedMs: 8 * 60 * 1000 + 24 * 1000,
+      challengeType: "puzzle" as const,
+      id: "puzzle-900",
+      lastTouchedLabel: "Paused 2 hours ago",
+      maxRating: 999,
+      minRating: 900,
+      mistakeCount: 1,
+      phaseLabel: "Puzzle 16 saved",
+      resumeState: personalBestActiveState(14, 1),
+      score: 14,
+      sittings: 2
+    },
+    {
+      activeElapsedMs: 5 * 60 * 1000 + 9 * 1000,
+      challengeType: "arrow_duel" as const,
+      id: "arrow-800",
+      lastTouchedLabel: "Paused yesterday",
+      maxRating: 899,
+      minRating: 800,
+      mistakeCount: 2,
+      phaseLabel: "Reply phase saved",
+      resumeState: personalBestArrowDuelResumeState(),
+      score: 7,
+      sittings: 3
+    },
+    {
+      activeElapsedMs: 19 * 60 * 1000 + 42 * 1000,
+      challengeType: "puzzle" as const,
+      id: "puzzle-600",
+      lastTouchedLabel: "Paused 3 days ago",
+      maxRating: 699,
+      minRating: 600,
+      mistakeCount: 2,
+      phaseLabel: "Puzzle 34 saved",
+      resumeState: personalBestActiveState(31, 2),
+      score: 31,
+      sittings: 4
+    }
+  ];
+  const levelRecords = [
+    { challengeType: "puzzle" as const, completedRunCount: 8, maxRating: 699, minRating: 600, score: 42 },
+    { challengeType: "puzzle" as const, completedRunCount: 4, maxRating: 899, minRating: 800, score: 23 },
+    { challengeType: "puzzle" as const, completedRunCount: 7, isRecommended: true, maxRating: 999, minRating: 900, score: 19 },
+    { challengeType: "puzzle" as const, completedRunCount: 2, maxRating: 1099, minRating: 1000, score: 8 },
+    { challengeType: "arrow_duel" as const, completedRunCount: 5, isRecommended: true, maxRating: 899, minRating: 800, score: 11 },
+    { challengeType: "arrow_duel" as const, completedRunCount: 2, maxRating: 999, minRating: 900, score: 6 }
+  ];
   const common = {
     band: PERSONAL_BEST_BAND,
     bestScore: 18,
+    challengeType: "puzzle" as const,
     completedRunCount: 6,
+    levelRecords,
+    pausedRuns,
+    referenceRuns,
+    selectedReferenceRunIds: {
+      arrow_duel: "arrow-duel",
+      puzzle: "standard"
+    },
     showActivePresentation: true,
     startState: personalBestActiveState(0, 0)
-  } as const;
+  };
   if (scenarioId === "practice-home") {
     return common;
+  }
+  if (scenarioId === "practice-personal-best-hub") {
+    return {
+      ...common,
+      hubInitiallyVisible: true
+    };
+  }
+  if (scenarioId === "practice-personal-best-source-run") {
+    return {
+      ...common,
+      hubInitiallyVisible: true,
+      sourcePickerInitiallyVisible: true
+    };
+  }
+  if (scenarioId === "practice-personal-best-starting-level") {
+    return {
+      ...common,
+      band: { currentRating: 600, minRating: 600, maxRating: 699 },
+      bestScore: null,
+      hubInitiallyVisible: true,
+      pausedRuns: [],
+      referenceRuns: referenceRuns.map((source) => source.id === "standard"
+        ? { ...source, games: 0, rating: 600 }
+        : source)
+    };
+  }
+  if (scenarioId === "practice-personal-best-arrow-duel") {
+    return {
+      ...common,
+      band: { currentRating: 875, minRating: 800, maxRating: 899 },
+      bestScore: 11,
+      challengeType: "arrow_duel",
+      hubInitiallyVisible: true
+    };
   }
   if (scenarioId === "practice-personal-best-guide") {
     return {
@@ -603,7 +745,8 @@ function personalBestChallengePreviewFor(
       result: {
         activeElapsedMs: 12 * 60 * 1000 + 48 * 1000,
         isNewBest: true,
-        previousBestScore: 18
+        previousBestScore: 18,
+        sittings: 3
       }
     };
   }
@@ -612,13 +755,6 @@ function personalBestChallengePreviewFor(
       ...common,
       bestScore: 19,
       completedRunCount: 7,
-      recentScores: [
-        { completedAtLabel: "Jul 10", score: 9 },
-        { completedAtLabel: "Jul 12", score: 12 },
-        { completedAtLabel: "Jul 14", score: 11 },
-        { completedAtLabel: "Jul 16", score: 14 },
-        { completedAtLabel: "Jul 18", score: 19 }
-      ],
       showHistoryCard: true
     };
   }
@@ -675,6 +811,37 @@ function personalBestResultState(): SprintState {
     ratingBefore: PERSONAL_BEST_BAND.currentRating,
     startedAt,
     status: "failed"
+  };
+}
+
+function personalBestArrowDuelResumeState(): SprintState {
+  const base = tacticalFocusActiveState("arrow_duel");
+  const currentPuzzle = base.currentPuzzle?.kind === "arrow_duel"
+    ? {
+        ...base.currentPuzzle,
+        phase: "reply" as const,
+        replyStartedAt: new Date(LAB_NOW_MS - 17 * 1000).toISOString(),
+        selectedMove: base.currentPuzzle.correctMove
+      }
+    : base.currentPuzzle;
+  return {
+    ...base,
+    config: {
+      ...base.config,
+      durationSeconds: 24 * 60 * 60,
+      maxMistakes: 3,
+      puzzleTiming: {
+        slowAfterSeconds: null,
+        timeoutAfterSeconds: null
+      },
+      tacticalFocus: undefined,
+      targetCorrect: 92_839
+    },
+    correctCount: 7,
+    currentPuzzle,
+    id: "personal-best-arrow-duel-resume",
+    mistakeCount: 2,
+    ratingBefore: 875
   };
 }
 

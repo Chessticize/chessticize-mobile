@@ -53,8 +53,14 @@ export const PersonalBestRecords: Story = {
     await openHistory(canvasElement);
     await waitForTestId(canvasElement, "personal-best-history-card");
     await expectTestIdText(canvasElement, "personal-best-history-score", "19");
-    await waitForTestId(canvasElement, "personal-best-history-chart");
-    await waitForText(canvasElement, "Runs ended early stay in History but do not set a best.");
+    await waitForTestId(canvasElement, "personal-best-history-in-progress");
+    await waitForTestId(canvasElement, "personal-best-history-puzzle");
+    await waitForTestId(canvasElement, "personal-best-history-arrow_duel");
+    await waitForText(canvasElement, "Every level stands on its own");
+    await waitForText(
+      canvasElement,
+      "Runs ended early stay in History but do not set a best. Active time and sittings are context only."
+    );
   }
 };
 

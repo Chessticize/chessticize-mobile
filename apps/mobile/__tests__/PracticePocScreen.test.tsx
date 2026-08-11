@@ -7834,22 +7834,25 @@ describe("PracticePocScreen", () => {
   });
 
   it("starts the Personal Best preview through its public first-use contract", () => {
-    const renderer = renderLabScenario("practice-home");
+    const renderer = renderLabScenario("practice-personal-best-hub");
 
-    expect(collectText(findByTestId(renderer, "personal-best-home-card"))).toContain(
-      "No timer · Three mistakes end the Run"
+    expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
+      "No time limit · 3 mistakes · Rating unchanged"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-home-score"))).toBe("18");
-    press(renderer, "personal-best-start");
+    expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe("900–999");
+    press(renderer, "personal-best-hub-start");
 
     expect(findByTestId(renderer, "personal-best-guide")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
-      "Marking a puzzle Unclear does not count as a mistake."
+      "Marking it Unclear does not add another mistake."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-guide"))).toContain(
+      "Pause now, continue later"
     );
     press(renderer, "personal-best-guide-start");
 
     expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No timer");
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No time limit");
     expect(collectText(findByTestId(renderer, "personal-best-unrated"))).toBe("Unrated");
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
       "Mistakes 0 of 3"
@@ -7859,19 +7862,81 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("keeps Personal Best score, mistakes, and no-timer status glanceable during play", () => {
+  it("resumes the latest paused Personal Best directly from Home", () => {
+    const renderer = renderLabScenario("practice-home");
+
+    expect(collectText(findByTestId(renderer, "personal-best-home-score"))).toBe("14");
+    expect(collectText(findByTestId(renderer, "personal-best-more-paused"))).toBe("2 more paused");
+    press(renderer, "personal-best-continue");
+
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("14 solved");
+    expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
+      "Mistakes 1 of 3"
+    );
+  });
+
+  it("keeps Personal Best score, mistakes, elapsed context, pause, and explicit early ending clear", () => {
     const renderer = renderLabScenario("practice-personal-best-active");
 
     expect(collectText(findByTestId(renderer, "active-session-shell"))).toContain(
       "Personal Best"
     );
-    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No timer");
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No time limit");
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
       "Mistakes 1 of 3"
     );
     expect(collectText(findByTestId(renderer, "personal-best-mistakes"))).toBe("×1/3");
     expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
       "5 more to beat 18"
+    );
+    expect(findByTestId(renderer, "session-puzzle-timing")).toBeTruthy();
+    press(renderer, "personal-best-end-run");
+    expect(collectText(findByTestId(renderer, "session-abandon-confirmation"))).toContain(
+      "ending early will not set a personal best"
+    );
+    press(renderer, "session-abandon-cancel");
+    press(renderer, "session-abandon");
+    expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
+  });
+
+  it("uses only the explicitly selected compatible Run to suggest a Personal Best level", () => {
+    const renderer = renderLabScenario("practice-personal-best-source-run");
+
+    expect(findByTestId(renderer, "personal-best-source-picker")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "personal-best-source-standard"))).toContain(
+      "Rating 925 · 900–999"
+    );
+    press(renderer, "personal-best-source-balanced-practice");
+    expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe("800–899");
+    expect(collectText(findByTestId(renderer, "personal-best-reference-source"))).toContain(
+      "Based on Balanced Practice · Rating 842"
+    );
+  });
+
+  it("uses Standard's default Rating as a clearly labeled starting level when it has no games", () => {
+    const renderer = renderLabScenario("practice-personal-best-starting-level");
+
+    expect(collectText(findByTestId(renderer, "personal-best-hub"))).toContain("Starting level");
+    expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe("600–699");
+    expect(collectText(findByTestId(renderer, "personal-best-reference-source"))).toContain(
+      "Based on Standard’s starting Rating"
+    );
+  });
+
+  it("keeps Arrow Duel recommendation and candidate-plus-reply rules separate", () => {
+    const renderer = renderLabScenario("practice-personal-best-arrow-duel");
+
+    expect(collectText(findByTestId(renderer, "personal-best-recommended-level"))).toBe("800–899");
+    expect(collectText(findByTestId(renderer, "personal-best-reference-source"))).toContain(
+      "Based on Arrow Duel · Rating 875"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
+      "Candidate + required reply"
+    );
+    press(renderer, "personal-best-paused-continue-arrow-800");
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("7 solved");
+    expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
+      "Mistakes 2 of 3"
     );
   });
 
@@ -7883,10 +7948,13 @@ describe("PracticePocScreen", () => {
       "Previous best 18"
     );
     expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
-      "The Run ended after 3 mistakes."
+      "The Run ended normally after 3 mistakes."
     );
     expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
-      "Rating 925 unchanged"
+      "This level has its own record · Rating unchanged"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+      "19 solved · 12:48 active · 3 sittings"
     );
     expect(collectText(findByTestId(renderer, "personal-best-result-replay"))).toBe(
       "Replay 3 mistakes"
@@ -7894,7 +7962,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("Sprint failed");
   });
 
-  it("shows a band-specific Personal Best record above existing History", () => {
+  it("shows paused and completed Personal Best records without cross-level comparison", () => {
     const renderer = renderLabScenario("history-personal-best");
 
     press(renderer, "history-tab");
@@ -7904,10 +7972,16 @@ describe("PracticePocScreen", () => {
       "900–999"
     );
     expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
-      "7 completed Runs"
+      "Puzzle"
     );
     expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
-      "Runs ended early stay in History but do not set a best."
+      "Arrow Duel"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-history-comparison-note"))).toContain(
+      "A best of 42 at 600–699 never outranks or replaces a best of 19 at 900–999."
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-history-card"))).toContain(
+      "Paused Runs remain eligible, but do not become records until completed."
     );
     expect(findByTestId(renderer, "history-attempt-history-unclear")).toBeTruthy();
   });
