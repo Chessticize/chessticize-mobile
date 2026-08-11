@@ -25,7 +25,8 @@ const {
   ANDROID_REVIEW_REMINDERS_TEST_MATCH,
   RESOURCE_SOAK_TEST_MATCH,
   resolveDetoxTestMatch,
-  resolveDetoxMaxWorkers
+  resolveDetoxMaxWorkers,
+  resolveDetoxTestTimeout
 } = require('../e2e/suiteConfig');
 const {
   bringAndroidAppToForeground,
@@ -1898,6 +1899,10 @@ describe('Detox suite configuration', () => {
       CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT: '1'
     })).toEqual(IOS_LANDSCAPE_LAYOUT_TEST_MATCH);
     expect(IOS_LANDSCAPE_LAYOUT_TEST_MATCH).toEqual(MARKETING_ASSETS_TEST_MATCH);
+    expect(resolveDetoxTestTimeout({
+      CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT: '1'
+    })).toBe(1200000);
+    expect(resolveDetoxTestTimeout({})).toBe(300000);
 
     const spec = fs.readFileSync(
       path.resolve(__dirname, '../e2e/marketing-assets.e2e.js'),
