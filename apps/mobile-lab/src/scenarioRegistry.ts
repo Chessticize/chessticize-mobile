@@ -85,6 +85,7 @@ export type LabScenarioId =
   | "history-arrow-duel-replay"
   | "history-replay-unavailable"
   | "settings-ios-sync"
+  | "settings-ios-sync-syncing"
   | "settings-ios-sync-error-details"
   | "settings-ios-sync-support-bundle"
   | "settings-ios-sync-support-bundle-partial"
@@ -297,6 +298,16 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "settings",
     ["iCloud Sync", "Explicit Sync Now button", "No disclosure chevron", "Global Arrow Duel reply control", "User-first On explanation", "Paused Sprint and puzzle timers", "Per-Run Edit Run handoff", "Straight-to-next-puzzle Off explanation", "Previously chosen Run settings restored on re-enable", "Notifications", "Sound and haptic toggles", "Move and capture audio previews", "Guidance reset", "About"],
     ["Run editor", "Native audio and haptic validation", "Stockfish diagnostics"]
+  ),
+  "settings-ios-sync-syncing": defineScenario(
+    "settings-ios-sync-syncing",
+    "Settings",
+    "iOS sync · syncing",
+    "settings--ios-sync-syncing",
+    "After Sync Now is pressed, the button becomes a disabled Syncing… state with a visible progress indicator until the current sync finishes. The previous stable sync result remains above instead of repeating Syncing, and the user stays in Settings without starting a duplicate sync.",
+    "settings",
+    ["Existing iCloud Sync section", "Disabled Syncing button", "Visible progress indicator", "Stable previous sync result", "Busy accessibility state", "No duplicate submission", "No navigation"],
+    ["CloudKit completion timing", "Success and error result details"]
   ),
   "settings-ios-sync-error-details": defineScenario(
     "settings-ios-sync-error-details",

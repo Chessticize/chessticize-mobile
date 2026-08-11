@@ -54,7 +54,7 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
   assert.deepEqual(
     newScenarios.map((scenario) => scenario.id),
-    ["settings-ios-sync"]
+    ["settings-ios-sync", "settings-ios-sync-syncing"]
   );
   assert.ok(scenarioRegistry["settings-ios-sync"].issues?.some(
     (issue) => issue.issueNumber === 522
@@ -63,7 +63,7 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
     newScenarios
       .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 522))
       .map((scenario) => scenario.id),
-    ["settings-ios-sync"]
+    ["settings-ios-sync", "settings-ios-sync-syncing"]
   );
 
   for (const scenario of scenarios) {
@@ -152,6 +152,7 @@ test("the approved Settings clone keeps its scope while Issue #522 highlights th
     []
   );
   assert.deepEqual(storyTagsForScenario("settings-ios-sync"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("settings-ios-sync-syncing"), ["new"]);
   assert.deepEqual(scenarioRegistry["settings-ios-sync"].scope.includes, [
     "iCloud Sync",
     "Explicit Sync Now button",
@@ -167,6 +168,15 @@ test("the approved Settings clone keeps its scope while Issue #522 highlights th
     "Move and capture audio previews",
     "Guidance reset",
     "About"
+  ]);
+  assert.deepEqual(scenarioRegistry["settings-ios-sync-syncing"].scope.includes, [
+    "Existing iCloud Sync section",
+    "Disabled Syncing button",
+    "Visible progress indicator",
+    "Stable previous sync result",
+    "Busy accessibility state",
+    "No duplicate submission",
+    "No navigation"
   ]);
   assert.equal(
     scenarioRegistry["practice-home"].issues?.some((issue) => issue.issueNumber === 247) ?? false,

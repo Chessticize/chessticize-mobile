@@ -5,6 +5,7 @@ import {
   clickTestId,
   expectTestIdAbsent,
   openSettings,
+  waitForDisabledTestId,
   waitForTestId,
   waitForText
 } from "./storyPlay.ts";
@@ -42,6 +43,21 @@ export const IosSync: Story = {
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-success");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-preview-mistake");
     expectTestIdAbsent(canvasElement, "settings-move-feedback-device-note");
+    await centerTestId(canvasElement, "settings-sync-section");
+  }
+};
+
+export const IosSyncSyncing: Story = {
+  name: "iOS sync · syncing",
+  args: { scenarioId: "settings-ios-sync-syncing" },
+  play: async ({ canvasElement }) => {
+    await openSettings(canvasElement);
+    await waitForText(canvasElement, "Sign in to iCloud to sync");
+    await clickTestId(canvasElement, "settings-sync-now");
+    await waitForText(canvasElement, "Syncing…");
+    await waitForText(canvasElement, "Sign in to iCloud to sync");
+    await waitForTestId(canvasElement, "settings-sync-now-spinner");
+    await waitForDisabledTestId(canvasElement, "settings-sync-now");
     await centerTestId(canvasElement, "settings-sync-section");
   }
 };

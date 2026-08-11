@@ -6,5 +6,13 @@
         "changeNote": "Present Sync Now as an explicit button without a disclosure chevron, while preserving the existing sync explanation and behavior."
       }
     ]
+  },
+  "settings-ios-sync-syncing": {
+    "issues": [
+      {
+        "issueNumber": 522,
+        "changeNote": "Disable Sync Now and show Syncing with visible progress until the current sync finishes, while the status row keeps its previous stable result."
+      }
+    ]
   }
 }
