@@ -23,13 +23,30 @@ function parseOptions(args) {
   const options = {};
   for (let index = 0; index < rest.length; index += 1) {
     const name = rest[index];
-    if (!name.startsWith("--") || index + 1 >= rest.length) {
+    const value = rest[index + 1];
+    if (!name.startsWith("--") || value === undefined || value.startsWith("--")) {
       throw new Error(`Expected --name value, received ${name}.`);
     }
-    options[name.slice(2)] = rest[index + 1];
+    const optionName = name.slice(2);
+    if (Object.hasOwn(options, optionName)) {
+      throw new Error(`Duplicate option --${optionName}.`);
+    }
+    options[optionName] = value;
     index += 1;
   }
   return { command, options };
+}
+
+function assertOnlyOptions(options, allowedOptions) {
+  const unknownOptions = Object.keys(options).filter(
+    (option) => !allowedOptions.includes(option),
+  );
+  if (unknownOptions.length > 0) {
+    throw new Error(
+      `Unknown option${unknownOptions.length === 1 ? "" : "s"}: ` +
+        unknownOptions.map((option) => `--${option}`).join(", "),
+    );
+  }
 }
 
 function readJson(path) {
@@ -66,11 +83,13 @@ export function runMobileVersionCommand(args, output = process.stdout) {
   const releaseVersion = validateReleaseVersion(readJson(releasePath));
 
   if (command === "status") {
+    assertOnlyOptions(options, ["root"]);
     output.write(`${JSON.stringify({ developmentVersion, releaseVersion }, null, 2)}\n`);
     return;
   }
 
   if (command === "check") {
+    assertOnlyOptions(options, ["root"]);
     const expectedDevelopmentConfig = renderIOSDevelopmentVersion(developmentVersion);
     const expectedReleaseConfig = renderIOSReleaseVersion(releaseVersion);
     if (
@@ -83,6 +102,7 @@ export function runMobileVersionCommand(args, output = process.stdout) {
   }
 
   if (command === "advance-development" || command === "set-development") {
+    assertOnlyOptions(options, ["root", "public-version"]);
     if (command === "set-development" && options["public-version"] === undefined) {
       throw new Error("set-development requires --public-version.");
     }
@@ -100,6 +120,12 @@ export function runMobileVersionCommand(args, output = process.stdout) {
   }
 
   if (command === "prepare-release") {
+    assertOnlyOptions(options, [
+      "root",
+      "public-version",
+      "android-version-code",
+      "ios-build-number",
+    ]);
     const nextRelease = prepareReleaseVersion({
       developmentVersion,
       previousReleaseVersion: releaseVersion,

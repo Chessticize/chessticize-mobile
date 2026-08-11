@@ -141,6 +141,60 @@ test("version transitions reject public-version rollback", () => {
   );
 });
 
+test("the CLI rejects unknown, duplicate, and missing option values", () => {
+  const root = mkdtempSync(join(tmpdir(), "chessticize-version-options-"));
+  const mobileRoot = join(root, "apps/mobile");
+  const configRoot = join(mobileRoot, "ios/Config");
+  mkdirSync(configRoot, { recursive: true });
+  writeFileSync(join(mobileRoot, "development-version.json"), JSON.stringify({
+    schemaVersion: 1,
+    plannedPublicVersion: "1.5.0",
+  }));
+  writeFileSync(join(mobileRoot, "release-version.json"), JSON.stringify({
+    schemaVersion: 1,
+    publicVersion: "1.4.1",
+    iosPublicVersion: "1.4.1",
+    androidVersionCode: 16,
+    iosBuildNumber: 1,
+  }));
+  writeFileSync(join(configRoot, "DevelopmentVersion.xcconfig"), "unused\n");
+  writeFileSync(join(configRoot, "ReleaseVersion.xcconfig"), "unused\n");
+
+  assert.throws(
+    () => runMobileVersionCommand([
+      "prepare-release",
+      "--root",
+      root,
+      "--android-versoin-code",
+      "17",
+    ]),
+    /Unknown option: --android-versoin-code/u,
+  );
+  assert.throws(
+    () => runMobileVersionCommand([
+      "prepare-release",
+      "--root",
+      root,
+      "--ios-build-number",
+      "2",
+      "--ios-build-number",
+      "3",
+    ]),
+    /Duplicate option --ios-build-number/u,
+  );
+  assert.throws(
+    () => runMobileVersionCommand([
+      "prepare-release",
+      "--root",
+      root,
+      "--public-version",
+      "--ios-build-number",
+      "2",
+    ]),
+    /Expected --name value/u,
+  );
+});
+
 test("the CLI writes each version only in its intended transition", () => {
   const root = mkdtempSync(join(tmpdir(), "chessticize-versioning-"));
   const mobileRoot = join(root, "apps/mobile");
