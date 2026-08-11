@@ -28,6 +28,12 @@ describe("test launch configuration", () => {
       'constants[@"puzzleSelectionSeed"] = puzzleSelectionSeed;'
     );
     expect(iosModule).toContain(
+      'processArgumentValueForName:@"chessticizePuzzleSelectionId"'
+    );
+    expect(iosModule).toContain(
+      'constants[@"puzzleSelectionId"] = puzzleSelectionId;'
+    );
+    expect(iosModule).toContain(
       'processArgumentValueForName:@"chessticizeStandardTargetCorrect"'
     );
     expect(iosModule).toContain(
