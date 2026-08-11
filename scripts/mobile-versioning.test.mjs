@@ -157,7 +157,11 @@ test("the CLI writes each version only in its intended transition", () => {
     androidVersionCode: 16,
     iosBuildNumber: 1,
   }));
-  writeFileSync(join(configRoot, "DevelopmentVersion.xcconfig"), "stale\n");
+  const developmentConfig =
+    "// Generated from apps/mobile/development-version.json. Do not edit.\n" +
+    "MARKETING_VERSION = 1.5.0\n" +
+    "CURRENT_PROJECT_VERSION = 1\n";
+  writeFileSync(join(configRoot, "DevelopmentVersion.xcconfig"), developmentConfig);
   writeFileSync(join(configRoot, "ReleaseVersion.xcconfig"), "stale\n");
   const output = { write() {} };
 
@@ -180,6 +184,10 @@ test("the CLI writes each version only in its intended transition", () => {
     JSON.parse(readFileSync(join(mobileRoot, "development-version.json"), "utf8"))
       .plannedPublicVersion,
     "1.5.0",
+  );
+  assert.equal(
+    readFileSync(join(configRoot, "DevelopmentVersion.xcconfig"), "utf8"),
+    developmentConfig,
   );
 
   runMobileVersionCommand([

@@ -56,7 +56,7 @@ describe("iOS App Store identity artifacts", () => {
     expect(debugConfig).not.toContain('#include "ReleaseVersion.xcconfig"');
     expect(releaseConfig).toContain('#include "ReleaseVersion.xcconfig"');
     expect(generatedDevelopmentConfig).toBe(
-      renderIOSDevelopmentVersion(developmentVersion, releaseVersion)
+      renderIOSDevelopmentVersion(developmentVersion)
     );
     expect(generatedConfig).toBe(renderIOSReleaseVersion(releaseVersion));
     expect(renderIOSReleaseVersion({

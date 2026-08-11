@@ -1,20 +1,18 @@
 "use strict";
 
-function renderIOSDevelopmentVersion(developmentVersion, releaseVersion) {
+function renderIOSDevelopmentVersion(developmentVersion) {
   if (
     developmentVersion?.schemaVersion !== 1 ||
     typeof developmentVersion?.plannedPublicVersion !== "string" ||
     !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u.test(
       developmentVersion.plannedPublicVersion,
-    ) ||
-    !Number.isSafeInteger(releaseVersion?.iosBuildNumber) ||
-    releaseVersion.iosBuildNumber < 1
+    )
   ) {
     throw new Error("apps/mobile/development-version.json has invalid iOS version fields.");
   }
   return "// Generated from apps/mobile/development-version.json. Do not edit.\n" +
     `MARKETING_VERSION = ${developmentVersion.plannedPublicVersion}\n` +
-    `CURRENT_PROJECT_VERSION = ${releaseVersion.iosBuildNumber}\n`;
+    "CURRENT_PROJECT_VERSION = 1\n";
 }
 
 function renderIOSReleaseVersion(releaseVersion) {

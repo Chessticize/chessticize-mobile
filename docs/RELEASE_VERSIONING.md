@@ -10,7 +10,9 @@ modifying an identity that has already shipped.
 - `apps/mobile/development-version.json` is the public version shown by Android
   Debug/E2E and iOS Debug-Dev builds from `main`. It describes the version the
   open development line is targeting. Changing it does not allocate an Android
-  version code or an iOS build number.
+  version code or an iOS store build number. The isolated iOS Debug-Dev identity
+  uses build `1`, so preparing a release cannot change its generated config or
+  create a conflict with the separate `main` development advance.
 - `apps/mobile/release-version.json` is the exact cross-platform candidate
   identity. Android Release/R8 Validation and iOS Release-Production builds use
   it. Android `versionCode` and iOS `CFBundleVersion` are allocated only here.

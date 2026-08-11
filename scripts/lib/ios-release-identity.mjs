@@ -58,8 +58,7 @@ export function loadIOSReleaseIdentity(repoRoot) {
   const releaseConfig = readText("apps/mobile/ios/Config/Release.xcconfig");
   const project = readText("apps/mobile/ios/ChessticizeMobile.xcodeproj/project.pbxproj");
   const expectedDevelopmentConfig = renderCanonicalIOSDevelopmentConfig(
-    developmentVersion,
-    releaseVersion
+    developmentVersion
   );
   const expectedConfig = renderCanonicalIOSReleaseConfig(releaseVersion);
   const projectUsesGeneratedConfig =

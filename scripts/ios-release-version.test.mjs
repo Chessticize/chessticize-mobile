@@ -36,16 +36,27 @@ test("the shared iOS renderer keeps Debug on the development target", () => {
       {
         schemaVersion: 1,
         plannedPublicVersion: "1.5.0"
-      },
-      {
-        schemaVersion: 1,
-        iosPublicVersion: "1.4.1",
-        iosBuildNumber: 7
       }
     ),
     "// Generated from apps/mobile/development-version.json. Do not edit.\n" +
       "MARKETING_VERSION = 1.5.0\n" +
-      "CURRENT_PROJECT_VERSION = 7\n"
+      "CURRENT_PROJECT_VERSION = 1\n"
+  );
+});
+
+test("the iOS development config is independent from consumed release build numbers", () => {
+  const developmentVersion = {
+    schemaVersion: 1,
+    plannedPublicVersion: "1.5.0"
+  };
+
+  assert.equal(
+    sharedRenderer.renderIOSDevelopmentVersion(developmentVersion, {
+      iosBuildNumber: 7
+    }),
+    sharedRenderer.renderIOSDevelopmentVersion(developmentVersion, {
+      iosBuildNumber: 42
+    })
   );
 });
 

@@ -71,10 +71,7 @@ export function runMobileVersionCommand(args, output = process.stdout) {
   }
 
   if (command === "check") {
-    const expectedDevelopmentConfig = renderIOSDevelopmentVersion(
-      developmentVersion,
-      releaseVersion,
-    );
+    const expectedDevelopmentConfig = renderIOSDevelopmentVersion(developmentVersion);
     const expectedReleaseConfig = renderIOSReleaseVersion(releaseVersion);
     if (
       readFileSync(developmentConfigPath, "utf8") !== expectedDevelopmentConfig ||
@@ -96,7 +93,7 @@ export function runMobileVersionCommand(args, output = process.stdout) {
     writeJson(developmentPath, nextDevelopment);
     writeFileSync(
       developmentConfigPath,
-      renderIOSDevelopmentVersion(nextDevelopment, releaseVersion),
+      renderIOSDevelopmentVersion(nextDevelopment),
     );
     output.write(`${JSON.stringify(nextDevelopment, null, 2)}\n`);
     return;
@@ -114,10 +111,6 @@ export function runMobileVersionCommand(args, output = process.stdout) {
       iosBuildNumber: optionalInteger(options["ios-build-number"], "iOS build number"),
     });
     writeJson(releasePath, nextRelease);
-    writeFileSync(
-      developmentConfigPath,
-      renderIOSDevelopmentVersion(developmentVersion, nextRelease),
-    );
     writeFileSync(releaseConfigPath, renderIOSReleaseVersion(nextRelease));
     output.write(`${JSON.stringify(nextRelease, null, 2)}\n`);
     return;

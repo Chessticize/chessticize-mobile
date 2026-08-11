@@ -20,10 +20,7 @@ function main() {
   const releaseOutputPath = path.join(mobileRoot, 'ios', 'Config', 'ReleaseVersion.xcconfig');
   const developmentVersion = JSON.parse(fs.readFileSync(developmentVersionPath, 'utf8'));
   const releaseVersion = JSON.parse(fs.readFileSync(releaseVersionPath, 'utf8'));
-  const expectedDevelopment = renderIOSDevelopmentVersion(
-    developmentVersion,
-    releaseVersion,
-  );
+  const expectedDevelopment = renderIOSDevelopmentVersion(developmentVersion);
   const expectedRelease = renderIOSReleaseVersion(releaseVersion);
   if (process.argv.includes('--check')) {
     const actualDevelopment = fs.existsSync(developmentOutputPath)
