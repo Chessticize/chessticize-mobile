@@ -5905,12 +5905,6 @@ function PracticeHome({
                 runReorderDesignPreview={runReorderDesignPreview}
                 onRunReorderFeedbackPreview={onRunReorderFeedbackPreview}
               />
-              {personalBestChallenge ? (
-                <PersonalBestHomeCard
-                  presentation={personalBestChallenge}
-                  onOpenHub={onOpenPersonalBestHub}
-                />
-              ) : null}
             </>
           ) : (
             <>
@@ -5952,6 +5946,13 @@ function PracticeHome({
               ratingContextLabel={selectedRun?.name}
             />
           )}
+
+          {runManagement && personalBestChallenge ? (
+            <PersonalBestHomeCard
+              presentation={personalBestChallenge}
+              onOpenHub={onOpenPersonalBestHub}
+            />
+          ) : null}
 
           {tacticalProfile ? (
             <TacticalProfileHomeCard presentation={tacticalProfile} />

@@ -8141,6 +8141,18 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "session-board")).toThrow();
   });
 
+  it("places Survival Challenge below Progress on Practice Home", () => {
+    const renderer = renderLabScenario("practice-home");
+    const secondaryColumnIds = collectTestIds(
+      findByTestId(renderer, "practice-home-secondary-column")
+    );
+
+    expect(secondaryColumnIds).toContain("personal-best-home-card");
+    expect(secondaryColumnIds.indexOf("practice-progress-summary")).toBeLessThan(
+      secondaryColumnIds.indexOf("personal-best-home-card")
+    );
+  });
+
   it("shows help on the first Survival Home entry, then opens the Hub directly after Got it", () => {
     const service = createProductionSurvivalService();
     const renderer = renderScreen({

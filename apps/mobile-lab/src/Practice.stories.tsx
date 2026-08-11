@@ -134,6 +134,11 @@ export const Home: Story = {
       "personal-best-home-card",
       "Survival ChallengeSee how far you can go, at your own pace.›"
     );
+    await expectTestIdsInOrder(canvasElement, [
+      "practice-progress-summary",
+      "personal-best-home-card",
+      "training-focus-card"
+    ]);
     expectTestIdAbsent(canvasElement, "personal-best-home-score");
     expectTestIdAbsent(canvasElement, "personal-best-more-paused-count");
     expectTestIdAbsent(canvasElement, "personal-best-continue");
