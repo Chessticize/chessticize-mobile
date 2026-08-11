@@ -265,9 +265,9 @@ check(
 
 check(
   "English App Store metadata fits the current field limits",
-  appStoreMetadata.appName?.value === "Chessticize" &&
-    appStoreMetadata.appName?.decision === "keep" &&
-    appStoreMetadata.subtitle === "Offline Chess Puzzle Trainer" &&
+  appStoreMetadata.appName?.value === "Chessticize: Chess Puzzles" &&
+    appStoreMetadata.appName?.decision === "expand" &&
+    appStoreMetadata.subtitle === "Build Tactical Intuition" &&
     Array.from(appStoreMetadata.appName.value).length <= appStoreMetadata.limits.appNameCharacters &&
     Array.from(appStoreMetadata.subtitle).length <= appStoreMetadata.limits.subtitleCharacters &&
     Array.from(appStoreMetadata.promotionalText).length <= appStoreMetadata.limits.promotionalTextCharacters &&
@@ -301,8 +301,8 @@ check(
 
 check(
   "Store metadata document contains upload-ready public fields",
-  storeAssets.includes("| App name | `Chessticize` |") &&
-    storeAssets.includes("| Subtitle | `Offline Chess Puzzle Trainer` |") &&
+  storeAssets.includes("| App name | `Chessticize: Chess Puzzles` |") &&
+    storeAssets.includes("| Subtitle | `Build Tactical Intuition` |") &&
     storeAssets.includes("config/app-store-metadata-en-us-v1.json") &&
     storeAssets.includes("| Support URL | `https://chessticize.github.io/chessticize-mobile/support/` |") &&
     storeAssets.includes("| Marketing URL | `https://chessticize.github.io/chessticize-mobile/` |") &&

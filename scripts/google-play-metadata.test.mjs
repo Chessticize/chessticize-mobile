@@ -39,7 +39,7 @@ test("Google Play en-US copy is canonical, paste-ready, and within Unicode limit
   assert.equal(metadata.metadataId, "google-play-en-us-v1");
   assert.equal(metadata.issue, 444);
   assert.equal(metadata.locale, "en-US");
-  assert.equal(metadata.appName, "Chessticize");
+  assert.equal(metadata.appName, "Chessticize: Chess Puzzles");
   assert.equal(metadata.listingSettings.defaultLanguage, "English (United States)");
   assert.equal(metadata.listingSettings.appOrGame, "Game");
   assert.equal(metadata.listingSettings.category, "Board");
