@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import test from "node:test";
 
 const storyUrl = new URL(
@@ -218,14 +219,24 @@ test("story source identity and claim evidence match version-controlled files", 
       "utf8"
     );
     for (const testId of frame.source.requiredVisibleTestIds) {
+      const testIdSource = frame.source.requiredVisibleTestIdSources?.[testId];
+      const visibleSource = testIdSource
+        ? await readFile(new URL(testIdSource, repositoryRoot), "utf8")
+        : componentSource;
       const literalTestId = new RegExp(`testID=["']${testId}["']`);
       const dynamicHistoryAttemptId = testId.startsWith("history-attempt-")
-        && componentSource.includes(
+        && visibleSource.includes(
           "testID={`history-attempt-${attempt.id}`}"
         );
+      if (testIdSource) {
+        assert.ok(
+          componentSource.includes(basename(testIdSource)),
+          `Expected ${frame.source.component} to reference ${testIdSource}`
+        );
+      }
       assert.ok(
-        literalTestId.test(componentSource) || dynamicHistoryAttemptId,
-        `Expected ${testId} in ${frame.source.component}`
+        literalTestId.test(visibleSource) || dynamicHistoryAttemptId,
+        `Expected ${testId} in ${testIdSource ?? frame.source.component}`
       );
     }
   }
