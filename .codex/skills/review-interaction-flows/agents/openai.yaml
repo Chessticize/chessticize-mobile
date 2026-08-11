@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Interaction Flows"
+  short_description: "Review user journeys, feedback, state, and recovery"
+  default_prompt: "Use $review-interaction-flows to review this product journey from the user’s point of view."
