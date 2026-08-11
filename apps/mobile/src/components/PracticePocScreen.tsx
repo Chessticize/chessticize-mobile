@@ -5883,12 +5883,12 @@ function PracticeHome({
       ) : null}
 
       <View
-        style={adaptiveLayout.usesWideContent ? styles.practiceHomeColumns : styles.practiceHomeStack}
+        style={adaptiveLayout.usesHomeColumns ? styles.practiceHomeColumns : styles.practiceHomeStack}
         testID="practice-home-layout"
       >
         <View style={[
           styles.practiceHomePrimaryColumn,
-          adaptiveLayout.usesWideContent
+          adaptiveLayout.usesHomeColumns
             ? styles.practiceHomePrimaryColumnWide
             : styles.practiceHomeColumnStacked
         ]} testID="practice-home-primary-column">
@@ -5932,7 +5932,7 @@ function PracticeHome({
 
         <View style={[
           styles.practiceHomeSecondaryColumn,
-          adaptiveLayout.usesWideContent
+          adaptiveLayout.usesHomeColumns
             ? styles.practiceHomeSecondaryColumnWide
             : styles.practiceHomeColumnStacked
         ]} testID="practice-home-secondary-column">

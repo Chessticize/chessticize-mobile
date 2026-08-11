@@ -27,6 +27,7 @@ export type AdaptiveLayout = {
   sideNavigationExpanded: boolean;
   sideNavigationWidth: number;
   usesSideNavigation: boolean;
+  usesHomeColumns: boolean;
   usesSessionRail: boolean;
   usesWideContent: boolean;
 };
@@ -51,6 +52,7 @@ const REGULAR_LANDSCAPE_RESERVED_SESSION_CHROME_HEIGHT = 120;
 // this budget must also keep the post-answer Unclear action inside the viewport.
 const COMPACT_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 332;
 const REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 240;
+const HOME_COLUMNS_MIN_CONTENT_WIDTH = 700;
 
 export function buildPracticeAdaptiveLayout({
   fontScale,
@@ -85,6 +87,10 @@ export function buildPracticeAdaptiveLayout({
   const usesWideContent = (
     contentWidth >= 860
       || (sideNavigationExpanded && contentWidth >= 820)
+  ) && !isLargeText;
+  const usesHomeColumns = (
+    usesWideContent
+      || (isLandscape && contentWidth >= HOME_COLUMNS_MIN_CONTENT_WIDTH)
   ) && !isLargeText;
   const usesSessionRail = isCompactLandscape || (isRegularWidth && isLandscape);
   const sessionRailWidth = isRegularWidth
@@ -159,6 +165,7 @@ export function buildPracticeAdaptiveLayout({
     sideNavigationExpanded,
     sideNavigationWidth,
     usesSideNavigation,
+    usesHomeColumns,
     usesSessionRail,
     usesWideContent
   };
