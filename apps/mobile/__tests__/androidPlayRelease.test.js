@@ -908,6 +908,10 @@ describe('Android Play release contract', () => {
       mobileRoot,
       'store-assets/android/feature-graphic-source.png',
     ))).toBe(true);
+    expect(fs.existsSync(path.join(
+      mobileRoot,
+      'store-assets/android/feature-graphic-arrow-duel-capture.png',
+    ))).toBe(true);
     expect(pngMetadata('apps/mobile/store-assets/android/play-icon-512.png')).toEqual({
       width: 512,
       height: 512,
@@ -930,8 +934,19 @@ describe('Android Play release contract', () => {
       bitDepth: 8,
       colorType: 2,
     });
+    expect(pngMetadata(
+      'apps/mobile/store-assets/android/feature-graphic-arrow-duel-capture.png',
+    )).toEqual({
+      width: 1080,
+      height: 1920,
+      bitDepth: 8,
+      colorType: 6,
+    });
     expect(featureRenderer).toContain('feature-graphic-source.png');
+    expect(featureRenderer).toContain('feature-graphic-arrow-duel-capture.png');
     expect(featureRenderer).toContain('sourceImage.draw(');
+    expect(featureRenderer).toContain('captureImage.draw(');
+    expect(featureRenderer).toContain('ovalIn: NSRect(');
     expect(featureRenderer).toContain('let rgbBitmap = NSBitmapImageRep(');
     expect(featureRenderer).toContain('samplesPerPixel: 3');
     expect(featureRenderer).toContain('hasAlpha: false');
