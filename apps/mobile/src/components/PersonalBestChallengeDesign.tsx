@@ -633,7 +633,7 @@ export function PersonalBestChallengeHub({
                     <Text
                       adjustsFontSizeToFit
                       minimumFontScale={0.75}
-                      numberOfLines={1}
+                      numberOfLines={compactFourDigitLevelRanges && level.minRating >= 1000 ? 2 : 1}
                       style={[
                         styles.levelCardRange,
                         compactFourDigitLevelRanges && level.minRating >= 1000
@@ -642,7 +642,9 @@ export function PersonalBestChallengeHub({
                         selected ? styles.levelCardRangeSelected : null
                       ]}
                     >
-                      {levelLabel(level)}
+                      {compactFourDigitLevelRanges && level.minRating >= 1000
+                        ? `${level.minRating}–\n${level.maxRating}`
+                        : levelLabel(level)}
                     </Text>
                     <Text style={styles.levelCardBest}>
                       {best === null ? "No best yet" : `Best ${best}`}
@@ -2121,7 +2123,8 @@ const styles = StyleSheet.create({
   },
   levelCardRangeCompact: {
     fontSize: 14,
-    letterSpacing: -0.25
+    letterSpacing: -0.25,
+    lineHeight: 15
   },
   levelCardRangeSelected: {
     color: "#1E3A8A"
