@@ -9,6 +9,11 @@ export type MobileBackTransient =
   | "settings-advanced-ratings"
   | "custom-rating-editor"
   | "sprint-session-guide"
+  | "survival-guide-to-hub"
+  | "survival-guide-to-practice"
+  | "survival-hub"
+  | "survival-pause"
+  | "survival-records"
   | "starting-practice";
 
 export type MobileBackOwner = MobileBackPrimaryTab;
@@ -92,6 +97,19 @@ export function mobileBackDestination(
       }
       if (intent.transient === "sprint-session-guide") {
         return { label: "Practice setup", testID: "practice-setup" };
+      }
+      if (
+        intent.transient === "survival-guide-to-hub"
+        || intent.transient === "survival-records"
+      ) {
+        return { label: "Survival Hub", testID: "personal-best-hub" };
+      }
+      if (
+        intent.transient === "survival-guide-to-practice"
+        || intent.transient === "survival-hub"
+        || intent.transient === "survival-pause"
+      ) {
+        return { label: "Practice", testID: "practice-home" };
       }
       if (intent.transient === "custom-rating-editor") {
         return { label: "Custom setup", testID: "custom-sprint-setup" };

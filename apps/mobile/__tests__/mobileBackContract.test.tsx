@@ -38,6 +38,37 @@ describe("mobile Back contract", () => {
       kind: "dismiss-transient",
       transient: "sprint-session-guide"
     });
+
+    for (const transient of [
+      "survival-records",
+      "survival-guide-to-hub",
+      "survival-guide-to-practice",
+      "survival-hub",
+      "survival-pause"
+    ] as const) {
+      expect(resolveMobileBackIntent({
+        ...rootState,
+        topTransient: transient
+      }, "button")).toEqual({ kind: "dismiss-transient", transient });
+    }
+  });
+
+  it("describes the visible Survival parent for each nested page", () => {
+    for (const transient of ["survival-records", "survival-guide-to-hub"] as const) {
+      const state: MobileBackState = { ...rootState, topTransient: transient };
+      expect(mobileBackDestination(resolveMobileBackIntent(state, "button"), state)).toEqual({
+        label: "Survival Hub",
+        testID: "personal-best-hub"
+      });
+    }
+
+    for (const transient of ["survival-guide-to-practice", "survival-hub", "survival-pause"] as const) {
+      const state: MobileBackState = { ...rootState, topTransient: transient };
+      expect(mobileBackDestination(resolveMobileBackIntent(state, "button"), state)).toEqual({
+        label: "Practice",
+        testID: "practice-home"
+      });
+    }
   });
 
   it("returns analysis and review detail to their owning surface", () => {

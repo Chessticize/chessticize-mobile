@@ -130,8 +130,10 @@ export const Home: Story = {
     await waitForText(canvasElement, "More information needed");
     await waitForTestId(canvasElement, "personal-best-home-card");
     await expectTestIdText(canvasElement, "personal-best-home-score", "19");
-    await expectTestIdText(canvasElement, "personal-best-more-paused", "2 more paused");
-    await clickTestId(canvasElement, "personal-best-more-paused");
+    await expectTestIdText(canvasElement, "personal-best-more-paused-count", "2 more paused");
+    await waitForText(canvasElement, "Open Survival");
+    expectTestIdAbsent(canvasElement, "personal-best-continue");
+    await clickTestId(canvasElement, "personal-best-home-card");
     await waitForTestId(canvasElement, "personal-best-hub");
     await clickTestId(canvasElement, "personal-best-hub-close");
     await waitForTestId(canvasElement, "personal-best-home-card");
@@ -201,6 +203,32 @@ export const PersonalBestArrowDuel: Story = {
   }
 };
 
+export const PersonalBestArrowDuelRequiredReply: Story = {
+  name: "Survival · Arrow Duel required reply",
+  args: {
+    scenarioId: "practice-personal-best-arrow-duel",
+    storyPresentation: {
+      storyId: "practice--survival-arrow-duel-required-reply",
+      title: "Survival · Arrow Duel required reply"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "personal-best-hub-start");
+    await clickTestId(canvasElement, "personal-best-guide-start");
+    await waitForTestId(canvasElement, "arrow-duel-reply-challenge");
+    await waitForEnabledTestId(canvasElement, "lab-board-correct");
+    await clickTestId(canvasElement, "lab-board-correct");
+    await waitForTestId(canvasElement, "arrow-duel-what-if-overlay");
+    await expectTestIdText(
+      canvasElement,
+      "arrow-duel-what-if-detail",
+      "Find the opponent’s reply. There is no time limit."
+    );
+    expectTestIdAbsent(canvasElement, "arrow-duel-what-if-settings-hint");
+    expectTestIdAbsent(canvasElement, "arrow-duel-reply-timer");
+  }
+};
+
 export const SurvivalEmptyHomeSource: Story = {
   name: "Survival · Empty Home source",
   args: { scenarioId: "practice-personal-best-empty-home-source" },
@@ -228,7 +256,7 @@ export const SurvivalHighestLevel: Story = {
 };
 
 export const PersonalBestGuide: Story = {
-  name: "Survival · first-use guide",
+  name: "Survival · rules",
   args: { scenarioId: "practice-personal-best-guide" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-guide");
@@ -237,6 +265,8 @@ export const PersonalBestGuide: Story = {
     await waitForText(canvasElement, "Three mistakes end the Run");
     await waitForText(canvasElement, "No time limit");
     await waitForText(canvasElement, "Pause now, continue later");
+    await expectTestIdText(canvasElement, "personal-best-guide-start", "Got it");
+    expectTestIdAbsent(canvasElement, "personal-best-guide-not-now");
   }
 };
 

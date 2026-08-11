@@ -1,6 +1,6 @@
 # Survival Challenge Design
 
-Status date: 2026-08-10  
+Status date: 2026-08-11
 Issue: [#492](https://github.com/Chessticize/chessticize-mobile/issues/492)  
 Phase: Approved Storybook design contract; production implementation in review.
 
@@ -57,6 +57,9 @@ time.
   state, Puzzle or Arrow Duel phase, score, mistakes, selection cursor, active
   time, level, and rule version.
 - Active time stops while paused or backgrounded. A paused Run has no expiry.
+- Backgrounding derives the same puzzle-hidden `Resume` / `Leave paused`
+  surface from the authoritative paused Run state; foregrounding never leaves
+  an unexplained blank session shell.
 - The Storybook interaction uses the same domain pause/resume transition as a
   Sprint: opening the puzzle-hidden pause surface freezes both Run and
   per-puzzle active time, and resuming shifts the active deadlines by exactly
@@ -139,10 +142,12 @@ Practice Home keeps one Survival module.
   count for the others.
 - A newly reached best is labeled `New best saved` even while the Run remains
   paused and resumable.
-- `Continue` resumes the latest exact state. The additional-count action opens
+- The paused summary is one whole-card button into the Hub. Home never resumes
+  Survival directly; `Continue` appears only beside the exact saved Run inside
   the Hub.
 
-The one-page Survival Hub contains:
+The full-page Survival Hub starts at the top, uses Back rather than Close, and
+contains:
 
 1. All in-progress Runs for the selected type, sorted by last touched.
 2. Puzzle or Arrow Duel.
@@ -151,11 +156,19 @@ The one-page Survival Hub contains:
 5. One compact summary with no time limit and a three-mistake end condition.
 6. One `Survival records` entry summarizing completed and in-progress Runs.
 
+The adjacent selected level uses the short label `Recommended`, avoiding
+character-level wrapping on supported phone widths.
+
 If the selected type and level already has an in-progress Run, the Hub action
 says `Continue Survival`; it never offers a reset that discards mistakes.
 Otherwise, Start carries the exact selected challenge type, level, Rating
 source, source Rating snapshot, and level-specific best into the first-use
 guide and the active Run. The guide never reverts to the Hub defaults.
+
+`How it works` on Home and `?` in the Hub are informational entries. Their
+primary action is `Got it`; it returns to the originating Home or Hub without
+starting or resuming a Run. Only an unseen first-use guide reached after an
+explicit `Start Survival` intent retains `Start Survival` and `Not now`.
 
 All Survival disclosures use the same short motion contract instead of
 appearing or disappearing abruptly:
@@ -195,6 +208,11 @@ type, Rating source, and level selection.
 Arrow Duel is a separate Survival type and best namespace.
 
 - Every puzzle includes the candidate choice and required opponent reply.
+- The ordinary Arrow Duel opponent-reply setting does not apply to Survival;
+  Survival always renders and scores its required reply without optional
+  Settings copy.
+- The required reply has no countdown or timeout, matching Survival's
+  no-time-limit contract.
 - The puzzle scores only after both stages are correct.
 - A wrong candidate or wrong reply adds exactly one mistake for that puzzle,
   never two.
@@ -226,8 +244,9 @@ first empty batch proved full-pool exhaustion.
 
 ## Storybook boundary
 
-The Interaction Lab demonstrates the expected Home, Hub, Rating-source,
-unavailable saved source, highest-level, empty-Home, first-use, active,
+The Interaction Lab demonstrates the expected Home, full-page Hub,
+informational rules, Rating-source, unavailable saved source, highest-level,
+empty-Home, first-use start, active,
 puzzle-hidden pause, third-mistake result, full-pool `Perfect clear`, and
 dedicated Survival records states. General History deliberately has no
 Survival summary module.

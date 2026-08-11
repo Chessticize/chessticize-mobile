@@ -104,14 +104,12 @@ export type PersonalBestChallengeDesignPreview = {
 
 export function PersonalBestHomeCard({
   presentation,
-  onContinue,
   onHowItWorks,
   onOpenHub
 }: {
   presentation: PersonalBestChallengeDesignPreview;
-  onContinue: (runId: string) => void;
   onHowItWorks: () => void;
-  onOpenHub: () => void;
+  onOpenHub: (run?: PersonalBestPausedRunPresentation) => void;
 }): React.JSX.Element {
   const pausedRuns = presentation.pausedRuns ?? [];
   const latestPaused = pausedRuns[0] ?? null;
@@ -121,10 +119,13 @@ export function PersonalBestHomeCard({
     const reachedNewBest = presentation.bestScore === null
       || latestPaused.score > presentation.bestScore;
     return (
-      <View
-        accessibilityLabel={`Survival paused. ${typeLabel}. Level ${latestPaused.minRating} to ${latestPaused.maxRating}. ${latestPaused.score} solved. ${latestPaused.mistakeCount} of 3 mistakes. ${morePausedCount} more paused Runs.`}
+      <Pressable
+        accessibilityLabel={`Survival paused. ${typeLabel}. Level ${latestPaused.minRating} to ${latestPaused.maxRating}. ${latestPaused.score} solved. ${latestPaused.mistakeCount} of 3 mistakes. ${morePausedCount} more paused ${morePausedCount === 1 ? "Run" : "Runs"}.`}
+        accessibilityHint="Opens the Survival Hub"
+        accessibilityRole="button"
         style={styles.homeCard}
         testID="personal-best-home-card"
+        onPress={() => onOpenHub(latestPaused)}
       >
         <View style={styles.homeCardHeader}>
           <View style={styles.homeTitleBlock}>
@@ -150,39 +151,18 @@ export function PersonalBestHomeCard({
             <Text style={styles.pausedHomeMetaText}>{latestPaused.lastTouchedLabel}</Text>
           </View>
         </View>
-        <View style={styles.actionRow}>
+        <View style={styles.pausedHomeOpenRow}>
           {morePausedCount > 0 ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Open ${morePausedCount} more paused Survival Runs`}
-              style={styles.secondaryAction}
-              testID="personal-best-more-paused"
-              onPress={onOpenHub}
-            >
-              <Text style={styles.secondaryActionText}>{morePausedCount} more paused</Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Choose another Survival Run"
-              style={styles.secondaryAction}
-              testID="personal-best-choose-another"
-              onPress={onOpenHub}
-            >
-              <Text style={styles.secondaryActionText}>Challenges</Text>
-            </Pressable>
-          )}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Continue ${typeLabel} Survival`}
-            style={styles.primaryAction}
-            testID="personal-best-continue"
-            onPress={() => onContinue(latestPaused.id)}
-          >
-            <Text style={styles.primaryActionText}>Continue</Text>
-          </Pressable>
+            <Text style={styles.pausedHomeMoreText} testID="personal-best-more-paused-count">
+              {morePausedCount} more paused
+            </Text>
+          ) : <View />}
+          <View style={styles.pausedHomeOpenAction}>
+            <Text style={styles.pausedHomeOpenText}>Open Survival</Text>
+            <Text style={styles.pausedHomeOpenChevron}>›</Text>
+          </View>
         </View>
-      </View>
+      </Pressable>
     );
   }
   const bestLabel = presentation.bestScore === null
@@ -244,7 +224,7 @@ export function PersonalBestHomeCard({
           accessibilityLabel="Choose a Survival Run"
           style={styles.primaryAction}
           testID="personal-best-start"
-          onPress={onOpenHub}
+          onPress={() => onOpenHub()}
         >
           <Text style={styles.primaryActionText}>Choose a challenge</Text>
         </Pressable>
@@ -254,11 +234,17 @@ export function PersonalBestHomeCard({
 }
 
 export function PersonalBestGuide({
+  acknowledgementOnly = false,
+  backAccessibilityLabel = "Back from Survival guide",
   presentation,
+  onAcknowledge,
   onClose,
   onStart
 }: {
+  acknowledgementOnly?: boolean;
+  backAccessibilityLabel?: string;
   presentation: PersonalBestChallengeDesignPreview;
+  onAcknowledge: () => void;
   onClose: () => void;
   onStart: () => void;
 }): React.JSX.Element {
@@ -293,12 +279,12 @@ export function PersonalBestGuide({
       <View style={styles.guideTopBar}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Close Survival guide"
+          accessibilityLabel={backAccessibilityLabel}
           style={styles.closeButton}
           testID="personal-best-guide-close"
           onPress={onClose}
         >
-          <Text style={styles.closeButtonText}>×</Text>
+          <Text style={styles.recordsBackText}>‹</Text>
         </Pressable>
         <Text style={styles.guideTopBarTitle}>Survival</Text>
         <View style={styles.closeButton} />
@@ -339,22 +325,24 @@ export function PersonalBestGuide({
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Start Survival"
+        accessibilityLabel={acknowledgementOnly ? "Acknowledge Survival rules" : "Start Survival"}
         style={styles.guideStartAction}
         testID="personal-best-guide-start"
-        onPress={onStart}
+        onPress={acknowledgementOnly ? onAcknowledge : onStart}
       >
-        <Text style={styles.primaryActionText}>Start Survival</Text>
+        <Text style={styles.primaryActionText}>{acknowledgementOnly ? "Got it" : "Start Survival"}</Text>
       </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Not now"
-        style={styles.guideNotNowAction}
-        testID="personal-best-guide-not-now"
-        onPress={onClose}
-      >
-        <Text style={styles.secondaryActionText}>Not now</Text>
-      </Pressable>
+      {!acknowledgementOnly ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Not now"
+          style={styles.guideNotNowAction}
+          testID="personal-best-guide-not-now"
+          onPress={onClose}
+        >
+          <Text style={styles.secondaryActionText}>Not now</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -445,7 +433,7 @@ export function PersonalBestChallengeHub({
           ? "Harder"
           : sourceAboveAvailableLevels
             ? "Highest available"
-            : "Your level"
+            : "Recommended"
     }))
     .filter((level) => Math.abs(level.index - recommendedIndex) <= 1);
   const compactFourDigitLevelRanges = viewportWidth < 480 && adjacentLevels.length === 3;
@@ -512,12 +500,12 @@ export function PersonalBestChallengeHub({
       <View style={styles.guideTopBar}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Close Survival"
+          accessibilityLabel="Back to Practice"
           style={styles.closeButton}
           testID="personal-best-hub-close"
           onPress={onClose}
         >
-          <Text style={styles.closeButtonText}>×</Text>
+          <Text style={styles.recordsBackText}>‹</Text>
         </Pressable>
         <Text style={styles.hubTopBarTitle}>Survival</Text>
         <Pressable
@@ -720,7 +708,7 @@ export function PersonalBestChallengeHub({
                     onPress={() => setSelectedBand({ minRating: level.minRating, maxRating: level.maxRating })}
                   >
                     <Text style={[styles.levelCardLabel, selected ? styles.levelCardLabelSelected : null]}>
-                      {level.label}{level.label === "Your level" ? " · Recommended" : ""}
+                      {level.label}
                     </Text>
                     <Text
                       adjustsFontSizeToFit
@@ -2307,12 +2295,7 @@ const styles = StyleSheet.create({
   },
   hubScreen: {
     alignSelf: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 20,
-    borderWidth: 1,
-    maxWidth: 680,
-    padding: 16
+    maxWidth: 680
   },
   hubSection: {
     marginTop: 18
@@ -2477,6 +2460,36 @@ const styles = StyleSheet.create({
     color: "#64748B",
     fontSize: 11,
     fontWeight: "600"
+  },
+  pausedHomeOpenChevron: {
+    color: "#1D4ED8",
+    fontSize: 24,
+    fontWeight: "500",
+    lineHeight: 26
+  },
+  pausedHomeMoreText: {
+    color: "#64748B",
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  pausedHomeOpenAction: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4
+  },
+  pausedHomeOpenRow: {
+    alignItems: "center",
+    borderTopColor: "#BFDBFE",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+    paddingTop: 12
+  },
+  pausedHomeOpenText: {
+    color: "#1D4ED8",
+    fontSize: 14,
+    fontWeight: "800"
   },
   pausedHomeSummary: {
     alignItems: "center",

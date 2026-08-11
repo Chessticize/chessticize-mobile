@@ -7952,29 +7952,170 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "session-board")).toThrow();
     press(renderer, "personal-best-pause-and-leave");
     expect(service.getActiveSprint()).toBeUndefined();
-    expect(service.listResumableSurvivalRuns()[0]?.currentPuzzle?.puzzle.id).toBe(pausedPuzzleId);
+    const pausedRun = service.listResumableSurvivalRuns()[0];
+    expect(pausedRun?.currentPuzzle?.puzzle.id).toBe(pausedPuzzleId);
     expect(collectText(findByTestId(renderer, "personal-best-home-score"))).toBe("1");
 
-    press(renderer, "personal-best-continue");
+    press(renderer, "personal-best-home-card");
+    press(renderer, `personal-best-paused-continue-${pausedRun?.id}`);
     expect(service.getActiveSprint()?.currentPuzzle?.puzzle.id).toBe(pausedPuzzleId);
     expect(service.getActiveSprint()?.survival?.sittings).toBe(2);
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 solved");
   });
 
-  it("resumes the latest paused Survival Run directly from Home", () => {
+  it.each([
+    { feedbackColor: "rgba(22, 163, 74, 0.34)", move: "e6e7", result: "correct" },
+    { feedbackColor: "rgba(220, 38, 38, 0.32)", move: "e6d6", result: "wrong" }
+  ])("keeps production Survival $result feedback and the next entry animation after the synthetic Sprint deadline", async ({
+    feedbackColor,
+    move
+  }) => {
+    const service = createProductionSurvivalService();
+    let nowMs = Date.parse("2026-08-11T12:00:00.000Z");
+    const renderer = renderScreen({
+      currentTimeMs: () => nowMs,
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-hub-start");
+    press(renderer, "personal-best-guide-start");
+    await settleEntryPreview();
+    const submittedPuzzleId = collectText(findByTestId(renderer, "session-current-puzzle-id"));
+    const board = findByTestId(renderer, "mock-chessboard");
+    const imperativeMove = board.props.mockImperativeMove as jest.Mock;
+    imperativeMove.mockClear();
+
+    nowMs += 2_000;
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    await boardMove(renderer, move);
+    const nextPuzzle = service.getActiveSprint()?.currentPuzzle;
+    if (!nextPuzzle || nextPuzzle.puzzle.id === submittedPuzzleId) {
+      throw new Error("Expected Survival to select the next puzzle behind feedback");
+    }
+
+    expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
+    expect(hasStyleValue(renderer.root, feedbackColor)).toBe(true);
+    expect(collectText(findByTestId(renderer, "session-current-puzzle-id"))).toBe(submittedPuzzleId);
+    expect(imperativeMove).not.toHaveBeenCalledWith(
+      parseBoardMove(nextPuzzle.puzzle.solutionMoves[0]!)
+    );
+
+    await settleFeedbackSnapshot();
+
+    expect(collectText(findByTestId(renderer, "session-current-puzzle-id"))).toBe(nextPuzzle.puzzle.id);
+    expect(imperativeMove).toHaveBeenCalledWith(
+      parseBoardMove(nextPuzzle.puzzle.solutionMoves[0]!)
+    );
+    expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(nextPuzzle.currentFen);
+    expect(findByTestId(renderer, "session-last-move-overlay").props.accessibilityLabel).toBe(
+      `Last move ${nextPuzzle.puzzle.solutionMoves[0]!.slice(0, 2)} to ${nextPuzzle.puzzle.solutionMoves[0]!.slice(2, 4)}`
+    );
+  });
+
+  it("shows the hidden-puzzle Survival pause surface when the app backgrounds", async () => {
+    const service = createProductionSurvivalService();
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-08-11T12:00:00.000Z"),
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-hub-start");
+    press(renderer, "personal-best-guide-start");
+    await boardMove(renderer, "e6e7");
+    await settleFeedbackSnapshot();
+
+    act(() => {
+      (AppState as unknown as { __emit: (nextState: string) => void }).__emit("background");
+      (AppState as unknown as { __emit: (nextState: string) => void }).__emit("active");
+    });
+
+    expect(service.getActiveSprint()?.status).toBe("paused");
+    expect(collectText(findByTestId(renderer, "session-abandon-confirmation"))).toContain(
+      "Survival paused"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-exit-best"))).toBe(
+      "New best 1 · already saved"
+    );
+    expect(collectText(findByTestId(renderer, "session-abandon-confirmation"))).toContain(
+      "Your puzzle is hidden. Resume here, or leave it paused and continue any time."
+    );
+    expect(findByTestId(renderer, "personal-best-pause-and-leave")).toBeTruthy();
+    expect(findByTestId(renderer, "session-abandon-cancel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+  });
+
+  it("pauses active Survival with Android Back and leaves the saved Run on a second Back", () => {
+    const service = createProductionSurvivalService();
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true,
+      systemBack
+    });
+
+    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-hub-start");
+    press(renderer, "personal-best-guide-start");
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(service.getActiveSprint()?.status).toBe("paused");
+    expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(service.listResumableSurvivalRuns()).toHaveLength(1);
+    expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
+  });
+
+  it("opens the Survival Hub from the paused Home card before a Run can resume", () => {
     const renderer = renderLabScenario("practice-home");
 
     expect(collectText(findByTestId(renderer, "personal-best-home-score"))).toBe("19");
     expect(collectText(findByTestId(renderer, "personal-best-home-card"))).toContain(
       "New best saved"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-more-paused"))).toBe("2 more paused");
-    press(renderer, "personal-best-continue");
+    expect(findByTestId(renderer, "personal-best-home-card").props.accessibilityRole).toBe("button");
+    expect(collectText(findByTestId(renderer, "personal-best-home-card"))).toContain("Open Survival");
+    expect(collectText(findByTestId(renderer, "personal-best-more-paused-count"))).toBe("2 more paused");
+    expect(() => findByTestId(renderer, "personal-best-continue")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-more-paused")).toThrow();
+    press(renderer, "personal-best-home-card");
 
-    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("19 solved");
-    expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
-      "Mistakes 1 of 3"
+    expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "personal-best-paused-continue-puzzle-900"))).toBe(
+      "Continue"
     );
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+  });
+
+  it("opens the Hub on the latest paused Survival type and exact Run", () => {
+    const service = createProductionArrowSurvivalService();
+    const started = service.startSurvival({
+      challengeType: "arrow_duel",
+      level: { minRating: 900, maxRating: 999 },
+      ratingSourceRunId: "arrow-duel"
+    }, "2026-08-11T12:00:00.000Z");
+    service.pauseSprint("2026-08-11T12:00:05.000Z");
+    service.leavePausedSurvival();
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-08-11T12:01:00.000Z"),
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "personal-best-home-card");
+
+    expect(findByTestId(renderer, "personal-best-type-arrow_duel").props.accessibilityState).toEqual({
+      selected: true
+    });
+    expect(findByTestId(renderer, `personal-best-paused-continue-${started.id}`)).toBeTruthy();
   });
 
   it("continues an existing Survival level without an End or reset action", () => {
@@ -7986,6 +8127,126 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "personal-best-paused-end-puzzle-900")).toThrow();
     press(renderer, "personal-best-hub-start");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("19 solved");
+  });
+
+  it("presents the Survival Hub as a full page with a back action and an unclipped recommendation", () => {
+    const renderer = renderLabScenario("practice-personal-best-hub");
+
+    expect(findByTestId(renderer, "personal-best-hub-close").props.accessibilityLabel).toBe(
+      "Back to Practice"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-hub-close"))).toBe("‹");
+    expect(collectText(findByTestId(renderer, "personal-best-level-900"))).toBe(
+      "Recommended900–999Best 19"
+    );
+  });
+
+  it("returns through Survival records, rules, and Hub with Android Back", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderScreen({
+      practiceService: createProductionSurvivalService(),
+      runManagementEnabled: true,
+      systemBack
+    });
+
+    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-hub-records");
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
+    expect(() => findByTestId(renderer, "personal-best-records-screen")).toThrow();
+
+    press(renderer, "personal-best-hub-help");
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
+    expect(() => findByTestId(renderer, "personal-best-guide")).toThrow();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
+    expect(() => findByTestId(renderer, "personal-best-hub")).toThrow();
+  });
+
+  it("scrolls every Survival page entry back to the top", () => {
+    const nativeScrollMock = ReactNative as unknown as {
+      __getScrollViewCommands?: () => Array<{ animated: boolean; y: number }>;
+    };
+    const renderer = renderScreen({
+      practiceService: createProductionSurvivalService(),
+      runManagementEnabled: true
+    });
+    const mainScroll = findByTestId(renderer, "practice-main-scroll");
+    act(() => {
+      mainScroll.props.onScroll({ nativeEvent: { contentOffset: { y: 640 } } });
+    });
+
+    press(renderer, "personal-best-start");
+
+    expect(nativeScrollMock.__getScrollViewCommands?.()).toContainEqual({
+      animated: false,
+      y: 0
+    });
+  });
+
+  it("acknowledges Survival rules opened from Home without starting a Run", () => {
+    const service = createProductionSurvivalService();
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-08-11T12:00:00.000Z"),
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "personal-best-how-it-works");
+    expect(collectText(findByTestId(renderer, "personal-best-guide-start"))).toBe("Got it");
+    expect(() => findByTestId(renderer, "personal-best-guide-not-now")).toThrow();
+    press(renderer, "personal-best-guide-start");
+
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
+    expect(() => findByTestId(renderer, "personal-best-guide")).toThrow();
+
+    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-hub-start");
+    expect(service.getActiveSprint()?.status).toBe("active");
+    expect(() => findByTestId(renderer, "personal-best-guide")).toThrow();
+  });
+
+  it("does not mark Survival rules seen when the user backs out", () => {
+    const service = createProductionSurvivalService();
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-08-11T12:00:00.000Z"),
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "personal-best-how-it-works");
+    press(renderer, "personal-best-guide-close");
+    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-hub-start");
+
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(collectText(findByTestId(renderer, "personal-best-guide-start"))).toBe("Start Survival");
+    expect(findByTestId(renderer, "personal-best-guide-not-now")).toBeTruthy();
+  });
+
+  it("returns from Survival rules opened with the Hub question mark without starting", () => {
+    const service = createProductionSurvivalService();
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-08-11T12:00:00.000Z"),
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-hub-help");
+    expect(collectText(findByTestId(renderer, "personal-best-guide-start"))).toBe("Got it");
+    press(renderer, "personal-best-guide-start");
+
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
+    expect(() => findByTestId(renderer, "personal-best-guide")).toThrow();
+
+    press(renderer, "personal-best-hub-start");
+    expect(service.getActiveSprint()?.status).toBe("active");
+    expect(() => findByTestId(renderer, "personal-best-guide")).toThrow();
   });
 
   it("animates Survival disclosures and removes collapsed content from interaction", () => {
@@ -8166,6 +8427,31 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).toContain("Choose the best move");
     expect(collectText(renderer.root)).toContain("between the two arrows");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 solved");
+  });
+
+  it("requires the Arrow Duel reply in Survival even when ordinary Runs disable it", async () => {
+    const service = createProductionArrowSurvivalService();
+    service.saveSettings({
+      ...service.getSettings(),
+      arrowDuel: { opponentReplyEnabled: false }
+    });
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    press(renderer, "personal-best-start");
+    press(renderer, "personal-best-type-arrow_duel");
+    press(renderer, "personal-best-hub-start");
+    press(renderer, "personal-best-guide-start");
+    const arrow = requireArrowDuelState(service.getActiveSprint());
+    await boardMove(renderer, arrow.correctMove);
+    await settleArrowDuelReplyHandoff();
+
+    expect(findByTestId(renderer, "arrow-duel-reply-challenge")).toBeTruthy();
+    expect(() => findByTestId(renderer, "arrow-duel-reply-timer")).toThrow();
+    expect(collectVisibleText(renderer.root)).not.toContain("Optional · Turn off in Settings");
+    expect(collectVisibleText(renderer.root)).not.toContain("1 second");
   });
 
   it("shows every Core Pack Survival level and clamps a higher Rating to 2100–2200", () => {
@@ -15478,6 +15764,24 @@ function createProductionSurvivalService(): PracticeService {
   });
 }
 
+function createProductionArrowSurvivalService(): PracticeService {
+  const store = new MemoryStore();
+  store.seedPuzzles(tacticalProfilePuzzleFixture
+    .filter(isServerCompatibleArrowDuelPuzzle)
+    .slice(0, 12)
+    .map((puzzle, index) => ({
+      ...puzzle,
+      id: `component-survival-arrow-${index}`,
+      rating: 900 + index
+    })));
+  const service = new PracticeService(store, undefined, {
+    survivalPackVersion: 5,
+    survivalPackHash: "sha256:component-survival-arrow"
+  });
+  service.setPracticeRunRating("arrow-duel", 925);
+  return service;
+}
+
 function createMultiContextDueReviewService(): PracticeService {
   const service = createMobilePracticeService("random1000");
   service.startSprint(
@@ -16304,8 +16608,8 @@ function activeSprintForTest(service: ReturnType<typeof createMobilePracticeServ
   return state;
 }
 
-function requireArrowDuelState(state: SprintState): ArrowDuelState {
-  if (state.currentPuzzle?.kind !== "arrow_duel") {
+function requireArrowDuelState(state: SprintState | undefined): ArrowDuelState {
+  if (!state || state.currentPuzzle?.kind !== "arrow_duel") {
     throw new Error("Expected an active Arrow Duel puzzle");
   }
   return state.currentPuzzle;
