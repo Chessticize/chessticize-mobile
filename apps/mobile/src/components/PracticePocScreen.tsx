@@ -1019,6 +1019,7 @@ export function PracticePocScreen({
   const [mobileBackPreview, setMobileBackPreview] = useState<MobileBackPreview | null>(null);
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
+  const [iCloudSyncInProgress, setICloudSyncInProgress] = useState(false);
   const iCloudAccountStatusRef =
     useRef<ICloudAccountStatus | "not_checked">("not_checked");
   const [lastICloudSyncFailure, setLastICloudSyncFailure] =
@@ -1639,6 +1640,7 @@ export function PracticePocScreen({
   function saveICloudSyncEnabled(enabled: boolean): void {
     iCloudSyncGenerationRef.current += 1;
     iCloudSyncInFlightRef.current = null;
+    setICloudSyncInProgress(false);
     service.saveSettings({
       ...service.getSettings(),
       sync: {
@@ -1719,7 +1721,7 @@ export function PracticePocScreen({
       service.getSettings().sync.iCloudEnabled;
 
     const work = (async () => {
-      setICloudSyncStatus("Syncing");
+      setICloudSyncInProgress(true);
       try {
         const accountStatus = await iCloudSyncClient.getAccountStatus();
         if (!isCurrent()) {
@@ -1768,6 +1770,7 @@ export function PracticePocScreen({
     void work.finally(() => {
       if (iCloudSyncInFlightRef.current === work) {
         iCloudSyncInFlightRef.current = null;
+        setICloudSyncInProgress(false);
       }
     });
     return work;
@@ -5441,6 +5444,7 @@ export function PracticePocScreen({
                 captureBottomInset={settingsCaptureBottomInset}
                 iCloudSyncEnabled={iCloudSyncEnabled}
                 iCloudSyncErrorDetails={effectiveErrorDetails}
+                iCloudSyncInProgress={iCloudSyncInProgress}
                 iCloudSyncStatus={iCloudSyncErrorDetails ? "iCloud sync failed" : iCloudSyncStatus}
                 iCloudSyncSupportBundle={effectiveSupportBundle}
                 moveFeedbackPreferences={moveFeedbackPreferences}
@@ -16246,6 +16250,7 @@ function SettingsPanel({
   onSyncICloudNow,
   iCloudSyncEnabled,
   iCloudSyncErrorDetails,
+  iCloudSyncInProgress,
   iCloudSyncStatus,
   iCloudSyncSupportBundle,
   moveFeedbackPreferences,
@@ -16281,6 +16286,7 @@ function SettingsPanel({
   onSyncICloudNow: () => Promise<string>;
   iCloudSyncEnabled: boolean;
   iCloudSyncErrorDetails?: ICloudSyncErrorDetailsPresentation;
+  iCloudSyncInProgress: boolean;
   iCloudSyncStatus: string;
   iCloudSyncSupportBundle?: ICloudSyncSupportBundlePresentation;
   moveFeedbackPreferences: MoveFeedbackPreferences;
@@ -16344,9 +16350,10 @@ function SettingsPanel({
           </View>
           {iCloudSyncEnabled ? (
             <>
-              <SettingsActionRow
+              <SettingsActionButton
                 label="Sync Now"
                 detail="Merge ratings, history, and review queue with your private iCloud."
+                loading={iCloudSyncInProgress}
                 testID="settings-sync-now"
                 onPress={() => {
                   void onSyncICloudNow().then((message) => {
@@ -16894,6 +16901,51 @@ function SettingsActionRow({
       </View>
       <ChevronGlyph direction="right" />
     </Pressable>
+  );
+}
+
+function SettingsActionButton({
+  detail,
+  label,
+  loading,
+  onPress,
+  testID
+}: {
+  detail: string;
+  label: string;
+  loading: boolean;
+  onPress: () => void;
+  testID: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.settingsActionButtonRow}>
+      <Text style={[styles.helperText, styles.settingsActionButtonDetail]} testID={`${testID}-detail`}>
+        {detail}
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={loading ? "Syncing progress" : label}
+        accessibilityState={{ busy: loading, disabled: loading }}
+        disabled={loading}
+        testID={testID}
+        style={[
+          styles.settingsActionButton,
+          loading ? styles.settingsActionButtonDisabled : null
+        ]}
+        onPress={onPress}
+      >
+        {loading ? (
+          <ActivityIndicator
+            color="#FFFFFF"
+            size="small"
+            testID={`${testID}-spinner`}
+          />
+        ) : null}
+        <Text style={styles.settingsActionButtonText} testID={`${testID}-label`}>
+          {loading ? "Syncing…" : label}
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -22619,6 +22671,41 @@ const styles = StyleSheet.create({
     minHeight: 58,
     paddingHorizontal: 12,
     paddingVertical: 10
+  },
+  settingsActionButtonRow: {
+    alignItems: "center",
+    borderBottomColor: "#E2E8F0",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  settingsActionButtonDetail: {
+    flex: 1,
+    minWidth: 200
+  },
+  settingsActionButton: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    marginLeft: "auto",
+    minHeight: 40,
+    minWidth: 128,
+    paddingHorizontal: 16
+  },
+  settingsActionButtonDisabled: {
+    backgroundColor: "#64748B"
+  },
+  settingsActionButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800"
   },
   settingsDestructiveText: {
     color: "#DC2626"
