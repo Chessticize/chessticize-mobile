@@ -8220,6 +8220,19 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
   });
 
+  it("pauses Survival on the first Back after continuing above the Rating source picker", () => {
+    const systemBack = createTestSystemBackSource("android");
+    const renderer = renderLabScenario("practice-personal-best-source-run", { systemBack });
+
+    expect(findByTestId(renderer, "personal-best-source-picker")).toBeTruthy();
+    press(renderer, "personal-best-paused-continue-puzzle-900");
+    expect(findByTestId(renderer, "session-board")).toBeTruthy();
+
+    expect(systemBack.invoke()).toBe(true);
+    expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+  });
+
   it("scrolls every Survival page entry back to the top", () => {
     const nativeScrollMock = ReactNative as unknown as {
       __getScrollViewCommands?: () => Array<{ animated: boolean; y: number }>;
@@ -8304,23 +8317,41 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "personal-best-guide")).toThrow();
   });
 
-  it("preserves a non-recommended level across rules and first-use guide detours", () => {
+  it("preserves type, source, and level across rules and first-use guide detours", () => {
     const rulesRenderer = renderLabScenario("practice-personal-best-hub");
-    press(rulesRenderer, "personal-best-level-800");
+    press(rulesRenderer, "personal-best-type-arrow_duel");
+    press(rulesRenderer, "personal-best-use-another-run");
+    press(rulesRenderer, "personal-best-source-arrow-duel-study");
+    press(rulesRenderer, "personal-best-level-1000");
     press(rulesRenderer, "personal-best-hub-help");
     press(rulesRenderer, "personal-best-guide-start");
-    expect(findByTestId(rulesRenderer, "personal-best-level-800").props.accessibilityState).toEqual({
+    expect(findByTestId(rulesRenderer, "personal-best-type-arrow_duel").props.accessibilityState).toEqual({
+      selected: true
+    });
+    expect(collectText(findByTestId(rulesRenderer, "personal-best-reference-source"))).toContain(
+      "Based on Arrow Duel Study · Rating 936"
+    );
+    expect(findByTestId(rulesRenderer, "personal-best-level-1000").props.accessibilityState).toEqual({
       selected: true
     });
 
     const firstUseRenderer = renderLabScenario("practice-personal-best-hub");
-    press(firstUseRenderer, "personal-best-level-800");
+    press(firstUseRenderer, "personal-best-type-arrow_duel");
+    press(firstUseRenderer, "personal-best-use-another-run");
+    press(firstUseRenderer, "personal-best-source-arrow-duel-study");
+    press(firstUseRenderer, "personal-best-level-1000");
     press(firstUseRenderer, "personal-best-hub-start");
     expect(collectText(findByTestId(firstUseRenderer, "personal-best-guide-start"))).toBe(
       "Start Survival"
     );
     press(firstUseRenderer, "personal-best-guide-not-now");
-    expect(findByTestId(firstUseRenderer, "personal-best-level-800").props.accessibilityState).toEqual({
+    expect(findByTestId(firstUseRenderer, "personal-best-type-arrow_duel").props.accessibilityState).toEqual({
+      selected: true
+    });
+    expect(collectText(findByTestId(firstUseRenderer, "personal-best-reference-source"))).toContain(
+      "Based on Arrow Duel Study · Rating 936"
+    );
+    expect(findByTestId(firstUseRenderer, "personal-best-level-1000").props.accessibilityState).toEqual({
       selected: true
     });
   });

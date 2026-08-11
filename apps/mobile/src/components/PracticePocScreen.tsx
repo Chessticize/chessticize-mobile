@@ -2553,6 +2553,7 @@ export function PracticePocScreen({
       const nextState = run.resumeState
         ?? service.resumeSurvival(run.id, captureLiveNowIso());
       selectPersonalBestPausedRun(run);
+      setPersonalBestSourcePickerVisible(false);
       setPersonalBestHubVisible(false);
       setMode(nextState.config.mode);
       commitState(nextState);
