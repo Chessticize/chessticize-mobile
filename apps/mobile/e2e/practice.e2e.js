@@ -35,6 +35,31 @@ const {
 // the actual runtime candidates before checking that both neutral arrows paint.
 const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v4:23';
 
+async function waitForRunFramesToSettle(sourceTestID, targetTestID, timeoutMs = 5000) {
+  const startedAt = Date.now();
+  let previousSourceFrame;
+  let previousTargetFrame;
+  let stableSamples = 0;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const sourceFrame = await frameFor(element(by.id(sourceTestID)));
+    const targetFrame = await frameFor(element(by.id(targetTestID)));
+    const framesStable = previousSourceFrame
+      && previousTargetFrame
+      && Math.abs(sourceFrame.y - previousSourceFrame.y) <= 0.5
+      && Math.abs(targetFrame.y - previousTargetFrame.y) <= 0.5;
+    stableSamples = framesStable ? stableSamples + 1 : 0;
+    if (stableSamples >= 4) {
+      return;
+    }
+    previousSourceFrame = sourceFrame;
+    previousTargetFrame = targetFrame;
+    await sleep(100);
+  }
+
+  throw new Error(`Expected ${sourceTestID} and ${targetTestID} frames to settle before dragging`);
+}
+
 async function waitForRunOrder(sourceTestID, targetTestID, timeoutMs = 5000) {
   const startedAt = Date.now();
   let sourceFrame;
@@ -44,7 +69,15 @@ async function waitForRunOrder(sourceTestID, targetTestID, timeoutMs = 5000) {
     sourceFrame = await frameFor(element(by.id(sourceTestID)));
     targetFrame = await frameFor(element(by.id(targetTestID)));
     if (sourceFrame.y > targetFrame.y) {
-      return;
+      // Native layout animation can expose the final visual order one frame
+      // before the Pressable hit targets settle. Require the order to persist
+      // through that transition before the journey taps the next card.
+      await sleep(750);
+      sourceFrame = await frameFor(element(by.id(sourceTestID)));
+      targetFrame = await frameFor(element(by.id(targetTestID)));
+      if (sourceFrame.y > targetFrame.y) {
+        return;
+      }
     }
     await sleep(100);
   }
@@ -120,6 +153,7 @@ describe('Practice POC', () => {
       await expect(element(by.id('practice-run-standard'))).toBeVisible();
       await expect(element(by.id('practice-run-arrow-duel'))).toBeVisible();
     }
+    await waitForRunFramesToSettle('practice-run-standard', 'practice-run-arrow-duel');
     // Keep the small verified scroll offset so both drag endpoints remain
     // actionable on shorter portrait viewports.
     const standardBefore = await frameFor(element(by.id('practice-run-standard')));
@@ -130,15 +164,17 @@ describe('Practice POC', () => {
     if (device.getPlatform() === 'android') {
       await dragAndroidElementToElement('practice-run-standard', 'practice-run-arrow-duel');
     } else {
+      // Start in the card's left padding gutter instead of its 50% flex-row
+      // boundary, where nested Pressables can make responder ownership vary.
       await element(by.id('practice-run-standard')).longPressAndDrag(
-        750,
-        0.5,
-        0.5,
+        2000,
+        0.03,
+        0.4,
         element(by.id('practice-run-arrow-duel')),
-        0.5,
-        0.9,
-        'slow',
-        200
+        0.03,
+        0.65,
+        'fast',
+        1000
       );
     }
     await waitForRunOrder('practice-run-standard', 'practice-run-arrow-duel');
