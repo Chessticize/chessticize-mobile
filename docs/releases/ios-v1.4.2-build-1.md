@@ -12,15 +12,12 @@
 
 - Restore synced progress more reliably when setting up another Apple device.
 - Open the pawn-promotion chooser more quickly.
-- Move pieces in Replay Analysis and Review without scrolling the surrounding
-  screen.
 
 ## Store copy (`en-US`)
 
 ```text
 • Restore synced progress more reliably when setting up another Apple device.
 • Open the pawn-promotion chooser more quickly.
-• Move pieces in Replay Analysis and Review without scrolling the surrounding screen.
 ```
 
 ## Release details
@@ -30,8 +27,7 @@
 ## GitHub customer summary
 
 Chessticize 1.4.2 improves progress restoration when setting up another Apple
-device, makes pawn promotion more responsive, and keeps Replay Analysis and
-Review board gestures from scrolling the surrounding screen.
+device and makes pawn promotion more responsive.
 
 ## Release-note review
 
