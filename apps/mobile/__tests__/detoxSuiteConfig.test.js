@@ -25,7 +25,8 @@ const {
   ANDROID_REVIEW_REMINDERS_TEST_MATCH,
   RESOURCE_SOAK_TEST_MATCH,
   resolveDetoxTestMatch,
-  resolveDetoxMaxWorkers
+  resolveDetoxMaxWorkers,
+  resolveDetoxTestTimeout
 } = require('../e2e/suiteConfig');
 const {
   bringAndroidAppToForeground,
@@ -1747,6 +1748,15 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).not.toContain('toHaveToggleValue');
   });
 
+  it('waits for the stable Sprint summary boundary after confirmed abandonment', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const confirmedAbandonments = flowsSpec.match(
+      /element\(by\.id\('session-abandon-confirm'\)\)\.tap\(\);[\s\S]{0,180}?waitFor\(element\(by\.id\('sprint-summary-panel'\)\)\)\.toExist\(\)\.withTimeout\(30000\);/g
+    ) ?? [];
+
+    expect(confirmedAbandonments).toHaveLength(3);
+  });
+
   it('targets current public controls in the practice suite', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
@@ -1889,6 +1899,10 @@ describe('Detox suite configuration', () => {
       CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT: '1'
     })).toEqual(IOS_LANDSCAPE_LAYOUT_TEST_MATCH);
     expect(IOS_LANDSCAPE_LAYOUT_TEST_MATCH).toEqual(MARKETING_ASSETS_TEST_MATCH);
+    expect(resolveDetoxTestTimeout({
+      CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT: '1'
+    })).toBe(1200000);
+    expect(resolveDetoxTestTimeout({})).toBe(300000);
 
     const spec = fs.readFileSync(
       path.resolve(__dirname, '../e2e/marketing-assets.e2e.js'),

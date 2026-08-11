@@ -14,6 +14,7 @@ const captureRunbook = readFileSync(
 const {
   assertCaptureDimensions,
   captureMarketingScreenshot,
+  resolveIosLandscapeValidationTarget,
   resolveMarketingCaptureTarget,
   sourceCommitForCapture,
   writeCombinedCaptureManifest,
@@ -21,6 +22,22 @@ const {
 } = require('../e2e/marketingCaptureArtifacts');
 
 describe('App Store marketing capture artifacts', () => {
+  it('accepts any dedicated iPad profile for screenshot-free landscape validation', () => {
+    expect(resolveIosLandscapeValidationTarget({
+      DETOX_IOS_DEVICE: 'iPad Pro 11-inch (M5)',
+    })).toEqual({
+      deviceFamily: 'ipad',
+      deviceName: 'iPad Pro 11-inch (M5)',
+      orientation: 'landscape',
+    });
+    expect(() => resolveIosLandscapeValidationTarget({
+      DETOX_IOS_DEVICE: 'Chessticize Marketing iPad Pro 13-inch (M5)',
+    })).not.toThrow();
+    expect(() => resolveIosLandscapeValidationTarget({
+      DETOX_IOS_DEVICE: 'iPhone 17 Pro Max',
+    })).toThrow('requires an iPad Simulator');
+  });
+
   it('fails closed on the wrong device family, orientation, or pixel dimensions', () => {
     const iphone = resolveMarketingCaptureTarget({
       CHESSTICIZE_MARKETING_DEVICE_FAMILY: 'iphone',

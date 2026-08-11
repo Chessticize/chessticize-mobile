@@ -1,5 +1,6 @@
 const {
   resolveDetoxMaxWorkers,
+  resolveDetoxTestTimeout,
   resolveDetoxTestMatch
 } = require('./suiteConfig');
 
@@ -7,7 +8,7 @@ module.exports = {
   rootDir: '..',
   testMatch: resolveDetoxTestMatch(),
   testPathIgnorePatterns: [],
-  testTimeout: 300000,
+  testTimeout: resolveDetoxTestTimeout(),
   forceExit: true,
   maxWorkers: resolveDetoxMaxWorkers(),
   globalSetup: 'detox/runners/jest/globalSetup',

@@ -61,6 +61,20 @@ function resolveMarketingCaptureTarget(environment, story) {
   };
 }
 
+function resolveIosLandscapeValidationTarget(environment) {
+  const deviceName = String(environment.DETOX_IOS_DEVICE ?? '').trim();
+  if (!/ipad/i.test(deviceName)) {
+    throw new Error(
+      'iOS landscape layout validation requires an iPad Simulator.'
+    );
+  }
+  return {
+    deviceFamily: 'ipad',
+    deviceName,
+    orientation: 'landscape',
+  };
+}
+
 function captureMarketingScreenshot({
   captureScreenshot,
   frame,
@@ -391,6 +405,7 @@ module.exports = {
   IPHONE_6_9_PORTRAIT_SIZES,
   assertCaptureDimensions,
   captureMarketingScreenshot,
+  resolveIosLandscapeValidationTarget,
   resolveMarketingCaptureTarget,
   sourceCommitForCapture,
   writeCombinedCaptureManifest,

@@ -18,6 +18,7 @@ const {
 const { waitForAndroidUiState } = require('./androidPublicUiEvidence');
 const {
   captureMarketingScreenshot,
+  resolveIosLandscapeValidationTarget,
   resolveMarketingCaptureTarget,
   sourceCommitForCapture,
   writeDeviceCaptureManifest,
@@ -54,9 +55,14 @@ const outputRoot = resolve(
     ?? resolve(repositoryRoot, 'scratch/store-assets/marketing/raw')
 );
 const sourceCommit = sourceCommitForCapture(repositoryRoot);
-const target = isGooglePlayCapture
-  ? resolveGooglePlayCaptureTarget(process.env)
-  : resolveMarketingCaptureTarget(process.env, story);
+let target;
+if (verifyIosLandscapeLayout) {
+  target = resolveIosLandscapeValidationTarget(process.env);
+} else if (isGooglePlayCapture) {
+  target = resolveGooglePlayCaptureTarget(process.env);
+} else {
+  target = resolveMarketingCaptureTarget(process.env, story);
+}
 const androidArtifact = isGooglePlayCapture
   ? resolveGooglePlayArtifactIdentity({
       environment: process.env,
