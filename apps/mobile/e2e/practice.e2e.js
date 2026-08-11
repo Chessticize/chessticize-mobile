@@ -147,8 +147,6 @@ describe('Practice POC', () => {
       if (standardAfterScroll.y >= arrowAfterScroll.y) {
         throw new Error('Expected a fast non-hold Edit Runs scroll gesture to preserve Run order');
       }
-      await element(by.id('practice-main-scroll')).scroll(20, 'up');
-      await sleep(100);
     } else {
       await expect(element(by.id('practice-run-standard'))).toBeVisible();
       await expect(element(by.id('practice-run-arrow-duel'))).toBeVisible();
@@ -169,7 +167,7 @@ describe('Practice POC', () => {
       await element(by.id('practice-run-standard')).longPressAndDrag(
         2000,
         0.03,
-        0.4,
+        0.8,
         element(by.id('practice-run-arrow-duel')),
         0.03,
         0.65,
