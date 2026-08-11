@@ -315,6 +315,8 @@ Before declaring code work complete:
 - When a refresh is required, the normal order is focused component tests, mobile typecheck, then simulator refresh.
 - Use `pnpm mobile:ios` to rebuild and relaunch the app when native or bundled code may have changed.
 - Do not run Detox E2E on the simulator used for manual testing. Detox launches the app with `delete: true` and wipes the app sandbox, including local SQLite history, sprint sessions, and review queue data. Use a dedicated simulator such as `iPhone 17-Detox` for local Detox runs.
+- After simulator or emulator work completes, fails, or is interrupted, shut down every test device started by that task to release host memory. Address each task-owned iOS simulator by exact UDID and each Android emulator by exact serial; never use a blanket `shutdown all` or kill an unrelated manual-testing device. Verify the post-cleanup booted/attached-device lists before handing off.
+- Leave a task-owned simulator or emulator running only when the owner explicitly asks for it to remain available, and record that exception in the handoff.
 - If Metro is not running or the simulator reports that it cannot connect to the development server, start Metro with `pnpm mobile:start` and then rerun the simulator refresh.
 - If simulator refresh is skipped because Xcode, Metro, or the simulator is unavailable, say that explicitly in the final response and include the exact command the next agent or developer should run.
 
