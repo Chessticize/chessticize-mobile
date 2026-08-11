@@ -23,6 +23,32 @@ const FINAL_MOVE = 'e8e2';
 // SwiftShader emulator, so this is an end-to-end guard against the user-visible
 // one-second-plus stall rather than a JS-render microbenchmark.
 const PROMOTION_PICKER_READY_BUDGET_MS = 900;
+const IOS_MODAL_DISMISSAL_BUDGET_MS = 3000;
+
+async function tapAfterIosModalDismissal(board, point) {
+  const startedAt = Date.now();
+
+  while (true) {
+    try {
+      await board.tapAtPoint(point);
+      console.log(
+        `[promotion-modal-dismissal] waitMs=${Date.now() - startedAt}`
+      );
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const elapsedMs = Date.now() - startedAt;
+      const systemTransitionBlockedTap = device.getPlatform() === 'ios'
+        && message.includes('UITransitionView')
+        && message.includes('not hittable');
+
+      if (!systemTransitionBlockedTap || elapsedMs >= IOS_MODAL_DISMISSAL_BUDGET_MS) {
+        throw error;
+      }
+      await sleep(100);
+    }
+  }
+}
 
 describe(`Promotion responsiveness (${PROMOTION_PUZZLE_ID})`, () => {
   beforeAll(async () => {
@@ -93,7 +119,13 @@ describe(`Promotion responsiveness (${PROMOTION_PUZZLE_ID})`, () => {
       10000,
       50
     );
-    await playBoardMove('session-board', FINAL_MOVE);
+    // The picker can disappear from the hierarchy before UIKit removes its
+    // transition view. Retry only the unconsumed first tap while that exact
+    // system overlay owns the hit point; all other failures remain immediate.
+    const finalMoveTargets = await boardTapTargets('session-board', FINAL_MOVE);
+    await tapAfterIosModalDismissal(finalMoveTargets.board, finalMoveTargets.from);
+    await sleep(250);
+    await finalMoveTargets.board.tapAtPoint(finalMoveTargets.to);
     await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
   });
 });
