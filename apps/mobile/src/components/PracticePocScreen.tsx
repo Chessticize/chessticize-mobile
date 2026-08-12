@@ -4630,12 +4630,6 @@ export function PracticePocScreen({
           {displayedPuzzle?.puzzle.id ?? ""}
         </Text>
       ) : null}
-      {personalBestActivePresentation?.activeRecordCelebration
-        && displayedPuzzle?.kind === "line" ? (
-          <Text testID="personal-best-record-expected-move" style={styles.reviewDueHiddenMetric}>
-            {currentExpectedMove(displayedPuzzle) ?? ""}
-          </Text>
-        ) : null}
       <View
         accessible
         accessibilityLabel={sessionBoardAccessibilityLabel(displayedSideToMove, displayedLastBoardMove)}

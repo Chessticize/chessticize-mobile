@@ -8636,9 +8636,6 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "personal-best-record-celebration")).toBeTruthy();
     expect(findByTestId(renderer, "personal-best-record-aura")).toBeTruthy();
     expect(findByTestId(renderer, "personal-best-record-impact")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "personal-best-record-expected-move"))).toBe(
-      "e2e4"
-    );
     expect(() => findByTestId(renderer, "personal-best-progress-fill")).toThrow();
   });
 
