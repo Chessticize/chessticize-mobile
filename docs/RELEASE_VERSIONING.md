@@ -105,13 +105,16 @@ identity was consumed outside the repository record.
 Every replacement still follows the RC invalidation, convergence, validation,
 review, note, tag, and artifact rules in `docs/RELEASE_SOURCE_POLICY.md`.
 
-## After publication
+## After review submission
 
-Do not bump either file merely because a store changes a release to published.
-The release branch already contains the exact published identity, and `main`
-already names the next development target. Complete the platform evidence,
-merge the final release PR with a merge commit, and leave the immutable tags as
-the shipped record.
+Do not bump either file merely because a store changes a release from in review
+to approved or published. The release branch already contains the exact
+submitted identity, and `main` already names the next development target. Once
+every platform included in the coordinated release has been formally submitted
+and reports an in-review state, merge the final release PR with a merge commit.
+Do not wait for approval, public availability, or the post-Play APK mirror.
+Track those outcomes after the merge and leave the immutable tags as the shipped
+record.
 
 For a hotfix to an older version, branch from its exact platform tag and
 explicitly allocate new store build identities. Do not roll back `main`'s

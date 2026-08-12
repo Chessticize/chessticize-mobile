@@ -104,8 +104,14 @@ and SHA; the merge commit is not the released source tag target and must never
 move or replace that tag.
 
 Keep the release PR draft until the exact identity, approved build-specific
-customer notes, fast checks, selected native evidence, and release review are
-complete. The final release PR to `main` is the only merge-commit exception.
+customer notes, fast checks, selected native evidence, release review, exact
+platform tags, and uploaded binaries are complete. Mark it ready only after
+every platform included in the coordinated release has been formally submitted
+for store review. Once those submissions report an in-review state, merge the
+release PR; do not wait for store approval, public availability, or the
+post-Play APK mirror. Continue tracking those post-merge outcomes against the
+immutable platform tags and release evidence. The final release PR to `main` is
+the only merge-commit exception.
 Keep merge commits enabled in the GitHub repository and merge that PR with
 `gh pr merge --merge --delete-branch`, preserving the release branch's
 already-squashed work-package commits under one explicit release merge commit.
