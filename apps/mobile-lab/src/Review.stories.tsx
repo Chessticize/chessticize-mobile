@@ -44,7 +44,7 @@ export const DueQueue: Story = {
     await waitForTestId(canvasElement, "review-today-history");
     await waitForTestId(canvasElement, "review-completed-today-toggle");
     await waitForTestId(canvasElement, "review-today-history-items");
-    await waitForVisibleTestId(canvasElement, "review-today-to-review-items-motion");
+    await waitForHiddenTestId(canvasElement, "review-today-to-review-items-motion");
     await waitForVisibleTestId(canvasElement, "review-today-history-items-motion");
     await expectTestIdHeight(canvasElement, "review-today-to-review-toggle", 44);
     await expectTestIdHeight(canvasElement, "review-completed-today-toggle", 44);
@@ -58,6 +58,8 @@ export const DueQueue: Story = {
       "review-completed-today-toggle-count",
       "review-completed-today-toggle-chevron"
     );
+    await clickTestId(canvasElement, "review-today-to-review-toggle");
+    await waitForVisibleTestId(canvasElement, "review-today-to-review-items-motion");
     await waitForText(canvasElement, "First missed 1 day ago");
     await waitForText(canvasElement, "Last retry 3 days ago");
     await expectTestIdText(

@@ -13816,7 +13816,7 @@ function ReviewPanel({
   const activeReviewGenerationRef = useRef(0);
   const appliedPreferredEntriesKeyRef = useRef(preferredEntriesKey);
   const [queueFilter, setQueueFilter] = useState<ReviewTodayFilter>("all");
-  const [todayReviewsExpanded, setTodayReviewsExpanded] = useState(true);
+  const [todayReviewsExpanded, setTodayReviewsExpanded] = useState(false);
   const [completedReviewsExpanded, setCompletedReviewsExpanded] = useState(true);
   const [devStatus, setDevStatus] = useState<string | null>(null);
   const reviewToday = useMemo(() => {

@@ -4646,36 +4646,36 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(reviewRenderer, "review-today-to-review-items-motion")).toBeTruthy();
     expect(findByTestId(reviewRenderer, "review-today-history-items-motion")).toBeTruthy();
-    expect(flattenTestStyle(
-      findByTestId(reviewRenderer, "review-today-to-review-items").props.style
-    ).position).toBeUndefined();
-    act(() => {
-      findByTestId(reviewRenderer, "review-today-to-review-items").props.onLayout({
-        nativeEvent: { layout: { height: 180 } }
-      });
-    });
-    expect(flattenTestStyle(
-      findByTestId(reviewRenderer, "review-today-to-review-items").props.style
-    ).position).toBe("absolute");
-    expect(flattenTestStyle(
-      findByTestId(reviewRenderer, "review-today-to-review-items-motion").props.style
-    ).height).not.toBe(0);
-    press(reviewRenderer, "review-today-to-review-toggle");
     expect(findByTestId(reviewRenderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({
       expanded: false
     });
-    expect(findByTestId(reviewRenderer, "review-today-to-review-items")).toBeTruthy();
+    expect(findByTestId(reviewRenderer, "review-completed-today-toggle").props.accessibilityState).toEqual({
+      expanded: true
+    });
     expect(findByTestId(reviewRenderer, "review-today-to-review-items-motion").props).toMatchObject({
       accessibilityElementsHidden: true,
       pointerEvents: "none"
+    });
+    expect(findByTestId(reviewRenderer, "review-today-history-items-motion").props).toMatchObject({
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
+    });
+    press(reviewRenderer, "review-today-to-review-toggle");
+    expect(findByTestId(reviewRenderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({
+      expanded: true
+    });
+    expect(findByTestId(reviewRenderer, "review-today-to-review-items")).toBeTruthy();
+    expect(findByTestId(reviewRenderer, "review-today-to-review-items-motion").props).toMatchObject({
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
     });
     act(() => {
       jest.advanceTimersByTime(100);
     });
     press(reviewRenderer, "review-today-to-review-toggle");
     expect(findByTestId(reviewRenderer, "review-today-to-review-items-motion").props).toMatchObject({
-      accessibilityElementsHidden: false,
-      pointerEvents: "auto"
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
     });
 
     const practiceHomeRenderer = renderLabScenario("practice-home");
@@ -13312,7 +13312,11 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "review-filter-toggle").props.accessibilityState).toEqual({ expanded: false });
     expect(collectText(findByTestId(renderer, "review-due-items"))).toContain("Today to review");
     expect(collectText(findByTestId(renderer, "review-today-to-review-toggle"))).toContain("2");
-    expect(findByTestId(renderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({ expanded: true });
+    expect(findByTestId(renderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({ expanded: false });
+    expect(findByTestId(renderer, "review-today-to-review-items-motion").props).toMatchObject({
+      accessibilityElementsHidden: true,
+      pointerEvents: "none"
+    });
     expect(hasStyleEntry(findByTestId(renderer, "review-today-to-review-toggle"), "height", 44)).toBe(true);
     expect(hasStyleEntry(findByTestId(renderer, "review-today-to-review-toggle-meta"), "height", 18)).toBe(true);
     expect(hasStyleEntry(findByTestId(renderer, "review-today-to-review-toggle-meta"), "alignItems", "center")).toBe(true);
@@ -13323,6 +13327,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-today-history"))).toContain("Completed today");
     expect(collectText(findByTestId(renderer, "review-completed-today-toggle"))).toContain("1");
     expect(findByTestId(renderer, "review-completed-today-toggle").props.accessibilityState).toEqual({ expanded: true });
+    expect(findByTestId(renderer, "review-today-history-items-motion").props).toMatchObject({
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
+    });
     expect(hasStyleEntry(findByTestId(renderer, "review-completed-today-toggle"), "height", 44)).toBe(true);
     expect(findByTestId(renderer, "review-today-history-items")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-due-count"))).toBe("1 / 3");
@@ -13347,10 +13355,10 @@ describe("PracticePocScreen", () => {
     )).toBe(true);
 
     press(renderer, "review-today-to-review-toggle");
-    expect(findByTestId(renderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({ expanded: false });
+    expect(findByTestId(renderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({ expanded: true });
     expect(findByTestId(renderer, "review-today-to-review-items-motion").props).toMatchObject({
-      accessibilityElementsHidden: true,
-      pointerEvents: "none"
+      accessibilityElementsHidden: false,
+      pointerEvents: "auto"
     });
 
     press(renderer, "review-completed-today-toggle");
@@ -13361,9 +13369,9 @@ describe("PracticePocScreen", () => {
     });
 
     press(renderer, "review-today-to-review-toggle");
-    expect(findByTestId(renderer, "review-due-item-review-badge-0-standard-standard-5-20")).toBeTruthy();
+    expect(findByTestId(renderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({ expanded: false });
     press(renderer, "review-completed-today-toggle");
-    expect(findByTestId(renderer, "review-today-history-items")).toBeTruthy();
+    expect(findByTestId(renderer, "review-completed-today-toggle").props.accessibilityState).toEqual({ expanded: true });
   });
 
   it("counts reviews as overdue after the next 4 AM review-day rollover", () => {
@@ -13392,7 +13400,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "review-due-items"))).not.toContain("Overdue");
   });
 
-  it("keeps both Today sections visible with inline empty states for an empty review queue", () => {
+  it("keeps both Today sections available with their default disclosure states for an empty review queue", () => {
     const renderer = renderScreen();
 
     press(renderer, "review-tab");
@@ -13404,6 +13412,8 @@ describe("PracticePocScreen", () => {
     );
     expect(collectText(findByTestId(renderer, "review-today-to-review-toggle"))).toContain("0");
     expect(collectText(findByTestId(renderer, "review-completed-today-toggle"))).toContain("0");
+    expect(findByTestId(renderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({ expanded: false });
+    expect(findByTestId(renderer, "review-completed-today-toggle").props.accessibilityState).toEqual({ expanded: true });
     expect(findByTestId(renderer, "review-today-to-review-empty")).toBeTruthy();
     expect(findByTestId(renderer, "review-today-history-empty")).toBeTruthy();
     expect(() => findByTestId(renderer, "review-empty-state")).toThrow();
