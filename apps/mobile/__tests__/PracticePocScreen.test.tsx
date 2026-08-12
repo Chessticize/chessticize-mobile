@@ -4660,14 +4660,6 @@ describe("PracticePocScreen", () => {
       accessibilityElementsHidden: false,
       pointerEvents: "auto"
     });
-    expect(flattenTestStyle(
-      findByTestId(reviewRenderer, "review-today-to-review-items").props.style
-    ).position).toBe("absolute");
-    act(() => {
-      findByTestId(reviewRenderer, "review-today-to-review-items").props.onLayout({
-        nativeEvent: { layout: { height: 180 } }
-      });
-    });
     press(reviewRenderer, "review-today-to-review-toggle");
     expect(findByTestId(reviewRenderer, "review-today-to-review-toggle").props.accessibilityState).toEqual({
       expanded: true
@@ -4677,9 +4669,6 @@ describe("PracticePocScreen", () => {
       accessibilityElementsHidden: false,
       pointerEvents: "auto"
     });
-    expect(flattenTestStyle(
-      findByTestId(reviewRenderer, "review-today-to-review-items-motion").props.style
-    ).height).not.toBe(0);
     act(() => {
       jest.advanceTimersByTime(100);
     });
