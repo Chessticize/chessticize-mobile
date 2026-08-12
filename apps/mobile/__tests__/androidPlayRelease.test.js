@@ -677,7 +677,7 @@ function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false 
 }
 
 describe('Android Play release contract', () => {
-  it('pins the proposed Play release to public version 1.4.2 build 17', () => {
+  it('pins the proposed Play release to public version 1.5.0 build 18', () => {
     const sourceTag = canonicalAndroidSourceTag(
       releaseVersion.publicVersion,
       releaseVersion.androidVersionCode,
@@ -707,11 +707,11 @@ describe('Android Play release contract', () => {
 
     expect(releaseVersion).toEqual(
       expect.objectContaining({
-        publicVersion: '1.4.2',
-        androidVersionCode: 17,
+        publicVersion: '1.5.0',
+        androidVersionCode: 18,
       }),
     );
-    expect(sourceTag).toBe('android-v1.4.2-build-17');
+    expect(sourceTag).toBe('android-v1.5.0-build-18');
     expect(ownerEvidenceExample.candidate).toEqual(
       expect.objectContaining(expectedIdentityBinding),
     );
@@ -724,10 +724,10 @@ describe('Android Play release contract', () => {
       ownerEvidenceExample.sourceRelease.reference.endsWith(sourceTag),
     ).toBe(true);
     expect(runbook).toContain(
-      'Android version code: `apps/mobile/release-version.json` (`17`)',
+      'Android version code: `apps/mobile/release-version.json` (`18`)',
     );
-    expect(releaseNote).toContain('Public version: `1.4.2`');
-    expect(releaseNote).toContain('Build or version code: `17`');
+    expect(releaseNote).toContain('Public version: `1.5.0`');
+    expect(releaseNote).toContain('Build or version code: `18`');
     expect(releaseNote).toContain(`Source tag: \`${sourceTag}\``);
     const storeCopy = releaseNote.match(
       /## Store copy \(`en-US`\)\n\n```text\n([\s\S]+?)\n```/,
@@ -735,10 +735,10 @@ describe('Android Play release contract', () => {
     expect(storeCopy).toBeDefined();
     expect(Array.from(storeCopy).length).toBeLessThanOrEqual(300);
     expect(storeCopy).not.toMatch(/https?:\/\//u);
-    expect(storeCopy).toContain('Promote pawns');
-    expect(storeCopy).toContain('Replay Analysis and Review');
-    expect(storeCopy).toContain('smaller app build');
-    expect(storeCopy).toContain('complete offline puzzle library');
+    expect(storeCopy).toContain('Survival Challenge');
+    expect(storeCopy).toContain('third mistake');
+    expect(storeCopy).toContain('resume exactly where you left off');
+    expect(storeCopy).toContain('clearer Practice Home');
     expect(storeCopy).not.toContain('Progress Backup');
     expect(releaseNote).not.toMatch(/Rating history/i);
     expect(storeCopy).not.toMatch(/across devices|cross-platform sync/i);

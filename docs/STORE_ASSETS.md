@@ -1,6 +1,6 @@
 # App Store Assets
 
-This document is the 1.4.2 source of truth for App Store Connect metadata and
+This document is the 1.5.0 source of truth for App Store Connect metadata and
 store screenshot capture. Recheck Apple's live documentation before upload:
 
 - Screenshot specifications:
@@ -112,22 +112,23 @@ model-derived improvement.
 
 ### What's New
 
-For iOS 1.4.2, review this proposed ready-to-paste copy:
+For iOS 1.5.0, review this proposed ready-to-paste copy:
 
 ```text
-• Restore synced progress more reliably when setting up another Apple device.
-• Open the pawn-promotion chooser more quickly.
+• Take on Survival Challenge in Puzzle or Arrow Duel—no timer, and the third mistake ends your Run.
+• Find Run help, editing, and creation together on a clearer Practice Home.
+• See when iCloud Sync is working while duplicate Sync Now requests are blocked.
 ```
 
-This proposed copy is 125 / 300 Unicode characters, including line breaks.
+This proposed copy is 256 / 300 Unicode characters, including line breaks.
 Future versions must use the reusable template in
 [`docs/releases/RELEASE_NOTES_TEMPLATE.md`](releases/RELEASE_NOTES_TEMPLATE.md):
 lead with user benefits, use two or three short bullets, omit raw URLs, and do
 not call stable features experimental unless that qualification is an
 intentional product promise.
 
-This copy belongs to the proposed `ios-v1.4.2-build-1` release identity and
-must match `docs/releases/ios-v1.4.2-build-1.md` before the owner marks that
+This copy belongs to the proposed `ios-v1.5.0-build-1` release identity and
+must match `docs/releases/ios-v1.5.0-build-1.md` before the owner marks that
 note Approved. The release PR must retain a screenshot or exported metadata
 record showing the exact submitted text.
 
@@ -155,7 +156,7 @@ the resulting feature is declared.
 
 ## Screenshot Requirements
 
-The app targets iPhone and iPad for 1.4.2. The current automated capture plan
+The app targets iPhone and iPad for 1.5.0. The current automated capture plan
 covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
 The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
 Apple's current screenshot reference, rechecked on 2026-07-28, lists 6.9" as
@@ -182,9 +183,10 @@ Release rule:
 5. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
 
-The 1.4.2 changes improve sync restoration, pawn promotion responsiveness, and
-Replay/Review board gesture arbitration without changing the selected six-frame
-marketing moments.
+The 1.5.0 changes add Survival Challenge, reorganize Practice Home utilities,
+and clarify in-progress iCloud Sync. The selected six-frame marketing moments
+do not yet include Survival, so prior compositions are reused only after the
+exact-head product baseline and existing marketing claims pass review.
 The prior approved marketing compositions may be reused only after the current
 metadata and screenshot audit passes. The separate release-delta workflow must
 still recapture and inspect its exact-head product baseline.
