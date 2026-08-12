@@ -48,8 +48,8 @@
     ]
   },
   "currentVersionWhatsNew": {
-    "sourceTag": "ios-v1.4.2-build-1",
+    "sourceTag": "ios-v1.5.0-build-1",
     "status": "release-candidate",
-    "storeCopy": "• Restore synced progress more reliably when setting up another Apple device.\n• Open the pawn-promotion chooser more quickly."
+    "storeCopy": "• Take on Survival Challenge in Puzzle or Arrow Duel—no time limit, and the third mistake ends your Run.\n• Find Run help, editing, and creation together on a clearer Practice Home.\n• See when iCloud Sync is working, with repeat Sync Now taps safely ignored."
   }
 }

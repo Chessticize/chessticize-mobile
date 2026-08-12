@@ -8215,6 +8215,10 @@ describe("PracticePocScreen", () => {
     expect(systemBack.invoke()).toBe(true);
     expect(service.getActiveSprint()?.status).toBe("paused");
     expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "personal-best-exit-best"))).toBe(
+      "No best yet · solve 1 to set it"
+    );
+    expect(service.listSurvivalBests()).toEqual([]);
     expect(() => findByTestId(renderer, "session-board")).toThrow();
 
     expect(systemBack.invoke()).toBe(true);
