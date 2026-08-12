@@ -4573,7 +4573,13 @@ export function PracticePocScreen({
   ) : null;
   const personalBestActivePresentation = isSurvivalState
     && personalBestPresentation?.showActivePresentation === true
-    ? personalBestPresentation
+    ? state?.survival
+      ? {
+          ...personalBestPresentation,
+          activeRecordMode: state.correctCount > (state.survival.bestBefore ?? 0),
+          bestScore: state.survival.bestBefore
+        }
+      : personalBestPresentation
     : undefined;
   const sessionStatusNode = state && (isOpenSession || isShowingFeedbackSnapshot) ? (
     <SessionStatusBar

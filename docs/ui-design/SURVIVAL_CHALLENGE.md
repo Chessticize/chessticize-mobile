@@ -62,10 +62,11 @@ The active Run uses two visually distinct score states:
   readable without competing with the puzzle or repeating either the solved
   count or an explanatory status already implied by `NEW BEST`.
 
-The record-mode Interaction Lab state is a presentation proposal awaiting
-explicit approval. Later production wiring must compare against the standing
-best captured when the Run starts and keep the static milestone current as new
-solves are counted.
+Production and the record-mode Interaction Lab state compare against the
+standing best captured when the Run starts and keep the static milestone
+current as new solves are counted. With no standing best, `0 solved` remains a
+pre-record state that says `1 more to set your first best`; the first solved
+puzzle becomes the first best.
 
 ## Pause and leave
 

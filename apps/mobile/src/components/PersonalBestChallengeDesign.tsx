@@ -804,13 +804,15 @@ export function PersonalBestProgressBanner({
   recordMode?: boolean;
   score: number;
 }): React.JSX.Element {
-  const target = (bestScore ?? -1) + 1;
-  const isNewBest = bestScore === null || score >= target;
+  const target = bestScore === null ? 1 : bestScore + 1;
+  const isNewBest = score >= target;
   const showsRecordMilestone = isNewBest && recordMode;
   const remaining = Math.max(0, target - score);
   const progress = isNewBest ? 1 : Math.max(0.06, score / Math.max(1, target));
   const title = isNewBest
     ? `New best · ${score}`
+    : bestScore === null
+    ? `${remaining} more to set your first best`
     : `${remaining} more to beat ${bestScore}`;
   const recordContext = bestScore === null
     ? "First score at this level"
@@ -822,6 +824,8 @@ export function PersonalBestProgressBanner({
         ? `New best, ${score} solved. ${recordContext}.`
         : isNewBest
         ? `New best, ${score} solved`
+        : bestScore === null
+        ? `${score} solved, ${remaining} more to set your first best`
         : `${score} solved, ${remaining} more to beat best ${bestScore}`}
       style={[
         styles.progressBanner,

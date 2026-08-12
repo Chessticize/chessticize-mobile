@@ -34,7 +34,7 @@ import { fixtureNeedsAtLeast, PracticeService } from "../../../packages/storage/
 import { MemoryStore } from "../../../packages/storage/src/memory-store";
 import { MemoryTacticalProfileRepository } from "../../../packages/storage/src/tactical-profile-repository";
 import { TacticalProfileService } from "../../../packages/storage/src/tactical-profile-service";
-import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, isServerCompatibleArrowDuelPuzzle, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, startSprint, type ArrowDuelState, type AttemptEvent, type Puzzle, type PuzzleTimingPolicy, type SprintState, type TacticalProfileCalibrationArtifact, type UciEngineTransport } from "../../../packages/core/src/index";
+import { defaultSprintConfig, formatLocalCalendarDate, formatReviewDay, isServerCompatibleArrowDuelPuzzle, practiceRunSprintConfig, PRACTICE_RUN_NAME_MAX_LENGTH, startSprint, SURVIVAL_RULE_VERSION, type ArrowDuelState, type AttemptEvent, type Puzzle, type PuzzleTimingPolicy, type SprintState, type TacticalProfileCalibrationArtifact, type UciEngineTransport } from "../../../packages/core/src/index";
 import { FakeReviewReminderNotificationClient, FakeReviewReminderScheduler } from "../src/platform/reviewReminderScheduler";
 import { FakeICloudProgressSyncClient } from "../src/platform/iCloudProgressSync";
 import { decodeProgressV2Record } from "../../../packages/storage/src/progress-sync-v2";
@@ -8017,6 +8017,78 @@ describe("PracticePocScreen", () => {
     expect(service.getActiveSprint()?.currentPuzzle?.puzzle.id).toBe(pausedPuzzleId);
     expect(service.getActiveSprint()?.survival?.sittings).toBe(2);
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("1 solved");
+  });
+
+  it("turns the first solved puzzle into the first active Survival best", async () => {
+    const service = createProductionSurvivalService();
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    openSurvivalHubFromHome(renderer);
+    press(renderer, "personal-best-hub-start");
+
+    expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
+      "1 more to set your first best"
+    );
+    expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(
+      "0 solved, 1 more to set your first best"
+    );
+    expect(() => findByTestId(renderer, "personal-best-record-badge")).toThrow();
+
+    await boardMove(renderer, "e6e7");
+    await settleFeedbackSnapshot();
+
+    expect(collectText(findByTestId(renderer, "personal-best-record-badge"))).toBe("NEW BEST");
+    expect(collectText(findByTestId(renderer, "personal-best-record-previous"))).toBe(
+      "First score"
+    );
+    expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(
+      "New best, 1 solved. First score at this level."
+    );
+    expect(() => findByTestId(renderer, "personal-best-progress-fill")).toThrow();
+  });
+
+  it("keeps the Run-start Survival best after crossing it and resuming", async () => {
+    const service = createProductionSurvivalService({ bestScore: 1 });
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    openSurvivalHubFromHome(renderer);
+    press(renderer, "personal-best-hub-start");
+
+    expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
+      "2 more to beat 1"
+    );
+    await boardMove(renderer, "e6e7");
+    await settleFeedbackSnapshot();
+    expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
+      "1 more to beat 1"
+    );
+    expect(() => findByTestId(renderer, "personal-best-record-badge")).toThrow();
+
+    await boardMove(renderer, "e6e7");
+    await settleFeedbackSnapshot();
+    expect(collectText(findByTestId(renderer, "personal-best-record-badge"))).toBe("NEW BEST");
+    expect(collectText(findByTestId(renderer, "personal-best-record-previous"))).toBe(
+      "Previous best 1"
+    );
+    expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(
+      "New best, 2 solved. Previous best 1."
+    );
+
+    press(renderer, "session-abandon");
+    press(renderer, "personal-best-pause-and-leave");
+    openSurvivalHubFromHome(renderer);
+    const pausedRun = service.listResumableSurvivalRuns()[0];
+    press(renderer, `personal-best-paused-continue-${pausedRun?.id}`);
+
+    expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(
+      "New best, 2 solved. Previous best 1."
+    );
   });
 
   it.each([
@@ -16230,7 +16302,7 @@ function createPlayedCustomService(): PracticeService {
   return new PracticeService(store);
 }
 
-function createProductionSurvivalService(): PracticeService {
+function createProductionSurvivalService(options: { bestScore?: number } = {}): PracticeService {
   const store = new MemoryStore();
   store.seedPuzzles(Array.from({ length: 6 }, (_, index) => ({
     id: `component-survival-${index}`,
@@ -16248,6 +16320,17 @@ function createProductionSurvivalService(): PracticeService {
     ratingDeviation: 100,
     volatility: 0.05
   });
+  if (options.bestScore !== undefined) {
+    store.saveSurvivalBest({
+      challengeType: "puzzle",
+      minRating: 900,
+      maxRating: 999,
+      ruleVersion: SURVIVAL_RULE_VERSION,
+      score: options.bestScore,
+      sessionId: "component-survival-previous-best",
+      reachedAt: "2026-08-10T12:00:00.000Z"
+    });
+  }
   return new PracticeService(store, undefined, {
     survivalPackVersion: 5,
     survivalPackHash: "sha256:component-survival"
