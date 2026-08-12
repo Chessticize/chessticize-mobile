@@ -1,37 +1,62 @@
 import React from "react";
 import type { Preview } from "@storybook/react-native-web-vite";
-import { useWindowDimensions } from "react-native";
 import {
   SafeAreaFrameContext,
   SafeAreaInsetsContext
 } from "react-native-safe-area-context";
+import { PracticeViewportProvider } from "../../mobile/src/components/PracticeViewport.tsx";
 import "../src/lab.css";
 import {
   LAB_DEVICE_VIEWPORTS,
+  labDeviceViewportForGlobal,
   labSafeAreaMetricsForViewport
 } from "../src/labDeviceFrame.ts";
 
-function LabDeviceFrame({ children }: React.PropsWithChildren): React.JSX.Element {
-  const { height, width } = useWindowDimensions();
+function LabDeviceFrame({
+  children,
+  viewportGlobal
+}: React.PropsWithChildren<{ viewportGlobal: unknown }>): React.JSX.Element {
+  const selectedViewport = labDeviceViewportForGlobal(
+    viewportGlobal as Parameters<typeof labDeviceViewportForGlobal>[0]
+  );
+  if (selectedViewport === null) {
+    return <>{children}</>;
+  }
+
+  const { height, width } = selectedViewport;
   const metrics = labSafeAreaMetricsForViewport(width, height);
 
   return (
-    <SafeAreaFrameContext.Provider value={metrics.frame}>
-      <SafeAreaInsetsContext.Provider value={metrics.insets}>
-        {children}
-      </SafeAreaInsetsContext.Provider>
-    </SafeAreaFrameContext.Provider>
+    <div
+      className="lab-device-frame"
+      data-testid="lab-device-frame"
+      style={{ height, minHeight: height, width }}
+    >
+      <PracticeViewportProvider value={{ height, width }}>
+        <SafeAreaFrameContext.Provider value={metrics.frame}>
+          <SafeAreaInsetsContext.Provider value={metrics.insets}>
+            {children}
+          </SafeAreaInsetsContext.Provider>
+        </SafeAreaFrameContext.Provider>
+      </PracticeViewportProvider>
+    </div>
   );
 }
 
 const preview: Preview = {
   decorators: [
-    (Story) => (
-      <LabDeviceFrame>
+    (Story, context) => (
+      <LabDeviceFrame viewportGlobal={context.globals.viewport}>
         <Story />
       </LabDeviceFrame>
     )
   ],
+  initialGlobals: {
+    viewport: {
+      value: "phonePortrait",
+      isRotated: false
+    }
+  },
   parameters: {
     controls: {
       expanded: true
@@ -43,7 +68,6 @@ const preview: Preview = {
       }
     },
     viewport: {
-      defaultViewport: "phonePortrait",
       options: {
         compactPhone: {
           name: "Compact phone",

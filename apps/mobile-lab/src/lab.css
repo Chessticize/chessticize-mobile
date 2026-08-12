@@ -24,6 +24,10 @@ html {
   width: 100%;
 }
 
+.lab-device-frame {
+  overflow: hidden;
+}
+
 .lab-app-surface {
   display: flex;
 }

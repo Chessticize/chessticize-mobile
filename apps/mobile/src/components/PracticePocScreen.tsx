@@ -16,7 +16,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View
 } from "react-native";
 import type { ImageSourcePropType } from "react-native";
@@ -237,6 +236,7 @@ import {
   PRACTICE_UI_PADDING as UI_PADDING,
   type AdaptiveLayout
 } from "./adaptivePracticeLayout.ts";
+import { usePracticeViewport } from "./PracticeViewport.tsx";
 import {
   boardMoveToUci,
   consumeSuppressedBoardMove
@@ -859,7 +859,7 @@ export function PracticePocScreen({
   const arrowDuelReplyPreparationContinueRef = useRef<(() => void) | null>(null);
   const nowMsRef = useRef<number>(currentTimeMs());
   const reviewBackCommandIdRef = useRef(0);
-  const { fontScale, height, width } = useWindowDimensions();
+  const { fontScale, height, width } = usePracticeViewport();
   const insets = useSafeAreaInsets();
 
   const [mode, setMode] = useState<SprintMode>(
@@ -4584,7 +4584,7 @@ export function PracticePocScreen({
       mode={mode}
       personalBest={personalBestActivePresentation}
       state={state}
-      timerText={personalBestActivePresentation ? "No time limit" : timerText}
+      timerText={timerText}
       confirmAbandon={personalBestActivePresentation
         ? isSurvivalPauseVisible
         : practiceExitConfirmationVisible}
@@ -10716,11 +10716,14 @@ function SessionStatusBar({
             : isTacticalFocus
             ? `Puzzles ${completedAttempts} of ${plannedAttempts}`
             : `Progress ${state.correctCount} of ${state.config.targetCorrect}`}
-          style={[styles.sessionMetricBlock, isPersonalBest ? styles.personalBestSideMetricBlock : null]}
+          style={[
+            styles.sessionMetricBlock,
+            isPersonalBest ? styles.personalBestProgressMetricBlock : null
+          ]}
           testID="session-progress-block"
         >
           <Text
-            adjustsFontSizeToFit={compactMetrics}
+            adjustsFontSizeToFit={compactMetrics || isPersonalBest}
             minimumFontScale={0.75}
             numberOfLines={1}
             testID="session-progress"
@@ -10736,25 +10739,26 @@ function SessionStatusBar({
               : `${state.correctCount} / ${state.config.targetCorrect}`}
           </Text>
         </View>
-        <View
-          accessibilityLabel={`Timer ${timerText}`}
-          style={[styles.sessionMetricBlock, isPersonalBest ? styles.personalBestTimerMetricBlock : null]}
-          testID="session-timer-block"
-        >
-          <Text
-            adjustsFontSizeToFit={compactMetrics}
-            minimumFontScale={0.75}
-            numberOfLines={1}
-            testID="session-timer"
-            style={[
-              styles.timerText,
-              isPersonalBest ? styles.personalBestTimerText : null,
-              compactMetrics ? styles.sessionMetricTextCompact : null
-            ]}
+        {isPersonalBest ? null : (
+          <View
+            accessibilityLabel={`Timer ${timerText}`}
+            style={styles.sessionMetricBlock}
+            testID="session-timer-block"
           >
-            {timerText}
-          </Text>
-        </View>
+            <Text
+              adjustsFontSizeToFit={compactMetrics}
+              minimumFontScale={0.75}
+              numberOfLines={1}
+              testID="session-timer"
+              style={[
+                styles.timerText,
+                compactMetrics ? styles.sessionMetricTextCompact : null
+              ]}
+            >
+              {timerText}
+            </Text>
+          </View>
+        )}
         {isTacticalFocus ? (
           <View
             accessibilityLabel="Rating unchanged"
@@ -10778,7 +10782,7 @@ function SessionStatusBar({
             accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
             style={[
               styles.sessionMetricBlock,
-              isPersonalBest ? styles.personalBestSideMetricBlock : null
+              isPersonalBest ? styles.personalBestMistakesMetricBlock : null
             ]}
             testID="session-mistakes-block"
           >
@@ -20265,17 +20269,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minWidth: 0
   },
-  personalBestSideMetricBlock: {
-    flex: 0.9
+  personalBestProgressMetricBlock: {
+    alignItems: "flex-start",
+    flex: 1
   },
-  personalBestTimerMetricBlock: {
-    flex: 1.2
-  },
-  personalBestTimerText: {
-    fontFamily: "System",
-    fontSize: 16,
-    letterSpacing: 0,
-    textAlign: "center"
+  personalBestMistakesMetricBlock: {
+    alignItems: "flex-end",
+    flex: 0,
+    minWidth: 64
   },
   sessionAbandonConfirm: {
     alignItems: "center",

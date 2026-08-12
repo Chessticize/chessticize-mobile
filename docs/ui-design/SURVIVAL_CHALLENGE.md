@@ -23,6 +23,10 @@ one fixed level before the third mistake?
   does not add a mistake by itself.
 - Survival has no decorative `S` icon or repeated `Unrated` badge. The
   informational guide explains once that Rating stays unchanged.
+- The active header shows only the two changing Run facts: solved count on the
+  left and mistakes on the right. It does not repeat `No time limit`; setup and
+  rules already establish that contract, and the redundant metric must not
+  crowd or truncate the solved count.
 
 ## Best updates while a Run continues
 

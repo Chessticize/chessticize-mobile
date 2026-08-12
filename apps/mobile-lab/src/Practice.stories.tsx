@@ -644,7 +644,8 @@ export const PersonalBestActive: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "active-session-shell");
     await waitForText(canvasElement, "Survival");
-    await expectTestIdText(canvasElement, "session-timer", "No time limit");
+    expectTestIdAbsent(canvasElement, "session-timer-block");
+    expectTestIdAbsent(canvasElement, "session-timer");
     await waitForTestId(canvasElement, "session-mistakes");
     expectTestIdAbsent(canvasElement, "personal-best-mistakes");
     await expectTestIdText(canvasElement, "personal-best-progress-title", "5 more to beat 18");
@@ -687,6 +688,8 @@ export const SurvivalLeaveOptions: Story = {
     expectTestIdAbsent(canvasElement, "session-board");
     expectTestIdAbsent(canvasElement, "practice-prompt");
     expectTestIdAbsent(canvasElement, "session-puzzle-timing");
+    expectTestIdAbsent(canvasElement, "session-timer-block");
+    expectTestIdAbsent(canvasElement, "session-timer");
     expectTestIdAbsent(canvasElement, "session-abandon-confirm");
     expectTestIdAbsent(canvasElement, "session-abandon");
     expectTestIdAbsent(canvasElement, "personal-best-end-run");

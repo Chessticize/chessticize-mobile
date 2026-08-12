@@ -7964,7 +7964,8 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
     expect(() => findByTestId(renderer, "personal-best-guide")).toThrow();
-    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No time limit");
+    expect(() => findByTestId(renderer, "session-timer-block")).toThrow();
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 solved");
     expect(() => findByTestId(renderer, "personal-best-unrated")).toThrow();
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
       "Mistakes 0 of 3"
@@ -7994,7 +7995,7 @@ describe("PracticePocScreen", () => {
       minRating: 900,
       maxRating: 999
     });
-    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No time limit");
+    expect(() => findByTestId(renderer, "session-timer-block")).toThrow();
     await boardMove(renderer, "e6e7");
     await settleFeedbackSnapshot();
     expect(service.listSurvivalBests()[0]?.score).toBe(1);
@@ -8585,7 +8586,14 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "active-session-shell"))).toContain(
       "Survival"
     );
-    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("No time limit");
+    expect(() => findByTestId(renderer, "session-timer-block")).toThrow();
+    expect(() => findByTestId(renderer, "session-timer")).toThrow();
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("14 solved");
+    expect(findByTestId(renderer, "session-progress").props).toMatchObject({
+      adjustsFontSizeToFit: true,
+      minimumFontScale: 0.75,
+      numberOfLines: 1
+    });
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
       "Mistakes 1 of 3"
     );
