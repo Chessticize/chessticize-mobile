@@ -10,7 +10,7 @@
 
 ## Customer-facing changes
 
-- Take on Survival Challenge in Puzzle or Arrow Duel with no timer; the third
+- Take on Survival Challenge in Puzzle or Arrow Duel with no time limit; the third
   mistake ends the Run.
 - Pause Survival and resume exactly where you left off.
 - Find Run help, editing, and creation together on a clearer Practice Home.
@@ -18,7 +18,7 @@
 ## Store copy (`en-US`)
 
 ```text
-• Take on Survival Challenge in Puzzle or Arrow Duel—no timer, and the third mistake ends your Run.
+• Take on Survival Challenge in Puzzle or Arrow Duel—no time limit, and the third mistake ends your Run.
 • Pause Survival and resume exactly where you left off.
 • Find Run help, editing, and creation together on a clearer Practice Home.
 ```

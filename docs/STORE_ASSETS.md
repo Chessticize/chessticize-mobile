@@ -115,12 +115,12 @@ model-derived improvement.
 For iOS 1.5.0, review this proposed ready-to-paste copy:
 
 ```text
-• Take on Survival Challenge in Puzzle or Arrow Duel—no timer, and the third mistake ends your Run.
+• Take on Survival Challenge in Puzzle or Arrow Duel—no time limit, and the third mistake ends your Run.
 • Find Run help, editing, and creation together on a clearer Practice Home.
-• See when iCloud Sync is working while duplicate Sync Now requests are blocked.
+• See when iCloud Sync is working, with repeat Sync Now taps safely ignored.
 ```
 
-This proposed copy is 256 / 300 Unicode characters, including line breaks.
+This proposed copy is 257 / 300 Unicode characters, including line breaks.
 Future versions must use the reusable template in
 [`docs/releases/RELEASE_NOTES_TEMPLATE.md`](releases/RELEASE_NOTES_TEMPLATE.md):
 lead with user benefits, use two or three short bullets, omit raw URLs, and do

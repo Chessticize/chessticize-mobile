@@ -10,18 +10,17 @@
 
 ## Customer-facing changes
 
-- Take on Survival Challenge in Puzzle or Arrow Duel with no timer; the third
+- Take on Survival Challenge in Puzzle or Arrow Duel with no time limit; the third
   mistake ends the Run.
 - Find Run help, editing, and creation together on a clearer Practice Home.
-- See when iCloud Sync is working while duplicate Sync Now requests are
-  blocked.
+- See when iCloud Sync is working, with repeat Sync Now taps safely ignored.
 
 ## Store copy (`en-US`)
 
 ```text
-• Take on Survival Challenge in Puzzle or Arrow Duel—no timer, and the third mistake ends your Run.
+• Take on Survival Challenge in Puzzle or Arrow Duel—no time limit, and the third mistake ends your Run.
 • Find Run help, editing, and creation together on a clearer Practice Home.
-• See when iCloud Sync is working while duplicate Sync Now requests are blocked.
+• See when iCloud Sync is working, with repeat Sync Now taps safely ignored.
 ```
 
 ## Release details
