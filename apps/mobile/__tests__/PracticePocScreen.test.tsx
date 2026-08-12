@@ -8043,7 +8043,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "e6e7");
     await settleFeedbackSnapshot();
 
-    expect(collectText(findByTestId(renderer, "personal-best-record-badge"))).toBe("NEW BEST");
+    expect(collectText(findByTestId(renderer, "personal-best-record-badge"))).toBe("NEW BEST 1");
     expect(collectText(findByTestId(renderer, "personal-best-record-previous"))).toBe(
       "First score"
     );
@@ -8075,7 +8075,7 @@ describe("PracticePocScreen", () => {
 
     await boardMove(renderer, "e6e7");
     await settleFeedbackSnapshot();
-    expect(collectText(findByTestId(renderer, "personal-best-record-badge"))).toBe("NEW BEST");
+    expect(collectText(findByTestId(renderer, "personal-best-record-badge"))).toBe("NEW BEST 2");
     expect(collectText(findByTestId(renderer, "personal-best-record-previous"))).toBe(
       "Previous best 1"
     );
@@ -8713,7 +8713,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("practice-personal-best-record");
 
     expect(collectText(findByTestId(renderer, "personal-best-record-badge"))).toBe(
-      "NEW BEST"
+      "NEW BEST 19"
     );
     expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(
       "New best, 19 solved. Previous best 18."
@@ -8749,6 +8749,9 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderedBanner, "personal-best-progress").props.accessibilityLabel).toBe(
       "New best, 20 solved. Previous best 18."
     );
+    expect(collectText(findByTestId(renderedBanner, "personal-best-record-badge"))).toBe(
+      "NEW BEST 20"
+    );
     expect(() => findByTestId(renderedBanner, "personal-best-record-impact")).toThrow();
   });
 
@@ -8766,6 +8769,9 @@ describe("PracticePocScreen", () => {
 
     expect(collectText(findByTestId(renderer, "personal-best-record-previous"))).toBe(
       "First score"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-record-badge"))).toBe(
+      "NEW BEST 1"
     );
     expect(findByTestId(renderer, "personal-best-record-previous").props.numberOfLines).toBe(1);
     expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(

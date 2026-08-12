@@ -843,7 +843,14 @@ export function PersonalBestProgressBanner({
               style={[styles.resultBadge, styles.resultBadgeBest, styles.recordMilestoneBadge]}
               testID="personal-best-record-badge"
             >
-              <Text style={[styles.resultBadgeText, styles.resultBadgeTextBest]}>NEW BEST</Text>
+              <Text
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                numberOfLines={1}
+                style={[styles.resultBadgeText, styles.resultBadgeTextBest]}
+              >
+                NEW BEST {score.toLocaleString("en-US")}
+              </Text>
             </View>
             <Text
               adjustsFontSizeToFit
@@ -1698,7 +1705,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   recordMilestoneBadge: {
-    flexShrink: 0,
+    flexShrink: 1,
+    maxWidth: "60%",
     paddingHorizontal: 8
   },
   recordPreviousBest: {

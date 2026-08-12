@@ -664,7 +664,7 @@ export const PersonalBestRecord: Story = {
   play: async ({ canvasElement }) => {
     await expectLabDeviceStatusBar(canvasElement);
     await waitForTestId(canvasElement, "active-session-shell");
-    await expectTestIdText(canvasElement, "personal-best-record-badge", "NEW BEST");
+    await expectTestIdText(canvasElement, "personal-best-record-badge", "NEW BEST 19");
     await expectTestIdText(canvasElement, "personal-best-record-previous", "Previous best 18");
     await expectTestIdHorizontalCentersAligned(canvasElement, "practice-prompt", "session-board");
     await expectTestIdsNotOverlapping(

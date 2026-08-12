@@ -56,11 +56,12 @@ The active Run uses two visually distinct score states:
 - Before the standing best is passed, the meter keeps the useful progress bar
   and says how many more solves are needed to beat that best.
 - After the standing best is passed, the completed bar disappears. A static
-  milestone card reuses the result screen's `NEW BEST` badge, names the previous
-  best, and stays on one line so the board remains the visual focus.
+  milestone card shows `NEW BEST {score}`, increments that score after every
+  solve, names the previous best, and stays on one line so the board remains
+  the visual focus.
 - Record mode has no looping or per-solve animation. The milestone stays
-  readable without competing with the puzzle or repeating either the solved
-  count or an explanatory status already implied by `NEW BEST`.
+  readable without competing with the puzzle or adding explanatory status
+  already implied by `NEW BEST`.
 - New-best milestones and results use the product blue with the same shared
   monochrome trophy as a successful Sprint. Yellow and red remain reserved for
   timing and mistake feedback. A completed Run that does not set a best stays
