@@ -1,6 +1,6 @@
 # Chessticize Android 1.5.0 (build 18)
 
-- Status: Draft
+- Status: Approved
 - Locale: `en-US`
 - Platform: `Android`
 - Public version: `1.5.0`
@@ -35,17 +35,17 @@ clearer Practice Home.
 
 ## Release-note review
 
-- [ ] Every claim was verified against the exact candidate behavior and
+- [x] Every claim was verified against the exact candidate behavior and
   release evidence.
-- [ ] Privacy, offline, sync or backup, reminder, analysis, and device-support
+- [x] Privacy, offline, sync or backup, reminder, analysis, and device-support
   wording is truthful for this platform.
-- [ ] Every store bullet applies to this platform and the block contains no more
+- [x] Every store bullet applies to this platform and the block contains no more
   than three bullets.
-- [ ] The separate release-details link opens the exact platform GitHub Release
+- [x] The separate release-details link opens the exact platform GitHub Release
   and identifies the source tag and public repository.
-- [ ] The complete store copy is at most 300 Unicode characters and also fits
+- [x] The complete store copy is at most 300 Unicode characters and also fits
   the destination's current limit, contains no raw URL, and leads with user
   benefits.
-- [ ] No issue numbers, internal code names, implementation details, or private
+- [x] No issue numbers, internal code names, implementation details, or private
   evidence are included.
-- [ ] The release owner approved the copy before the source tag was created.
+- [x] The release owner approved the copy before the source tag was created.
