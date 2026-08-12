@@ -173,9 +173,14 @@ ADR is not itself a defect.
   record whose release-side parent preserves that exact commit and its SHA; it
   must not replace, move, or be substituted for that release tag.
 - Keep the release PR draft until its complete release identity, approved
-  build-specific notes, required fast checks, selected native evidence, and
-  release review are recorded. The final release PR is the only merge-commit
-  exception: merge it to `main` with
+  build-specific notes, required fast checks, selected native evidence,
+  release review, exact platform tags, and uploaded binaries are recorded.
+  Mark it ready only after every platform included in the coordinated release
+  has been formally submitted for store review. Once those submissions report
+  an in-review state, merge the release PR; do not wait for store approval,
+  public availability, or the post-Play APK mirror. Track those post-merge
+  outcomes against the immutable platform tags and release evidence. The final
+  release PR is the only merge-commit exception: merge it to `main` with
   `gh pr merge --merge --delete-branch`, preserving the release branch's
   already-squashed work-package commits under one explicit release merge
   commit. GitHub repository settings must keep merge commits enabled for this
