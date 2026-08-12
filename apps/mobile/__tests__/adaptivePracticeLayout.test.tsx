@@ -81,6 +81,31 @@ describe("buildPracticeAdaptiveLayout", () => {
     expect(layout.usesWideContent).toBe(true);
   });
 
+  it("uses Home columns in the maintained phone landscape Safe Area without widening every screen", () => {
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height: 402,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 },
+      width: 874
+    });
+
+    expect(layout.className).toBe("compactLandscape");
+    expect(layout.contentWidth).toBe(686);
+    expect(layout.usesWideContent).toBe(false);
+    expect(layout.usesHomeColumns).toBe(true);
+  });
+
+  it("stacks Home in compact landscape when text is enlarged", () => {
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale: 1.5,
+      height: 402,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 },
+      width: 874
+    });
+
+    expect(layout.usesHomeColumns).toBe(false);
+  });
+
   it.each([
     {
       label: "compact wide-short resizable viewport",

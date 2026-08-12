@@ -543,6 +543,23 @@ test("only ordinary mixed Sprint attempts enter Tactical Profile discovery", () 
   const focused = tacticalAttempt({
     sessionConfig: { themes: ["fork"] }
   });
+  const survival = tacticalAttempt({
+    sessionConfig: {
+      survival: {
+        challengeType: "puzzle",
+        ruleVersion: 1,
+        minRating: 900,
+        maxRating: 999,
+        ratingSourceRunId: "standard",
+        ratingSourceRating: 925,
+        ratingSourceGeneration: 0,
+        eligibleCount: 10,
+        packVersion: 5,
+        packHash: "sha256:test-pack",
+        selectionSeed: "tactical-profile-test"
+      }
+    }
+  });
   const missingConfig = tacticalAttempt({ sessionConfig: undefined });
 
   assert.deepEqual(classifyTacticalProfileAttempt(ordinary), {
@@ -560,6 +577,10 @@ test("only ordinary mixed Sprint attempts enter Tactical Profile discovery", () 
   assert.deepEqual(classifyTacticalProfileAttempt(focused), {
     status: "excluded",
     reason: "focused_intervention"
+  });
+  assert.deepEqual(classifyTacticalProfileAttempt(survival), {
+    status: "excluded",
+    reason: "survival_challenge"
   });
   assert.deepEqual(classifyTacticalProfileAttempt(missingConfig), {
     status: "excluded",

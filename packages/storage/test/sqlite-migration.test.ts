@@ -44,6 +44,8 @@ const SNAPSHOT_TABLES = [
   "review_queue",
   "review_schedule_removals",
   "review_events",
+  "survival_bests",
+  "survival_preferences",
   "tactical_profile_source_state"
 ] as const;
 
@@ -1391,6 +1393,46 @@ test("SQLite v21 defaults the global Arrow Duel reply preference on and persists
       assert.equal(reopened.getSettings().arrowDuel.opponentReplyEnabled, false);
     } finally {
       reopened.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("SQLite v22 adds device-local Survival resume, best, and preference storage", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-v22-survival-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setup = new SQLiteStore(databasePath);
+    setup.migrate();
+    setup.db.exec(`
+      DROP INDEX sprint_sessions_survival_resume_idx;
+      DROP TABLE survival_bests;
+      DROP TABLE survival_preferences;
+      ALTER TABLE sprint_sessions DROP COLUMN resume_json;
+      PRAGMA user_version = 21;
+    `);
+    setup.close();
+
+    const migrated = new SQLiteStore(databasePath);
+    migrated.migrate();
+    try {
+      assert.equal(
+        (migrated.db.prepare(
+          "SELECT COUNT(*) AS count FROM survival_preferences WHERE singleton_id = 1 AND guide_seen = 0"
+        ).get() as { count: number }).count,
+        1
+      );
+      assert.equal(
+        (migrated.db.prepare(
+          "SELECT COUNT(*) AS count FROM pragma_table_info('sprint_sessions') WHERE name = 'resume_json'"
+        ).get() as { count: number }).count,
+        1
+      );
+      assert.equal(schemaVersionForStore(migrated), CURRENT_SCHEMA_VERSION);
+      assert.equal(integrityResultForStore(migrated), "ok");
+    } finally {
+      migrated.close();
     }
   } finally {
     await rm(directory, { recursive: true, force: true });

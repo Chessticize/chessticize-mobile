@@ -1,8 +1,8 @@
 # Survival Challenge Design
 
-Status date: 2026-08-10  
+Status date: 2026-08-11
 Issue: [#492](https://github.com/Chessticize/chessticize-mobile/issues/492)  
-Phase: Approved Storybook design contract; production behavior is not implemented.
+Phase: Approved Storybook design contract; production implementation in review.
 
 ## Product name and promise
 
@@ -22,7 +22,11 @@ one fixed level before the third mistake?
 - `Slow` is not a Survival scoring state. `Unclear` remains independent and
   does not add a mistake by itself.
 - Survival has no decorative `S` icon or repeated `Unrated` badge. The
-  first-use guide explains once that Rating stays unchanged.
+  informational guide explains once that Rating stays unchanged.
+- The active header shows only the two changing Run facts: solved count on the
+  left and mistakes on the right. It does not repeat `No time limit`; setup and
+  rules already establish that contract, and the redundant metric must not
+  crowd or truncate the solved count.
 
 ## Best updates while a Run continues
 
@@ -36,14 +40,38 @@ Waiting for the third mistake would add delay without improving integrity:
 future play can never reduce the already reached score.
 
 - Active and paused Runs may own the current best.
-- The dedicated Survival records page labels a best owned by a resumable Run
-  as `best · in progress`.
+- The dedicated Survival records page shows that saved best like every other
+  type-and-level best, without a paused or in-progress status label.
 - Pausing, leaving through Back, or restarting the app never revokes a best
   already reached.
 - A solved-puzzle transaction must save the attempt, incremented score, and any
   new best atomically in the later production implementation.
 - Puzzle and Arrow Duel bests remain separate, and different levels are never
   ranked against each other.
+
+### Active record meter
+
+The active Run uses two visually distinct score states:
+
+- Before the standing best is passed, the meter keeps the useful progress bar
+  and says how many more solves are needed to beat that best.
+- After the standing best is passed, the completed bar disappears. A static
+  milestone card shows `NEW BEST {score}`, increments that score after every
+  solve, names the previous best, and stays on one line so the board remains
+  the visual focus.
+- Record mode has no looping or per-solve animation. The milestone stays
+  readable without competing with the puzzle or adding explanatory status
+  already implied by `NEW BEST`.
+- New-best milestones and results use the product blue with the same shared
+  monochrome trophy as a successful Sprint. Yellow and red remain reserved for
+  timing and mistake feedback. A completed Run that does not set a best stays
+  neutral on white.
+
+Production and the record-mode Interaction Lab state compare against the
+standing best captured when the Run starts and keep the static milestone
+current as new solves are counted. With no standing best, `0 solved` remains a
+pre-record state that says `1 more to set your first best`; the first solved
+puzzle becomes the first best.
 
 ## Pause and leave
 
@@ -56,7 +84,14 @@ time.
 - `Leave paused` returns Home while saving the exact hidden puzzle, board/ply
   state, Puzzle or Arrow Duel phase, score, mistakes, selection cursor, active
   time, level, and rule version.
+- The header pause action appears only while the puzzle is active. It is hidden
+  on the paused surface, where `Resume` and `Leave paused` are the only actions.
 - Active time stops while paused or backgrounded. A paused Run has no expiry.
+- Backgrounding derives the same puzzle-hidden `Resume` / `Leave paused`
+  surface from the authoritative paused Run state; foregrounding never leaves
+  an unexplained blank session shell.
+- Android Back and Predictive Back both preview and commit that same Survival
+  pause surface while a Run is active.
 - The Storybook interaction uses the same domain pause/resume transition as a
   Sprint: opening the puzzle-hidden pause surface freezes both Run and
   per-puzzle active time, and resuming shifts the active deadlines by exactly
@@ -66,6 +101,10 @@ time.
 - There is no manual `End Run` or `End & start over` action. Selecting the same
   type and level continues its existing Run, preserving its mistakes.
 - Only the third mistake or a full-pool `Perfect clear` ends a Run.
+
+The active header uses the same shared mistake-mark presentation as Sprint;
+Survival does not introduce a second icon or count treatment for the same
+`count / max` state.
 
 V1 persistence is local to one device. Cross-device resume remains out of
 scope until a conflict contract is designed.
@@ -134,40 +173,63 @@ Survival does not synthesize a global Rating.
 
 Practice Home keeps one Survival module.
 
-- With no paused Run, it introduces Survival and opens the setup Hub.
-- With paused Runs, it shows the most recently touched Run plus an explicit
-  count for the others.
-- A newly reached best is labeled `New best saved` even while the Run remains
-  paused and resumable.
-- `Continue` resumes the latest exact state. The additional-count action opens
-  the Hub.
+- Home always shows the same compact, calm, whole-card `Survival Challenge`
+  entry with the invitation `See how far you can go, at your own pace.` and
+  one chevron. It stays visually secondary to the saved Run cards.
+- Home does not expose paused state, score, record, level, mistakes, active
+  time, sittings, or a resume action. Those details appear only after the user
+  chooses to enter the Hub.
+- The first entry opens the informational rules. `Got it` acknowledges them
+  and continues into the Hub without starting a Run. Back returns to Practice
+  without acknowledging them, so the next entry explains the rules again.
+- Later entries open the Hub on the most recently touched paused Run when one
+  exists, but visible and accessible Home copy never frames that Run as an
+  unfinished task. The Hub's `?` opens the same informational rules any time.
+- Home never resumes Survival directly; `Continue` appears only beside the
+  exact saved Run inside the Hub.
 
-The one-page Survival Hub contains:
+The full-page Survival Hub starts at the top, uses Back rather than Close, and
+contains:
 
 1. All in-progress Runs for the selected type, sorted by last touched.
 2. Puzzle or Arrow Duel.
 3. Recommended Rating source, with `Use another Run` only when useful.
 4. Supported adjacent levels and every remaining level under `More levels`.
 5. One compact summary with no time limit and a three-mistake end condition.
-6. One `Survival records` entry summarizing completed and in-progress Runs.
+6. One `Survival records` entry for Puzzle and Arrow Duel bests by level. The
+   Hub's separate `In progress` section owns every resume detail.
+
+The adjacent selected level uses the short label `Recommended`, avoiding
+character-level wrapping on supported phone widths.
 
 If the selected type and level already has an in-progress Run, the Hub action
 says `Continue Survival`; it never offers a reset that discards mistakes.
 Otherwise, Start carries the exact selected challenge type, level, Rating
-source, source Rating snapshot, and level-specific best into the first-use
-guide and the active Run. The guide never reverts to the Hub defaults.
+source, source Rating snapshot, and level-specific best directly into the
+active Run. Rules detours preserve the selected type, Rating source, and level
+when the user returns to the Hub. Back from the Rating-source picker dismisses
+only that picker before Back can leave the Hub.
+
+`?` in the Hub is the informational rules entry. Its primary action is `Got
+it`; it returns to the Hub without starting or resuming a Run. An explicit
+`Start Survival` action in the Hub begins the selected Run directly.
 
 All Survival disclosures use the same short motion contract instead of
 appearing or disappearing abruptly:
 
-- Hub `In progress`, records-page `In progress`, and `More levels` are expanded
-  or collapsed by a full-width labeled control with an animated chevron.
-- Both `In progress` sections default open so resumable Runs remain prominent;
-  `More levels` defaults closed unless the current deterministic design state
+- Hub `In progress` and `More levels` are expanded or collapsed by a full-width
+  labeled control with an animated chevron.
+- Hub `In progress` defaults open so resumable Runs remain prominent; `More
+  levels` defaults closed unless the current deterministic design state
   explicitly demonstrates the full inventory.
 - The content animates height, fade, and a subtle upward offset over 200 ms with
   an ease-out curve. Collapsed content remains mounted for a smooth transition
   but is hidden from accessibility and pointer input.
+- `Survival records` has no in-progress section or paused/in-progress labels.
+  It includes already-saved live best values in the ordinary type-and-level
+  rows while the Hub remains the only place that manages resumable Runs.
+- `Survival records` is a full page on the Practice canvas, not a page wrapped
+  in one large card. Only the individual level records retain card borders.
 - The `More levels` control keeps spacing above its focus outline so browser and
   keyboard focus never touches the selected level card. The deterministic Hub
   preview opens the full inventory without a synthetic click, so it never leaves
@@ -181,26 +243,43 @@ Survival records do not appear as a large module inside general History.
 History remains focused on individual puzzle attempts, filters, and replay.
 The Challenge Hub opens a dedicated `Survival records` page that owns:
 
-- In-progress Runs and any live best already reached.
 - Separate Puzzle and Arrow Duel sections.
-- One row per played level, including its completed-Run count and best.
-- Recommended-level emphasis without ranking different levels against one
-  another.
+- Compact cards for played levels, showing only level and best: two columns in
+  portrait and four columns at landscape or regular width.
+- A higher live best already reached by a paused Run, without a status label.
+- No recommended-level label or styling; records do not imply which level the
+  player should choose next.
 
 Back from records returns to the Challenge Hub, preserving the user's current
 type, Rating source, and level selection.
+
+The result keeps Review impact in the same neutral `In Review` card used by a
+Sprint; only its compact count remains red. `Play again` is the explicit
+continue action. A top-left Back control and the bottom `Done` action both
+return to Practice Home; the result does not push the player into challenge
+setup.
 
 ## Arrow Duel
 
 Arrow Duel is a separate Survival type and best namespace.
 
-- Every puzzle includes the candidate choice and required opponent reply.
-- The puzzle scores only after both stages are correct.
-- A wrong candidate or wrong reply adds exactly one mistake for that puzzle,
-  never two.
+- Survival uses the global `Find the opponent's best reply` setting and does
+  not add a second Survival-specific override.
+- A new Run snapshots that global setting. Resuming a paused Run preserves the
+  rule it started with so the exact puzzle state does not change underneath
+  the user.
+- When the setting is off, a correct candidate completes the puzzle and a
+  wrong candidate adds one mistake and enters Review immediately.
+- When the setting is on, a correct candidate continues to the required
+  opponent reply. That reply has no countdown or timeout, matching Survival's
+  no-time-limit contract.
+- With the reply enabled, the puzzle scores only after both stages are correct.
+  A wrong candidate or wrong reply adds exactly one mistake for that puzzle,
+  never two; a wrong candidate never opens the reply step.
 - Pause restores the exact candidate or reply phase.
-- Candidate-only play would require a separate future challenge type rather
-  than silently sharing these records.
+- Candidate-only and candidate-plus-reply Runs share the same Survival level
+  record because the global preference changes the interaction, not the
+  challenge type.
 
 ## Data required by later implementation
 
@@ -226,11 +305,13 @@ first empty batch proved full-pool exhaustion.
 
 ## Storybook boundary
 
-The Interaction Lab demonstrates the expected Home, Hub, Rating-source,
-unavailable saved source, highest-level, empty-Home, first-use, active,
+The Interaction Lab demonstrates the expected Home, full-page Hub,
+informational rules, Rating-source, unavailable saved source, highest-level,
+empty-Home, first-entry help, active, record-mode,
 puzzle-hidden pause, third-mistake result, full-pool `Perfect clear`, and
 dedicated Survival records states. General History deliberately has no
 Survival summary module.
-It remains presentation-only: no production navigation, domain selection,
-persistence, best transaction, backend, sync, analytics, or native behavior is
-wired in this design PR.
+The Interaction Lab remains presentation-only and continues to document the
+approved states with deterministic fixtures. Production wiring lives outside
+the Lab in the shared domain, storage, service, and mobile presentation layers;
+V1 still adds no cross-device resume, analytics, or native-module behavior.

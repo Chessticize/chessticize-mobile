@@ -23,8 +23,14 @@ import {
 import type {
   PuzzleSource,
   RatingBandPuzzleSelection,
-  RatingBandPuzzleSelectionInput
+  RatingBandPuzzleSelectionInput,
+  SurvivalPuzzleBatch,
+  SurvivalPuzzleBatchInput
 } from "./puzzle-source.ts";
+import {
+  eligibleSurvivalPuzzles,
+  selectSurvivalPuzzleBatchFromPuzzles
+} from "./survival-puzzle-selection.ts";
 import type { SyncSqliteDatabase } from "./sync-sqlite-store.ts";
 
 interface PuzzlePackRow {
@@ -152,6 +158,128 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
     });
+  }
+
+  countSurvivalPuzzles(
+    input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
+  ): number {
+    if (input.challengeType === "arrow_duel" && this.arrowDuelEligibility === "validate") {
+      return eligibleSurvivalPuzzles(this.allSurvivalPuzzles(input), input).length;
+    }
+    const row = this.db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM puzzles
+      WHERE rating >= ?
+        AND rating <= ?
+        ${this.survivalArrowDuelSql(input.challengeType)}
+    `).get(input.level.minRating, input.level.maxRating) as { count: number };
+    return row.count;
+  }
+
+  selectSurvivalPuzzleBatch(input: SurvivalPuzzleBatchInput): SurvivalPuzzleBatch {
+    if (!Number.isSafeInteger(input.limit) || input.limit < 1) {
+      throw new Error("Survival puzzle batch limit must be a positive integer");
+    }
+    if (input.challengeType === "arrow_duel" && this.arrowDuelEligibility === "validate") {
+      return selectSurvivalPuzzleBatchFromPuzzles(this.allSurvivalPuzzles(input), input);
+    }
+    const eligibility = this.survivalArrowDuelSql(input.challengeType);
+    const baseParams = [input.level.minRating, input.level.maxRating] as const;
+    const rowsAtOffset = (limit: number, offset: number): PuzzlePackRow[] => (
+      this.db.prepare(`
+        SELECT *
+        FROM puzzles
+        WHERE rating >= ?
+          AND rating <= ?
+          ${eligibility}
+        ORDER BY id ASC
+        LIMIT ? OFFSET ?
+      `).all(...baseParams, limit, offset) as PuzzlePackRow[]
+    );
+    const rowsAfter = (
+      afterPuzzleId: string,
+      limit: number,
+      beforePuzzleId?: string
+    ): PuzzlePackRow[] => (
+      this.db.prepare(`
+        SELECT *
+        FROM puzzles
+        WHERE rating >= ?
+          AND rating <= ?
+          ${eligibility}
+          AND id > ?
+          ${beforePuzzleId === undefined ? "" : "AND id < ?"}
+        ORDER BY id ASC
+        LIMIT ?
+      `).all(
+        ...baseParams,
+        afterPuzzleId,
+        ...(beforePuzzleId === undefined ? [] : [beforePuzzleId]),
+        limit
+      ) as PuzzlePackRow[]
+    );
+    const rowsBefore = (beforePuzzleId: string, limit: number): PuzzlePackRow[] => (
+      this.db.prepare(`
+        SELECT *
+        FROM puzzles
+        WHERE rating >= ?
+          AND rating <= ?
+          ${eligibility}
+          AND id < ?
+        ORDER BY id ASC
+        LIMIT ?
+      `).all(...baseParams, beforePuzzleId, limit) as PuzzlePackRow[]
+    );
+
+    if (!input.cursor) {
+      const count = this.countSurvivalPuzzles(input);
+      if (count === 0) {
+        return { puzzles: [] };
+      }
+      const offset = seededOffset(
+        input.selectionSeed,
+        `${input.challengeType}:${input.level.minRating}:${input.level.maxRating}`,
+        count
+      );
+      const rows = rowsAtOffset(input.limit, offset);
+      let wrapped = false;
+      const startPuzzleId = rows[0]?.id;
+      if (rows.length < input.limit && startPuzzleId) {
+        rows.push(...rowsBefore(startPuzzleId, input.limit - rows.length));
+        wrapped = true;
+      }
+      if (rows.length === 0 || !startPuzzleId) {
+        return { puzzles: [] };
+      }
+      return {
+        puzzles: this.puzzlesFromRows(rows),
+        cursor: {
+          startPuzzleId,
+          afterPuzzleId: rows.at(-1)!.id,
+          wrapped
+        }
+      };
+    }
+
+    const rows = input.cursor.wrapped
+      ? rowsAfter(input.cursor.afterPuzzleId, input.limit, input.cursor.startPuzzleId)
+      : rowsAfter(input.cursor.afterPuzzleId, input.limit);
+    let wrapped = input.cursor.wrapped;
+    if (!wrapped && rows.length < input.limit) {
+      rows.push(...rowsBefore(input.cursor.startPuzzleId, input.limit - rows.length));
+      wrapped = true;
+    }
+    if (rows.length === 0) {
+      return { puzzles: [], cursor: { ...input.cursor } };
+    }
+    return {
+      puzzles: this.puzzlesFromRows(rows),
+      cursor: {
+        startPuzzleId: input.cursor.startPuzzleId,
+        afterPuzzleId: rows.at(-1)!.id,
+        wrapped
+      }
+    };
   }
 
   selectPuzzlesForRatingBands(
@@ -384,6 +512,35 @@ export class SQLitePuzzlePackSource implements PuzzleSource {
     }
 
     return selected;
+  }
+
+  private allSurvivalPuzzles(
+    input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
+  ): Puzzle[] {
+    const rows = this.db.prepare(`
+      SELECT *
+      FROM puzzles
+      WHERE rating >= ? AND rating <= ?
+      ORDER BY id ASC
+    `).all(input.level.minRating, input.level.maxRating) as PuzzlePackRow[];
+    return this.puzzlesFromRows(rows);
+  }
+
+  private survivalArrowDuelSql(
+    challengeType: SurvivalPuzzleBatchInput["challengeType"]
+  ): string {
+    if (challengeType !== "arrow_duel" || this.arrowDuelEligibility === "all") {
+      return "";
+    }
+    if (this.arrowDuelEligibility === "validate") {
+      return "";
+    }
+    return this.rowEncoding === "binary-v1"
+      ? "AND SUBSTR(HEX(stockfish_bestmove), 3, 1) = '0' " +
+          "AND SUBSTR(HEX(solution_moves), 3, 1) = '0'"
+      : "AND LENGTH(TRIM(stockfish_bestmove)) = 4 " +
+          "AND LENGTH(SUBSTR(TRIM(solution_moves), 1, " +
+          "INSTR(TRIM(solution_moves) || ' ', ' ') - 1)) = 4";
   }
 
   private queryCandidates(filter: PuzzleSelectionFilter): Puzzle[] {

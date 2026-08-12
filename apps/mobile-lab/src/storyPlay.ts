@@ -10,6 +10,26 @@ export async function waitForTestId(canvasElement: HTMLElement, testID: string):
   await page.findByTestId(testID, {}, { timeout: 4_000 });
 }
 
+export async function expectLabDeviceStatusBar(canvasElement: HTMLElement): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const frame = await page.findByTestId("lab-device-frame", {}, { timeout: 4_000 });
+  const statusBar = await page.findByTestId("lab-device-status-bar", {}, { timeout: 4_000 });
+  const safeAreaTop = Number(frame.dataset.safeAreaTop);
+
+  await waitFor(() => {
+    const frameRect = frame.getBoundingClientRect();
+    const statusBarRect = statusBar.getBoundingClientRect();
+    if (Math.abs(statusBarRect.top - frameRect.top) > 0.5) {
+      throw new Error("Expected the Lab status bar to start at the top of the device frame");
+    }
+    if (Math.abs(statusBarRect.height - safeAreaTop) > 0.5) {
+      throw new Error(
+        `Expected the Lab status bar to fill the ${safeAreaTop}px top Safe Area`
+      );
+    }
+  }, { timeout: 4_000 });
+}
+
 export async function centerTestId(canvasElement: HTMLElement, testID: string): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
@@ -79,6 +99,27 @@ export async function expectTestIdHorizontalCentersAligned(
       throw new Error(
         `Expected ${firstTestID} and ${secondTestID} centers within ${tolerance}px; offset ${offset.toFixed(2)}px`
       );
+    }
+  });
+}
+
+export async function expectTestIdsNotOverlapping(
+  canvasElement: HTMLElement,
+  firstTestID: string,
+  secondTestID: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const first = await page.findByTestId(firstTestID, {}, { timeout: 4_000 });
+  const second = await page.findByTestId(secondTestID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    const firstRect = first.getBoundingClientRect();
+    const secondRect = second.getBoundingClientRect();
+    const overlaps = firstRect.left < secondRect.right
+      && firstRect.right > secondRect.left
+      && firstRect.top < secondRect.bottom
+      && firstRect.bottom > secondRect.top;
+    if (overlaps) {
+      throw new Error(`Expected ${firstTestID} not to overlap ${secondTestID}`);
     }
   });
 }

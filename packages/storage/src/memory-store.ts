@@ -22,6 +22,7 @@ import {
   samePracticeRun,
   sameReviewContext,
   sideToMoveForHistoryPuzzle,
+  survivalRunKey,
   updateAttemptUnclearState
 } from "../../core/src/index.ts";
 import type {
@@ -42,7 +43,9 @@ import type {
   ReviewScheduleChange,
   ReviewScheduleRemoval,
   SessionMistakeReviewItem,
-  SprintState
+  SprintState,
+  SurvivalBestRecord,
+  SurvivalPreferences
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type {
@@ -57,6 +60,11 @@ import type {
   PracticeStore,
   ReviewQueueDuePromotionResult
 } from "./practice-store.ts";
+import type { SurvivalPuzzleBatch, SurvivalPuzzleBatchInput } from "./puzzle-source.ts";
+import {
+  eligibleSurvivalPuzzles,
+  selectSurvivalPuzzleBatchFromPuzzles
+} from "./survival-puzzle-selection.ts";
 import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
 import { buildPracticeProgressSummary } from "./rating-history.ts";
 import { clonePracticeSettings, defaultPracticeSettings, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
@@ -89,6 +97,8 @@ export class MemoryStore implements PracticeStore {
     defaultPracticeRuns().map((run) => [run.id, run])
   );
   private readonly sessions = new Map<string, SprintState>();
+  private readonly survivalBests = new Map<string, SurvivalBestRecord>();
+  private survivalPreferences: SurvivalPreferences = { guideSeen: false };
   private readonly attempts: AttemptEvent[] = [];
   private readonly reviewQueue = new Map<string, ReviewQueueState>();
   private readonly reviewRemovals = new Map<string, ReviewScheduleRemoval>();
@@ -135,6 +145,16 @@ export class MemoryStore implements PracticeStore {
       ...(filter.excludeIds === undefined ? {} : { excludeIds: filter.excludeIds }),
       ...(filter.randomSeed === undefined ? {} : { randomSeed: filter.randomSeed })
     });
+  }
+
+  countSurvivalPuzzles(
+    input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
+  ): number {
+    return eligibleSurvivalPuzzles([...this.puzzles.values()], input).length;
+  }
+
+  selectSurvivalPuzzleBatch(input: SurvivalPuzzleBatchInput): SurvivalPuzzleBatch {
+    return selectSurvivalPuzzleBatchFromPuzzles([...this.puzzles.values()], input);
   }
 
   selectPuzzlesForRatingBands(
@@ -285,6 +305,54 @@ export class MemoryStore implements PracticeStore {
     }
   }
 
+  getResumableSurvivalSprint(id: string): SprintState | undefined {
+    const state = this.sessions.get(id);
+    return state?.config.survival && isOpenSprint(state)
+      ? cloneSprintState(state)
+      : undefined;
+  }
+
+  listResumableSurvivalSprints(): SprintState[] {
+    return [...this.sessions.values()]
+      .filter((state) => state.config.survival !== undefined && isOpenSprint(state))
+      .sort((left, right) => (
+        (right.survival?.lastTouchedAt ?? right.startedAt).localeCompare(
+          left.survival?.lastTouchedAt ?? left.startedAt
+        ) || right.id.localeCompare(left.id)
+      ))
+      .map(cloneSprintState);
+  }
+
+  listSurvivalBests(): SurvivalBestRecord[] {
+    return [...this.survivalBests.values()]
+      .map((record) => ({ ...record }))
+      .sort((left, right) => (
+        left.challengeType.localeCompare(right.challengeType) ||
+        left.minRating - right.minRating ||
+        left.ruleVersion - right.ruleVersion
+      ));
+  }
+
+  saveSurvivalBest(record: SurvivalBestRecord): void {
+    const key = survivalRunKey({
+      challengeType: record.challengeType,
+      level: { minRating: record.minRating, maxRating: record.maxRating },
+      ruleVersion: record.ruleVersion
+    });
+    const previous = this.survivalBests.get(key);
+    if (!previous || record.score > previous.score) {
+      this.survivalBests.set(key, { ...record });
+    }
+  }
+
+  getSurvivalPreferences(): SurvivalPreferences {
+    return { ...this.survivalPreferences };
+  }
+
+  saveSurvivalPreferences(preferences: SurvivalPreferences): void {
+    this.survivalPreferences = { ...preferences };
+  }
+
   recordAttempt(attempt: AttemptEvent): void {
     this.attempts.push(cloneAttemptHistoryRow(attempt));
     if (
@@ -391,6 +459,13 @@ export class MemoryStore implements PracticeStore {
 
   listSprintSessions(): ExportedSprintSession[] {
     return [...this.sessions.values()]
+      .map(exportedSprintSessionFromState)
+      .sort((left, right) => right.startedAt.localeCompare(left.startedAt) || right.id.localeCompare(left.id));
+  }
+
+  listSurvivalSessions(): ExportedSprintSession[] {
+    return [...this.sessions.values()]
+      .filter((session) => session.config.survival !== undefined)
       .map(exportedSprintSessionFromState)
       .sort((left, right) => right.startedAt.localeCompare(left.startedAt) || right.id.localeCompare(left.id));
   }
@@ -1018,6 +1093,7 @@ function isTacticalProfileEvidenceSession(
     session?.completedAt &&
     session.config &&
     session.config.tacticalFocus === undefined &&
+    session.config.survival === undefined &&
     namedThemesForSelection(session.config.themes).length === 0
   );
 }
@@ -1112,4 +1188,8 @@ function sameReviewQueue(left: ReviewQueueState | undefined, right: ReviewQueueS
 
 function isOpenSprint(session: SprintState): boolean {
   return session.status === "active" || session.status === "paused";
+}
+
+function cloneSprintState(state: SprintState): SprintState {
+  return JSON.parse(JSON.stringify(state)) as SprintState;
 }

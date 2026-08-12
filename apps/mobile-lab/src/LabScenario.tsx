@@ -10,9 +10,11 @@ import type {
 import {
   beginArrowDuelPuzzle,
   beginLinePuzzle,
+  DEFAULT_OPPONENT_REPLY_SECONDS,
   defaultSprintConfig,
   pauseSprint,
-  startSprint
+  startSprint,
+  submitSprintMove
 } from "../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../packages/storage/src/memory-store.ts";
 import { PracticeService } from "../../../packages/storage/src/practice-service.ts";
@@ -20,6 +22,7 @@ import { MemoryTacticalProfileRepository } from "../../../packages/storage/src/t
 import { TacticalProfileService } from "../../../packages/storage/src/tactical-profile-service.ts";
 import { PracticePocScreen } from "../../mobile/src/components/PracticePocScreen.tsx";
 import type { MobilePlatformCapabilities } from "../../mobile/src/platform/mobilePlatformCapabilities.ts";
+import type { MobileSystemBackSource } from "../../mobile/src/navigation/mobileSystemBack.ts";
 import type {
   ReviewReminderNotificationClient,
   ReviewReminderNotificationRoute,
@@ -108,18 +111,22 @@ export function LabScenario({
   arrowDuelReplyPreparationConfirmationRequired,
   arrowDuelReplyPreparationHoldMs,
   arrowDuelReplySeconds,
+  personalBestArrowDuelPostCorrectCandidate,
   runReorderPickedUpRunId,
   scenarioId,
-  storyPresentation
+  storyPresentation,
+  systemBack
 }: {
   arrowDuelOpponentReplyGlobalEnabled?: boolean;
   arrowDuelReplyAutoTimeoutMs?: number;
   arrowDuelReplyPreparationConfirmationRequired?: boolean;
   arrowDuelReplyPreparationHoldMs?: number;
   arrowDuelReplySeconds?: number;
+  personalBestArrowDuelPostCorrectCandidate?: boolean;
   runReorderPickedUpRunId?: string;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
+  systemBack?: MobileSystemBackSource;
 }): React.JSX.Element {
   const runtime = useMemo(() => createScenarioRuntime(scenarioId), [scenarioId]);
 
@@ -133,10 +140,12 @@ export function LabScenario({
       }
       arrowDuelReplyPreparationHoldMs={arrowDuelReplyPreparationHoldMs}
       arrowDuelReplySeconds={arrowDuelReplySeconds}
+      personalBestArrowDuelPostCorrectCandidate={personalBestArrowDuelPostCorrectCandidate}
       runReorderPickedUpRunId={runReorderPickedUpRunId}
       runtime={runtime}
       scenarioId={scenarioId}
       storyPresentation={storyPresentation}
+      systemBack={systemBack}
     />
   );
 }
@@ -147,20 +156,24 @@ function LabScenarioContent({
   arrowDuelReplyPreparationConfirmationRequired,
   arrowDuelReplyPreparationHoldMs,
   arrowDuelReplySeconds,
+  personalBestArrowDuelPostCorrectCandidate,
   runReorderPickedUpRunId,
   runtime,
   scenarioId,
-  storyPresentation
+  storyPresentation,
+  systemBack
 }: {
   arrowDuelOpponentReplyGlobalEnabled?: boolean;
   arrowDuelReplyAutoTimeoutMs?: number;
   arrowDuelReplyPreparationConfirmationRequired?: boolean;
   arrowDuelReplyPreparationHoldMs?: number;
   arrowDuelReplySeconds?: number;
+  personalBestArrowDuelPostCorrectCandidate?: boolean;
   runReorderPickedUpRunId?: string;
   runtime: ScenarioRuntime;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
+  systemBack?: MobileSystemBackSource;
 }): React.JSX.Element {
   const tacticalProfileScenarioId = isTacticalProfileScenario(scenarioId)
     ? scenarioId
@@ -291,6 +304,45 @@ function LabScenarioContent({
           }
         }
       };
+  const personalBestChallengePreview = useMemo(() => {
+    const preview = personalBestChallengePreviewFor(scenarioId);
+    if (!preview) {
+      return preview;
+    }
+    if (arrowDuelOpponentReplyGlobalEnabled === undefined) {
+      return preview;
+    }
+    const arrowDuelStart = preview.startStates?.arrow_duel
+      ? personalBestArrowDuelStateWithOpponentReply(
+          preview.startStates.arrow_duel,
+          arrowDuelOpponentReplyGlobalEnabled
+        )
+      : undefined;
+    const effectiveArrowDuelStart = arrowDuelStart
+      && personalBestArrowDuelPostCorrectCandidate === true
+      ? personalBestArrowDuelAfterCorrectCandidate(arrowDuelStart)
+      : arrowDuelStart;
+    return {
+      ...preview,
+      opponentReplyEnabled: arrowDuelOpponentReplyGlobalEnabled,
+      pausedRuns: preview.pausedRuns?.map((run) => run.challengeType === "arrow_duel"
+        ? {
+            ...run,
+            opponentReplyEnabled: run.resumeState?.config.opponentReply?.enabled ?? true
+          }
+        : run),
+      startStates: {
+        ...preview.startStates,
+        ...(effectiveArrowDuelStart === undefined
+          ? {}
+          : { arrow_duel: effectiveArrowDuelStart })
+      }
+    };
+  }, [
+    arrowDuelOpponentReplyGlobalEnabled,
+    personalBestArrowDuelPostCorrectCandidate,
+    scenarioId
+  ]);
 
   return (
     <LabScenarioShell
@@ -311,8 +363,9 @@ function LabScenarioContent({
         historyProgressPresentation={isHistoryProgressScenario(scenarioId)
           ? historyProgressPresentationFor(scenarioId)
           : undefined}
-        personalBestChallengeDesignPreview={personalBestChallengePreviewFor(scenarioId)}
+        personalBestChallengeDesignPreview={personalBestChallengePreview}
         platformCapabilities={runtime.platformCapabilities}
+        systemBack={systemBack}
         runReorderDesignPreview={runReorderPickedUpRunId && runReorderDesignPreviewActive
           ? { pickedUpRunId: runReorderPickedUpRunId }
           : undefined}
@@ -348,6 +401,7 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-personal-best-highest-level",
     "practice-personal-best-leave",
     "practice-personal-best-active",
+    "practice-personal-best-record",
     "practice-personal-best-result",
     "practice-personal-best-pool-cleared",
     "practice-personal-best-records",
@@ -374,6 +428,11 @@ function sprintRulesDesignPreviewFor(
   if (scenarioId === "practice-personal-best-active") {
     return {
       initialActiveState: personalBestActiveState(14, 1)
+    };
+  }
+  if (scenarioId === "practice-personal-best-record") {
+    return {
+      initialActiveState: personalBestActiveState(19, 1)
     };
   }
   if (scenarioId === "practice-personal-best-leave") {
@@ -731,7 +790,10 @@ function personalBestChallengePreviewFor(
     }
   };
   if (scenarioId === "practice-home") {
-    return common;
+    return {
+      ...common,
+      homeGuideOnFirstEntry: true
+    };
   }
   if (scenarioId === "practice-runs-empty") {
     return {
@@ -815,11 +877,17 @@ function personalBestChallengePreviewFor(
   if (scenarioId === "practice-personal-best-guide") {
     return {
       ...common,
-      guideInitiallyVisible: true
+      hubInitiallyVisible: true
     };
   }
   if (scenarioId === "practice-personal-best-active") {
     return common;
+  }
+  if (scenarioId === "practice-personal-best-record") {
+    return {
+      ...common,
+      activeRecordMode: true
+    };
   }
   if (scenarioId === "practice-personal-best-leave") {
     return {
@@ -860,6 +928,16 @@ function personalBestChallengePreviewFor(
       ...common,
       bestScore: 19,
       completedRunCount: 7,
+      levelRecords: [
+        ...levelRecords,
+        {
+          challengeType: "arrow_duel",
+          completedRunCount: 1,
+          maxRating: 1099,
+          minRating: 1000,
+          score: 3
+        }
+      ],
       recordsInitiallyVisible: true
     };
   }
@@ -894,6 +972,46 @@ function personalBestActiveState(
     ratingBefore: PERSONAL_BEST_BAND.currentRating,
     startedAt,
     status: "active"
+  };
+}
+
+function personalBestSurvivalActiveState(
+  correctCount: number,
+  mistakeCount: number
+): SprintState {
+  const state = personalBestActiveState(correctCount, mistakeCount);
+  const firstPuzzle = state.puzzles[0]!;
+  const lastPuzzle = state.puzzles[state.puzzles.length - 1]!;
+  return {
+    ...state,
+    config: {
+      ...state.config,
+      survival: {
+        challengeType: "puzzle",
+        eligibleCount: state.puzzles.length,
+        maxRating: PERSONAL_BEST_BAND.maxRating,
+        minRating: PERSONAL_BEST_BAND.minRating,
+        packHash: "interaction-lab",
+        packVersion: 1,
+        ratingSourceGeneration: 1,
+        ratingSourceRating: PERSONAL_BEST_BAND.currentRating,
+        ratingSourceRunId: "standard",
+        ruleVersion: 1,
+        selectionSeed: "personal-best-record"
+      }
+    },
+    survival: {
+      bestBefore: 18,
+      consumedPuzzleCount: state.currentPuzzleIndex,
+      lastTouchedAt: new Date(LAB_NOW_MS).toISOString(),
+      loadedPuzzleCount: state.puzzles.length,
+      pauseCount: 0,
+      poolExhaustedAfterBuffer: true,
+      selectionCursorPuzzleId: lastPuzzle.id,
+      selectionStartPuzzleId: firstPuzzle.id,
+      selectionWrapped: false,
+      sittings: 1
+    }
   };
 }
 
@@ -976,6 +1094,33 @@ function personalBestArrowDuelStartState(): SprintState {
     id: "personal-best-arrow-duel-start",
     mistakeCount: 0
   };
+}
+
+function personalBestArrowDuelStateWithOpponentReply(
+  state: SprintState,
+  enabled: boolean
+): SprintState {
+  return {
+    ...state,
+    config: {
+      ...state.config,
+      opponentReply: {
+        enabled,
+        seconds: state.config.opponentReply?.seconds ?? DEFAULT_OPPONENT_REPLY_SECONDS
+      }
+    }
+  };
+}
+
+function personalBestArrowDuelAfterCorrectCandidate(state: SprintState): SprintState {
+  if (state.currentPuzzle?.kind !== "arrow_duel") {
+    throw new Error("Arrow Duel global-off fixture requires an Arrow Duel puzzle");
+  }
+  return submitSprintMove(
+    state,
+    state.currentPuzzle.correctMove,
+    new Date(LAB_NOW_MS).toISOString()
+  ).state;
 }
 
 function personalBestConfig(): SprintState["config"] {
@@ -1208,9 +1353,13 @@ export function LabScenarioShell({
           <span>{nativeFeedbackPreview}</span>
         </div>
       ) : null}
-      <aside className="lab-toolbar" aria-label="Interaction Lab scenario controls">
+      <aside
+        className="lab-toolbar"
+        aria-label="Interaction Lab scenario controls"
+        data-testid="lab-scenario-toolbar"
+      >
         <details>
-          <summary>
+          <summary aria-label={`Scenario details for ${storyTitle}`}>
             {definition.nativeBoundary
               ? `${definition.group} · Native boundary`
               : `${definition.group} · ${storyTitle}`}
@@ -1321,9 +1470,17 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       ? createTacticalProfileLabService()
       : createRunManagementService(
           scenarioId === "practice-runs-empty",
-          scenarioId === "practice-home" ? 28 : 0
+          scenarioId === "practice-home" ? 28 : 0,
+          scenarioId === "practice-personal-best-record"
+            ? personalBestSurvivalActiveState(19, 1)
+            : undefined
         );
     screenProps.runManagementEnabled = true;
+    if (scenarioId === "practice-personal-best-record") {
+      screenProps.sprintRulesDesignPreview = {
+        initialActiveState: service.getActiveSprint()
+      };
+    }
   }
 
   switch (scenarioId) {
@@ -1455,7 +1612,10 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     );
     screenProps.standardTargetCorrect = 2;
   }
-  if (scenarioId === "practice-personal-best-active") {
+  if (
+    scenarioId === "practice-personal-best-active"
+    || scenarioId === "practice-personal-best-record"
+  ) {
     screenProps.currentTimeMs = createPersonalBestLiveClock();
   }
 
@@ -1574,13 +1734,21 @@ function createSessionGuideService(): PracticeService {
   return new PracticeService(store);
 }
 
-function createRunManagementService(empty: boolean, dueReviewCount = 0): PracticeService {
+function createRunManagementService(
+  empty: boolean,
+  dueReviewCount = 0,
+  initialSurvivalState?: SprintState
+): PracticeService {
   const store = new MemoryStore();
   const reviewPuzzles = Array.from({ length: dueReviewCount }, (_, index) => ({
     ...LAB_PUZZLES[index % LAB_PUZZLES.length]!,
     id: `home-review-${index + 1}`
   }));
-  store.seedPuzzles([...LAB_PUZZLES, ...reviewPuzzles]);
+  store.seedPuzzles([
+    ...LAB_PUZZLES,
+    ...reviewPuzzles,
+    ...(initialSurvivalState?.puzzles ?? [])
+  ]);
   for (const puzzle of reviewPuzzles) {
     store.scheduleMistakeReview({
       puzzleId: puzzle.id,
@@ -1590,6 +1758,10 @@ function createRunManagementService(empty: boolean, dueReviewCount = 0): Practic
   }
   const service = new PracticeService(store);
   seedRunManagementCatalog(service, empty);
+  if (initialSurvivalState) {
+    store.createSprintSession(initialSurvivalState);
+    service.resumeSurvival(initialSurvivalState.id, new Date(LAB_NOW_MS).toISOString());
+  }
   return service;
 }
 

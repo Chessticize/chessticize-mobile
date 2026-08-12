@@ -14,7 +14,9 @@ import type {
   SessionMistakeReviewItem,
   SprintMode,
   SprintConfig,
-  SprintState
+  SprintState,
+  SurvivalBestRecord,
+  SurvivalPreferences
 } from "../../core/src/index.ts";
 import { isReviewDay, reviewDayFor } from "../../core/src/index.ts";
 import type { HistoryQuery, HistoryView, ReviewReminderSettings } from "../../core/src/index.ts";
@@ -22,6 +24,7 @@ import type { SprintGuideProgress } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type { PracticeProgressSummary } from "./rating-history.ts";
 import type { ProgressV2PersistenceHost } from "./progress-v2-persistence.ts";
+import type { SurvivalPuzzleBatch, SurvivalPuzzleBatchInput } from "./puzzle-source.ts";
 
 export interface ClearSyncedHistoryResult {
   attempts: number;
@@ -132,6 +135,8 @@ export interface PracticeStore extends ProgressV2PersistenceHost {
   countPuzzles(filter?: PuzzleSelectionFilter): number;
   getPuzzle(id: string): Puzzle | undefined;
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[];
+  countSurvivalPuzzles(input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">): number;
+  selectSurvivalPuzzleBatch(input: SurvivalPuzzleBatchInput): SurvivalPuzzleBatch;
   getRating(key: string): RatingRecord;
   listRatings(): RatingRecord[];
   listPlayedRatings(): RatingRecord[];
@@ -152,6 +157,12 @@ export interface PracticeStore extends ProgressV2PersistenceHost {
   ): AppReviewRequestAttempt;
   createSprintSession(state: SprintState): void;
   updateSprintSession(state: SprintState): void;
+  getResumableSurvivalSprint(id: string): SprintState | undefined;
+  listResumableSurvivalSprints(): SprintState[];
+  listSurvivalBests(): SurvivalBestRecord[];
+  saveSurvivalBest(record: SurvivalBestRecord): void;
+  getSurvivalPreferences(): SurvivalPreferences;
+  saveSurvivalPreferences(preferences: SurvivalPreferences): void;
   recordAttempt(attempt: AttemptEvent): void;
   setAttemptUnclear(attemptId: string, unclear: boolean, updatedAt: string): AttemptHistoryRow;
   getAttempt(attemptId: string): AttemptHistoryRow | undefined;
@@ -164,6 +175,7 @@ export interface PracticeStore extends ProgressV2PersistenceHost {
   listLatestTerminalFocusedSprintSessions(): ExportedSprintSession[];
   listSprintAttemptUtcDays(sessionIds: readonly string[]): string[];
   listSprintSessions(): ExportedSprintSession[];
+  listSurvivalSessions(): ExportedSprintSession[];
   getTacticalProfileSourceRevision(): number;
   exportLocalData(): LocalDataExport;
   importLocalData(

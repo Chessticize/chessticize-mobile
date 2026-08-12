@@ -139,6 +139,39 @@ test("SQLitePuzzlePackSource skips repeated Arrow Duel validation for a manifest
   }
 });
 
+test("SQLitePuzzlePackSource traverses a seeded Survival pool once in bounded batches", () => {
+  const puzzles = Array.from({ length: 40 }, (_, index) =>
+    selectionPuzzle(`survival-${String(index).padStart(2, "0")}`, 900 + (index % 10), ["fork"])
+  );
+  const packDb = buildPackDatabase(puzzles);
+  try {
+    const source = new SQLitePuzzlePackSource(new NodeSqliteDatabase(packDb), {
+      arrowDuelEligibility: "all"
+    });
+    const common = {
+      challengeType: "puzzle" as const,
+      level: { minRating: 900, maxRating: 999 },
+      limit: 13,
+      selectionSeed: "bounded-wrap"
+    };
+    assert.equal(source.countSurvivalPuzzles(common), 40);
+    let batch = source.selectSurvivalPuzzleBatch(common);
+    const selectedIds: string[] = [];
+    while (batch.puzzles.length > 0) {
+      selectedIds.push(...batch.puzzles.map((puzzle) => puzzle.id));
+      assert.ok(batch.cursor);
+      batch = source.selectSurvivalPuzzleBatch({ ...common, cursor: batch.cursor });
+    }
+
+    assert.equal(selectedIds.length, 40);
+    assert.equal(new Set(selectedIds).size, 40);
+    assert.deepEqual([...selectedIds].sort(), puzzles.map((puzzle) => puzzle.id).sort());
+    assert.equal(batch.cursor?.wrapped, true);
+  } finally {
+    packDb.close();
+  }
+});
+
 test("SQLitePuzzlePackSource keeps promotion puzzles in Standard but excludes them from Arrow Duel", () => {
   const standardPuzzle = arrowDuelPuzzle({
     id: "standard-arrow-duel",
@@ -166,6 +199,23 @@ test("SQLitePuzzlePackSource keeps promotion puzzles in Standard but excludes th
     );
     assert.deepEqual(
       source.selectPuzzles({ mode: "arrow_duel", limit: 10 }).map((puzzle) => puzzle.id),
+      [standardPuzzle.id]
+    );
+    assert.equal(source.countSurvivalPuzzles({
+      challengeType: "puzzle",
+      level: { minRating: 1500, maxRating: 1599 }
+    }), 2);
+    assert.equal(source.countSurvivalPuzzles({
+      challengeType: "arrow_duel",
+      level: { minRating: 1500, maxRating: 1599 }
+    }), 1);
+    assert.deepEqual(
+      source.selectSurvivalPuzzleBatch({
+        challengeType: "arrow_duel",
+        level: { minRating: 1500, maxRating: 1599 },
+        limit: 2,
+        selectionSeed: "promotion-filter"
+      }).puzzles.map((puzzle) => puzzle.id),
       [standardPuzzle.id]
     );
   } finally {

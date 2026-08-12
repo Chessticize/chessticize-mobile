@@ -12,6 +12,7 @@ export * from "./puzzle-source.ts";
 export * from "./pack-backed-practice-store.ts";
 export * from "./puzzle-pack-binary-codec.ts";
 export * from "./sqlite-puzzle-pack-source.ts";
+export * from "./survival-puzzle-selection.ts";
 export * from "./sqlite-store.ts";
 export { CURRENT_SCHEMA_VERSION } from "./sync-sqlite-store.ts";
 export * from "./practice-service.ts";

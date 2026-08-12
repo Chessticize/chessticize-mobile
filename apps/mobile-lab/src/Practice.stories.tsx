@@ -4,12 +4,14 @@ import {
   centerTestId,
   clickTestId,
   dragTestId,
+  expectLabDeviceStatusBar,
   expectPointerDrivenRunDrag,
   expectReorderAnimation,
   expectRunCardPickedUp,
   expectRunCardInsets,
   expectRunTouchSelectionSuppressed,
   expectTestIdHorizontalCentersAligned,
+  expectTestIdsNotOverlapping,
   expectTestIdText,
   expectTestIdAbsent,
   expectTestIdsInOrder,
@@ -123,18 +125,39 @@ function expectFullScreenStoryId(canvasElement: HTMLElement, storyId: string): v
 export const Home: Story = {
   args: { scenarioId: "practice-home" },
   play: async ({ canvasElement }) => {
+    await expectLabDeviceStatusBar(canvasElement);
     await expectTestIdText(canvasElement, "practice-mode-standard-rating", "925");
     await expectTestIdText(canvasElement, "practice-mode-arrow-duel-rating", "875");
     expectTestIdAbsent(canvasElement, "practice-review-strip");
     await waitForTestId(canvasElement, "training-focus-card");
     await waitForText(canvasElement, "More information needed");
     await waitForTestId(canvasElement, "personal-best-home-card");
-    await expectTestIdText(canvasElement, "personal-best-home-score", "19");
-    await expectTestIdText(canvasElement, "personal-best-more-paused", "2 more paused");
-    await clickTestId(canvasElement, "personal-best-more-paused");
+    await expectTestIdText(
+      canvasElement,
+      "personal-best-home-card",
+      "Survival ChallengeSee how far you can go, at your own pace.›"
+    );
+    await expectTestIdsInOrder(canvasElement, [
+      "practice-progress-summary",
+      "personal-best-home-card",
+      "training-focus-card"
+    ]);
+    expectTestIdAbsent(canvasElement, "personal-best-home-score");
+    expectTestIdAbsent(canvasElement, "personal-best-more-paused-count");
+    expectTestIdAbsent(canvasElement, "personal-best-continue");
+    await clickTestId(canvasElement, "personal-best-home-card");
+    await waitForTestId(canvasElement, "personal-best-guide");
+    await expectTestIdText(canvasElement, "personal-best-guide-start", "Got it");
+    await clickTestId(canvasElement, "personal-best-guide-close");
+    await waitForTestId(canvasElement, "personal-best-home-card");
+    await clickTestId(canvasElement, "personal-best-home-card");
+    await waitForTestId(canvasElement, "personal-best-guide");
+    await clickTestId(canvasElement, "personal-best-guide-start");
     await waitForTestId(canvasElement, "personal-best-hub");
     await clickTestId(canvasElement, "personal-best-hub-close");
     await waitForTestId(canvasElement, "personal-best-home-card");
+    await clickTestId(canvasElement, "personal-best-home-card");
+    await waitForTestId(canvasElement, "personal-best-hub");
   }
 };
 
@@ -201,6 +224,55 @@ export const PersonalBestArrowDuel: Story = {
   }
 };
 
+export const PersonalBestArrowDuelGlobalOff: Story = {
+  name: "Survival · Arrow Duel global reply off",
+  args: {
+    arrowDuelOpponentReplyGlobalEnabled: false,
+    personalBestArrowDuelPostCorrectCandidate: true,
+    scenarioId: "practice-personal-best-arrow-duel",
+    storyPresentation: {
+      storyId: "practice--survival-arrow-duel-global-reply-off",
+      title: "Survival · Arrow Duel global reply off"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "personal-best-hub");
+    await expectTestIdText(canvasElement, "personal-best-recommended-level", "800–899");
+    await clickTestId(canvasElement, "personal-best-level-900");
+    await waitForText(canvasElement, "Choose the better arrow · No time limit · 3 mistakes");
+    await clickTestId(canvasElement, "personal-best-hub-help");
+    await waitForText(
+      canvasElement,
+      "Choose the better arrow. A wrong choice adds one mistake and enters Review. A correct choice completes the puzzle. Turn on opponent replies in Settings to add the reply step to new Survival Runs. Other Arrow Duel Runs return to their saved choice; paused sessions keep the rule they started with."
+    );
+    await clickTestId(canvasElement, "personal-best-guide-start");
+    await waitForTestId(canvasElement, "personal-best-hub");
+    await clickTestId(canvasElement, "personal-best-hub-start");
+    await expectTestIdText(canvasElement, "session-progress", "1 solved");
+    expectTestIdAbsent(canvasElement, "arrow-duel-reply-challenge");
+    expectTestIdAbsent(canvasElement, "arrow-duel-what-if-overlay");
+    expectTestIdAbsent(canvasElement, "arrow-duel-reply-timer");
+  }
+};
+
+export const PersonalBestArrowDuelRequiredReply: Story = {
+  name: "Survival · Arrow Duel required reply",
+  args: {
+    scenarioId: "practice-personal-best-arrow-duel",
+    storyPresentation: {
+      storyId: "practice--survival-arrow-duel-required-reply",
+      title: "Survival · Arrow Duel required reply"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "personal-best-paused-continue-arrow-800");
+    await waitForTestId(canvasElement, "arrow-duel-reply-challenge");
+    await expectTestIdText(canvasElement, "arrow-duel-reply-title", "Find the reply");
+    await expectTestIdText(canvasElement, "arrow-duel-reply-hint", "");
+    expectTestIdAbsent(canvasElement, "arrow-duel-reply-timer");
+  }
+};
+
 export const SurvivalEmptyHomeSource: Story = {
   name: "Survival · Empty Home source",
   args: { scenarioId: "practice-personal-best-empty-home-source" },
@@ -228,15 +300,18 @@ export const SurvivalHighestLevel: Story = {
 };
 
 export const PersonalBestGuide: Story = {
-  name: "Survival · first-use guide",
+  name: "Survival · rules",
   args: { scenarioId: "practice-personal-best-guide" },
   play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "personal-best-hub-help");
     await waitForTestId(canvasElement, "personal-best-guide");
     await expectTestIdText(canvasElement, "personal-best-guide-score", "18");
     await waitForText(canvasElement, "One level for the whole Run");
     await waitForText(canvasElement, "Three mistakes end the Run");
     await waitForText(canvasElement, "No time limit");
     await waitForText(canvasElement, "Pause now, continue later");
+    await expectTestIdText(canvasElement, "personal-best-guide-start", "Got it");
+    expectTestIdAbsent(canvasElement, "personal-best-guide-not-now");
   }
 };
 
@@ -559,6 +634,7 @@ export const ActiveSession: Story = {
   name: "Active session",
   args: { scenarioId: "practice-active" },
   play: async ({ canvasElement }) => {
+    await expectLabDeviceStatusBar(canvasElement);
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
     await waitForText(canvasElement, "Puzzle 0:24");
@@ -571,12 +647,35 @@ export const PersonalBestActive: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "active-session-shell");
     await waitForText(canvasElement, "Survival");
-    await expectTestIdText(canvasElement, "session-timer", "No time limit");
-    await waitForTestId(canvasElement, "personal-best-mistakes");
+    expectTestIdAbsent(canvasElement, "session-timer-block");
+    expectTestIdAbsent(canvasElement, "session-timer");
+    await waitForTestId(canvasElement, "session-mistakes");
+    expectTestIdAbsent(canvasElement, "personal-best-mistakes");
     await expectTestIdText(canvasElement, "personal-best-progress-title", "5 more to beat 18");
     await waitForTestId(canvasElement, "session-puzzle-timing");
     expectTestIdAbsent(canvasElement, "personal-best-end-run");
     expectTestIdAbsent(canvasElement, "personal-best-unrated");
+  }
+};
+
+export const PersonalBestRecord: Story = {
+  name: "Survival · record mode",
+  args: { scenarioId: "practice-personal-best-record" },
+  play: async ({ canvasElement }) => {
+    await expectLabDeviceStatusBar(canvasElement);
+    await waitForTestId(canvasElement, "active-session-shell");
+    await expectTestIdText(canvasElement, "personal-best-record-badge", "NEW BEST 19");
+    await expectTestIdText(canvasElement, "personal-best-record-previous", "Previous best 18");
+    await expectTestIdHorizontalCentersAligned(canvasElement, "practice-prompt", "session-board");
+    await expectTestIdsNotOverlapping(
+      canvasElement,
+      "personal-best-progress",
+      "lab-scenario-toolbar"
+    );
+    await waitForEnabledTestId(canvasElement, "lab-board-correct");
+    expectTestIdAbsent(canvasElement, "personal-best-progress-fill");
+    expectTestIdAbsent(canvasElement, "personal-best-record-impact");
+    expectTestIdAbsent(canvasElement, "personal-best-record-aura");
   }
 };
 
@@ -593,7 +692,10 @@ export const SurvivalLeaveOptions: Story = {
     expectTestIdAbsent(canvasElement, "session-board");
     expectTestIdAbsent(canvasElement, "practice-prompt");
     expectTestIdAbsent(canvasElement, "session-puzzle-timing");
+    expectTestIdAbsent(canvasElement, "session-timer-block");
+    expectTestIdAbsent(canvasElement, "session-timer");
     expectTestIdAbsent(canvasElement, "session-abandon-confirm");
+    expectTestIdAbsent(canvasElement, "session-abandon");
     expectTestIdAbsent(canvasElement, "personal-best-end-run");
     expectTestIdAbsent(canvasElement, "personal-best-unrated");
   }
@@ -1110,12 +1212,20 @@ export const PersonalBestResult: Story = {
     await waitForTestId(canvasElement, "personal-best-result");
     await expectTestIdText(canvasElement, "personal-best-result-score", "19");
     await expectTestIdText(canvasElement, "personal-best-result-comparison", "Previous best 18");
+    await waitForTestId(canvasElement, "personal-best-result-trophy");
     await waitForText(canvasElement, "New best at 900–999");
     await waitForText(canvasElement, "19 solved · 12:48 active · 3 sittings");
     await waitForTestId(canvasElement, "personal-best-result-review");
+    await expectTestIdText(
+      canvasElement,
+      "personal-best-result-review-detail",
+      "3 mistakes · Included in replay"
+    );
     await expectTestIdText(canvasElement, "personal-best-result-replay", "Replay 3 mistakes");
     await expectTestIdText(canvasElement, "personal-best-result-try-again", "Play again");
-    await expectTestIdText(canvasElement, "personal-best-result-change-challenge", "Change challenge");
+    await waitForTestId(canvasElement, "personal-best-result-back");
+    await expectTestIdText(canvasElement, "personal-best-result-done", "Done");
+    expectTestIdAbsent(canvasElement, "personal-best-result-change-challenge");
   }
 };
 
@@ -1137,16 +1247,13 @@ export const PersonalBestRecords: Story = {
   args: { scenarioId: "practice-personal-best-records" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-records-screen");
-    await expectTestIdText(canvasElement, "personal-best-records-score", "19");
-    await waitForTestId(canvasElement, "personal-best-records-in-progress");
-    await waitForVisibleTestId(canvasElement, "personal-best-records-in-progress-content-motion");
+    await expectTestIdText(canvasElement, "personal-best-record-puzzle-900", "900–999Best19");
+    await expectTestIdText(canvasElement, "personal-best-record-arrow_duel-1000", "1000–1099Best3");
+    expectTestIdAbsent(canvasElement, "personal-best-records-in-progress");
+    expectTestIdAbsent(canvasElement, "personal-best-records-comparison-note");
     await waitForTestId(canvasElement, "personal-best-records-puzzle");
     await waitForTestId(canvasElement, "personal-best-records-arrow_duel");
     await waitForText(canvasElement, "Every level stands on its own");
-    await waitForText(
-      canvasElement,
-      "Pausing keeps any best already reached. Active time and sittings are context only."
-    );
     expectTestIdAbsent(canvasElement, "history-attempt-history-unclear");
   }
 };

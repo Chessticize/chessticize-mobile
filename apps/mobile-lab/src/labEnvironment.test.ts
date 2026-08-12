@@ -16,6 +16,7 @@ test("the lab allows tall mobile stories to scroll vertically", async () => {
   assert.match(labCss, /html\s*\{[^}]*overflow-x:\s*hidden;/s);
   assert.match(labCss, /html\s*\{[^}]*overflow-y:\s*auto;/s);
   assert.match(labCss, /html\s*\{[^}]*-webkit-overflow-scrolling:\s*touch;/s);
+  assert.match(labCss, /\.lab-device-frame\s*\{[^}]*overflow:\s*visible;/s);
 });
 
 test("the lab app surface fills short Release screens", async () => {

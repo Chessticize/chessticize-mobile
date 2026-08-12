@@ -489,6 +489,7 @@ export type TacticalProfileAttemptInput = {
     | "ratingKey"
     | "themes"
     | "tacticalFocus"
+    | "survival"
   >;
   puzzle: Pick<
     Puzzle,
@@ -507,6 +508,7 @@ export type TacticalProfileAttemptClassification =
         | "scheduled_review"
         | "incomplete"
         | "focused_intervention"
+        | "survival_challenge"
         | "unknown_session_config";
     };
 
@@ -675,6 +677,9 @@ export function classifyTacticalProfileAttempt(
   }
   if (input.sessionConfig.tacticalFocus !== undefined) {
     return { status: "excluded", reason: "focused_intervention" };
+  }
+  if (input.sessionConfig.survival !== undefined) {
+    return { status: "excluded", reason: "survival_challenge" };
   }
   if (namedThemesForSelection(input.sessionConfig.themes).length > 0) {
     return { status: "excluded", reason: "focused_intervention" };

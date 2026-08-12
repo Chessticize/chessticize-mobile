@@ -6,6 +6,7 @@ import {
 
 const rootState: MobileBackState = {
   activePractice: false,
+  activeSurvival: false,
   detail: null,
   tab: "practice",
   topTransient: null
@@ -15,6 +16,7 @@ describe("mobile Back contract", () => {
   it("unwinds the topmost transient before any underlying state", () => {
     expect(resolveMobileBackIntent({
       activePractice: true,
+      activeSurvival: false,
       detail: { kind: "review-analysis", owner: "history" },
       tab: "history",
       topTransient: "practice-exit-confirmation"
@@ -38,6 +40,42 @@ describe("mobile Back contract", () => {
       kind: "dismiss-transient",
       transient: "sprint-session-guide"
     });
+
+    for (const transient of [
+      "survival-records",
+      "survival-guide-to-hub",
+      "survival-guide-to-practice",
+      "survival-hub",
+      "survival-pause",
+      "survival-source-picker"
+    ] as const) {
+      expect(resolveMobileBackIntent({
+        ...rootState,
+        topTransient: transient
+      }, "button")).toEqual({ kind: "dismiss-transient", transient });
+    }
+  });
+
+  it("describes the visible Survival parent for each nested page", () => {
+    for (const transient of [
+      "survival-records",
+      "survival-guide-to-hub",
+      "survival-source-picker"
+    ] as const) {
+      const state: MobileBackState = { ...rootState, topTransient: transient };
+      expect(mobileBackDestination(resolveMobileBackIntent(state, "button"), state)).toEqual({
+        label: "Survival Hub",
+        testID: "personal-best-hub"
+      });
+    }
+
+    for (const transient of ["survival-guide-to-practice", "survival-hub", "survival-pause"] as const) {
+      const state: MobileBackState = { ...rootState, topTransient: transient };
+      expect(mobileBackDestination(resolveMobileBackIntent(state, "button"), state)).toEqual({
+        label: "Practice",
+        testID: "practice-home"
+      });
+    }
   });
 
   it("returns analysis and review detail to their owning surface", () => {
@@ -120,6 +158,18 @@ describe("mobile Back contract", () => {
       activePractice: true
     }, "button")).toEqual({ kind: "request-practice-exit" });
 
+    const activeSurvivalState: MobileBackState = {
+      ...rootState,
+      activePractice: true,
+      activeSurvival: true
+    };
+    const activeSurvivalIntent = resolveMobileBackIntent(activeSurvivalState, "button");
+    expect(activeSurvivalIntent).toEqual({ kind: "pause-survival" });
+    expect(mobileBackDestination(activeSurvivalIntent, activeSurvivalState)).toEqual({
+      label: "Survival pause",
+      testID: "session-abandon-confirmation"
+    });
+
     expect(resolveMobileBackIntent({
       ...rootState,
       tab: "settings"
@@ -133,6 +183,7 @@ describe("mobile Back contract", () => {
       { ...rootState, topTransient: "review-reminder-prompt" },
       { ...rootState, detail: { kind: "review-analysis", owner: "review" }, tab: "review" },
       { ...rootState, activePractice: true },
+      { ...rootState, activePractice: true, activeSurvival: true },
       { ...rootState, tab: "history" },
       rootState
     ];

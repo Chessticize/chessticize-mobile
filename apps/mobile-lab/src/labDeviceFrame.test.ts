@@ -3,6 +3,7 @@ import test from "node:test";
 import { buildPracticeAdaptiveLayout } from "../../mobile/src/components/adaptivePracticeLayout.ts";
 import {
   LAB_DEVICE_VIEWPORTS,
+  labDeviceViewportForGlobal,
   labSafeAreaMetricsForViewport
 } from "./labDeviceFrame.ts";
 
@@ -28,6 +29,18 @@ test("the safe-area provider receives the matching frame for each maintained pho
     frame: { x: 0, y: 0, width: 874, height: 402 },
     insets: { top: 0, right: 62, bottom: 21, left: 62 }
   });
+});
+
+test("the selected Storybook device stays at its calibrated size when the manager canvas is shorter", () => {
+  assert.deepEqual(labDeviceViewportForGlobal("largePhone"), {
+    width: 430,
+    height: 932,
+    insets: { top: 59, right: 0, bottom: 34, left: 0 }
+  });
+  assert.deepEqual(labDeviceViewportForGlobal({
+    value: "phonePortrait",
+    isRotated: true
+  }), LAB_DEVICE_VIEWPORTS.phoneLandscape);
 });
 
 test("the maintained iPad viewports cover portrait and landscape Release geometry", () => {

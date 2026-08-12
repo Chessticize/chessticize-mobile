@@ -1,0 +1,4 @@
+interface:
+  display_name: "User-First Product Copy"
+  short_description: "Write clear product copy without engineer jargon"
+  default_prompt: "Use $write-user-first-copy to audit and rewrite this product copy for a new user."

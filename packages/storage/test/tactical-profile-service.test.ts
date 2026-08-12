@@ -1925,7 +1925,7 @@ test("an active Focused Run keeps its frozen puzzle IDs, Rating band, and quotas
 });
 
 for (const storeKind of ["memory", "sqlite"] as const) {
-  test(`${storeKind} source revisions ignore interventions and zero-attempt Runs`, () => {
+  test(`${storeKind} source revisions ignore interventions, Survival, and zero-attempt Runs`, () => {
     const store = storeKind === "memory"
       ? new MemoryStore()
       : new SQLiteStore();
@@ -1989,6 +1989,55 @@ for (const storeKind of ["memory", "sqlite"] as const) {
         before,
         "clearing intervention-only history must not invalidate the profile"
       );
+
+      const survivalConfig = {
+        ...buildSprintConfig({
+          mode: "standard",
+          durationSeconds: 1,
+          perPuzzleSeconds: 1,
+          targetCorrect: 1,
+          maxMistakes: 3,
+          ratingPolicy: "unrated"
+        }),
+        survival: {
+          challengeType: "puzzle",
+          ruleVersion: 1,
+          minRating: 900,
+          maxRating: 999,
+          ratingSourceRunId: "standard",
+          ratingSourceRating: 925,
+          ratingSourceGeneration: 0,
+          eligibleCount: 1,
+          packVersion: 5,
+          packHash: "sha256:test-pack",
+          selectionSeed: "profile-revision"
+        } as const
+      };
+      const survival = startSprint({
+        id: `${storeKind}-survival-revision`,
+        config: survivalConfig,
+        puzzles: [store.getPuzzle("revision-puzzle")!],
+        ratingBefore: 925,
+        now: "2026-07-25T01:30:00.000Z"
+      });
+      store.transaction(() => {
+        store.createSprintSession(survival);
+        store.recordAttempt(attempt({
+          id: `${storeKind}-survival-attempt`,
+          sessionId: survival.id,
+          puzzleId: "revision-puzzle",
+          completedAt: "2026-07-25T01:30:10.000Z"
+        }));
+        store.updateSprintSession({
+          ...survival,
+          status: "won",
+          completedAt: "2026-07-25T01:30:10.000Z",
+          endReason: "pool_cleared",
+          correctCount: 1,
+          mistakeCount: 0
+        });
+      });
+      assert.equal(store.getTacticalProfileSourceRevision(), before);
 
       const ordinaryConfig = buildSprintConfig({
         mode: "standard",

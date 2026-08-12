@@ -14,7 +14,9 @@ import type {
   ReviewQueueState,
   ReviewScheduleRemoval,
   SessionMistakeReviewItem,
-  SprintState
+  SprintState,
+  SurvivalBestRecord,
+  SurvivalPreferences
 } from "../../core/src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter, PuzzleSelectionFilter } from "./query-types.ts";
 import type {
@@ -31,6 +33,7 @@ import type {
 } from "./practice-store.ts";
 import type { ReviewReminderSettings } from "../../core/src/index.ts";
 import type { PuzzleSource } from "./puzzle-source.ts";
+import type { SurvivalPuzzleBatch, SurvivalPuzzleBatchInput } from "./puzzle-source.ts";
 import type { ProgressV2Persistence } from "./progress-v2-persistence.ts";
 
 export class PackBackedPracticeStore implements PracticeStore {
@@ -76,6 +79,20 @@ export class PackBackedPracticeStore implements PracticeStore {
       this.userStore.seedPuzzles(puzzles);
     }
     return puzzles;
+  }
+
+  countSurvivalPuzzles(
+    input: Pick<SurvivalPuzzleBatchInput, "challengeType" | "level">
+  ): number {
+    return this.puzzleSource.countSurvivalPuzzles(input);
+  }
+
+  selectSurvivalPuzzleBatch(input: SurvivalPuzzleBatchInput): SurvivalPuzzleBatch {
+    const batch = this.puzzleSource.selectSurvivalPuzzleBatch(input);
+    if (batch.puzzles.length > 0) {
+      this.userStore.seedPuzzles(batch.puzzles);
+    }
+    return batch;
   }
 
   getRating(key: string): RatingRecord {
@@ -152,6 +169,30 @@ export class PackBackedPracticeStore implements PracticeStore {
     this.userStore.updateSprintSession(state);
   }
 
+  getResumableSurvivalSprint(id: string): SprintState | undefined {
+    return this.userStore.getResumableSurvivalSprint(id);
+  }
+
+  listResumableSurvivalSprints(): SprintState[] {
+    return this.userStore.listResumableSurvivalSprints();
+  }
+
+  listSurvivalBests(): SurvivalBestRecord[] {
+    return this.userStore.listSurvivalBests();
+  }
+
+  saveSurvivalBest(record: SurvivalBestRecord): void {
+    this.userStore.saveSurvivalBest(record);
+  }
+
+  getSurvivalPreferences(): SurvivalPreferences {
+    return this.userStore.getSurvivalPreferences();
+  }
+
+  saveSurvivalPreferences(preferences: SurvivalPreferences): void {
+    this.userStore.saveSurvivalPreferences(preferences);
+  }
+
   recordAttempt(attempt: AttemptEvent): void {
     this.userStore.recordAttempt(attempt);
   }
@@ -186,6 +227,10 @@ export class PackBackedPracticeStore implements PracticeStore {
 
   listSprintSessions(): ExportedSprintSession[] {
     return this.userStore.listSprintSessions();
+  }
+
+  listSurvivalSessions(): ExportedSprintSession[] {
+    return this.userStore.listSurvivalSessions();
   }
 
   getSprintSessions(ids: readonly string[]): ExportedSprintSession[] {
