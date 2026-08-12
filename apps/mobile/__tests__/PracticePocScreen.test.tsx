@@ -18,7 +18,10 @@ import {
   PRACTICE_UI_PADDING,
   type PracticeSafeAreaInsets
 } from "../src/components/adaptivePracticeLayout";
-import { PersonalBestProgressBanner } from "../src/components/PersonalBestChallengeDesign";
+import {
+  PersonalBestProgressBanner,
+  PersonalBestResult
+} from "../src/components/PersonalBestChallengeDesign";
 import {
   ARROW_DUEL_REPLY_LAB_MOVES,
   LabScenario
@@ -9007,6 +9010,18 @@ describe("PracticePocScreen", () => {
   it("treats the third Survival mistake as a normal result and preserves the record context", () => {
     const renderer = renderLabScenario("practice-personal-best-result");
 
+    expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-hero").props.style))
+      .toMatchObject({ backgroundColor: "#EFF6FF", borderColor: "#93C5FD" });
+    expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-badge").props.style))
+      .toMatchObject({ backgroundColor: "#DBEAFE" });
+    expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-badge-text").props.style))
+      .toMatchObject({ color: "#1D4ED8" });
+    expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-score").props.style))
+      .toMatchObject({ color: "#1D4ED8" });
+    expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-comparison").props.style))
+      .toMatchObject({ color: "#1D4ED8" });
+    expect(findByTestId(renderer, "personal-best-result-trophy")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "personal-best-result-trophy"))).toBe("");
     expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("19");
     expect(collectText(findByTestId(renderer, "personal-best-result-comparison"))).toBe(
       "Previous best 18"
@@ -9023,11 +9038,67 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "personal-best-result-replay"))).toBe(
       "Replay 3 mistakes"
     );
+    expect(findByTestId(renderer, "personal-best-result-back").props.accessibilityLabel).toBe(
+      "Back to Practice"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-result-done"))).toBe("Done");
+    expect(() => findByTestId(renderer, "personal-best-result-change-challenge")).toThrow();
+    expect(collectText(findByTestId(renderer, "personal-best-result-review-detail"))).toBe(
+      "3 mistakes · Included in replay"
+    );
+    expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-review-count").props.style))
+      .toMatchObject({ color: "#991B1B" });
     expect(collectText(renderer.root)).not.toContain("Sprint failed");
+
+    press(renderer, "personal-best-result-done");
+    expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
+
+    const backRenderer = renderLabScenario("practice-personal-best-result");
+    press(backRenderer, "personal-best-result-back");
+    expect(findByTestId(backRenderer, "personal-best-home-card")).toBeTruthy();
+  });
+
+  it("keeps a Survival result neutral when it does not set a new best", () => {
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    act(() => {
+      renderer = TestRenderer.create(
+        <PersonalBestResult
+          activeElapsedMs={94_000}
+          band={{ currentRating: 742, minRating: 700, maxRating: 799 }}
+          bestStreak={4}
+          challengeType="puzzle"
+          isNewBest={false}
+          mistakeCount={3}
+          previousBestScore={8}
+          score={6}
+          sittings={1}
+          onDone={jest.fn()}
+          onTryAgain={jest.fn()}
+        />
+      );
+    });
+    if (!renderer) {
+      throw new Error("Neutral Survival result did not render");
+    }
+    const neutralRenderer = renderer;
+    renderers.push(neutralRenderer);
+
+    expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-hero").props.style))
+      .toMatchObject({ backgroundColor: "#FFFFFF", borderColor: "#E2E8F0" });
+    expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-badge").props.style))
+      .toMatchObject({ backgroundColor: "#E2E8F0" });
+    expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-badge-text").props.style))
+      .toMatchObject({ color: "#475569" });
+    expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-score").props.style))
+      .toMatchObject({ color: "#0F172A" });
+    expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-comparison").props.style))
+      .toMatchObject({ color: "#64748B" });
+    expect(() => findByTestId(neutralRenderer, "personal-best-result-trophy")).toThrow();
   });
 
   it("opens dedicated Survival records from the Challenge Hub without taking over History", () => {
     const renderer = renderLabScenario("practice-personal-best-hub");
+    const hubWidth = flattenTestStyle(findByTestId(renderer, "personal-best-hub").props.style).width;
 
     expect(collectText(findByTestId(renderer, "personal-best-hub-records"))).toBe(
       "Survival recordsPuzzle and Arrow Duel bests by level›"
@@ -9035,6 +9106,17 @@ describe("PracticePocScreen", () => {
     press(renderer, "personal-best-hub-records");
 
     const recordsScreen = findByTestId(renderer, "personal-best-records-screen");
+    const recordsScreenStyle = flattenTestStyle(recordsScreen.props.style);
+    expect(recordsScreenStyle).toMatchObject({
+      alignSelf: "center",
+      maxWidth: 680,
+      width: hubWidth
+    });
+    expect(recordsScreenStyle.backgroundColor).toBeUndefined();
+    expect(recordsScreenStyle.borderColor).toBeUndefined();
+    expect(recordsScreenStyle.borderRadius).toBeUndefined();
+    expect(recordsScreenStyle.borderWidth).toBeUndefined();
+    expect(recordsScreenStyle.padding).toBeUndefined();
     expect(collectText(findByTestId(renderer, "personal-best-record-puzzle-900"))).toBe(
       "900–999Best19"
     );

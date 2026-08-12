@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native";
 import type { SprintState } from "../../../../packages/core/src/types.ts";
+import { ResultReviewImpactCard } from "./ResultReviewImpactCard.tsx";
+import { ResultTrophyGlyph } from "./ResultTrophyGlyph.tsx";
 
 const SURVIVAL_DISCLOSURE_MOTION_DURATION_MS = 200;
 
@@ -838,10 +840,10 @@ export function PersonalBestProgressBanner({
         <>
           <View style={styles.recordMilestoneRow}>
             <View
-              style={[styles.resultBadge, styles.recordMilestoneBadge]}
+              style={[styles.resultBadge, styles.resultBadgeBest, styles.recordMilestoneBadge]}
               testID="personal-best-record-badge"
             >
-              <Text style={styles.resultBadgeText}>NEW BEST</Text>
+              <Text style={[styles.resultBadgeText, styles.resultBadgeTextBest]}>NEW BEST</Text>
             </View>
             <Text
               adjustsFontSizeToFit
@@ -864,7 +866,6 @@ export function PersonalBestProgressBanner({
             <View
               style={[
                 styles.progressFill,
-                isNewBest ? styles.progressFillBest : null,
                 { width: `${Math.round(progress * 100)}%` }
               ]}
               testID="personal-best-progress-fill"
@@ -884,7 +885,6 @@ export function PersonalBestResult({
   endReason = "max_mistakes",
   isNewBest,
   mistakeCount,
-  onChangeChallenge,
   onDone,
   onReplayMistakes,
   onTryAgain,
@@ -899,7 +899,6 @@ export function PersonalBestResult({
   endReason?: "max_mistakes" | "pool_cleared";
   isNewBest: boolean;
   mistakeCount: number;
-  onChangeChallenge: () => void;
   onDone: () => void;
   onReplayMistakes?: () => void;
   onTryAgain: () => void;
@@ -925,31 +924,49 @@ export function PersonalBestResult({
       <View style={styles.resultTopBar}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Done"
+          accessibilityLabel="Back to Practice"
           style={styles.resultDoneButton}
-          testID="personal-best-result-done"
+          testID="personal-best-result-back"
           onPress={onDone}
         >
-          <Text style={styles.resultDoneButtonText}>Done</Text>
+          <Text style={styles.recordsBackText}>‹</Text>
         </Pressable>
         <Text style={styles.resultTopBarTitle}>{challengeTypeLabel(challengeType)} Result</Text>
         <View style={styles.resultDoneButton} />
       </View>
 
-      <View style={[styles.resultHero, isNewBest ? styles.resultHeroBest : null]}>
-        <View style={styles.resultBadge}>
-          <Text style={styles.resultBadgeText}>
+      <View
+        style={[styles.resultHero, isNewBest ? styles.resultHeroBest : null]}
+        testID="personal-best-result-hero"
+      >
+        <View
+          style={[styles.resultBadge, isNewBest ? styles.resultBadgeBest : null]}
+          testID="personal-best-result-badge"
+        >
+          {isNewBest ? (
+            <ResultTrophyGlyph size={14} testID="personal-best-result-trophy" />
+          ) : null}
+          <Text
+            style={[styles.resultBadgeText, isNewBest ? styles.resultBadgeTextBest : null]}
+            testID="personal-best-result-badge-text"
+          >
             {isPerfectClear ? "PERFECT CLEAR" : isNewBest ? "NEW BEST" : "COMPLETE"}
           </Text>
         </View>
         <Text style={styles.resultTitle}>{resultTitle}</Text>
         <View style={styles.resultScoreRow}>
-          <Text style={styles.resultScore} testID="personal-best-result-score">
+          <Text
+            style={[styles.resultScore, isNewBest ? styles.resultScoreBest : null]}
+            testID="personal-best-result-score"
+          >
             {isPerfectClear ? score.toLocaleString("en-US") : score}
           </Text>
           <Text style={styles.resultScoreLabel}>solved</Text>
         </View>
-        <Text style={styles.resultComparison} testID="personal-best-result-comparison">
+        <Text
+          style={[styles.resultComparison, isNewBest ? styles.resultComparisonBest : null]}
+          testID="personal-best-result-comparison"
+        >
           {comparison}
         </Text>
         <Text style={styles.resultEndReason}>
@@ -980,15 +997,14 @@ export function PersonalBestResult({
         <ResultMetric label="Best streak" value={String(bestStreak)} />
       </View>
 
-      <View style={styles.reviewRow} testID="personal-best-result-review">
-        <View style={styles.reviewIcon}>
-          <Text style={styles.reviewIconText}>↺</Text>
-        </View>
-        <View style={styles.reviewCopy}>
-          <Text style={styles.reviewTitle}>{mistakeCount} mistakes added to Review</Text>
-          <Text style={styles.reviewDetail}>Replay them now or return from the Review tab later.</Text>
-        </View>
-      </View>
+      <ResultReviewImpactCard
+        count={mistakeCount}
+        countTestID="personal-best-result-review-count"
+        detail={`${mistakeCount} mistakes · Included in replay`}
+        detailTestID="personal-best-result-review-detail"
+        style={styles.resultReviewCard}
+        testID="personal-best-result-review"
+      />
 
       {onReplayMistakes ? (
         <Pressable
@@ -1012,12 +1028,12 @@ export function PersonalBestResult({
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Change Survival Run"
+        accessibilityLabel="Done"
         style={styles.resultSecondaryAction}
-        testID="personal-best-result-change-challenge"
-        onPress={onChangeChallenge}
+        testID="personal-best-result-done"
+        onPress={onDone}
       >
-        <Text style={styles.secondaryActionText}>Change challenge</Text>
+        <Text style={styles.secondaryActionText}>Done</Text>
       </Pressable>
     </View>
   );
@@ -1041,7 +1057,10 @@ export function PersonalBestRecordsScreen({
   return (
     <View
       accessibilityLabel={`Survival bests by level. ${recordSummary}. Puzzle and Arrow Duel records are separate.`}
-      style={styles.recordsScreen}
+      style={[
+        styles.recordsScreen,
+        { width: Math.min(680, Math.max(0, viewportWidth - 32)) }
+      ]}
       testID="personal-best-records-screen"
     >
       <View style={styles.guideTopBar}>
@@ -1655,9 +1674,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: "100%"
   },
-  progressFillBest: {
-    backgroundColor: "#F59E0B"
-  },
   progressScore: {
     color: "#64748B",
     fontSize: 11,
@@ -1692,16 +1708,25 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   resultBadge: {
-    backgroundColor: "#FEF3C7",
+    alignItems: "center",
+    backgroundColor: "#E2E8F0",
     borderRadius: 999,
+    flexDirection: "row",
+    gap: 5,
     paddingHorizontal: 11,
     paddingVertical: 5
   },
+  resultBadgeBest: {
+    backgroundColor: "#DBEAFE"
+  },
   resultBadgeText: {
-    color: "#92400E",
+    color: "#475569",
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.8
+  },
+  resultBadgeTextBest: {
+    color: "#1D4ED8"
   },
   resultBandCard: {
     alignItems: "center",
@@ -1726,21 +1751,19 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   resultComparison: {
-    color: "#B45309",
+    color: "#64748B",
     fontSize: 14,
     fontWeight: "800",
     marginTop: 4
+  },
+  resultComparisonBest: {
+    color: "#1D4ED8"
   },
   resultDoneButton: {
     alignItems: "flex-start",
     justifyContent: "center",
     minHeight: 44,
     minWidth: 52
-  },
-  resultDoneButtonText: {
-    color: "#2563EB",
-    fontSize: 14,
-    fontWeight: "800"
   },
   resultEndReason: {
     color: "#64748B",
@@ -1750,7 +1773,7 @@ const styles = StyleSheet.create({
   },
   resultHero: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#FFFFFF",
     borderColor: "#E2E8F0",
     borderRadius: 18,
     borderWidth: 1,
@@ -1758,8 +1781,8 @@ const styles = StyleSheet.create({
     padding: 20
   },
   resultHeroBest: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#FDE68A"
+    backgroundColor: "#EFF6FF",
+    borderColor: "#93C5FD"
   },
   resultMetric: {
     alignItems: "center",
@@ -1805,11 +1828,17 @@ const styles = StyleSheet.create({
     minHeight: 48,
     padding: 13
   },
+  resultReviewCard: {
+    marginTop: 12
+  },
   resultScore: {
-    color: "#B45309",
+    color: "#0F172A",
     fontSize: 54,
     fontWeight: "900",
     letterSpacing: -1.8
+  },
+  resultScoreBest: {
+    color: "#1D4ED8"
   },
   resultScoreLabel: {
     color: "#475569",
@@ -1846,44 +1875,6 @@ const styles = StyleSheet.create({
   resultTopBarTitle: {
     color: "#334155",
     fontSize: 14,
-    fontWeight: "800"
-  },
-  reviewCopy: {
-    flex: 1
-  },
-  reviewDetail: {
-    color: "#64748B",
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 3
-  },
-  reviewIcon: {
-    alignItems: "center",
-    backgroundColor: "#FEE2E2",
-    borderRadius: 18,
-    height: 36,
-    justifyContent: "center",
-    width: 36
-  },
-  reviewIconText: {
-    color: "#B91C1C",
-    fontSize: 19,
-    fontWeight: "900"
-  },
-  reviewRow: {
-    alignItems: "center",
-    backgroundColor: "#FFF7F7",
-    borderColor: "#FECACA",
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 11,
-    marginTop: 12,
-    padding: 12
-  },
-  reviewTitle: {
-    color: "#7F1D1D",
-    fontSize: 13,
     fontWeight: "800"
   },
   ruleCopy: {
@@ -2254,13 +2245,7 @@ const styles = StyleSheet.create({
   },
   recordsScreen: {
     alignSelf: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 20,
-    borderWidth: 1,
-    maxWidth: 680,
-    padding: 16,
-    width: "100%"
+    maxWidth: 680
   },
   rulesSummary: {
     backgroundColor: "#F8FAFC",

@@ -1212,12 +1212,20 @@ export const PersonalBestResult: Story = {
     await waitForTestId(canvasElement, "personal-best-result");
     await expectTestIdText(canvasElement, "personal-best-result-score", "19");
     await expectTestIdText(canvasElement, "personal-best-result-comparison", "Previous best 18");
+    await waitForTestId(canvasElement, "personal-best-result-trophy");
     await waitForText(canvasElement, "New best at 900–999");
     await waitForText(canvasElement, "19 solved · 12:48 active · 3 sittings");
     await waitForTestId(canvasElement, "personal-best-result-review");
+    await expectTestIdText(
+      canvasElement,
+      "personal-best-result-review-detail",
+      "3 mistakes · Included in replay"
+    );
     await expectTestIdText(canvasElement, "personal-best-result-replay", "Replay 3 mistakes");
     await expectTestIdText(canvasElement, "personal-best-result-try-again", "Play again");
-    await expectTestIdText(canvasElement, "personal-best-result-change-challenge", "Change challenge");
+    await waitForTestId(canvasElement, "personal-best-result-back");
+    await expectTestIdText(canvasElement, "personal-best-result-done", "Done");
+    expectTestIdAbsent(canvasElement, "personal-best-result-change-challenge");
   }
 };
 

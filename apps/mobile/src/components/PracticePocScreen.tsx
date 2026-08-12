@@ -275,6 +275,8 @@ import {
   type PersonalBestChallengeSelection,
   type PersonalBestPausedRunPresentation
 } from "./PersonalBestChallengeDesign.tsx";
+import { ResultReviewImpactCard } from "./ResultReviewImpactCard.tsx";
+import { ResultTrophyGlyph } from "./ResultTrophyGlyph.tsx";
 import { SessionMistakeIndicator } from "./SessionMistakeIndicator.tsx";
 import {
   buildSurvivalChallengePresentation,
@@ -5397,10 +5399,6 @@ export function PracticePocScreen({
                       previousBestScore={personalBestPresentation.result.previousBestScore}
                       score={state.correctCount}
                       sittings={personalBestPresentation.result.sittings}
-                      onChangeChallenge={() => {
-                        resetToIdle();
-                        setPersonalBestHubVisible(true);
-                      }}
                       onDone={resetToIdle}
                       onReplayMistakes={sprintReplayItems.length > 0
                         ? showSessionReplay
@@ -11200,27 +11198,15 @@ function SprintSummary({
         </View>
       ) : null}
 
-      <View style={styles.resultReviewRow} testID="sprint-result-review-impact">
-        <View style={styles.resultReviewCopy}>
-          <Text style={styles.listText}>In Review</Text>
-          <Text style={styles.helperText}>
-            {`${replayInReviewCount} ${
-              replayInReviewCount === 1 ? "attempt" : "attempts"
-            } · Included in replay`}
-          </Text>
-        </View>
-        <View
-          style={styles.resultSummaryCountColumn}
-          testID="sprint-result-mistakes-count-column"
-        >
-          <Text
-            testID="sprint-result-mistakes"
-            style={[styles.resultReviewCount, replayInReviewCount > 0 ? styles.errorText : styles.positive]}
-          >
-            {replayInReviewCount}
-          </Text>
-        </View>
-      </View>
+      <ResultReviewImpactCard
+        count={replayInReviewCount}
+        countColumnTestID="sprint-result-mistakes-count-column"
+        countTestID="sprint-result-mistakes"
+        detail={`${replayInReviewCount} ${
+          replayInReviewCount === 1 ? "attempt" : "attempts"
+        } · Included in replay`}
+        testID="sprint-result-review-impact"
+      />
 
       {replayItems ? (
         <Text style={styles.resultReviewNote} testID="sprint-result-review-note">
@@ -11311,14 +11297,10 @@ function ResultHistoryShortcut({
 function SprintResultStatusGlyph({ status }: { status: "won" | "failed" }): React.JSX.Element {
   if (status === "won") {
     return (
-      <View style={styles.resultTrophyGlyph} testID="sprint-result-status-glyph">
-        <View style={styles.resultTrophyCup} testID="sprint-result-won-glyph">
-          <View style={[styles.resultTrophyHandle, styles.resultTrophyHandleLeft]} />
-          <View style={[styles.resultTrophyHandle, styles.resultTrophyHandleRight]} />
-        </View>
-        <View style={styles.resultTrophyStem} />
-        <View style={styles.resultTrophyBase} />
-      </View>
+      <ResultTrophyGlyph
+        cupTestID="sprint-result-won-glyph"
+        testID="sprint-result-status-glyph"
+      />
     );
   }
 
@@ -21389,49 +21371,6 @@ const styles = StyleSheet.create({
   resultIconFailed: {
     backgroundColor: "#FEF2F2"
   },
-  resultTrophyGlyph: {
-    alignItems: "center",
-    height: 28,
-    justifyContent: "center",
-    position: "relative",
-    width: 28
-  },
-  resultTrophyCup: {
-    backgroundColor: "#2563EB",
-    borderBottomLeftRadius: 7,
-    borderBottomRightRadius: 7,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
-    height: 13,
-    position: "relative",
-    width: 17
-  },
-  resultTrophyHandle: {
-    borderColor: "#2563EB",
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 10,
-    position: "absolute",
-    top: 2,
-    width: 8
-  },
-  resultTrophyHandleLeft: {
-    left: -7
-  },
-  resultTrophyHandleRight: {
-    right: -7
-  },
-  resultTrophyStem: {
-    backgroundColor: "#2563EB",
-    height: 7,
-    width: 4
-  },
-  resultTrophyBase: {
-    backgroundColor: "#2563EB",
-    borderRadius: 999,
-    height: 3,
-    width: 17
-  },
   resultAlertGlyph: {
     alignItems: "center",
     gap: 3,
@@ -21591,26 +21530,6 @@ const styles = StyleSheet.create({
     top: 7,
     transform: [{ rotate: "-31deg" }],
     width: 10
-  },
-  resultReviewRow: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 58,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  resultReviewCount: {
-    fontSize: 18,
-    fontWeight: "900"
-  },
-  resultReviewCopy: {
-    flex: 1,
-    minWidth: 0
   },
   resultReviewNote: {
     color: "#475569",

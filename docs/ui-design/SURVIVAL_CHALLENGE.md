@@ -61,6 +61,10 @@ The active Run uses two visually distinct score states:
 - Record mode has no looping or per-solve animation. The milestone stays
   readable without competing with the puzzle or repeating either the solved
   count or an explanatory status already implied by `NEW BEST`.
+- New-best milestones and results use the product blue with the same shared
+  monochrome trophy as a successful Sprint. Yellow and red remain reserved for
+  timing and mistake feedback. A completed Run that does not set a best stays
+  neutral on white.
 
 Production and the record-mode Interaction Lab state compare against the
 standing best captured when the Run starts and keep the static milestone
@@ -223,6 +227,8 @@ appearing or disappearing abruptly:
 - `Survival records` has no in-progress section or paused/in-progress labels.
   It includes already-saved live best values in the ordinary type-and-level
   rows while the Hub remains the only place that manages resumable Runs.
+- `Survival records` is a full page on the Practice canvas, not a page wrapped
+  in one large card. Only the individual level records retain card borders.
 - The `More levels` control keeps spacing above its focus outline so browser and
   keyboard focus never touches the selected level card. The deterministic Hub
   preview opens the full inventory without a synthetic click, so it never leaves
@@ -245,6 +251,12 @@ The Challenge Hub opens a dedicated `Survival records` page that owns:
 
 Back from records returns to the Challenge Hub, preserving the user's current
 type, Rating source, and level selection.
+
+The result keeps Review impact in the same neutral `In Review` card used by a
+Sprint; only its compact count remains red. `Play again` is the explicit
+continue action. A top-left Back control and the bottom `Done` action both
+return to Practice Home; the result does not push the player into challenge
+setup.
 
 ## Arrow Duel
 
