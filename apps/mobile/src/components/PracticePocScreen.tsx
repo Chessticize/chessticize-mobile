@@ -4608,7 +4608,7 @@ export function PracticePocScreen({
     personalBestActivePresentation ? (
       <PersonalBestProgressBanner
         bestScore={personalBestActivePresentation.bestScore}
-        celebration={personalBestActivePresentation.activeRecordCelebration}
+        recordMode={personalBestActivePresentation.activeRecordMode === true}
         compact={sessionUsesRail}
         score={state.correctCount}
       />

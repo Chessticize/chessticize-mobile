@@ -8624,57 +8624,69 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
   });
 
-  it("replaces a completed Survival progress bar with a record celebration", () => {
+  it("replaces a completed Survival progress bar with a restrained record milestone", () => {
     const renderer = renderLabScenario("practice-personal-best-record");
 
-    expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
-      "New best · 19"
+    expect(collectText(findByTestId(renderer, "personal-best-record-badge"))).toBe(
+      "NEW BEST"
     );
     expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(
-      "New best, 19 solved"
+      "New best, 19 solved. Previous best 18. Every solve now raises your best."
     );
-    expect(findByTestId(renderer, "personal-best-record-celebration")).toBeTruthy();
-    expect(findByTestId(renderer, "personal-best-record-aura")).toBeTruthy();
-    expect(findByTestId(renderer, "personal-best-record-impact")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "personal-best-record-previous"))).toBe(
+      "Previous best 18"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-record-message"))).toBe(
+      "Every solve now raises your best."
+    );
     expect(() => findByTestId(renderer, "personal-best-progress-fill")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-record-aura")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-record-impact")).toThrow();
   });
 
-  it("replays the record impact when another solve extends the best", () => {
+  it("keeps the record milestone current when another solve extends the best", () => {
     let renderer: TestRenderer.ReactTestRenderer | undefined;
     act(() => {
       renderer = TestRenderer.create(
-        <PersonalBestProgressBanner bestScore={18} celebration={{}} score={19} />
+        <PersonalBestProgressBanner bestScore={18} recordMode score={19} />
       );
     });
     if (!renderer) {
       throw new Error("Record progress banner did not render");
     }
-    renderers.push(renderer);
+    const renderedBanner = renderer;
+    renderers.push(renderedBanner);
 
     act(() => {
-      renderer?.update(
-        <PersonalBestProgressBanner bestScore={18} celebration={{}} score={20} />
+      renderedBanner.update(
+        <PersonalBestProgressBanner bestScore={18} recordMode score={20} />
       );
     });
 
-    expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
-      "New best · 20"
+    expect(findByTestId(renderedBanner, "personal-best-progress").props.accessibilityLabel).toBe(
+      "New best, 20 solved. Previous best 18. Every solve now raises your best."
     );
-    expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(
-      "New best, 20 solved"
-    );
-    expect(findByTestId(renderer, "personal-best-record-impact")).toBeTruthy();
+    expect(() => findByTestId(renderedBanner, "personal-best-record-impact")).toThrow();
   });
 
-  it("keeps record mode static when reduced motion is requested", () => {
-    const renderer = renderLabScenario("practice-personal-best-record", {
-      personalBestRecordCelebrationReducedMotion: true
+  it("describes a first Survival score without inventing a previous best", () => {
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    act(() => {
+      renderer = TestRenderer.create(
+        <PersonalBestProgressBanner bestScore={null} recordMode score={1} />
+      );
     });
+    if (!renderer) {
+      throw new Error("First-score progress banner did not render");
+    }
+    renderers.push(renderer);
 
-    expect(findByTestId(renderer, "personal-best-record-celebration")).toBeTruthy();
-    expect(() => findByTestId(renderer, "personal-best-record-aura")).toThrow();
-    expect(() => findByTestId(renderer, "personal-best-record-impact")).toThrow();
-    expect(() => findByTestId(renderer, "personal-best-progress-fill")).toThrow();
+    expect(collectText(findByTestId(renderer, "personal-best-record-previous"))).toBe(
+      "First score at this level"
+    );
+    expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(
+      "New best, 1 solved. First score at this level. Every solve now raises your best."
+    );
   });
 
   it("uses only the explicitly selected compatible Run to suggest a Survival level", () => {

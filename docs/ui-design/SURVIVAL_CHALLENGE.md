@@ -51,17 +51,17 @@ The active Run uses two visually distinct score states:
 
 - Before the standing best is passed, the meter keeps the useful progress bar
   and says how many more solves are needed to beat that best.
-- After the standing best is passed, the completed bar disappears. A restrained
-  blue-and-gold aura keeps the score card in record mode, and each additional
-  solve lands one brief `+1` impact without covering the puzzle or board.
-- Reduced motion keeps the warmer record card and its plain-language status but
-  omits both the looping aura and per-solve impact.
+- After the standing best is passed, the completed bar disappears. A static
+  milestone card reuses the result screen's `NEW BEST` badge, names the previous
+  best, and explains that every further solve raises the record.
+- Record mode has no looping or per-solve animation. The milestone stays
+  readable without competing with the puzzle or repeating the solved count
+  already shown in the session header.
 
 The record-mode Interaction Lab state is a presentation proposal awaiting
 explicit approval. Later production wiring must compare against the standing
-best captured when the Run starts, trigger the impact only for a newly counted
-solve, and never replay an old milestone merely because the screen remounts or
-a paused Run resumes.
+best captured when the Run starts and keep the static milestone current as new
+solves are counted.
 
 ## Pause and leave
 

@@ -112,7 +112,6 @@ export function LabScenario({
   arrowDuelReplyPreparationHoldMs,
   arrowDuelReplySeconds,
   personalBestArrowDuelPostCorrectCandidate,
-  personalBestRecordCelebrationReducedMotion,
   runReorderPickedUpRunId,
   scenarioId,
   storyPresentation,
@@ -124,7 +123,6 @@ export function LabScenario({
   arrowDuelReplyPreparationHoldMs?: number;
   arrowDuelReplySeconds?: number;
   personalBestArrowDuelPostCorrectCandidate?: boolean;
-  personalBestRecordCelebrationReducedMotion?: boolean;
   runReorderPickedUpRunId?: string;
   scenarioId: LabScenarioId;
   storyPresentation?: LabStoryPresentation;
@@ -143,7 +141,6 @@ export function LabScenario({
       arrowDuelReplyPreparationHoldMs={arrowDuelReplyPreparationHoldMs}
       arrowDuelReplySeconds={arrowDuelReplySeconds}
       personalBestArrowDuelPostCorrectCandidate={personalBestArrowDuelPostCorrectCandidate}
-      personalBestRecordCelebrationReducedMotion={personalBestRecordCelebrationReducedMotion}
       runReorderPickedUpRunId={runReorderPickedUpRunId}
       runtime={runtime}
       scenarioId={scenarioId}
@@ -160,7 +157,6 @@ function LabScenarioContent({
   arrowDuelReplyPreparationHoldMs,
   arrowDuelReplySeconds,
   personalBestArrowDuelPostCorrectCandidate,
-  personalBestRecordCelebrationReducedMotion,
   runReorderPickedUpRunId,
   runtime,
   scenarioId,
@@ -173,7 +169,6 @@ function LabScenarioContent({
   arrowDuelReplyPreparationHoldMs?: number;
   arrowDuelReplySeconds?: number;
   personalBestArrowDuelPostCorrectCandidate?: boolean;
-  personalBestRecordCelebrationReducedMotion?: boolean;
   runReorderPickedUpRunId?: string;
   runtime: ScenarioRuntime;
   scenarioId: LabScenarioId;
@@ -314,21 +309,12 @@ function LabScenarioContent({
     if (!preview) {
       return preview;
     }
-    const previewWithRecordMotion = preview.activeRecordCelebration
-      ? {
-          ...preview,
-          activeRecordCelebration: {
-            ...preview.activeRecordCelebration,
-            reducedMotion: personalBestRecordCelebrationReducedMotion === true
-          }
-        }
-      : preview;
     if (arrowDuelOpponentReplyGlobalEnabled === undefined) {
-      return previewWithRecordMotion;
+      return preview;
     }
-    const arrowDuelStart = previewWithRecordMotion.startStates?.arrow_duel
+    const arrowDuelStart = preview.startStates?.arrow_duel
       ? personalBestArrowDuelStateWithOpponentReply(
-          previewWithRecordMotion.startStates.arrow_duel,
+          preview.startStates.arrow_duel,
           arrowDuelOpponentReplyGlobalEnabled
         )
       : undefined;
@@ -337,16 +323,16 @@ function LabScenarioContent({
       ? personalBestArrowDuelAfterCorrectCandidate(arrowDuelStart)
       : arrowDuelStart;
     return {
-      ...previewWithRecordMotion,
+      ...preview,
       opponentReplyEnabled: arrowDuelOpponentReplyGlobalEnabled,
-      pausedRuns: previewWithRecordMotion.pausedRuns?.map((run) => run.challengeType === "arrow_duel"
+      pausedRuns: preview.pausedRuns?.map((run) => run.challengeType === "arrow_duel"
         ? {
             ...run,
             opponentReplyEnabled: run.resumeState?.config.opponentReply?.enabled ?? true
           }
         : run),
       startStates: {
-        ...previewWithRecordMotion.startStates,
+        ...preview.startStates,
         ...(effectiveArrowDuelStart === undefined
           ? {}
           : { arrow_duel: effectiveArrowDuelStart })
@@ -355,7 +341,6 @@ function LabScenarioContent({
   }, [
     arrowDuelOpponentReplyGlobalEnabled,
     personalBestArrowDuelPostCorrectCandidate,
-    personalBestRecordCelebrationReducedMotion,
     scenarioId
   ]);
 
@@ -901,7 +886,7 @@ function personalBestChallengePreviewFor(
   if (scenarioId === "practice-personal-best-record") {
     return {
       ...common,
-      activeRecordCelebration: {}
+      activeRecordMode: true
     };
   }
   if (scenarioId === "practice-personal-best-leave") {
