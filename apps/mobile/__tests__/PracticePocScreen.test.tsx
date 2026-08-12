@@ -1015,7 +1015,7 @@ describe("PracticePocScreen", () => {
     expect(settledRunSurface).toBeTruthy();
   });
 
-  it("shows picked-up feedback and locks Edit Runs while a Run card drag is active", () => {
+  it("shows picked-up feedback and blocks the parent native scroll gesture while dragging", () => {
     const runReorderFeedbackPreview = jest.fn();
     const moveFeedbackClient = new FakeMoveFeedbackClient();
     const practiceService = createMobilePracticeService("random1000");
@@ -1048,7 +1048,10 @@ describe("PracticePocScreen", () => {
     act(() => {
       standardRun!.props.onPanResponderGrant();
     });
-    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    expect(standardRun!.props.mockGesture.config.blocksExternalGesture.current).toEqual(
+      expect.objectContaining({ handlerTag: 1 })
+    );
     expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(1);
     expect(runReorderFeedbackPreview).toHaveBeenCalledWith({ haptic: "medium" });
     expect(moveFeedbackClient.requests).toEqual([{
@@ -1093,7 +1096,7 @@ describe("PracticePocScreen", () => {
       jest.advanceTimersByTime(180);
     });
 
-    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
     expect(runReorderFeedbackPreview).toHaveBeenCalledTimes(1);
     expect(moveFeedbackClient.requests).toEqual([{
       cue: "move",
@@ -1112,6 +1115,24 @@ describe("PracticePocScreen", () => {
       standardRun.props.onTouchEnd();
     });
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+  });
+
+  it("keeps native Run hold recognition in the gesture layer", () => {
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ homeEditing: true })
+    });
+    const standardRun = findNativeRunDragSurface(renderer, "practice-run-standard");
+
+    expect(standardRun.props.mockGesture.config).toEqual(expect.objectContaining({
+      activateAfterLongPress: 180,
+      enabled: true,
+      minDistance: 6,
+      runOnJS: true,
+      shouldCancelWhenOutside: false
+    }));
+    expect(standardRun.props.mockGesture.config.blocksExternalGesture.current).toEqual(
+      expect.objectContaining({ handlerTag: 1 })
+    );
   });
 
   it("previews a native card-sized insertion slot and commits the reorder only on drop", () => {
@@ -1696,7 +1717,7 @@ describe("PracticePocScreen", () => {
       playSound: false,
       playHaptic: true
     });
-    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
 
     act(() => {
       standardRun!.props.onPanResponderRelease();

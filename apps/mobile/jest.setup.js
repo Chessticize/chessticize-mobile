@@ -15,7 +15,107 @@ jest.mock('react-native-gesture-handler', () => {
     return React.createElement(ReactNative.ScrollView, { ...scrollProps, ref: scrollViewRef }, children);
   });
 
+  function createGestureMock() {
+    const gesture = {
+      config: {},
+      handlers: {}
+    };
+    [
+      'activateAfterLongPress',
+      'blocksExternalGesture',
+      'enabled',
+      'minDistance',
+      'runOnJS',
+      'shouldCancelWhenOutside'
+    ].forEach((name) => {
+      gesture[name] = (value) => {
+        gesture.config[name] = value;
+        return gesture;
+      };
+    });
+    ['onEnd', 'onFinalize', 'onStart', 'onUpdate'].forEach((name) => {
+      gesture[name] = (handler) => {
+        gesture.handlers[name] = handler;
+        return gesture;
+      };
+    });
+    return gesture;
+  }
+
+  function GestureDetectorMock({ children, gesture }) {
+    const activeRef = React.useRef(false);
+    const holdTimerRef = React.useRef(null);
+
+    React.useEffect(() => () => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+      }
+    }, []);
+
+    const finish = (success) => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
+      if (!activeRef.current) {
+        gesture.handlers.onFinalize?.({}, false);
+        return;
+      }
+      activeRef.current = false;
+      gesture.handlers.onEnd?.({}, success);
+      gesture.handlers.onFinalize?.({}, success);
+    };
+    const start = (event = {}) => {
+      if (activeRef.current || gesture.config.enabled === false) {
+        return;
+      }
+      activeRef.current = true;
+      gesture.handlers.onStart?.({
+        absoluteY: event.nativeEvent?.pageY ?? 0,
+        translationY: 0
+      });
+    };
+
+    return React.cloneElement(React.Children.only(children), {
+      mockGesture: gesture,
+      onMoveShouldSetPanResponder: (_event, state) => {
+        if (!activeRef.current && (Math.abs(state.dx) > 10 || Math.abs(state.dy) > 10)) {
+          if (holdTimerRef.current) {
+            clearTimeout(holdTimerRef.current);
+            holdTimerRef.current = null;
+          }
+        }
+        return activeRef.current;
+      },
+      onPanResponderGrant: start,
+      onPanResponderMove: (event, state) => {
+        gesture.handlers.onUpdate?.({
+          absoluteY: event.nativeEvent?.pageY ?? 0,
+          translationY: state.dy
+        });
+      },
+      onPanResponderRelease: () => finish(true),
+      onPanResponderTerminate: () => finish(false),
+      onTouchCancel: () => finish(false),
+      onTouchEnd: () => finish(true),
+      onTouchStart: (event = {}) => {
+        if (holdTimerRef.current) {
+          clearTimeout(holdTimerRef.current);
+        }
+        activeRef.current = false;
+        holdTimerRef.current = setTimeout(() => {
+          holdTimerRef.current = null;
+          start(event);
+        }, gesture.config.activateAfterLongPress ?? 0);
+      }
+    });
+  }
+
   return {
+    Gesture: {
+      Pan: createGestureMock
+    },
+    GestureDetector: GestureDetectorMock,
     GestureHandlerRootView(props) {
       return React.createElement('GestureHandlerRootView', props, props.children);
     },

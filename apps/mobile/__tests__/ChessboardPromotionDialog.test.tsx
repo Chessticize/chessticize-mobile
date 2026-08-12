@@ -187,7 +187,15 @@ describe("react-native-chessboard promotion dialog patch", () => {
     expect(renderer.root.findByProps({ testID: "promotion-dialog-container" })).toBeTruthy();
     const pieceButtons = renderer.root.findAll((node) => String(node.type) === "TouchableOpacity");
     expect(pieceButtons).toHaveLength(4);
-    ["q", "r", "b", "n"].forEach((piece) => {
+    const promotionChoices = [
+      ["q", "queen"],
+      ["r", "rook"],
+      ["b", "bishop"],
+      ["n", "knight"]
+    ] as const;
+    promotionChoices.forEach(([piece, pieceName]) => {
+      const choice = renderer!.root.findByProps({ testID: `promotion-choice-${piece}` });
+      expect(choice.props.accessibilityLabel).toBe(`Promote to ${pieceName}`);
       const choiceImage = renderer!.root.findByProps({ testID: `promotion-choice-${piece}-image` });
       expect(choiceImage.props.style).toMatchObject({
         width: 48,

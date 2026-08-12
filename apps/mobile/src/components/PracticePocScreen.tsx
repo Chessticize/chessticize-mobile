@@ -8,7 +8,6 @@ import {
   LayoutAnimation,
   Linking,
   Modal,
-  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -19,11 +18,15 @@ import {
   View
 } from "react-native";
 import type { ImageSourcePropType } from "react-native";
-import type { LayoutChangeEvent, PanResponderGestureState } from "react-native";
+import type {
+  LayoutChangeEvent
+} from "react-native";
 import type { StyleProp, ViewStyle } from "react-native";
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
+  Gesture,
+  GestureDetector,
   GestureHandlerRootView,
   LegacyScrollView,
   type GestureType
@@ -766,6 +769,7 @@ export function PracticePocScreen({
     windowTop: 0
   });
   const nativeRunReorderScrollController = useMemo<NativeRunReorderScrollController>(() => ({
+    scrollGestureRef: practiceScrollGestureRef,
     getSnapshot(): NativeRunReorderScrollSnapshot | null {
       const metrics = practiceMainScrollMetricsRef.current;
       if (
@@ -809,7 +813,7 @@ export function PracticePocScreen({
       practiceMainScrollRef.current.scrollTo({ animated: false, y: nextOffsetY });
       return appliedDeltaY;
     }
-  }), []);
+  }), [practiceScrollGestureRef]);
   const sessionBoardHandlersRef = useRef<{
     onIllegalMove: (from: Square, to: Square) => void;
     onMove: (result: MoveResult) => void;
@@ -1032,7 +1036,6 @@ export function PracticePocScreen({
   const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
   const [reviewBoardTouchActive, setReviewBoardTouchActive] = useState(false);
-  const [runReorderDragActive, setRunReorderDragActive] = useState(false);
   const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryUnavailableAttempt | null>(null);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
   const [historyProgressOpen, setHistoryProgressOpen] = useState(false);
@@ -4030,8 +4033,7 @@ export function PracticePocScreen({
   const reviewBoardVisible = reviewSessionSource !== null || historyReviewEntries.length > 0;
   const practiceScrollLocked = shouldShowSessionBoard
     || (adaptiveLayout.usesSessionRail && reviewBoardVisible)
-    || reviewBoardTouchActive
-    || runReorderDragActive;
+    || reviewBoardTouchActive;
   const boardGestureEnabled = Boolean(
     isActive
       && !isShowingFeedbackSnapshot
@@ -5272,7 +5274,6 @@ export function PracticePocScreen({
                     onSelectMode={setMode}
                     onStartMode={(nextMode) => startSprint(nextMode)}
                     onResumeSprint={resumeSprint}
-                    onRunReorderDragActiveChange={setRunReorderDragActive}
                     nativeRunReorderScrollController={nativeRunReorderScrollController}
                     runReorderDesignPreview={runReorderDesignPreview}
                     onRunReorderFeedbackPreview={playRunReorderPickupFeedback}
@@ -5849,7 +5850,6 @@ function PracticeHome({
   onSelectMode,
   onStartMode,
   onResumeSprint,
-  onRunReorderDragActiveChange,
   nativeRunReorderScrollController,
   runReorderDesignPreview,
   onRunReorderFeedbackPreview
@@ -5871,7 +5871,6 @@ function PracticeHome({
   onSelectMode: (next: SprintMode) => void;
   onStartMode: (next: SprintMode) => void;
   onResumeSprint: (sprint: SprintState) => void;
-  onRunReorderDragActiveChange: (active: boolean) => void;
   nativeRunReorderScrollController: NativeRunReorderScrollController;
   runReorderDesignPreview?: Props["runReorderDesignPreview"];
   onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
@@ -5906,7 +5905,6 @@ function PracticeHome({
                 sprintRulesGuideVisible={sprintRulesGuideVisible}
                 onDismissSprintRulesGuide={onDismissSprintRulesGuide}
                 onOpenSprintRulesGuide={onOpenSprintRulesGuide}
-                onRunReorderDragActiveChange={onRunReorderDragActiveChange}
                 nativeRunReorderScrollController={nativeRunReorderScrollController}
                 runReorderDesignPreview={runReorderDesignPreview}
                 onRunReorderFeedbackPreview={onRunReorderFeedbackPreview}
@@ -5976,7 +5974,6 @@ function PracticeRunHome({
   sprintRulesGuideVisible,
   onDismissSprintRulesGuide,
   onOpenSprintRulesGuide,
-  onRunReorderDragActiveChange,
   nativeRunReorderScrollController,
   runReorderDesignPreview,
   onRunReorderFeedbackPreview
@@ -5986,7 +5983,6 @@ function PracticeRunHome({
   sprintRulesGuideVisible: boolean;
   onDismissSprintRulesGuide: () => void;
   onOpenSprintRulesGuide: () => void;
-  onRunReorderDragActiveChange: (active: boolean) => void;
   nativeRunReorderScrollController: NativeRunReorderScrollController;
   runReorderDesignPreview?: Props["runReorderDesignPreview"];
   onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
@@ -6022,7 +6018,7 @@ function PracticeRunHome({
     }
   }, []);
   const recordNativeRunLayout = (runId: string, layout: NativeRunLayout): void => {
-    // PanResponder movement is evaluated against one geometry snapshot. React
+    // Native drag movement is evaluated against one geometry snapshot. React
     // Native can deliver queued onLayout generations after pickup, so accepting
     // them here would mix old and new card coordinates in the same gesture.
     // The committed drop already advances this snapshot optimistically; fresh
@@ -6067,7 +6063,6 @@ function PracticeRunHome({
     setDropTargetPosition(null);
     setInsertionOutlineTop(null);
     setDropPreviewOffsets({});
-    onRunReorderDragActiveChange(false);
   };
   const startRunDrag = (runId: string): void => {
     if (Platform.OS !== "web") {
@@ -6106,11 +6101,8 @@ function PracticeRunHome({
     setInsertionOutlineTop(null);
     setDropPreviewOffsets({});
     committedDropSettlingRef.current = false;
-    onRunReorderDragActiveChange(true);
     onRunReorderFeedbackPreview?.({ haptic: "medium" });
   };
-
-  useEffect(() => () => onRunReorderDragActiveChange(false), [onRunReorderDragActiveChange]);
   const applyRunDropPreview = (
     preview: RunReorderPreview | null,
     outlineContainerTop = 0
@@ -8116,6 +8108,7 @@ type NativeRunReorderScrollSnapshot = {
 };
 
 type NativeRunReorderScrollController = {
+  scrollGestureRef: React.RefObject<GestureType | undefined>;
   getSnapshot: () => NativeRunReorderScrollSnapshot | null;
   refreshBounds: (reorderElement?: NativeRunReorderMeasureElement | null) => void;
   scrollBy: (deltaY: number) => number;
@@ -8254,6 +8247,8 @@ type WebTouchMoveElement = {
   ) => void;
 };
 
+const NATIVE_RUN_DRAG_HOLD_MS = 180;
+
 function RunCardDropSurface({
   children,
   committedDropSettling,
@@ -8300,11 +8295,9 @@ function RunCardDropSurface({
   const nativeDragOffset = useRef(new Animated.Value(0)).current;
   const nativeDropPreviewOffset = useRef(new Animated.Value(dropPreviewOffsetY)).current;
   const nativeDragActiveRef = useRef(false);
-  const nativePickupActiveRef = useRef(false);
+  const nativeGestureEndedRef = useRef(false);
   const nativeDragCompensationRef = useRef(0);
   const nativeDragDyRef = useRef(0);
-  const nativeDragArmedRef = useRef(false);
-  const nativeDragArmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nativeAutoScrollSpeedRef = useRef(0);
   const nativeAutoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [webDragOffsetY, setWebDragOffsetY] = useState(0);
@@ -8322,13 +8315,6 @@ function RunCardDropSurface({
   const webAutoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const webElementRef = useRef<WebTouchMoveElement | null>(null);
   const webSuppressClickRef = useRef(false);
-  const disarmNativeDrag = useCallback((): void => {
-    if (nativeDragArmTimerRef.current) {
-      clearTimeout(nativeDragArmTimerRef.current);
-      nativeDragArmTimerRef.current = null;
-    }
-    nativeDragArmedRef.current = false;
-  }, []);
   const stopNativeAutoScroll = useCallback((): void => {
     if (nativeAutoScrollTimerRef.current) {
       clearInterval(nativeAutoScrollTimerRef.current);
@@ -8336,31 +8322,6 @@ function RunCardDropSurface({
     }
     nativeAutoScrollSpeedRef.current = 0;
   }, []);
-  const armNativeDrag = useCallback((): void => {
-    disarmNativeDrag();
-    if (!draggable) {
-      return;
-    }
-    nativeDragArmTimerRef.current = setTimeout(() => {
-      nativeDragArmTimerRef.current = null;
-      nativeDragArmedRef.current = true;
-      if (!nativePickupActiveRef.current) {
-        nativePickupActiveRef.current = true;
-        nativeDragCompensationRef.current = 0;
-        nativeDragDyRef.current = 0;
-        nativeDragOffset.stopAnimation();
-        nativeRunReorderScrollController.refreshBounds();
-        onDragStart(runId);
-      }
-    }, 180);
-  }, [
-    disarmNativeDrag,
-    draggable,
-    nativeDragOffset,
-    nativeRunReorderScrollController,
-    onDragStart,
-    runId
-  ]);
   const disarmWebDrag = useCallback((): void => {
     if (webDragArmTimerRef.current) {
       clearTimeout(webDragArmTimerRef.current);
@@ -8506,11 +8467,10 @@ function RunCardDropSurface({
     nativeDropPreviewOffset
   ]);
   useEffect(() => () => {
-    disarmNativeDrag();
     disarmWebDrag();
     stopNativeAutoScroll();
     stopWebAutoScroll();
-  }, [disarmNativeDrag, disarmWebDrag, stopNativeAutoScroll, stopWebAutoScroll]);
+  }, [disarmWebDrag, stopNativeAutoScroll, stopWebAutoScroll]);
   const nativeDragHandlersRef = useRef({
     runId,
     onDragEnd,
@@ -8525,15 +8485,6 @@ function RunCardDropSurface({
     onDrop,
     onNativeDragMove
   };
-  const cancelHeldNativePickup = useCallback((): void => {
-    disarmNativeDrag();
-    if (!nativePickupActiveRef.current || nativeDragActiveRef.current) {
-      return;
-    }
-    nativePickupActiveRef.current = false;
-    stopNativeAutoScroll();
-    nativeDragHandlersRef.current.onDragEnd();
-  }, [disarmNativeDrag, stopNativeAutoScroll]);
   const applyNativeDragPosition = useCallback((translationY: number): void => {
     nativeDragDyRef.current = translationY;
     const effectiveTranslationY = translationY + nativeDragCompensationRef.current;
@@ -8586,81 +8537,76 @@ function RunCardDropSurface({
       applyNativeDragPosition(nativeDragDyRef.current);
     }, 16);
   }, [applyNativeDragPosition, nativeRunReorderScrollController, stopNativeAutoScroll]);
-  const nativePanResponder = useMemo(() => {
-    const shouldClaimNativeDrag = (_event: unknown, gesture: PanResponderGestureState): boolean => {
-      const movedPastThreshold = Math.abs(gesture.dy) > 6 || Math.abs(gesture.dx) > 6;
-      if (!nativeDragArmedRef.current) {
-        if (movedPastThreshold) {
-          disarmNativeDrag();
-        }
-        return false;
-      }
-      return Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx);
-    };
-    return PanResponder.create({
-    onMoveShouldSetPanResponder: shouldClaimNativeDrag,
-    onMoveShouldSetPanResponderCapture: shouldClaimNativeDrag,
-    onPanResponderGrant: () => {
+  const settleNativeDragOffset = useCallback((): void => {
+    Animated.spring(nativeDragOffset, {
+      toValue: 0,
+      damping: 24,
+      stiffness: 260,
+      mass: 0.8,
+      useNativeDriver: true
+    }).start(() => {
+      nativeDragCompensationRef.current = 0;
+      nativeDragDyRef.current = 0;
+    });
+  }, [nativeDragOffset]);
+  const cancelNativeDrag = useCallback((): void => {
+    stopNativeAutoScroll();
+    if (nativeDragActiveRef.current) {
+      nativeDragActiveRef.current = false;
+      nativeDragHandlersRef.current.onDragEnd();
+    }
+    settleNativeDragOffset();
+  }, [settleNativeDragOffset, stopNativeAutoScroll]);
+  const nativeDragGesture = useMemo(() => Gesture.Pan()
+    .enabled(draggable)
+    .activateAfterLongPress(NATIVE_RUN_DRAG_HOLD_MS)
+    .minDistance(6)
+    .shouldCancelWhenOutside(false)
+    .blocksExternalGesture(nativeRunReorderScrollController.scrollGestureRef)
+    .runOnJS(true)
+    .onStart((event) => {
       const handlers = nativeDragHandlersRef.current;
+      nativeGestureEndedRef.current = false;
       nativeDragActiveRef.current = true;
       nativeDragCompensationRef.current = 0;
       nativeDragDyRef.current = 0;
       nativeDragOffset.stopAnimation();
       nativeRunReorderScrollController.refreshBounds();
-      if (!nativePickupActiveRef.current) {
-        nativePickupActiveRef.current = true;
-        handlers.onDragStart(handlers.runId);
-      }
-    },
-    onPanResponderMove: (event, gesture: PanResponderGestureState) => {
-      applyNativeDragPosition(gesture.dy);
-      refreshNativeAutoScroll(event.nativeEvent.pageY);
-    },
-    onPanResponderRelease: () => {
-      disarmNativeDrag();
-      stopNativeAutoScroll();
-      nativeDragActiveRef.current = false;
-      nativePickupActiveRef.current = false;
-      const committed = nativeDragHandlersRef.current.onDrop();
-      if (committed) {
+      handlers.onDragStart(handlers.runId);
+      applyNativeDragPosition(event.translationY);
+      refreshNativeAutoScroll(event.absoluteY);
+    })
+    .onUpdate((event) => {
+      applyNativeDragPosition(event.translationY);
+      refreshNativeAutoScroll(event.absoluteY);
+    })
+    .onEnd((_event, success) => {
+      nativeGestureEndedRef.current = true;
+      if (!success) {
+        cancelNativeDrag();
         return;
       }
-      Animated.spring(nativeDragOffset, {
-        toValue: 0,
-        damping: 24,
-        stiffness: 260,
-        mass: 0.8,
-        useNativeDriver: true
-      }).start(() => {
-        nativeDragCompensationRef.current = 0;
-        nativeDragDyRef.current = 0;
-      });
-    },
-    onPanResponderTerminate: () => {
-      disarmNativeDrag();
       stopNativeAutoScroll();
       nativeDragActiveRef.current = false;
-      nativePickupActiveRef.current = false;
-      nativeDragHandlersRef.current.onDragEnd();
-      Animated.spring(nativeDragOffset, {
-        toValue: 0,
-        damping: 24,
-        stiffness: 260,
-        mass: 0.8,
-        useNativeDriver: true
-      }).start(() => {
-        nativeDragCompensationRef.current = 0;
-        nativeDragDyRef.current = 0;
-      });
-    },
-    onPanResponderTerminationRequest: () => false
-    });
-  }, [
+      const committed = nativeDragHandlersRef.current.onDrop();
+      if (!committed) {
+        settleNativeDragOffset();
+      }
+    })
+    .onFinalize(() => {
+      if (nativeGestureEndedRef.current) {
+        nativeGestureEndedRef.current = false;
+        return;
+      }
+      cancelNativeDrag();
+    }), [
     applyNativeDragPosition,
-    disarmNativeDrag,
+    cancelNativeDrag,
+    draggable,
     nativeDragOffset,
     nativeRunReorderScrollController,
     refreshNativeAutoScroll,
+    settleNativeDragOffset,
     stopNativeAutoScroll
   ]);
 
@@ -8844,32 +8790,30 @@ function RunCardDropSurface({
     );
   }
   return (
-    <Animated.View
-      {...(draggable ? nativePanResponder.panHandlers : {})}
-      accessibilityHint={draggable ? "Touch and hold, then drag vertically to reorder this run. Arrow buttons are also available." : undefined}
-      onLayout={handleNativeLayout}
-      onTouchCancel={cancelHeldNativePickup}
-      onTouchEnd={cancelHeldNativePickup}
-      onTouchStart={armNativeDrag}
-      style={[
-        style,
-        // Fabric may still hold a synchronous native-driver transform override
-        // when Edit Runs closes, so keep the React prop type stable at zero.
-        {
-          transform: [
-            { translateY: draggable && !committedDropSettling ? nativeDragOffset : 0 },
-            { translateY: draggable && !committedDropSettling ? nativeDropPreviewOffset : 0 },
-            { translateX: draggable && dragging ? 10 : 0 },
-            { translateY: draggable && dragging ? -2 : 0 },
-            { scale: draggable && dragging ? 1.015 : 1 }
-          ]
-        },
-        dragging ? styles.runCardNativeDragging : null
-      ]}
-      testID={testID}
-    >
-      {children}
-    </Animated.View>
+    <GestureDetector gesture={nativeDragGesture}>
+      <Animated.View
+        accessibilityHint={draggable ? "Touch and hold, then drag vertically to reorder this run. Arrow buttons are also available." : undefined}
+        onLayout={handleNativeLayout}
+        style={[
+          style,
+          // Fabric may still hold a synchronous native-driver transform override
+          // when Edit Runs closes, so keep the React prop type stable at zero.
+          {
+            transform: [
+              { translateY: draggable && !committedDropSettling ? nativeDragOffset : 0 },
+              { translateY: draggable && !committedDropSettling ? nativeDropPreviewOffset : 0 },
+              { translateX: draggable && dragging ? 10 : 0 },
+              { translateY: draggable && dragging ? -2 : 0 },
+              { scale: draggable && dragging ? 1.015 : 1 }
+            ]
+          },
+          dragging ? styles.runCardNativeDragging : null
+        ]}
+        testID={testID}
+      >
+        {children}
+      </Animated.View>
+    </GestureDetector>
   );
 }
 

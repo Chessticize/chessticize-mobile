@@ -160,6 +160,12 @@ function resolveDetoxMaxWorkers(environment = process.env) {
   return workerCount;
 }
 
+function resolveDetoxTestTimeout(environment = process.env) {
+  return environment.CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT === '1'
+    ? 1200000
+    : 300000;
+}
+
 module.exports = {
   ACTIVE_E2E_TEST_MATCH_BY_SUITE,
   ACTIVE_E2E_TEST_MATCH,
@@ -185,5 +191,6 @@ module.exports = {
   RESOURCE_SOAK_TEST_MATCH,
   DEFAULT_DETOX_MAX_WORKERS,
   resolveDetoxTestMatch,
-  resolveDetoxMaxWorkers
+  resolveDetoxMaxWorkers,
+  resolveDetoxTestTimeout
 };

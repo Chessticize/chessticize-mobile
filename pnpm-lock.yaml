@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   detox@20.51.4: 3a8c46f110f1595c57b5a00c22330a6bbee2f23941ebc32eb6885a8c7ed6b7ae
-  react-native-chessboard@0.2.0: b704af2282d14d20d74b91e16fbb9cfcc30467d3aab7c15d15d1a456bf41b1a2
+  react-native-chessboard@0.2.0: 92c6886f5b980afcfbf5cc10a2e7b7f78a02a89d13bdf64be5dc01c7a7bb8707
   react-native@0.86.0: 44a1d416a056ef1fd6a9e4eb4f29839b207a0e8c3259bb187feb16c2985bd1af
 
 importers:
@@ -46,7 +46,7 @@ importers:
         version: 0.86.0(patch_hash=44a1d416a056ef1fd6a9e4eb4f29839b207a0e8c3259bb187feb16c2985bd1af)(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.86.0(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3)
       react-native-chessboard:
         specifier: 0.2.0
-        version: 0.2.0(patch_hash=b704af2282d14d20d74b91e16fbb9cfcc30467d3aab7c15d15d1a456bf41b1a2)(8774dc92bec3de5309e628e5ad0b2ca6)
+        version: 0.2.0(patch_hash=92c6886f5b980afcfbf5cc10a2e7b7f78a02a89d13bdf64be5dc01c7a7bb8707)(8774dc92bec3de5309e628e5ad0b2ca6)
       react-native-gesture-handler:
         specifier: ^3.0.2
         version: 3.0.2(react-native@0.86.0(patch_hash=44a1d416a056ef1fd6a9e4eb4f29839b207a0e8c3259bb187feb16c2985bd1af)(@babel/core@7.29.7)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.86.0(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
@@ -12704,7 +12704,7 @@ snapshots:
 
   react-is@19.2.7: {}
 
-  react-native-chessboard@0.2.0(patch_hash=b704af2282d14d20d74b91e16fbb9cfcc30467d3aab7c15d15d1a456bf41b1a2)(8774dc92bec3de5309e628e5ad0b2ca6):
+  react-native-chessboard@0.2.0(patch_hash=92c6886f5b980afcfbf5cc10a2e7b7f78a02a89d13bdf64be5dc01c7a7bb8707)(8774dc92bec3de5309e628e5ad0b2ca6):
     dependencies:
       '@shopify/react-native-skia': 2.6.5(03766da70a9a2773895e0e38c3a94e79)
       chess.js: 1.4.0

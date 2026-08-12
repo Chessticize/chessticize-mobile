@@ -25,7 +25,8 @@ const {
   ANDROID_REVIEW_REMINDERS_TEST_MATCH,
   RESOURCE_SOAK_TEST_MATCH,
   resolveDetoxTestMatch,
-  resolveDetoxMaxWorkers
+  resolveDetoxMaxWorkers,
+  resolveDetoxTestTimeout
 } = require('../e2e/suiteConfig');
 const {
   bringAndroidAppToForeground,
@@ -1073,7 +1074,7 @@ describe('Detox suite configuration', () => {
     );
   });
 
-  it('drives Android Run reordering through a black-box system touch stream', () => {
+  it('drives native Run reordering through black-box system touch streams', () => {
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const helperStart = helpers.indexOf('async function dragAndroidElementToElement');
@@ -1096,9 +1097,12 @@ describe('Detox suite configuration', () => {
       "dragAndroidElementToElement('practice-run-standard', 'practice-run-arrow-duel')"
     );
     expect(runManagementCase).toContain(
-      "element(by.id('practice-run-standard')).swipe('up', 'fast', 0.1, 0.5, 0.5)"
+      "waitForVisibleInPracticeScroll('practice-run-standard')"
     );
     expect(runManagementCase).toContain(
+      "element(by.id('practice-run-standard')).swipe('up', 'fast', 0.1, 0.5, 0.5)"
+    );
+    expect(runManagementCase).not.toContain(
       "element(by.id('practice-main-scroll')).scroll(20, 'up')"
     );
     expect(runManagementCase).toContain("frameFor(element(by.id('adaptive-layout')))");
@@ -1109,7 +1113,11 @@ describe('Detox suite configuration', () => {
     expect(runManagementCase).not.toContain(
       "element(by.id('practice-run-standard')).swipe('up', 'slow'"
     );
-    expect(runManagementCase).toContain('.longPressAndDrag(\n        750,');
+    expect(runManagementCase).toContain('.longPressAndDrag(\n        2000,');
+    expect(runManagementCase).toContain(
+      "0.03,\n        0.8,\n        element(by.id('practice-run-arrow-duel')),\n        0.03,\n        0.65"
+    );
+    expect(runManagementCase).not.toContain('practice-run-move-down-standard');
   });
 
   it('expands the collapsed theme picker before selecting the default Run theme', () => {
@@ -1243,6 +1251,31 @@ describe('Detox suite configuration', () => {
     expect(normalizeOuterScroll).toBeGreaterThan(0);
     expect(scrollControlRail).toBeGreaterThan(normalizeOuterScroll);
     expect(requireUnclearVisible).toBeGreaterThan(scrollControlRail);
+  });
+
+  it('uses a bounded public swipe for compact History review actions', () => {
+    const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
+    const caseStart = practiceSpec.indexOf(
+      "it('persists Unclear, places its History actions responsively"
+    );
+    const caseEnd = practiceSpec.indexOf(
+      "it('opens last sprint mistake review",
+      caseStart
+    );
+    const responsiveHistoryCase = practiceSpec.slice(caseStart, caseEnd);
+    const compactBranch = responsiveHistoryCase.indexOf("'compactPortrait'");
+    const boundedSwipe = responsiveHistoryCase.indexOf(
+      "element(by.id('practice-main-scroll')).swipe('up', 'fast', 0.75, 0.5, 0.9)",
+      compactBranch
+    );
+    const requireUnclearVisible = responsiveHistoryCase.indexOf(
+      "expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible()",
+      boundedSwipe
+    );
+
+    expect(compactBranch).toBeGreaterThan(0);
+    expect(boundedSwipe).toBeGreaterThan(compactBranch);
+    expect(requireUnclearVisible).toBeGreaterThan(boundedSwipe);
   });
 
   it('checks the visible Sprint result boundary after first-use guidance', () => {
@@ -1747,6 +1780,15 @@ describe('Detox suite configuration', () => {
     expect(flowsSpec).not.toContain('toHaveToggleValue');
   });
 
+  it('waits for the stable Sprint summary boundary after confirmed abandonment', () => {
+    const flowsSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/flows.e2e.js'), 'utf8');
+    const confirmedAbandonments = flowsSpec.match(
+      /element\(by\.id\('session-abandon-confirm'\)\)\.tap\(\);[\s\S]{0,180}?waitFor\(element\(by\.id\('sprint-summary-panel'\)\)\)\.toExist\(\)\.withTimeout\(30000\);/g
+    ) ?? [];
+
+    expect(confirmedAbandonments).toHaveLength(3);
+  });
+
   it('targets current public controls in the practice suite', () => {
     const practiceSpec = fs.readFileSync(path.resolve(__dirname, '../e2e/practice.e2e.js'), 'utf8');
     const helpers = fs.readFileSync(path.resolve(__dirname, '../e2e/helpers.js'), 'utf8');
@@ -1889,6 +1931,10 @@ describe('Detox suite configuration', () => {
       CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT: '1'
     })).toEqual(IOS_LANDSCAPE_LAYOUT_TEST_MATCH);
     expect(IOS_LANDSCAPE_LAYOUT_TEST_MATCH).toEqual(MARKETING_ASSETS_TEST_MATCH);
+    expect(resolveDetoxTestTimeout({
+      CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT: '1'
+    })).toBe(1200000);
+    expect(resolveDetoxTestTimeout({})).toBe(300000);
 
     const spec = fs.readFileSync(
       path.resolve(__dirname, '../e2e/marketing-assets.e2e.js'),
