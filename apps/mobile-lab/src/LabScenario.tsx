@@ -1353,9 +1353,13 @@ export function LabScenarioShell({
           <span>{nativeFeedbackPreview}</span>
         </div>
       ) : null}
-      <aside className="lab-toolbar" aria-label="Interaction Lab scenario controls">
+      <aside
+        className="lab-toolbar"
+        aria-label="Interaction Lab scenario controls"
+        data-testid="lab-scenario-toolbar"
+      >
         <details>
-          <summary>
+          <summary aria-label={`Scenario details for ${storyTitle}`}>
             {definition.nativeBoundary
               ? `${definition.group} · Native boundary`
               : `${definition.group} · ${storyTitle}`}

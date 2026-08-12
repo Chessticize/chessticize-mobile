@@ -10,6 +10,7 @@ import {
   expectRunCardInsets,
   expectRunTouchSelectionSuppressed,
   expectTestIdHorizontalCentersAligned,
+  expectTestIdsNotOverlapping,
   expectTestIdText,
   expectTestIdAbsent,
   expectTestIdsInOrder,
@@ -660,10 +661,11 @@ export const PersonalBestRecord: Story = {
     await waitForTestId(canvasElement, "active-session-shell");
     await expectTestIdText(canvasElement, "personal-best-record-badge", "NEW BEST");
     await expectTestIdText(canvasElement, "personal-best-record-previous", "Previous best 18");
-    await expectTestIdText(
+    await expectTestIdHorizontalCentersAligned(canvasElement, "practice-prompt", "session-board");
+    await expectTestIdsNotOverlapping(
       canvasElement,
-      "personal-best-record-message",
-      "Every solve now raises your best."
+      "personal-best-progress",
+      "lab-scenario-toolbar"
     );
     await waitForEnabledTestId(canvasElement, "lab-board-correct");
     expectTestIdAbsent(canvasElement, "personal-best-progress-fill");

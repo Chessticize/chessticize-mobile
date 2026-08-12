@@ -52,10 +52,11 @@ html {
 }
 
 .lab-toolbar {
-  bottom: 10px;
-  left: 10px;
+  bottom: 4px;
+  left: auto;
   max-width: min(420px, calc(100vw - 20px));
   position: fixed;
+  right: 4px;
   z-index: 100000;
 }
 
@@ -73,6 +74,33 @@ html {
   font-size: 12px;
   font-weight: 750;
   padding: 9px 12px;
+}
+
+.lab-toolbar details:not([open]) summary {
+  align-items: center;
+  box-sizing: border-box;
+  display: flex;
+  font-size: 0;
+  height: 28px;
+  justify-content: center;
+  list-style: none;
+  padding: 0;
+  width: 28px;
+}
+
+.lab-toolbar details:not([open]) summary::-webkit-details-marker {
+  display: none;
+}
+
+.lab-toolbar details:not([open]) summary::after {
+  color: #cbd5e1;
+  content: "i";
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.lab-toolbar details[open] {
+  max-width: min(420px, calc(100vw - 8px));
 }
 
 .lab-toolbar-body {

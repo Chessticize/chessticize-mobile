@@ -4784,6 +4784,7 @@ export function PracticePocScreen({
         styles.practicePromptStack,
         { width: sessionUsesRail ? adaptiveLayout.sessionRailWidth : boardSize }
       ]}
+      testID="practice-prompt-stack"
     >
       {arrowDuelReplyChallengeVisible && displayedPuzzle?.kind === "arrow_duel" ? (
           <ArrowDuelReplyChallengePrompt
@@ -20586,6 +20587,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9
   },
   practicePromptStack: {
+    alignSelf: "center",
     gap: 6
   },
   promptIcon: {

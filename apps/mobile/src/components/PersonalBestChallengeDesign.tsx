@@ -815,10 +815,11 @@ export function PersonalBestProgressBanner({
   const recordContext = bestScore === null
     ? "First score at this level"
     : `Previous best ${bestScore}`;
+  const visibleRecordContext = bestScore === null ? "First score" : recordContext;
   return (
     <View
       accessibilityLabel={showsRecordMilestone
-        ? `New best, ${score} solved. ${recordContext}. Every solve now raises your best.`
+        ? `New best, ${score} solved. ${recordContext}.`
         : isNewBest
         ? `New best, ${score} solved`
         : `${score} solved, ${remaining} more to beat best ${bestScore}`}
@@ -832,16 +833,22 @@ export function PersonalBestProgressBanner({
       {showsRecordMilestone ? (
         <>
           <View style={styles.recordMilestoneRow}>
-            <View style={styles.resultBadge} testID="personal-best-record-badge">
+            <View
+              style={[styles.resultBadge, styles.recordMilestoneBadge]}
+              testID="personal-best-record-badge"
+            >
               <Text style={styles.resultBadgeText}>NEW BEST</Text>
             </View>
-            <Text style={styles.recordPreviousBest} testID="personal-best-record-previous">
-              {recordContext}
+            <Text
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+              numberOfLines={1}
+              style={styles.recordPreviousBest}
+              testID="personal-best-record-previous"
+            >
+              {visibleRecordContext}
             </Text>
           </View>
-          <Text style={styles.recordMilestoneMessage} testID="personal-best-record-message">
-            Every solve now raises your best.
-          </Text>
         </>
       ) : (
         <View style={styles.progressCopyAndTrack}>
@@ -1667,16 +1674,16 @@ const styles = StyleSheet.create({
   recordMilestoneRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     justifyContent: "space-between"
   },
-  recordMilestoneMessage: {
-    color: "#1E3A8A",
-    fontSize: 12,
-    fontWeight: "700"
+  recordMilestoneBadge: {
+    flexShrink: 0,
+    paddingHorizontal: 8
   },
   recordPreviousBest: {
     color: "#64748B",
+    flexShrink: 1,
     fontSize: 11,
     fontWeight: "700"
   },

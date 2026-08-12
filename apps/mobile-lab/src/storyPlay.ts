@@ -83,6 +83,27 @@ export async function expectTestIdHorizontalCentersAligned(
   });
 }
 
+export async function expectTestIdsNotOverlapping(
+  canvasElement: HTMLElement,
+  firstTestID: string,
+  secondTestID: string
+): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  const first = await page.findByTestId(firstTestID, {}, { timeout: 4_000 });
+  const second = await page.findByTestId(secondTestID, {}, { timeout: 4_000 });
+  await waitFor(() => {
+    const firstRect = first.getBoundingClientRect();
+    const secondRect = second.getBoundingClientRect();
+    const overlaps = firstRect.left < secondRect.right
+      && firstRect.right > secondRect.left
+      && firstRect.top < secondRect.bottom
+      && firstRect.bottom > secondRect.top;
+    if (overlaps) {
+      throw new Error(`Expected ${firstTestID} not to overlap ${secondTestID}`);
+    }
+  });
+}
+
 export async function expectTestIdVerticalCentersAligned(
   canvasElement: HTMLElement,
   firstTestID: string,

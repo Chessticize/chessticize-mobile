@@ -6634,6 +6634,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-score-strip")).toBeTruthy();
     expect(findByTestId(renderer, "practice-prompt")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-prompt"))).toContain("Find the best move");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-stack").props.style).alignSelf)
+      .toBe("center");
     expect(flattenTestStyle(findByTestId(renderer, "chessboard-king-white-sprite").props.style).width)
       .toBe(Math.round(boardSize / 8) * 6);
     expect(flattenTestStyle(findByTestId(renderer, "practice-prompt-icon").props.style).width)
@@ -8631,14 +8633,12 @@ describe("PracticePocScreen", () => {
       "NEW BEST"
     );
     expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(
-      "New best, 19 solved. Previous best 18. Every solve now raises your best."
+      "New best, 19 solved. Previous best 18."
     );
     expect(collectText(findByTestId(renderer, "personal-best-record-previous"))).toBe(
       "Previous best 18"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-record-message"))).toBe(
-      "Every solve now raises your best."
-    );
+    expect(() => findByTestId(renderer, "personal-best-record-message")).toThrow();
     expect(() => findByTestId(renderer, "personal-best-progress-fill")).toThrow();
     expect(() => findByTestId(renderer, "personal-best-record-aura")).toThrow();
     expect(() => findByTestId(renderer, "personal-best-record-impact")).toThrow();
@@ -8664,7 +8664,7 @@ describe("PracticePocScreen", () => {
     });
 
     expect(findByTestId(renderedBanner, "personal-best-progress").props.accessibilityLabel).toBe(
-      "New best, 20 solved. Previous best 18. Every solve now raises your best."
+      "New best, 20 solved. Previous best 18."
     );
     expect(() => findByTestId(renderedBanner, "personal-best-record-impact")).toThrow();
   });
@@ -8682,10 +8682,11 @@ describe("PracticePocScreen", () => {
     renderers.push(renderer);
 
     expect(collectText(findByTestId(renderer, "personal-best-record-previous"))).toBe(
-      "First score at this level"
+      "First score"
     );
+    expect(findByTestId(renderer, "personal-best-record-previous").props.numberOfLines).toBe(1);
     expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(
-      "New best, 1 solved. First score at this level. Every solve now raises your best."
+      "New best, 1 solved. First score at this level."
     );
   });
 
