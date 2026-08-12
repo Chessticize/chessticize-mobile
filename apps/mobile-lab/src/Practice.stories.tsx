@@ -4,6 +4,7 @@ import {
   centerTestId,
   clickTestId,
   dragTestId,
+  expectLabDeviceStatusBar,
   expectPointerDrivenRunDrag,
   expectReorderAnimation,
   expectRunCardPickedUp,
@@ -124,6 +125,7 @@ function expectFullScreenStoryId(canvasElement: HTMLElement, storyId: string): v
 export const Home: Story = {
   args: { scenarioId: "practice-home" },
   play: async ({ canvasElement }) => {
+    await expectLabDeviceStatusBar(canvasElement);
     await expectTestIdText(canvasElement, "practice-mode-standard-rating", "925");
     await expectTestIdText(canvasElement, "practice-mode-arrow-duel-rating", "875");
     expectTestIdAbsent(canvasElement, "practice-review-strip");
@@ -632,6 +634,7 @@ export const ActiveSession: Story = {
   name: "Active session",
   args: { scenarioId: "practice-active" },
   play: async ({ canvasElement }) => {
+    await expectLabDeviceStatusBar(canvasElement);
     await openPracticeSession(canvasElement);
     await waitForTestId(canvasElement, "session-puzzle-timing");
     await waitForText(canvasElement, "Puzzle 0:24");
@@ -659,6 +662,7 @@ export const PersonalBestRecord: Story = {
   name: "Survival · record mode",
   args: { scenarioId: "practice-personal-best-record" },
   play: async ({ canvasElement }) => {
+    await expectLabDeviceStatusBar(canvasElement);
     await waitForTestId(canvasElement, "active-session-shell");
     await expectTestIdText(canvasElement, "personal-best-record-badge", "NEW BEST");
     await expectTestIdText(canvasElement, "personal-best-record-previous", "Previous best 18");

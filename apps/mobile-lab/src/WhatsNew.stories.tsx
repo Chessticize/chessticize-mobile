@@ -63,7 +63,10 @@ export function WhatsNewIndex({
 
 const meta = {
   title: "00 What's New",
-  component: WhatsNewIndex
+  component: WhatsNewIndex,
+  parameters: {
+    labDeviceChrome: false
+  }
 } satisfies Meta<typeof WhatsNewIndex>;
 
 export default meta;

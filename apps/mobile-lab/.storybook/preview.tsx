@@ -6,6 +6,7 @@ import {
 } from "react-native-safe-area-context";
 import { PracticeViewportProvider } from "../../mobile/src/components/PracticeViewport.tsx";
 import "../src/lab.css";
+import { LabDeviceStatusBar } from "../src/LabDeviceStatusBar.tsx";
 import {
   LAB_DEVICE_VIEWPORTS,
   labDeviceViewportForGlobal,
@@ -14,8 +15,12 @@ import {
 
 function LabDeviceFrame({
   children,
+  showDeviceChrome,
   viewportGlobal
-}: React.PropsWithChildren<{ viewportGlobal: unknown }>): React.JSX.Element {
+}: React.PropsWithChildren<{
+  showDeviceChrome: boolean;
+  viewportGlobal: unknown;
+}>): React.JSX.Element {
   const selectedViewport = labDeviceViewportForGlobal(
     viewportGlobal as Parameters<typeof labDeviceViewportForGlobal>[0]
   );
@@ -29,9 +34,13 @@ function LabDeviceFrame({
   return (
     <div
       className="lab-device-frame"
+      data-safe-area-top={metrics.insets.top}
       data-testid="lab-device-frame"
       style={{ height, minHeight: height, width }}
     >
+      {showDeviceChrome ? (
+        <LabDeviceStatusBar height={metrics.insets.top} width={width} />
+      ) : null}
       <PracticeViewportProvider value={{ height, width }}>
         <SafeAreaFrameContext.Provider value={metrics.frame}>
           <SafeAreaInsetsContext.Provider value={metrics.insets}>
@@ -46,7 +55,10 @@ function LabDeviceFrame({
 const preview: Preview = {
   decorators: [
     (Story, context) => (
-      <LabDeviceFrame viewportGlobal={context.globals.viewport}>
+      <LabDeviceFrame
+        showDeviceChrome={context.parameters.labDeviceChrome !== false}
+        viewportGlobal={context.globals.viewport}
+      >
         <Story />
       </LabDeviceFrame>
     )
