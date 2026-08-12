@@ -394,7 +394,8 @@ function LabButton({
 }
 
 function expectedMoveForLab(displayFen: string): string | undefined {
-  const replyExpectedMove = labTestText("arrow-duel-reply-expected-move")
+  const replyExpectedMove = labTestText("personal-best-record-expected-move")
+    ?? labTestText("arrow-duel-reply-expected-move")
     ?? labTestText("review-arrow-duel-reply-expected-move");
   if (replyExpectedMove) {
     return replyExpectedMove;
