@@ -18,6 +18,7 @@ import {
   PRACTICE_UI_PADDING,
   type PracticeSafeAreaInsets
 } from "../src/components/adaptivePracticeLayout";
+import { PersonalBestProgressBanner } from "../src/components/PersonalBestChallengeDesign";
 import {
   ARROW_DUEL_REPLY_LAB_MOVES,
   LabScenario
@@ -8621,6 +8622,59 @@ describe("PracticePocScreen", () => {
     press(renderer, "session-abandon");
     press(renderer, "personal-best-pause-and-leave");
     expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
+  });
+
+  it("replaces a completed Survival progress bar with a record celebration", () => {
+    const renderer = renderLabScenario("practice-personal-best-record");
+
+    expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
+      "New best · 19"
+    );
+    expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(
+      "New best, 19 solved"
+    );
+    expect(findByTestId(renderer, "personal-best-record-celebration")).toBeTruthy();
+    expect(findByTestId(renderer, "personal-best-record-aura")).toBeTruthy();
+    expect(findByTestId(renderer, "personal-best-record-impact")).toBeTruthy();
+    expect(() => findByTestId(renderer, "personal-best-progress-fill")).toThrow();
+  });
+
+  it("replays the record impact when another solve extends the best", () => {
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    act(() => {
+      renderer = TestRenderer.create(
+        <PersonalBestProgressBanner bestScore={18} celebration={{}} score={19} />
+      );
+    });
+    if (!renderer) {
+      throw new Error("Record progress banner did not render");
+    }
+    renderers.push(renderer);
+
+    act(() => {
+      renderer?.update(
+        <PersonalBestProgressBanner bestScore={18} celebration={{}} score={20} />
+      );
+    });
+
+    expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
+      "New best · 20"
+    );
+    expect(findByTestId(renderer, "personal-best-progress").props.accessibilityLabel).toBe(
+      "New best, 20 solved"
+    );
+    expect(findByTestId(renderer, "personal-best-record-impact")).toBeTruthy();
+  });
+
+  it("keeps record mode static when reduced motion is requested", () => {
+    const renderer = renderLabScenario("practice-personal-best-record", {
+      personalBestRecordCelebrationReducedMotion: true
+    });
+
+    expect(findByTestId(renderer, "personal-best-record-celebration")).toBeTruthy();
+    expect(() => findByTestId(renderer, "personal-best-record-aura")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-record-impact")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-progress-fill")).toThrow();
   });
 
   it("uses only the explicitly selected compatible Run to suggest a Survival level", () => {

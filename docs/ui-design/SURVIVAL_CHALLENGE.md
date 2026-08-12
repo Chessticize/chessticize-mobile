@@ -45,6 +45,24 @@ future play can never reduce the already reached score.
 - Puzzle and Arrow Duel bests remain separate, and different levels are never
   ranked against each other.
 
+### Active record meter
+
+The active Run uses two visually distinct score states:
+
+- Before the standing best is passed, the meter keeps the useful progress bar
+  and says how many more solves are needed to beat that best.
+- After the standing best is passed, the completed bar disappears. A restrained
+  blue-and-gold aura keeps the score card in record mode, and each additional
+  solve lands one brief `+1` impact without covering the puzzle or board.
+- Reduced motion keeps the warmer record card and its plain-language status but
+  omits both the looping aura and per-solve impact.
+
+The record-mode Interaction Lab state is a presentation proposal awaiting
+explicit approval. Later production wiring must compare against the standing
+best captured when the Run starts, trigger the impact only for a newly counted
+solve, and never replay an old milestone merely because the screen remounts or
+a paused Run resumes.
+
 ## Pause and leave
 
 Back, Close, and the pause control pause Survival instead of discarding
@@ -271,7 +289,7 @@ first empty batch proved full-pool exhaustion.
 
 The Interaction Lab demonstrates the expected Home, full-page Hub,
 informational rules, Rating-source, unavailable saved source, highest-level,
-empty-Home, first-entry help, active,
+empty-Home, first-entry help, active, record-mode,
 puzzle-hidden pause, third-mistake result, full-pool `Perfect clear`, and
 dedicated Survival records states. General History deliberately has no
 Survival summary module.

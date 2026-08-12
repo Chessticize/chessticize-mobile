@@ -76,6 +76,9 @@ export type PersonalBestLevelRecordPresentation = {
 };
 
 export type PersonalBestChallengeDesignPreview = {
+  activeRecordCelebration?: {
+    reducedMotion?: boolean;
+  };
   availableLevels?: readonly PersonalBestAvailableLevelPresentation[];
   band: PersonalBestRatingBandPresentation;
   bestScore: number | null;
@@ -794,43 +797,171 @@ function PersonalBestSourcePicker({
 
 export function PersonalBestProgressBanner({
   bestScore,
+  celebration,
   compact = false,
   score
 }: {
   bestScore: number | null;
+  celebration?: PersonalBestChallengeDesignPreview["activeRecordCelebration"];
   compact?: boolean;
   score: number;
 }): React.JSX.Element {
   const target = (bestScore ?? -1) + 1;
   const isNewBest = bestScore === null || score >= target;
+  const celebratesRecord = isNewBest && celebration !== undefined;
+  const reducedMotion = celebration?.reducedMotion === true;
+  const recordPulse = React.useRef(new Animated.Value(0)).current;
+  const recordImpact = React.useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    if (!celebratesRecord || reducedMotion) {
+      recordPulse.stopAnimation();
+      recordPulse.setValue(0);
+      return;
+    }
+    let stopped = false;
+    const animateTo = (toValue: 0 | 1): void => {
+      Animated.timing(recordPulse, {
+        duration: 1600,
+        easing: Easing.out(Easing.cubic),
+        toValue,
+        useNativeDriver: true
+      }).start(({ finished }) => {
+        if (finished && !stopped) {
+          animateTo(toValue === 1 ? 0 : 1);
+        }
+      });
+    };
+    animateTo(1);
+    return () => {
+      stopped = true;
+      recordPulse.stopAnimation();
+    };
+  }, [celebratesRecord, recordPulse, reducedMotion]);
+  React.useEffect(() => {
+    if (!celebratesRecord || reducedMotion) {
+      recordImpact.stopAnimation();
+      recordImpact.setValue(0);
+      return;
+    }
+    recordImpact.setValue(0);
+    let stopped = false;
+    Animated.timing(recordImpact, {
+      duration: 130,
+      easing: Easing.out(Easing.cubic),
+      toValue: 1,
+      useNativeDriver: true
+    }).start(({ finished }) => {
+      if (!finished || stopped) {
+        return;
+      }
+      Animated.timing(recordImpact, {
+        duration: 390,
+        easing: Easing.out(Easing.cubic),
+        toValue: 0,
+        useNativeDriver: true
+      }).start();
+    });
+    return () => {
+      stopped = true;
+      recordImpact.stopAnimation();
+    };
+  }, [celebratesRecord, recordImpact, reducedMotion, score]);
   const remaining = Math.max(0, target - score);
   const progress = isNewBest ? 1 : Math.max(0.06, score / Math.max(1, target));
   const title = isNewBest
     ? `New best · ${score}`
     : `${remaining} more to beat ${bestScore}`;
+  const impactScale = recordImpact.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.035]
+  });
+  const impactTranslateY = recordImpact.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-16, 0]
+  });
   return (
-    <View
+    <Animated.View
       accessibilityLabel={isNewBest
         ? `New best, ${score} solved`
         : `${score} solved, ${remaining} more to beat best ${bestScore}`}
-      style={[styles.progressBanner, compact ? styles.progressBannerCompact : null]}
+      style={[
+        styles.progressBanner,
+        celebratesRecord ? styles.progressBannerRecord : null,
+        compact ? styles.progressBannerCompact : null,
+        celebratesRecord && !reducedMotion ? { transform: [{ scale: impactScale }] } : null
+      ]}
       testID="personal-best-progress"
     >
+      {celebratesRecord ? (
+        <View
+          pointerEvents="none"
+          style={styles.recordCelebration}
+          testID="personal-best-record-celebration"
+        >
+          <View style={styles.recordCelebrationWash} />
+          {!reducedMotion ? (
+            <Animated.View
+              style={[
+                styles.recordAura,
+                {
+                  opacity: recordPulse.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.28, 0.72]
+                  }),
+                  transform: [{
+                    scale: recordPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.96, 1]
+                    })
+                  }]
+                }
+              ]}
+              testID="personal-best-record-aura"
+            />
+          ) : null}
+        </View>
+      ) : null}
       <View style={styles.progressCopyRow}>
         <Text style={styles.progressTitle} testID="personal-best-progress-title">{title}</Text>
         <Text style={styles.progressScore}>{score} solved</Text>
       </View>
-      <View style={styles.progressTrack}>
-        <View
+      {celebratesRecord ? (
+        <View pointerEvents="none" style={styles.recordStatusRow}>
+          <Text style={styles.recordStatusSpark}>✦</Text>
+          <Text style={styles.recordStatusText}>Every solve extends your best</Text>
+          <Text style={styles.recordStatusSpark}>✦</Text>
+        </View>
+      ) : (
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              isNewBest ? styles.progressFillBest : null,
+              { width: `${Math.round(progress * 100)}%` }
+            ]}
+            testID="personal-best-progress-fill"
+          />
+        </View>
+      )}
+      {celebratesRecord && !reducedMotion ? (
+        <Animated.View
+          pointerEvents="none"
           style={[
-            styles.progressFill,
-            isNewBest ? styles.progressFillBest : null,
-            { width: `${Math.round(progress * 100)}%` }
+            styles.recordImpact,
+            {
+              opacity: recordImpact,
+              transform: [
+                { scale: impactScale },
+                { translateY: impactTranslateY }
+              ]
+            }
           ]}
-          testID="personal-best-progress-fill"
-        />
-      </View>
-    </View>
+          testID="personal-best-record-impact"
+        >
+          <Text style={styles.recordImpactText}>+1</Text>
+        </Animated.View>
+      ) : null}
+    </Animated.View>
   );
 }
 
@@ -1595,6 +1726,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8
   },
+  progressBannerRecord: {
+    backgroundColor: "#FFF9E8",
+    borderColor: "#FBBF24",
+    borderWidth: 1.5,
+    overflow: "hidden",
+    position: "relative"
+  },
   progressCopyRow: {
     alignItems: "center",
     flexDirection: "row",
@@ -1625,6 +1763,67 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 6,
     overflow: "hidden"
+  },
+  recordAura: {
+    bottom: 0,
+    borderColor: "#F59E0B",
+    borderRadius: 13,
+    borderWidth: 2,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  recordCelebration: {
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  recordCelebrationWash: {
+    backgroundColor: "rgba(37, 99, 235, 0.045)",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  recordImpact: {
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    borderColor: "#FFFFFF",
+    borderRadius: 999,
+    borderWidth: 1.5,
+    justifyContent: "center",
+    minHeight: 26,
+    minWidth: 34,
+    paddingHorizontal: 7,
+    position: "absolute",
+    right: 8,
+    top: 4
+  },
+  recordImpactText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  recordStatusRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+    justifyContent: "center"
+  },
+  recordStatusSpark: {
+    color: "#D97706",
+    fontSize: 10,
+    fontWeight: "900"
+  },
+  recordStatusText: {
+    color: "#92400E",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.15
   },
   resultBadge: {
     backgroundColor: "#FEF3C7",

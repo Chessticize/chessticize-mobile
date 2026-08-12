@@ -87,6 +87,14 @@
       }
     ]
   },
+  "practice-personal-best-record": {
+    "issues": [
+      {
+        "issueNumber": 492,
+        "changeNote": "Replace the completed progress bar with a persistent record-mode aura and one brief impact for every additional solve after a new best."
+      }
+    ]
+  },
   "practice-personal-best-result": {
     "issues": [
       {

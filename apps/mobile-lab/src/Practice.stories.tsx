@@ -653,6 +653,38 @@ export const PersonalBestActive: Story = {
   }
 };
 
+export const PersonalBestRecord: Story = {
+  name: "Survival · record mode",
+  args: { scenarioId: "practice-personal-best-record" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "active-session-shell");
+    await expectTestIdText(canvasElement, "personal-best-progress-title", "New best · 19");
+    await waitForTestId(canvasElement, "personal-best-record-celebration");
+    await waitForTestId(canvasElement, "personal-best-record-impact");
+    await waitForEnabledTestId(canvasElement, "lab-board-correct");
+    expectTestIdAbsent(canvasElement, "personal-best-progress-fill");
+  }
+};
+
+export const PersonalBestRecordReducedMotion: Story = {
+  name: "Survival · record mode · reduced motion",
+  args: {
+    personalBestRecordCelebrationReducedMotion: true,
+    scenarioId: "practice-personal-best-record",
+    storyPresentation: {
+      storyId: "practice--personal-best-record-reduced-motion",
+      title: "Survival · record mode · reduced motion"
+    }
+  },
+  play: async ({ canvasElement }) => {
+    await expectTestIdText(canvasElement, "personal-best-progress-title", "New best · 19");
+    await waitForTestId(canvasElement, "personal-best-record-celebration");
+    expectTestIdAbsent(canvasElement, "personal-best-record-impact");
+    expectTestIdAbsent(canvasElement, "personal-best-record-aura");
+    expectTestIdAbsent(canvasElement, "personal-best-progress-fill");
+  }
+};
+
 export const SurvivalLeaveOptions: Story = {
   name: "Survival · paused",
   args: { scenarioId: "practice-personal-best-leave" },
