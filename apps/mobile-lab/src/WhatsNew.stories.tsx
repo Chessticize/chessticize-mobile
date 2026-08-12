@@ -69,7 +69,25 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Overview: Story = {};
+export const Overview: Story = {
+  play: async ({ canvasElement }) => {
+    const cards = Array.from(canvasElement.querySelectorAll("article"));
+    const lastCard = cards.at(-1);
+    if (!lastCard) {
+      return;
+    }
+
+    const documentElement = canvasElement.ownerDocument.documentElement;
+    const lastCardBottom = lastCard.getBoundingClientRect().bottom
+      + canvasElement.ownerDocument.defaultView!.scrollY;
+    if (documentElement.scrollHeight <= documentElement.clientHeight) {
+      throw new Error("The What's New catalog should scroll when its cards exceed the device frame.");
+    }
+    if (lastCardBottom > documentElement.scrollHeight) {
+      throw new Error("The last What's New card is clipped outside the scrollable document.");
+    }
+  }
+};
 
 const styles: Record<string, React.CSSProperties> = {
   page: {

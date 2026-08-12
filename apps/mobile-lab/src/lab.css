@@ -25,7 +25,7 @@ html {
 }
 
 .lab-device-frame {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .lab-app-surface {
