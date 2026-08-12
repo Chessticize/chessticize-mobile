@@ -10582,6 +10582,7 @@ function SessionStatusBar({
   const isPersonalBest = personalBest !== undefined;
   const previousSurvivalBest = personalBest?.bestScore;
   const hasNewSurvivalBest = isPersonalBest
+    && state.correctCount >= 1
     && (previousSurvivalBest === null || state.correctCount > (previousSurvivalBest ?? -1));
   const savedSurvivalBest = Math.max(state.correctCount, previousSurvivalBest ?? 0);
   const completedAttempts = state.correctCount + state.mistakeCount;
@@ -10749,6 +10750,8 @@ function SessionStatusBar({
             <Text style={styles.survivalExitBest} testID="personal-best-exit-best">
               {hasNewSurvivalBest
                 ? `New best ${savedSurvivalBest} · already saved`
+                : previousSurvivalBest === null
+                  ? "No best yet · solve 1 to set it"
                 : `Best ${savedSurvivalBest} · saved`}
             </Text>
             <Text style={styles.helperText}>
