@@ -9144,6 +9144,46 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
   });
 
+  it("opens the approved empty Survival records state from a fresh persisted profile", () => {
+    const service = createProductionSurvivalService();
+    expect(service.listSurvivalBests()).toEqual([]);
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    openSurvivalHubFromHome(renderer);
+    press(renderer, "personal-best-hub-records");
+
+    const recordsScreen = findByTestId(renderer, "personal-best-records-screen");
+    expect(collectText(findByTestId(renderer, "personal-best-records-empty"))).toBe(
+      "YOUR BESTSNo Survival bests yetSolve one puzzle in Survival to set your first best. Puzzle and Arrow Duel keep separate bests at each level."
+    );
+    expect(recordsScreen.props.accessibilityLabel).toBe(
+      "Survival records. No bests yet. Solve one puzzle in Survival to set your first best. Puzzle and Arrow Duel bests are separate by level."
+    );
+    expect(() => findByTestId(renderer, "personal-best-records-puzzle")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-records-arrow_duel")).toThrow();
+  });
+
+  it("keeps persisted Survival bests on the populated records path", () => {
+    const service = createProductionSurvivalService({ bestScore: 4 });
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    openSurvivalHubFromHome(renderer);
+    press(renderer, "personal-best-hub-records");
+
+    expect(() => findByTestId(renderer, "personal-best-records-empty")).toThrow();
+    expect(collectText(findByTestId(renderer, "personal-best-record-puzzle-900"))).toBe(
+      "900–999Best4"
+    );
+    expect(findByTestId(renderer, "personal-best-records-puzzle")).toBeTruthy();
+    expect(findByTestId(renderer, "personal-best-records-arrow_duel")).toBeTruthy();
+  });
+
   it("opens dedicated Survival records from the Challenge Hub without taking over History", () => {
     const renderer = renderLabScenario("practice-personal-best-hub");
     const hubWidth = flattenTestStyle(findByTestId(renderer, "personal-best-hub").props.style).width;

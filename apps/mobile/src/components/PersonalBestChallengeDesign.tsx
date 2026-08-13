@@ -1101,7 +1101,7 @@ export function PersonalBestRecordsScreen({
             : "Puzzle and Arrow Duel keep separate records. A higher score at an easier level never replaces a best at a harder one."}
         </Text>
       </View>
-      {(["puzzle", "arrow_duel"] as const).map((type) => {
+      {recordsAreEmpty ? null : (["puzzle", "arrow_duel"] as const).map((type) => {
         const typeRecords = records.filter((record) => record.challengeType === type);
         if (typeRecords.length === 0) {
           return null;
