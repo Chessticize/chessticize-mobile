@@ -95,6 +95,7 @@ export type PersonalBestChallengeDesignPreview = {
   selectedReferenceRunIds?: Partial<Record<PersonalBestChallengeType, string>>;
   showActivePresentation?: boolean;
   recordsInitiallyVisible?: boolean;
+  recordsState?: "empty" | "populated";
   sourcePickerInitiallyVisible?: boolean;
   startState?: SprintState;
   startStates?: Partial<Record<PersonalBestChallengeType, SprintState>>;
@@ -1057,13 +1058,16 @@ export function PersonalBestRecordsScreen({
   const usesWideRecordGrid = viewportWidth >= 700;
   const records = presentation.levelRecords ?? [];
   const pausedRuns = presentation.pausedRuns ?? [];
+  const recordsAreEmpty = presentation.recordsState === "empty";
   const recordSummary = records.map((record) => {
     const best = survivalBestForLevel(record, pausedRuns);
     return `${challengeTypeLabel(record.challengeType)} ${levelLabel(record)} best ${best}`;
   }).join(", ");
   return (
     <View
-      accessibilityLabel={`Survival bests by level. ${recordSummary}. Puzzle and Arrow Duel records are separate.`}
+      accessibilityLabel={recordsAreEmpty
+        ? "Survival records. No bests yet. Solve one puzzle in Survival to set your first best. Puzzle and Arrow Duel bests are separate by level."
+        : `Survival bests by level. ${recordSummary}. Puzzle and Arrow Duel records are separate.`}
       style={[
         styles.recordsScreen,
         { width: Math.min(680, Math.max(0, viewportWidth - 32)) }
@@ -1083,11 +1087,18 @@ export function PersonalBestRecordsScreen({
         <Text style={styles.hubTopBarTitle}>Survival records</Text>
         <View style={styles.closeButtonSpacer} />
       </View>
-      <View style={styles.recordsIntro}>
+      <View
+        style={styles.recordsIntro}
+        testID={recordsAreEmpty ? "personal-best-records-empty" : undefined}
+      >
         <Text style={styles.historyEyebrow}>YOUR BESTS</Text>
-        <Text style={styles.historyTitle}>Every level stands on its own</Text>
+        <Text style={styles.historyTitle}>
+          {recordsAreEmpty ? "No Survival bests yet" : "Every level stands on its own"}
+        </Text>
         <Text style={styles.recordsIntroText}>
-          Puzzle and Arrow Duel keep separate records. A higher score at an easier level never replaces a best at a harder one.
+          {recordsAreEmpty
+            ? "Solve one puzzle in Survival to set your first best. Puzzle and Arrow Duel keep separate bests at each level."
+            : "Puzzle and Arrow Duel keep separate records. A higher score at an easier level never replaces a best at a harder one."}
         </Text>
       </View>
       {(["puzzle", "arrow_duel"] as const).map((type) => {

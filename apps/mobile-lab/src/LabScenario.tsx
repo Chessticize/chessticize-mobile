@@ -926,18 +926,11 @@ function personalBestChallengePreviewFor(
   if (scenarioId === "practice-personal-best-records") {
     return {
       ...common,
-      bestScore: 19,
-      completedRunCount: 7,
-      levelRecords: [
-        ...levelRecords,
-        {
-          challengeType: "arrow_duel",
-          completedRunCount: 1,
-          maxRating: 1099,
-          minRating: 1000,
-          score: 3
-        }
-      ],
+      bestScore: null,
+      completedRunCount: 0,
+      levelRecords: [],
+      pausedRuns: [],
+      recordsState: "empty" as const,
       recordsInitiallyVisible: true
     };
   }

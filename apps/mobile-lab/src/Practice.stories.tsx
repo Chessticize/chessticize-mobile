@@ -1247,13 +1247,16 @@ export const PersonalBestRecords: Story = {
   args: { scenarioId: "practice-personal-best-records" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-records-screen");
-    await expectTestIdText(canvasElement, "personal-best-record-puzzle-900", "900–999Best19");
-    await expectTestIdText(canvasElement, "personal-best-record-arrow_duel-1000", "1000–1099Best3");
+    await expectTestIdText(
+      canvasElement,
+      "personal-best-records-empty",
+      "YOUR BESTSNo Survival bests yetSolve one puzzle in Survival to set your first best. Puzzle and Arrow Duel keep separate bests at each level."
+    );
     expectTestIdAbsent(canvasElement, "personal-best-records-in-progress");
     expectTestIdAbsent(canvasElement, "personal-best-records-comparison-note");
-    await waitForTestId(canvasElement, "personal-best-records-puzzle");
-    await waitForTestId(canvasElement, "personal-best-records-arrow_duel");
-    await waitForText(canvasElement, "Every level stands on its own");
+    expectTestIdAbsent(canvasElement, "personal-best-records-puzzle");
+    expectTestIdAbsent(canvasElement, "personal-best-records-arrow_duel");
+    await waitForText(canvasElement, "No Survival bests yet");
     expectTestIdAbsent(canvasElement, "history-attempt-history-unclear");
   }
 };
