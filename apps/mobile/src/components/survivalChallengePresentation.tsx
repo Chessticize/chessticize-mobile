@@ -94,6 +94,7 @@ export function buildSurvivalChallengePresentation(input: {
     opponentReplyEnabled: service.getSettings().arrowDuel.opponentReplyEnabled,
     pausedRuns,
     referenceRuns: sources,
+    recordsState: bests.length === 0 ? "empty" : "populated",
     selectedReferenceRunIds,
     showActivePresentation: activeSurvival !== undefined,
     ...(result ? { result } : {}),
