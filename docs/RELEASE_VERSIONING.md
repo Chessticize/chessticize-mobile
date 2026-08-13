@@ -20,16 +20,13 @@ modifying an identity that has already shipped.
   that was submitted or published. Never move a tag or reuse a consumed Android
   version code or iOS build number.
 
-The expected state while the coordinated 1.4.2 release branch is open is
-therefore:
+The expected state after the coordinated 1.5.0 release has shipped is therefore:
 
-- development target on `main`: `1.5.0`;
-- latest integrated release identity: `1.4.1`, Android version code `16`, iOS
+- development target on `main`: `1.5.1`;
+- latest integrated release identity: `1.5.0`, Android version code `18`, iOS
   build `1`;
-- proposed release-branch identity: `1.4.2`, Android version code `17`, iOS
-  build `1`; and
-- shipped identity: the immutable `1.4.1` platform tags, such as
-  `android-v1.4.1-build-16`, until the coordinated release is accepted.
+- shipped identity: the immutable `android-v1.5.0-build-18` and
+  `ios-v1.5.0-build-1` platform tags.
 
 Run this at any time to inspect both mutable records:
 
