@@ -9127,6 +9127,23 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(neutralRenderer, "personal-best-result-trophy")).toThrow();
   });
 
+  it("shows a truthful and grammatical empty Survival records state", () => {
+    const renderer = renderLabScenario("practice-personal-best-records");
+    const recordsScreen = findByTestId(renderer, "personal-best-records-screen");
+
+    expect(collectText(findByTestId(renderer, "personal-best-records-empty"))).toBe(
+      "YOUR BESTSNo Survival bests yetSolve one puzzle in Survival to set your first best. Puzzle and Arrow Duel keep separate bests at each level."
+    );
+    expect(recordsScreen.props.accessibilityLabel).toBe(
+      "Survival records. No bests yet. Solve one puzzle in Survival to set your first best. Puzzle and Arrow Duel bests are separate by level."
+    );
+    expect(() => findByTestId(renderer, "personal-best-records-puzzle")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-records-arrow_duel")).toThrow();
+
+    press(renderer, "personal-best-records-back");
+    expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
+  });
+
   it("opens dedicated Survival records from the Challenge Hub without taking over History", () => {
     const renderer = renderLabScenario("practice-personal-best-hub");
     const hubWidth = flattenTestStyle(findByTestId(renderer, "personal-best-hub").props.style).width;

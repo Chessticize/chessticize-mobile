@@ -55,48 +55,18 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   assert.deepEqual(
     newScenarios.map((scenario) => scenario.id),
     [
-      "practice-home",
-      "practice-personal-best-hub",
-      "practice-personal-best-source-run",
-      "practice-personal-best-unavailable-source",
-      "practice-personal-best-starting-level",
-      "practice-personal-best-arrow-duel",
-      "practice-personal-best-empty-home-source",
-      "practice-personal-best-guide",
-      "practice-personal-best-highest-level",
-      "practice-personal-best-leave",
-      "practice-personal-best-active",
-      "practice-personal-best-record",
-      "practice-personal-best-result",
-      "practice-personal-best-pool-cleared",
-      "practice-personal-best-records",
-      "practice-runs-empty"
+      "practice-personal-best-records"
     ]
   );
-  assert.ok(scenarioRegistry["practice-home"].issues?.some(
-    (issue) => issue.issueNumber === 492
+  assert.ok(scenarioRegistry["practice-personal-best-records"].issues?.some(
+    (issue) => issue.issueNumber === 576
   ) ?? false);
   assert.deepEqual(
     newScenarios
-      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 492))
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 576))
       .map((scenario) => scenario.id),
     [
-      "practice-home",
-      "practice-personal-best-hub",
-      "practice-personal-best-source-run",
-      "practice-personal-best-unavailable-source",
-      "practice-personal-best-starting-level",
-      "practice-personal-best-arrow-duel",
-      "practice-personal-best-empty-home-source",
-      "practice-personal-best-guide",
-      "practice-personal-best-highest-level",
-      "practice-personal-best-leave",
-      "practice-personal-best-active",
-      "practice-personal-best-record",
-      "practice-personal-best-result",
-      "practice-personal-best-pool-cleared",
-      "practice-personal-best-records",
-      "practice-runs-empty"
+      "practice-personal-best-records"
     ]
   );
 
@@ -419,7 +389,7 @@ test("Practice home delegates Review workload to the dedicated tab", () => {
   assert.ok(home.scope.includes.includes("Collecting-evidence state"));
   assert.ok(home.scope.includes.includes("Tactical Profile entry"));
   assert.match(home.description, /dedicated Review tab/);
-  assert.deepEqual(storyTagsForScenario("practice-home"), ["new"]);
+  assert.deepEqual(storyTagsForScenario("practice-home"), []);
 });
 
 test("post-attempt handoffs explain Timeout, Wrong, and Slow-correct results", () => {
