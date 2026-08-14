@@ -71,7 +71,6 @@ export type PersonalBestPausedRunPresentation = {
 export type PersonalBestLevelRecordPresentation = {
   challengeType: PersonalBestChallengeType;
   completedRunCount: number;
-  isRecommended?: boolean;
   maxRating: number;
   minRating: number;
   score: number;
@@ -1333,19 +1332,25 @@ function survivalBestScoreForLevel({
   pausedRuns: readonly PersonalBestPausedRunPresentation[];
   records: readonly PersonalBestLevelRecordPresentation[];
 }): number | null {
-  const recordScore = records.find((record) => (
+  const recordScore = displayableSurvivalBestScore(records.find((record) => (
     record.challengeType === challengeType
     && record.minRating === band.minRating
     && record.maxRating === band.maxRating
-  ))?.score ?? fallbackBest;
+  ))?.score ?? fallbackBest);
   return pausedRuns
     .filter((run) => (
       run.challengeType === challengeType
       && run.minRating === band.minRating
       && run.maxRating === band.maxRating
-      && run.score >= 1
     ))
-    .reduce<number | null>((best, run) => Math.max(best ?? -1, run.score), recordScore);
+    .reduce<number | null>((best, run) => {
+      const runScore = displayableSurvivalBestScore(run.score);
+      return runScore === null ? best : Math.max(best ?? -1, runScore);
+    }, recordScore);
+}
+
+function displayableSurvivalBestScore(score: number | null | undefined): number | null {
+  return score !== null && score !== undefined && score >= 1 ? score : null;
 }
 
 function referenceRunFor(

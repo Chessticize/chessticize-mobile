@@ -764,9 +764,9 @@ function personalBestChallengePreviewFor(
   const levelRecords = [
     { challengeType: "puzzle" as const, completedRunCount: 8, maxRating: 699, minRating: 600, score: 42 },
     { challengeType: "puzzle" as const, completedRunCount: 4, maxRating: 899, minRating: 800, score: 23 },
-    { challengeType: "puzzle" as const, completedRunCount: 7, isRecommended: true, maxRating: 999, minRating: 900, score: 18 },
+    { challengeType: "puzzle" as const, completedRunCount: 7, maxRating: 999, minRating: 900, score: 18 },
     { challengeType: "puzzle" as const, completedRunCount: 2, maxRating: 1099, minRating: 1000, score: 8 },
-    { challengeType: "arrow_duel" as const, completedRunCount: 5, isRecommended: true, maxRating: 899, minRating: 800, score: 11 },
+    { challengeType: "arrow_duel" as const, completedRunCount: 5, maxRating: 899, minRating: 800, score: 11 },
     { challengeType: "arrow_duel" as const, completedRunCount: 2, maxRating: 999, minRating: 900, score: 6 }
   ];
   const common = {

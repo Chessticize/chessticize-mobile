@@ -59,7 +59,6 @@ export function buildSurvivalChallengePresentation(input: {
   );
   const levelRecords = levelRecordPresentations({
     bests,
-    service,
     sessions
   });
   const currentBest = service.getSurvivalBest(defaultChallengeType, currentLevel)?.score ?? null;
@@ -110,17 +109,10 @@ export function buildSurvivalChallengePresentation(input: {
 
 function levelRecordPresentations(input: {
   bests: ReturnType<PracticeService["listSurvivalBests"]>;
-  service: PracticeService;
   sessions: ReturnType<PracticeService["listSurvivalSessions"]>;
 }): PersonalBestLevelRecordPresentation[] {
   const records: PersonalBestLevelRecordPresentation[] = [];
   for (const challengeType of ["puzzle", "arrow_duel"] as const) {
-    const selectedSourceId = input.service.selectedSurvivalRatingSourceId(challengeType);
-    const selectedRun = input.service.listPracticeRuns().find((run) => run.id === selectedSourceId);
-    const selectedRating = selectedRun
-      ? input.service.getRating(selectedRun.ratingKey).rating
-      : 600;
-    const recommended = survivalLevelForRating(selectedRating);
     for (const level of SURVIVAL_LEVELS) {
       const best = input.bests.find((record) => (
         record.challengeType === challengeType
@@ -135,14 +127,12 @@ function levelRecordPresentations(input: {
         && session.config.survival.minRating === level.minRating
         && session.config.survival.maxRating === level.maxRating
       )).length;
-      const isRecommended = recommended.minRating === level.minRating;
       if (!best) {
         continue;
       }
       records.push({
         challengeType,
         completedRunCount,
-        ...(isRecommended ? { isRecommended: true } : {}),
         maxRating: level.maxRating,
         minRating: level.minRating,
         score: best.score
