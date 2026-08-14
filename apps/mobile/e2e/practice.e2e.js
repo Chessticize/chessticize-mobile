@@ -121,14 +121,10 @@ describe('Practice POC', () => {
   it('opens the empty Survival records state from a fresh profile', async () => {
     await waitForVisibleInPracticeScroll('personal-best-home-card');
     await element(by.id('personal-best-home-card')).tap();
-    await waitFor(element(by.id('personal-best-guide-start')))
-      .toBeVisible()
-      .withTimeout(10000);
+    await waitForVisibleInPracticeScroll('personal-best-guide-start');
     await tapUntilExists('personal-best-guide-start', 'personal-best-hub', 3);
     await waitFor(element(by.id('personal-best-hub'))).toExist().withTimeout(10000);
-    await waitFor(element(by.id('personal-best-hub-records')))
-      .toBeVisible()
-      .withTimeout(10000);
+    await waitForVisibleInPracticeScroll('personal-best-hub-records');
     await element(by.id('personal-best-hub-records')).tap();
 
     const emptyRecords = element(by.id('personal-best-records-empty'));
