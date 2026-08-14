@@ -31,6 +31,7 @@ const {
 
 const story = require('../../../config/app-store-marketing-story-v1.json');
 const ROOT_CLIPPED_SCROLL_CONTAINERS = new Set([
+  'practice-run-editor',
   'settings-about-section',
 ]);
 const capturePlatform =

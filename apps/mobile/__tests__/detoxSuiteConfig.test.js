@@ -1944,6 +1944,7 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('await assertRequiredFrameGeometry(frame)');
     expect(spec).toContain('waitFor(requiredElement).toExist().withTimeout(10000)');
     expect(spec).toContain("ROOT_CLIPPED_SCROLL_CONTAINERS.has(testID)");
+    expect(spec).toContain("'practice-run-editor'");
     expect(spec).toContain("'settings-about-section'");
     expect(spec).toContain('assertFramesIntersect(');
     const compositionHelperStart = spec.indexOf('async function assertCompositionViewport');
