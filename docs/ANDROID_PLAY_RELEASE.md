@@ -31,7 +31,9 @@ Version code 16 completed the Android 1.4.1 source, signed-candidate,
 Play-generated APK, and GitHub mirror path. Version code 17 is the immutable
 Android 1.4.2 candidate in Google Play Production review with corresponding
 source published; its Play-generated APK mirror is still pending. Version code
-18 is reserved for Android 1.5.0.
+18 is the immutable Android 1.5.0 candidate submitted to Google Play Production
+review with corresponding source published; its Play-generated APK mirror is
+still pending. Version code 19 is reserved for Android 1.5.1.
 This runbook deliberately separates
 repository-owned checks from owner-only Play Console evidence. Missing signing material,
 protected-environment setup, or any console result is a blocker; never replace
@@ -494,22 +496,44 @@ Do not move the build-17 tag, rebuild its AAB, replace its public source
 manifest, or reuse version code 17. Retry only the idempotent APK mirror after
 Play exposes the generated artifact.
 
-Build 18 is the proposed Android 1.5.0 candidate identity. It has no annotated
+Build 18 is the immutable Android 1.5.0 candidate in Google Play Production
+review:
+
+- annotated tag: `android-v1.5.0-build-18`, targeting
+  `1136ca4c7101a24f715577cc86a8e587118240b5`;
+- successful protected candidate workflow run:
+  [`31597924716`](https://github.com/Chessticize/chessticize-mobile/actions/runs/31597924716);
+- retained signed-candidate artifact: ID `9142320504`;
+- signed AAB: 321,180,446 bytes, SHA-256
+  `7d735ddcbdfec35f0280033058590d9089dd3f6554f06185e564fc2adeab82b4`;
+- public corresponding-source release:
+  [`android-v1.5.0-build-18`](https://github.com/Chessticize/chessticize-mobile/releases/tag/android-v1.5.0-build-18);
+- public source-manifest asset: ID `511578928`, SHA-256
+  `d51717e75d2ddc4f4013d0a160b29a91da3b6090adcea40bb68eec83aec4df2b`;
+- Google Play Production reports release `18 (1.5.0)` as submitted for full
+  rollout with changes in review; and
+- no Play-generated APK or GitHub APK mirror exists yet.
+
+Do not move the build-18 tag, rebuild its AAB, replace its public source
+manifest, or reuse version code 18. Retry only the idempotent APK mirror after
+Play exposes the generated artifact.
+
+Build 19 is the proposed Android 1.5.1 candidate identity. It has no annotated
 source tag, signed AAB, corresponding-source Release, Play upload, or APK
-mirror until the 1.5.0 release branch is frozen, its build-specific note is
+mirror until the 1.5.1 release branch is frozen, its build-specific note is
 approved, and the protected candidate/source workflow succeeds.
 
 ## Canonical identity
 
 - Application ID: `com.chessticize.mobile`
-- Public version: `apps/mobile/release-version.json` (`1.5.0`)
-- Android version code: `apps/mobile/release-version.json` (`18`)
+- Public version: `apps/mobile/release-version.json` (`1.5.1`)
+- Android version code: `apps/mobile/release-version.json` (`19`)
 - iOS build number: `apps/mobile/release-version.json` (`1`, independent from Android)
-- Open-development target: `apps/mobile/development-version.json` (`1.5.0`;
+- Open-development target: `apps/mobile/development-version.json` (`1.5.1`;
   Debug/E2E only, not a store identity)
 - Supported ABIs: `arm64-v8a`, `x86_64`
 - Target SDK: API 36
-- Required source tag before any Play track upload: `android-v1.5.0-build-18`
+- Required source tag before any Play track upload: `android-v1.5.1-build-19`
 
 Android `versionCode` must increase for every later Play upload. The public
 version must continue to match iOS. Settings reads `versionName` and
@@ -619,8 +643,8 @@ the mirror and Play track states independently until both are complete.
 
 For a bounded follow-up release:
 
-For Android version `1.5.0` build `18`, release notes and this support document must
-name the canonical source tag `android-v1.5.0-build-18` and the public source
+For Android version `1.5.1` build `19`, release notes and this support document must
+name the canonical source tag `android-v1.5.1-build-19` and the public source
 repository `https://github.com/Chessticize/chessticize-mobile`. The evidence
 must bind the annotated tag, commit, application ID, version, version code, and
 AAB SHA-256 before Play distribution. A missing or lightweight public tag, a
