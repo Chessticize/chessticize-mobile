@@ -31,6 +31,7 @@ const {
 
 const story = require('../../../config/app-store-marketing-story-v1.json');
 const ROOT_CLIPPED_SCROLL_CONTAINERS = new Set([
+  'practice-run-editor',
   'settings-about-section',
 ]);
 const capturePlatform =
@@ -181,6 +182,10 @@ async function prepareFrame(frame) {
         0.5,
         0.5
       );
+      await waitFor(element(by.id('settings-license')))
+        .toBeVisible()
+        .whileElement(by.id('practice-main-scroll'))
+        .scroll(100, 'up', 0.5, 0.5);
       return;
     default:
       throw new Error(`Unhandled marketing frame ${frame.id}`);

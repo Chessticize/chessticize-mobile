@@ -732,8 +732,8 @@ for (const releaseDoc of releaseDocs) {
   assert.match(releaseDoc, /physical/i);
 }
 
-assert.equal(releaseVersion.publicVersion, "1.5.0");
-assert.equal(releaseVersion.androidVersionCode, 18);
+assert.equal(releaseVersion.publicVersion, "1.5.1");
+assert.equal(releaseVersion.androidVersionCode, 19);
 assert.deepEqual(developmentVersion, {
   schemaVersion: 1,
   plannedPublicVersion: "1.5.2"
