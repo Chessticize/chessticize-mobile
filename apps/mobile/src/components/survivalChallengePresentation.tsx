@@ -59,7 +59,6 @@ export function buildSurvivalChallengePresentation(input: {
   );
   const levelRecords = levelRecordPresentations({
     bests,
-    pausedRuns,
     service,
     sessions
   });
@@ -111,7 +110,6 @@ export function buildSurvivalChallengePresentation(input: {
 
 function levelRecordPresentations(input: {
   bests: ReturnType<PracticeService["listSurvivalBests"]>;
-  pausedRuns: PersonalBestPausedRunPresentation[];
   service: PracticeService;
   sessions: ReturnType<PracticeService["listSurvivalSessions"]>;
 }): PersonalBestLevelRecordPresentation[] {
@@ -137,13 +135,8 @@ function levelRecordPresentations(input: {
         && session.config.survival.minRating === level.minRating
         && session.config.survival.maxRating === level.maxRating
       )).length;
-      const hasPausedRun = input.pausedRuns.some((run) => (
-        run.challengeType === challengeType
-        && run.minRating === level.minRating
-        && run.maxRating === level.maxRating
-      ));
       const isRecommended = recommended.minRating === level.minRating;
-      if (!best && completedRunCount === 0 && !hasPausedRun && !isRecommended) {
+      if (!best) {
         continue;
       }
       records.push({
@@ -152,7 +145,7 @@ function levelRecordPresentations(input: {
         ...(isRecommended ? { isRecommended: true } : {}),
         maxRating: level.maxRating,
         minRating: level.minRating,
-        score: best?.score ?? 0
+        score: best.score
       });
     }
   }

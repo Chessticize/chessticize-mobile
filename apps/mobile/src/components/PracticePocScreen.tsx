@@ -2566,13 +2566,14 @@ export function PracticePocScreen({
     const source = personalBestPresentation?.referenceRuns?.find((candidate) => (
       candidate.challengeType === run.challengeType && candidate.id === sourceId
     ));
+    const pausedBestScore = Math.max(run.score, personalBestPresentation?.levelRecords?.find((record) => (
+      record.challengeType === run.challengeType
+      && record.minRating === run.minRating
+      && record.maxRating === run.maxRating
+    ))?.score ?? -1);
     setPersonalBestSelectedSetup({
       band: { minRating: run.minRating, maxRating: run.maxRating },
-      bestScore: Math.max(run.score, personalBestPresentation?.levelRecords?.find((record) => (
-        record.challengeType === run.challengeType
-        && record.minRating === run.minRating
-        && record.maxRating === run.maxRating
-      ))?.score ?? -1),
+      bestScore: pausedBestScore >= 1 ? pausedBestScore : null,
       challengeType: run.challengeType,
       sourceId: source?.id ?? sourceId ?? "standard",
       sourceRating: source?.rating ?? run.minRating

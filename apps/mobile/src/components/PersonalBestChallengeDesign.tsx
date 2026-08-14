@@ -688,7 +688,7 @@ export function PersonalBestChallengeHub({
               {selectedInProgress
                 ? `${selectedInProgress.score} solved · ${selectedInProgress.mistakeCount} of 3 mistakes · paused`
                 : selectedBest === null
-                  ? "New level — set your first best"
+                  ? "No best yet · solve 1 to set it"
                   : `Best ${selectedBest} at this level`}
             </Text>
           </View>
@@ -1343,6 +1343,7 @@ function survivalBestScoreForLevel({
       run.challengeType === challengeType
       && run.minRating === band.minRating
       && run.maxRating === band.maxRating
+      && run.score >= 1
     ))
     .reduce<number | null>((best, run) => Math.max(best ?? -1, run.score), recordScore);
 }
