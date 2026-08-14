@@ -34,6 +34,15 @@ const {
 // Keep this seed stable to reduce fixture churn. The test reads and validates
 // the actual runtime candidates before checking that both neutral arrows paint.
 const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v4:23';
+const SURVIVAL_RECORDS_CAPTURE_ORIENTATION =
+  process.env.CHESSTICIZE_SURVIVAL_RECORDS_CAPTURE_ORIENTATION;
+
+if (SURVIVAL_RECORDS_CAPTURE_ORIENTATION
+  && !['portrait', 'landscape'].includes(SURVIVAL_RECORDS_CAPTURE_ORIENTATION)) {
+  throw new Error(
+    'CHESSTICIZE_SURVIVAL_RECORDS_CAPTURE_ORIENTATION must be portrait or landscape'
+  );
+}
 
 async function waitForRunFramesToSettle(sourceTestID, targetTestID, timeoutMs = 5000) {
   const startedAt = Date.now();
@@ -101,7 +110,8 @@ describe('Practice POC', () => {
         chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED
       }
     });
-    if (process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD !== '1') {
+    if (process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD !== '1'
+      && !SURVIVAL_RECORDS_CAPTURE_ORIENTATION) {
       await device.setOrientation('portrait');
     }
   });
@@ -124,12 +134,24 @@ describe('Practice POC', () => {
     );
     await expect(element(by.id('personal-best-records-puzzle'))).not.toExist();
     await expect(element(by.id('personal-best-records-arrow_duel'))).not.toExist();
-    await device.takeScreenshot('survival-records-empty-portrait');
-
-    await device.setOrientation('landscape');
-    await waitFor(emptyRecords).toBeVisible().withTimeout(10000);
-    await device.takeScreenshot('survival-records-empty-landscape');
-    await device.setOrientation('portrait');
+    const captureOrientation = SURVIVAL_RECORDS_CAPTURE_ORIENTATION ?? 'portrait';
+    const expectedLayoutClass = captureOrientation === 'landscape' ? 'Landscape' : 'Portrait';
+    await waitForElementAccessibilityLabelContaining(
+      'adaptive-layout',
+      expectedLayoutClass,
+      10000
+    );
+    const layoutFrame = await frameFor(element(by.id('adaptive-layout')));
+    const hasExpectedShape = captureOrientation === 'landscape'
+      ? layoutFrame.width > layoutFrame.height
+      : layoutFrame.height > layoutFrame.width;
+    if (!hasExpectedShape) {
+      throw new Error(
+        `Expected ${captureOrientation} Survival records layout, received ${JSON.stringify(layoutFrame)}`
+      );
+    }
+    await sleep(500);
+    await device.takeScreenshot(`survival-records-empty-${captureOrientation}`);
 
     await element(by.id('personal-best-records-back')).tap();
     await waitFor(element(by.id('personal-best-hub'))).toBeVisible().withTimeout(10000);
