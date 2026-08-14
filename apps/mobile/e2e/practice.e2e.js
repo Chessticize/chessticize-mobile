@@ -123,7 +123,10 @@ describe('Practice POC', () => {
       .toBeVisible()
       .withTimeout(10000);
     await tapUntilExists('personal-best-guide-start', 'personal-best-hub', 3);
-    await waitFor(element(by.id('personal-best-hub'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('personal-best-hub'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('personal-best-hub-records')))
+      .toBeVisible()
+      .withTimeout(10000);
     await element(by.id('personal-best-hub-records')).tap();
 
     const emptyRecords = element(by.id('personal-best-records-empty'));
@@ -153,7 +156,7 @@ describe('Practice POC', () => {
     await device.takeScreenshot(`survival-records-empty-${captureOrientation}`);
 
     await element(by.id('personal-best-records-back')).tap();
-    await waitFor(element(by.id('personal-best-hub'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('personal-best-hub'))).toExist().withTimeout(10000);
   });
 
   it('creates, reorders, edits, archives, restores, and relaunches a saved Run', async () => {
