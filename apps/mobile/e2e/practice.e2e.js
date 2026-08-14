@@ -104,6 +104,7 @@ describe('Practice POC', () => {
     // busy after the first visible frame, so launch args disable synchronization
     // before Detox waits on app readiness.
     await launchWithDisabledSynchronization({
+      enableTestControls: !SURVIVAL_RECORDS_CAPTURE_ORIENTATION,
       newInstance: true,
       delete: true,
       launchArgs: {
