@@ -106,6 +106,35 @@ describe('Practice POC', () => {
     }
   });
 
+  it('opens the empty Survival records state from a fresh profile', async () => {
+    await waitForVisibleInPracticeScroll('personal-best-home-card');
+    await element(by.id('personal-best-home-card')).tap();
+    await waitFor(element(by.id('personal-best-guide-start')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await element(by.id('personal-best-guide-start')).tap();
+
+    await waitFor(element(by.id('personal-best-hub'))).toBeVisible().withTimeout(10000);
+    await element(by.id('personal-best-hub-records')).tap();
+
+    const emptyRecords = element(by.id('personal-best-records-empty'));
+    await waitFor(emptyRecords).toBeVisible().withTimeout(10000);
+    await expect(element(by.id('personal-best-records-screen'))).toHaveLabel(
+      'Survival records. No bests yet. Solve one puzzle in Survival to set your first best. Puzzle and Arrow Duel bests are separate by level.'
+    );
+    await expect(element(by.id('personal-best-records-puzzle'))).not.toExist();
+    await expect(element(by.id('personal-best-records-arrow_duel'))).not.toExist();
+    await device.takeScreenshot('survival-records-empty-portrait');
+
+    await device.setOrientation('landscape');
+    await waitFor(emptyRecords).toBeVisible().withTimeout(10000);
+    await device.takeScreenshot('survival-records-empty-landscape');
+    await device.setOrientation('portrait');
+
+    await element(by.id('personal-best-records-back')).tap();
+    await waitFor(element(by.id('personal-best-hub'))).toBeVisible().withTimeout(10000);
+  });
+
   it('creates, reorders, edits, archives, restores, and relaunches a saved Run', async () => {
     await waitFor(element(by.id('practice-run-management'))).toExist().withTimeout(180000);
     await waitForVisibleInPracticeScroll('practice-run-standard');
