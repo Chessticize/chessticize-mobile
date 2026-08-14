@@ -122,8 +122,7 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('personal-best-guide-start')))
       .toBeVisible()
       .withTimeout(10000);
-    await element(by.id('personal-best-guide-start')).tap();
-
+    await tapUntilExists('personal-best-guide-start', 'personal-best-hub', 3);
     await waitFor(element(by.id('personal-best-hub'))).toBeVisible().withTimeout(10000);
     await element(by.id('personal-best-hub-records')).tap();
 
