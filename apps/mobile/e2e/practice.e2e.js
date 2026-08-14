@@ -111,8 +111,9 @@ describe('Practice POC', () => {
         chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED
       }
     });
-    if (process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD !== '1'
-      && !SURVIVAL_RECORDS_CAPTURE_ORIENTATION) {
+    if (SURVIVAL_RECORDS_CAPTURE_ORIENTATION) {
+      await device.setOrientation(SURVIVAL_RECORDS_CAPTURE_ORIENTATION);
+    } else if (process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD !== '1') {
       await device.setOrientation('portrait');
     }
   });
