@@ -57,10 +57,7 @@ export function buildSurvivalChallengePresentation(input: {
   const pausedRuns = service.listResumableSurvivalRuns().map((state) =>
     pausedRunPresentation(state, nowMs)
   );
-  const levelRecords = levelRecordPresentations({
-    bests,
-    sessions
-  });
+  const levelRecords = levelRecordPresentations(bests);
   const currentBest = service.getSurvivalBest(defaultChallengeType, currentLevel)?.score ?? null;
   const completedSessions = sessions.filter((session) => session.completedAt !== undefined);
   const activeSurvival = currentState?.config.survival;
@@ -107,32 +104,23 @@ export function buildSurvivalChallengePresentation(input: {
   };
 }
 
-function levelRecordPresentations(input: {
-  bests: ReturnType<PracticeService["listSurvivalBests"]>;
-  sessions: ReturnType<PracticeService["listSurvivalSessions"]>;
-}): PersonalBestLevelRecordPresentation[] {
+function levelRecordPresentations(
+  bests: ReturnType<PracticeService["listSurvivalBests"]>
+): PersonalBestLevelRecordPresentation[] {
   const records: PersonalBestLevelRecordPresentation[] = [];
   for (const challengeType of ["puzzle", "arrow_duel"] as const) {
     for (const level of SURVIVAL_LEVELS) {
-      const best = input.bests.find((record) => (
+      const best = bests.find((record) => (
         record.challengeType === challengeType
         && record.ruleVersion === SURVIVAL_RULE_VERSION
         && record.minRating === level.minRating
         && record.maxRating === level.maxRating
       ));
-      const completedRunCount = input.sessions.filter((session) => (
-        session.completedAt !== undefined
-        && session.config?.survival?.challengeType === challengeType
-        && session.config.survival.ruleVersion === SURVIVAL_RULE_VERSION
-        && session.config.survival.minRating === level.minRating
-        && session.config.survival.maxRating === level.maxRating
-      )).length;
       if (!best) {
         continue;
       }
       records.push({
         challengeType,
-        completedRunCount,
         maxRating: level.maxRating,
         minRating: level.minRating,
         score: best.score

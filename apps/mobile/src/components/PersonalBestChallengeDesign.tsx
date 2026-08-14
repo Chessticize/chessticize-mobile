@@ -70,7 +70,6 @@ export type PersonalBestPausedRunPresentation = {
 
 export type PersonalBestLevelRecordPresentation = {
   challengeType: PersonalBestChallengeType;
-  completedRunCount: number;
   maxRating: number;
   minRating: number;
   score: number;
