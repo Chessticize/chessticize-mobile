@@ -7999,6 +7999,29 @@ describe("PracticePocScreen", () => {
     );
   });
 
+  it("keeps a fresh Survival profile free of synthetic zero bests", () => {
+    const service = createProductionSurvivalService();
+    expect(service.listSurvivalBests()).toEqual([]);
+    expect(service.getSurvivalBest("puzzle", { minRating: 900, maxRating: 999 })).toBeUndefined();
+    const renderer = renderScreen({
+      practiceService: service,
+      runManagementEnabled: true
+    });
+
+    openSurvivalHubFromHome(renderer);
+
+    expect(collectText(findByTestId(renderer, "personal-best-level-900"))).toBe(
+      "Recommended900–999No best yet"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-rules-summary"))).toContain(
+      "No best yet · solve 1 to set it"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-hub"))).not.toContain("Best 0");
+
+    press(renderer, "personal-best-hub-start");
+    expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+  });
+
   it("runs production Survival through the service and resumes its exact saved puzzle", async () => {
     const service = createProductionSurvivalService();
     const currentTimeMs = () => Date.parse("2026-08-11T12:00:00.000Z");
@@ -8225,6 +8248,19 @@ describe("PracticePocScreen", () => {
     expect(service.getActiveSprint()).toBeUndefined();
     expect(service.listResumableSurvivalRuns()).toHaveLength(1);
     expect(findByTestId(renderer, "personal-best-home-card")).toBeTruthy();
+
+    openSurvivalHubFromHome(renderer);
+    expect(collectText(findByTestId(renderer, "personal-best-level-900"))).toBe(
+      "Recommended900–999No best yet"
+    );
+    expect(collectText(findByTestId(renderer, "personal-best-hub-start"))).toBe(
+      "Continue Survival"
+    );
+    press(renderer, "personal-best-hub-start");
+    expect(service.getActiveSprint()?.status).toBe("active");
+    expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
+      "1 more to set your first best"
+    );
   });
 
   it("previews and commits the Survival pause destination with Android Predictive Back", () => {
@@ -9166,7 +9202,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "personal-best-records-arrow_duel")).toThrow();
   });
 
-  it("keeps persisted Survival bests on the populated records path", () => {
+  it("keeps only persisted Survival bests on the populated records path", () => {
     const service = createProductionSurvivalService({ bestScore: 4 });
     const renderer = renderScreen({
       practiceService: service,
@@ -9181,7 +9217,10 @@ describe("PracticePocScreen", () => {
       "900–999Best4"
     );
     expect(findByTestId(renderer, "personal-best-records-puzzle")).toBeTruthy();
-    expect(findByTestId(renderer, "personal-best-records-arrow_duel")).toBeTruthy();
+    expect(() => findByTestId(renderer, "personal-best-records-arrow_duel")).toThrow();
+    expect(collectText(findByTestId(renderer, "personal-best-records-screen"))).not.toContain(
+      "Best0"
+    );
   });
 
   it("opens dedicated Survival records from the Challenge Hub without taking over History", () => {

@@ -57,12 +57,7 @@ export function buildSurvivalChallengePresentation(input: {
   const pausedRuns = service.listResumableSurvivalRuns().map((state) =>
     pausedRunPresentation(state, nowMs)
   );
-  const levelRecords = levelRecordPresentations({
-    bests,
-    pausedRuns,
-    service,
-    sessions
-  });
+  const levelRecords = levelRecordPresentations(bests);
   const currentBest = service.getSurvivalBest(defaultChallengeType, currentLevel)?.score ?? null;
   const completedSessions = sessions.filter((session) => session.completedAt !== undefined);
   const activeSurvival = currentState?.config.survival;
@@ -109,50 +104,26 @@ export function buildSurvivalChallengePresentation(input: {
   };
 }
 
-function levelRecordPresentations(input: {
-  bests: ReturnType<PracticeService["listSurvivalBests"]>;
-  pausedRuns: PersonalBestPausedRunPresentation[];
-  service: PracticeService;
-  sessions: ReturnType<PracticeService["listSurvivalSessions"]>;
-}): PersonalBestLevelRecordPresentation[] {
+function levelRecordPresentations(
+  bests: ReturnType<PracticeService["listSurvivalBests"]>
+): PersonalBestLevelRecordPresentation[] {
   const records: PersonalBestLevelRecordPresentation[] = [];
   for (const challengeType of ["puzzle", "arrow_duel"] as const) {
-    const selectedSourceId = input.service.selectedSurvivalRatingSourceId(challengeType);
-    const selectedRun = input.service.listPracticeRuns().find((run) => run.id === selectedSourceId);
-    const selectedRating = selectedRun
-      ? input.service.getRating(selectedRun.ratingKey).rating
-      : 600;
-    const recommended = survivalLevelForRating(selectedRating);
     for (const level of SURVIVAL_LEVELS) {
-      const best = input.bests.find((record) => (
+      const best = bests.find((record) => (
         record.challengeType === challengeType
         && record.ruleVersion === SURVIVAL_RULE_VERSION
         && record.minRating === level.minRating
         && record.maxRating === level.maxRating
       ));
-      const completedRunCount = input.sessions.filter((session) => (
-        session.completedAt !== undefined
-        && session.config?.survival?.challengeType === challengeType
-        && session.config.survival.ruleVersion === SURVIVAL_RULE_VERSION
-        && session.config.survival.minRating === level.minRating
-        && session.config.survival.maxRating === level.maxRating
-      )).length;
-      const hasPausedRun = input.pausedRuns.some((run) => (
-        run.challengeType === challengeType
-        && run.minRating === level.minRating
-        && run.maxRating === level.maxRating
-      ));
-      const isRecommended = recommended.minRating === level.minRating;
-      if (!best && completedRunCount === 0 && !hasPausedRun && !isRecommended) {
+      if (!best) {
         continue;
       }
       records.push({
         challengeType,
-        completedRunCount,
-        ...(isRecommended ? { isRecommended: true } : {}),
         maxRating: level.maxRating,
         minRating: level.minRating,
-        score: best?.score ?? 0
+        score: best.score
       });
     }
   }
