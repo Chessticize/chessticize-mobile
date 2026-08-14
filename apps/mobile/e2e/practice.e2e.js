@@ -34,6 +34,15 @@ const {
 // Keep this seed stable to reduce fixture churn. The test reads and validates
 // the actual runtime candidates before checking that both neutral arrows paint.
 const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v4:23';
+const SURVIVAL_RECORDS_CAPTURE_ORIENTATION =
+  process.env.CHESSTICIZE_SURVIVAL_RECORDS_CAPTURE_ORIENTATION;
+
+if (SURVIVAL_RECORDS_CAPTURE_ORIENTATION
+  && !['portrait', 'landscape'].includes(SURVIVAL_RECORDS_CAPTURE_ORIENTATION)) {
+  throw new Error(
+    'CHESSTICIZE_SURVIVAL_RECORDS_CAPTURE_ORIENTATION must be portrait or landscape'
+  );
+}
 
 async function waitForRunFramesToSettle(sourceTestID, targetTestID, timeoutMs = 5000) {
   const startedAt = Date.now();
@@ -95,15 +104,61 @@ describe('Practice POC', () => {
     // busy after the first visible frame, so launch args disable synchronization
     // before Detox waits on app readiness.
     await launchWithDisabledSynchronization({
+      enableTestControls: !SURVIVAL_RECORDS_CAPTURE_ORIENTATION,
       newInstance: true,
       delete: true,
       launchArgs: {
         chessticizePuzzleSelectionSeed: PRACTICE_RENDER_PUZZLE_SELECTION_SEED
       }
     });
-    if (process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD !== '1') {
+    if (SURVIVAL_RECORDS_CAPTURE_ORIENTATION) {
+      await device.setOrientation(SURVIVAL_RECORDS_CAPTURE_ORIENTATION);
+    } else if (process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD !== '1') {
       await device.setOrientation('portrait');
     }
+  });
+
+  it('opens the empty Survival records state from a fresh profile', async () => {
+    await waitForVisibleInPracticeScroll('personal-best-home-card');
+    await element(by.id('personal-best-home-card')).tap();
+    await waitFor(element(by.id('personal-best-guide-start')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await tapUntilExists('personal-best-guide-start', 'personal-best-hub', 3);
+    await waitFor(element(by.id('personal-best-hub'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('personal-best-hub-records')))
+      .toBeVisible()
+      .withTimeout(10000);
+    await element(by.id('personal-best-hub-records')).tap();
+
+    const emptyRecords = element(by.id('personal-best-records-empty'));
+    await waitFor(emptyRecords).toBeVisible().withTimeout(10000);
+    await expect(element(by.id('personal-best-records-screen'))).toHaveLabel(
+      'Survival records. No bests yet. Solve one puzzle in Survival to set your first best. Puzzle and Arrow Duel bests are separate by level.'
+    );
+    await expect(element(by.id('personal-best-records-puzzle'))).not.toExist();
+    await expect(element(by.id('personal-best-records-arrow_duel'))).not.toExist();
+    const captureOrientation = SURVIVAL_RECORDS_CAPTURE_ORIENTATION ?? 'portrait';
+    const expectedLayoutClass = captureOrientation === 'landscape' ? 'Landscape' : 'Portrait';
+    await waitForElementAccessibilityLabelContaining(
+      'adaptive-layout',
+      expectedLayoutClass,
+      10000
+    );
+    const layoutFrame = await frameFor(element(by.id('adaptive-layout')));
+    const hasExpectedShape = captureOrientation === 'landscape'
+      ? layoutFrame.width > layoutFrame.height
+      : layoutFrame.height > layoutFrame.width;
+    if (!hasExpectedShape) {
+      throw new Error(
+        `Expected ${captureOrientation} Survival records layout, received ${JSON.stringify(layoutFrame)}`
+      );
+    }
+    await sleep(500);
+    await device.takeScreenshot(`survival-records-empty-${captureOrientation}`);
+
+    await element(by.id('personal-best-records-back')).tap();
+    await waitFor(element(by.id('personal-best-hub'))).toExist().withTimeout(10000);
   });
 
   it('creates, reorders, edits, archives, restores, and relaunches a saved Run', async () => {
