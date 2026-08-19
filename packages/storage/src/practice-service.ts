@@ -837,6 +837,7 @@ export class PracticeService {
     });
     this.activeSprint = sprint;
     this.store.transaction(() => {
+      this.store.seedPuzzles([...result.prepared.puzzles]);
       this.advanceReplyCueForStartedSprint(sprint.config);
       this.store.createSprintSession(sprint);
     });

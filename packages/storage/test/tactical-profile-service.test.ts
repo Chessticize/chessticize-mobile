@@ -12,6 +12,7 @@ import {
   type TacticalProfileCalibrationArtifact
 } from "../../core/src/index.ts";
 import { MemoryStore } from "../src/memory-store.ts";
+import { PackBackedPracticeStore } from "../src/pack-backed-practice-store.ts";
 import { PracticeService } from "../src/practice-service.ts";
 import { MemoryTacticalProfileRepository } from "../src/tactical-profile-repository.ts";
 import { NodeSqliteDatabase, SQLiteStore } from "../src/sqlite-store.ts";
@@ -1810,6 +1811,75 @@ test("PracticeService starts the prepared Focused Run through the normal session
     practice.listSprintSessions().find((session) => session.id === started.id)?.config?.maxAttempts,
     15
   );
+});
+
+test("PracticeService persists a pack-backed Focused Run puzzle batch before its first attempt", () => {
+  const userStore = new SQLiteStore(":memory:");
+  userStore.migrate();
+  try {
+    const evidencePuzzles = Array.from({ length: 12 }, (_, index) =>
+      puzzle(`evidence-${index}`, ["fork"])
+    );
+    userStore.seedPuzzles(evidencePuzzles);
+    userStore.saveRating({
+      key: "standard 5/20",
+      generation: 0,
+      rating: 925,
+      ratingDeviation: 80,
+      volatility: 0.06,
+      games: 12
+    });
+    seedWeaknessHistory(userStore);
+
+    const packSource = new MemoryStore();
+    packSource.seedPuzzles([
+      ...evidencePuzzles,
+      ...Array.from({ length: 12 }, (_, index) => ({
+        ...puzzle(`fresh-fork-${index}`, ["fork"]),
+        solutionMoves: ["e6e7", "h1g1"]
+      })),
+      ...Array.from({ length: 12 }, (_, index) => ({
+        ...puzzle(`mixed-${index}`, ["sacrifice"]),
+        solutionMoves: ["e6e7", "h1g1"]
+      }))
+    ]);
+    const store = new PackBackedPracticeStore(userStore, packSource);
+    const profile = new TacticalProfileService({
+      progressStore: store,
+      puzzleSource: packSource,
+      repository: new MemoryTacticalProfileRepository(),
+      calibration: CALIBRATION,
+      naturalFrequency: { line: { fork: 0.12 }, arrow_duel: {} },
+      focusedRunPolicy: {
+        runSize: 15,
+        recentPuzzleDays: 30,
+        ratingBandHalfWidths: [100, 200]
+      }
+    });
+    const practice = new PracticeService(store, profile);
+
+    const started = practice.startFocusedRun(
+      "line",
+      "2026-07-25T00:00:00.000Z",
+      "pack-backed-focus"
+    );
+    assert.deepEqual(
+      started.puzzles.map((candidate) =>
+        userStore.getPuzzle(candidate.id)?.id
+      ),
+      started.puzzles.map((candidate) => candidate.id)
+    );
+
+    const result = practice.submitMove(
+      "h1g1",
+      "2026-07-25T00:00:05.000Z"
+    );
+
+    assert.equal(result.attempt?.result, "correct");
+    assert.equal(userStore.listAttempts({ sessionId: started.id }).length, 1);
+  } finally {
+    userStore.close();
+  }
 });
 
 test("PracticeService advances reply-cue familiarity for a Focused Arrow Duel start", () => {
