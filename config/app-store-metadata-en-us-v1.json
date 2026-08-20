@@ -48,8 +48,8 @@
     ]
   },
   "currentVersionWhatsNew": {
-    "sourceTag": "ios-v1.5.1-build-1",
+    "sourceTag": "ios-v1.5.2-build-1",
     "status": "release-candidate",
-    "storeCopy": "• Review opens with Today to review collapsed and Completed today expanded.\n• Before your first Survival best, Survival records explain how to set it and that Puzzle and Arrow Duel bests stay separate by level."
+    "storeCopy": "• Focused Runs now continue normally after your first answer.\n• Close and reopen the app without losing an unfinished Focused Run—it returns paused at the puzzle where you left off."
   }
 }
