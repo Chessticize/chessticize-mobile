@@ -141,15 +141,16 @@ describe('Key user flows', () => {
 
     // Mistakes schedule for the next day, so nothing is due yet: the stable
     // Today view must surface the next due estimate and both inline empty
-    // sections without replacing the queue with a separate empty screen.
+    // sections without replacing the queue with a separate empty screen. The
+    // review section opens collapsed, so exercise its public disclosure before
+    // asserting the empty content.
     await openTab('review-tab', 'review-due-card');
     await waitFor(element(by.id('review-tomorrow-count'))).toHaveText('3').withTimeout(10000);
     await waitFor(element(by.id('review-next-seven-days-count'))).toHaveText('3').withTimeout(10000);
     await waitFor(element(by.id('review-total-count'))).toHaveText('3').withTimeout(10000);
     await waitForElementTextContaining('review-next-due', 'Next:', 10000);
     await expect(element(by.id('review-start-due'))).toBeVisible();
-    await expect(element(by.id('review-today-to-review-empty'))).toBeVisible();
-    await expect(element(by.id('review-today-history-empty'))).toBeVisible();
+    await expectEmptyReviewTodaySections();
   });
 
   it('shows scheduled due reviews after relaunch', async () => {
@@ -419,8 +420,7 @@ describe('Key user flows', () => {
     await openStandardHistoryTrend();
 
     await openTab('review-tab', 'review-due-card');
-    await expect(element(by.id('review-today-to-review-empty'))).toBeVisible();
-    await expect(element(by.id('review-today-history-empty'))).toBeVisible();
+    await expectEmptyReviewTodaySections();
 
     await openTab('settings-tab', 'settings-app-version');
     await expect(element(by.id('settings-standard-elo-row'))).not.toExist();
@@ -434,6 +434,15 @@ describe('Key user flows', () => {
     await waitForElementTextContaining('practice-mode-standard-rating', '700', 5000);
   });
 });
+
+async function expectEmptyReviewTodaySections() {
+  const todayToReviewEmpty = element(by.id('review-today-to-review-empty'));
+  await expect(todayToReviewEmpty).not.toBeVisible();
+  await waitForVisibleInPracticeScroll('review-today-to-review-toggle');
+  await element(by.id('review-today-to-review-toggle')).tap();
+  await waitForVisibleInPracticeScroll('review-today-to-review-empty');
+  await waitForVisibleInPracticeScroll('review-today-history-empty');
+}
 
 async function createSavedCustomRun(name, { shorterDuration = false, themes = [] } = {}) {
   await waitForVisibleInPracticeScroll('practice-add-run');

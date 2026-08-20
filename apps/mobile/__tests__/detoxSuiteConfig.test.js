@@ -178,10 +178,17 @@ describe('Detox suite configuration', () => {
     );
     const caseEnd = flowsSpec.indexOf('\n  });', caseStart);
     const reviewQueueCase = flowsSpec.slice(caseStart, caseEnd);
+    const helperStart = flowsSpec.indexOf('async function expectEmptyReviewTodaySections');
+    const helperEnd = flowsSpec.indexOf('\n}', helperStart);
+    const reviewTodayEmptyHelper = flowsSpec.slice(helperStart, helperEnd);
 
     expect(reviewQueueCase).toContain("openTab('review-tab', 'review-due-card')");
-    expect(reviewQueueCase).toContain("by.id('review-today-to-review-empty')");
-    expect(reviewQueueCase).toContain("by.id('review-today-history-empty')");
+    expect(reviewQueueCase).toContain('expectEmptyReviewTodaySections()');
+    expect(reviewTodayEmptyHelper).toContain("by.id('review-today-to-review-empty')");
+    expect(reviewTodayEmptyHelper).toContain("expect(todayToReviewEmpty).not.toBeVisible()");
+    expect(reviewTodayEmptyHelper).toContain("waitForVisibleInPracticeScroll('review-today-to-review-toggle')");
+    expect(reviewTodayEmptyHelper).toContain("by.id('review-today-to-review-toggle')).tap()");
+    expect(reviewTodayEmptyHelper).toContain("waitForVisibleInPracticeScroll('review-today-history-empty')");
     expect(reviewQueueCase).not.toContain('review-empty-state');
     expect(reviewQueueCase).not.toContain('review-empty-practice');
     expect(flowsSpec).not.toContain('review-empty-state');
