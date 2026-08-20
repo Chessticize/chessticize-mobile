@@ -148,8 +148,8 @@ describe('Key user flows', () => {
     await waitFor(element(by.id('review-total-count'))).toHaveText('3').withTimeout(10000);
     await waitForElementTextContaining('review-next-due', 'Next:', 10000);
     await expect(element(by.id('review-start-due'))).toBeVisible();
-    await expect(element(by.id('review-today-to-review-empty'))).toBeVisible();
-    await expect(element(by.id('review-today-history-empty'))).toBeVisible();
+    await waitForVisibleInPracticeScroll('review-today-to-review-empty');
+    await waitForVisibleInPracticeScroll('review-today-history-empty');
   });
 
   it('shows scheduled due reviews after relaunch', async () => {
@@ -419,8 +419,8 @@ describe('Key user flows', () => {
     await openStandardHistoryTrend();
 
     await openTab('review-tab', 'review-due-card');
-    await expect(element(by.id('review-today-to-review-empty'))).toBeVisible();
-    await expect(element(by.id('review-today-history-empty'))).toBeVisible();
+    await waitForVisibleInPracticeScroll('review-today-to-review-empty');
+    await waitForVisibleInPracticeScroll('review-today-history-empty');
 
     await openTab('settings-tab', 'settings-app-version');
     await expect(element(by.id('settings-standard-elo-row'))).not.toExist();
