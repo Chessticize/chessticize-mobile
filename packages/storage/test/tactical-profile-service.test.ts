@@ -1882,6 +1882,64 @@ test("PracticeService persists a pack-backed Focused Run puzzle batch before its
   }
 });
 
+for (const backend of ["memory", "sqlite"] as const) {
+  test(`PracticeService restores an interrupted ${backend} Focused Run as paused`, () => {
+    const store = backend === "memory"
+      ? new MemoryStore()
+      : new SQLiteStore(":memory:");
+    if (store instanceof SQLiteStore) {
+      store.migrate();
+    }
+    try {
+      const focusedPuzzle = playablePuzzle(`focused-resume-${backend}`);
+      const config = buildSprintConfig({
+        mode: "standard",
+        durationSeconds: 300,
+        perPuzzleSeconds: 20,
+        targetCorrect: 2,
+        maxMistakes: 2,
+        maxAttempts: 2,
+        ratingPolicy: "unrated",
+        tacticalFocus: {
+          taskFamily: "line",
+          themes: ["mateIn2"],
+          mixedControlCount: 1,
+          ratingAnchor: 925,
+          minRating: 825,
+          maxRating: 1_025
+        }
+      });
+      const started = startSprint({
+        id: `focused-resume-${backend}`,
+        config,
+        puzzles: [focusedPuzzle],
+        ratingBefore: 925,
+        now: "2026-08-19T12:00:00.000Z"
+      });
+      store.transaction(() => {
+        store.seedPuzzles([focusedPuzzle]);
+        store.createSprintSession(started);
+      });
+
+      const restarted = new PracticeService(store);
+      const restored = restarted.getActiveSprint();
+
+      assert.equal(restored?.id, started.id);
+      assert.equal(restored?.status, "paused");
+      assert.equal(restored?.pausedAt, started.currentPuzzleStartedAt);
+      assert.equal(restored?.currentPuzzle?.puzzle.id, focusedPuzzle.id);
+
+      const resumed = restarted.resumeSprint("2026-08-19T13:00:00.000Z");
+      assert.equal(resumed.status, "active");
+      assert.equal(resumed.currentPuzzle?.puzzle.id, focusedPuzzle.id);
+    } finally {
+      if (store instanceof SQLiteStore) {
+        store.close();
+      }
+    }
+  });
+}
+
 test("PracticeService advances reply-cue familiarity for a Focused Arrow Duel start", () => {
   const store = arrowFocusedRunStore();
   seedArrowWeaknessHistory(store);

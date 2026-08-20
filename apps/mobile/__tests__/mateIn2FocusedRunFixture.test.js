@@ -1,5 +1,6 @@
 const bundledCorePuzzles = require('../../../fixtures/puzzles/bundled-core-pack.json');
 const {
+  focusedRunBoardFlipped,
   focusedRunMoveSteps,
 } = require('../e2e/mateIn2FocusedRunFixture');
 
@@ -14,6 +15,11 @@ describe('Mate in 2 Focused Run E2E fixture', () => {
           : []
       ))
     );
+  });
+
+  it('matches the production board perspective after the stored opponent entry move', () => {
+    expect(focusedRunBoardFlipped('0030b')).toBe(false);
+    expect(focusedRunBoardFlipped('0R8ni')).toBe(true);
   });
 
   it('fails closed when a runtime puzzle is absent from the tracked Core Pack', () => {

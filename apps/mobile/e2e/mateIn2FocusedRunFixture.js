@@ -5,10 +5,7 @@ const bundledCorePuzzlesById = new Map(
 );
 
 function focusedRunMoveSteps(puzzleId) {
-  const puzzle = bundledCorePuzzlesById.get(puzzleId);
-  if (!puzzle) {
-    throw new Error(`Focused Run puzzle ${puzzleId} is missing from the bundled Core Pack fixture`);
-  }
+  const puzzle = focusedRunPuzzle(puzzleId);
   const steps = puzzle.solutionMoves.flatMap((userMove, index, solutionMoves) => (
     index % 2 === 1
       ? [{ autoReply: solutionMoves[index + 1], userMove }]
@@ -20,6 +17,20 @@ function focusedRunMoveSteps(puzzleId) {
   return steps;
 }
 
+function focusedRunBoardFlipped(puzzleId) {
+  const puzzle = focusedRunPuzzle(puzzleId);
+  return puzzle.initialFen.split(/\s+/)[1] === 'w';
+}
+
+function focusedRunPuzzle(puzzleId) {
+  const puzzle = bundledCorePuzzlesById.get(puzzleId);
+  if (!puzzle) {
+    throw new Error(`Focused Run puzzle ${puzzleId} is missing from the bundled Core Pack fixture`);
+  }
+  return puzzle;
+}
+
 module.exports = {
+  focusedRunBoardFlipped,
   focusedRunMoveSteps,
 };

@@ -159,6 +159,7 @@ export interface PracticeStore extends ProgressV2PersistenceHost {
   updateSprintSession(state: SprintState): void;
   getResumableSurvivalSprint(id: string): SprintState | undefined;
   listResumableSurvivalSprints(): SprintState[];
+  listResumableFocusedSprints(): SprintState[];
   listSurvivalBests(): SurvivalBestRecord[];
   saveSurvivalBest(record: SurvivalBestRecord): void;
   getSurvivalPreferences(): SurvivalPreferences;

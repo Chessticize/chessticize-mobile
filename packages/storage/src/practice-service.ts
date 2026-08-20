@@ -112,6 +112,7 @@ import {
   TacticalProfileService,
   type FocusedRunPreflightResult,
   type PrepareFocusedRunResult,
+  type PreparedFocusedRun,
   type TacticalProfileProgress,
   type TacticalProfileSnapshot
 } from "./tactical-profile-service.ts";
@@ -219,6 +220,25 @@ export class PracticeService {
       survivalPackHash: options.survivalPackHash ?? "unversioned-local-pack"
     };
     this.reconcilePersistedRatings();
+    this.restoreInterruptedFocusedSprint();
+  }
+
+  private restoreInterruptedFocusedSprint(): void {
+    const stored = this.store.listResumableFocusedSprints()[0];
+    if (!stored) {
+      return;
+    }
+    if (stored.status === "paused") {
+      this.activeSprint = stored;
+      return;
+    }
+    const paused: SprintState = {
+      ...stored,
+      status: "paused",
+      pausedAt: stored.currentPuzzleStartedAt ?? stored.startedAt
+    };
+    this.store.updateSprintSession(paused);
+    this.activeSprint = paused;
   }
 
   get progressV2(): ProgressV2Persistence {
@@ -827,17 +847,28 @@ export class PracticeService {
     if (result.status !== "ready") {
       throw new FocusedRunUnavailableError(result.reason);
     }
-    const rating = this.store.getRating(result.prepared.config.ratingKey);
+    return this.startPreparedFocusedRun(result.prepared, now);
+  }
+
+  startPreparedFocusedRun(
+    prepared: PreparedFocusedRun,
+    now = new Date().toISOString()
+  ): SprintState {
+    if (this.activeSprint && isOpenSprint(this.activeSprint)) {
+      throw new Error("Cannot start a new sprint while another sprint is active");
+    }
+    assertPreparedFocusedRun(prepared);
+    const rating = this.store.getRating(prepared.config.ratingKey);
     const sprint = startSprint({
-      config: result.prepared.config,
-      puzzles: [...result.prepared.puzzles],
+      config: prepared.config,
+      puzzles: [...prepared.puzzles],
       ratingBefore: rating.rating,
       ratingBeforeRecord: rating,
       now
     });
     this.activeSprint = sprint;
     this.store.transaction(() => {
-      this.store.seedPuzzles([...result.prepared.puzzles]);
+      this.store.seedPuzzles([...prepared.puzzles]);
       this.advanceReplyCueForStartedSprint(sprint.config);
       this.store.createSprintSession(sprint);
     });
@@ -1578,6 +1609,26 @@ function defaultPerPuzzleSeconds(mode: SprintMode): number {
 
 function isOpenSprint(state: SprintState): boolean {
   return state.status === "active" || state.status === "paused";
+}
+
+function assertPreparedFocusedRun(prepared: PreparedFocusedRun): void {
+  const focus = prepared.config.tacticalFocus;
+  const plannedPuzzleCount = prepared.plan.reasons.reduce(
+    (count, reason) => count + reason.count,
+    prepared.plan.mixedControlCount
+  );
+  if (
+    !focus ||
+    prepared.config.ratingPolicy !== "unrated" ||
+    prepared.plan.taskFamily !== focus.taskFamily ||
+    plannedPuzzleCount !== prepared.puzzles.length ||
+    prepared.config.targetCorrect !== prepared.puzzles.length ||
+    prepared.config.maxMistakes !== prepared.puzzles.length ||
+    prepared.config.maxAttempts !== prepared.puzzles.length ||
+    new Set(prepared.puzzles.map((puzzle) => puzzle.id)).size !== prepared.puzzles.length
+  ) {
+    throw new Error("Prepared Focused Run is inconsistent");
+  }
 }
 
 function isBuiltInPracticeRun(runId: string): boolean {

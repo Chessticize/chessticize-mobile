@@ -351,30 +351,91 @@ export function injectMateIn2FocusedRun(
   service: PracticeService,
   now = new Date().toISOString()
 ): SprintState {
-  const evidencePuzzles = bundledCoreFixturePuzzles()
-    .filter((puzzle) =>
-      puzzle.themes.includes("mateIn2")
-      && puzzle.rating >= 850
-      && puzzle.rating <= 1_000
-      && puzzle.solutionMoves.length >= 4
-    )
-    .slice(0, 12)
-    .map((puzzle) => ({
-      ...puzzle,
-      themes: ["mateIn2"]
-    }));
-  if (evidencePuzzles.length < 12) {
-    throw new Error("Mate in 2 Focused Run fixture needs 12 evidence puzzles");
-  }
-
-  service.loadFixturePuzzles(evidencePuzzles);
-  const exported = service.exportLocalData();
-  const config = defaultSprintConfig("standard");
   const nowMs = Date.parse(now);
   if (!Number.isFinite(nowMs)) {
     throw new Error(`Mate in 2 Focused Run fixture received invalid time: ${now}`);
   }
   const fixtureId = `mate-in-2-focus-${Math.trunc(nowMs)}`;
+  const discoveryStartedAtMs = nowMs - 13 * 24 * 60 * 60 * 1_000;
+  const fixturePuzzles = bundledCoreFixturePuzzles();
+  const mateIn2CandidateIds = fixturePuzzles
+    .filter((puzzle) =>
+      puzzle.themes.includes("mateIn2") &&
+      puzzle.rating >= 850 &&
+      puzzle.rating <= 1_000 &&
+      puzzle.solutionMoves.length >= 2
+    )
+    .map((puzzle) => puzzle.id);
+  const mixedCandidateIds = fixturePuzzles
+    .filter((puzzle) =>
+      !puzzle.themes.includes("mateIn2") &&
+      puzzle.rating >= 850 &&
+      puzzle.rating <= 1_000 &&
+      puzzle.solutionMoves.length >= 2
+    )
+    .slice(0, 1_000)
+    .map((puzzle) => puzzle.id);
+  let focusedCandidates: Puzzle[] = [];
+  let mixedCandidates: Puzzle[] = [];
+  let discoverySessionId: string | undefined;
+  try {
+    service.setPuzzleSelectionScopeIds(mateIn2CandidateIds);
+    const focusedDiscovery = service.startSprint({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 27,
+      maxMistakes: 27,
+      themes: ["mateIn2"],
+      minRating: 850,
+      maxRating: 1_000,
+      puzzleSelectionSeed: "mate-in-2-focused-run-candidates-v1"
+    }, new Date(discoveryStartedAtMs).toISOString());
+    discoverySessionId = focusedDiscovery.id;
+    focusedCandidates = [...focusedDiscovery.puzzles];
+    service.abandonSprint(new Date(discoveryStartedAtMs + 1_000).toISOString());
+    discoverySessionId = undefined;
+
+    service.setPuzzleSelectionScopeIds(mixedCandidateIds);
+    const mixedDiscovery = service.startSprint({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      targetCorrect: 15,
+      maxMistakes: 15,
+      minRating: 850,
+      maxRating: 1_000,
+      puzzleSelectionSeed: "mate-in-2-focused-run-mixed-controls-v1"
+    }, new Date(discoveryStartedAtMs + 2_000).toISOString());
+    discoverySessionId = mixedDiscovery.id;
+    mixedCandidates = [...mixedDiscovery.puzzles];
+    service.abandonSprint(new Date(discoveryStartedAtMs + 3_000).toISOString());
+    discoverySessionId = undefined;
+  } finally {
+    const active = service.getActiveSprint();
+    if (
+      active !== undefined &&
+      active.id === discoverySessionId &&
+      (active.status === "active" || active.status === "paused")
+    ) {
+      service.abandonSprint(new Date(discoveryStartedAtMs + 4_000).toISOString());
+    }
+    configureMobilePracticePuzzleSource(service, DEFAULT_PUZZLE_SOURCE);
+  }
+
+  const evidencePuzzles = focusedCandidates.slice(0, 12).map((puzzle) => ({
+    ...puzzle,
+    themes: ["mateIn2"]
+  }));
+  if (evidencePuzzles.length < 12 || focusedCandidates.length < 27 || mixedCandidates.length < 15) {
+    throw new Error(
+      "Mate in 2 Focused Run fixture needs 27 focused and 15 mixed pack-backed puzzles"
+    );
+  }
+
+  service.loadFixturePuzzles(evidencePuzzles);
+  const exported = service.exportLocalData();
+  const config = defaultSprintConfig("standard");
   const sprintSessions: typeof exported.sprintSessions = [];
   const attempts: typeof exported.attempts = [];
 
@@ -449,7 +510,47 @@ export function injectMateIn2FocusedRun(
       focusedRunSeen: true
     }
   });
-  return service.startFocusedRun("line", now, fixtureId);
+  const prepared = service.prepareFocusedRun("line", now, fixtureId);
+  if (prepared.status !== "ready") {
+    throw new Error(`Mate in 2 Focused Run fixture is unavailable: ${prepared.reason}`);
+  }
+  const focusedPuzzleCount = prepared.prepared.plan.reasons.reduce(
+    (count, reason) => count + reason.count,
+    0
+  );
+  const mixedPuzzleCount = prepared.prepared.plan.mixedControlCount;
+  const deterministicPuzzles = weaveFocusedRunFixturePuzzles(
+    focusedCandidates.slice(12, 12 + focusedPuzzleCount),
+    mixedCandidates.slice(0, mixedPuzzleCount)
+  );
+  if (deterministicPuzzles.length !== prepared.prepared.puzzles.length) {
+    throw new Error("Mate in 2 Focused Run fixture allocation is incomplete");
+  }
+  return service.startPreparedFocusedRun({
+    ...prepared.prepared,
+    puzzles: deterministicPuzzles
+  }, now);
+}
+
+function weaveFocusedRunFixturePuzzles(
+  focused: readonly Puzzle[],
+  mixed: readonly Puzzle[]
+): Puzzle[] {
+  const woven: Puzzle[] = [];
+  let focusedIndex = 0;
+  let mixedIndex = 0;
+  const total = focused.length + mixed.length;
+  for (let index = 0; index < total; index += 1) {
+    const expectedMixedCount = Math.floor(((index + 1) * mixed.length) / total);
+    if (mixedIndex < expectedMixedCount) {
+      woven.push(mixed[mixedIndex] as Puzzle);
+      mixedIndex += 1;
+    } else {
+      woven.push(focused[focusedIndex] as Puzzle);
+      focusedIndex += 1;
+    }
+  }
+  return woven;
 }
 
 export function createMobilePracticeTestControls(service: PracticeService):
