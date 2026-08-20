@@ -1,10 +1,12 @@
 // Mobile platform storage composition belongs outside the backend/domain seam.
 import {
+  defaultSprintConfig,
   tacticalThemeFrequencyAtRating,
   tacticalThemeInventoryUpperBound,
   type Puzzle,
   type PuzzlePackManifest,
-  type SprintMode
+  type SprintMode,
+  type SprintState
 } from "../../../../packages/core/src/index.ts";
 import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
 import { PackBackedPracticeStore } from "../../../../packages/storage/src/pack-backed-practice-store.ts";
@@ -28,6 +30,7 @@ import {
   obsoleteBundledPuzzlePackDatabaseNames
 } from "../backend/mobileDatabaseLayout.ts";
 import { productionTacticalProfileCalibration } from "../backend/tacticalProfileCalibration.ts";
+import { arePracticeTestControlsEnabled } from "../releaseConfig.ts";
 
 const bundledCoreManifest = require("../../../../fixtures/puzzles/bundled-core-pack.manifest.json") as PuzzlePackManifest;
 const regressionPuzzles = require("../../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];
@@ -342,6 +345,122 @@ export function configureMobilePracticePuzzleSource(
     seededPuzzleSources.set(service, seededSources);
   }
   service.setPuzzleSelectionScopeIds(puzzles.map((puzzle) => puzzle.id));
+}
+
+export function injectMateIn2FocusedRun(
+  service: PracticeService,
+  now = new Date().toISOString()
+): SprintState {
+  const evidencePuzzles = bundledCoreFixturePuzzles()
+    .filter((puzzle) =>
+      puzzle.themes.includes("mateIn2")
+      && puzzle.rating >= 850
+      && puzzle.rating <= 1_000
+      && puzzle.solutionMoves.length >= 4
+    )
+    .slice(0, 12)
+    .map((puzzle) => ({
+      ...puzzle,
+      themes: ["mateIn2"]
+    }));
+  if (evidencePuzzles.length < 12) {
+    throw new Error("Mate in 2 Focused Run fixture needs 12 evidence puzzles");
+  }
+
+  service.loadFixturePuzzles(evidencePuzzles);
+  const exported = service.exportLocalData();
+  const config = defaultSprintConfig("standard");
+  const nowMs = Date.parse(now);
+  if (!Number.isFinite(nowMs)) {
+    throw new Error(`Mate in 2 Focused Run fixture received invalid time: ${now}`);
+  }
+  const fixtureId = `mate-in-2-focus-${Math.trunc(nowMs)}`;
+  const sprintSessions: typeof exported.sprintSessions = [];
+  const attempts: typeof exported.attempts = [];
+
+  for (let sessionIndex = 0; sessionIndex < 3; sessionIndex += 1) {
+    const completedAt = new Date(
+      nowMs - (12 - sessionIndex * 4) * 24 * 60 * 60 * 1_000
+    ).toISOString();
+    const startedAt = new Date(Date.parse(completedAt) - 4 * 60 * 1_000).toISOString();
+    const sessionId = `${fixtureId}-session-${sessionIndex}`;
+    sprintSessions.push({
+      id: sessionId,
+      mode: "standard",
+      ratingKey: config.ratingKey,
+      ratingGeneration: 0,
+      startedAt,
+      completedAt,
+      status: "failed",
+      correctCount: 0,
+      mistakeCount: 4,
+      ratingBefore: 925,
+      ratingAfter: 925,
+      config
+    });
+    for (let offset = 0; offset < 4; offset += 1) {
+      const puzzle = evidencePuzzles[sessionIndex * 4 + offset];
+      if (!puzzle) {
+        throw new Error("Mate in 2 Focused Run fixture evidence is incomplete");
+      }
+      attempts.push({
+        id: `${fixtureId}-attempt-${sessionIndex * 4 + offset}`,
+        source: "sprint",
+        sessionId,
+        puzzleId: puzzle.id,
+        mode: "standard",
+        ratingKey: config.ratingKey,
+        result: "wrong",
+        submittedMove: "a1a2",
+        expectedMove: puzzle.solutionMoves[1] ?? puzzle.solutionMoves[0] ?? "a1a2",
+        startedAt: completedAt,
+        completedAt,
+        elapsedMs: 10_000,
+        ratingBefore: 925
+      });
+    }
+  }
+
+  const currentRating = service.getRating(config.ratingKey);
+  service.importLocalData({
+    ...exported,
+    ratings: [
+      ...exported.ratings.filter((rating) => rating.key !== config.ratingKey),
+      {
+        ...currentRating,
+        rating: 925,
+        ratingDeviation: 80,
+        volatility: 0.06,
+        games: Math.max(12, currentRating.games)
+      }
+    ],
+    attempts: [...exported.attempts, ...attempts],
+    sprintSessions: [...exported.sprintSessions, ...sprintSessions]
+  });
+  service.saveSettings({
+    ...service.getSettings(),
+    sync: {
+      iCloudEnabled: false
+    },
+    sprintGuides: {
+      ...service.getSettings().sprintGuides,
+      rulesSeen: true,
+      activeSessionSeen: true,
+      focusedRunSeen: true
+    }
+  });
+  return service.startFocusedRun("line", now, fixtureId);
+}
+
+export function createMobilePracticeTestControls(service: PracticeService):
+  | { injectMateIn2FocusedRun: (now?: string) => SprintState }
+  | undefined {
+  if (!arePracticeTestControlsEnabled()) {
+    return undefined;
+  }
+  return {
+    injectMateIn2FocusedRun: (now) => injectMateIn2FocusedRun(service, now)
+  };
 }
 
 export function seededPuzzleCount(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): number {

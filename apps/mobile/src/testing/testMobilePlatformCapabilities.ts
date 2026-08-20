@@ -4,6 +4,7 @@ import type { ICloudProgressSyncClient } from '../platform/iCloudProgressSync.ts
 import type { ICloudSyncDiagnosticsClient } from '../platform/iCloudSyncDiagnostics.ts';
 import {
   configureMobilePracticePuzzleSource,
+  createMobilePracticeTestControls,
   createMobilePracticeService,
   type MobilePuzzleSource,
 } from '../platform/mobilePractice.ts';
@@ -53,6 +54,7 @@ export function createTestMobilePlatformCapabilities(
   const supportsPuzzleSourceConfiguration =
     overrides.practiceService === undefined ||
     overrides.configurePuzzleSource !== undefined;
+  const testControls = createMobilePracticeTestControls(service);
 
   return {
     storage: {
@@ -65,6 +67,7 @@ export function createTestMobilePlatformCapabilities(
           }
         : {}),
     },
+    ...(testControls ? { testControls } : {}),
     progressProtection: overrides.progressProtection ?? { kind: 'icloud_sync' },
     progressSync: {
       client: overrides.iCloudProgressSyncClient ?? null,

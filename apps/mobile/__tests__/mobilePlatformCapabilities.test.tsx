@@ -184,4 +184,49 @@ describe('mobile platform capabilities', () => {
       buildNumber: 'test-build',
     });
   });
+
+  it('exposes the Mate in 2 Focused Run injector only to an explicit test harness', () => {
+    const globals = globalThis as typeof globalThis & {
+      __CHESSTICIZE_ENABLE_TEST_CONTROLS__?: boolean;
+      __DEV__?: boolean;
+    };
+    const previousDev = globals.__DEV__;
+    const previousTestControls = globals.__CHESSTICIZE_ENABLE_TEST_CONTROLS__;
+    const service = createMobilePracticeService();
+
+    try {
+      globals.__DEV__ = false;
+      globals.__CHESSTICIZE_ENABLE_TEST_CONTROLS__ = false;
+      expect(
+        composeIOSMobilePlatformCapabilities(service, installedApplicationMetadata).testControls
+      ).toBeUndefined();
+
+      globals.__CHESSTICIZE_ENABLE_TEST_CONTROLS__ = true;
+      const capabilities = composeIOSMobilePlatformCapabilities(
+        service,
+        installedApplicationMetadata,
+      );
+      const focused = capabilities.testControls?.injectMateIn2FocusedRun(
+        '2026-08-19T12:00:00.000Z'
+      );
+
+      expect(focused).toMatchObject({
+        status: 'active',
+        correctCount: 0,
+        config: {
+          mode: 'standard',
+          maxAttempts: 15,
+          ratingPolicy: 'unrated',
+          tacticalFocus: {
+            taskFamily: 'line',
+          },
+        },
+      });
+      expect(focused?.puzzles).toHaveLength(15);
+      expect(focused?.config.tacticalFocus?.themes).toContain('mateIn2');
+    } finally {
+      globals.__DEV__ = previousDev;
+      globals.__CHESSTICIZE_ENABLE_TEST_CONTROLS__ = previousTestControls;
+    }
+  });
 });

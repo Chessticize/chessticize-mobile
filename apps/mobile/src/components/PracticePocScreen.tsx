@@ -736,6 +736,7 @@ export function PracticePocScreen({
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = platformCapabilities.storage.practiceService;
   const configurePuzzleSource = platformCapabilities.storage.configurePuzzleSource;
+  const injectMateIn2FocusedRun = platformCapabilities.testControls?.injectMateIn2FocusedRun;
   const stockfish = platformCapabilities.stockfish;
   const scheduler = platformCapabilities.reminders.scheduler;
   const notificationClient = platformCapabilities.reminders.notificationClient;
@@ -2419,6 +2420,18 @@ export function PracticePocScreen({
     // Review aggregates. Avoid pulling every persisted attempt/session back
     // into the UI at this latency-sensitive boundary.
     internalRunManagement.refresh();
+  }
+
+  function injectTestMateIn2FocusedRun(): void {
+    if (!injectMateIn2FocusedRun) {
+      return;
+    }
+    setError(null);
+    try {
+      adoptStartedSprint(injectMateIn2FocusedRun(captureLiveNowIso()));
+    } catch (caught) {
+      setError(errorMessage(caught));
+    }
   }
 
   function changePuzzleSource(nextSource: MobilePuzzleSource): void {
@@ -5462,6 +5475,7 @@ export function PracticePocScreen({
                   <TestPuzzleSourceControl
                     source={puzzleSource}
                     onChange={changePuzzleSource}
+                    onInjectMateIn2FocusedRun={injectTestMateIn2FocusedRun}
                   />
                 ) : null}
               </>
@@ -10466,10 +10480,12 @@ function PreviousCustomConfigRow({
 
 function TestPuzzleSourceControl({
   source,
-  onChange
+  onChange,
+  onInjectMateIn2FocusedRun
 }: {
   source: MobilePuzzleSource;
   onChange: (next: MobilePuzzleSource) => void;
+  onInjectMateIn2FocusedRun?: () => void;
 }): React.JSX.Element {
   return (
     <View style={styles.testPanel} testID="test-puzzle-source-control">
@@ -10485,6 +10501,14 @@ function TestPuzzleSourceControl({
           />
         ))}
       </View>
+      {onInjectMateIn2FocusedRun ? (
+        <OptionButton
+          active={false}
+          label="Inject Mate in 2 Focused Run"
+          testID="test-focused-run-inject-mate-in-2"
+          onPress={onInjectMateIn2FocusedRun}
+        />
+      ) : null}
     </View>
   );
 }

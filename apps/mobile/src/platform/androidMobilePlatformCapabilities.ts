@@ -2,6 +2,7 @@
 import type { PracticeService } from '../../../../packages/storage/src/practice-service.ts';
 import {
   configureMobilePracticePuzzleSource,
+  createMobilePracticeTestControls,
   createPersistentMobilePracticeService,
   createPersistentMobilePracticeServiceSync,
   getPersistentMobileProgressDatabasePath,
@@ -41,12 +42,14 @@ export function composeAndroidMobilePlatformCapabilities(
   applicationMetadata: MobileApplicationMetadata = readNativeApplicationMetadata(),
   progressDatabasePath: string | undefined = getPersistentMobileProgressDatabasePath(),
 ): MobilePlatformCapabilities {
+  const testControls = createMobilePracticeTestControls(service);
   return {
     storage: {
       practiceService: service,
       configurePuzzleSource: (source, mode) =>
         configureMobilePracticePuzzleSource(service, source, mode),
     },
+    ...(testControls ? { testControls } : {}),
     progressProtection: {
       kind: 'android_managed_backup',
     },
