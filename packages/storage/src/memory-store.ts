@@ -323,6 +323,13 @@ export class MemoryStore implements PracticeStore {
       .map(cloneSprintState);
   }
 
+  listResumableFocusedSprints(): SprintState[] {
+    return [...this.sessions.values()]
+      .filter((state) => state.config.tacticalFocus !== undefined && isOpenSprint(state))
+      .sort(compareResumableFocusedSprints)
+      .map(cloneSprintState);
+  }
+
   listSurvivalBests(): SurvivalBestRecord[] {
     return [...this.survivalBests.values()]
       .map((record) => ({ ...record }))
@@ -1192,4 +1199,13 @@ function isOpenSprint(session: SprintState): boolean {
 
 function cloneSprintState(state: SprintState): SprintState {
   return JSON.parse(JSON.stringify(state)) as SprintState;
+}
+
+function compareResumableFocusedSprints(left: SprintState, right: SprintState): number {
+  return focusedSprintActivityAt(right).localeCompare(focusedSprintActivityAt(left)) ||
+    right.id.localeCompare(left.id);
+}
+
+function focusedSprintActivityAt(state: SprintState): string {
+  return state.pausedAt ?? state.currentPuzzleStartedAt ?? state.startedAt;
 }

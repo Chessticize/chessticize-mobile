@@ -291,7 +291,7 @@ interface SprintSessionExportRow {
   runName?: string | null;
 }
 
-interface SurvivalResumeRow {
+interface SprintResumeRow {
   id: string;
   resumeJson: string;
 }
@@ -1149,7 +1149,7 @@ export class SyncSQLiteStore implements PracticeStore {
           ...(state.ratingDeviationBefore === undefined ? {} : { ratingDeviationBefore: state.ratingDeviationBefore }),
           ...(state.volatilityBefore === undefined ? {} : { volatilityBefore: state.volatilityBefore })
         }),
-        survivalResumeJson(state),
+        resumableSprintJson(state),
         state.startedAt,
         state.deadlineAt,
         state.status,
@@ -1185,7 +1185,7 @@ export class SyncSQLiteStore implements PracticeStore {
         state.correctCount,
         state.mistakeCount,
         state.ratingAfter ?? null,
-        survivalResumeJson(state),
+        resumableSprintJson(state),
         state.id
       );
     const isNowEligible =
@@ -1203,8 +1203,14 @@ export class SyncSQLiteStore implements PracticeStore {
        WHERE id = ?
          AND status IN ('active', 'paused')
          AND resume_json IS NOT NULL`
-    ).get(id) as SurvivalResumeRow | undefined;
-    return row ? survivalStateFromResumeJson(row.resumeJson, row.id) : undefined;
+    ).get(id) as SprintResumeRow | undefined;
+    if (!row) {
+      return undefined;
+    }
+    const state = sprintStateFromResumeJson(row.resumeJson, row.id);
+    return state.config.survival !== undefined && state.survival !== undefined
+      ? state
+      : undefined;
   }
 
   listResumableSurvivalSprints(): SprintState[] {
@@ -1213,14 +1219,28 @@ export class SyncSQLiteStore implements PracticeStore {
        FROM sprint_sessions
        WHERE status IN ('active', 'paused')
          AND resume_json IS NOT NULL`
-    ).all() as SurvivalResumeRow[];
+    ).all() as SprintResumeRow[];
     return rows
-      .map((row) => survivalStateFromResumeJson(row.resumeJson, row.id))
+      .map((row) => sprintStateFromResumeJson(row.resumeJson, row.id))
+      .filter((state) => state.config.survival !== undefined && state.survival !== undefined)
       .sort((left, right) => (
         (right.survival?.lastTouchedAt ?? right.startedAt).localeCompare(
           left.survival?.lastTouchedAt ?? left.startedAt
         ) || right.id.localeCompare(left.id)
       ));
+  }
+
+  listResumableFocusedSprints(): SprintState[] {
+    const rows = this.db.prepare(
+      `SELECT id, resume_json AS resumeJson
+       FROM sprint_sessions
+       WHERE status IN ('active', 'paused')
+         AND resume_json IS NOT NULL`
+    ).all() as SprintResumeRow[];
+    return rows
+      .map((row) => sprintStateFromResumeJson(row.resumeJson, row.id))
+      .filter((state) => state.config.tacticalFocus !== undefined)
+      .sort(compareResumableFocusedSprints);
   }
 
   listSurvivalBests(): SurvivalBestRecord[] {
@@ -4318,31 +4338,42 @@ function exportedSprintSessionFromRow(row: SprintSessionExportRow): ExportedSpri
   };
 }
 
-function survivalResumeJson(state: SprintState): string | null {
-  return state.config.survival !== undefined &&
-    state.survival !== undefined &&
-    (state.status === "active" || state.status === "paused")
+function resumableSprintJson(state: SprintState): string | null {
+  const supportsResume =
+    (state.config.survival !== undefined && state.survival !== undefined) ||
+    state.config.tacticalFocus !== undefined;
+  return supportsResume && (state.status === "active" || state.status === "paused")
     ? JSON.stringify(state)
     : null;
 }
 
-function survivalStateFromResumeJson(value: string, expectedId: string): SprintState {
+function sprintStateFromResumeJson(value: string, expectedId: string): SprintState {
   const parsed = JSON.parse(value) as unknown;
   if (!isJsonObject(parsed)) {
-    throw new Error(`Stored Survival Run ${expectedId} is not an object`);
+    throw new Error(`Stored resumable Run ${expectedId} is not an object`);
   }
   const state = parsed as unknown as SprintState;
+  const isSurvival = state.config?.survival !== undefined && state.survival !== undefined;
+  const isFocused = state.config?.tacticalFocus !== undefined;
   if (
     state.id !== expectedId ||
     (state.status !== "active" && state.status !== "paused") ||
-    !state.config?.survival ||
-    !state.survival ||
+    (!isSurvival && !isFocused) ||
     !Array.isArray(state.puzzles) ||
     !state.currentPuzzle
   ) {
-    throw new Error(`Stored Survival Run ${expectedId} is incomplete`);
+    throw new Error(`Stored resumable Run ${expectedId} is incomplete`);
   }
   return state;
+}
+
+function compareResumableFocusedSprints(left: SprintState, right: SprintState): number {
+  return focusedSprintActivityAt(right).localeCompare(focusedSprintActivityAt(left)) ||
+    right.id.localeCompare(left.id);
+}
+
+function focusedSprintActivityAt(state: SprintState): string {
+  return state.pausedAt ?? state.currentPuzzleStartedAt ?? state.startedAt;
 }
 
 function practiceRunFromRow(row: PracticeRunRow): PracticeRunRecord {

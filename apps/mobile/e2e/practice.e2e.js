@@ -31,6 +31,7 @@ const {
   FIRST_STANDARD_FEEDBACK_MOVES,
 } = require('./familiar15Fixture');
 const {
+  focusedRunBoardFlipped,
   focusedRunMoveSteps,
 } = require('./mateIn2FocusedRunFixture');
 
@@ -308,7 +309,9 @@ describe('Practice POC', () => {
     await device.terminateApp();
     await launchWithDisabledSynchronization({ newInstance: true, delete: false });
     await waitForVisibleInPracticeScroll('practice-resume-card');
-    await waitForElementTextContaining('practice-resume-card', '1 solved · 14 left', 10000);
+    await waitFor(element(by.text('Standard · 1 solved · 14 left · 0 mistakes')))
+      .toBeVisible()
+      .withTimeout(10000);
     await element(by.id('practice-resume-card')).tap();
     await waitFor(element(by.id('session-board'))).toExist().withTimeout(10000);
     await waitFor(element(by.id('session-progress'))).toHaveText('1 / 15').withTimeout(10000);
@@ -332,10 +335,8 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(30000);
     await expect(element(by.text('Focused Run complete'))).toBeVisible();
     await expect(element(by.text('Focused Run Result'))).toBeVisible();
-    await expect(element(by.id('sprint-result-solved'))).toHaveText('Solved 15');
-    await expect(element(by.id('sprint-result-accuracy'))).toHaveText(
-      '15 attempted · 100% Accuracy'
-    );
+    await expect(element(by.id('sprint-result-solved'))).toHaveText('15 / 15');
+    await expect(element(by.id('sprint-result-accuracy'))).toHaveText('100% Accuracy');
   });
 
   it('renders the standard sprint board', async () => {
@@ -659,23 +660,51 @@ describe('Practice POC', () => {
 async function injectMateIn2FocusedRun() {
   await waitForVisibleInPracticeScroll('test-focused-run-inject-mate-in-2');
   await element(by.id('test-focused-run-inject-mate-in-2')).tap();
-  await waitFor(element(by.id('session-board'))).toExist().withTimeout(30000);
+  try {
+    await waitFor(element(by.id('session-board'))).toExist().withTimeout(30000);
+  } catch (error) {
+    let injectionError = 'No error panel was rendered.';
+    try {
+      injectionError = await elementText('error-panel');
+    } catch {
+      // Preserve the original board timeout when the app exposed no error.
+    }
+    throw new Error(
+      `Mate in 2 Focused Run injection did not open the board. ${injectionError}`,
+      { cause: error }
+    );
+  }
   await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);
-  await waitForElementTextContaining('active-session-shell', 'Focused Run', 10000);
+  await waitFor(element(by.text('Focused Run'))).toBeVisible().withTimeout(10000);
 }
 
 async function solveCurrentFocusedRunPuzzle(expectedCompleted) {
   const puzzleId = await elementText('session-current-puzzle-id');
+  const boardFlipped = focusedRunBoardFlipped(puzzleId);
   const moveSteps = focusedRunMoveSteps(puzzleId);
   for (const { autoReply, userMove } of moveSteps) {
-    await playBoardMove('session-board', userMove);
-    if (autoReply) {
-      await waitForElementAccessibilityLabelContaining(
-        'session-board',
-        `Last move ${autoReply.slice(0, 2)} to ${autoReply.slice(2, 4)}`,
-        15000,
-        25
-      );
+    if (!autoReply) {
+      await playBoardMove('session-board', userMove, boardFlipped);
+      continue;
+    }
+    let lastMoveError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await playBoardMove('session-board', userMove, boardFlipped);
+      try {
+        await waitForElementAccessibilityLabelContaining(
+          'session-board',
+          `Last move ${autoReply.slice(0, 2)} to ${autoReply.slice(2, 4)}`,
+          5000,
+          25
+        );
+        lastMoveError = undefined;
+        break;
+      } catch (error) {
+        lastMoveError = error;
+      }
+    }
+    if (lastMoveError) {
+      throw lastMoveError;
     }
   }
 

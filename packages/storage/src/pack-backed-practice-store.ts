@@ -177,6 +177,10 @@ export class PackBackedPracticeStore implements PracticeStore {
     return this.userStore.listResumableSurvivalSprints();
   }
 
+  listResumableFocusedSprints(): SprintState[] {
+    return this.userStore.listResumableFocusedSprints();
+  }
+
   listSurvivalBests(): SurvivalBestRecord[] {
     return this.userStore.listSurvivalBests();
   }
