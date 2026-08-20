@@ -30,6 +30,7 @@ import {
   createMobilePracticeService,
   configureMobilePracticePuzzleSource,
   getBundledCorePackManifest,
+  injectMateIn2FocusedRun,
   seededPuzzleCount,
   seededUniquePositionCount
 } from "../src/platform/mobilePractice";
@@ -2572,7 +2573,7 @@ describe("PracticePocScreen", () => {
       "Choose the best move"
     );
     expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toContain(
-      "Arrow Duel sprint"
+      "Focused Run"
     );
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 15");
 
@@ -7728,12 +7729,73 @@ describe("PracticePocScreen", () => {
     expect(testIdOrder(renderer, "practice-resume-card", "practice-mode-standard")).toBeLessThan(0);
     expect(collectText(findByTestId(renderer, "practice-resume-card"))).toContain("Resume sprint");
     expect(collectText(findByTestId(renderer, "practice-resume-card"))).toContain("Standard · 0 solved · 15 left · 0 mistakes");
+    expect(findByTestId(renderer, "practice-resume-card").props.accessibilityLabel)
+      .toBe("Resume Standard sprint");
     expect(() => findByTestId(renderer, "session-board")).toThrow();
 
     press(renderer, "practice-resume-card");
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 15");
     expect(() => findByTestId(renderer, "practice-resume-card")).toThrow();
+  });
+
+  it("keeps an ordinary Arrow Duel resume card distinct from a Focused Run", () => {
+    jest.setSystemTime(new Date("2026-08-19T12:00:05.000Z"));
+    const service = createMobilePracticeService("familiar15");
+    service.startSprint({
+      mode: "arrow_duel",
+      durationSeconds: 300,
+      perPuzzleSeconds: 30,
+      targetCorrect: 15,
+      maxMistakes: 3
+    }, "2026-08-19T12:00:00.000Z");
+    const renderer = renderScreen({ practiceService: service });
+
+    const resumeCard = findByTestId(renderer, "practice-resume-card");
+    expect(collectText(resumeCard)).toContain("Resume sprint");
+    expect(collectText(resumeCard)).toContain(
+      "Arrow Duel · 0 solved · 15 left · 0 mistakes"
+    );
+    expect(resumeCard.props.accessibilityLabel).toBe("Resume Arrow Duel sprint");
+  });
+
+  it("identifies a resumed and paused tactical session as a Focused Run", async () => {
+    jest.setSystemTime(new Date("2026-08-19T12:00:05.000Z"));
+    const service = createMobilePracticeService();
+    injectMateIn2FocusedRun(service, "2026-08-19T12:00:00.000Z");
+    const renderer = renderScreen({ practiceService: service });
+
+    const resumeCard = findByTestId(renderer, "practice-resume-card");
+    expect(collectText(resumeCard)).toContain("Resume Focused Run");
+    expect(collectText(resumeCard)).toContain(
+      "Focused Run · 0 completed · 15 left · 0 mistakes"
+    );
+    expect(resumeCard.props.accessibilityLabel).toBe(
+      "Resume Focused Run, 0 completed, 15 left, 0 mistakes"
+    );
+
+    press(renderer, "practice-resume-card");
+    await settleEntryPreview();
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel)
+      .toContain("Focused Run.");
+    expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel)
+      .toContain("0 completed, 0 mistakes.");
+    expect(findByTestId(renderer, "session-pause").props.accessibilityLabel)
+      .toBe("Pause Focused Run");
+
+    press(renderer, "session-pause");
+    const pausedPanel = findByTestId(renderer, "paused-session-panel");
+    expect(collectText(pausedPanel)).toContain("Focused Run paused");
+    expect(collectText(pausedPanel)).toContain(
+      "0 completed · 15 left · 0 mistakes"
+    );
+    expect(pausedPanel.props.accessibilityLabel).toBe(
+      "Paused Focused Run, 0 completed, 15 left, 0 mistakes"
+    );
+    expect(findByTestId(renderer, "paused-session-abandon").props.accessibilityLabel)
+      .toBe("Abandon paused Focused Run");
+    expect(findByTestId(renderer, "paused-session-resume").props.accessibilityLabel)
+      .toBe("Resume paused Focused Run");
   });
 
   it("opens custom setup from the compact custom row instead of starting a scored sprint", () => {
