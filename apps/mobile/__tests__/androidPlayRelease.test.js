@@ -677,7 +677,7 @@ function signedAabFixture({ appendUnsigned = false, addUnexpectedSigner = false 
 }
 
 describe('Android Play release contract', () => {
-  it('pins the proposed Play release to public version 1.5.1 build 19', () => {
+  it('pins the proposed Play release to public version 1.5.2 build 20', () => {
     const sourceTag = canonicalAndroidSourceTag(
       releaseVersion.publicVersion,
       releaseVersion.androidVersionCode,
@@ -707,11 +707,11 @@ describe('Android Play release contract', () => {
 
     expect(releaseVersion).toEqual(
       expect.objectContaining({
-        publicVersion: '1.5.1',
-        androidVersionCode: 19,
+        publicVersion: '1.5.2',
+        androidVersionCode: 20,
       }),
     );
-    expect(sourceTag).toBe('android-v1.5.1-build-19');
+    expect(sourceTag).toBe('android-v1.5.2-build-20');
     expect(ownerEvidenceExample.candidate).toEqual(
       expect.objectContaining(expectedIdentityBinding),
     );
@@ -724,10 +724,10 @@ describe('Android Play release contract', () => {
       ownerEvidenceExample.sourceRelease.reference.endsWith(sourceTag),
     ).toBe(true);
     expect(runbook).toContain(
-      'Android version code: `apps/mobile/release-version.json` (`19`)',
+      'Android version code: `apps/mobile/release-version.json` (`20`)',
     );
-    expect(releaseNote).toContain('Public version: `1.5.1`');
-    expect(releaseNote).toContain('Build or version code: `19`');
+    expect(releaseNote).toContain('Public version: `1.5.2`');
+    expect(releaseNote).toContain('Build or version code: `20`');
     expect(releaseNote).toContain(`Source tag: \`${sourceTag}\``);
     const storeCopy = releaseNote.match(
       /## Store copy \(`en-US`\)\n\n```text\n([\s\S]+?)\n```/,
@@ -735,12 +735,9 @@ describe('Android Play release contract', () => {
     expect(storeCopy).toBeDefined();
     expect(Array.from(storeCopy).length).toBeLessThanOrEqual(300);
     expect(storeCopy).not.toMatch(/https?:\/\//u);
-    expect(storeCopy).toContain('Today to review');
-    expect(storeCopy).toContain('Completed today');
-    expect(storeCopy).toContain('first Survival best');
-    expect(storeCopy).toContain(
-      'Puzzle and Arrow Duel bests stay separate by level',
-    );
+    expect(storeCopy).toContain('continue normally after your first answer');
+    expect(storeCopy).toContain('without losing an unfinished Focused Run');
+    expect(storeCopy).toContain('returns paused at the puzzle where you left off');
     expect(storeCopy).not.toContain('Progress Backup');
     expect(releaseNote).not.toMatch(/Rating history/i);
     expect(storeCopy).not.toMatch(/across devices|cross-platform sync/i);

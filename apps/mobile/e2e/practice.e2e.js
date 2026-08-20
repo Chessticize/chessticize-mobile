@@ -309,7 +309,7 @@ describe('Practice POC', () => {
     await device.terminateApp();
     await launchWithDisabledSynchronization({ newInstance: true, delete: false });
     await waitForVisibleInPracticeScroll('practice-resume-card');
-    await waitFor(element(by.text('Standard · 1 solved · 14 left · 0 mistakes')))
+    await waitFor(element(by.text('Focused Run · 1 completed · 14 left · 0 mistakes')))
       .toBeVisible()
       .withTimeout(10000);
     await element(by.id('practice-resume-card')).tap();

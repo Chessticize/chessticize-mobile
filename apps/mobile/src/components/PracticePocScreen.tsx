@@ -4885,7 +4885,9 @@ export function PracticePocScreen({
     : boardFeedback
       ? `${boardFeedback.result === "correct" ? "Correct move" : "Wrong move"}. ${boardFeedback.puzzleSolved ? "Puzzle complete." : "Continue the puzzle."}`
       : isActive && displayedSideToMove
-        ? `${personalBestActivePresentation ? "Survival" : `${modeLabel(mode)} sprint`}. ${sideToMoveAccessibilityLabel(displayedSideToMove)}. ${state?.correctCount ?? 0} solved, ${state?.mistakeCount ?? 0} mistakes.`
+        ? state?.config.tacticalFocus
+          ? `Focused Run. ${sideToMoveAccessibilityLabel(displayedSideToMove)}. ${(state.correctCount + state.mistakeCount)} completed, ${state.mistakeCount} mistakes.`
+          : `${personalBestActivePresentation ? "Survival" : `${modeLabel(mode)} sprint`}. ${sideToMoveAccessibilityLabel(displayedSideToMove)}. ${state?.correctCount ?? 0} solved, ${state?.mistakeCount ?? 0} mistakes.`
         : `${screenTitle} screen`;
 
   return (
@@ -9686,11 +9688,21 @@ function ResumeSprintCard({
   onResume: () => void;
   sprint: SprintState;
 }): React.JSX.Element {
-  const remaining = Math.max(0, sprint.config.targetCorrect - sprint.correctCount);
+  const isTacticalFocus = sprint.config.tacticalFocus !== undefined;
+  const completedCount = sprint.correctCount + sprint.mistakeCount;
+  const remaining = Math.max(
+    0,
+    (isTacticalFocus
+      ? sprint.config.maxAttempts ?? sprint.config.targetCorrect
+      : sprint.config.targetCorrect) -
+      (isTacticalFocus ? completedCount : sprint.correctCount)
+  );
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Resume ${modeLabel(sprint.config.mode)} sprint`}
+      accessibilityLabel={isTacticalFocus
+        ? `Resume Focused Run, ${completedCount} completed, ${remaining} left, ${sprint.mistakeCount} mistakes`
+        : `Resume ${modeLabel(sprint.config.mode)} sprint`}
       style={styles.resumeSprintCard}
       testID="practice-resume-card"
       onPress={onResume}
@@ -9699,9 +9711,13 @@ function ResumeSprintCard({
         <PracticeModeGlyph mode={sprint.config.mode} />
       </View>
       <View style={styles.resumeSprintCopy}>
-        <Text style={styles.sectionLabel}>Resume sprint</Text>
+        <Text style={styles.sectionLabel}>
+          {isTacticalFocus ? "Resume Focused Run" : "Resume sprint"}
+        </Text>
         <Text style={styles.helperText}>
-          {modeLabel(sprint.config.mode)} · {sprint.correctCount} solved · {remaining} left · {sprint.mistakeCount} mistakes
+          {isTacticalFocus
+            ? `Focused Run · ${completedCount} completed · ${remaining} left · ${sprint.mistakeCount} mistakes`
+            : `${modeLabel(sprint.config.mode)} · ${sprint.correctCount} solved · ${remaining} left · ${sprint.mistakeCount} mistakes`}
         </Text>
       </View>
       <Text style={styles.resumeSprintAction}>Resume</Text>
@@ -9718,23 +9734,39 @@ function PausedSessionPanel({
   onResume: () => void;
   state: SprintState;
 }): React.JSX.Element {
-  const remaining = Math.max(0, state.config.targetCorrect - state.correctCount);
+  const isTacticalFocus = state.config.tacticalFocus !== undefined;
+  const completedCount = state.correctCount + state.mistakeCount;
+  const remaining = Math.max(
+    0,
+    (isTacticalFocus
+      ? state.config.maxAttempts ?? state.config.targetCorrect
+      : state.config.targetCorrect) -
+      (isTacticalFocus ? completedCount : state.correctCount)
+  );
   return (
     <View
-      accessibilityLabel={`Paused ${modeLabel(state.config.mode)} sprint, ${state.correctCount} solved, ${remaining} left`}
+      accessibilityLabel={isTacticalFocus
+        ? `Paused Focused Run, ${completedCount} completed, ${remaining} left, ${state.mistakeCount} mistakes`
+        : `Paused ${modeLabel(state.config.mode)} sprint, ${state.correctCount} solved, ${remaining} left`}
       style={styles.pausedSessionPanel}
       testID="paused-session-panel"
     >
       <View style={styles.pausedSessionCopy}>
-        <Text style={styles.sectionLabel}>Sprint paused</Text>
+        <Text style={styles.sectionLabel}>
+          {isTacticalFocus ? "Focused Run paused" : "Sprint paused"}
+        </Text>
         <Text style={styles.helperText}>
-          {modeLabel(state.config.mode)} · {state.correctCount} solved · {remaining} left · {state.mistakeCount} mistakes
+          {isTacticalFocus
+            ? `${completedCount} completed · ${remaining} left · ${state.mistakeCount} mistakes`
+            : `${modeLabel(state.config.mode)} · ${state.correctCount} solved · ${remaining} left · ${state.mistakeCount} mistakes`}
         </Text>
       </View>
       <View style={styles.pausedSessionActions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Abandon paused sprint"
+          accessibilityLabel={isTacticalFocus
+            ? "Abandon paused Focused Run"
+            : "Abandon paused sprint"}
           testID="paused-session-abandon"
           style={styles.secondaryButton}
           onPress={onAbandon}
@@ -9743,7 +9775,9 @@ function PausedSessionPanel({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Resume paused sprint"
+          accessibilityLabel={isTacticalFocus
+            ? "Resume paused Focused Run"
+            : "Resume paused sprint"}
           testID="paused-session-resume"
           style={styles.primaryButton}
           onPress={onResume}
@@ -10650,7 +10684,7 @@ function SessionStatusBar({
           ) : onPause ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Pause sprint"
+              accessibilityLabel={isTacticalFocus ? "Pause Focused Run" : "Pause sprint"}
               testID="session-pause"
               style={styles.sessionNavButton}
               onPress={onPause}
@@ -10660,7 +10694,7 @@ function SessionStatusBar({
           ) : onResume ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Resume sprint"
+              accessibilityLabel={isTacticalFocus ? "Resume Focused Run" : "Resume sprint"}
               testID="session-resume"
               style={styles.sessionNavButton}
               onPress={onResume}
@@ -10813,18 +10847,20 @@ function SessionStatusBar({
         <View style={styles.sessionAbandonConfirm} testID="session-abandon-confirmation">
           <View style={styles.sessionAbandonCopy}>
             <Text style={styles.listText}>
-              {isTacticalFocus ? "Abandon focused Run?" : "Abandon sprint?"}
+              {isTacticalFocus ? "Abandon Focused Run?" : "Abandon sprint?"}
             </Text>
             <Text style={styles.helperText}>
               {isTacticalFocus
-                ? "This ends the focused Run. Completed puzzles stay in History and your Rating stays unchanged."
+                ? "This ends the Focused Run. Completed puzzles stay in History and your Rating stays unchanged."
                 : "This ends the run and records a failed sprint."}
             </Text>
           </View>
           <View style={styles.sessionAbandonActions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Cancel abandon sprint"
+              accessibilityLabel={isTacticalFocus
+                ? "Cancel abandoning Focused Run"
+                : "Cancel abandon sprint"}
               testID="session-abandon-cancel"
               style={styles.secondaryButton}
               onPress={() => onConfirmAbandonChange(false)}
@@ -10833,7 +10869,9 @@ function SessionStatusBar({
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Confirm abandon sprint"
+              accessibilityLabel={isTacticalFocus
+                ? "Confirm abandoning Focused Run"
+                : "Confirm abandon sprint"}
               testID="session-abandon-confirm"
               style={styles.destructiveButton}
               onPress={() => {
