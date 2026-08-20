@@ -1,6 +1,6 @@
 # App Store Assets
 
-This document is the 1.5.1 source of truth for App Store Connect metadata and
+This document is the 1.5.2 source of truth for App Store Connect metadata and
 store screenshot capture. Recheck Apple's live documentation before upload:
 
 - Screenshot specifications:
@@ -112,22 +112,22 @@ model-derived improvement.
 
 ### What's New
 
-For iOS 1.5.1, review this proposed ready-to-paste copy:
+For iOS 1.5.2, review this proposed ready-to-paste copy:
 
 ```text
-• Review opens with Today to review collapsed and Completed today expanded.
-• Before your first Survival best, Survival records explain how to set it and that Puzzle and Arrow Duel bests stay separate by level.
+• Focused Runs now continue normally after your first answer.
+• Close and reopen the app without losing an unfinished Focused Run—it returns paused at the puzzle where you left off.
 ```
 
-This proposed copy is 210 / 300 Unicode characters, including line breaks.
+This proposed copy is 181 / 300 Unicode characters, including line breaks.
 Future versions must use the reusable template in
 [`docs/releases/RELEASE_NOTES_TEMPLATE.md`](releases/RELEASE_NOTES_TEMPLATE.md):
 lead with user benefits, use two or three short bullets, omit raw URLs, and do
 not call stable features experimental unless that qualification is an
 intentional product promise.
 
-This copy belongs to the proposed `ios-v1.5.1-build-1` release identity and
-must match `docs/releases/ios-v1.5.1-build-1.md` before the owner marks that
+This copy belongs to the proposed `ios-v1.5.2-build-1` release identity and
+must match `docs/releases/ios-v1.5.2-build-1.md` before the owner marks that
 note Approved. The release PR must retain a screenshot or exported metadata
 record showing the exact submitted text.
 
@@ -155,7 +155,7 @@ the resulting feature is declared.
 
 ## Screenshot Requirements
 
-The app targets iPhone and iPad for 1.5.1. The current automated capture plan
+The app targets iPhone and iPad for 1.5.2. The current automated capture plan
 covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
 The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
 Apple's current screenshot reference, rechecked on 2026-07-28, lists 6.9" as
@@ -182,11 +182,11 @@ Release rule:
 5. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
 
-The 1.5.1 changes keep pending Review work compact while leaving completed work
-visible, and add a truthful empty state before the first Survival best. The
-selected six-frame marketing moments do not include either changed state, so
-prior compositions are reused only after the exact-head product baseline and
-existing marketing claims pass review.
+The 1.5.2 changes keep Focused Runs moving after the first answer and preserve
+unfinished Focused Runs across an app restart. The selected six-frame marketing
+moments do not include either changed state, so prior compositions are reused
+only after the exact-head product baseline and existing marketing claims pass
+review.
 The prior approved marketing compositions may be reused only after the current
 metadata and screenshot audit passes. The separate release-delta workflow must
 still recapture and inspect its exact-head product baseline.
