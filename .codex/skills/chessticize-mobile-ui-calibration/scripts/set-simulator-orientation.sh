@@ -4,7 +4,6 @@ set -euo pipefail
 SIMULATOR_UDID="${1:-}"
 DEVICE_NAME="${2:-}"
 TARGET_ORIENTATION="${3:-}"
-WINDOW_ORIENTATION_INVERTED="${CHESSTICIZE_SIMULATOR_WINDOW_ORIENTATION_INVERTED:-0}"
 
 fail() {
   echo "ERROR: $*" >&2
@@ -16,20 +15,15 @@ fail() {
 [[ -n "$DEVICE_NAME" ]] || fail "Pass the exact Simulator device name as argument 2."
 [[ "$TARGET_ORIENTATION" == "portrait" || "$TARGET_ORIENTATION" == "landscape" ]] || \
   fail "Orientation must be portrait or landscape."
-[[ "$WINDOW_ORIENTATION_INVERTED" == "0" || "$WINDOW_ORIENTATION_INVERTED" == "1" ]] || \
-  fail "CHESSTICIZE_SIMULATOR_WINDOW_ORIENTATION_INVERTED must be 0 or 1."
 command -v osascript >/dev/null 2>&1 || fail "osascript is required."
 
 # Xcode 26.6 keeps simctl screenshot dimensions fixed to the physical display even
 # while the Simulator rotates. The exact Simulator window dimensions still track
 # the effective device orientation and avoid accepting a stale framebuffer shape.
-# Some Simulator device/runtime states expose the app surface at the inverse of the
-# window aspect ratio; the explicit host-only switch corrects that observed state.
 simulator_window_orientation() {
   local dimensions
   local width
   local height
-  local window_orientation
   dimensions="$(
     /usr/bin/osascript \
       -e 'on run argv' \
@@ -49,18 +43,9 @@ simulator_window_orientation() {
   [[ "$width" =~ ^[0-9]+$ && "$height" =~ ^[0-9]+$ ]] || \
     fail "Could not parse the Simulator window dimensions: $dimensions"
   if (( width > height )); then
-    window_orientation="landscape"
+    echo "landscape"
   else
-    window_orientation="portrait"
-  fi
-  if [[ "$WINDOW_ORIENTATION_INVERTED" == "1" ]]; then
-    if [[ "$window_orientation" == "portrait" ]]; then
-      echo "landscape"
-    else
-      echo "portrait"
-    fi
-  else
-    echo "$window_orientation"
+    echo "portrait"
   fi
 }
 

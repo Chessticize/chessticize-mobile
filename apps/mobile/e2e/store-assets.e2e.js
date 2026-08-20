@@ -74,6 +74,7 @@ async function launchStoreAssetApp(nowMs, deleteData, enableTestControls = true)
       chessticizeTestNowMs: String(nowMs)
     }
   });
+  await device.setOrientation(captureOrientation);
   await waitForScreenOrientation(captureOrientation);
 }
 

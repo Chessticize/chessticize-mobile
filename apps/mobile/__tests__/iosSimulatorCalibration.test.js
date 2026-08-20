@@ -19,11 +19,8 @@ const calibrationRunner = fs.readFileSync(
   ),
   "utf8"
 );
-const orientationRunner = fs.readFileSync(
-  path.join(
-    repoRoot,
-    ".codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
-  ),
+const storeAssetCaptureRunner = fs.readFileSync(
+  path.join(appRoot, "e2e/store-assets.e2e.js"),
   "utf8"
 );
 const releaseBuildRunner = fs.readFileSync(
@@ -213,18 +210,10 @@ describe("iOS Simulator calibration identity", () => {
     expect(restoreIndex).toBeLessThan(rotateIndex);
   });
 
-  it("supports an explicit host-only inversion for mirrored Simulator window geometry", () => {
-    expect(orientationRunner).toContain(
-      'WINDOW_ORIENTATION_INVERTED="${CHESSTICIZE_SIMULATOR_WINDOW_ORIENTATION_INVERTED:-0}"'
+  it("requests the capture orientation after the Release app launches", () => {
+    expect(storeAssetCaptureRunner).toContain(
+      "await device.setOrientation(captureOrientation);\n  await waitForScreenOrientation(captureOrientation);"
     );
-    expect(orientationRunner).toContain(
-      '[[ "$WINDOW_ORIENTATION_INVERTED" == "0" || "$WINDOW_ORIENTATION_INVERTED" == "1" ]]'
-    );
-    expect(orientationRunner).toContain(
-      'if [[ "$WINDOW_ORIENTATION_INVERTED" == "1" ]]; then'
-    );
-    expect(orientationRunner).toContain('window_orientation="portrait"');
-    expect(orientationRunner).toContain('window_orientation="landscape"');
   });
 });
 
