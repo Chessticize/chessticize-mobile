@@ -30,6 +30,9 @@ const {
 const {
   FIRST_STANDARD_FEEDBACK_MOVES,
 } = require('./familiar15Fixture');
+const {
+  focusedRunMoveSteps,
+} = require('./mateIn2FocusedRunFixture');
 
 // Keep this seed stable to reduce fixture churn. The test reads and validates
 // the actual runtime candidates before checking that both neutral arrows paint.
@@ -296,6 +299,43 @@ describe('Practice POC', () => {
     await waitFor(element(by.text('Still collecting evidence'))).toExist().withTimeout(10000);
     await element(by.id('tactical-profile-back')).tap();
     await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
+  });
+
+  it('resumes an interrupted Mate in 2 Focused Run from real SQLite', async () => {
+    await injectMateIn2FocusedRun();
+    const nextPuzzleId = await solveCurrentFocusedRunPuzzle(1);
+
+    await device.terminateApp();
+    await launchWithDisabledSynchronization({ newInstance: true, delete: false });
+    await waitForVisibleInPracticeScroll('practice-resume-card');
+    await waitForElementTextContaining('practice-resume-card', '1 solved · 14 left', 10000);
+    await element(by.id('practice-resume-card')).tap();
+    await waitFor(element(by.id('session-board'))).toExist().withTimeout(10000);
+    await waitFor(element(by.id('session-progress'))).toHaveText('1 / 15').withTimeout(10000);
+    const resumedPuzzleId = await elementText('session-current-puzzle-id');
+    if (resumedPuzzleId !== nextPuzzleId) {
+      throw new Error(
+        `Expected Focused Run to resume ${nextPuzzleId}, received ${resumedPuzzleId}`
+      );
+    }
+
+    await solveCurrentFocusedRunPuzzle(2);
+  });
+
+  it('completes a full 15-puzzle Mate in 2 Focused Run', async () => {
+    await injectMateIn2FocusedRun();
+
+    for (let completed = 1; completed <= 15; completed += 1) {
+      await solveCurrentFocusedRunPuzzle(completed);
+    }
+
+    await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(30000);
+    await expect(element(by.text('Focused Run complete'))).toBeVisible();
+    await expect(element(by.text('Focused Run Result'))).toBeVisible();
+    await expect(element(by.id('sprint-result-solved'))).toHaveText('Solved 15');
+    await expect(element(by.id('sprint-result-accuracy'))).toHaveText(
+      '15 attempted · 100% Accuracy'
+    );
   });
 
   it('renders the standard sprint board', async () => {
@@ -615,6 +655,53 @@ describe('Practice POC', () => {
     await waitForElementTextContaining('review-analysis-line-0', 'Top move', 90000);
   });
 });
+
+async function injectMateIn2FocusedRun() {
+  await waitForVisibleInPracticeScroll('test-focused-run-inject-mate-in-2');
+  await element(by.id('test-focused-run-inject-mate-in-2')).tap();
+  await waitFor(element(by.id('session-board'))).toExist().withTimeout(30000);
+  await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);
+  await waitForElementTextContaining('active-session-shell', 'Focused Run', 10000);
+}
+
+async function solveCurrentFocusedRunPuzzle(expectedCompleted) {
+  const puzzleId = await elementText('session-current-puzzle-id');
+  const moveSteps = focusedRunMoveSteps(puzzleId);
+  for (const { autoReply, userMove } of moveSteps) {
+    await playBoardMove('session-board', userMove);
+    if (autoReply) {
+      await waitForElementAccessibilityLabelContaining(
+        'session-board',
+        `Last move ${autoReply.slice(0, 2)} to ${autoReply.slice(2, 4)}`,
+        15000,
+        25
+      );
+    }
+  }
+
+  if (expectedCompleted === 15) {
+    return puzzleId;
+  }
+  await waitFor(element(by.id('session-progress')))
+    .toHaveText(`${expectedCompleted} / 15`)
+    .withTimeout(10000);
+  return waitForNextFocusedRunPuzzle(puzzleId);
+}
+
+async function waitForNextFocusedRunPuzzle(previousPuzzleId, timeoutMs = 15000) {
+  const startedAt = Date.now();
+  let currentPuzzleId = previousPuzzleId;
+  while (Date.now() - startedAt < timeoutMs) {
+    currentPuzzleId = await elementText('session-current-puzzle-id');
+    if (currentPuzzleId && currentPuzzleId !== previousPuzzleId) {
+      return currentPuzzleId;
+    }
+    await sleep(200);
+  }
+  throw new Error(
+    `Expected Focused Run to advance from ${previousPuzzleId}; current=${currentPuzzleId}`
+  );
+}
 
 function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame) {
   const png = readRgbaPng(screenshotPath);

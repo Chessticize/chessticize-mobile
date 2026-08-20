@@ -4,6 +4,7 @@ import { createNativeICloudProgressSyncClient } from './iCloudProgressSync.ts';
 import { createNativeICloudSyncDiagnosticsClient } from './iCloudSyncDiagnostics.ts';
 import {
   configureMobilePracticePuzzleSource,
+  createMobilePracticeTestControls,
   createPersistentMobilePracticeService,
   createPersistentMobilePracticeServiceSync,
   getPersistentMobileProgressDatabasePath,
@@ -41,12 +42,14 @@ export function composeIOSMobilePlatformCapabilities(
   service: PracticeService,
   applicationMetadata: MobileApplicationMetadata = readNativeApplicationMetadata(),
 ): MobilePlatformCapabilities {
+  const testControls = createMobilePracticeTestControls(service);
   return {
     storage: {
       practiceService: service,
       configurePuzzleSource: (source, mode) =>
         configureMobilePracticePuzzleSource(service, source, mode),
     },
+    ...(testControls ? { testControls } : {}),
     progressProtection: {
       kind: 'icloud_sync',
     },

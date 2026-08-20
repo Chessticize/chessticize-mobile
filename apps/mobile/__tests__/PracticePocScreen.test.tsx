@@ -7796,6 +7796,18 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it("injects a deterministic Mate in 2 Focused Run from test controls", () => {
+    const renderer = renderScreen();
+
+    press(renderer, "test-focused-run-inject-mate-in-2");
+
+    expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "active-session-shell"))).toContain(
+      "Focused Run"
+    );
+    expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 15");
+  });
+
   it("can switch test builds between core and familiar puzzle sources", () => {
     const renderer = renderScreen();
     const familiarService = createMobilePracticeService("familiar15");

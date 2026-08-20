@@ -66,6 +66,7 @@ describe("release configuration integration", () => {
     const renderer = renderScreen();
 
     expect(findAllByTestId(renderer, "test-puzzle-source-control")).toEqual([]);
+    expect(findAllByTestId(renderer, "test-focused-run-inject-mate-in-2")).toEqual([]);
 
     press(renderer, "settings-tab");
     expect(findAllByTestId(renderer, "settings-stockfish-diagnostics")).toEqual([]);
@@ -79,6 +80,7 @@ describe("release configuration integration", () => {
     const renderer = renderScreen();
 
     expect(findAllByTestId(renderer, "test-puzzle-source-control").length).toBeGreaterThan(0);
+    expect(findAllByTestId(renderer, "test-focused-run-inject-mate-in-2").length).toBeGreaterThan(0);
   });
 
   it("exposes test controls for the native debug harness in a production-mode bundle", () => {
@@ -89,6 +91,7 @@ describe("release configuration integration", () => {
     const renderer = renderScreen();
 
     expect(findAllByTestId(renderer, "test-puzzle-source-control").length).toBeGreaterThan(0);
+    expect(findAllByTestId(renderer, "test-focused-run-inject-mate-in-2").length).toBeGreaterThan(0);
     press(renderer, "settings-tab");
     expect(findAllByTestId(renderer, "settings-stockfish-diagnostics").length).toBeGreaterThan(0);
     const hiddenScheduleStatus = findAllByTestId(renderer, "settings-review-reminder-schedule-status")[0];
