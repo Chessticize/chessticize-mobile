@@ -19,6 +19,13 @@ const calibrationRunner = fs.readFileSync(
   ),
   "utf8"
 );
+const orientationRunner = fs.readFileSync(
+  path.join(
+    repoRoot,
+    ".codex/skills/chessticize-mobile-ui-calibration/scripts/set-simulator-orientation.sh"
+  ),
+  "utf8"
+);
 const releaseBuildRunner = fs.readFileSync(
   path.join(appRoot, "scripts/ios-build-release-for-detox.sh"),
   "utf8"
@@ -204,6 +211,20 @@ describe("iOS Simulator calibration identity", () => {
     expect(restoreIndex).toBeGreaterThan(0);
     expect(rotateIndex).toBeGreaterThan(0);
     expect(restoreIndex).toBeLessThan(rotateIndex);
+  });
+
+  it("supports an explicit host-only inversion for mirrored Simulator window geometry", () => {
+    expect(orientationRunner).toContain(
+      'WINDOW_ORIENTATION_INVERTED="${CHESSTICIZE_SIMULATOR_WINDOW_ORIENTATION_INVERTED:-0}"'
+    );
+    expect(orientationRunner).toContain(
+      '[[ "$WINDOW_ORIENTATION_INVERTED" == "0" || "$WINDOW_ORIENTATION_INVERTED" == "1" ]]'
+    );
+    expect(orientationRunner).toContain(
+      'if [[ "$WINDOW_ORIENTATION_INVERTED" == "1" ]]; then'
+    );
+    expect(orientationRunner).toContain('window_orientation="portrait"');
+    expect(orientationRunner).toContain('window_orientation="landscape"');
   });
 });
 
