@@ -160,6 +160,11 @@ design or authorize product wiring.
 
 ## Troubleshooting
 
+- **Scope-only successful run:** known non-input changes intentionally leave the
+  deployed catalog unchanged. The scope job records the comparison baseline.
+  Read `codex-build.json` from the existing URL for its actual deployed SHA;
+  use manual dispatch if review needs a deployment of the newer commit.
+
 - **Missing-secret error:** add or rotate all three GitHub Actions secrets. The
   token, organization ID, and project ID must belong to the same Vercel scope.
 - **HTTP 401 or 403:** disable Deployment Protection for both Preview and
