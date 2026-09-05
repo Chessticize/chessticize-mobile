@@ -15,18 +15,70 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "tsconfig.json"
+      - "vercel.json"
+      - "scripts/storybook-ci*"
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: mobile-lab-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: Interaction Lab typecheck and build
+  scope:
+    name: Select Storybook work
     if: github.event_name != 'push' || github.event.deleted == false
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.scope.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compare with last successful branch run
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          base=""
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$(jq -r .created "$GITHUB_EVENT_PATH")" != "true" ]]; then
+            base="$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/mobile-lab.yml/runs" \
+              -f branch="$GITHUB_REF_NAME" -f status=success -f per_page=100 \
+              --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")][0].head_sha // ""')"
+          fi
+          build="$(node scripts/storybook-ci.mjs scope "$base")"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "Storybook build required: $build; comparison base: ${base:-none (full build)}" >> "$GITHUB_STEP_SUMMARY"
+
+  pr-markers:
+    name: Interaction Lab PR marker check
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check markers against PR base without rebuilding
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: pnpm mobile:lab:check-markers
+
+  validate:
+    name: ${{ github.event_name == 'pull_request' && 'Fork Interaction Lab typecheck and build' || 'Interaction Lab typecheck and build' }}
+    needs: scope
+    if: >-
+      needs.scope.outputs.build == 'true' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -56,6 +108,21 @@ jobs:
         env:
           BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
         run: pnpm mobile:lab:check-markers
+
+      - name: Seal validated static output
+        if: github.event_name != 'pull_request'
+        run: node scripts/storybook-ci.mjs seal "$GITHUB_SHA"
+
+      - name: Upload exact validated bundle
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-${{ github.sha }}-${{ github.run_id }}
+          path: apps/mobile-lab/storybook-static/
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
 
   deploy:
     name: Deploy branch Storybook to Vercel
@@ -111,8 +178,17 @@ jobs:
             pnpm exec vercel pull --yes --environment=preview --git-branch="$GITHUB_REF_NAME" --token="$VERCEL_TOKEN"
           fi
 
-      - name: Build the validated Storybook deployment
+      - name: Download exact validated bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: storybook-${{ github.sha }}-${{ github.run_id }}
+          path: apps/mobile-lab/storybook-static/
+
+      - name: Package the validated Storybook deployment
+        env:
+          STORYBOOK_PREBUILT: "1"
         run: |
+          node scripts/storybook-ci.mjs verify "$GITHUB_SHA"
           if [[ "$GITHUB_REF_NAME" == "main" ]]; then
             pnpm exec vercel build --prod
           else
@@ -199,6 +275,10 @@ jobs:
           verify_public_url "$STORYBOOK_URL"
           verify_public_url "${IMMUTABLE_URL}storybook/"
           verify_public_url "${STORYBOOK_URL}storybook/"
+          for root in "$IMMUTABLE_URL" "$STORYBOOK_URL"; do
+            actual_sha="$(curl --fail --silent --show-error "${root}codex-build.json" | jq -r .sourceSha)"
+            [[ "$actual_sha" == "$GITHUB_SHA" ]] || { echo "::error::Deployed source SHA mismatch"; exit 1; }
+          done
 
           {
             echo "## Storybook deployment"

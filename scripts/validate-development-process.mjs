@@ -126,7 +126,7 @@ assert.deepEqual(workflowFiles, [
   "process.yml"
 ]);
 assert.equal(rootPackage.packageManager, "pnpm@11.20.0");
-assert.equal(count(workflowSources.join("\n"), "version: 11.20.0"), 6);
+assert.equal(count(workflowSources.join("\n"), "version: 11.20.0"), 7);
 assert.doesNotMatch(workflowSources.join("\n"), /version: 11\.1\.2/);
 assert.match(pnpmWorkspace, /^minimumReleaseAge: 10080$/m);
 assert.match(pnpmWorkspace, /^minimumReleaseAgeStrict: true$/m);
@@ -410,12 +410,12 @@ assert.equal(
   3
 );
 const mobileLabBuildStep = mobileLabWorkflow.match(
-  /      - name: Build the validated Storybook deployment\n[\s\S]*?\n      - name: Deploy the exact branch commit/
+  /      - name: Package the validated Storybook deployment\n[\s\S]*?\n      - name: Deploy the exact branch commit/
 )?.[0];
 assert.ok(mobileLabBuildStep);
 assert.doesNotMatch(mobileLabBuildStep, /secrets\.|VERCEL_TOKEN|--token/);
 assert.equal(rootPackage.devDependencies?.vercel, "58.4.4");
-assert.equal(count(mobileLabWorkflow, "run: pnpm install --frozen-lockfile"), 2);
+assert.equal(count(mobileLabWorkflow, "run: pnpm install --frozen-lockfile"), 3);
 assert.doesNotMatch(mobileLabWorkflow, /npm install --global/);
 assert.doesNotMatch(mobileLabWorkflow, /pnpm dlx\s+vercel/);
 assert.equal(count(mobileLabWorkflow, "pnpm exec vercel"), 6);
@@ -424,6 +424,13 @@ assert.match(mobileLabWorkflow, /pnpm exec vercel build/);
 assert.match(mobileLabWorkflow, /pnpm exec vercel deploy/);
 assert.match(mobileLabWorkflow, /--git-branch="\$GITHUB_REF_NAME"/);
 assert.match(mobileLabWorkflow, /--prebuilt/);
+assert.equal(count(mobileLabWorkflow, "run: pnpm mobile:lab:validate"), 1);
+assert.match(mobileLabWorkflow, /actions\/upload-artifact@v4/);
+assert.match(mobileLabWorkflow, /actions\/download-artifact@v4/);
+assert.equal(count(mobileLabWorkflow, "storybook-${{ github.sha }}-${{ github.run_id }}"), 2);
+assert.match(mobileLabWorkflow, /STORYBOOK_PREBUILT: "1"/);
+assert.match(mobileLabWorkflow, /node scripts\/storybook-ci\.mjs verify/);
+assert.match(mobileLabWorkflow, /Deployed source SHA mismatch/);
 assert.match(mobileLabWorkflow, /--meta=githubDeployment=1/);
 assert.match(mobileLabWorkflow, /--meta=githubCommitRef="\$GITHUB_REF_NAME"/);
 assert.match(mobileLabWorkflow, /deploy_args\+=\(--prod\)/);
@@ -447,7 +454,7 @@ assert.match(mobileLabWorkflow, /verify_public_url "\$\{STORYBOOK_URL\}storybook
 assert.doesNotMatch(storybookDeployment, /pnpm dlx\s+vercel/);
 assert.match(storybookDeployment, /pnpm exec vercel login/);
 assert.match(storybookDeployment, /pnpm exec vercel link/);
-assert.equal(vercelConfig.buildCommand, "pnpm mobile:lab:validate");
+assert.equal(vercelConfig.buildCommand, "node scripts/storybook-ci.mjs vercel-build");
 assert.equal(vercelConfig.installCommand, "pnpm install --frozen-lockfile");
 assert.equal(vercelConfig.outputDirectory, "apps/mobile-lab/storybook-static");
 assert.equal(vercelConfig.git.deploymentEnabled, false);
