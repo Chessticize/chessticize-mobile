@@ -36,6 +36,8 @@ on:
       - "scripts/mobile-version.mjs"
       - "scripts/mobile-versioning.test.mjs"
       - "scripts/validate-development-process.mjs"
+      - "scripts/lib/guidance-links.mjs"
+      - "scripts/guidance-links.test.mjs"
       - "vercel.json"
   push:
     branches:
@@ -74,6 +76,8 @@ on:
       - "scripts/mobile-version.mjs"
       - "scripts/mobile-versioning.test.mjs"
       - "scripts/validate-development-process.mjs"
+      - "scripts/lib/guidance-links.mjs"
+      - "scripts/guidance-links.test.mjs"
       - "vercel.json"
 
 permissions:
@@ -98,4 +102,6 @@ jobs:
           node-version: 26.x
 
       - name: Validate process policy and automation
-        run: node scripts/validate-development-process.mjs
+        run: |
+          node --test scripts/guidance-links.test.mjs
+          node scripts/validate-development-process.mjs

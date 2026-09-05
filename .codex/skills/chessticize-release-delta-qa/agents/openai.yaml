@@ -1,4 +1,4 @@
 interface:
   display_name: "Chessticize Release Delta QA"
-  short_description: "Audit simulator behavior, copy, and visual polish"
-  default_prompt: "Use $chessticize-release-delta-qa to audit changes since the last mobile release through exact-head Release simulator screenshots, judge functional behavior, copy quality, and presentation quality across every affected state and viewport, file visual, copy, aesthetic, layout, or functional product issues without fixing them, and immediately repair proven test drift."
+  short_description: "Summarize release changes or run requested visual QA"
+  default_prompt: "Use $chessticize-release-delta-qa to handle the requested release comparison. Keep change summaries read-only; only execute simulator captures and the visual QA workflow when visual QA is requested. Report exact source identities and the limits of existing or newly collected evidence."

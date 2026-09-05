@@ -532,8 +532,17 @@ test both compatibility contracts deliberately.
 | Host-side E2E spec, selector, wait, assertion, or non-bundled fixture | Focused test-runner checks | Reuse the verified validation App artifact and rerun only the affected native spec/suite |
 | Native bridge/adapter, native dependency, platform project, or native persistence integration | Targeted native spec or suite | Rebuild for changed App inputs; otherwise reuse the validation App artifact and rerun only changed test evidence |
 | App startup, shared native wiring, native launch fixtures, platform build configuration, or Detox infrastructure | Full `flows` and `practice` | Full release scope while that risk is present |
-| CloudKit behavior | Fake transport integration; targeted native validation only when adapter wiring changed | Signed staging/manual release validation |
+| CloudKit behavior | Fake transport integration; targeted native validation only when adapter wiring changed | Optional signed staging/manual diagnostics; not a submission gate |
 | Notification scheduling/routing | Fake/native fixture tests; targeted native validation only when routing changed | Optional physical-device diagnosis after automated validation |
+
+## Guidance And Process Validation
+
+Keep workflow policy in its owning document and link to it from AGENTS and
+skills. Process checks should verify reachable local references and executable
+contracts, not require identical sentences in several documents. A wording or
+heading change alone is not a policy regression. Review policy semantics in the
+PR; use behavior tests for changed validators and keep checks for real build,
+identity, deployment and source-publication boundaries.
 
 ## Completion Checklist
 

@@ -1,20 +1,30 @@
 ---
 name: chessticize-release-delta-qa
-description: Audit Chessticize Mobile changes since an exact published release with simulator visual verification as the primary acceptance layer and a locked-Mac-compatible Release build gate for iPad landscape geometry. Identify changed screens and states, capture and inspect the exact-head Release app across relevant viewports and orientations, judge functional correctness, copy quality, and presentation quality such as hierarchy, alignment, typography, spacing, and visual balance, use automated tests as supporting evidence, file visual, copy, aesthetic, layout, or functional product defects without fixing them, and repair proven test or workflow drift. Use for post-release regression sweeps, pre-release visual QA, iPad landscape release validation without unlocking macOS, requests to summarize fixes since a version, or requests to have a subagent validate changed mobile journeys.
+description: Summarize changes since an exact mobile release, or execute explicitly requested release-delta visual QA. Change reports stay read-only; simulator builds and captures belong only to visual QA mode.
 ---
 
 # Chessticize Release Delta QA
 
-Audit the final product delta rather than replaying commit history as if every
-intermediate design were still current. The main acceptance evidence is the
-exact-head Release app rendered in iOS simulators, not a list of green unit
-tests. Keep product code read-only during the QA phase: visual and functional
-product problems become issues, while proven test-fixture or workflow drift is
-repaired narrowly and revalidated.
+## Select The Requested Mode
+
+- **Change summary:** For "summarize fixes since version X" or release-delta
+  reports, use steps 1 and 2 below to resolve exact commits and reconstruct final
+  behavior. Report existing evidence and its limits, then stop. Do not build,
+  install, launch simulators, capture screenshots, edit files or file issues.
+  Do not load the calibration, local E2E or triage skills for a summary.
+- **Visual QA:** For a requested regression sweep, simulator acceptance or visual
+  audit, follow the remaining workflow. The main evidence is the exact-head
+  Release app rendered in simulators. Product findings remain read-only and
+  become issues within the authorized tracker scope; repair only proven test
+  or workflow drift and revalidate its affected scope.
+
+Audit the final product delta rather than treating superseded intermediate
+commits as current behavior. A request that only asks what changed uses summary
+mode; it does not imply permission or a requirement to execute visual QA.
 
 ## Load The Governing Skills
 
-Read these repo-local skills before acting:
+For visual QA only, load each skill when its step is needed:
 
 - `../chessticize-mobile-dev-loop/SKILL.md` for validation-layer selection.
 - `../chessticize-mobile-ui-calibration/SKILL.md` for exact-head Release
@@ -72,6 +82,10 @@ Treat an older PR description as historical when a later PR supersedes it.
 Call out the final rule and the superseding PR instead of presenting both
 behaviors as simultaneously true.
 
+For summary mode, report final behavior, source identity and existing validation
+limits here, then stop. The following matrix and execution steps are for visual
+QA only.
+
 Build a surface matrix using
 [`references/qa-matrix-template.md`](references/qa-matrix-template.md). For
 every behavior-changing PR, capture:
@@ -124,9 +138,11 @@ scope from the union of changes since the release, not only the newest PR.
 - Require an exact-head Release iOS build for an iOS release-delta request.
 - Select targeted native validation for one bounded native bridge or one
   affected native journey.
-- Select full native validation when the accumulated delta spans multiple
-  native/persistence/navigation journeys or is being treated as a release
-  candidate.
+- Select full native validation only when the accumulated native risk cannot
+  be bounded to one suite under Testing Architecture. A release candidate or
+  multiple JavaScript navigation journeys alone do not select full Detox.
+  Requested visual captures and required native regression suites are distinct
+  evidence scopes.
 - Include the released-fixture migration matrix and simulator upgrade smoke
   when SQLite schema or repair behavior changed.
 - Keep physical-device sound, haptic, notification, CloudKit, and similar

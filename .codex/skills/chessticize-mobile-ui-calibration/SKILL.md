@@ -1,6 +1,6 @@
 ---
 name: chessticize-mobile-ui-calibration
-description: Capture and visually calibrate Chessticize Mobile's Storybook Interaction Lab against exact-head iPhone portrait and iPad portrait/landscape Release simulator builds, judge functional rendering, copy quality, and presentation quality including hierarchy, alignment, typography, spacing, balance, and polish, archive local screenshots, enforce production-only UI, and record PR evidence. Use when UI work needs native screenshot parity, copy review, or aesthetic and layout review, when Storybook may differ from the real app, when Custom Setup or Review controls need verification, when refreshing the project's foundational UI screenshots, or before preparing App Store screenshot sets.
+description: Compare requested Chessticize native Release screenshots with Storybook, using affected scenes or the full baseline. Use for native visual acceptance and baseline refreshes, not ordinary copy or layout review that needs only component or Lab evidence.
 ---
 
 # Chessticize Mobile UI Calibration
@@ -58,7 +58,22 @@ Vercel URL and record that URL. For an existing flow regression, use its current
 hosted story as the comparison reference and add or update component assertions
 before changing the product UI.
 
-### 2. Capture the exact-head Release baseline
+### 2. Select capture scope
+
+Use the full baseline when establishing or explicitly refreshing it, when shared
+layout/font/theme changes affect the catalog, or when release-delta QA requires
+it. For a bounded flow fix, inspect affected states and viewports plus directly
+related guidance instead. Record the selected scenes and why they cover the
+change; do not claim a focused pass refreshed the entire baseline.
+
+The wrapper below always captures the full baseline; it has no scene filter.
+For focused acceptance, reach the selected state through public UI in a Release
+simulator and capture with `xcrun simctl io <exact-UDID> screenshot <path>`, or
+use an existing focused Detox spec. Keep source identity, clean-worktree,
+orientation and production-only checks. Use the wrapper when deterministic
+setup cannot be reached by the focused path; do not invent runner flags.
+
+### Full-baseline capture
 
 Run from the repository root:
 
@@ -96,9 +111,10 @@ Set `CHESSTICIZE_IOS_PREPARE=1` only when the CocoaPods workspace or locked
 bundle genuinely needs preparation. Environment preparation must not update
 tracked lockfiles unintentionally.
 
-### 3. Inspect all twenty-six captures
+### 3. Inspect the selected captures
 
-Open every PNG, not only the flow that originally changed:
+For a full-baseline run, open all twenty-six PNGs. For focused acceptance, open
+every selected state/viewport and use the relevant contracts below:
 
 | Screenshot | Calibration contract |
 | --- | --- |
@@ -164,8 +180,10 @@ When a mismatch is real:
 2. Fix the shared production component rather than adding a Storybook-only
    imitation.
 3. Run focused component tests and `pnpm mobile:typecheck`.
-4. Commit the change, rerun the capture script, and inspect all twenty-six
-   images.
+4. Commit the change and recapture affected scenes/viewports. Expand to all
+   twenty-six images only when the change affects shared presentation or the
+   requested full-baseline acceptance remains incomplete. Record which earlier
+   evidence remains applicable; do not relabel old images as the new head.
 
 Do not add pixel-perfect native snapshot diffs by default. System fonts,
 rendering versions, and antialiasing create noisy changes; keep semantic
