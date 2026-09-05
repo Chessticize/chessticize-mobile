@@ -13,19 +13,34 @@ Storybook deployment is public and must not require authentication.
 
 ## Deployment model
 
-- `.github/workflows/mobile-lab.yml` validates every branch push, installs the
-  exact-pinned Vercel CLI from the frozen repository lockfile, and uploads the
-  prebuilt output from that exact commit. Its CLI and transitive dependencies
-  are therefore covered by pnpm's lockfile integrity and build-script policy.
-- A push to `main` uses the Vercel Production environment and updates the
-  project's stable Production domain.
-- A push to any other branch uses the Vercel Preview environment. Git metadata
-  binds the deployment to that branch. The workflow assigns a deterministic
-  alias containing a readable branch prefix and a hash of the full branch name,
-  so later pushes advance only that branch without overwriting another branch.
-- Pull requests still run the Interaction Lab validation job. Deployment uses
-  only `push` or manual `workflow_dispatch` events, so untrusted fork pull
-  requests never receive Vercel credentials.
+- `.github/workflows/mobile-lab.yml` runs a cheap scope check on branch pushes.
+  It compares against the last successful push/manual run on that same branch,
+  not merely the preceding commit. Failed/canceled relevant changes therefore
+  remain in the next comparison. First runs, manual retries, missing/divergent
+  baselines and unknown paths build conservatively. Known documentation,
+  guidance, site and test-only paths may skip an unchanged Lab. The classifier
+  is `scripts/storybook-ci.mjs`; shared components, packages, dependencies,
+  Vercel configuration and the Lab workflow/helpers require a build.
+- A relevant push validates and builds Storybook once without Vercel credentials,
+  seals the static files with a source SHA and SHA-256 inventory, and uploads a
+  run-specific artifact. The deploy job downloads that same-run artifact
+  and verifies all bytes and the SHA before packaging routes with Vercel.
+  The artifact name uses run ID rather than attempt so retrying only the failed
+  deploy job can reuse its successful validation output; rerunning validation
+  replaces that run's artifact after sealing it again.
+  `STORYBOOK_PREBUILT=1` makes the Vercel build command verify the existing output
+  instead of repeating Lab validation or compilation. The exact-pinned CLI and
+  dependencies remain covered by lockfile integrity and build-script policy.
+- A push to `main` uses Production; other branches use Preview and a deterministic
+  branch alias. Skipped pushes leave that branch's existing URL and deployed SHA
+  unchanged. Do not claim a skipped commit was deployed. A new branch has no
+  successful baseline, so it receives its own full-catalog preview. Use manual
+  dispatch when a new exact-commit deployment is required despite unchanged inputs.
+- Same-repository pull requests run only the base-sensitive marker check; the
+  head commit's push run supplies full build evidence. Fork pull requests still
+  validate/build without publishing. Deployment uses only push/manual events;
+  untrusted fork pull requests never receive Vercel credentials. Distinct check
+  names keep skipped fork jobs from masking the real push build result.
 - Concurrency is scoped by Git ref. A newer push cancels an older in-flight run
   for the same branch without canceling deployments for other branches.
 - Deleting a branch does not start a replacement deployment. Its historical
@@ -105,8 +120,10 @@ code change is required.
 The deploy job does not expose these credentials while installing JavaScript
 dependencies or building Storybook. It injects them only into the three steps
 that validate credentials, pull project settings, or contact Vercel to deploy.
-The local Vercel build uses the already-pulled project settings without an
-authentication token.
+The local Vercel packaging step uses already-pulled project settings without an
+authentication token. It verifies the downloaded static output; it does not
+recompile the Lab. The source manifest is published as `codex-build.json`, and
+the access step checks its SHA at both immutable and branch URLs.
 
 ## First deployment
 
