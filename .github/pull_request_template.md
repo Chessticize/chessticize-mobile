@@ -79,12 +79,14 @@ Rationale or full-review trigger:
 
 ## Release follow-up
 
-Check any conditional release gates created or changed by this PR.
+Record conditional release gates and separately requested optional diagnostics.
+CloudKit, physical-device and TestFlight diagnostics are not automatic submission
+gates; use `docs/TESTING_ARCHITECTURE.md` to select required scope.
 
 - [ ] None
 - [ ] Native schema upgrade smoke
-- [ ] Signed CloudKit staging/manual validation
-- [ ] Physical-device notification or interaction smoke
+- [ ] Optional signed CloudKit staging/manual diagnostics
+- [ ] Optional physical-device notification or interaction smoke
 - [ ] TestFlight upgrade or App Store screenshot validation
 
 Notes:

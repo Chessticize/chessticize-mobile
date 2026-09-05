@@ -11,41 +11,25 @@ API exposes it.
 Treat the signed AAB, annotated tag, source manifest, Play version code, and
 mirrored APK as one release identity.
 
-## Load the authoritative contracts
+## Select Mode Before Reading Runbooks
 
-Read these files completely before acting:
+Read the relevant sections for the requested operation; do not load all release
+contracts or prepare the machine for a status question.
 
-- `AGENTS.md`
-- `apps/mobile/release-version.json`
-- `docs/RELEASE_SOURCE_POLICY.md`
-- `docs/RELEASE_NOTES.md`
-- `docs/ANDROID_PLAY_RELEASE.md`
-- `docs/ANDROID_GITHUB_RELEASE.md`
-- `docs/ANDROID_VALIDATION.md`
-- `docs/ANDROID_PLAY_LISTING.md`
-- `docs/ANDROID_PRIVACY_DISCLOSURE.md`
-- `.github/workflows/mobile-android-release-candidate.yml`
-- `.github/workflows/mobile-android-github-release.yml`
-- `.github/workflows/mobile-android-source-recovery.yml`
+| Mode | Read and do |
+| --- | --- |
+| Status | Read `apps/mobile/release-version.json`, the candidate's release record and the identity/submission rules in [source policy](../../../docs/RELEASE_SOURCE_POLICY.md). Query exact tags, retained artifacts, runs and visible Play state. Report unobserved state as unknown. |
+| Build/advance | Read [Play release](../../../docs/ANDROID_PLAY_RELEASE.md), [release notes](../../../docs/RELEASE_NOTES.md), source policy and `.github/workflows/mobile-android-release-candidate.yml`; prepare the environment only when needed. |
+| Native validation | Select scope using [Android validation](../../../docs/ANDROID_VALIDATION.md); read its required device/runner sections. |
+| Source recovery | Read the recovery section of [GitHub release](../../../docs/ANDROID_GITHUB_RELEASE.md) and `.github/workflows/mobile-android-source-recovery.yml`; preserve and reuse the exact retained signed artifact. |
+| APK mirror | Read GitHub release and `.github/workflows/mobile-android-github-release.yml`; verify the Play-signed universal APK identity. |
+| Listing/privacy | Read [listing](../../../docs/ANDROID_PLAY_LISTING.md) and [privacy](../../../docs/ANDROID_PRIVACY_DISCLOSURE.md) only for first launch, changed disclosures/listing, or a reported store problem. |
 
-Use them for commands, evidence fields, Console copy, and workflow inputs. Live
-store/account requirements override repository assumptions. ADR-0009 replaces
-the historical multi-phase GitHub publication protocol with one post-Play APK
-mirror job.
-
-## Select the operating mode
-
-- For status, perform a read-only audit of exact tags, releases, workflow runs,
-  artifacts, open PRs, and visible Play state.
-- For advance work, execute the next dependency-ready action and verify its
-  postcondition.
-- For recovery, preserve failed evidence and reuse only the exact retained
-  candidate artifact.
-- For repository changes, follow `AGENTS.md` and the user's requested scope.
-
-Prefer CLI or APIs for auditable state. Use Computer Use only for Play Console
-surfaces without a supported API, and never bypass authentication, protected
-approval, account verification, or explicit owner authorization.
+For advance work, execute the next authorized dependency-ready action and verify
+its postcondition. Follow AGENTS and the user's requested scope for repository
+changes. CLI/APIs are preferred; use Computer Use for Console-only surfaces.
+Live store requirements override repository assumptions. ADR-0009 supersedes
+the historical multi-phase publication protocol with one post-Play mirror job.
 
 ## Establish a trustworthy checkout
 

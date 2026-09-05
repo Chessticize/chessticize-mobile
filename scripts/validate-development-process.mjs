@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { validateGuidanceLinks } from "./lib/guidance-links.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
@@ -22,7 +23,6 @@ const mobileWorkflow = read(".github/workflows/mobile-js.yml");
 const mobileLabWorkflow = read(".github/workflows/mobile-lab.yml");
 const pagesWorkflow = read(".github/workflows/pages.yml");
 const processWorkflow = read(".github/workflows/process.yml");
-const agents = read("AGENTS.md");
 const rootReadme = read("README.md");
 const labReadme = read("apps/mobile-lab/README.md");
 const testingArchitecture = read("docs/TESTING_ARCHITECTURE.md");
@@ -38,7 +38,6 @@ const issueTracker = read(agentDocPaths[1]);
 const triageLabels = read(agentDocPaths[2]);
 const uiFlowDesign = read(agentDocPaths[3]);
 const issueTriage = read(agentDocPaths[4]);
-const devLoopSkill = read(".codex/skills/chessticize-mobile-dev-loop/SKILL.md");
 const issueTriageSkill = read(".codex/skills/chessticize-issue-triage/SKILL.md");
 const scenarioRegistry = read("apps/mobile-lab/src/scenarioRegistry.ts");
 const markerCheck = read("apps/mobile-lab/scripts/check-new-scenarios.ts");
@@ -183,31 +182,16 @@ assert.equal(count(mobileWorkflow, "DETOX_ACTIVE_SUITE: flows"), 0);
 assert.equal(count(mobileWorkflow, "DETOX_ACTIVE_SUITE: practice"), 0);
 assert.equal(count(mobileWorkflow, "matrix:"), 0);
 
-for (const policy of [agents, testingArchitecture, devLoopSkill, localE2eSkill]) {
-  assert.match(policy, /No mobile Detox/);
-  assert.match(policy, /Targeted native validation/);
-  assert.match(policy, /Full native validation/);
-  assert.match(
-    policy,
-    /local (?:iOS )?native\s+validation|native validation on both platforms is local/i
-  );
-  assert.match(
-    policy,
-    /only for (?:releases|release candidates) and native-impacting\s+changes|only for a release candidate or a change to native/i
-  );
-  assert.match(policy, /App source SHA/i);
-  assert.match(policy, /test-runner SHA/i);
-  assert.match(policy, /App-input digest/i);
-}
-
-assert.doesNotMatch(agents, /Any required Detox evidence must come from the exact PR head/);
-assert.doesNotMatch(testingArchitecture, /source-tree change invalidates that evidence/);
-assert.doesNotMatch(devLoopSkill, /Any later source-tree change invalidates native evidence/);
-assert.doesNotMatch(localE2eSkill, /same Git tree/);
-
-for (const agentDocPath of agentDocPaths) {
-  assert.match(agents, new RegExp(agentDocPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-}
+// Guidance routes to owning policies instead of copying their wording. Keep
+// build/runtime assertions below separate from editorial policy review.
+const guidanceEntries = [
+  "AGENTS.md",
+  "docs/agents/pr-workflow.md",
+  ...readdirSync(path.join(repoRoot, ".codex/skills"), { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map(entry => `.codex/skills/${entry.name}/SKILL.md`)
+];
+assert.deepEqual(validateGuidanceLinks(repoRoot, guidanceEntries), []);
 
 assert.match(domainDocs, /lazy artifacts/);
 assert.match(domainDocs, /CONTEXT-MAP\.md/);
@@ -332,15 +316,6 @@ assert.equal(landingPageAssetManifest.schemaVersion, 1);
 assert.equal(landingPageAssetManifest.assets.length, 11);
 assert.match(landingPageTest, /ships optimized, reproducible marketing images/);
 
-for (const policy of [agents, devLoopSkill, labReadme]) {
-  assert.match(policy, /Storybook-first UI flow gate/i);
-  assert.match(policy, /explicit design approval/);
-}
-
-for (const policy of [agents, rootReadme, labReadme, testingArchitecture, devLoopSkill, prTemplate]) {
-  assert.match(policy, /docs\/agents\/ui-flow-design\.md/);
-}
-
 assert.match(uiFlowDesign, /must not begin\s+production wiring/i);
 assert.match(uiFlowDesign, /stable Storybook URL/);
 assert.match(uiFlowDesign, /explicit design approval/);
@@ -350,7 +325,6 @@ assert.match(uiFlowDesign, /without\s+launching a local Storybook server/i);
 assert.match(uiFlowDesign, /Do not commit generated\s+Storybook bundles/i);
 assert.match(uiFlowDesign, /modify that existing\s+story incrementally/i);
 assert.match(uiFlowDesign, /post-implementation product/i);
-assert.match(devLoopSkill, /existing product-clone story/i);
 assert.match(labReadme, /Do not add a parallel standalone page/i);
 assert.match(prTemplate, /Storybook-first design approved before product wiring/);
 assert.match(prTemplate, /Storybook-only design increment/);
@@ -358,15 +332,14 @@ assert.match(prTemplate, /Stable branch Storybook manager URL:/);
 assert.match(prTemplate, /Reset every previous design marker/);
 assert.match(prTemplate, /not a local Storybook server/);
 assert.match(prTemplate, /Design approval record:/);
-assert.match(agents, /Storybook-only PR[\s\S]*may merge while the linked product issue remains open/);
 
-for (const triagePolicy of [agents, issueTriageSkill]) {
+for (const triagePolicy of [issueTriageSkill]) {
   assert.match(triagePolicy, /docs\/agents\/issue-triage\.md/);
   assert.match(triagePolicy, /Storybook/);
   assert.match(triagePolicy, /product implementation/i);
 }
 
-for (const triagePolicy of [agents, issueTracker, issueTriage, issueTriageSkill]) {
+for (const triagePolicy of [issueTracker, issueTriage, issueTriageSkill]) {
   assert.match(triagePolicy, /docs\/agents\/ui-flow-design\.md/);
   assert.match(triagePolicy, /relationship suggestions are advisory/i);
   assert.match(triagePolicy, /do not consolidate/i);
@@ -407,21 +380,8 @@ assert.match(issueTriageSkill, /one\s+Storybook design track.*per\s+issue/is);
 assert.match(issueTriageSkill, /every UI or functional-feature issue/);
 assert.match(issueTriageSkill, /do not invent priority\s+labels/i);
 assert.match(issueTriageSkill, /codex\/storybook-issue-<number>-<goal>/);
-for (const publicStorybookPolicy of [
-  agents,
-  labReadme,
-  uiFlowDesign,
-  issueTriage,
-  issueTriageSkill,
-  devLoopSkill,
-  prTemplate,
-  storybookDeployment
-]) {
-  assert.match(
-    publicStorybookPolicy,
-    /public\s+and\s+must\s+not\s+require\s+authentication/i
-  );
-}
+// Public access is checked by the deployment workflow below; policy copies
+// need not repeat a particular sentence.
 assert.doesNotMatch(issueTriageSkill, /owner-only deployment/i);
 assert.match(issueTriage, /Vercel Preview is a review artifact/);
 for (const lifecycleContract of [issueTriage, issueTriageSkill, uiFlowDesign, processWorkflow]) {
@@ -535,17 +495,6 @@ assert.doesNotMatch(mobileLabWorkflow, /ALLOW_NEW_SCENARIOS|Reject stale New Sce
 assert.equal(typeof markerManifest, "object");
 assert.equal(Array.isArray(markerManifest), false);
 
-for (const reviewPolicy of [agents, devLoopSkill]) {
-  assert.match(reviewPolicy, /prefer incremental\s+review/i);
-  assert.match(reviewPolicy, /Reviewed-Through/);
-  assert.match(reviewPolicy, /40-character commit SHA/i);
-  assert.match(reviewPolicy, /ancestor of the\s+current head/i);
-  assert.match(reviewPolicy, /PR merge base/i);
-  assert.match(reviewPolicy, /git range-diff/);
-  assert.match(reviewPolicy, /semantic (impact|blast radius)/i);
-  assert.match(reviewPolicy, /exact[- ]head/i);
-}
-
 assert.match(prTemplate, /Incremental review/);
 assert.match(prTemplate, /Full review/);
 assert.match(prTemplate, /Review-Baseline: <40-character commit SHA>/);
@@ -553,18 +502,6 @@ assert.match(prTemplate, /Reviewed-Through: <40-character commit SHA>/);
 assert.match(prTemplate, /Review-Result: pending\|findings\|pass/);
 assert.match(prTemplate, /PR merge base/);
 assert.match(prTemplate, /full-review trigger/i);
-
-for (const releaseContract of [
-  "docs/RELEASE_SOURCE_POLICY.md",
-  "docs/RELEASE_NOTES.md",
-  "docs/ANDROID_PLAY_RELEASE.md",
-  "docs/ANDROID_GITHUB_RELEASE.md",
-  "docs/ANDROID_VALIDATION.md",
-  "docs/ANDROID_PLAY_LISTING.md",
-  "docs/ANDROID_PRIVACY_DISCLOSURE.md"
-]) {
-  assert.match(androidReleaseSkill, new RegExp(releaseContract.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-}
 
 assert.match(androidReleaseSkill, /Google Play processes Android binaries/);
 assert.match(androidReleaseSkill, /GitHub publishes corresponding\s+source/);
@@ -592,7 +529,6 @@ assert.match(androidReleaseSkill, /first\s+launch, the boundary changed, or Play
 assert.match(androidReleaseSkill, /Respect RC freeze generations/);
 assert.match(androidReleaseSkill, /host-side test-runner defect/);
 assert.match(androidReleaseSkill, /invalidate the generation before merging/);
-assert.match(agents, /\.codex\/skills\/chessticize-android-release\/SKILL\.md/);
 assert.match(androidPlayRelease, /successful APK-mirror workflow run/);
 assert.match(androidPlayRelease, /exactly the required source manifest/);
 assert.match(androidPlayRelease, /Release completion states/);
@@ -629,8 +565,6 @@ assert.match(releaseNotesTemplate, /release owner approved the copy before the s
 assert.match(localE2eSkill, /CHESSTICIZE_E2E_SCOPE/);
 assert.match(localE2eSkill, /Replace `practice` with `flows` or `full`/);
 assert.doesNotMatch(localE2eSkill, /Routine PRs require passing local `flows` and `practice`/);
-assert.match(agents, /chessticize-mobile-ui-calibration\/SKILL\.md/);
-assert.match(devLoopSkill, /\$chessticize-mobile-ui-calibration/);
 assert.match(uiCalibrationSkill, /app-store-07-custom-setup/);
 assert.match(uiCalibrationSkill, /app-store-08-review-session/);
 
@@ -710,10 +644,7 @@ assert.match(androidValidation, /invalidates that RC\s+generation/);
 assert.match(androidValidation, /rebuild only the affected artifacts and validation scope/);
 
 for (const rcFreezePolicy of [
-  agents,
-  releaseSourcePolicy,
-  devLoopSkill,
-  androidReleaseSkill
+  releaseSourcePolicy
 ]) {
   assert.match(rcFreezePolicy, /RC freeze|RC frozen|frozen RC/i);
   assert.match(rcFreezePolicy, /planned development/);
@@ -746,7 +677,6 @@ assert.match(releaseVersioning, /mobile:version:set-development/);
 assert.match(releaseVersioning, /1\.5\.0/);
 assert.match(releaseVersioning, /2\.0\.0/);
 assert.match(releaseVersioning, /Do not bump either file merely because a store changes/);
-assert.match(agents, /docs\/RELEASE_VERSIONING\.md/);
 assert.match(releaseSourcePolicy, /mobile:version:prepare-release/);
 assert.match(releaseSourcePolicy, /mobile:version:advance-development/);
 for (const command of [
