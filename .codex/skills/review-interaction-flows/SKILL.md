@@ -1,11 +1,19 @@
 ---
 name: review-interaction-flows
-description: Review end-to-end product interaction flows from the user's point of view, including entry intent, navigation, action semantics, state transitions, feedback continuity, interruption and recovery, responsive layout, accessibility, and copy. Use when Codex is asked to review UX, try a feature, inspect a multi-step journey, evaluate a modal or page, diagnose an interaction that feels surprising or abrupt, assess screenshots plus real behavior, or perform a pre-merge experience pass beyond visual polish and isolated acceptance tests.
+description: Review a requested product interaction journey or UX behavior, including navigation, feedback, recovery and accessibility. For a static page or screenshot review, use only the visible scope; do not implicitly run a full journey audit or implement fixes.
 ---
 
 # Review Interaction Flows
 
 Evaluate the journey as a conversation between the product and the user. Treat every visible action as a promise: its label, placement, and affordance must predict what happens next.
+
+## Select Scope
+
+Static review uses the supplied page/screenshots and reports unobserved behavior.
+A bounded journey review exercises that journey and relevant edge cases. Only a
+requested comprehensive experience audit expands to all platforms, lifecycle
+paths and viewport extremes. Apply the checklist below within the selected
+scope; do not turn each item into a mandatory separate execution.
 
 ## Establish the review boundary
 
@@ -94,7 +102,7 @@ For each suspected defect:
    Enter from the preceding real screen; a fixture that mounts the destination directly cannot prove entry position, navigation, or transition behavior.
 2. Record the entry path, starting state, action, actual result, and expected result.
 3. Confirm the implementation cause before proposing a fix.
-4. Add a red-capable regression test at the lowest public layer that proves the contract. Add integrated or lifecycle coverage when the defect crosses boundaries.
+4. Recommend regression coverage in review-only mode. When implementation is authorized, add a red-capable regression test at the lowest reliable layer and integrated/lifecycle coverage for changed cross-boundary behavior.
 5. After a fix, replay the complete journey, not only the failing step. Synchronize maintained Storybook scenarios with the accepted production behavior.
 
 Use screenshots or recordings for layout and temporal evidence. Use tests for behavioral durability. Neither replaces the other.

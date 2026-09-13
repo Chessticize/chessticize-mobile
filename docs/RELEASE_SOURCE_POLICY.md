@@ -4,6 +4,28 @@ Chessticize Mobile embeds Stockfish and is distributed as GPL-3.0-or-later.
 Every binary submitted to App Store Connect or Google Play must have a matching
 public source release.
 
+## Delivery Stages
+
+Follow AGENTS and `docs/agents/pr-workflow.md`: `main` is the integration hub.
+Astra may merge usable, sufficiently tested increments and upload Dev or
+Production TestFlight builds without another user confirmation. User device
+feedback follows delivery and becomes new PRs from `main`.
+
+TestFlight preparation does not require coordinated release branches, an RC
+freeze, final store marketing approval, both platforms, or final user acceptance.
+Use an isolated short preparation branch from current `main` when build identity
+files need updating, and integrate that increment through the normal PR workflow.
+Preserve each app's actual bundle/signing identity and unused store build number;
+never repurpose a Debug signing setup as a TestFlight distribution configuration.
+
+Formal public Production release requires the owner's final go/no-go. Prepare
+its concrete candidate and risk summary before that decision; reuse a decision
+already given for that candidate and scope. The release checklist below is for
+that stage. Public-source and artifact provenance apply to distributed builds
+at either stage, but do not imply a full QA or marketing-approval requirement.
+Use `docs/TESTING_ARCHITECTURE.md` for risk-based evidence reuse even at final
+release. A low-risk change or new SHA never demands full QA on its own.
+
 ## Required Rule
 
 For each submitted binary:
@@ -14,7 +36,7 @@ For each submitted binary:
 2. Create a signed or annotated platform repository tag for the submitted
    version and build, for example `ios-v1.0.0-build-1` or
    `android-v1.1.0-build-1`.
-3. Create and approve the matching customer-facing file under `docs/releases/`
+3. Create and review the matching customer-facing file under `docs/releases/`
    as defined by `docs/RELEASE_NOTES.md`. Its filename must match the platform
    source tag, and it must be part of the exact tagged commit.
 4. Publish a GitHub release for that tag before or at the same time as App
@@ -87,14 +109,10 @@ before it is squash-merged into the release branch. These integration PRs use
 `gh pr merge --squash --delete-branch`, leaving one intentional release-branch
 commit per completed work package.
 
-After integration, run the cross-change QA, release build, and selected native
-validation from a clean exact release-branch head. Do not treat a passing
-contributor branch as automatically valid integrated release evidence. Reuse
-its validation App artifact only when the fail-closed App-input comparison
-proves the App source is an ancestor of the release test runner and their
-App-input digests match; rerun any test evidence changed by the integration.
-This does not reuse or relabel a signed distribution candidate: build and bind
-that candidate to the exact final release-branch head.
+After integration, assess cross-change risk and run only validation invalidated
+by that integration. Reuse contributor evidence under Testing Architecture;
+low-risk App changes do not invalidate all native evidence. Build a submitted
+binary from its declared source; do not relabel another signed artifact.
 
 The exact validated release-branch head is the source for the submitted
 binaries and the immutable iOS and Android platform tags. The later merge
@@ -103,15 +121,14 @@ next-version work. Its release-side parent preserves the exact release commit
 and SHA; the merge commit is not the released source tag target and must never
 move or replace that tag.
 
-Keep the release PR draft until the exact identity, approved build-specific
-customer notes, fast checks, selected native evidence, release review, exact
-platform tags, and uploaded binaries are complete. Mark it ready only after
-every platform included in the coordinated release has been formally submitted
-for store review. Once those submissions report an in-review state, merge the
-release PR; do not wait for store approval, public availability, or the
-post-Play APK mirror. Continue tracking those post-merge outcomes against the
-immutable platform tags and release evidence. The final release PR to `main` is
-the only merge-commit exception.
+Merge the usable, reviewed release preparation increment when necessary checks
+pass. Do not wait for TestFlight acceptance, another platform, store submission,
+or an in-review state. Track subsequent upload, review, public release and APK
+mirror outcomes independently against immutable platform tags. The coordinated
+release PR uses a merge commit to preserve source history; ordinary preparation
+and feature PRs use squash. A merged release record is not a public-release
+approval.
+
 Keep merge commits enabled in the GitHub repository and merge that PR with
 `gh pr merge --merge --delete-branch`, preserving the release branch's
 already-squashed work-package commits under one explicit release merge commit.
@@ -121,8 +138,9 @@ contributor branch or a partially integrated release branch.
 
 ## Release Candidate Freeze
 
-Use an explicit release-candidate generation instead of treating the release
-branch as permanently frozen:
+Use an RC generation only for a formal Production candidate that needs
+stabilization; ordinary main/TestFlight iteration needs no freeze. A generation
+records the candidate and remaining risk, not a requirement to repeat all QA:
 
 1. **Integration open:** approved work for the release may enter through
    contributor PRs. Do not spend final release-build or native-validation time
@@ -135,7 +153,8 @@ branch as permanently frozen:
    Only one generation is active.
 3. **RC accepted:** required current-head fast checks, selected native evidence,
    release review, notes, and identity gates pass for that generation. Only the
-   latest accepted generation may be tagged, signed, submitted, or published.
+   accepted candidate may be publicly released; TestFlight delivery follows the
+   lighter delivery stage above.
 4. **Remediation:** a required App or release-identity correction invalidates
    the active generation before the release branch moves. Record
    `RC-State: invalidated`, the blocking finding, and the invalidated evidence.
@@ -162,69 +181,33 @@ Validation findings use these exception paths:
   current generation and enter remediation. Add the lowest reliable regression
   test, merge the reviewed focused fix into the release branch with squash,
   batch all other known blockers, and freeze the resulting head as the next
-  generation. Run exact-head fast checks, rebuild affected App or signed
+  generation. Run affected checks, rebuild required App or signed
   artifacts, and rerun only the validation gates invalidated by the changed
   boundary. Full native validation is required only when the resulting risk is
   broad.
-- **Record-only correction:** queue non-blocking documentation, review
-  metadata, or agent-guidance changes until after release so the frozen head
-  stays stable. If the correction is required for this release, use remediation
-  and a new generation; native App evidence may still be reused when the
-  fail-closed comparison passes, but current-head fast and exact identity checks
-  remain required.
+- **Record-only correction:** retain valid evidence and update the record.
+  Documentation changes do not force remediation, a new generation, or native
+  execution. Record the actual source of any newly built distribution artifact.
 
 If a frozen generation already has an immutable platform tag, signed candidate,
 or store-consumed build identity, follow the platform replacement rules. Never
 move the tag or reuse the consumed build number or Android version code.
 Retain invalidated generations and their artifacts as audit evidence.
 
-## Pre-Retry Convergence Sweep
+## Failure Recovery
 
-Do not immediately restart a complete release matrix after its first failure.
-Use one convergence pass to find and batch every issue that can be discovered
-without another full native run:
+Preserve failing output, classify the failure and inspect the changed boundary.
+Repair the lowest reliable layer and run the affected regression test. Retry
+only invalidated checks; independent passing results remain valid. Inspect the
+other platform only when shared inputs or identities changed. Do not rerun
+both platform doctors, all fast suites, CocoaPods installation, screenshots or
+full native QA for an unrelated failure. Rebuild only artifacts whose inputs
+changed and which are needed for new execution or distribution.
 
-1. Keep failed command output and local artifacts. Let independent fast checks
-   finish unless continuing them is unsafe, because they may expose additional
-   blockers without another native build.
-2. Record the exact commit and Git tree, then inspect every failed, cancelled,
-   or timed-out step. Classify each result as a product regression, stale
-   deterministic evidence or fixture, local infrastructure failure,
-   credential/signing gate, or store-console gate. A retry is not a substitute
-   for classification. For Android matrix failures, retain and inspect
-   `api-<level>.progress.json`; it identifies the last running step even when
-   the bounded matrix command is terminated.
-3. Audit both platform identities together: public version, iOS build number,
-   Android version code, proposed annotated tags, build-specific release-note
-   filenames and links, and the absence of an immutable tag or store build that
-   would be reused accidentally.
-4. Run the complete fast proving layer on the proposed fix head: core/storage
-   tests, root and mobile typechecks, mobile component tests, lint, App Store
-   preflight/signing/third-party checks, screenshot audit when applicable, and
-   Android doctor plus release-policy tests. Run focused real-adapter tests for
-   every changed fixture or native boundary. For iOS, run the locked CocoaPods
-   installer so a restored `Pods/Manifest.lock` is checked against the
-   committed `Podfile.lock` before another full native build.
-5. Put all coherent release-validation fixes in one release-fix PR. For every
-   stale fixture or assertion, add a fast consistency test that would have
-   rejected the mismatch before the native matrix.
-6. Recheck the diff, clean tracked worktree, exact PR head, open PRs, and remote
-   `main`. Resolve all known blockers before spending the full native retry.
-7. Run the required local iOS evidence once after the last App build input
-   change and merge once. If the PR head or squash-merged release candidate
-   changes only host-side specs, selectors, assertions, evidence collectors, or
-   non-bundled fixtures, verify the App-input digest, reuse the checksummed App
-   bundle, and rerun only the affected scope. Documentation, review metadata,
-   agent guidance, and merge ancestry require no native rerun. Record the App
-   source SHA, test-runner SHA, App-input digest, artifact checksum, and focused
-   results. Android test-only reruns use the local retained-APK procedure in
-   `docs/ANDROID_VALIDATION.md`.
-
-If that final run reveals a genuinely new deterministic failure, preserve it,
-extend the fast proving layer that missed it, and repeat this sweep. A
-test-runner-only correction reruns the affected scope against the verified App
-artifact; an App build input correction rebuilds and reruns the selected native
-scope. Never hide an unexplained failure with a successful rerun.
+Keep test-runner fixes separate from product failures in the evidence. An
+artifact-reuse comparison authenticates the retained binary; Astra's risk
+assessment determines which test results still apply. Record both decisions.
+An unexplained deterministic failure cannot be hidden by a successful retry.
 
 ## Release Checklist
 
@@ -237,12 +220,12 @@ scope. Never hide an unexplained failure with a successful rerun.
   missing Apple Developer Team ID, Xcode, or Apple distribution identity before
   archiving.
 - Record the release validation scope from `docs/TESTING_ARCHITECTURE.md`.
-  Ordinary deltas use exact-head fast checks plus the platform's signed-artifact
+  Ordinary deltas reuse valid checks and add affected checks plus signed-artifact
   checks; targeted changes run the affected simulator/emulator suite, and only
   broad native changes require both `flows` and `practice`. Physical-device
   testing is optional and does not block App Store or Play submission, or APK
-  mirroring. Passing native evidence remains reusable across later
-  non-development changes when the unchanged-input comparison is recorded.
+  mirroring. Passing native evidence remains reusable across later changes when Astra
+  records why the tested behavior is unaffected; see Testing Architecture.
 - Run `pnpm app-store:third-party-audit` from the final lockfile and resolve
   any stale package, Stockfish, NNUE, or puzzle-data notice.
 - When screenshots or store metadata changed, run
@@ -250,8 +233,8 @@ scope. Never hide an unexplained failure with a successful rerun.
   scene or invalid pixel size before uploading screenshots.
 - Run `pnpm app-store:release-manifest` from the clean release commit and save
   the JSON output with the GitHub release or the TestFlight QA evidence.
-- For first launch, a new App Store version, screenshot/metadata changes, or
-  broad native risk, run
+- When the public-release evidence bundle is needed for first launch, changed
+  store assets or broad uncovered risk, run
   `pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final`
   from the clean candidate commit to collect the full evidence bundle.
 - Follow `docs/APP_STORE_UPLOAD.md` to archive and upload with
@@ -308,6 +291,6 @@ runtime dependency patches are disclosed, and confirms that the Stockfish,
 NNUE, and Lichess puzzle-data notices match the bundled release artifacts.
 
 This audit is required before tagging a submitted App Store binary. It is still
-not a replacement for the release owner reading the notices against the final
-submitted build, because license interpretation and App Store submission remain
-human release decisions.
+used to prepare the owner's final Production decision. Reuse reviewed notices
+when dependencies and disclosures are unchanged; beta uploads need no repeated
+human notice review.

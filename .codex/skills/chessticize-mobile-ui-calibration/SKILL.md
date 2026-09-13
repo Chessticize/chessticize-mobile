@@ -26,10 +26,9 @@ full-screen iPhone rotation.
   device checks are a separate, explicitly requested workflow and are never
   accepted as substitutes for the named simulator evidence.
 - Commit the intended changes and require a clean tracked worktree before
-  producing exact-head evidence. Any later visual, runtime, native, dependency,
-  capture-fixture, or build-configuration change invalidates it. Documentation,
-  review metadata, and merge ancestry alone may reuse it when both SHAs and the
-  unchanged-input diff are recorded.
+  producing exact-head evidence. Later changes invalidate only affected scenes or behavior. Reuse unchanged
+  visual evidence with the tested source and impact rationale; never relabel
+  an old image as newly captured. A new SHA alone does not invalidate it.
 - Capture Release, not Debug. Debug exposes puzzle-source and Review developer
   controls that must not appear in the product baseline.
 - Keep raw screenshots under ignored `scratch/` or `apps/mobile/artifacts/`.
@@ -43,8 +42,8 @@ full-screen iPhone rotation.
 
 ### 1. Establish the Storybook contract
 
-For a new UI flow, follow `docs/agents/ui-flow-design.md` before production
-wiring. Run the headless Lab validation, push the exact reviewed commit, open or
+For a new UI flow, follow `docs/agents/ui-flow-design.md` for incremental
+integration. Run the headless Lab validation, push the exact reviewed commit, open or
 update its issue-scoped PR, and wait for GitHub Actions to publish that branch's
 Vercel preview:
 
@@ -55,8 +54,7 @@ pnpm mobile:lab:validate
 Do not start `pnpm mobile:storybook` or use localhost as the review surface.
 Inspect the affected scenario at the relevant viewport on the stable branch
 Vercel URL and record that URL. For an existing flow regression, use its current
-hosted story as the comparison reference and add or update component assertions
-before changing the product UI.
+hosted story as the comparison reference and recommend component assertions; add them when repair is authorized.
 
 ### 2. Select capture scope
 
@@ -171,9 +169,11 @@ novice-hostile copy as a real mismatch even when it renders without clipping.
 The text must describe the UI and consequence the user can actually observe,
 not merely mirror an internal implementation name.
 
-### 4. Fix and repeat
+### 4. Report Or Repair Within Scope
 
-When a mismatch is real:
+For calibration/review-only requests, report real mismatches and recommended
+regression coverage without changing product code or tests. Only when repair
+is authorized:
 
 1. Add or update a component regression test when the public behavior can be
    asserted below the simulator layer.

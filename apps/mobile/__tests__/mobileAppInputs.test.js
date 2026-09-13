@@ -163,7 +163,7 @@ describe('mobile App input identity', () => {
     })).toThrow(/Changed App build inputs: .*App\.tsx.*unknown-release-input/);
   });
 
-  it('requires the App source to be an ancestor of the test runner', () => {
+  it('rejects different App inputs on an unrelated history', () => {
     const { repoRoot, sourceSha } = createRepository();
     runGit(repoRoot, ['checkout', '--orphan', 'unrelated']);
     runGit(repoRoot, ['rm', '-rf', '.']);
@@ -174,7 +174,36 @@ describe('mobile App input identity', () => {
       appSourceSha: sourceSha,
       repoRoot,
       testRunnerSha: unrelatedSha,
-    })).toThrow('must be an ancestor');
+    })).toThrow('App build inputs differ');
+  });
+
+  it('verifies retained bytes after a squash with equivalent App inputs', () => {
+    const { repoRoot, sourceSha } = createRepository();
+    const artifactPath = path.join(repoRoot, 'build/Chessticize.app');
+    const manifestPath = path.join(repoRoot, 'build/app-manifest.json');
+    const outputPath = path.join(repoRoot, 'build/reuse.json');
+    runGit(repoRoot, ['checkout', '-b', 'feature']);
+    write(repoRoot, 'apps/mobile/src/App.tsx', 'export const app = 2;\n');
+    const appSourceSha = commitAll(repoRoot, 'Usable feature');
+    write(repoRoot, 'build/Chessticize.app/main.jsbundle', 'feature bundle\n');
+    recordArtifactManifest({ appSourceSha, artifactPath, outputPath: manifestPath, repoRoot });
+
+    runGit(repoRoot, ['checkout', '-b', 'integration', sourceSha]);
+    runGit(repoRoot, ['merge', '--squash', 'feature']);
+    const testRunnerSha = commitAll(repoRoot, 'Integrate usable increment');
+    expect(spawnSync('git', ['merge-base', '--is-ancestor', appSourceSha, testRunnerSha], {
+      cwd: repoRoot,
+    }).status).toBe(1);
+    expect(verifyArtifactReuse({
+      appSourceSha, artifactPath, manifestPath, outputPath, repoRoot, testRunnerSha,
+    })).toMatchObject({ appBuildInputsUnchanged: true, artifactBytesUnchanged: true });
+
+    write(repoRoot, 'apps/mobile/src/App.tsx', 'export const app = 3;\n');
+    const changedSha = commitAll(repoRoot, 'Change runtime');
+    expect(() => verifyArtifactReuse({
+      appSourceSha, artifactPath, manifestPath, outputPath, repoRoot, testRunnerSha: changedSha,
+    })).toThrow('App build inputs differ');
+    fs.rmSync(repoRoot, { recursive: true, force: true });
   });
 
   it('records and verifies unchanged artifact bytes across a test-only commit', () => {

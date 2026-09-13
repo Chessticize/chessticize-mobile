@@ -316,77 +316,9 @@ assert.equal(landingPageAssetManifest.schemaVersion, 1);
 assert.equal(landingPageAssetManifest.assets.length, 11);
 assert.match(landingPageTest, /ships optimized, reproducible marketing images/);
 
-assert.match(uiFlowDesign, /must not begin\s+production wiring/i);
-assert.match(uiFlowDesign, /stable Storybook URL/);
-assert.match(uiFlowDesign, /explicit design approval/);
-assert.match(uiFlowDesign, /full Storybook/i);
-assert.match(uiFlowDesign, /Reset `newScenarioMarkers\.json`/i);
-assert.match(uiFlowDesign, /without\s+launching a local Storybook server/i);
-assert.match(uiFlowDesign, /Do not commit generated\s+Storybook bundles/i);
-assert.match(uiFlowDesign, /modify that existing\s+story incrementally/i);
-assert.match(uiFlowDesign, /post-implementation product/i);
-assert.match(labReadme, /Do not add a parallel standalone page/i);
-assert.match(prTemplate, /Storybook-first design approved before product wiring/);
-assert.match(prTemplate, /Storybook-only design increment/);
-assert.match(prTemplate, /Stable branch Storybook manager URL:/);
-assert.match(prTemplate, /Reset every previous design marker/);
-assert.match(prTemplate, /not a local Storybook server/);
-assert.match(prTemplate, /Design approval record:/);
-
-for (const triagePolicy of [issueTriageSkill]) {
-  assert.match(triagePolicy, /docs\/agents\/issue-triage\.md/);
-  assert.match(triagePolicy, /Storybook/);
-  assert.match(triagePolicy, /product implementation/i);
-}
-
-for (const triagePolicy of [issueTracker, issueTriage, issueTriageSkill]) {
-  assert.match(triagePolicy, /docs\/agents\/ui-flow-design\.md/);
-  assert.match(triagePolicy, /relationship suggestions are advisory/i);
-  assert.match(triagePolicy, /do not consolidate/i);
-  assert.match(triagePolicy, /explicit human\s+approval/i);
-}
-
-for (const uiTriagePolicy of [issueTriage, issueTriageSkill]) {
-  assert.match(uiTriagePolicy, /existing product-clone/i);
-}
-
-assert.doesNotMatch(issueTriage, /possible implementation groupings/i);
-assert.doesNotMatch(issueTriageSkill, /possible implementation groupings/i);
-assert.doesNotMatch(issueTriage, /Decide implementation grouping separately/i);
-assert.doesNotMatch(issueTriageSkill, /Decide later implementation grouping separately/i);
-
-for (const priority of ["P0", "P1", "P2", "P3"]) {
-  assert.match(issueTriage, new RegExp(priority));
-}
-
-for (const triageContract of [issueTriage, issueTriageSkill]) {
-  assert.match(triageContract, /high uncertainty/i);
-  assert.match(triageContract, /full Storybook/i);
-  assert.match(triageContract, /issueNumber/);
-  assert.match(triageContract, /explicit\s+(design\s+)?approval/i);
-  assert.match(triageContract, /merge to `main`/i);
-  assert.match(triageContract, /reset[\s\S]*marker/i);
-}
-
-assert.match(issueTriage, /0\.5–2 engineering days/);
-assert.match(issueTriage, /3–5 engineering days/);
-assert.match(issueTriage, /1–2 engineering weeks/);
-assert.match(issueTriage, /2–4\+ engineering weeks/);
-assert.match(issueTriage, /do not invent or apply them/i);
-assert.match(issueTriage, /Each feedback issue owns its own Storybook design track/i);
-assert.match(issueTriage, /every UI or functional-feature issue/);
-assert.match(issueTriage, /native-only behavior/);
-assert.match(issueTriageSkill, /one\s+Storybook design track.*per\s+issue/is);
-assert.match(issueTriageSkill, /every UI or functional-feature issue/);
-assert.match(issueTriageSkill, /do not invent priority\s+labels/i);
-assert.match(issueTriageSkill, /codex\/storybook-issue-<number>-<goal>/);
-// Public access is checked by the deployment workflow below; policy copies
-// need not repeat a particular sentence.
-assert.doesNotMatch(issueTriageSkill, /owner-only deployment/i);
-assert.match(issueTriage, /Vercel Preview is a review artifact/);
-for (const lifecycleContract of [issueTriage, issueTriageSkill, uiFlowDesign, processWorkflow]) {
-  assert.doesNotMatch(lifecycleContract, /sites\/storybook-previews|preview-manifest/);
-}
+// Guidance is validated through reachable links above. Do not freeze prose,
+// approval gates, or workflow choices with regex assertions; executable marker,
+// deployment and release contracts are checked below.
 
 assert.match(mobileLabWorkflow, /branches: \["\*\*"\]/);
 assert.match(mobileLabWorkflow, /Deploy branch Storybook to Vercel/);
@@ -508,7 +440,6 @@ assert.match(prTemplate, /Review-Baseline: <40-character commit SHA>/);
 assert.match(prTemplate, /Reviewed-Through: <40-character commit SHA>/);
 assert.match(prTemplate, /Review-Result: pending\|findings\|pass/);
 assert.match(prTemplate, /PR merge base/);
-assert.match(prTemplate, /full-review trigger/i);
 
 assert.match(androidReleaseSkill, /Google Play processes Android binaries/);
 assert.match(androidReleaseSkill, /GitHub publishes corresponding\s+source/);
@@ -567,7 +498,6 @@ assert.match(releaseNotesTemplate, /## Release-note review/);
 assert.match(releaseNotesTemplate, /at most 300 Unicode\s+characters/);
 assert.match(releaseNotesTemplate, /contains no raw URL/);
 assert.match(releaseNotesTemplate, /releases\/tag\/<ios\|android>/);
-assert.match(releaseNotesTemplate, /release owner approved the copy before the source tag was created/i);
 
 assert.match(localE2eSkill, /CHESSTICIZE_E2E_SCOPE/);
 assert.match(localE2eSkill, /Replace `practice` with `flows` or `full`/);
@@ -631,21 +561,6 @@ assert.match(
   /CHESSTICIZE_E2E_EXPECTED_VERSION_SOURCE="\$variant"/
 );
 
-for (const option of [
-  "- [ ] No mobile Detox",
-  "- [ ] Targeted `flows` spec or suite",
-  "- [ ] Targeted `practice` spec or suite",
-  "- [ ] Full `flows` and `practice`",
-  "- [ ] Optional focused simulator screenshot only"
-]) {
-  assert.match(prTemplate, new RegExp(option.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-}
-assert.match(prTemplate, /only for releases and native-impacting changes/i);
-assert.match(prTemplate, /App-input comparison/i);
-assert.match(prTemplate, /test-runner-only change/i);
-assert.match(prTemplate, /RC freeze \(release PRs and release-blocker PRs only\)/);
-assert.match(prTemplate, /Evidence-only test-runner correction/);
-assert.match(prTemplate, /prior RC was invalidated/);
 assert.match(androidValidation, /During an active RC freeze/);
 assert.match(androidValidation, /invalidates that RC\s+generation/);
 assert.match(androidValidation, /rebuild only the affected artifacts and validation scope/);
@@ -661,13 +576,6 @@ for (const rcFreezePolicy of [
     rcFreezePolicy,
     /next\s+(?:RC\s+)?generation|new frozen\s+generation/
   );
-  assert.match(rcFreezePolicy, /exact-head\s+fast checks/);
-}
-
-for (const releaseDoc of releaseDocs) {
-  assert.match(releaseDoc, /exact/);
-  assert.match(releaseDoc, /delta/i);
-  assert.match(releaseDoc, /physical/i);
 }
 
 assert.equal(releaseVersion.publicVersion, "1.5.2");
@@ -683,7 +591,7 @@ assert.match(releaseVersioning, /mobile:version:advance-development/);
 assert.match(releaseVersioning, /mobile:version:set-development/);
 assert.match(releaseVersioning, /1\.5\.0/);
 assert.match(releaseVersioning, /2\.0\.0/);
-assert.match(releaseVersioning, /Do not bump either file merely because a store changes/);
+
 assert.match(releaseSourcePolicy, /mobile:version:prepare-release/);
 assert.match(releaseSourcePolicy, /mobile:version:advance-development/);
 for (const command of [

@@ -10,16 +10,16 @@ Choose the changed boundary before running commands. This is a routing guide;
 required native scope and evidence reuse. Read the relevant section when making
 those decisions, not every platform runbook.
 
-## Design Before Product Wiring
+## Incremental UI Delivery
 
-For a new UI flow, follow [UI flow design](../../../docs/agents/ui-flow-design.md)
-and obtain explicit design approval before product wiring. Update the existing
-product-clone story and its corresponding first-use guidance. Small fixes within
-an approved flow do not automatically restart design approval.
+For UI work, use [incremental design](../../../docs/agents/ui-flow-design.md).
+Merge usable, tested increments into the `main` integration hub; user review and
+polish continue in later PRs. Update stories and guidance when their behavior
+changes. Wait for design approval only when the current user explicitly asks.
 
-A requested Storybook review uses [the branch Vercel deployment](../../../docs/STORYBOOK_DEPLOYMENT.md).
-Run local headless validation before push; GitHub Actions publishes the preview.
-Do not launch `pnpm mobile:storybook` or hand off localhost for design review.
+For a requested hosted Storybook handoff, use
+[branch Vercel deployment](../../../docs/STORYBOOK_DEPLOYMENT.md). Headless Lab
+validation is enough for ordinary iteration until a visual handoff is needed.
 
 ## Select The Development Loop
 
@@ -48,8 +48,8 @@ lowest layer that detects the reported bug.
   Reuse an accepted review checkpoint for bounded follow-ups; full review and
   native evidence reuse are separate decisions.
 - **iOS native testing/environment:** [Local E2E](../chessticize-mobile-local-e2e/SKILL.md).
-  Select `flows`, `practice` or `full` before building. iOS release simulator
-  E2E runs the selected scope with `CHESSTICIZE_E2E_VARIANTS=both`.
+  Select the affected spec, `flows`, `practice` or `full` before building.
+  Choose Debug, Release or both by the identity and configuration risk.
 - **Android native testing:** [Android validation](../../../docs/ANDROID_VALIDATION.md).
   Emulator and Detox execution stays local.
 - **Native visual acceptance:** [UI calibration](../chessticize-mobile-ui-calibration/SKILL.md).
@@ -66,12 +66,13 @@ lowest layer that detects the reported bug.
 
 ## Completion
 
-State the changed behavior, focused results and selected validation scope in
-the PR. Native evidence may span commits only under the App-input comparison
-in Testing Architecture, with App source SHA, test-runner SHA, App-input digest
-and artifact checksum. Test-runner-only changes rerun affected evidence;
-record-only changes do not force another native build. Signed distribution
-candidates still bind to the exact final release head.
+State the usable increment, focused results, reused evidence, and remaining
+acceptance in the PR. Testing Architecture distinguishes artifact reuse from
+risk-based test-evidence reuse. An App input change does not automatically
+invalidate every prior test; a distribution build records its actual source.
+Astra may merge and deliver Dev or Production TestFlight after sufficient
+validation without waiting for final user review. Public Production release
+retains the owner's final decision.
 
 Do not rerun unaffected tests or visual scenes solely because a review comment
 or documentation changed. Report any required evidence that remains blocked,

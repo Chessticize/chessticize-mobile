@@ -53,11 +53,12 @@ Use distinct gates instead of treating every PR as a release candidate:
 | --- | --- | --- |
 | Pull request | Prove the changed behavior at the cheapest reliable layer | Path-scoped fast CI; native validation only for native-impacting changes |
 | Local native | Prove simulator/emulator and native behavior without a hosted native test build | One local build followed by the selected Detox scope |
-| Release candidate | Prove the exact source tree intended for distribution | Exact-head fast checks, risk-scoped local simulator/emulator validation, and signed-artifact checks |
+| TestFlight (Dev or Production) | Deliver the integrated usable increment | Necessary automated checks, risk-based evidence reuse, and actual build/signing identity |
+| Public Production release | Final owner go/no-go on the integrated product | Review accumulated risk, affected validation and signed-artifact/store checks; reuse unaffected evidence |
 
 Every PR must pass its relevant unit, integration, CLI E2E, component, and
 typecheck jobs. GitHub workflow path filters select the applicable fast jobs.
-Native validation is required only for a release candidate or a change to
+Select native validation for uncovered risk in
 native implementation, native integration/configuration, native dependencies,
 or native validation infrastructure. Non-release JavaScript/TypeScript product
 changes remain at the lower proving layers even when they affect navigation,
@@ -81,11 +82,11 @@ PR author selects one native-validation scope based on that boundary:
 
 GitHub Actions does not run Xcode builds, Android E2E APK builds, emulators,
 simulators, or Detox. Native validation on both platforms is local and required
-only for releases and native-impacting changes. Record the App source SHA,
+when native risk cannot be covered below that boundary. Record the App source SHA,
 test-runner SHA, App-input digest, selected scope, artifact checksum, build
 result, commands, results, and clean-worktree confirmation. A failed required
-fast check, failed selected native scope, or known product failure remains a
-merge blocker.
+fast check, failed selected native scope, or known fault that makes the increment unusable remains a
+merge blocker. Final device feedback and non-blocking polish may follow merge.
 
 When iPad landscape geometry is specifically in scope, run
 `pnpm mobile:verify:ios:landscape-layout` locally in addition to the selected
@@ -119,45 +120,36 @@ and mirror workflows require GitHub or Play credentials and remote release
 state. The other retained workflows are bounded fast checks or publication.
 Android emulator and test-only rerun workflows are intentionally absent.
 
-### Validation identity and test-only reruns
+### Artifact Identity And Evidence Reuse
 
-Validation-relevant inputs have three separate identities:
+Keep artifact reuse separate from the decision to rerun tests.
 
-1. **App build inputs** are production runtime and domain sources,
-   native/platform projects and native test-APK sources, dependency manifests,
-   lockfiles and patches, build/release configuration, and every fixture,
-   puzzle pack, engine, network, or resource compiled or bundled into the App.
-   The fail-closed classifier itself is also a trust-anchor input: changing it
-   requires one fresh validation build before later evidence can use the new
-   policy.
-2. **Test-runner inputs** are host-side Detox specs, selectors, waits,
-   assertions, screenshot/evidence collectors, non-bundled deterministic
-   fixtures, and local evidence-runner scripts.
-3. **Record-only inputs** are documentation, review metadata, agent guidance,
-   and merge ancestry that cannot change the built App or execute a product
-   test.
+- **Artifact reuse:** the existing validation App can execute new host-side
+  tests only when its relevant build inputs and artifact bytes are unchanged.
+  `node apps/mobile/scripts/mobile-app-inputs.js compare --app-source-sha <sha>
+  --test-runner-sha <sha> --output <path>` compares both Git trees, including
+  unknown paths conservatively. Equivalent inputs after squash/rebase are valid
+  even without ancestry. A changed runtime cannot be tested by relabeling an old
+  binary; build the current App when new native execution is needed.
+- **Evidence reuse:** Astra assesses which prior test conclusions the diff
+  invalidates. A low-risk App input change may need only a focused component or
+  core regression test; retain unaffected native results. Record the prior
+  tested source, latest change, affected boundary, results reused and any
+  supplemental checks. Do not require every test on one SHA or rerun the
+  previously selected full suite simply because a digest changes.
+- **Test-runner changes:** rerun affected tests against a verified matching App
+  artifact. Record the test-runner SHA and actual App identity independently.
+- **Record-only changes:** use relevant documentation/static checks. No native
+  rebuild or rerun; reuse successful CI evidence where the workflow permits it.
 
-Unknown or unclassified paths are App build inputs and fail closed. The
-repository classifier is
-`node apps/mobile/scripts/mobile-app-inputs.js compare --app-source-sha <sha>
---test-runner-sha <sha> --output <path>`. It computes the App-input digest from
-both Git trees and permits reuse only when the App source is an ancestor of the
-test runner and both digests are identical.
+Rebuild distribution artifacts from their declared source with the correct
+signing identity and an unused store build number. Never relabel an older signed
+candidate. Exact source provenance does not require exact-SHA full validation.
+Full QA is justified by broad uncovered risk, not a new commit or version.
 
-An App build input change requires a new validation App build and the selected
-native scope. A test-runner change invalidates only the affected test evidence:
-reuse the checksummed validation App artifact, reinstall or reset its sandbox,
-and rerun the smallest affected spec, suite, screenshot set, or device job. A
-record-only change requires current-head fast/static checks but neither a
-native rebuild nor a native rerun. Never change an expected result merely to
-convert a product failure into a test-only failure.
+Inspect failures before rerunning. Do not change expectations to hide a product
+regression. Required CI remains green; do not duplicate completed checks locally.
 
-Passing evidence may therefore span two commits. It records `appSourceSha`,
-`testRunnerSha`, `appInputDigest`, and the App artifact checksum, plus the
-selected test result. Exact-head fast checks still run on the final candidate,
-and the distributed signed artifact, tag, and corresponding source still bind
-to one exact release commit. Validation reuse never authorizes relabeling an
-ancestor's signed candidate as that final artifact.
 
 Android native validation runs on the local Android build machine at the
 risk-scoped layer selected for the change. The fail-closed runner is
@@ -177,29 +169,27 @@ When only a host-side Android test-runner input changes, prove the App-input
 digest and locally retained APK bytes are unchanged, then rerun one affected
 target without invoking Gradle.
 
-Before any release, run exact-head fast checks and select the same no-native,
-targeted, or full scope used for PRs. An ordinary delta does not rerun complete
-Detox and does not require physical-device installation. Run one
-affected simulator/emulator suite for targeted risk and both suites only for
-broad native risk. Whenever the selected iOS release scope includes simulator
-E2E, run that scope against both Debug-Dev and Release-Production with
-`CHESSTICIZE_E2E_VARIANTS=both`. Passing native evidence may be reused after a later commit
-or squash merge when the App-input comparison above passes; the commit SHA and
-full Git tree may differ. Test-runner changes rerun only their affected scope
-against the retained validation App artifact. Record the App source and
-test-runner SHAs plus the comparison. Real CloudKit, notification delivery,
-TestFlight upgrade, schema-upgrade, compatibility-matrix, and App Store
-screenshot checks remain conditional platform checks when that boundary
-changed or the store reports a problem.
+Before TestFlight or public release, assess accumulated changes since accepted
+evidence and select no-native, targeted or full scope by uncovered risk. Reuse
+unaffected results, including across low-risk product changes. Run only the
+affected spec or suite; full validation requires a broad reason.
+
+Choose `CHESSTICIZE_E2E_VARIANTS=debug`, `release` or `both` by the delivered
+identity and changed configuration. Use both only when configuration differences
+or coverage of both identities matters. A release or upload alone does not
+require dual execution. CloudKit, notification, upgrade, compatibility and
+store-screenshot checks apply only when their boundary changes or a problem
+requires investigation.
 
 Physical-device checks are optional diagnostic evidence, not a feature-PR or
 release gate. They may help diagnose install, real board input, Stockfish
 lifecycle, background/resume, reminders, backup-sensitive storage, CloudKit,
 notification delivery, or upgrade behavior, but store submission and APK
-mirroring do not wait for them. Any pre-release install on a personal iPhone
+mirroring do not wait for them. Routine local sideloading on a personal iPhone
 must use `pnpm mobile:ios:dev:device`, which installs the isolated Debug bundle
 and its Development-only CloudKit container. Do not sideload the production
-Release identity for routine device testing.
+Release identity for routine local device testing. Dev and Production
+TestFlight delivery are both authorized; user device feedback follows delivery.
 
 ## What Must Be Exhaustive
 
@@ -278,11 +268,10 @@ Local headless validation may build the catalog, but visual review always uses
 the pushed branch's GitHub Actions-managed Vercel preview rather than a local
 Storybook server.
 
-New UI flows must pass the Storybook-first design gate before production
-navigation, backend, storage, native-module, analytics, or rollout wiring
-begins. The approved scenario remains the living presentation contract during
-implementation. See `docs/agents/ui-flow-design.md`; this process gate does not
-change the native-risk validation scope described below.
+UI design and integration follow `docs/agents/ui-flow-design.md`. Usable,
+automatically tested increments may merge before final user review. Storybook
+stays current with the integrated product; it is not a default human approval
+gate before navigation, storage or native wiring.
 
 ## Detox Regression Scope
 

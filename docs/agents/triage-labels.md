@@ -6,14 +6,15 @@ snapshot of live labels.
 
 ## Live tracker preflight
 
-Before a workflow creates or labels an issue, inspect the live label registry:
+Before using labels in an authorized write, inspect the live label registry.
+Reuse the result within the batch unless label state changes:
 
 ```sh
 gh label list --limit 100 --json name --jq '.[].name'
 ```
 
 Every label required by that workflow must appear exactly. If one is missing,
-stop and report the tracker setup blocker. Do not silently substitute a stock
+report that label operation as blocked and continue independent authorized work. Do not silently substitute a stock
 GitHub label. Provisioning repository labels changes external tracker state and
 must be handled as an explicit repository setup action.
 

@@ -596,9 +596,9 @@ token. No temporary GitHub token is used.
 
 ## Build and repository audit
 
-After any failed complete release workflow, perform the cross-platform
-pre-retry convergence sweep in `docs/RELEASE_SOURCE_POLICY.md` before
-dispatching another full native run.
+After a failed check, use focused failure recovery in
+`docs/RELEASE_SOURCE_POLICY.md`. Reuse unaffected evidence and repeat only
+invalidated checks; do not restart both platforms or full QA automatically.
 
 1. Start from a clean exact candidate commit containing the canonical puzzle
    pack, Stockfish source and networks, license notices, lockfile, and approved

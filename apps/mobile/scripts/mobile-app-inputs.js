@@ -132,17 +132,6 @@ function changedPathsBetween(repoRoot, appSourceSha, testRunnerSha) {
 function compareMobileAppInputs({ appSourceSha, repoRoot, testRunnerSha }) {
   const normalizedAppSourceSha = assertExactSha(appSourceSha, 'App source SHA');
   const normalizedTestRunnerSha = assertExactSha(testRunnerSha, 'Test runner SHA');
-  const ancestry = spawnSync(
-    'git',
-    ['merge-base', '--is-ancestor', normalizedAppSourceSha, normalizedTestRunnerSha],
-    { cwd: repoRoot, encoding: 'utf8' },
-  );
-  if (ancestry.status !== 0) {
-    throw new Error(
-      `App source ${normalizedAppSourceSha} must be an ancestor of test runner ${normalizedTestRunnerSha}.`,
-    );
-  }
-
   const appSourceDigest = computeAppInputDigest(repoRoot, normalizedAppSourceSha);
   const testRunnerDigest = computeAppInputDigest(repoRoot, normalizedTestRunnerSha);
   const classifiedChanges = changedPathsBetween(

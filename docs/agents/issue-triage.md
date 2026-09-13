@@ -18,13 +18,13 @@ First identify both the issue set and the allowed writes:
   labels, comments, branches, or PRs.
 - Tracker triage may update labels and comments when requested, but it does not
   implicitly authorize closing issues or marking them `wontfix`.
-- Relationship suggestions are advisory. Do not consolidate tickets, close one
-  as a duplicate, move its scope, or create a shared handling track without
-  explicit human approval for that exact action.
+- Relationship suggestions are advisory during triage. Shared implementation
+  follows the PR workflow; it does not silently consolidate or close tickets.
 - A request to create a Storybook design authorizes its issue branch, PR, and
   GitHub Actions-managed Vercel preview. Triage-only requests remain read-only.
-- Product implementation requires a later explicit request. For a new UI flow,
-  it also requires recorded design approval.
+- A design-only request does not authorize product implementation. When
+  implementation is requested, follow the incremental UI flow contract; final
+  user design approval is not a default prerequisite.
 
 For a complete feedback batch, list the requested `user-feedback` issues and
 cross-check recently created issues for an omitted label. State the final issue
@@ -114,96 +114,28 @@ decisions could materially move the estimate.
   judgment, credentials, hardware, or account access.
 - `wontfix`: use only after an explicit maintainer decision.
 
-Do not mark a new UI flow ready for product implementation while its Storybook
-design choice is unapproved. The prototype PR may be ready for design review
-while the product issue remains in triage.
+A UI issue may be ready for an agent when its intended outcome and a usable
+increment are clear. Wait only for a material missing decision or an explicit
+user request to approve design first.
 
-## 7. Relate Issues Without Consolidating Them
+## 7. Relate Issues
 
-Each feedback issue owns its own Storybook design track, even when several
-issues touch the same screen or may later share an implementation. Link related
-issues and record shared dependencies, but give each issue its own:
+Keep each issue's acceptance and status traceable. Related issues with a shared
+root cause or implementation boundary may share a PR during authorized work.
+Do not consolidate acceptance criteria or close duplicates without authorization.
 
-- Issue-numbered Storybook branch and PR history.
-- New Scenario Marker ownership.
-- Full-Storybook deployment URL.
-- Approval record and implementation handoff.
+## 8. Requested UI Previews
 
-Relationship suggestions are advisory. Triage may suggest that shared handling
-could be considered, but it must present that as a question for human review,
-not as a grouping decision. Do not consolidate tickets, close one as a
-duplicate, combine acceptance criteria, create one Storybook track, or schedule
-one implementation track without explicit human approval. Until that approval
-is recorded, keep each ticket independently actionable and independently
-closable.
+For requested preview work with an actual presentation change, follow
+`docs/agents/ui-flow-design.md`: update the existing product-clone story,
+validate affected behavior, and publish using `docs/STORYBOOK_DEPLOYMENT.md`.
+Pure domain, storage and build work needs no Storybook slice. Native-only
+behavior uses reachable presentation states when useful; mark unproven native
+behavior rather than pretending browser evidence proves it.
 
-## 8. Prototype UI And Functional Feedback
-
-When Storybook design work is requested:
-
-1. Represent every UI or functional-feature issue in a Storybook design slice.
-   For native-only behavior, show its reachable presentation states and mark
-   the unproven native exit explicitly.
-   When the affected product screen already exists in the catalog, change that
-   existing product-clone story incrementally and preserve its stable URL; do
-   not invent a separate page for the feature. The full Storybook should
-   represent the expected product after implementation, with `new` highlighting
-   the delta.
-2. Create a branch named `codex/storybook-issue-<number>-<goal>` for one issue.
-3. Reset `newScenarioMarkers.json`, then add every new or materially changed
-   scenario owned by the current issue. Do not retain `new` markers from an
-   earlier design track, even when its issue remains open. Add the current
-   `issueNumber` and concise `changeNote`; the registry derives `isNew: true`
-   from the non-empty array.
-4. Add deterministic variants and important states to the complete Interaction
-   Lab catalog.
-   Prefer two or three structurally different directions when the decision is
-   genuinely open.
-5. Run headless Interaction Lab validation. Do not launch a local Storybook
-   server or use localhost for review.
-6. Push the exact reviewed commit, open or update the issue PR, wait for the
-   GitHub Actions-managed Vercel deployment, and inspect affected phone and wide
-   viewports there. Make the current issue's scenarios easy to find through the
-   `new` tag and What's New page.
-7. Link the issue, PR, deployment, exact commit, and design rationale in both
-   directions.
-
-A design PR may become ready and merge to `main` when its current interaction
-increment is coherent and its required checks pass. Merging design artifacts is
-not design approval and does not authorize product wiring. Continue later
-feedback rounds from current `main`, update the same issue-owned scenarios, and
-deploy through the new branch's isolated Vercel Preview and stable branch URL
-until the design is approved for implementation.
-
-Retain every scenario itself as living UI documentation. When the next
-issue-scoped Storybook design begins, reset all prior New Scenario Markers
-before adding the current issue. Pull-request CI rejects a newly introduced
-issue marker while an earlier design marker remains.
-
-The Storybook phase must not add production navigation, persistent storage or
-backend mutation, native-module wiring, analytics, rollout, or release logic.
-It cannot prove native latency, gestures, sound, haptics, or device behavior;
-record those as later diagnostic or validation work.
-
-### Hosted preview handoff
-
-Every requested Storybook design uses a hosted preview. Push the reviewed branch's exact
-commit and let the Mobile Interaction Lab GitHub Actions workflow deploy the
-complete `apps/mobile-lab` Storybook to the dedicated Vercel project. Each
-branch owns an isolated Preview deployment and stable branch URL; later pushes
-advance only that URL, while `main` owns the Production catalog. Stop if the
-recorded source branch or commit does not match the reviewed application
-branch. Every Storybook deployment is public and must not require
-authentication. Require the workflow's unauthenticated HTTP 200 check at
-`/storybook/` before handoff. Follow `docs/STORYBOOK_DEPLOYMENT.md`.
-Do not run `pnpm mobile:storybook` or hand off localhost; local execution is
-limited to headless validation and static builds.
-
-Do not commit `storybook-static`, copied bundles, a preview manifest, or hosting
-result files to the application branch. Generate deployment input in ignored or
-temporary storage and keep the source commit as the identity recorded in the
-issue and PR. A hosted preview does not approve a design or begin product
-implementation. A Vercel Preview is a review artifact, not a product release.
+A usable design or implementation increment can merge to `main` after review
+and necessary automated checks. Continue feedback with new PRs from `main`.
+A Vercel Preview is a review artifact; design-only scope remains design-only.
 
 ## 9. Leave A Durable Comment
 
@@ -221,13 +153,13 @@ Dependencies or missing evidence: <none or explicit list>
 
 Related issues: <none, or links plus shared dependency or implementation boundary>
 
-Relationship review: <none, or advisory suggestion requiring explicit human approval before consolidation or shared handling>
+Relationship review: <none, or related issues and a shared implementation boundary>
 ```
 
 For a published prototype, add a second comment containing the issue-scoped PR,
 branch, full Storybook URL, direct story URL, variant/state parameters, exact
-commit, validation result, excluded production boundaries, and explicit
-approval gate.
+commit, validation result, remaining acceptance, and any explicitly requested
+user decision.
 
 ## 10. Report The Backlog
 
@@ -236,9 +168,9 @@ Finish with:
 - The audited issue count and scope.
 - A table sorted by priority, then dependency order.
 - Category, effort, and uncertainty for every issue.
-- Related-issue suggestions and shared dependencies awaiting human review.
+- Related issues and shared dependencies.
 - Issue-scoped Storybook branches, deployments, and check status, if authorized.
 - Missing information, native/owner gates, and the next decision.
 
 Keep local verification distinct from remote CI, and keep completed triage
-distinct from unapproved implementation.
+distinct from completed implementation.

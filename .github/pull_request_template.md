@@ -2,58 +2,24 @@
 
 - <!-- Describe the coherent goal and user/developer impact. -->
 
-## UI flow design gate
+## Increment And Follow-up
 
-Select exactly one. For a new UI flow, the Storybook design slice and explicit
-approval must predate production wiring. See `docs/agents/ui-flow-design.md`.
+Describe the usable increment being integrated into `main`, remaining polish or
+user/device acceptance, and linked issues. Final user approval is required only
+when explicitly requested; subsequent feedback continues in new PRs.
 
-- [ ] Not a new UI flow
-- [ ] Storybook-only design increment; no product wiring
-- [ ] Storybook-first design approved before product wiring
-
-Linked UI issue:
-
-Storybook source branch:
-
-Stable branch Storybook manager URL:
-
-Direct story URL:
-
-Storybook source commit:
-
-Storybook anonymous access verification (the site is public and must not require authentication):
-
-New Scenario Marker lifecycle (select one):
-
-- [ ] Not applicable
-- [ ] Reset every previous design marker and added only the current issue marker(s)
-- [ ] Same-issue follow-up retained, moved, or removed only the current marker(s)
-
-Storybook review used the branch Vercel preview, not a local Storybook server:
-
-Design approval record:
-
-## Validation scope
-
-Native validation is required only for releases and native-impacting changes.
-Select exactly one scope and explain why the change does or does not cross that
-boundary.
-
-- [ ] No mobile Detox
-- [ ] Targeted `flows` spec or suite
-- [ ] Targeted `practice` spec or suite
-- [ ] Full `flows` and `practice`
-- [ ] Optional focused simulator screenshot only
-
-Rationale:
+For UI changes, link the updated story and hosted preview when a handoff is in
+scope. Omit UI fields for unrelated work. See `docs/agents/ui-flow-design.md`.
 
 ## Validation
 
-- [ ] Relevant focused regression test
-- [ ] Required path-scoped CI checks
-- [ ] Native evidence recorded when targeted/full is selected, or reuse documented with App source SHA, test-runner SHA, App-input comparison, artifact checksum, and the affected test rerun after a test-runner-only change
+- Changed behavior and necessary automated checks:
+- Results and reused evidence (tested source, affected diff, reuse rationale):
+- Native scope and identity, only when uncovered native risk requires execution:
+- Known limitations or follow-up acceptance:
 
-Commands and results:
+Do not duplicate CI locally or require all tests on the latest SHA. Artifact
+reuse and test-evidence reuse follow `docs/TESTING_ARCHITECTURE.md` separately.
 
 ## Review mode
 
@@ -77,33 +43,10 @@ incremental review, use the prior passing `Reviewed-Through`.
 
 Rationale or full-review trigger:
 
-## Release follow-up
+## Distribution (when in scope)
 
-Record conditional release gates and separately requested optional diagnostics.
-CloudKit, physical-device and TestFlight diagnostics are not automatic submission
-gates; use `docs/TESTING_ARCHITECTURE.md` to select required scope.
-
-- [ ] None
-- [ ] Native schema upgrade smoke
-- [ ] Optional signed CloudKit staging/manual diagnostics
-- [ ] Optional physical-device notification or interaction smoke
-- [ ] TestFlight upgrade or App Store screenshot validation
-
-Notes:
-
-## RC freeze (release PRs and release-blocker PRs only)
-
-- [ ] Not applicable
-- [ ] Integration open; no RC generation is frozen
-- [ ] Evidence-only test-runner correction; frozen App head is unchanged
-- [ ] Product/App-input/release-identity remediation; prior RC was invalidated
-
-RC generation and state:
-
-Frozen or invalidated release-branch SHA:
-
-Finding classification and affected boundary:
-
-App source SHA / test-runner SHA / App-input digest / artifact checksum:
-
-Invalidated gates and smallest required rerun:
+Dev or Production TestFlight may follow automated acceptance without waiting
+for final device feedback. Public Production release retains the owner's final
+go/no-go. Record the actual source/build identity, processing state and remaining
+acceptance separately. RC records apply only to formal stabilization, not
+ordinary `main` iteration.

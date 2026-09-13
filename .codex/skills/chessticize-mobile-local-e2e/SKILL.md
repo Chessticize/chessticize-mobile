@@ -24,23 +24,30 @@ as separate phases.
   `pnpm mobile:ios:dev:device`; do not use a Release device build for routine
   testing.
 - Commit the intended code first and require a clean worktree before producing merge evidence.
-- Rebuild and rerun the selected scope after an App build input changes. Those
-  inputs include mobile runtime/domain sources, native/platform projects and
-  native test-bundle sources, dependency manifests, lockfiles and patches,
-  build/release configuration, and bundled fixtures/resources. Host-side
-  specs, selectors, assertions, screenshot/evidence collectors, and
-  non-bundled fixtures are test-runner inputs: verify the App-input digest,
-  reuse the checksummed App bundle, and rerun only the affected scope.
-  Documentation, review metadata, and merge-parent changes force neither.
+- Separate artifact reuse from test-evidence reuse under Testing Architecture.
+  Build the current App when new native execution needs changed App inputs;
+  rerun only checks invalidated by the change. Low-risk runtime/copy edits do
+  not automatically invalidate all previous native results. Retained App reuse
+  requires unchanged build inputs and checksummed bytes, not Git ancestry.
+
+
 - Choose `flows`, `practice`, or `full` from the repository risk matrix. Do not default a routine PR to `full` without a broad native reason.
-- Use `CHESSTICIZE_E2E_VARIANTS=debug` for ordinary native-impacting PR
-  evidence. When an iOS release candidate requires simulator E2E, use
-  `CHESSTICIZE_E2E_VARIANTS=both`; the same selected scope must pass once on
-  Debug-Dev and once on Release-Production.
-- GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
-  validation is required only for releases and native-impacting changes. All
-  relevant fast CI checks must still pass on the current head.
+- Select `CHESSTICIZE_E2E_VARIANTS=debug`, `release` or `both` by the target
+  identity and configuration risk. Use both only when their differences need
+  testing; TestFlight or a release alone does not select both.
+- GitHub Actions does not run Xcode builds or iOS Detox. Select local native
+  validation only for uncovered native risk. Reuse valid CI and local results.
+
+
 - Do not weaken Ruby, package-manager, signing, or certificate checks to make setup pass.
+
+## Select The Entry Point
+
+On a working machine, run the environment doctor and proceed to the selected
+scope. Install or repair only missing dependencies; do not replay setup for
+an unchanged host. For diagnosis, read the matching failure section first.
+Use the wrapper or the manual sequence, not both; wrapper preflights need not
+be repeated separately.
 
 ## Prepare the Mac
 
@@ -62,7 +69,9 @@ sudo xcodebuild -license accept
 xcodebuild -runFirstLaunch
 ```
 
-Ask before running commands that require `sudo` or change the active developer directory.
+Prefer a process-local `DEVELOPER_DIR` for Xcode selection. Reuse explicit
+authorization for machine setup; ask only before a new, unauthorized privileged
+or machine-wide change, not again for an already approved operation.
 
 ### 2. Install Node, pnpm, and JavaScript dependencies
 
@@ -188,8 +197,8 @@ CHESSTICIZE_E2E_SCOPE=practice \
 ```
 
 Replace `practice` with `flows` or `full`. The runner defaults to `debug` for
-ordinary PR evidence. For release-candidate simulator E2E, set
-`CHESSTICIZE_E2E_VARIANTS=both`. The runner requires an explicit scope so a
+ordinary PR evidence. Choose the identity being tested; select `both` only for risk spanning both
+configurations. The runner requires an explicit scope so a
 routine PR cannot accidentally pay for the complete suite.
 
 The runner:
@@ -200,8 +209,8 @@ The runner:
 4. Verifies the dedicated simulator and iOS environment.
 5. Builds the selected Debug, Release, or both App variants with bundled
    JavaScript, or verifies and reuses each checksummed existing App bundle when
-   `CHESSTICIZE_E2E_REUSE_APP_SOURCE_SHA` names an ancestor whose App-input
-   digest matches the current test runner.
+   `CHESSTICIZE_E2E_REUSE_APP_SOURCE_SHA` names a source whose App-input
+   digest matches the current test runner, including equivalent squash/rebase trees.
 6. Normalizes only the known worktree-dependent Hermes checksum when that is the build's sole tracked change; any other tracked or untracked build output fails the gate.
 7. Runs the selected suite, or both suites for `full`, with one worker against
    each selected App identity.
@@ -222,8 +231,8 @@ CHESSTICIZE_E2E_SCOPE=practice \
 Each normal build writes an ignored, variant-specific artifact manifest
 containing the App source SHA, App-input digest, and App-bundle checksum. Reuse
 fails closed if either required manifest is absent, the artifact bytes changed,
-an App build input changed, or the App source is not an ancestor of the test
-runner.
+or an App build input changed. This artifact check does not decide whether
+unaffected prior test results remain valid.
 
 To run commands manually, use the same order and run only the selected scope. This example shows `practice`:
 
@@ -243,10 +252,9 @@ DETOX_ACTIVE_SUITE=practice ./node_modules/.bin/detox test \
   --configuration ios.sim.release --cleanup
 ```
 
-For an ordinary PR, run only the risk-selected Debug command. For a release
-candidate whose selected scope includes simulator E2E, run the same scope for
-both configurations. For `full`, run `flows` and `practice` for both
-configurations; reuse each configuration's build.
+The manual example shows both build identities for reference. Run only the
+selected configuration(s) and scope; a single-identity test needs one build.
+Full scope and dual identity are separate risk decisions.
 
 ## Release Host Resources After Validation
 
@@ -294,21 +302,14 @@ containing:
 - Full App source SHA and test-runner SHA.
 - App-input digest and App-bundle checksum.
 - Selected scope and rationale.
-- Selected identities: Debug-Dev for ordinary PR evidence, or both Debug-Dev
-  and Release-Production for release-candidate simulator E2E.
+- Selected identities and the risk that justifies one or both configurations.
 - Xcode version and simulator name.
 - Build command and success.
 - Each required suite command, pass count, and duration.
 - Total duration.
 - Confirmation that the worktree remained clean and `HEAD` did not change.
 
-Then verify all relevant fast checks on the current head. Later documentation,
-review metadata, or merge-parent changes do not invalidate native evidence.
-When the test runner differs from the App source, retain the fail-closed
-App-input comparison. Rebuild after any runtime, native/platform, native
-test-bundle, dependency, build/release, or bundled fixture/resource change.
-Rerun only affected test evidence after a host-side spec, selector, assertion,
-collector, or non-bundled fixture change. Release runs use delta, targeted, or
-full scope and require both suites only for broad native risk; whenever that
-scope includes iOS simulator E2E, run it for both identities with
-`CHESSTICIZE_E2E_VARIANTS=both`.
+Reuse relevant passing CI rather than duplicating it locally. Record which
+prior results remain valid and why, plus any affected rerun. Follow Testing
+Architecture for risk-based evidence reuse. Exact binary identity remains
+accurate; all tests need not run again on the latest SHA.
