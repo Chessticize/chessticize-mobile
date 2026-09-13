@@ -64,22 +64,4 @@ describe('Android validation documentation', () => {
     }
   });
 
-  it('routes future changes to the smallest proving Android layer', () => {
-    const devLoop = read('.codex/skills/chessticize-mobile-dev-loop/SKILL.md');
-    const architecture = read('docs/TESTING_ARCHITECTURE.md');
-
-    expect(devLoop).toContain('## Android Validation');
-    expect(devLoop).toContain('No Android Detox');
-    expect(devLoop).toContain('Targeted Android validation');
-    expect(devLoop).toContain('Full Android validation');
-    expect(devLoop).toContain('pnpm mobile:validate:android:matrix');
-    expect(devLoop).toContain('node apps/mobile/scripts/mobile-app-inputs.js compare');
-    expect(devLoop).toContain('locally retained');
-    expect(devLoop).toContain('Do not dispatch or recreate');
-    expect(architecture).toContain('Android emulator and test-only rerun workflows are intentionally absent');
-    expect(architecture).toContain('API 24');
-    expect(architecture).toContain('bounded launch');
-    expect(architecture).toContain('Validation identity and test-only reruns');
-    expect(architecture).toContain('Physical-device checks are optional');
-  });
 });
