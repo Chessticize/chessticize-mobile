@@ -20,8 +20,10 @@ only as explicit v1 fallbacks.
 
 ## Workflow
 
-1. Locate the exact raw capture directory. Require its `manifest.json`, all six
-   iPhone portrait PNGs, and all six native iPad landscape PNGs.
+1. Select the requested platform/device family before loading captures. For the
+   complete App Store set, require its manifest and six iPhone portrait plus six
+   iPad landscape PNGs. For Android, use only the Google Play workflow below;
+   focused previews require only their selected family.
 2. Run preview-only composition first:
 
    ```sh
@@ -38,7 +40,8 @@ only as explicit v1 fallbacks.
    headline is legible, every product screen remains the main proof, all four
    iPhone corners follow the photographed bezel without leaking or clipping,
    and the iPad set retains the real landscape hierarchy.
-4. Generate the upload-sized files after review:
+4. Generate the upload-sized files after Astra inspects the preview. Reuse
+   approved layout decisions; wait for user review only when explicitly requested:
 
    ```sh
    pnpm app-store:compose-marketing -- \

@@ -33,29 +33,34 @@
   test-only corrections, and focused fixes remain incremental unless their
   semantic impact meets a full-review trigger. A small native, persistence,
   signing, privacy, or release-identity change may still require full review.
-- Review reuse does not reuse stale validation evidence. Required fast checks
-  must pass on the current head. Native App evidence remains reusable only
-  while the fail-closed App-input digest is unchanged. A test-runner change
-  invalidates and reruns only the affected test evidence; documentation,
-  review metadata, and merge-parent changes alone invalidate neither.
+- Reuse review and validation by affected boundary under
+  `docs/TESTING_ARCHITECTURE.md`. Required CI must be green, but do not repeat
+  its checks locally or rerun unaffected suites merely for a new SHA. Record
+  remaining risks and the focused evidence that covers the latest increment.
 
 ## Feature Branches And Completion
 
-Use one feature-scoped branch and PR per coherent goal; push related follow-ups
-to that PR. Use a draft while the stated goal is incomplete, and mark it ready
-proactively once the goal and selected local validation are complete. A
-Storybook-only increment may complete while product wiring remains out of scope
-and its issue remains open.
+Use one feature-scoped branch and PR per usable increment from current `main`.
+Keep related follow-ups in that PR until it merges; subsequent feedback uses a
+new PR from `main`. Multiple issues with a shared root cause or implementation
+boundary may share a PR while retaining individual acceptance and status.
 
-Draft PRs receive the applicable path-scoped checks; ready PRs also receive
-Mobile JS checks when their paths apply. Pushes to open PR branches are
-authorized. Merge a complete, reviewed, ready PR after checking its actual
-required CI results and required local evidence with `gh pr checks` and the PR
-record. Missing branch protection is not a blocker or evidence of success. Do
-not merge an unfinished goal, red required check, incomplete selected native
-scope, or unresolved product issue in the stated goal. Use
-`gh pr merge --squash --delete-branch` for feature and contributor PRs, and
-delete or reuse stale `codex/*` feature branches after merge.
+Astra may mark the increment ready and merge when it is usable, reviewed, and
+its necessary automated checks pass. Final user review, device testing, and
+non-blocking polish need not be finished. Record remaining acceptance and follow-up
+work; do not close an issue whose requested outcome is still incomplete.
+Design-only requests remain design-only unless implementation is authorized.
+
+Pushes and merging these increments are authorized. Check actual required CI
+with `gh pr checks`; reuse completed local evidence by risk. Missing branch
+protection is not a blocker or proof of success. Do not merge failed required
+checks or known faults that make the increment unusable. Use
+`gh pr merge --squash --delete-branch` for feature and contributor PRs.
+
+`main` is the integration hub for one binary containing the latest features.
+Dev and Production TestFlight uploads may proceed without final user approval
+or device acceptance when delivery is in scope. They do not authorize formal
+public Production release; follow the release policy for that final decision.
 
 For coordinated releases, read [Release Source Policy](../RELEASE_SOURCE_POLICY.md)
 and [Release Versioning](../RELEASE_VERSIONING.md) before changing any branch or

@@ -64,7 +64,7 @@
     "mobile:e2e:test:ios": "pnpm --filter ChessticizeMobile e2e:test:ios",
     "mobile:e2e:test:ios:release": "pnpm --filter ChessticizeMobile e2e:test:ios:release",
     "mobile:e2e:test:ios:ci": "pnpm --filter ChessticizeMobile e2e:test:ios:ci",
-    "mobile:validate:ios:release": "CHESSTICIZE_E2E_VARIANTS=both .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh",
+    "mobile:validate:ios:release": "CHESSTICIZE_E2E_VARIANTS=${CHESSTICIZE_E2E_VARIANTS:-release} .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh",
     "mobile:e2e:resource-soak:ios": "pnpm --filter ChessticizeMobile e2e:resource-soak:ios",
     "mobile:e2e:store-assets:ios": "pnpm --filter ChessticizeMobile e2e:store-assets:ios",
     "mobile:e2e:store-assets:ios:release": "pnpm --filter ChessticizeMobile e2e:store-assets:ios:release",

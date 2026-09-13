@@ -1,6 +1,6 @@
 ---
 name: chessticize-android-release
-description: Audit, prepare, advance, recover, and complete Chessticize Mobile Android releases across exact source tags, protected signed AABs, Google Play tracks, post-Play APK mirroring, and risk-scoped local emulator validation. Use for release status, local validation or protected signed builds, Play readiness, versionCode bumps, source-publication recovery, and launch evidence.
+description: Audit or advance Chessticize Android/Google Play releases, signed AAB source publication, recovery and Play-signed APK mirroring. Use for Android release operations; ordinary Android development and local testing use the dev loop and Android validation contract.
 ---
 
 # Chessticize Android Release
@@ -31,9 +31,15 @@ changes. CLI/APIs are preferred; use Computer Use for Console-only surfaces.
 Live store requirements override repository assumptions. ADR-0009 supersedes
 the historical multi-phase publication protocol with one post-Play mirror job.
 
+Environment setup is not validation. Run only missing setup steps, then select
+checks by actual risk. Merge usable increments under the PR workflow and reuse
+unaffected test evidence under Testing Architecture. Formal public Production
+promotion retains the owner decision; internal testing does not inherit it.
+
 ## Establish a trustworthy checkout
 
-For a new or uncertain Mac, begin with a clean synchronized checkout and run:
+For build work on a new or uncertain Mac, use an isolated checkout and run
+only the missing preparation steps from this reference:
 
 ```sh
 gh auth status
@@ -44,9 +50,6 @@ git status --short --branch
 pnpm install --frozen-lockfile
 pnpm fetch:core-pack
 pnpm mobile:doctor:android
-pnpm process:validate
-pnpm mobile:typecheck
-pnpm mobile:test
 adb devices -l
 ```
 
@@ -70,7 +73,7 @@ setup during a strict read-only audit.
 ## Select the release scope
 
 - **Delta:** bounded JavaScript, copy, styling, test, documentation, or release
-  metadata changes. Require exact-head fast checks and the protected signed
+  metadata changes. Reuse valid fast checks, run affected checks, and use the protected signed
   AAB/source job. Do not add a physical-device release gate.
 - **Targeted:** navigation, one multi-screen journey, relaunch persistence,
   board rendering/input, adaptive layout, or one native-module boundary. Run
@@ -116,7 +119,8 @@ state; report `APK mirror pending` whenever mirroring is still open.
 
 ## Respect RC freeze generations
 
-Freeze only after known release work has converged. Record the generation,
+Use a freeze only for formal Production stabilization, not routine internal
+testing or a version bump. Freeze after known release work has converged. Record the generation,
 exact release-branch head, scope, App-input digest, and blockers in the draft
 release PR without committing a marker that changes the recorded head.
 
@@ -158,7 +162,7 @@ and evidence record.
   Console screenshots out of commits and public comments.
 - Do not weaken Google requirements, GPL disclosure, artifact identity, or the
   selected automated changed-boundary tests.
-- Keep exact-head fast checks and exact signed-artifact/source identity. When
+- Reuse unaffected checks and keep exact signed-artifact/source identity. When
   only a host-side test-runner input changes, authenticate the retained E2E App
   artifact, prove the fail-closed App-input digest is unchanged, and rerun only
   the affected Android target without rebuilding. Never relabel that E2E
@@ -167,8 +171,8 @@ and evidence record.
 ## Recover without broadening the protocol
 
 - Add regression coverage for repository defects and rerun only invalidated
-  gates. An App build input change rebuilds and reruns the selected native
-  scope; a test-runner-only change reuses the checksummed E2E App artifact and
+  gates. A changed App input requires a new artifact only for new execution or
+  distribution; rerun native checks only where the change invalidates evidence; a test-runner-only change reuses the checksummed E2E App artifact and
   reruns only the affected local test evidence.
 - For a source-publication failure, use the recovery workflow with the original
   candidate artifact ID. It can recover an artifact retained before the normal

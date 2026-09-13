@@ -24,6 +24,12 @@ to start a release note. The file must be committed, reviewed, and marked
 replacement build gets a new file because its build identity and source tag are
 different, even when its customer-facing summary is unchanged.
 
+For Dev or Production TestFlight, Astra may review and mark the test-build note
+`Approved` after checking its claims; that status is not a human Production
+release decision. A concise testing summary is sufficient. Store-specific copy
+and marketing acceptance apply when preparing the public store release. Reuse
+unchanged reviewed text rather than requesting approval for each build.
+
 ## Required outputs
 
 The checked-in file contains the approved English (`en-US`) source copy for:
@@ -70,7 +76,7 @@ localization task explicitly adds another one.
    previous public tag and the candidate, their acceptance evidence, and the
    current product/listing docs. The Interaction Lab’s temporary New Scenario
    Marker can help during design review, but it is not a release-note record and
-   is cleared before merge.
+   follows the marker lifecycle in `docs/agents/ui-flow-design.md`.
 3. **Select user-visible changes.** Lead with new capabilities, then meaningful
    improvements and fixes. Include security, privacy, data-loss, migration, or
    compatibility changes whenever they affect a user’s decision to update.

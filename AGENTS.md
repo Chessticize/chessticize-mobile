@@ -3,6 +3,30 @@
 Repository documentation and user-facing GUI copy are written and reviewed in
 English unless a localization task explicitly adds another locale.
 
+## Delivery Default
+
+`main` is the integration hub: one current binary should contain the latest
+usable feature increments. Work through small PRs from current `main`. Astra
+may merge a coherent, usable increment once review and the necessary automated
+checks are sufficient; final user design review, polish, and device feedback
+may follow in new PRs. Do not keep an entire feature on a branch until perfect.
+Keep acceptance gaps visible and do not call unfinished product work complete.
+
+Astra may build and upload both Dev and Production TestFlight identities for
+integrated testing without another confirmation. Device testing and feedback
+follow delivery. Production TestFlight is beta distribution, not public store
+release. Formal Production release retains the owner's final go/no-go and
+risk-scoped release checks. This task's narrower instructions always prevail.
+
+Efficiency applies at every stage, including Production release: reuse valid
+review and test evidence; run only checks invalidated by the actual change.
+A new SHA, small low-risk change, or build-number bump alone never requires
+full QA or all tests on one exact SHA. Record the actual binary source and
+signing identity accurately; do not relabel old artifacts as new builds.
+
+Read only the contract sections needed for the current action. Existing task
+authorization and recorded decisions persist; do not ask for them again.
+
 ## Find The Relevant Contract
 
 This file is the entry point. Read the linked contract for the current task;
@@ -49,14 +73,12 @@ than maintain copies. Current user instructions take precedence.
 
 ## UI Design And Delivery
 
-- New UI flows require explicit design approval before production wiring.
-  Small fixes inside an approved flow do not automatically restart that gate.
-  Follow the UI flow contract for classification and phase boundaries.
-- Update the existing product-clone story and preserve its stable scenario URL.
-  Keep Sprint first-use guidance synchronized with changed screens, terms,
-  rules, timing and controls, including Active Session and Arrow Duel guidance.
-- Each issue retains its own design and approval track. Do not consolidate
-  issues or share implementation tracks without explicit human approval.
+- For UI changes, follow the incremental design contract. Update the existing
+  product-clone story when its presentation changes and preserve its stable URL.
+  Synchronize Sprint first-use guidance only when the described behavior changes.
+- Keep each issue's acceptance and status traceable. Related issues with one
+  root cause or implementation boundary may share a PR without another approval.
+
 - Storybook review uses the exact branch's public Vercel preview published by
   GitHub Actions. Follow the deployment contract for exact-commit identity,
   marker lifecycle and anonymous access checks; do not substitute localhost or

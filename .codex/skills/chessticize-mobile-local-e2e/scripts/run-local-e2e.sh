@@ -32,7 +32,7 @@ case "$E2E_VARIANTS" in
     E2E_VARIANT_LIST=(debug release)
     ;;
   *)
-    fail "Set CHESSTICIZE_E2E_VARIANTS to debug|release|both. Release candidates must use both."
+    fail "Set CHESSTICIZE_E2E_VARIANTS to debug|release|both. Choose both only when risk spans both identities."
     ;;
 esac
 

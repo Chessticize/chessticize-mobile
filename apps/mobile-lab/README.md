@@ -4,18 +4,14 @@ The Interaction Lab is the development-only browser rendering of the real shared
 
 It is not a separate HTML mockup and is not a production web app. Stories render `apps/mobile/src/components/PracticePocScreen.tsx` through React Native Web with deterministic `PracticeService` and `MemoryStore` fixtures.
 
-## Storybook-first UI flow gate
+## Incremental UI Integration
 
-Every new UI flow starts here before product wiring. Build the interactive
-design slice with production-intended presentation components and deterministic
-fixtures, publish its stable Storybook URL, and obtain explicit design approval.
-During this phase, do not add the production navigation entry, backend or
-storage mutations, native-module wiring, analytics, or rollout logic. After
-approval, keep the scenario as living UI documentation while wiring the real
-product boundaries.
-
-The complete definition, exceptions, approval record, and handoff checklist are
-in [`docs/agents/ui-flow-design.md`](../../docs/agents/ui-flow-design.md).
+Keep the Lab aligned with usable product increments integrated into `main`.
+Astra may merge a reviewed, automatically tested increment before final user
+review. Continue device feedback and polish in later PRs. A design-only request
+remains design-only; explicit requests to approve before wiring or merge still
+apply. See [`docs/agents/ui-flow-design.md`](../../docs/agents/ui-flow-design.md)
+for the scope and preview handoff contract.
 
 ## Publish and review the lab
 
@@ -92,7 +88,7 @@ Whole-screen stories are currently marked `free-roam`, matching the monolithic `
 
 ## Add or change a scenario
 
-1. For a new UI flow, confirm that the PR is still in the Storybook design phase described in `docs/agents/ui-flow-design.md`.
+1. Select the requested design-only or implementation scope under `docs/agents/ui-flow-design.md`.
 2. Find the existing product-clone story for the affected screen or state and update it incrementally, preserving its stable URL. Do not add a parallel standalone page for a control that belongs on an existing screen. Add a new scenario only when the product would actually gain a new destination or materially distinct state.
 3. Seed starting data through `PracticeService`, `MemoryStore`, or an interface-compatible native-boundary fake in `LabScenario.tsx`.
 4. Add or update the typed definition and navigation coverage in `scenarioRegistry.ts`.
@@ -101,5 +97,5 @@ Whole-screen stories are currently marked `free-roam`, matching the monolithic `
 7. Run headless validation without starting `pnpm mobile:storybook`. Push the issue's exact commit, open or update its PR, and wait for the Mobile Interaction Lab workflow to deploy the full Storybook through the current branch's stable Vercel Preview URL. Later pushes advance only that branch URL; another branch, including one for the same issue, receives a different Preview deployment and URL, while `main` owns Production. Every deployment is public and must not require authentication. Verify the recorded branch and commit, stop rather than substitute another branch's URL, and require the workflow's unauthenticated HTTP 200 check at `/storybook/`. Record the branch, stable manager URL, direct story URL, source commit, and workflow run in the issue and PR; generated bundles, `.vercel/` project-link metadata, and hosting result files stay untracked.
 8. A coherent design increment may merge to `main` before implementation. Continue later feedback in a new PR from `main`, updating the same issue-owned scenario through the new branch's dedicated deployment.
 9. Retain each scenario as living UI documentation. The next new issue-scoped Storybook design resets all earlier `new` markers before adding its own; pull-request CI rejects a newly introduced issue marker while any earlier design marker remains.
-10. Record explicit design approval before product wiring starts.
+10. Record remaining user acceptance and follow-up work. Wait for approval only when explicitly requested.
 11. Keep focused mobile component tests for shared production UI changes. Use native validation only when the changed boundary requires it under the repository risk rules.

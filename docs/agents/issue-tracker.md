@@ -29,15 +29,11 @@ Infer the repo from `git remote -v` — `gh` does this automatically when run in
 
 ## Ticket Relationships And Consolidation
 
-Relationship suggestions are advisory. Triage may note that tickets appear
-related and explain the shared journey, contract, or dependency, but must not
-turn that suggestion into shared handling.
-
-Do not consolidate tickets, close one as a duplicate, transfer its acceptance
-criteria, convert the relationship into a parent/child consolidation, or place
-multiple tickets on one design or implementation track without explicit human
-approval for that exact action. Until approval is recorded, every ticket keeps
-its own state, scope, comments, approval record, and closure decision.
+Relationship suggestions are advisory during triage. During authorized
+implementation, a shared root cause or implementation boundary may use one PR.
+Preserve each issue's acceptance, status and closure decision. Do not consolidate
+tickets, transfer acceptance criteria or close duplicates without authorization;
+shared code work alone does not require another confirmation.
 
 ## Pull requests as a triage surface
 

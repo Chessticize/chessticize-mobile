@@ -51,6 +51,16 @@ This updates only the development version and generated iOS Debug config. It
 does not claim that the version has shipped and does not consume store build
 identities.
 
+## TestFlight Iteration
+
+For routine Dev or Production TestFlight, start from current `main` and use a
+short preparation PR only when identity/configuration changes are needed. Merge
+that usable increment after necessary checks. No coordinated release branch or
+RC freeze is required. Verify the selected app's distribution configuration and
+allocate an unused build number; the Debug-Dev display build `1` is not a
+reusable TestFlight upload identity. Do not change runtime versioning behavior
+or signing configuration merely by interpreting these instructions.
+
 ## Open a coordinated release
 
 1. On current `main`, confirm that `development-version.json` names the public
@@ -102,16 +112,14 @@ identity was consumed outside the repository record.
 Every replacement still follows the RC invalidation, convergence, validation,
 review, note, tag, and artifact rules in `docs/RELEASE_SOURCE_POLICY.md`.
 
-## After review submission
+## Integrate And Track Distribution
 
-Do not bump either file merely because a store changes a release from in review
-to approved or published. The release branch already contains the exact
-submitted identity, and `main` already names the next development target. Once
-every platform included in the coordinated release has been formally submitted
-and reports an in-review state, merge the final release PR with a merge commit.
-Do not wait for approval, public availability, or the post-Play APK mirror.
-Track those outcomes after the merge and leave the immutable tags as the shipped
-record.
+Merge a usable, reviewed preparation increment after necessary checks; store
+submission, review and public availability are later independent states. For a
+coordinated release use a merge commit to preserve its source; ordinary PRs use
+squash. Never wait for every platform to be in review before integrating fixes
+into `main`. Keep immutable tags and consumed build identities unchanged.
+Store state changes alone do not bump either version file.
 
 For a hotfix to an older version, branch from its exact platform tag and
 explicitly allocate new store build identities. Do not roll back `main`'s

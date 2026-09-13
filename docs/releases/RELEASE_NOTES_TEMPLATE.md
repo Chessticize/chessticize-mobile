@@ -58,4 +58,4 @@ notes.>
   benefits.
 - [ ] No issue numbers, internal code names, implementation details, or private
   evidence are included.
-- [ ] The release owner approved the copy before the source tag was created.
+- [ ] The reviewer verified the copy before tagging (Astra may review beta notes). Public Production release retains the owner's final go/no-go.

@@ -1,7 +1,8 @@
 # App Store Upload Runbook
 
-This runbook covers the owner-executed upload step for the 1.5.0 App Store
-release path. Recheck Apple's live documentation before executing it:
+This runbook covers authorized iOS beta uploads and public App Store release.
+Follow the delivery stages in `docs/RELEASE_SOURCE_POLICY.md`. Recheck Apple's
+live requirements when preparing distribution on a new/changed toolchain:
 
 - Upload builds:
   https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds/
@@ -11,31 +12,32 @@ release path. Recheck Apple's live documentation before executing it:
   https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases
 
 Apple currently supports uploading builds with Xcode, Swift Playground,
-`altool`, or Transporter. This repository standardizes the 1.5.0 path on
+`altool`, or Transporter. This repository uses
 `xcodebuild archive` plus `xcodebuild -exportArchive` using the checked-in
 `apps/mobile/ios/ExportOptions.app-store-connect.plist`.
 
 ## Preconditions
 
-Run from a clean checkout of the exact accepted release-branch commit that will
-be uploaded:
+Use a clean isolated checkout of the source being uploaded. For TestFlight,
+current integrated `main` is the normal starting point; no formal RC freeze is
+needed. Verify the target app identity, unused build number and signing setup.
+The archive example below is for Production; Dev TestFlight requires its own
+distribution-capable app configuration, not a Debug-device sideload.
+
+Run missing environment preparation only. Reuse already successful checks:
 
 ```sh
 git status --short --branch
 xcodebuild -version
 xcrun --sdk iphoneos --show-sdk-version
-pnpm install --frozen-lockfile
-export PATH="$(brew --prefix ruby@3.3)/bin:$PATH"
-ruby --version
-(cd apps/mobile && scripts/ios-install-pods-locked.sh)
-pnpm app-store:preflight
 pnpm app-store:signing-readiness
-pnpm test
-pnpm typecheck
-pnpm mobile:test
-pnpm mobile:typecheck
-pnpm mobile:doctor:ios
 ```
+
+Install locked JavaScript/CocoaPods dependencies only when absent or changed.
+Select automated checks through `docs/TESTING_ARCHITECTURE.md`. A beta upload
+does not require full core/mobile suites to run again after a low-risk change;
+reuse applicable evidence and run only affected checks. Do not skip failed
+required CI or signing/artifact validation.
 
 As of 2026-07-29, Apple's
 [SDK minimum requirements](https://developer.apple.com/news/upcoming-requirements/)
@@ -45,7 +47,7 @@ capturing release evidence when either command above reports an older
 toolchain. Recheck Apple's live requirement immediately before the final
 archive because accepted toolchains can change.
 
-For the 1.5.0 release, perform native build, signing, and upload work
+Perform native build, signing, and upload work
 on a clean release Mac whose exact Xcode build is supported by App Store
 Connect. Repository preparation on another checkout is not native evidence.
 Record the release Mac's exact `xcodebuild -version` output and confirm that
@@ -59,41 +61,24 @@ podspec evaluation can produce different lockfile checksums even when package
 versions are unchanged. The installer fails before mutating `Pods` when the
 active Ruby is unsupported.
 
-GitHub Actions does not run Xcode builds or iOS Detox. Local iOS native
-validation is the only iOS native release gate. Select delta, targeted, or full
-scope under `docs/TESTING_ARCHITECTURE.md`, then record the App source SHA,
-test-runner SHA, App-input digest, App-bundle checksum, Xcode version, dedicated
-simulator, build result, suite results, and clean-worktree confirmation. A
-squash-merged candidate may reuse the passing PR-head App bundle when
-`node apps/mobile/scripts/mobile-app-inputs.js compare` proves that its App
-source is an ancestor and the App-input digest is unchanged.
+GitHub Actions does not run Xcode builds or iOS Detox. Select local native
+execution by uncovered risk under `docs/TESTING_ARCHITECTURE.md`. The same policy
+separately governs binary reuse and reuse of unaffected test conclusions. A
+squash or rebase alone does not invalidate evidence.
 
-When the selected iOS release scope includes simulator E2E, run each selected
-suite against both the isolated Debug-Dev identity and the production Release
-identity:
+For selected native execution, choose the delivered identity and affected scope.
+For example, a bounded Production-identity practice check uses:
 
 ```sh
-CHESSTICIZE_E2E_SCOPE=full \
-  CHESSTICIZE_E2E_VARIANTS=both \
+CHESSTICIZE_E2E_SCOPE=practice \
+  CHESSTICIZE_E2E_VARIANTS=release \
   DETOX_IOS_DEVICE="iPhone 17-Detox" \
   .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
 ```
 
-Replace `full` with the risk-selected `flows` or `practice` scope when bounded.
-Do not install the Release build on a personal iPhone for pre-release checks;
-use `pnpm mobile:ios:dev:device` and the isolated Development CloudKit
-container described in `docs/IOS_DEVELOPMENT_BUILD.md`.
-
-Mobile runtime/domain sources, native/platform projects and native test-bundle
-sources, dependency manifests, lockfiles and patches, build/release
-configuration, and bundled fixtures/resources are App build inputs; a change
-requires a new local build and the selected local Detox scope. Host-side specs,
-selectors, assertions, screenshot/evidence collectors, and non-bundled
-fixtures invalidate only their affected test evidence. Use
-`CHESSTICIZE_E2E_REUSE_APP_SOURCE_SHA=<app-source-sha>` with the local E2E
-runner to verify the existing bundle and rerun that scope without rebuilding.
-Documentation, review metadata, agent guidance, and merge ancestry require
-neither.
+Use `both` only when configuration risk spans both identities; full scope needs
+a broad risk reason. TestFlight Dev and Production are both permitted. Routine
+local sideloading still uses `pnpm mobile:ios:dev:device` to preserve isolation.
 
 React Native's Hermes compiler
 setting is intentionally patched to use a stable `PODS_ROOT`-based path; an
@@ -103,70 +88,31 @@ versions are unchanged. The locked installer removes only a local `ios/Pods`
 sandbox whose `Manifest.lock` is missing or differs from the committed
 `Podfile.lock`, then runs CocoaPods in deployment mode.
 
-After any failed complete release validation pass, perform the cross-platform
-pre-retry convergence sweep in `docs/RELEASE_SOURCE_POLICY.md` before
-starting another full local native run.
+After a failed check, classify the cause and use the focused failure recovery
+in `docs/RELEASE_SOURCE_POLICY.md`; do not automatically restart both platforms.
 
-For first launch, a new App Store version, screenshot/metadata changes, or broad
-native risk, also generate the full evidence bundle:
+Astra can review a build-specific testing note before tagging and archiving.
+Final public store copy and owner approval belong to formal Production release,
+not routine TestFlight delivery. Preserve the source note and manifest required
+by the distribution pipeline; see `docs/RELEASE_NOTES.md`.
 
-```sh
-pnpm app-store:testflight-evidence -- --screenshot-root scratch/store-assets/final
-```
+Production archives read `apps/mobile/release-version.json`. Do not silently
+substitute the Debug-Dev development display identity. Allocate the actual
+candidate's unused store identity under `docs/RELEASE_VERSIONING.md`.
 
-Before creating the source tag or archive, create and approve
-`docs/releases/ios-v<normalized-version>-build-<build>.md` from the template in
-`docs/RELEASE_NOTES.md`. Verify the exact `Store copy` against this candidate,
-including its two-or-three-bullet, 300-character limit, benefit-first wording,
-and absence of raw URLs. Verify the file's separate release-details link opens
-the exact iOS GitHub Release. The approved file must be present in the clean
-commit that is tagged and archived.
-
-The Release-Production archive always reads its public version and build number
-from `apps/mobile/release-version.json`. Prepare that file on the coordinated
-release branch with `pnpm mobile:version:prepare-release`; do not archive using
-`apps/mobile/development-version.json`, which belongs to Debug-Dev and the open
-`main` development line. See `docs/RELEASE_VERSIONING.md`.
-
-For 1.5.0, `config/app-store-metadata-en-us-v1.json` records the release
-candidate's exact `currentVersionWhatsNew` copy. It must match
-`docs/releases/ios-v1.5.0-build-1.md` before owner approval and tagging. Retain
-the submitted metadata evidence required by `docs/STORE_ASSETS.md`.
-
-Before archiving, record whether this is a delta, targeted, or full native
-release under `docs/TESTING_ARCHITECTURE.md`. A delta requires the exact-head
-fast checks above and the signed archive checks. A delta does not require a fresh
-full Detox run or a physical TestFlight smoke. Record the affected simulator
-suite for targeted risk, or both `flows` and `practice` for broad native risk.
-
-An ordinary delta does not require a fresh full Detox run. The 1.5.0 candidate
-is explicitly a **Full native release** because its accumulated App-input delta
-adds the persisted Survival journey and schema-v22 migration, spans shared
-Practice navigation and pause/resume behavior, retains the 1.4.2 native gesture
-and promotion fixes, and changes release identity. A fresh Detox build is
-required. Run both `flows`
-and `practice` once for Debug-Dev and once for Release-Production on a dedicated
-simulator with `CHESSTICIZE_E2E_VARIANTS=both`, run the released
-SQLite fixture and native upgrade evidence, run
-`pnpm mobile:verify:ios:landscape-layout`, and complete the exact-head Release
-visual matrix. Physical-device execution remains optional.
-
-When the evidence command is applicable, it must report `dirty: false`,
-`status: "pass"`, and `releaseReady: true`. A build-number-only delta with
-unchanged store metadata and screenshots does not regenerate that bundle.
+Only generate `pnpm app-store:testflight-evidence` with its screenshot bundle
+when that public-release evidence is relevant to changed store assets or broad
+uncovered risk. A new version/build alone does not select a full bundle or QA.
+Prior releases' full matrices are historical evidence, not recurring commands.
+Physical-device testing follows TestFlight delivery and does not block upload.
 
 ## Public Source Tag
 
-Create and publish the source tag before or at the same time as the App Store
-Connect upload. The proposed iOS 1.5.0 build-1 tag is:
-
-```sh
-git tag -a ios-v1.5.0-build-1 -m "iOS 1.5.0 build 1"
-git push origin ios-v1.5.0-build-1
-```
-
-Then publish a GitHub release for that tag and attach or copy the
-`release-manifest.json` from the evidence bundle.
+Create and publish the source tag for the actual app version/build before or
+with distribution. Derive the name from the candidate identity; never reuse a
+historical version/build example. Publish its matching source release and
+`release-manifest.json`. This exact provenance does not require every test on
+that commit; accepted evidence may cover unaffected behavior from prior builds.
 
 ## Credentials
 
@@ -271,7 +217,7 @@ valid while this signing-account gate is still incomplete.
 ## After Upload
 
 1. Wait for App Store Connect processing to complete.
-2. Confirm the uploaded build number is `1` for version `1.5.0`.
+2. Confirm version, build number and bundle identity match the actual candidate.
 3. Confirm export compliance is accepted for
    `ITSAppUsesNonExemptEncryption = false`.
 4. Optionally configure an internal TestFlight group or run the diagnostic
@@ -285,8 +231,10 @@ valid while this signing-account gate is still incomplete.
 6. Before submission, recheck Apple’s live character limit, compare the saved
     text byte-for-byte with the approved file, and retain a screenshot or
     exported metadata record with the release evidence.
-7. Submit the processed build after the selected local simulator scope and store
-   metadata checks pass; do not wait for physical-device QA.
+7. For TestFlight, finish beta availability and report processing separately.
+   For public Production release, prepare the validated candidate and metadata
+   for the owner's final go/no-go; reuse existing authorization for that scope.
+   Do not infer public-release approval from beta upload or merge.
 8. After release, compare the live App Store notes with the approved file and
     record the result. A mismatch blocks completion until corrected and
     reverified.

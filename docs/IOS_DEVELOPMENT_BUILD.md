@@ -69,15 +69,10 @@ CHESSTICIZE_E2E_SCOPE=practice \
   .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
 ```
 
-When an iOS release candidate requires simulator E2E, run the same selected
-scope against both Debug-Dev and Release-Production:
-
-```sh
-CHESSTICIZE_E2E_SCOPE=full \
-  CHESSTICIZE_E2E_VARIANTS=both \
-  DETOX_IOS_DEVICE="iPhone 17-Detox" \
-  .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh
-```
+For Release/TestFlight validation, select the affected scope and target identity
+under `docs/TESTING_ARCHITECTURE.md`. Use `release` for Production-identity risk;
+use `both` only when configuration differences need coverage. A release alone
+does not require dual execution or full scope.
 
 The simulator suites remain deterministic and must not depend on a signed-in
 personal iCloud account. Real Dev-container CloudKit validation is a separate

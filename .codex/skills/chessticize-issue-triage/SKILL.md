@@ -1,163 +1,39 @@
 ---
 name: chessticize-issue-triage
-description: Triage new Chessticize GitHub issues into evidence-backed categories, effort bands, priorities, tracker states, dependencies, and issue-scoped UI design tracks without consolidating related tickets by default. Use when evaluating an issue batch, processing user feedback, deciding what is ready for an agent or human, estimating issue scope, suggesting related issues for human review, or routing Storybook-only UI design previews before implementation.
+description: Classify and prioritize Chessticize GitHub issues or a requested feedback batch. Use for tracker triage, issue readiness, and explicitly requested issue-linked Storybook previews; not generic estimates or ordinary implementation.
 ---
 
 # Chessticize Issue Triage
 
-Produce a decision-ready backlog without beginning product implementation.
-
-## Read The Repository Contracts
-
-Before acting, read:
-
-- `docs/agents/issue-tracker.md` for GitHub operations.
-- `docs/agents/triage-labels.md` for exact labels and the live-label preflight.
-- `docs/agents/issue-triage.md` for the authoritative evaluation rubric and comment format.
-- `docs/agents/ui-flow-design.md` for every UI/UX or functional issue with a
-  presentation change, before preview work or product implementation.
-
-Treat missing required labels as a tracker setup blocker. Do not substitute a
-similar label.
-
-## Respect The Requested Write Scope
-
-- For review or reporting requests, keep GitHub and the repository read-only.
-- For triage requests that authorize tracker updates, apply labels and post the
-  durable triage comment described in `docs/agents/issue-triage.md`.
-- Treat a current request to create, show, or deliver a Storybook or visual UI
-  design as authorization to create its issue branch, push the reviewed commit,
-  open or update the PR, publish the branch-owned public Storybook preview, and
-  add the preview handoff to the issue. The request does not authorize merge or
-  product implementation.
-- Current user instructions control the publication scope. Historical issue
-  text such as “no branch/PR at this stage” records the earlier phase and does
-  not override a later Storybook or visual-design request. Still honor a
-  current instruction such as “local only”, “do not push”, or “do not open a
-  PR”.
-- Never infer authorization to close, mark `wontfix`, or start product
-  implementation.
-- Relationship suggestions are advisory. Do not consolidate tickets, close one
-  as a duplicate, move its acceptance criteria, or create shared design or
-  implementation handling without explicit human approval for that exact
-  action.
-
-Storybook is a design artifact, not product implementation. It may contain
-production-intended presentation components and deterministic fixtures, but no
-production navigation, persistence or backend mutation, native integration,
-analytics, rollout, or release wiring.
+Evaluate the requested issue set without inferring product implementation.
+For read-only evaluation, read the relevant rubric sections in
+`docs/agents/issue-triage.md`. Read `docs/agents/issue-tracker.md` only for GitHub
+operations; read `docs/agents/triage-labels.md` and query live labels only before
+using labels. Reuse that query within a batch unless label state changes.
+A missing label blocks that label operation, not the analysis or an otherwise
+authorized issue/comment write.
 
 ## Workflow
 
-1. **Inventory the complete batch.** Query the requested label, state, date
-   window, or issue numbers. Cross-check recently created unlabeled issues when
-   the request says “all feedback” or otherwise implies completeness.
-2. **Read the full record.** Inspect each issue body, labels, comments, linked
-   issues, and relevant existing behavior. Distinguish reported fact, product
-   request, and inference.
-3. **Classify and estimate.** Assign category, priority, effort, confidence,
-   dependencies, and a recommended tracker state using the canonical rubric.
-   Estimate the complete implementation boundary, including domain, storage,
-   sync, native, migration, testing, and release work that the issue actually
-   crosses. Record priority in the durable comment; do not invent priority
-   labels that are absent from the repository vocabulary.
-4. **Resolve ambiguity safely.** Use `needs-info` for missing reproduction or
-   outcome details. Use `needs-triage` when maintainer decisions remain. Do not
-   disguise high uncertainty as a small estimate.
-5. **Suggest relationships without consolidating tickets.** Note issues that
-   share a journey, data contract, dependency, or likely implementation, but
-   describe the relationship as advisory and leave shared handling as a human
-   review question. Keep one Storybook design track, marker lifecycle,
-   deployment, approval record, tracker state, and closure decision per issue.
-   Do not consolidate, close as duplicate, or group implementation without
-   explicit human approval.
-6. **Prototype authorized UI issues.** For preview-enabled triage, represent
-   every UI or functional-feature issue in a Storybook design slice, including
-   the reachable presentation states around a native-only boundary. Follow
-   `docs/agents/ui-flow-design.md`: update the existing product-clone story
-   incrementally, preserve its stable URL, and make the full Storybook show the
-   expected post-implementation product. Create one issue-numbered Storybook
-   branch and PR per issue. Prefer two or three structurally distinct directions
-   when a real design choice exists.
-7. **Preserve native boundaries.** Storybook can specify perceived response,
-   layout, states, and handoff copy. It cannot prove board latency, gestures,
-   audio, haptics, native modules, persistence, or device behavior. Record the
-   later diagnostic or validation requirement separately.
-8. **Publish the record.** Post one concise triage comment per issue. For a
-   prototype, add the branch, PR, full Storybook URL, direct story URL, exact
-   commit, deterministic variant/state parameters, validation result, and
-   explicit approval gate.
-9. **Hand off by priority.** Report the complete issue count, sorted triage
-   matrix, advisory relationship suggestions, preview links, blockers, and the
-   next human decision. Do not present shared handling as decided.
+1. Inventory the requested issue numbers or batch, including unlabeled feedback
+   when completeness is requested. Inspect bodies, comments and relevant behavior.
+2. Apply the rubric's category, priority, effort and next-state criteria. Mark
+   high uncertainty and estimate only boundaries actually affected; do not invent
+   priority labels. Distinguish reported fact, desired behavior and inference.
+3. Relationship suggestions are advisory during triage. During authorized
+   implementation, related issues may share a PR under the PR workflow. Do not
+   consolidate or close tickets merely because their implementation is shared.
+4. Keep review/report requests read-only. For authorized tracker updates, leave
+   one concise durable triage comment and apply the requested labels. Preserve
+   each issue's acceptance and closure decision.
+5. For requested Storybook work with a real presentation change, use
+   `docs/agents/ui-flow-design.md` and the existing product-clone story.
+   A single-issue preview can use `codex/storybook-issue-<number>-<goal>`.
+   Pure core, storage and build issues need no design slice. Only read the
+   deployment contract when publishing a requested preview.
+6. Report the inventory, priorities, uncertainties and next actions. A usable
+   increment may merge to `main`; final user acceptance can follow there through
+   new PRs. An explicit design-only request does not authorize product wiring.
 
-## Storybook Preview Gate
-
-For a requested Storybook preview:
-
-- Use `codex/storybook-issue-<number>-<goal>` for exactly one issue.
-- Follow `docs/agents/ui-flow-design.md`: modify the existing product-clone
-  story incrementally whenever it exists, preserve its stable URL, and expose
-  the issue-owned delta inside the complete product catalog.
-- Reset `newScenarioMarkers.json` before adding every new or materially changed
-  scenario for the current issue. Do not carry `new` markers from an earlier
-  Storybook design track, even when its issue remains open. Add the current
-  issue's `issueNumber` and concise `changeNote`; the registry derives
-  `isNew: true` from that array.
-- Link the issue in the PR and link the PR back from the issue.
-- Run `pnpm mobile:lab:validate` plus focused component or type checks required
-  by the presentation boundary.
-- Do not launch a local Storybook server. Push the exact reviewed commit, open
-  or update its PR, wait for the Interaction Lab Vercel deployment, then inspect
-  affected phone and wide viewports and exercise the stable hosted URL.
-- A coherent design increment may become ready and merge to `main`; merging is
-  not explicit approval and does not begin implementation. Continue later
-  feedback from current `main`, update the same scenario, and use the new
-  branch's stable Preview alias in the shared Interaction Lab Vercel project.
-- Retain each scenario as living UI documentation. The next new issue-scoped
-  Storybook design resets all earlier `new` markers before adding its own; CI
-  rejects a new issue marker while any earlier issue marker remains.
-- Stop after the design handoff. Do not mark the product issue
-  `ready-for-agent` for implementation until the design decision and remaining
-  acceptance criteria are explicit.
-
-## Completion Standard
-
-Do not call triage complete until every issue in the inventory has a recorded
-category, priority, effort, rationale, dependency or advisory relationship
-assessment, and next state. Make uncertainty and human-review decisions
-visible. Triage completion never implies approval to consolidate tickets.
-
-## Hosted Preview Handoff
-
-Every requested Storybook design is published for review:
-
-- Push the issue branch's exact reviewed commit and let the Mobile Interaction
-  Lab GitHub Actions workflow build and deploy the complete
-  `apps/mobile-lab` Storybook to the repository's existing shared Vercel
-  project. GitHub Actions is the only deployment writer. Never create a Vercel
-  or Sites project for a branch, and never run `vercel link` or `vercel deploy`
-  locally.
-- Do not use `pnpm mobile:storybook` or a localhost URL as the review handoff.
-  Local work is limited to headless validation and static builds; visual review
-  waits for the branch-owned Vercel preview.
-- Use the stable Preview alias assigned to that branch inside the shared
-  project. Never reuse a URL owned by another branch; later pushes to the same
-  branch advance its alias.
-- Before publishing, compare the deployment input's recorded branch and commit
-  with the reviewed application branch. Stop on any mismatch instead of
-  overwriting the existing branch owner's Preview alias.
-- Every Storybook review site, including the main-branch catalog and every
-  branch-owned Preview, is public and must not require authentication. Verify
-  that the workflow confirms unauthenticated HTTP 200 for the manager root and
-  `/storybook/` before handoff.
-- Keep `storybook-static`, copied bundles, preview manifests, Vercel
-  project-link metadata, and hosting result files out of the application
-  branch. Use ignored or temporary storage for generated deployment input.
-- Add the source branch, full Storybook manager URL, direct story URL, and exact
-  source commit to the issue and PR, along with the successful workflow run and
-  explicit approval gate.
-
-If the workflow cannot publish, record the failure and keep the design gate in
-place. Use only the repository-owner waiver path in
-`docs/agents/ui-flow-design.md`; do not create a replacement hosting project.
+Do not add user approval gates beyond the current request and the owning
+contracts. Triage completion does not imply implementation or issue closure.

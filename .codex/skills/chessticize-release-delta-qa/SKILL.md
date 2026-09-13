@@ -15,8 +15,8 @@ description: Summarize changes since an exact mobile release, or execute explici
 - **Visual QA:** For a requested regression sweep, simulator acceptance or visual
   audit, follow the remaining workflow. The main evidence is the exact-head
   Release app rendered in simulators. Product findings remain read-only and
-  become issues within the authorized tracker scope; repair only proven test
-  or workflow drift and revalidate its affected scope.
+  become issues within the authorized tracker scope. Repair proven validation
+  drift only when repairs are authorized, then revalidate the affected scope.
 
 Audit the final product delta rather than treating superseded intermediate
 commits as current behavior. A request that only asks what changed uses summary
@@ -38,11 +38,9 @@ For visual QA only, load each skill when its step is needed:
 Follow `AGENTS.md`. A release-delta audit does not waive its clean-worktree,
 native-evidence, issue-tracker, or Storybook rules.
 
-This skill narrows the calibration workflow's repair loop. If the calibration
-skill says to fix a visual mismatch and repeat the capture, treat that as
-authorization to repair only validation infrastructure during a release-delta
-audit. A mismatch in product rendering or behavior remains a product finding:
-file an issue and leave product code unchanged.
+Calibration follows its review-only mode here. Product findings remain reports
+or issues within authorized tracker scope. Repair validation drift only when
+repair is in scope; a review request alone does not authorize file changes.
 
 ## 1. Pin Exact Identities
 
@@ -120,11 +118,13 @@ scope from the union of changes since the release, not only the newest PR.
   wide-short, live-resize, and foldable-sized component or Interaction Lab
   evidence for the same changed state. A portrait pass is not evidence for a
   wide or landscape layout.
-- Always cover the maintained fifteen Release scenes. Capture and inspect them
-  when host visual calibration is available. For functional iPad landscape
-  geometry, always run the dedicated exact-head gate below; the eleven
-  layout-sensitive landscape screenshots are optional visual evidence and do
-  not replace that native-frame gate.
+- Cover the maintained fifteen Release scenes only for an explicitly full
+  visual sweep or broadly affected shared presentation. Otherwise inspect the
+  changed scenes and directly affected regression states. Run the dedicated
+  iPad landscape gate only when native landscape geometry is in scope; choose
+  landscape screenshots when their visual evidence is needed.
+
+
 - Keep ordinary full-screen iPhone simulator captures in portrait. Do not
   restore iPhone rotation merely to satisfy an older screenshot matrix.
 - Add another device family when the delta touches adaptive layout, Safe Area,
@@ -157,7 +157,7 @@ the app without Metro.
 
 ## 4. Capture And Inspect Release Simulator Evidence
 
-From the clean exact application head, run the iPad landscape functional gate:
+When native iPad landscape geometry is selected, run the functional gate:
 
 ```sh
 pnpm mobile:verify:ios:landscape-layout
@@ -242,10 +242,11 @@ the design contract; the Release simulator is native acceptance evidence.
 Avoid pixel-perfect snapshot gates by default. Record human visual judgment per
 scene and keep the screenshot path.
 
-## 5. Run One Independent QA Agent
+## 5. Optional Independent QA
 
-When subagents are available, use one bounded QA subagent for the simulator
-visual sweep and its supporting interaction checks. Give it:
+Delegate a bounded simulator sweep only when authorized and useful alongside
+independent work. Do not duplicate a completed sweep by default. If delegated,
+give the agent:
 
 - Exact baseline and target identities.
 - The raw delta inventory and surface matrix.
@@ -269,8 +270,8 @@ the user's manual-testing simulator.
 During this workflow:
 
 - Do not edit product code to resolve a newly discovered product defect.
-- Reproduce a reported failure once outside the subagent when safe and
-  practical.
+- Reproduce a delegated failure again only when evidence is insufficient or
+  independent confirmation would materially change the finding.
 - Classify the failure before choosing the terminal action:
   - A reproducible visual mismatch in the Release simulator is a product
     finding even when automated assertions pass. File an issue and do not fix
@@ -286,8 +287,8 @@ During this workflow:
   - Any other mismatch in current product behavior is also a product finding.
     File an issue and do not fix it during this sweep.
   - A test, fixture, or workflow that still asserts a superseded contract is
-    validation drift. Preserve the original failing evidence, repair only that
-    validation artifact, and rerun the smallest affected command immediately.
+    validation drift. Preserve the original evidence and report the repair. If
+    repair is authorized, change only that artifact and rerun the affected check.
   - An environment or account failure is blocked evidence. Do not weaken a
     gate or silently rewrite a test to make it pass.
 - Prove validation drift from the current final contract and an independent
@@ -303,7 +304,7 @@ During this workflow:
   severity, acceptance criteria, or require independent investigation.
 - Do not consolidate or close existing issues without explicit human approval.
 
-Run the live label preflight required by the issue-triage skill. Each new issue
+Before using labels, reuse the batch preflight or query the labels needed. Each new issue
 must include:
 
 - Baseline and target commits.

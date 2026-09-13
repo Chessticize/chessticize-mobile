@@ -113,7 +113,7 @@ describe('iOS development identity isolation', () => {
     );
   });
 
-  it('provides a Dev-only physical-device command and a dual-identity release simulator gate', () => {
+  it('provides a Dev-only physical-device command and configurable release simulator validation', () => {
     const rootPackage = JSON.parse(readText(join(repoRoot, 'package.json')));
     const mobilePackage = JSON.parse(readText(join(appRoot, 'package.json')));
     const deviceRunner = readText(join(appRoot, 'scripts', 'ios-run-dev-device.sh'));
@@ -132,7 +132,7 @@ describe('iOS development identity isolation', () => {
       'pnpm --filter ChessticizeMobile ios:dev:device',
     );
     expect(rootPackage.scripts['mobile:validate:ios:release']).toBe(
-      'CHESSTICIZE_E2E_VARIANTS=both .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh',
+      'CHESSTICIZE_E2E_VARIANTS=${CHESSTICIZE_E2E_VARIANTS:-release} .codex/skills/chessticize-mobile-local-e2e/scripts/run-local-e2e.sh',
     );
     expect(mobilePackage.scripts['ios:dev:device']).toBe(
       'bash scripts/ios-run-dev-device.sh',
@@ -146,35 +146,4 @@ describe('iOS development identity isolation', () => {
     expect(e2eRunner).toContain('ios.sim.release');
   });
 
-  it('records the dual-simulator and Dev-only-device policy in agent guidance', () => {
-    const testingArchitecture = readText(
-      join(repoRoot, 'docs', 'TESTING_ARCHITECTURE.md'),
-    );
-    const developmentDoc = readText(
-      join(repoRoot, 'docs', 'IOS_DEVELOPMENT_BUILD.md'),
-    );
-    const devLoopSkill = readText(
-      join(
-        repoRoot,
-        '.codex',
-        'skills',
-        'chessticize-mobile-dev-loop',
-        'SKILL.md',
-      ),
-    );
-    const localE2eSkill = readText(
-      join(
-        repoRoot,
-        '.codex',
-        'skills',
-        'chessticize-mobile-local-e2e',
-        'SKILL.md',
-      ),
-    );
-
-    for (const text of [testingArchitecture, developmentDoc, devLoopSkill, localE2eSkill]) {
-      expect(text).toContain('CHESSTICIZE_E2E_VARIANTS=both');
-      expect(text).toContain('pnpm mobile:ios:dev:device');
-    }
-  });
 });
