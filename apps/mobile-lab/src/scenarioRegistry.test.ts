@@ -52,26 +52,23 @@ test("every typed navigation coverage entry points to a registered scenario", ()
 test("New Scenario Markers derive catalog tags from issue ownership", () => {
   const scenarios = Object.values(scenarioRegistry);
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
-  assert.deepEqual(
-    newScenarios.map((scenario) => scenario.id),
-    [
-      "practice-active-session-guide",
-      "practice-arrow-duel-guide",
-      "practice-arrow-duel-guide-only",
-      "practice-tactical-focus-guide"
-    ]
-  );
+  const issue609Scenarios = [
+    "visual-direction-a-grouped-native-tokens",
+    "visual-direction-a-grouped-native-phone",
+    "visual-direction-a-grouped-native-ipad"
+  ];
+  assert.deepEqual(newScenarios.map((scenario) => scenario.id), issue609Scenarios);
   assert.deepEqual(
     newScenarios
-      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 611))
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 609))
       .map((scenario) => scenario.id),
-    [
-      "practice-active-session-guide",
-      "practice-arrow-duel-guide",
-      "practice-arrow-duel-guide-only",
-      "practice-tactical-focus-guide"
-    ]
+    issue609Scenarios
   );
+  for (const id of issue609Scenarios) {
+    assert.equal(scenarioRegistry[id as LabScenarioId].group, "Visual Direction");
+  }
+  // The #609 design track reset the merged #611 guide markers; the scenarios stay.
+  assert.deepEqual(storyTagsForScenario("practice-active-session-guide"), []);
 
   for (const scenario of scenarios) {
     assert.deepEqual(

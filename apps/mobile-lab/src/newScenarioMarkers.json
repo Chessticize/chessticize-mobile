@@ -1,33 +1,25 @@
 {
-  "practice-active-session-guide": {
+  "visual-direction-a-grouped-native-tokens": {
     "issues": [
       {
-        "issueNumber": 611,
-        "changeNote": "Rebuild the first-use session guide as three short steps on the real Sprint screen: a scrim with a cut-out, one callout and pointer placed inside the Safe Area, and Back/Next inside the callout."
+        "issueNumber": 609,
+        "changeNote": "Chosen direction A Grouped Native: token sheet and primitives (HIG type scale, light and dark color roles, radius, spacing, surfaces, tinted icon tiles), the reference for phase 2."
       }
     ]
   },
-  "practice-arrow-duel-guide": {
+  "visual-direction-a-grouped-native-phone": {
     "issues": [
       {
-        "issueNumber": 611,
-        "changeNote": "Cut the first Arrow Duel guide from six steps to three (header, choice, reply) on the real Arrow Duel screen."
+        "issueNumber": 609,
+        "changeNote": "Chosen direction A Grouped Native on iPhone: Practice Home, Sprint HUD and Sprint Result, light and dark."
       }
     ]
   },
-  "practice-arrow-duel-guide-only": {
+  "visual-direction-a-grouped-native-ipad": {
     "issues": [
       {
-        "issueNumber": 611,
-        "changeNote": "Show the two Arrow Duel steps with the shared overlay callout on the real Arrow Duel screen."
-      }
-    ]
-  },
-  "practice-tactical-focus-guide": {
-    "issues": [
-      {
-        "issueNumber": 611,
-        "changeNote": "Use the shared three-step overlay for the first Focused Run."
+        "issueNumber": 609,
+        "changeNote": "Chosen direction A Grouped Native at iPad landscape: Practice Home with the navigation rail and the session board lane, light and dark."
       }
     ]
   }
