@@ -62,7 +62,7 @@ async function playBoardMove(testID, move, flipped = false) {
       + `display=${androidMetrics.widthPixels}x${androidMetrics.heightPixels}@${androidMetrics.densityDpi}`
     );
   }
-  await board.tapAtPoint(pointForSquare(move.slice(0, 2)));
+  await tapAfterIosModalTransition(board, pointForSquare(move.slice(0, 2)));
   await sleep(250);
   await board.tapAtPoint(pointForSquare(move.slice(2, 4)));
   const promotion = move.slice(4, 5).toLowerCase();
@@ -71,8 +71,41 @@ async function playBoardMove(testID, move, flipped = false) {
       throw new Error(`Unsupported promotion piece in move "${move}"`);
     }
     const promotionChoice = element(by.id(`promotion-choice-${promotion}`));
-    await waitFor(promotionChoice).toExist().withTimeout(10000);
+    // The picker is a native Modal. On iOS it can exist before its fade-in is
+    // ready, and UIKit discards taps sent during that transition, which left
+    // the picker open. Wait for the visible control and let the transition
+    // settle before choosing.
+    await waitFor(promotionChoice).toBeVisible().withTimeout(10000);
+    if (device.getPlatform() === 'ios') {
+      await sleep(IOS_MODAL_TRANSITION_SETTLE_MS);
+    }
     await promotionChoice.tap();
+    await waitFor(promotionChoice).not.toExist().withTimeout(10000);
+  }
+}
+
+const IOS_MODAL_TRANSITION_SETTLE_MS = 750;
+const IOS_MODAL_DISMISSAL_BUDGET_MS = 3000;
+
+// After a promotion the picker can leave the hierarchy before UIKit removes
+// its transition view. Retry only a tap blocked by that system overlay; every
+// other failure stays immediate.
+async function tapAfterIosModalTransition(target, point, budgetMs = IOS_MODAL_DISMISSAL_BUDGET_MS) {
+  const startedAt = Date.now();
+  while (true) {
+    try {
+      await target.tapAtPoint(point);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const blockedByTransition = device.getPlatform() === 'ios'
+        && message.includes('UITransitionView')
+        && message.includes('not hittable');
+      if (!blockedByTransition || Date.now() - startedAt >= budgetMs) {
+        throw error;
+      }
+      await sleep(100);
+    }
   }
 }
 
@@ -1096,6 +1129,7 @@ module.exports = {
   startPracticeMode,
   startSelectedPracticeRun,
   selectTestPuzzleSource,
+  tapAfterIosModalTransition,
   waitForVisibleInPracticeScroll,
   waitForHistoryFiltersCollapsed,
   tapUntilAnyExists,

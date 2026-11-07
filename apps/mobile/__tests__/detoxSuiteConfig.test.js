@@ -1719,6 +1719,7 @@ describe('Detox suite configuration', () => {
     expect(ACTIVE_E2E_TEST_MATCH).toEqual([
       '<rootDir>/e2e/practice.e2e.js',
       '<rootDir>/e2e/promotion.e2e.js',
+      '<rootDir>/e2e/tactical-profile.e2e.js',
       '<rootDir>/e2e/flows.e2e.js'
     ]);
   });

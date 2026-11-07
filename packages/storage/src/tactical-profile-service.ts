@@ -6,11 +6,14 @@ import {
   estimateTacticalProfileThemes,
   evaluateTacticalProfile,
   namedThemesForSelection,
-  tacticalProfileCalibrationAssurance
+  tacticalProfileCalibrationAssurance,
+  tacticalThemeFrequencyAtRating,
+  tacticalThemeInventoryUpperBound
 } from "../../core/src/index.ts";
 import type {
   FocusedRunPlan,
   Puzzle,
+  PuzzlePackManifest,
   SprintConfig,
   TacticalProfileCalibrationAssurance,
   TacticalProfileCalibrationArtifact,
@@ -122,6 +125,45 @@ export type TacticalProfileServiceOptions = {
   focusedRunPolicy?: TacticalProfileFocusedRunPolicy;
   maxDirtyDaysPerRefresh?: number;
 };
+
+/**
+ * Pack-derived Tactical Profile options. The mobile composition root and the
+ * simulated-player harness share this so both evaluate the same natural
+ * frequencies, inventory bounds and Focused Run policy.
+ */
+export function tacticalProfilePackOptions(
+  manifest: PuzzlePackManifest,
+  calibration: TacticalProfileCalibrationArtifact
+): Pick<
+  TacticalProfileServiceOptions,
+  | "naturalFrequency"
+  | "naturalFrequencyForRating"
+  | "inventoryUpperBound"
+  | "focusedRunPolicy"
+> {
+  const frequencies = Object.fromEntries(
+    Object.entries(manifest.themeCounts ?? {}).map(([theme, count]) => [
+      theme,
+      count / Math.max(1, manifest.puzzleCount)
+    ])
+  );
+  return {
+    naturalFrequency: { line: frequencies, arrow_duel: frequencies },
+    naturalFrequencyForRating: (taskFamily, rating) =>
+      tacticalThemeFrequencyAtRating(manifest, taskFamily, rating),
+    inventoryUpperBound: (taskFamily, minRating, maxRating, themes) =>
+      tacticalThemeInventoryUpperBound(
+        manifest,
+        taskFamily,
+        minRating,
+        maxRating,
+        themes
+      )?.availableByTheme,
+    ...(calibration.focusedRun === undefined
+      ? {}
+      : { focusedRunPolicy: calibration.focusedRun })
+  };
+}
 
 export class TacticalProfileService {
   private readonly progressStore: PracticeStore;

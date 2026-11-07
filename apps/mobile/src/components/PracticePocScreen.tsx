@@ -142,6 +142,7 @@ import {
   type ProgressV2SyncResult
 } from "../../../../packages/storage/src/progress-sync-v2.ts";
 import type { PracticeProgressSummary } from "../../../../packages/storage/src/rating-history.ts";
+import type { SimulatedHistoryScenarioId } from "../../../../packages/storage/src/simulation/scenarios.ts";
 import {
   getBundledCorePackManifest,
   seededPuzzleCount,
@@ -658,6 +659,12 @@ const CHESSBOARD_COLORS = {
   validMoveCapture: "rgba(15, 23, 42, 0.56)"
 } as const;
 const CHESSBOARD_DURATIONS = { move: BOARD_MOVE_ANIMATION_MS } as const;
+const SIMULATED_HISTORY_SCENARIOS: ReadonlyArray<{ scenario: SimulatedHistoryScenarioId; label: string }> = [
+  { scenario: "slow-fork-speed", label: "Slow fork" },
+  { scenario: "weak-fork-solve", label: "Weak fork" },
+  { scenario: "balanced", label: "Balanced" },
+  { scenario: "recently-recommended", label: "Recent" }
+];
 const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: string }> = [
   { source: "bundledCore", label: "Core Pack" },
   { source: "familiar15", label: "Familiar 15" }
@@ -737,6 +744,7 @@ export function PracticePocScreen({
   const service = platformCapabilities.storage.practiceService;
   const configurePuzzleSource = platformCapabilities.storage.configurePuzzleSource;
   const injectMateIn2FocusedRun = platformCapabilities.testControls?.injectMateIn2FocusedRun;
+  const seedTacticalHistory = platformCapabilities.testControls?.seedTacticalHistory;
   const stockfish = platformCapabilities.stockfish;
   const scheduler = platformCapabilities.reminders.scheduler;
   const notificationClient = platformCapabilities.reminders.notificationClient;
@@ -1073,6 +1081,8 @@ export function PracticePocScreen({
   const [iCloudSyncEnabled, setICloudSyncEnabled] = useState(() => service.getSettings().sync.iCloudEnabled);
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
   const [iCloudSyncInProgress, setICloudSyncInProgress] = useState(false);
+  const [seededHistoryStatus, setSeededHistoryStatus] = useState<string | null>(null);
+  const seedingHistoryRef = useRef(false);
   const iCloudAccountStatusRef =
     useRef<ICloudAccountStatus | "not_checked">("not_checked");
   const [lastICloudSyncFailure, setLastICloudSyncFailure] =
@@ -2432,6 +2442,35 @@ export function PracticePocScreen({
     } catch (caught) {
       setError(errorMessage(caught));
     }
+  }
+
+  function seedTestTacticalHistory(scenario: SimulatedHistoryScenarioId): void {
+    if (!seedTacticalHistory || isActive || seedingHistoryRef.current) {
+      return;
+    }
+    seedingHistoryRef.current = true;
+    setError(null);
+    const label = SIMULATED_HISTORY_SCENARIOS.find((option) => option.scenario === scenario)?.label
+      ?? scenario;
+    void seedTacticalHistory(scenario, captureLiveNowIso(), (completedRuns, totalRuns) => {
+      setSeededHistoryStatus(`Seeding ${label}… ${completedRuns} / ${totalRuns} Runs`);
+    })
+      .then((seeded) => {
+        setICloudSyncEnabled(false);
+        setICloudSyncStatus("Off");
+        refreshState();
+        setSeededHistoryStatus(
+          `Seeded ${seeded.runs} Runs in ${(seeded.durationMs / 1_000).toFixed(1)} s · Profile ${seeded.phase}`
+        );
+      })
+      .catch((caught: unknown) => {
+        refreshState();
+        setSeededHistoryStatus(null);
+        setError(errorMessage(caught));
+      })
+      .finally(() => {
+        seedingHistoryRef.current = false;
+      });
   }
 
   function changePuzzleSource(nextSource: MobilePuzzleSource): void {
@@ -5478,6 +5517,10 @@ export function PracticePocScreen({
                     source={puzzleSource}
                     onChange={changePuzzleSource}
                     onInjectMateIn2FocusedRun={injectTestMateIn2FocusedRun}
+                    {...(seedTacticalHistory && puzzleSource === "bundledCore"
+                      ? { onSeedTacticalHistory: seedTestTacticalHistory }
+                      : {})}
+                    seededHistoryStatus={seededHistoryStatus}
                   />
                 ) : null}
               </>
@@ -10515,11 +10558,15 @@ function PreviousCustomConfigRow({
 function TestPuzzleSourceControl({
   source,
   onChange,
-  onInjectMateIn2FocusedRun
+  onInjectMateIn2FocusedRun,
+  onSeedTacticalHistory,
+  seededHistoryStatus
 }: {
   source: MobilePuzzleSource;
   onChange: (next: MobilePuzzleSource) => void;
   onInjectMateIn2FocusedRun?: () => void;
+  onSeedTacticalHistory?: (scenario: SimulatedHistoryScenarioId) => void;
+  seededHistoryStatus?: string | null;
 }): React.JSX.Element {
   return (
     <View style={styles.testPanel} testID="test-puzzle-source-control">
@@ -10542,6 +10589,27 @@ function TestPuzzleSourceControl({
           testID="test-focused-run-inject-mate-in-2"
           onPress={onInjectMateIn2FocusedRun}
         />
+      ) : null}
+      {onSeedTacticalHistory ? (
+        <>
+          <Text style={styles.helperText}>Seed simulated history (Dev only)</Text>
+          <View style={styles.optionRow}>
+            {SIMULATED_HISTORY_SCENARIOS.map(({ scenario, label }) => (
+              <OptionButton
+                key={scenario}
+                active={false}
+                label={label}
+                testID={`test-seed-tactical-history-${scenario}`}
+                onPress={() => onSeedTacticalHistory(scenario)}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
+      {seededHistoryStatus ? (
+        <Text style={styles.helperText} testID="test-seed-tactical-history-status">
+          {seededHistoryStatus}
+        </Text>
       ) : null}
     </View>
   );

@@ -1,8 +1,6 @@
 // Mobile platform storage composition belongs outside the backend/domain seam.
 import {
   defaultSprintConfig,
-  tacticalThemeFrequencyAtRating,
-  tacticalThemeInventoryUpperBound,
   type Puzzle,
   type PuzzlePackManifest,
   type SprintMode,
@@ -16,7 +14,10 @@ import {
   MemoryTacticalProfileRepository,
   type TacticalProfileRepository
 } from "../../../../packages/storage/src/tactical-profile-repository.ts";
-import { TacticalProfileService } from "../../../../packages/storage/src/tactical-profile-service.ts";
+import {
+  TacticalProfileService,
+  tacticalProfilePackOptions
+} from "../../../../packages/storage/src/tactical-profile-service.ts";
 import type {
   PuzzleSource,
   RatingBandPuzzleSelection,
@@ -31,6 +32,9 @@ import {
 } from "../backend/mobileDatabaseLayout.ts";
 import { productionTacticalProfileCalibration } from "../backend/tacticalProfileCalibration.ts";
 import { arePracticeTestControlsEnabled } from "../releaseConfig.ts";
+import type { MobileTestControlCapabilities } from "./mobilePlatformCapabilities.ts";
+
+declare const __DEV__: boolean;
 
 const bundledCoreManifest = require("../../../../fixtures/puzzles/bundled-core-pack.manifest.json") as PuzzlePackManifest;
 const regressionPuzzles = require("../../../../fixtures/puzzles/presolved-1000.json") as Puzzle[];
@@ -293,38 +297,8 @@ function createTacticalProfileService(
     puzzleSource,
     repository,
     calibration,
-    naturalFrequency: bundledNaturalFrequency(),
-    naturalFrequencyForRating: (taskFamily, rating) =>
-      tacticalThemeFrequencyAtRating(
-        bundledCoreManifest,
-        taskFamily,
-        rating
-      ),
-    inventoryUpperBound: (taskFamily, minRating, maxRating, themes) =>
-      tacticalThemeInventoryUpperBound(
-        bundledCoreManifest,
-        taskFamily,
-        minRating,
-        maxRating,
-        themes
-      )?.availableByTheme,
-    ...(calibration.focusedRun === undefined
-      ? {}
-      : { focusedRunPolicy: calibration.focusedRun })
+    ...tacticalProfilePackOptions(bundledCoreManifest, calibration)
   });
-}
-
-function bundledNaturalFrequency() {
-  const frequencies = Object.fromEntries(
-    Object.entries(bundledCoreManifest.themeCounts ?? {}).map(([theme, count]) => [
-      theme,
-      count / Math.max(1, bundledCoreManifest.puzzleCount)
-    ])
-  );
-  return {
-    line: frequencies,
-    arrow_duel: frequencies
-  };
 }
 
 export function configureMobilePracticePuzzleSource(
@@ -554,13 +528,23 @@ function weaveFocusedRunFixturePuzzles(
 }
 
 export function createMobilePracticeTestControls(service: PracticeService):
-  | { injectMateIn2FocusedRun: (now?: string) => SprintState }
+  | MobileTestControlCapabilities
   | undefined {
   if (!arePracticeTestControlsEnabled()) {
     return undefined;
   }
   return {
-    injectMateIn2FocusedRun: (now) => injectMateIn2FocusedRun(service, now)
+    injectMateIn2FocusedRun: (now) => injectMateIn2FocusedRun(service, now),
+    // Keep this a literal `__DEV__` branch: Metro inlines it as false in
+    // Release bundles and drops the require, so seeded synthetic history is
+    // unreachable in Production builds even with test controls enabled.
+    ...(__DEV__
+      ? {
+          seedTacticalHistory: (scenario, now, onProgress) =>
+            (require("./devTacticalHistorySeed.ts") as typeof import("./devTacticalHistorySeed.ts"))
+              .seedDevTacticalHistory(service, scenario, now, onProgress)
+        }
+      : {})
   };
 }
 

@@ -4,6 +4,8 @@ import type { PracticeService } from '../../../../packages/storage/src/practice-
 import type { ICloudProgressSyncClient } from './iCloudProgressSync.ts';
 import type { ICloudSyncDiagnosticsClient } from './iCloudSyncDiagnostics.ts';
 import type { MobilePuzzleSource } from './mobilePractice.ts';
+import type { SimulatedHistoryScenarioId } from '../../../../packages/storage/src/simulation/scenarios.ts';
+import type { DevTacticalHistorySeedResult } from './devTacticalHistorySeed.ts';
 import type {
   ReviewReminderNotificationClient,
   ReviewReminderScheduler,
@@ -18,6 +20,12 @@ export interface MobileStorageCapabilities {
 
 export interface MobileTestControlCapabilities {
   injectMateIn2FocusedRun: (now?: string) => SprintState;
+  /** Dev builds only; absent from Release bundles. */
+  seedTacticalHistory?: (
+    scenario: SimulatedHistoryScenarioId,
+    now: string,
+    onProgress?: (completedRuns: number, totalRuns: number) => void,
+  ) => Promise<DevTacticalHistorySeedResult>;
 }
 
 export interface MobileProgressSyncCapabilities {

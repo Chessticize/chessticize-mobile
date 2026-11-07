@@ -26,6 +26,31 @@ contain a global expected solve time. If a theme lacks enough personal
 controls, that speed head remains unavailable rather than falling back to a
 fixed number of seconds.
 
+## Simulated-player diagnostics
+
+`packages/storage/src/simulation/` contains a deterministic, seeded simulated
+player with planted ground truth (per-theme solve offsets and speed
+multipliers, log-normal time noise, optional improvement). It plays real Runs
+only through `PracticeService` against the production-shaped SQLite store and
+the shipped artifact. Behavioral tests live in
+`packages/storage/test/tactical-profile-simulation-*.test.ts`; longer sweeps
+use:
+
+```sh
+pnpm simulate:tactical-profile --seeds 10 --runs 40
+pnpm simulate:tactical-profile --pack fixtures/puzzles/bundled-core-pack.sqlite
+```
+
+The report prints detection rate, Runs to detection, false-positive rate, and
+Runs until the first Profile phase change. Synthetic histories are never
+calibration evidence: the report carries no corpus or report hash and must not
+be passed to `pnpm calibrate:tactical-profile`.
+
+Dev builds also offer the same named histories from the Practice test panel
+so a simulator or the Dev iPhone shows a real Profile within seconds. Seeding
+requires empty progress, turns iCloud sync off, and is excluded from Release
+bundles; `pnpm mobile:verify:release-bundle:dev-history` checks that exclusion.
+
 ## Required inputs
 
 - One or more private JSON progress exports. Each file may contain one canonical

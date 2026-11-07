@@ -53,13 +53,21 @@ describe('Detox Android board coordinates', () => {
       }
       return {};
     };
-    global.waitFor = () => ({
+    const waitedFor = [];
+    global.waitFor = (target) => ({
       toExist: () => ({
         withTimeout: async () => undefined,
       }),
+      toBeVisible: () => ({
+        withTimeout: async () => {
+          waitedFor.push(['visible', target]);
+        },
+      }),
       not: {
         toExist: () => ({
-          withTimeout: async () => undefined,
+          withTimeout: async () => {
+            waitedFor.push(['gone', target]);
+          },
         }),
       },
     });
@@ -68,6 +76,53 @@ describe('Detox Android board coordinates', () => {
       await playBoardMove('session-board', 'e2e1q', true);
       expect(board.tapAtPoint).toHaveBeenCalledTimes(2);
       expect(promotionTap).toHaveBeenCalledTimes(1);
+      // The iOS picker is chosen only once visible, and the move completes
+      // only after the picker has left, so the next tap cannot hit its overlay.
+      const promotionWaits = waitedFor.filter(([, target]) => target !== undefined && target.tap === promotionTap);
+      expect(promotionWaits.map(([kind]) => kind)).toEqual(['visible', 'gone']);
+    } finally {
+      if (originalBy === undefined) delete global.by;
+      else global.by = originalBy;
+      if (originalDevice === undefined) delete global.device;
+      else global.device = originalDevice;
+      if (originalElement === undefined) delete global.element;
+      else global.element = originalElement;
+      if (originalWaitFor === undefined) delete global.waitFor;
+      else global.waitFor = originalWaitFor;
+    }
+  });
+
+  it('retries only a first tap blocked by the iOS modal transition view', async () => {
+    const originalBy = global.by;
+    const originalDevice = global.device;
+    const originalElement = global.element;
+    const originalWaitFor = global.waitFor;
+    const transitionBlocked = new Error(
+      'Test Failed: View is not hittable at its visible point. Origin view: <UITransitionView: 0x1>'
+    );
+    const board = {
+      getAttributes: jest.fn().mockResolvedValue({
+        frame: { x: 0, y: 0, width: 800, height: 800 },
+      }),
+      tapAtPoint: jest.fn()
+        .mockRejectedValueOnce(transitionBlocked)
+        .mockResolvedValue(undefined),
+    };
+    global.by = { id: (testID) => testID };
+    global.device = { getPlatform: () => 'ios' };
+    global.element = (matcher) => (matcher === 'session-board' ? board : {});
+    global.waitFor = () => ({
+      not: { toExist: () => ({ withTimeout: async () => undefined }) },
+    });
+
+    try {
+      await playBoardMove('session-board', 'e2e4');
+      expect(board.tapAtPoint).toHaveBeenCalledTimes(3);
+
+      const unrelated = new Error('Test Failed: element not found');
+      board.tapAtPoint.mockReset().mockRejectedValueOnce(unrelated);
+      await expect(playBoardMove('session-board', 'e2e4')).rejects.toBe(unrelated);
+      expect(board.tapAtPoint).toHaveBeenCalledTimes(1);
     } finally {
       if (originalBy === undefined) delete global.by;
       else global.by = originalBy;
