@@ -63,8 +63,8 @@ function tokenValue(theme: Theme, tokenPath: string): string | undefined {
 function parseHex(color: string): [number, number, number] | undefined {
   const match = /^#([0-9a-f]{6})$/i.exec(color);
   if (!match) return undefined;
-  const value = parseInt(match[1], 16);
-  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  const hex = match[1];
+  return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
 }
 
 function luminance([r, g, b]: [number, number, number]): number {
