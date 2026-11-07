@@ -231,6 +231,17 @@ export const FeedbackEntryFailure: Story = {
 export const StockfishDiagnostics: Story = {
   name: "Stockfish diagnostics",
   args: { scenarioId: "settings-stockfish-diagnostics" },
+  // The diagnostics entry only exists when the app's test controls are on, and the Lab keeps
+  // them off everywhere else (see createMobilePracticeTestControls).
+  beforeEach: () => {
+    const flags = globalThis as { __CHESSTICIZE_ENABLE_TEST_CONTROLS__?: boolean };
+    const previous = flags.__CHESSTICIZE_ENABLE_TEST_CONTROLS__;
+    flags.__CHESSTICIZE_ENABLE_TEST_CONTROLS__ = true;
+    return () => {
+      if (previous === undefined) delete flags.__CHESSTICIZE_ENABLE_TEST_CONTROLS__;
+      else flags.__CHESSTICIZE_ENABLE_TEST_CONTROLS__ = previous;
+    };
+  },
   play: async ({ canvasElement }) => {
     await openSettings(canvasElement);
     await clickTestId(canvasElement, "settings-stockfish-diagnostics");
