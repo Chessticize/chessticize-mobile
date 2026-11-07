@@ -88,6 +88,7 @@ function isPracticeSettings(value: unknown): value is PracticeSettings {
   const moveFeedback = value.moveFeedback;
   const sprintGuides = value.sprintGuides;
   if (
+    !isOptional(value.appearance, isAppearancePreference) ||
     !isRecord(sync) ||
     typeof sync.iCloudEnabled !== "boolean" ||
     !isRecord(arrowDuel) ||
@@ -106,6 +107,10 @@ function isPracticeSettings(value: unknown): value is PracticeSettings {
     typeof sprintGuides.arrowDuelSeen === "boolean" &&
     isOptional(sprintGuides.focusedRunSeen, isBoolean) &&
     isOptional(sprintGuides.arrowDuelReplyCueStage, isArrowDuelReplyCueStage);
+}
+
+function isAppearancePreference(value: unknown): boolean {
+  return value === "system" || value === "light" || value === "dark";
 }
 
 function isArrowDuelReplyCueStage(value: unknown): boolean {

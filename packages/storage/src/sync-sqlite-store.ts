@@ -71,7 +71,7 @@ import type {
   ReviewQueueDuePromotionResult
 } from "./practice-store.ts";
 import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
-import { clonePracticeSettings, defaultPracticeSettings, normalizeReviewReminderPreference, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
+import { clonePracticeSettings, defaultPracticeSettings, normalizeAppearancePreference, normalizeReviewReminderPreference, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import {
   selectUniquePuzzles,
   selectUniquePuzzlesForRatingBands
@@ -257,6 +257,7 @@ interface AppSettingsRow {
   sync_icloud_enabled: number;
   sync_upload_allowed: number;
   arrow_duel_opponent_reply_enabled: number;
+  appearance: PracticeSettings["appearance"];
   review_reminder_mode: PracticeSettings["notifications"]["reviewReminder"]["mode"];
   review_reminder_fixed_local_time: string | null;
   move_feedback_sound_enabled: number;
@@ -363,7 +364,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 22;
+export const CURRENT_SCHEMA_VERSION = 23;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -394,7 +395,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 18, to: 19, apply: migrateV18ToV19 },
   { from: 19, to: 20, apply: migrateV19ToV20 },
   { from: 20, to: 21, apply: migrateV20ToV21 },
-  { from: 21, to: 22, apply: migrateV21ToV22 }
+  { from: 21, to: 22, apply: migrateV21ToV22 },
+  { from: 22, to: 23, apply: migrateV22ToV23 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -1019,6 +1021,7 @@ export class SyncSQLiteStore implements PracticeStore {
           sync_icloud_enabled,
           sync_upload_allowed,
           arrow_duel_opponent_reply_enabled,
+          appearance,
           review_reminder_mode,
           review_reminder_fixed_local_time,
           move_feedback_sound_enabled,
@@ -1028,11 +1031,12 @@ export class SyncSQLiteStore implements PracticeStore {
           sprint_arrow_duel_guide_seen,
           sprint_focused_run_guide_seen,
           sprint_arrow_duel_reply_cue_stage
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           sync_icloud_enabled = excluded.sync_icloud_enabled,
           sync_upload_allowed = excluded.sync_upload_allowed,
           arrow_duel_opponent_reply_enabled = excluded.arrow_duel_opponent_reply_enabled,
+          appearance = excluded.appearance,
           review_reminder_mode = excluded.review_reminder_mode,
           review_reminder_fixed_local_time = excluded.review_reminder_fixed_local_time,
           move_feedback_sound_enabled = excluded.move_feedback_sound_enabled,
@@ -1047,6 +1051,7 @@ export class SyncSQLiteStore implements PracticeStore {
         boolToInt(cloned.sync.iCloudEnabled),
         0,
         boolToInt(cloned.arrowDuel.opponentReplyEnabled),
+        cloned.appearance,
         cloned.notifications.reviewReminder.mode,
         cloned.notifications.reviewReminder.mode === "fixed"
           ? cloned.notifications.reviewReminder.fixedLocalTime
@@ -3132,10 +3137,12 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   }
   migrateV20ToV21(db);
   migrateV21ToV22(db);
+  migrateV22ToV23(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
   return hasColumn(db, "app_settings", "arrow_duel_opponent_reply_enabled") &&
+    hasColumn(db, "app_settings", "appearance") &&
     hasColumn(db, "app_settings", "move_feedback_sound_enabled") &&
     hasColumn(db, "app_settings", "move_feedback_haptics_enabled") &&
     hasColumn(db, "app_settings", "sprint_rules_guide_seen") &&
@@ -3961,6 +3968,16 @@ function migrateV20ToV21(db: SyncSqliteDatabase): void {
   );
 }
 
+function migrateV22ToV23(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "appearance",
+    "ALTER TABLE app_settings ADD COLUMN appearance TEXT NOT NULL DEFAULT 'system' " +
+      "CHECK (appearance IN ('system', 'light', 'dark'))"
+  );
+}
+
 function migrateV21ToV22(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
@@ -4130,6 +4147,7 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
       : { mode: row.review_reminder_mode }
   );
   return {
+    appearance: normalizeAppearancePreference(row.appearance),
     sync: {
       iCloudEnabled: intToBool(row.sync_icloud_enabled)
     },

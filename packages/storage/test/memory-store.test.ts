@@ -354,6 +354,7 @@ test("PracticeService persists settings through the store boundary", () => {
 
   const defaults = service.getSettings();
   assert.deepEqual(defaults, {
+    appearance: "system",
     arrowDuel: {
       opponentReplyEnabled: true
     },
@@ -379,6 +380,7 @@ test("PracticeService persists settings through the store boundary", () => {
   });
 
   const saved = service.saveSettings({
+    appearance: "system",
     arrowDuel: {
       opponentReplyEnabled: true
     },
@@ -410,6 +412,7 @@ test("PracticeService persists settings through the store boundary", () => {
   assert.deepEqual(service.getSettings().sync, { iCloudEnabled: true });
   assert.deepEqual(service.getSettings().notifications.reviewReminder, { mode: "fixed", fixedLocalTime: "20:30" });
   assert.deepEqual(service.exportLocalData().settings, {
+    appearance: "system",
     arrowDuel: {
       opponentReplyEnabled: true
     },
@@ -1039,3 +1042,15 @@ function compactFenRow(row: string[]): string {
   }
   return output + (empty > 0 ? String(empty) : "");
 }
+
+test("PracticeService saves the appearance override without touching other settings", () => {
+  const service = new PracticeService(new MemoryStore());
+  const before = service.getSettings();
+
+  const saved = service.saveSettings({ ...before, appearance: "dark" });
+
+  assert.equal(saved.appearance, "dark");
+  assert.deepEqual({ ...service.getSettings(), appearance: "system" }, before);
+  assert.equal(service.getSettings().appearance, "dark");
+  assert.equal(service.exportLocalData().settings.appearance, "dark");
+});
