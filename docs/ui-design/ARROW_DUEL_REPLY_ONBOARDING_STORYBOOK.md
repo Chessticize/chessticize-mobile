@@ -1,8 +1,9 @@
 # Arrow Duel Reply Onboarding
 
 Status: approved Storybook design with production wiring in PR #506. The
-Interaction Lab remains the living visual reference for the implemented guide,
-preparation cue, and side-specific reply prompt.
+first-use guide was rebuilt as an overlay on the real session screen in #611.
+The Interaction Lab remains the living visual reference for the implemented
+guide, preparation cue, and side-specific reply prompt.
 
 ## Problem
 
@@ -17,22 +18,29 @@ the board alone.
 
 ## First-use sequence
 
-Keep the four shared Active Session guide screens unchanged. Replace the one
-Arrow Duel screen with two responsive screens:
+The first-use guide is a guided state of the real Arrow Duel screen (#611): a
+dimmed scrim with a rounded cut-out around the current target, and one callout
+whose Back · n of m · Next row sits inside it. The step set comes from
+`sprintSessionGuidePlanFor` in `packages/core/src/sprint-guidance.ts`:
 
-1. **Choose the stronger move**
+- A brand-new player sees three steps: the Sprint header, then the two Arrow
+  Duel steps below. Finishing records only the Arrow Duel guide, so the first
+  Standard Sprint still teaches the amber timer and Mark as unclear.
+- A player who finished a Standard Sprint guide sees only the two Arrow Duel
+  steps.
+- With opponent reply off, the reply step is omitted.
+
+1. **Choose the stronger move** (cut-out: the board)
    - Show the two legal candidate arrows: `Qg7#` and `Qe8+`.
-   - Explain that a correct choice rewinds the board and plays the other,
-     tempting move.
-2. **Then reply for Black**
+   - Callout: `Two arrows, two candidate moves. Play the stronger one on the
+     board.`
+2. **Then reply for Black** (cut-out: the board)
    - Show the resulting position without candidate or answer arrows.
-   - Highlight the other move as the last move.
-   - Use the real side glyph and the side-specific ready prompt.
-   - Explain that the reply is requested only after a correct choice to test
-     the player's understanding of the counterplay, then give the 10-second
-     reply limit.
-   - Explain the mistake and Review consequence without introducing partial
-     scoring.
+   - Highlight the other move as the last move; the prompt uses the real side
+     glyph and the side-specific ready prompt.
+   - Callout: `Next we play the other move. Find Black’s best reply in 10
+     seconds. Sprint time pauses.`
+   - Note line: `This extra challenge is optional — turn it off in Settings.`
 
 The guide does not expose the familiarity-timing progression. Its three timing
 states remain available as separate Storybook cue stories for design review.
@@ -96,21 +104,23 @@ distinct interaction.
 
 ## Responsive contract
 
-- Phone portrait: keep the board unobscured; put the callout below it; preserve
-  44-point Back, Next, Start, and Exit targets.
-- Phone landscape: keep the board and control rail side by side; place the
-  callout in the board's empty lower lane; do not let its connector resemble a
-  third candidate arrow.
-- iPad portrait and landscape: preserve the same hierarchy rather than
-  expanding copy to long desktop line lengths.
-- Compact 320-point width and increased text scale: allow body copy to wrap and
-  never clip the side-specific prompt or its countdown.
-- The full-board cue must remain centered and balanced with a two- or three-line
-  title, a shorter supporting line, and no forced line break tied to one device.
+The guide shows the session at its real size and layout, so it follows the
+session's own responsive rules. A pure geometry function
+(`apps/mobile/src/components/sessionGuideGeometry.ts`) places the callout:
+
+- It tries the step's preferred sides (for the board: trailing, below, above,
+  leading), flips to a side with room, and clamps the callout inside the Safe
+  Area with each inset applied to its own edge.
+- When no side has room (very large text on a small phone), the callout covers
+  part of the cut-out and the pointer is hidden rather than leaving the screen.
+- The callout copy scrolls inside the callout before its navigation row is
+  squeezed, so Back, progress and Next always stay visible.
+- Back, Next and Start keep 44-point targets; Exit sits in the callout header
+  with a 44-point hit area.
 
 ## Storybook reference
 
-The Interaction Lab keeps the approved two-step guide and side-specific copy as
+The Interaction Lab keeps the Arrow Duel guide steps and side-specific copy as
 deterministic visual references. The first-cue story exposes the real `Got it`
 interaction. The 1.5-second and 1-second cue stories stay frozen so each state
 can be reviewed without racing the production timer. The production flow owns

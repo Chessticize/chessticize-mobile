@@ -11,7 +11,6 @@ const {
   selectTestPuzzleSource,
   setAndroidDisplayOrientation,
   sleep,
-  startPracticeMode,
   waitForVisibleInPracticeScroll,
   withAndroidUiDiagnostics
 } = require('./helpers');
@@ -24,6 +23,7 @@ const {
   createAdaptiveScreenshotArchiver,
   sanitizeAdaptiveScreenshotLabel,
 } = require('./adaptiveScreenshotEvidence');
+const { expectSessionGuideContained } = require('./sessionGuideAssertions');
 
 const describeAdaptiveLayout = process.env.CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT === '1'
   || process.env.DETOX_ACTIVE_SUITE === 'android-adaptive-layout'
@@ -52,6 +52,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     await selectTestPuzzleSource('familiar15');
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await sleep(300);
+    await walkArrowDuelGuideAndExit(initialOrientation);
     await startStandardSprintThroughContainedGuide(initialOrientation);
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
     await waitFor(element(by.id('session-current-puzzle-id'))).toExist().withTimeout(10000);
@@ -164,15 +165,10 @@ async function assertFirstUseSprintRulesGuideLayout() {
   }
 }
 
-async function startStandardSprintThroughContainedGuide(orientation) {
-  if (deviceLabel.includes('large-text')) {
-    // Enlarged text may legitimately scroll the guide; its operability is
-    // covered by the component tests for large text.
-    await startPracticeMode('standard');
-    return;
-  }
-  await waitForVisibleInPracticeScroll('practice-run-standard');
-  await element(by.id('practice-run-select-standard')).tap();
+async function selectAndStartRun(mode) {
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await waitForVisibleInPracticeScroll(`practice-run-${mode}`);
+  await element(by.id(`practice-run-select-${mode}`)).tap();
   await element(by.id('practice-main-scroll')).scrollTo('top');
   if (await existsNow('practice-sprint-rules-dismiss')) {
     await element(by.id('practice-sprint-rules-dismiss')).tap();
@@ -180,6 +176,30 @@ async function startStandardSprintThroughContainedGuide(orientation) {
   }
   await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
   await element(by.id('practice-run-start')).tap();
+}
+
+// A brand-new player's first Arrow Duel shows the header, choice and reply
+// steps. Each step's callout, pointer and navigation must stay inside the Safe
+// Area. Exit leaves the guide without recording it, so the Standard guide that
+// follows still shows all three of its steps.
+async function walkArrowDuelGuideAndExit(orientation) {
+  await selectAndStartRun('arrow-duel');
+  for (let step = 1; step <= 3; step += 1) {
+    await waitFor(element(by.id('practice-session-guide-start'))).toExist().withTimeout(10000);
+    await expectSessionGuideContained(`${deviceLabel} ${orientation} Arrow Duel guide step ${step}`);
+    await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-arrow-duel-guide-${step}`);
+    if (step < 3) {
+      await element(by.id('practice-session-guide-start')).tap();
+      await sleep(300);
+    }
+  }
+  await element(by.id('practice-session-guide-exit')).tap();
+  await waitFor(element(by.id('practice-home'))).toExist().withTimeout(10000);
+  await expect(element(by.id('practice-arrow-duel-guide'))).not.toExist();
+}
+
+async function startStandardSprintThroughContainedGuide(orientation) {
+  await selectAndStartRun('standard');
 
   for (let step = 1; step <= 8; step += 1) {
     try {
@@ -187,8 +207,6 @@ async function startStandardSprintThroughContainedGuide(orientation) {
     } catch {
       break;
     }
-    // The guide re-lays out after each step; let the new callout settle.
-    await sleep(500);
     if (
       !await existsNow('practice-active-session-guide')
       && !await existsNow('practice-arrow-duel-guide')
@@ -196,37 +214,10 @@ async function startStandardSprintThroughContainedGuide(orientation) {
       // The last Start action is leaving the guide for the live session.
       break;
     }
-    await expectGuideContained(`${orientation} guide step ${step}`);
+    await expectSessionGuideContained(`${deviceLabel} ${orientation} guide step ${step}`);
+    await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-standard-guide-${step}`);
     await element(by.id('practice-session-guide-start')).tap();
-  }
-}
-
-async function expectGuideContained(label) {
-  const screenFrame = await frameFor(element(by.id('adaptive-layout')));
-  const guideFrame = await frameForIfPresent('practice-active-session-guide')
-    ?? await frameForIfPresent('practice-arrow-duel-guide');
-  const navigationFrame = await frameFor(element(by.id('practice-session-guide-navigation')));
-  // Back/progress/Next must be on screen without scrolling (#602, #613).
-  expectFrameContained(navigationFrame, screenFrame, `${deviceLabel} ${label} navigation`);
-  for (const testID of [
-    'practice-session-guide-back',
-    'practice-session-guide-coach-progress',
-    'practice-session-guide-start'
-  ]) {
-    const frame = await frameForIfPresent(testID);
-    if (frame) {
-      expectFrameContained(frame, navigationFrame, `${deviceLabel} ${label} ${testID}`);
-    }
-  }
-  if (!guideFrame) {
-    throw new Error(`${deviceLabel} ${label} has guide navigation without a guide container`);
-  }
-  // The demo board and rail must not be clipped by the guide container.
-  for (const testID of ['practice-session-guide-demo-board', 'active-session-control-rail']) {
-    const frame = await frameForIfPresent(testID);
-    if (frame) {
-      expectFrameContained(frame, guideFrame, `${deviceLabel} ${label} ${testID}`);
-    }
+    await sleep(300);
   }
 }
 

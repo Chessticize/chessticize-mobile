@@ -172,21 +172,21 @@ describe("buildPracticeAdaptiveLayout", () => {
       width: 466,
       height: 678,
       insets: { top: 0, right: 84, bottom: 34, left: 0 },
-      expected: { className: "compactPortrait", board: 280, guideBoard: 176, rail: false }
+      expected: { className: "compactPortrait", board: 280, rail: false }
     },
     {
       label: "iPad Pro 13-inch portrait",
       width: 1032,
       height: 1376,
       insets: { top: 32, right: 0, bottom: 20, left: 0 },
-      expected: { className: "regularPortrait", board: 860, guideBoard: 556, rail: false }
+      expected: { className: "regularPortrait", board: 860, rail: false }
     },
     {
       label: "iPad Pro 13-inch landscape",
       width: 1376,
       height: 1032,
       insets: { top: 10, right: 0, bottom: 20, left: 0 },
-      expected: { className: "regularLandscape", board: 640, guideBoard: 640, rail: true }
+      expected: { className: "regularLandscape", board: 640, rail: true }
     }
   ])("lays out the measured $label window", ({ expected, height, insets, width }) => {
     const layout = buildPracticeAdaptiveLayout({ fontScale: 1, height, insets, width });
@@ -194,38 +194,10 @@ describe("buildPracticeAdaptiveLayout", () => {
     expect({
       className: layout.className,
       board: layout.boardSize,
-      guideBoard: layout.sessionGuideBoardSize,
       rail: layout.usesSessionRail
     }).toEqual(expected);
     expect(layout.contentWidth + (layout.usesSideNavigation ? layout.sideNavigationWidth : 0))
       .toBe(width - insets.left - insets.right);
-  });
-
-  it("keeps the iPhone Duo outer first-use guide navigation inside the viewport", () => {
-    const insets = { top: 0, right: 84, bottom: 34, left: 0 };
-    const layout = buildPracticeAdaptiveLayout({ fontScale: 1, height: 678, insets, width: 466 });
-    // Measured on the Duo outer display before this budget existed: the
-    // Mark-as-unclear step put 335 points of non-board, non-prompt chrome
-    // around a 218-point board and pushed Back/Next 37 points off screen.
-    const measuredGuideChrome = 335;
-
-    expect(
-      PRACTICE_UI_PADDING
-        + layout.promptFrameHeight
-        + measuredGuideChrome
-        + layout.sessionGuideBoardSize
-    ).toBeLessThanOrEqual(layout.contentHeight);
-  });
-
-  it("does not shrink the first-use guide board on taller phones", () => {
-    const layout = buildPracticeAdaptiveLayout({
-      fontScale: 1,
-      height: 874,
-      insets: { top: 62, right: 0, bottom: 34, left: 0 },
-      width: 402
-    });
-
-    expect(layout.sessionGuideBoardSize).toBe(Math.floor(layout.contentHeight * 0.34));
   });
 
   // Sizes that cannot yet be measured headlessly (see docs/DEVICE_TARGETS.md):
@@ -266,8 +238,6 @@ describe("buildPracticeAdaptiveLayout", () => {
     const safeHeight = height - insets.top - insets.bottom;
 
     expect(layout.boardSize).toBeGreaterThanOrEqual(200);
-    expect(layout.sessionGuideBoardSize).toBeGreaterThan(0);
-    expect(layout.sessionGuideBoardSize).toBeLessThanOrEqual(layout.boardSize);
     if (layout.usesSessionRail) {
       expect(layout.sessionPackedRowWidth)
         .toBeLessThanOrEqual(safeWidth - 2 * PRACTICE_UI_PADDING);

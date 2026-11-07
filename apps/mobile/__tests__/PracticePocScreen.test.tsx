@@ -2242,25 +2242,31 @@ describe("PracticePocScreen", () => {
     );
     press(renderer, "focused-run-start");
     expect(findByTestId(renderer, "practice-active-session-guide")).toBeTruthy();
-    expectText(renderer, "Track the fixed Run");
-    expect(service.getSettings().sprintGuides.focusedRunSeen).toBe(false);
-
-    for (let step = 0; step < 4; step += 1) {
-      press(renderer, "practice-session-guide-start");
-    }
-
-    expect(service.getSettings().sprintGuides.focusedRunSeen).toBe(true);
-    expect(service.getActiveSprint()).toBeUndefined();
-    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
-    expect(service.getSettings().sprintGuides.arrowDuelSeen).toBe(false);
-
-    press(renderer, "practice-session-guide-start");
-    expect(service.getSettings().sprintGuides.arrowDuelSeen).toBe(false);
+    expectText(renderer, "Track your Focused Run");
     expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
-      "6 of 6"
+      "1 of 3"
     );
+
     press(renderer, "practice-session-guide-start");
-    expect(service.getSettings().sprintGuides.arrowDuelSeen).toBe(true);
+    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
+    press(renderer, "practice-session-guide-start");
+    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
+      "3 of 3"
+    );
+    expect(service.getSettings().sprintGuides).toMatchObject({
+      arrowDuelSeen: false,
+      focusedRunSeen: false
+    });
+    expect(service.getActiveSprint()).toBeUndefined();
+    expect(collectText(findByTestId(renderer, "practice-session-guide-start"))).toBe(
+      "Start Focused Run"
+    );
+
+    press(renderer, "practice-session-guide-start");
+    expect(service.getSettings().sprintGuides).toMatchObject({
+      arrowDuelSeen: true,
+      focusedRunSeen: true
+    });
     expect(service.getActiveSprint()).toBeUndefined();
     act(() => {
       jest.advanceTimersByTime(200);
@@ -2833,7 +2839,7 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("persists the production rules and shared Active Session guides before starting the real timer", () => {
+  it("persists the production rules and the Standard session guide before starting the real timer", () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({
       sprintGuidanceEnabled: true,
@@ -2850,13 +2856,18 @@ describe("PracticePocScreen", () => {
     expect(service.getActiveSprint()).toBeUndefined();
     expect(() => findByTestId(renderer, "session-board")).toThrow();
 
-    for (let step = 0; step < 4; step += 1) {
+    const titles: string[] = [];
+    for (let step = 0; step < 3; step += 1) {
+      titles.push(collectText(findByTestId(renderer, "practice-session-guide-title")));
+      expect(service.getSettings().sprintGuides.activeSessionSeen).toBe(false);
       press(renderer, "practice-session-guide-start");
     }
 
+    expect(titles).toEqual(["Track your Sprint", "Amber means slow", "Mark as unclear"]);
     expect(service.getSettings().sprintGuides.activeSessionSeen).toBe(true);
     expect(service.getActiveSprint()?.status).toBe("active");
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
+    expect(() => findByTestId(renderer, "practice-session-guide-callout")).toThrow();
 
     act(() => renderer.unmount());
     const relaunched = renderScreen({
@@ -2887,8 +2898,8 @@ describe("PracticePocScreen", () => {
     expect(service.getSettings().sprintGuides.activeSessionSeen).toBe(false);
   });
 
-  it("keeps the guide close control available without starting or completing the guide", () => {
-    for (let coachStep = 0; coachStep < 4; coachStep += 1) {
+  it("lets the guide exit on every step without starting or completing the guide", () => {
+    for (let guideStep = 0; guideStep < 3; guideStep += 1) {
       const service = createMobilePracticeService("random1000");
       const renderer = renderScreen({
         sprintGuidanceEnabled: true,
@@ -2897,14 +2908,14 @@ describe("PracticePocScreen", () => {
       });
 
       press(renderer, "practice-run-start");
-      for (let step = 0; step < coachStep; step += 1) {
+      for (let step = 0; step < guideStep; step += 1) {
         press(renderer, "practice-session-guide-start");
       }
 
-      expect(findByTestId(renderer, "session-abandon").props.accessibilityLabel).toBe(
+      expect(findByTestId(renderer, "practice-session-guide-exit").props.accessibilityLabel).toBe(
         "Exit guide"
       );
-      press(renderer, "session-abandon");
+      press(renderer, "practice-session-guide-exit");
 
       expect(() => findByTestId(renderer, "practice-active-session-guide")).toThrow();
       expect(findByTestId(renderer, "practice-home")).toBeTruthy();
@@ -2912,14 +2923,37 @@ describe("PracticePocScreen", () => {
       expect(service.getSettings().sprintGuides.activeSessionSeen).toBe(false);
 
       press(renderer, "practice-run-start");
-      expect(findByTestId(renderer, "practice-active-session-guide")).toBeTruthy();
+      expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
+        "1 of 3"
+      );
       expect(service.getSettings().sprintGuides.activeSessionSeen).toBe(false);
 
       act(() => renderer.unmount());
     }
   });
 
-  it("shows both guides for a first Arrow Duel, then only its own guide after shared guidance", () => {
+  it("moves Back through the steps and only offers Back after the first step", () => {
+    const renderer = renderLabScenario("practice-active-session-guide");
+
+    expect(() => findByTestId(renderer, "practice-session-guide-back")).toThrow();
+    expect(findByTestId(renderer, "practice-session-guide-step-session_progress")).toBeTruthy();
+    press(renderer, "practice-session-guide-start");
+    press(renderer, "practice-session-guide-start");
+    expect(findByTestId(renderer, "practice-session-guide-step-mark_unclear")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-session-guide-start"))).toBe("Start Sprint");
+
+    press(renderer, "practice-session-guide-back");
+    expect(findByTestId(renderer, "practice-session-guide-step-slow_timer")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
+      "2 of 3"
+    );
+    expect(collectText(findByTestId(renderer, "practice-session-guide-start"))).toBe("Next");
+    press(renderer, "practice-session-guide-back");
+    expect(findByTestId(renderer, "practice-session-guide-step-session_progress")).toBeTruthy();
+    expect(() => findByTestId(renderer, "practice-session-guide-back")).toThrow();
+  });
+
+  it("teaches a first Arrow Duel in three steps and keeps the Standard basics for later", () => {
     const freshService = createMobilePracticeService("random1000");
     const firstArrowDuel = renderScreen({
       sprintGuidanceEnabled: true,
@@ -2930,30 +2964,40 @@ describe("PracticePocScreen", () => {
     press(firstArrowDuel, "practice-run-select-arrow-duel");
     press(firstArrowDuel, "practice-run-start");
     expect(findByTestId(firstArrowDuel, "practice-active-session-guide")).toBeTruthy();
-    expect(collectText(findByTestId(firstArrowDuel, "practice-session-guide-coach-progress"))).toBe("1 of 6");
+    expect(collectText(findByTestId(firstArrowDuel, "practice-session-guide-coach-progress"))).toBe("1 of 3");
+    expect(collectText(findByTestId(firstArrowDuel, "practice-session-guide-title"))).toBe(
+      "Track your Sprint"
+    );
     expect(freshService.getActiveSprint()).toBeUndefined();
 
-    for (let step = 0; step < 4; step += 1) {
-      press(firstArrowDuel, "practice-session-guide-start");
-    }
+    press(firstArrowDuel, "practice-session-guide-start");
     expect(findByTestId(firstArrowDuel, "practice-arrow-duel-guide")).toBeTruthy();
-    expect(collectText(findByTestId(firstArrowDuel, "practice-session-guide-coach-progress"))).toBe("5 of 6");
-    expect(freshService.getSettings().sprintGuides.activeSessionSeen).toBe(true);
-    expect(freshService.getSettings().sprintGuides.arrowDuelSeen).toBe(false);
+    expect(collectText(findByTestId(firstArrowDuel, "practice-session-guide-coach-progress"))).toBe("2 of 3");
+    expect(collectText(findByTestId(firstArrowDuel, "practice-session-guide-title"))).toBe(
+      "Choose the stronger move"
+    );
+    expect(findByTestId(firstArrowDuel, "practice-arrow-duel-guide-candidates")).toBeTruthy();
 
     press(firstArrowDuel, "practice-session-guide-start");
-    expect(collectText(findByTestId(firstArrowDuel, "practice-session-guide-coach-progress"))).toBe("6 of 6");
-    expect(collectText(findByTestId(firstArrowDuel, "practice-arrow-duel-guide"))).toContain(
+    expect(collectText(findByTestId(firstArrowDuel, "practice-session-guide-coach-progress"))).toBe("3 of 3");
+    expect(collectText(findByTestId(firstArrowDuel, "practice-session-guide-title"))).toBe(
       "Then reply for Black"
     );
-    expect(collectText(findByTestId(
-      firstArrowDuel,
-      "practice-session-guide-optional-settings-notice"
-    ))).toBe("This extra challenge is optional — turn it off in Settings.");
+    expect(collectText(findByTestId(firstArrowDuel, "practice-session-guide-note"))).toBe(
+      "This extra challenge is optional — turn it off in Settings."
+    );
+    expect(findByTestId(firstArrowDuel, "practice-arrow-duel-guide-reply-last-move")).toBeTruthy();
+    expect(() => findByTestId(firstArrowDuel, "practice-arrow-duel-guide-candidates")).toThrow();
     expect(freshService.getSettings().sprintGuides.arrowDuelSeen).toBe(false);
+    expect(collectText(findByTestId(firstArrowDuel, "practice-session-guide-start"))).toBe(
+      "Start Arrow Duel"
+    );
 
     press(firstArrowDuel, "practice-session-guide-start");
-    expect(freshService.getSettings().sprintGuides.arrowDuelSeen).toBe(true);
+    expect(freshService.getSettings().sprintGuides).toMatchObject({
+      activeSessionSeen: false,
+      arrowDuelSeen: true
+    });
     expect(freshService.getActiveSprint()).toBeUndefined();
     act(() => {
       jest.advanceTimersByTime(200);
@@ -3007,13 +3051,13 @@ describe("PracticePocScreen", () => {
       renderer,
       "practice-session-guide-coach-progress"
     ))).toBe("1 of 1");
-    expect(() => findByTestId(
-      renderer,
-      "practice-session-guide-optional-settings-notice"
-    )).toThrow();
+    expect(collectText(findByTestId(renderer, "practice-session-guide-start"))).toBe(
+      "Start Arrow Duel"
+    );
+    expect(() => findByTestId(renderer, "practice-session-guide-note")).toThrow();
   });
 
-  it("lets Arrow Duel leave either guide without completing its own guidance", () => {
+  it("lets Arrow Duel leave its guide without recording it", () => {
     const service = createMobilePracticeService("random1000");
     const renderer = renderScreen({
       sprintGuidanceEnabled: true,
@@ -3023,41 +3067,23 @@ describe("PracticePocScreen", () => {
 
     press(renderer, "practice-run-select-arrow-duel");
     press(renderer, "practice-run-start");
-    for (let step = 0; step < 4; step += 1) {
-      press(renderer, "practice-session-guide-start");
-    }
+    press(renderer, "practice-session-guide-start");
+    press(renderer, "practice-session-guide-start");
 
     expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
-      "5 of 6"
-    );
-    expect(findByTestId(renderer, "session-abandon").props.accessibilityLabel).toBe(
-      "Exit guide"
-    );
-    press(renderer, "session-abandon");
+    press(renderer, "practice-session-guide-exit");
 
     expect(() => findByTestId(renderer, "practice-arrow-duel-guide")).toThrow();
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
     expect(service.getActiveSprint()).toBeUndefined();
     expect(service.getSettings().sprintGuides).toMatchObject({
-      activeSessionSeen: true,
+      activeSessionSeen: false,
       arrowDuelSeen: false
     });
 
     press(renderer, "practice-run-start");
-    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
-    expect(() => findByTestId(renderer, "practice-active-session-guide")).toThrow();
     expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
-      "1 of 2"
-    );
-    press(renderer, "session-abandon");
-
-    expect(findByTestId(renderer, "practice-home")).toBeTruthy();
-    expect(service.getSettings().sprintGuides.arrowDuelSeen).toBe(false);
-    press(renderer, "practice-run-start");
-    expect(findByTestId(renderer, "practice-arrow-duel-guide")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
-      "1 of 2"
+      "1 of 3"
     );
 
     act(() => renderer.unmount());
@@ -3096,224 +3122,195 @@ describe("PracticePocScreen", () => {
     );
   });
 
-  it("calibrates the frozen first-use guides to the real Sprint layout before Sprint and Arrow Duel", () => {
-    const activeSession = renderLabScenario("practice-active-session-guide");
-    expect(findByTestId(activeSession, "practice-active-session-guide")).toBeTruthy();
-    expect(() => findByTestId(activeSession, "session-board")).toThrow();
-    expect(findByTestId(activeSession, "practice-session-guide-demo-board")).toBeTruthy();
-    expect(findByTestId(activeSession, "active-session-shell")).toBeTruthy();
-    expect(findByTestId(activeSession, "session-status-metrics")).toBeTruthy();
-    expect(findByTestId(activeSession, "practice-prompt")).toBeTruthy();
-    expect(findByTestId(activeSession, "session-puzzle-timing")).toBeTruthy();
-    expect(findByTestId(activeSession, "session-score-strip")).toBeTruthy();
-    expect(testIdOrder(activeSession, "active-session-shell", "practice-prompt")).toBeLessThan(0);
-    expect(testIdOrder(activeSession, "practice-prompt", "practice-session-guide-demo-board")).toBeLessThan(0);
-    expect(testIdOrder(activeSession, "practice-session-guide-demo-board", "session-score-strip")).toBeLessThan(0);
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-progress"))).toBe(
-      "1 of 4"
-    );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-overview"))).toContain(
-      "The top row shows puzzles solved, Sprint time left, and mistakes remaining."
-    );
-    expect(() => findByTestId(activeSession, "practice-session-guide-coach-slow")).toThrow();
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-start"))).toBe("Next");
+  it("shows each guide step as a guided state of the real session layout", () => {
+    const renderer = renderLabScenario("practice-active-session-guide");
 
-    press(activeSession, "practice-session-guide-start");
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-progress"))).toBe(
-      "2 of 4"
+    expect(findByTestId(renderer, "stacked-session-layout")).toBeTruthy();
+    expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+    expect(findByTestId(renderer, "session-status-metrics")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-prompt")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-session-guide-board")).toBeTruthy();
+    expect(findByTestId(renderer, "session-puzzle-timing")).toBeTruthy();
+    expect(findByTestId(renderer, "session-score-strip")).toBeTruthy();
+    expect(() => findByTestId(renderer, "session-board")).toThrow();
+    expect(testIdOrder(renderer, "active-session-shell", "practice-prompt")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "practice-prompt", "practice-session-guide-board")).toBeLessThan(0);
+    expect(testIdOrder(renderer, "practice-session-guide-board", "session-score-strip")).toBeLessThan(0);
+    // The guide shows the session at its real board size.
+    expect(flattenTestStyle(
+      findByTestId(renderer, "practice-session-guide-board").props.style
+    ).width).toBe(buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height: 844,
+      insets: { bottom: 0, left: 0, right: 0, top: 0 },
+      width: 390
+    }).boardSize);
+    // One callout holds the copy and the Back · n of m · Next row.
+    const callout = findByTestId(renderer, "practice-session-guide-callout");
+    expect(callout.findByProps({ testID: "practice-session-guide-navigation" })).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
+      "1 of 3"
     );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-slow"))).toContain(
-      "Amber means you’re taking too long"
-    );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-slow"))).toContain(
-      "Keep solving. A correct answer will be marked Unclear because you took too long, but it will not count as a mistake."
-    );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-timer"))).toContain(
-      "Puzzle 0:40"
-    );
+    expect(findByTestId(renderer, "practice-session-guide-scrim")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:00");
 
-    press(activeSession, "practice-session-guide-start");
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-progress"))).toBe(
-      "3 of 4"
+    press(renderer, "practice-session-guide-start");
+    expect(collectText(findByTestId(renderer, "session-puzzle-timing-label"))).toBe("Puzzle 0:40");
+    expect(collectText(findByTestId(renderer, "practice-session-guide-detail"))).toBe(
+      "Keep going. A slow correct answer still counts, but it is marked Unclear."
     );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-timeout"))).toContain(
-      "This puzzle counts as a mistake"
-    );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-timeout"))).toContain(
-      "It is added to Review. Mistakes are not marked Unclear. The Sprint then shows the next puzzle."
-    );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-board"))).toContain(
-      "Added to Review"
-    );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-board"))).not.toContain(
-      "Mistake ·"
-    );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-board"))).not.toContain(
-      "Moving on"
-    );
+    expect(() => findByTestId(renderer, "sprint-unclear-prompt")).toThrow();
 
-    press(activeSession, "practice-session-guide-start");
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-progress"))).toBe(
-      "4 of 4"
+    press(renderer, "practice-session-guide-start");
+    expect(findByTestId(renderer, "sprint-unclear-prompt")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "practice-session-guide-detail"))).toBe(
+      "Tap it after a puzzle if the solution still doesn’t make sense to you."
     );
-    expect(() => findByTestId(activeSession, "practice-session-guide-timeout-overlay")).toThrow();
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-unclear"))).toContain(
-      "Use Mark as unclear when needed"
-    );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-demo-unclear"))).toContain(
-      "Mark as unclear"
-    );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-unclear"))).toContain(
-      "Tap it after a correct answer, or on the final Incomplete puzzle, when the solution still does not make sense to you."
-    );
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-start"))).toBe(
-      "Start Sprint"
-    );
+  });
 
-    press(activeSession, "practice-session-guide-back");
-    expect(collectText(findByTestId(activeSession, "practice-session-guide-coach-progress"))).toBe(
-      "3 of 4"
-    );
-    press(activeSession, "practice-session-guide-start");
-    expect(
-      findByTestId(activeSession, "practice-active-session-guide").props.accessibilityLabel
-    ).toBe(
-      "Guide 4 of 4. Use Mark as unclear when needed. Tap it after a correct answer, or on the final Incomplete puzzle, when the solution still does not make sense to you."
-    );
-
-    press(activeSession, "practice-session-guide-start");
-    expect(findByTestId(activeSession, "session-board")).toBeTruthy();
-
-    const firstEverArrowDuel = renderLabScenario("practice-arrow-duel-guide");
-
-    expect(findByTestId(firstEverArrowDuel, "practice-active-session-guide")).toBeTruthy();
-    expect(() => findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide")).toThrow();
-    expect(() => findByTestId(firstEverArrowDuel, "session-board")).toThrow();
-    expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-coach-progress"))).toBe(
-      "1 of 6"
-    );
-    expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-start"))).toBe(
-      "Next"
-    );
-
-    for (let index = 0; index < 4; index += 1) {
-      press(firstEverArrowDuel, "practice-session-guide-start");
+  it("keeps every step's copy short and free of tour meta copy", () => {
+    const scenarios = [
+      ["practice-active-session-guide", 3],
+      ["practice-arrow-duel-guide", 3],
+      ["practice-arrow-duel-guide-only", 2],
+      ["practice-tactical-focus-guide", 3]
+    ] as const;
+    for (const [scenarioId, steps] of scenarios) {
+      const renderer = renderLabScenario(scenarioId);
+      for (let step = 0; step < steps; step += 1) {
+        const title = collectText(findByTestId(renderer, "practice-session-guide-title"));
+        const detail = collectText(findByTestId(renderer, "practice-session-guide-detail"));
+        expect(title.split(/\s+/).length).toBeLessThanOrEqual(5);
+        expect(detail.split(/\s+/).length).toBeLessThanOrEqual(18);
+        expect(`${title} ${detail}`).not.toMatch(/\b(?:step|tour|guide)\b/i);
+        if (step < steps - 1) {
+          press(renderer, "practice-session-guide-start");
+        }
+      }
+      expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(
+        `${steps} of ${steps}`
+      );
+      act(() => renderer.unmount());
     }
-    expect(() => findByTestId(firstEverArrowDuel, "practice-active-session-guide")).toThrow();
-    expect(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide")).toBeTruthy();
-    expect(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-timing-demo")).toBeTruthy();
-    expect(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-demo-board")).toBeTruthy();
-    expect(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-candidates")).toBeTruthy();
-    expect(findByTestId(
-      firstEverArrowDuel,
-      "practice-arrow-duel-guide-candidates-order-g6g7-g6e8"
-    )).toBeTruthy();
-    expect(findByTestId(firstEverArrowDuel, "active-session-shell")).toBeTruthy();
-    expect(findByTestId(firstEverArrowDuel, "practice-prompt")).toBeTruthy();
-    expect(findByTestId(firstEverArrowDuel, "session-puzzle-timing")).toBeTruthy();
-    expect(findByTestId(firstEverArrowDuel, "session-score-strip")).toBeTruthy();
-    expect(() => findByTestId(firstEverArrowDuel, "session-board")).toThrow();
-    expect(testIdOrder(firstEverArrowDuel, "active-session-shell", "practice-prompt")).toBeLessThan(0);
-    expect(testIdOrder(firstEverArrowDuel, "practice-prompt", "practice-arrow-duel-guide-demo-board")).toBeLessThan(0);
-    expect(testIdOrder(firstEverArrowDuel, "practice-arrow-duel-guide-demo-board", "session-score-strip")).toBeLessThan(0);
-    expect(collectText(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide-coach"))).toContain(
-      "Play one of the two arrows. A correct choice rewinds the board and plays the other, tempting move instead."
-    );
-    expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-coach-progress"))).toBe(
-      "5 of 6"
-    );
+  });
 
-    press(firstEverArrowDuel, "practice-session-guide-back");
-    expect(findByTestId(firstEverArrowDuel, "practice-active-session-guide")).toBeTruthy();
-    expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-coach-progress"))).toBe(
-      "4 of 6"
-    );
-    expect(findByTestId(firstEverArrowDuel, "practice-session-guide-coach-unclear")).toBeTruthy();
-    press(firstEverArrowDuel, "practice-session-guide-start");
-    expect(findByTestId(firstEverArrowDuel, "practice-arrow-duel-guide")).toBeTruthy();
-    expect(collectText(findByTestId(firstEverArrowDuel, "practice-session-guide-coach-progress"))).toBe(
-      "5 of 6"
-    );
-
-    press(firstEverArrowDuel, "practice-session-guide-start");
-    expect(findByTestId(
-      firstEverArrowDuel,
-      "practice-arrow-duel-guide-reply-last-move"
-    )).toBeTruthy();
-    expect(() => findByTestId(
-      firstEverArrowDuel,
-      "practice-arrow-duel-guide-reply-timing-ramp"
-    )).toThrow();
-    expect(() => findByTestId(
-      firstEverArrowDuel,
-      "practice-arrow-duel-guide-candidates"
-    )).toThrow();
-    expect(collectText(findByTestId(
-      firstEverArrowDuel,
-      "practice-session-guide-coach-copy-arrow-duel-reply"
-    ))).toContain("Then reply for Black");
-    expect(collectText(findByTestId(
-      firstEverArrowDuel,
-      "practice-session-guide-coach-copy-arrow-duel-reply"
-    ))).toContain(
-      "After you choose correctly, we play the other move. You have 10 seconds to find Black’s best reply while your Sprint time is paused. A miss or timeout counts as one mistake and goes to Review."
-    );
-    expect(collectText(findByTestId(
-      firstEverArrowDuel,
-      "practice-session-guide-optional-settings-notice"
-    ))).toBe("This extra challenge is optional — turn it off in Settings.");
-    expect(flattenTestStyle(findByTestId(
-      firstEverArrowDuel,
-      "practice-session-guide-optional-settings-notice"
-    ).props.style)).toMatchObject({
-      backgroundColor: "#DBEAFE",
-      borderWidth: 1
+  it("places the callout from measured frames inside an asymmetric safe frame", () => {
+    // Window and Safe Area measured on the iPhone Duo outer display (#618):
+    // the status-bar column is a right inset only.
+    setPracticeViewport({
+      width: 466,
+      height: 678,
+      scale: 3,
+      insets: { top: 0, right: 84, bottom: 34, left: 0 }
     });
-    expect(flattenTestStyle(findByTestId(
-      firstEverArrowDuel,
-      "practice-session-guide-optional-settings-label"
-    ).props.style).fontWeight).toBe("900");
-    expect(collectText(findByTestId(
-      firstEverArrowDuel,
-      "practice-arrow-duel-guide-reply-hint"
-    ))).toBe("Optional · Turn off in Settings");
-    expect(collectText(findByTestId(
-      firstEverArrowDuel,
-      "practice-session-guide-coach-progress"
-    ))).toBe("6 of 6");
+    const frames = ReactNative as unknown as {
+      __setViewFrame?: (
+        testID: string,
+        frame: { height: number; width: number; x: number; y: number }
+      ) => void;
+    };
+    frames.__setViewFrame?.("practice-active-session-guide", { x: 0, y: 0, width: 466, height: 678 });
+    frames.__setViewFrame?.("session-status-metrics", { x: 16, y: 64, width: 350, height: 52 });
+    frames.__setViewFrame?.("practice-session-guide-callout", { x: 0, y: 0, width: 358, height: 150 });
 
-    press(firstEverArrowDuel, "practice-session-guide-start");
-    expect(findByTestId(firstEverArrowDuel, "sprint-loading-overlay")).toBeTruthy();
+    const renderer = renderLabScenario("practice-active-session-guide");
+    const calloutStyle = () => flattenTestStyle(
+      findByTestId(renderer, "practice-session-guide-callout").props.style
+    );
+    expect(calloutStyle().opacity).toBe(0);
+    expect(() => findByTestId(renderer, "practice-session-guide-cutout")).toThrow();
+
     act(() => {
-      jest.advanceTimersByTime(200);
+      jest.advanceTimersByTime(300);
     });
-    expect(findByTestId(firstEverArrowDuel, "session-board")).toBeTruthy();
 
-    const returningArrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
+    const placed = calloutStyle();
+    expect(placed.opacity).toBe(1);
+    expect(placed.width).toBe(358);
+    // Below the 6-point cut-out padding plus the 14-point pointer gap.
+    expect(placed.top).toBe(64 + 52 + 6 + 14);
+    expect(placed.left).toBeGreaterThanOrEqual(12);
+    expect(Number(placed.left) + 358).toBeLessThanOrEqual(466 - 84 - 12);
+    expect(findByTestId(renderer, "practice-session-guide-pointer")).toBeTruthy();
+    const cutout = flattenTestStyle(
+      findByTestId(renderer, "practice-session-guide-cutout").props.style
+    );
+    expect(cutout).toMatchObject({ height: 64, left: 10, top: 58, width: 362 });
+  });
 
-    expect(findByTestId(returningArrowDuel, "practice-arrow-duel-guide")).toBeTruthy();
-    expect(() => findByTestId(returningArrowDuel, "practice-active-session-guide")).toThrow();
-    expect(findByTestId(returningArrowDuel, "practice-arrow-duel-guide-timing-demo")).toBeTruthy();
-    expect(findByTestId(returningArrowDuel, "practice-arrow-duel-guide-demo-board")).toBeTruthy();
-    expect(findByTestId(returningArrowDuel, "practice-arrow-duel-guide-candidates")).toBeTruthy();
-    expect(() => findByTestId(returningArrowDuel, "session-board")).toThrow();
-    expect(collectText(findByTestId(returningArrowDuel, "practice-session-guide-coach-progress"))).toBe(
-      "1 of 2"
-    );
-    expect(collectText(findByTestId(returningArrowDuel, "practice-session-guide-start"))).toBe(
-      "Next"
-    );
-    press(returningArrowDuel, "practice-session-guide-start");
-    expect(collectText(findByTestId(returningArrowDuel, "practice-session-guide-coach-progress"))).toBe(
-      "2 of 2"
-    );
-    expect(() => findByTestId(
-      returningArrowDuel,
-      "practice-arrow-duel-guide-reply-timing-ramp"
-    )).toThrow();
-    expect(collectText(findByTestId(returningArrowDuel, "practice-session-guide-start"))).toBe(
-      "Start Arrow Duel"
-    );
+  it("keeps the guide navigation operable with large text on a compact phone", () => {
+    setPracticeViewport({
+      width: 320,
+      height: 693,
+      scale: 2,
+      fontScale: 1.5,
+      insets: { top: 24, right: 0, bottom: 20, left: 0 }
+    });
+
+    const frames = ReactNative as unknown as {
+      __setViewFrame?: (
+        testID: string,
+        frame: { height: number; width: number; x: number; y: number }
+      ) => void;
+    };
+    frames.__setViewFrame?.("practice-arrow-duel-guide", { x: 0, y: 0, width: 320, height: 693 });
+    frames.__setViewFrame?.("practice-session-guide-board", { x: 16, y: 230, width: 288, height: 288 });
+    frames.__setViewFrame?.("practice-session-guide-callout", { x: 0, y: 0, width: 296, height: 420 });
+    const renderer = renderLabScenario("practice-arrow-duel-guide-only");
+    press(renderer, "practice-session-guide-start");
+    act(() => {
+      jest.advanceTimersByTime(300);
+    });
+
+    expect(findByTestId(renderer, "practice-session-guide-back").props.accessibilityRole)
+      .toBe("button");
+    expect(findByTestId(renderer, "practice-session-guide-start").props.accessibilityLabel)
+      .toBe("Start Arrow Duel");
+    // The copy scrolls inside the callout before the navigation row is squeezed.
+    const callout = findByTestId(renderer, "practice-session-guide-callout");
+    const calloutStyle = flattenTestStyle(callout.props.style);
+    expect(calloutStyle.maxHeight).toBe(693 - 24 - 20 - 24);
+    expect(calloutStyle.opacity).toBe(1);
+    expect(Number(calloutStyle.top)).toBeGreaterThanOrEqual(24 + 12);
+    expect(Number(calloutStyle.top) + 420).toBeLessThanOrEqual(693 - 20 - 12);
+  });
+
+  it("previews the full landscape session row in the 13-inch iPad guide (#602)", () => {
+    setPracticeViewport({
+      width: 1376,
+      height: 1032,
+      scale: 2,
+      insets: { top: 10, right: 0, bottom: 20, left: 0 }
+    });
+
+    const renderer = renderLabScenario("practice-active-session-guide");
+
+    expect(findByTestId(renderer, "active-session-adaptive-layout")).toBeTruthy();
+    expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-session-guide-navigation")).toBeTruthy();
+    // The packed board, gap and rail row is 1125 points wide. The 1120-point
+    // wide-content cap left 1088 points and clipped the board and rail.
+    expect(flattenTestStyle(
+      findByTestId(renderer, "practice-main-scroll").props.contentContainerStyle
+    ).maxWidth).toBeUndefined();
+  });
+
+  it("shows the complete Arrow Duel guide progress at maintained landscape widths", () => {
+    setPracticeViewport({
+      width: 874,
+      height: 402,
+      scale: 3,
+      insets: { top: 0, right: 62, bottom: 21, left: 62 }
+    });
+
+    const renderer = renderLabScenario("practice-arrow-duel-guide");
+    press(renderer, "practice-session-guide-start");
+
+    const progress = () => collectText(findByTestId(renderer, "practice-session-guide-coach-progress"));
+    expect(progress()).toBe("2 of 3");
+    press(renderer, "practice-session-guide-start");
+    expect(progress()).toBe("3 of 3");
+    expect(findByTestId(renderer, "active-session-adaptive-layout")).toBeTruthy();
   });
 
   it("previews the default-on Arrow Duel reply setting without saving it", () => {
@@ -3760,488 +3757,6 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
       "Choose the best move"
     );
-  });
-
-  it("uses semantic first-use guidance without visible tour-step meta copy", () => {
-    const activeSession = renderLabScenario("practice-active-session-guide");
-    const guide = findByTestId(activeSession, "practice-active-session-guide");
-    const progress = findByTestId(activeSession, "practice-session-guide-coach-progress");
-
-    expect(guide.props.accessibilityLabel).not.toMatch(/\b(?:step|tour)\b/i);
-    expect(guide.props.accessibilityLabel).toBe(
-      "Guide 1 of 4. Track your Sprint. The top row shows puzzles solved, Sprint time left, and mistakes remaining. At zero, the active puzzle is saved as Incomplete, not as a mistake. The Sprint begins when you finish this guide."
-    );
-    expect(progress.props.accessibilityLabel).toBe("Guide 1 of 4");
-    expect(findByTestId(activeSession, "practice-session-guide-metrics")).toBeTruthy();
-    expect(collectText(
-      findByTestId(activeSession, "practice-session-guide-coach-copy-overview")
-    )).toBe(
-      "SPRINT HEADERTrack your SprintThe top row shows puzzles solved, Sprint time left, and mistakes remaining. At zero, the active puzzle is saved as Incomplete, not as a mistake. The Sprint begins when you finish this guide."
-    );
-
-    press(activeSession, "practice-session-guide-start");
-    expect(findByTestId(
-      activeSession,
-      "practice-active-session-guide"
-    ).props.accessibilityLabel).toBe(
-      "Guide 2 of 4. Amber means you’re taking too long. Keep solving. A correct answer will be marked Unclear because you took too long, but it will not count as a mistake."
-    );
-    expect(findByTestId(activeSession, "practice-session-guide-demo-timer")).toBeTruthy();
-    expect(collectText(
-      findByTestId(activeSession, "practice-session-guide-coach-copy-slow")
-    )).toBe(
-      "SLOWAmber means you’re taking too longKeep solving. A correct answer will be marked Unclear because you took too long, but it will not count as a mistake."
-    );
-
-    press(activeSession, "practice-session-guide-start");
-    expect(findByTestId(
-      activeSession,
-      "practice-active-session-guide"
-    ).props.accessibilityLabel).toBe(
-      "Guide 3 of 4. This puzzle counts as a mistake. It is added to Review. Mistakes are not marked Unclear. The Sprint then shows the next puzzle."
-    );
-    expect(findByTestId(activeSession, "practice-session-guide-demo-board")).toBeTruthy();
-    expect(collectText(
-      findByTestId(activeSession, "practice-session-guide-coach-copy-timeout")
-    )).toBe(
-      "TIMED OUTThis puzzle counts as a mistakeIt is added to Review. Mistakes are not marked Unclear. The Sprint then shows the next puzzle."
-    );
-
-    press(activeSession, "practice-session-guide-start");
-    expect(findByTestId(
-      activeSession,
-      "practice-active-session-guide"
-    ).props.accessibilityLabel).toBe(
-      "Guide 4 of 4. Use Mark as unclear when needed. Tap it after a correct answer, or on the final Incomplete puzzle, when the solution still does not make sense to you."
-    );
-    expect(findByTestId(activeSession, "practice-session-guide-demo-unclear")).toBeTruthy();
-    expect(collectText(
-      findByTestId(activeSession, "practice-session-guide-coach-copy-unclear")
-    )).toBe(
-      "UNCLEARUse Mark as unclear when neededTap it after a correct answer, or on the final Incomplete puzzle, when the solution still does not make sense to you."
-    );
-
-    const arrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
-    expect(findByTestId(arrowDuel, "practice-arrow-duel-guide-candidates")).toBeTruthy();
-    expect(findByTestId(
-      arrowDuel,
-      "practice-session-guide-coach-pointer-arrow-duel-top"
-    )).toBeTruthy();
-    expect(collectText(
-      findByTestId(arrowDuel, "practice-session-guide-coach-copy-arrow-duel")
-    )).toBe(
-      "ARROW DUEL · 1 OF 2Choose the stronger movePlay one of the two arrows. A correct choice rewinds the board and plays the other, tempting move instead."
-    );
-    expect(findByTestId(
-      arrowDuel,
-      "practice-arrow-duel-guide"
-    ).props.accessibilityLabel).toBe(
-      "Guide 1 of 2. Choose the stronger move. Play one of the two arrows. A correct choice rewinds the board and plays the other, tempting move instead."
-    );
-    press(arrowDuel, "practice-session-guide-start");
-    expect(collectText(
-      findByTestId(arrowDuel, "practice-session-guide-coach-copy-arrow-duel-reply")
-    )).toBe(
-      "FIND THE REPLY · 2 OF 2Then reply for BlackAfter you choose correctly, we play the other move. You have 10 seconds to find Black’s best reply while your Sprint time is paused. A miss or timeout counts as one mistake and goes to Review.This extra challenge is optional — turn it off in Settings."
-    );
-    expect(collectText(
-      findByTestId(arrowDuel, "practice-session-guide-optional-settings-notice")
-    )).toBe("This extra challenge is optional — turn it off in Settings.");
-    expect(findByTestId(
-      arrowDuel,
-      "practice-arrow-duel-guide"
-    ).props.accessibilityLabel).toBe(
-      "Guide 2 of 2. Then reply for Black. After you choose correctly, we play the other move. You have 10 seconds to find Black’s best reply while your Sprint time is paused. A miss or timeout counts as one mistake and goes to Review. This extra challenge is optional — turn it off in Settings."
-    );
-
-    const rules = renderLabScenario("practice-first-sprint-guide");
-    const rulesText = collectText(findByTestId(rules, "practice-sprint-rules-guide"));
-    expect(rulesText).toContain(
-      "At zero, the active puzzle is saved as Incomplete, not as a mistake, and needs attention. If it is Slow, it is also marked Unclear."
-    );
-    expect(rulesText).toContain(
-      "The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake."
-    );
-    expect(rulesText).toContain(
-      "When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. Mistakes are not marked Unclear."
-    );
-  });
-
-  it("keeps every guide target and connector in the public portrait and wide-short flow", () => {
-    setPracticeViewport({
-      width: 402,
-      height: 874,
-      scale: 3,
-      insets: { top: 62, right: 0, bottom: 34, left: 0 }
-    });
-
-    const portrait = renderLabScenario("practice-active-session-guide");
-    expect(() => findByTestId(
-      portrait,
-      "practice-session-guide-back"
-    )).toThrow();
-    expect(findByTestId(
-      portrait,
-      "practice-session-guide-coach-pointer-overview-top"
-    )).toBeTruthy();
-    press(portrait, "practice-session-guide-start");
-    expect(findByTestId(portrait, "practice-session-guide-demo-timer")).toBeTruthy();
-    expect(findByTestId(
-      portrait,
-      "practice-session-guide-coach-pointer-slow-bottom"
-    )).toBeTruthy();
-    expect(flattenTestStyle(findByTestId(
-      portrait,
-      "practice-session-guide-coach-pointer-slow-bottom"
-    ).props.style).bottom).toBe(-16);
-    expect(findByTestId(
-      portrait,
-      "practice-session-guide-coach-pointer-slow-bottom-line"
-    )).toBeTruthy();
-    expect(findByTestId(
-      portrait,
-      "practice-session-guide-coach-pointer-slow-bottom-head"
-    )).toBeTruthy();
-    press(portrait, "practice-session-guide-start");
-    expect(findByTestId(portrait, "practice-session-guide-timeout-overlay")).toBeTruthy();
-    press(portrait, "practice-session-guide-start");
-    expect(findByTestId(portrait, "sprint-unclear-toggle").props.accessibilityLabel).toBe(
-      "Mark this attempt as unclear"
-    );
-    expect(findByTestId(
-      portrait,
-      "practice-session-guide-coach-pointer-unclear-bottom"
-    )).toBeTruthy();
-    expect(findByTestId(
-      portrait,
-      "practice-session-guide-coach-pointer-unclear-bottom-head"
-    )).toBeTruthy();
-
-    setPracticeViewport({
-      width: 874,
-      height: 402,
-      scale: 3,
-      insets: { top: 0, right: 62, bottom: 21, left: 62 }
-    });
-
-    const landscape = renderLabScenario("practice-active-session-guide");
-    const disabledBack = findByTestId(landscape, "practice-session-guide-back");
-    expect(disabledBack.props.accessibilityState).toEqual({ disabled: true });
-    press(landscape, "practice-session-guide-start");
-    expect(findByTestId(
-      landscape,
-      "practice-session-guide-coach-pointer-slow-right"
-    )).toBeTruthy();
-    press(landscape, "practice-session-guide-start");
-    expect(findByTestId(
-      landscape,
-      "practice-session-guide-coach-pointer-timeout-left"
-    )).toBeTruthy();
-    press(landscape, "practice-session-guide-start");
-    expect(findByTestId(
-      landscape,
-      "practice-session-guide-coach-pointer-unclear-right"
-    )).toBeTruthy();
-    expect(() => findByTestId(
-      landscape,
-      "practice-session-guide-coach-pointer-unclear-right-horizontal"
-    )).toThrow();
-    expect(() => findByTestId(
-      landscape,
-      "practice-session-guide-coach-pointer-unclear-right-vertical"
-    )).toThrow();
-    expect(findByTestId(
-      landscape,
-      "practice-session-guide-coach-pointer-unclear-right-head"
-    )).toBeTruthy();
-    expect(flattenTestStyle(
-      findByTestId(landscape, "active-session-control-rail-content").props.style
-    ).gap).toBe(4);
-    expect(findByTestId(landscape, "sprint-unclear-toggle").props.accessibilityLabel).toBe(
-      "Mark this attempt as unclear"
-    );
-
-    const arrowDuel = renderLabScenario("practice-arrow-duel-guide-only");
-    expect(findByTestId(arrowDuel, "practice-arrow-duel-guide-candidates")).toBeTruthy();
-    expect(findByTestId(
-      arrowDuel,
-      "practice-session-guide-coach-pointer-arrow-duel-top"
-    )).toBeTruthy();
-    expect(findByTestId(
-      arrowDuel,
-      "practice-session-guide-coach-pointer-arrow-duel-top-vertical"
-    )).toBeTruthy();
-    expect(findByTestId(
-      arrowDuel,
-      "practice-session-guide-coach-pointer-arrow-duel-top-head"
-    )).toBeTruthy();
-    expect(() => findByTestId(
-      arrowDuel,
-      "practice-session-guide-coach-pointer-arrow-duel-top-horizontal"
-    )).toThrow();
-    expect(() => findByTestId(
-      arrowDuel,
-      "practice-session-guide-coach-pointer-arrow-duel-top-endpoint"
-    )).toThrow();
-  });
-
-  it.each([
-    {
-      height: 874,
-      insets: { top: 62, right: 0, bottom: 34, left: 0 },
-      label: "iPhone portrait",
-      scale: 3,
-      width: 402
-    },
-    {
-      height: 402,
-      insets: { top: 0, right: 62, bottom: 21, left: 62 },
-      label: "iPhone landscape",
-      scale: 3,
-      width: 874
-    },
-    {
-      height: 1180,
-      insets: { top: 24, right: 0, bottom: 20, left: 0 },
-      label: "iPad portrait",
-      scale: 2,
-      width: 820
-    },
-    {
-      height: 820,
-      insets: { top: 0, right: 0, bottom: 20, left: 0 },
-      label: "iPad landscape",
-      scale: 2,
-      width: 1180
-    }
-  ])("aligns the Arrow Duel guide prompt in $label", ({
-    height,
-    insets,
-    scale,
-    width
-  }: {
-    height: number;
-    insets: PracticeSafeAreaInsets;
-    label: string;
-    scale: number;
-    width: number;
-  }) => {
-    setPracticeViewport({ width, height, scale, insets });
-
-    const renderer = renderLabScenario("practice-arrow-duel-guide-only");
-    const promptStyle = flattenTestStyle(findByTestId(
-      renderer,
-      "practice-session-guide-prompt"
-    ).props.style);
-    const promptPanelStyle = flattenTestStyle(findByTestId(
-      renderer,
-      "practice-prompt"
-    ).props.style);
-    const layout = buildPracticeAdaptiveLayout({
-      fontScale: 1,
-      height,
-      insets,
-      width
-    });
-
-    expect(promptStyle.alignSelf).toBe("center");
-    expect(promptPanelStyle.minHeight).toBeUndefined();
-    expect(promptPanelStyle.height).toBe(layout.promptFrameHeight);
-    if (layout.usesSessionRail) {
-      const railStyle = flattenTestStyle(findByTestId(
-        renderer,
-        "active-session-control-rail-content"
-      ).props.style);
-      expect(promptStyle.width).toBe(railStyle.width);
-    } else {
-      const boardStyle = flattenTestStyle(findByTestId(
-        renderer,
-        "practice-arrow-duel-guide-demo-board"
-      ).props.style);
-      expect(promptStyle.width).toBe(boardStyle.width);
-    }
-
-    press(renderer, "practice-session-guide-start");
-    expect(collectText(findByTestId(
-      renderer,
-      "practice-session-guide-coach-copy-arrow-duel-reply"
-    ))).toContain("Then reply for Black");
-    expect(() => findByTestId(
-      renderer,
-      "practice-arrow-duel-guide-reply-timing-ramp"
-    )).toThrow();
-    expect(() => findByTestId(renderer, "practice-arrow-duel-guide-candidates")).toThrow();
-  });
-
-  it("keeps the Arrow Duel reply guide below the demonstrated white piece on iPhone portrait", () => {
-    setPracticeViewport({
-      width: 402,
-      height: 874,
-      scale: 3,
-      insets: { top: 62, right: 0, bottom: 34, left: 0 }
-    });
-
-    const renderer = renderLabScenario("practice-arrow-duel-guide-only");
-    press(renderer, "practice-session-guide-start");
-
-    const boardStyle = flattenTestStyle(findByTestId(
-      renderer,
-      "practice-arrow-duel-guide-demo-board"
-    ).props.style);
-    const calloutStyle = flattenTestStyle(findByTestId(
-      renderer,
-      "practice-arrow-duel-guide-coach"
-    ).props.style);
-    const boardHeight = Number(boardStyle.height);
-    const calloutWidth = Number(calloutStyle.width);
-
-    expect(calloutStyle).toMatchObject({
-      left: "50%",
-      position: "absolute",
-      top: Math.round(boardHeight * 0.4 + boardHeight / 8)
-    });
-    expect(calloutStyle.transform).toEqual([
-      { translateX: -calloutWidth / 2 }
-    ]);
-  });
-
-  it("keeps the reply guide operable with large text on a compact phone", () => {
-    setPracticeViewport({
-      width: 320,
-      height: 693,
-      scale: 2,
-      fontScale: 1.5,
-      insets: { top: 24, right: 0, bottom: 20, left: 0 }
-    });
-
-    const renderer = renderLabScenario("practice-arrow-duel-guide-only");
-    press(renderer, "practice-session-guide-start");
-
-    expect(() => findByTestId(
-      renderer,
-      "practice-arrow-duel-guide-reply-timing-ramp"
-    )).toThrow();
-    expect(() => findByTestId(renderer, "practice-prompt-icon")).toThrow();
-    expect(findByTestId(renderer, "practice-session-guide-back").props.accessibilityRole)
-      .toBe("button");
-    expect(findByTestId(renderer, "practice-session-guide-start").props.accessibilityLabel)
-      .toBe("Start Arrow Duel");
-  });
-
-  it("stacks reply guidance at a 150%-effective compact width", () => {
-    setPracticeViewport({
-      width: 213,
-      height: 462,
-      scale: 2,
-      fontScale: 1.5,
-      insets: { top: 0, right: 0, bottom: 0, left: 0 }
-    });
-
-    const renderer = renderLabScenario("practice-arrow-duel-guide-only");
-    press(renderer, "practice-session-guide-start");
-
-    expect(() => findByTestId(
-      renderer,
-      "practice-arrow-duel-guide-reply-timing-ramp"
-    )).toThrow();
-    expect(flattenTestStyle(findByTestId(
-      renderer,
-      "practice-session-guide-navigation"
-    ).props.style).flexDirection).toBe("column");
-    expect(flattenTestStyle(findByTestId(
-      renderer,
-      "practice-session-guide-start"
-    ).props.style)).toEqual(expect.objectContaining({
-      minWidth: 0,
-      width: "100%"
-    }));
-  });
-
-  it("keeps the complete first-use guide operable in the maintained iPhone portrait viewport", () => {
-    setPracticeViewport({
-      width: 402,
-      height: 874,
-      scale: 3,
-      insets: { top: 62, right: 0, bottom: 34, left: 0 }
-    });
-
-    const renderer = renderLabScenario("practice-active-session-guide");
-    for (let index = 0; index < 3; index += 1) {
-      expect(findByTestId(renderer, "practice-session-guide-start")).toBeTruthy();
-      press(renderer, "practice-session-guide-start");
-    }
-    expect(findByTestId(renderer, "practice-session-guide-demo-unclear")).toBeTruthy();
-    expect(findByTestId(renderer, "practice-session-guide-back")).toBeTruthy();
-    expect(findByTestId(renderer, "practice-session-guide-start").props.accessibilityLabel).toBe(
-      "Start Sprint"
-    );
-  });
-
-  it("keeps the first-use guide navigation on screen on the iPhone Duo outer display", () => {
-    // Window and Safe Area measured on the iPhone Duo simulator outer display:
-    // the status-bar column is a right-side inset only.
-    setPracticeViewport({
-      width: 466,
-      height: 678,
-      scale: 3,
-      insets: { top: 0, right: 84, bottom: 34, left: 0 }
-    });
-
-    const renderer = renderLabScenario("practice-active-session-guide");
-    const guideBoardWidth = () => flattenTestStyle(
-      findByTestId(renderer, "practice-session-guide-demo-board").props.style
-    ).width;
-    const firstStepBoardWidth = guideBoardWidth();
-    for (let index = 0; index < 3; index += 1) {
-      press(renderer, "practice-session-guide-start");
-    }
-
-    expect(findByTestId(renderer, "practice-session-guide-demo-unclear")).toBeTruthy();
-    // The Mark-as-unclear step is the tallest; its board shares the budget that
-    // keeps Back/Next inside the 644-point safe height on every step.
-    expect(guideBoardWidth()).toBe(176);
-    expect(firstStepBoardWidth).toBe(176);
-  });
-
-  it("previews the full landscape session row in the 13-inch iPad guide (#602)", () => {
-    setPracticeViewport({
-      width: 1376,
-      height: 1032,
-      scale: 2,
-      insets: { top: 10, right: 0, bottom: 20, left: 0 }
-    });
-
-    const renderer = renderLabScenario("practice-active-session-guide");
-
-    expect(findByTestId(renderer, "practice-session-guide-navigation")).toBeTruthy();
-    // The packed board, gap and rail row is 1125 points wide. The 1120-point
-    // wide-content cap left 1088 points and clipped the board and rail.
-    expect(flattenTestStyle(
-      findByTestId(renderer, "practice-main-scroll").props.contentContainerStyle
-    ).maxWidth).toBeUndefined();
-  });
-
-  it("shows the complete Arrow Duel guide progress at maintained landscape widths", () => {
-    setPracticeViewport({
-      width: 874,
-      height: 402,
-      scale: 3,
-      insets: { top: 0, right: 62, bottom: 21, left: 62 }
-    });
-
-    const renderer = renderLabScenario("practice-arrow-duel-guide");
-    for (let index = 0; index < 4; index += 1) {
-      press(renderer, "practice-session-guide-start");
-    }
-
-    const progress = findByTestId(renderer, "practice-session-guide-coach-progress");
-    expect(collectText(progress)).toBe("5 of 6");
-    press(renderer, "practice-session-guide-start");
-    expect(collectText(progress)).toBe("6 of 6");
-    expect(() => findByTestId(
-      renderer,
-      "practice-arrow-duel-guide-reply-timing-ramp"
-    )).toThrow();
   });
 
   it("summarizes dynamic pass rules and timeout Review behavior in production New and Edit Run", () => {
@@ -9453,15 +8968,13 @@ describe("PracticePocScreen", () => {
   it("explains fixed and unrated semantics before a first Focused Run", () => {
     const renderer = renderLabScenario("practice-tactical-focus-guide");
 
-    expectText(renderer, "Track the fixed Run");
-    expectText(renderer, "Your Rating will not change.");
+    expectText(renderer, "Track your Focused Run");
+    expectText(renderer, "This Run is unrated.");
     expectText(renderer, "Unrated");
     expect(
       collectText(findByTestId(renderer, "practice-session-guide-start"))
     ).toBe("Next");
     press(renderer, "practice-session-guide-start");
-    press(renderer, "practice-session-guide-start");
-    expectText(renderer, "It is added to Review and counts as one completed puzzle.");
     press(renderer, "practice-session-guide-start");
     expect(
       collectText(findByTestId(renderer, "practice-session-guide-start"))

@@ -143,8 +143,9 @@ Release readiness for this item is covered by:
   measured iPhone Duo outer and iPad Pro 13-inch windows, and Duo inner, Split
   View and Stage Manager sizes with asymmetric insets.
 - The opt-in adaptive-layout E2E (`pnpm mobile:e2e:adaptive-layout:ios`), which
-  records each run's window and insets, asserts that first-use guide navigation,
-  the board, HUD and primary session actions stay inside the Safe Area, and
+  records each run's window and insets, asserts that the first-use guide
+  callout, pointer and navigation, the board, HUD and primary session actions
+  stay inside the Safe Area, and
   repeats the session checks after a rotation resize. On iPhone Duo set
   `CHESSTICIZE_ADAPTIVE_IOS_SCREENSHOT_DISPLAY=primary` so screenshots capture
   the outer display.

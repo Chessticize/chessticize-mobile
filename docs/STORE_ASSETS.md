@@ -289,18 +289,18 @@ install or launch a physical-device build.
 | `app-store-07-custom-setup` | New Run editor with a required name, compact mode and theme choices, and the default All theme selection. The stable asset name is retained for evidence continuity. |
 | `app-store-08-review-session` | Active Review session with the scheduled puzzle board and progress context. |
 | `app-store-09-sprint-rules-guide` | Visual QA: first-use Sprint rules before the first session. |
-| `app-store-10-active-session-guide-header` | Visual QA: active-session guide step 1 and real header hierarchy. |
-| `app-store-11-active-session-guide-slow` | Visual QA: active-session guide step 2 and automatic Slow timing state. |
-| `app-store-12-active-session-guide-timeout` | Visual QA: active-session guide step 3 and automatic timeout consequences. |
-| `app-store-13-active-session-guide-unclear` | Visual QA: active-session guide step 4 and the manual Unclear action. |
-| `app-store-14-arrow-duel-guide` | Visual QA: Arrow Duel guide step 5 and both candidate arrows. |
+| `app-store-10-active-session-guide-header` | Visual QA: Standard guide step 1, the cut-out around the real Sprint header. |
+| `app-store-11-active-session-guide-slow` | Visual QA: Standard guide step 2, the amber puzzle timer. |
+| `app-store-13-active-session-guide-unclear` | Visual QA: Standard guide step 3, the manual Mark as unclear action. |
+| `app-store-14-arrow-duel-guide` | Visual QA: first Arrow Duel guide step 2, both candidate arrows. |
 | `app-store-15-sprint-result` | Visual QA: failed Sprint reason, accuracy, rating, mistakes, Review impact, and history action. |
 
 The capture suite builds one deterministic active-player profile through the
 public app UI before taking any screenshots. On fresh data it captures and
 dismisses the Sprint rules, raises Standard difficulty to ELO 800 and Arrow
-Duel difficulty to ELO 850, then advances through and captures every
-first-session guide step. It records a three-mistake Arrow Duel sprint and its
+Duel difficulty to ELO 850, then advances through the first Arrow Duel guide,
+asserting that each step's callout, pointer and navigation stay inside the
+Safe Area. It records a three-mistake Arrow Duel sprint and its
 result, advances the app through the screenshot-only fixed-clock launch
 boundary to the next review day, and completes one scheduled review. The
 resulting store story therefore includes:

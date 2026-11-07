@@ -1,9 +1,33 @@
 {
-  "practice-personal-best-records": {
+  "practice-active-session-guide": {
     "issues": [
       {
-        "issueNumber": 576,
-        "changeNote": "Give fresh profiles a truthful first-best explanation without adding a redundant action, while preserving separate Puzzle and Arrow Duel records by level."
+        "issueNumber": 611,
+        "changeNote": "Rebuild the first-use session guide as three short steps on the real Sprint screen: a scrim with a cut-out, one callout and pointer placed inside the Safe Area, and Back/Next inside the callout."
+      }
+    ]
+  },
+  "practice-arrow-duel-guide": {
+    "issues": [
+      {
+        "issueNumber": 611,
+        "changeNote": "Cut the first Arrow Duel guide from six steps to three (header, choice, reply) on the real Arrow Duel screen."
+      }
+    ]
+  },
+  "practice-arrow-duel-guide-only": {
+    "issues": [
+      {
+        "issueNumber": 611,
+        "changeNote": "Show the two Arrow Duel steps with the shared overlay callout on the real Arrow Duel screen."
+      }
+    ]
+  },
+  "practice-tactical-focus-guide": {
+    "issues": [
+      {
+        "issueNumber": 611,
+        "changeNote": "Use the shared three-step overlay for the first Focused Run."
       }
     ]
   }

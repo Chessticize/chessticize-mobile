@@ -55,18 +55,21 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
   assert.deepEqual(
     newScenarios.map((scenario) => scenario.id),
     [
-      "practice-personal-best-records"
+      "practice-active-session-guide",
+      "practice-arrow-duel-guide",
+      "practice-arrow-duel-guide-only",
+      "practice-tactical-focus-guide"
     ]
   );
-  assert.ok(scenarioRegistry["practice-personal-best-records"].issues?.some(
-    (issue) => issue.issueNumber === 576
-  ) ?? false);
   assert.deepEqual(
     newScenarios
-      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 576))
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 611))
       .map((scenario) => scenario.id),
     [
-      "practice-personal-best-records"
+      "practice-active-session-guide",
+      "practice-arrow-duel-guide",
+      "practice-arrow-duel-guide-only",
+      "practice-tactical-focus-guide"
     ]
   );
 
@@ -247,7 +250,6 @@ test("the closed Issue #250 state set stays complete without new markers", () =>
     "practice-tactical-profile-explanation",
     "practice-tactical-profile-focused-run",
     "practice-tactical-profile-suppressed",
-    "practice-tactical-focus-guide",
     "practice-tactical-focus-active",
     "practice-tactical-focus-result"
   ] satisfies LabScenarioId[];
@@ -323,58 +325,33 @@ test("the closed Issue #456 keeps the Tactical Progress filters without a new ma
   );
 });
 
-test("Issue #337 keeps semantic Sprint guidance on the existing responsive Lab scenarios", () => {
+test("Issue #611 presents first-use session guidance as a short overlay on the real session screen", () => {
   const activeSessionGuide = scenarioRegistry["practice-active-session-guide"];
   const arrowDuelGuide = scenarioRegistry["practice-arrow-duel-guide"];
+  const arrowDuelGuideOnly = scenarioRegistry["practice-arrow-duel-guide-only"];
   const firstSprintGuide = scenarioRegistry["practice-first-sprint-guide"];
   const settingsGuidance = scenarioRegistry["settings-sprint-guidance"];
 
+  for (const guide of [activeSessionGuide, arrowDuelGuide, arrowDuelGuideOnly]) {
+    assert.ok(guide.scope.includes.includes("Navigation inside the callout"));
+    assert.ok(guide.scope.includes.includes("Exit guide without completion"));
+    assert.ok(guide.scope.includes.some((item) => /real (?:session|Arrow Duel) layout/.test(item)));
+  }
+  assert.ok(activeSessionGuide.scope.includes.includes("Dimmed scrim with a rounded cut-out"));
+  assert.ok(activeSessionGuide.scope.includes.includes("One callout and one pointer style"));
   assert.ok(activeSessionGuide.scope.includes.includes(
-    "SPRINT HEADER, SLOW, TIMED OUT, and UNCLEAR guidance"
+    "Measured placement that flips and clamps to the Safe Area"
   ));
   assert.ok(activeSessionGuide.scope.includes.includes(
-    "Current-guide-only accessibility announcement"
+    "Header, amber timer and Mark as unclear steps"
   ));
-  assert.ok(activeSessionGuide.scope.includes.includes(
-    "Measured landscape connectors routed around copy with target clearance"
-  ));
-  assert.ok(activeSessionGuide.scope.includes.includes(
-    "Full-width production Unclear prompt in portrait"
-  ));
-  assert.ok(activeSessionGuide.scope.includes.includes(
-    "Fixed-shape downward portrait arrows outside callout borders with target clearance"
-  ));
-  assert.ok(activeSessionGuide.scope.includes.includes(
-    "Always-available direct guide exit without completion"
-  ));
-  assert.ok(activeSessionGuide.scope.includes.includes(
-    "Raised portrait Timed Out callout with full pointer and board clearance"
-  ));
-  assert.match(activeSessionGuide.description, /full red pointer above that board/);
-  assert.ok(arrowDuelGuide.scope.includes.includes("Two-step Arrow Duel mental model"));
-  assert.ok(arrowDuelGuide.scope.includes.includes("Guide 5: choose the stronger move"));
-  assert.ok(arrowDuelGuide.scope.includes.includes("Guide 6: Find the reply for Black"));
+  assert.ok(arrowDuelGuide.scope.includes.includes("Three steps: header, choice, reply"));
   assert.ok(arrowDuelGuide.scope.includes.includes("Legal Qg7 and Qe8 candidate arrows"));
-  assert.ok(arrowDuelGuide.scope.includes.includes(
-    "Portrait reply callout partially overlays the board"
-  ));
-  assert.ok(arrowDuelGuide.scope.includes.includes("Landscape callout in the empty board lane"));
-  assert.ok(arrowDuelGuide.scope.includes.includes(
-    "Always-available direct guide exit without completion"
-  ));
-  assert.match(arrowDuelGuide.description, /reply for Black/);
-  assert.match(arrowDuelGuide.description, /familiarity-timing internals out/);
-  const arrowDuelGuideOnly = scenarioRegistry["practice-arrow-duel-guide-only"];
-  assert.ok(arrowDuelGuideOnly.scope.includes.includes(
-    "Portrait reply callout partially overlays the board"
-  ));
-  assert.ok(arrowDuelGuideOnly.scope.includes.includes(
-    "Always-available direct guide exit without completion"
-  ));
+  assert.match(arrowDuelGuide.description, /reply after Qe8/);
   assert.match(arrowDuelGuideOnly.description, /eligible for the next Arrow Duel/);
   assert.doesNotMatch(
     `${activeSessionGuide.description} ${arrowDuelGuide.description}`,
-    /\b(?:step|tour)\b/i
+    /\btour\b/i
   );
   assert.deepEqual(storyTagsForScenario(firstSprintGuide.id), []);
   assert.deepEqual(storyTagsForScenario(settingsGuidance.id), []);

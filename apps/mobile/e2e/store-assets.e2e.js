@@ -12,6 +12,7 @@ const {
   waitForVisibleInPracticeScroll
 } = require('./helpers');
 const { expectFrameContained } = require('./screenshotAssertions');
+const { expectSessionGuideContained } = require('./sessionGuideAssertions');
 const {
   decodeUciMoveHex,
   sideToMoveFromPositionMetadataHex
@@ -115,25 +116,20 @@ async function failArrowDuelSprint() {
   await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
   await element(by.id('practice-run-start')).tap();
 
-  for (const scene of [
-    'app-store-10-active-session-guide-header',
-    'app-store-11-active-session-guide-slow',
-    'app-store-12-active-session-guide-timeout',
-    'app-store-13-active-session-guide-unclear'
-  ]) {
-    await waitFor(element(by.id('practice-active-session-guide'))).toExist().withTimeout(10000);
-    await takePortraitScreenshotAtTop(scene);
-    await takeLandscapeScreenshot(scene);
-    await element(by.id('practice-session-guide-start')).tap();
-  }
+  // A first Arrow Duel shows the Sprint header, then the choice and reply.
+  await waitFor(element(by.id('practice-active-session-guide'))).toExist().withTimeout(10000);
+  await expectSessionGuideContained('Arrow Duel guide header');
+  await element(by.id('practice-session-guide-start')).tap();
 
   await waitFor(element(by.id('practice-arrow-duel-guide'))).toExist().withTimeout(10000);
+  await expectSessionGuideContained('Arrow Duel guide choice');
   await takePortraitScreenshotAtTop('app-store-14-arrow-duel-guide');
   await takeLandscapeScreenshot('app-store-14-arrow-duel-guide');
   await element(by.id('practice-session-guide-start')).tap();
-  await waitFor(element(by.id('practice-session-guide-coach-copy-arrow-duel-reply')))
+  await waitFor(element(by.id('practice-session-guide-step-arrow_duel_reply')))
     .toExist()
     .withTimeout(10000);
+  await expectSessionGuideContained('Arrow Duel guide reply');
   await element(by.id('practice-session-guide-start')).tap();
   await waitForVisibleInPracticeScroll('session-board');
 
@@ -232,7 +228,24 @@ async function captureMainTabScenes() {
 
 async function captureSprintScenes() {
   await openTab('practice-tab', 'practice-run-standard');
-  await startPracticeMode('standard');
+  await waitForVisibleInPracticeScroll('practice-run-standard');
+  await element(by.id('practice-run-select-standard')).tap();
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
+  await element(by.id('practice-run-start')).tap();
+  // The first Standard Sprint teaches the header, the amber timer and Mark as
+  // unclear; the first Arrow Duel guide did not record them.
+  for (const scene of [
+    'app-store-10-active-session-guide-header',
+    'app-store-11-active-session-guide-slow',
+    'app-store-13-active-session-guide-unclear'
+  ]) {
+    await waitFor(element(by.id('practice-active-session-guide'))).toExist().withTimeout(10000);
+    await expectSessionGuideContained(scene);
+    await takePortraitScreenshotAtTop(scene);
+    await takeLandscapeScreenshot(scene);
+    await element(by.id('practice-session-guide-start')).tap();
+  }
   await waitForVisibleInPracticeScroll('session-board');
   await takePortraitScreenshotAtTop('app-store-05-standard-sprint');
   await takeLandscapeScreenshot('app-store-05-standard-sprint');
