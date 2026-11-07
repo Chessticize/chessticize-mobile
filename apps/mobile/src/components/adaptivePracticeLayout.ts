@@ -24,6 +24,7 @@ export type AdaptiveLayout = {
   sessionPackedRowWidth: number;
   sessionRailGap: number;
   sessionRailWidth: number;
+  sessionGuideBoardSize: number;
   sideNavigationExpanded: boolean;
   sideNavigationWidth: number;
   usesSideNavigation: boolean;
@@ -53,6 +54,15 @@ const REGULAR_LANDSCAPE_RESERVED_SESSION_CHROME_HEIGHT = 120;
 const COMPACT_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 332;
 const REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 240;
 const HOME_COLUMNS_MIN_CONTENT_WIDTH = 650;
+// The first-use guide demo shares one scroll page with its Back/Next rail. In
+// a short compact portrait viewport such as the iPhone Duo outer display the
+// tallest step (Mark as unclear) must still keep that rail on screen, so the
+// guide reserves its non-board chrome: status bar, score strip, timing row,
+// unclear prompt and navigation, measured at 335 points on the Duo outer
+// display, plus a small margin. The prompt frame is reserved separately.
+const COMPACT_PORTRAIT_GUIDE_RESERVED_CHROME_HEIGHT = 340;
+const COMPACT_PORTRAIT_GUIDE_HEIGHT_RATIO = 0.34;
+const REGULAR_PORTRAIT_GUIDE_HEIGHT_RATIO = 0.42;
 
 export function buildPracticeAdaptiveLayout({
   fontScale,
@@ -141,13 +151,33 @@ export function buildPracticeAdaptiveLayout({
     0,
     sessionContentWidth - PRACTICE_UI_PADDING * 2 - boardSize - sessionRailWidth
   );
+  // Balance the gap against the gutters of the safe viewport the row is
+  // centred in. Raw window width over-counts asymmetric insets such as the
+  // iPhone Duo status-bar column, which only one side of the row can see.
   const balancedSessionRailGap = Math.floor(
-    (width - boardSize - sessionRailWidth) / 3
+    (sessionContentWidth - boardSize - sessionRailWidth) / 3
   );
   const sessionRailGap = Math.min(
     maximumSessionRailGap,
     Math.max(SESSION_RAIL_GAP_MIN, balancedSessionRailGap)
   );
+
+  const sessionGuideBoardSize = usesSessionRail
+    ? boardSize
+    : Math.floor(Math.max(0, Math.min(
+      boardSize,
+      contentHeight * (
+        isRegularWidth
+          ? REGULAR_PORTRAIT_GUIDE_HEIGHT_RATIO
+          : COMPACT_PORTRAIT_GUIDE_HEIGHT_RATIO
+      ),
+      isRegularWidth
+        ? Number.POSITIVE_INFINITY
+        : contentHeight
+          - PRACTICE_UI_PADDING
+          - promptFrameHeight
+          - COMPACT_PORTRAIT_GUIDE_RESERVED_CHROME_HEIGHT
+    )));
 
   return {
     boardSize,
@@ -162,6 +192,7 @@ export function buildPracticeAdaptiveLayout({
     sessionPackedRowWidth: boardSize + sessionRailWidth + sessionRailGap,
     sessionRailGap,
     sessionRailWidth,
+    sessionGuideBoardSize,
     sideNavigationExpanded,
     sideNavigationWidth,
     usesSideNavigation,

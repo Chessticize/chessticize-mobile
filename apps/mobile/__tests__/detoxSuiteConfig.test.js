@@ -2042,7 +2042,16 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('if (waitForPieces) {');
     expect(spec).toContain('await waitForBoardScreenshotContainsPieces({');
     expect(spec).toContain('archiveScreenshot: archiveAdaptiveScreenshot');
-    expect(spec).toContain('captureScreenshot: (label) => device.takeScreenshot(label)');
+    expect(spec).toContain('captureScreenshot: (label) => takeAdaptiveScreenshot(label)');
+    expect(spec).toContain('return device.takeScreenshot(label);');
+    expect(spec).toContain("`--display=${iosScreenshotDisplay}`");
+    // Resize evidence keeps the board, HUD, primary actions and first-use
+    // guide navigation inside the measured Safe Area (#602, #613).
+    expect(spec.indexOf("await expectSessionControlsContained('landscape');"))
+      .toBeGreaterThan(captureLandscape);
+    expect(spec).toContain('await expectSessionControlsContained(initialOrientation);');
+    expect(spec).toContain('await startStandardSprintThroughContainedGuide(initialOrientation);');
+    expect(spec).toContain("frameFor(element(by.id('practice-session-guide-navigation')))");
     expect(spec).toContain("require('./adaptiveScreenshotEvidence')");
     expect(spec).toContain('const archiveAdaptiveScreenshot = createAdaptiveScreenshotArchiver();');
     expect(spec).toContain(

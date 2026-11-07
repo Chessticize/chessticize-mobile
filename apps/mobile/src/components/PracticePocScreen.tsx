@@ -240,6 +240,7 @@ import {
   type AdaptiveLayout
 } from "./adaptivePracticeLayout.ts";
 import { usePracticeViewport } from "./PracticeViewport.tsx";
+import { SafeAreaModalBackdrop } from "./SafeAreaModalBackdrop.tsx";
 import {
   boardMoveToUci,
   consumeSuppressedBoardMove
@@ -4480,6 +4481,9 @@ export function PracticePocScreen({
   const sideNavigationVisible = appChromeVisible && adaptiveLayout.usesSideNavigation;
   const bottomTabsVisible = appChromeVisible && !sideNavigationVisible;
   const sessionUsesRail = shouldShowSessionBoard && adaptiveLayout.usesSessionRail;
+  // The first-use guide previews the session row at full session width; the
+  // 1120-point wide-content cap would clip its board and rail (#602).
+  const sessionGuideUsesRail = isSessionGuideVisible && adaptiveLayout.usesSessionRail;
   const sessionPackedRowWidth = adaptiveLayout.sessionPackedRowWidth;
   const screenTitle = (
     (tab === "review" && reviewSessionSource === "session")
@@ -4994,7 +4998,9 @@ export function PracticePocScreen({
             }}
             contentContainerStyle={[
               styles.content,
-              adaptiveLayout.usesWideContent && !sessionUsesRail ? styles.contentWide : null,
+              adaptiveLayout.usesWideContent && !sessionUsesRail && !sessionGuideUsesRail
+                ? styles.contentWide
+                : null,
               bottomTabsVisible ? styles.contentWithBottomTabs : null,
               sessionUsesRail ? styles.contentSessionRail : null
             ]}
@@ -6750,12 +6756,7 @@ function ActiveSessionGuide({
   const isFocusedRun = presentation.focusedRun === true;
   const guideBoardSize = adaptiveLayout.usesSessionRail
     ? boardSize
-    : Math.min(
-        boardSize,
-        Math.floor(
-          adaptiveLayout.contentHeight * (adaptiveLayout.isRegularWidth ? 0.42 : 0.34)
-        )
-      );
+    : Math.min(boardSize, adaptiveLayout.sessionGuideBoardSize);
   const currentGuideCoachSteps = sessionGuideCoachStepCount(presentation);
   const isLastCoachStep = coachStep >= currentGuideCoachSteps - 1;
   const unifiedCoachStep = coachStepOffset + coachStep + 1;
@@ -16076,7 +16077,7 @@ function ReviewScheduleControl({
             transparent
             visible={confirmationVisible}
           >
-            <View style={styles.accessibleMoveModalBackdrop}>
+            <SafeAreaModalBackdrop style={styles.accessibleMoveModalBackdrop}>
               <View
                 accessibilityViewIsModal
                 style={styles.reviewScheduleConfirmation}
@@ -16111,7 +16112,7 @@ function ReviewScheduleControl({
                   </Pressable>
                 </View>
               </View>
-            </View>
+            </SafeAreaModalBackdrop>
           </Modal>
         </>
       ) : null}
@@ -16960,7 +16961,7 @@ function FeedbackSupportCard({
           transparent
           visible
         >
-          <View style={styles.accessibleMoveModalBackdrop}>
+          <SafeAreaModalBackdrop style={styles.accessibleMoveModalBackdrop}>
             <View
               accessibilityViewIsModal
               style={styles.feedbackHandoffConfirmation}
@@ -17007,7 +17008,7 @@ function FeedbackSupportCard({
                 </Pressable>
               </View>
             </View>
-          </View>
+          </SafeAreaModalBackdrop>
         </Modal>
       ) : null}
     </SettingsSection>

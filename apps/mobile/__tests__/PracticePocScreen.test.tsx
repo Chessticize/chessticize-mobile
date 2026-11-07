@@ -4177,6 +4177,50 @@ describe("PracticePocScreen", () => {
     );
   });
 
+  it("keeps the first-use guide navigation on screen on the iPhone Duo outer display", () => {
+    // Window and Safe Area measured on the iPhone Duo simulator outer display:
+    // the status-bar column is a right-side inset only.
+    setPracticeViewport({
+      width: 466,
+      height: 678,
+      scale: 3,
+      insets: { top: 0, right: 84, bottom: 34, left: 0 }
+    });
+
+    const renderer = renderLabScenario("practice-active-session-guide");
+    const guideBoardWidth = () => flattenTestStyle(
+      findByTestId(renderer, "practice-session-guide-demo-board").props.style
+    ).width;
+    const firstStepBoardWidth = guideBoardWidth();
+    for (let index = 0; index < 3; index += 1) {
+      press(renderer, "practice-session-guide-start");
+    }
+
+    expect(findByTestId(renderer, "practice-session-guide-demo-unclear")).toBeTruthy();
+    // The Mark-as-unclear step is the tallest; its board shares the budget that
+    // keeps Back/Next inside the 644-point safe height on every step.
+    expect(guideBoardWidth()).toBe(176);
+    expect(firstStepBoardWidth).toBe(176);
+  });
+
+  it("previews the full landscape session row in the 13-inch iPad guide (#602)", () => {
+    setPracticeViewport({
+      width: 1376,
+      height: 1032,
+      scale: 2,
+      insets: { top: 10, right: 0, bottom: 20, left: 0 }
+    });
+
+    const renderer = renderLabScenario("practice-active-session-guide");
+
+    expect(findByTestId(renderer, "practice-session-guide-navigation")).toBeTruthy();
+    // The packed board, gap and rail row is 1125 points wide. The 1120-point
+    // wide-content cap left 1088 points and clipped the board and rail.
+    expect(flattenTestStyle(
+      findByTestId(renderer, "practice-main-scroll").props.contentContainerStyle
+    ).maxWidth).toBeUndefined();
+  });
+
   it("shows the complete Arrow Duel guide progress at maintained landscape widths", () => {
     setPracticeViewport({
       width: 874,
@@ -15317,6 +15361,31 @@ describe("PracticePocScreen", () => {
     expect(moveFeedbackClient.requests).toEqual([]);
     expect(service.listHistory({ source: "scheduled_review" })).toEqual([]);
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
+  });
+
+  it("keeps modal dialogs clear of a one-sided status-bar column", () => {
+    setPracticeViewport({
+      width: 466,
+      height: 678,
+      scale: 3,
+      insets: { top: 0, right: 84, bottom: 34, left: 0 }
+    });
+    const renderer = renderScreen();
+
+    press(renderer, "settings-tab");
+    press(renderer, "settings-feedback-open-github");
+
+    let backdrop = findByTestId(renderer, "settings-feedback-handoff-confirmation").parent;
+    while (backdrop && flattenTestStyle(backdrop.props.style).backgroundColor === undefined) {
+      backdrop = backdrop.parent;
+    }
+    expect(backdrop).toBeTruthy();
+    expect(flattenTestStyle(backdrop?.props.style)).toEqual(expect.objectContaining({
+      paddingBottom: 54,
+      paddingLeft: 20,
+      paddingRight: 104,
+      paddingTop: 20
+    }));
   });
 
   it("routes feedback to GitHub only after an explicit privacy handoff", async () => {

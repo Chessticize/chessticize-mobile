@@ -9,6 +9,7 @@ import {
   Text,
   View
 } from "react-native";
+import { SafeAreaModalBackdrop } from "./SafeAreaModalBackdrop.tsx";
 
 export type ICloudSyncSupportBundleResult = {
   bundleUrl?: string;
@@ -248,7 +249,7 @@ export function ICloudSyncErrorDetails({
         transparent
         visible={visible}
       >
-        <View style={styles.backdrop}>
+        <SafeAreaModalBackdrop style={styles.backdrop}>
           <View
             accessibilityViewIsModal
             style={[
@@ -668,7 +669,7 @@ export function ICloudSyncErrorDetails({
               ) : null}
             </ScrollView>
           </View>
-        </View>
+        </SafeAreaModalBackdrop>
       </Modal>
     </>
   );
