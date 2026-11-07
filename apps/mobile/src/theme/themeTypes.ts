@@ -113,6 +113,8 @@ export type ThemeColors = {
   // Solid fills for tracks, dots and disabled controls, light to dark.
   fillMuted: string;
   fillStrong: string;
+  // Fill of a disabled button; its label stays text.onAccent.
+  fillDisabled: string;
   // Translucent fills layered over tinted surfaces.
   glass: string;
   glassStrong: string;

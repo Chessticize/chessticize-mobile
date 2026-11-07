@@ -17921,7 +17921,8 @@ const useStyles = makeStyles((theme) => ({
     top: -7
   },
   tabCountBadgeDanger: {
-    backgroundColor: theme.colors.danger.s600
+    backgroundColor: theme.colors.danger.s600,
+    color: theme.colors.text.onTone
   },
   tabText: {
     color: theme.colors.text.tertiary,
@@ -21722,7 +21723,7 @@ const useStyles = makeStyles((theme) => ({
     paddingHorizontal: 16
   },
   settingsActionButtonDisabled: {
-    backgroundColor: theme.colors.text.tertiary
+    backgroundColor: theme.colors.fillDisabled
   },
   settingsActionButtonText: {
     color: theme.colors.text.onAccent,

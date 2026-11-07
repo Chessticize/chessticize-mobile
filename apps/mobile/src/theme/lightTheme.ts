@@ -13,6 +13,7 @@ const colors: ThemeColors = {
   thumb: "#FFFFFF",
   fillMuted: "#CBD5E1",
   fillStrong: "#94A3B8",
+  fillDisabled: "#64748B",
   glass: "rgba(255, 255, 255, 0.66)",
   glassStrong: "rgba(255, 255, 255, 0.94)",
   veil: "rgba(248, 250, 252, 0.92)",

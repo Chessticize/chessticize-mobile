@@ -68,18 +68,18 @@
       }
     }
   }
+  // Pure black is the dark canvas of direction A, so only white surfaces are leftovers.
   if (document.documentElement.dataset.labTheme === "dark") {
     for (const element of Array.from(document.body.querySelectorAll("*"))) {
       if (element.closest(chrome)) continue;
       const color = parse(getComputedStyle(element).backgroundColor);
       const rect = element.getBoundingClientRect();
       const white = color && color[0] === 255 && color[1] === 255 && color[2] === 255;
-      const black = color && color[0] === 0 && color[1] === 0 && color[2] === 0;
-      if (color && color[3] >= 1 && rect.width * rect.height > 1500 && (white || black)) {
+      if (color && color[3] >= 1 && rect.width * rect.height > 1500 && white) {
         const holder = element.closest("[data-testid]");
         issues.push({
           kind: "surface",
-          detail: "pure " + (white ? "white" : "black") + " surface " + Math.round(rect.width) + "x"
+          detail: "pure white surface " + Math.round(rect.width) + "x"
             + Math.round(rect.height) + " [" + (holder ? holder.getAttribute("data-testid") : "") + "]"
         });
       }
