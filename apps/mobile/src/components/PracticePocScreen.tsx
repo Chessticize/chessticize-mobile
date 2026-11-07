@@ -659,11 +659,11 @@ const CHESSBOARD_COLORS = {
   validMoveCapture: "rgba(15, 23, 42, 0.56)"
 } as const;
 const CHESSBOARD_DURATIONS = { move: BOARD_MOVE_ANIMATION_MS } as const;
-const SIMULATED_HISTORY_SCENARIO_IDS: readonly SimulatedHistoryScenarioId[] = [
-  "slow-fork-speed",
-  "weak-fork-solve",
-  "balanced",
-  "recently-recommended"
+const SIMULATED_HISTORY_SCENARIOS: ReadonlyArray<{ scenario: SimulatedHistoryScenarioId; label: string }> = [
+  { scenario: "slow-fork-speed", label: "Slow fork" },
+  { scenario: "weak-fork-solve", label: "Weak fork" },
+  { scenario: "balanced", label: "Balanced" },
+  { scenario: "recently-recommended", label: "Recent" }
 ];
 const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: string }> = [
   { source: "bundledCore", label: "Core Pack" },
@@ -2454,7 +2454,7 @@ export function PracticePocScreen({
       setICloudSyncStatus("Off");
       refreshState();
       setSeededHistoryStatus(
-        `Seeded ${seeded.scenario}: ${seeded.runs} Runs, ${seeded.attempts} attempts, Profile ${seeded.phase}`
+        `Seeded ${seeded.runs} Runs · Profile ${seeded.phase}`
       );
     } catch (caught) {
       setSeededHistoryStatus(null);
@@ -10583,11 +10583,11 @@ function TestPuzzleSourceControl({
         <>
           <Text style={styles.helperText}>Seed simulated history (Dev only)</Text>
           <View style={styles.optionRow}>
-            {SIMULATED_HISTORY_SCENARIO_IDS.map((scenario) => (
+            {SIMULATED_HISTORY_SCENARIOS.map(({ scenario, label }) => (
               <OptionButton
                 key={scenario}
                 active={false}
-                label={scenario}
+                label={label}
                 testID={`test-seed-tactical-history-${scenario}`}
                 onPress={() => onSeedTacticalHistory(scenario)}
               />

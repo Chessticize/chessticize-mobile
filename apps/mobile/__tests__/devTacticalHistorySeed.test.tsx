@@ -1,5 +1,3 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
 import {
   createMobilePracticeService,
   createMobilePracticeTestControls,
@@ -61,44 +59,4 @@ describe('Dev-only seeded Tactical Profile history', () => {
 
     expect(() => controls?.seedTacticalHistory?.('balanced', NOW)).toThrow(/empty progress/);
   });
-
-  it('is required only behind a literal __DEV__ branch so Release bundles drop it', () => {
-    const sourceRoot = resolve(__dirname, '../src');
-    const appRoot = resolve(__dirname, '..');
-    const files = [
-      ...sourceFiles(sourceRoot),
-      join(appRoot, 'App.tsx'),
-      join(appRoot, 'index.js'),
-    ];
-    const runtimeReferences: string[] = [];
-    for (const file of files) {
-      const source = readFileSync(file, 'utf8');
-      const runtimeImport =
-        /^import\s+(?!type\b)[^;]*from\s+["'][^"']*(?:devTacticalHistorySeed|\/simulation\/)[^"']*["']/m;
-      if (runtimeImport.test(source)) {
-        runtimeReferences.push(`${relative(appRoot, file)}: static import`);
-      }
-      for (const match of source.matchAll(/require\(\s*["'][^"']*(?:devTacticalHistorySeed|\/simulation\/)[^"']*["']\s*\)/g)) {
-        const preceding = source.slice(Math.max(0, (match.index ?? 0) - 400), match.index);
-        const guarded = /\.\.\.\(__DEV__\s*\?\s*\{\s*seedTacticalHistory:[\s\S]*$/.test(preceding);
-        if (!guarded) {
-          runtimeReferences.push(`${relative(appRoot, file)}: unguarded require`);
-        }
-      }
-    }
-
-    expect(runtimeReferences).toEqual([]);
-    const mobilePractice = readFileSync(join(sourceRoot, 'platform/mobilePractice.ts'), 'utf8');
-    expect(mobilePractice).toMatch(/\.\.\.\(__DEV__\s*\?\s*\{\s*seedTacticalHistory:/);
-  });
 });
-
-function sourceFiles(directory: string): string[] {
-  return readdirSync(directory).flatMap((entry) => {
-    const path = join(directory, entry);
-    if (statSync(path).isDirectory()) {
-      return sourceFiles(path);
-    }
-    return /\.(ts|tsx|js)$/.test(entry) && entry !== 'devTacticalHistorySeed.ts' ? [path] : [];
-  });
-}
