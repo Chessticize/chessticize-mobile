@@ -1526,7 +1526,7 @@ const useStyles = makeStyles((theme) => ({
   },
   guideStartAction: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 12,
     justifyContent: "center",
     marginTop: 16,
@@ -1662,7 +1662,7 @@ const useStyles = makeStyles((theme) => ({
   },
   primaryAction: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 11,
     flex: 1,
     justifyContent: "center",
@@ -1703,7 +1703,7 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "space-between"
   },
   progressFill: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     height: "100%"
   },
@@ -1855,7 +1855,7 @@ const useStyles = makeStyles((theme) => ({
   },
   resultPrimaryAction: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 12,
     justifyContent: "center",
     marginTop: 14,
@@ -2070,7 +2070,7 @@ const useStyles = makeStyles((theme) => ({
   },
   hubStartButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 12,
     justifyContent: "center",
     marginTop: 14,
@@ -2203,7 +2203,7 @@ const useStyles = makeStyles((theme) => ({
   },
   pausedRunContinue: {
     alignSelf: "flex-end",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 9,
     paddingHorizontal: 11,
     paddingVertical: 9

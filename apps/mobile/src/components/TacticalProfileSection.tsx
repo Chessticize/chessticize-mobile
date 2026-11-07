@@ -1173,7 +1173,7 @@ const useStyles = makeStyles((theme) => ({
   rank: {
     backgroundColor: theme.colors.surfaceInverse,
     borderRadius: 16,
-    color: theme.colors.text.onAccent,
+    color: theme.colors.text.onTone,
     fontSize: 13,
     fontWeight: "900",
     height: 30,
@@ -1240,7 +1240,7 @@ const useStyles = makeStyles((theme) => ({
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 12,
     justifyContent: "center",
     minHeight: 48,
@@ -1325,7 +1325,7 @@ const useStyles = makeStyles((theme) => ({
     flexBasis: 0
   },
   allocationPrimary: {
-    backgroundColor: theme.colors.accent.s600
+    backgroundColor: theme.colors.accent.fill
   },
   allocationSecondary: {
     backgroundColor: theme.colors.accent.s400

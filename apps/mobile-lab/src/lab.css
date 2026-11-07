@@ -19,7 +19,7 @@ html {
 }
 
 :root[data-lab-theme="dark"] {
-  background: #0b1120;
+  background: #000000;
   color-scheme: dark;
 }
 
@@ -55,8 +55,8 @@ html {
 }
 
 :root[data-lab-theme="dark"] .lab-device-status-bar {
-  background: #0b1120;
-  color: #f8fafc;
+  background: #000000;
+  color: #ffffff;
 }
 
 .lab-device-status-bar--dynamic-island {

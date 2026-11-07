@@ -210,7 +210,7 @@ const useStyles = makeStyles((theme) => ({
     width: 50
   },
   switchTrackEnabled: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderColor: theme.colors.accent.s600
   },
   switchThumb: {

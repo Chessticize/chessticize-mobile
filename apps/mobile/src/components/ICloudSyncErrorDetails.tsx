@@ -1162,7 +1162,7 @@ const useStyles = makeStyles((theme) => ({
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 9,
     flexGrow: 1,
     justifyContent: "center",

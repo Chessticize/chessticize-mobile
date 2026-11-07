@@ -13,7 +13,8 @@ const COMPONENTS_DIR = path.join(__dirname, "../src/components");
 const NEUTRAL_SURFACES = ["surface", "surfaceRaised", "surfaceSunken", "surfaceStrong"];
 // Text tokens that only appear on a specific kind of background.
 const SPECIAL_BACKGROUNDS: Record<string, string[]> = {
-  "text.onAccent": ["accent.s600", "danger.s600", "positive.s600", "success.s700"],
+  "text.onAccent": ["accent.fill"],
+  "text.onTone": ["danger.s600", "positive.s600", "warning.s500", "text.tertiary", "surfaceInverse"],
   "text.inverse": ["surfaceInverse"],
   fillMuted: ["surfaceInverse"],
   "board.coordinateOnLightSquare": ["board.lightSquare"],
@@ -41,8 +42,8 @@ const KNOWN_LIGHT_BELOW_AA: ReadonlySet<string> = new Set([
   "text.faint on surfaceRaised",
   "text.faint on surfaceStrong",
   "text.faint on surfaceSunken",
-  "text.onAccent on positive.s600",
-  "text.onAccent on warning.s500",
+  "text.onTone on positive.s600",
+  "text.onTone on warning.s500",
   "text.tertiary on surfaceStrong",
   "text.tertiary on surfaceSunken",
   "warning.s600 on surface",

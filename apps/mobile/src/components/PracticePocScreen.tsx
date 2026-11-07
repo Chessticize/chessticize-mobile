@@ -17893,7 +17893,7 @@ const useStyles = makeStyles((theme) => ({
     width: 32
   },
   tabCountBadge: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderColor: theme.colors.surface,
     borderRadius: 999,
     borderWidth: 1,
@@ -18169,7 +18169,7 @@ const useStyles = makeStyles((theme) => ({
   },
   sprintRulesDismissButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 8,
     minHeight: 44,
     justifyContent: "center",
@@ -18241,7 +18241,7 @@ const useStyles = makeStyles((theme) => ({
   },
   primaryCompactButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 8,
     height: 36,
     justifyContent: "center",
@@ -19055,7 +19055,7 @@ const useStyles = makeStyles((theme) => ({
   },
   reviewRetryBadge: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     height: 28,
     justifyContent: "center",
@@ -19287,7 +19287,7 @@ const useStyles = makeStyles((theme) => ({
   puzzleTimingCountdown: {
     backgroundColor: theme.colors.warning.s500,
     borderRadius: 999,
-    color: theme.colors.text.onAccent,
+    color: theme.colors.text.onTone,
     fontFamily: "menlo",
     fontSize: 10,
     fontWeight: "900",
@@ -19531,7 +19531,7 @@ const useStyles = makeStyles((theme) => ({
     gap: 1
   },
   arrowDuelReplyTimer: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     color: theme.colors.text.onAccent,
     fontFamily: "menlo",
@@ -19799,7 +19799,7 @@ const useStyles = makeStyles((theme) => ({
   },
   sprintHeaderStartButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 8,
     height: 40,
     justifyContent: "center",
@@ -20142,7 +20142,7 @@ const useStyles = makeStyles((theme) => ({
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 8,
     flex: 1,
     height: 42,
@@ -20156,7 +20156,7 @@ const useStyles = makeStyles((theme) => ({
   },
   primarySmallButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 8,
     height: 38,
     justifyContent: "center",
@@ -20195,7 +20195,7 @@ const useStyles = makeStyles((theme) => ({
     paddingHorizontal: 14
   },
   destructiveButtonText: {
-    color: theme.colors.text.onAccent,
+    color: theme.colors.text.onTone,
     fontSize: 13,
     fontWeight: "800"
   },
@@ -20410,7 +20410,7 @@ const useStyles = makeStyles((theme) => ({
     width: 22
   },
   resultTrendGlyphDot: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     height: 5,
     position: "absolute",
@@ -20429,7 +20429,7 @@ const useStyles = makeStyles((theme) => ({
     top: 2
   },
   resultTrendGlyphLine: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     height: 2,
     position: "absolute"
@@ -20776,7 +20776,7 @@ const useStyles = makeStyles((theme) => ({
     paddingHorizontal: 10
   },
   filterButtonActive: {
-    backgroundColor: theme.colors.accent.s600
+    backgroundColor: theme.colors.accent.fill
   },
   filterButtonContent: {
     alignItems: "center",
@@ -20853,7 +20853,7 @@ const useStyles = makeStyles((theme) => ({
     paddingHorizontal: 8
   },
   historyQuickChipActive: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderColor: theme.colors.accent.s600
   },
   historyQuickChipCompact: {
@@ -20897,7 +20897,7 @@ const useStyles = makeStyles((theme) => ({
     width: 42
   },
   historyToggleTrackActive: {
-    backgroundColor: theme.colors.accent.s600
+    backgroundColor: theme.colors.accent.fill
   },
   historyToggleThumb: {
     backgroundColor: theme.colors.thumb,
@@ -21001,7 +21001,7 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "flex-end"
   },
   historyChartBar: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 4,
     minHeight: 4
   },
@@ -21039,7 +21039,7 @@ const useStyles = makeStyles((theme) => ({
     top: 8
   },
   historyLineSegment: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     height: 2,
     opacity: 0.82,
@@ -21053,7 +21053,7 @@ const useStyles = makeStyles((theme) => ({
     width: StyleSheet.hairlineWidth
   },
   historyLineSelectionPoint: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderColor: theme.colors.surface,
     borderRadius: 999,
     borderWidth: 2,
@@ -21073,7 +21073,7 @@ const useStyles = makeStyles((theme) => ({
     width: HISTORY_LINE_TOOLTIP_WIDTH
   },
   historyLineTooltipRating: {
-    color: theme.colors.text.onAccent,
+    color: theme.colors.text.onTone,
     fontSize: 12,
     fontWeight: "800"
   },
@@ -21153,7 +21153,7 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.colors.text.tertiary
   },
   historyResultUnknownText: {
-    color: theme.colors.text.onAccent,
+    color: theme.colors.text.onTone,
     fontSize: 16,
     fontWeight: "800"
   },
@@ -21428,7 +21428,7 @@ const useStyles = makeStyles((theme) => ({
   settingsGuidanceResetButton: {
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderColor: theme.colors.accent.s600,
     borderRadius: 8,
     borderWidth: 1,
@@ -21509,7 +21509,7 @@ const useStyles = makeStyles((theme) => ({
   },
   feedbackSupportButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 9,
     flexDirection: "row",
     gap: 8,
@@ -21602,7 +21602,7 @@ const useStyles = makeStyles((theme) => ({
   },
   feedbackHandoffContinueButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 9,
     justifyContent: "center",
     minHeight: 44,
@@ -21711,7 +21711,7 @@ const useStyles = makeStyles((theme) => ({
   },
   settingsActionButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 8,
     flexDirection: "row",
     gap: 8,
@@ -21938,7 +21938,7 @@ const useStyles = makeStyles((theme) => ({
     width: 18
   },
   plusGlyphLine: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     position: "absolute"
   },
@@ -22146,7 +22146,7 @@ const useStyles = makeStyles((theme) => ({
     width: 52
   },
   switchButtonActive: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderColor: theme.colors.accent.s600
   },
   switchGlyph: {

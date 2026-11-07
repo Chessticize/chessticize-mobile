@@ -35,13 +35,13 @@ export function ResultTrophyGlyph({
 
 const useStyles = makeStyles((theme) => ({
   base: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: theme.radius.pill,
     height: 3,
     width: 17
   },
   cup: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderBottomLeftRadius: theme.radius[7],
     borderBottomRightRadius: theme.radius[7],
     borderTopLeftRadius: theme.radius[4],
@@ -76,7 +76,7 @@ const useStyles = makeStyles((theme) => ({
     right: -7
   },
   stem: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     height: 7,
     width: 4
   }

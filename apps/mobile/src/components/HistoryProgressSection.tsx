@@ -634,7 +634,7 @@ const useStyles = makeStyles((theme) => ({
     height: 15
   },
   glyphBar: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 2,
     width: 3
   },

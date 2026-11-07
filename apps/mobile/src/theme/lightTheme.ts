@@ -27,6 +27,7 @@ const colors: ThemeColors = {
     tertiary: "#64748B",
     faint: "#94A3B8",
     onAccent: "#FFFFFF",
+    onTone: "#FFFFFF",
     ink: "#111827",
     inverse: "#E2E8F0"
   },
@@ -47,6 +48,7 @@ const colors: ThemeColors = {
     s800: "#1E40AF",
     s900: "#1E3A8A",
     wash: "#F8FBFF",
+    fill: "#2563EB",
     dropZone: "rgba(37, 99, 235, 0.025)",
     glassFill: "rgba(219, 234, 254, 0.14)",
     glassBorder: "rgba(147, 197, 253, 0.48)"

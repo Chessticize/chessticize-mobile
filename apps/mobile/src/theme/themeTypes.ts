@@ -16,6 +16,8 @@ export type AccentColors = {
   s800: string;
   s900: string;
   wash: string;
+  // Fill of buttons and active controls. Text drawn on it uses text.onAccent.
+  fill: string;
   // Faint fill of a drop target and the tint of accent hints drawn on a dark scrim.
   dropZone: string;
   glassFill: string;
@@ -125,6 +127,8 @@ export type ThemeColors = {
     tertiary: string;
     faint: string;
     onAccent: string;
+    // Labels on tone fills (danger, positive, warning, neutral) and on the inverse surface.
+    onTone: string;
     // Darkest ink, used by headings that sit on the app canvas.
     ink: string;
     // Text drawn on the dark inverse surface.

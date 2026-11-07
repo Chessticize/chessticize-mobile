@@ -1,138 +1,141 @@
 import { createElevation, fontFamily, fontSize, fontWeight, radius, space } from "./scales.ts";
 import type { Theme, ThemeColors } from "./themeTypes.ts";
 
-// Provisional dark palette in the same slate/blue family as the light theme.
-// Ramp steps keep their role (s50 is the faint tint, s900 the strongest text),
-// so a ramp is mirrored: tints become deep surfaces and text steps become light.
-// Accent and tone fills (s500/s600) are bright so the dark on-accent text stays
-// legible and the same value also reads as text and border on dark surfaces.
-// Only these values should change when the visual direction (#609) is decided.
+// Dark palette for visual direction A "Grouped Native" (#609): Apple's system dark colors.
+// The named roles come from the chosen direction (background #000000, surface #1C1C1E,
+// raised #2C2C2E, separator #38383A, secondary text #AEAEB2, accent fill #0A6FE0 and accent
+// text #4DA3FF, positive #4CD964, negative #FF6961, warning #FFB340 and their soft fills).
+// Roles the direction does not define (tonal ramps, faint text, scrims, board squares) are
+// derived in the same system-gray family. Ramp steps keep their role: s50 is the faint tint,
+// s900 the strongest text. The light theme stays slate until direction A's light palette lands.
 const colors: ThemeColors = {
-  surface: "#0F172A",
-  surfaceRaised: "#0B1120",
-  surfaceSunken: "#172033",
-  surfaceStrong: "#1E293B",
-  surfaceInverse: "#E2E8F0",
-  thumb: "#F1F5F9",
-  fillMuted: "#334155",
-  fillStrong: "#64748B",
-  glass: "rgba(15, 23, 42, 0.66)",
-  glassStrong: "rgba(15, 23, 42, 0.94)",
-  veil: "rgba(11, 17, 32, 0.92)",
-  scrim: "rgba(2, 6, 23, 0.65)",
-  scrimSoft: "rgba(2, 6, 23, 0.55)",
-  scrimStrong: "rgba(2, 6, 23, 0.92)",
+  surface: "#1C1C1E",
+  surfaceRaised: "#000000",
+  surfaceSunken: "#262628",
+  surfaceStrong: "#303032",
+  surfaceInverse: "#E5E5EA",
+  thumb: "#FFFFFF",
+  fillMuted: "#48484A",
+  fillStrong: "#6E6E73",
+  glass: "rgba(28, 28, 30, 0.66)",
+  glassStrong: "rgba(36, 36, 38, 0.9)",
+  veil: "rgba(0, 0, 0, 0.92)",
+  scrim: "rgba(0, 0, 0, 0.65)",
+  scrimSoft: "rgba(0, 0, 0, 0.55)",
+  scrimStrong: "rgba(0, 0, 0, 0.92)",
   shadow: "#000000",
   text: {
-    primary: "#F8FAFC",
-    heading: "#F1F5F9",
-    strong: "#E2E8F0",
-    secondary: "#CBD5E1",
-    tertiary: "#A3B1C6",
-    faint: "#8795AB",
-    onAccent: "#0B1120",
-    ink: "#F8FAFC",
-    inverse: "#0F172A"
+    primary: "#FFFFFF",
+    heading: "#F2F2F7",
+    strong: "#E5E5EA",
+    secondary: "#D1D1D6",
+    tertiary: "#AEAEB2",
+    faint: "#A6A6AB",
+    onAccent: "#FFFFFF",
+    onTone: "#000000",
+    ink: "#FFFFFF",
+    inverse: "#1C1C1E"
   },
   border: {
-    default: "#1E293B",
-    strong: "#334155",
-    heavy: "#64748B"
+    default: "#38383A",
+    strong: "#48484A",
+    heavy: "#6E6E73"
   },
   accent: {
-    s50: "#101E3A",
-    s100: "#172B52",
-    s200: "#1E3A6D",
-    s300: "#2F5CA8",
-    s400: "#4C8DEB",
-    s500: "#6AA8FB",
-    s600: "#60A5FA",
-    s700: "#93C5FD",
-    s800: "#A9CDFE",
-    s900: "#BFDBFE",
-    wash: "#0E1A30",
-    dropZone: "rgba(96, 165, 250, 0.06)",
+    s50: "#0B2A4D",
+    s100: "#103862",
+    s200: "#16467A",
+    s300: "#235F9E",
+    s400: "#2F7FE0",
+    s500: "#3E8EF0",
+    s600: "#4DA3FF",
+    s700: "#6AB4FF",
+    s800: "#8AC4FF",
+    s900: "#B2D8FF",
+    wash: "#081E38",
+    fill: "#0A6FE0",
+    dropZone: "rgba(10, 111, 224, 0.08)",
     glassFill: "rgba(219, 234, 254, 0.14)",
     glassBorder: "rgba(147, 197, 253, 0.48)"
   },
   success: {
-    s50: "#0B2A22",
-    s100: "#0F3B2F",
-    s200: "#166A50",
-    s300: "#2F9E7C",
-    s700: "#34D399",
-    s800: "#6EE7B7"
+    s50: "#0E2616",
+    s100: "#12331B",
+    s200: "#1F5A31",
+    s300: "#2F8A4B",
+    s700: "#4CD964",
+    s800: "#86E89A"
   },
   positive: {
-    s100: "#0F3B24",
-    s600: "#4ADE80",
-    s700: "#4ADE80",
-    flash: "rgba(74, 222, 128, 0.30)"
+    s100: "#12331B",
+    s600: "#4CD964",
+    s700: "#4CD964",
+    flash: "rgba(76, 217, 100, 0.30)"
   },
   warning: {
-    s50: "#2B2008",
-    s100: "#3A2A08",
-    s200: "#5C4310",
-    s300: "#7A5A12",
-    s400: "#A67B12",
-    s500: "#F59E0B",
-    s600: "#FBBF24",
-    s700: "#FBBF24",
-    s800: "#FCD34D",
-    s900: "#FDE68A"
+    s50: "#2A1C06",
+    s100: "#3A2709",
+    s200: "#5C400E",
+    s300: "#7C5712",
+    s400: "#A87A1A",
+    s500: "#FFB340",
+    s600: "#FFB340",
+    s700: "#FFB340",
+    s800: "#FFC670",
+    s900: "#FFD99B"
   },
   caution: {
-    s50: "#2A1608",
-    s100: "#3A200C",
-    s200: "#6B3A12",
-    s700: "#FB923C",
-    s800: "#FDBA74",
-    s900: "#FED7AA"
+    s50: "#2B190A",
+    s100: "#3A230F",
+    s200: "#6B3F17",
+    s700: "#FF9F0A",
+    s800: "#FFB866",
+    s900: "#FFCF99"
   },
   danger: {
-    s50: "#2D1215",
-    s100: "#3F1A1E",
-    s200: "#6E2A2F",
-    s300: "#A04048",
-    s500: "#F87171",
-    s600: "#F87171",
-    s700: "#FCA5A5",
-    s800: "#FECACA",
-    flash: "rgba(248, 113, 113, 0.32)"
+    s50: "#2B1010",
+    s100: "#3D1414",
+    s200: "#6A2424",
+    s300: "#A03A38",
+    s500: "#FF6961",
+    s600: "#FF6961",
+    s700: "#FF8A84",
+    s800: "#FFB0AB",
+    flash: "rgba(255, 105, 97, 0.32)"
   },
   hairline: {
-    neutral: "rgba(148, 163, 184, 0.25)",
-    warning: "rgba(251, 191, 36, 0.30)",
-    warningStrong: "rgba(251, 191, 36, 0.25)"
+    neutral: "rgba(235, 235, 245, 0.18)",
+    warning: "rgba(255, 179, 64, 0.30)",
+    warningStrong: "rgba(255, 179, 64, 0.25)"
   },
   board: {
-    lightSquare: "#A9B4C4",
-    darkSquare: "#6B778C",
-    promotionPieceButton: "#CBD5E1",
+    lightSquare: "#B0B0B5",
+    darkSquare: "#747479",
+    promotionPieceButton: "#D1D1D6",
     lastMoveHighlight: "rgba(0, 0, 0, 0)",
     checkmateHighlight: "rgba(0, 0, 0, 0)",
-    validMoveDot: "rgba(248, 250, 252, 0.45)",
-    validMoveCapture: "rgba(248, 250, 252, 0.65)",
-    lastMoveSquare: "rgba(59, 130, 246, 0.18)",
-    promotionOverlay: "rgba(2, 6, 23, 0.62)",
-    promotionContainer: "#0F172A",
-    promotionBorder: "#334155",
+    validMoveDot: "rgba(0, 0, 0, 0.38)",
+    validMoveCapture: "rgba(0, 0, 0, 0.58)",
+    lastMoveSquare: "rgba(10, 111, 224, 0.20)",
+    promotionOverlay: "rgba(0, 0, 0, 0.62)",
+    promotionContainer: "#1C1C1E",
+    promotionBorder: "#38383A",
     promotionShadow: "#000",
-    promotionPieceBorder: "#475569",
-    coordinateOnLightSquare: "#0F172A",
+    promotionPieceBorder: "#48484A",
+    coordinateOnLightSquare: "#000000",
     coordinateOnDarkSquare: "#FFFFFF",
-    coordinateHaloOnLightSquare: "rgba(248, 250, 252, 0.35)",
-    coordinateHaloOnDarkSquare: "rgba(2, 6, 23, 0.65)"
+    coordinateHaloOnLightSquare: "rgba(255, 255, 255, 0.35)",
+    coordinateHaloOnDarkSquare: "rgba(0, 0, 0, 0.65)"
   },
   launch: {
-    background: "#0B1120",
-    title: "#F1F5F9",
-    detail: "#A3B1C6"
+    background: "#000000",
+    title: "#FFFFFF",
+    detail: "#AEAEB2"
   },
   backGesture: {
-    stage: "#0B1120",
-    eyebrow: "#A3B1C6",
-    label: "#E2E8F0"
+    stage: "#000000",
+    eyebrow: "#AEAEB2",
+    label: "#E5E5EA"
   }
 };
 
