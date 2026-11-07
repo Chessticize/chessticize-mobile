@@ -51,3 +51,8 @@ export function getBundledCorePackManifest(): PuzzlePackManifest {
 export function shouldRandomizePuzzleSelection(source: MobilePuzzleSource): boolean {
   return source !== "familiar15";
 }
+
+// Test controls are native E2E hooks; the Lab never enables them.
+export function createMobilePracticeTestControls(_service: PracticeService): undefined {
+  return undefined;
+}
