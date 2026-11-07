@@ -5,6 +5,7 @@ import {
   SafeAreaInsetsContext
 } from "react-native-safe-area-context";
 import { PracticeViewportProvider } from "../../mobile/src/components/PracticeViewport.tsx";
+import { ThemeProvider } from "../../mobile/src/theme/index.ts";
 import "../src/lab.css";
 import { LabDeviceStatusBar } from "../src/LabDeviceStatusBar.tsx";
 import {
@@ -54,6 +55,11 @@ function LabDeviceFrame({
 
 const preview: Preview = {
   decorators: [
+    (Story) => (
+      <ThemeProvider>
+        <Story />
+      </ThemeProvider>
+    ),
     (Story, context) => (
       <LabDeviceFrame
         showDeviceChrome={context.parameters.labDeviceChrome !== false}

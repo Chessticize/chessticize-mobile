@@ -1,8 +1,8 @@
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
+import { makeStyles } from "../theme/index.ts";
 
 const BASE_SIZE = 28;
-const TROPHY_COLOR = "#2563EB";
 
 export function ResultTrophyGlyph({
   cupTestID,
@@ -13,6 +13,7 @@ export function ResultTrophyGlyph({
   size?: number;
   testID?: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessibilityElementsHidden
@@ -32,19 +33,19 @@ export function ResultTrophyGlyph({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((theme) => ({
   base: {
-    backgroundColor: TROPHY_COLOR,
-    borderRadius: 999,
+    backgroundColor: theme.colors.accent.s600,
+    borderRadius: theme.radius.pill,
     height: 3,
     width: 17
   },
   cup: {
-    backgroundColor: TROPHY_COLOR,
-    borderBottomLeftRadius: 7,
-    borderBottomRightRadius: 7,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
+    backgroundColor: theme.colors.accent.s600,
+    borderBottomLeftRadius: theme.radius[7],
+    borderBottomRightRadius: theme.radius[7],
+    borderTopLeftRadius: theme.radius[4],
+    borderTopRightRadius: theme.radius[4],
     height: 13,
     position: "relative",
     width: 17
@@ -60,8 +61,8 @@ const styles = StyleSheet.create({
     width: BASE_SIZE
   },
   handle: {
-    borderColor: TROPHY_COLOR,
-    borderRadius: 999,
+    borderColor: theme.colors.accent.s600,
+    borderRadius: theme.radius.pill,
     borderWidth: 2,
     height: 10,
     position: "absolute",
@@ -75,8 +76,8 @@ const styles = StyleSheet.create({
     right: -7
   },
   stem: {
-    backgroundColor: TROPHY_COLOR,
+    backgroundColor: theme.colors.accent.s600,
     height: 7,
     width: 4
   }
-});
+}));

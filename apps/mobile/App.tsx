@@ -21,6 +21,7 @@ import {
 } from "./src/testing/appStoreMarketingCapture";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
 import { createMobileSystemBackSource } from "./src/navigation/mobileSystemBack";
+import { ThemeProvider } from "./src/theme";
 
 enableTestControlsFromLaunchConfig();
 
@@ -81,34 +82,36 @@ function App() {
 
   return (
     <SafeAreaProvider>
-      {platformCapabilities ? (
-        <PracticePocScreen
-          platformCapabilities={platformCapabilities}
-          arrowDuelTargetCorrect={arrowDuelTargetCorrect}
-          currentTimeMs={currentTimeMs}
-          customTargetCorrect={customTargetCorrect}
-          sprintGuidanceEnabled
-          puzzleSelectionId={puzzleSelectionId}
-          puzzleSelectionSeed={puzzleSelectionSeed}
-          runManagementEnabled
-          settingsCaptureBottomInset={marketingCaptureFixture?.frameId === "private-offline-open-source"
-            ? 420
-            : undefined}
-          sprintRulesDesignPreview={marketingCaptureFixture?.initialActiveState
-            ? { initialActiveState: marketingCaptureFixture.initialActiveState }
-            : undefined}
-          standardTargetCorrect={standardTargetCorrect}
-          systemBack={systemBack}
-          themeCatalogPresentation={marketingCaptureFixture?.themeCatalogPresentation}
-        />
-      ) : (
-        <View style={styles.loadingRoot}>
-          <Text style={styles.loadingTitle} testID={loadError ? "puzzle-pack-load-error" : "puzzle-pack-loading"}>
-            {loadError ? "Puzzle pack unavailable" : "Loading puzzle pack"}
-          </Text>
-          {loadError ? <Text style={styles.loadingDetail}>{loadError}</Text> : null}
-        </View>
-      )}
+      <ThemeProvider>
+        {platformCapabilities ? (
+          <PracticePocScreen
+            platformCapabilities={platformCapabilities}
+            arrowDuelTargetCorrect={arrowDuelTargetCorrect}
+            currentTimeMs={currentTimeMs}
+            customTargetCorrect={customTargetCorrect}
+            sprintGuidanceEnabled
+            puzzleSelectionId={puzzleSelectionId}
+            puzzleSelectionSeed={puzzleSelectionSeed}
+            runManagementEnabled
+            settingsCaptureBottomInset={marketingCaptureFixture?.frameId === "private-offline-open-source"
+              ? 420
+              : undefined}
+            sprintRulesDesignPreview={marketingCaptureFixture?.initialActiveState
+              ? { initialActiveState: marketingCaptureFixture.initialActiveState }
+              : undefined}
+            standardTargetCorrect={standardTargetCorrect}
+            systemBack={systemBack}
+            themeCatalogPresentation={marketingCaptureFixture?.themeCatalogPresentation}
+          />
+        ) : (
+          <View style={styles.loadingRoot}>
+            <Text style={styles.loadingTitle} testID={loadError ? "puzzle-pack-load-error" : "puzzle-pack-loading"}>
+              {loadError ? "Puzzle pack unavailable" : "Loading puzzle pack"}
+            </Text>
+            {loadError ? <Text style={styles.loadingDetail}>{loadError}</Text> : null}
+          </View>
+        )}
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

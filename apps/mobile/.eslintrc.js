@@ -11,6 +11,21 @@ module.exports = {
   },
   overrides: [
     {
+      // Components read colors from the theme (src/theme). PracticePocScreen.tsx joins
+      // this list once its literals are migrated (#608).
+      files: ['src/components/**/*.{ts,tsx}'],
+      excludedFiles: ['src/components/PracticePocScreen.tsx'],
+      rules: {
+        'no-restricted-syntax': [
+          'error',
+          {
+            selector: "Literal[value=/^#[0-9a-fA-F]{3,8}$/], Literal[value=/^rgba?\\(/], TemplateElement[value.raw=/#[0-9a-fA-F]{6}|rgba?\\(/]",
+            message: 'Use a theme color token (useTheme or makeStyles) instead of a hex or rgba literal.',
+          },
+        ],
+      },
+    },
+    {
       files: ['scripts/**/*.js'],
       env: {
         node: true,

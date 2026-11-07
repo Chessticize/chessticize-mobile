@@ -1,6 +1,7 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import type { StyleProp, ViewStyle } from "react-native";
+import { makeStyles } from "../theme/index.ts";
 
 export function ResultReviewImpactCard({
   count,
@@ -19,6 +20,7 @@ export function ResultReviewImpactCard({
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={[styles.card, style]} testID={testID}>
       <View style={styles.copy}>
@@ -37,32 +39,32 @@ export function ResultReviewImpactCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((theme) => ({
   card: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
-    borderRadius: 8,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.radius[8],
     borderWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 58,
-    paddingHorizontal: 12,
-    paddingVertical: 10
+    paddingHorizontal: theme.space[12],
+    paddingVertical: theme.space[10]
   },
   copy: {
     flex: 1,
     minWidth: 0
   },
   count: {
-    fontSize: 18,
-    fontWeight: "900"
+    fontSize: theme.fontSize[18],
+    fontWeight: theme.fontWeight.black
   },
   countAttention: {
-    color: "#991B1B"
+    color: theme.colors.danger.s800
   },
   countClear: {
-    color: "#15803D"
+    color: theme.colors.positive.s700
   },
   countColumn: {
     alignItems: "center",
@@ -70,14 +72,14 @@ const styles = StyleSheet.create({
     width: 38
   },
   detail: {
-    color: "#64748B",
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 2
+    color: theme.colors.text.tertiary,
+    fontSize: theme.fontSize[12],
+    fontWeight: theme.fontWeight.semibold,
+    marginTop: theme.space[2]
   },
   title: {
-    color: "#0F172A",
-    fontSize: 14,
-    fontWeight: "800"
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSize[14],
+    fontWeight: theme.fontWeight.heavy
   }
-});
+}));

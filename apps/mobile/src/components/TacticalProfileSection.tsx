@@ -2,10 +2,10 @@ import React from "react";
 import {
   ActivityIndicator,
   Pressable,
-  StyleSheet,
   Text,
   View
 } from "react-native";
+import { makeStyles, useTheme } from "../theme/index.ts";
 import {
   TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT,
   type TacticalProfileTaskFamily
@@ -21,6 +21,8 @@ export function TacticalProfileHomeCard({
 }: {
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
+  const styles = useStyles();
+  const theme = useTheme();
   const primarySignal = homeLeadSignalFor(presentation);
   const content = homeContentFor(presentation, primarySignal);
   const recommendationCount = recommendedThemeLabels(presentation).length;
@@ -34,15 +36,15 @@ export function TacticalProfileHomeCard({
         accessibilityLabel={`Training focus. ${content.title}. ${content.body}${
           presentation.assurance === "provisional" ? " Early estimate." : ""
         }`}
-        style={[styles.homeCard, homeToneStyle(content.tone)]}
+        style={[styles.homeCard, homeToneStyle(styles, content.tone)]}
         testID="training-focus-card"
       >
         <View style={styles.homeHeader}>
-          <View style={[styles.statusPill, statusPillStyle(content.tone)]}>
+          <View style={[styles.statusPill, statusPillStyle(styles, content.tone)]}>
             {presentation.phase === "building" ? (
-              <ActivityIndicator color="#1D4ED8" size="small" testID="training-focus-building-indicator" />
+              <ActivityIndicator color={theme.colors.accent.s700} size="small" testID="training-focus-building-indicator" />
             ) : null}
-            <Text style={[styles.statusPillText, statusPillTextStyle(content.tone)]}>
+            <Text style={[styles.statusPillText, statusPillTextStyle(styles, content.tone)]}>
               {content.status}
             </Text>
           </View>
@@ -102,6 +104,7 @@ function TacticalProfileScreen({
 }: {
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
+  const styles = useStyles();
   const activeTaskFamily = activeTaskFamilyFor(presentation);
   const taskFamilies = signalTaskFamilies(presentation.signals);
   const familySignals = presentation.signals.filter(
@@ -222,6 +225,7 @@ function RecommendationExplanation({
 }: {
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
+  const styles = useStyles();
   const signal = selectedSignalFor(presentation);
   if (!signal) {
     return <TacticalProfileScreen presentation={presentation} />;
@@ -294,6 +298,7 @@ function FocusedRunPreviewScreen({
 }: {
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
+  const styles = useStyles();
   const preview = presentation.focusedRun;
   if (!preview || preview.taskFamily !== activeTaskFamilyFor(presentation)) {
     return <TacticalProfileScreen presentation={presentation} />;
@@ -325,7 +330,7 @@ function FocusedRunPreviewScreen({
               key={allocation.id}
               style={[
                 styles.allocationSegment,
-                allocationToneStyle(allocation),
+                allocationToneStyle(styles, allocation),
                 { flexGrow: allocation.puzzleCount }
               ]}
             />
@@ -334,7 +339,7 @@ function FocusedRunPreviewScreen({
         <View style={styles.allocationList}>
           {preview.allocations.map((allocation) => (
             <View key={allocation.id} style={styles.allocationRow}>
-              <View style={[styles.allocationDot, allocationToneStyle(allocation)]} />
+              <View style={[styles.allocationDot, allocationToneStyle(styles, allocation)]} />
               <Text style={styles.allocationLabel}>{allocation.label}</Text>
               <Text style={styles.allocationCount}>
                 {allocation.puzzleCount} · {Math.round(allocation.puzzleCount / preview.totalPuzzleCount * 100)}%
@@ -380,6 +385,7 @@ function SuppressedRecommendation({
 }: {
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={[styles.flow, styles.suppressedFlow]} testID="tactical-profile-suppressed">
       <View style={styles.suppressedIcon}>
@@ -419,6 +425,7 @@ function SignalCard({
   signal: TacticalProfileSignal;
   onExplain: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.signalCard} testID={`tactical-profile-signal-${signal.id}`}>
       <View style={styles.signalHeader}>
@@ -454,6 +461,7 @@ function TaskFamilySelector({
   taskFamilies: readonly TacticalProfileTaskFamily[];
   onSelect: (taskFamily: TacticalProfileTaskFamily) => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessibilityLabel="Choose tactical profile mode"
@@ -485,6 +493,7 @@ function TaskFamilySelector({
 }
 
 function EvidenceLine({ signal }: { signal: TacticalProfileSignal }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <Text style={styles.evidence} testID={`tactical-profile-evidence-${signal.id}`}>
       {formatCount(signal.distinctPuzzleCount, "different puzzle", "different puzzles")}
@@ -499,6 +508,7 @@ function SignalKindPill({
 }: {
   kind: TacticalProfileSignal["kind"];
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={[styles.kindPill, kind === "speed" ? styles.kindPillSpeed : styles.kindPillSolve]}>
       <Text style={[styles.kindPillText, kind === "speed" ? styles.kindPillTextSpeed : styles.kindPillTextSolve]}>
@@ -523,6 +533,7 @@ function FlowHeader({
   title: string;
   onBack: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.flowHeader}>
       <Pressable
@@ -684,6 +695,7 @@ function EarlyEstimateNotice({
 }: {
   presentation: TacticalProfilePresentation;
 }): React.JSX.Element | null {
+  const styles = useStyles();
   if (presentation.assurance !== "provisional") {
     return null;
   }
@@ -847,36 +859,38 @@ function formatCount(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function homeToneStyle(tone: "blue" | "green" | "amber" | "neutral") {
+type Styles = ReturnType<typeof useStyles>;
+
+function homeToneStyle(styles: Styles, tone: "blue" | "green" | "amber" | "neutral") {
   if (tone === "green") return styles.homeCardGreen;
   if (tone === "amber") return styles.homeCardAmber;
   if (tone === "neutral") return styles.homeCardNeutral;
   return styles.homeCardBlue;
 }
 
-function statusPillStyle(tone: "blue" | "green" | "amber" | "neutral") {
+function statusPillStyle(styles: Styles, tone: "blue" | "green" | "amber" | "neutral") {
   if (tone === "green") return styles.statusPillGreen;
   if (tone === "amber") return styles.statusPillAmber;
   if (tone === "neutral") return styles.statusPillNeutral;
   return styles.statusPillBlue;
 }
 
-function statusPillTextStyle(tone: "blue" | "green" | "amber" | "neutral") {
+function statusPillTextStyle(styles: Styles, tone: "blue" | "green" | "amber" | "neutral") {
   if (tone === "green") return styles.statusPillTextGreen;
   if (tone === "amber") return styles.statusPillTextAmber;
   if (tone === "neutral") return styles.statusPillTextNeutral;
   return styles.statusPillTextBlue;
 }
 
-function allocationToneStyle(allocation: FocusedRunAllocation) {
+function allocationToneStyle(styles: Styles, allocation: FocusedRunAllocation) {
   if (allocation.tone === "secondary") return styles.allocationSecondary;
   if (allocation.tone === "mixed") return styles.allocationMixed;
   return styles.allocationPrimary;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((theme) => ({
   sectionLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "800",
     letterSpacing: 0.8,
@@ -890,20 +904,20 @@ const styles = StyleSheet.create({
     padding: 16
   },
   homeCardBlue: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s200
   },
   homeCardGreen: {
-    backgroundColor: "#ECFDF5",
-    borderColor: "#A7F3D0"
+    backgroundColor: theme.colors.success.s50,
+    borderColor: theme.colors.success.s200
   },
   homeCardAmber: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#FDE68A"
+    backgroundColor: theme.colors.warning.s50,
+    borderColor: theme.colors.warning.s200
   },
   homeCardNeutral: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1"
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong
   },
   homeHeader: {
     alignItems: "center",
@@ -913,7 +927,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   earlyEstimateLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0.4,
@@ -929,60 +943,60 @@ const styles = StyleSheet.create({
     paddingVertical: 4
   },
   statusPillBlue: {
-    backgroundColor: "#DBEAFE"
+    backgroundColor: theme.colors.accent.s100
   },
   statusPillGreen: {
-    backgroundColor: "#D1FAE5"
+    backgroundColor: theme.colors.success.s100
   },
   statusPillAmber: {
-    backgroundColor: "#FEF3C7"
+    backgroundColor: theme.colors.warning.s100
   },
   statusPillNeutral: {
-    backgroundColor: "#E2E8F0"
+    backgroundColor: theme.colors.surfaceStrong
   },
   statusPillText: {
     fontSize: 12,
     fontWeight: "800"
   },
   statusPillTextBlue: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   statusPillTextGreen: {
-    color: "#047857"
+    color: theme.colors.success.s700
   },
   statusPillTextAmber: {
-    color: "#92400E"
+    color: theme.colors.warning.s800
   },
   statusPillTextNeutral: {
-    color: "#475569"
+    color: theme.colors.text.secondary
   },
   homeTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 18,
     fontWeight: "800",
     lineHeight: 23
   },
   modeLabel: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.8,
     textTransform: "uppercase"
   },
   body: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 14,
     lineHeight: 21
   },
   evidence: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 13,
     fontWeight: "700",
     lineHeight: 18
   },
   cardAction: {
     alignItems: "center",
-    borderTopColor: "rgba(100, 116, 139, 0.22)",
+    borderTopColor: theme.colors.hairline.neutral,
     borderTopWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -991,12 +1005,12 @@ const styles = StyleSheet.create({
     paddingTop: 10
   },
   cardActionText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 14,
     fontWeight: "800"
   },
   cardActionChevron: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 24,
     lineHeight: 24
   },
@@ -1014,8 +1028,8 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 22,
     borderWidth: 1,
     height: 44,
@@ -1023,7 +1037,7 @@ const styles = StyleSheet.create({
     width: 44
   },
   backButtonText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 30,
     lineHeight: 30,
     marginTop: -2
@@ -1032,40 +1046,40 @@ const styles = StyleSheet.create({
     flex: 1
   },
   eyebrow: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1.2
   },
   flowTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 25,
     fontWeight: "900",
     letterSpacing: -0.5,
     lineHeight: 31
   },
   contextCard: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 16,
     borderWidth: 1,
     gap: 8,
     padding: 18
   },
   contextTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 19,
     fontWeight: "800",
     lineHeight: 25
   },
   contextFoot: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     lineHeight: 18
   },
   earlyEstimateNotice: {
-    backgroundColor: "#FFF7ED",
-    borderColor: "#FED7AA",
+    backgroundColor: theme.colors.caution.s50,
+    borderColor: theme.colors.caution.s200,
     borderRadius: 14,
     borderWidth: 1,
     gap: 3,
@@ -1073,19 +1087,19 @@ const styles = StyleSheet.create({
     paddingVertical: 11
   },
   earlyEstimateNoticeTitle: {
-    color: "#9A3412",
+    color: theme.colors.caution.s800,
     fontSize: 12,
     fontWeight: "900",
     letterSpacing: 0.5,
     textTransform: "uppercase"
   },
   earlyEstimateNoticeBody: {
-    color: "#7C2D12",
+    color: theme.colors.caution.s900,
     fontSize: 13,
     lineHeight: 18
   },
   taskFamilySelector: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceStrong,
     borderRadius: 16,
     flexDirection: "row",
     gap: 4,
@@ -1100,33 +1114,33 @@ const styles = StyleSheet.create({
     paddingVertical: 9
   },
   taskFamilyTabSelected: {
-    backgroundColor: "#FFFFFF"
+    backgroundColor: theme.colors.surface
   },
   taskFamilyTabTitle: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 13,
     fontWeight: "800"
   },
   taskFamilyTabTitleSelected: {
-    color: "#0F172A"
+    color: theme.colors.text.primary
   },
   taskFamilyTabBody: {
-    color: "#94A3B8",
+    color: theme.colors.text.faint,
     fontSize: 10,
     lineHeight: 14
   },
   taskFamilyTabBodySelected: {
-    color: "#64748B"
+    color: theme.colors.text.tertiary
   },
   monitoringNote: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 13,
     lineHeight: 19,
     paddingHorizontal: 4
   },
   unavailableCard: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#FDE68A",
+    backgroundColor: theme.colors.warning.s50,
+    borderColor: theme.colors.warning.s200,
     borderRadius: 16,
     borderWidth: 1,
     gap: 8,
@@ -1136,8 +1150,8 @@ const styles = StyleSheet.create({
     gap: 10
   },
   signalCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 16,
     borderWidth: 1,
     gap: 10,
@@ -1157,9 +1171,9 @@ const styles = StyleSheet.create({
     gap: 10
   },
   rank: {
-    backgroundColor: "#0F172A",
+    backgroundColor: theme.colors.surfaceInverse,
     borderRadius: 16,
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 13,
     fontWeight: "900",
     height: 30,
@@ -1171,13 +1185,13 @@ const styles = StyleSheet.create({
     flexShrink: 1
   },
   signalTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 18,
     fontWeight: "800",
     lineHeight: 23
   },
   priorityLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "700",
     marginTop: 2
@@ -1188,23 +1202,23 @@ const styles = StyleSheet.create({
     paddingVertical: 5
   },
   kindPillSolve: {
-    backgroundColor: "#DBEAFE"
+    backgroundColor: theme.colors.accent.s100
   },
   kindPillSpeed: {
-    backgroundColor: "#FEF3C7"
+    backgroundColor: theme.colors.warning.s100
   },
   kindPillText: {
     fontSize: 11,
     fontWeight: "800"
   },
   kindPillTextSolve: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   kindPillTextSpeed: {
-    color: "#92400E"
+    color: theme.colors.warning.s800
   },
   signalSummary: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 15,
     fontWeight: "600",
     lineHeight: 22
@@ -1217,7 +1231,7 @@ const styles = StyleSheet.create({
     paddingRight: 10
   },
   explainButtonText: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 14,
     fontWeight: "800"
   },
@@ -1226,7 +1240,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 12,
     justifyContent: "center",
     minHeight: 48,
@@ -1234,14 +1248,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12
   },
   primaryButtonText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 15,
     fontWeight: "800"
   },
   secondaryButton: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 12,
     borderWidth: 1,
     justifyContent: "center",
@@ -1250,51 +1264,51 @@ const styles = StyleSheet.create({
     paddingVertical: 12
   },
   secondaryButtonText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 15,
     fontWeight: "800"
   },
   explanationHero: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s200,
     borderRadius: 16,
     borderWidth: 1,
     gap: 10,
     padding: 18
   },
   explanationTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 20,
     fontWeight: "800",
     lineHeight: 27
   },
   explanationSection: {
-    backgroundColor: "#FFFFFF",
-    borderBottomColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: 1,
     gap: 6,
     paddingBottom: 14
   },
   sectionTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 16,
     fontWeight: "800",
     lineHeight: 22
   },
   previewSummary: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 15,
     fontWeight: "700"
   },
   ratingAnchor: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 13,
     fontWeight: "800",
     marginTop: -8
   },
   allocationCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 16,
     borderWidth: 1,
     gap: 12,
@@ -1311,13 +1325,13 @@ const styles = StyleSheet.create({
     flexBasis: 0
   },
   allocationPrimary: {
-    backgroundColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s600
   },
   allocationSecondary: {
-    backgroundColor: "#60A5FA"
+    backgroundColor: theme.colors.accent.s400
   },
   allocationMixed: {
-    backgroundColor: "#94A3B8"
+    backgroundColor: theme.colors.fillStrong
   },
   allocationList: {
     gap: 10
@@ -1334,31 +1348,31 @@ const styles = StyleSheet.create({
     width: 10
   },
   allocationLabel: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     flex: 1,
     fontSize: 14,
     fontWeight: "700"
   },
   allocationCount: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 13,
     fontWeight: "700"
   },
   previewGuardrails: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 16,
     borderWidth: 1,
     gap: 8,
     padding: 18
   },
   guardrailItem: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 14,
     lineHeight: 21
   },
   previewFoot: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     lineHeight: 18,
     textAlign: "center"
@@ -1371,28 +1385,28 @@ const styles = StyleSheet.create({
   },
   suppressedIcon: {
     alignItems: "center",
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceStrong,
     borderRadius: 28,
     height: 56,
     justifyContent: "center",
     width: 56
   },
   suppressedIconText: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 26,
     fontWeight: "900"
   },
   suppressedTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 23,
     fontWeight: "900",
     textAlign: "center"
   },
   suppressedBody: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 15,
     lineHeight: 22,
     maxWidth: 460,
     textAlign: "center"
   }
-});
+}));
