@@ -440,7 +440,7 @@ const useStyles = makeStyles((theme) => ({
     position: "absolute"
   },
   callout: {
-    backgroundColor: theme.colors.surfaceRaised,
+    backgroundColor: theme.colors.surfaceFloating,
     borderColor: theme.colors.border.default,
     borderRadius: DEFAULT_GUIDE_METRICS.calloutRadius,
     borderWidth: 1,
@@ -455,7 +455,7 @@ const useStyles = makeStyles((theme) => ({
     shadowRadius: 16
   },
   pointer: {
-    backgroundColor: theme.colors.surfaceRaised,
+    backgroundColor: theme.colors.surfaceFloating,
     borderColor: theme.colors.border.default,
     height: POINTER_SIDE,
     position: "absolute",
@@ -550,7 +550,7 @@ const useStyles = makeStyles((theme) => ({
   },
   nextButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     flexShrink: 0,
     marginLeft: "auto",
     borderRadius: theme.radius[8],

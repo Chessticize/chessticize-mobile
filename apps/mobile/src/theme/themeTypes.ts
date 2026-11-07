@@ -106,6 +106,8 @@ export type ThemeColors = {
   surfaceSunken: string;
   surfaceStrong: string;
   surfaceInverse: string;
+  // Callouts and popovers drawn above content.
+  surfaceFloating: string;
   // Knob of a toggle; stays light so it reads against both track states.
   thumb: string;
   // Solid fills for tracks, dots and disabled controls, light to dark.

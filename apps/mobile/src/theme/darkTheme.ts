@@ -14,6 +14,7 @@ const colors: ThemeColors = {
   surfaceSunken: "#262628",
   surfaceStrong: "#303032",
   surfaceInverse: "#E5E5EA",
+  surfaceFloating: "#2C2C2E",
   thumb: "#FFFFFF",
   fillMuted: "#48484A",
   fillStrong: "#6E6E73",

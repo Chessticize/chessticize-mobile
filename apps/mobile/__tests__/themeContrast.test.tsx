@@ -10,7 +10,7 @@ import type { Theme } from "../src/theme";
 // against every neutral surface it can sit on.
 
 const COMPONENTS_DIR = path.join(__dirname, "../src/components");
-const NEUTRAL_SURFACES = ["surface", "surfaceRaised", "surfaceSunken", "surfaceStrong"];
+const NEUTRAL_SURFACES = ["surface", "surfaceRaised", "surfaceSunken", "surfaceStrong", "surfaceFloating"];
 // Text tokens that only appear on a specific kind of background.
 const SPECIAL_BACKGROUNDS: Record<string, string[]> = {
   "text.onAccent": ["accent.fill"],
@@ -34,11 +34,13 @@ const KNOWN_LIGHT_BELOW_AA: ReadonlySet<string> = new Set([
   "danger.s600 on surfaceSunken",
   "positive.s600 on surface",
   "positive.s600 on surfaceRaised",
+  "positive.s600 on surfaceFloating",
   "positive.s600 on surfaceStrong",
   "positive.s600 on surfaceSunken",
   "positive.s700 on surfaceStrong",
   "success.s700 on surfaceStrong",
   "text.faint on surface",
+  "text.faint on surfaceFloating",
   "text.faint on surfaceRaised",
   "text.faint on surfaceStrong",
   "text.faint on surfaceSunken",
@@ -46,10 +48,6 @@ const KNOWN_LIGHT_BELOW_AA: ReadonlySet<string> = new Set([
   "text.onTone on warning.s500",
   "text.tertiary on surfaceStrong",
   "text.tertiary on surfaceSunken",
-  "warning.s600 on surface",
-  "warning.s600 on surfaceRaised",
-  "warning.s600 on surfaceStrong",
-  "warning.s600 on surfaceSunken",
   "warning.s700 on surfaceStrong"
 ]);
 
