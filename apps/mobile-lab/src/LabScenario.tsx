@@ -1508,6 +1508,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       screenProps.sprintStartDelayMs = 60_000;
       break;
     case "practice-reminder-prompt":
+      notificationStatus = "not_determined";
+      service = createReviewService("due");
+      break;
     case "settings-notifications-not-determined":
       notificationStatus = "not_determined";
       break;

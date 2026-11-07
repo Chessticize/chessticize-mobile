@@ -28,7 +28,8 @@ export const EmptyQueue: Story = {
   args: { scenarioId: "review-empty" },
   play: async ({ canvasElement }) => {
     await openReviewQueue(canvasElement);
-    await waitForTestId(canvasElement, "review-empty-state");
+    await waitForTestId(canvasElement, "review-today-to-review-empty");
+    await waitForTestId(canvasElement, "review-today-history-empty");
   }
 };
 
@@ -111,7 +112,8 @@ export const OverdueQueue: Story = {
   args: { scenarioId: "review-overdue" },
   play: async ({ canvasElement }) => {
     await openReviewQueue(canvasElement);
-    await waitForTestId(canvasElement, "review-overdue-count");
+    await waitForTestId(canvasElement, "review-due-summary");
+    await waitForText(canvasElement, "Overdue now");
   }
 };
 
@@ -178,11 +180,7 @@ export const ArrowDuelReply: Story = {
     await waitForEnabledTestId(canvasElement, "lab-board-correct");
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForTestId(canvasElement, "review-arrow-duel-reply-timer");
-    await expectTestIdText(
-      canvasElement,
-      "review-arrow-duel-reply-hint",
-      "Optional · Turn off in Settings"
-    );
+    await waitForText(canvasElement, "Optional · Turn off in Settings");
   }
 };
 

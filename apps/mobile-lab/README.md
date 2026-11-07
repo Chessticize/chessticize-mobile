@@ -92,12 +92,12 @@ comparison on the same machine and browser.
 `pnpm mobile:lab:smoke` loads every registry scenario once from the built
 `storybook-static` (run `pnpm mobile:lab:validate` or `build-storybook` first) in a
 headless browser and fails, naming the scenario, when it throws while rendering:
-an uncaught page error, a console error, the Storybook error overlay, or a registry
-story missing from the Storybook index. The Interaction Lab CI job runs it after the
+an uncaught page error, a console error, the Storybook error overlay, a failed `play`
+assertion, or a registry story missing from the Storybook index. The Interaction Lab CI job runs it after the
 static build. It shares the headless loader (`scripts/labBrowser.ts`) with the visual
-regression tool, uses the same browser fallback, and takes about a minute. A scenario
-whose `play` assertions fail but which rendered is listed as a warning and does not
-fail the run. Options: `--only <story-id substring>`, `--concurrency N`, and
+regression tool, uses the same browser fallback, and takes about a minute. Stories
+listed in `KNOWN_STALE_PLAY` in `scripts/render-smoke.ts` are warnings only; each entry
+names the issue rewriting it. Options: `--only <story-id substring>`, `--concurrency N`, and
 `--static-dir <dir>`.
 
 ## Browser boundaries

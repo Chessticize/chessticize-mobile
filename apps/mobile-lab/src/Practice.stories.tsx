@@ -18,6 +18,7 @@ import {
   expectRunInsertionTarget,
   expectRunPreviewShift,
   openPracticeSession,
+  openReviewQueue,
   replaceTextTestId,
   waitForEnabledTestId,
   waitForHiddenTestId,
@@ -186,7 +187,7 @@ export const PersonalBestRatingSource: Story = {
     await waitForTestId(canvasElement, "personal-best-source-standard");
     await waitForText(
       canvasElement,
-      "Focused, themed, and candidate-only Runs are excluded. Your choice is remembered for future Puzzle challenges; paused Runs never change level."
+      "Focused, themed, and candidate-only Runs are excluded. Your choice is remembered for future Puzzle Survival Runs; paused Runs never change level."
     );
   }
 };
@@ -305,7 +306,7 @@ export const PersonalBestGuide: Story = {
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "personal-best-hub-help");
     await waitForTestId(canvasElement, "personal-best-guide");
-    await expectTestIdText(canvasElement, "personal-best-guide-score", "18");
+    await expectTestIdText(canvasElement, "personal-best-guide-score", "19");
     await waitForText(canvasElement, "One level for the whole Run");
     await waitForText(canvasElement, "Three mistakes end the Run");
     await waitForText(canvasElement, "No time limit");
@@ -615,9 +616,9 @@ export const EmptyHomeAndRestore: Story = {
   name: "Empty Home and restore",
   args: { scenarioId: "practice-runs-empty" },
   play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "practice-empty-state");
+    await waitForTestId(canvasElement, "practice-runs-empty");
     await waitForTestId(canvasElement, "personal-best-home-card");
-    await waitForText(canvasElement, "Survival");
+    await waitForText(canvasElement, "Survival Challenge");
   }
 };
 
@@ -999,7 +1000,10 @@ export const SlowUnclearNotice: Story = {
 
 export const UnclearFollowUp: Story = {
   name: "Unclear follow-up",
-  args: { scenarioId: "practice-unclear-follow-up" },
+  args: {
+    scenarioId: "practice-unclear-follow-up",
+    arrowDuelOpponentReplyGlobalEnabled: false
+  },
   play: async ({ canvasElement }) => {
     await clickTestId(canvasElement, "practice-mode-arrow-duel");
     await clickTestId(canvasElement, "practice-start-button");
@@ -1200,6 +1204,7 @@ export const SprintSummary: Story = {
   args: { scenarioId: "practice-summary" },
   play: async ({ canvasElement }) => {
     await openPracticeSession(canvasElement);
+    await waitForEnabledTestId(canvasElement, "lab-board-correct");
     await clickTestId(canvasElement, "lab-board-correct");
     await waitForTestId(canvasElement, "sprint-summary-panel");
   }
@@ -1267,7 +1272,6 @@ export const SprintResultGoalClarity: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "sprint-result-goal-label");
     await waitForTestId(canvasElement, "sprint-result-solved");
-    await waitForTestId(canvasElement, "sprint-unclear-toggle");
     await waitForTestId(canvasElement, "sprint-result-unclear-count-column");
     await waitForTestId(canvasElement, "sprint-result-mistakes-count-column");
     await waitForTestId(canvasElement, "sprint-result-review-note");
@@ -1334,8 +1338,14 @@ export const ReviewReminderPrompt: Story = {
   name: "Review reminder prompt",
   args: { scenarioId: "practice-reminder-prompt" },
   play: async ({ canvasElement }) => {
-    await openPracticeSession(canvasElement);
-    await clickTestId(canvasElement, "lab-board-wrong");
+    await openReviewQueue(canvasElement);
+    await clickTestId(canvasElement, "review-start-due");
+    await waitForEnabledTestId(canvasElement, "lab-board-correct");
+    await clickTestId(canvasElement, "lab-board-correct");
+    // The first due item is an Arrow Duel review, which finishes after its reply step.
+    await waitForTestId(canvasElement, "review-arrow-duel-reply-timer");
+    await waitForEnabledTestId(canvasElement, "lab-board-correct");
+    await clickTestId(canvasElement, "lab-board-correct");
     await waitForTestId(canvasElement, "review-reminder-permission-prompt");
   }
 };

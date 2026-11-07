@@ -10,13 +10,21 @@ import {
 } from "./labBrowser.ts";
 
 // Headless render smoke: loads every registered product-clone scenario once from the built
-// storybook-static and fails, naming the scenario, when it throws while rendering. Pixel
-// comparison lives in visual-regression.ts and is not a CI gate.
+// storybook-static and fails, naming the scenario, when it throws while rendering or when its
+// `play` assertions fail. Pixel comparison lives in visual-regression.ts and is not a CI gate.
 // Usage: render-smoke [--concurrency N] [--only <story-id substring>] [--static-dir dir]
 
 const staticDir = fileURLToPath(new URL("../storybook-static", import.meta.url));
 const VIEWPORT = { width: 402, height: 874 };
 const SETTLE_MS = 300;
+
+// Scenarios whose play assertions are known to be stale and are being rewritten elsewhere.
+// They are reported as warnings instead of failures. Remove an entry when its work lands.
+const KNOWN_STALE_PLAY: Record<string, string> = {
+  "practice--arrow-duel-guide": "first-use guide stories, rewritten by #611",
+  "practice--arrow-duel-guide-only": "first-use guide stories, rewritten by #611",
+  "practice--tactical-focus-guide": "first-use guide stories, rewritten by #611"
+};
 
 // Console noise that is not a render failure: a missing favicon or other static asset.
 const BENIGN_CONSOLE_ERROR = /Failed to load resource/;
@@ -60,16 +68,23 @@ try {
 }
 
 const seconds = ((Date.now() - started) / 1000).toFixed(1);
-if (playFailures.size > 0) {
-  // The scenario rendered but its `play` interaction script failed an assertion. That is a
-  // stale or broken interaction check, not a render throw, so it is reported but not gated.
-  console.warn(`\nWarning: ${playFailures.size} scenario(s) rendered but their play function failed:`);
-  for (const [storyId, message] of [...playFailures].sort(([a], [b]) => a.localeCompare(b))) {
-    console.warn(`  ${storyId}: ${message.split("\n")[0]}`);
+for (const storyId of Object.keys(KNOWN_STALE_PLAY)) {
+  if (registered.includes(storyId) && indexed.has(storyId) && !playFailures.has(storyId)) {
+    console.warn(`Note: ${storyId} now passes its play function; remove it from KNOWN_STALE_PLAY.`);
+  }
+}
+const knownStale = [...playFailures].filter(([storyId]) => storyId in KNOWN_STALE_PLAY);
+for (const [storyId, message] of playFailures) {
+  if (!(storyId in KNOWN_STALE_PLAY)) fail(storyId, `play function failed: ${message}`);
+}
+if (knownStale.length > 0) {
+  console.warn(`\nWarning: ${knownStale.length} scenario(s) have a known-stale play function (not gated):`);
+  for (const [storyId, message] of knownStale.sort(([a], [b]) => a.localeCompare(b))) {
+    console.warn(`  ${storyId} (${KNOWN_STALE_PLAY[storyId]}): ${message.split("\n")[0]}`);
   }
 }
 if (failures.size > 0) {
-  console.error(`\nRender smoke FAILED: ${failures.size} of ${registered.length} scenario(s) did not render.`);
+  console.error(`\nRender smoke FAILED: ${failures.size} of ${registered.length} scenario(s) failed.`);
   for (const [storyId, reasons] of [...failures].sort(([a], [b]) => a.localeCompare(b))) {
     console.error(`  ${storyId}`);
     for (const reason of reasons) console.error(`    ${reason}`);
@@ -77,7 +92,7 @@ if (failures.size > 0) {
   console.error(`(${seconds}s)`);
   process.exit(1);
 }
-console.log(`Render smoke passed: ${registered.length} scenarios rendered with no errors (${seconds}s).`);
+console.log(`Render smoke passed: ${registered.length} scenarios rendered and passed their play functions (${seconds}s).`);
 
 async function renderOnce(
   browser: Browser,
