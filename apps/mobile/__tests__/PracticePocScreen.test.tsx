@@ -2214,7 +2214,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("uses the only recommended Arrow Duel family and shows returning users the dedicated Focused Run guide", () => {
-    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    jest.setSystemTime(new Date(ARROW_PROFILE_FIXTURE_NOW));
     const service = createArrowFocusedPracticeService();
     service.saveSettings({
       ...service.getSettings(),
@@ -2282,7 +2282,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("maps two production task-family recommendations to one explicit Home lead", () => {
-    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    jest.setSystemTime(new Date(ARROW_PROFILE_FIXTURE_NOW));
     const practiceService = createDualFamilyFocusedPracticeService();
     expect(
       practiceService.getTacticalProfileSnapshot()?.homeLeadSignalId
@@ -2317,7 +2317,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("keeps watch-only evidence visible in both task-family lanes", () => {
-    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    jest.setSystemTime(new Date(ARROW_PROFILE_FIXTURE_NOW));
     const watchOnlyCalibration = {
       ...COMPONENT_TACTICAL_PROFILE_CALIBRATION,
       evidence: {
@@ -2346,7 +2346,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("keeps an explicitly selected watch lane visible beside a recommendation", () => {
-    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    jest.setSystemTime(new Date(ARROW_PROFILE_FIXTURE_NOW));
     const mixedStatusCalibration = {
       ...COMPONENT_TACTICAL_PROFILE_CALIBRATION,
       evidence: {
@@ -2378,7 +2378,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("opens a cached production Tactical Profile without reading full history or exact inventory", () => {
-    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    jest.setSystemTime(new Date(ARROW_PROFILE_FIXTURE_NOW));
     let store: MemoryStore | undefined;
     const practiceService = createArrowFocusedPracticeService(
       true,
@@ -2424,7 +2424,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("withholds the public Preview CTA after a Focused Run until newer mixed evidence", () => {
-    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    jest.setSystemTime(new Date(ARROW_PROFILE_FIXTURE_NOW));
     let store: MemoryStore | undefined;
     const practiceService = createArrowFocusedPracticeService(
       true,
@@ -2458,7 +2458,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("keeps a production-service focus visible while withholding an inventory-blocked Run", () => {
-    jest.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
+    jest.setSystemTime(new Date(ARROW_PROFILE_FIXTURE_NOW));
     const renderer = renderScreen({
       practiceService: createArrowFocusedPracticeService(false)
     });
@@ -4488,6 +4488,7 @@ describe("PracticePocScreen", () => {
   });
 
   it("renders the current model weakness and weekly evidence in production History", async () => {
+    jest.setSystemTime(new Date(ARROW_PROFILE_FIXTURE_NOW));
     const renderer = renderScreen({
       practiceService: createArrowFocusedPracticeService()
     });
@@ -16985,6 +16986,11 @@ function firstArrowDuelPuzzleForTest(): ArrowDuelState {
   });
   return requireArrowDuelState(state);
 }
+
+// The Arrow Duel Profile fixture records evidence on fixed July 2026 days.
+// Tests that read it against the wall clock pin the clock here so the
+// evidence never ages out of recency windows such as History's eight weeks.
+const ARROW_PROFILE_FIXTURE_NOW = "2026-07-25T00:00:00.000Z";
 
 function createArrowFocusedPracticeService(
   inventoryAvailable = true,
