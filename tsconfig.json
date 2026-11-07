@@ -11,5 +11,7 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["apps/**/*.ts", "packages/**/*.ts", "types/**/*.d.ts"]
+  "include": ["apps/**/*.ts", "packages/**/*.ts", "types/**/*.d.ts"],
+  // Typechecked by apps/mobile-lab; its Playwright and sharp types conflict with node:sqlite types here.
+  "exclude": ["apps/mobile-lab/scripts/visual-regression.ts"]
 }
