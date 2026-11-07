@@ -40,6 +40,16 @@ of the research specification for the rationale. A future calibrated
 artifact may omit `personalBaseline` and fit the family intercept from the
 representative corpus instead.
 
+The provisional artifact retains a recommendation until its confidence falls
+below 0.80, not the policy's predeclared 0.85 (issue #616). With 0.85, planted
+weaknesses whose true size never changed exited at confidences between 0.77
+and 0.85 and re-entered a few Runs later. No exit was caused by the impact,
+practical-multiplier, or diversity gates. Entry stays at 0.90. The exit
+threshold is applied at query time only, so derived cells and the
+calibration identity are unchanged. Like the solve-theme priors, this
+provisional value differs from `artifactParameters` in the predeclared policy,
+which governs a future calibrated artifact.
+
 ## Simulated-player diagnostics
 
 `packages/storage/src/simulation/` contains a deterministic, seeded simulated

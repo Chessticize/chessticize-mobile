@@ -11,7 +11,11 @@ import {
   playActiveRun,
   type SimulatedPlayerProfile
 } from "../src/simulation/simulated-player.ts";
-import { playHistory, signalStatus } from "./simulation-fixtures.ts";
+import {
+  SHIPPED_RECOMMENDATION_EXIT_PROBABILITY,
+  playHistory,
+  signalStatus
+} from "./simulation-fixtures.ts";
 
 test("an improved player's speed recommendation exits through hysteresis without flickering", (t) => {
   const exits: number[] = [];
@@ -47,11 +51,38 @@ test("an improved player's speed recommendation exits through hysteresis without
     for (const record of history.records.slice(firstRecommended, lastRecommended + 1)) {
       const fork = record.signals.find((signal) => signal.id === "line:fork");
       assert.ok(fork);
-      assert.ok(Math.max(fork.speedConfidence, fork.solveConfidence) >= 0.85);
+      assert.ok(
+        Math.max(fork.speedConfidence, fork.solveConfidence) >=
+          SHIPPED_RECOMMENDATION_EXIT_PROBABILITY
+      );
     }
     exits.push(lastRecommended + 1);
   }
   t.diagnostic(`last recommended Run: ${exits.join(", ")}`);
+});
+
+// #616 item 1. Seed 2 is a recorded case: with an exit threshold of 0.85, the
+// planted weakness's posterior dipped to about 0.846 while the true weakness
+// was unchanged, exited, and re-entered five Runs later.
+test("a constant planted solve weakness never leaves and re-enters recommendation", (t) => {
+  const history = playHistory({
+    player: {
+      ...BALANCED_SIMULATED_PLAYER,
+      themeSolveLogitOffsets: { fork: -1.4 }
+    },
+    seed: "solve:fork:arrow_duel:2",
+    plan: { runs: 40, arrowDuelShare: 1 }
+  });
+  history.world.close();
+  const statuses = history.records.map((record) => signalStatus(record, "arrow_duel:fork"));
+  const first = statuses.indexOf("recommended");
+  const last = statuses.lastIndexOf("recommended");
+  t.diagnostic(statuses.map((status) => status[0]).join(""));
+  assert.ok(first >= 0, "the planted Arrow Duel fork weakness is detected");
+  assert.ok(
+    statuses.slice(first, last + 1).every((status) => status === "recommended"),
+    `recommendation flapped: ${statuses.join(",")}`
+  );
 });
 
 test("a recommendation leads to a Focused Run that records every attempt without becoming evidence", () => {

@@ -24,6 +24,11 @@ const packSlice = readJson<Puzzle[]>("fixtures/puzzles/bundled-core-pack.json");
 const manifest = readJson<PuzzlePackManifest>("fixtures/puzzles/bundled-core-pack.manifest.json");
 const shippedCalibration = readJson<unknown>("config/tactical-profile-calibration-artifact-v1.json");
 
+/** The shipped artifact's recommendation exit threshold. */
+export const SHIPPED_RECOMMENDATION_EXIT_PROBABILITY = (
+  shippedCalibration as { evidence: { recommendationExitProbability: number } }
+).evidence.recommendationExitProbability;
+
 export const SIMULATION_START = "2026-06-01T00:00:00.000Z";
 
 export function createSliceWorld(): SimulationWorld {
