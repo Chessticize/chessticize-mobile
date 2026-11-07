@@ -52,6 +52,10 @@ Run focused component tests and headless `pnpm mobile:lab:validate` when Lab
 inputs change. Native checks are selected by `docs/TESTING_ARCHITECTURE.md`, not
 by whether the UI has received final user acceptance.
 
+For refactors that must not change the UI, run `pnpm mobile:lab:visual`
+(see the Lab README) against a baseline from `main` and attach its summary to
+the PR as no-visual-change evidence.
+
 A requested Storybook handoff includes the branch, PR and hosted preview unless
 the user gives a narrower scope. Follow `docs/STORYBOOK_DEPLOYMENT.md` for the
 GitHub Actions-managed branch Vercel preview, source identity and public access.

@@ -58,6 +58,35 @@ does not fetch the LFS puzzle pack. See
 [`docs/STORYBOOK_DEPLOYMENT.md`](../../docs/STORYBOOK_DEPLOYMENT.md) for the
 one-time account setup and deployment runbook.
 
+## Visual regression
+
+`pnpm mobile:lab:visual` pixel-diffs every registry scenario between a baseline
+build and the current checkout. It builds `storybook-static`, serves it locally,
+screenshots each scenario in a headless browser at phone portrait, phone
+landscape and regular width. Each scenario is loaded twice and sampled several
+times; screen regions that differ between samples (running timers, spinners) are
+ignored, and the summary names scenarios where more than a quarter of the screen
+was ignored. Use it as the no-visual-change evidence for refactors and to review
+intended changes.
+
+```sh
+pnpm mobile:lab:visual baseline --ref origin/main   # build and capture the baseline from a ref
+pnpm mobile:lab:visual compare                      # build and capture this checkout, then diff
+```
+
+The summary lists scenarios compared, changed, added and removed, and exits
+non-zero when anything differs. Diff images (changed pixels in red) and
+`summary.json` are written under `scratch/visual-regression/`, which is
+git-ignored along with the baseline and current captures. Options:
+`--viewports phonePortrait,regularWidth`, `--only <story-id substring>`,
+`--skip-build`, `--concurrency N`, and `--out <dir>`. Omit `--ref` to capture
+the baseline from the current checkout.
+
+The tool uses Playwright's Chromium when installed
+(`pnpm exec playwright-core install chromium-headless-shell` from `apps/mobile-lab`)
+and otherwise falls back to installed Google Chrome. Capture baseline and
+comparison on the same machine and browser.
+
 ## Browser boundaries
 
 - `react-native-chessboard` resolves to `BoardPlaceholder.tsx`. It preserves the requested board geometry, displays FEN/orientation/input-lock state, implements `move`, `resetBoard`, and `getState`, and exposes conspicuous **LAB ONLY** controls for correct, wrong, and complete-puzzle transitions.
