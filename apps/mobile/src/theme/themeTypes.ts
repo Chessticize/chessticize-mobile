@@ -90,6 +90,11 @@ export type BoardColors = {
   promotionBorder: string;
   promotionShadow: string;
   promotionPieceBorder: string;
+  // Coordinate labels drawn over the squares, with their legibility halo.
+  coordinateOnLightSquare: string;
+  coordinateOnDarkSquare: string;
+  coordinateHaloOnLightSquare: string;
+  coordinateHaloOnDarkSquare: string;
 };
 
 export type ThemeColors = {
@@ -106,7 +111,6 @@ export type ThemeColors = {
   glass: string;
   glassStrong: string;
   veil: string;
-  halo: string;
   scrim: string;
   scrimSoft: string;
   scrimStrong: string;
@@ -142,6 +146,12 @@ export type ThemeColors = {
     warningStrong: string;
   };
   board: BoardColors;
+  // Loading screen shown before the app UI is ready; matches the native launch screen.
+  launch: {
+    background: string;
+    title: string;
+    detail: string;
+  };
   // Stage drawn while the predictive-back preview is shown.
   backGesture: {
     stage: string;
@@ -242,6 +252,8 @@ export type ThemeElevation = {
     resting: string;
   };
 };
+
+export type AppearancePreference = "system" | "light" | "dark";
 
 export type Theme = {
   name: "light" | "dark";

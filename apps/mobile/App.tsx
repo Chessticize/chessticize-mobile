@@ -1,5 +1,5 @@
 import React from "react";
-import { LogBox, Platform, StyleSheet, Text, View } from "react-native";
+import { LogBox, Platform, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { PracticePocScreen } from "./src/components/PracticePocScreen";
 import { mobilePlatformCapabilityFactoryFor } from "./src/platform/nativeMobilePlatformCapabilities";
@@ -21,7 +21,7 @@ import {
 } from "./src/testing/appStoreMarketingCapture";
 import { shouldSuppressLogBoxWarnings } from "./src/releaseConfig";
 import { createMobileSystemBackSource } from "./src/navigation/mobileSystemBack";
-import { ThemeProvider } from "./src/theme";
+import { makeStyles, ThemeProvider, type AppearancePreference } from "./src/theme";
 
 enableTestControlsFromLaunchConfig();
 
@@ -43,6 +43,14 @@ function App() {
     )
   );
   const { marketingCaptureFixture, platformCapabilities } = platformState;
+  const [appearance, setAppearance] = React.useState<AppearancePreference>(
+    () => platformCapabilities?.storage.practiceService.getSettings().appearance ?? "system"
+  );
+  React.useEffect(() => {
+    if (platformCapabilities) {
+      setAppearance(platformCapabilities.storage.practiceService.getSettings().appearance);
+    }
+  }, [platformCapabilities]);
   const [loadError, setLoadError] = React.useState<string | undefined>(undefined);
   const testNowMs = resolveTestNowMsFromLaunchConfig();
   const arrowDuelTargetCorrect = resolveTestArrowDuelTargetCorrectFromLaunchConfig();
@@ -82,7 +90,7 @@ function App() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
+      <ThemeProvider appearance={appearance} onAppearanceChange={setAppearance}>
         {platformCapabilities ? (
           <PracticePocScreen
             platformCapabilities={platformCapabilities}
@@ -104,12 +112,7 @@ function App() {
             themeCatalogPresentation={marketingCaptureFixture?.themeCatalogPresentation}
           />
         ) : (
-          <View style={styles.loadingRoot}>
-            <Text style={styles.loadingTitle} testID={loadError ? "puzzle-pack-load-error" : "puzzle-pack-loading"}>
-              {loadError ? "Puzzle pack unavailable" : "Loading puzzle pack"}
-            </Text>
-            {loadError ? <Text style={styles.loadingDetail}>{loadError}</Text> : null}
-          </View>
+          <LoadingScreen loadError={loadError} />
         )}
       </ThemeProvider>
     </SafeAreaProvider>
@@ -141,25 +144,37 @@ function preparePlatformState(
   };
 }
 
-const styles = StyleSheet.create({
+function LoadingScreen({ loadError }: { loadError: string | undefined }): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <View style={styles.loadingRoot}>
+      <Text style={styles.loadingTitle} testID={loadError ? "puzzle-pack-load-error" : "puzzle-pack-loading"}>
+        {loadError ? "Puzzle pack unavailable" : "Loading puzzle pack"}
+      </Text>
+      {loadError ? <Text style={styles.loadingDetail}>{loadError}</Text> : null}
+    </View>
+  );
+}
+
+const useStyles = makeStyles((theme) => ({
   loadingRoot: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
-    backgroundColor: "#F7F7F2"
+    backgroundColor: theme.colors.launch.background
   },
   loadingTitle: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#1D201F"
+    color: theme.colors.launch.title
   },
   loadingDetail: {
     marginTop: 8,
     fontSize: 13,
-    color: "#6B6258",
+    color: theme.colors.launch.detail,
     textAlign: "center"
   }
-});
+}));
 
 export default App;

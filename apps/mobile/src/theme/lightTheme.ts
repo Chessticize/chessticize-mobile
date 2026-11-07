@@ -14,7 +14,6 @@ const colors: ThemeColors = {
   glass: "rgba(255, 255, 255, 0.66)",
   glassStrong: "rgba(255, 255, 255, 0.94)",
   veil: "rgba(248, 250, 252, 0.92)",
-  halo: "rgba(248, 250, 252, 0.85)",
   scrim: "rgba(15, 23, 42, 0.55)",
   scrimSoft: "rgba(15, 23, 42, 0.48)",
   scrimStrong: "rgba(15, 23, 42, 0.90)",
@@ -114,7 +113,16 @@ const colors: ThemeColors = {
     promotionContainer: "#F8FAFC",
     promotionBorder: "#D8E0E8",
     promotionShadow: "#000",
-    promotionPieceBorder: "#CBD5E1"
+    promotionPieceBorder: "#CBD5E1",
+    coordinateOnLightSquare: "#334155",
+    coordinateOnDarkSquare: "#F8FAFC",
+    coordinateHaloOnLightSquare: "rgba(248, 250, 252, 0.85)",
+    coordinateHaloOnDarkSquare: "rgba(15, 23, 42, 0.55)"
+  },
+  launch: {
+    background: "#F7F7F2",
+    title: "#1D201F",
+    detail: "#6B6258"
   },
   backGesture: {
     stage: "#DCE7F5",

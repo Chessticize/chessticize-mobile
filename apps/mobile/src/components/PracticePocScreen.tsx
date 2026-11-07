@@ -309,7 +309,7 @@ export type {
   HistoryWeaknessEffect,
   HistoryStrengthSeries
 } from "./historyProgressPresentation.ts";
-import { makeStyles, useTheme, type Theme } from "../theme/index.ts";
+import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -1105,6 +1105,10 @@ export function PracticePocScreen({
   const [moveFeedbackPreferences, setMoveFeedbackPreferences] = useState<MoveFeedbackPreferences>(
     () => service.getSettings().moveFeedback
   );
+  const [appearance, setAppearancePreference] = useState<AppearancePreference>(
+    () => service.getSettings().appearance
+  );
+  const { setAppearance } = useAppearance();
   const [, setSettingsRevision] = useState(0);
   const internalRunManagement = usePracticeRunManagement({
     enabled: runManagementEnabled && runManagementPresentation === undefined,
@@ -1744,6 +1748,15 @@ export function PracticePocScreen({
     });
     setMoveFeedbackPreferences(saved.moveFeedback);
     setSettingsRevision((current) => current + 1);
+  }
+
+  function saveAppearance(next: AppearancePreference): void {
+    const saved = service.saveSettings({
+      ...service.getSettings(),
+      appearance: next
+    });
+    setAppearancePreference(saved.appearance);
+    setAppearance(saved.appearance);
   }
 
   function playCommittedMoveFeedback(
@@ -5761,6 +5774,7 @@ export function PracticePocScreen({
                 iCloudSyncInProgress={iCloudSyncInProgress}
                 iCloudSyncStatus={iCloudSyncErrorDetails ? "iCloud sync failed" : iCloudSyncStatus}
                 iCloudSyncSupportBundle={effectiveSupportBundle}
+                appearance={appearance}
                 moveFeedbackPreferences={moveFeedbackPreferences}
                 moveFeedbackPreviewer={moveFeedbackSettings?.preview}
                 showSprintGuideReset={
@@ -5769,6 +5783,7 @@ export function PracticePocScreen({
                 }
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
                 onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
+                onAppearanceChange={saveAppearance}
                 onMoveFeedbackPreferencesChange={saveMoveFeedbackPreferences}
                 onOpenNotificationSettings={openReviewReminderSystemSettings}
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
@@ -15620,6 +15635,7 @@ function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
 function SettingsPanel({
   advancedRatingsOpen,
   adaptiveLayout,
+  appearance,
   applicationMetadata,
   arrowDuelOpponentReplyGlobalSetting,
   captureBottomInset,
@@ -15642,6 +15658,7 @@ function SettingsPanel({
   moveFeedbackPreferences,
   moveFeedbackPreviewer,
   notificationPermissionStatus,
+  onAppearanceChange,
   onMoveFeedbackPreferencesChange,
   reminderPlatform,
   ratings,
@@ -15675,9 +15692,11 @@ function SettingsPanel({
   iCloudSyncInProgress: boolean;
   iCloudSyncStatus: string;
   iCloudSyncSupportBundle?: ICloudSyncSupportBundlePresentation;
+  appearance: AppearancePreference;
   moveFeedbackPreferences: MoveFeedbackPreferences;
   moveFeedbackPreviewer?: MoveFeedbackPreviewer;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
+  onAppearanceChange: (appearance: AppearancePreference) => void;
   onMoveFeedbackPreferencesChange: (preferences: MoveFeedbackPreferences) => void;
   reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"];
   ratings: Array<{ label: string; record: RatingRecord }>;
@@ -15890,6 +15909,33 @@ function SettingsPanel({
           onPreferencesChange={onMoveFeedbackPreferencesChange}
           onPreview={moveFeedbackPreviewer}
         />
+      </SettingsSection>
+
+      <SettingsSection
+        title="Appearance"
+        testID="settings-appearance-section"
+        wide={adaptiveLayout.usesWideContent}
+      >
+        <View style={styles.settingsInlineControls} testID="settings-appearance-options">
+          <SettingsPreferenceButton
+            active={appearance === "system"}
+            label="System"
+            testID="settings-appearance-system"
+            onPress={() => onAppearanceChange("system")}
+          />
+          <SettingsPreferenceButton
+            active={appearance === "light"}
+            label="Light"
+            testID="settings-appearance-light"
+            onPress={() => onAppearanceChange("light")}
+          />
+          <SettingsPreferenceButton
+            active={appearance === "dark"}
+            label="Dark"
+            testID="settings-appearance-dark"
+            onPress={() => onAppearanceChange("dark")}
+          />
+        </View>
       </SettingsSection>
 
       {showRatingControls ? (
@@ -19415,12 +19461,12 @@ const useStyles = makeStyles((theme) => ({
     width: 16
   },
   coordinateTextOnLight: {
-    color: theme.colors.text.strong,
-    textShadowColor: theme.colors.halo
+    color: theme.colors.board.coordinateOnLightSquare,
+    textShadowColor: theme.colors.board.coordinateHaloOnLightSquare
   },
   coordinateTextOnDark: {
-    color: theme.colors.surfaceRaised,
-    textShadowColor: theme.colors.scrim
+    color: theme.colors.board.coordinateOnDarkSquare,
+    textShadowColor: theme.colors.board.coordinateHaloOnDarkSquare
   },
   promptPanel: {
     alignItems: "center",

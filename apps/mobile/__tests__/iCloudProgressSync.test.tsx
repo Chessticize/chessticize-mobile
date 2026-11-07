@@ -305,6 +305,7 @@ function sampleSnapshot(): ProgressSyncSnapshot {
     data: {
       schemaVersion: 1,
       settings: {
+        appearance: "system",
         arrowDuel: {
           opponentReplyEnabled: true
         },
