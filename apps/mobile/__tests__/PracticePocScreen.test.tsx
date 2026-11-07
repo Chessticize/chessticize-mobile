@@ -5,6 +5,7 @@ import { AppState } from "react-native";
 import * as ReactNative from "react-native";
 import * as SafeAreaContext from "react-native-safe-area-context";
 import TestRenderer, { act } from "react-test-renderer";
+import { ThemeProvider } from "../src/theme";
 import {
   isAppReviewRequestSurfaceBlocked,
   PracticePocScreen,
@@ -3405,6 +3406,36 @@ describe("PracticePocScreen", () => {
 
     expect(() => findByTestId(renderer, "practice-run-arrow-duel-reply-setting")).toThrow();
     expect(findByTestId(renderer, "practice-run-puzzle-timing")).toBeTruthy();
+  });
+
+  it("saves the appearance override from Settings and tells the theme provider", () => {
+    const platformCapabilities = createTestMobilePlatformCapabilities();
+    const service = platformCapabilities.storage.practiceService;
+    const onAppearanceChange = jest.fn();
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    act(() => {
+      renderer = TestRenderer.create(
+        <ThemeProvider appearance="system" onAppearanceChange={onAppearanceChange}>
+          <PracticePocScreen platformCapabilities={platformCapabilities} />
+        </ThemeProvider>
+      );
+    });
+    renderers.push(renderer!);
+
+    press(renderer!, "settings-tab");
+    expect(service.getSettings().appearance).toBe("system");
+
+    press(renderer!, "settings-appearance-dark");
+    expect(service.getSettings().appearance).toBe("dark");
+    expect(onAppearanceChange).toHaveBeenLastCalledWith("dark");
+
+    press(renderer!, "settings-appearance-light");
+    expect(service.getSettings().appearance).toBe("light");
+    expect(onAppearanceChange).toHaveBeenLastCalledWith("light");
+
+    press(renderer!, "settings-appearance-system");
+    expect(service.getSettings().appearance).toBe("system");
+    expect(onAppearanceChange).toHaveBeenLastCalledWith("system");
   });
 
   it("explains the visible global on and off behavior before saved Run preferences", () => {
