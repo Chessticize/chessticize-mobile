@@ -55,6 +55,7 @@
     "mobile:lab:typecheck": "pnpm --filter ChessticizeMobileLab typecheck",
     "mobile:lab:test": "pnpm --filter ChessticizeMobileLab test",
     "mobile:lab:check-markers": "pnpm --filter ChessticizeMobileLab check:new-scenarios",
+    "mobile:lab:visual": "pnpm --filter ChessticizeMobileLab visual",
     "mobile:lab:validate": "pnpm --filter ChessticizeMobileLab validate",
     "mobile:doctor:ios": "pnpm --filter ChessticizeMobile doctor:ios",
     "mobile:doctor:android": "pnpm --filter ChessticizeMobile doctor:android",

@@ -6,6 +6,7 @@ import {
   Text,
   View
 } from "react-native";
+import { makeStyles } from "../theme/index.ts";
 import type {
   TacticalFocusReason,
   TacticalProfileTaskFamily
@@ -29,6 +30,7 @@ export function HistoryProgressEntryButton({
 }: {
   onPress: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityLabel="Open tactical progress"
@@ -53,6 +55,7 @@ export function HistoryProgressScreen({
   onBack: () => void;
   presentation: HistoryProgressPresentation;
 }): React.JSX.Element {
+  const styles = useStyles();
   const [selectedSeriesId, setSelectedSeriesId] = useState(
     presentation.initialSeriesId
   );
@@ -288,6 +291,7 @@ function HistoryTaskFamilySelector({
   onSelect: (taskFamily: TacticalProfileTaskFamily) => void;
   taskFamilies: readonly TacticalProfileTaskFamily[];
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessibilityLabel="Choose progress mode"
@@ -332,6 +336,7 @@ function ProgressMetricSelector({
   selectedSeriesId: string;
   series: readonly HistoryStrengthSeries[];
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessibilityLabel="Progress metric"
@@ -384,6 +389,7 @@ function StrengthTrendChart({
   sampleUnitLabel: string;
   series: HistoryStrengthSeries;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessibilityLabel={`${series.label} ${series.metricLabel}. ${series.points
@@ -444,6 +450,7 @@ function WeaknessCard({
 }: {
   weakness: HistoryProgressWeakness;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.weaknessCard} testID="history-clear-weakness">
       <View style={styles.sectionHeader}>
@@ -491,6 +498,7 @@ function ModelSignalPill({
   kind: TacticalFocusReason;
   weakness?: boolean;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={[styles.signalPill, weakness ? styles.signalPillWeakness : null]}>
       <Text
@@ -531,6 +539,7 @@ function progressMetricNoteTitle(
 }
 
 function ProgressGlyph(): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View accessibilityElementsHidden style={styles.glyph}>
       <View style={[styles.glyphBar, styles.glyphBarShort]} />
@@ -545,7 +554,7 @@ const TASK_FAMILY_LABELS = {
   arrow_duel: "Arrow Duel"
 } satisfies Record<TacticalProfileTaskFamily, string>;
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((theme) => ({
   screen: {
     gap: 16,
     width: "100%"
@@ -564,12 +573,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6
   },
   backArrow: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 28,
     lineHeight: 28
   },
   backLabel: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 15,
     fontWeight: "700"
   },
@@ -577,21 +586,21 @@ const styles = StyleSheet.create({
     gap: 3
   },
   title: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 28,
     fontWeight: "800",
     letterSpacing: -0.5
   },
   subtitle: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 13,
     lineHeight: 19
   },
   earlyEstimate: {
     alignSelf: "flex-start",
-    backgroundColor: "#FEF3C7",
+    backgroundColor: theme.colors.warning.s100,
     borderRadius: 999,
-    color: "#92400E",
+    color: theme.colors.warning.s800,
     fontSize: 10,
     fontWeight: "800",
     marginTop: 3,
@@ -601,8 +610,8 @@ const styles = StyleSheet.create({
   },
   entryButton: {
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s200,
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: "row",
@@ -611,7 +620,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11
   },
   entryButtonText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 13,
     fontWeight: "800"
   },
@@ -625,7 +634,7 @@ const styles = StyleSheet.create({
     height: 15
   },
   glyphBar: {
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 2,
     width: 3
   },
@@ -639,8 +648,8 @@ const styles = StyleSheet.create({
     height: 15
   },
   section: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 18,
     borderWidth: 1,
     gap: 13,
@@ -658,21 +667,21 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   eyebrow: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0.8,
     textTransform: "uppercase"
   },
   weaknessEyebrow: {
-    color: "#B45309",
+    color: theme.colors.warning.s700,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0.8,
     textTransform: "uppercase"
   },
   sectionTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 20,
     fontWeight: "800",
     lineHeight: 25
@@ -681,7 +690,7 @@ const styles = StyleSheet.create({
     gap: 10
   },
   taskFamilySelector: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceStrong,
     borderRadius: 16,
     flexDirection: "row",
     gap: 4,
@@ -697,23 +706,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8
   },
   taskFamilyTabSelected: {
-    backgroundColor: "#FFFFFF"
+    backgroundColor: theme.colors.surface
   },
   taskFamilyTabTitle: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 13,
     fontWeight: "800"
   },
   taskFamilyTabTitleSelected: {
-    color: "#0F172A"
+    color: theme.colors.text.primary
   },
   progressMetricSelector: {
     flexDirection: "row",
     gap: 10
   },
   progressMetricCard: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 14,
     borderWidth: 1,
     flex: 1,
@@ -723,30 +732,30 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   progressMetricCardSelected: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#60A5FA"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s400
   },
   progressMetricCardLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "700"
   },
   progressMetricCardLabelSelected: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   progressMetricCardValue: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 20,
     fontWeight: "800",
     lineHeight: 24
   },
   progressMetricCardValueSelected: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   signalPill: {
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s200,
     borderRadius: 999,
     borderWidth: 1,
     justifyContent: "center",
@@ -754,72 +763,72 @@ const styles = StyleSheet.create({
     paddingVertical: 5
   },
   signalPillWeakness: {
-    backgroundColor: "#FEF3C7",
-    borderColor: "#FCD34D",
+    backgroundColor: theme.colors.warning.s100,
+    borderColor: theme.colors.warning.s300,
     maxWidth: 142
   },
   signalPillText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 10,
     fontWeight: "800",
     lineHeight: 13,
     textAlign: "center"
   },
   signalPillTextUnselected: {
-    color: "#64748B"
+    color: theme.colors.text.tertiary
   },
   signalPillTextWeakness: {
-    color: "#92400E"
+    color: theme.colors.warning.s800
   },
   changePill: {
-    backgroundColor: "#DCFCE7",
+    backgroundColor: theme.colors.positive.s100,
     borderRadius: 999,
     paddingHorizontal: 9,
     paddingVertical: 5
   },
   changePillText: {
-    color: "#15803D",
+    color: theme.colors.positive.s700,
     fontSize: 11,
     fontWeight: "800"
   },
   changePillSteady: {
-    backgroundColor: "#F1F5F9"
+    backgroundColor: theme.colors.surfaceSunken
   },
   changePillWorsened: {
-    backgroundColor: "#FEE2E2"
+    backgroundColor: theme.colors.danger.s100
   },
   changePillTextSteady: {
-    color: "#475569"
+    color: theme.colors.text.secondary
   },
   changePillTextWorsened: {
-    color: "#B91C1C"
+    color: theme.colors.danger.s700
   },
   selectorRow: {
     flexDirection: "row",
     gap: 8
   },
   selector: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 7
   },
   selectorSelected: {
-    backgroundColor: "#DBEAFE",
-    borderColor: "#60A5FA"
+    backgroundColor: theme.colors.accent.s100,
+    borderColor: theme.colors.accent.s400
   },
   selectorText: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 12,
     fontWeight: "700"
   },
   selectorTextSelected: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   metricLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     flex: 1,
     fontSize: 12,
     fontWeight: "700"
@@ -837,7 +846,7 @@ const styles = StyleSheet.create({
     position: "relative"
   },
   chartGuideTop: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceStrong,
     height: StyleSheet.hairlineWidth,
     left: 0,
     position: "absolute",
@@ -845,7 +854,7 @@ const styles = StyleSheet.create({
     top: 34
   },
   chartGuideMiddle: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceStrong,
     height: StyleSheet.hairlineWidth,
     left: 0,
     position: "absolute",
@@ -867,12 +876,12 @@ const styles = StyleSheet.create({
     minWidth: 28
   },
   chartValue: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 10,
     fontWeight: "800"
   },
   chartBarTrack: {
-    backgroundColor: "#EFF6FF",
+    backgroundColor: theme.colors.accent.s50,
     borderRadius: 6,
     height: 112,
     justifyContent: "flex-end",
@@ -880,51 +889,51 @@ const styles = StyleSheet.create({
     width: "72%"
   },
   chartBar: {
-    backgroundColor: "#3B82F6",
+    backgroundColor: theme.colors.accent.s500,
     borderRadius: 6,
     minHeight: 8,
     width: "100%"
   },
   chartBarUnavailable: {
-    backgroundColor: "#CBD5E1"
+    backgroundColor: theme.colors.fillMuted
   },
   chartLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 9,
     textAlign: "center",
     width: "100%"
   },
   chartSample: {
-    color: "#94A3B8",
+    color: theme.colors.text.faint,
     fontSize: 9,
     textAlign: "center",
     width: "100%"
   },
   chartNote: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.colors.surfaceRaised,
     borderRadius: 10,
     gap: 3,
     paddingHorizontal: 11,
     paddingVertical: 9
   },
   chartNoteTitle: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 11,
     fontWeight: "800"
   },
   chartNoteBody: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     lineHeight: 16
   },
   summary: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 13,
     lineHeight: 20
   },
   weaknessCard: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#FCD34D",
+    backgroundColor: theme.colors.warning.s50,
+    borderColor: theme.colors.warning.s300,
     borderRadius: 18,
     borderWidth: 1,
     gap: 14,
@@ -934,15 +943,15 @@ const styles = StyleSheet.create({
     gap: 10
   },
   weaknessEffect: {
-    backgroundColor: "rgba(255, 255, 255, 0.66)",
-    borderColor: "rgba(245, 158, 11, 0.28)",
+    backgroundColor: theme.colors.glass,
+    borderColor: theme.colors.hairline.warning,
     borderRadius: 12,
     borderWidth: 1,
     gap: 6,
     padding: 12
   },
   effectKindLabel: {
-    color: "#92400E",
+    color: theme.colors.warning.s800,
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 0.5,
@@ -955,61 +964,61 @@ const styles = StyleSheet.create({
     gap: 7
   },
   weaknessValue: {
-    color: "#92400E",
+    color: theme.colors.warning.s800,
     fontSize: 26,
     fontWeight: "900"
   },
   weaknessMetric: {
-    color: "#78350F",
+    color: theme.colors.warning.s900,
     fontSize: 12,
     fontWeight: "700"
   },
   comparisonLabel: {
-    color: "#78350F",
+    color: theme.colors.warning.s900,
     fontSize: 13,
     lineHeight: 19
   },
   evidenceNote: {
-    backgroundColor: "rgba(255, 255, 255, 0.66)",
+    backgroundColor: theme.colors.glass,
     borderRadius: 12,
     gap: 4,
     padding: 12
   },
   evidenceTitle: {
-    color: "#78350F",
+    color: theme.colors.warning.s900,
     fontSize: 12,
     fontWeight: "800"
   },
   evidenceBody: {
-    color: "#78350F",
+    color: theme.colors.warning.s900,
     fontSize: 12,
     lineHeight: 18
   },
   evidenceMeta: {
-    color: "#92400E",
+    color: theme.colors.warning.s800,
     fontSize: 11,
     lineHeight: 16
   },
   modelNote: {
-    borderTopColor: "rgba(180, 83, 9, 0.22)",
+    borderTopColor: theme.colors.hairline.warningStrong,
     borderTopWidth: 1,
     gap: 4,
     paddingTop: 12
   },
   modelNoteTitle: {
-    color: "#78350F",
+    color: theme.colors.warning.s900,
     fontSize: 11,
     fontWeight: "800"
   },
   modelNoteBody: {
-    color: "#92400E",
+    color: theme.colors.warning.s800,
     fontSize: 11,
     lineHeight: 17
   },
   noWeaknessCard: {
     alignItems: "flex-start",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 18,
     borderWidth: 1,
     flexDirection: "row",
@@ -1017,40 +1026,40 @@ const styles = StyleSheet.create({
     padding: 16
   },
   noWeaknessCardBalanced: {
-    backgroundColor: "#ECFDF5",
-    borderColor: "#A7F3D0"
+    backgroundColor: theme.colors.success.s50,
+    borderColor: theme.colors.success.s200
   },
   noWeaknessIcon: {
     alignItems: "center",
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceStrong,
     borderRadius: 16,
     height: 32,
     justifyContent: "center",
     width: 32
   },
   noWeaknessIconBalanced: {
-    backgroundColor: "#D1FAE5"
+    backgroundColor: theme.colors.success.s100
   },
   noWeaknessIconText: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 18,
     fontWeight: "800"
   },
   noWeaknessIconTextBalanced: {
-    color: "#047857"
+    color: theme.colors.success.s700
   },
   noWeaknessCopy: {
     flex: 1,
     gap: 4
   },
   noWeaknessTitle: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 15,
     fontWeight: "800"
   },
   noWeaknessBody: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     lineHeight: 18
   }
-});
+}));

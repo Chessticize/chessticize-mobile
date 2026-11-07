@@ -3,11 +3,11 @@ import {
   Animated,
   Easing,
   Pressable,
-  StyleSheet,
   Text,
   useWindowDimensions,
   View
 } from "react-native";
+import { makeStyles } from "../theme/index.ts";
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native";
 import type { SprintState } from "../../../../packages/core/src/types.ts";
 import { ResultReviewImpactCard } from "./ResultReviewImpactCard.tsx";
@@ -114,6 +114,7 @@ export function PersonalBestHomeCard({
   presentation: PersonalBestChallengeDesignPreview;
   onOpenHub: (run?: PersonalBestPausedRunPresentation) => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const latestPaused = presentation.pausedRuns?.[0];
   return (
     <Pressable
@@ -144,6 +145,7 @@ export function PersonalBestGuide({
   onAcknowledge: () => void;
   onClose: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const challengeType = presentation.challengeType ?? "puzzle";
   const typeLabel = challengeTypeLabel(challengeType);
   const opponentReplyEnabled = presentation.opponentReplyEnabled !== false;
@@ -264,6 +266,7 @@ export function PersonalBestChallengeHub({
   recordsVisible: boolean;
   onStart: (selection: PersonalBestChallengeSelection) => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const { width: viewportWidth } = useWindowDimensions();
   const initialType = initialSelection?.challengeType ?? presentation.challengeType ?? "puzzle";
   const [challengeType, setChallengeType] = React.useState<PersonalBestChallengeType>(initialType);
@@ -724,6 +727,7 @@ function PersonalBestSourcePicker({
   onCancel: () => void;
   onSelect: (source: PersonalBestReferenceRunPresentation) => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const sources = (presentation.referenceRuns ?? []).filter((source) => (
     source.challengeType === challengeType
     && (source.isOnHome !== false || source.id === selectedSourceId)
@@ -805,6 +809,7 @@ export function PersonalBestProgressBanner({
   recordMode?: boolean;
   score: number;
 }): React.JSX.Element {
+  const styles = useStyles();
   const target = bestScore === null ? 1 : bestScore + 1;
   const isNewBest = score >= target;
   const showsRecordMilestone = isNewBest && recordMode;
@@ -912,6 +917,7 @@ export function PersonalBestResult({
   score: number;
   sittings: number;
 }): React.JSX.Element {
+  const styles = useStyles();
   const attemptCount = score + mistakeCount;
   const accuracy = Math.round((score / Math.max(1, attemptCount)) * 100);
   const isPerfectClear = endReason === "pool_cleared";
@@ -1052,6 +1058,7 @@ export function PersonalBestRecordsScreen({
   onBack: () => void;
   presentation: PersonalBestChallengeDesignPreview;
 }): React.JSX.Element {
+  const styles = useStyles();
   const { width: viewportWidth } = useWindowDimensions();
   const usesWideRecordGrid = viewportWidth >= 700;
   const records = presentation.levelRecords ?? [];
@@ -1147,6 +1154,7 @@ function SurvivalCollapsibleRegion({
   contentTestID: string;
   expanded: boolean;
 }): React.JSX.Element {
+  const styles = useStyles();
   const progress = React.useRef(new Animated.Value(expanded ? 1 : 0)).current;
   const [contentHeight, setContentHeight] = React.useState(0);
 
@@ -1226,6 +1234,7 @@ function SurvivalDisclosureChevron({
   expanded: boolean;
   testID: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const progress = React.useRef(new Animated.Value(expanded ? 1 : 0)).current;
 
   React.useEffect(() => {
@@ -1254,6 +1263,7 @@ function SurvivalDisclosureChevron({
 }
 
 function ResultMetric({ label, value }: { label: string; value: string }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.resultMetric}>
       <Text style={styles.resultMetricValue}>{value}</Text>
@@ -1366,7 +1376,7 @@ function referenceRunFor(
   return compatible[0];
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((theme) => ({
   actionRow: {
     alignItems: "center",
     flexDirection: "row",
@@ -1382,16 +1392,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   chartBar: {
-    backgroundColor: "#60A5FA",
+    backgroundColor: theme.colors.accent.s400,
     borderRadius: 6,
     minHeight: 12,
     width: "100%"
   },
   chartBarBest: {
-    backgroundColor: "#F59E0B"
+    backgroundColor: theme.colors.warning.s500
   },
   chartBlock: {
-    borderTopColor: "#DBEAFE",
+    borderTopColor: theme.colors.accent.s100,
     borderTopWidth: 1,
     gap: 10,
     marginTop: 16,
@@ -1404,17 +1414,17 @@ const styles = StyleSheet.create({
     height: "100%"
   },
   chartLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 10,
     fontWeight: "600"
   },
   chartTitle: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 12,
     fontWeight: "700"
   },
   chartTrack: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceStrong,
     borderRadius: 6,
     flex: 1,
     justifyContent: "flex-end",
@@ -1422,7 +1432,7 @@ const styles = StyleSheet.create({
     width: 22
   },
   chartValue: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 11,
     fontWeight: "800"
   },
@@ -1437,25 +1447,25 @@ const styles = StyleSheet.create({
     width: 44
   },
   closeButtonText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 26,
     fontWeight: "400"
   },
   eyebrow: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0.8
   },
   guideBandPrimary: {
-    color: "#1E3A8A",
+    color: theme.colors.accent.s900,
     fontSize: 13,
     fontWeight: "800"
   },
   guideBandRow: {
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s200,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
@@ -1467,18 +1477,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   guideBandSecondary: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 12,
     fontWeight: "600"
   },
   guideBestLabel: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 13,
     fontWeight: "700"
   },
   guideBestRow: {
     alignItems: "center",
-    borderTopColor: "#E2E8F0",
+    borderTopColor: theme.colors.border.default,
     borderTopWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1486,7 +1496,7 @@ const styles = StyleSheet.create({
     paddingTop: 16
   },
   guideBestValue: {
-    color: "#B45309",
+    color: theme.colors.warning.s700,
     fontSize: 24,
     fontWeight: "900"
   },
@@ -1496,7 +1506,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8
   },
   guideIntro: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 15,
     lineHeight: 22,
     marginTop: 8,
@@ -1505,8 +1515,8 @@ const styles = StyleSheet.create({
   },
   guideScreen: {
     alignSelf: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 20,
     borderWidth: 1,
     maxWidth: 620,
@@ -1516,7 +1526,7 @@ const styles = StyleSheet.create({
   },
   guideStartAction: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 12,
     justifyContent: "center",
     marginTop: 16,
@@ -1525,7 +1535,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13
   },
   guideTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 27,
     fontWeight: "900",
     letterSpacing: -0.5,
@@ -1539,48 +1549,48 @@ const styles = StyleSheet.create({
     minHeight: 52
   },
   guideTopBarTitle: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 14,
     fontWeight: "800"
   },
   historyBandPill: {
-    backgroundColor: "#DBEAFE",
+    backgroundColor: theme.colors.accent.s100,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6
   },
   historyBandPillText: {
-    color: "#1E40AF",
+    color: theme.colors.accent.s800,
     fontSize: 12,
     fontWeight: "800"
   },
   historyBestBlock: {
-    borderRightColor: "#DBEAFE",
+    borderRightColor: theme.colors.accent.s100,
     borderRightWidth: 1,
     minWidth: 94,
     paddingRight: 20
   },
   historyBestLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "700"
   },
   historyBestValue: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 38,
     fontWeight: "900",
     letterSpacing: -1
   },
   historyCard: {
-    backgroundColor: "#F8FBFF",
-    borderColor: "#BFDBFE",
+    backgroundColor: theme.colors.accent.wash,
+    borderColor: theme.colors.accent.s200,
     borderRadius: 18,
     borderWidth: 1,
     marginBottom: 16,
     padding: 16
   },
   historyEyebrow: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.9
@@ -1595,7 +1605,7 @@ const styles = StyleSheet.create({
     gap: 4
   },
   historySummaryPrimary: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 14,
     fontWeight: "800"
   },
@@ -1606,20 +1616,20 @@ const styles = StyleSheet.create({
     marginTop: 16
   },
   historySummarySecondary: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "600"
   },
   historyTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 19,
     fontWeight: "900",
     marginTop: 2
   },
   homeCard: {
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s300,
     borderRadius: 16,
     borderWidth: 1,
     flexDirection: "row",
@@ -1630,13 +1640,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12
   },
   homeChevron: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 25,
     fontWeight: "400",
     lineHeight: 27
   },
   homeDescription: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 12,
     fontWeight: "600",
     lineHeight: 17,
@@ -1646,13 +1656,13 @@ const styles = StyleSheet.create({
     flex: 1
   },
   homeTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 18,
     fontWeight: "900"
   },
   primaryAction: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 11,
     flex: 1,
     justifyContent: "center",
@@ -1661,13 +1671,13 @@ const styles = StyleSheet.create({
     paddingVertical: 11
   },
   primaryActionText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 14,
     fontWeight: "800"
   },
   progressBanner: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s200,
     borderRadius: 13,
     borderWidth: 1,
     gap: 8,
@@ -1680,8 +1690,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8
   },
   progressBannerRecord: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s300
   },
   progressCopyAndTrack: {
     gap: 8
@@ -1693,23 +1703,23 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   progressFill: {
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 999,
     height: "100%"
   },
   progressScore: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "700"
   },
   progressTitle: {
-    color: "#1E3A8A",
+    color: theme.colors.accent.s900,
     flex: 1,
     fontSize: 12,
     fontWeight: "800"
   },
   progressTrack: {
-    backgroundColor: "#DBEAFE",
+    backgroundColor: theme.colors.accent.s100,
     borderRadius: 999,
     height: 6,
     overflow: "hidden"
@@ -1726,14 +1736,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8
   },
   recordPreviousBest: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     flexShrink: 1,
     fontSize: 11,
     fontWeight: "700"
   },
   resultBadge: {
     alignItems: "center",
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceStrong,
     borderRadius: 999,
     flexDirection: "row",
     gap: 5,
@@ -1741,21 +1751,21 @@ const styles = StyleSheet.create({
     paddingVertical: 5
   },
   resultBadgeBest: {
-    backgroundColor: "#DBEAFE"
+    backgroundColor: theme.colors.accent.s100
   },
   resultBadgeText: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.8
   },
   resultBadgeTextBest: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   resultBandCard: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
@@ -1764,24 +1774,24 @@ const styles = StyleSheet.create({
     padding: 13
   },
   resultBandDetail: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "600",
     marginTop: 3
   },
   resultBandTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 14,
     fontWeight: "800"
   },
   resultComparison: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 14,
     fontWeight: "800",
     marginTop: 4
   },
   resultComparisonBest: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   resultDoneButton: {
     alignItems: "flex-start",
@@ -1790,23 +1800,23 @@ const styles = StyleSheet.create({
     minWidth: 52
   },
   resultEndReason: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "600",
     marginTop: 8
   },
   resultHero: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 18,
     borderWidth: 1,
     marginTop: 8,
     padding: 20
   },
   resultHeroBest: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s300
   },
   resultMetric: {
     alignItems: "center",
@@ -1814,18 +1824,18 @@ const styles = StyleSheet.create({
     gap: 3
   },
   resultMetricLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "700"
   },
   resultMetricValue: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 20,
     fontWeight: "900"
   },
   resultMetrics: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
@@ -1835,8 +1845,8 @@ const styles = StyleSheet.create({
   },
   resultPanel: {
     alignSelf: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 20,
     borderWidth: 1,
     maxWidth: 620,
@@ -1845,7 +1855,7 @@ const styles = StyleSheet.create({
   },
   resultPrimaryAction: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 12,
     justifyContent: "center",
     marginTop: 14,
@@ -1856,16 +1866,16 @@ const styles = StyleSheet.create({
     marginTop: 12
   },
   resultScore: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 54,
     fontWeight: "900",
     letterSpacing: -1.8
   },
   resultScoreBest: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   resultScoreLabel: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 17,
     fontWeight: "800",
     marginBottom: 9
@@ -1877,7 +1887,7 @@ const styles = StyleSheet.create({
   },
   resultSecondaryAction: {
     alignItems: "center",
-    borderColor: "#CBD5E1",
+    borderColor: theme.colors.border.strong,
     borderRadius: 12,
     borderWidth: 1,
     justifyContent: "center",
@@ -1886,7 +1896,7 @@ const styles = StyleSheet.create({
     padding: 12
   },
   resultTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 23,
     fontWeight: "900",
     marginTop: 10
@@ -1897,7 +1907,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   resultTopBarTitle: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 14,
     fontWeight: "800"
   },
@@ -1905,7 +1915,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   ruleDetail: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 3
@@ -1916,8 +1926,8 @@ const styles = StyleSheet.create({
   },
   ruleMarker: {
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s200,
     borderRadius: 18,
     borderWidth: 1,
     height: 36,
@@ -1925,14 +1935,14 @@ const styles = StyleSheet.create({
     width: 36
   },
   ruleMarkerText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 12,
     fontWeight: "900"
   },
   ruleRow: {
     alignItems: "flex-start",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
@@ -1940,13 +1950,13 @@ const styles = StyleSheet.create({
     padding: 13
   },
   ruleTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 14,
     fontWeight: "800"
   },
   secondaryAction: {
     alignItems: "center",
-    borderColor: "#93C5FD",
+    borderColor: theme.colors.accent.s300,
     borderRadius: 11,
     borderWidth: 1,
     flex: 1,
@@ -1956,7 +1966,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11
   },
   secondaryActionText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 14,
     fontWeight: "800"
   },
@@ -1973,7 +1983,7 @@ const styles = StyleSheet.create({
     marginTop: 8
   },
   historyRecordRow: {
-    borderColor: "#E2E8F0",
+    borderColor: theme.colors.border.default,
     borderRadius: 12,
     borderWidth: 1,
     justifyContent: "center",
@@ -1986,12 +1996,12 @@ const styles = StyleSheet.create({
     width: "24%"
   },
   historyRecordScore: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 20,
     fontWeight: "900"
   },
   historyRecordScoreLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "700"
   },
@@ -1999,18 +2009,18 @@ const styles = StyleSheet.create({
     marginTop: 16
   },
   historyRecordSectionTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 15,
     fontWeight: "900"
   },
   historyRecordTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 13,
     fontWeight: "800"
   },
   hubHelpButton: {
     alignItems: "center",
-    borderColor: "#CBD5E1",
+    borderColor: theme.colors.border.strong,
     borderRadius: 18,
     borderWidth: 1,
     height: 36,
@@ -2018,7 +2028,7 @@ const styles = StyleSheet.create({
     width: 36
   },
   hubHelpButtonText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 16,
     fontWeight: "900"
   },
@@ -2026,7 +2036,7 @@ const styles = StyleSheet.create({
     marginTop: 8
   },
   hubIntroText: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 5
@@ -2039,9 +2049,9 @@ const styles = StyleSheet.create({
     marginTop: 18
   },
   hubSectionCount: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceStrong,
     borderRadius: 999,
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 11,
     fontWeight: "800",
     overflow: "hidden",
@@ -2049,7 +2059,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3
   },
   hubSectionTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 14,
     fontWeight: "900"
   },
@@ -2060,7 +2070,7 @@ const styles = StyleSheet.create({
   },
   hubStartButton: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 12,
     justifyContent: "center",
     marginTop: 14,
@@ -2071,19 +2081,19 @@ const styles = StyleSheet.create({
     opacity: 0.45
   },
   hubTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 24,
     fontWeight: "900",
     letterSpacing: -0.5
   },
   hubTopBarTitle: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 15,
     fontWeight: "900"
   },
   levelCard: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
     borderRadius: 13,
     borderWidth: 1,
     flex: 1,
@@ -2091,21 +2101,21 @@ const styles = StyleSheet.create({
     padding: 11
   },
   levelCardBest: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 10,
     fontWeight: "600",
     marginTop: 6
   },
   levelCardLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 10,
     fontWeight: "800"
   },
   levelCardLabelSelected: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   levelCardRange: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 16,
     fontWeight: "900",
     marginTop: 5
@@ -2116,11 +2126,11 @@ const styles = StyleSheet.create({
     lineHeight: 15
   },
   levelCardRangeSelected: {
-    color: "#1E3A8A"
+    color: theme.colors.accent.s900
   },
   levelCardSelected: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s600,
     borderWidth: 2,
     padding: 10
   },
@@ -2131,19 +2141,19 @@ const styles = StyleSheet.create({
     marginTop: 9
   },
   moreLevelChip: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 11,
     paddingVertical: 8
   },
   moreLevelChipSelected: {
-    backgroundColor: "#DBEAFE",
-    borderColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s100,
+    borderColor: theme.colors.accent.s600
   },
   moreLevelChipText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "800"
   },
@@ -2154,7 +2164,7 @@ const styles = StyleSheet.create({
     marginTop: 9
   },
   moreLevelsAvailability: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 3,
@@ -2172,18 +2182,18 @@ const styles = StyleSheet.create({
     paddingVertical: 7
   },
   moreLevelsChevron: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 16
   },
   moreLevelsText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 13,
     fontWeight: "800"
   },
   pausedRunCard: {
     alignItems: "stretch",
-    backgroundColor: "#FFFBEB",
-    borderColor: "#FDE68A",
+    backgroundColor: theme.colors.warning.s50,
+    borderColor: theme.colors.warning.s200,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: "column",
@@ -2193,13 +2203,13 @@ const styles = StyleSheet.create({
   },
   pausedRunContinue: {
     alignSelf: "flex-end",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 9,
     paddingHorizontal: 11,
     paddingVertical: 9
   },
   pausedRunContinueText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 12,
     fontWeight: "800"
   },
@@ -2207,31 +2217,31 @@ const styles = StyleSheet.create({
     flex: 1
   },
   pausedRunDetail: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 11,
     fontWeight: "600",
     marginTop: 3
   },
   pausedRunMeta: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 10,
     marginTop: 3
   },
   pausedRunTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 13,
     fontWeight: "900"
   },
   recordsBackText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 34,
     fontWeight: "300",
     lineHeight: 36
   },
   recordsEntry: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
@@ -2241,7 +2251,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12
   },
   recordsEntryChevron: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 26,
     fontWeight: "500"
   },
@@ -2249,12 +2259,12 @@ const styles = StyleSheet.create({
     flex: 1
   },
   recordsEntryDetail: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     marginTop: 3
   },
   recordsEntryTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 14,
     fontWeight: "900"
   },
@@ -2262,7 +2272,7 @@ const styles = StyleSheet.create({
     marginTop: 8
   },
   recordsIntroText: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     lineHeight: 18,
     marginTop: 6
@@ -2272,34 +2282,34 @@ const styles = StyleSheet.create({
     maxWidth: 680
   },
   rulesSummary: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
     borderRadius: 14,
     borderWidth: 1,
     marginTop: 18,
     padding: 13
   },
   rulesSummaryHint: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 12,
     fontWeight: "800",
     marginTop: 6
   },
   rulesSummaryLine: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 12,
     lineHeight: 18,
     marginTop: 4
   },
   rulesSummaryTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 14,
     fontWeight: "900"
   },
   sourceCard: {
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s300,
     borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
@@ -2317,24 +2327,24 @@ const styles = StyleSheet.create({
     paddingVertical: 8
   },
   sourceChangeText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 12,
     fontWeight: "800"
   },
   sourceHelper: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 7
   },
   sourceLevel: {
-    color: "#1E3A8A",
+    color: theme.colors.accent.s900,
     fontSize: 21,
     fontWeight: "900"
   },
   sourceOption: {
     alignItems: "center",
-    borderColor: "#E2E8F0",
+    borderColor: theme.colors.border.default,
     borderRadius: 13,
     borderWidth: 1,
     flexDirection: "row",
@@ -2344,7 +2354,7 @@ const styles = StyleSheet.create({
   },
   sourceOptionCheck: {
     alignItems: "center",
-    borderColor: "#93C5FD",
+    borderColor: theme.colors.accent.s300,
     borderRadius: 10,
     borderWidth: 1,
     height: 20,
@@ -2352,7 +2362,7 @@ const styles = StyleSheet.create({
     width: 20
   },
   sourceOptionCheckText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 12,
     fontWeight: "900"
   },
@@ -2360,31 +2370,31 @@ const styles = StyleSheet.create({
     flex: 1
   },
   sourceOptionDetail: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 12,
     marginTop: 3
   },
   sourceOptionSelected: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s600
   },
   sourceOptionUnavailable: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FCA5A5"
+    backgroundColor: theme.colors.danger.s50,
+    borderColor: theme.colors.danger.s300
   },
   sourceOptionTiming: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     marginTop: 2
   },
   sourceOptionTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 14,
     fontWeight: "900"
   },
   sourcePicker: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 16,
     borderWidth: 1,
     marginTop: 18,
@@ -2397,7 +2407,7 @@ const styles = StyleSheet.create({
     width: 36
   },
   sourcePickerFootnote: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 11
@@ -2408,7 +2418,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   sourcePickerIntro: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 3
@@ -2417,12 +2427,12 @@ const styles = StyleSheet.create({
     flex: 1
   },
   sourceTiming: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     marginTop: 3
   },
   sourceTitle: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "700",
     marginTop: 3
@@ -2453,7 +2463,7 @@ const styles = StyleSheet.create({
   },
   typeOption: {
     alignItems: "center",
-    borderColor: "#CBD5E1",
+    borderColor: theme.colors.border.strong,
     borderRadius: 12,
     borderWidth: 1,
     flex: 1,
@@ -2461,28 +2471,28 @@ const styles = StyleSheet.create({
     paddingVertical: 11
   },
   typeOptionDetail: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 10,
     marginTop: 3
   },
   typeOptionDetailSelected: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   typeOptionSelected: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s600
   },
   typeOptionText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 14,
     fontWeight: "900"
   },
   typeOptionTextSelected: {
-    color: "#1E3A8A"
+    color: theme.colors.accent.s900
   },
   typeSelector: {
     flexDirection: "row",
     gap: 8,
     marginTop: 16
   }
-});
+}));

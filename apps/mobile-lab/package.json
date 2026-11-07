@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/*.test.ts src/*.test.tsx",
     "check:new-scenarios": "tsx scripts/check-new-scenarios.ts",
+    "visual": "tsx scripts/visual-regression.ts",
     "validate": "pnpm typecheck && pnpm test && pnpm build-storybook"
   },
   "dependencies": {
@@ -24,6 +25,7 @@
     "@types/node": "^26.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "19.2.3",
+    "playwright-core": "1.58.2",
     "storybook": "10.5.2",
     "tsx": "^4.23.1",
     "typescript": "^5.9.0",

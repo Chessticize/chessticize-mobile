@@ -5,6 +5,7 @@ import {
   Text,
   View
 } from "react-native";
+import { makeStyles } from "../theme/index.ts";
 import type {
   MoveFeedbackCue,
   MoveFeedbackPreferences,
@@ -37,6 +38,7 @@ export function MoveFeedbackSettingsSection({
   onPreview?: MoveFeedbackPreviewer;
   preferences: MoveFeedbackPreferences;
 }): React.JSX.Element {
+  const styles = useStyles();
   const [previewMessage, setPreviewMessage] = useState<string | null>(null);
 
   async function preview(cue: MoveFeedbackCue): Promise<void> {
@@ -129,6 +131,7 @@ function FeedbackToggleRow({
   label: string;
   onChange: (enabled: boolean) => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.toggleRow}>
       <View style={styles.rowCopy}>
@@ -168,101 +171,98 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((theme) => ({
   toggleRow: {
     alignItems: "center",
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
-    gap: 12,
+    gap: theme.space[12],
     justifyContent: "space-between",
     minHeight: 66,
-    paddingHorizontal: 12,
-    paddingVertical: 10
+    paddingHorizontal: theme.space[12],
+    paddingVertical: theme.space[10]
   },
   rowCopy: {
     flex: 1,
     flexShrink: 1,
-    gap: 2,
+    gap: theme.space[2],
     minWidth: 0
   },
   rowLabel: {
-    color: "#1E293B",
-    fontSize: 14,
-    fontWeight: "800"
+    color: theme.colors.text.heading,
+    fontSize: theme.fontSize[14],
+    fontWeight: theme.fontWeight.heavy
   },
   helperText: {
-    color: "#64748B",
-    fontSize: 12,
+    color: theme.colors.text.tertiary,
+    fontSize: theme.fontSize[12],
     lineHeight: 17
   },
   switchTrack: {
-    backgroundColor: "#CBD5E1",
-    borderColor: "#94A3B8",
-    borderRadius: 999,
+    backgroundColor: theme.colors.fillMuted,
+    borderColor: theme.colors.border.heavy,
+    borderRadius: theme.radius.pill,
     borderWidth: 1,
     height: 30,
     justifyContent: "center",
-    paddingHorizontal: 2,
+    paddingHorizontal: theme.space[2],
     width: 50
   },
   switchTrackEnabled: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s600,
+    borderColor: theme.colors.accent.s600
   },
   switchThumb: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 999,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.pill,
     height: 24,
-    shadowColor: "#0F172A",
-    shadowOffset: { height: 1, width: 0 },
-    shadowOpacity: 0.18,
-    shadowRadius: 2,
+    ...theme.elevation.low,
     width: 24
   },
   switchThumbEnabled: {
     alignSelf: "flex-end"
   },
   previewBlock: {
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12
+    gap: theme.space[10],
+    paddingHorizontal: theme.space[12],
+    paddingVertical: theme.space[12]
   },
   previewHeading: {
-    gap: 2
+    gap: theme.space[2]
   },
   previewButtons: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: theme.space[8]
   },
   previewButton: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
-    borderRadius: 8,
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
+    borderRadius: theme.radius[8],
     borderWidth: 1,
-    gap: 1,
+    gap: theme.space[1],
     minHeight: 48,
     minWidth: 96,
-    paddingHorizontal: 10,
-    paddingVertical: 8
+    paddingHorizontal: theme.space[10],
+    paddingVertical: theme.space[8]
   },
   previewButtonLabel: {
-    color: "#1D4ED8",
-    fontSize: 12,
-    fontWeight: "900"
+    color: theme.colors.accent.s700,
+    fontSize: theme.fontSize[12],
+    fontWeight: theme.fontWeight.black
   },
   previewButtonDetail: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "700"
+    color: theme.colors.text.tertiary,
+    fontSize: theme.fontSize[11],
+    fontWeight: theme.fontWeight.bold
   },
   previewStatus: {
-    color: "#334155",
-    fontSize: 12,
-    fontWeight: "700",
+    color: theme.colors.text.strong,
+    fontSize: theme.fontSize[12],
+    fontWeight: theme.fontWeight.bold,
     lineHeight: 17
   }
-});
+}));

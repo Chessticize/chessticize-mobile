@@ -1,5 +1,6 @@
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
+import { makeStyles } from "../theme/index.ts";
 
 export function SessionMistakeIndicator({
   count,
@@ -8,6 +9,7 @@ export function SessionMistakeIndicator({
   count: number;
   max: number;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessibilityLabel={`Mistakes ${count} of ${max}`}
@@ -30,18 +32,18 @@ export function SessionMistakeIndicator({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((theme) => ({
   dot: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#94A3B8",
-    borderRadius: 3,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.heavy,
+    borderRadius: theme.radius[3],
     borderWidth: 1,
     height: 9,
     width: 9
   },
   dots: {
     flexDirection: "row",
-    gap: 3
+    gap: theme.space[3]
   },
   indicator: {
     alignItems: "center",
@@ -49,7 +51,7 @@ const styles = StyleSheet.create({
     minWidth: 42
   },
   usedDot: {
-    backgroundColor: "#DC2626",
-    borderColor: "#DC2626"
+    backgroundColor: theme.colors.danger.s600,
+    borderColor: theme.colors.danger.s600
   }
-});
+}));

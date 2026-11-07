@@ -10,6 +10,7 @@ import {
   View
 } from "react-native";
 import { SafeAreaModalBackdrop } from "./SafeAreaModalBackdrop.tsx";
+import { makeStyles, useTheme } from "../theme/index.ts";
 
 export type ICloudSyncSupportBundleResult = {
   bundleUrl?: string;
@@ -63,6 +64,8 @@ export function ICloudSyncErrorDetails({
   entryVariant?: "error" | "support";
   presentation: ICloudSyncErrorDetailsPresentation;
 }): React.JSX.Element {
+  const styles = useStyles();
+  const theme = useTheme();
   const [visible, setVisible] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [panel, setPanel] = useState<Panel>(
@@ -522,7 +525,7 @@ export function ICloudSyncErrorDetails({
                   style={styles.preparing}
                   testID="settings-sync-support-bundle-preparing"
                 >
-                  <ActivityIndicator color="#2563EB" size="large" />
+                  <ActivityIndicator color={theme.colors.accent.s600} size="large" />
                   <Text style={styles.preparingTitle}>Preparing files…</Text>
                   <Text style={styles.preparingCopy}>
                     Keep Chessticize open. Your data stays on this device until you choose a share
@@ -682,6 +685,7 @@ function BundleFile({
   description: string;
   name: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.fileRow}>
       <View style={styles.fileIcon}>
@@ -695,11 +699,11 @@ function BundleFile({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((theme) => ({
   entry: {
     alignItems: "center",
-    backgroundColor: "#FFF7ED",
-    borderBottomColor: "#FED7AA",
+    backgroundColor: theme.colors.caution.s50,
+    borderBottomColor: theme.colors.caution.s200,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 10,
@@ -709,14 +713,14 @@ const styles = StyleSheet.create({
   },
   entryIndicator: {
     alignItems: "center",
-    backgroundColor: "#FFEDD5",
+    backgroundColor: theme.colors.caution.s100,
     borderRadius: 999,
     height: 30,
     justifyContent: "center",
     width: 30
   },
   entryIndicatorText: {
-    color: "#C2410C",
+    color: theme.colors.caution.s700,
     fontSize: 17,
     fontWeight: "900"
   },
@@ -726,25 +730,25 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   entryTitle: {
-    color: "#9A3412",
+    color: theme.colors.caution.s800,
     fontSize: 14,
     fontWeight: "900"
   },
   entryDetail: {
-    color: "#7C2D12",
+    color: theme.colors.caution.s900,
     fontSize: 11,
     fontWeight: "600",
     lineHeight: 16
   },
   entryChevron: {
-    color: "#C2410C",
+    color: theme.colors.caution.s700,
     fontSize: 26,
     fontWeight: "500"
   },
   supportEntry: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderBottomColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderBottomColor: theme.colors.border.strong,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 10,
@@ -754,42 +758,42 @@ const styles = StyleSheet.create({
   },
   supportEntryIndicator: {
     alignItems: "center",
-    backgroundColor: "#DBEAFE",
+    backgroundColor: theme.colors.accent.s100,
     borderRadius: 999,
     height: 30,
     justifyContent: "center",
     width: 30
   },
   supportEntryIndicatorText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 17,
     fontWeight: "900"
   },
   supportEntryTitle: {
-    color: "#1E3A8A",
+    color: theme.colors.accent.s900,
     fontSize: 14,
     fontWeight: "900"
   },
   supportEntryDetail: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 11,
     fontWeight: "600",
     lineHeight: 16
   },
   supportEntryChevron: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 26,
     fontWeight: "500"
   },
   backdrop: {
     alignItems: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.55)",
+    backgroundColor: theme.colors.scrim,
     flex: 1,
     justifyContent: "center",
     padding: 18
   },
   modal: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.surface,
     borderRadius: 18,
     maxHeight: "92%",
     maxWidth: 520,
@@ -818,83 +822,83 @@ const styles = StyleSheet.create({
   },
   badge: {
     alignSelf: "flex-start",
-    backgroundColor: "#FFEDD5",
+    backgroundColor: theme.colors.caution.s100,
     borderRadius: 999,
     paddingHorizontal: 9,
     paddingVertical: 5
   },
   badgeText: {
-    color: "#9A3412",
+    color: theme.colors.caution.s800,
     fontSize: 9,
     fontWeight: "900",
     letterSpacing: 0.8
   },
   title: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 23,
     fontWeight: "900"
   },
   subtitle: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 19
   },
   closeIconButton: {
     alignItems: "center",
-    backgroundColor: "#F1F5F9",
+    backgroundColor: theme.colors.surfaceSunken,
     borderRadius: 999,
     height: 34,
     justifyContent: "center",
     width: 34
   },
   closeIcon: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 24,
     fontWeight: "500",
     lineHeight: 27
   },
   messageCard: {
-    backgroundColor: "#FFF7ED",
-    borderColor: "#FED7AA",
+    backgroundColor: theme.colors.caution.s50,
+    borderColor: theme.colors.caution.s200,
     borderRadius: 11,
     borderWidth: 1,
     gap: 6,
     padding: 13
   },
   cardLabel: {
-    color: "#9A3412",
+    color: theme.colors.caution.s800,
     fontSize: 9,
     fontWeight: "900",
     letterSpacing: 0.8
   },
   message: {
-    color: "#7C2D12",
+    color: theme.colors.caution.s900,
     fontSize: 14,
     fontWeight: "700",
     lineHeight: 20
   },
   privacyCard: {
-    backgroundColor: "#EFF6FF",
+    backgroundColor: theme.colors.accent.s50,
     borderRadius: 11,
     gap: 4,
     padding: 13
   },
   privacyTitle: {
-    color: "#1E3A8A",
+    color: theme.colors.accent.s900,
     fontSize: 13,
     fontWeight: "900"
   },
   privacyCopy: {
-    color: "#1E40AF",
+    color: theme.colors.accent.s800,
     fontSize: 11,
     fontWeight: "600",
     lineHeight: 17
   },
   exportCard: {
     alignItems: "stretch",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 11,
     borderWidth: 1,
     gap: 12,
@@ -904,19 +908,19 @@ const styles = StyleSheet.create({
     gap: 4
   },
   exportTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 13,
     fontWeight: "900"
   },
   exportCopy: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 11,
     fontWeight: "600",
     lineHeight: 17
   },
   exportButton: {
     alignItems: "center",
-    borderColor: "#2563EB",
+    borderColor: theme.colors.accent.s600,
     borderRadius: 9,
     borderWidth: 1,
     justifyContent: "center",
@@ -924,25 +928,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14
   },
   exportButtonText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 12,
     fontWeight: "900"
   },
   sensitiveCard: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FECACA",
+    backgroundColor: theme.colors.danger.s50,
+    borderColor: theme.colors.danger.s200,
     borderRadius: 11,
     borderWidth: 1,
     gap: 5,
     padding: 13
   },
   sensitiveTitle: {
-    color: "#991B1B",
+    color: theme.colors.danger.s800,
     fontSize: 14,
     fontWeight: "900"
   },
   sensitiveCopy: {
-    color: "#991B1B",
+    color: theme.colors.danger.s800,
     fontSize: 11,
     fontWeight: "600",
     lineHeight: 17
@@ -957,7 +961,7 @@ const styles = StyleSheet.create({
   },
   fileIcon: {
     alignItems: "center",
-    backgroundColor: "#DCFCE7",
+    backgroundColor: theme.colors.positive.s100,
     borderRadius: 999,
     height: 23,
     justifyContent: "center",
@@ -965,7 +969,7 @@ const styles = StyleSheet.create({
     width: 23
   },
   fileIconText: {
-    color: "#15803D",
+    color: theme.colors.positive.s700,
     fontSize: 12,
     fontWeight: "900"
   },
@@ -974,7 +978,7 @@ const styles = StyleSheet.create({
     gap: 2
   },
   fileName: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontFamily: Platform.select({
       android: "monospace",
       default: "monospace",
@@ -984,30 +988,30 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   fileDescription: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 10,
     fontWeight: "600",
     lineHeight: 15
   },
   excludedCard: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.colors.surfaceRaised,
     borderRadius: 11,
     gap: 4,
     padding: 13
   },
   excludedTitle: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "900"
   },
   excludedCopy: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 11,
     fontWeight: "600",
     lineHeight: 17
   },
   noUploadCopy: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 11,
     fontWeight: "700",
     lineHeight: 17
@@ -1019,12 +1023,12 @@ const styles = StyleSheet.create({
     paddingVertical: 30
   },
   preparingTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 16,
     fontWeight: "900"
   },
   preparingCopy: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 12,
     fontWeight: "600",
     lineHeight: 18,
@@ -1032,45 +1036,45 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   partialCard: {
-    backgroundColor: "#FFF7ED",
-    borderColor: "#FED7AA",
+    backgroundColor: theme.colors.caution.s50,
+    borderColor: theme.colors.caution.s200,
     borderRadius: 11,
     borderWidth: 1,
     gap: 5,
     padding: 13
   },
   partialTitle: {
-    color: "#9A3412",
+    color: theme.colors.caution.s800,
     fontSize: 14,
     fontWeight: "900"
   },
   partialCopy: {
-    color: "#C2410C",
+    color: theme.colors.caution.s700,
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 17
   },
   partialHelp: {
-    color: "#7C2D12",
+    color: theme.colors.caution.s900,
     fontSize: 11,
     fontWeight: "600",
     lineHeight: 17
   },
   completeCard: {
-    backgroundColor: "#ECFDF5",
-    borderColor: "#A7F3D0",
+    backgroundColor: theme.colors.success.s50,
+    borderColor: theme.colors.success.s200,
     borderRadius: 11,
     borderWidth: 1,
     gap: 5,
     padding: 13
   },
   completeTitle: {
-    color: "#065F46",
+    color: theme.colors.success.s800,
     fontSize: 14,
     fontWeight: "900"
   },
   completeCopy: {
-    color: "#047857",
+    color: theme.colors.success.s700,
     fontSize: 11,
     fontWeight: "600",
     lineHeight: 17
@@ -1081,12 +1085,12 @@ const styles = StyleSheet.create({
     gap: 8
   },
   readyFileCheck: {
-    color: "#15803D",
+    color: theme.colors.positive.s700,
     fontSize: 13,
     fontWeight: "900"
   },
   readyFileName: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontFamily: Platform.select({
       android: "monospace",
       default: "monospace",
@@ -1099,23 +1103,23 @@ const styles = StyleSheet.create({
     gap: 7
   },
   technicalTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 14,
     fontWeight: "900"
   },
   technicalHelp: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "600",
     lineHeight: 16
   },
   technicalCard: {
-    backgroundColor: "#0F172A",
+    backgroundColor: theme.colors.surfaceInverse,
     borderRadius: 11,
     padding: 13
   },
   technicalText: {
-    color: "#E2E8F0",
+    color: theme.colors.text.inverse,
     fontFamily: Platform.select({
       android: "monospace",
       default: "monospace",
@@ -1125,13 +1129,13 @@ const styles = StyleSheet.create({
     lineHeight: 17
   },
   copySuccess: {
-    color: "#047857",
+    color: theme.colors.success.s700,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 17
   },
   copyFailure: {
-    color: "#B91C1C",
+    color: theme.colors.danger.s700,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 17
@@ -1144,7 +1148,7 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     alignItems: "center",
-    borderColor: "#CBD5E1",
+    borderColor: theme.colors.border.strong,
     borderRadius: 9,
     borderWidth: 1,
     justifyContent: "center",
@@ -1152,13 +1156,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   secondaryButtonText: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 13,
     fontWeight: "800"
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 9,
     flexGrow: 1,
     justifyContent: "center",
@@ -1170,8 +1174,8 @@ const styles = StyleSheet.create({
     opacity: 0.6
   },
   primaryButtonText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 13,
     fontWeight: "900"
   }
-});
+}));
