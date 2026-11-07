@@ -22,7 +22,10 @@ const MANIFEST_PATH = "fixtures/puzzles/bundled-core-pack.manifest.json";
 const CALIBRATION_PATH = "config/tactical-profile-calibration-artifact-v1.json";
 const HISTORY_START = "2026-06-01T00:00:00.000Z";
 
-/** Planted effects measured by the report; each targets the Line family. */
+/**
+ * Planted effects measured by the report. Each targets one signal; an effect
+ * may pin its own Arrow Duel share so an Arrow Duel target has evidence.
+ */
 export const REPORT_EFFECTS = [
   {
     id: "uniform",
@@ -34,6 +37,19 @@ export const REPORT_EFFECTS = [
     description: "fork solve-rate weakness (logit -1.4, observed about 70% vs 88%)",
     target: { signalId: "line:fork", reasons: ["solve_rate", "both"] },
     player: { ...BALANCED_SIMULATED_PLAYER, themeSolveLogitOffsets: { fork: -1.4 } }
+  },
+  {
+    id: "solve:fork:arrow_duel",
+    description: "fork solve-rate weakness in Arrow Duel (logit -1.4, Arrow Duel Runs only)",
+    target: { signalId: "arrow_duel:fork", reasons: ["solve_rate", "both"] },
+    arrowDuelShare: 1,
+    player: { ...BALANCED_SIMULATED_PLAYER, themeSolveLogitOffsets: { fork: -1.4 } }
+  },
+  {
+    id: "uniform:arrow_duel",
+    description: "uniform player in Arrow Duel (false-positive baseline, Arrow Duel Runs only)",
+    arrowDuelShare: 1,
+    player: BALANCED_SIMULATED_PLAYER
   },
   {
     id: "speed:fork",
@@ -62,7 +78,7 @@ export function simulateEffect({ effect, seeds, runs, arrowDuelShare, createWorl
         player: new SimulatedPlayer(effect.player, seed),
         clock,
         seed,
-        plan: { runs, arrowDuelShare }
+        plan: { runs, arrowDuelShare: effect.arrowDuelShare ?? arrowDuelShare }
       });
       histories.push(summarizeHistory(records, effect.target));
     } finally {
@@ -88,13 +104,76 @@ export function summarizeHistory(records, target) {
   const offTargetRuns = records.filter((record) => record.signals.some((signal) =>
     signal.status === "recommended" && signal.theme !== targetTheme
   )).length;
+  // A re-entry is a signal that becomes recommended again after leaving
+  // recommendation: flapping around the hysteresis band.
+  const recommendedBefore = new Set();
+  const leftRecommendation = new Set();
+  let recommendationReentries = 0;
+  for (const record of records) {
+    const recommendedNow = new Set(record.signals
+      .filter((signal) => signal.status === "recommended")
+      .map((signal) => signal.id));
+    for (const id of recommendedBefore) {
+      if (!recommendedNow.has(id)) {
+        leftRecommendation.add(id);
+      }
+    }
+    for (const id of recommendedNow) {
+      if (leftRecommendation.delete(id)) {
+        recommendationReentries += 1;
+      }
+      recommendedBefore.add(id);
+    }
+    for (const id of [...recommendedBefore]) {
+      if (!recommendedNow.has(id)) {
+        recommendedBefore.delete(id);
+      }
+    }
+  }
+  // Top-rank precision. Signals arrive in the Profile's ranked order: the
+  // first recommendation is the Home lead, and a Focused Run takes the top
+  // two recommended themes of its task family.
+  const targetFamily = target?.signalId.split(":")[0];
+  let runsWithRecommendation = 0;
+  let plantedLeadRuns = 0;
+  let offTargetRunSlotRuns = 0;
+  for (const record of records) {
+    const recommended = record.signals.filter((signal) => signal.status === "recommended");
+    if (recommended.length === 0) {
+      continue;
+    }
+    runsWithRecommendation += 1;
+    if (recommended[0]?.theme === targetTheme) {
+      plantedLeadRuns += 1;
+    }
+    const runSlots = recommended
+      .filter((signal) => signal.taskFamily === targetFamily)
+      .slice(0, 2);
+    if (runSlots.some((signal) => signal.theme !== targetTheme)) {
+      offTargetRunSlotRuns += 1;
+    }
+  }
   return {
     runs: records.length,
     detectedAtRun: detectedAt < 0 ? undefined : detectedAt + 1,
     offTargetRecommendationRuns: offTargetRuns,
+    runsWithRecommendation,
+    plantedLeadRuns,
+    offTargetRunSlotRuns,
+    recommendationReentries,
     firstPhaseChangeRun: firstPhaseChange < 0 ? undefined : firstPhaseChange + 1,
     firstPhase: initialPhase,
     changedPhase: firstPhaseChange < 0 ? undefined : records[firstPhaseChange]?.phase
+  };
+}
+
+function topRankSummary(histories) {
+  const sum = (key) => histories.reduce((total, history) => total + history[key], 0);
+  const withRecommendation = sum("runsWithRecommendation");
+  return {
+    runsWithRecommendation: withRecommendation,
+    plantedLeadRate: ratio(sum("plantedLeadRuns"), withRecommendation),
+    offTargetRunSlotRate: ratio(sum("offTargetRunSlotRuns"), withRecommendation)
   };
 }
 
@@ -118,7 +197,8 @@ function summarizeEffect(effect, histories) {
       ? {}
       : {
           detectionRate: ratio(detections.length, histories.length),
-          runsToDetection: distribution(detections)
+          runsToDetection: distribution(detections),
+          topRank: topRankSummary(histories)
         }),
     falsePositive: {
       seedsWithAnyOffTargetRecommendation: histories.filter(
@@ -130,6 +210,10 @@ function summarizeEffect(effect, histories) {
       ),
       runRate: ratio(offTargetRuns, totalRuns)
     },
+    recommendationReentries: histories.reduce(
+      (sum, history) => sum + history.recommendationReentries,
+      0
+    ),
     runsToFirstPhaseChange: distribution(phaseChanges),
     phaseChanges: countBy(histories.map((history) =>
       history.changedPhase === undefined
@@ -173,6 +257,7 @@ function parseOptions(argv) {
       "arrow-duel-share": { type: "string", default: "0.25" },
       effect: { type: "string", multiple: true },
       pack: { type: "string" },
+      calibration: { type: "string", default: CALIBRATION_PATH },
       json: { type: "boolean", default: false }
     }
   });
@@ -199,12 +284,19 @@ function parseOptions(argv) {
         }
         return effect;
       });
-  return { seeds, runs, arrowDuelShare, effects, pack: values.pack, json: values.json };
+  return {
+    seeds,
+    runs,
+    arrowDuelShare,
+    effects,
+    pack: values.pack,
+    calibration: values.calibration,
+    json: values.json
+  };
 }
 
-function worldFactory(packPath) {
+function worldFactory(packPath, calibration) {
   const manifest = JSON.parse(readFileSync(resolve(MANIFEST_PATH), "utf8"));
-  const calibration = JSON.parse(readFileSync(resolve(CALIBRATION_PATH), "utf8"));
   if (packPath === undefined) {
     const packPuzzles = JSON.parse(readFileSync(resolve(SLICE_PATH), "utf8"));
     return {
@@ -249,10 +341,14 @@ function formatText(report) {
           ? "  (never detected)"
           : `  Runs to detection min/median/mean/max: ${detection.min}/${detection.median}/${detection.mean}/${detection.max}`)
       );
+      lines.push(
+        `  top rank (of ${result.topRank.runsWithRecommendation} Runs with a recommendation): planted theme leads ${result.topRank.plantedLeadRate}, off-target in Focused Run slots ${result.topRank.offTargetRunSlotRate}`
+      );
     }
     lines.push(
       `  false positive (recommendations for other themes): seed rate ${result.falsePositive.seedRate}, run rate ${result.falsePositive.runRate}`
     );
+    lines.push(`  recommendation re-entries (flapping): ${result.recommendationReentries}`);
     const phase = result.runsToFirstPhaseChange;
     lines.push(
       `  first Profile phase change: ${phase === null ? "none" : `Runs min/median/max ${phase.min}/${phase.median}/${phase.max}`}  ${JSON.stringify(result.phaseChanges)}`
@@ -266,8 +362,9 @@ function formatText(report) {
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   const startedAt = Date.now();
-  const factory = worldFactory(options.pack);
-  const calibration = JSON.parse(readFileSync(resolve(CALIBRATION_PATH), "utf8"));
+  // A candidate artifact may be compared before it replaces the shipped one.
+  const calibration = JSON.parse(readFileSync(resolve(options.calibration), "utf8"));
+  const factory = worldFactory(options.pack, calibration);
   try {
     const results = options.effects.map((effect) => simulateEffect({
       effect,

@@ -19,13 +19,12 @@ function firstRecommendation(
   ));
 }
 
-// Acceptance test for #607. The shipped solve baseline expects 50% success at
-// equal Ratings, while a Run Rating settles near an 85% per-puzzle solve rate,
-// so a fork theme solved about 70% of the time still looks strong. Remove
-// `todo` when #607 lands; it must then pass unchanged.
+// Acceptance test for #607. A Run Rating settles near an 85% per-puzzle solve
+// rate, so a fixed 50% baseline made a fork theme solved about 70% of the time
+// look strong. The personal solve baseline measures it against the player's
+// own level instead.
 test(
   "a planted fork solve-rate weakness is recommended for its solve rate",
-  { todo: "Fails until #607 gives the solve head a personal baseline" },
   () => {
     for (const seed of ["solve-1", "solve-2"]) {
       const history = playHistory({

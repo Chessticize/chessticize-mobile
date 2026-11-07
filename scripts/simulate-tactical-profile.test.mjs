@@ -4,7 +4,10 @@ import { execFileSync } from "node:child_process";
 import { summarizeHistory } from "./simulate-tactical-profile.mjs";
 
 function record(phase, signals = []) {
-  return { phase, signals };
+  return {
+    phase,
+    signals: signals.map((signal) => ({ ...signal, taskFamily: signal.id.split(":")[0] }))
+  };
 }
 
 test("summaries count detection by planted signal and false positives by other themes", () => {
@@ -18,16 +21,27 @@ test("summaries count detection by planted signal and false positives by other t
       { id: "line:fork", theme: "fork", status: "recommended", reason: "solve_rate" },
       { id: "line:pin", theme: "pin", status: "watch", reason: "completed_speed" }
     ]),
+    // An off-target theme outranks the planted one: it leads Home and takes
+    // a Focused Run slot.
     record("ready", [
-      { id: "line:fork", theme: "fork", status: "recommended", reason: "completed_speed" },
-      { id: "line:pin", theme: "pin", status: "recommended", reason: "completed_speed" }
+      { id: "line:pin", theme: "pin", status: "recommended", reason: "completed_speed" },
+      { id: "line:fork", theme: "fork", status: "recommended", reason: "completed_speed" }
+    ]),
+    // arrow_duel:fork left recommendation after Run 2 and re-enters here.
+    record("ready", [
+      { id: "arrow_duel:fork", theme: "fork", status: "recommended", reason: "completed_speed" },
+      { id: "line:fork", theme: "fork", status: "recommended", reason: "completed_speed" }
     ])
   ], target);
 
   assert.deepEqual(summary, {
-    runs: 4,
+    runs: 5,
     detectedAtRun: 4,
     offTargetRecommendationRuns: 1,
+    runsWithRecommendation: 4,
+    plantedLeadRuns: 3,
+    offTargetRunSlotRuns: 1,
+    recommendationReentries: 1,
     firstPhaseChangeRun: 2,
     firstPhase: "collecting",
     changedPhase: "ready"

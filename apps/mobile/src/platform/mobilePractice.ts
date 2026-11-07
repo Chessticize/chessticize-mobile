@@ -375,8 +375,8 @@ export function injectMateIn2FocusedRun(
       mode: "standard",
       durationSeconds: 300,
       perPuzzleSeconds: 20,
-      targetCorrect: 15,
-      maxMistakes: 15,
+      targetCorrect: 27,
+      maxMistakes: 27,
       minRating: 850,
       maxRating: 1_000,
       puzzleSelectionSeed: "mate-in-2-focused-run-mixed-controls-v1"
@@ -401,9 +401,18 @@ export function injectMateIn2FocusedRun(
     ...puzzle,
     themes: ["mateIn2"]
   }));
-  if (evidencePuzzles.length < 12 || focusedCandidates.length < 27 || mixedCandidates.length < 15) {
+  // The solve head compares a theme with the player's own other attempts, so
+  // the fixture also records solved mixed controls beside the missed Mate in 2
+  // evidence. They are distinct from the mixed puzzles the Run itself uses.
+  const controlPuzzles = mixedCandidates.slice(15, 39);
+  if (
+    evidencePuzzles.length < 12 ||
+    focusedCandidates.length < 27 ||
+    mixedCandidates.length < 15 ||
+    controlPuzzles.length < 24
+  ) {
     throw new Error(
-      "Mate in 2 Focused Run fixture needs 27 focused and 15 mixed pack-backed puzzles"
+      "Mate in 2 Focused Run fixture needs 27 focused and 39 mixed pack-backed puzzles"
     );
   }
 
@@ -427,12 +436,34 @@ export function injectMateIn2FocusedRun(
       startedAt,
       completedAt,
       status: "failed",
-      correctCount: 0,
+      correctCount: 8,
       mistakeCount: 4,
       ratingBefore: 925,
       ratingAfter: 925,
       config
     });
+    for (let offset = 0; offset < 8; offset += 1) {
+      const puzzle = controlPuzzles[sessionIndex * 8 + offset];
+      if (!puzzle) {
+        throw new Error("Mate in 2 Focused Run fixture controls are incomplete");
+      }
+      const expectedMove = puzzle.solutionMoves[1] ?? puzzle.solutionMoves[0] ?? "a1a2";
+      attempts.push({
+        id: `${fixtureId}-control-${sessionIndex * 8 + offset}`,
+        source: "sprint",
+        sessionId,
+        puzzleId: puzzle.id,
+        mode: "standard",
+        ratingKey: config.ratingKey,
+        result: "correct",
+        submittedMove: expectedMove,
+        expectedMove,
+        startedAt: completedAt,
+        completedAt,
+        elapsedMs: 10_000,
+        ratingBefore: 925
+      });
+    }
     for (let offset = 0; offset < 4; offset += 1) {
       const puzzle = evidencePuzzles[sessionIndex * 4 + offset];
       if (!puzzle) {

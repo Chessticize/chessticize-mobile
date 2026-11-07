@@ -290,6 +290,35 @@ accepted baseline are invalid for this head. The harness may establish an
 explicit calibrated `unknown-policy` stratum; production MUST NOT infer historic
 policy from current defaults.
 
+### Provisional personal solve baseline
+
+Without a representative corpus, the owner-approved provisional trial cannot
+fit `alpha` from population data, and a fixed `alpha = 0` expects a 50%
+per-puzzle solve rate at equal Ratings. Players near Run equilibrium solve
+roughly 85% of their puzzles, so that baseline made ordinary themes look strong
+and left the solve head effectively disabled (issue #607). The provisional
+artifact therefore mirrors the personal speed head (section 7):
+
+```text
+logit(p_i) = artifactLogit_i + personalOffset[taskFamily_i, -theme]
+```
+
+`artifactLogit_i` keeps the Glicko-shaped Rating-gap term and Timeout effect
+above. `personalOffset` is a per-family MAP logit offset (Normal prior centred
+on zero) fitted from the user's own eligible attempts in that family, excluding
+every attempt that carries the theme being judged, so a theme is never its own
+control. If the leave-theme-out controls fall below the artifact's minimum
+weight, that theme's solve head is unavailable rather than measured against the
+fixed baseline. A calibrated population artifact may omit
+`solve.personalBaseline` and use its fitted `alpha` directly.
+
+Arrow Duel keeps the same logistic form. Its attempt success is not a pure
+two-choice event: with opponent replies on, a correct choice must also be
+followed by the punishing reply, so a fixed 50% guess floor is not the right
+shape either. Simulated-player evidence showed the personal offset alone
+detects planted Arrow Duel solve weaknesses; Arrow Duel uses a tighter
+solve-theme prior than Line so its false-positive rate does not rise.
+
 The model shape is related to a one-parameter item-response model: learner
 ability and item difficulty enter a Bernoulli-logit response probability with an
 intercept. Stan documents that structure in its
@@ -394,7 +423,12 @@ posteriorMean = posteriorVariance * U
 
 The sums are evaluated around `delta = 0`. This is a one-step quadratic
 score/Fisher or Laplace approximation, not an exact closed-form logistic
-posterior. The prior scale and all baseline parameters are calibration-required.
+posterior. With the personal solve baseline, a score step around the artifact
+baseline would be badly biased because the personal offset is about 1.7 logits.
+That head therefore stores attempts binned by artifact logit (0.05-logit bins
+with weight, success, mean logit, and mean sensitivity) and finds the exact
+Laplace mode of `delta` around the personal baseline by Newton iteration. Tests
+compare it with `exactSolveThemePosterior` on the same attempts. The prior scale and all baseline parameters are calibration-required.
 Calling the model validated, or removing its early-estimate disclosure,
 requires golden-fixture comparison with an exact one-dimensional Newton or grid
 posterior. The owner-approved provisional production trial does not satisfy
@@ -750,7 +784,10 @@ theme or baseline sentinel
 
 Its exact numeric columns are frozen only after calibration, but it must retain
 the additive solve score/Fisher terms and completed-speed Normal-regression
-sufficient statistics required by section 8. It must also retain deterministic,
+sufficient statistics required by section 8. A family with a personal solve
+baseline also keeps logit-binned solve statistics: family baseline bins on the
+baseline-sentinel cell, and per-theme bins plus full-weight leave-theme-out
+exclusion bins on each theme cell. It must also retain deterministic,
 threshold-capped distinct puzzle and session ID sets per theme/day so diversity
 guards can be resolved by unioning daily cells rather than scanning raw history.
 If one day already reaches the guard, capping at that guard preserves the
@@ -968,7 +1005,8 @@ The checked-in provisional artifact supplies bounded trial values for these
 terms. They are product experiments, not validated population truths, and must
 remain behind the same early-estimate disclosure:
 
-- solve-family intercepts and Glicko-shaped slopes;
+- solve-family intercepts and Glicko-shaped slopes, including the personal
+  solve baseline's minimum control weight and offset prior;
 - Timeout, pace, Slow-threshold, decision-count, and Run-rule effects;
 - solve-theme and speed-theme prior scales;
 - Elo-equivalent deficit threshold (30 Rating points was discussed, not

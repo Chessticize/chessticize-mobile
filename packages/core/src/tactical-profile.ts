@@ -425,6 +425,16 @@ export type TacticalProfileActiveFamilyCalibration = {
     themePriorSdRating: number;
     practicalDeficitRating: number;
     minExpectedFailuresPer100: number;
+    /**
+     * When present, each theme is measured against the user's own solve
+     * level: a per-family logit offset fitted from leave-theme-out attempts
+     * and added to the artifact baseline above. Without it the artifact
+     * baseline is used directly.
+     */
+    personalBaseline?: {
+      minimumControlWeight: number;
+      offsetPriorSdLogit: number;
+    };
   };
   speed?: {
     minimumControlWeight: number;
@@ -530,9 +540,32 @@ export type TacticalProfileDailyCell = {
   speedBaseline: TacticalProfileSpeedSufficientStatistics;
   speedTheme: TacticalProfileSpeedSufficientStatistics;
   speedControlExclusion: TacticalProfileSpeedSufficientStatistics;
+  /** Personal solve baseline statistics; empty unless the family uses one. */
+  solveBaseline: readonly TacticalProfileSolveBin[];
+  solveTheme: readonly TacticalProfileSolveBin[];
+  solveControlExclusion: readonly TacticalProfileSolveBin[];
   distinctPuzzleIds: readonly string[];
   distinctSessionIds: readonly string[];
 };
+
+/**
+ * Solve attempts grouped by their artifact baseline logit, rounded to
+ * TACTICAL_PROFILE_SOLVE_BIN_WIDTH_LOGIT:
+ * [bin, weight, success weight, weighted logit sum, weighted sensitivity sum].
+ * The bins re-evaluate the solve likelihood under any personal offset (to
+ * within each bin's mean logit and sensitivity), so a theme posterior is
+ * re-centred on the personal baseline instead of being approximated by one
+ * score step around the artifact baseline.
+ */
+export type TacticalProfileSolveBin = readonly [
+  bin: number,
+  weight: number,
+  successWeight: number,
+  logitWeight: number,
+  sensitivityWeight: number
+];
+
+export const TACTICAL_PROFILE_SOLVE_BIN_WIDTH_LOGIT = 0.05;
 
 export type TacticalProfileSpeedSufficientStatistics = {
   weight: number;
@@ -717,7 +750,14 @@ export function buildTacticalProfileDailyCells(
       classification.taskFamily,
       familyCalibration
     );
-    if (speedObservation) {
+    // A personal solve baseline reuses the family baseline cell that the
+    // speed head already keeps, so its controls follow the same
+    // leave-theme-out subtraction.
+    const personalSolveObservation =
+      familyCalibration.solve.personalBaseline === undefined
+        ? undefined
+        : solveObservation;
+    if (speedObservation || personalSolveObservation) {
       const baselineKey = dailyCellKey({
         calibration,
         completedDay,
@@ -730,11 +770,20 @@ export function buildTacticalProfileDailyCells(
         taskFamily: classification.taskFamily,
         theme: TACTICAL_PROFILE_SPEED_BASELINE_THEME
       });
-      addSpeedObservation(
-        baselineCell.speedBaseline,
-        speedObservation,
-        1
-      );
+      if (speedObservation) {
+        addSpeedObservation(
+          baselineCell.speedBaseline,
+          speedObservation,
+          1
+        );
+      }
+      if (personalSolveObservation) {
+        addSolveBinObservation(
+          baselineCell.solveBaseline,
+          personalSolveObservation,
+          1
+        );
+      }
       cells.set(baselineKey, baselineCell);
     }
     if (themes.length === 0) {
@@ -769,6 +818,18 @@ export function buildTacticalProfileDailyCells(
         cell.solveObservedSuccess += weight * solveObservation.success;
         cell.solveSensitivity += weight * solveObservation.sensitivity;
         cell.solveWeight += weight;
+      }
+      if (personalSolveObservation) {
+        addSolveBinObservation(
+          cell.solveTheme,
+          personalSolveObservation,
+          themeWeight
+        );
+        addSolveBinObservation(
+          cell.solveControlExclusion,
+          personalSolveObservation,
+          1
+        );
       }
       if (speedObservation) {
         addSpeedObservation(
@@ -1022,15 +1083,24 @@ type MutableTacticalProfileDailyCell = Omit<
   | "speedBaseline"
   | "speedTheme"
   | "speedControlExclusion"
+  | "solveBaseline"
+  | "solveTheme"
+  | "solveControlExclusion"
   | "distinctPuzzleIds"
   | "distinctSessionIds"
 > & {
   speedBaseline: MutableSpeedSufficientStatistics;
   speedTheme: MutableSpeedSufficientStatistics;
   speedControlExclusion: MutableSpeedSufficientStatistics;
+  solveBaseline: MutableSolveBins;
+  solveTheme: MutableSolveBins;
+  solveControlExclusion: MutableSolveBins;
   distinctPuzzleIds: Set<string>;
   distinctSessionIds: Set<string>;
 };
+
+/** bin -> [weight, success weight, logit weight, sensitivity weight] */
+type MutableSolveBins = Map<number, [number, number, number, number]>;
 
 type MutableSpeedSufficientStatistics = {
   weight: number;
@@ -1052,6 +1122,8 @@ type MutableEvaluationAggregate = {
   solveWeight: number;
   speedTheme: MutableSpeedSufficientStatistics;
   speedControlExclusion: MutableSpeedSufficientStatistics;
+  solveTheme: MutableSolveBins;
+  solveControlExclusion: MutableSolveBins;
   distinctPuzzleIds: Set<string>;
   distinctSessionIds: Set<string>;
 };
@@ -1093,6 +1165,7 @@ function tacticalProfileThemeAnalyses(
     TacticalProfileTaskFamily,
     MutableSpeedSufficientStatistics
   >();
+  const solveBaselines = new Map<TacticalProfileTaskFamily, MutableSolveBins>();
 
   for (const cell of cells) {
     if (
@@ -1115,6 +1188,9 @@ function tacticalProfileThemeAnalyses(
         mutableSpeedStatistics();
       addSpeedStatistics(baseline, cell.speedBaseline, decay);
       speedBaselines.set(cell.taskFamily, baseline);
+      const solveBaseline = solveBaselines.get(cell.taskFamily) ?? new Map();
+      addSolveBins(solveBaseline, cell.solveBaseline, decay);
+      solveBaselines.set(cell.taskFamily, solveBaseline);
       continue;
     }
     const key = `${cell.taskFamily}\u0000${cell.theme}`;
@@ -1136,6 +1212,12 @@ function tacticalProfileThemeAnalyses(
       cell.speedControlExclusion,
       decay
     );
+    addSolveBins(aggregate.solveTheme, cell.solveTheme, decay);
+    addSolveBins(
+      aggregate.solveControlExclusion,
+      cell.solveControlExclusion,
+      decay
+    );
     cell.distinctPuzzleIds.forEach((id) => aggregate.distinctPuzzleIds.add(id));
     cell.distinctSessionIds.forEach((id) => aggregate.distinctSessionIds.add(id));
     aggregates.set(key, aggregate);
@@ -1147,35 +1229,34 @@ function tacticalProfileThemeAnalyses(
       if (!isActiveFamilyCalibration(familyCalibration)) {
         throw new Error("Tactical Profile active family changed during evaluation");
       }
-      const solvePosterior = posteriorFromScoreInformation(
-        aggregate.solveScore,
-        aggregate.solveInformation,
-        familyCalibration.solve.themePriorSdRating
-      );
-      const solveConfidence = normalCdf(
-        (
-          -familyCalibration.solve.practicalDeficitRating -
-          solvePosterior.mean
-        ) / solvePosterior.standardDeviation
-      );
-      const representativeProbability = aggregate.solveWeight > 0
-        ? clampProbability(
-            aggregate.solveExpectedSuccess / aggregate.solveWeight
+      const solveHead = familyCalibration.solve.personalBaseline
+        ? personalSolveHead(
+            aggregate,
+            solveBaselines.get(aggregate.taskFamily),
+            familyCalibration.solve,
+            familyCalibration.solve.personalBaseline
           )
-        : 0.5;
-      const representativeSensitivity = aggregate.solveWeight > 0
-        ? aggregate.solveSensitivity / aggregate.solveWeight
+        : artifactSolveHead(aggregate, familyCalibration.solve);
+      const solveConfidence = solveHead.posterior
+        ? normalCdf(
+            (
+              -familyCalibration.solve.practicalDeficitRating -
+              solveHead.posterior.mean
+            ) / solveHead.posterior.standardDeviation
+          )
         : 0;
-      const expectedFailuresPer100 = Math.max(
-        0,
-        100 * (
-          representativeProbability -
-          logistic(
-            logit(representativeProbability) +
-            representativeSensitivity * solvePosterior.mean
+      const expectedFailuresPer100 = solveHead.posterior
+        ? Math.max(
+            0,
+            100 * (
+              solveHead.representativeProbability -
+              logistic(
+                logit(solveHead.representativeProbability) +
+                solveHead.representativeSensitivity * solveHead.posterior.mean
+              )
+            )
           )
-        )
-      );
+        : 0;
       const solveImpactPasses =
         expectedFailuresPer100 >=
         familyCalibration.solve.minExpectedFailuresPer100;
@@ -1219,7 +1300,7 @@ function tacticalProfileThemeAnalyses(
         distinctPuzzleCount: aggregate.distinctPuzzleIds.size,
         distinctSessionCount: aggregate.distinctSessionIds.size,
         accuracyEvidenceWeight: aggregate.accuracyWeight,
-        solveEvidenceWeight: aggregate.solveWeight,
+        solveEvidenceWeight: solveHead.evidenceWeight,
         speedEvidenceWeight: speedPosterior
           ? aggregate.speedTheme.weight
           : 0,
@@ -1282,6 +1363,9 @@ function mutableDailyCell(input: {
     speedBaseline: mutableSpeedStatistics(),
     speedTheme: mutableSpeedStatistics(),
     speedControlExclusion: mutableSpeedStatistics(),
+    solveBaseline: new Map(),
+    solveTheme: new Map(),
+    solveControlExclusion: new Map(),
     distinctPuzzleIds: new Set<string>(),
     distinctSessionIds: new Set<string>()
   };
@@ -1298,6 +1382,9 @@ function freezeDailyCell(
     speedControlExclusion: freezeSpeedStatistics(
       cell.speedControlExclusion
     ),
+    solveBaseline: freezeSolveBins(cell.solveBaseline),
+    solveTheme: freezeSolveBins(cell.solveTheme),
+    solveControlExclusion: freezeSolveBins(cell.solveControlExclusion),
     distinctPuzzleIds: [...cell.distinctPuzzleIds]
       .sort()
       .slice(0, calibration.evidence.minDistinctPuzzles),
@@ -1333,15 +1420,268 @@ function mutableEvaluationAggregate(
     solveWeight: 0,
     speedTheme: mutableSpeedStatistics(),
     speedControlExclusion: mutableSpeedStatistics(),
+    solveTheme: new Map(),
+    solveControlExclusion: new Map(),
     distinctPuzzleIds: new Set<string>(),
     distinctSessionIds: new Set<string>()
   };
 }
 
+type SolveHead = {
+  /** Undefined when the head has too little evidence to judge the theme. */
+  posterior: NormalPosterior | undefined;
+  evidenceWeight: number;
+  representativeProbability: number;
+  representativeSensitivity: number;
+};
+
+function artifactSolveHead(
+  aggregate: MutableEvaluationAggregate,
+  calibration: TacticalProfileActiveFamilyCalibration["solve"]
+): SolveHead {
+  return {
+    posterior: posteriorFromScoreInformation(
+      aggregate.solveScore,
+      aggregate.solveInformation,
+      calibration.themePriorSdRating
+    ),
+    evidenceWeight: aggregate.solveWeight,
+    representativeProbability: aggregate.solveWeight > 0
+      ? clampProbability(aggregate.solveExpectedSuccess / aggregate.solveWeight)
+      : 0.5,
+    representativeSensitivity: aggregate.solveWeight > 0
+      ? aggregate.solveSensitivity / aggregate.solveWeight
+      : 0
+  };
+}
+
+/**
+ * Measures a theme against the user's own solve level. The family offset is
+ * fitted from every eligible attempt except those carrying the theme, then
+ * the theme's Rating deficit is fitted exactly around that personal
+ * baseline. The Glicko-shaped Rating-gap term of the artifact baseline is
+ * kept inside each bin's logit.
+ */
+function personalSolveHead(
+  aggregate: MutableEvaluationAggregate,
+  familyBaseline: MutableSolveBins | undefined,
+  calibration: TacticalProfileActiveFamilyCalibration["solve"],
+  personal: NonNullable<
+    TacticalProfileActiveFamilyCalibration["solve"]["personalBaseline"]
+  >
+): SolveHead {
+  const theme = freezeSolveBins(aggregate.solveTheme);
+  const controls = subtractSolveBins(
+    familyBaseline,
+    aggregate.solveControlExclusion
+  );
+  const themeWeight = solveBinWeight(theme);
+  const offset = solveBinWeight(controls) >= personal.minimumControlWeight
+    ? fitPersonalSolveOffset(controls, personal.offsetPriorSdLogit)
+    : undefined;
+  if (offset === undefined || themeWeight <= 0) {
+    return {
+      posterior: undefined,
+      evidenceWeight: 0,
+      representativeProbability: 0.5,
+      representativeSensitivity: 0
+    };
+  }
+  let expected = 0;
+  let sensitivity = 0;
+  for (const [, weight, , logitWeight, sensitivityWeight] of theme) {
+    expected += weight * logistic(logitWeight / weight + offset);
+    sensitivity += sensitivityWeight;
+  }
+  return {
+    posterior: personalSolveThemePosterior(
+      theme,
+      offset,
+      calibration.themePriorSdRating
+    ),
+    evidenceWeight: themeWeight,
+    representativeProbability: clampProbability(expected / themeWeight),
+    representativeSensitivity: sensitivity / themeWeight
+  };
+}
+
+/**
+ * MAP logit offset of the user's solve rate from the artifact baseline,
+ * fitted on control bins with a normal prior centred on zero. The
+ * Glicko-shaped Rating-gap term stays inside each bin's artifact logit.
+ */
+export function fitPersonalSolveOffset(
+  controls: readonly TacticalProfileSolveBin[],
+  priorSdLogit: number
+): number {
+  assertPositiveFinite("personal solve offset prior", priorSdLogit);
+  const priorPrecision = 1 / priorSdLogit ** 2;
+  let offset = 0;
+  for (let iteration = 0; iteration < 50; iteration += 1) {
+    let gradient = -offset * priorPrecision;
+    let curvature = priorPrecision;
+    for (const [, weight, successWeight, logitWeight] of controls) {
+      const probability = logistic(logitWeight / weight + offset);
+      gradient += successWeight - weight * probability;
+      curvature += weight * probability * (1 - probability);
+    }
+    const step = gradient / curvature;
+    offset += step;
+    if (Math.abs(step) < 1e-10) {
+      break;
+    }
+  }
+  return offset;
+}
+
+/**
+ * Laplace posterior of a theme's Rating deficit around a personal baseline,
+ * matching exactSolveThemePosterior on the same attempts to within each bin's
+ * mean logit and sensitivity.
+ */
+export function personalSolveThemePosterior(
+  theme: readonly TacticalProfileSolveBin[],
+  offset: number,
+  priorSdRating: number
+): NormalPosterior {
+  assertPositiveFinite("solve prior standard deviation", priorSdRating);
+  if (!Number.isFinite(offset)) {
+    throw new Error("Personal solve offset must be finite");
+  }
+  const priorPrecision = 1 / priorSdRating ** 2;
+  let mean = 0;
+  let curvature = priorPrecision;
+  for (let iteration = 0; iteration < 50; iteration += 1) {
+    let gradient = -mean * priorPrecision;
+    curvature = priorPrecision;
+    for (const [, weight, successWeight, logitWeight, sensitivityWeight] of theme) {
+      const sensitivity = sensitivityWeight / weight;
+      const probability = logistic(
+        logitWeight / weight + offset + sensitivity * mean
+      );
+      gradient += sensitivity * (successWeight - weight * probability);
+      curvature += weight * sensitivity ** 2 * probability * (1 - probability);
+    }
+    const step = gradient / curvature;
+    mean += step;
+    if (Math.abs(step) < 1e-9) {
+      break;
+    }
+  }
+  return { mean, standardDeviation: Math.sqrt(1 / curvature) };
+}
+
+/** Bins raw solve observations; exported for exact-equivalence tests. */
+export function tacticalProfileSolveBins(
+  observations: readonly (SolveThemeObservation & { baselineLogit: number })[]
+): TacticalProfileSolveBin[] {
+  const bins: MutableSolveBins = new Map();
+  for (const observation of observations) {
+    addSolveBinObservation(bins, observation, observation.weight);
+  }
+  return freezeSolveBins(bins);
+}
+
+function addSolveBinObservation(
+  bins: MutableSolveBins,
+  observation: BaselineSolveObservation,
+  weight: number
+): void {
+  if (
+    !validSolveObservation(observation) ||
+    !Number.isFinite(observation.baselineLogit) ||
+    !Number.isFinite(weight) ||
+    weight <= 0
+  ) {
+    throw new Error("Tactical Profile solve observation is invalid");
+  }
+  const bin = Math.round(
+    observation.baselineLogit / TACTICAL_PROFILE_SOLVE_BIN_WIDTH_LOGIT
+  );
+  const current = bins.get(bin) ?? [0, 0, 0, 0];
+  current[0] += weight;
+  current[1] += weight * observation.success;
+  current[2] += weight * observation.baselineLogit;
+  current[3] += weight * observation.sensitivity;
+  bins.set(bin, current);
+}
+
+function addSolveBins(
+  target: MutableSolveBins,
+  source: readonly TacticalProfileSolveBin[],
+  scale: number
+): void {
+  if (!Number.isFinite(scale) || scale < 0) {
+    throw new Error("Tactical Profile solve statistics are invalid");
+  }
+  for (const entry of source) {
+    if (!validSolveBin(entry)) {
+      throw new Error("Tactical Profile solve statistics are invalid");
+    }
+    const [bin, weight, successWeight, logitWeight, sensitivityWeight] = entry;
+    const current = target.get(bin) ?? [0, 0, 0, 0];
+    current[0] += scale * weight;
+    current[1] += scale * successWeight;
+    current[2] += scale * logitWeight;
+    current[3] += scale * sensitivityWeight;
+    target.set(bin, current);
+  }
+}
+
+function subtractSolveBins(
+  total: MutableSolveBins | undefined,
+  excluded: MutableSolveBins
+): TacticalProfileSolveBin[] {
+  const difference: MutableSolveBins = new Map();
+  for (const [bin, values] of total ?? []) {
+    const removed = excluded.get(bin) ?? [0, 0, 0, 0];
+    const weight = cleanSubtraction(values[0] - removed[0]);
+    if (weight <= 1e-9) {
+      continue;
+    }
+    difference.set(bin, [
+      weight,
+      Math.min(weight, Math.max(0, cleanSubtraction(values[1] - removed[1]))),
+      values[2] - removed[2],
+      Math.max(0, values[3] - removed[3])
+    ]);
+  }
+  return freezeSolveBins(difference);
+}
+
+function freezeSolveBins(bins: MutableSolveBins): TacticalProfileSolveBin[] {
+  return [...bins.entries()]
+    .filter(([, values]) => values[0] > 0)
+    .sort(([left], [right]) => left - right)
+    .map(([bin, values]) => [bin, values[0], values[1], values[2], values[3]]);
+}
+
+function solveBinWeight(bins: readonly TacticalProfileSolveBin[]): number {
+  return bins.reduce((sum, [, weight]) => sum + weight, 0);
+}
+
+export function validSolveBin(value: unknown): value is TacticalProfileSolveBin {
+  if (!Array.isArray(value) || value.length !== 5) {
+    return false;
+  }
+  const [bin, weight, successWeight, logitWeight, sensitivityWeight] = value as unknown[];
+  return Number.isSafeInteger(bin) &&
+    typeof weight === "number" && Number.isFinite(weight) && weight > 0 &&
+    typeof successWeight === "number" && Number.isFinite(successWeight) &&
+    successWeight >= 0 && successWeight <= weight + 1e-9 &&
+    typeof logitWeight === "number" && Number.isFinite(logitWeight) &&
+    typeof sensitivityWeight === "number" && Number.isFinite(sensitivityWeight) &&
+    sensitivityWeight >= 0;
+}
+
+type BaselineSolveObservation = SolveThemeObservation & {
+  baselineLogit: number;
+};
+
 function solveObservationFor(
   input: TacticalProfileAttemptInput,
   calibration: TacticalProfileActiveFamilyCalibration
-): SolveThemeObservation | undefined {
+): BaselineSolveObservation | undefined {
   const ratingDeviation = input.puzzle.ratingDeviation;
   const timeoutAfterSeconds = input.sessionConfig?.puzzleTiming?.timeoutAfterSeconds;
   if (
@@ -1368,6 +1708,7 @@ function solveObservationFor(
     calibration.solve.timeoutLogCoefficient *
       features.timeoutLogRatio;
   return {
+    baselineLogit: eta,
     baselineProbability: logistic(eta),
     sensitivity: features.sensitivity,
     success: input.attempt.result === "correct" ? 1 : 0,
@@ -2037,6 +2378,23 @@ export function assertValidTacticalProfileCalibrationArtifact(
         family.solve.minExpectedFailuresPer100
       )
     );
+    if (family.solve.personalBaseline !== undefined) {
+      const personal = family.solve.personalBaseline as unknown;
+      if (!isRecord(personal)) {
+        throw new Error("Tactical Profile personal solve baseline is invalid");
+      }
+      assertPositiveFinite(
+        "personal solve minimum control weight",
+        finiteNumber(
+          "personal solve minimum control weight",
+          personal.minimumControlWeight
+        )
+      );
+      assertPositiveFinite(
+        "personal solve offset prior",
+        finiteNumber("personal solve offset prior", personal.offsetPriorSdLogit)
+      );
+    }
     if (family.speed !== undefined) {
       if (!isRecord(family.speed)) {
         throw new Error("Tactical Profile speed calibration is invalid");

@@ -473,6 +473,96 @@ test("SQLite Tactical Profile cache v7 invalidates released v6 speed rows atomic
   assert.ok(!columns.includes("speed_weighted_residual"));
 });
 
+test("SQLite Tactical Profile cache v8 invalidates released v7 rows without personal solve statistics", () => {
+  const native = new DatabaseSync(":memory:");
+  createSchemaV6Fixture(native);
+  native.exec(`
+    DROP TABLE weakness_daily_stats;
+    CREATE TABLE weakness_daily_stats (
+      model_version TEXT NOT NULL,
+      pack_feature_hash TEXT NOT NULL,
+      calibration_id TEXT NOT NULL,
+      completed_day TEXT NOT NULL,
+      task_family TEXT NOT NULL,
+      theme TEXT NOT NULL,
+      accuracy_success_weight REAL NOT NULL,
+      accuracy_weight REAL NOT NULL,
+      solve_score REAL NOT NULL,
+      solve_information REAL NOT NULL,
+      solve_expected_success REAL NOT NULL,
+      solve_observed_success REAL NOT NULL,
+      solve_sensitivity REAL NOT NULL,
+      solve_weight REAL NOT NULL,
+      speed_baseline_json TEXT NOT NULL,
+      speed_theme_json TEXT NOT NULL,
+      speed_control_exclusion_json TEXT NOT NULL,
+      distinct_puzzle_ids_json TEXT NOT NULL,
+      distinct_session_ids_json TEXT NOT NULL,
+      PRIMARY KEY (
+        model_version,
+        pack_feature_hash,
+        calibration_id,
+        completed_day,
+        task_family,
+        theme
+      )
+    );
+    INSERT INTO weakness_daily_stats VALUES (
+      'model-v1', 'sha256:pack', 'calibration-v1', '2026-07-01', 'line', 'fork',
+      1, 1, 0, 0, 0, 0, 0, 0, '{}', '{}', '{}', '["p1"]', '["s1"]'
+    );
+    PRAGMA user_version = 7;
+  `);
+  const repository = new SQLiteTacticalProfileRepository(
+    new NodeSqliteDatabase(native)
+  );
+
+  repository.migrate();
+
+  assert.equal(
+    (native.prepare("PRAGMA user_version").get() as { user_version: number })
+      .user_version,
+    TACTICAL_PROFILE_CACHE_SCHEMA_VERSION
+  );
+  assert.equal(repository.getBuildState(), undefined);
+  assert.equal(
+    (native.prepare("SELECT COUNT(*) AS count FROM weakness_daily_stats").get() as {
+      count: number;
+    }).count,
+    0
+  );
+  const columns = native.prepare("PRAGMA table_info(weakness_daily_stats)")
+    .all()
+    .map((row) => (row as { name: string }).name);
+  assert.ok(columns.includes("solve_baseline_json"));
+  assert.ok(columns.includes("solve_theme_json"));
+  assert.ok(columns.includes("solve_control_exclusion_json"));
+});
+
+test("SQLite Tactical Profile cache round-trips and validates personal solve statistics", () => {
+  const native = new DatabaseSync(":memory:");
+  const repository = new SQLiteTacticalProfileRepository(
+    new NodeSqliteDatabase(native)
+  );
+  repository.migrate();
+  repository.reset(IDENTITY, ["2026-07-20"], 1);
+  const stored = {
+    ...cell("2026-07-20", "fork", 0.1),
+    solveTheme: [[-4, 0.5, 0.5, -0.1, 0.0027]] as const,
+    solveControlExclusion: [[-4, 1, 1, -0.2, 0.0055]] as const
+  };
+
+  repository.replaceDay(IDENTITY, "2026-07-20", [stored]);
+
+  assert.deepEqual(repository.listDailyCells(IDENTITY), [stored]);
+  native.prepare("UPDATE weakness_daily_stats SET solve_theme_json = ?")
+    .run(JSON.stringify([[-4, 0.5, 0.9, -0.1, 0.0027]]));
+  assert.throws(
+    () => repository.listDailyCells(IDENTITY),
+    /Invalid Tactical Profile solve statistics/
+  );
+});
+
 test("SQLite Tactical Profile cache migration failure preserves the v6 schema version", () => {
   const native = new DatabaseSync(":memory:");
   native.exec(`
@@ -601,6 +691,9 @@ function cell(
     speedBaseline: emptySpeedStatistics(),
     speedTheme: emptySpeedStatistics(),
     speedControlExclusion: emptySpeedStatistics(),
+    solveBaseline: [],
+    solveTheme: [],
+    solveControlExclusion: [],
     distinctPuzzleIds: [`p-${theme}`],
     distinctSessionIds: [`s-${completedDay}`]
   };

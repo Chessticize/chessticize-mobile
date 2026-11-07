@@ -26,6 +26,20 @@ contain a global expected solve time. If a theme lacks enough personal
 controls, that speed head remains unavailable rather than falling back to a
 fixed number of seconds.
 
+The solve head is personal in the same way (issue #607). Each family's
+`solve.personalBaseline` fits a logit offset from the user's own leave-theme-out
+eligible attempts on top of the artifact baseline, which keeps the
+Glicko-shaped Rating-gap term. A theme is measured against that personal level
+rather than a fixed 50% per-puzzle expectation. If a theme lacks
+`minimumControlWeight` of controls, its solve head is unavailable. The artifact
+identity `tactical-profile-v1-provisional-personal-solve-speed` replaced the
+speed-only identity, so existing history is rebuilt into new cells. The
+families stay `provisional` under the same owner decision record. Arrow Duel
+uses the same logistic offset with a tighter solve-theme prior; see section 6
+of the research specification for the rationale. A future calibrated
+artifact may omit `personalBaseline` and fit the family intercept from the
+representative corpus instead.
+
 ## Simulated-player diagnostics
 
 `packages/storage/src/simulation/` contains a deterministic, seeded simulated
@@ -39,10 +53,13 @@ use:
 ```sh
 pnpm simulate:tactical-profile --seeds 10 --runs 40
 pnpm simulate:tactical-profile --pack fixtures/puzzles/bundled-core-pack.sqlite
+pnpm simulate:tactical-profile --calibration scratch/candidate-artifact.json
 ```
 
-The report prints detection rate, Runs to detection, false-positive rate, and
-Runs until the first Profile phase change. Synthetic histories are never
+The report prints detection rate, Runs to detection, false-positive rate,
+recommendation re-entries, and Runs until the first Profile phase change.
+`--calibration` compares a candidate artifact with the same seeds before it
+replaces the shipped one. Synthetic histories are never
 calibration evidence: the report carries no corpus or report hash and must not
 be passed to `pnpm calibrate:tactical-profile`.
 
