@@ -99,6 +99,9 @@ test("derived Tactical Profile cache cannot enter local export or iCloud sync pa
     speedBaseline: emptySpeedStatistics(),
     speedTheme: emptySpeedStatistics(),
     speedControlExclusion: emptySpeedStatistics(),
+    solveBaseline: [],
+    solveTheme: [],
+    solveControlExclusion: [],
     distinctPuzzleIds: ["private-derived-puzzle"],
     distinctSessionIds: ["private-derived-session"]
   }]);

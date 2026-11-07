@@ -1,13 +1,17 @@
 import type {
   TacticalProfileCalibrationArtifact,
   TacticalProfileDailyCell,
+  TacticalProfileSolveBin,
   TacticalProfileSpeedSufficientStatistics,
   TacticalProfileTaskFamily
 } from "../../core/src/index.ts";
-import { TACTICAL_PROFILE_SPEED_FEATURE_COUNT } from "../../core/src/index.ts";
+import {
+  TACTICAL_PROFILE_SPEED_FEATURE_COUNT,
+  validSolveBin
+} from "../../core/src/index.ts";
 import type { SyncSqliteDatabase } from "./sync-sqlite-store.ts";
 
-export const TACTICAL_PROFILE_CACHE_SCHEMA_VERSION = 7;
+export const TACTICAL_PROFILE_CACHE_SCHEMA_VERSION = 8;
 
 const CREATE_CURRENT_DERIVED_TABLES_SQL = `
   CREATE TABLE weakness_daily_stats (
@@ -28,6 +32,9 @@ const CREATE_CURRENT_DERIVED_TABLES_SQL = `
     speed_baseline_json TEXT NOT NULL,
     speed_theme_json TEXT NOT NULL,
     speed_control_exclusion_json TEXT NOT NULL,
+    solve_baseline_json TEXT NOT NULL,
+    solve_theme_json TEXT NOT NULL,
+    solve_control_exclusion_json TEXT NOT NULL,
     distinct_puzzle_ids_json TEXT NOT NULL,
     distinct_session_ids_json TEXT NOT NULL,
     PRIMARY KEY (
@@ -312,7 +319,7 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
             ADD COLUMN focused_run_watermarks_json TEXT;
           `);
         }
-        if (current <= 6) {
+        if (current <= 7) {
           this.db.exec(`
             DROP TABLE IF EXISTS weakness_daily_stats;
             DROP TABLE IF EXISTS weakness_dirty_days;
@@ -448,9 +455,12 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           speed_baseline_json,
           speed_theme_json,
           speed_control_exclusion_json,
+          solve_baseline_json,
+          solve_theme_json,
+          solve_control_exclusion_json,
           distinct_puzzle_ids_json,
           distinct_session_ids_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const cell of cells) {
         if (
@@ -477,6 +487,9 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
           JSON.stringify(cell.speedBaseline),
           JSON.stringify(cell.speedTheme),
           JSON.stringify(cell.speedControlExclusion),
+          JSON.stringify(cell.solveBaseline),
+          JSON.stringify(cell.solveTheme),
+          JSON.stringify(cell.solveControlExclusion),
           JSON.stringify([...cell.distinctPuzzleIds].sort()),
           JSON.stringify([...cell.distinctSessionIds].sort())
         );
@@ -512,6 +525,9 @@ export class SQLiteTacticalProfileRepository implements TacticalProfileRepositor
         speed_baseline_json AS speedBaselineJson,
         speed_theme_json AS speedThemeJson,
         speed_control_exclusion_json AS speedControlExclusionJson,
+        solve_baseline_json AS solveBaselineJson,
+        solve_theme_json AS solveThemeJson,
+        solve_control_exclusion_json AS solveControlExclusionJson,
         distinct_puzzle_ids_json AS distinctPuzzleIdsJson,
         distinct_session_ids_json AS distinctSessionIdsJson
       FROM weakness_daily_stats
@@ -640,6 +656,9 @@ interface DailyCellRow extends Omit<
   | "speedBaseline"
   | "speedTheme"
   | "speedControlExclusion"
+  | "solveBaseline"
+  | "solveTheme"
+  | "solveControlExclusion"
   | "distinctPuzzleIds"
   | "distinctSessionIds"
 > {
@@ -647,6 +666,9 @@ interface DailyCellRow extends Omit<
   speedBaselineJson: string;
   speedThemeJson: string;
   speedControlExclusionJson: string;
+  solveBaselineJson: string;
+  solveThemeJson: string;
+  solveControlExclusionJson: string;
   distinctPuzzleIdsJson: string;
   distinctSessionIdsJson: string;
 }
@@ -867,6 +889,9 @@ function dailyCellFromRow(row: DailyCellRow): TacticalProfileDailyCell {
     speedControlExclusion: parseSpeedStatistics(
       row.speedControlExclusionJson
     ),
+    solveBaseline: parseSolveBins(row.solveBaselineJson),
+    solveTheme: parseSolveBins(row.solveThemeJson),
+    solveControlExclusion: parseSolveBins(row.solveControlExclusionJson),
     distinctPuzzleIds: parseStringArray(row.distinctPuzzleIdsJson),
     distinctSessionIds: parseStringArray(row.distinctSessionIdsJson)
   };
@@ -878,6 +903,14 @@ function parseStringArray(value: string): string[] {
     throw new Error("Invalid Tactical Profile diversity set");
   }
   return [...new Set(parsed)].sort();
+}
+
+function parseSolveBins(value: string): TacticalProfileSolveBin[] {
+  const parsed = JSON.parse(value) as unknown;
+  if (!Array.isArray(parsed) || !parsed.every(validSolveBin)) {
+    throw new Error("Invalid Tactical Profile solve statistics");
+  }
+  return parsed.map((bin) => [...bin] as unknown as TacticalProfileSolveBin);
 }
 
 function parseSpeedStatistics(
@@ -962,6 +995,11 @@ function cloneCell(cell: TacticalProfileDailyCell): TacticalProfileDailyCell {
     speedTheme: cloneSpeedStatistics(cell.speedTheme),
     speedControlExclusion: cloneSpeedStatistics(
       cell.speedControlExclusion
+    ),
+    solveBaseline: cell.solveBaseline.map((bin) => [...bin] as unknown as TacticalProfileSolveBin),
+    solveTheme: cell.solveTheme.map((bin) => [...bin] as unknown as TacticalProfileSolveBin),
+    solveControlExclusion: cell.solveControlExclusion.map(
+      (bin) => [...bin] as unknown as TacticalProfileSolveBin
     ),
     distinctPuzzleIds: [...cell.distinctPuzzleIds],
     distinctSessionIds: [...cell.distinctSessionIds]

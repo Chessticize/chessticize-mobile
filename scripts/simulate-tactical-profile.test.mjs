@@ -21,13 +21,19 @@ test("summaries count detection by planted signal and false positives by other t
     record("ready", [
       { id: "line:fork", theme: "fork", status: "recommended", reason: "completed_speed" },
       { id: "line:pin", theme: "pin", status: "recommended", reason: "completed_speed" }
+    ]),
+    // arrow_duel:fork left recommendation after Run 2 and re-enters here.
+    record("ready", [
+      { id: "arrow_duel:fork", theme: "fork", status: "recommended", reason: "completed_speed" },
+      { id: "line:fork", theme: "fork", status: "recommended", reason: "completed_speed" }
     ])
   ], target);
 
   assert.deepEqual(summary, {
-    runs: 4,
+    runs: 5,
     detectedAtRun: 4,
     offTargetRecommendationRuns: 1,
+    recommendationReentries: 1,
     firstPhaseChangeRun: 2,
     firstPhase: "collecting",
     changedPhase: "ready"
