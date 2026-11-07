@@ -104,6 +104,12 @@ jobs:
       - name: Typecheck, registry tests, and static Storybook build
         run: pnpm mobile:lab:validate
 
+      - name: Install pinned headless Chromium for the render smoke
+        run: pnpm --filter ChessticizeMobileLab exec playwright-core install --with-deps chromium-headless-shell
+
+      - name: Render every Lab scenario headlessly
+        run: pnpm mobile:lab:smoke
+
       - name: Validate issue-owned New Scenario Markers
         env:
           BASE_REF: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}

@@ -1,13 +1,19 @@
 import { execFileSync } from "node:child_process";
-import { createReadStream, existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
-import { extname, join, normalize, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Browser } from "playwright-core";
+import type { Browser } from "playwright-core";
 import sharp from "sharp";
 import { LAB_DEVICE_VIEWPORTS } from "../src/labDeviceFrame.ts";
-import { scenarioRegistry } from "../src/scenarioRegistry.ts";
+import {
+  launchBrowser,
+  readIndexedStoryIds,
+  registryStoryIds,
+  serve,
+  storyUrl,
+  waitForStoryRender
+} from "./labBrowser.ts";
 
 // Pixel-diffs every product-clone scenario between a baseline build and the
 // current checkout. Usage and output are documented in apps/mobile-lab/README.md.
@@ -18,19 +24,6 @@ type Mode = "baseline" | "compare";
 const labRoot = fileURLToPath(new URL("../", import.meta.url));
 const repoRoot = resolve(labRoot, "../..");
 const defaultViewports: ViewportKey[] = ["phonePortrait", "phoneLandscape", "regularWidth"];
-const mimeTypes: Record<string, string> = {
-  ".css": "text/css",
-  ".html": "text/html",
-  ".js": "text/javascript",
-  ".json": "application/json",
-  ".mjs": "text/javascript",
-  ".png": "image/png",
-  ".svg": "image/svg+xml",
-  ".ttf": "font/ttf",
-  ".wasm": "application/wasm",
-  ".woff": "font/woff",
-  ".woff2": "font/woff2"
-};
 
 const { mode, options } = parseArguments(process.argv.slice(2));
 const outDir = resolve(options.out ?? join(repoRoot, "scratch", "visual-regression"));
@@ -143,19 +136,8 @@ async function capture(checkoutRoot: string, targetDir: string): Promise<void> {
   if (!options.skipBuild) {
     run("pnpm", ["--filter", "ChessticizeMobileLab", "build-storybook"], checkoutRoot);
   }
-  if (!existsSync(join(staticDir, "index.json"))) {
-    throw new Error(`No Storybook build at ${staticDir}.`);
-  }
-
-  const indexed = new Set(
-    Object.keys(
-      (JSON.parse(readFileSync(join(staticDir, "index.json"), "utf8")) as {
-        entries: Record<string, unknown>;
-      }).entries
-    )
-  );
-  const storyIds = Object.values(scenarioRegistry)
-    .map((scenario) => scenario.storyId)
+  const indexed = readIndexedStoryIds(staticDir);
+  const storyIds = registryStoryIds()
     .filter((storyId) => indexed.has(storyId) && (options.only === undefined
       || storyId.includes(options.only)));
   const jobs = options.viewports.flatMap((viewport) =>
@@ -163,14 +145,7 @@ async function capture(checkoutRoot: string, targetDir: string): Promise<void> {
   );
 
   const server = await serve(staticDir);
-  // Prefer Playwright's own Chromium; fall back to the installed Google Chrome. Baseline and
-  // comparison must run on the same browser build.
-  const bundledBrowser = existsSync(chromium.executablePath());
-  if (!bundledBrowser) {
-    console.log("Playwright Chromium is not installed; using Google Chrome. "
-      + "Install it with `pnpm exec playwright-core install chromium-headless-shell`.");
-  }
-  const browser = await chromium.launch(bundledBrowser ? {} : { channel: "chrome" });
+  const browser = await launchBrowser();
   try {
     await mkdir(targetDir, { recursive: true });
     let next = 0;
@@ -236,24 +211,8 @@ async function sampleFrames(
   });
   try {
     const page = await context.newPage();
-    const url = `${baseUrl}/iframe.html?id=${storyId}&viewMode=story&globals=viewport.value:${viewport}`;
-    await page.goto(url, { waitUntil: "load" });
-    await page.waitForFunction(
-      () => {
-        const preview = (window as unknown as {
-          __STORYBOOK_PREVIEW__?: { currentRender?: { phase?: string } };
-        }).__STORYBOOK_PREVIEW__;
-        const phase = preview?.currentRender?.phase;
-        const body = document.body.classList;
-        if (body.contains("sb-show-errordisplay") || phase === "errored" || phase === "aborted") {
-          throw new Error(`story failed to render (${phase})`);
-        }
-        return body.contains("sb-show-main") && (phase === "played" || phase === "completed"
-          || phase === "finished");
-      },
-      undefined,
-      { timeout: 30_000 }
-    );
+    await page.goto(storyUrl(baseUrl, storyId, viewport), { waitUntil: "load" });
+    await waitForStoryRender(page);
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(options.settleMs);
     const frames: Buffer[] = [];
@@ -379,26 +338,6 @@ async function listPngs(dir: string): Promise<string[]> {
     }
   }
   return files;
-}
-
-function serve(root: string): Promise<{ url: string; close: () => void }> {
-  const server: Server = createServer((request, response) => {
-    const pathname = decodeURIComponent(new URL(request.url ?? "/", "http://localhost").pathname);
-    const file = normalize(join(root, pathname));
-    if (!file.startsWith(root + sep) || !existsSync(file)) {
-      response.writeHead(404).end();
-      return;
-    }
-    response.writeHead(200, { "content-type": mimeTypes[extname(file)] ?? "application/octet-stream" });
-    createReadStream(file).pipe(response);
-  });
-  return new Promise((resolveServer) => {
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      const port = typeof address === "object" && address !== null ? address.port : 0;
-      resolveServer({ url: `http://127.0.0.1:${port}`, close: () => server.close() });
-    });
-  });
 }
 
 function git(args: string[]): void {
