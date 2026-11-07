@@ -141,8 +141,15 @@ async function assertFirstUseSprintRulesGuideLayout() {
   const badge = element(by.id('practice-sprint-rule-puzzle-timeout-badge'));
   const copy = element(by.id('practice-sprint-rule-puzzle-timeout-copy'));
 
-  await waitFor(element(by.id('practice-sprint-rules-guide'))).toBeVisible().withTimeout(10000);
-  await waitFor(element(by.text('TIMEOUT'))).toBeVisible().withTimeout(10000);
+  if (deviceLabel.includes('large-text')) {
+    // An enlarged rules card can be taller than Detox's 75% visibility
+    // threshold allows; the frame checks below still cover its layout.
+    await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(10000);
+    await waitFor(element(by.text('TIMEOUT'))).toExist().withTimeout(10000);
+  } else {
+    await waitFor(element(by.id('practice-sprint-rules-guide'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.text('TIMEOUT'))).toBeVisible().withTimeout(10000);
+  }
 
   const rowFrame = await frameFor(row);
   const badgeFrame = await frameFor(badge);
