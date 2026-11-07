@@ -664,7 +664,12 @@ function chessboardColorsFor(theme: Theme): ChessboardColors {
       checkmateHighlight: board.checkmateHighlight,
       promotionPieceButton: board.promotionPieceButton,
       validMoveDot: board.validMoveDot,
-      validMoveCapture: board.validMoveCapture
+      validMoveCapture: board.validMoveCapture,
+      promotionOverlay: board.promotionOverlay,
+      promotionContainer: board.promotionContainer,
+      promotionBorder: board.promotionBorder,
+      promotionShadow: board.promotionShadow,
+      promotionPieceBorder: board.promotionPieceBorder
     };
     chessboardColorCache.set(theme, colors);
   }
@@ -20895,7 +20900,7 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.colors.accent.s600
   },
   historyToggleThumb: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.thumb,
     borderRadius: 10,
     height: 20,
     width: 20

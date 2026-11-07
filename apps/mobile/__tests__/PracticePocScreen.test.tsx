@@ -5,7 +5,7 @@ import { AppState } from "react-native";
 import * as ReactNative from "react-native";
 import * as SafeAreaContext from "react-native-safe-area-context";
 import TestRenderer, { act } from "react-test-renderer";
-import { ThemeProvider } from "../src/theme";
+import { darkTheme, lightTheme, ThemeProvider } from "../src/theme";
 import {
   isAppReviewRequestSurfaceBlocked,
   PracticePocScreen,
@@ -3406,6 +3406,37 @@ describe("PracticePocScreen", () => {
 
     expect(() => findByTestId(renderer, "practice-run-arrow-duel-reply-setting")).toThrow();
     expect(findByTestId(renderer, "practice-run-puzzle-timing")).toBeTruthy();
+  });
+
+  it("gives the chessboard, including its promotion dialog, the colors of the active theme", () => {
+    for (const theme of [lightTheme, darkTheme]) {
+      let renderer: TestRenderer.ReactTestRenderer | undefined;
+      act(() => {
+        renderer = TestRenderer.create(
+          <ThemeProvider theme={theme}>
+            <LabScenario scenarioId="practice-arrow-duel-prompt" />
+          </ThemeProvider>
+        );
+      });
+      renderers.push(renderer!);
+      startArrowDuelSprint(renderer!);
+
+      const { board } = theme.colors;
+      expect(findByTestId(renderer!, "mock-chessboard").props.colors).toEqual({
+        white: board.lightSquare,
+        black: board.darkSquare,
+        lastMoveHighlight: board.lastMoveHighlight,
+        checkmateHighlight: board.checkmateHighlight,
+        promotionPieceButton: board.promotionPieceButton,
+        validMoveDot: board.validMoveDot,
+        validMoveCapture: board.validMoveCapture,
+        promotionOverlay: board.promotionOverlay,
+        promotionContainer: board.promotionContainer,
+        promotionBorder: board.promotionBorder,
+        promotionShadow: board.promotionShadow,
+        promotionPieceBorder: board.promotionPieceBorder
+      });
+    }
   });
 
   it("saves the appearance override from Settings and tells the theme provider", () => {

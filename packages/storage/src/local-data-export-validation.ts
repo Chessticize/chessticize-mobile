@@ -53,6 +53,7 @@ export function normalizeLegacyProgressSyncSnapshot(
     data: {
       ...data,
       settings: {
+        appearance: defaults.appearance,
         sync: settings.sync,
         arrowDuel: defaults.arrowDuel,
         notifications: settings.notifications,

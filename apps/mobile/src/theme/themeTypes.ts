@@ -104,6 +104,8 @@ export type ThemeColors = {
   surfaceSunken: string;
   surfaceStrong: string;
   surfaceInverse: string;
+  // Knob of a toggle; stays light so it reads against both track states.
+  thumb: string;
   // Solid fills for tracks, dots and disabled controls, light to dark.
   fillMuted: string;
   fillStrong: string;

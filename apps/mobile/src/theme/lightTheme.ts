@@ -9,6 +9,7 @@ const colors: ThemeColors = {
   surfaceSunken: "#F1F5F9",
   surfaceStrong: "#E2E8F0",
   surfaceInverse: "#0F172A",
+  thumb: "#FFFFFF",
   fillMuted: "#CBD5E1",
   fillStrong: "#94A3B8",
   glass: "rgba(255, 255, 255, 0.66)",
