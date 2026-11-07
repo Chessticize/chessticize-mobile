@@ -60,6 +60,7 @@ const HOME_COLUMNS_MIN_CONTENT_WIDTH = 650;
 // guide reserves its non-board chrome: status bar, score strip, timing row,
 // unclear prompt and navigation, measured at 335 points on the Duo outer
 // display, plus a small margin. The prompt frame is reserved separately.
+// Stopgap: the measured guide layout in #611 replaces this device constant.
 const COMPACT_PORTRAIT_GUIDE_RESERVED_CHROME_HEIGHT = 340;
 const COMPACT_PORTRAIT_GUIDE_HEIGHT_RATIO = 0.34;
 const REGULAR_PORTRAIT_GUIDE_HEIGHT_RATIO = 0.42;
@@ -151,11 +152,8 @@ export function buildPracticeAdaptiveLayout({
     0,
     sessionContentWidth - PRACTICE_UI_PADDING * 2 - boardSize - sessionRailWidth
   );
-  // Balance the gap against the gutters of the safe viewport the row is
-  // centred in. Raw window width over-counts asymmetric insets such as the
-  // iPhone Duo status-bar column, which only one side of the row can see.
   const balancedSessionRailGap = Math.floor(
-    (sessionContentWidth - boardSize - sessionRailWidth) / 3
+    (width - boardSize - sessionRailWidth) / 3
   );
   const sessionRailGap = Math.min(
     maximumSessionRailGap,

@@ -2052,6 +2052,8 @@ describe('Detox suite configuration', () => {
     expect(spec).toContain('await expectSessionControlsContained(initialOrientation);');
     expect(spec).toContain('await startStandardSprintThroughContainedGuide(initialOrientation);');
     expect(spec).toContain("frameFor(element(by.id('practice-session-guide-navigation')))");
+    // A build that declares no portrait orientation skips the rotate-back.
+    expect(spec).toContain("&& iosAppSupportsOrientation('portrait')");
     expect(spec).toContain("require('./adaptiveScreenshotEvidence')");
     expect(spec).toContain('const archiveAdaptiveScreenshot = createAdaptiveScreenshotArchiver();');
     expect(spec).toContain(

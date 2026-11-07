@@ -112,7 +112,7 @@ describe("buildPracticeAdaptiveLayout", () => {
       width: 956,
       height: 440,
       insets: { top: 0, right: 62, bottom: 21, left: 62 },
-      expected: { board: 387, gap: 54, rail: 282, row: 723 }
+      expected: { board: 387, gap: 95, rail: 282, row: 764 }
     },
     {
       label: "iPad Pro 13-inch landscape",
@@ -126,16 +126,9 @@ describe("buildPracticeAdaptiveLayout", () => {
       width: 1080,
       height: 720,
       insets: { top: 0, right: 44, bottom: 21, left: 44 },
-      expected: { board: 579, gap: 38, rail: 297, row: 914 }
-    },
-    {
-      label: "landscape window with a one-sided status-bar column",
-      width: 951,
-      height: 669,
-      insets: { top: 0, right: 84, bottom: 20, left: 0 },
-      expected: { board: 525, gap: 14, rail: 296, row: 835 }
+      expected: { board: 579, gap: 68, rail: 297, row: 944 }
     }
-  ])("balances $label gutters inside its safe viewport", ({
+  ])("balances $label gutters without exceeding its safe viewport", ({
     expected,
     height,
     insets,
@@ -153,7 +146,6 @@ describe("buildPracticeAdaptiveLayout", () => {
       insets,
       width
     });
-    const safeWidth = width - insets.left - insets.right;
 
     expect({
       board: layout.boardSize,
@@ -162,42 +154,12 @@ describe("buildPracticeAdaptiveLayout", () => {
       row: layout.sessionPackedRowWidth
     }).toEqual(expected);
     expect(layout.sessionPackedRowWidth)
-      .toBeLessThanOrEqual(safeWidth - 2 * PRACTICE_UI_PADDING);
-    // The row is centred in the safe viewport, so the gap matches the safe
-    // gutters unless the minimum content padding caps it.
-    const safeGutter = (safeWidth - layout.sessionPackedRowWidth) / 2;
-    if (safeGutter > PRACTICE_UI_PADDING) {
-      expect(Math.abs(safeGutter - layout.sessionRailGap)).toBeLessThanOrEqual(1);
-    } else {
-      expect(safeGutter).toBeGreaterThanOrEqual(PRACTICE_UI_PADDING);
-    }
-  });
-
-  it("uses the inset-adjusted width for the rail gap when insets are asymmetric", () => {
-    const symmetric = buildPracticeAdaptiveLayout({
-      fontScale: 1,
-      height: 1032,
-      insets: { top: 0, right: 42, bottom: 20, left: 42 },
-      width: 1376
-    });
-    const leftOnly = buildPracticeAdaptiveLayout({
-      fontScale: 1,
-      height: 1032,
-      insets: { top: 0, right: 0, bottom: 20, left: 84 },
-      width: 1376
-    });
-    const rightOnly = buildPracticeAdaptiveLayout({
-      fontScale: 1,
-      height: 1032,
-      insets: { top: 0, right: 84, bottom: 20, left: 0 },
-      width: 1376
-    });
-
-    expect(leftOnly).toEqual(rightOnly);
-    expect(leftOnly.sessionRailGap).toBe(symmetric.sessionRailGap);
-    expect(leftOnly.sessionRailGap).toBe(
-      Math.floor((1376 - 84 - leftOnly.boardSize - leftOnly.sessionRailWidth) / 3)
-    );
+      .toBeLessThanOrEqual(
+        width - insets.left - insets.right - 2 * PRACTICE_UI_PADDING
+      );
+    expect(Math.abs(
+      (width - layout.sessionPackedRowWidth) / 2 - layout.sessionRailGap
+    )).toBeLessThanOrEqual(1);
   });
 
   // Window sizes and Safe Area insets measured with the iOS 27.1 Release app

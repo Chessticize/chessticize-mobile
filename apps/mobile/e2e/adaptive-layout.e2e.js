@@ -122,9 +122,14 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       });
     }
 
-    if (needsPortraitRestore && device.getPlatform() !== 'android') {
+    if (
+      needsPortraitRestore
+      && device.getPlatform() !== 'android'
+      && iosAppSupportsOrientation('portrait')
+    ) {
       // Leave the emulator in its natural orientation before the shell applies
-      // the next profile's portrait-shaped size override.
+      // the next profile's portrait-shaped size override. The landscape-only
+      // iPad validation build cannot rotate back, so it skips this restore.
       await setAdaptiveOrientation('portrait');
     }
   });
@@ -267,6 +272,37 @@ async function takeAdaptiveScreenshot(label) {
     screenshotPath
   ], { stdio: 'ignore' });
   return screenshotPath;
+}
+
+// Reads the orientations the installed iOS build declares for this device
+// family, so a step that needs an orientation the build does not support
+// (for example the landscape-only iPad validation build) is not attempted.
+function iosAppSupportsOrientation(orientation) {
+  const { config } = require('detox/internals');
+  const app = Object.values(config.apps)[0];
+  const infoPlistPath = path.resolve(process.cwd(), app.binaryPath, 'Info.plist');
+  const deviceQuery = config.device.device ?? {};
+  const deviceName = `${deviceQuery.name ?? ''} ${deviceQuery.type ?? ''}`;
+  const keys = /iPad/i.test(deviceName)
+    ? ['UISupportedInterfaceOrientations~ipad', 'UISupportedInterfaceOrientations']
+    : ['UISupportedInterfaceOrientations'];
+  for (const key of keys) {
+    let declared;
+    try {
+      declared = JSON.parse(execFileSync(
+        'plutil',
+        ['-extract', key, 'json', '-o', '-', infoPlistPath],
+        { encoding: 'utf8' }
+      ));
+    } catch {
+      continue;
+    }
+    const prefix = orientation === 'portrait'
+      ? 'UIInterfaceOrientationPortrait'
+      : 'UIInterfaceOrientationLandscape';
+    return declared.some((value) => value.startsWith(prefix));
+  }
+  return true;
 }
 
 async function captureHome(orientation) {
