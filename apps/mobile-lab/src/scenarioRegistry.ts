@@ -100,9 +100,12 @@ export type LabScenarioId =
   | "settings-stockfish-diagnostics"
   | "system-loading"
   | "system-error"
-  | "system-full-app";
+  | "system-full-app"
+  | "visual-direction-a-grouped-native-tokens"
+  | "visual-direction-a-grouped-native-phone"
+  | "visual-direction-a-grouped-native-ipad";
 
-export type LabScenarioGroup = "Practice" | "Review" | "History" | "Settings" | "System";
+export type LabScenarioGroup = "Practice" | "Review" | "History" | "Settings" | "System" | "Visual Direction";
 
 type LabScenarioMetadata = {
   id: LabScenarioId;
@@ -354,7 +357,10 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "settings-stockfish-diagnostics": defineScenario("settings-stockfish-diagnostics", "Settings", "Stockfish diagnostics", "settings--stockfish-diagnostics", "Development diagnostics with the engine boundary unavailable in the browser.", "settings", ["Diagnostic positions", "Unavailable engine state"], ["Settings"]),
   "system-loading": defineScenario("system-loading", "System", "Loading", "system--loading", "Reusable full-screen loading treatment shown through the real sprint start transition.", "system", ["Progress indicator", "Loading copy"], ["Practice"]),
   "system-error": defineScenario("system-error", "System", "Error", "system--error", "Real start failure rendered with an empty in-memory puzzle service.", "system", ["Error message", "Recovery context"], ["Practice"]),
-  "system-full-app": defineScenario("system-full-app", "System", "Full App (free roam)", "system--full-app-free-roam", "Unconstrained whole-screen scenario for exploratory flow walking.", "system", ["All current tabs and non-native interactions"], ["External links", "Native-only services"])
+  "system-full-app": defineScenario("system-full-app", "System", "Full App (free roam)", "system--full-app-free-roam", "Unconstrained whole-screen scenario for exploratory flow walking.", "system", ["All current tabs and non-native interactions"], ["External links", "Native-only services"]),
+  "visual-direction-a-grouped-native-tokens": defineScenario("visual-direction-a-grouped-native-tokens", "Visual Direction", "A Grouped Native Tokens", "visual-direction--a-grouped-native-tokens", "A Grouped Native token sheet: type scale and weights, light and dark color roles with contrast, radius, 4-pt spacing, surfaces, and primitive specimens.", "system", ["Type scale and weights", "Light and dark color roles", "Radius and spacing", "Surfaces and elevation", "Buttons, rows, segmented control, badges", "Icon sample"], ["None (static Issue #609 prototype)"], "contained"),
+  "visual-direction-a-grouped-native-phone": defineScenario("visual-direction-a-grouped-native-phone", "Visual Direction", "A Grouped Native Phone", "visual-direction--a-grouped-native-phone", "A Grouped Native applied to Practice Home, the Standard Sprint HUD around the board, and Sprint Result on iPhone, light and dark.", "system", ["Practice Home", "Session HUD", "Sprint Result", "Light and dark"], ["None (static Issue #609 prototype)"], "contained"),
+  "visual-direction-a-grouped-native-ipad": defineScenario("visual-direction-a-grouped-native-ipad", "Visual Direction", "A Grouped Native iPad", "visual-direction--a-grouped-native-ipad", "A Grouped Native applied to Practice Home with the navigation rail and the session HUD board lane plus control rail at iPad landscape width, light and dark.", "system", ["Practice Home with navigation rail", "Session board lane and control rail", "Light and dark"], ["None (static Issue #609 prototype)"], "contained"),
 };
 
 export const scenarioRegistry = Object.fromEntries(

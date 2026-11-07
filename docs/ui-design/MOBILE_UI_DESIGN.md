@@ -216,51 +216,120 @@ Implementation notes:
 
 The mobile UI should feel like a quiet training tool, not a marketing page.
 
-![Clean mobile palette](assets/mobile-color-palette.png)
-
-Color tokens:
-
-- App background: `#F8FAFC`
-- Surface: `#FFFFFF`
-- Primary text: `#111827`
-- Secondary text: `#64748B`
-- Border: `#E2E8F0`
-- Accent: `#2563EB`
-- Board light square: `#E6E8EB`
-- Board dark square: `#7B8794`
-- Correct: `#16A34A`
-- Wrong: `#DC2626`
-- Warning: `#D97706`
-- Highlight: `#FACC15`
+The chosen direction is **A "Grouped Native"** (Issue #609, owner decision). It
+stays close to stock iOS 26: inset grouped sections on a grouped background,
+Human Interface Guidelines text styles, tinted icon tiles, and a floating glass
+tab bar. The Interaction Lab stories under **Visual Direction** are the visual
+reference: `visual-direction--a-grouped-native-tokens`, `-phone` and `-ipad`.
+The values below are the target for the app theme in `apps/mobile/src/theme`.
+Phase 2 applies them destination by destination. Until a destination is
+migrated, it may still show the earlier values.
 
 Style rules:
 
-- No gradients, decorative blobs, or emoji.
+- No gradients, decorative blobs, emoji, or Unicode glyphs used as icons.
+- One surface level. Sections sit directly on the grouped background, with
+  hairline separators between rows and no borders. Avoid nested cards.
 - Use cards only for repeated list items, modals, and framed tools.
-- Avoid nested cards.
 - Keep controls stable in height and width to prevent layout shift during timers and progress changes.
 - Use icons only where they reduce text, with accessible labels.
 - Board and timer areas should be optimized for one-handed portrait use.
 
-Typography:
+### Typography
 
-- Use the platform system font.
-- Screen title: 22-24 pt, semibold.
-- Section title: 16-18 pt, semibold.
-- Body text: 15-16 pt.
-- Metadata and helper text: 12-13 pt.
-- Timer text: tabular numerals, 18-22 pt depending on surface.
+Use the platform system font (SF Pro on iOS) and the Dynamic Type text styles
+below, at the default Large size. Use only the Regular (400), Semibold (600)
+and Bold (700) weights. Never use 800 or 900. Numerals that change during a
+session use tabular figures.
 
-Spacing and shape:
+| Role | Size / line height (pt) | Weight | Use |
+| --- | --- | --- | --- |
+| Large title | 34 / 41 | Bold | Tab root titles such as Practice |
+| Title | 22 / 28 | Bold | Section titles and result headlines |
+| Headline | 17 / 22 | Semibold | Row titles, navigation titles, button labels |
+| Body | 17 / 22 | Regular | Body copy and row values |
+| Subheadline | 15 / 20 | Regular | Row subtitles and helper copy |
+| Footnote | 13 / 18 | Regular | Metadata and section footers |
+| Caption | 12 / 16 | Regular | Metric labels and badges |
+| Numeral XL | 34 / 41 | Semibold, tabular | Large scores; 28 / 34 inside compact metric cards |
+| Numeral L | 22 / 28 | Semibold, tabular | Session timer, progress, ratings |
 
-- Base spacing unit: 4 px.
-- Screen horizontal padding: 16 px on phones.
-- Component gap: 8, 12, or 16 px.
-- Cards and sheets: 8 px radius unless native platform controls require otherwise.
-- Board radius: 6-8 px, never a floating decorative card inside another card.
-- Hit target minimum: 44 x 44 px.
+### Color Roles
 
-Core components:
+All text roles meet WCAG AA (4.5:1) on the background, surface, and raised
+surface in both appearances. The Lab test `visualDirectionPrototype.test.ts`
+checks this. Dark mode is tracked by #610.
+
+| Role | Light | Dark | Use |
+| --- | --- | --- | --- |
+| background | `#F2F2F7` | `#000000` | Grouped screen background |
+| surface | `#FFFFFF` | `#1C1C1E` | Sections, rows, cards |
+| surfaceRaised | `#FFFFFF` | `#2C2C2E` | Sheets, popovers, selected segment |
+| separator | `#D8D8DC` | `#38383A` | Hairlines and segmented track |
+| textPrimary | `#000000` | `#FFFFFF` | Primary text |
+| textSecondary | `#636366` | `#AEAEB2` | Secondary text and metadata |
+| accent | `#0066D6` | `#0A6FE0` | Primary action fill |
+| onAccent | `#FFFFFF` | `#FFFFFF` | Text and icons on accent |
+| accentText | `#0062CC` | `#4DA3FF` | Links, selection checks, active tab |
+| accentSoft | `#E3EEFC` | `#0B2A4D` | Icon tiles, secondary buttons, badges, active rail item |
+| positive / positiveSoft | `#1F7A35` / `#E3F4E7` | `#4CD964` / `#12331B` | Correct, solved, rating gain |
+| negative / negativeSoft | `#C8102E` / `#FCE6E8` | `#FF6961` / `#3D1414` | Wrong, mistakes, failure, destructive |
+| warning / warningSoft | `#9A5400` / `#FDF0DE` | `#FFB340` / `#3A2709` | Unclear, timing warnings |
+| chrome | `rgba(249,249,251,0.9)` | `rgba(36,36,38,0.9)` | Floating tab bar and glass buttons, over a blur material |
+| chromeStroke | `rgba(0,0,0,0.08)` | `rgba(255,255,255,0.12)` | Edge of floating chrome |
+
+The accent and semantic colors are darker than the stock system colors
+(`#007AFF`, `#34C759`, `#FF3B30`) so that small text reaches AA. Board squares,
+highlights, and arrows keep their own palette; #610 owns the board in dark mode.
+
+### Spacing, Shape And Elevation
+
+- 4-pt grid: 4, 8, 12, 16, 20, 24, 32, 40.
+- Screen horizontal padding 16. Gap between sections 32. Gap between a section
+  header and its content, and between grouped items, 8. Gap between stacked
+  session elements 12.
+- Rows are at least 52 pt tall. Every hit target is at least 44 x 44 pt,
+  including circular icon buttons.
+- Radius: control 12 (buttons, rail items, inputs), card 20 (inset sections and
+  cards), sheet 34 (sheets and large panels). Segmented controls, badges, and
+  the tab bar are capsules. Icon tiles use 8. The board uses 8 and is never a
+  card inside another card.
+- Elevation: sections have no shadow; contrast with the grouped background
+  separates them. Only floating chrome (tab bar, sheets) casts a shadow:
+  opacity 0.12, radius 24, y-offset 8 in light. Dark appearance relies on the
+  surface steps and the chrome stroke.
+- iOS 26 materials: the tab bar is a floating capsule over a system blur
+  material, and content scrolls beneath it. Navigation-bar and session actions
+  are 44-pt circular glass buttons. React Native core has no backdrop blur, so
+  native screens need a blur or material view (or a solid `chrome` fallback).
+
+### Icons
+
+- Treatment: list-row and status icons sit in a 30-pt tinted tile (`accentSoft`
+  or the matching semantic soft color, radius 8) with an 18-pt glyph in the
+  matching text color. Tab bar, rail, and toolbar icons are untiled, at 22-24 pt.
+- System: SF Symbols on iOS, with one shared SVG set as the fallback for
+  Android and the Interaction Lab. Use one name map from semantic icon to SF
+  Symbol name and fallback glyph, so screens never reference a platform icon
+  directly. This is the recommended default; the owner may still override it.
+- Fallback licensing: the Lab sample uses [Lucide](https://lucide.dev) (ISC,
+  with Feather-derived glyphs under MIT). Both licenses allow redistribution
+  with their notice. Vendor only the glyphs used, keep the license notice next
+  to them, and list the set in the app's third-party notices before it ships.
+  SF Symbols are used through the system API under Apple's license and are not
+  redistributed as assets.
+
+### Motion And Haptics
+
+- Motion: system springs only. Use standard push, pop, and sheet transitions.
+  Disclosure rows expand with a 0.35 s spring, and score and timer numerals
+  roll on change. Under Reduce Motion, replace movement with a cross-fade.
+- Haptics, at the system-default level: a selection tick on segmented controls
+  and run selection, a light impact on Start, and a success or warning
+  notification on the Sprint result. Move feedback keeps the existing
+  move-feedback setting, and UI haptics respect it where the two overlap.
+
+### Core Components
 
 - `SessionStatusBar`: mode, rating, progress, timer, mistakes, pause/abandon affordance.
 - `ChessboardSurface`: reused board component plus highlight/arrow overlay adapter.
