@@ -228,7 +228,7 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("app-store-09-sprint-rules-guide");
     expect(storeAssetsE2e).toContain("app-store-10-active-session-guide-header");
     expect(storeAssetsE2e).toContain("app-store-11-active-session-guide-slow");
-    expect(storeAssetsE2e).toContain("app-store-12-active-session-guide-timeout");
+    expect(storeAssetsE2e).not.toContain("app-store-12-active-session-guide-timeout");
     expect(storeAssetsE2e).toContain("app-store-13-active-session-guide-unclear");
     expect(storeAssetsE2e).toContain("app-store-14-arrow-duel-guide");
     expect(storeAssetsE2e).toContain("app-store-15-sprint-result");
@@ -257,8 +257,9 @@ describe("App Store assets document", () => {
     expect(storeAssetsE2e).toContain("by.id('practice-active-session-guide')");
     expect(storeAssetsE2e).toContain("by.id('practice-arrow-duel-guide')");
     expect(storeAssetsE2e).toContain(
-      "by.id('practice-session-guide-coach-copy-arrow-duel-reply')"
+      "by.id('practice-session-guide-step-arrow_duel_reply')"
     );
+    expect(storeAssetsE2e).toContain("expectSessionGuideContained(scene)");
     expect(storeAssetsE2e).toContain("by.id('practice-session-guide-start')");
     expect(storeAssetsE2e).toContain("takeLandscapeScreenshot('app-store-15-sprint-result')");
     expect(storeAssetsE2e).toContain("waitForScreenOrientation('landscape')");

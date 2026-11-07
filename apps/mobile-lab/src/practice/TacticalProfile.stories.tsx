@@ -144,8 +144,8 @@ export const TacticalFocusGuide: Story = {
   args: { scenarioId: "practice-tactical-focus-guide" },
   parameters: { __id: "practice--tactical-focus-guide" },
   play: async ({ canvasElement }) => {
-    await waitForText(canvasElement, "Track the fixed Run");
-    await waitForText(canvasElement, "Your Rating will not change.");
+    await waitForText(canvasElement, "Track your Focused Run");
+    await waitForText(canvasElement, "1 of 3");
     await waitForText(canvasElement, "Unrated");
   }
 };

@@ -1942,6 +1942,9 @@ describe('Detox suite configuration', () => {
     expect(resolveDetoxTestTimeout({
       CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT: '1'
     })).toBe(1200000);
+    expect(resolveDetoxTestTimeout({
+      CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT: '1'
+    })).toBe(900000);
     expect(resolveDetoxTestTimeout({})).toBe(300000);
 
     const spec = fs.readFileSync(
@@ -2052,7 +2055,16 @@ describe('Detox suite configuration', () => {
       .toBeGreaterThan(captureLandscape);
     expect(spec).toContain('await expectSessionControlsContained(initialOrientation);');
     expect(spec).toContain('await startStandardSprintThroughContainedGuide(initialOrientation);');
-    expect(spec).toContain("frameFor(element(by.id('practice-session-guide-navigation')))");
+    expect(spec).toContain("require('./sessionGuideAssertions')");
+    expect(spec).toContain('await walkArrowDuelGuideAndExit(initialOrientation);');
+    expect(spec).toContain('await expectSessionGuideContained(');
+    const guideAssertions = fs.readFileSync(
+      path.resolve(__dirname, '../e2e/sessionGuideAssertions.js'),
+      'utf8'
+    );
+    expect(guideAssertions).toContain("frameFor(element(by.id('practice-session-guide-navigation')))");
+    expect(guideAssertions).toContain("'practice-session-guide-pointer'");
+    expect(guideAssertions).toContain("frameFor(element(by.id('adaptive-layout')))");
     // A build that declares no portrait orientation skips the rotate-back.
     expect(spec).toContain("&& iosAppSupportsOrientation('portrait')");
     expect(spec).toContain("require('./adaptiveScreenshotEvidence')");

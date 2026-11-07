@@ -12,7 +12,10 @@ import {
   beginLinePuzzle,
   DEFAULT_OPPONENT_REPLY_SECONDS,
   defaultSprintConfig,
+  defaultSprintGuideProgress,
+  markSprintGuideSeen,
   pauseSprint,
+  sprintSessionGuidePlanFor,
   startSprint,
   submitSprintMove
 } from "../../../packages/core/src/index.ts";
@@ -484,40 +487,52 @@ function sprintRulesDesignPreviewFor(
     || scenarioId === "practice-arrow-duel-guide"
     || scenarioId === "practice-arrow-duel-guide-only"
   ) {
-    const sharedGuide = {
-      durationLabel: "5:00",
-      guideKey: "active_session" as const,
-      maxMistakes: 3,
-      mode: "standard" as const,
-      targetCorrect: 15
-    };
-    const arrowDuelGuide = {
-      ...sharedGuide,
-      arrowDuelReplyChallenge: true,
-      arrowDuelReplyOnboarding: "choice_then_reply" as const,
-      guideKey: "arrow_duel" as const,
-      mode: "arrow_duel" as const,
-      opponentReplySettingsHint: true
-    };
+    const isArrowDuel = scenarioId !== "practice-active-session-guide";
+    // The arrow-duel-guide scenario is a brand-new player; the guide-only
+    // scenario already finished a Standard Sprint guide.
+    const progress = scenarioId === "practice-arrow-duel-guide-only"
+      ? markSprintGuideSeen(defaultSprintGuideProgress(), "active_session")
+      : defaultSprintGuideProgress();
     return {
       arrowDuelOpponentReplyGlobalSetting: { enabled: true },
-      initialSessionGuides: scenarioId === "practice-arrow-duel-guide"
-        ? [sharedGuide, arrowDuelGuide]
-        : [scenarioId === "practice-arrow-duel-guide-only" ? arrowDuelGuide : sharedGuide],
+      initialSessionGuide: {
+        plan: sprintSessionGuidePlanFor(
+          progress,
+          isArrowDuel ? "arrow_duel" : "standard",
+          { opponentReply: isArrowDuel }
+        ),
+        presentation: {
+          durationLabel: "5:00",
+          maxMistakes: 3,
+          mode: isArrowDuel ? "arrow_duel" : "standard",
+          targetCorrect: 15,
+          ...(isArrowDuel
+            ? {
+                arrowDuelReplyChallenge: true,
+                arrowDuelReplyOnboarding: "choice_then_reply" as const,
+                opponentReplySettingsHint: true
+              }
+            : {})
+        }
+      },
       timeoutCountsAsMistake: true
     };
   }
   if (scenarioId === "practice-tactical-focus-guide") {
     return {
-      initialSessionGuides: [{
-        durationLabel: "5:00",
-        focusedRun: true,
-        guideKey: "focused_run",
-        maxAttempts: 15,
-        maxMistakes: 15,
-        mode: "standard",
-        targetCorrect: 15
-      }],
+      initialSessionGuide: {
+        plan: sprintSessionGuidePlanFor(defaultSprintGuideProgress(), "standard", {
+          focusedRun: true
+        }),
+        presentation: {
+          durationLabel: "5:00",
+          focusedRun: true,
+          maxAttempts: 15,
+          maxMistakes: 15,
+          mode: "standard",
+          targetCorrect: 15
+        }
+      },
       timeoutCountsAsMistake: true
     };
   }

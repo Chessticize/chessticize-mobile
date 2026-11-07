@@ -162,8 +162,13 @@ function resolveDetoxMaxWorkers(environment = process.env) {
 }
 
 function resolveDetoxTestTimeout(environment = process.env) {
-  return environment.CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT === '1'
-    ? 1200000
+  if (environment.CHESSTICIZE_VERIFY_IOS_LANDSCAPE_LAYOUT === '1') {
+    return 1200000;
+  }
+  // The adaptive-layout capture walks every first-use guide step on each
+  // display before its Sprint and rotation checks.
+  return environment.CHESSTICIZE_CAPTURE_ADAPTIVE_LAYOUT === '1'
+    ? 900000
     : 300000;
 }
 

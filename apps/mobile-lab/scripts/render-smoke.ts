@@ -20,11 +20,7 @@ const SETTLE_MS = 300;
 
 // Scenarios whose play assertions are known to be stale and are being rewritten elsewhere.
 // They are reported as warnings instead of failures. Remove an entry when its work lands.
-const KNOWN_STALE_PLAY: Record<string, string> = {
-  "practice--arrow-duel-guide": "first-use guide stories, rewritten by #611",
-  "practice--arrow-duel-guide-only": "first-use guide stories, rewritten by #611",
-  "practice--tactical-focus-guide": "first-use guide stories, rewritten by #611"
-};
+const KNOWN_STALE_PLAY: Record<string, string> = {};
 
 // Console noise that is not a render failure: a missing favicon or other static asset.
 const BENIGN_CONSOLE_ERROR = /Failed to load resource/;

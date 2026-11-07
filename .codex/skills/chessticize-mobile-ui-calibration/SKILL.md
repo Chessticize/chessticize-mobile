@@ -127,7 +127,6 @@ every selected state/viewport and use the relevant contracts below:
 | `app-store-09-sprint-rules-guide` | First-use rules clearly distinguish target, duration, mistakes, Slow, and timeout before a Sprint starts. |
 | `app-store-10-active-session-guide-header` | The Sprint header guide preserves the real hierarchy and keeps its callout legible. |
 | `app-store-11-active-session-guide-slow` | The Slow guide makes the amber timing state readable without implying a user control. |
-| `app-store-12-active-session-guide-timeout` | The Timed Out guide shows the automatic timeout overlay and its mistake, Unclear, and Review consequences without clipping. |
 | `app-store-13-active-session-guide-unclear` | The Unclear guide explains the manual action and points to the visible control. |
 | `app-store-14-arrow-duel-guide` | The Arrow Duel guide shows both candidate arrows, bounded copy, and the delayed timer start. |
 | `app-store-15-sprint-result` | The failed result clearly reports reason, solved/attempted accuracy, rating, mistakes, Review impact, and history action. |

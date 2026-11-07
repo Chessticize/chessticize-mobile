@@ -20,7 +20,6 @@ PORTRAIT_SCENES=(
   app-store-09-sprint-rules-guide
   app-store-10-active-session-guide-header
   app-store-11-active-session-guide-slow
-  app-store-12-active-session-guide-timeout
   app-store-13-active-session-guide-unclear
   app-store-14-arrow-duel-guide
   app-store-15-sprint-result
@@ -33,7 +32,6 @@ LANDSCAPE_SCENES=(
   app-store-09-sprint-rules-guide-landscape
   app-store-10-active-session-guide-header-landscape
   app-store-11-active-session-guide-slow-landscape
-  app-store-12-active-session-guide-timeout-landscape
   app-store-13-active-session-guide-unclear-landscape
   app-store-14-arrow-duel-guide-landscape
   app-store-15-sprint-result-landscape
