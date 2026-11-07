@@ -10,6 +10,7 @@
     "test": "tsx --test src/*.test.ts src/*.test.tsx",
     "check:new-scenarios": "tsx scripts/check-new-scenarios.ts",
     "visual": "tsx scripts/visual-regression.ts",
+    "smoke": "tsx scripts/render-smoke.ts",
     "validate": "pnpm typecheck && pnpm test && pnpm build-storybook"
   },
   "dependencies": {
