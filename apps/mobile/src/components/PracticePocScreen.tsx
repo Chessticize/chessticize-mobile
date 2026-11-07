@@ -8104,6 +8104,7 @@ function PracticeRunEditor({
               <Text style={styles.requiredFieldLabel}>Required · unique</Text>
             </View>
             <TextInput
+              keyboardAppearance={appTheme.name}
               accessibilityLabel="Run name"
               autoCapitalize="words"
               autoCorrect={false}
@@ -8294,6 +8295,7 @@ function ArrowDuelReplyChallengeSetting({
   onToggle: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
   return (
     <View style={styles.settingsSection} testID="practice-run-arrow-duel-reply-setting">
       <View style={styles.runTimingSectionCopy}>
@@ -8375,6 +8377,7 @@ function ArrowDuelReplyChallengeSetting({
               ]}
             >
               <TextInput
+                keyboardAppearance={appTheme.name}
                 accessibilityLabel="Time to find the opponent’s reply in seconds"
                 accessibilityState={{ disabled: !enabled }}
                 editable={enabled}
@@ -8601,6 +8604,7 @@ function PracticeRunEloRow({
   value: number;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
   if (directEntry) {
     const parsedInput = Number(inputValue);
     const stepValue = /^\d{1,4}$/.test(inputValue ?? "") && Number.isInteger(parsedInput)
@@ -8636,6 +8640,7 @@ function PracticeRunEloRow({
               testID="practice-run-elo-input-shell"
             >
               <TextInput
+                keyboardAppearance={appTheme.name}
                 accessibilityLabel={isCreate ? "Starting rating" : "Current rating"}
                 inputMode="numeric"
                 keyboardType="number-pad"

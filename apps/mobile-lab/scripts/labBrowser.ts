@@ -66,8 +66,14 @@ export function registryStoryIds(): string[] {
   return Object.values(scenarioRegistry).map((scenario) => scenario.storyId);
 }
 
-export function storyUrl(baseUrl: string, storyId: string, viewport: string): string {
-  return `${baseUrl}/iframe.html?id=${storyId}&viewMode=story&globals=viewport.value:${viewport}`;
+export function storyUrl(
+  baseUrl: string,
+  storyId: string,
+  viewport: string,
+  theme: "light" | "dark" = "light"
+): string {
+  return `${baseUrl}/iframe.html?id=${storyId}&viewMode=story&globals=viewport.value:${viewport}`
+    + (theme === "dark" ? ";theme:dark" : "");
 }
 
 // Resolves once the story has rendered; throws when Storybook reports a render failure.
