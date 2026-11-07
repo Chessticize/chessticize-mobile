@@ -2,10 +2,10 @@ const { execFileSync } = require('node:child_process');
 const { resolve } = require('node:path');
 const { config: detoxConfig } = require('detox/internals');
 const {
-  boardTapTargets,
   completeFirstUseSessionGuides,
   elementText,
   launchWithDisabledSynchronization,
+  playBoardMove,
   sleep,
   waitForElementAccessibilityLabelContaining,
   waitForElementTextContaining,
@@ -80,12 +80,12 @@ async function solveCurrentPackPuzzle() {
     const userMove = solutionMoves[index];
     const autoReply = solutionMoves[index + 1];
     if (!autoReply) {
-      await playMove(userMove, flipped);
+      await playBoardMove('session-board', userMove, flipped);
       continue;
     }
     let lastMoveError;
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      await playMove(userMove, flipped);
+      await playBoardMove('session-board', userMove, flipped);
       try {
         await waitForElementAccessibilityLabelContaining(
           'session-board',
@@ -104,44 +104,6 @@ async function solveCurrentPackPuzzle() {
     }
   }
   return puzzleId;
-}
-
-// Pack lines include promotions. iOS discards taps sent while the native
-// promotion Modal is still transitioning in or out, so wait for the visible
-// picker and retry only taps blocked by that system transition view.
-async function playMove(move, flipped) {
-  await waitFor(element(by.id('board-input-blocker'))).not.toExist().withTimeout(10000);
-  const { board, from, to } = await boardTapTargets('session-board', move, flipped);
-  await tapAfterModalTransition(board, from);
-  await sleep(250);
-  await tapAfterModalTransition(board, to);
-  const promotion = move.slice(4, 5).toLowerCase();
-  if (!promotion) {
-    return;
-  }
-  const choice = element(by.id(`promotion-choice-${promotion}`));
-  await waitFor(choice).toBeVisible().withTimeout(10000);
-  await sleep(750);
-  await choice.tap();
-  await waitFor(choice).not.toExist().withTimeout(10000);
-}
-
-async function tapAfterModalTransition(board, point, budgetMs = 3000) {
-  const startedAt = Date.now();
-  while (true) {
-    try {
-      await board.tapAtPoint(point);
-      return;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const blockedByTransition = message.includes('UITransitionView')
-        && message.includes('not hittable');
-      if (!blockedByTransition || Date.now() - startedAt >= budgetMs) {
-        throw error;
-      }
-      await sleep(100);
-    }
-  }
 }
 
 async function waitForNextPuzzle(previousPuzzleId, timeoutMs = 15000) {

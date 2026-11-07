@@ -30,7 +30,7 @@ describe('Dev-only seeded Tactical Profile history', () => {
     expect(controls?.seedTacticalHistory).toBeUndefined();
   });
 
-  it('seeds a ready Profile through public service paths and keeps it local', () => {
+  it('seeds a ready Profile through public service paths and keeps it local', async () => {
     globals.__DEV__ = true;
     const service = createMobilePracticeService();
     service.saveSettings({
@@ -39,9 +39,17 @@ describe('Dev-only seeded Tactical Profile history', () => {
     });
     const controls = createMobilePracticeTestControls(service);
 
-    const seeded = controls?.seedTacticalHistory?.('slow-fork-speed', NOW);
+    const progress: string[] = [];
+    const seeded = await controls?.seedTacticalHistory?.(
+      'slow-fork-speed',
+      NOW,
+      (completed, total) => progress.push(`${completed}/${total}`),
+    );
 
     expect(seeded).toMatchObject({ scenario: 'slow-fork-speed', phase: 'ready' });
+    // Progress is reported before the first Run and after each later one.
+    expect(progress[0]).toBe('0/12');
+    expect(progress.at(-1)).toBe('11/12');
     expect(seeded?.attempts).toBe(service.countHistory());
     expect(service.getSettings().sync.iCloudEnabled).toBe(false);
     const sessions = service.listSprintSessions();
@@ -57,6 +65,6 @@ describe('Dev-only seeded Tactical Profile history', () => {
     );
     expect(service.prepareFocusedRun('line', NOW, 'seeded').status).toBe('ready');
 
-    expect(() => controls?.seedTacticalHistory?.('balanced', NOW)).toThrow(/empty progress/);
+    await expect(controls?.seedTacticalHistory?.('balanced', NOW)).rejects.toThrow(/empty progress/);
   });
 });

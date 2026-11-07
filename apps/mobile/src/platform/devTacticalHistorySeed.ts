@@ -5,7 +5,7 @@
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
 import {
   SIMULATED_HISTORY_SCENARIOS,
-  playSimulatedHistoryScenario,
+  playSimulatedHistoryScenarioAsync,
   type SimulatedHistoryScenarioId
 } from "../../../../packages/storage/src/simulation/scenarios.ts";
 import { createSimulationClock } from "../../../../packages/storage/src/simulation/simulated-player.ts";
@@ -22,18 +22,23 @@ export type DevTacticalHistorySeedResult = {
   runs: number;
   attempts: number;
   phase: string;
+  /** Wall-clock time spent seeding on this device. */
+  durationMs: number;
 };
 
 /**
  * Plays a named simulated history that ends before `now`. It refuses to mix
  * synthetic Runs into existing progress, and turns iCloud sync off first so
- * the synthetic history stays on this device.
+ * the synthetic history stays on this device. Seeding takes several seconds
+ * on a simulator, so it yields to the UI after each Run and reports progress.
  */
-export function seedDevTacticalHistory(
+export async function seedDevTacticalHistory(
   service: PracticeService,
   scenario: SimulatedHistoryScenarioId,
-  now: string
-): DevTacticalHistorySeedResult {
+  now: string,
+  onProgress?: (completedRuns: number, totalRuns: number) => void
+): Promise<DevTacticalHistorySeedResult> {
+  const seedingStartedAtMs = Date.now();
   const nowMs = Date.parse(now);
   if (!Number.isFinite(nowMs)) {
     throw new Error(`Seeded history received an invalid time: ${now}`);
@@ -49,15 +54,23 @@ export function seedDevTacticalHistory(
     ...service.getSettings(),
     sync: { ...service.getSettings().sync, iCloudEnabled: false }
   });
-  const days = Math.ceil(SIMULATED_HISTORY_SCENARIOS[scenario].runs / RUNS_PER_DAY) + 1;
+  const totalRuns = SIMULATED_HISTORY_SCENARIOS[scenario].runs;
+  const days = Math.ceil(totalRuns / RUNS_PER_DAY) + 1;
   const clock = createSimulationClock(nowMs - days * DAY_MS);
-  const records = playSimulatedHistoryScenario({
-    practice: service,
-    clock,
-    scenario,
-    seed: `dev-seed:${scenario}`,
-    plan: { runsPerDay: RUNS_PER_DAY, observeEveryRun: false }
-  });
+  onProgress?.(0, totalRuns);
+  const records = await playSimulatedHistoryScenarioAsync(
+    {
+      practice: service,
+      clock,
+      scenario,
+      seed: `dev-seed:${scenario}`,
+      plan: { runsPerDay: RUNS_PER_DAY, observeEveryRun: false }
+    },
+    async (completedRuns) => {
+      onProgress?.(completedRuns, totalRuns);
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+  );
   if (clock.nowMs() >= nowMs) {
     throw new Error("Seeded history overlapped the current time");
   }
@@ -66,6 +79,7 @@ export function seedDevTacticalHistory(
     scenario,
     runs: records.length,
     attempts: records.reduce((sum, record) => sum + record.attemptCount, 0),
-    phase: snapshot?.phase ?? "unavailable"
+    phase: snapshot?.phase ?? "unavailable",
+    durationMs: Date.now() - seedingStartedAtMs
   };
 }

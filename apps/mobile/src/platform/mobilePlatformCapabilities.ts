@@ -24,7 +24,8 @@ export interface MobileTestControlCapabilities {
   seedTacticalHistory?: (
     scenario: SimulatedHistoryScenarioId,
     now: string,
-  ) => DevTacticalHistorySeedResult;
+    onProgress?: (completedRuns: number, totalRuns: number) => void,
+  ) => Promise<DevTacticalHistorySeedResult>;
 }
 
 export interface MobileProgressSyncCapabilities {

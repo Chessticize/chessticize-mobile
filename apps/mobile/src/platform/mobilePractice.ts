@@ -540,9 +540,9 @@ export function createMobilePracticeTestControls(service: PracticeService):
     // unreachable in Production builds even with test controls enabled.
     ...(__DEV__
       ? {
-          seedTacticalHistory: (scenario, now) =>
+          seedTacticalHistory: (scenario, now, onProgress) =>
             (require("./devTacticalHistorySeed.ts") as typeof import("./devTacticalHistorySeed.ts"))
-              .seedDevTacticalHistory(service, scenario, now)
+              .seedDevTacticalHistory(service, scenario, now, onProgress)
         }
       : {})
   };

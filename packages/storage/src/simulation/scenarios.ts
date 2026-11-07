@@ -6,6 +6,8 @@ import type { PracticeService } from "../practice-service.ts";
 import {
   SimulatedPlayer,
   simulateTrainingHistory,
+  simulateTrainingHistoryAsync,
+  type SimulatedHistoryInput,
   type SimulatedHistoryPlan,
   type SimulatedPlayerProfile,
   type SimulatedRunRecord,
@@ -85,17 +87,31 @@ export function setSimulatedStartingRatings(
   }
 }
 
-/** Plays one named scenario through PracticeService. */
-export function playSimulatedHistoryScenario(input: {
+type ScenarioInput = {
   practice: PracticeService;
   clock: SimulationClock;
   scenario: SimulatedHistoryScenarioId;
   seed: string | number;
   plan?: Partial<SimulatedHistoryPlan>;
-}): SimulatedRunRecord[] {
+};
+
+/** Plays one named scenario through PracticeService. */
+export function playSimulatedHistoryScenario(input: ScenarioInput): SimulatedRunRecord[] {
+  return simulateTrainingHistory(scenarioHistoryInput(input));
+}
+
+/** Plays one named scenario, awaiting `between` after each mixed Run. */
+export function playSimulatedHistoryScenarioAsync(
+  input: ScenarioInput,
+  between: (completedRuns: number) => Promise<void>
+): Promise<SimulatedRunRecord[]> {
+  return simulateTrainingHistoryAsync(scenarioHistoryInput(input), between);
+}
+
+function scenarioHistoryInput(input: ScenarioInput): SimulatedHistoryInput {
   const scenario = SIMULATED_HISTORY_SCENARIOS[input.scenario];
   setSimulatedStartingRatings(input.practice);
-  return simulateTrainingHistory({
+  return {
     practice: input.practice,
     player: new SimulatedPlayer(scenario.player, input.seed),
     clock: input.clock,
@@ -105,5 +121,5 @@ export function playSimulatedHistoryScenario(input: {
       arrowDuelShare: scenario.arrowDuelShare,
       ...input.plan
     }
-  });
+  };
 }

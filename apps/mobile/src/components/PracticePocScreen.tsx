@@ -1082,6 +1082,7 @@ export function PracticePocScreen({
   const [iCloudSyncStatus, setICloudSyncStatus] = useState(() => service.getSettings().sync.iCloudEnabled ? "Ready" : "Off");
   const [iCloudSyncInProgress, setICloudSyncInProgress] = useState(false);
   const [seededHistoryStatus, setSeededHistoryStatus] = useState<string | null>(null);
+  const seedingHistoryRef = useRef(false);
   const iCloudAccountStatusRef =
     useRef<ICloudAccountStatus | "not_checked">("not_checked");
   const [lastICloudSyncFailure, setLastICloudSyncFailure] =
@@ -2444,22 +2445,32 @@ export function PracticePocScreen({
   }
 
   function seedTestTacticalHistory(scenario: SimulatedHistoryScenarioId): void {
-    if (!seedTacticalHistory || isActive) {
+    if (!seedTacticalHistory || isActive || seedingHistoryRef.current) {
       return;
     }
+    seedingHistoryRef.current = true;
     setError(null);
-    try {
-      const seeded = seedTacticalHistory(scenario, captureLiveNowIso());
-      setICloudSyncEnabled(false);
-      setICloudSyncStatus("Off");
-      refreshState();
-      setSeededHistoryStatus(
-        `Seeded ${seeded.runs} Runs · Profile ${seeded.phase}`
-      );
-    } catch (caught) {
-      setSeededHistoryStatus(null);
-      setError(errorMessage(caught));
-    }
+    const label = SIMULATED_HISTORY_SCENARIOS.find((option) => option.scenario === scenario)?.label
+      ?? scenario;
+    void seedTacticalHistory(scenario, captureLiveNowIso(), (completedRuns, totalRuns) => {
+      setSeededHistoryStatus(`Seeding ${label}… ${completedRuns} / ${totalRuns} Runs`);
+    })
+      .then((seeded) => {
+        setICloudSyncEnabled(false);
+        setICloudSyncStatus("Off");
+        refreshState();
+        setSeededHistoryStatus(
+          `Seeded ${seeded.runs} Runs in ${(seeded.durationMs / 1_000).toFixed(1)} s · Profile ${seeded.phase}`
+        );
+      })
+      .catch((caught: unknown) => {
+        refreshState();
+        setSeededHistoryStatus(null);
+        setError(errorMessage(caught));
+      })
+      .finally(() => {
+        seedingHistoryRef.current = false;
+      });
   }
 
   function changePuzzleSource(nextSource: MobilePuzzleSource): void {

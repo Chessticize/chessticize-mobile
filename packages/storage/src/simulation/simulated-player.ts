@@ -410,13 +410,44 @@ export type SimulatedHistoryPlan = {
  * scheduled local slot so sessions spread over distinct days, and the
  * Tactical Profile is read after each Run like the Home screen does.
  */
-export function simulateTrainingHistory(input: {
+export type SimulatedHistoryInput = {
   practice: PracticeService;
   player: SimulatedPlayer;
   clock: SimulationClock;
   plan: SimulatedHistoryPlan;
   seed: string | number;
-}): SimulatedRunRecord[] {
+};
+
+export function simulateTrainingHistory(input: SimulatedHistoryInput): SimulatedRunRecord[] {
+  const runs = trainingHistoryRuns(input);
+  let step = runs.next();
+  while (!step.done) {
+    step = runs.next();
+  }
+  return step.value;
+}
+
+/**
+ * The same history as simulateTrainingHistory, awaiting `between` after each
+ * mixed Run so a UI thread can render progress between Runs.
+ */
+export async function simulateTrainingHistoryAsync(
+  input: SimulatedHistoryInput,
+  between: (completedRuns: number) => Promise<void>
+): Promise<SimulatedRunRecord[]> {
+  const runs = trainingHistoryRuns(input);
+  let step = runs.next();
+  while (!step.done) {
+    await between(step.value);
+    step = runs.next();
+  }
+  return step.value;
+}
+
+/** Yields the count of completed mixed Runs after each one. */
+function* trainingHistoryRuns(
+  input: SimulatedHistoryInput
+): Generator<number, SimulatedRunRecord[], void> {
   const { practice, player, clock, plan } = input;
   const schedule = new SeededRandom(`schedule:${input.seed}`);
   const runsPerDay = Math.max(1, Math.trunc(plan.runsPerDay ?? 2));
@@ -475,6 +506,9 @@ export function simulateTrainingHistory(input: {
     }
     if (plan.stopWhen?.(record)) {
       break;
+    }
+    if (runIndex < plan.runs - 1) {
+      yield runIndex + 1;
     }
   }
   return records;
