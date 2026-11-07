@@ -130,14 +130,50 @@ export function summarizeHistory(records, target) {
       }
     }
   }
+  // Top-rank precision. Signals arrive in the Profile's ranked order: the
+  // first recommendation is the Home lead, and a Focused Run takes the top
+  // two recommended themes of its task family.
+  const targetFamily = target?.signalId.split(":")[0];
+  let runsWithRecommendation = 0;
+  let plantedLeadRuns = 0;
+  let offTargetRunSlotRuns = 0;
+  for (const record of records) {
+    const recommended = record.signals.filter((signal) => signal.status === "recommended");
+    if (recommended.length === 0) {
+      continue;
+    }
+    runsWithRecommendation += 1;
+    if (recommended[0]?.theme === targetTheme) {
+      plantedLeadRuns += 1;
+    }
+    const runSlots = recommended
+      .filter((signal) => signal.taskFamily === targetFamily)
+      .slice(0, 2);
+    if (runSlots.some((signal) => signal.theme !== targetTheme)) {
+      offTargetRunSlotRuns += 1;
+    }
+  }
   return {
     runs: records.length,
     detectedAtRun: detectedAt < 0 ? undefined : detectedAt + 1,
     offTargetRecommendationRuns: offTargetRuns,
+    runsWithRecommendation,
+    plantedLeadRuns,
+    offTargetRunSlotRuns,
     recommendationReentries,
     firstPhaseChangeRun: firstPhaseChange < 0 ? undefined : firstPhaseChange + 1,
     firstPhase: initialPhase,
     changedPhase: firstPhaseChange < 0 ? undefined : records[firstPhaseChange]?.phase
+  };
+}
+
+function topRankSummary(histories) {
+  const sum = (key) => histories.reduce((total, history) => total + history[key], 0);
+  const withRecommendation = sum("runsWithRecommendation");
+  return {
+    runsWithRecommendation: withRecommendation,
+    plantedLeadRate: ratio(sum("plantedLeadRuns"), withRecommendation),
+    offTargetRunSlotRate: ratio(sum("offTargetRunSlotRuns"), withRecommendation)
   };
 }
 
@@ -161,7 +197,8 @@ function summarizeEffect(effect, histories) {
       ? {}
       : {
           detectionRate: ratio(detections.length, histories.length),
-          runsToDetection: distribution(detections)
+          runsToDetection: distribution(detections),
+          topRank: topRankSummary(histories)
         }),
     falsePositive: {
       seedsWithAnyOffTargetRecommendation: histories.filter(
@@ -303,6 +340,9 @@ function formatText(report) {
         (detection === null
           ? "  (never detected)"
           : `  Runs to detection min/median/mean/max: ${detection.min}/${detection.median}/${detection.mean}/${detection.max}`)
+      );
+      lines.push(
+        `  top rank (of ${result.topRank.runsWithRecommendation} Runs with a recommendation): planted theme leads ${result.topRank.plantedLeadRate}, off-target in Focused Run slots ${result.topRank.offTargetRunSlotRate}`
       );
     }
     lines.push(
