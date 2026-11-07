@@ -57,6 +57,40 @@ size (1376 × 1032) without encouraging arbitrarily wide desktop layouts. These
 restrictions are guarded by `isiOSAppOnMac`, so they do not alter iPad Split
 View, Stage Manager, or full-screen sizing.
 
+## iPhone Duo
+
+iPhone Duo runs the same iPhone binary on two displays. Apple's guidance
+([Prepare your app for iPhone Duo](https://developer.apple.com/videos/play/tech-talks/111461/))
+is that the inner display ignores supported orientations, is regular × regular,
+and resizes the app on fold, unfold and Split View. With the iOS 27.1 SDK the
+app extends to the screen edge, so custom chrome must stay inside the Safe Area.
+
+Measured with the iOS 27.1 SDK Release app on the iPhone Duo simulator
+(Xcode 27.1, iOS 27.1 runtime):
+
+| Pose | Window (points) | Safe Area insets (points) | Layout class |
+| --- | --- | --- | --- |
+| Outer display, portrait | 466 × 678 | top 0, left 0, bottom 34, right 84 | compact portrait |
+
+The outer display's status bar and camera sit in an 84-point column on the
+right edge, reported as a right Safe Area inset only. The app shell, bottom
+tabs and modal dialogs therefore apply each inset to its own edge instead of
+assuming symmetric insets.
+
+The inner display panel is 2853 × 2007 pixels at 3x (951 × 669 points
+landscape, 669 × 951 points portrait). The simulator could not yet be folded,
+unfolded or placed in Split View headlessly: those controls live in the
+DeviceHub window and `simctl` exposes no fold or posture command. Inner,
+Split View and fold/unfold window sizes and insets therefore remain to be
+measured with DeviceHub. Until then the layout unit tests cover the inner
+panel sizes and the Split View fractions with no, left-only and right-only
+side insets.
+
+The full-screen iPhone portrait lock stays. It no longer constrains the inner
+display, which follows the scene size, and lifting it would also rotate every
+other iPhone. Outer-display landscape ("tent" use) would land in the existing
+compact wide-short layout if the lock is reconsidered.
+
 ## Adaptive Window Coverage
 
 The mobile UI design defines the adaptive target for compact portrait phones,
@@ -105,7 +139,15 @@ Release readiness for this item is covered by:
   iPad target family, portrait-only iPhone and all-orientation iPad Info.plist
   masks, iOS 15.1 deployment target, and this documented decision.
 - `apps/mobile/__tests__/adaptivePracticeLayout.test.tsx`, which retains compact
-  wide-short, iPad landscape, and unfolded foldable-sized layout contracts.
+  wide-short, iPad landscape, and unfolded foldable-sized layout contracts, the
+  measured iPhone Duo outer and iPad Pro 13-inch windows, and Duo inner, Split
+  View and Stage Manager sizes with asymmetric insets.
+- The opt-in adaptive-layout E2E (`pnpm mobile:e2e:adaptive-layout:ios`), which
+  records each run's window and insets, asserts that first-use guide navigation,
+  the board, HUD and primary session actions stay inside the Safe Area, and
+  repeats the session checks after a rotation resize. On iPhone Duo set
+  `CHESSTICIZE_ADAPTIVE_IOS_SCREENSHOT_DISPLAY=primary` so screenshots capture
+  the outer display.
 - `apps/mobile/__tests__/PracticePocScreen.test.tsx`, which renders the main app
   shell under compact iPhone SE-sized portrait, modern iPhone portrait, compact
   wide-short, iPad portrait, iPad landscape, and split-width viewports.

@@ -1,6 +1,8 @@
 /* global by, describe, device, element, expect, it, waitFor */
 
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
+const path = require('node:path');
 const {
   elementText,
   frameFor,
@@ -10,6 +12,7 @@ const {
   setAndroidDisplayOrientation,
   sleep,
   startPracticeMode,
+  waitForVisibleInPracticeScroll,
   withAndroidUiDiagnostics
 } = require('./helpers');
 const {
@@ -32,6 +35,10 @@ const deviceLabel = sanitizeAdaptiveScreenshotLabel(
 );
 const includeLandscape = process.env.CHESSTICIZE_ADAPTIVE_INCLUDE_LANDSCAPE === '1';
 const onlyOrientation = process.env.CHESSTICIZE_ADAPTIVE_ONLY_ORIENTATION;
+// Detox captures the default iOS framebuffer. A folded iPhone Duo renders the
+// app on its outer display (simctl device name `primary`) while that default
+// is the dark inner display, so the run can name the display to capture.
+const iosScreenshotDisplay = process.env.CHESSTICIZE_ADAPTIVE_IOS_SCREENSHOT_DISPLAY;
 const archiveAdaptiveScreenshot = createAdaptiveScreenshotArchiver();
 
 describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
@@ -45,13 +52,14 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     await selectTestPuzzleSource('familiar15');
     await element(by.id('practice-main-scroll')).scrollTo('top');
     await sleep(300);
-    await startPracticeMode('standard');
+    await startStandardSprintThroughContainedGuide(initialOrientation);
     await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
     await waitFor(element(by.id('session-current-puzzle-id'))).toExist().withTimeout(10000);
     await waitForSettledSprintLayout(initialOrientation);
 
     const puzzleID = await elementText('session-current-puzzle-id');
     await captureSprint(initialOrientation);
+    await expectSessionControlsContained(initialOrientation);
 
     if (includeLandscape && initialOrientation === 'portrait') {
       await setAdaptiveOrientation('landscape');
@@ -62,6 +70,10 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
         throw new Error(`Rotation replaced the active puzzle: ${puzzleID} -> ${rotatedPuzzleID}`);
       }
       await captureSprint('landscape', { waitForPieces: true });
+      // Rotation is the resize Detox can drive on iOS and Android. The same
+      // containment contract applies to iPhone Duo fold/unfold and Split View
+      // resizes, which the simulator cannot yet perform headlessly.
+      await expectSessionControlsContained('landscape');
     }
 
     const needsPortraitRestore = includeLandscape || initialOrientation === 'landscape';
@@ -110,9 +122,14 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       });
     }
 
-    if (needsPortraitRestore && device.getPlatform() !== 'android') {
+    if (
+      needsPortraitRestore
+      && device.getPlatform() !== 'android'
+      && iosAppSupportsOrientation('portrait')
+    ) {
       // Leave the emulator in its natural orientation before the shell applies
-      // the next profile's portrait-shaped size override.
+      // the next profile's portrait-shaped size override. The landscape-only
+      // iPad validation build cannot rotate back, so it skips this restore.
       await setAdaptiveOrientation('portrait');
     }
   });
@@ -147,13 +164,156 @@ async function assertFirstUseSprintRulesGuideLayout() {
   }
 }
 
+async function startStandardSprintThroughContainedGuide(orientation) {
+  if (deviceLabel.includes('large-text')) {
+    // Enlarged text may legitimately scroll the guide; its operability is
+    // covered by the component tests for large text.
+    await startPracticeMode('standard');
+    return;
+  }
+  await waitForVisibleInPracticeScroll('practice-run-standard');
+  await element(by.id('practice-run-select-standard')).tap();
+  await element(by.id('practice-main-scroll')).scrollTo('top');
+  if (await existsNow('practice-sprint-rules-dismiss')) {
+    await element(by.id('practice-sprint-rules-dismiss')).tap();
+    await element(by.id('practice-main-scroll')).scrollTo('top');
+  }
+  await waitFor(element(by.id('practice-run-start'))).toBeVisible().withTimeout(10000);
+  await element(by.id('practice-run-start')).tap();
+
+  for (let step = 1; step <= 8; step += 1) {
+    try {
+      await waitFor(element(by.id('practice-session-guide-start'))).toExist().withTimeout(5000);
+    } catch {
+      break;
+    }
+    // The guide re-lays out after each step; let the new callout settle.
+    await sleep(500);
+    if (
+      !await existsNow('practice-active-session-guide')
+      && !await existsNow('practice-arrow-duel-guide')
+    ) {
+      // The last Start action is leaving the guide for the live session.
+      break;
+    }
+    await expectGuideContained(`${orientation} guide step ${step}`);
+    await element(by.id('practice-session-guide-start')).tap();
+  }
+}
+
+async function expectGuideContained(label) {
+  const screenFrame = await frameFor(element(by.id('adaptive-layout')));
+  const guideFrame = await frameForIfPresent('practice-active-session-guide')
+    ?? await frameForIfPresent('practice-arrow-duel-guide');
+  const navigationFrame = await frameFor(element(by.id('practice-session-guide-navigation')));
+  // Back/progress/Next must be on screen without scrolling (#602, #613).
+  expectFrameContained(navigationFrame, screenFrame, `${deviceLabel} ${label} navigation`);
+  for (const testID of [
+    'practice-session-guide-back',
+    'practice-session-guide-coach-progress',
+    'practice-session-guide-start'
+  ]) {
+    const frame = await frameForIfPresent(testID);
+    if (frame) {
+      expectFrameContained(frame, navigationFrame, `${deviceLabel} ${label} ${testID}`);
+    }
+  }
+  if (!guideFrame) {
+    throw new Error(`${deviceLabel} ${label} has guide navigation without a guide container`);
+  }
+  // The demo board and rail must not be clipped by the guide container.
+  for (const testID of ['practice-session-guide-demo-board', 'active-session-control-rail']) {
+    const frame = await frameForIfPresent(testID);
+    if (frame) {
+      expectFrameContained(frame, guideFrame, `${deviceLabel} ${label} ${testID}`);
+    }
+  }
+}
+
+async function expectSessionControlsContained(orientation) {
+  const screenFrame = await frameFor(element(by.id('adaptive-layout')));
+  for (const testID of [
+    'session-board',
+    'session-status-metrics',
+    'session-score-strip',
+    'session-abandon',
+    'session-pause'
+  ]) {
+    const frame = await frameForIfPresent(testID);
+    if (!frame) {
+      throw new Error(`${deviceLabel} ${orientation} session is missing ${testID}`);
+    }
+    expectFrameContained(frame, screenFrame, `${deviceLabel} ${orientation} ${testID}`);
+  }
+}
+
+async function existsNow(testID) {
+  try {
+    await expect(element(by.id(testID))).toExist();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function takeAdaptiveScreenshot(label) {
+  if (device.getPlatform() !== 'ios' || !iosScreenshotDisplay) {
+    return device.takeScreenshot(label);
+  }
+  const directory = path.resolve(__dirname, '../artifacts/adaptive-layout/display-screenshots');
+  fs.mkdirSync(directory, { recursive: true });
+  const screenshotPath = path.join(directory, `${sanitizeAdaptiveScreenshotLabel(label)}.png`);
+  execFileSync('xcrun', [
+    'simctl',
+    'io',
+    device.id,
+    'screenshot',
+    `--display=${iosScreenshotDisplay}`,
+    screenshotPath
+  ], { stdio: 'ignore' });
+  return screenshotPath;
+}
+
+// Reads the orientations the installed iOS build declares for this device
+// family, so a step that needs an orientation the build does not support
+// (for example the landscape-only iPad validation build) is not attempted.
+function iosAppSupportsOrientation(orientation) {
+  const { config } = require('detox/internals');
+  const app = Object.values(config.apps)[0];
+  const infoPlistPath = path.resolve(process.cwd(), app.binaryPath, 'Info.plist');
+  const deviceQuery = config.device.device ?? {};
+  const deviceName = `${deviceQuery.name ?? ''} ${deviceQuery.type ?? ''}`;
+  const keys = /iPad/i.test(deviceName)
+    ? ['UISupportedInterfaceOrientations~ipad', 'UISupportedInterfaceOrientations']
+    : ['UISupportedInterfaceOrientations'];
+  for (const key of keys) {
+    let declared;
+    try {
+      declared = JSON.parse(execFileSync(
+        'plutil',
+        ['-extract', key, 'json', '-o', '-', infoPlistPath],
+        { encoding: 'utf8' }
+      ));
+    } catch {
+      continue;
+    }
+    const prefix = orientation === 'portrait'
+      ? 'UIInterfaceOrientationPortrait'
+      : 'UIInterfaceOrientationLandscape';
+    return declared.some((value) => value.startsWith(prefix));
+  }
+  return true;
+}
+
 async function captureHome(orientation) {
+  await recordViewportMetrics(`${orientation}-home`);
   const homeFrame = await frameFor(element(by.id('adaptive-layout')));
   expectOrientationFrame(homeFrame, orientation);
-  await device.takeScreenshot(`${deviceLabel}-${orientation}-home`);
+  await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-home`);
 }
 
 async function captureSprint(orientation, { waitForPieces = false } = {}) {
+  await recordViewportMetrics(`${orientation}-sprint`);
   const screenFrame = await frameFor(element(by.id('adaptive-layout')));
   const layoutFrame = await frameForIfPresent('active-session-adaptive-layout') ?? screenFrame;
   const boardFrame = await frameFor(element(by.id('session-board')));
@@ -165,14 +325,14 @@ async function captureSprint(orientation, { waitForPieces = false } = {}) {
     await waitForBoardScreenshotContainsPieces({
       archiveScreenshot: archiveAdaptiveScreenshot,
       boardFrame,
-      captureScreenshot: (label) => device.takeScreenshot(label),
+      captureScreenshot: (label) => takeAdaptiveScreenshot(label),
       screenFrame,
       screenshotLabel,
     });
     return;
   }
 
-  const screenshotPath = await device.takeScreenshot(screenshotLabel);
+  const screenshotPath = await takeAdaptiveScreenshot(screenshotLabel);
   expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenFrame);
 }
 
@@ -263,13 +423,44 @@ async function waitForSettledSprintLayout(
 }
 
 async function waitForHomeTopFrame() {
-  await waitFor(element(by.id('practice-action-header'))).toBeVisible().withTimeout(10000);
+  // iPadOS 27 Detox reports the full-width Home header as below its 75%
+  // visibility threshold even when it is on screen; its frame is asserted
+  // inside the Safe Area instead.
+  await waitFor(element(by.id('practice-action-header'))).toExist().withTimeout(10000);
+  expectFrameContained(
+    await frameFor(element(by.id('practice-action-header'))),
+    await frameFor(element(by.id('adaptive-layout'))),
+    `${deviceLabel} Home action header`
+  );
   // Saved-run content can begin below the first-fold guide on maintained phone
   // viewports. Prove that the catalog rendered without requiring the top-frame
   // screenshot to expose offscreen content.
   await waitFor(element(by.id('practice-run-standard'))).toExist().withTimeout(10000);
   await waitFor(element(by.id('practice-progress-summary'))).toExist().withTimeout(10000);
   await expect(element(by.id('practice-review-strip'))).not.toExist();
+}
+
+// Records the measured window and safe-area insets so device-specific layout
+// contracts (for example iPhone Duo inner and outer displays) can be copied
+// into unit tests from real simulator geometry rather than guessed.
+async function recordViewportMetrics(label) {
+  const windowFrame = await frameFor(element(by.id('practice-gesture-root')));
+  const safeFrame = await frameFor(element(by.id('adaptive-layout')));
+  const layoutAttributes = await element(by.id('adaptive-layout')).getAttributes();
+  const layoutLabel = (Array.isArray(layoutAttributes) ? layoutAttributes[0] : layoutAttributes).label;
+  const insets = {
+    top: safeFrame.y - windowFrame.y,
+    left: safeFrame.x - windowFrame.x,
+    bottom: windowFrame.y + windowFrame.height - (safeFrame.y + safeFrame.height),
+    right: windowFrame.x + windowFrame.width - (safeFrame.x + safeFrame.width)
+  };
+  const record = `viewport ${deviceLabel} ${label} window=${windowFrame.width}x${windowFrame.height} `
+    + `insets=${JSON.stringify(insets)} layout="${layoutLabel}"`;
+  console.log(`[adaptive-viewport] ${record}`);
+  const evidencePath = process.env.CHESSTICIZE_ADAPTIVE_ORIENTATION_EVIDENCE;
+  if (evidencePath) {
+    fs.appendFileSync(evidencePath, `${record}\n`, 'utf8');
+  }
 }
 
 async function frameForIfPresent(testID) {
