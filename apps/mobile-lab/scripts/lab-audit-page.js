@@ -39,6 +39,9 @@
     const text = node.textContent && node.textContent.trim();
     const element = node.parentElement;
     if (!text || !element || element.closest(chrome)) continue;
+    // Coordinates sit in an overlay above the board squares, so their real background is a
+    // sibling layer this walk cannot see; the board contrast is covered by themeContrast.test.
+    if (element.closest("[data-testid^=\"board-coordinate\"]")) continue;
     const style = getComputedStyle(element);
     if (style.visibility === "hidden" || style.display === "none" || Number(style.opacity) === 0) continue;
     const rect = element.getBoundingClientRect();
