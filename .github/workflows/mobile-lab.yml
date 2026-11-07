@@ -104,11 +104,13 @@ jobs:
       - name: Typecheck, registry tests, and static Storybook build
         run: pnpm mobile:lab:validate
 
-      - name: Install pinned headless Chromium for the render smoke
-        run: pnpm --filter ChessticizeMobileLab exec playwright-core install --with-deps chromium-headless-shell
-
+      # Uses the runner image's preinstalled Google Chrome through the pinned playwright-core
+      # (a Playwright Chromium download hung for ten minutes on this runner).
       - name: Render every Lab scenario headlessly
-        run: pnpm mobile:lab:smoke
+        timeout-minutes: 8
+        run: |
+          google-chrome --version
+          pnpm mobile:lab:smoke
 
       - name: Validate issue-owned New Scenario Markers
         env:
