@@ -104,6 +104,10 @@ export function createElevation(shadowColor: string): ThemeElevation {
       shadowOffset: { height: 1, width: 0 },
       shadowOpacity: 0.18,
       shadowRadius: 2
+    },
+    web: {
+      raised: "0 12px 28px rgba(15, 23, 42, 0.20)",
+      resting: "0 1px 3px rgba(15, 23, 42, 0.08)"
     }
   };
 }

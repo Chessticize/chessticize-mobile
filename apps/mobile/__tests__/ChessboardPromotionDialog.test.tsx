@@ -165,7 +165,12 @@ describe("react-native-chessboard promotion dialog patch", () => {
           onCancel={jest.fn()}
           config={{
             colors: {
-              promotionPieceButton: "#F8FAFC"
+              promotionPieceButton: "#F8FAFC",
+              promotionOverlay: "rgba(15, 23, 42, 0.38)",
+              promotionContainer: "#F8FAFC",
+              promotionBorder: "#D8E0E8",
+              promotionShadow: "#000",
+              promotionPieceBorder: "#CBD5E1"
             }
           } as never}
         />
@@ -184,7 +189,15 @@ describe("react-native-chessboard promotion dialog patch", () => {
       justifyContent: "center",
       alignItems: "center"
     });
-    expect(renderer.root.findByProps({ testID: "promotion-dialog-container" })).toBeTruthy();
+    expect(StyleSheet.flatten(overlay.props.style)).toMatchObject({
+      backgroundColor: "rgba(15, 23, 42, 0.38)"
+    });
+    const container = renderer.root.findByProps({ testID: "promotion-dialog-container" });
+    expect(StyleSheet.flatten(container.props.style)).toMatchObject({
+      backgroundColor: "#F8FAFC",
+      borderColor: "#D8E0E8",
+      shadowColor: "#000"
+    });
     const pieceButtons = renderer.root.findAll((node) => String(node.type) === "TouchableOpacity");
     expect(pieceButtons).toHaveLength(4);
     const promotionChoices = [
@@ -211,17 +224,11 @@ describe("react-native-chessboard promotion dialog patch", () => {
     expect(renderer.root.findAll((node) => String(node.type) === "Image")).toHaveLength(4);
     expect(renderer.root.findAll((node) => String(node.type) === "Canvas")).toHaveLength(0);
     expect(renderer.root.findAll((node) => String(node.type) === "Atlas")).toHaveLength(0);
-    expect(pieceButtons[0].props.style).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          borderColor: "#CBD5E1",
-          borderWidth: 1
-        }),
-        expect.objectContaining({
-          backgroundColor: "#F8FAFC"
-        })
-      ])
-    );
+    expect(StyleSheet.flatten(pieceButtons[0].props.style)).toMatchObject({
+      backgroundColor: "#F8FAFC",
+      borderColor: "#CBD5E1",
+      borderWidth: 1
+    });
     renderer.root.findByProps({ testID: "promotion-choice-q" }).props.onPress();
     expect(onSelect).toHaveBeenCalledWith("q");
   });

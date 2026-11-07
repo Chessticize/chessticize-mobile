@@ -1,8 +1,10 @@
 diff --git a/lib/commonjs/components/promotion-dialog.js b/lib/commonjs/components/promotion-dialog.js
-index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..36f900ad0525e8a0385464295e7ece6daf730988 100644
+index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..ad4945237d1a2a55b0b6ba83bf7b62af0cc6f05e 100644
 --- a/lib/commonjs/components/promotion-dialog.js
 +++ b/lib/commonjs/components/promotion-dialog.js
-@@ -13,28 +13,37 @@ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e
+@@ -11,30 +11,34 @@ var _pieceImages = require("../assets/piece-images");
+ function _interopRequireWildcard(e, t) { if ("function" == typeof WeakMap) var r = new WeakMap(), n = new WeakMap(); return (_interopRequireWildcard = function (e, t) { if (!t && e && e.__esModule) return e; var o, i, f = { __proto__: null, default: e }; if (null === e || "object" != typeof e && "function" != typeof e) return f; if (o = t ? n : r) { if (o.has(e)) return o.get(e); o.set(e, f); } for (const t in e) "default" !== t && {}.hasOwnProperty.call(e, t) && ((i = (o = Object.defineProperty) && Object.getOwnPropertyDescriptor(e, t)) && (i.get || i.set) ? o(f, t, i) : f[t] = e[t]); return f; })(e, t); }
+ function _interopRequireDefault(e) { return e && e.__esModule ? e : { default: e }; }
  const PROMOTION_PIECES = ['q', 'r', 'b', 'n'];
 +const PROMOTION_PIECE_NAMES = { q: 'queen', r: 'rook', b: 'bishop', n: 'knight' };
  const styles = _reactNative.StyleSheet.create({
@@ -10,7 +12,6 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..36f900ad0525e8a0385464295e7ece6d
 -    ..._reactNative.StyleSheet.absoluteFillObject,
 -    backgroundColor: 'rgba(0, 0, 0, 0.5)',
 +    flex: 1,
-+    backgroundColor: 'rgba(15, 23, 42, 0.38)',
      justifyContent: 'center',
 -    alignItems: 'center'
 +    alignItems: 'center',
@@ -19,14 +20,12 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..36f900ad0525e8a0385464295e7ece6d
    container: {
      flexDirection: 'row',
 -    backgroundColor: 'white',
-+    backgroundColor: '#F8FAFC',
      borderRadius: 8,
 -    padding: 8,
-+    borderColor: '#D8E0E8',
+-    shadowColor: '#000',
 +    borderWidth: 1,
 +    padding: 10,
 +    zIndex: 1,
-     shadowColor: '#000',
      shadowOffset: {
        width: 0,
 -      height: 2
@@ -44,12 +43,11 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..36f900ad0525e8a0385464295e7ece6d
      padding: 8,
 -    borderRadius: 4,
 +    borderRadius: 7,
-+    borderColor: '#CBD5E1',
 +    borderWidth: 1,
      marginHorizontal: 4
    },
    pieceImage: {
-@@ -51,31 +59,38 @@ const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.me
+@@ -51,31 +55,45 @@ const PromotionDialog = exports.PromotionDialog = /*#__PURE__*/_react.default.me
    const {
      colors
    } = config;
@@ -60,11 +58,13 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..36f900ad0525e8a0385464295e7ece6d
 -    animationType: "fade",
 +    animationType: animatePresentation ? "fade" : "none",
      onRequestClose: onCancel
--  }, /*#__PURE__*/_react.default.createElement(_reactNative.Pressable, {
 +  }, /*#__PURE__*/_react.default.createElement(_reactNative.View, {
-     style: styles.overlay,
++    style: [styles.overlay, {
++      backgroundColor: colors.promotionOverlay
++    }],
 +    testID: "promotion-dialog-overlay"
-+  }, /*#__PURE__*/_react.default.createElement(_reactNative.Pressable, {
+   }, /*#__PURE__*/_react.default.createElement(_reactNative.Pressable, {
+-    style: styles.overlay,
 +    style: _reactNative.StyleSheet.absoluteFillObject,
      onPress: onCancel
 -  }, /*#__PURE__*/_react.default.createElement(_reactNativeReanimated.default.View, {
@@ -74,7 +74,11 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..36f900ad0525e8a0385464295e7ece6d
 +  }), /*#__PURE__*/_react.default.createElement(_reactNativeReanimated.default.View, {
 +    entering: animatePresentation ? _reactNativeReanimated.FadeIn.duration(200) : undefined,
 +    exiting: animatePresentation ? _reactNativeReanimated.FadeOut.duration(200) : undefined,
-+    style: styles.container,
++    style: [styles.container, {
++      backgroundColor: colors.promotionContainer,
++      borderColor: colors.promotionBorder,
++      shadowColor: colors.promotionShadow
++    }],
 +    testID: "promotion-dialog-container"
    }, PROMOTION_PIECES.map(piece => {
      const pieceCode = `${color}${piece}`;
@@ -82,7 +86,9 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..36f900ad0525e8a0385464295e7ece6d
      return /*#__PURE__*/_react.default.createElement(_reactNative.TouchableOpacity, {
        key: piece,
        style: [styles.pieceButton, {
-         backgroundColor: colors.promotionPieceButton
+-        backgroundColor: colors.promotionPieceButton
++        backgroundColor: colors.promotionPieceButton,
++        borderColor: colors.promotionPieceBorder
        }],
 +      testID: `promotion-choice-${piece}`,
        onPress: () => onSelect(piece),
@@ -99,7 +105,7 @@ index de72beac3b9cda50edb7a8f34b1630cfdd2bd8cf..36f900ad0525e8a0385464295e7ece6d
    }))));
  });
 diff --git a/lib/commonjs/components/skia/gesture-board.js b/lib/commonjs/components/skia/gesture-board.js
-index 7ddc0516545a4e1e16774f520123aaa883c235c0..0c1eeb4b952cfea643b9ae9422a56809a34f512d 100644
+index 7ddc0516545a4e1e16774f520123aaa883c235c0..8b97816cbda6a7212cac4f38a3db0e702485a75e 100644
 --- a/lib/commonjs/components/skia/gesture-board.js
 +++ b/lib/commonjs/components/skia/gesture-board.js
 @@ -20,13 +20,17 @@ var _promotionDialog = require("../promotion-dialog");
@@ -554,7 +560,7 @@ index 26deda8bb43c022624db07d6ea463a1028f082f9..3f254c3319f5f012d0a48506936b13cb
  };
  exports.useBoardGesture = useBoardGesture;
 diff --git a/lib/commonjs/hooks/use-chessboard-ref.js b/lib/commonjs/hooks/use-chessboard-ref.js
-index 759528090f2fb7b1e3ddc0bdc47841ceea24c1ab..5a2285f370efed55ab7c50f303161db1735060f1 100644
+index 759528090f2fb7b1e3ddc0bdc47841ceea24c1ab..707ae1b5cff77c98be2a98beba293947f5d37b95 100644
 --- a/lib/commonjs/hooks/use-chessboard-ref.js
 +++ b/lib/commonjs/hooks/use-chessboard-ref.js
 @@ -12,7 +12,8 @@ const useChessboardRef = ({
@@ -619,21 +625,26 @@ index 360d75d327324795ca72a43b37965b1ea2bc19d9..b72d8157424094f16b0d79a66fa62281
    }));
  });
 diff --git a/lib/commonjs/state/board-state-context.js b/lib/commonjs/state/board-state-context.js
-index cfd52d5394e32d3972be93c85977c62f4ad30885..297972ef10bbda6a19b00c88166ac3a916364387 100644
+index cfd52d5394e32d3972be93c85977c62f4ad30885..c102fb6e746d7cddad822637ebe2c21ffe36cee6 100644
 --- a/lib/commonjs/state/board-state-context.js
 +++ b/lib/commonjs/state/board-state-context.js
-@@ -19,7 +19,9 @@ const defaultColors = {
+@@ -19,7 +19,14 @@ const defaultColors = {
    black: '#62B1A8',
    lastMoveHighlight: 'rgba(255,255,0, 0.5)',
    checkmateHighlight: '#E84855',
 -  promotionPieceButton: '#FF9B71'
 +  promotionPieceButton: '#FF9B71',
 +  validMoveDot: 'rgba(0, 0, 0, 0.3)',
-+  validMoveCapture: 'rgba(0, 0, 0, 0.55)'
++  validMoveCapture: 'rgba(0, 0, 0, 0.55)',
++  promotionOverlay: 'rgba(15, 23, 42, 0.38)',
++  promotionContainer: '#F8FAFC',
++  promotionBorder: '#D8E0E8',
++  promotionShadow: '#000',
++  promotionPieceBorder: '#CBD5E1'
  };
  const defaultDurations = {
    move: 150
-@@ -34,6 +36,7 @@ const BoardStateProvider = ({
+@@ -34,6 +41,7 @@ const BoardStateProvider = ({
    fen,
    boardSize = DEFAULT_BOARD_SIZE,
    gestureEnabled = true,
@@ -641,7 +652,7 @@ index cfd52d5394e32d3972be93c85977c62f4ad30885..297972ef10bbda6a19b00c88166ac3a9
    flipped = false,
    withLetters = true,
    withNumbers = true,
-@@ -46,6 +49,7 @@ const BoardStateProvider = ({
+@@ -46,6 +54,7 @@ const BoardStateProvider = ({
      boardSize,
      pieceSize,
      gestureEnabled,
@@ -649,7 +660,7 @@ index cfd52d5394e32d3972be93c85977c62f4ad30885..297972ef10bbda6a19b00c88166ac3a9
      flipped,
      withLetters,
      withNumbers,
-@@ -59,7 +63,7 @@ const BoardStateProvider = ({
+@@ -59,7 +68,7 @@ const BoardStateProvider = ({
      },
      animations: defaultAnimations,
      fontSource: fontSource ?? null
@@ -659,7 +670,7 @@ index cfd52d5394e32d3972be93c85977c62f4ad30885..297972ef10bbda6a19b00c88166ac3a9
      boardState,
      chess
 diff --git a/lib/commonjs/state/move-executor.js b/lib/commonjs/state/move-executor.js
-index 983112b3bfd62a93c150077851c9cdc0e6fc5c48..57fccec6ee15028cd1d4bcd74e158734eeb05559 100644
+index 983112b3bfd62a93c150077851c9cdc0e6fc5c48..fd4d3bed09b97b0ede1de7994e52aeb42fa2bcb2 100644
 --- a/lib/commonjs/state/move-executor.js
 +++ b/lib/commonjs/state/move-executor.js
 @@ -61,51 +61,56 @@ const createMoveExecutor = (chess, boardState, config, callbacks) => {
@@ -977,10 +988,10 @@ index 0a6faf6b1ec0b5ac518104d513f3e1a0a9c1a9b6..4a9ba5a255d44f8f9a140019f6f351a2
        chess.reset();
      } else {
 diff --git a/lib/module/components/promotion-dialog.js b/lib/module/components/promotion-dialog.js
-index 5bf64b655079b16368383257bc53bc3bce4d8418..14f6c9229a38e371517b7655e11f4c58ffd5df38 100644
+index 5bf64b655079b16368383257bc53bc3bce4d8418..d07030053476c10fec7719da9293f77ba2f831d1 100644
 --- a/lib/module/components/promotion-dialog.js
 +++ b/lib/module/components/promotion-dialog.js
-@@ -1,32 +1,41 @@
+@@ -1,32 +1,36 @@
  import React from 'react';
 -import { StyleSheet, TouchableOpacity, Image, Modal, Pressable } from 'react-native';
 +import { StyleSheet, TouchableOpacity, Image, Modal, Platform, Pressable, View } from 'react-native';
@@ -993,7 +1004,6 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..14f6c9229a38e371517b7655e11f4c58
 -    ...StyleSheet.absoluteFillObject,
 -    backgroundColor: 'rgba(0, 0, 0, 0.5)',
 +    flex: 1,
-+    backgroundColor: 'rgba(15, 23, 42, 0.38)',
      justifyContent: 'center',
 -    alignItems: 'center'
 +    alignItems: 'center',
@@ -1002,14 +1012,12 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..14f6c9229a38e371517b7655e11f4c58
    container: {
      flexDirection: 'row',
 -    backgroundColor: 'white',
-+    backgroundColor: '#F8FAFC',
      borderRadius: 8,
 -    padding: 8,
-+    borderColor: '#D8E0E8',
+-    shadowColor: '#000',
 +    borderWidth: 1,
 +    padding: 10,
 +    zIndex: 1,
-     shadowColor: '#000',
      shadowOffset: {
        width: 0,
 -      height: 2
@@ -1027,12 +1035,11 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..14f6c9229a38e371517b7655e11f4c58
      padding: 8,
 -    borderRadius: 4,
 +    borderRadius: 7,
-+    borderColor: '#CBD5E1',
 +    borderWidth: 1,
      marginHorizontal: 4
    },
    pieceImage: {
-@@ -43,31 +51,38 @@ export const PromotionDialog = /*#__PURE__*/React.memo(({
+@@ -43,31 +47,45 @@ export const PromotionDialog = /*#__PURE__*/React.memo(({
    const {
      colors
    } = config;
@@ -1043,11 +1050,13 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..14f6c9229a38e371517b7655e11f4c58
 -    animationType: "fade",
 +    animationType: animatePresentation ? "fade" : "none",
      onRequestClose: onCancel
--  }, /*#__PURE__*/React.createElement(Pressable, {
 +  }, /*#__PURE__*/React.createElement(View, {
-     style: styles.overlay,
++    style: [styles.overlay, {
++      backgroundColor: colors.promotionOverlay
++    }],
 +    testID: "promotion-dialog-overlay"
-+  }, /*#__PURE__*/React.createElement(Pressable, {
+   }, /*#__PURE__*/React.createElement(Pressable, {
+-    style: styles.overlay,
 +    style: StyleSheet.absoluteFillObject,
      onPress: onCancel
 -  }, /*#__PURE__*/React.createElement(Animated.View, {
@@ -1057,7 +1066,11 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..14f6c9229a38e371517b7655e11f4c58
 +  }), /*#__PURE__*/React.createElement(Animated.View, {
 +    entering: animatePresentation ? FadeIn.duration(200) : undefined,
 +    exiting: animatePresentation ? FadeOut.duration(200) : undefined,
-+    style: styles.container,
++    style: [styles.container, {
++      backgroundColor: colors.promotionContainer,
++      borderColor: colors.promotionBorder,
++      shadowColor: colors.promotionShadow
++    }],
 +    testID: "promotion-dialog-container"
    }, PROMOTION_PIECES.map(piece => {
      const pieceCode = `${color}${piece}`;
@@ -1065,7 +1078,9 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..14f6c9229a38e371517b7655e11f4c58
      return /*#__PURE__*/React.createElement(TouchableOpacity, {
        key: piece,
        style: [styles.pieceButton, {
-         backgroundColor: colors.promotionPieceButton
+-        backgroundColor: colors.promotionPieceButton
++        backgroundColor: colors.promotionPieceButton,
++        borderColor: colors.promotionPieceBorder
        }],
 +      testID: `promotion-choice-${piece}`,
        onPress: () => onSelect(piece),
@@ -1082,7 +1097,7 @@ index 5bf64b655079b16368383257bc53bc3bce4d8418..14f6c9229a38e371517b7655e11f4c58
    }))));
  });
 diff --git a/lib/module/components/skia/gesture-board.js b/lib/module/components/skia/gesture-board.js
-index 79598f3cce08d079d2a004ed0563f1194fd7d31c..abd5a388b3146bf82650c6de75e346b1093ac8fb 100644
+index 79598f3cce08d079d2a004ed0563f1194fd7d31c..de993aab7013fb3195216144f73301a29dac3c24 100644
 --- a/lib/module/components/skia/gesture-board.js
 +++ b/lib/module/components/skia/gesture-board.js
 @@ -1,4 +1,4 @@
@@ -1544,7 +1559,7 @@ index 504126e4dc0a469cf5b00913e176e360322a1194..c09174430003ba109c895bb474aad9eb
  //# sourceMappingURL=use-board-gesture.js.map
 \ No newline at end of file
 diff --git a/lib/module/hooks/use-chessboard-ref.js b/lib/module/hooks/use-chessboard-ref.js
-index 0c7aa00855119b0b99285596e024cf51f18409ce..ffb0af8cf082f8d5383f579fa62b5482b8e4e783 100644
+index 0c7aa00855119b0b99285596e024cf51f18409ce..a61c64e89088a25600b3dadd6cce3b3a2098fdf7 100644
 --- a/lib/module/hooks/use-chessboard-ref.js
 +++ b/lib/module/hooks/use-chessboard-ref.js
 @@ -6,7 +6,8 @@ export const useChessboardRef = ({
@@ -1609,21 +1624,26 @@ index 7cee33e75529b83bea5c7216e4b89be54c9fb520..ad70cac42f9a03c9934ec526a71a1933
    }));
  });
 diff --git a/lib/module/state/board-state-context.js b/lib/module/state/board-state-context.js
-index 9c5fc37c72a09fa6a338aba03bd0433d0c09573e..9c781af9859d91627effe7113c653689ad84ac7e 100644
+index 9c5fc37c72a09fa6a338aba03bd0433d0c09573e..2f03cddb0f694120a243c41d5f79ca01e023af9e 100644
 --- a/lib/module/state/board-state-context.js
 +++ b/lib/module/state/board-state-context.js
-@@ -12,7 +12,9 @@ const defaultColors = {
+@@ -12,7 +12,14 @@ const defaultColors = {
    black: '#62B1A8',
    lastMoveHighlight: 'rgba(255,255,0, 0.5)',
    checkmateHighlight: '#E84855',
 -  promotionPieceButton: '#FF9B71'
 +  promotionPieceButton: '#FF9B71',
 +  validMoveDot: 'rgba(0, 0, 0, 0.3)',
-+  validMoveCapture: 'rgba(0, 0, 0, 0.55)'
++  validMoveCapture: 'rgba(0, 0, 0, 0.55)',
++  promotionOverlay: 'rgba(15, 23, 42, 0.38)',
++  promotionContainer: '#F8FAFC',
++  promotionBorder: '#D8E0E8',
++  promotionShadow: '#000',
++  promotionPieceBorder: '#CBD5E1'
  };
  const defaultDurations = {
    move: 150
-@@ -27,6 +29,7 @@ export const BoardStateProvider = ({
+@@ -27,6 +34,7 @@ export const BoardStateProvider = ({
    fen,
    boardSize = DEFAULT_BOARD_SIZE,
    gestureEnabled = true,
@@ -1631,7 +1651,7 @@ index 9c5fc37c72a09fa6a338aba03bd0433d0c09573e..9c781af9859d91627effe7113c653689
    flipped = false,
    withLetters = true,
    withNumbers = true,
-@@ -39,6 +42,7 @@ export const BoardStateProvider = ({
+@@ -39,6 +47,7 @@ export const BoardStateProvider = ({
      boardSize,
      pieceSize,
      gestureEnabled,
@@ -1639,7 +1659,7 @@ index 9c5fc37c72a09fa6a338aba03bd0433d0c09573e..9c781af9859d91627effe7113c653689
      flipped,
      withLetters,
      withNumbers,
-@@ -52,7 +56,7 @@ export const BoardStateProvider = ({
+@@ -52,7 +61,7 @@ export const BoardStateProvider = ({
      },
      animations: defaultAnimations,
      fontSource: fontSource ?? null
@@ -1649,7 +1669,7 @@ index 9c5fc37c72a09fa6a338aba03bd0433d0c09573e..9c781af9859d91627effe7113c653689
      boardState,
      chess
 diff --git a/lib/module/state/move-executor.js b/lib/module/state/move-executor.js
-index f2f179f71c94846c9cbe456e5889ac1b5c0714d9..d3768a64a1c06447481b8febd223bec9d38ae9f8 100644
+index f2f179f71c94846c9cbe456e5889ac1b5c0714d9..9f691db1754d1ddbb52947bb111a126cdb3b6ee0 100644
 --- a/lib/module/state/move-executor.js
 +++ b/lib/module/state/move-executor.js
 @@ -1,5 +1,5 @@
@@ -2094,7 +2114,7 @@ index 6bef8348a4fd8cde7955491eaca48e8da844d89b..7651fa22d9200ee42f6c719c5a7bcb9b
  };
  export type MoveExecutor = ReturnType<typeof createMoveExecutor>;
 diff --git a/lib/typescript/state/types.d.ts b/lib/typescript/state/types.d.ts
-index eaac9e98118247d6e6776fe990fa7e10aa5b9227..2f896b9f44846bf23b0cbac42e69da0176304d9a 100644
+index eaac9e98118247d6e6776fe990fa7e10aa5b9227..a9fa92602ea79cb5109a5a03a1209737695584e0 100644
 --- a/lib/typescript/state/types.d.ts
 +++ b/lib/typescript/state/types.d.ts
 @@ -31,6 +31,7 @@ export interface BoardConfig {
@@ -2105,20 +2125,25 @@ index eaac9e98118247d6e6776fe990fa7e10aa5b9227..2f896b9f44846bf23b0cbac42e69da01
      flipped: boolean;
      withLetters: boolean;
      withNumbers: boolean;
-@@ -40,6 +41,8 @@ export interface BoardConfig {
+@@ -40,6 +41,13 @@ export interface BoardConfig {
          lastMoveHighlight: string;
          checkmateHighlight: string;
          promotionPieceButton: string;
 +        validMoveDot: string;
 +        validMoveCapture: string;
++        promotionOverlay: string;
++        promotionContainer: string;
++        promotionBorder: string;
++        promotionShadow: string;
++        promotionPieceBorder: string;
      };
      durations: {
          move: number;
 diff --git a/src/components/promotion-dialog.tsx b/src/components/promotion-dialog.tsx
-index a3f67bf02f45b674772813bdf03f4b25c56f070e..133a12df3289ac45a55b3cce5c717b778f0455e0 100644
+index a3f67bf02f45b674772813bdf03f4b25c56f070e..82b0a9414620d14010296422c974664f8625266a 100644
 --- a/src/components/promotion-dialog.tsx
 +++ b/src/components/promotion-dialog.tsx
-@@ -4,7 +4,9 @@ import {
+@@ -4,14 +4,17 @@ import {
    TouchableOpacity,
    Image,
    Modal,
@@ -2128,11 +2153,16 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..133a12df3289ac45a55b3cce5c717b77
  } from 'react-native';
  import type { PieceSymbol } from 'chess.js';
  import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-@@ -16 +18,2 @@ import { PIECE_SOURCES } from '../assets/piece-images';
+ import type { BoardConfig } from '../state';
+ import { PIECE_SOURCES } from '../assets/piece-images';
+ 
 -const PROMOTION_PIECES: PieceSymbol[] = ['q', 'r', 'b', 'n'];
 +const PROMOTION_PIECES = ['q', 'r', 'b', 'n'] as const satisfies readonly PieceSymbol[];
 +const PROMOTION_PIECE_NAMES: Record<(typeof PROMOTION_PIECES)[number], string> = { q: 'queen', r: 'rook', b: 'bishop', n: 'knight' };
-@@ -20,27 +23,45 @@ interface PromotionDialogProps {
+ 
+ interface PromotionDialogProps {
+   color: 'w' | 'b';
+@@ -20,27 +23,40 @@ interface PromotionDialogProps {
    config: BoardConfig;
  }
  
@@ -2151,7 +2181,6 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..133a12df3289ac45a55b3cce5c717b77
 -    ...StyleSheet.absoluteFillObject,
 -    backgroundColor: 'rgba(0, 0, 0, 0.5)',
 +    flex: 1,
-+    backgroundColor: 'rgba(15, 23, 42, 0.38)',
      justifyContent: 'center',
      alignItems: 'center',
 +    zIndex: 20,
@@ -2159,17 +2188,15 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..133a12df3289ac45a55b3cce5c717b77
    container: {
      flexDirection: 'row',
 -    backgroundColor: 'white',
-+    backgroundColor: '#F8FAFC',
      borderRadius: 8,
 -    padding: 8,
-+    borderColor: '#D8E0E8',
-+    borderWidth: 1,
-+    padding: 10,
-+    zIndex: 1,
-     shadowColor: '#000',
+-    shadowColor: '#000',
 -    shadowOffset: { width: 0, height: 2 },
 -    shadowOpacity: 0.25,
 -    shadowRadius: 4,
++    borderWidth: 1,
++    padding: 10,
++    zIndex: 1,
 +    shadowOffset: { width: 0, height: 8 },
 +    shadowOpacity: 0.14,
 +    shadowRadius: 18,
@@ -2181,12 +2208,11 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..133a12df3289ac45a55b3cce5c717b77
      padding: 8,
 -    borderRadius: 4,
 +    borderRadius: 7,
-+    borderColor: '#CBD5E1',
 +    borderWidth: 1,
      marginHorizontal: 4,
    },
    pieceImage: {
-@@ -52,19 +73,26 @@ const styles = StyleSheet.create({
+@@ -52,36 +68,65 @@ const styles = StyleSheet.create({
  export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
    ({ color, onSelect, onCancel, config }) => {
      const { colors } = config;
@@ -2201,14 +2227,25 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..133a12df3289ac45a55b3cce5c717b77
 +        animationType={animatePresentation ? 'fade' : 'none'}
 +        onRequestClose={onCancel}
 +      >
-+        <View style={styles.overlay} testID="promotion-dialog-overlay">
++        <View
++          style={[styles.overlay, { backgroundColor: colors.promotionOverlay }]}
++          testID="promotion-dialog-overlay"
++        >
 +          <Pressable style={StyleSheet.absoluteFillObject} onPress={onCancel} />
            <Animated.View
 -            entering={FadeIn.duration(200)}
 -            exiting={FadeOut.duration(200)}
+-            style={styles.container}
 +            entering={animatePresentation ? FadeIn.duration(200) : undefined}
 +            exiting={animatePresentation ? FadeOut.duration(200) : undefined}
-             style={styles.container}
++            style={[
++              styles.container,
++              {
++                backgroundColor: colors.promotionContainer,
++                borderColor: colors.promotionBorder,
++                shadowColor: colors.promotionShadow,
++              },
++            ]}
 +            testID="promotion-dialog-container"
            >
              {PROMOTION_PIECES.map((piece) => {
@@ -2218,9 +2255,14 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..133a12df3289ac45a55b3cce5c717b77
  
                return (
                  <TouchableOpacity
-@@ -73,15 +101,24 @@ export const PromotionDialog: React.FC<PromotionDialogProps> = React.memo(
+                   key={piece}
+                   style={[
                      styles.pieceButton,
-                     { backgroundColor: colors.promotionPieceButton },
+-                    { backgroundColor: colors.promotionPieceButton },
++                    {
++                      backgroundColor: colors.promotionPieceButton,
++                      borderColor: colors.promotionPieceBorder,
++                    },
                    ]}
 -                  onPress={() => onSelect(piece)}
 +                  testID={`promotion-choice-${piece}`}
@@ -3024,7 +3066,7 @@ index a50f36cba22769b8a484a1c4429a3135e661dcf3..cfc883fb8cab34b3e13120c18e2dee4f
          />
        </BoardStateProvider>
 diff --git a/src/state/board-state-context.tsx b/src/state/board-state-context.tsx
-index 2f2990b96a62e49047a101e225317ab1a01b20ae..222650a2f245f85e9f15eab121943056cf90668d 100644
+index 2f2990b96a62e49047a101e225317ab1a01b20ae..49b3ca47ff47230e756b5c6baede95d1d4bd528a 100644
 --- a/src/state/board-state-context.tsx
 +++ b/src/state/board-state-context.tsx
 @@ -4,6 +4,7 @@ import type { BoardState, BoardConfig } from './types';
@@ -3043,16 +3085,21 @@ index 2f2990b96a62e49047a101e225317ab1a01b20ae..222650a2f245f85e9f15eab121943056
    flipped?: boolean;
    withLetters?: boolean;
    withNumbers?: boolean;
-@@ -40,6 +42,8 @@ const defaultColors: BoardConfig['colors'] = {
+@@ -40,6 +42,13 @@ const defaultColors: BoardConfig['colors'] = {
    lastMoveHighlight: 'rgba(255,255,0, 0.5)',
    checkmateHighlight: '#E84855',
    promotionPieceButton: '#FF9B71',
 +  validMoveDot: 'rgba(0, 0, 0, 0.3)',
 +  validMoveCapture: 'rgba(0, 0, 0, 0.55)',
++  promotionOverlay: 'rgba(15, 23, 42, 0.38)',
++  promotionContainer: '#F8FAFC',
++  promotionBorder: '#D8E0E8',
++  promotionShadow: '#000',
++  promotionPieceBorder: '#CBD5E1',
  };
  
  const defaultDurations: BoardConfig['durations'] = {
-@@ -57,6 +61,7 @@ export const BoardStateProvider: React.FC<BoardStateProviderProps> = ({
+@@ -57,6 +66,7 @@ export const BoardStateProvider: React.FC<BoardStateProviderProps> = ({
    fen,
    boardSize = DEFAULT_BOARD_SIZE,
    gestureEnabled = true,
@@ -3060,7 +3107,7 @@ index 2f2990b96a62e49047a101e225317ab1a01b20ae..222650a2f245f85e9f15eab121943056
    flipped = false,
    withLetters = true,
    withNumbers = true,
-@@ -71,6 +76,7 @@ export const BoardStateProvider: React.FC<BoardStateProviderProps> = ({
+@@ -71,6 +81,7 @@ export const BoardStateProvider: React.FC<BoardStateProviderProps> = ({
        boardSize,
        pieceSize,
        gestureEnabled,
@@ -3068,7 +3115,7 @@ index 2f2990b96a62e49047a101e225317ab1a01b20ae..222650a2f245f85e9f15eab121943056
        flipped,
        withLetters,
        withNumbers,
-@@ -83,6 +89,7 @@ export const BoardStateProvider: React.FC<BoardStateProviderProps> = ({
+@@ -83,6 +94,7 @@ export const BoardStateProvider: React.FC<BoardStateProviderProps> = ({
        boardSize,
        pieceSize,
        gestureEnabled,
@@ -3475,7 +3522,7 @@ index 5957db9d36a2d7ab8800c7b171b0c8ef79052d8d..16ee21ed3efa4b8bac663e633a288964
  
    const undo = (): Move | null => {
 diff --git a/src/state/types.ts b/src/state/types.ts
-index 2b02a76df0c9b736fe0c9f1089787dac919ae336..9b7139a692e2bdd344cc08284d36c4ab072fc6a2 100644
+index 2b02a76df0c9b736fe0c9f1089787dac919ae336..6608d09743021f7975c100475ff3233fd7930e46 100644
 --- a/src/state/types.ts
 +++ b/src/state/types.ts
 @@ -49,6 +49,7 @@ export interface BoardConfig {
@@ -3486,12 +3533,17 @@ index 2b02a76df0c9b736fe0c9f1089787dac919ae336..9b7139a692e2bdd344cc08284d36c4ab
    flipped: boolean;
    withLetters: boolean;
    withNumbers: boolean;
-@@ -58,6 +59,8 @@ export interface BoardConfig {
+@@ -58,6 +59,13 @@ export interface BoardConfig {
      lastMoveHighlight: string;
      checkmateHighlight: string;
      promotionPieceButton: string;
 +    validMoveDot: string;
 +    validMoveCapture: string;
++    promotionOverlay: string;
++    promotionContainer: string;
++    promotionBorder: string;
++    promotionShadow: string;
++    promotionPieceBorder: string;
    };
    durations: {
      move: number;

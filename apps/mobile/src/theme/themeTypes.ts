@@ -16,12 +16,17 @@ export type AccentColors = {
   s800: string;
   s900: string;
   wash: string;
+  // Faint fill of a drop target and the tint of accent hints drawn on a dark scrim.
+  dropZone: string;
+  glassFill: string;
+  glassBorder: string;
 };
 
 export type SuccessColors = {
   s50: string;
   s100: string;
   s200: string;
+  s300: string;
   s700: string;
   s800: string;
 };
@@ -29,7 +34,10 @@ export type SuccessColors = {
 // Green variant used by Review counts and a few positive badges.
 export type PositiveColors = {
   s100: string;
+  s600: string;
   s700: string;
+  // Translucent fill flashed on a correct move.
+  flash: string;
 };
 
 export type WarningColors = {
@@ -37,7 +45,9 @@ export type WarningColors = {
   s100: string;
   s200: string;
   s300: string;
+  s400: string;
   s500: string;
+  s600: string;
   s700: string;
   s800: string;
   s900: string;
@@ -57,9 +67,12 @@ export type DangerColors = {
   s100: string;
   s200: string;
   s300: string;
+  s500: string;
   s600: string;
   s700: string;
   s800: string;
+  // Translucent fill flashed on a wrong move.
+  flash: string;
 };
 
 export type BoardColors = {
@@ -70,6 +83,13 @@ export type BoardColors = {
   checkmateHighlight: string;
   validMoveDot: string;
   validMoveCapture: string;
+  lastMoveSquare: string;
+  // Promotion dialog surfaces (patched react-native-chessboard).
+  promotionOverlay: string;
+  promotionContainer: string;
+  promotionBorder: string;
+  promotionShadow: string;
+  promotionPieceBorder: string;
 };
 
 export type ThemeColors = {
@@ -84,7 +104,12 @@ export type ThemeColors = {
   fillStrong: string;
   // Translucent fills layered over tinted surfaces.
   glass: string;
+  glassStrong: string;
+  veil: string;
+  halo: string;
   scrim: string;
+  scrimSoft: string;
+  scrimStrong: string;
   shadow: string;
   text: {
     primary: string;
@@ -94,6 +119,8 @@ export type ThemeColors = {
     tertiary: string;
     faint: string;
     onAccent: string;
+    // Darkest ink, used by headings that sit on the app canvas.
+    ink: string;
     // Text drawn on the dark inverse surface.
     inverse: string;
   };
@@ -115,6 +142,12 @@ export type ThemeColors = {
     warningStrong: string;
   };
   board: BoardColors;
+  // Stage drawn while the predictive-back preview is shown.
+  backGesture: {
+    stage: string;
+    eyebrow: string;
+    label: string;
+  };
 };
 
 export type ThemeSpace = {
@@ -203,10 +236,17 @@ export type ThemeElevation = {
     shadowOpacity: number;
     shadowRadius: number;
   };
+  // CSS box shadows used by the web Lab.
+  web: {
+    raised: string;
+    resting: string;
+  };
 };
 
 export type Theme = {
   name: "light" | "dark";
+  // Status bar icon style that stays legible over the theme's canvas.
+  statusBarStyle: "dark-content" | "light-content";
   colors: ThemeColors;
   space: ThemeSpace;
   radius: ThemeRadius;

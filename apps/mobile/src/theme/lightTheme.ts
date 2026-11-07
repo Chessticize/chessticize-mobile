@@ -12,7 +12,12 @@ const colors: ThemeColors = {
   fillMuted: "#CBD5E1",
   fillStrong: "#94A3B8",
   glass: "rgba(255, 255, 255, 0.66)",
+  glassStrong: "rgba(255, 255, 255, 0.94)",
+  veil: "rgba(248, 250, 252, 0.92)",
+  halo: "rgba(248, 250, 252, 0.85)",
   scrim: "rgba(15, 23, 42, 0.55)",
+  scrimSoft: "rgba(15, 23, 42, 0.48)",
+  scrimStrong: "rgba(15, 23, 42, 0.90)",
   shadow: "#0F172A",
   text: {
     primary: "#0F172A",
@@ -22,6 +27,7 @@ const colors: ThemeColors = {
     tertiary: "#64748B",
     faint: "#94A3B8",
     onAccent: "#FFFFFF",
+    ink: "#111827",
     inverse: "#E2E8F0"
   },
   border: {
@@ -40,25 +46,33 @@ const colors: ThemeColors = {
     s700: "#1D4ED8",
     s800: "#1E40AF",
     s900: "#1E3A8A",
-    wash: "#F8FBFF"
+    wash: "#F8FBFF",
+    dropZone: "rgba(37, 99, 235, 0.025)",
+    glassFill: "rgba(219, 234, 254, 0.14)",
+    glassBorder: "rgba(147, 197, 253, 0.48)"
   },
   success: {
     s50: "#ECFDF5",
     s100: "#D1FAE5",
     s200: "#A7F3D0",
+    s300: "#6EE7B7",
     s700: "#047857",
     s800: "#065F46"
   },
   positive: {
     s100: "#DCFCE7",
-    s700: "#15803D"
+    s600: "#16A34A",
+    s700: "#15803D",
+    flash: "rgba(22, 163, 74, 0.34)"
   },
   warning: {
     s50: "#FFFBEB",
     s100: "#FEF3C7",
     s200: "#FDE68A",
     s300: "#FCD34D",
+    s400: "#FBBF24",
     s500: "#F59E0B",
+    s600: "#D97706",
     s700: "#B45309",
     s800: "#92400E",
     s900: "#78350F"
@@ -76,9 +90,11 @@ const colors: ThemeColors = {
     s100: "#FEE2E2",
     s200: "#FECACA",
     s300: "#FCA5A5",
+    s500: "#EF4444",
     s600: "#DC2626",
     s700: "#B91C1C",
-    s800: "#991B1B"
+    s800: "#991B1B",
+    flash: "rgba(220, 38, 38, 0.32)"
   },
   hairline: {
     neutral: "rgba(100, 116, 139, 0.22)",
@@ -92,12 +108,24 @@ const colors: ThemeColors = {
     lastMoveHighlight: "rgba(0, 0, 0, 0)",
     checkmateHighlight: "rgba(0, 0, 0, 0)",
     validMoveDot: "rgba(15, 23, 42, 0.36)",
-    validMoveCapture: "rgba(15, 23, 42, 0.56)"
+    validMoveCapture: "rgba(15, 23, 42, 0.56)",
+    lastMoveSquare: "rgba(37, 99, 235, 0.3)",
+    promotionOverlay: "rgba(15, 23, 42, 0.38)",
+    promotionContainer: "#F8FAFC",
+    promotionBorder: "#D8E0E8",
+    promotionShadow: "#000",
+    promotionPieceBorder: "#CBD5E1"
+  },
+  backGesture: {
+    stage: "#DCE7F5",
+    eyebrow: "#516078",
+    label: "#172033"
   }
 };
 
 export const lightTheme: Theme = {
   name: "light",
+  statusBarStyle: "dark-content",
   colors,
   space,
   radius,
