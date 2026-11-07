@@ -308,6 +308,7 @@ export type {
   HistoryWeaknessEffect,
   HistoryStrengthSeries
 } from "./historyProgressPresentation.ts";
+import { makeStyles, useTheme, type Theme } from "../theme/index.ts";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -573,13 +574,6 @@ type ReviewBackCommand = {
 type DeferBackRelevantTransition = (key: string, resumeAfterCancel: () => void) => boolean;
 
 const HISTORY_PAGE_LIMIT = 20;
-const NEUTRAL_ARROW = "#2563EB";
-const ARROW_VISUAL_STYLES = {
-  candidate: {
-    stroke: NEUTRAL_ARROW,
-    opacity: 0.68
-  }
-} as const;
 const FEEDBACK_SNAPSHOT_MS = 800;
 
 function shouldShowTimeoutSnapshot(
@@ -646,19 +640,26 @@ const CUSTOM_THEME_OPTIONS: ReadonlyArray<CustomThemeFilter> = [
   ALL_THEMES_FILTER,
   ...SERVER_CURATED_THEMES
 ];
-const BOARD_COLOR_TOKENS = {
-  white: "#E6E8EB",
-  black: "#7B8794"
-} as const;
-const CHESSBOARD_COLORS = {
-  white: BOARD_COLOR_TOKENS.white,
-  black: BOARD_COLOR_TOKENS.black,
-  lastMoveHighlight: "rgba(0, 0, 0, 0)",
-  checkmateHighlight: "rgba(0, 0, 0, 0)",
-  promotionPieceButton: "#F8FAFC",
-  validMoveDot: "rgba(15, 23, 42, 0.36)",
-  validMoveCapture: "rgba(15, 23, 42, 0.56)"
-} as const;
+type ChessboardColors = NonNullable<React.ComponentProps<typeof Chessboard>["colors"]>;
+const chessboardColorCache = new WeakMap<Theme, ChessboardColors>();
+// Stable per theme so the board does not see a new colors prop on every render.
+function chessboardColorsFor(theme: Theme): ChessboardColors {
+  let colors = chessboardColorCache.get(theme);
+  if (colors === undefined) {
+    const { board } = theme.colors;
+    colors = {
+      white: board.lightSquare,
+      black: board.darkSquare,
+      lastMoveHighlight: board.lastMoveHighlight,
+      checkmateHighlight: board.checkmateHighlight,
+      promotionPieceButton: board.promotionPieceButton,
+      validMoveDot: board.validMoveDot,
+      validMoveCapture: board.validMoveCapture
+    };
+    chessboardColorCache.set(theme, colors);
+  }
+  return colors;
+}
 const CHESSBOARD_DURATIONS = { move: BOARD_MOVE_ANIMATION_MS } as const;
 const SIMULATED_HISTORY_SCENARIOS: ReadonlyArray<{ scenario: SimulatedHistoryScenarioId; label: string }> = [
   { scenario: "slow-fork-speed", label: "Slow fork" },
@@ -741,6 +742,8 @@ export function PracticePocScreen({
   systemBack,
   tacticalProfilePresentation
 }: Props): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
   const [puzzleSource, setPuzzleSource] = useState<MobilePuzzleSource>("bundledCore");
   const service = platformCapabilities.storage.practiceService;
   const configurePuzzleSource = platformCapabilities.storage.configurePuzzleSource;
@@ -4723,7 +4726,7 @@ export function PracticePocScreen({
             withNumbers={false}
             durations={CHESSBOARD_DURATIONS}
             spriteSource={CHESS_PIECE_SPRITE}
-            colors={CHESSBOARD_COLORS}
+            colors={chessboardColorsFor(appTheme)}
             onReady={arrowDuelBoardRenderKey ? markArrowDuelBoardReady : undefined}
           />
         ) : (
@@ -4975,7 +4978,7 @@ export function PracticePocScreen({
             : null
         ]}
       >
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={appTheme.statusBarStyle} />
       <View
         accessibilityLabel={`Layout ${adaptiveLayout.className}`}
         style={styles.appRootShell}
@@ -5821,7 +5824,7 @@ export function PracticePocScreen({
             testID="sprint-loading-overlay"
           >
             <View style={styles.sprintLoadingCard}>
-              <ActivityIndicator color="#2563EB" size="large" testID="sprint-loading-spinner" />
+              <ActivityIndicator color={appTheme.colors.accent.s600} size="large" testID="sprint-loading-spinner" />
               <Text style={styles.sprintLoadingTitle}>Preparing {modeLabel(startingMode)}</Text>
               <Text style={styles.sprintLoadingDetail}>Loading puzzles and setting up the board</Text>
             </View>
@@ -5864,6 +5867,7 @@ function SprintStartHeader({
   onClose?: () => void;
   onStart: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.sprintScreenHeader} testID={headerTestID}>
       {onClose ? (
@@ -5940,6 +5944,7 @@ function PracticeHome({
   runReorderDesignPreview?: Props["runReorderDesignPreview"];
   onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const selectedRun = runManagement?.runs.find((run) => run.id === runManagement.selectedRunId) ?? null;
   const progressMode = selectedRun?.mode ?? mode;
 
@@ -6052,6 +6057,8 @@ function PracticeRunHome({
   runReorderDesignPreview?: Props["runReorderDesignPreview"];
   onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
 }): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
   const [draggedRunId, setDraggedRunId] = useState<string | null>(null);
   const [dropTargetRunId, setDropTargetRunId] = useState<string | null>(null);
   const [dropTargetPosition, setDropTargetPosition] = useState<RunDropTargetPosition | null>(null);
@@ -6476,8 +6483,8 @@ function PracticeRunHome({
                 ? `practice-run-${safeTestId(dropTargetRunId)}`
                 : undefined}
               style={{
-                backgroundColor: "rgba(37, 99, 235, 0.025)",
-                border: "2px dashed #2563EB",
+                backgroundColor: appTheme.colors.accent.dropZone,
+                border: `2px dashed ${appTheme.colors.accent.s600}`,
                 borderRadius: 12,
                 boxSizing: "border-box",
                 height: dragSourceHeightRef.current,
@@ -6544,6 +6551,7 @@ function SprintRulesGuide({
   presentation: SprintRulesGuidePresentation;
   onDismiss: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const mistakeLimitDetail = `The ${ordinalWord(presentation.maxMistakes)} mistake ends the Sprint.`;
 
   return (
@@ -6614,6 +6622,7 @@ function SprintRuleRow({
   label: string;
   tone?: "default" | "danger" | "warning";
 }): React.JSX.Element {
+  const styles = useStyles();
   const ruleTestId = safeTestId(label);
 
   return (
@@ -6795,6 +6804,7 @@ function ActiveSessionGuide({
   stepNumber: number;
   totalCoachSteps: number;
 }): React.JSX.Element {
+  const styles = useStyles();
   const isArrowDuel = presentation.mode === "arrow_duel";
   const isFocusedRun = presentation.focusedRun === true;
   const guideBoardSize = adaptiveLayout.usesSessionRail
@@ -7045,6 +7055,8 @@ function SessionCoachmarkDemo({
   onExit: () => void;
   presentation: SprintSessionGuidePresentation;
 }): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
   const isArrowDuel = mode === "arrow_duel";
   const isArrowDuelReplyStep = isArrowDuel
     && presentation.arrowDuelReplyOnboarding === "choice_then_reply"
@@ -7342,10 +7354,10 @@ function SessionCoachmarkDemo({
         ? "right"
       : "top";
   const pointerColor = callout.tone === "warning"
-    ? "#D97706"
+    ? appTheme.colors.warning.s600
     : callout.tone === "danger"
-      ? "#DC2626"
-      : "#2563EB";
+      ? appTheme.colors.danger.s600
+      : appTheme.colors.accent.s600;
   const usesPortraitTimeoutPointer = !adaptiveLayout.usesSessionRail
     && callout.id === "timeout";
   const pointerTestId = `practice-session-guide-coach-pointer-${callout.id}-${pointerPlacement}`;
@@ -8008,6 +8020,7 @@ function PracticeRunCard({
   onKeyboardReorder: (runId: string, direction: "up" | "down") => void;
   run: PracticeRunPresentation;
 }): React.JSX.Element {
+  const styles = useStyles();
   const details = run.kind === "custom"
     ? `${run.themes.map(customThemeLabel).join(" + ")} · ${formatSprintTimingLabel({
         ...defaultSprintConfig(run.mode),
@@ -8352,6 +8365,8 @@ function RunCardDropSurface({
   onWebDrop: () => void;
   onDrop: () => boolean;
 }): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
   const nativeDragOffset = useRef(new Animated.Value(0)).current;
   const nativeDropPreviewOffset = useRef(new Animated.Value(dropPreviewOffsetY)).current;
   const nativeDragActiveRef = useRef(false);
@@ -8708,8 +8723,8 @@ function RunCardDropSurface({
         style={{
           ...webStyle,
           boxShadow: dragging
-            ? "0 12px 28px rgba(15, 23, 42, 0.20)"
-            : "0 1px 3px rgba(15, 23, 42, 0.08)",
+            ? appTheme.elevation.web.raised
+            : appTheme.elevation.web.resting,
           boxSizing: "border-box",
           cursor: draggable ? (dragging ? "grabbing" : "grab") : "default",
           display: "flex",
@@ -8912,6 +8927,7 @@ function RunRemovalConfirmation({
   onIntent: PracticeRunManagementPresentation["onIntent"];
   run: PracticeRunPresentation | null;
 }): React.JSX.Element | null {
+  const styles = useStyles();
   if (!run) {
     return null;
   }
@@ -8968,6 +8984,8 @@ function PracticeRunEditor({
   themeCatalogPresentation?: ThemeCatalogPresentation;
   timeoutCountsAsMistake: boolean;
 }): React.JSX.Element | null {
+  const styles = useStyles();
+  const appTheme = useTheme();
   const draft = presentation.draft;
   if (!draft) {
     return null;
@@ -9058,7 +9076,7 @@ function PracticeRunEditor({
               autoCorrect={false}
               maxLength={PRACTICE_RUN_NAME_MAX_LENGTH}
               placeholder="e.g. Tactics Focus"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={appTheme.colors.text.faint}
               returnKeyType="done"
               style={[styles.runNameInput, presentation.nameError ? styles.runNameInputError : null]}
               submitBehavior="blurAndSubmit"
@@ -9242,6 +9260,7 @@ function ArrowDuelReplyChallengeSetting({
   onReplySecondsInputChange: (value: string) => void;
   onToggle: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.settingsSection} testID="practice-run-arrow-duel-reply-setting">
       <View style={styles.runTimingSectionCopy}>
@@ -9349,6 +9368,7 @@ function SprintPassRulesSummary({
 }: {
   config: SprintConfig;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessibilityLabel={`Pass rules. Solve ${config.targetCorrect} before ${formatSprintDurationLabel(config.durationSeconds)} ends. Mistake ${config.maxMistakes} ends the Sprint. Wrong answers count as attempts, not solved puzzles.`}
@@ -9394,6 +9414,7 @@ function PracticeRunTimingSettings({
   } | undefined;
   timeoutCountsAsMistake: boolean;
 }): React.JSX.Element {
+  const styles = useStyles();
   const editor = puzzleTimingEditorState(puzzleTiming, perPuzzleSeconds);
   const currentTiming = editor.policy;
   const warningEnabled = currentTiming.slowAfterSeconds !== null;
@@ -9476,6 +9497,7 @@ function RunTimingSettingRow({
   onChange: (seconds: number) => void;
   onToggle: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.runTimingRow} testID={testID}>
       <View style={styles.runTimingRowCopy}>
@@ -9545,6 +9567,7 @@ function PracticeRunEloRow({
   onInputStep?: (direction: -1 | 1) => void;
   value: number;
 }): React.JSX.Element {
+  const styles = useStyles();
   if (directEntry) {
     const parsedInput = Number(inputValue);
     const stepValue = /^\d{1,4}$/.test(inputValue ?? "") && Number.isInteger(parsedInput)
@@ -9665,6 +9688,7 @@ function PracticeProgressCard({
   progress: PracticeProgressSummary;
   ratingContextLabel?: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const progressDelta = progress.correctThisWeek + progress.wrongThisWeek === 0
     ? "Start training"
     : `${progress.netThisWeek >= 0 ? "+" : ""}${progress.netThisWeek} net`;
@@ -9714,6 +9738,7 @@ function PracticeProgressCard({
 }
 
 function PracticeNoRunProgressCard(): React.JSX.Element {
+  const styles = useStyles();
   return (
     <>
       <Text style={styles.sectionLabel}>Progress</Text>
@@ -9732,6 +9757,7 @@ function ResumeSprintCard({
   onResume: () => void;
   sprint: SprintState;
 }): React.JSX.Element {
+  const styles = useStyles();
   const isTacticalFocus = sprint.config.tacticalFocus !== undefined;
   const completedCount = sprint.correctCount + sprint.mistakeCount;
   const remaining = Math.max(
@@ -9778,6 +9804,7 @@ function PausedSessionPanel({
   onResume: () => void;
   state: SprintState;
 }): React.JSX.Element {
+  const styles = useStyles();
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
   const completedCount = state.correctCount + state.mistakeCount;
   const remaining = Math.max(
@@ -9842,6 +9869,7 @@ function PracticeModeCard({
   item: PracticeModeSummary;
   onPress: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const label = modeLabel(item.mode);
   const detail = practiceModeDetailLabel(item);
   const ratingLabel = item.rating === undefined ? null : `Rating ${item.rating}`;
@@ -9960,6 +9988,7 @@ function CustomSprintSetup({
   onThemeIntent: (intent: ThemeChoiceIntent) => void;
   onStart: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const requiredPuzzleCount = targetCorrect + maxMistakes;
   const hasEnoughLocalPuzzles = availablePuzzleCount >= requiredPuzzleCount;
   const canStartWithLocalPuzzles = availablePuzzleCount > 0;
@@ -10072,6 +10101,7 @@ function CustomEligibilityNotice({
   hasEnoughLocalPuzzles: boolean;
   requiredPuzzleCount: number;
 }): React.JSX.Element | null {
+  const styles = useStyles();
   if (hasEnoughLocalPuzzles) {
     return null;
   }
@@ -10095,6 +10125,7 @@ function CustomModeChoiceRow({
   testID: string;
   value: "custom" | "arrow_duel";
 }): React.JSX.Element {
+  const styles = useStyles();
   const options: Array<{ value: "custom" | "arrow_duel"; label: string; detail: string; testID: string }> = [
     { value: "custom", label: "Regular Puzzles", detail: "Board moves", testID: "custom-mode-regular" },
     { value: "arrow_duel", label: "Arrow Duel", detail: "Two candidates", testID: "custom-mode-arrow-duel" }
@@ -10138,6 +10169,7 @@ function CustomInitialRatingRow({
   onEditOpenChange: (open: boolean) => void;
   value: number;
 }): React.JSX.Element {
+  const styles = useStyles();
   if (!played) {
     return (
       <View
@@ -10193,6 +10225,7 @@ function CustomRatingStepper({
   onChange: (next: number) => void;
   value: number;
 }): React.JSX.Element {
+  const styles = useStyles();
   const canDecrease = value > CUSTOM_INITIAL_RATING_MIN;
   const canIncrease = value < CUSTOM_INITIAL_RATING_MAX;
   const decrease = () => {
@@ -10246,6 +10279,7 @@ function CustomValueRow({
   value: string;
   valueTestID?: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const accessibilityLabel = [label, value, detail].filter(Boolean).join(", ");
   return (
     <View
@@ -10280,6 +10314,7 @@ function CustomThemeChoiceRow({
   themeCatalogPresentation?: ThemeCatalogPresentation;
   testID: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   if (themeCatalogPresentation) {
     return (
       <ThemeCatalogChoiceRow
@@ -10323,6 +10358,7 @@ function ThemeCatalogChoiceRow({
   showDisclosure: boolean;
   testID: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const [expanded, setExpanded] = useState(!showDisclosure);
   const selectedThemeLabels = selectedThemes
     .filter((theme) => theme !== ALL_THEMES_FILTER)
@@ -10417,6 +10453,7 @@ function ThemeChoiceChip({
   option: CustomThemeFilter;
   selected: boolean;
 }): React.JSX.Element {
+  const styles = useStyles();
   const visibleLabel = label ?? customThemeLabel(option);
   const representsAllThemes = option === ALL_THEMES_FILTER;
   return (
@@ -10451,6 +10488,7 @@ function CustomOptionRow<T extends number>({
   selected: T;
   value: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const selectedIndex = Math.max(0, options.findIndex((option) => option.value === selected));
   const previousOption = options[selectedIndex - 1];
   const nextOption = options[selectedIndex + 1];
@@ -10520,6 +10558,7 @@ function PreviousCustomConfigRow({
   config: PreviousCustomConfig;
   onPress: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const ratingLabel = historyRatingKeyLabel(config.ratingKey);
   const metaLabel = `${config.themeLabel} · ${config.timing} · Last ${config.lastPlayed}`;
 
@@ -10569,6 +10608,7 @@ function TestPuzzleSourceControl({
   onSeedTacticalHistory?: (scenario: SimulatedHistoryScenarioId) => void;
   seededHistoryStatus?: string | null;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.testPanel} testID="test-puzzle-source-control">
       <Text style={styles.helperText}>Test puzzle source</Text>
@@ -10630,6 +10670,7 @@ function PuzzleTimingIndicator({
   phase: SessionTimingState["phase"];
   timeoutSeconds: number | null;
 }): React.JSX.Element {
+  const styles = useStyles();
   const label = `Puzzle ${formatCompactDuration(elapsedSeconds)}`;
   const remainingSeconds = timeoutSeconds === null ? null : timeoutSeconds - elapsedSeconds;
   const countdownSeconds = phase !== "timed_out"
@@ -10705,6 +10746,7 @@ function SessionStatusBar({
   onPause?: () => void;
   onResume?: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
   const isPersonalBest = personalBest !== undefined;
   const previousSurvivalBest = personalBest?.bestScore;
@@ -10962,6 +11004,7 @@ function PreviousAttemptNotice({
 }: {
   reason: PreviousAttemptNoticeReason;
 }): React.JSX.Element {
+  const styles = useStyles();
   const presentation = reason === "slow"
     ? {
         detail: "It was automatically marked Unclear and added to Review.",
@@ -11019,6 +11062,7 @@ function UnclearAttemptPrompt({
   targetArea?: "action" | "prompt";
   targetRef?: React.RefObject<View | null>;
 }): React.JSX.Element {
+  const styles = useStyles();
   const targetsPrompt = targetArea === "prompt";
 
   return (
@@ -11082,6 +11126,7 @@ function SprintSummary({
   onOpenHistory: () => void;
   onOpenReplay?: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const delta = (state.ratingAfter ?? state.ratingBefore) - state.ratingBefore;
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
   const showGoalClarification = clarifyGoal && !isTacticalFocus;
@@ -11349,6 +11394,7 @@ function ResultHistoryShortcut({
   ratingAfter: number;
   ratingBefore: number;
 }): React.JSX.Element {
+  const styles = useStyles();
   const deltaLabel = `${delta >= 0 ? "+" : ""}${delta}`;
   return (
     <Pressable
@@ -11373,6 +11419,7 @@ function ResultHistoryShortcut({
 }
 
 function SprintResultStatusGlyph({ status }: { status: "won" | "failed" }): React.JSX.Element {
+  const styles = useStyles();
   if (status === "won") {
     return (
       <ResultTrophyGlyph
@@ -11391,6 +11438,7 @@ function SprintResultStatusGlyph({ status }: { status: "won" | "failed" }): Reac
 }
 
 function ErrorPanel({ error }: { error: string }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessible
@@ -11426,6 +11474,7 @@ function ArrowDuelWhatIfOverlay({
   titleSide?: MoveSide;
   veryCompactTitle?: boolean;
 }): React.JSX.Element {
+  const styles = useStyles();
   const accessibilityTitle = title.replace(/\s+/g, " ");
   return (
     <View
@@ -11555,6 +11604,7 @@ function ArrowDuelReplyChallengePrompt({
   showReplyTimer?: boolean;
   testIDPrefix?: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const displayedSide = promptSide ?? sideToMove(currentPuzzle.currentFen);
   const side = displayedSide === "b" ? "black" : "white";
   const sideName = moveSideDisplayName(displayedSide);
@@ -11685,6 +11735,7 @@ function PracticePrompt({
   promptHintNumberOfLines?: number;
   reserveDefaultLayout?: boolean;
 }): React.JSX.Element | null {
+  const styles = useStyles();
   if (!currentPuzzle) {
     return null;
   }
@@ -11805,6 +11856,7 @@ function PracticePrompt({
 }
 
 function BoardInputBlocker(): React.JSX.Element {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityElementsHidden
@@ -11825,7 +11877,9 @@ function PracticeModeGlyph({
   mode: SprintMode;
   testIDPrefix?: string;
 }): React.JSX.Element {
-  const color = inverse ? "#FFFFFF" : "#2563EB";
+  const styles = useStyles();
+  const appTheme = useTheme();
+  const color = inverse ? appTheme.colors.text.onAccent : appTheme.colors.accent.s600;
   if (mode === "standard") {
     return (
       <View style={styles.modeGlyphCanvas}>
@@ -11892,6 +11946,7 @@ function SessionScoreStrip({
   compact?: boolean;
   state: SprintState;
 }): React.JSX.Element {
+  const styles = useStyles();
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
   const completedCount = state.correctCount + state.mistakeCount;
   const leftCount = Math.max(
@@ -11955,6 +12010,7 @@ function SessionScoreMetric({
   tone: "positive" | "negative" | "neutral";
   value: number;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessible
@@ -11987,6 +12043,7 @@ function SessionScoreMetric({
 }
 
 function SessionScoreGlyph({ tone }: { tone: "positive" | "negative" | "neutral" }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       style={[
@@ -12023,6 +12080,7 @@ function MoveSideGlyph({
   side: MoveSide;
   testID?: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       style={[styles.moveSideKingGlyph, { height: kingPieceSize, width: kingPieceSize }]}
@@ -12059,6 +12117,7 @@ function BoardCoordinateOverlay({
   boardSize: number;
   flipped: boolean;
 }): React.JSX.Element {
+  const styles = useStyles();
   const squareSize = boardSize / 8;
   const fontSize = Math.max(9, Math.min(12, squareSize * 0.22));
   const files = flipped ? BOARD_FILES_FLIPPED : BOARD_FILES;
@@ -12076,7 +12135,7 @@ function BoardCoordinateOverlay({
           style={[
             styles.coordinateText,
             styles.coordinateFileText,
-            coordinateTextStyle(7, index),
+            coordinateTextStyle(styles, 7, index),
             {
               bottom: 2,
               fontSize,
@@ -12095,7 +12154,7 @@ function BoardCoordinateOverlay({
           style={[
             styles.coordinateText,
             styles.coordinateRankText,
-            coordinateTextStyle(index, 0),
+            coordinateTextStyle(styles, index, 0),
             {
               fontSize,
               left: 3,
@@ -12111,7 +12170,7 @@ function BoardCoordinateOverlay({
   );
 }
 
-function coordinateTextStyle(row: number, col: number): object {
+function coordinateTextStyle(styles: ReturnType<typeof useStyles>, row: number, col: number): object {
   return (row + col) % 2 === 0 ? styles.coordinateTextOnLight : styles.coordinateTextOnDark;
 }
 
@@ -12126,6 +12185,7 @@ function LastMoveOverlay({
   move: BoardMove;
   overlayTestID: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const squareSize = boardSize / 8;
   return (
     <View
@@ -12182,8 +12242,10 @@ function MoveFeedbackOverlay({
   move: BoardMove;
   result: "correct" | "wrong";
 }): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
   const squareSize = boardSize / 8;
-  const backgroundColor = result === "correct" ? "rgba(22, 163, 74, 0.34)" : "rgba(220, 38, 38, 0.32)";
+  const backgroundColor = result === "correct" ? appTheme.colors.positive.flash : appTheme.colors.danger.flash;
 
   return (
     <View style={[styles.arrowLayer, { width: boardSize, height: boardSize }]} pointerEvents="none" testID="move-feedback-overlay">
@@ -12220,6 +12282,8 @@ function ArrowCandidateOverlay({
   candidates: string[];
   testID?: string;
 }): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
   const squareSize = boardSize / 8;
   const pieceMoves = candidates.map((candidate) => ({
     move: candidate,
@@ -12240,7 +12304,7 @@ function ArrowCandidateOverlay({
       {testID ? <View testID={`${testID}-order-${candidates.join("-")}`} /> : null}
       {pieceMoves.map((arrow) => {
         const from = arrowFromTo(arrow.move);
-        const arrowStyle = ARROW_VISUAL_STYLES.candidate;
+        const arrowStyle = { stroke: appTheme.colors.accent.s600, opacity: 0.68 };
         if (!from) {
           return null;
         }
@@ -12282,6 +12346,7 @@ function ArrowHint({
   selected: boolean;
   from: { from: string; to: string };
 }): React.JSX.Element {
+  const styles = useStyles();
   const fromPos = squareToPixel(from.from, squareSize, flipped);
   const toPos = squareToPixel(from.to, squareSize, flipped);
   const dx = toPos.x - fromPos.x;
@@ -12405,6 +12470,7 @@ function HistoryPanel({
   onResetFilters: () => void;
   onAttentionOnlyChange: (attentionOnly: boolean) => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const visibleAttempts = attempts;
   const attentionOnly = attentionReasons.length > 0;
   const ratingPoints = performance.charts.rating;
@@ -12638,6 +12704,7 @@ function HistoryThemeCatalogFilter({
   presentation: ThemeCatalogPresentation;
   selectedThemes: readonly string[];
 }): React.JSX.Element {
+  const styles = useStyles();
   const [expanded, setExpanded] = useState(false);
   const selectedThemeLabels = selectedThemes
     .filter((theme) => theme !== ALL_THEMES_FILTER)
@@ -12791,6 +12858,7 @@ function HistoryActiveFilterStrip({
   compact?: boolean;
   labels: string[];
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <ScrollView
       horizontal
@@ -12877,6 +12945,7 @@ function HistoryRatingTrendChart({
 }: {
   points: HistoryPerformancePoint[];
 }): React.JSX.Element {
+  const styles = useStyles();
   const displayed = downsampleHistoryRatingPoints(points, HISTORY_LINE_CHART_MAX_POINTS);
   if (displayed.length === 0) {
     return (
@@ -12893,6 +12962,7 @@ function HistoryRatingLineChart({
 }: {
   points: HistoryPerformancePoint[];
 }): React.JSX.Element {
+  const styles = useStyles();
   // Segment geometry needs the layer's pixel width: percent-based math mixed
   // px rise with % run, which rendered detached segments at wrong angles.
   const [plotWidth, setPlotWidth] = useState(0);
@@ -13097,6 +13167,7 @@ function historyRatingKeyLabel(
 }
 
 function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "incomplete" }): React.JSX.Element {
+  const styles = useStyles();
   if (tone === "correct") {
     return (
       <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-correct-glyph">
@@ -13131,6 +13202,7 @@ function HistoryChipRow({
   contentStyle?: StyleProp<ViewStyle>;
   testID: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <ScrollView
       horizontal
@@ -13209,6 +13281,7 @@ function HistoryAttentionFilter({
   attentionOnly: boolean;
   onChange: (attentionOnly: boolean) => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessibilityLabel="History view"
@@ -13271,6 +13344,7 @@ function HistoryAttemptRow({
   nowMs: number;
   onOpen: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const detail = normalizeHistoryAttemptDetail(attempt);
   const persistedTimingStatus = attempt.timingStatus
     ?? (attempt.result === "timed_out" ? "timed_out" : null);
@@ -13412,6 +13486,7 @@ function ThemeTagRail({
   testID: string;
   themes: readonly string[];
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <ScrollView
       horizontal
@@ -13453,6 +13528,7 @@ function FilterButton({
   testID: string;
   onPress: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -13467,7 +13543,9 @@ function FilterButton({
 }
 
 function FilterGlyph({ active }: { active: boolean }): React.JSX.Element {
-  const color = active ? "#2563EB" : "#334155";
+  const styles = useStyles();
+  const appTheme = useTheme();
+  const color = active ? appTheme.colors.accent.s600 : appTheme.colors.text.strong;
   return (
     <View style={styles.filterGlyph} testID="filter-glyph">
       <View style={[styles.filterGlyphLine, { backgroundColor: color }]}>
@@ -13484,6 +13562,7 @@ function FilterGlyph({ active }: { active: boolean }): React.JSX.Element {
 }
 
 function PlusGlyph(): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.plusGlyph} testID="plus-glyph">
       <View style={[styles.plusGlyphLine, styles.plusGlyphHorizontal]} />
@@ -13493,6 +13572,7 @@ function PlusGlyph(): React.JSX.Element {
 }
 
 function MinusGlyph(): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.minusGlyph} testID="minus-glyph">
       <View style={styles.minusGlyphLine} />
@@ -13501,21 +13581,25 @@ function MinusGlyph(): React.JSX.Element {
 }
 
 function CloseGlyph({
-  color = "#111827",
+  color,
   testID = "close-glyph"
 }: {
   color?: string;
   testID?: string;
 } = {}): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
+  const glyphColor = color ?? appTheme.colors.text.ink;
   return (
     <View style={styles.closeGlyph} testID={testID}>
-      <View style={[styles.closeGlyphLine, styles.closeGlyphForward, { backgroundColor: color }]} />
-      <View style={[styles.closeGlyphLine, styles.closeGlyphBackward, { backgroundColor: color }]} />
+      <View style={[styles.closeGlyphLine, styles.closeGlyphForward, { backgroundColor: glyphColor }]} />
+      <View style={[styles.closeGlyphLine, styles.closeGlyphBackward, { backgroundColor: glyphColor }]} />
     </View>
   );
 }
 
 function MoreGlyph(): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.moreGlyph} testID="more-glyph">
       <View style={styles.moreGlyphDot} />
@@ -13526,6 +13610,7 @@ function MoreGlyph(): React.JSX.Element {
 }
 
 function PauseGlyph(): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.pauseGlyph} testID="pause-glyph">
       <View style={styles.pauseGlyphBar} />
@@ -13535,12 +13620,14 @@ function PauseGlyph(): React.JSX.Element {
 }
 
 function PlayGlyph(): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.playGlyph} testID="play-glyph" />
   );
 }
 
 function ResultTrendGlyph(): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.resultTrendGlyph} testID="result-trend-glyph">
       <View style={[styles.resultTrendGlyphDot, styles.resultTrendGlyphDotStart]} />
@@ -13557,6 +13644,7 @@ function ChevronGlyph({
 }: {
   direction: "down" | "left" | "right" | "up";
 }): React.JSX.Element {
+  const styles = useStyles();
   const directionStyle = direction === "left"
     ? styles.chevronGlyphLeft
     : direction === "right"
@@ -13604,6 +13692,7 @@ function AnimatedCollapsibleRegion({
   contentStyle?: StyleProp<ViewStyle>;
   expanded: boolean;
 }): React.JSX.Element | null {
+  const styles = useStyles();
   const progress = useRef(new Animated.Value(expanded ? 1 : 0)).current;
   const [contentHeight, setContentHeight] = useState(0);
   const durationMs = DISCLOSURE_MOTION_DURATION_MS;
@@ -13699,6 +13788,7 @@ function AnimatedDisclosureChevron({
   expanded: boolean;
   testID?: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const progress = useRef(new Animated.Value(expanded ? 1 : 0)).current;
   useEffect(() => {
     progress.stopAnimation();
@@ -13725,6 +13815,7 @@ function AnimatedDisclosureChevron({
 }
 
 function FlipGlyph(): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.flipGlyph} testID="flip-glyph">
       <View style={styles.flipGlyphTrackTop} />
@@ -13736,6 +13827,7 @@ function FlipGlyph(): React.JSX.Element {
 }
 
 function SearchGlyph(): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.searchGlyph} testID="search-glyph">
       <View style={styles.searchGlyphLens} />
@@ -13929,6 +14021,7 @@ function ReviewPanel({
   stockfish: MobileStockfishCapabilities;
   systemBackCommand: ReviewBackCommand | null;
 }): React.JSX.Element {
+  const styles = useStyles();
   const sessionEntries = sessionReplayItems.map((item): ReviewEntry => buildServiceReviewEntry(service, {
     puzzle: item.puzzle,
     mode: item.attempt.mode,
@@ -14330,6 +14423,7 @@ function reviewDueCardSubline(label: string): string {
 }
 
 function ReviewFilterSummary({ label }: { label: string }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessibilityLabel={`Review filter summary, ${label}`}
@@ -14388,6 +14482,7 @@ function ReviewQueueItemCard({
   nowMs: number;
   onPress: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const { history, item } = presentation;
   const activityLabel = reviewTodayActivityLabel(history, nowMs);
   const source = reviewItemSourceSprintLabel(item.review);
@@ -14444,6 +14539,7 @@ function ReviewSectionToggle({
   toggleTestID: string;
   onPress: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -14474,6 +14570,7 @@ function TodayReviewAttemptRow({
   item: CompletedReviewItem;
   onOpen: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const isWrong = item.attempt.result === "wrong";
   const resultLabel = isWrong ? "Wrong" : "Correct";
   const elapsedSeconds = Math.max(
@@ -14523,6 +14620,7 @@ function ReviewForecastMetric({
   label: string;
   countTestID: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.reviewForecastMetric}>
       <Text style={styles.reviewForecastCount} testID={countTestID}>{count}</Text>
@@ -14588,6 +14686,8 @@ function ReviewSession({
   stockfish: MobileStockfishCapabilities;
   systemBackCommand: ReviewBackCommand | null;
 }): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
   const boardRef = useRef<ChessboardRef | null>(null);
   const reviewSuppressedBoardMovesRef = useRef<string[]>([]);
   const reviewResultRecordedRef = useRef(false);
@@ -15899,15 +15999,7 @@ function ReviewSession({
               withNumbers={false}
               durations={{ move: BOARD_MOVE_ANIMATION_MS }}
               spriteSource={CHESS_PIECE_SPRITE}
-              colors={{
-                white: BOARD_COLOR_TOKENS.white,
-                black: BOARD_COLOR_TOKENS.black,
-                lastMoveHighlight: "rgba(0, 0, 0, 0)",
-                checkmateHighlight: "rgba(0, 0, 0, 0)",
-                promotionPieceButton: "#F8FAFC",
-                validMoveDot: "rgba(15, 23, 42, 0.36)",
-                validMoveCapture: "rgba(15, 23, 42, 0.56)"
-              }}
+              colors={chessboardColorsFor(appTheme)}
             />
             <BoardCoordinateOverlay
               boardSize={boardSize}
@@ -16074,6 +16166,7 @@ function ReviewScheduleControl({
   refreshToken?: unknown;
   service: PracticeService;
 }): React.JSX.Element {
+  const styles = useStyles();
   const contextKey = `${context.puzzleId}\u0000${context.mode}\u0000${context.ratingKey}`;
   const [review, setReview] = useState<ReviewQueueState | undefined>(() => service.getReviewQueueState(context));
   const [confirmationVisible, setConfirmationVisible] = useState(false);
@@ -16207,6 +16300,7 @@ function HistoryAttemptReplayUnavailable({
   replayAvailability: Extract<HistoryAttemptReplayAvailability, { status: "unavailable" }>;
   service: PracticeService;
 }): React.JSX.Element {
+  const styles = useStyles();
   const reviewContext = reviewContextForHistoryAttempt(attempt);
   return (
     <View
@@ -16256,6 +16350,7 @@ function HistoryUnclearAction({
   actionLabel?: "Clear" | "Mark clear";
   onClear: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessibilityLabel="This attempt is marked unclear"
@@ -16335,10 +16430,12 @@ function AnalysisArrowOverlay({
   lines: ReviewAnalysisLine[];
   blunderMove?: string;
 }): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
   const squareSize = boardSize / 8;
   const arrows = [
-    ...lines.slice(0, 1).map((line) => ({ move: line.move, stroke: "#16A34A", opacity: 0.72, selected: true })),
-    ...(blunderMove ? [{ move: blunderMove, stroke: "#DC2626", opacity: 0.68, selected: false }] : [])
+    ...lines.slice(0, 1).map((line) => ({ move: line.move, stroke: appTheme.colors.positive.s600, opacity: 0.72, selected: true })),
+    ...(blunderMove ? [{ move: blunderMove, stroke: appTheme.colors.danger.s600, opacity: 0.68, selected: false }] : [])
   ];
 
   return (
@@ -16375,6 +16472,8 @@ function GuidedMoveOverlay({
   flipped: boolean;
   move: string;
 }): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
   const squareSize = boardSize / 8;
   const from = arrowFromTo(move);
   return (
@@ -16385,7 +16484,7 @@ function GuidedMoveOverlay({
           squareSize={squareSize}
           flipped={flipped}
           move={move}
-          stroke={NEUTRAL_ARROW}
+          stroke={appTheme.colors.accent.s600}
           opacity={0.7}
           selected
           from={from}
@@ -16571,6 +16670,7 @@ function SettingsPanel({
   showRatingControls: boolean;
   standardRating: number;
 }): React.JSX.Element {
+  const styles = useStyles();
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [sprintGuideReady, setSprintGuideReady] = useState(false);
   const bundledCoreManifest = getBundledCorePackManifest();
@@ -16946,6 +17046,7 @@ function FeedbackSupportCard({
   supportEmailUrl: string;
   wide: boolean;
 }): React.JSX.Element {
+  const styles = useStyles();
   const [confirmationVisible, setConfirmationVisible] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
 
@@ -17090,6 +17191,7 @@ function ReviewReminderPermissionPrompt({
   onDismiss: () => void;
   onEnable: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.reviewReminderPrompt} testID="review-reminder-permission-prompt">
       <View style={styles.reviewReminderPromptCopy}>
@@ -17131,6 +17233,7 @@ function SettingsPreferenceButton({
   onPress: () => void;
   testID: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -17157,6 +17260,7 @@ function SettingsActionRow({
   onPress: () => void;
   testID: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -17187,6 +17291,8 @@ function SettingsActionButton({
   onPress: () => void;
   testID: string;
 }): React.JSX.Element {
+  const styles = useStyles();
+  const appTheme = useTheme();
   return (
     <View style={styles.settingsActionButtonRow}>
       <Text style={[styles.helperText, styles.settingsActionButtonDetail]} testID={`${testID}-detail`}>
@@ -17206,7 +17312,7 @@ function SettingsActionButton({
       >
         {loading ? (
           <ActivityIndicator
-            color="#FFFFFF"
+            color={appTheme.colors.text.onAccent}
             size="small"
             testID={`${testID}-spinner`}
           />
@@ -17326,6 +17432,7 @@ function AdvancedRatingsPanel({
   onAdjust: (ratingKey: string, nextRating: number) => void;
   ratings: Array<{ label: string; record: RatingRecord }>;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.advancedRatingsPanel} testID="settings-advanced-ratings-panel">
       <Text style={styles.sectionLabel}>Difficulty controls</Text>
@@ -17358,6 +17465,7 @@ function AdvancedRatingRow({
   record: RatingRecord;
   testID: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const decrementDisabled = record.rating <= RATING_FLOOR;
   return (
     <View style={styles.advancedRatingRow} testID={testID}>
@@ -17423,6 +17531,7 @@ function SettingsSection({
   title: string;
   wide?: boolean;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={[styles.settingsSection, wide ? styles.settingsSectionWide : null]} testID={testID}>
       <Text style={styles.sectionLabel}>{title}</Text>
@@ -17450,6 +17559,7 @@ function SettingsRow({
   testID: string;
   value?: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const accessibilityLabel = [label, value, detail].filter(Boolean).join(", ");
   return (
     <Pressable
@@ -17493,6 +17603,7 @@ function SettingsExternalLinkRow({
   testID: string;
   value: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const accessibilityLabel = [label, value, detail, linkLabel].join(", ");
   return (
     <Pressable
@@ -17576,6 +17687,7 @@ function bundledCoreCustomEligiblePuzzleCount(theme: string | undefined): number
 // This dormant panel is intentionally retained while it is not wired into navigation.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function PacksPanel(): React.JSX.Element {
+  const styles = useStyles();
   const [selectedPackId, setSelectedPackId] = useState<string | null>(null);
   const installedPacks = PACK_CATALOG;
   const selectedPack = selectedPackId === null
@@ -17684,6 +17796,7 @@ function PackCoverageMetric({
   testID: string;
   value: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.packCoverageMetric} testID={testID}>
       <Text style={styles.packCoverageLabel}>{label}</Text>
@@ -17701,6 +17814,7 @@ function PackSection({
   testID: string;
   title: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.settingsSection} testID={testID}>
       <Text style={styles.sectionLabel}>{title}</Text>
@@ -17716,6 +17830,7 @@ function PackRow({
   onOpenDetail: () => void;
   pack: PackRowModel;
 }): React.JSX.Element {
+  const styles = useStyles();
   const statusLabel = pack.status === "active" ? "Active" : pack.status === "installed" ? "Installed" : "Optional";
   const coverageLabel = `${pack.coverage.puzzles} puzzles, rating ${pack.coverage.rating}, ${pack.coverage.themes} themes, Arrow Duel ${pack.coverage.arrowDuel}`;
   const optionalCoverageSummary = `${pack.coverage.rating} · ${pack.coverage.themes} · Arrow Duel ${pack.coverage.arrowDuel}`;
@@ -17758,6 +17873,7 @@ function PackRow({
 }
 
 function PackActiveMark({ testID }: { testID: string }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.packActiveMark} testID={testID}>
       <View style={[styles.packActiveGlyphLine, styles.packActiveGlyphShort]} />
@@ -17773,6 +17889,7 @@ function PackDetailPanel({
   onClose: () => void;
   pack: PackRowModel;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View style={styles.packInfoCard} testID="pack-detail-panel">
       <View style={styles.sectionHeaderRow}>
@@ -17816,6 +17933,7 @@ function PackInfoRow({
   testID: string;
   value: string;
 }): React.JSX.Element {
+  const styles = useStyles();
   const accessibilityLabel = [label, value, detail].filter(Boolean).join(", ");
   return (
     <View
@@ -17840,6 +17958,7 @@ function StockfishDiagnosticsPanel({
 }: {
   stockfish: MobileStockfishCapabilities;
 }): React.JSX.Element {
+  const styles = useStyles();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [runId, setRunId] = useState(0);
   const [status, setStatus] = useState("Starting");
@@ -18019,6 +18138,7 @@ function OptionButton({
   testID: string;
   onPress: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -18048,6 +18168,7 @@ function NavigationRail({
   width: number;
   onSelectTab: (tab: Exclude<Tab, "analysis">) => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   return (
     <View
       accessibilityLabel={expanded ? "Primary navigation rail" : "Compact navigation rail"}
@@ -18100,6 +18221,7 @@ function TabButton({
   testID: string;
   onPress: () => void;
 }): React.JSX.Element {
+  const styles = useStyles();
   const hasBadge = badgeCount > 0;
   const badgeText = badgeCount > 99 ? "99+" : `${badgeCount}`;
   return (
@@ -18156,7 +18278,9 @@ function TabGlyph({
   active: boolean;
   tab: Exclude<Tab, "analysis">;
 }): React.JSX.Element {
-  const color = active ? "#2563EB" : "#64748B";
+  const styles = useStyles();
+  const appTheme = useTheme();
+  const color = active ? appTheme.colors.accent.s600 : appTheme.colors.text.tertiary;
   if (tab === "practice") {
     return (
       <View style={styles.tabGlyphCanvas}>
@@ -18528,7 +18652,7 @@ const FABRIC_SAFE_HIDDEN_TEXT_STYLE = {
   width: 0
 } as const;
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((theme) => ({
   accessibilityAnnouncement: {
     height: 1,
     left: -10000,
@@ -18539,18 +18663,18 @@ const styles = StyleSheet.create({
   },
   accessibleMoveModalBackdrop: {
     alignItems: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.48)",
+    backgroundColor: theme.colors.scrimSoft,
     flex: 1,
     justifyContent: "center",
     padding: 20
   },
   predictiveBackStage: {
-    backgroundColor: "#DCE7F5",
+    backgroundColor: theme.colors.backGesture.stage,
     flex: 1
   },
   predictiveBackDestination: {
     alignItems: "center",
-    backgroundColor: "#DCE7F5",
+    backgroundColor: theme.colors.backGesture.stage,
     bottom: 0,
     justifyContent: "center",
     left: 0,
@@ -18560,25 +18684,25 @@ const styles = StyleSheet.create({
     top: 0
   },
   predictiveBackEyebrow: {
-    color: "#516078",
+    color: theme.colors.backGesture.eyebrow,
     fontSize: 13,
     fontWeight: "600",
     letterSpacing: 0.5,
     textTransform: "uppercase"
   },
   predictiveBackDestinationLabel: {
-    color: "#172033",
+    color: theme.colors.backGesture.label,
     fontSize: 24,
     fontWeight: "700",
     marginTop: 8,
     textAlign: "center"
   },
   safeArea: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.colors.surfaceRaised,
     flex: 1
   },
   appRootShell: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.colors.surfaceRaised,
     flex: 1,
     flexDirection: "row",
     minWidth: 0
@@ -18589,7 +18713,7 @@ const styles = StyleSheet.create({
   },
   sprintLoadingOverlay: {
     alignItems: "center",
-    backgroundColor: "rgba(248, 250, 252, 0.92)",
+    backgroundColor: theme.colors.veil,
     bottom: 0,
     justifyContent: "center",
     left: 0,
@@ -18601,8 +18725,8 @@ const styles = StyleSheet.create({
   },
   sprintLoadingCard: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#DBEAFE",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.accent.s100,
     borderRadius: 14,
     borderWidth: 1,
     gap: 10,
@@ -18612,12 +18736,12 @@ const styles = StyleSheet.create({
     width: "100%"
   },
   sprintLoadingTitle: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 18,
     fontWeight: "800"
   },
   sprintLoadingDetail: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 13,
     lineHeight: 18,
     textAlign: "center"
@@ -18631,14 +18755,14 @@ const styles = StyleSheet.create({
     paddingBottom: 10
   },
   title: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 22,
     fontWeight: "700"
   },
   bottomTabs: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderTopColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderTopColor: theme.colors.border.default,
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     justifyContent: "space-around",
@@ -18648,8 +18772,8 @@ const styles = StyleSheet.create({
   },
   navigationRail: {
     alignItems: "stretch",
-    backgroundColor: "#FFFFFF",
-    borderRightColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderRightColor: theme.colors.border.default,
     borderRightWidth: StyleSheet.hairlineWidth,
     gap: 8,
     justifyContent: "center",
@@ -18696,11 +18820,11 @@ const styles = StyleSheet.create({
     width: 32
   },
   tabCountBadge: {
-    backgroundColor: "#2563EB",
-    borderColor: "#FFFFFF",
+    backgroundColor: theme.colors.accent.s600,
+    borderColor: theme.colors.surface,
     borderRadius: 999,
     borderWidth: 1,
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 9,
     fontWeight: "900",
     includeFontPadding: false,
@@ -18724,10 +18848,10 @@ const styles = StyleSheet.create({
     top: -7
   },
   tabCountBadgeDanger: {
-    backgroundColor: "#DC2626"
+    backgroundColor: theme.colors.danger.s600
   },
   tabText: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 10,
     fontWeight: "700"
   },
@@ -18736,7 +18860,7 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   tabTextActive: {
-    color: "#2563EB"
+    color: theme.colors.accent.s600
   },
   tabGlyphCanvas: {
     alignItems: "center",
@@ -18921,8 +19045,8 @@ const styles = StyleSheet.create({
   },
   sprintRulesHelpIcon: {
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s300,
     borderRadius: 999,
     borderWidth: 1,
     height: 24,
@@ -18930,18 +19054,18 @@ const styles = StyleSheet.create({
     width: 24
   },
   sprintRulesHelpIconText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 13,
     fontWeight: "900"
   },
   sprintRulesHelpLinkText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 13,
     fontWeight: "800"
   },
   sprintRulesGuide: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s300,
     borderRadius: 12,
     borderWidth: 1,
     gap: 12,
@@ -18959,27 +19083,27 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   sprintRulesEyebrow: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.8
   },
   sprintRulesGuideTitle: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 19,
     fontWeight: "900",
     lineHeight: 24
   },
   sprintRulesDismissButton: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 8,
     minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: 12
   },
   sprintRulesDismissText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 12,
     fontWeight: "900"
   },
@@ -18994,7 +19118,7 @@ const styles = StyleSheet.create({
   },
   sprintRuleBadge: {
     alignItems: "center",
-    backgroundColor: "#DBEAFE",
+    backgroundColor: theme.colors.accent.s100,
     borderRadius: 8,
     height: 36,
     justifyContent: "center",
@@ -19002,22 +19126,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   sprintRuleBadgeDanger: {
-    backgroundColor: "#FEE2E2"
+    backgroundColor: theme.colors.danger.s100
   },
   sprintRuleBadgeWarning: {
-    backgroundColor: "#FEF3C7"
+    backgroundColor: theme.colors.warning.s100
   },
   sprintRuleBadgeText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontFamily: "menlo",
     fontSize: 13,
     fontWeight: "900"
   },
   sprintRuleBadgeTextDanger: {
-    color: "#B91C1C"
+    color: theme.colors.danger.s700
   },
   sprintRuleBadgeTextWarning: {
-    color: "#B45309"
+    color: theme.colors.warning.s700
   },
   sprintRuleCopy: {
     flex: 1,
@@ -19025,19 +19149,19 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   sprintRuleLabel: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 13,
     fontWeight: "800"
   },
   sprintRuleDetail: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 11,
     lineHeight: 15
   },
   sprintRulesGuideFootnote: {
-    borderTopColor: "#BFDBFE",
+    borderTopColor: theme.colors.accent.s200,
     borderTopWidth: StyleSheet.hairlineWidth,
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 11,
     lineHeight: 16,
     paddingTop: 10
@@ -19086,10 +19210,10 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   sessionGuideStaticBoardSquareLight: {
-    backgroundColor: BOARD_COLOR_TOKENS.white
+    backgroundColor: theme.colors.board.lightSquare
   },
   sessionGuideStaticBoardSquareDark: {
-    backgroundColor: BOARD_COLOR_TOKENS.black
+    backgroundColor: theme.colors.board.darkSquare
   },
   sessionGuideStaticPieceViewport: {
     overflow: "hidden",
@@ -19099,8 +19223,8 @@ const styles = StyleSheet.create({
     position: "absolute"
   },
   sessionGuideCoachCallout: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s300,
     borderRadius: 10,
     borderWidth: 1,
     gap: 3,
@@ -19113,15 +19237,15 @@ const styles = StyleSheet.create({
     gap: 3
   },
   sessionGuideCoachCalloutWarning: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#F59E0B"
+    backgroundColor: theme.colors.warning.s50,
+    borderColor: theme.colors.warning.s500
   },
   sessionGuideCoachCalloutDanger: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#EF4444"
+    backgroundColor: theme.colors.danger.s50,
+    borderColor: theme.colors.danger.s500
   },
   sessionGuideCoachPointer: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 18,
     fontWeight: "900",
     lineHeight: 18,
@@ -19177,23 +19301,23 @@ const styles = StyleSheet.create({
     width: 18
   },
   sessionGuideCoachPointerWarning: {
-    color: "#D97706"
+    color: theme.colors.warning.s600
   },
   sessionGuideCoachPointerDanger: {
-    color: "#DC2626"
+    color: theme.colors.danger.s600
   },
   sessionGuideCoachTargetConnector: {
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     height: 2,
     position: "absolute",
     top: "50%",
     transform: [{ translateY: -1 }]
   },
   sessionGuideCoachTargetConnectorWarning: {
-    backgroundColor: "#D97706"
+    backgroundColor: theme.colors.warning.s600
   },
   sessionGuideCoachTargetConnectorDanger: {
-    backgroundColor: "#DC2626"
+    backgroundColor: theme.colors.danger.s600
   },
   sessionGuideCoachTargetArrowHead: {
     borderBottomColor: "transparent",
@@ -19213,7 +19337,7 @@ const styles = StyleSheet.create({
     position: "absolute"
   },
   sessionGuideCoachTargetRouteHorizontal: {
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     height: 2,
     left: 0,
     position: "absolute",
@@ -19221,7 +19345,7 @@ const styles = StyleSheet.create({
     top: 0
   },
   sessionGuideCoachTargetRouteVertical: {
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     position: "absolute",
     right: 0,
     top: 0,
@@ -19234,7 +19358,7 @@ const styles = StyleSheet.create({
     position: "absolute"
   },
   sessionGuideArrowDuelTargetConnectorVertical: {
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     bottom: 0,
     left: 4,
     position: "absolute",
@@ -19242,7 +19366,7 @@ const styles = StyleSheet.create({
     width: 2
   },
   sessionGuideArrowDuelTargetConnectorHead: {
-    borderBottomColor: "#2563EB",
+    borderBottomColor: theme.colors.accent.s600,
     borderBottomWidth: 7,
     borderLeftColor: "transparent",
     borderLeftWidth: 5,
@@ -19255,23 +19379,23 @@ const styles = StyleSheet.create({
     width: 0
   },
   sessionGuideCoachBadge: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontFamily: "menlo",
     fontSize: 9,
     fontWeight: "900",
     letterSpacing: 0.4
   },
   sessionGuideCoachBadgeWarning: {
-    color: "#B45309"
+    color: theme.colors.warning.s700
   },
   sessionGuideCoachBadgeDanger: {
-    color: "#B91C1C"
+    color: theme.colors.danger.s700
   },
   sessionGuideCoachNavigation: {
     alignItems: "center",
     alignSelf: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: "row",
@@ -19294,7 +19418,7 @@ const styles = StyleSheet.create({
   },
   sessionGuideCoachBackButton: {
     alignItems: "center",
-    borderColor: "#CBD5E1",
+    borderColor: theme.colors.border.strong,
     borderRadius: 9,
     borderWidth: 1,
     justifyContent: "center",
@@ -19312,8 +19436,8 @@ const styles = StyleSheet.create({
     width: "100%"
   },
   sessionGuideCoachBackButtonDisabled: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0"
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default
   },
   sessionGuideCoachBackSpacer: {
     minWidth: 76
@@ -19322,15 +19446,15 @@ const styles = StyleSheet.create({
     minWidth: 64
   },
   sessionGuideCoachBackText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "900"
   },
   sessionGuideCoachBackTextDisabled: {
-    color: "#94A3B8"
+    color: theme.colors.text.faint
   },
   sessionGuideCoachProgress: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     flex: 1,
     flexShrink: 0,
     fontFamily: "menlo",
@@ -19346,7 +19470,7 @@ const styles = StyleSheet.create({
   },
   sessionGuideCoachNextButton: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 9,
     justifyContent: "center",
     minHeight: 44,
@@ -19360,21 +19484,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8
   },
   sessionGuideInfoTitle: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 13,
     fontWeight: "800"
   },
   sessionGuideInfoText: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 11,
     lineHeight: 16
   },
   sessionGuideOptionalSettingsNotice: {
-    backgroundColor: "#DBEAFE",
-    borderColor: "#93C5FD",
+    backgroundColor: theme.colors.accent.s100,
+    borderColor: theme.colors.accent.s300,
     borderRadius: 7,
     borderWidth: 1,
-    color: "#1E3A8A",
+    color: theme.colors.accent.s900,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 4,
@@ -19382,11 +19506,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6
   },
   sessionGuideOptionalSettingsLabel: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontWeight: "900"
   },
   sessionGuideStartButtonText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 14,
     fontWeight: "900"
   },
@@ -19395,7 +19519,7 @@ const styles = StyleSheet.create({
   },
   primaryCompactButton: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 8,
     height: 36,
     justifyContent: "center",
@@ -19403,8 +19527,8 @@ const styles = StyleSheet.create({
   },
   secondaryCompactButton: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     height: 36,
@@ -19412,27 +19536,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12
   },
   secondaryCompactButtonText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "800"
   },
   runNotice: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s300,
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 8
   },
   runNoticeText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 12,
     fontWeight: "700"
   },
   runEmptyState: {
     alignItems: "flex-start",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderStyle: "dashed",
     borderWidth: 1,
@@ -19444,8 +19568,8 @@ const styles = StyleSheet.create({
     marginTop: 4
   },
   runNoSelectionCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     gap: 4,
@@ -19462,15 +19586,15 @@ const styles = StyleSheet.create({
   },
   runCardNativeDragging: {
     elevation: 8,
-    shadowColor: "#0F172A",
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 14,
     zIndex: 20
   },
   runInsertionOutline: {
-    backgroundColor: "rgba(37, 99, 235, 0.025)",
-    borderColor: "#2563EB",
+    backgroundColor: theme.colors.accent.dropZone,
+    borderColor: theme.colors.accent.s600,
     borderRadius: 12,
     borderStyle: "dashed",
     borderWidth: 2,
@@ -19480,7 +19604,7 @@ const styles = StyleSheet.create({
     zIndex: 15
   },
   runEditingMeta: {
-    borderTopColor: "#E2E8F0",
+    borderTopColor: theme.colors.border.default,
     borderTopWidth: StyleSheet.hairlineWidth,
     justifyContent: "space-between",
     marginTop: 6,
@@ -19494,8 +19618,8 @@ const styles = StyleSheet.create({
   },
   runEditButton: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     height: 32,
@@ -19503,14 +19627,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9
   },
   runEditButtonText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 11,
     fontWeight: "800"
   },
   runIconButton: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     height: 32,
@@ -19518,22 +19642,22 @@ const styles = StyleSheet.create({
     width: 34
   },
   runReorderButton: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s200
   },
   runRemoveButton: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FCA5A5"
+    backgroundColor: theme.colors.danger.s50,
+    borderColor: theme.colors.danger.s300
   },
   runRemoveButtonText: {
-    color: "#DC2626",
+    color: theme.colors.danger.s600,
     fontSize: 20,
     fontWeight: "900",
     lineHeight: 22
   },
   runRemovalConfirmation: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FCA5A5",
+    backgroundColor: theme.colors.danger.s50,
+    borderColor: theme.colors.danger.s300,
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
@@ -19557,8 +19681,8 @@ const styles = StyleSheet.create({
   },
   runRestoreRow: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -19574,8 +19698,8 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   runEditorIntro: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#BFDBFE",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s200,
     borderRadius: 8,
     borderWidth: 1,
     gap: 3,
@@ -19583,8 +19707,8 @@ const styles = StyleSheet.create({
     paddingVertical: 9
   },
   sprintPassRulesCard: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 10,
     borderWidth: 1,
     gap: 7,
@@ -19597,7 +19721,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   sprintPassRulesHeadline: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 17,
@@ -19605,26 +19729,26 @@ const styles = StyleSheet.create({
   },
   sprintPassRulesTarget: {
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
+    backgroundColor: theme.colors.accent.s50,
     borderRadius: 8,
     minWidth: 58,
     paddingHorizontal: 9,
     paddingVertical: 6
   },
   sprintPassRulesTargetValue: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontFamily: "menlo",
     fontSize: 18,
     fontWeight: "900"
   },
   sprintPassRulesTargetLabel: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 8,
     fontWeight: "900",
     letterSpacing: 0.6
   },
   sprintPassRulesHint: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 10,
     fontWeight: "700"
   },
@@ -19632,7 +19756,7 @@ const styles = StyleSheet.create({
     marginBottom: -4
   },
   runEditorRunName: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 15,
     fontWeight: "900",
     lineHeight: 19
@@ -19647,16 +19771,16 @@ const styles = StyleSheet.create({
     paddingTop: 2
   },
   requiredFieldLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 10,
     fontWeight: "700"
   },
   runNameInput: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
-    color: "#111827",
+    color: theme.colors.text.ink,
     flex: 1,
     fontSize: 14,
     fontWeight: "700",
@@ -19667,12 +19791,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8
   },
   runNameInputError: {
-    borderColor: "#DC2626"
+    borderColor: theme.colors.danger.s600
   },
   runEloInputShell: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -19681,10 +19805,10 @@ const styles = StyleSheet.create({
     width: 72
   },
   runEloInputShellError: {
-    borderColor: "#DC2626"
+    borderColor: theme.colors.danger.s600
   },
   runEloInput: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     flex: 1,
     fontSize: 15,
     fontWeight: "800",
@@ -19701,20 +19825,20 @@ const styles = StyleSheet.create({
     gap: 6
   },
   runNameError: {
-    backgroundColor: "#FEF2F2",
-    borderBottomColor: "#FCA5A5",
+    backgroundColor: theme.colors.danger.s50,
+    borderBottomColor: theme.colors.danger.s300,
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     paddingVertical: 8
   },
   runNameErrorText: {
-    color: "#B91C1C",
+    color: theme.colors.danger.s700,
     fontSize: 12,
     fontWeight: "700"
   },
   runThemeLabelRow: {
     alignItems: "center",
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -19740,7 +19864,7 @@ const styles = StyleSheet.create({
   },
   historyResetButton: {
     alignItems: "center",
-    borderColor: "#CBD5E1",
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
@@ -19748,18 +19872,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12
   },
   historyResetButtonText: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 12,
     fontWeight: "800"
   },
   screenTitle: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 22,
     fontWeight: "800",
     lineHeight: 28
   },
   sectionLabel: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 15,
     fontWeight: "800"
   },
@@ -19768,8 +19892,8 @@ const styles = StyleSheet.create({
   },
   practiceModeCard: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -19779,16 +19903,16 @@ const styles = StyleSheet.create({
     paddingVertical: 8
   },
   practiceModeCardActive: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s300
   },
   managedRunCard: {
-    borderColor: "#CBD5E1",
+    borderColor: theme.colors.border.strong,
     borderStyle: "solid",
     minHeight: 62
   },
   managedRunCardActive: {
-    borderColor: "#60A5FA"
+    borderColor: theme.colors.accent.s400
   },
   practiceModeSelectArea: {
     alignItems: "center",
@@ -19801,14 +19925,14 @@ const styles = StyleSheet.create({
   },
   practiceModeIcon: {
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
+    backgroundColor: theme.colors.accent.s50,
     borderRadius: 999,
     height: 32,
     justifyContent: "center",
     width: 32
   },
   practiceModeIconActive: {
-    backgroundColor: "#DBEAFE"
+    backgroundColor: theme.colors.accent.s100
   },
   modeGlyphCanvas: {
     alignItems: "center",
@@ -19910,13 +20034,13 @@ const styles = StyleSheet.create({
     gap: 6
   },
   practiceModeTitle: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 14,
     fontWeight: "800",
     lineHeight: 18
   },
   practiceModeDescription: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "600",
     lineHeight: 16
@@ -19934,7 +20058,7 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   practiceModeRating: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 14
@@ -19947,8 +20071,8 @@ const styles = StyleSheet.create({
   },
   practiceProgressCard: {
     alignItems: "flex-start",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -19968,7 +20092,7 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   progressMetricLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 15,
@@ -19976,10 +20100,10 @@ const styles = StyleSheet.create({
   },
   progressDivider: {
     alignSelf: "stretch",
-    backgroundColor: "#E2E8F0"
+    backgroundColor: theme.colors.surfaceStrong
   },
   progressValue: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 22,
     fontWeight: "800",
     lineHeight: 26,
@@ -19992,25 +20116,25 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   progressContextText: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "700",
     lineHeight: 14,
     textAlign: "center"
   },
   progressDeltaPositive: {
-    color: "#16A34A"
+    color: theme.colors.positive.s600
   },
   progressDeltaNegative: {
-    color: "#DC2626"
+    color: theme.colors.danger.s600
   },
   progressDeltaNeutral: {
-    color: "#64748B"
+    color: theme.colors.text.tertiary
   },
   resumeSprintCard: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#93C5FD",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.accent.s300,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -20025,13 +20149,13 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   resumeSprintAction: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 13,
     fontWeight: "900"
   },
   pausedSessionPanel: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -20053,8 +20177,8 @@ const styles = StyleSheet.create({
   },
   reviewFilterButton: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     height: 38,
@@ -20062,8 +20186,8 @@ const styles = StyleSheet.create({
     width: 38
   },
   reviewFilterButtonActive: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s600
   },
   filterGlyph: {
     gap: 4,
@@ -20093,8 +20217,8 @@ const styles = StyleSheet.create({
   },
   reviewDueCard: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -20108,12 +20232,12 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   reviewDueTitle: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 15,
     fontWeight: "800"
   },
   reviewDueBigCount: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 24,
     fontWeight: "900",
     lineHeight: 28,
@@ -20134,8 +20258,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: UI_PADDING
   },
   reviewForecastRow: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -20143,7 +20267,7 @@ const styles = StyleSheet.create({
   },
   reviewForecastMetric: {
     alignItems: "center",
-    borderRightColor: "#E2E8F0",
+    borderRightColor: theme.colors.border.default,
     borderRightWidth: 1,
     flex: 1,
     gap: 2,
@@ -20153,12 +20277,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   reviewForecastCount: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 16,
     fontWeight: "900"
   },
   reviewForecastLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 10,
     fontWeight: "700",
     textAlign: "center"
@@ -20179,7 +20303,7 @@ const styles = StyleSheet.create({
     height: 18
   },
   reviewSectionCount: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 14,
     fontWeight: "800",
     includeFontPadding: false,
@@ -20197,8 +20321,8 @@ const styles = StyleSheet.create({
   },
   reviewItemCard: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -20209,14 +20333,14 @@ const styles = StyleSheet.create({
   },
   reviewRetryBadge: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 999,
     height: 28,
     justifyContent: "center",
     width: 28
   },
   reviewRetryGlyph: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 20,
     fontWeight: "800",
     lineHeight: 22,
@@ -20233,8 +20357,8 @@ const styles = StyleSheet.create({
   },
   reviewDevControls: {
     alignItems: "stretch",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
@@ -20288,7 +20412,7 @@ const styles = StyleSheet.create({
   },
   sessionNavRow: {
     alignItems: "center",
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -20308,7 +20432,7 @@ const styles = StyleSheet.create({
     width: 48
   },
   sessionNavTitle: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     flex: 1,
     flexShrink: 1,
     fontSize: 16,
@@ -20346,8 +20470,8 @@ const styles = StyleSheet.create({
   },
   sessionAbandonConfirm: {
     alignItems: "center",
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FCA5A5",
+    backgroundColor: theme.colors.danger.s50,
+    borderColor: theme.colors.danger.s300,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -20368,7 +20492,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   survivalExitBest: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 14,
     fontWeight: "900"
   },
@@ -20377,20 +20501,20 @@ const styles = StyleSheet.create({
     gap: 8
   },
   survivalExitSheet: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s300,
     borderRadius: 12,
     borderWidth: 1,
     gap: 11,
     padding: 12
   },
   survivalExitTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 17,
     fontWeight: "900"
   },
   sessionProgressValue: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 21,
     fontWeight: "800",
     textAlign: "center"
@@ -20403,7 +20527,7 @@ const styles = StyleSheet.create({
     position: "absolute"
   },
   timerText: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontFamily: "menlo",
     fontSize: 21,
     fontWeight: "800",
@@ -20416,8 +20540,8 @@ const styles = StyleSheet.create({
   },
   puzzleTimingIndicator: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.94)",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.glassStrong,
+    borderColor: theme.colors.border.strong,
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: "row",
@@ -20434,23 +20558,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0
   },
   puzzleTimingIndicatorSlow: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#F59E0B"
+    backgroundColor: theme.colors.warning.s50,
+    borderColor: theme.colors.warning.s500
   },
   puzzleTimingIndicatorText: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontFamily: "menlo",
     fontSize: 11,
     fontWeight: "800",
     fontVariant: ["tabular-nums"]
   },
   puzzleTimingIndicatorTextSlow: {
-    color: "#B45309"
+    color: theme.colors.warning.s700
   },
   puzzleTimingCountdown: {
-    backgroundColor: "#F59E0B",
+    backgroundColor: theme.colors.warning.s500,
     borderRadius: 999,
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontFamily: "menlo",
     fontSize: 10,
     fontWeight: "900",
@@ -20464,17 +20588,17 @@ const styles = StyleSheet.create({
   puzzleTimeoutOverlay: {
     ...StyleSheet.absoluteFill,
     alignItems: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.90)",
+    backgroundColor: theme.colors.scrimStrong,
     justifyContent: "center",
     zIndex: 60
   },
   puzzleTimeoutOverlayTitle: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 22,
     fontWeight: "900"
   },
   puzzleTimeoutOverlayDetail: {
-    color: "#E2E8F0",
+    color: theme.colors.text.inverse,
     fontSize: 12,
     fontWeight: "700",
     marginTop: 4
@@ -20488,7 +20612,7 @@ const styles = StyleSheet.create({
     gap: 3
   },
   boardSurface: {
-    borderColor: "#E2E8F0",
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     overflow: "hidden",
@@ -20501,7 +20625,7 @@ const styles = StyleSheet.create({
   },
   arrowDuelWhatIfOverlay: {
     alignItems: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.90)",
+    backgroundColor: theme.colors.scrimStrong,
     bottom: 0,
     justifyContent: "center",
     left: 0,
@@ -20516,7 +20640,7 @@ const styles = StyleSheet.create({
     width: "100%"
   },
   arrowDuelWhatIfTitle: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 27,
@@ -20535,7 +20659,7 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   arrowDuelWhatIfTitleLine: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     flexShrink: 1,
     fontSize: 22,
     fontWeight: "900",
@@ -20552,8 +20676,8 @@ const styles = StyleSheet.create({
   },
   arrowDuelWhatIfSideGlyphChip: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 7,
     borderWidth: 1,
     height: 32,
@@ -20574,7 +20698,7 @@ const styles = StyleSheet.create({
     width: 24
   },
   arrowDuelWhatIfDetail: {
-    color: "#E2E8F0",
+    color: theme.colors.text.inverse,
     fontSize: 14,
     fontWeight: "700",
     lineHeight: 19,
@@ -20583,11 +20707,11 @@ const styles = StyleSheet.create({
   },
   arrowDuelWhatIfSettingsHint: {
     alignSelf: "center",
-    backgroundColor: "rgba(219, 234, 254, 0.14)",
-    borderColor: "rgba(147, 197, 253, 0.48)",
+    backgroundColor: theme.colors.accent.glassFill,
+    borderColor: theme.colors.accent.glassBorder,
     borderRadius: 999,
     borderWidth: 1,
-    color: "#DBEAFE",
+    color: theme.colors.accent.s100,
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 16,
@@ -20599,7 +20723,7 @@ const styles = StyleSheet.create({
   },
   arrowDuelWhatIfAction: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.surface,
     borderRadius: 9,
     justifyContent: "center",
     marginTop: 18,
@@ -20608,7 +20732,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18
   },
   arrowDuelWhatIfActionText: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 15,
     fontWeight: "900"
   },
@@ -20634,17 +20758,17 @@ const styles = StyleSheet.create({
     width: 16
   },
   coordinateTextOnLight: {
-    color: "#334155",
-    textShadowColor: "rgba(248, 250, 252, 0.85)"
+    color: theme.colors.text.strong,
+    textShadowColor: theme.colors.halo
   },
   coordinateTextOnDark: {
-    color: "#F8FAFC",
-    textShadowColor: "rgba(15, 23, 42, 0.55)"
+    color: theme.colors.surfaceRaised,
+    textShadowColor: theme.colors.scrim
   },
   promptPanel: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -20663,8 +20787,8 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   arrowDuelReplyPromptActive: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#60A5FA"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s400
   },
   arrowDuelReplyPromptPanel: {
     alignSelf: "center",
@@ -20694,9 +20818,9 @@ const styles = StyleSheet.create({
     gap: 1
   },
   arrowDuelReplyTimer: {
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 999,
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontFamily: "menlo",
     fontSize: 12,
     fontWeight: "900",
@@ -20709,8 +20833,8 @@ const styles = StyleSheet.create({
   },
   unclearPrompt: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -20727,15 +20851,15 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   unclearPromptQuestion: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     flex: 1,
     fontSize: 12,
     fontWeight: "700"
   },
   unclearPromptButton: {
     alignItems: "center",
-    backgroundColor: "#FFFBEB",
-    borderColor: "#F59E0B",
+    backgroundColor: theme.colors.warning.s50,
+    borderColor: theme.colors.warning.s500,
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
@@ -20743,7 +20867,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8
   },
   unclearPromptButtonText: {
-    color: "#B45309",
+    color: theme.colors.warning.s700,
     fontSize: 11,
     fontWeight: "900"
   },
@@ -20753,19 +20877,19 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   previousAttemptNoticeTitle: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "800"
   },
   previousAttemptNoticeDetail: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "600"
   },
   readOnlyAttemptStatus: {
     alignItems: "center",
-    backgroundColor: "#EFF6FF",
-    borderColor: "#93C5FD",
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s300,
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
@@ -20773,7 +20897,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8
   },
   readOnlyAttemptStatusText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 11,
     fontWeight: "900"
   },
@@ -20784,7 +20908,7 @@ const styles = StyleSheet.create({
     position: "relative"
   },
   promptTitle: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 16,
     fontWeight: "800"
   },
@@ -20800,12 +20924,12 @@ const styles = StyleSheet.create({
     gap: PRACTICE_PROMPT_COPY_GAP
   },
   promptText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "600"
   },
   promptHint: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 12,
     fontWeight: "800"
   },
@@ -20818,8 +20942,8 @@ const styles = StyleSheet.create({
   },
   sessionScoreStrip: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -20847,7 +20971,7 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   sessionScoreLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 0.25,
@@ -20868,18 +20992,18 @@ const styles = StyleSheet.create({
     width: 20
   },
   sessionScoreDotPositive: {
-    backgroundColor: "#16A34A"
+    backgroundColor: theme.colors.positive.s600
   },
   sessionScoreDotNegative: {
-    backgroundColor: "#DC2626"
+    backgroundColor: theme.colors.danger.s600
   },
   sessionScoreDotNeutral: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#94A3B8",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.heavy,
     borderWidth: 1.5
   },
   sessionScoreGlyphLine: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.surface,
     borderRadius: 999,
     position: "absolute"
   },
@@ -20908,24 +21032,24 @@ const styles = StyleSheet.create({
     width: 10
   },
   sessionScoreNeutralLine: {
-    backgroundColor: "#64748B",
+    backgroundColor: theme.colors.text.tertiary,
     borderRadius: 999,
     height: 2.25,
     width: 8
   },
   sessionScoreValue: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 15,
     fontWeight: "900",
     lineHeight: 17
   },
   emptyBoard: {
     alignItems: "center",
-    backgroundColor: "#E6E8EB",
+    backgroundColor: theme.colors.board.lightSquare,
     justifyContent: "center"
   },
   emptyBoardText: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 18,
     fontWeight: "700"
   },
@@ -20952,7 +21076,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start"
   },
   sprintScreenTitle: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 17,
     fontWeight: "800",
     textAlign: "center"
@@ -20962,7 +21086,7 @@ const styles = StyleSheet.create({
   },
   sprintHeaderStartButton: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 8,
     height: 40,
     justifyContent: "center",
@@ -20970,15 +21094,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14
   },
   customConfigCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     overflow: "hidden"
   },
   customConfigRow: {
     alignItems: "center",
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 12,
@@ -20992,7 +21116,7 @@ const styles = StyleSheet.create({
   },
   runTimingRow: {
     alignItems: "center",
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 8,
@@ -21013,7 +21137,7 @@ const styles = StyleSheet.create({
     gap: 6
   },
   arrowDuelReplySettingValue: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "800"
   },
@@ -21025,8 +21149,8 @@ const styles = StyleSheet.create({
   },
   arrowDuelReplySecondsInputShell: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -21035,7 +21159,7 @@ const styles = StyleSheet.create({
     width: 64
   },
   arrowDuelReplySecondsInput: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     flex: 1,
     fontFamily: "menlo",
     fontSize: 14,
@@ -21047,7 +21171,7 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   arrowDuelReplySecondsUnit: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "800"
   },
@@ -21067,8 +21191,8 @@ const styles = StyleSheet.create({
   },
   runTimingStepButton: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 7,
     borderWidth: 1,
     height: 30,
@@ -21076,13 +21200,13 @@ const styles = StyleSheet.create({
     width: 30
   },
   runTimingStepText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 17,
     fontWeight: "800",
     lineHeight: 19
   },
   runTimingValue: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontFamily: "menlo",
     fontSize: 12,
     fontWeight: "800",
@@ -21113,8 +21237,8 @@ const styles = StyleSheet.create({
   },
   customStepperButton: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     height: 32,
@@ -21122,7 +21246,7 @@ const styles = StyleSheet.create({
     width: 36
   },
   customConfigValue: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 13,
     fontWeight: "800"
   },
@@ -21142,8 +21266,8 @@ const styles = StyleSheet.create({
   },
   customMiniChip: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 32,
@@ -21151,19 +21275,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10
   },
   customMiniChipActive: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s600
   },
   customMiniChipText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "800"
   },
   customMiniChipTextActive: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   themeCatalogSection: {
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 10,
     paddingHorizontal: 12,
@@ -21178,7 +21302,7 @@ const styles = StyleSheet.create({
     gap: 10
   },
   themeCatalogTitle: {
-    color: "#1E293B",
+    color: theme.colors.text.heading,
     fontSize: 14,
     fontWeight: "900"
   },
@@ -21186,7 +21310,7 @@ const styles = StyleSheet.create({
     gap: 6
   },
   themeCatalogGroupLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.5,
@@ -21201,8 +21325,8 @@ const styles = StyleSheet.create({
     gap: 8
   },
   themeCatalogGroupCard: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     gap: 7,
@@ -21214,24 +21338,24 @@ const styles = StyleSheet.create({
     gap: 6
   },
   customEligibilityCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     gap: 4,
     padding: 12
   },
   customEligibilityWarning: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#FBBF24"
+    backgroundColor: theme.colors.warning.s50,
+    borderColor: theme.colors.warning.s400
   },
   previousConfigList: {
     gap: 8
   },
   previousConfigRow: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -21268,8 +21392,8 @@ const styles = StyleSheet.create({
     width: 14
   },
   testPanel: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
@@ -21282,7 +21406,7 @@ const styles = StyleSheet.create({
   },
   optionButton: {
     alignItems: "center",
-    borderColor: "#CBD5E1",
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     flexBasis: "30%",
@@ -21292,20 +21416,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10
   },
   optionButtonActive: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s600
   },
   optionButtonText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "800"
   },
   optionButtonTextActive: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 8,
     flex: 1,
     height: 42,
@@ -21313,20 +21437,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14
   },
   primaryButtonText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 13,
     fontWeight: "800"
   },
   primarySmallButton: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 8,
     height: 38,
     justifyContent: "center",
     paddingHorizontal: 14
   },
   primarySmallButtonText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 12,
     fontWeight: "800"
   },
@@ -21337,7 +21461,7 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     alignItems: "center",
-    borderColor: "#CBD5E1",
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     height: 42,
@@ -21345,20 +21469,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14
   },
   secondaryButtonText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 13,
     fontWeight: "700"
   },
   destructiveButton: {
     alignItems: "center",
-    backgroundColor: "#DC2626",
+    backgroundColor: theme.colors.danger.s600,
     borderRadius: 8,
     height: 42,
     justifyContent: "center",
     paddingHorizontal: 14
   },
   destructiveButtonText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 13,
     fontWeight: "800"
   },
@@ -21369,8 +21493,8 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     height: 38,
@@ -21378,7 +21502,7 @@ const styles = StyleSheet.create({
     width: 38
   },
   iconButtonText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 18,
     fontWeight: "800",
     lineHeight: 22
@@ -21387,8 +21511,8 @@ const styles = StyleSheet.create({
     opacity: 0.36
   },
   summaryPanel: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -21415,7 +21539,7 @@ const styles = StyleSheet.create({
     width: 40
   },
   resultTopBarTitle: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 16,
     fontWeight: "800"
   },
@@ -21444,10 +21568,10 @@ const styles = StyleSheet.create({
     width: 40
   },
   resultIconWon: {
-    backgroundColor: "#EFF6FF"
+    backgroundColor: theme.colors.accent.s50
   },
   resultIconFailed: {
-    backgroundColor: "#FEF2F2"
+    backgroundColor: theme.colors.danger.s50
   },
   resultAlertGlyph: {
     alignItems: "center",
@@ -21457,13 +21581,13 @@ const styles = StyleSheet.create({
     width: 28
   },
   resultAlertBar: {
-    backgroundColor: "#DC2626",
+    backgroundColor: theme.colors.danger.s600,
     borderRadius: 999,
     height: 15,
     width: 4
   },
   resultAlertDot: {
-    backgroundColor: "#DC2626",
+    backgroundColor: theme.colors.danger.s600,
     borderRadius: 999,
     height: 4,
     width: 4
@@ -21477,44 +21601,44 @@ const styles = StyleSheet.create({
     gap: 2
   },
   resultGoalScoreBlock: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 9
   },
   resultGoalLabel: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.2
   },
   resultSolvedCount: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 28,
     fontWeight: "900",
     lineHeight: 32
   },
   resultSolvedTarget: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 14,
     fontWeight: "700"
   },
   resultAccuracy: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "700"
   },
   resultMetricGrid: {
-    borderColor: "#E2E8F0",
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
     overflow: "hidden"
   },
   resultMetric: {
-    borderRightColor: "#E2E8F0",
+    borderRightColor: theme.colors.border.default,
     borderRightWidth: 1,
     flex: 1,
     gap: 4,
@@ -21522,18 +21646,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   resultMetricLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "700"
   },
   resultMetricValue: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontFamily: "menlo",
     fontSize: 16,
     fontWeight: "800"
   },
   resultMetricSubtext: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "700"
   },
@@ -21562,7 +21686,7 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   resultTrendRangeText: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontFamily: "menlo",
     fontSize: 10,
     fontWeight: "800"
@@ -21573,7 +21697,7 @@ const styles = StyleSheet.create({
     width: 22
   },
   resultTrendGlyphDot: {
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 999,
     height: 5,
     position: "absolute",
@@ -21592,7 +21716,7 @@ const styles = StyleSheet.create({
     top: 2
   },
   resultTrendGlyphLine: {
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 999,
     height: 2,
     position: "absolute"
@@ -21610,7 +21734,7 @@ const styles = StyleSheet.create({
     width: 10
   },
   resultReviewNote: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 11,
     fontWeight: "600",
     lineHeight: 16,
@@ -21623,8 +21747,8 @@ const styles = StyleSheet.create({
   },
   resultUnclearRow: {
     alignItems: "center",
-    backgroundColor: "#FFFBEB",
-    borderColor: "#FDE68A",
+    backgroundColor: theme.colors.warning.s50,
+    borderColor: theme.colors.warning.s200,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -21640,28 +21764,28 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   resultUnclearNote: {
-    color: "#92400E",
+    color: theme.colors.warning.s800,
     fontSize: 10,
     fontWeight: "700",
     lineHeight: 14
   },
   resultUnclearCountBadge: {
-    backgroundColor: "#FEF3C7",
+    backgroundColor: theme.colors.warning.s100,
     borderRadius: 999,
     height: 38,
   },
   resultUnclearCount: {
-    color: "#B45309",
+    color: theme.colors.warning.s700,
     fontSize: 18,
     fontWeight: "900"
   },
   summaryTitle: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 18,
     fontWeight: "800"
   },
   summaryText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 14,
     fontWeight: "600"
   },
@@ -21671,32 +21795,32 @@ const styles = StyleSheet.create({
     marginTop: 8
   },
   errorPanel: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FCA5A5",
+    backgroundColor: theme.colors.danger.s50,
+    borderColor: theme.colors.danger.s300,
     borderRadius: 8,
     borderWidth: 1,
     marginTop: 8,
     padding: 12
   },
   errorText: {
-    color: "#991B1B",
+    color: theme.colors.danger.s800,
     fontSize: 14,
     fontWeight: "700"
   },
   positive: {
-    color: "#15803D",
+    color: theme.colors.positive.s700,
     fontWeight: "700"
   },
   listPanel: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     padding: 12,
     gap: 8
   },
   panelTitle: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 18,
     fontWeight: "800"
   },
@@ -21739,8 +21863,8 @@ const styles = StyleSheet.create({
   },
   reviewContextPill: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -21748,7 +21872,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10
   },
   reviewContextPillDanger: {
-    borderColor: "#FCA5A5"
+    borderColor: theme.colors.danger.s300
   },
   reviewTimerPill: {
     justifyContent: "center",
@@ -21756,7 +21880,7 @@ const styles = StyleSheet.create({
     minWidth: 78
   },
   reviewTimerText: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontFamily: "menlo",
     fontSize: 21,
     fontWeight: "800",
@@ -21764,7 +21888,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2
   },
   reviewContextPillText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "800"
   },
@@ -21782,16 +21906,16 @@ const styles = StyleSheet.create({
     gap: 12
   },
   analysisPanel: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     gap: 6,
     padding: 12
   },
   analysisError: {
-    backgroundColor: "#FEF2F2",
-    borderColor: "#FECACA",
+    backgroundColor: theme.colors.danger.s50,
+    borderColor: theme.colors.danger.s200,
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
@@ -21812,8 +21936,8 @@ const styles = StyleSheet.create({
   },
   analysisIconButton: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     height: 40,
@@ -21823,8 +21947,8 @@ const styles = StyleSheet.create({
   analysisPrimaryButton: {
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -21833,12 +21957,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12
   },
   analysisPrimaryButtonText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 13,
     fontWeight: "800"
   },
   analysisEngineStatus: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontFamily: "Menlo",
     fontSize: 11,
     fontWeight: "700",
@@ -21846,8 +21970,8 @@ const styles = StyleSheet.create({
   },
   analysisLineRow: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -21857,21 +21981,21 @@ const styles = StyleSheet.create({
     paddingVertical: 7
   },
   analysisEvalText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontFamily: "Menlo",
     fontSize: 12,
     fontWeight: "800",
     minWidth: 44
   },
   analysisMoveText: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontFamily: "Menlo",
     fontSize: 13,
     fontWeight: "800",
     flexShrink: 1
   },
   analysisLineLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "700",
     marginLeft: "auto"
@@ -21886,52 +22010,52 @@ const styles = StyleSheet.create({
     flex: 1
   },
   diagnosticFen: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontFamily: "Menlo",
     fontSize: 11,
     lineHeight: 16
   },
   diagnosticPvPanel: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     gap: 5,
     padding: 10
   },
   diagnosticPvText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontFamily: "Menlo",
     fontSize: 11,
     lineHeight: 16
   },
   diagnosticLogPanel: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     gap: 6,
     padding: 10
   },
   diagnosticLogText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontFamily: "Menlo",
     fontSize: 10,
     lineHeight: 14
   },
   listText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 13,
     fontWeight: "600"
   },
   helperText: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "600"
   },
   filterButton: {
     alignItems: "center",
-    borderColor: "#2563EB",
+    borderColor: theme.colors.accent.s600,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 32,
@@ -21939,7 +22063,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10
   },
   filterButtonActive: {
-    backgroundColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s600
   },
   filterButtonContent: {
     alignItems: "center",
@@ -21947,12 +22071,12 @@ const styles = StyleSheet.create({
     gap: 4
   },
   filterButtonText: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 12,
     fontWeight: "800"
   },
   filterButtonTextActive: {
-    color: "#FFFFFF"
+    color: theme.colors.text.onAccent
   },
   historyPanel: {
     gap: 10
@@ -21966,8 +22090,8 @@ const styles = StyleSheet.create({
     gap: 8
   },
   historyAttentionFilter: {
-    backgroundColor: "#E2E8F0",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceStrong,
+    borderColor: theme.colors.border.strong,
     borderRadius: 9,
     borderWidth: 1,
     flexDirection: "row",
@@ -21982,15 +22106,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10
   },
   historyAttentionOptionActive: {
-    backgroundColor: "#FFFFFF"
+    backgroundColor: theme.colors.surface
   },
   historyAttentionOptionText: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 13,
     fontWeight: "800"
   },
   historyAttentionOptionTextActive: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   historyQuickFilterRow: {
     alignItems: "center",
@@ -22006,8 +22130,8 @@ const styles = StyleSheet.create({
   },
   historyQuickChip: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: "row",
@@ -22016,24 +22140,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8
   },
   historyQuickChipActive: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s600,
+    borderColor: theme.colors.accent.s600
   },
   historyQuickChipCompact: {
     paddingHorizontal: 6
   },
   historyQuickChipCheck: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 11,
     fontWeight: "900"
   },
   historyQuickChipText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "800"
   },
   historyQuickChipTextActive: {
-    color: "#FFFFFF"
+    color: theme.colors.text.onAccent
   },
   historyQuickFacetGroup: {
     alignItems: "center",
@@ -22042,28 +22166,28 @@ const styles = StyleSheet.create({
     gap: 4
   },
   historyQuickFacetDivider: {
-    backgroundColor: "#CBD5E1",
+    backgroundColor: theme.colors.fillMuted,
     height: 20,
     marginHorizontal: 1,
     width: StyleSheet.hairlineWidth
   },
   historyQuickFacetLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "800"
   },
   historyToggleTrack: {
-    backgroundColor: "#CBD5E1",
+    backgroundColor: theme.colors.fillMuted,
     borderRadius: 12,
     height: 24,
     padding: 2,
     width: 42
   },
   historyToggleTrackActive: {
-    backgroundColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s600
   },
   historyToggleThumb: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.surface,
     borderRadius: 10,
     height: 20,
     width: 20
@@ -22072,8 +22196,8 @@ const styles = StyleSheet.create({
     transform: [{ translateX: 18 }]
   },
   historyAdvancedFilters: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 10,
     borderWidth: 1,
     gap: 8,
@@ -22083,7 +22207,7 @@ const styles = StyleSheet.create({
     gap: 4
   },
   historyFilterGroupLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "900",
     marginLeft: 2
@@ -22106,7 +22230,7 @@ const styles = StyleSheet.create({
     paddingRight: 8
   },
   historyThemeSummary: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "700",
     marginTop: 2
@@ -22115,8 +22239,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-start"
   },
   historyPerformanceCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
@@ -22133,14 +22257,14 @@ const styles = StyleSheet.create({
     minWidth: 74
   },
   historyAccuracy: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 28,
     fontWeight: "900"
   },
   historyChart: {
     alignItems: "flex-end",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -22151,8 +22275,8 @@ const styles = StyleSheet.create({
   },
   historyChartEmpty: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
@@ -22164,13 +22288,13 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end"
   },
   historyChartBar: {
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 4,
     minHeight: 4
   },
   historyLineChart: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     height: 76,
@@ -22180,7 +22304,7 @@ const styles = StyleSheet.create({
     position: "relative"
   },
   historyLineGrid: {
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceStrong,
     height: StyleSheet.hairlineWidth,
     left: 12,
     opacity: 0.75,
@@ -22202,22 +22326,22 @@ const styles = StyleSheet.create({
     top: 8
   },
   historyLineSegment: {
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 999,
     height: 2,
     opacity: 0.82,
     position: "absolute"
   },
   historyLineSelectionGuide: {
-    backgroundColor: "#93C5FD",
+    backgroundColor: theme.colors.accent.s300,
     bottom: 0,
     position: "absolute",
     top: 0,
     width: StyleSheet.hairlineWidth
   },
   historyLineSelectionPoint: {
-    backgroundColor: "#2563EB",
-    borderColor: "#FFFFFF",
+    backgroundColor: theme.colors.accent.s600,
+    borderColor: theme.colors.surface,
     borderRadius: 999,
     borderWidth: 2,
     height: 10,
@@ -22227,7 +22351,7 @@ const styles = StyleSheet.create({
     width: 10
   },
   historyLineTooltip: {
-    backgroundColor: "#0F172A",
+    backgroundColor: theme.colors.surfaceInverse,
     borderRadius: 7,
     minHeight: HISTORY_LINE_TOOLTIP_HEIGHT,
     paddingHorizontal: 8,
@@ -22236,12 +22360,12 @@ const styles = StyleSheet.create({
     width: HISTORY_LINE_TOOLTIP_WIDTH
   },
   historyLineTooltipRating: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 12,
     fontWeight: "800"
   },
   historyLineTooltipDate: {
-    color: "#CBD5E1",
+    color: theme.colors.fillMuted,
     fontSize: 9,
     fontWeight: "600"
   },
@@ -22251,8 +22375,8 @@ const styles = StyleSheet.create({
     paddingRight: 2
   },
   historyActiveFilterChip: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 30,
@@ -22260,7 +22384,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10
   },
   historyActiveFilterText: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 12,
     fontWeight: "800"
   },
@@ -22275,19 +22399,19 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   historyCompactFilterSeparator: {
-    color: "#94A3B8",
+    color: theme.colors.text.faint,
     fontSize: 12,
     fontWeight: "700"
   },
   historyCompactFilterText: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "700"
   },
   historyAttemptCard: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -22304,19 +22428,19 @@ const styles = StyleSheet.create({
     width: 28
   },
   historyResultWrong: {
-    backgroundColor: "#DC2626"
+    backgroundColor: theme.colors.danger.s600
   },
   historyResultCorrect: {
-    backgroundColor: "#16A34A"
+    backgroundColor: theme.colors.positive.s600
   },
   historyResultIncomplete: {
-    backgroundColor: "#64748B"
+    backgroundColor: theme.colors.text.tertiary
   },
   historyResultUnknown: {
-    backgroundColor: "#64748B"
+    backgroundColor: theme.colors.text.tertiary
   },
   historyResultUnknownText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 16,
     fontWeight: "800"
   },
@@ -22328,7 +22452,7 @@ const styles = StyleSheet.create({
     width: 18
   },
   resultBadgeGlyphLine: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.surface,
     borderRadius: 999,
     position: "absolute"
   },
@@ -22387,22 +22511,22 @@ const styles = StyleSheet.create({
     paddingRight: 10
   },
   historyThemeChip: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 7,
     paddingVertical: 3
   },
   historyThemeChipText: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 10,
     fontWeight: "800"
   },
   historyUnclearBadge: {
     alignItems: "center",
-    backgroundColor: "#FFFBEB",
-    borderColor: "#F59E0B",
+    backgroundColor: theme.colors.warning.s50,
+    borderColor: theme.colors.warning.s500,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -22411,7 +22535,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4
   },
   historyUnclearBadgeText: {
-    color: "#B45309",
+    color: theme.colors.warning.s700,
     fontSize: 10,
     fontWeight: "900"
   },
@@ -22423,20 +22547,20 @@ const styles = StyleSheet.create({
     paddingVertical: 4
   },
   historyTimingBadgeSlow: {
-    backgroundColor: "#FFFBEB",
-    borderColor: "#F59E0B"
+    backgroundColor: theme.colors.warning.s50,
+    borderColor: theme.colors.warning.s500
   },
   historyTimingBadgeText: {
     fontSize: 10,
     fontWeight: "900"
   },
   historyTimingBadgeTextSlow: {
-    color: "#B45309"
+    color: theme.colors.warning.s700
   },
   historyAttemptUnclearBanner: {
     alignItems: "center",
-    backgroundColor: "#FFFBEB",
-    borderColor: "#F59E0B",
+    backgroundColor: theme.colors.warning.s50,
+    borderColor: theme.colors.warning.s500,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -22451,7 +22575,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   historyAttemptUnclearTitle: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 13,
     fontWeight: "900"
   },
@@ -22462,14 +22586,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8
   },
   historyAttemptClearButtonText: {
-    color: "#B45309",
+    color: theme.colors.warning.s700,
     fontSize: 12,
     fontWeight: "900"
   },
   reviewScheduleControl: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -22487,7 +22611,7 @@ const styles = StyleSheet.create({
     gap: 2
   },
   reviewScheduleState: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 12,
     fontWeight: "800"
   },
@@ -22498,17 +22622,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6
   },
   reviewScheduleAddText: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 12,
     fontWeight: "900"
   },
   reviewScheduleRemoveText: {
-    color: "#B91C1C",
+    color: theme.colors.danger.s700,
     fontSize: 12,
     fontWeight: "900"
   },
   reviewScheduleConfirmation: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.surface,
     borderRadius: 14,
     gap: 12,
     maxWidth: 440,
@@ -22537,7 +22661,7 @@ const styles = StyleSheet.create({
     textAlign: "right"
   },
   historyRowTitle: {
-    color: "#1E293B",
+    color: theme.colors.text.heading,
     fontSize: 13,
     fontWeight: "800"
   },
@@ -22566,21 +22690,21 @@ const styles = StyleSheet.create({
     minWidth: 300
   },
   settingsSectionCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     overflow: "hidden"
   },
   sprintGuideReadyStatus: {
-    backgroundColor: "#ECFDF5",
-    borderTopColor: "#A7F3D0",
+    backgroundColor: theme.colors.success.s50,
+    borderTopColor: theme.colors.success.s200,
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     paddingVertical: 9
   },
   sprintGuideReadyStatusText: {
-    color: "#047857",
+    color: theme.colors.success.s700,
     fontSize: 12,
     fontWeight: "800"
   },
@@ -22591,8 +22715,8 @@ const styles = StyleSheet.create({
   settingsGuidanceResetButton: {
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
+    borderColor: theme.colors.accent.s600,
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
@@ -22600,19 +22724,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   settingsGuidanceResetButtonComplete: {
-    backgroundColor: "#ECFDF5",
-    borderColor: "#6EE7B7"
+    backgroundColor: theme.colors.success.s50,
+    borderColor: theme.colors.success.s300
   },
   settingsGuidanceResetButtonText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 13,
     fontWeight: "800"
   },
   settingsGuidanceResetButtonTextComplete: {
-    color: "#047857"
+    color: theme.colors.success.s700
   },
   feedbackSupportSectionCard: {
-    borderColor: "#BFDBFE",
+    borderColor: theme.colors.accent.s200,
     borderRadius: 14
   },
   feedbackSupportCard: {
@@ -22626,14 +22750,14 @@ const styles = StyleSheet.create({
   },
   feedbackSupportIcon: {
     alignItems: "center",
-    backgroundColor: "#DBEAFE",
+    backgroundColor: theme.colors.accent.s100,
     borderRadius: 999,
     height: 42,
     justifyContent: "center",
     width: 42
   },
   feedbackSupportIconText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 22,
     fontWeight: "900"
   },
@@ -22643,36 +22767,36 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   feedbackSupportTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 18,
     fontWeight: "900"
   },
   feedbackSupportDetail: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 18
   },
   feedbackPrivacyStrip: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.colors.surfaceRaised,
     borderRadius: 9,
     gap: 2,
     padding: 11
   },
   feedbackPrivacyTitle: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "900"
   },
   feedbackPrivacyCopy: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "600",
     lineHeight: 16
   },
   feedbackSupportButton: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 9,
     flexDirection: "row",
     gap: 8,
@@ -22681,27 +22805,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   feedbackSupportButtonPressed: {
-    backgroundColor: "#1D4ED8"
+    backgroundColor: theme.colors.accent.s700
   },
   feedbackSupportButtonText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 14,
     fontWeight: "900"
   },
   feedbackSupportButtonArrow: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 18,
     fontWeight: "900",
     marginLeft: 8
   },
   feedbackSubmissionCopy: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 10,
     fontWeight: "700",
     textAlign: "center"
   },
   feedbackHandoffConfirmation: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
     gap: 14,
     maxWidth: 430,
@@ -22710,48 +22834,48 @@ const styles = StyleSheet.create({
   },
   feedbackExternalBadge: {
     alignSelf: "flex-start",
-    backgroundColor: "#DBEAFE",
+    backgroundColor: theme.colors.accent.s100,
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 5
   },
   feedbackExternalBadgeText: {
-    color: "#1D4ED8",
+    color: theme.colors.accent.s700,
     fontSize: 9,
     fontWeight: "900",
     letterSpacing: 0.8
   },
   feedbackHandoffTitle: {
-    color: "#0F172A",
+    color: theme.colors.text.primary,
     fontSize: 22,
     fontWeight: "900"
   },
   feedbackHandoffCopy: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 20
   },
   feedbackHandoffPrivacyCard: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.colors.surfaceRaised,
     borderRadius: 9,
     gap: 3,
     padding: 12
   },
   feedbackHandoffPrivacyTitle: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "900"
   },
   feedbackHandoffPrivacyCopy: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "600",
     lineHeight: 16
   },
   feedbackHandoffCancelButton: {
     alignItems: "center",
-    borderColor: "#CBD5E1",
+    borderColor: theme.colors.border.strong,
     borderRadius: 9,
     borderWidth: 1,
     justifyContent: "center",
@@ -22759,27 +22883,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15
   },
   feedbackHandoffCancelButtonText: {
-    color: "#475569",
+    color: theme.colors.text.secondary,
     fontSize: 13,
     fontWeight: "800"
   },
   feedbackHandoffContinueButton: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 9,
     justifyContent: "center",
     minHeight: 44,
     paddingHorizontal: 16
   },
   feedbackHandoffContinueButtonText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 13,
     fontWeight: "900",
     textAlign: "center"
   },
   settingsRow: {
     alignItems: "center",
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 12,
@@ -22803,20 +22927,20 @@ const styles = StyleSheet.create({
     maxWidth: "36%"
   },
   settingsRowValue: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "800",
     flexShrink: 1,
     textAlign: "right"
   },
   settingsLinkText: {
-    color: "#2563EB",
+    color: theme.colors.accent.s600,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 16
   },
   settingsInlineControls: {
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     flexWrap: "wrap",
@@ -22826,8 +22950,8 @@ const styles = StyleSheet.create({
   },
   settingsPreferenceButton: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 34,
@@ -22835,20 +22959,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12
   },
   settingsPreferenceButtonActive: {
-    backgroundColor: "#EFF6FF",
-    borderColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s50,
+    borderColor: theme.colors.accent.s600
   },
   settingsPreferenceButtonText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 12,
     fontWeight: "800"
   },
   settingsPreferenceButtonTextActive: {
-    color: "#1D4ED8"
+    color: theme.colors.accent.s700
   },
   settingsActionRow: {
     alignItems: "center",
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 10,
@@ -22859,7 +22983,7 @@ const styles = StyleSheet.create({
   },
   settingsActionButtonRow: {
     alignItems: "center",
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     flexWrap: "wrap",
@@ -22874,7 +22998,7 @@ const styles = StyleSheet.create({
   },
   settingsActionButton: {
     alignItems: "center",
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 8,
     flexDirection: "row",
     gap: 8,
@@ -22885,20 +23009,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   settingsActionButtonDisabled: {
-    backgroundColor: "#64748B"
+    backgroundColor: theme.colors.text.tertiary
   },
   settingsActionButtonText: {
-    color: "#FFFFFF",
+    color: theme.colors.text.onAccent,
     fontSize: 13,
     fontWeight: "800"
   },
   settingsDestructiveText: {
-    color: "#DC2626"
+    color: theme.colors.danger.s600
   },
   reviewReminderPrompt: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#BFDBFE",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.accent.s200,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -22918,8 +23042,8 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end"
   },
   advancedRatingsPanel: {
-    backgroundColor: "#F8FAFC",
-    borderBottomColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 8,
     paddingHorizontal: 12,
@@ -22930,8 +23054,8 @@ const styles = StyleSheet.create({
   },
   advancedRatingRow: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -22951,7 +23075,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   settingsStatusText: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontSize: 13,
     fontWeight: "700",
     paddingHorizontal: 2
@@ -22961,8 +23085,8 @@ const styles = StyleSheet.create({
   },
   packsIconButton: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     height: 38,
@@ -22971,7 +23095,7 @@ const styles = StyleSheet.create({
   },
   packRow: {
     alignItems: "center",
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 10,
@@ -22991,8 +23115,8 @@ const styles = StyleSheet.create({
     gap: 8
   },
   packCoverageCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
@@ -23004,8 +23128,8 @@ const styles = StyleSheet.create({
     gap: 8
   },
   packCoverageMetric: {
-    backgroundColor: "#F8FAFC",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     flexBasis: "47%",
@@ -23016,25 +23140,25 @@ const styles = StyleSheet.create({
     paddingVertical: 8
   },
   packCoverageLabel: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 9,
     fontWeight: "800"
   },
   packCoverageHiddenText: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   packRowMetaText: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 15
   },
   packCoverageMetricValue: {
-    color: "#111827",
+    color: theme.colors.text.ink,
     fontSize: 15,
     fontWeight: "900"
   },
   packActiveMark: {
     alignItems: "center",
-    backgroundColor: "#16A34A",
+    backgroundColor: theme.colors.positive.s600,
     borderRadius: 999,
     height: 28,
     justifyContent: "center",
@@ -23042,7 +23166,7 @@ const styles = StyleSheet.create({
     width: 28
   },
   packActiveGlyphLine: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.surface,
     borderRadius: 999,
     height: 2.5,
     position: "absolute"
@@ -23066,8 +23190,8 @@ const styles = StyleSheet.create({
   },
   packDetailButton: {
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surfaceRaised,
+    borderColor: theme.colors.border.strong,
     borderRadius: 8,
     borderWidth: 1,
     height: 34,
@@ -23075,8 +23199,8 @@ const styles = StyleSheet.create({
     width: 34
   },
   packInfoCard: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#E2E8F0",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.default,
     borderRadius: 8,
     borderWidth: 1,
     gap: 8,
@@ -23089,7 +23213,7 @@ const styles = StyleSheet.create({
     gap: 12
   },
   packLicenseText: {
-    color: "#64748B",
+    color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "600",
     lineHeight: 17
@@ -23101,7 +23225,7 @@ const styles = StyleSheet.create({
     width: 18
   },
   plusGlyphLine: {
-    backgroundColor: "#2563EB",
+    backgroundColor: theme.colors.accent.s600,
     borderRadius: 999,
     position: "absolute"
   },
@@ -23120,7 +23244,7 @@ const styles = StyleSheet.create({
     width: 18
   },
   minusGlyphLine: {
-    backgroundColor: "#111827",
+    backgroundColor: theme.colors.text.ink,
     borderRadius: 999,
     height: 2.5,
     width: 15
@@ -23132,7 +23256,7 @@ const styles = StyleSheet.create({
     width: 18
   },
   closeGlyphLine: {
-    backgroundColor: "#111827",
+    backgroundColor: theme.colors.text.ink,
     borderRadius: 999,
     height: 2.25,
     position: "absolute",
@@ -23152,7 +23276,7 @@ const styles = StyleSheet.create({
     width: 18
   },
   moreGlyphDot: {
-    backgroundColor: "#111827",
+    backgroundColor: theme.colors.text.ink,
     borderRadius: 999,
     height: 4,
     width: 4
@@ -23162,7 +23286,7 @@ const styles = StyleSheet.create({
     gap: 4
   },
   pauseGlyphBar: {
-    backgroundColor: "#111827",
+    backgroundColor: theme.colors.text.ink,
     borderRadius: 999,
     height: 16,
     width: 4
@@ -23170,7 +23294,7 @@ const styles = StyleSheet.create({
   playGlyph: {
     borderBottomColor: "transparent",
     borderBottomWidth: 8,
-    borderLeftColor: "#111827",
+    borderLeftColor: theme.colors.text.ink,
     borderLeftWidth: 13,
     borderTopColor: "transparent",
     borderTopWidth: 8,
@@ -23201,7 +23325,7 @@ const styles = StyleSheet.create({
     top: 0
   },
   chevronGlyph: {
-    borderColor: "#334155",
+    borderColor: theme.colors.text.strong,
     height: 9,
     width: 9
   },
@@ -23231,7 +23355,7 @@ const styles = StyleSheet.create({
     width: 18
   },
   flipGlyphTrackTop: {
-    backgroundColor: "#334155",
+    backgroundColor: theme.colors.text.strong,
     borderRadius: 999,
     height: 2,
     left: 3,
@@ -23240,7 +23364,7 @@ const styles = StyleSheet.create({
     width: 11
   },
   flipGlyphTrackBottom: {
-    backgroundColor: "#334155",
+    backgroundColor: theme.colors.text.strong,
     borderRadius: 999,
     height: 2,
     left: 4,
@@ -23251,7 +23375,7 @@ const styles = StyleSheet.create({
   flipGlyphHeadRight: {
     borderBottomColor: "transparent",
     borderBottomWidth: 4,
-    borderLeftColor: "#334155",
+    borderLeftColor: theme.colors.text.strong,
     borderLeftWidth: 5,
     borderTopColor: "transparent",
     borderTopWidth: 4,
@@ -23264,7 +23388,7 @@ const styles = StyleSheet.create({
   flipGlyphHeadLeft: {
     borderBottomColor: "transparent",
     borderBottomWidth: 4,
-    borderRightColor: "#334155",
+    borderRightColor: theme.colors.text.strong,
     borderRightWidth: 5,
     borderTopColor: "transparent",
     borderTopWidth: 4,
@@ -23280,7 +23404,7 @@ const styles = StyleSheet.create({
     width: 18
   },
   searchGlyphLens: {
-    borderColor: "#0F172A",
+    borderColor: theme.colors.surfaceInverse,
     borderRadius: 999,
     borderWidth: 2,
     height: 10,
@@ -23290,7 +23414,7 @@ const styles = StyleSheet.create({
     width: 10
   },
   searchGlyphHandle: {
-    backgroundColor: "#0F172A",
+    backgroundColor: theme.colors.surfaceInverse,
     borderRadius: 999,
     height: 2.5,
     left: 11,
@@ -23301,7 +23425,7 @@ const styles = StyleSheet.create({
   },
   switchButton: {
     alignItems: "center",
-    borderColor: "#CBD5E1",
+    borderColor: theme.colors.border.strong,
     borderRadius: 999,
     borderWidth: 1,
     height: 30,
@@ -23309,8 +23433,8 @@ const styles = StyleSheet.create({
     width: 52
   },
   switchButtonActive: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB"
+    backgroundColor: theme.colors.accent.s600,
+    borderColor: theme.colors.accent.s600
   },
   switchGlyph: {
     height: 24,
@@ -23319,8 +23443,8 @@ const styles = StyleSheet.create({
     width: 46
   },
   switchGlyphKnob: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#CBD5E1",
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border.strong,
     borderRadius: 999,
     borderWidth: 1,
     height: 22,
@@ -23329,7 +23453,7 @@ const styles = StyleSheet.create({
     width: 22
   },
   switchGlyphKnobEnabled: {
-    borderColor: "#FFFFFF",
+    borderColor: theme.colors.surface,
     left: 23
   },
   arrowLayer: {
@@ -23338,14 +23462,14 @@ const styles = StyleSheet.create({
     left: 0
   },
   lastMoveSquare: {
-    backgroundColor: "rgba(37, 99, 235, 0.3)",
+    backgroundColor: theme.colors.board.lastMoveSquare,
     position: "absolute"
   },
   feedbackMoveSquare: {
     position: "absolute"
   },
   debugLog: {
-    color: "#334155",
+    color: theme.colors.text.strong,
     fontFamily: "Menlo",
     fontSize: 9,
     lineHeight: 12,
@@ -23368,4 +23492,4 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: 0
   },
-});
+}));

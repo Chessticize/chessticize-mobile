@@ -11,10 +11,8 @@ module.exports = {
   },
   overrides: [
     {
-      // Components read colors from the theme (src/theme). PracticePocScreen.tsx joins
-      // this list once its literals are migrated (#608).
+      // Components read colors from the theme (src/theme), never from literals.
       files: ['src/components/**/*.{ts,tsx}'],
-      excludedFiles: ['src/components/PracticePocScreen.tsx'],
       rules: {
         'no-restricted-syntax': [
           'error',
