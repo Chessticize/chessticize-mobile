@@ -7261,7 +7261,7 @@ function PracticeRunCard({
         testID={`practice-run-select-${safeTestId(run.id)}`}
         onPress={() => presentationRunPress(editing, run.id, onIntent)}
       >
-        <View testID={`practice-run-${safeTestId(run.id)}-icon`}>
+        <View style={styles.homeRowLeadingTile} testID={`practice-run-${safeTestId(run.id)}-icon`}>
           <IconTile name={runIconName(run)} />
         </View>
         <View style={styles.homeRowCopy}>
@@ -9066,7 +9066,7 @@ function PracticeModeCard({
     >
       <HomeRowSeparator position={position} />
       <View style={styles.homeRowSelectArea}>
-        <View testID={`practice-mode-${modeTestId}-icon`}>
+        <View style={styles.homeRowLeadingTile} testID={`practice-mode-${modeTestId}-icon`}>
           <IconTile name={modeIconName(item.mode)} />
         </View>
         <View style={styles.homeRowCopy}>
@@ -16429,7 +16429,7 @@ function FeedbackSupportCard({
     >
       <View style={styles.settingsBlock}>
         <View style={styles.feedbackSupportHeader}>
-          <IconTile name="help" />
+          <IconTile alignFirstLine name="help" />
           <View style={styles.settingsRowCopy}>
             <AppText variant="headline">Help improve Chessticize</AppText>
             <AppText tone="secondary" variant="subheadline">
@@ -18077,6 +18077,10 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing.row,
     minHeight: theme.metrics.minTarget,
     minWidth: 0
+  },
+  // Home rows are multi-line: the leading tile sits level with the first line.
+  homeRowLeadingTile: {
+    alignSelf: "flex-start"
   },
   homeRowCopy: {
     flex: 1,

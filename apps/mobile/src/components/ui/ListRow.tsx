@@ -9,11 +9,24 @@ import type { IconName } from "./iconNames.ts";
 // A grouped-list row: optional tinted icon tile, title and subtitle, trailing
 // content, and a chevron or selection check. At least 52 pt tall and grows with
 // Dynamic Type. Use inside <Section rows>.
+//
+// Leading tile alignment, one rule app-wide: in a multi-line row (a subtitle
+// or more lines) the tile sits level with the first line; in a single-line
+// row it is centered. Trailing content and the chevron stay centered.
 
 export type IconTone = "accent" | "positive" | "negative" | "warning" | "neutral";
 export type RowAccessory = "chevron" | "check" | "none";
 
-export function IconTile({ name, tone = "accent" }: { name: IconName; tone?: IconTone }): React.JSX.Element {
+export function IconTile({
+  alignFirstLine = false,
+  name,
+  tone = "accent"
+}: {
+  /** Set in multi-line rows so the tile sits level with the first line instead of centering. */
+  alignFirstLine?: boolean;
+  name: IconName;
+  tone?: IconTone;
+}): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
   const foreground = {
@@ -24,7 +37,7 @@ export function IconTile({ name, tone = "accent" }: { name: IconName; tone?: Ico
     neutral: theme.colors.text.tertiary
   }[tone];
   return (
-    <View style={[styles.tile, styles[`tile_${tone}`]]}>
+    <View style={[styles.tile, styles[`tile_${tone}`], alignFirstLine ? styles.tileFirstLine : null]}>
       <Icon color={foreground} name={name} size={18} weight="semibold" />
     </View>
   );
@@ -56,7 +69,7 @@ export function ListRowContent({
   const theme = useTheme();
   return (
     <>
-      {icon ? <IconTile name={icon} tone={iconTone} /> : null}
+      {icon ? <IconTile alignFirstLine={Boolean(subtitle)} name={icon} tone={iconTone} /> : null}
       <View style={styles.copy}>
         <AppText ellipsizeMode="tail" numberOfLines={titleLines} variant="headline" testID={titleTestID}>
           {title}
@@ -186,6 +199,9 @@ const useStyles = makeStyles((theme) => ({
     height: theme.metrics.iconTile,
     justifyContent: "center",
     width: theme.metrics.iconTile
+  },
+  tileFirstLine: {
+    alignSelf: "flex-start"
   },
   tile_accent: {
     backgroundColor: theme.colors.accent.s100
