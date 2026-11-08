@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildSessionReplay } from "../src/index.ts";
+import { buildSessionReplay, selectMistakeReplayItems } from "../src/index.ts";
 import type {
   AttemptEvent,
   Puzzle,
@@ -119,6 +119,27 @@ test("buildSessionReplay de-duplicates repeated attempt rows without collapsing 
   });
 
   assert.deepEqual(items.map((item) => item.attempt.id), ["same-attempt", "later-attempt"]);
+});
+
+test("selectMistakeReplayItems keeps only wrong and timed-out attempts from the Replay set", () => {
+  const items = buildSessionReplay({
+    sessionId: "s1",
+    attempts: [
+      attempt({ id: "wrong", puzzleId: "p1", result: "wrong", completedAt: "2026-06-20T00:00:10.000Z" }),
+      attempt({ id: "unclear-correct", puzzleId: "p2", unclear: true, completedAt: "2026-06-20T00:00:20.000Z" }),
+      attempt({ id: "timed-out", puzzleId: "p3", result: "timed_out", completedAt: "2026-06-20T00:00:30.000Z" }),
+      attempt({ id: "incomplete", puzzleId: "p4", result: "incomplete", unclear: true, completedAt: "2026-06-20T00:00:40.000Z" })
+    ],
+    puzzles: [puzzle("p1"), puzzle("p2"), puzzle("p3"), puzzle("p4")],
+    reviewQueue: [
+      review({ puzzleId: "p1", mode: "standard", ratingKey: "standard 5/20" }),
+      review({ puzzleId: "p3", mode: "standard", ratingKey: "standard 5/20" })
+    ]
+  });
+
+  assert.equal(items.length, 4);
+  assert.deepEqual(selectMistakeReplayItems(items).map((item) => item.attempt.id), ["wrong", "timed-out"]);
+  assert.deepEqual(selectMistakeReplayItems([]), []);
 });
 
 function attempt(

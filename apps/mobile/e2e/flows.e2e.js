@@ -101,7 +101,7 @@ describe('Key user flows', () => {
 
       await waitFor(element(by.id('sprint-result-solved'))).toBeVisible().withTimeout(10000);
       await expect(element(by.id('sprint-result-reason'))).toBeVisible();
-      await expect(element(by.id('sprint-result-mistakes'))).toBeVisible();
+      await expect(element(by.id('sprint-result-review-count'))).toHaveText('3 to review');
       await expect(element(by.id('sprint-result-rating-change'))).toBeVisible();
       await expect(element(by.id('sprint-result-review-impact'))).toBeVisible();
       await expect(element(by.id('review-mistakes-button'))).toBeVisible();
@@ -114,7 +114,7 @@ describe('Key user flows', () => {
       await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
       await element(by.id('session-abandon-confirm')).tap();
       await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(30000);
-      await expect(element(by.text('Sprint failed'))).toBeVisible();
+      await expect(element(by.text('Sprint abandoned'))).toBeVisible();
     });
   });
 

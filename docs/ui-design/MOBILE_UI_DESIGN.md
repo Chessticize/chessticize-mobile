@@ -765,8 +765,34 @@ New Run behavior:
 ### Sprint Results
 
 - Results should stay action-oriented and compact.
-- Show win/loss, reason, solved count, Unclear count, In Review count, time, best streak, rating before/after, rating delta, Play Again, and the applicable Replay action.
 - Do not make the rating performance chart the main result view; link to History for deeper trend analysis.
+
+Sprint Result is a full-screen destination in direction A (#609; the
+approved spec is in PR #650). The tab bar and the Practice title are hidden
+while it shows. The Survival result keeps its own layout.
+
+- Top bar: Done (back) on the left, the title (`Sprint Result` or `Focused
+  Run Result`) in the middle, and the rating-trend icon button on the right,
+  which opens History on the Run's rating. A Focused Run has no trend button.
+- Hero, centered: an outcome line with a status badge (green check for
+  passed, red cross for failed, grey minus for abandoned or ended), then
+  `Solved / target` in the `display` numeral with a thin bar toward the pass
+  target (a Focused Run's planned count), then `N attempted · X% accuracy`.
+  Outcome copy: `Sprint passed`, `Sprint failed · N mistakes`, `Sprint failed ·
+  Time ran out`, `Sprint abandoned`, `Sprint ended · No more puzzles`, the
+  same with `Arrow Duel` for Arrow Duel Runs, and `Focused Run complete`.
+- One stats card with three centered columns and hairlines: Rating (`−15`
+  over `709 → 694`), Time, and Best streak. A Focused Run shows `Unrated` over
+  `709 unchanged`, elapsed time, and `Avg solve` over `Usually 24s`. Narrow
+  phones use label and value rows; accessibility sizes read label over value.
+- The review row appears only when something is left to review: `N to review
+  · Replay ›` opens Replay of the Unclear and In Review union, and its info
+  button explains that union. With nothing to review, the section is hidden.
+  The final-puzzle `Was the final puzzle unclear?` question sits in the same
+  group.
+- Actions: `Replay N mistakes` (secondary, only with mistakes, replaying just
+  the mistakes) above the primary `Play again` (`Back to Practice` for a
+  Focused Run). Phone portrait pins them to the bottom when the content fits.
 
 ### Settings
 

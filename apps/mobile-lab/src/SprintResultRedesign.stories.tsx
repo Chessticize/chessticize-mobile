@@ -1,10 +1,10 @@
 import React from "react";
+import { View } from "react-native";
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
-import {
-  LabTextSize,
-  LARGEST_ACCESSIBILITY_FONT_SCALE,
-  SprintResultPrototype
-} from "./sprintResultRedesign/SprintResultPrototype.tsx";
+import { usePracticeViewport } from "../../mobile/src/components/PracticeViewport.tsx";
+import { SprintResultScreen } from "../../mobile/src/components/SprintResultScreen.tsx";
+import type { SprintResultData } from "../../mobile/src/components/sprintResultPresentation.ts";
+import { LabTextSize, LARGEST_ACCESSIBILITY_FONT_SCALE } from "./LabTextSize.tsx";
 import { SPRINT_RESULT_FIXTURES } from "./sprintResultRedesign/sprintResultFixtures.ts";
 import {
   expectTestIdAbsent,
@@ -14,14 +14,41 @@ import {
   waitForText
 } from "./storyPlay.ts";
 
-// Issue #609 design-only prototype of the redesigned Sprint Result in direction A.
-// It renders the real ui/ primitives and theme inside the Lab device frame; use
-// the viewport toolbar for phone landscape and iPad, and the Theme toolbar for
-// dark. The production result screen (practice--sprint-summary) is unchanged.
+// Issue #609 Sprint Result in direction A. Each story renders the production
+// SprintResultScreen with fixture data so every result state is reviewable on
+// its own; the Practice product-clone stories (practice--sprint-summary and the
+// practice--sprint-result-* stories) reach the same screen through a real
+// session. Use the viewport toolbar for phone landscape and iPad, and the Theme
+// toolbar for dark. Story URLs are stable from the #650 design preview.
+
+function ResultFrame({
+  data,
+  initialInfoOpen
+}: {
+  data: SprintResultData;
+  initialInfoOpen?: boolean;
+}): React.JSX.Element {
+  const viewport = usePracticeViewport();
+  return (
+    <View style={{ height: viewport.height }}>
+      <SprintResultScreen
+        data={data}
+        {...(initialInfoOpen === undefined ? {} : { initialInfoOpen })}
+        onBack={() => undefined}
+        onMarkUnclear={() => undefined}
+        onOpenHistory={() => undefined}
+        onPlayAgain={() => undefined}
+        onReplay={() => undefined}
+        onReplayMistakes={() => undefined}
+      />
+    </View>
+  );
+}
+
 const meta = {
   title: "Sprint Result redesign",
-  component: SprintResultPrototype
-} satisfies Meta<typeof SprintResultPrototype>;
+  component: ResultFrame
+} satisfies Meta<typeof ResultFrame>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -29,15 +56,11 @@ type Story = StoryObj<typeof meta>;
 type Canvas = { canvasElement: HTMLElement };
 
 async function expectHeroAndStats(canvasElement: HTMLElement, score: string, outcome: string): Promise<void> {
-  await waitForTestId(canvasElement, "sprint-result-redesign-hero");
-  await expectTestIdText(canvasElement, "sprint-result-redesign-outcome", outcome);
-  await expectTestIdText(canvasElement, "sprint-result-redesign-score", score);
-  await waitForTestId(canvasElement, "sprint-result-redesign-stats");
-  await expectTestIdsNotOverlapping(
-    canvasElement,
-    "sprint-result-redesign-top-bar",
-    "sprint-result-redesign-hero"
-  );
+  await waitForTestId(canvasElement, "sprint-result-hero");
+  await expectTestIdText(canvasElement, "sprint-result-outcome", outcome);
+  await expectTestIdText(canvasElement, "sprint-result-solved", score);
+  await waitForTestId(canvasElement, "sprint-result-stats");
+  await expectTestIdsNotOverlapping(canvasElement, "sprint-result-top-bar", "sprint-result-hero");
 }
 
 export const Passed: Story = {
@@ -46,8 +69,8 @@ export const Passed: Story = {
     await expectHeroAndStats(canvasElement, "15 / 15", "Sprint passed");
     await waitForText(canvasElement, "1 to review");
     await waitForText(canvasElement, "695 → 709");
-    expectTestIdAbsent(canvasElement, "sprint-result-redesign-replay-mistakes");
-    await expectTestIdText(canvasElement, "sprint-result-redesign-primary", "Play again");
+    expectTestIdAbsent(canvasElement, "review-mistakes-button");
+    await expectTestIdText(canvasElement, "play-again-button", "Play again");
   }
 };
 
@@ -55,10 +78,10 @@ export const FailedMistakes: Story = {
   name: "Failed · mistakes",
   args: { data: SPRINT_RESULT_FIXTURES.failedMistakes },
   play: async ({ canvasElement }: Canvas) => {
-    await expectHeroAndStats(canvasElement, "9 / 15", "Sprint failed · 3 mistakes");
+    await expectHeroAndStats(canvasElement, "9 / 15", "Sprint failed·3 mistakes");
     await waitForText(canvasElement, "−18");
     await waitForText(canvasElement, "3 to review");
-    await waitForTestId(canvasElement, "sprint-result-redesign-replay-mistakes");
+    await expectTestIdText(canvasElement, "review-mistakes-button", "Replay 3 mistakes");
   }
 };
 
@@ -66,20 +89,20 @@ export const FailedTimeRanOut: Story = {
   name: "Failed · time ran out",
   args: { data: SPRINT_RESULT_FIXTURES.failedTime },
   play: async ({ canvasElement }: Canvas) => {
-    await expectHeroAndStats(canvasElement, "13 / 15", "Sprint failed · Time ran out");
+    await expectHeroAndStats(canvasElement, "13 / 15", "Sprint failed·Time ran out");
     await waitForText(canvasElement, "Was the final puzzle unclear?");
-    await waitForTestId(canvasElement, "sprint-result-redesign-mark-unclear");
+    await waitForTestId(canvasElement, "sprint-unclear-toggle");
     await waitForText(canvasElement, "1 to review");
-    await expectTestIdText(canvasElement, "sprint-result-redesign-replay-mistakes", "Replay 1 mistake");
+    await expectTestIdText(canvasElement, "review-mistakes-button", "Replay 1 mistake");
   }
 };
 
 export const FailedTimeMarkedUnclear: Story = {
   name: "Failed · time ran out, marked unclear",
-  args: { data: SPRINT_RESULT_FIXTURES.failedTime, initialMarkedUnclear: true },
+  args: { data: SPRINT_RESULT_FIXTURES.failedTimeMarked },
   play: async ({ canvasElement }: Canvas) => {
-    await expectTestIdText(canvasElement, "sprint-result-redesign-unclear-marked", "Marked");
-    expectTestIdAbsent(canvasElement, "sprint-result-redesign-mark-unclear");
+    await expectTestIdText(canvasElement, "sprint-unclear-marked", "Marked");
+    expectTestIdAbsent(canvasElement, "sprint-unclear-toggle");
     await waitForText(canvasElement, "2 to review");
   }
 };
@@ -90,7 +113,7 @@ export const Abandoned: Story = {
     await expectHeroAndStats(canvasElement, "1 / 15", "Sprint abandoned");
     await waitForText(canvasElement, "1 attempted · 100% accuracy");
     await waitForText(canvasElement, "709 → 694");
-    expectTestIdAbsent(canvasElement, "sprint-result-redesign-review");
+    expectTestIdAbsent(canvasElement, "sprint-result-review");
   }
 };
 
@@ -100,9 +123,9 @@ export const ReviewAndMistakes: Story = {
   play: async ({ canvasElement }: Canvas) => {
     await expectHeroAndStats(canvasElement, "15 / 15", "Sprint passed");
     await waitForText(canvasElement, "3 to review");
-    await waitForTestId(canvasElement, "sprint-result-redesign-review-info");
-    await expectTestIdText(canvasElement, "sprint-result-redesign-replay-mistakes", "Replay 2 mistakes");
-    expectTestIdAbsent(canvasElement, "sprint-result-redesign-review-explanation");
+    await waitForTestId(canvasElement, "sprint-result-review-info");
+    await expectTestIdText(canvasElement, "review-mistakes-button", "Replay 2 mistakes");
+    expectTestIdAbsent(canvasElement, "sprint-result-review-note");
   }
 };
 
@@ -110,7 +133,7 @@ export const ReviewExplanation: Story = {
   name: "Review explanation (info open)",
   args: { data: SPRINT_RESULT_FIXTURES.reviewAndMistakes, initialInfoOpen: true },
   play: async ({ canvasElement }: Canvas) => {
-    await waitForTestId(canvasElement, "sprint-result-redesign-review-explanation");
+    await waitForTestId(canvasElement, "sprint-result-review-note");
     await waitForText(canvasElement, "3 puzzles to look at again: 2 Unclear and 2 In Review (1 is both).");
     await waitForText(canvasElement, "Replaying them does not change when they come back in Review.");
   }
@@ -122,8 +145,8 @@ export const ZeroReview: Story = {
   args: { data: SPRINT_RESULT_FIXTURES.zeroReview },
   play: async ({ canvasElement }: Canvas) => {
     await expectHeroAndStats(canvasElement, "15 / 15", "Sprint passed");
-    expectTestIdAbsent(canvasElement, "sprint-result-redesign-review");
-    expectTestIdAbsent(canvasElement, "sprint-result-redesign-replay-mistakes");
+    expectTestIdAbsent(canvasElement, "sprint-result-review");
+    expectTestIdAbsent(canvasElement, "review-mistakes-button");
   }
 };
 
@@ -145,8 +168,8 @@ export const FocusedRun: Story = {
     await waitForText(canvasElement, "Unrated");
     await waitForText(canvasElement, "709 unchanged");
     await waitForText(canvasElement, "Usually 24s");
-    expectTestIdAbsent(canvasElement, "sprint-result-redesign-trend");
-    await expectTestIdText(canvasElement, "sprint-result-redesign-primary", "Back to Practice");
+    expectTestIdAbsent(canvasElement, "sprint-result-history-button");
+    await expectTestIdText(canvasElement, "play-again-button", "Back to Practice");
   }
 };
 
@@ -155,12 +178,12 @@ export const LargestText: Story = {
   args: { data: SPRINT_RESULT_FIXTURES.reviewAndMistakes },
   render: (args) => (
     <LabTextSize fontScale={LARGEST_ACCESSIBILITY_FONT_SCALE}>
-      <SprintResultPrototype {...args} />
+      <ResultFrame {...args} />
     </LabTextSize>
   ),
   play: async ({ canvasElement }: Canvas) => {
-    await waitForTestId(canvasElement, "sprint-result-redesign-stat-rating");
+    await waitForTestId(canvasElement, "sprint-result-rating-change");
     await waitForText(canvasElement, "3 to review");
-    await waitForTestId(canvasElement, "sprint-result-redesign-primary");
+    await waitForTestId(canvasElement, "play-again-button");
   }
 };

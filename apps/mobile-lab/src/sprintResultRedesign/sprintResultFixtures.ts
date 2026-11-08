@@ -1,8 +1,10 @@
-import type { SprintResultPrototypeData } from "./sprintResultPresentation.ts";
+import type { SprintResultData } from "../../../mobile/src/components/sprintResultPresentation.ts";
 
-// Plausible results for the Issue #609 Sprint Result redesign stories. Standard
-// Sprints use the default 5-minute, 15-to-pass configuration; Arrow Duel passes
-// at 10. The Focused Run pace matches the #616 design-preview fixture.
+// Plausible results for the Sprint Result stories (Issue #609). They feed the
+// production SprintResultScreen directly; the product-clone Practice stories
+// reach the same screen through the real session. Standard Sprints use the
+// default 5-minute, 15-to-pass configuration; Arrow Duel passes at 10. The
+// Focused Run pace matches the #616 design-preview fixture.
 
 const noUnclear = { markedByYou: 0, afterSlow: 0, afterTimedOut: 0 };
 
@@ -20,10 +22,10 @@ export const SPRINT_RESULT_FIXTURES = {
     ratingBefore: 695,
     ratingAfter: 709,
     elapsedSeconds: 221,
-    limitSeconds: 300,
     bestStreak: 15,
     mistakeCount: 0,
-    review: { unclear: { ...noUnclear, afterSlow: 1 }, inReviewCount: 0, overlapCount: 0 }
+    review: { count: 1, unclear: { ...noUnclear, afterSlow: 1 }, inReviewCount: 0, overlapCount: 0 },
+    mistakeReplayCount: 0
   },
   failedMistakes: {
     kind: "sprint",
@@ -37,10 +39,10 @@ export const SPRINT_RESULT_FIXTURES = {
     ratingBefore: 709,
     ratingAfter: 691,
     elapsedSeconds: 177,
-    limitSeconds: 300,
     bestStreak: 5,
     mistakeCount: 3,
-    review: { unclear: noUnclear, inReviewCount: 3, overlapCount: 0 }
+    review: { count: 3, unclear: noUnclear, inReviewCount: 3, overlapCount: 0 },
+    mistakeReplayCount: 3
   },
   failedTime: {
     kind: "sprint",
@@ -54,11 +56,29 @@ export const SPRINT_RESULT_FIXTURES = {
     ratingBefore: 709,
     ratingAfter: 703,
     elapsedSeconds: 300,
-    limitSeconds: 300,
     bestStreak: 9,
     mistakeCount: 1,
-    review: { unclear: noUnclear, inReviewCount: 1, overlapCount: 0 },
-    unclearPrompt: { question: "Was the final puzzle unclear?" }
+    review: { count: 1, unclear: noUnclear, inReviewCount: 1, overlapCount: 0 },
+    mistakeReplayCount: 1,
+    unclearPrompt: { question: "Was the final puzzle unclear?", marked: false }
+  },
+  failedTimeMarked: {
+    kind: "sprint",
+    mode: "standard",
+    outcome: "failed",
+    endReason: "time_expired",
+    solved: 13,
+    target: 15,
+    attempted: 14,
+    accuracyPercent: 93,
+    ratingBefore: 709,
+    ratingAfter: 703,
+    elapsedSeconds: 300,
+    bestStreak: 9,
+    mistakeCount: 1,
+    review: { count: 2, unclear: { ...noUnclear, markedByYou: 1 }, inReviewCount: 1, overlapCount: 0 },
+    mistakeReplayCount: 1,
+    unclearPrompt: { question: "Was the final puzzle unclear?", marked: true }
   },
   abandoned: {
     kind: "sprint",
@@ -72,10 +92,10 @@ export const SPRINT_RESULT_FIXTURES = {
     ratingBefore: 709,
     ratingAfter: 694,
     elapsedSeconds: 48,
-    limitSeconds: 300,
     bestStreak: 1,
     mistakeCount: 0,
-    review: { unclear: noUnclear, inReviewCount: 0, overlapCount: 0 }
+    review: { count: 0, unclear: noUnclear, inReviewCount: 0, overlapCount: 0 },
+    mistakeReplayCount: 0
   },
   reviewAndMistakes: {
     kind: "sprint",
@@ -89,10 +109,10 @@ export const SPRINT_RESULT_FIXTURES = {
     ratingBefore: 709,
     ratingAfter: 718,
     elapsedSeconds: 276,
-    limitSeconds: 300,
     bestStreak: 8,
     mistakeCount: 2,
-    review: { unclear: { ...noUnclear, markedByYou: 1, afterSlow: 1 }, inReviewCount: 2, overlapCount: 1 }
+    review: { count: 3, unclear: { ...noUnclear, markedByYou: 1, afterSlow: 1 }, inReviewCount: 2, overlapCount: 1 },
+    mistakeReplayCount: 2
   },
   zeroReview: {
     kind: "sprint",
@@ -106,10 +126,10 @@ export const SPRINT_RESULT_FIXTURES = {
     ratingBefore: 709,
     ratingAfter: 725,
     elapsedSeconds: 192,
-    limitSeconds: 300,
     bestStreak: 15,
     mistakeCount: 0,
-    review: { unclear: noUnclear, inReviewCount: 0, overlapCount: 0 }
+    review: { count: 0, unclear: noUnclear, inReviewCount: 0, overlapCount: 0 },
+    mistakeReplayCount: 0
   },
   arrowDuel: {
     kind: "sprint",
@@ -123,10 +143,10 @@ export const SPRINT_RESULT_FIXTURES = {
     ratingBefore: 812,
     ratingAfter: 823,
     elapsedSeconds: 245,
-    limitSeconds: 300,
     bestStreak: 6,
     mistakeCount: 2,
-    review: { unclear: noUnclear, inReviewCount: 2, overlapCount: 0 }
+    review: { count: 2, unclear: noUnclear, inReviewCount: 2, overlapCount: 0 },
+    mistakeReplayCount: 2
   },
   focusedRun: {
     kind: "focusedRun",
@@ -140,10 +160,9 @@ export const SPRINT_RESULT_FIXTURES = {
     ratingBefore: 709,
     elapsedSeconds: 432,
     bestStreak: 6,
-    pace: { averageSolveSeconds: 17, usualSolveSeconds: 24 },
     mistakeCount: 3,
-    review: { unclear: { ...noUnclear, afterSlow: 1 }, inReviewCount: 3, overlapCount: 0 }
+    pace: { averageSolveSeconds: 17, usualSolveSeconds: 24 },
+    review: { count: 4, unclear: { ...noUnclear, afterSlow: 1 }, inReviewCount: 3, overlapCount: 0 },
+    mistakeReplayCount: 3
   }
-} as const satisfies Record<string, SprintResultPrototypeData>;
-
-export type SprintResultFixtureName = keyof typeof SPRINT_RESULT_FIXTURES;
+} as const satisfies Record<string, SprintResultData>;

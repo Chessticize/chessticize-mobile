@@ -57,7 +57,7 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).toContain("by.id('move-feedback-overlay')");
     expect(journey).toContain("toHaveText('No more puzzles')");
     expect(journey).not.toContain('sleep(1800)');
-    expect(journey).toContain("by.text('Sprint complete')");
+    expect(journey).toContain("by.id('sprint-result-outcome')");
     expect(journey).toContain("by.id('sprint-result-reason')");
     expect(journey).toContain('device.pressBack()');
     expect(journey).toContain("const result = element(by.text('Correct')).atIndex(0)");

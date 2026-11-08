@@ -177,7 +177,7 @@ async function runGameplaySoak(mode) {
 
     const completedInSprint = ((completed - 1) % COMPLETED_PUZZLES_PER_SPRINT) + 1;
     if (completedInSprint === COMPLETED_PUZZLES_PER_SPRINT) {
-      await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
+      await waitFor(element(by.id('sprint-result-outcome'))).toBeVisible().withTimeout(30000);
     } else {
       await waitFor(element(by.id('session-progress')))
         .toHaveText(`${completedInSprint} / ${COMPLETED_PUZZLES_PER_SPRINT}`)

@@ -114,6 +114,6 @@ describe(`Promotion responsiveness (${PROMOTION_PUZZLE_ID})`, () => {
     );
     await sleep(250);
     await finalMoveTargets.board.tapAtPoint(finalMoveTargets.to);
-    await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
+    await waitFor(element(by.id('sprint-result-outcome'))).toBeVisible().withTimeout(30000);
   });
 });

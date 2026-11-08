@@ -55,6 +55,7 @@ import {
   historyAttemptReplayAvailability,
   historyAttemptSpeedSeconds,
   isAttemptMarkedUnclear,
+  selectMistakeReplayItems,
   isUnclearAttemptEligible,
   isReviewOverdue,
   markSprintGuideSeen,
@@ -294,8 +295,8 @@ import {
   type PersonalBestChallengeSelection,
   type PersonalBestPausedRunPresentation
 } from "./PersonalBestChallengeDesign.tsx";
-import { ResultReviewImpactCard } from "./ResultReviewImpactCard.tsx";
-import { ResultTrophyGlyph } from "./ResultTrophyGlyph.tsx";
+import { SprintResultScreen } from "./SprintResultScreen.tsx";
+import { sprintResultDataFromSession } from "./sprintResultPresentation.ts";
 import { SessionMistakeIndicator } from "./SessionMistakeIndicator.tsx";
 import {
   buildSurvivalChallengePresentation,
@@ -1163,6 +1164,19 @@ export function PracticePocScreen({
     refreshKey: aggregateRevision
   });
 
+  // Sprint Result (#609) replaces the Practice tab content as a full-screen
+  // destination; the Survival result keeps its in-tab layout.
+  const sprintResultVisible = tab === "practice"
+    && state !== null
+    && state.status !== "active"
+    && state.status !== "paused"
+    && feedbackSnapshot === null
+    && !(
+      (state.config.survival !== undefined
+        || personalBestChallengeDesignPreview?.showActivePresentation === true)
+      && personalBestPresentation?.result
+    );
+
   // Top-level navigation (#612). Global navigation is hidden whenever a focused
   // surface owns the screen (an open Run, its feedback snapshot, guides,
   // Survival setup and records, an open review). The screen stays in the
@@ -1177,6 +1191,7 @@ export function PracticePocScreen({
     personalBestGuideVisible,
     personalBestHubVisible,
     personalBestRecordsVisible,
+    sprintResultVisible,
     reviewSurfaceOpen: reviewSessionSource !== null
       || historyReviewEntries.length > 0
       || historyUnavailableAttempt !== null,
@@ -3461,12 +3476,15 @@ export function PracticePocScreen({
     }
   }
 
-  function showSessionReplay(): void {
+  function showSessionReplay(scope: "all" | "mistakes" = "all"): void {
     const sessionId = stateRef.current?.id;
-    const replayItems: SessionReplayItem[] =
+    const allReplayItems: SessionReplayItem[] =
       sprintRulesDesignPreview?.resultReplayItems
         ? [...sprintRulesDesignPreview.resultReplayItems]
         : sessionId ? service.getSessionReplay(sessionId) : [];
+    const replayItems = scope === "mistakes"
+      ? selectMistakeReplayItems(allReplayItems)
+      : allReplayItems;
     resetToIdle();
     setSessionReplayItems(replayItems);
     navigateToTab("review");
@@ -5280,6 +5298,60 @@ export function PracticePocScreen({
           />
         ) : null}
         <View style={styles.appContentShell}>
+          {sprintResultVisible && state ? (
+            <SprintResultScreen
+              data={sprintResultDataFromSession({
+                state,
+                elapsedMs: isUntimedRun
+                  ? untimedRunElapsedMs
+                  : Math.min(sprintElapsedMs, state.config.durationSeconds * 1000),
+                replayItems: sprintReplayItems,
+                ...(storedSprintResultSummary ? { resultSummary: storedSprintResultSummary } : {}),
+                ...(sprintRulesDesignPreview?.resultUnclearSummary
+                  ? { unclearSummary: sprintRulesDesignPreview.resultUnclearSummary }
+                  : {}),
+                ...((storedSprintResultSummary?.averageSolveSeconds
+                  ?? sprintRulesDesignPreview?.resultFocusedRunPace?.averageSolveSeconds) === undefined
+                  ? {}
+                  : {
+                      averageSolveSeconds: storedSprintResultSummary?.averageSolveSeconds
+                        ?? sprintRulesDesignPreview?.resultFocusedRunPace?.averageSolveSeconds
+                    }),
+                ...((focusedRunUsualSolveSeconds
+                  ?? sprintRulesDesignPreview?.resultFocusedRunPace?.usualSolveSeconds) === undefined
+                  ? {}
+                  : {
+                      usualSolveSeconds: focusedRunUsualSolveSeconds
+                        ?? sprintRulesDesignPreview?.resultFocusedRunPace?.usualSolveSeconds
+                    }),
+                unclearPrompt,
+                includePromptInCounts: sprintRulesDesignPreview?.initialResultUnclearPrompt !== undefined
+              })}
+              notice={errorNode}
+              paddingInsets={{ bottom: 0, left: 0, right: 0, top: 0 }}
+              onBack={resetToIdle}
+              onMarkUnclear={toggleUnclearPrompt}
+              onOpenHistory={() => {
+                setHistoryRatingKey(state.config.ratingKey);
+                setHistoryPageOffset(0);
+                navigateToTab("history");
+              }}
+              onPlayAgain={() => {
+                if (state.config.tacticalFocus) {
+                  resetToIdle();
+                  return;
+                }
+                if (state.run) {
+                  startPracticeRun(state.run.id);
+                  return;
+                }
+                startSprint(state.config.mode);
+              }}
+              onReplay={() => showSessionReplay()}
+              onReplayMistakes={() => showSessionReplay("mistakes")}
+            />
+          ) : (
+          <>
           {appHeaderVisible ? (
             <View
               accessibilityLabel={screenSubtitle ? `${screenTitle}, ${screenSubtitle}` : screenTitle}
@@ -5670,61 +5742,14 @@ export function PracticePocScreen({
                       sittings={personalBestPresentation.result.sittings}
                       onDone={resetToIdle}
                       onReplayMistakes={sprintReplayItems.length > 0
-                        ? showSessionReplay
+                        ? () => showSessionReplay()
                         : undefined}
                       onTryAgain={() => {
                         resetToIdle();
                         startPersonalBestChallenge();
                       }}
                     />
-                  ) : (
-                    <SprintSummary
-                      state={state}
-                      resultSummary={storedSprintResultSummary}
-                      clarifyGoal={
-                        sprintGuidanceEnabled
-                        || sprintRulesDesignPreview?.initialResultState !== undefined
-                      }
-                      elapsedMs={isUntimedRun
-                        ? untimedRunElapsedMs
-                        : Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
-                      usualSolveSeconds={focusedRunUsualSolveSeconds
-                        ?? sprintRulesDesignPreview?.resultFocusedRunPace?.usualSolveSeconds}
-                      averageSolveSeconds={storedSprintResultSummary?.averageSolveSeconds
-                        ?? sprintRulesDesignPreview?.resultFocusedRunPace?.averageSolveSeconds}
-                      unclearPrompt={unclearPrompt}
-                      unclearSummary={
-                        sprintRulesDesignPreview?.resultUnclearSummary
-                      }
-                      replayItems={sprintReplayItems}
-                      includePromptInUnclearSummary={
-                        sprintRulesDesignPreview?.initialResultUnclearPrompt !== undefined
-                      }
-                      onToggleUnclear={toggleUnclearPrompt}
-                      onReplay={() => {
-                        if (state.config.tacticalFocus) {
-                          resetToIdle();
-                          return;
-                        }
-                        if (state.run) {
-                          startPracticeRun(state.run.id);
-                          return;
-                        }
-                        startSprint(state.config.mode);
-                      }}
-                      onBack={resetToIdle}
-                      onOpenHistory={() => {
-                        setHistoryRatingKey(state.config.ratingKey);
-                        setHistoryPageOffset(0);
-                        navigateToTab("history");
-                      }}
-                      onOpenReplay={
-                        sprintReplayItems.length > 0
-                          ? showSessionReplay
-                          : undefined
-                      }
-                    />
-                  )
+                  ) : null
                 ) : null}
 
                 {!isSessionGuideVisible
@@ -6013,6 +6038,8 @@ export function PracticePocScreen({
               <StockfishDiagnosticsPanel stockfish={stockfish} />
             ) : null}
           </LegacyScrollView>
+          </>
+          )}
         </View>
         {startingMode ? (
           <View
@@ -10262,6 +10289,96 @@ function SessionStatusBar({
   const plannedAttempts = state.config.maxAttempts ?? state.config.targetCorrect;
   const showsSessionHeaderAction = Boolean(onClose || onAbandon)
     && !(isPersonalBest && confirmAbandon);
+  // At accessibility text sizes (#652) the timer takes its own line above the
+  // other metrics, and every HUD value shrinks to fit instead of truncating.
+  const largeText = usePracticeViewport().fontScale >= HUD_LARGE_TEXT_FONT_SCALE;
+  const progressMetric = (
+    <View
+      accessibilityLabel={isPersonalBest
+        ? `Solved ${state.correctCount}`
+        : isTacticalFocus
+        ? `Puzzles ${completedAttempts} of ${plannedAttempts}`
+        : `Progress ${state.correctCount} of ${state.config.targetCorrect}`}
+      style={[
+        styles.sessionMetricBlock,
+        isPersonalBest ? styles.personalBestProgressMetricBlock : null
+      ]}
+      testID="session-progress-block"
+    >
+      <Text
+        adjustsFontSizeToFit
+        maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
+        minimumFontScale={0.5}
+        numberOfLines={1}
+        testID="session-progress"
+        style={[
+          styles.sessionProgressValue,
+          compactMetrics ? styles.sessionMetricTextCompact : null
+        ]}
+      >
+        {isPersonalBest
+          ? `${state.correctCount} solved`
+          : isTacticalFocus
+          ? `${completedAttempts} / ${plannedAttempts}`
+          : `${state.correctCount} / ${state.config.targetCorrect}`}
+      </Text>
+    </View>
+  );
+  const timerMetric = isPersonalBest ? null : (
+    <View
+      accessibilityLabel={state.config.runClock === "untimed" ? `Elapsed ${timerText}` : `Timer ${timerText}`}
+      style={[styles.sessionMetricBlock, largeText ? styles.sessionMetricBlockFullRow : null]}
+      testID="session-timer-block"
+    >
+      <Text
+        adjustsFontSizeToFit
+        maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
+        minimumFontScale={0.5}
+        numberOfLines={1}
+        testID="session-timer"
+        style={[
+          styles.timerText,
+          compactMetrics ? styles.sessionMetricTextCompact : null
+        ]}
+      >
+        {timerText}
+      </Text>
+    </View>
+  );
+  const policyMetric = isTacticalFocus ? (
+    <View
+      accessibilityLabel="Rating unchanged"
+      style={styles.sessionMetricBlock}
+      testID="session-rating-policy"
+    >
+      <Text
+        adjustsFontSizeToFit
+        maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
+        minimumFontScale={0.5}
+        numberOfLines={1}
+        style={[
+          styles.timerText,
+          compactMetrics ? styles.sessionMetricTextCompact : null
+        ]}
+      >
+        Unrated
+      </Text>
+    </View>
+  ) : (
+    <View
+      accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
+      style={[
+        styles.sessionMetricBlock,
+        isPersonalBest ? styles.personalBestMistakesMetricBlock : null
+      ]}
+      testID="session-mistakes-block"
+    >
+      <SessionMistakeIndicator
+        count={state.mistakeCount}
+        max={state.config.maxMistakes}
+      />
+    </View>
+  );
   return (
     <View style={styles.activeSessionShell} testID="active-session-shell">
       <View style={styles.sessionNavRow} testID="session-shell-nav">
@@ -10278,7 +10395,13 @@ function SessionStatusBar({
         ) : (
           <View style={styles.sessionNavButton} />
         )}
-        <Text numberOfLines={1} style={styles.sessionNavTitle}>
+        <Text
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
+          minimumFontScale={0.5}
+          numberOfLines={1}
+          style={styles.sessionNavTitle}
+        >
           {isPersonalBest ? "Survival" : isTacticalFocus ? "Focused Run" : modeLabel(mode)}
         </Text>
         <View style={styles.sessionNavActions} testID="session-nav-actions">
@@ -10317,92 +10440,26 @@ function SessionStatusBar({
         ref={metricsRef}
         style={[
           styles.sessionActiveMetricRow,
-          compactMetrics ? styles.sessionActiveMetricRowCompact : null
+          compactMetrics ? styles.sessionActiveMetricRowCompact : null,
+          largeText ? styles.sessionActiveMetricRowLargeText : null
         ]}
         testID="session-status-metrics"
         onLayout={onMetricsLayout}
       >
-        <View
-          accessibilityLabel={isPersonalBest
-            ? `Solved ${state.correctCount}`
-            : isTacticalFocus
-            ? `Puzzles ${completedAttempts} of ${plannedAttempts}`
-            : `Progress ${state.correctCount} of ${state.config.targetCorrect}`}
-          style={[
-            styles.sessionMetricBlock,
-            isPersonalBest ? styles.personalBestProgressMetricBlock : null
-          ]}
-          testID="session-progress-block"
-        >
-          <Text
-            adjustsFontSizeToFit={compactMetrics || isPersonalBest}
-            minimumFontScale={0.75}
-            numberOfLines={1}
-            testID="session-progress"
-            style={[
-              styles.sessionProgressValue,
-              compactMetrics ? styles.sessionMetricTextCompact : null
-            ]}
-          >
-            {isPersonalBest
-              ? `${state.correctCount} solved`
-              : isTacticalFocus
-              ? `${completedAttempts} / ${plannedAttempts}`
-              : `${state.correctCount} / ${state.config.targetCorrect}`}
-          </Text>
-        </View>
-        {isPersonalBest ? null : (
-          <View
-            accessibilityLabel={state.config.runClock === "untimed" ? `Elapsed ${timerText}` : `Timer ${timerText}`}
-            style={styles.sessionMetricBlock}
-            testID="session-timer-block"
-          >
-            <Text
-              adjustsFontSizeToFit={compactMetrics}
-              minimumFontScale={0.75}
-              numberOfLines={1}
-              testID="session-timer"
-              style={[
-                styles.timerText,
-                compactMetrics ? styles.sessionMetricTextCompact : null
-              ]}
-            >
-              {timerText}
-            </Text>
-          </View>
-        )}
-        {isTacticalFocus ? (
-          <View
-            accessibilityLabel="Rating unchanged"
-            style={styles.sessionMetricBlock}
-            testID="session-rating-policy"
-          >
-            <Text
-              adjustsFontSizeToFit={compactMetrics}
-              minimumFontScale={0.75}
-              numberOfLines={1}
-              style={[
-                styles.timerText,
-                compactMetrics ? styles.sessionMetricTextCompact : null
-              ]}
-            >
-              Unrated
-            </Text>
-          </View>
+        {largeText ? (
+          <>
+            {timerMetric}
+            <View style={styles.sessionMetricLargeTextRow}>
+              {progressMetric}
+              {policyMetric}
+            </View>
+          </>
         ) : (
-          <View
-            accessibilityLabel={`Mistakes ${state.mistakeCount} of ${state.config.maxMistakes}`}
-            style={[
-              styles.sessionMetricBlock,
-              isPersonalBest ? styles.personalBestMistakesMetricBlock : null
-            ]}
-            testID="session-mistakes-block"
-          >
-            <SessionMistakeIndicator
-              count={state.mistakeCount}
-              max={state.config.maxMistakes}
-            />
-          </View>
+          <>
+            {progressMetric}
+            {timerMetric}
+            {policyMetric}
+          </>
         )}
       </View>
 
@@ -10587,390 +10644,6 @@ function UnclearAttemptPrompt({
           <Text style={styles.unclearPromptButtonText}>Mark as unclear</Text>
         </Pressable>
       )}
-    </View>
-  );
-}
-
-function SprintSummary({
-  state,
-  clarifyGoal,
-  elapsedMs,
-  includePromptInUnclearSummary,
-  unclearPrompt,
-  unclearSummary,
-  replayItems,
-  resultSummary,
-  averageSolveSeconds,
-  usualSolveSeconds,
-  onToggleUnclear,
-  onReplay,
-  onBack,
-  onOpenHistory,
-  onOpenReplay
-}: {
-  state: SprintState;
-  clarifyGoal: boolean;
-  elapsedMs: number;
-  includePromptInUnclearSummary: boolean;
-  unclearPrompt: UnclearPromptState | null;
-  unclearSummary?: SprintResultUnclearSummaryPresentation;
-  replayItems?: readonly SprintResultReplayDesignItem[];
-  resultSummary?: SprintResultSummary;
-  /** This Run's average solve time, in seconds. */
-  averageSolveSeconds?: number;
-  /** The player's usual solve time on a Focused Run's themes, when known. */
-  usualSolveSeconds?: number;
-  onToggleUnclear: () => void;
-  onReplay: () => void;
-  onBack: () => void;
-  onOpenHistory: () => void;
-  onOpenReplay?: () => void;
-}): React.JSX.Element {
-  const styles = useStyles();
-  const delta = (state.ratingAfter ?? state.ratingBefore) - state.ratingBefore;
-  const isTacticalFocus = state.config.tacticalFocus !== undefined;
-  const showGoalClarification = clarifyGoal && !isTacticalFocus;
-  const reason = formatEndReason(state.endReason);
-  const shouldPrioritizeReplay = Boolean(onOpenReplay);
-  const attemptCount = resultSummary?.attemptCount
-    ?? state.correctCount + state.mistakeCount;
-  const accuracy = resultSummary?.accuracyPercent
-    ?? Math.round((state.correctCount / Math.max(1, attemptCount)) * 100);
-  const ratingAfter = state.ratingAfter ?? state.ratingBefore;
-  const replayInReviewCount = replayItems?.filter((item) => item.inReview).length ?? 0;
-  const replayItemCount = replayItems?.length ?? 0;
-  const replayAttemptCountLabel = `${replayItemCount} ${
-    replayItemCount === 1 ? "attempt" : "attempts"
-  }`;
-  const replayOverlapCount = replayItems?.filter(
-    (item) => item.inReview && isAttemptMarkedUnclear(item.attempt)
-  ).length ?? 0;
-  const resolvedUnclearSummary = resultSummary?.unclear ?? unclearSummary;
-  const promptMarkedCount = includePromptInUnclearSummary && unclearPrompt?.marked ? 1 : 0;
-  const userMarkedCount = (resolvedUnclearSummary?.userMarkedCount ?? 0) + promptMarkedCount;
-  const unclearCount = resolvedUnclearSummary
-    ? userMarkedCount
-      + resolvedUnclearSummary.slowMarkedCount
-      + (resolvedUnclearSummary.timedOutMarkedCount ?? 0)
-    : 0;
-  const unclearSources = resolvedUnclearSummary
-    ? [
-        userMarkedCount > 0
-          ? `${userMarkedCount} marked by you`
-          : null,
-        resolvedUnclearSummary.slowMarkedCount > 0
-          ? `${resolvedUnclearSummary.slowMarkedCount} marked after Slow`
-          : null,
-        (resolvedUnclearSummary.timedOutMarkedCount ?? 0) > 0
-          ? `${resolvedUnclearSummary.timedOutMarkedCount} marked after Timed out`
-          : null
-      ].filter((source): source is string => source !== null).join(" · ")
-    : "";
-
-  return (
-    <View style={styles.summaryPanel} testID="sprint-summary-panel">
-      <View style={styles.resultTopBar} testID="sprint-result-top-bar">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Done"
-          testID="back-practice-button"
-          style={styles.resultTopBarButton}
-          onPress={onBack}
-        >
-          <ChevronGlyph direction="left" />
-        </Pressable>
-        <Text style={styles.resultTopBarTitle}>
-          {isTacticalFocus ? "Focused Run Result" : "Sprint Result"}
-        </Text>
-        {isTacticalFocus ? (
-          <View style={styles.resultTopBarIconButton} />
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="View history trends"
-            testID="sprint-result-history-button"
-            style={styles.resultTopBarIconButton}
-            onPress={onOpenHistory}
-          >
-            <ResultTrendGlyph />
-          </Pressable>
-        )}
-      </View>
-
-      <View
-        style={[styles.resultHero, showGoalClarification ? styles.resultHeroClarified : null]}
-        testID="sprint-result-hero"
-      >
-        <View style={styles.resultStatusBlock}>
-          <View style={[styles.resultIcon, state.status === "won" ? styles.resultIconWon : styles.resultIconFailed]}>
-            <SprintResultStatusGlyph status={state.status === "won" ? "won" : "failed"} />
-          </View>
-          <View style={styles.resultTitleBlock}>
-            <Text style={styles.summaryTitle}>
-              {isTacticalFocus
-                ? state.status === "won" ? "Focused Run complete" : "Focused Run ended"
-                : state.status === "won" ? "Sprint complete" : "Sprint failed"}
-            </Text>
-            <Text
-              accessibilityLabel={`Result: ${reason}`}
-              style={styles.summaryText}
-              testID="sprint-result-reason"
-            >
-              {reason}
-            </Text>
-          </View>
-        </View>
-        <View style={[
-          styles.resultScoreBlock,
-          showGoalClarification ? styles.resultGoalScoreBlock : null
-        ]}>
-          {showGoalClarification ? (
-            <Text style={styles.resultGoalLabel} testID="sprint-result-goal-label">
-              Solve {state.config.targetCorrect} to pass
-            </Text>
-          ) : null}
-          {showGoalClarification ? (
-            <Text
-              accessibilityLabel={`Solved ${state.correctCount}`}
-              style={styles.resultSolvedCount}
-              testID="sprint-result-solved"
-            >
-              Solved {state.correctCount}
-            </Text>
-          ) : (
-            <Text style={styles.resultSolvedCount} testID="sprint-result-solved">
-              {state.correctCount}
-              <Text style={styles.resultSolvedTarget}>
-                {" / "}
-                {attemptCount}
-              </Text>
-            </Text>
-          )}
-          <Text style={styles.resultAccuracy} testID="sprint-result-accuracy">
-            {showGoalClarification ? `${attemptCount} attempted · ` : ""}
-            {accuracy}% Accuracy
-          </Text>
-        </View>
-      </View>
-
-      {unclearPrompt ? (
-        <UnclearAttemptPrompt
-          marked={unclearPrompt.marked}
-          question={unclearPrompt.question}
-          onToggle={onToggleUnclear}
-        />
-      ) : null}
-
-      {!isTacticalFocus ? (
-        <ResultHistoryShortcut
-          delta={delta}
-          ratingAfter={ratingAfter}
-          ratingBefore={state.ratingBefore}
-          onPress={onOpenHistory}
-        />
-      ) : null}
-
-      <View style={styles.resultMetricGrid}>
-        <View style={styles.resultMetric} testID="sprint-result-rating-change">
-          <Text style={styles.resultMetricLabel}>
-            {isTacticalFocus ? "Rating" : "Rating Change"}
-          </Text>
-          <Text style={[
-            styles.resultMetricValue,
-            isTacticalFocus ? styles.positive : delta >= 0 ? styles.positive : styles.errorText
-          ]}>
-            {isTacticalFocus ? "Unrated" : `${delta >= 0 ? "+" : ""}${delta}`}
-          </Text>
-          <Text testID="sprint-result-rating-range" style={styles.resultMetricSubtext}>
-            {isTacticalFocus ? `${state.ratingBefore} unchanged` : `${state.ratingBefore} -> ${ratingAfter}`}
-          </Text>
-        </View>
-        <View style={styles.resultMetric} testID="sprint-result-time">
-          <Text style={styles.resultMetricLabel}>Time</Text>
-          <Text style={styles.resultMetricValue}>{formatDuration(Math.floor(elapsedMs / 1000))}</Text>
-        </View>
-        {isTacticalFocus ? (
-          <View
-            accessibilityLabel={focusedRunPaceAccessibilityLabel(
-              averageSolveSeconds,
-              usualSolveSeconds
-            )}
-            style={styles.resultMetric}
-            testID="sprint-result-average-solve"
-          >
-            <Text style={styles.resultMetricLabel}>Avg Solve</Text>
-            <Text style={styles.resultMetricValue}>
-              {formatSolveSeconds(averageSolveSeconds)}
-            </Text>
-            {usualSolveSeconds === undefined ? null : (
-              <Text style={styles.resultMetricSubtext} testID="sprint-result-usual-solve">
-                Usually {formatSolveSeconds(usualSolveSeconds)}
-              </Text>
-            )}
-          </View>
-        ) : (
-          <View style={styles.resultMetric} testID="sprint-result-best-streak">
-            <Text style={styles.resultMetricLabel}>Best Streak</Text>
-            <Text style={styles.resultMetricValue}>
-              {state.bestStreak}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {resolvedUnclearSummary && unclearCount > 0 ? (
-        <View
-          accessibilityLabel={`Unclear ${unclearCount}. ${unclearSources}. ${
-            replayItems ? "Included in replay." : "Saved in History."
-          } Does not affect your Sprint result.`}
-          style={styles.resultUnclearRow}
-          testID="sprint-result-unclear-summary"
-        >
-          <View style={styles.resultUnclearCopy}>
-            <Text style={styles.listText}>Unclear</Text>
-            <Text style={styles.helperText} testID="sprint-result-unclear-sources">{unclearSources}</Text>
-            <Text style={styles.resultUnclearNote}>
-              {replayItems ? "Included in replay" : "Saved in History"} · Does not affect your Sprint result
-            </Text>
-          </View>
-          <View
-            style={[styles.resultSummaryCountColumn, styles.resultUnclearCountBadge]}
-            testID="sprint-result-unclear-count-column"
-          >
-            <Text style={styles.resultUnclearCount} testID="sprint-result-unclear-count">{unclearCount}</Text>
-          </View>
-        </View>
-      ) : null}
-
-      <ResultReviewImpactCard
-        count={replayInReviewCount}
-        countColumnTestID="sprint-result-mistakes-count-column"
-        countTestID="sprint-result-mistakes"
-        detail={`${replayInReviewCount} ${
-          replayInReviewCount === 1 ? "attempt" : "attempts"
-        } · Included in replay`}
-        testID="sprint-result-review-impact"
-      />
-
-      {replayItems ? (
-        <Text style={styles.resultReviewNote} testID="sprint-result-review-note">
-          {unclearCount} Unclear + {replayInReviewCount} in Review
-          {replayOverlapCount > 0 ? ` · ${replayOverlapCount} in both` : ""}
-          {" · "}{replayItemCount} total · Replay does not change Review scheduling
-        </Text>
-      ) : null}
-
-      {onOpenReplay && shouldPrioritizeReplay ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Replay ${replayAttemptCountLabel}`}
-          testID="review-mistakes-button"
-          style={[styles.primaryButton, styles.summaryPrimaryAction]}
-          onPress={onOpenReplay}
-        >
-          <Text style={styles.primaryButtonText}>
-            Replay {replayAttemptCountLabel}
-          </Text>
-        </Pressable>
-      ) : null}
-
-      <View style={styles.summaryRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={isTacticalFocus ? "Back to Practice" : "Play again"}
-          testID="play-again-button"
-          style={shouldPrioritizeReplay ? styles.secondaryButton : styles.primaryButton}
-          onPress={onReplay}
-        >
-          <Text style={shouldPrioritizeReplay ? styles.secondaryButtonText : styles.primaryButtonText}>
-            {isTacticalFocus ? "Back to Practice" : "Play again"}
-          </Text>
-        </Pressable>
-      </View>
-      {onOpenReplay && !shouldPrioritizeReplay ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Replay ${replayAttemptCountLabel}`}
-          testID="review-mistakes-button"
-          style={styles.secondaryButton}
-          onPress={onOpenReplay}
-        >
-          <Text style={styles.secondaryButtonText}>
-            Replay {replayAttemptCountLabel}
-          </Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-function ResultHistoryShortcut({
-  delta,
-  onPress,
-  ratingAfter,
-  ratingBefore
-}: {
-  delta: number;
-  onPress: () => void;
-  ratingAfter: number;
-  ratingBefore: number;
-}): React.JSX.Element {
-  const styles = useStyles();
-  const deltaLabel = `${delta >= 0 ? "+" : ""}${delta}`;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Open performance trend in history, rating ${ratingBefore} to ${ratingAfter}, ${deltaLabel}`}
-      style={styles.resultTrendCard}
-      testID="sprint-result-history-trend"
-      onPress={onPress}
-    >
-      <View style={styles.resultTrendCopy}>
-        <Text style={styles.listText}>History</Text>
-        <Text style={styles.helperText}>View performance trend</Text>
-      </View>
-      <View style={styles.resultTrendRange}>
-        <Text style={[styles.resultTrendDelta, delta < 0 ? styles.errorText : styles.positive]}>{deltaLabel}</Text>
-        <Text testID="sprint-result-trend-start" style={styles.resultTrendRangeText}>{ratingBefore}</Text>
-        <ChevronGlyph direction="right" />
-        <Text testID="sprint-result-trend-current" style={styles.resultTrendRangeText}>{ratingAfter}</Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function formatSolveSeconds(seconds: number | undefined): string {
-  return seconds === undefined ? "—" : `${Math.round(seconds)}s`;
-}
-
-function focusedRunPaceAccessibilityLabel(
-  averageSolveSeconds: number | undefined,
-  usualSolveSeconds: number | undefined
-): string {
-  if (averageSolveSeconds === undefined) {
-    return "Average solve time unavailable";
-  }
-  const average = `Average solve ${Math.round(averageSolveSeconds)} seconds`;
-  return usualSolveSeconds === undefined
-    ? average
-    : `${average}, usually ${Math.round(usualSolveSeconds)} seconds on these themes`;
-}
-
-function SprintResultStatusGlyph({ status }: { status: "won" | "failed" }): React.JSX.Element {
-  const styles = useStyles();
-  if (status === "won") {
-    return (
-      <ResultTrophyGlyph
-        cupTestID="sprint-result-won-glyph"
-        testID="sprint-result-status-glyph"
-      />
-    );
-  }
-
-  return (
-    <View style={styles.resultAlertGlyph} testID="sprint-result-status-glyph">
-      <View style={styles.resultAlertBar} testID="sprint-result-failed-glyph" />
-      <View style={styles.resultAlertDot} />
     </View>
   );
 }
@@ -11491,8 +11164,9 @@ function SessionScoreMetric({
     >
       {showLabel ? (
         <Text
-          adjustsFontSizeToFit={compact}
-          minimumFontScale={0.75}
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
+          minimumFontScale={0.5}
           numberOfLines={1}
           style={[
             styles.sessionScoreLabel,
@@ -11504,7 +11178,16 @@ function SessionScoreMetric({
       ) : (
         <SessionScoreGlyph tone={tone} />
       )}
-      <Text style={styles.sessionScoreValue} testID={`${metricTestID}-value`}>{value}</Text>
+      <Text
+        adjustsFontSizeToFit
+        maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
+        minimumFontScale={0.5}
+        numberOfLines={1}
+        style={styles.sessionScoreValue}
+        testID={`${metricTestID}-value`}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
@@ -13154,19 +12837,6 @@ function PlayGlyph(): React.JSX.Element {
   );
 }
 
-function ResultTrendGlyph(): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View style={styles.resultTrendGlyph} testID="result-trend-glyph">
-      <View style={[styles.resultTrendGlyphDot, styles.resultTrendGlyphDotStart]} />
-      <View style={[styles.resultTrendGlyphDot, styles.resultTrendGlyphDotMiddle]} />
-      <View style={[styles.resultTrendGlyphDot, styles.resultTrendGlyphDotEnd]} />
-      <View style={[styles.resultTrendGlyphLine, styles.resultTrendGlyphLineFirst]} />
-      <View style={[styles.resultTrendGlyphLine, styles.resultTrendGlyphLineSecond]} />
-    </View>
-  );
-}
-
 function ChevronGlyph({
   direction
 }: {
@@ -14152,6 +13822,10 @@ function TodayReviewAttemptRow({
 }
 
 const REVIEW_FORECAST_STACK_FONT_SCALE = 1.5;
+// Session HUD at accessibility text sizes (#652): reflow at this scale, and
+// let HUD values grow at most this much before they shrink to fit.
+const HUD_LARGE_TEXT_FONT_SCALE = 1.5;
+const HUD_MAX_TEXT_SCALE = 2;
 
 function ReviewForecastMetric({
   count,
@@ -17908,28 +17582,6 @@ function modeLabel(mode: SprintMode): string {
   return mode.charAt(0).toUpperCase() + mode.slice(1);
 }
 
-function formatEndReason(reason: SprintState["endReason"]): string {
-  if (reason === "target_reached") {
-    return "Target reached";
-  }
-  if (reason === "attempt_limit") {
-    return "Planned puzzles complete";
-  }
-  if (reason === "max_mistakes") {
-    return "Three mistakes";
-  }
-  if (reason === "time_expired") {
-    return "Time expired";
-  }
-  if (reason === "puzzles_exhausted") {
-    return "No more puzzles";
-  }
-  if (reason === "abandoned") {
-    return "Abandoned";
-  }
-  return "Completed";
-}
-
 function moveResultMatchesExpectedFen(result: MoveResult, expectedFen: string | null): boolean {
   if (!expectedFen || !result.state?.fen) {
     return true;
@@ -19007,6 +18659,21 @@ const useStyles = makeStyles((theme) => ({
     gap: 2,
     paddingHorizontal: 0,
   },
+  sessionActiveMetricRowLargeText: {
+    alignItems: "stretch",
+    flexDirection: "column",
+    gap: 4
+  },
+  sessionMetricLargeTextRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6
+  },
+  sessionMetricBlockFullRow: {
+    flexBasis: "auto",
+    flexGrow: 0,
+    flexShrink: 0
+  },
   sessionMetricBlock: {
     alignItems: "center",
     flex: 1,
@@ -19068,10 +18735,10 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 17,
     fontWeight: "900"
   },
+  // HUD values use direction A's Numeral L (system font, tabular digits).
   sessionProgressValue: {
+    ...theme.typography.numeral,
     color: theme.colors.text.ink,
-    fontSize: 21,
-    fontWeight: "800",
     textAlign: "center"
   },
   moveSideKingGlyph: {
@@ -19082,16 +18749,12 @@ const useStyles = makeStyles((theme) => ({
     position: "absolute"
   },
   timerText: {
+    ...theme.typography.numeral,
     color: theme.colors.text.ink,
-    fontFamily: "menlo",
-    fontSize: 21,
-    fontWeight: "800",
-    fontVariant: ["tabular-nums"],
-    letterSpacing: 0.2
+    textAlign: "center"
   },
   sessionMetricTextCompact: {
-    fontSize: 16,
-    letterSpacing: 0
+    ...theme.typography.numeralRow
   },
   puzzleTimingIndicator: {
     alignItems: "center",
@@ -20009,11 +19672,6 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 12,
     fontWeight: "800"
   },
-  summaryPrimaryAction: {
-    alignSelf: "stretch",
-    flex: 0,
-    minHeight: 42
-  },
   secondaryButton: {
     alignItems: "center",
     borderColor: theme.colors.border.strong,
@@ -20064,290 +19722,6 @@ const useStyles = makeStyles((theme) => ({
   },
   disabledButton: {
     opacity: 0.36
-  },
-  summaryPanel: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 12,
-    padding: 12
-  },
-  resultTopBar: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 44
-  },
-  resultTopBarButton: {
-    alignItems: "center",
-    borderRadius: 8,
-    height: 36,
-    justifyContent: "center",
-    width: 40
-  },
-  resultTopBarIconButton: {
-    alignItems: "center",
-    borderRadius: 8,
-    height: 36,
-    justifyContent: "center",
-    width: 40
-  },
-  resultTopBarTitle: {
-    color: theme.colors.text.ink,
-    fontSize: 16,
-    fontWeight: "800"
-  },
-  resultHero: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12
-  },
-  resultHeroClarified: {
-    alignItems: "stretch",
-    flexDirection: "column",
-    gap: 10
-  },
-  resultStatusBlock: {
-    alignItems: "center",
-    flex: 1,
-    flexDirection: "row",
-    gap: 12,
-    minWidth: 0
-  },
-  resultIcon: {
-    alignItems: "center",
-    borderRadius: 999,
-    height: 40,
-    justifyContent: "center",
-    width: 40
-  },
-  resultIconWon: {
-    backgroundColor: theme.colors.accent.s50
-  },
-  resultIconFailed: {
-    backgroundColor: theme.colors.danger.s50
-  },
-  resultAlertGlyph: {
-    alignItems: "center",
-    gap: 3,
-    height: 28,
-    justifyContent: "center",
-    width: 28
-  },
-  resultAlertBar: {
-    backgroundColor: theme.colors.danger.s600,
-    borderRadius: 999,
-    height: 15,
-    width: 4
-  },
-  resultAlertDot: {
-    backgroundColor: theme.colors.danger.s600,
-    borderRadius: 999,
-    height: 4,
-    width: 4
-  },
-  resultTitleBlock: {
-    flex: 1,
-    gap: 2
-  },
-  resultScoreBlock: {
-    alignItems: "flex-end",
-    gap: 2
-  },
-  resultGoalScoreBlock: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 9
-  },
-  resultGoalLabel: {
-    color: theme.colors.accent.s700,
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 0.2
-  },
-  resultSolvedCount: {
-    color: theme.colors.text.ink,
-    fontSize: 28,
-    fontWeight: "900",
-    lineHeight: 32
-  },
-  resultSolvedTarget: {
-    color: theme.colors.text.tertiary,
-    fontSize: 14,
-    fontWeight: "700"
-  },
-  resultAccuracy: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "700"
-  },
-  resultMetricGrid: {
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    overflow: "hidden"
-  },
-  resultMetric: {
-    borderRightColor: theme.colors.border.default,
-    borderRightWidth: 1,
-    flex: 1,
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 10
-  },
-  resultMetricLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "700"
-  },
-  resultMetricValue: {
-    color: theme.colors.text.ink,
-    fontFamily: "menlo",
-    fontSize: 16,
-    fontWeight: "800"
-  },
-  resultMetricSubtext: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "700"
-  },
-  resultTrendCard: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    minHeight: 44,
-    paddingHorizontal: 4,
-    paddingVertical: 2
-  },
-  resultTrendCopy: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
-  },
-  resultTrendRange: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 5
-  },
-  resultTrendDelta: {
-    fontFamily: "menlo",
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  resultTrendRangeText: {
-    color: theme.colors.text.tertiary,
-    fontFamily: "menlo",
-    fontSize: 10,
-    fontWeight: "800"
-  },
-  resultTrendGlyph: {
-    height: 20,
-    position: "relative",
-    width: 22
-  },
-  resultTrendGlyphDot: {
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 999,
-    height: 5,
-    position: "absolute",
-    width: 5
-  },
-  resultTrendGlyphDotStart: {
-    bottom: 3,
-    left: 1
-  },
-  resultTrendGlyphDotMiddle: {
-    left: 8,
-    top: 8
-  },
-  resultTrendGlyphDotEnd: {
-    right: 1,
-    top: 2
-  },
-  resultTrendGlyphLine: {
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 999,
-    height: 2,
-    position: "absolute"
-  },
-  resultTrendGlyphLineFirst: {
-    left: 4,
-    top: 12,
-    transform: [{ rotate: "-24deg" }],
-    width: 9
-  },
-  resultTrendGlyphLineSecond: {
-    right: 4,
-    top: 7,
-    transform: [{ rotate: "-31deg" }],
-    width: 10
-  },
-  resultReviewNote: {
-    color: theme.colors.text.secondary,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 16,
-    paddingHorizontal: 2
-  },
-  resultSummaryCountColumn: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 38
-  },
-  resultUnclearRow: {
-    alignItems: "center",
-    backgroundColor: theme.colors.warning.s50,
-    borderColor: theme.colors.warning.s200,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    minHeight: 70,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  resultUnclearCopy: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
-  },
-  resultUnclearNote: {
-    color: theme.colors.warning.s800,
-    fontSize: 10,
-    fontWeight: "700",
-    lineHeight: 14
-  },
-  resultUnclearCountBadge: {
-    backgroundColor: theme.colors.warning.s100,
-    borderRadius: 999,
-    height: 38,
-  },
-  resultUnclearCount: {
-    color: theme.colors.warning.s700,
-    fontSize: 18,
-    fontWeight: "900"
-  },
-  summaryTitle: {
-    color: theme.colors.text.ink,
-    fontSize: 18,
-    fontWeight: "800"
-  },
-  summaryText: {
-    color: theme.colors.text.strong,
-    fontSize: 14,
-    fontWeight: "600"
-  },
-  summaryRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 8
   },
   errorPanel: {
     backgroundColor: theme.colors.danger.s50,
@@ -21118,46 +20492,6 @@ const useStyles = makeStyles((theme) => ({
     color: theme.colors.text.onTone,
     fontSize: 16,
     fontWeight: "800"
-  },
-  resultBadgeGlyphCanvas: {
-    alignItems: "center",
-    height: 18,
-    justifyContent: "center",
-    position: "relative",
-    width: 18
-  },
-  resultBadgeGlyphLine: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 999,
-    position: "absolute"
-  },
-  resultBadgeCheckShort: {
-    height: 2,
-    left: 4,
-    top: 9,
-    transform: [{ rotate: "45deg" }],
-    width: 5
-  },
-  resultBadgeCheckLong: {
-    height: 2,
-    right: 3,
-    top: 8,
-    transform: [{ rotate: "-48deg" }],
-    width: 10
-  },
-  resultBadgeIncompleteDash: {
-    height: 2,
-    width: 11
-  },
-  resultBadgeCrossForward: {
-    height: 2,
-    transform: [{ rotate: "45deg" }],
-    width: 11
-  },
-  resultBadgeCrossBackward: {
-    height: 2,
-    transform: [{ rotate: "-45deg" }],
-    width: 11
   },
   historyAttemptCopy: {
     flex: 1,

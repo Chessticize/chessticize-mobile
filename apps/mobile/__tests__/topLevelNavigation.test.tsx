@@ -108,7 +108,8 @@ describe("top-level chrome visibility", () => {
     personalBestHubVisible: false,
     personalBestRecordsVisible: false,
     reviewSurfaceOpen: false,
-    sessionGuideVisible: false
+    sessionGuideVisible: false,
+    sprintResultVisible: false
   };
 
   it("shows global navigation only when no focused surface owns the screen", () => {

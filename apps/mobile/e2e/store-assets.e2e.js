@@ -150,7 +150,7 @@ async function failArrowDuelSprint() {
   }
 
   await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(30000);
-  await waitFor(element(by.id('sprint-result-mistakes'))).toHaveText('3').withTimeout(10000);
+  await waitFor(element(by.id('sprint-result-review-count'))).toHaveText('3 to review').withTimeout(10000);
   await takePortraitScreenshotAtTop('app-store-15-sprint-result');
   await takeLandscapeScreenshot('app-store-15-sprint-result');
 }

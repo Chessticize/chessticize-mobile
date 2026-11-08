@@ -46,7 +46,7 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
       await waitFor(element(by.id('move-feedback-overlay'))).toExist().withTimeout(10000);
       await waitFor(element(by.id('session-progress'))).toHaveText('0 / 1').withTimeout(10000);
 
-      await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
+      await waitFor(element(by.id('sprint-result-outcome'))).toBeVisible().withTimeout(30000);
       await waitFor(element(by.id('sprint-result-reason'))).toHaveText('No more puzzles').withTimeout(10000);
       await expect(element(by.id('review-mistakes-button'))).toBeVisible();
 
@@ -67,11 +67,11 @@ describe(`Android Arrow Duel offline journey (${fixture.puzzle.id})`, () => {
       await element(by.id('arrow-duel-what-if-action')).tap();
       await playBoardMove('session-board', fixture.puzzle.solutionMoves[1]);
 
-      await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
-      await waitFor(element(by.id('sprint-result-solved'))).toHaveText('Solved 1').withTimeout(10000);
+      await waitFor(element(by.id('sprint-result-outcome'))).toBeVisible().withTimeout(30000);
+      await waitForElementTextContaining('sprint-result-solved', '1 / ', 10000);
       await waitForElementTextContaining(
         'sprint-result-rating-range',
-        `${fixture.puzzle.rating} -> ${fixture.expectedRatingAfter}`,
+        `${fixture.puzzle.rating}\u00a0\u2192\u00a0${fixture.expectedRatingAfter}`,
         10000
       );
 
