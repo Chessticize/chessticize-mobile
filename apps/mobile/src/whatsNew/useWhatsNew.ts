@@ -91,14 +91,8 @@ function decideForLaunch(service: PracticeService, appVersion: string) {
     releaseVersion: WHATS_NEW_RELEASE_VERSION,
     appVersion,
     lastSeenVersion: service.getSettings().whatsNewSeenVersion,
-    hasExistingProgress: hasExistingProgress(service)
+    hasExistingProgress: service.hasPracticeActivity()
   });
-}
-
-// Attempts or a rated Run mean the user has practiced here before. Only the
-// presence of progress is read, so this stays cheap on a long history.
-function hasExistingProgress(service: PracticeService): boolean {
-  return service.countHistory() > 0 || service.listPlayedRatings().length > 0;
 }
 
 function recordSeenVersion(service: PracticeService, version: string): void {
