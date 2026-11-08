@@ -108,6 +108,7 @@ non-native responsibility:
 | `core.yml` | Path-scoped core, storage, CLI, typecheck, and tooling checks |
 | `mobile-js.yml` | Ready-PR mobile lint, typecheck, component, and native-library host tests |
 | `mobile-lab.yml` | Interaction Lab build and issue-marker validation |
+| `mobile-core-pack-cache.yml` | Main-only warm-up of the Core Pack cache that `mobile-js.yml` PR runs restore |
 | `process.yml` | Repository process and release-policy validation |
 | `pages.yml` | Public landing-page deployment |
 | `mobile-android-release-candidate.yml` | Protected production-signed AAB verification and corresponding-source publication |
