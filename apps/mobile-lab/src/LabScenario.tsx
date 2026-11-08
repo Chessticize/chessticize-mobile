@@ -417,7 +417,9 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-custom-rating-editor",
     "practice-run-remove-confirmation",
     "practice-start-conflict",
-    "practice-runs-empty"
+    "practice-runs-empty",
+    "release-notes-ios",
+    "release-notes-android"
   ].includes(scenarioId);
 }
 
@@ -1528,6 +1530,9 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     case "settings-sprint-guidance":
       screenProps.initialTab = "settings";
       break;
+    case "settings-whats-new":
+      screenProps.initialTab = "settings";
+      break;
     case "practice-unclear-follow-up":
       screenProps.arrowDuelTargetCorrect = 2;
       break;
@@ -1669,6 +1674,18 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
       buildNumber: "38"
     };
   }
+  if (isWhatsNewScenario(scenarioId)) {
+    // The first launch of 1.6.0 after an update from 1.5.3, or a launch where the notes were
+    // already seen and only the Settings row reopens them.
+    capabilityOverrides.applicationMetadata = {
+      versionName: "1.6.0",
+      buildNumber: "1"
+    };
+    service.saveSettings({
+      ...service.getSettings(),
+      whatsNewSeenVersion: scenarioId === "settings-whats-new" ? "1.6.0" : "1.5.3"
+    });
+  }
   if (configurePuzzleSource) {
     capabilityOverrides.configurePuzzleSource = (
       currentService: PracticeService,
@@ -1681,6 +1698,12 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
     screenProps,
     platformCapabilities: createTestMobilePlatformCapabilities(capabilityOverrides)
   };
+}
+
+function isWhatsNewScenario(scenarioId: LabScenarioId): boolean {
+  return scenarioId === "release-notes-ios"
+    || scenarioId === "release-notes-android"
+    || scenarioId === "settings-whats-new";
 }
 
 function timingScenarioInitialElapsedSeconds(scenarioId: LabScenarioId): number | null {

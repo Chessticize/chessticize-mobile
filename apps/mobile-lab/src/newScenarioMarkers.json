@@ -1,25 +1,25 @@
 {
-  "visual-direction-a-grouped-native-tokens": {
+  "release-notes-ios": {
     "issues": [
       {
-        "issueNumber": 609,
-        "changeNote": "Chosen direction A Grouped Native: token sheet and primitives (HIG type scale, light and dark color roles, radius, spacing, surfaces, tinted icon tiles), the reference for phase 2."
+        "issueNumber": 651,
+        "changeNote": "One-time What’s New sheet on the first launch after an update to 1.6.0 (iOS wording): phone portrait and landscape, iPad, light and dark, and large text."
       }
     ]
   },
-  "visual-direction-a-grouped-native-phone": {
+  "release-notes-android": {
     "issues": [
       {
-        "issueNumber": 609,
-        "changeNote": "Chosen direction A Grouped Native on iPhone: Practice Home, Sprint HUD and Sprint Result, light and dark."
+        "issueNumber": 651,
+        "changeNote": "The same What’s New sheet with Android wording for the bottom bar and side rail."
       }
     ]
   },
-  "visual-direction-a-grouped-native-ipad": {
+  "settings-whats-new": {
     "issues": [
       {
-        "issueNumber": 609,
-        "changeNote": "Chosen direction A Grouped Native at iPad landscape: Practice Home with the navigation rail and the session board lane, light and dark."
+        "issueNumber": 651,
+        "changeNote": "Settings > About gains a What’s New row that reopens the latest notes at any time."
       }
     ]
   },

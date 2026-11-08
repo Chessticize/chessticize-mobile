@@ -213,6 +213,15 @@ export async function waitForHiddenTestId(canvasElement: HTMLElement, testID: st
   }, { timeout: 4_000 });
 }
 
+export async function waitForAbsentTestId(canvasElement: HTMLElement, testID: string): Promise<void> {
+  const page = within(canvasElement.ownerDocument.body);
+  await waitFor(() => {
+    if (page.queryByTestId(testID)) {
+      throw new Error(`${testID} must be removed`);
+    }
+  }, { timeout: 4_000 });
+}
+
 export function expectTestIdAbsent(canvasElement: HTMLElement, testID: string): void {
   const page = within(canvasElement.ownerDocument.body);
   if (page.queryByTestId(testID)) {

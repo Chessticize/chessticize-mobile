@@ -4,7 +4,7 @@ import { makeStyles } from "../../theme/makeStyles.ts";
 import { useTheme } from "../../theme/ThemeProvider.ts";
 import { AppText } from "./AppText.tsx";
 import { Icon } from "./Icon.tsx";
-import type { IconName } from "./iconNames.ts";
+import type { IconName, IconTone } from "./iconNames.ts";
 
 // A grouped-list row: optional tinted icon tile, title and subtitle, trailing
 // content, and a chevron or selection check. At least 52 pt tall and grows with
@@ -14,7 +14,7 @@ import type { IconName } from "./iconNames.ts";
 // or more lines) the tile sits level with the first line; in a single-line
 // row it is centered. Trailing content and the chevron stay centered.
 
-export type IconTone = "accent" | "positive" | "negative" | "warning" | "neutral";
+export type { IconTone };
 export type RowAccessory = "chevron" | "check" | "none";
 
 export function IconTile({

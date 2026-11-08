@@ -8,6 +8,7 @@ import { PracticeViewportProvider } from "../../mobile/src/components/PracticeVi
 import { darkTheme, lightTheme, ThemeProvider } from "../../mobile/src/theme/index.ts";
 import "../src/lab.css";
 import { installLabIconFont } from "../src/labIconFont.ts";
+import { themeWithTextScale } from "../src/labTextScale.ts";
 import { LabDeviceStatusBar } from "../src/LabDeviceStatusBar.tsx";
 import {
   LAB_DEVICE_VIEWPORTS,
@@ -58,15 +59,16 @@ function LabDeviceFrame({
 // lab.css can switch color-scheme and the fake device chrome.
 function LabThemeScope({
   children,
+  textScale = 1,
   themeGlobal
-}: React.PropsWithChildren<{ themeGlobal: unknown }>): React.JSX.Element {
+}: React.PropsWithChildren<{ textScale?: number; themeGlobal: unknown }>): React.JSX.Element {
   const labTheme = themeGlobal === "dark" ? "dark" : "light";
   React.useLayoutEffect(() => {
     document.documentElement.dataset.labTheme = labTheme;
   }, [labTheme]);
 
   return (
-    <ThemeProvider theme={labTheme === "dark" ? darkTheme : lightTheme}>
+    <ThemeProvider theme={themeWithTextScale(labTheme === "dark" ? darkTheme : lightTheme, textScale)}>
       {children}
     </ThemeProvider>
   );
@@ -77,7 +79,10 @@ installLabIconFont();
 const preview: Preview = {
   decorators: [
     (Story, context) => (
-      <LabThemeScope themeGlobal={context.globals.theme}>
+      <LabThemeScope
+        textScale={typeof context.parameters.labTextScale === "number" ? context.parameters.labTextScale : 1}
+        themeGlobal={context.globals.theme}
+      >
         <Story />
       </LabThemeScope>
     ),
@@ -118,7 +123,7 @@ const preview: Preview = {
     layout: "fullscreen",
     options: {
       storySort: {
-        order: ["00 What's New", "Practice", "Review", "History", "Settings", "System", "Visual Direction", "Sprint Result redesign"]
+        order: ["00 What's New", "Practice", "Review", "History", "Settings", "Release Notes", "System", "Visual Direction", "Sprint Result redesign"]
       }
     },
     viewport: {

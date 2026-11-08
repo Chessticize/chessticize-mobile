@@ -99,6 +99,9 @@ export type LabScenarioId =
   | "settings-feedback-entry"
   | "settings-feedback-entry-failure"
   | "settings-stockfish-diagnostics"
+  | "settings-whats-new"
+  | "release-notes-ios"
+  | "release-notes-android"
   | "system-loading"
   | "system-error"
   | "system-full-app"
@@ -122,6 +125,7 @@ export type LabScenarioGroup =
   | "Review"
   | "History"
   | "Settings"
+  | "Release Notes"
   | "System"
   | "Visual Direction"
   | "Sprint Result redesign";
@@ -368,6 +372,9 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
     "contained"
   ),
   "settings-sprint-guidance": defineScenario("settings-sprint-guidance", "Settings", "Guidance · replay Sprint and Arrow Duel guides", "settings--sprint-guide-reset", "Settings guidance action that makes the rules, active-session, and Arrow Duel guides available again without changing Runs, ratings, or History.", "settings", ["Direct Settings entry", "Guidance focused in the phone viewport", "Explicit Reset guides button", "Reset the full guidance set", "No confirmation for a reversible action", "Inline completed state", "Progress safety copy"], ["Production onboarding persistence", "Practice"], "contained"),
+  "settings-whats-new": defineScenario("settings-whats-new", "Settings", "What’s New row", "settings--whats-new-row", "Settings > About gains a What’s New row that reopens the latest release notes at any time, without changing whether the notes count as seen.", "settings", ["About section", "What’s New row", "Reopened notes sheet", "Continue returns to Settings"], ["Release notes sheet content", "Native version metadata"]),
+  "release-notes-ios": defineScenario("release-notes-ios", "Release Notes", "iOS", "release-notes--ios-phone-light", "The one-time What’s New sheet on the first launch after an update to 1.6.0, over an idle Practice Home. iOS wording names the glass tab bar. Phone portrait, landscape and iPad, light and dark, and large text.", "practice", ["Update to 1.6.0 with existing progress", "Large title", "Three highlights with tinted icon tiles", "Glass tab bar wording", "Continue", "Bottom sheet on phones", "Centered sheet on iPad and landscape", "Large text scrolls", "Light and dark"], ["Practice Home behind the sheet", "Settings What’s New row"]),
+  "release-notes-android": defineScenario("release-notes-android", "Release Notes", "Android", "release-notes--android-phone-light", "The same What’s New sheet with Android wording for the bottom bar on phones and the side rail on tablets and foldables. Phone portrait, landscape and tablet, light and dark, and large text.", "practice", ["Update to 1.6.0 with existing progress", "Large title", "Three highlights with tinted icon tiles", "Bottom bar and side rail wording", "Continue", "Bottom sheet on phones", "Centered sheet on tablets and landscape", "Large text scrolls", "Light and dark"], ["Practice Home behind the sheet", "Settings What’s New row"]),
   "settings-android-backup": defineScenario("settings-android-backup", "Settings", "Android backup", "settings--android-backup", "Android managed-backup Settings keeps iCloud controls omitted and its local SQLite diagnostics export under Help & Feedback while sharing the same user-first global Arrow Duel reply control and On/Off explanation as iOS.", "settings", ["Android Progress Backup", "Global Arrow Duel reply control", "User-first On explanation", "Paused Sprint and puzzle timers", "Per-Run Edit Run handoff", "Straight-to-next-puzzle Off explanation", "Local SQLite support bundle", "Diagnostic manifest", "Android share handoff", "Notifications", "About"], ["Native SQLite snapshot and Android share options", "Global setting wiring"]),
   "settings-notifications-denied": defineScenario("settings-notifications-denied", "Settings", "Notifications denied", "settings--notifications-denied", "Denied notification permission with a public system-settings action.", "settings", ["Permission state", "Reminder preferences", "Open settings"], ["System settings"]),
   "settings-notifications-not-determined": defineScenario("settings-notifications-not-determined", "Settings", "Notifications not determined", "settings--notifications-not-determined", "Notification permission has not yet been requested.", "settings", ["Permission request", "Reminder preferences"], ["System permission prompt"]),

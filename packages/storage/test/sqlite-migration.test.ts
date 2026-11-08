@@ -1755,3 +1755,48 @@ test("SQLite v23 adds the appearance override and keeps existing settings", asyn
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("SQLite v24 adds the What's New seen version, leaves it unrecorded and keeps existing settings", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-whats-new-migration-"));
+  const databasePath = join(directory, "practice.sqlite");
+  try {
+    const setupStore = new SQLiteStore(databasePath);
+    setupStore.migrate();
+    const setupService = new PracticeService(setupStore);
+    setupService.saveSettings({
+      ...setupService.getSettings(),
+      appearance: "dark",
+      moveFeedback: { soundEnabled: true, hapticsEnabled: false },
+      notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "07:30" } }
+    });
+    // Rebuild the schema-v23 shape: no seen-version column.
+    setupStore.db.exec("ALTER TABLE app_settings DROP COLUMN whats_new_seen_version");
+    setupStore.db.exec("PRAGMA user_version = 23");
+    setupStore.close();
+
+    const migratedStore = new SQLiteStore(databasePath);
+    migratedStore.migrate();
+    const migratedService = new PracticeService(migratedStore);
+    try {
+      const settings = migratedService.getSettings();
+      assert.equal(settings.whatsNewSeenVersion, undefined);
+      assert.equal(settings.appearance, "dark");
+      assert.deepEqual(settings.moveFeedback, { soundEnabled: true, hapticsEnabled: false });
+      assert.deepEqual(settings.notifications.reviewReminder, { mode: "fixed", fixedLocalTime: "07:30" });
+      migratedService.saveSettings({ ...settings, whatsNewSeenVersion: "1.6.0" });
+    } finally {
+      migratedStore.close();
+    }
+
+    const reopenedStore = new SQLiteStore(databasePath);
+    reopenedStore.migrate();
+    try {
+      assert.equal(schemaVersionForStore(reopenedStore), CURRENT_SCHEMA_VERSION);
+      assert.equal(new PracticeService(reopenedStore).getSettings().whatsNewSeenVersion, "1.6.0");
+    } finally {
+      reopenedStore.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

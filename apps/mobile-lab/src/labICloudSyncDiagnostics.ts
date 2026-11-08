@@ -6,7 +6,9 @@ export type LabMobilePlatform = "android" | "ios";
 export function labMobilePlatformForScenario(
   scenarioId: LabScenarioId
 ): LabMobilePlatform {
-  return scenarioId === "settings-android-backup" ? "android" : "ios";
+  return scenarioId === "settings-android-backup" || scenarioId === "release-notes-android"
+    ? "android"
+    : "ios";
 }
 
 export function createLabICloudSyncDiagnosticsClient(

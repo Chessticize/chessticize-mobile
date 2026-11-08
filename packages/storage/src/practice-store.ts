@@ -102,6 +102,12 @@ export type AppearancePreference = "system" | "light" | "dark";
 
 export interface PracticeSettings {
   appearance: AppearancePreference;
+  /**
+   * Release version whose What's New notes were last seen or skipped on this
+   * device (for example "1.6.0"). Absent until recorded. Device-local: iCloud
+   * progress sync and local-data import never carry it.
+   */
+  whatsNewSeenVersion?: string;
   sync: {
     iCloudEnabled: boolean;
   };

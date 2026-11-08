@@ -24,11 +24,14 @@ export const ICONS = {
   clock: { sf: "clock", material: "schedule", codepoint: 0xefd6 },
   close: { sf: "xmark", material: "close", codepoint: 0xe5cd },
   custom: { sf: "slider.horizontal.3", material: "tune", codepoint: 0xe429 },
+  darkMode: { sf: "moon", material: "dark_mode", codepoint: 0xe51c },
+  design: { sf: "paintbrush", material: "brush", codepoint: 0xe3ae },
   edit: { sf: "pencil", material: "edit", codepoint: 0xf097 },
   external: { sf: "arrow.up.right.square", material: "open_in_new", codepoint: 0xe89e },
   filter: { sf: "line.3.horizontal.decrease", material: "filter_list", codepoint: 0xe152 },
   focus: { sf: "scope", material: "my_location", codepoint: 0xe55c },
   help: { sf: "questionmark.circle", material: "help", codepoint: 0xe8fd },
+  navigation: { sf: "dock.rectangle", material: "bottom_navigation", codepoint: 0xe98c },
   play: { sf: "play.fill", material: "play_arrow", codepoint: 0xe037 },
   profile: { sf: "chart.bar", material: "bar_chart", codepoint: 0xe26b },
   remove: { sf: "minus", material: "remove", codepoint: 0xe15b },
@@ -38,6 +41,7 @@ export const ICONS = {
   standard: { sf: "target", material: "target", codepoint: 0xe719 },
   survival: { sf: "shield", material: "shield", codepoint: 0xe9e0 },
   warning: { sf: "exclamationmark.triangle", material: "warning", codepoint: 0xf083 },
+  whatsNew: { sf: "sparkles", material: "auto_awesome", codepoint: 0xe65f },
   // Top-level tabs (#612). The native Android bottom navigation draws these from
   // vector drawables (res/drawable/ic_tab_*.xml) that the subset script writes
   // from the same font instance; see TAB_DRAWABLES there.
@@ -48,3 +52,6 @@ export const ICONS = {
 } as const satisfies Record<string, IconSpec>;
 
 export type IconName = keyof typeof ICONS;
+
+// Tint of the tile behind an icon (see IconTile in ListRow.tsx).
+export type IconTone = "accent" | "positive" | "negative" | "warning" | "neutral";

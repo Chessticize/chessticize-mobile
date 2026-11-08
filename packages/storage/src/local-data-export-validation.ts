@@ -7,6 +7,7 @@ import type {
 import type { ProgressSyncSnapshot } from "./progress-sync.ts";
 import {
   OPPONENT_REPLY_MAX_SECONDS,
+  parseReleaseVersion,
   type PracticeRunRecord,
   type RatingRecord,
   type ReviewScheduleRemoval,
@@ -90,6 +91,7 @@ function isPracticeSettings(value: unknown): value is PracticeSettings {
   const sprintGuides = value.sprintGuides;
   if (
     !isOptional(value.appearance, isAppearancePreference) ||
+    !isOptional(value.whatsNewSeenVersion, isReleaseVersionText) ||
     !isRecord(sync) ||
     typeof sync.iCloudEnabled !== "boolean" ||
     !isRecord(arrowDuel) ||
@@ -108,6 +110,10 @@ function isPracticeSettings(value: unknown): value is PracticeSettings {
     typeof sprintGuides.arrowDuelSeen === "boolean" &&
     isOptional(sprintGuides.focusedRunSeen, isBoolean) &&
     isOptional(sprintGuides.arrowDuelReplyCueStage, isArrowDuelReplyCueStage);
+}
+
+function isReleaseVersionText(value: unknown): boolean {
+  return typeof value === "string" && parseReleaseVersion(value) !== undefined;
 }
 
 function isAppearancePreference(value: unknown): boolean {
