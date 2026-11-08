@@ -727,11 +727,10 @@ const useStyles = makeStyles((theme) => ({
     overflow: "hidden",
     width: "100%"
   },
-  supportModal: {
-    flex: 1
-  },
+  supportModal: {},
   modalScroll: {
-    flexGrow: 0
+    flexGrow: 0,
+    flexShrink: 1
   },
   modalContent: {
     gap: 20,

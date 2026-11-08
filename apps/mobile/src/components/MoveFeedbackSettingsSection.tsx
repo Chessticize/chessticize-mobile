@@ -66,6 +66,7 @@ export function MoveFeedbackSettingsSection({
           setPreviewMessage(soundEnabled ? "Sound effects on" : "Sound effects off");
         }}
       />
+      <View style={styles.separator} />
       <FeedbackToggleRow
         detail="Light touch feedback for moves and captures."
         enabled={preferences.hapticsEnabled}
@@ -76,6 +77,7 @@ export function MoveFeedbackSettingsSection({
           setPreviewMessage(hapticsEnabled ? "Haptic feedback on" : "Haptic feedback off");
         }}
       />
+      {onPreview ? <View style={styles.separator} /> : null}
       {onPreview ? (
         <View style={styles.previewBlock} testID="settings-move-feedback-previews">
           <View style={styles.previewHeading}>
@@ -142,6 +144,7 @@ function FeedbackToggleRow({
         accessibilityRole="switch"
         accessibilityLabel={label}
         accessibilityState={{ checked: enabled }}
+        hitSlop={7}
         testID={controlTestID}
         style={[styles.switchTrack, enabled ? styles.switchTrackEnabled : null]}
         onPress={() => onChange(!enabled)}
@@ -172,16 +175,19 @@ function capitalize(value: string): string {
 }
 
 const useStyles = makeStyles((theme) => ({
+  separator: {
+    backgroundColor: theme.colors.border.default,
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 16
+  },
   toggleRow: {
     alignItems: "center",
-    borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: theme.spacing.row,
     justifyContent: "space-between",
     minHeight: theme.metrics.rowMinHeight,
-    paddingHorizontal: theme.spacing.row,
-    paddingVertical: theme.spacing.row
+    paddingHorizontal: 16,
+    paddingVertical: 10
   },
   rowCopy: {
     flex: 1,
@@ -190,13 +196,12 @@ const useStyles = makeStyles((theme) => ({
     minWidth: 0
   },
   rowLabel: {
-    ...theme.typography.subheadline,
-    color: theme.colors.text.heading,
-    fontWeight: theme.typography.headline.fontWeight
+    ...theme.typography.body,
+    color: theme.colors.text.primary
   },
   helperText: {
     ...theme.typography.footnote,
-    color: theme.colors.text.tertiary
+    color: theme.colors.text.secondary
   },
   switchTrack: {
     backgroundColor: theme.colors.fillMuted,
@@ -223,11 +228,9 @@ const useStyles = makeStyles((theme) => ({
     alignSelf: "flex-end"
   },
   previewBlock: {
-    borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: StyleSheet.hairlineWidth,
     gap: theme.spacing.row,
-    paddingHorizontal: theme.spacing.row,
-    paddingVertical: theme.spacing.row
+    paddingHorizontal: 16,
+    paddingVertical: 14
   },
   previewHeading: {
     gap: theme.spacing.inline / 2
@@ -238,10 +241,8 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing.group
   },
   previewButton: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
+    backgroundColor: theme.colors.accent.s100,
     borderRadius: theme.shape.control,
-    borderWidth: 1,
     gap: 2,
     minHeight: theme.metrics.minTarget,
     minWidth: 96,
@@ -250,16 +251,15 @@ const useStyles = makeStyles((theme) => ({
   },
   previewButtonLabel: {
     ...theme.typography.footnote,
-    color: theme.colors.accent.s700,
+    color: theme.colors.accent.s600,
     fontWeight: theme.typography.headline.fontWeight
   },
   previewButtonDetail: {
     ...theme.typography.caption,
-    color: theme.colors.text.tertiary
+    color: theme.colors.text.secondary
   },
   previewStatus: {
     ...theme.typography.footnote,
-    color: theme.colors.text.strong,
-    fontWeight: theme.typography.headline.fontWeight
-  }
+    color: theme.colors.text.secondary
+  },
 }));

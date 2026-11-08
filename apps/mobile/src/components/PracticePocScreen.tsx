@@ -11951,11 +11951,7 @@ function HistoryActiveFilterStrip({
 }): React.JSX.Element {
   const styles = useStyles();
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      testID="history-active-filter-summary"
-    >
+    <View testID="history-active-filter-summary">
       <View style={compact ? styles.historyCompactFilterSummary : styles.historyChipContent}>
         {labels.map((label, index) => (
           <React.Fragment key={`${label}-${index}`}>
@@ -11973,7 +11969,7 @@ function HistoryActiveFilterStrip({
           </React.Fragment>
         ))}
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -12540,20 +12536,33 @@ function HistoryThemeList({
   themes: readonly string[];
 }): React.JSX.Element {
   return (
-    <ThemeTagRail testID={`history-attempt-${attemptId}-themes`} themes={themes} />
+    <ThemeTagRail testID={`history-attempt-${attemptId}-themes`} themes={themes} wrap />
   );
 }
 
 function ThemeTagRail({
   centered = false,
   testID,
-  themes
+  themes,
+  wrap = false
 }: {
   centered?: boolean;
   testID: string;
   themes: readonly string[];
+  wrap?: boolean;
 }): React.JSX.Element {
   const styles = useStyles();
+  if (wrap) {
+    return (
+      <View style={[styles.historyThemeRail, styles.historyThemeRailWrapped]} testID={testID}>
+        {themes.map((theme) => (
+          <View key={theme} style={styles.historyThemeChip} testID={`${testID}-${safeTestId(theme)}`}>
+            <Text style={styles.historyThemeChipText}>{customThemeLabel(theme)}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  }
   return (
     <ScrollView
       horizontal
@@ -13566,7 +13575,9 @@ function ReviewFilterSummary({ label }: { label: string }): React.JSX.Element {
       testID="review-active-filter-summary"
     >
       <View style={styles.historyChipContent}>
-        <Badge label={label} testID="review-active-filter-0" tone="neutral" />
+        <View style={[styles.filterButton, styles.filterButtonActive]} testID="review-active-filter-0">
+          <Text style={[styles.filterButtonText, styles.filterButtonTextActive]}>{label}</Text>
+        </View>
       </View>
     </View>
   );
@@ -18691,7 +18702,6 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing.row
   },
   reviewFilterControlSlot: {
-    height: 32,
     overflow: "hidden"
   },
   reviewFilterButton: {
@@ -20946,6 +20956,7 @@ const useStyles = makeStyles((theme) => ({
   historyCompactFilterSummary: {
     alignItems: "center",
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 6,
     paddingHorizontal: 4
   },
@@ -21057,6 +21068,10 @@ const useStyles = makeStyles((theme) => ({
     gap: 4,
     paddingRight: 10,
     paddingTop: 2
+  },
+  historyThemeRailWrapped: {
+    flexWrap: "wrap",
+    paddingRight: 0
   },
   historyThemeRailCentered: {
     paddingLeft: 10,
