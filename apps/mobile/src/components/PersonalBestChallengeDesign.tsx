@@ -1046,8 +1046,9 @@ export function PersonalBestRecordsScreen({
   presentation: PersonalBestChallengeDesignPreview;
 }): React.JSX.Element {
   const styles = useStyles();
-  const rowStyle = useListRowStyle();
   const { width: viewportWidth } = useWindowDimensions();
+  // Two columns in portrait, four at landscape or regular width.
+  const usesWideRecordGrid = viewportWidth >= 700;
   const records = presentation.levelRecords ?? [];
   const pausedRuns = presentation.pausedRuns ?? [];
   const recordsAreEmpty = presentation.recordsState === "empty";
@@ -1092,24 +1093,29 @@ export function PersonalBestRecordsScreen({
           return null;
         }
         return (
-          <Section key={type} header={challengeTypeLabel(type)} rows testID={`personal-best-records-${type}`}>
-            {typeRecords.map((record) => {
-              const best = survivalBestForLevel(record, pausedRuns);
-              return (
-                <View
-                  key={`${type}-${record.minRating}`}
-                  accessibilityLabel={`${challengeTypeLabel(type)} ${levelLabel(record)}, best ${best}`}
-                  accessible
-                  style={rowStyle}
-                  testID={`personal-best-record-${type}-${record.minRating}`}
-                >
-                  <AppText style={styles.rowCopy} variant="numeralRow">{levelLabel(record)}</AppText>
-                  <AppText tone="secondary" variant="subheadline">Best</AppText>
-                  <AppText variant="numeral">{best}</AppText>
-                </View>
-              );
-            })}
-          </Section>
+          <View key={type} style={styles.hubSection} testID={`personal-best-records-${type}`}>
+            <AppText accessibilityRole="header" style={styles.sectionTitle} variant="title">{challengeTypeLabel(type)}</AppText>
+            <View style={styles.recordGrid}>
+              {typeRecords.map((record) => {
+                const best = survivalBestForLevel(record, pausedRuns);
+                return (
+                  <View
+                    key={`${type}-${record.minRating}`}
+                    accessibilityLabel={`${challengeTypeLabel(type)} ${levelLabel(record)}, best ${best}`}
+                    accessible
+                    style={[styles.recordCard, usesWideRecordGrid ? styles.recordCardWide : null]}
+                    testID={`personal-best-record-${type}-${record.minRating}`}
+                  >
+                    <AppText variant="numeralRow">{levelLabel(record)}</AppText>
+                    <View style={styles.recordBestRow}>
+                      <AppText tone="secondary" variant="footnote">Best</AppText>
+                      <AppText variant="numeral">{best}</AppText>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
         );
       })}
     </View>
@@ -1509,6 +1515,28 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: theme.shape.capsule,
     height: 6,
     overflow: "hidden"
+  },
+  recordBestRow: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  recordCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shape.control,
+    gap: 2,
+    minHeight: 68,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    width: "48.5%"
+  },
+  recordCardWide: {
+    width: "24%"
+  },
+  recordGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.group
   },
   recordMilestoneRow: {
     alignItems: "center",
