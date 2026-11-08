@@ -4,6 +4,9 @@
 // apps/mobile/scripts/build-material-symbols-subset.py; `codepoint` is the
 // Material Symbols Rounded codepoint for `material`.
 
+// Font family of the bundled Material Symbols subset (Android assets/fonts and the Lab).
+export const ICON_FONT_FAMILY = "ChessticizeSymbols";
+
 export type IconSpec = {
   sf: string;
   material: string;

@@ -6,14 +6,12 @@ import {
   type HostComponent,
   type ViewProps
 } from "react-native";
-import { ICONS, type IconName } from "./iconNames.ts";
+import { ICON_FONT_FAMILY, ICONS, type IconName } from "./iconNames.ts";
 
 // One icon API for every platform (#609). iOS draws the SF Symbol through the
 // app-local ChessticizeSymbolView; Android and the web Lab draw the matching
 // Material Symbols Rounded glyph from the bundled ChessticizeSymbols subset font.
 // Icons are decorative: put the accessible label on the surrounding control.
-
-export const ICON_FONT_FAMILY = "ChessticizeSymbols";
 
 type NativeSymbolProps = ViewProps & {
   symbolName: string;

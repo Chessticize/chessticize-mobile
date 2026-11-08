@@ -310,7 +310,7 @@ export type {
   HistoryStrengthSeries
 } from "./historyProgressPresentation.ts";
 import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
-import { AppText, Button, Icon, IconTile, ListRow, Section, type IconName } from "./ui/index.ts";
+import { AppText, Button, Icon, IconTile, ListRow, Section, type IconName } from "./ui/index.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;

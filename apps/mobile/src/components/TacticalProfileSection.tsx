@@ -7,7 +7,7 @@ import {
   View
 } from "react-native";
 import { makeStyles, useTheme } from "../theme/index.ts";
-import { AppText, Icon, Section } from "./ui/index.ts";
+import { AppText, Icon, Section } from "./ui/index.tsx";
 import {
   TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT,
   type TacticalProfileTaskFamily

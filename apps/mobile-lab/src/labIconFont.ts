@@ -1,4 +1,4 @@
-import { ICON_FONT_FAMILY } from "../../mobile/src/components/ui/Icon.tsx";
+import { ICON_FONT_FAMILY } from "../../mobile/src/components/ui/iconNames.ts";
 import iconFontUrl from "../../mobile/android/app/src/main/assets/fonts/ChessticizeSymbols.ttf?url";
 
 // The shared Icon draws Material Symbols glyphs from the bundled subset font on

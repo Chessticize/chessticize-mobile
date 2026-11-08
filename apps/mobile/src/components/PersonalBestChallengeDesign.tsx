@@ -12,7 +12,7 @@ import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native";
 import type { SprintState } from "../../../../packages/core/src/types.ts";
 import { ResultReviewImpactCard } from "./ResultReviewImpactCard.tsx";
 import { ResultTrophyGlyph } from "./ResultTrophyGlyph.tsx";
-import { ListRow, Section } from "./ui/index.ts";
+import { ListRow, Section } from "./ui/index.tsx";
 
 const SURVIVAL_DISCLOSURE_MOTION_DURATION_MS = 200;
 
