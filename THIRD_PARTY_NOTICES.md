@@ -58,6 +58,22 @@ the complete license texts shipped in this repository.
   `0.3` linear volume. The exact download URLs and file hashes are recorded
   beside the assets.
 
+## Material Symbols icon subset
+
+- Name: Material Symbols Rounded (Google)
+- Files shipped:
+  - `apps/mobile/android/app/src/main/assets/fonts/ChessticizeSymbols.ttf`
+  - `apps/mobile/android/app/src/main/assets/fonts/ChessticizeSymbols-LICENSE.txt`
+- License: Apache License 2.0; the full text ships beside the font.
+- Source: https://github.com/google/material-design-icons/tree/master/variablefont
+- Notes: The Android app and the Interaction Lab draw interface icons from this
+  subset. It contains only the glyphs named in
+  `apps/mobile/src/components/ui/iconNames.ts`, pinned to the outlined, regular
+  weight, 24 dp optical size, and renamed `ChessticizeSymbols`.
+  `apps/mobile/scripts/build-material-symbols-subset.py` rebuilds it. On iOS the
+  same icons are Apple SF Symbols drawn through the system API; no SF Symbols
+  artwork is redistributed.
+
 ## react-native-chessboard
 
 - Package: `react-native-chessboard`

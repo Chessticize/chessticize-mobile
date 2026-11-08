@@ -4,13 +4,60 @@ import type {
   ThemeElevation,
   ThemeFontSize,
   ThemeFontWeight,
+  ThemeMetrics,
   ThemeRadius,
-  ThemeSpace
+  ThemeShape,
+  ThemeSpace,
+  ThemeSpacing,
+  ThemeTypography
 } from "./themeTypes.ts";
 
-// Non-color scales shared by every palette. Keys are the pixel values the app
-// uses today; a later design pass can consolidate them without touching callers.
+// Non-color scales shared by every palette.
+//
+// The semantic scales (typography, shape, spacing, metrics) record visual
+// direction A "Grouped Native" from docs/ui-design/MOBILE_UI_DESIGN.md. New and
+// migrated components use only these. Sizes are Dynamic Type points at the
+// default Large size; React Native Text scales them with the user's text size.
 
+export const typography: ThemeTypography = {
+  largeTitle: { fontSize: 34, lineHeight: 41, fontWeight: "700" },
+  title: { fontSize: 22, lineHeight: 28, fontWeight: "700" },
+  headline: { fontSize: 17, lineHeight: 22, fontWeight: "600" },
+  body: { fontSize: 17, lineHeight: 22, fontWeight: "400" },
+  subheadline: { fontSize: 15, lineHeight: 20, fontWeight: "400" },
+  footnote: { fontSize: 13, lineHeight: 18, fontWeight: "400" },
+  caption: { fontSize: 12, lineHeight: 16, fontWeight: "400" },
+  numeral: { fontSize: 22, lineHeight: 28, fontWeight: "600", fontVariant: ["tabular-nums"] },
+  numeralLarge: { fontSize: 34, lineHeight: 41, fontWeight: "600", fontVariant: ["tabular-nums"] }
+};
+
+export const shape: ThemeShape = {
+  control: 12,
+  card: 20,
+  sheet: 34,
+  tile: 8,
+  capsule: 999
+};
+
+export const spacing: ThemeSpacing = {
+  screen: 16,
+  section: 32,
+  group: 8,
+  row: 12,
+  inline: 8
+};
+
+export const metrics: ThemeMetrics = {
+  rowMinHeight: 52,
+  minTarget: 44,
+  iconTile: 30
+};
+
+// Deprecated pixel-named scales. They remain only for SessionGuideOverlay and
+// SessionMistakeIndicator, which in-flight session PRs own; migrate those two to
+// the semantic scales above when they land, then delete these.
+
+/** @deprecated Use `spacing`. */
 export const space: ThemeSpace = {
   1: 1,
   2: 2,
@@ -32,6 +79,7 @@ export const space: ThemeSpace = {
   30: 30
 };
 
+/** @deprecated Use `shape`. */
 export const radius: ThemeRadius = {
   2: 2,
   3: 3,
@@ -54,6 +102,7 @@ export const radius: ThemeRadius = {
   pill: 999
 };
 
+/** @deprecated Use `typography`. */
 export const fontSize: ThemeFontSize = {
   9: 9,
   10: 10,
@@ -80,6 +129,7 @@ export const fontSize: ThemeFontSize = {
   54: 54
 };
 
+/** @deprecated Use `typography`. */
 export const fontWeight: ThemeFontWeight = {
   regular: "400",
   medium: "500",

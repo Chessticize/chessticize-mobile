@@ -94,6 +94,12 @@ class AnimatedValue {
 
 module.exports = {
   ActivityIndicator: component('ActivityIndicator'),
+  requireNativeComponent(name) {
+    return component(name);
+  },
+  processColor(color) {
+    return color;
+  },
   Animated: {
     Value: AnimatedValue,
     View: component('Animated.View'),

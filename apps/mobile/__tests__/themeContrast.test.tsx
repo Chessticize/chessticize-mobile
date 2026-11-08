@@ -23,32 +23,11 @@ const SPECIAL_BACKGROUNDS: Record<string, string[]> = {
 const AA_TEXT = 4.5;
 const AA_UI = 3;
 
-// Light is a shipped look and stays pixel-identical, so its pre-existing pairs
-// below AA are recorded here instead of changed. The list may only shrink; a new
-// light pair under AA fails the test. Dark has no exceptions.
+// Light follows visual direction A (#609); its only pair below AA is the board
+// coordinate on dark squares, which belongs to the board palette and stays at the
+// 3:1 board check below. The list may only shrink; a new light pair under AA fails.
 const KNOWN_LIGHT_BELOW_AA: ReadonlySet<string> = new Set([
-  "accent.s600 on surfaceStrong",
-  "board.coordinateOnDarkSquare on board.darkSquare",
-  "caution.s700 on surfaceStrong",
-  "danger.s600 on surfaceStrong",
-  "danger.s600 on surfaceSunken",
-  "positive.s600 on surface",
-  "positive.s600 on surfaceRaised",
-  "positive.s600 on surfaceFloating",
-  "positive.s600 on surfaceStrong",
-  "positive.s600 on surfaceSunken",
-  "positive.s700 on surfaceStrong",
-  "success.s700 on surfaceStrong",
-  "text.faint on surface",
-  "text.faint on surfaceFloating",
-  "text.faint on surfaceRaised",
-  "text.faint on surfaceStrong",
-  "text.faint on surfaceSunken",
-  "text.onTone on positive.s600",
-  "text.onTone on warning.s500",
-  "text.tertiary on surfaceStrong",
-  "text.tertiary on surfaceSunken",
-  "warning.s700 on surfaceStrong"
+  "board.coordinateOnDarkSquare on board.darkSquare"
 ]);
 
 function tokenValue(theme: Theme, tokenPath: string): string | undefined {
@@ -112,7 +91,10 @@ function usedPairs(): Pair[] {
   const add = (foreground: string, background: string): void => {
     seen.set(`${foreground} on ${background}`, { foreground, background });
   };
-  for (const file of fs.readdirSync(COMPONENTS_DIR).filter((name) => name.endsWith(".tsx"))) {
+  const files = fs.readdirSync(COMPONENTS_DIR, { recursive: true })
+    .map(String)
+    .filter((name) => name.endsWith(".tsx"));
+  for (const file of files) {
     const source = fs.readFileSync(path.join(COMPONENTS_DIR, file), "utf8");
     for (const entry of styleEntries(source)) {
       const foreground = /\bcolor:\s*theme\.colors\.([\w.]+)/.exec(entry)?.[1];

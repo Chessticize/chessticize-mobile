@@ -2,10 +2,12 @@ import React from "react";
 import {
   ActivityIndicator,
   Pressable,
+  StyleSheet,
   Text,
   View
 } from "react-native";
 import { makeStyles, useTheme } from "../theme/index.ts";
+import { AppText, Icon, Section } from "./ui/index.ts";
 import {
   TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT,
   type TacticalProfileTaskFamily
@@ -30,13 +32,12 @@ export function TacticalProfileHomeCard({
   const canOpen = presentation.phase !== "building";
 
   return (
-    <View testID="training-focus-section">
-      <Text style={styles.sectionLabel}>Training focus</Text>
+    <Section header="Training focus" surfaceStyle={styles.homeSurface} testID="training-focus-section">
       <View
         accessibilityLabel={`Training focus. ${content.title}. ${content.body}${
           presentation.assurance === "provisional" ? " Early estimate." : ""
         }`}
-        style={[styles.homeCard, homeToneStyle(styles, content.tone)]}
+        style={styles.homeCard}
         testID="training-focus-card"
       >
         <View style={styles.homeHeader}>
@@ -59,26 +60,26 @@ export function TacticalProfileHomeCard({
             {taskFamilyLabel(primarySignal.taskFamily)}
           </Text>
         ) : null}
-        <Text style={styles.homeTitle}>{content.title}</Text>
-        <Text style={styles.body}>{content.body}</Text>
+        <AppText variant="headline">{content.title}</AppText>
+        <AppText tone="secondary" variant="subheadline">{content.body}</AppText>
         {primarySignal ? (
           <EvidenceLine signal={primarySignal} />
         ) : null}
-        {canOpen ? (
-          <Pressable
-            accessibilityRole="button"
-            style={styles.cardAction}
-            testID="training-focus-open-profile"
-            onPress={() => presentation.onIntent({ type: "open-profile" })}
-          >
-            <Text style={styles.cardActionText}>
-              {homeActionLabel(presentation, recommendationCount)}
-            </Text>
-            <Text style={styles.cardActionChevron}>›</Text>
-          </Pressable>
-        ) : null}
       </View>
-    </View>
+      {canOpen ? (
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.cardAction, pressed ? styles.cardActionPressed : null]}
+          testID="training-focus-open-profile"
+          onPress={() => presentation.onIntent({ type: "open-profile" })}
+        >
+          <AppText style={styles.cardActionText} tone="accent" variant="body">
+            {homeActionLabel(presentation, recommendationCount)}
+          </AppText>
+          <Icon color={theme.colors.text.tertiary} name="chevronRight" size={15} weight="semibold" />
+        </Pressable>
+      ) : null}
+    </Section>
   );
 }
 
@@ -861,12 +862,6 @@ function formatCount(count: number, singular: string, plural: string): string {
 
 type Styles = ReturnType<typeof useStyles>;
 
-function homeToneStyle(styles: Styles, tone: "blue" | "green" | "amber" | "neutral") {
-  if (tone === "green") return styles.homeCardGreen;
-  if (tone === "amber") return styles.homeCardAmber;
-  if (tone === "neutral") return styles.homeCardNeutral;
-  return styles.homeCardBlue;
-}
 
 function statusPillStyle(styles: Styles, tone: "blue" | "green" | "amber" | "neutral") {
   if (tone === "green") return styles.statusPillGreen;
@@ -898,26 +893,8 @@ const useStyles = makeStyles((theme) => ({
     textTransform: "uppercase"
   },
   homeCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 9,
+    gap: theme.spacing.group,
     padding: 16
-  },
-  homeCardBlue: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s200
-  },
-  homeCardGreen: {
-    backgroundColor: theme.colors.success.s50,
-    borderColor: theme.colors.success.s200
-  },
-  homeCardAmber: {
-    backgroundColor: theme.colors.warning.s50,
-    borderColor: theme.colors.warning.s200
-  },
-  homeCardNeutral: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong
   },
   homeHeader: {
     alignItems: "center",
@@ -927,20 +904,16 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "space-between"
   },
   earlyEstimateLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.4,
-    textTransform: "uppercase"
+    ...theme.typography.footnote,
+    color: theme.colors.text.tertiary
   },
   statusPill: {
     alignItems: "center",
-    borderRadius: 999,
+    borderRadius: theme.shape.capsule,
     flexDirection: "row",
     gap: 6,
-    minHeight: 28,
-    paddingHorizontal: 10,
-    paddingVertical: 4
+    paddingHorizontal: 8,
+    paddingVertical: 2
   },
   statusPillBlue: {
     backgroundColor: theme.colors.accent.s100
@@ -955,26 +928,24 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.colors.surfaceStrong
   },
   statusPillText: {
-    fontSize: 12,
-    fontWeight: "800"
+    ...theme.typography.caption,
+    fontWeight: theme.typography.headline.fontWeight
   },
   statusPillTextBlue: {
-    color: theme.colors.accent.s700
+    color: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.s100
   },
   statusPillTextGreen: {
-    color: theme.colors.success.s700
+    color: theme.colors.positive.s600,
+    backgroundColor: theme.colors.success.s100
   },
   statusPillTextAmber: {
-    color: theme.colors.warning.s800
+    color: theme.colors.warning.s600,
+    backgroundColor: theme.colors.warning.s100
   },
   statusPillTextNeutral: {
-    color: theme.colors.text.secondary
-  },
-  homeTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 18,
-    fontWeight: "800",
-    lineHeight: 23
+    color: theme.colors.text.tertiary,
+    backgroundColor: theme.colors.surfaceStrong
   },
   modeLabel: {
     color: theme.colors.accent.s600,
@@ -996,23 +967,24 @@ const useStyles = makeStyles((theme) => ({
   },
   cardAction: {
     alignItems: "center",
-    borderTopColor: theme.colors.hairline.neutral,
-    borderTopWidth: 1,
+    borderTopColor: theme.colors.border.default,
+    borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
+    gap: theme.spacing.inline,
     justifyContent: "space-between",
-    marginTop: 3,
-    minHeight: 44,
-    paddingTop: 10
+    minHeight: theme.metrics.rowMinHeight,
+    paddingHorizontal: 16,
+    paddingVertical: 10
   },
   cardActionText: {
-    color: theme.colors.accent.s700,
-    fontSize: 14,
-    fontWeight: "800"
+    flex: 1
   },
-  cardActionChevron: {
-    color: theme.colors.accent.s700,
-    fontSize: 24,
-    lineHeight: 24
+  cardActionPressed: {
+    backgroundColor: theme.colors.surfaceStrong
+  },
+  homeSurface: {
+    gap: 0,
+    padding: 0
   },
   flow: {
     alignSelf: "center",

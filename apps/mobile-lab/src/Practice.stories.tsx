@@ -124,7 +124,7 @@ export const Home: Story = {
     await expectTestIdText(
       canvasElement,
       "personal-best-home-card",
-      "Survival ChallengeSee how far you can go, at your own pace.›"
+      "Survival ChallengeSee how far you can go, at your own pace."
     );
     await expectTestIdsInOrder(canvasElement, [
       "practice-progress-summary",

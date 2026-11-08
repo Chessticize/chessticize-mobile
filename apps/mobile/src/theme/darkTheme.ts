@@ -1,4 +1,15 @@
-import { createElevation, fontFamily, fontSize, fontWeight, radius, space } from "./scales.ts";
+import {
+  createElevation,
+  fontFamily,
+  fontSize,
+  fontWeight,
+  metrics,
+  radius,
+  shape,
+  space,
+  spacing,
+  typography
+} from "./scales.ts";
 import type { Theme, ThemeColors } from "./themeTypes.ts";
 
 // Dark palette for visual direction A "Grouped Native" (#609): Apple's system dark colors.
@@ -145,6 +156,10 @@ export const darkTheme: Theme = {
   name: "dark",
   statusBarStyle: "light-content",
   colors,
+  typography,
+  shape,
+  spacing,
+  metrics,
   space,
   radius,
   fontSize,

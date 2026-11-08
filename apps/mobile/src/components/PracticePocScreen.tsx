@@ -310,6 +310,7 @@ export type {
   HistoryStrengthSeries
 } from "./historyProgressPresentation.ts";
 import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
+import { AppText, Button, Icon, IconTile, ListRow, Section, type IconName } from "./ui/index.ts";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -5124,7 +5125,7 @@ export function PracticePocScreen({
               testID="app-shell-header"
             >
               <View>
-                <Text style={styles.title}>{screenTitle}</Text>
+                <Text style={[styles.title, tab === "practice" ? styles.titleLarge : null]}>{screenTitle}</Text>
               </View>
             </View>
           ) : null}
@@ -6053,7 +6054,7 @@ function PracticeHome({
             </>
           ) : (
             <>
-              <SprintStartHeader
+              <HomeStartHeader
                 headerTestID="practice-action-header"
                 startAccessibilityLabel={`Start ${modeLabel(mode)} sprint`}
                 startTestID="practice-start-button"
@@ -6061,12 +6062,13 @@ function PracticeHome({
                 titleTestID="practice-header-title"
                 onStart={() => onStartMode(mode)}
               />
-              <View style={styles.modeList}>
-                {modes.map((item) => (
+              <View style={styles.homeRowGroup}>
+                {modes.map((item, index) => (
                   <PracticeModeCard
                     key={item.mode}
                     active={mode === item.mode}
                     item={item}
+                    position={groupPosition(index, modes.length)}
                     onPress={() => onSelectMode(item.mode)}
                   />
                 ))}
@@ -6400,8 +6402,8 @@ function PracticeRunHome({
   }, [presentation.runs]);
 
   return (
-    <View style={styles.runManagementPanel} testID="practice-run-management">
-      <SprintStartHeader
+    <View style={styles.homeRunPanel} testID="practice-run-management">
+      <HomeStartHeader
         actionLabel={presentation.homeEditing ? "Done" : "Start"}
         headerTestID="practice-action-header"
         startAccessibilityLabel={presentation.homeEditing
@@ -6418,53 +6420,49 @@ function PracticeRunHome({
         })}
       />
 
-      <Text style={styles.helperText}>
+      <AppText style={styles.homeHelperText} tone="secondary" variant="subheadline">
         {presentation.homeEditing
           ? Platform.OS === "web"
             ? "Drag a card to reorder, or use the arrow buttons."
             : "Touch and hold a card to drag, or use the arrow buttons."
           : "Choose a run, then start when you are ready."}
-      </Text>
+      </AppText>
 
       <View
         style={styles.runManagementToolbar}
         testID="practice-run-home-utilities"
       >
         {sprintRulesGuide && !presentation.homeEditing && !sprintRulesGuideVisible ? (
-          <Pressable
-            accessibilityRole="button"
+          <Button
             accessibilityLabel="How Sprint works"
-            style={styles.sprintRulesHelpLink}
+            icon="help"
+            label="How Sprint works"
+            size="compact"
             testID="practice-sprint-rules-open"
+            variant="plain"
             onPress={onOpenSprintRulesGuide}
-          >
-            <View style={styles.sprintRulesHelpIcon}>
-              <Text style={styles.sprintRulesHelpIconText}>?</Text>
-            </View>
-            <Text style={styles.sprintRulesHelpLinkText}>How Sprint works</Text>
-          </Pressable>
+          />
         ) : null}
         <View style={styles.runManagementToolbarActions}>
           {!presentation.homeEditing ? (
-            <Pressable
-              accessibilityRole="button"
+            <Button
               accessibilityLabel="Edit runs"
-              style={styles.secondaryCompactButton}
+              label="Edit"
+              size="compact"
               testID="practice-run-home-edit"
+              variant="plain"
               onPress={() => presentation.onIntent({ type: "toggle-home-edit" })}
-            >
-              <Text style={styles.secondaryCompactButtonText}>Edit</Text>
-            </Pressable>
+            />
           ) : null}
-          <Pressable
-            accessibilityRole="button"
+          <Button
             accessibilityLabel="Add a run"
-            style={styles.primaryCompactButton}
+            icon="add"
+            label="Add Run"
+            size="compact"
             testID="practice-add-run"
+            variant="plain"
             onPress={() => presentation.onIntent({ type: "add-run" })}
-          >
-            <Text style={styles.primarySmallButtonText}>+ Add Run</Text>
-          </Pressable>
+          />
         </View>
       </View>
 
@@ -6486,33 +6484,32 @@ function PracticeRunHome({
       ) : null}
 
       {presentation.runs.length === 0 ? (
-        <View style={styles.runEmptyState} testID="practice-runs-empty">
-          <Text style={styles.sectionLabel}>No runs on Home</Text>
-          <Text style={styles.helperText}>
+        <Section testID="practice-runs-empty">
+          <AppText variant="headline">No runs on Home</AppText>
+          <AppText tone="secondary" variant="subheadline">
             Add a new run or restore one below. Saved ratings and history are still available.
-          </Text>
-          <Pressable
-            accessibilityRole="button"
+          </AppText>
+          <Button
             accessibilityLabel="Add a new run"
-            style={[styles.primaryButton, styles.runEmptyAction]}
+            icon="add"
+            label="Add a Run"
             testID="practice-empty-add-run"
             onPress={() => presentation.onIntent({ type: "add-run" })}
-          >
-            <Text style={styles.primaryButtonText}>Add a Run</Text>
-          </Pressable>
-        </View>
+          />
+        </Section>
       ) : (
         <View
           ref={(element) => {
             webRunListElementRef.current = element as unknown as WebRunElement | null;
             nativeRunListElementRef.current = element as unknown as NativeRunReorderMeasureElement | null;
           }}
-          style={[styles.modeList, { position: "relative" }]}
+          style={[styles.homeRowGroup, { position: "relative" }]}
           testID="practice-run-list"
         >
           {presentation.runs.map((run, index) => (
             <React.Fragment key={run.id}>
               <PracticeRunCard
+                position={groupPosition(index, presentation.runs.length)}
                 active={run.id === presentation.selectedRunId}
                 canMoveDown={index < presentation.runs.length - 1}
                 canMoveUp={index > 0}
@@ -6587,29 +6584,32 @@ function PracticeRunHome({
       )}
 
       {showRestore ? (
-        <View style={styles.runRestoreSection} testID="practice-run-restore-section">
-          <Text style={styles.sectionLabel}>Restore to Home</Text>
-          <Text style={styles.helperText}>Restoring a run keeps its existing rating and history.</Text>
-          <View style={styles.runRestoreList}>
-            {presentation.hiddenRuns.map((run) => (
-              <View key={run.id} style={styles.runRestoreRow}>
-                <View style={styles.runRestoreCopy}>
-                  <Text style={styles.listText}>{run.name}</Text>
-                  <Text style={styles.helperText}>Rating {run.elo}</Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
+        <Section
+          footer="Restoring a run keeps its existing rating and history."
+          header="Restore to Home"
+          rows
+          separatorInset={16 + appTheme.metrics.iconTile + appTheme.spacing.row}
+          testID="practice-run-restore-section"
+        >
+          {presentation.hiddenRuns.map((run) => (
+            <ListRow
+              key={run.id}
+              icon={runIconName(run)}
+              subtitle={`Rating ${run.elo}`}
+              title={run.name}
+              trailing={(
+                <Button
                   accessibilityLabel={`Restore ${run.name} to Home`}
-                  style={styles.secondaryCompactButton}
+                  label="Restore"
+                  size="compact"
                   testID={`practice-run-restore-${safeTestId(run.id)}`}
+                  variant="secondary"
                   onPress={() => presentation.onIntent({ type: "restore-run", runId: run.id })}
-                >
-                  <Text style={styles.secondaryCompactButtonText}>Restore</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        </View>
+                />
+              )}
+            />
+          ))}
+        </Section>
       ) : null}
     </View>
   );
@@ -7013,6 +7013,7 @@ function buildSessionGuideStageNodes({
 
 function PracticeRunCard({
   active,
+  position,
   canMoveDown,
   canMoveUp,
   committedDropSettling,
@@ -7057,8 +7058,10 @@ function PracticeRunCard({
   onDrop: () => boolean;
   onKeyboardReorder: (runId: string, direction: "up" | "down") => void;
   run: PracticeRunPresentation;
+  position: GroupPosition;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
   const details = run.kind === "custom"
     ? `${run.themes.map(customThemeLabel).join(" + ")} · ${formatSprintTimingLabel({
         ...defaultSprintConfig(run.mode),
@@ -7081,12 +7084,10 @@ function PracticeRunCard({
       runId={run.id}
       runName={run.name}
       style={[
-        styles.practiceModeCard,
-        styles.managedRunCard,
-        active && !editing ? styles.practiceModeCardActive : null,
-        active && !editing ? styles.managedRunCardActive : null,
-        editing ? styles.runCardEditing : null,
-        dragging ? styles.runCardDragging : null
+        styles.homeRow,
+        homeRowPositionStyle(styles, dragging ? "only" : position),
+        editing ? styles.homeRowEditing : null,
+        dragging ? styles.homeRowDragging : null
       ]}
       testID={`practice-run-${safeTestId(run.id)}`}
       onDragEnd={onDragEnd}
@@ -7098,45 +7099,47 @@ function PracticeRunCard({
       onWebDrop={onWebDrop}
       onDrop={onDrop}
     >
+      {dragging ? null : <HomeRowSeparator position={position} />}
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ selected: active && !editing }}
         accessibilityLabel={editing
           ? directRunEditing ? `Edit ${run.name}` : `Edit ${run.name} rating`
           : `Select ${run.name}, rating ${run.elo}, ${details}`}
-        style={styles.practiceModeSelectArea}
+        style={styles.homeRowSelectArea}
         testID={`practice-run-select-${safeTestId(run.id)}`}
         onPress={() => presentationRunPress(editing, run.id, onIntent)}
       >
-        <View style={[styles.practiceModeIcon, active && !editing ? styles.practiceModeIconActive : null]}>
-          <PracticeModeGlyph
-            mode={run.mode === "arrow_duel" ? "arrow_duel" : "standard"}
-            testIDPrefix={`practice-run-${safeTestId(run.id)}-glyph`}
-          />
+        <View testID={`practice-run-${safeTestId(run.id)}-icon`}>
+          <IconTile name={runIconName(run)} />
         </View>
-        <View style={styles.practiceModeCopy}>
-          <Text
+        <View style={styles.homeRowCopy}>
+          <AppText
             ellipsizeMode="tail"
             numberOfLines={1}
-            style={styles.practiceModeTitle}
             testID={`practice-run-name-${safeTestId(run.id)}`}
+            variant="headline"
           >
             {run.name}
-          </Text>
-          <Text ellipsizeMode="tail" numberOfLines={1} style={styles.practiceModeDescription}>{details}</Text>
+          </AppText>
+          <AppText ellipsizeMode="tail" numberOfLines={2} tone="secondary" variant="subheadline">{details}</AppText>
         </View>
       </Pressable>
-      <View style={[styles.practiceModeMeta, editing ? styles.runEditingMeta : null]}>
-        <Text
-          style={styles.practiceModeRating}
+      <View style={[styles.homeRowMeta, editing ? styles.homeRowEditingMeta : null]}>
+        <AppText
+          style={styles.homeRowRating}
           testID={run.kind === "standard"
             ? "practice-mode-standard-rating"
             : run.kind === "arrow_duel"
               ? "practice-mode-arrow-duel-rating"
               : undefined}
+          variant="numeral"
         >
           {run.elo}
-        </Text>
+        </AppText>
+        {active && !editing ? (
+          <Icon color={appTheme.colors.accent.s600} name="check" size={18} testID={`practice-run-selected-${safeTestId(run.id)}`} weight="semibold" />
+        ) : null}
         {editing ? (
           <View style={styles.runEditActions}>
             <Pressable
@@ -7144,40 +7147,39 @@ function PracticeRunCard({
               accessibilityLabel={`Move ${run.name} up`}
               accessibilityState={{ disabled: !canMoveUp }}
               disabled={!canMoveUp}
-              style={[styles.runIconButton, styles.runReorderButton, !canMoveUp ? styles.disabledButton : null]}
+              style={[styles.homeRowIconButton, !canMoveUp ? styles.homeRowIconButtonDisabled : null]}
               testID={`practice-run-move-up-${safeTestId(run.id)}`}
               onPress={() => onKeyboardReorder(run.id, "up")}
             >
-              <ChevronGlyph direction="up" />
+              <Icon color={appTheme.colors.accent.s600} name="chevronUp" size={18} weight="semibold" />
             </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Move ${run.name} down`}
               accessibilityState={{ disabled: !canMoveDown }}
               disabled={!canMoveDown}
-              style={[styles.runIconButton, styles.runReorderButton, !canMoveDown ? styles.disabledButton : null]}
+              style={[styles.homeRowIconButton, !canMoveDown ? styles.homeRowIconButtonDisabled : null]}
               testID={`practice-run-move-down-${safeTestId(run.id)}`}
               onPress={() => onKeyboardReorder(run.id, "down")}
             >
-              <ChevronGlyph direction="down" />
+              <Icon color={appTheme.colors.accent.s600} name="chevronDown" size={18} weight="semibold" />
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
+            <Button
               accessibilityLabel={directRunEditing ? `Edit ${run.name}` : `Edit ${run.name} rating`}
-              style={styles.runEditButton}
+              label={directRunEditing ? "Edit" : "Edit rating"}
+              size="compact"
               testID={`practice-run-edit-${safeTestId(run.id)}`}
+              variant="secondary"
               onPress={() => onIntent({ type: "edit-run", runId: run.id })}
-            >
-              <Text style={styles.runEditButtonText}>{directRunEditing ? "Edit" : "Edit rating"}</Text>
-            </Pressable>
+            />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Remove ${run.name} from Home`}
-              style={[styles.runIconButton, styles.runRemoveButton]}
+              style={[styles.homeRowIconButton, styles.homeRowRemoveButton]}
               testID={`practice-run-remove-${safeTestId(run.id)}`}
               onPress={() => onIntent({ type: "remove-run", runId: run.id })}
             >
-              <Text style={styles.runRemoveButtonText}>−</Text>
+              <Icon color={appTheme.colors.danger.s600} name="remove" size={18} weight="semibold" />
             </Pressable>
           </View>
         ) : null}
@@ -7970,32 +7972,30 @@ function RunRemovalConfirmation({
     return null;
   }
   return (
-    <View style={styles.runRemovalConfirmation} testID="practice-run-remove-confirmation">
-      <View style={styles.runRemovalCopy}>
-        <Text style={styles.listText}>Remove {run.name} from Home?</Text>
-        <Text style={styles.helperText}>
+    <View style={styles.homeRemovalConfirmation} testID="practice-run-remove-confirmation">
+      <View style={styles.homeRowCopy}>
+        <AppText variant="headline">Remove {run.name} from Home?</AppText>
+        <AppText tone="secondary" variant="subheadline">
           Its rating and history will be kept. You can restore this run later.
-        </Text>
+        </AppText>
       </View>
-      <View style={styles.runRemovalActions}>
-        <Pressable
-          accessibilityRole="button"
+      <View style={styles.homeRemovalActions}>
+        <Button
           accessibilityLabel="Cancel run removal"
-          style={styles.secondaryButton}
+          label="Cancel"
+          size="compact"
           testID="practice-run-remove-cancel"
+          variant="secondary"
           onPress={() => onIntent({ type: "dismiss-remove" })}
-        >
-          <Text style={styles.secondaryButtonText}>Cancel</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
+        />
+        <Button
           accessibilityLabel={`Confirm removing ${run.name} from Home`}
-          style={styles.destructiveButton}
+          label="Remove"
+          size="compact"
           testID="practice-run-remove-confirm"
+          variant="destructive"
           onPress={() => onIntent({ type: "confirm-remove" })}
-        >
-          <Text style={styles.destructiveButtonText}>Remove</Text>
-        </Pressable>
+        />
       </View>
     </View>
   );
@@ -8736,10 +8736,10 @@ function PracticeProgressCard({
     ? "Start training"
     : `${progress.netThisWeek >= 0 ? "+" : ""}${progress.netThisWeek} net`;
   const progressTone = progress.netThisWeek < 0
-    ? styles.progressDeltaNegative
+    ? styles.homeToneNegative
     : progress.correctThisWeek + progress.wrongThisWeek > 0
-      ? styles.progressDeltaPositive
-      : styles.progressDeltaNeutral;
+      ? styles.homeTonePositive
+      : styles.homeToneNeutral;
   const progressContext = progress.accuracyThisWeek === null
     ? "No attempts yet"
     : `${progress.accuracyThisWeek}% accuracy · ${progress.wrongThisWeek} ${progress.wrongThisWeek === 1 ? "mistake" : "mistakes"}`;
@@ -8747,49 +8747,42 @@ function PracticeProgressCard({
     ? "No rating change"
     : `${progress.ratingDeltaThisWeek >= 0 ? "+" : ""}${progress.ratingDeltaThisWeek} this week`;
   const ratingDeltaTone = progress.ratingDeltaThisWeek === null
-    ? styles.progressDeltaNeutral
+    ? styles.homeToneNeutral
     : progress.ratingDeltaThisWeek < 0
-      ? styles.progressDeltaNegative
-      : styles.progressDeltaPositive;
+      ? styles.homeToneNegative
+      : styles.homeTonePositive;
 
   return (
-    <>
-      <Text style={styles.sectionLabel}>Progress</Text>
+    <Section header="Progress">
       <View
+        accessible
         accessibilityLabel={`Progress summary, ${ratingContextLabel ?? modeLabel(mode)} rating ${currentRating}, ${ratingDeltaLabel}, this week ${progress.correctThisWeek}, ${progressDelta}, ${progressContext}`}
-        style={styles.practiceProgressCard}
+        style={styles.homeProgressMetrics}
         testID="practice-progress-summary"
       >
-        <View style={styles.progressMetric} testID="practice-progress-rating-metric">
-          <Text style={styles.progressMetricLabel}>{ratingContextLabel ?? modeLabel(mode)} rating</Text>
-          <Text style={styles.progressValue}>{currentRating}</Text>
-          <Text testID="practice-progress-rating-delta" style={[styles.progressDelta, ratingDeltaTone]}>{ratingDeltaLabel}</Text>
+        <View style={styles.homeProgressMetric} testID="practice-progress-rating-metric">
+          <AppText tone="secondary" variant="footnote">{ratingContextLabel ?? modeLabel(mode)} rating</AppText>
+          <AppText style={styles.homeProgressValue} variant="numeralLarge">{currentRating}</AppText>
+          <AppText testID="practice-progress-rating-delta" style={ratingDeltaTone} variant="footnote">{ratingDeltaLabel}</AppText>
         </View>
-        <View
-          style={[styles.practiceSummaryColumnGap, styles.progressDivider]}
-          testID="practice-progress-divider"
-        />
-        <View style={styles.progressMetric} testID="practice-progress-weekly-metric">
-          <Text style={styles.progressMetricLabel}>This Week</Text>
-          <Text testID="practice-progress-weekly-solved" style={styles.progressValue}>{progress.correctThisWeek}</Text>
-          <Text testID="practice-progress-weekly-delta" style={[styles.progressDelta, progressTone]}>{progressDelta}</Text>
-          <Text testID="practice-progress-weekly-context" style={styles.progressContextText}>{progressContext}</Text>
+        <View style={styles.homeProgressDivider} testID="practice-progress-divider" />
+        <View style={styles.homeProgressMetric} testID="practice-progress-weekly-metric">
+          <AppText tone="secondary" variant="footnote">This Week</AppText>
+          <AppText testID="practice-progress-weekly-solved" style={styles.homeProgressValue} variant="numeralLarge">{progress.correctThisWeek}</AppText>
+          <AppText testID="practice-progress-weekly-delta" style={progressTone} variant="footnote">{progressDelta}</AppText>
+          <AppText testID="practice-progress-weekly-context" tone="secondary" variant="footnote">{progressContext}</AppText>
         </View>
       </View>
-    </>
+    </Section>
   );
 }
 
 function PracticeNoRunProgressCard(): React.JSX.Element {
-  const styles = useStyles();
   return (
-    <>
-      <Text style={styles.sectionLabel}>Progress</Text>
-      <View style={styles.runNoSelectionCard} testID="practice-progress-no-run">
-        <Text style={styles.listText}>No run selected</Text>
-        <Text style={styles.helperText}>Add or restore a run to see its current rating.</Text>
-      </View>
-    </>
+    <Section header="Progress" testID="practice-progress-no-run">
+      <AppText variant="headline">No run selected</AppText>
+      <AppText tone="secondary" variant="subheadline">Add or restore a run to see its current rating.</AppText>
+    </Section>
   );
 }
 
@@ -8800,7 +8793,6 @@ function ResumeSprintCard({
   onResume: () => void;
   sprint: SprintState;
 }): React.JSX.Element {
-  const styles = useStyles();
   const isTacticalFocus = sprint.config.tacticalFocus !== undefined;
   const completedCount = sprint.correctCount + sprint.mistakeCount;
   const remaining = Math.max(
@@ -8811,30 +8803,21 @@ function ResumeSprintCard({
       (isTacticalFocus ? completedCount : sprint.correctCount)
   );
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={isTacticalFocus
-        ? `Resume Focused Run, ${completedCount} completed, ${remaining} left, ${sprint.mistakeCount} mistakes`
-        : `Resume ${modeLabel(sprint.config.mode)} sprint`}
-      style={styles.resumeSprintCard}
-      testID="practice-resume-card"
-      onPress={onResume}
-    >
-      <View style={styles.practiceModeIcon}>
-        <PracticeModeGlyph mode={sprint.config.mode} />
-      </View>
-      <View style={styles.resumeSprintCopy}>
-        <Text style={styles.sectionLabel}>
-          {isTacticalFocus ? "Resume Focused Run" : "Resume sprint"}
-        </Text>
-        <Text style={styles.helperText}>
-          {isTacticalFocus
-            ? `Focused Run · ${completedCount} completed · ${remaining} left · ${sprint.mistakeCount} mistakes`
-            : `${modeLabel(sprint.config.mode)} · ${sprint.correctCount} solved · ${remaining} left · ${sprint.mistakeCount} mistakes`}
-        </Text>
-      </View>
-      <Text style={styles.resumeSprintAction}>Resume</Text>
-    </Pressable>
+    <Section rows>
+      <ListRow
+        accessibilityLabel={isTacticalFocus
+          ? `Resume Focused Run, ${completedCount} completed, ${remaining} left, ${sprint.mistakeCount} mistakes`
+          : `Resume ${modeLabel(sprint.config.mode)} sprint`}
+        icon="play"
+        subtitle={isTacticalFocus
+          ? `Focused Run · ${completedCount} completed · ${remaining} left · ${sprint.mistakeCount} mistakes`
+          : `${modeLabel(sprint.config.mode)} · ${sprint.correctCount} solved · ${remaining} left · ${sprint.mistakeCount} mistakes`}
+        testID="practice-resume-card"
+        title={isTacticalFocus ? "Resume Focused Run" : "Resume sprint"}
+        trailing={<AppText tone="accent" variant="headline">Resume</AppText>}
+        onPress={onResume}
+      />
+    </Section>
   );
 }
 
@@ -8906,13 +8889,16 @@ function PausedSessionPanel({
 function PracticeModeCard({
   active,
   item,
+  position,
   onPress
 }: {
   active: boolean;
   item: PracticeModeSummary;
+  position: GroupPosition;
   onPress: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
   const label = modeLabel(item.mode);
   const detail = practiceModeDetailLabel(item);
   const ratingLabel = item.rating === undefined ? null : `Rating ${item.rating}`;
@@ -8925,24 +8911,24 @@ function PracticeModeCard({
         ? `Open Custom sprint setup, ${detail}`
         : `Select ${label} mode, ${detail}`}
       testID={`practice-mode-${modeTestId}`}
-      style={[styles.practiceModeCard, active ? styles.practiceModeCardActive : null]}
+      style={({ pressed }) => [styles.homeRow, homeRowPositionStyle(styles, position), pressed ? styles.homeRowPressed : null]}
       onPress={onPress}
     >
-      <View style={styles.practiceModeSelectArea}>
-        <View style={[styles.practiceModeIcon, active ? styles.practiceModeIconActive : null]} testID={`practice-mode-${modeTestId}-icon`}>
-          <PracticeModeGlyph mode={item.mode} testIDPrefix={`practice-mode-${modeTestId}`} />
+      <HomeRowSeparator position={position} />
+      <View style={styles.homeRowSelectArea}>
+        <View testID={`practice-mode-${modeTestId}-icon`}>
+          <IconTile name={modeIconName(item.mode)} />
         </View>
-        <View style={styles.practiceModeCopy}>
-          <View style={styles.practiceModeTitleRow}>
-            <Text style={styles.practiceModeTitle}>{label}</Text>
-          </View>
-          <Text
+        <View style={styles.homeRowCopy}>
+          <AppText variant="headline">{label}</AppText>
+          <AppText
             ellipsizeMode="tail"
-            numberOfLines={1}
-            style={styles.practiceModeDescription}
+            numberOfLines={2}
+            tone="secondary"
+            variant="subheadline"
           >
             {PRACTICE_MODE_DESCRIPTIONS[item.mode]}
-          </Text>
+          </AppText>
           <View
             accessibilityLabel={detail}
             testID={`practice-mode-${modeTestId}-details`}
@@ -8950,17 +8936,103 @@ function PracticeModeCard({
           />
         </View>
       </View>
-      <View style={styles.practiceModeMeta}>
+      <View style={styles.homeRowMeta}>
         {ratingLabel ? (
-          <Text style={styles.practiceModeRating} testID={`practice-mode-${modeTestId}-rating`}>{ratingLabel}</Text>
+          <AppText tone="secondary" testID={`practice-mode-${modeTestId}-rating`} variant="subheadline">{ratingLabel}</AppText>
+        ) : null}
+        {active ? (
+          <Icon color={appTheme.colors.accent.s600} name="check" size={18} testID={`practice-mode-${modeTestId}-selected`} weight="semibold" />
         ) : null}
         {item.mode === "custom" ? (
-          <View testID="practice-mode-custom-disclosure" style={styles.practiceModeDisclosure}>
-            <ChevronGlyph direction="right" />
+          <View testID="practice-mode-custom-disclosure">
+            <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} weight="semibold" />
           </View>
         ) : null}
       </View>
     </Pressable>
+  );
+}
+
+type GroupPosition = "only" | "first" | "middle" | "last";
+
+function groupPosition(index: number, count: number): GroupPosition {
+  if (count <= 1) {
+    return "only";
+  }
+  if (index === 0) {
+    return "first";
+  }
+  return index === count - 1 ? "last" : "middle";
+}
+
+// Rows in one grouped list keep their own surface so a dragged row can lift out
+// of the group; the first and last rows carry the section corners and every row
+// after the first draws an inset hairline.
+function homeRowPositionStyle(
+  styles: ReturnType<typeof useStyles>,
+  position: GroupPosition
+): React.ComponentProps<typeof View>["style"] {
+  return [
+    position === "only" || position === "first" ? styles.homeRowTop : null,
+    position === "only" || position === "last" ? styles.homeRowBottom : null
+  ];
+}
+
+// The inset hairline above every row after the first in a grouped list.
+function HomeRowSeparator({ position }: { position: GroupPosition }): React.JSX.Element | null {
+  const styles = useStyles();
+  if (position === "only" || position === "first") {
+    return null;
+  }
+  return <View pointerEvents="none" style={styles.homeRowSeparator} />;
+}
+
+function modeIconName(mode: SprintMode): IconName {
+  return mode === "arrow_duel" ? "arrowDuel" : mode === "custom" ? "custom" : "standard";
+}
+
+function runIconName(run: Pick<PracticeRunPresentation, "kind" | "mode">): IconName {
+  if (run.kind === "custom") {
+    return "custom";
+  }
+  return run.mode === "arrow_duel" ? "arrowDuel" : "standard";
+}
+
+function HomeStartHeader({
+  actionLabel = "Start",
+  headerTestID,
+  startAccessibilityLabel,
+  startDisabled = false,
+  startTestID,
+  title,
+  titleTestID,
+  onStart
+}: {
+  actionLabel?: string;
+  headerTestID: string;
+  startAccessibilityLabel: string;
+  startDisabled?: boolean;
+  startTestID: string;
+  title: string;
+  titleTestID: string;
+  onStart: () => void;
+}): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <View style={styles.homeStartHeader} testID={headerTestID}>
+      <AppText accessibilityRole="header" style={styles.homeStartTitle} testID={titleTestID} variant="title">
+        {title}
+      </AppText>
+      <Button
+        accessibilityLabel={startAccessibilityLabel}
+        disabled={startDisabled}
+        icon={actionLabel === "Start" ? "play" : undefined}
+        label={actionLabel}
+        size="compact"
+        testID={startTestID}
+        onPress={onStart}
+      />
+    </View>
   );
 }
 
@@ -10907,77 +10979,6 @@ function BoardInputBlocker(): React.JSX.Element {
       style={styles.boardInputBlocker}
       testID="board-input-blocker"
     />
-  );
-}
-
-function PracticeModeGlyph({
-  inverse = false,
-  mode,
-  testIDPrefix
-}: {
-  inverse?: boolean;
-  mode: SprintMode;
-  testIDPrefix?: string;
-}): React.JSX.Element {
-  const styles = useStyles();
-  const appTheme = useTheme();
-  const color = inverse ? appTheme.colors.text.onAccent : appTheme.colors.accent.s600;
-  if (mode === "standard") {
-    return (
-      <View style={styles.modeGlyphCanvas}>
-        <View
-          style={[styles.modeTargetOuter, { borderColor: color }]}
-          testID={testIDPrefix ? `${testIDPrefix}-standard-outer` : undefined}
-        />
-        <View
-          style={[styles.modeTargetInner, { borderColor: color }]}
-          testID={testIDPrefix ? `${testIDPrefix}-standard-inner` : undefined}
-        />
-      </View>
-    );
-  }
-  if (mode === "arrow_duel") {
-    return (
-      <View style={styles.modeGlyphCanvas}>
-        <View
-          style={[styles.modeDuelArrow, styles.modeDuelArrowUpper]}
-          testID={testIDPrefix ? `${testIDPrefix}-arrow-a` : undefined}
-        >
-          <View
-            style={[styles.modeDuelArrowShaft, { backgroundColor: color }]}
-            testID={testIDPrefix ? `${testIDPrefix}-arrow-a-shaft` : undefined}
-          />
-          <View style={[styles.modeDuelArrowHeadTop, { backgroundColor: color }]} />
-          <View style={[styles.modeDuelArrowHeadBottom, { backgroundColor: color }]} />
-        </View>
-        <View
-          style={[styles.modeDuelArrow, styles.modeDuelArrowLower]}
-          testID={testIDPrefix ? `${testIDPrefix}-arrow-b` : undefined}
-        >
-          <View
-            style={[styles.modeDuelArrowShaft, { backgroundColor: color }]}
-            testID={testIDPrefix ? `${testIDPrefix}-arrow-b-shaft` : undefined}
-          />
-          <View style={[styles.modeDuelArrowHeadTop, { backgroundColor: color }]} />
-          <View style={[styles.modeDuelArrowHeadBottom, { backgroundColor: color }]} />
-        </View>
-      </View>
-    );
-  }
-  if (mode === "blitz") {
-    return (
-      <View style={styles.modeGlyphCanvas}>
-        <View style={[styles.modeBoltTop, { backgroundColor: color }]} />
-        <View style={[styles.modeBoltBottom, { backgroundColor: color }]} />
-      </View>
-    );
-  }
-  return (
-    <View style={styles.modeListGlyph}>
-      <View style={[styles.modeListBar, { backgroundColor: color }]} />
-      <View style={[styles.modeListBar, { backgroundColor: color }]} />
-      <View style={[styles.modeListBar, { backgroundColor: color }]} />
-    </View>
   );
 }
 
@@ -18056,19 +18057,19 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "flex-start"
   },
   practiceHome: {
-    gap: 12
+    gap: theme.spacing.section
   },
   practiceHomeColumns: {
     alignItems: "flex-start",
     flexDirection: "row",
-    gap: 14
+    gap: theme.spacing.section
   },
   practiceHomeStack: {
     flexDirection: "column",
-    gap: 18
+    gap: theme.spacing.section
   },
   practiceHomePrimaryColumn: {
-    gap: 12,
+    gap: theme.spacing.group,
     minWidth: 0
   },
   practiceHomePrimaryColumnWide: {
@@ -18078,7 +18079,7 @@ const useStyles = makeStyles((theme) => ({
     width: "auto"
   },
   practiceHomeSecondaryColumn: {
-    gap: 12,
+    gap: theme.spacing.section,
     minWidth: 280
   },
   practiceHomeSecondaryColumnWide: {
@@ -18093,8 +18094,157 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 0,
     width: "100%"
   },
-  runManagementPanel: {
-    gap: 10
+  // Practice Home on the direction A primitives (#609).
+  titleLarge: {
+    ...theme.typography.largeTitle,
+    color: theme.colors.text.primary
+  },
+  homeStartHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.row,
+    justifyContent: "space-between",
+    minHeight: theme.metrics.minTarget,
+    paddingLeft: 4
+  },
+  homeStartTitle: {
+    flexShrink: 1
+  },
+  homeRunPanel: {
+    gap: theme.spacing.group
+  },
+  homeHelperText: {
+    paddingHorizontal: 4
+  },
+  homeRowGroup: {
+    gap: 0
+  },
+  homeRow: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    flexDirection: "row",
+    gap: theme.spacing.row,
+    minHeight: theme.metrics.rowMinHeight,
+    paddingHorizontal: 16,
+    paddingVertical: 10
+  },
+  homeRowTop: {
+    borderTopLeftRadius: theme.shape.card,
+    borderTopRightRadius: theme.shape.card
+  },
+  homeRowBottom: {
+    borderBottomLeftRadius: theme.shape.card,
+    borderBottomRightRadius: theme.shape.card
+  },
+  homeRowSeparator: {
+    backgroundColor: theme.colors.border.default,
+    height: StyleSheet.hairlineWidth,
+    left: 16 + theme.metrics.iconTile + theme.spacing.row,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  homeRowPressed: {
+    backgroundColor: theme.colors.surfaceStrong
+  },
+  homeRowEditing: {
+    flexWrap: "wrap"
+  },
+  homeRowDragging: {
+    borderRadius: theme.shape.card,
+    elevation: 6,
+    shadowColor: theme.colors.shadow,
+    shadowOffset: { height: 6, width: 0 },
+    shadowOpacity: theme.name === "dark" ? 0.5 : 0.16,
+    shadowRadius: 16,
+    zIndex: 20
+  },
+  homeRowSelectArea: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: theme.spacing.row,
+    minHeight: theme.metrics.minTarget,
+    minWidth: 0
+  },
+  homeRowCopy: {
+    flex: 1,
+    flexShrink: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  homeRowMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.inline
+  },
+  homeRowEditingMeta: {
+    justifyContent: "space-between",
+    paddingBottom: 2,
+    paddingLeft: theme.metrics.iconTile + theme.spacing.row,
+    width: "100%"
+  },
+  homeRowRating: {
+    fontSize: 20,
+    lineHeight: 26
+  },
+  homeRowIconButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.accent.s100,
+    borderRadius: theme.shape.control,
+    height: theme.metrics.minTarget,
+    justifyContent: "center",
+    width: theme.metrics.minTarget
+  },
+  homeRowIconButtonDisabled: {
+    opacity: 0.4
+  },
+  homeRowRemoveButton: {
+    backgroundColor: theme.colors.danger.s100
+  },
+  homeRemovalConfirmation: {
+    backgroundColor: theme.colors.surface,
+    borderTopColor: theme.colors.border.default,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: theme.spacing.row,
+    paddingHorizontal: 16,
+    paddingVertical: theme.spacing.row
+  },
+  homeRemovalActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.group,
+    justifyContent: "flex-end"
+  },
+  homeProgressMetrics: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 16
+  },
+  homeProgressMetric: {
+    alignItems: "flex-start",
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  homeProgressValue: {
+    fontSize: 28,
+    lineHeight: 34
+  },
+  homeProgressDivider: {
+    alignSelf: "stretch",
+    backgroundColor: theme.colors.border.default,
+    width: StyleSheet.hairlineWidth
+  },
+  homeToneNegative: {
+    color: theme.colors.danger.s600
+  },
+  homeTonePositive: {
+    color: theme.colors.positive.s600
+  },
+  homeToneNeutral: {
+    color: theme.colors.text.tertiary
   },
   runManagementToolbar: {
     alignItems: "center",
@@ -18108,34 +18258,6 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     gap: 8,
     marginLeft: "auto"
-  },
-  sprintRulesHelpLink: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    gap: 7,
-    minHeight: 44,
-    paddingHorizontal: 2
-  },
-  sprintRulesHelpIcon: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s300,
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 24,
-    justifyContent: "center",
-    width: 24
-  },
-  sprintRulesHelpIconText: {
-    color: theme.colors.accent.s700,
-    fontSize: 13,
-    fontWeight: "900"
-  },
-  sprintRulesHelpLinkText: {
-    color: theme.colors.accent.s700,
-    fontSize: 13,
-    fontWeight: "800"
   },
   sprintRulesGuide: {
     backgroundColor: theme.colors.accent.s50,
@@ -18240,29 +18362,6 @@ const useStyles = makeStyles((theme) => ({
     lineHeight: 16,
     paddingTop: 10
   },
-  primaryCompactButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 8,
-    height: 36,
-    justifyContent: "center",
-    paddingHorizontal: 12
-  },
-  secondaryCompactButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: "center",
-    paddingHorizontal: 12
-  },
-  secondaryCompactButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "800"
-  },
   runNotice: {
     backgroundColor: theme.colors.accent.s50,
     borderColor: theme.colors.accent.s300,
@@ -18275,37 +18374,6 @@ const useStyles = makeStyles((theme) => ({
     color: theme.colors.accent.s700,
     fontSize: 12,
     fontWeight: "700"
-  },
-  runEmptyState: {
-    alignItems: "flex-start",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderStyle: "dashed",
-    borderWidth: 1,
-    gap: 6,
-    padding: 14
-  },
-  runEmptyAction: {
-    flex: 0,
-    marginTop: 4
-  },
-  runNoSelectionCard: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-    minHeight: 76,
-    padding: 14
-  },
-  runCardEditing: {
-    alignItems: "center",
-    flexWrap: "wrap",
-    paddingVertical: 10
-  },
-  runCardDragging: {
-    opacity: 0.9
   },
   runCardNativeDragging: {
     elevation: 8,
@@ -18326,99 +18394,10 @@ const useStyles = makeStyles((theme) => ({
     right: 0,
     zIndex: 15
   },
-  runEditingMeta: {
-    borderTopColor: theme.colors.border.default,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    justifyContent: "space-between",
-    marginTop: 6,
-    paddingTop: 8,
-    width: "100%"
-  },
   runEditActions: {
     alignItems: "center",
     flexDirection: "row",
     gap: 6
-  },
-  runEditButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 32,
-    justifyContent: "center",
-    paddingHorizontal: 9
-  },
-  runEditButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  runIconButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 32,
-    justifyContent: "center",
-    width: 34
-  },
-  runReorderButton: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s200
-  },
-  runRemoveButton: {
-    backgroundColor: theme.colors.danger.s50,
-    borderColor: theme.colors.danger.s300
-  },
-  runRemoveButtonText: {
-    color: theme.colors.danger.s600,
-    fontSize: 20,
-    fontWeight: "900",
-    lineHeight: 22
-  },
-  runRemovalConfirmation: {
-    backgroundColor: theme.colors.danger.s50,
-    borderColor: theme.colors.danger.s300,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 10,
-    padding: 12
-  },
-  runRemovalCopy: {
-    gap: 3
-  },
-  runRemovalActions: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "flex-end"
-  },
-  runRestoreSection: {
-    gap: 6,
-    marginTop: 4
-  },
-  runRestoreList: {
-    gap: 6
-  },
-  runRestoreRow: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "space-between",
-    minHeight: 54,
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  runRestoreCopy: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
   },
   runEditorIntro: {
     backgroundColor: theme.colors.accent.s50,
@@ -18610,271 +18589,17 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 15,
     fontWeight: "800"
   },
-  modeList: {
-    gap: 8
-  },
-  practiceModeCard: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    minHeight: 56,
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  practiceModeCardActive: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s300
-  },
-  managedRunCard: {
-    borderColor: theme.colors.border.strong,
-    borderStyle: "solid",
-    minHeight: 62
-  },
-  managedRunCardActive: {
-    borderColor: theme.colors.accent.s400
-  },
-  practiceModeSelectArea: {
-    alignItems: "center",
-    flex: 1,
-    flexDirection: "row",
-    gap: 9,
-    justifyContent: "center",
-    minHeight: 40,
-    minWidth: 0
-  },
-  practiceModeIcon: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.s50,
-    borderRadius: 999,
-    height: 32,
-    justifyContent: "center",
-    width: 32
-  },
-  practiceModeIconActive: {
-    backgroundColor: theme.colors.accent.s100
-  },
-  modeGlyphCanvas: {
-    alignItems: "center",
-    height: 18,
-    justifyContent: "center",
-    width: 18
-  },
-  modeTargetOuter: {
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 17,
-    position: "absolute",
-    width: 17
-  },
-  modeTargetInner: {
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 10,
-    position: "absolute",
-    width: 10
-  },
-  modeDuelArrow: {
-    height: 7,
-    left: 1,
-    position: "absolute",
-    width: 15
-  },
-  modeDuelArrowUpper: {
-    top: 1,
-    transform: [{ rotate: "-28deg" }]
-  },
-  modeDuelArrowLower: {
-    bottom: 1,
-    transform: [{ rotate: "28deg" }]
-  },
-  modeDuelArrowShaft: {
-    borderRadius: 999,
-    height: 2,
-    left: 0,
-    position: "absolute",
-    top: 2.5,
-    width: 13
-  },
-  modeDuelArrowHeadTop: {
-    borderRadius: 999,
-    height: 2,
-    position: "absolute",
-    right: 0,
-    top: 1,
-    transform: [{ rotate: "45deg" }],
-    width: 6
-  },
-  modeDuelArrowHeadBottom: {
-    borderRadius: 999,
-    bottom: 1,
-    height: 2,
-    position: "absolute",
-    right: 0,
-    transform: [{ rotate: "-45deg" }],
-    width: 6
-  },
-  modeBoltTop: {
-    borderRadius: 999,
-    height: 3,
-    left: 6,
-    position: "absolute",
-    top: 2,
-    transform: [{ rotate: "-72deg" }],
-    width: 14
-  },
-  modeBoltBottom: {
-    borderRadius: 999,
-    bottom: 2,
-    height: 3,
-    left: 1,
-    position: "absolute",
-    transform: [{ rotate: "-72deg" }],
-    width: 14
-  },
-  modeListGlyph: {
-    gap: 3,
-    width: 16
-  },
-  modeListBar: {
-    borderRadius: 999,
-    height: 3,
-    width: 16
-  },
-  practiceModeCopy: {
-    flex: 1,
-    gap: 2,
-    justifyContent: "center",
-    minWidth: 0
-  },
-  practiceModeTitleRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6
-  },
-  practiceModeTitle: {
-    color: theme.colors.text.ink,
-    fontSize: 14,
-    fontWeight: "800",
-    lineHeight: 18
-  },
-  practiceModeDescription: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 16
-  },
   practiceModeDetailProbe: {
     height: 0,
     opacity: 0,
     overflow: "hidden",
     width: 0
   },
-  practiceModeMeta: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 4,
-    justifyContent: "center"
-  },
   practiceModeRating: {
     color: theme.colors.text.tertiary,
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 14
-  },
-  practiceModeDisclosure: {
-    alignItems: "center",
-    height: 44,
-    justifyContent: "center",
-    width: 28
-  },
-  practiceProgressCard: {
-    alignItems: "flex-start",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    minHeight: 92,
-    paddingHorizontal: 14,
-    paddingVertical: 14
-  },
-  practiceSummaryColumnGap: {
-    marginHorizontal: 12,
-    width: 1
-  },
-  progressMetric: {
-    alignItems: "center",
-    flex: 1,
-    gap: 4,
-    justifyContent: "flex-start",
-    minWidth: 0
-  },
-  progressMetricLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 15,
-    textAlign: "center"
-  },
-  progressDivider: {
-    alignSelf: "stretch",
-    backgroundColor: theme.colors.surfaceStrong
-  },
-  progressValue: {
-    color: theme.colors.text.ink,
-    fontSize: 22,
-    fontWeight: "800",
-    lineHeight: 26,
-    textAlign: "center"
-  },
-  progressDelta: {
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 15,
-    textAlign: "center"
-  },
-  progressContextText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
-    textAlign: "center"
-  },
-  progressDeltaPositive: {
-    color: theme.colors.positive.s600
-  },
-  progressDeltaNegative: {
-    color: theme.colors.danger.s600
-  },
-  progressDeltaNeutral: {
-    color: theme.colors.text.tertiary
-  },
-  resumeSprintCard: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.accent.s300,
-    borderRadius: 8,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    minHeight: 64,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  resumeSprintCopy: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
-  },
-  resumeSprintAction: {
-    color: theme.colors.accent.s600,
-    fontSize: 13,
-    fontWeight: "900"
   },
   pausedSessionPanel: {
     backgroundColor: theme.colors.surface,

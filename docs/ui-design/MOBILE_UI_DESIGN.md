@@ -221,9 +221,15 @@ stays close to stock iOS 26: inset grouped sections on a grouped background,
 Human Interface Guidelines text styles, tinted icon tiles, and a floating glass
 tab bar. The Interaction Lab stories under **Visual Direction** are the visual
 reference: `visual-direction--a-grouped-native-tokens`, `-phone` and `-ipad`.
-The values below are the target for the app theme in `apps/mobile/src/theme`.
-Phase 2 applies them destination by destination. Until a destination is
-migrated, it may still show the earlier values.
+The values below live in the app theme (`apps/mobile/src/theme`): the light and
+dark palettes, and the semantic `typography`, `shape`, `spacing` and `metrics`
+scales. Shared primitives in `apps/mobile/src/components/ui` (AppText, Section,
+ListRow and IconTile, Button, SegmentedControl, Badge, Icon) apply them. Phase 2
+moves destinations onto those primitives one at a time, starting with Practice
+Home; a destination not yet migrated keeps its earlier layout in the new
+palette. The pixel-named `space`, `radius`, `fontSize` and `fontWeight` scales
+are deprecated and remain only until the session guide and mistake indicator
+migrate.
 
 Style rules:
 
@@ -278,6 +284,9 @@ checks this. Dark mode is tracked by #610.
 | chrome | `rgba(249,249,251,0.9)` | `rgba(36,36,38,0.9)` | Floating tab bar and glass buttons, over a blur material |
 | chromeStroke | `rgba(0,0,0,0.08)` | `rgba(255,255,255,0.12)` | Edge of floating chrome |
 
+In the app theme the light `positive.s600` text tone is `#1B6F31`, one step
+darker than `#1F7A35`, so it also clears AA on the `surfaceStrong` fill.
+
 The accent and semantic colors are darker than the stock system colors
 (`#007AFF`, `#34C759`, `#FF3B30`) so that small text reaches AA. Board squares,
 highlights, and arrows keep their own palette; #610 owns the board in dark mode.
@@ -308,16 +317,17 @@ highlights, and arrows keep their own palette; #610 owns the board in dark mode.
 - Treatment: list-row and status icons sit in a 30-pt tinted tile (`accentSoft`
   or the matching semantic soft color, radius 8) with an 18-pt glyph in the
   matching text color. Tab bar, rail, and toolbar icons are untiled, at 22-24 pt.
-- System: SF Symbols on iOS, with one shared SVG set as the fallback for
-  Android and the Interaction Lab. Use one name map from semantic icon to SF
-  Symbol name and fallback glyph, so screens never reference a platform icon
-  directly. This is the recommended default; the owner may still override it.
-- Fallback licensing: the Lab sample uses [Lucide](https://lucide.dev) (ISC,
-  with Feather-derived glyphs under MIT). Both licenses allow redistribution
-  with their notice. Vendor only the glyphs used, keep the license notice next
-  to them, and list the set in the app's third-party notices before it ships.
-  SF Symbols are used through the system API under Apple's license and are not
-  redistributed as assets.
+- System: SF Symbols on iOS; Material Symbols Rounded on Android and in the
+  Interaction Lab. `apps/mobile/src/components/ui/iconNames.ts` maps each
+  semantic icon to both names, so screens never reference a platform icon.
+  iOS draws symbols through a small app-local native view
+  (`ChessticizeSymbolView`, `UIImage(systemName:)`); Android and the Lab draw
+  glyphs from a bundled font subset of only the icons in the map.
+- Licensing: SF Symbols are drawn through the system API under Apple's license
+  and are not redistributed. Material Symbols are Apache 2.0; the subset font
+  ships with its license text and is listed in `THIRD_PARTY_NOTICES.md`. Add a
+  glyph by extending the map and rerunning
+  `apps/mobile/scripts/build-material-symbols-subset.py`.
 
 ### Motion And Haptics
 
