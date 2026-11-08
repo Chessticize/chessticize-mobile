@@ -125,6 +125,12 @@ authentication token. It verifies the downloaded static output; it does not
 recompile the Lab. The source manifest is published as `codex-build.json`, and
 the access step checks its SHA at both immutable and branch URLs.
 
+Reassigning a branch alias can take a few seconds to propagate, so that SHA check
+polls (`node scripts/storybook-ci.mjs verify-deployed <sha> <url>...`, by default
+18 attempts 5 s apart, about 90 s in total) until every URL reports the exact
+commit. A wrong, missing or unreadable manifest that persists past the bound still
+fails the job, and the error names the URL and the last SHA it saw.
+
 ## First deployment
 
 1. Add the three repository secrets.
@@ -171,6 +177,10 @@ design or authorize product wiring.
   Production, redeploy, and require an unauthenticated HTTP 200 before handoff.
 - **HTTP 404 at `/storybook/`:** verify the Vercel project root is the repository
   root and that the deployment used the committed `vercel.json`.
+- **`Deployed source SHA mismatch` on a fresh push:** the check already retries for
+  about 90 s. If it still fails, the alias or immutable URL really serves another
+  commit: compare the SHA in the error with `codex-build.json` at that URL and rerun
+  the failed deploy job or use manual dispatch.
 - **No stable branch URL:** inspect the `vercel alias set` step, confirm the team
   token can assign aliases in the project, and verify that the deployment
   metadata shows `githubCommitRef`. Exact commit URLs alone do not replace the

@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-const [mode, source] = process.argv.slice(2);
+const [mode, source, ...rest] = process.argv.slice(2);
 const output = "apps/mobile-lab/storybook-static";
 const manifestName = "codex-build.json";
 const git = (...args) => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -42,6 +42,53 @@ function verify(sha) {
   assert.ok(manifest.files["index.html"], "Missing Storybook manager");
   console.log(`Verified Storybook bytes for ${sha}`);
 }
+// A freshly reassigned branch alias can briefly keep serving the previous
+// deployment. Poll every URL until it reports the expected commit, for a bounded
+// time (default 18 x 5 s = about 90 s), and fail closed if a wrong or missing
+// SHA persists.
+function positiveInteger(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const value = Number(raw);
+  assert.ok(Number.isInteger(value) && value > 0, `${name} must be a positive integer`);
+  return value;
+}
+async function observedSourceSha(root, attempt) {
+  const url = new URL(manifestName, root);
+  url.searchParams.set("sha-check", String(attempt));
+  try {
+    const response = await fetch(url, { headers: { "cache-control": "no-cache" }, signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) return { observed: `HTTP ${response.status}` };
+    const manifest = await response.json();
+    return { sha: manifest?.sourceSha, observed: `sourceSha ${manifest?.sourceSha}` };
+  } catch (error) {
+    return { observed: error instanceof Error ? error.message : String(error) };
+  }
+}
+async function verifyDeployed(sha, roots) {
+  assert.match(sha ?? "", /^[0-9a-f]{40}$/);
+  assert.ok(roots.length > 0, "Usage: storybook-ci.mjs verify-deployed <sha> <root-url>...");
+  const attempts = positiveInteger("STORYBOOK_SHA_ATTEMPTS", 18);
+  const intervalMs = positiveInteger("STORYBOOK_SHA_INTERVAL_MS", 5000);
+  const pending = new Map(roots.map(root => [root, "not checked"]));
+  for (let attempt = 1; attempt <= attempts && pending.size > 0; attempt++) {
+    for (const root of [...pending.keys()]) {
+      const { sha: actual, observed } = await observedSourceSha(root, attempt);
+      if (actual === sha) {
+        pending.delete(root);
+        console.log(`Deployed source SHA matches at ${root} (attempt ${attempt}/${attempts})`);
+      } else {
+        pending.set(root, observed);
+        console.log(`Waiting for ${sha} at ${root}: ${observed} (attempt ${attempt}/${attempts})`);
+      }
+    }
+    if (pending.size > 0 && attempt < attempts) await new Promise(resolve => setTimeout(resolve, intervalMs));
+  }
+  for (const [root, observed] of pending) {
+    console.error(`::error::Deployed source SHA mismatch at ${root}: expected ${sha}, last saw ${observed} after ${attempts} attempts`);
+  }
+  if (pending.size > 0) process.exitCode = 1;
+}
 switch (mode) {
   case "scope": console.log(needsBuild(source)); break;
   case "seal": {
@@ -53,9 +100,10 @@ switch (mode) {
     break;
   }
   case "verify": verify(source); break;
+  case "verify-deployed": await verifyDeployed(source, rest); break;
   case "vercel-build":
     if (process.env.STORYBOOK_PREBUILT === "1") verify(process.env.GITHUB_SHA);
     else execFileSync("pnpm", ["mobile:lab:validate"], { stdio: "inherit" });
     break;
-  default: throw new Error("Usage: storybook-ci.mjs scope [base] | seal <sha> | verify <sha> | vercel-build");
+  default: throw new Error("Usage: storybook-ci.mjs scope [base] | seal <sha> | verify <sha> | verify-deployed <sha> <root-url>... | vercel-build");
 }

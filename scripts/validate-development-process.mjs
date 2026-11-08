@@ -372,7 +372,7 @@ assert.match(mobileLabWorkflow, /actions\/download-artifact@v4/);
 assert.equal(count(mobileLabWorkflow, "storybook-${{ github.sha }}-${{ github.run_id }}"), 2);
 assert.match(mobileLabWorkflow, /STORYBOOK_PREBUILT: "1"/);
 assert.match(mobileLabWorkflow, /node scripts\/storybook-ci\.mjs verify/);
-assert.match(mobileLabWorkflow, /Deployed source SHA mismatch/);
+assert.match(read("scripts/storybook-ci.mjs"), /Deployed source SHA mismatch/);
 assert.match(mobileLabWorkflow, /--meta=githubDeployment=1/);
 assert.match(mobileLabWorkflow, /--meta=githubCommitRef="\$GITHUB_REF_NAME"/);
 assert.match(mobileLabWorkflow, /deploy_args\+=\(--prod\)/);
@@ -393,6 +393,11 @@ assert.match(mobileLabWorkflow, /verify_public_url "\$IMMUTABLE_URL"/);
 assert.match(mobileLabWorkflow, /verify_public_url "\$STORYBOOK_URL"/);
 assert.match(mobileLabWorkflow, /verify_public_url "\$\{IMMUTABLE_URL\}storybook\/"/);
 assert.match(mobileLabWorkflow, /verify_public_url "\$\{STORYBOOK_URL\}storybook\/"/);
+assert.match(
+  mobileLabWorkflow,
+  /node scripts\/storybook-ci\.mjs verify-deployed "\$GITHUB_SHA" "\$IMMUTABLE_URL" "\$STORYBOOK_URL"/
+);
+assert.match(storybookDeployment, /verify-deployed/);
 assert.doesNotMatch(storybookDeployment, /pnpm dlx\s+vercel/);
 assert.match(storybookDeployment, /pnpm exec vercel login/);
 assert.match(storybookDeployment, /pnpm exec vercel link/);
