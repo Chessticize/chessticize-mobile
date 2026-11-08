@@ -12580,16 +12580,14 @@ function HistoryAttemptRow({
       style={({ pressed }) => [rowStyle, styles.attemptRow, pressed ? styles.settingsRowPressed : null]}
       onPress={onOpen}
     >
-      <View style={styles.attemptRowLeading}>
-        <AttemptStatusTile
-          testID={`history-attempt-${attempt.id}-badge`}
-          tone={isIncomplete
-            ? "incomplete"
-            : isTimedOut || isWrong
-              ? "wrong"
-              : isCorrect ? "correct" : "unknown"}
-        />
-      </View>
+      <AttemptStatusTile
+        testID={`history-attempt-${attempt.id}-badge`}
+        tone={isIncomplete
+          ? "incomplete"
+          : isTimedOut || isWrong
+            ? "wrong"
+            : isCorrect ? "correct" : "unknown"}
+      />
       <View style={styles.attemptRowCopy}>
         <View style={styles.historyAttemptHeader}>
           <AppText variant="headline">{attempt.runName ?? historyAttemptModeLabel(detail.mode)}</AppText>
@@ -20397,10 +20395,6 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 1,
     gap: 2,
     minWidth: 0
-  },
-  // The History result icon is centered on the whole row (owner decision).
-  attemptRowLeading: {
-    alignSelf: "center"
   },
   attemptRowIdentity: {
     flexDirection: "row",
