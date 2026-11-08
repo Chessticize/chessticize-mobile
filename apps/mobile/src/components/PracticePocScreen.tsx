@@ -10222,6 +10222,7 @@ function PuzzleTimingIndicator({
       onLayout={onTargetLayout}
     >
       <Text
+        maxFontSizeMultiplier={SESSION_CHROME_MAX_TEXT_SCALE}
         numberOfLines={1}
         style={[
           styles.puzzleTimingIndicatorText,
@@ -10234,6 +10235,7 @@ function PuzzleTimingIndicator({
       {countdownSeconds === null ? null : (
         <Text
           accessibilityElementsHidden
+          maxFontSizeMultiplier={SESSION_CHROME_MAX_TEXT_SCALE}
           style={styles.puzzleTimingCountdown}
           testID="session-puzzle-countdown"
         >
@@ -10993,6 +10995,7 @@ function PracticePrompt({
             accessible={!layoutCopyHidden}
             accessibilityElementsHidden={layoutCopyHidden}
             importantForAccessibility={layoutCopyHidden ? "no-hide-descendants" : "auto"}
+            maxFontSizeMultiplier={SESSION_CHROME_MAX_TEXT_SCALE}
             style={[styles.promptTitle, layoutCopyHidden ? styles.promptSolvedLayoutCopy : null]}
             testID="practice-prompt-title-layout"
           >
@@ -11003,6 +11006,7 @@ function PracticePrompt({
           accessible={!layoutContextHidden}
           accessibilityElementsHidden={layoutContextHidden}
           importantForAccessibility={layoutContextHidden ? "no-hide-descendants" : "auto"}
+          maxFontSizeMultiplier={SESSION_CHROME_MAX_TEXT_SCALE}
           style={[styles.promptText, layoutContextHidden ? styles.promptSolvedLayoutCopy : null]}
           testID="practice-prompt-context"
         >
@@ -11012,6 +11016,7 @@ function PracticePrompt({
           accessible={!layoutHintHidden}
           accessibilityElementsHidden={layoutHintHidden}
           importantForAccessibility={layoutHintHidden ? "no-hide-descendants" : "auto"}
+          maxFontSizeMultiplier={SESSION_CHROME_MAX_TEXT_SCALE}
           numberOfLines={reserveDefaultLayout ? undefined : promptHintNumberOfLines}
           style={[
             styles.promptHint,
@@ -11164,9 +11169,9 @@ function SessionScoreMetric({
     >
       {showLabel ? (
         <Text
-          adjustsFontSizeToFit
-          maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
-          minimumFontScale={0.5}
+          adjustsFontSizeToFit={compact}
+          maxFontSizeMultiplier={SCORE_LABEL_MAX_TEXT_SCALE}
+          minimumFontScale={0.75}
           numberOfLines={1}
           style={[
             styles.sessionScoreLabel,
@@ -11293,6 +11298,7 @@ function BoardCoordinateOverlay({
               width: squareSize
             }
           ]}
+          allowFontScaling={false}
           testID={`board-coordinate-file-${file}`}
         >
           {file}
@@ -11311,6 +11317,7 @@ function BoardCoordinateOverlay({
               top: index * squareSize + 2
             }
           ]}
+          allowFontScaling={false}
           testID={`board-coordinate-rank-${rank}`}
         >
           {rank}
@@ -13826,6 +13833,10 @@ const REVIEW_FORECAST_STACK_FONT_SCALE = 1.5;
 // let HUD values grow at most this much before they shrink to fit.
 const HUD_LARGE_TEXT_FONT_SCALE = 1.5;
 const HUD_MAX_TEXT_SCALE = 2;
+// The prompt, puzzle timing and score labels sit in frames sized for the
+// board; they grow at most this much, and board coordinates do not scale.
+const SESSION_CHROME_MAX_TEXT_SCALE = 1.5;
+const SCORE_LABEL_MAX_TEXT_SCALE = 1.3;
 
 function ReviewForecastMetric({
   count,
