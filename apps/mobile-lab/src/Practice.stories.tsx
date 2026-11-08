@@ -3,7 +3,7 @@ import { LabScenario, type LabStoryPresentation } from "./LabScenario.tsx";
 import {
   LabTextSize,
   LARGEST_ACCESSIBILITY_FONT_SCALE
-} from "./sprintResultRedesign/SprintResultPrototype.tsx";
+} from "./LabTextSize.tsx";
 import {
   centerTestId,
   clickTestId,
