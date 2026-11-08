@@ -18773,9 +18773,11 @@ const useStyles = makeStyles((theme) => ({
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING
   },
+  // Matches the summary chip row so the slot keeps one height when toggled.
   reviewFilterContent: {
     gap: 8,
-    paddingHorizontal: UI_PADDING
+    paddingHorizontal: UI_PADDING,
+    paddingVertical: 4
   },
   reviewForecastRow: {
     backgroundColor: theme.colors.surface,

@@ -80,7 +80,7 @@ export const DueQueue: Story = {
       "review-due-items",
       "review-today-history"
     ]);
-    await expectTestIdHeight(canvasElement, "review-filter-controls", 32);
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 44);
     await expectTestIdText(canvasElement, "review-active-filter-0", "All");
     expectTestIdAbsent(canvasElement, "review-active-filter-1");
     await clickTestId(canvasElement, "review-today-to-review-toggle");
@@ -98,11 +98,11 @@ export const DueQueue: Story = {
     await clickTestId(canvasElement, "review-filter-toggle");
     await waitForVisibleTestId(canvasElement, "review-filter-options-motion");
     await waitForHiddenTestId(canvasElement, "review-filter-summary-motion");
-    await expectTestIdHeight(canvasElement, "review-filter-controls", 32);
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 44);
     await clickTestId(canvasElement, "review-filter-toggle");
     await waitForHiddenTestId(canvasElement, "review-filter-options-motion");
     await waitForVisibleTestId(canvasElement, "review-filter-summary-motion");
-    await expectTestIdHeight(canvasElement, "review-filter-controls", 32);
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 44);
     expectTestIdAbsent(canvasElement, "review-dev-controls");
   }
 };
@@ -130,13 +130,13 @@ export const Filters: Story = {
       "review-due-items",
       "review-today-history"
     ]);
-    await expectTestIdHeight(canvasElement, "review-filter-controls", 32);
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 44);
     await expectTestIdText(canvasElement, "review-active-filter-0", "All");
     expectTestIdAbsent(canvasElement, "review-active-filter-1");
     await clickTestId(canvasElement, "review-filter-toggle");
     await waitForVisibleTestId(canvasElement, "review-filter-options-motion");
     await waitForHiddenTestId(canvasElement, "review-filter-summary-motion");
-    await expectTestIdHeight(canvasElement, "review-filter-controls", 32);
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 44);
     await expectTestIdText(canvasElement, "review-filter-all", "All");
     await expectTestIdText(canvasElement, "review-filter-overdue", "Overdue");
     await expectTestIdText(canvasElement, "review-filter-repeat-misses", "Missed 2+ times");
@@ -152,7 +152,7 @@ export const Filters: Story = {
     await clickTestId(canvasElement, "review-filter-toggle");
     await waitForHiddenTestId(canvasElement, "review-filter-options-motion");
     await waitForVisibleTestId(canvasElement, "review-filter-summary-motion");
-    await expectTestIdHeight(canvasElement, "review-filter-controls", 32);
+    await expectTestIdHeight(canvasElement, "review-filter-controls", 44);
     await expectTestIdText(canvasElement, "review-active-filter-0", "Missed 2+ times");
     expectTestIdAbsent(canvasElement, "review-active-filter-1");
   }
