@@ -73,7 +73,9 @@ There should be no mobile Home tab, Game Review tab, or Packs tab in v1.
 Navigation rules:
 
 - Practice is the default launch tab.
-- Active practice sessions hide the tab bar and use a focused session shell.
+- Top-level navigation uses the platform's native tab container (#612). Active
+  Runs use a focused session shell that hides all navigation chrome (the tab
+  bar, the Android rail) and uses the full window.
 - Replay and Review reuse the same board-based surface but are distinct activities.
 - Replay is the unscored inspection, retry, and analysis surface opened from Sprint Result or History. Review is the official spaced-repetition flow that records Review attempts and updates the queue.
 - Settings owns puzzle data source attribution and license notes for the bundled offline puzzle data.
@@ -119,10 +121,10 @@ Adaptive classes:
 
 | Class | Typical viewport | Navigation | Content rule |
 | --- | --- | --- | --- |
-| Compact portrait | iPhone portrait, narrow split view | Bottom tab bar when app chrome is visible | Existing one-column scroll. Active sessions hide tabs and stack status, board, score, prompt, and results vertically. |
-| Compact landscape | Compact wide-short resizable or mirrored window, short-height split view | Icon rail outside active sessions; no bottom tab bar while playing | Active session uses a board lane plus a right control rail. The control rail owns status, prompt, score, pause/abandon, and overflow scrolling. |
-| Regular portrait | iPad portrait, tall large split view | Persistent side rail with labels when width allows, icon-only rail below that | Active practice uses a large board-first vertical flow so the board can grow with the tall screen. Dashboard, history, settings, and review surfaces can still use wider content where useful. |
-| Regular landscape | iPad landscape, wide large split view | Persistent side rail with labels when width allows, icon-only rail below that | Use two-pane or three-pane layouts with constrained content width. Active-session controls sit beside the board where space allows. |
+| Compact portrait | iPhone portrait, narrow split view | System tab bar: bottom glass capsule; vertical column on iPhone Duo | Existing one-column scroll. Active sessions hide the tab chrome and stack status, board, score, prompt, and results vertically. |
+| Compact landscape | Compact wide-short resizable or mirrored window, short-height split view | System tab bar where the system places it; Material rail on Android at 600 dp and wider | Active session uses a board lane plus a right control rail. The control rail owns status, prompt, score, pause/abandon, and overflow scrolling. |
+| Regular portrait | iPad portrait, tall large split view, Android tablet or unfolded foldable | iPad: top glass tab bar. Android: Material rail | Active practice uses a large board-first vertical flow so the board can grow with the tall screen. Dashboard, history, settings, and review surfaces can still use wider content where useful. |
+| Regular landscape | iPad landscape, wide large split view, Android tablet | iPad: top glass tab bar. Android: Material rail | Use two-pane or three-pane layouts with constrained content width. Active-session controls sit beside the board where space allows. |
 
 Sizing rules:
 
@@ -134,12 +136,43 @@ Sizing rules:
 - iPad landscape board target: cap at a comfortable inspection size rather than filling the whole display. A 560-640 pt board is usually enough; extra space belongs to analysis, queue, history, or settings detail panels.
 - Never scale type with viewport width. Keep platform text sizes stable and let columns, gaps, and panel counts change instead.
 
-Navigation rules:
+Navigation rules (#612, owner decision 2026-11-07):
 
-- Bottom tabs are for compact portrait only.
-- Compact landscape uses a narrow vertical rail outside active sessions so navigation does not consume scarce height.
-- Regular width uses a persistent side rail. At wider iPad sizes, show icon plus text labels; at narrower split-view widths, collapse to icon-only.
-- Active practice and review sessions hide global navigation in every class. The exit/close affordance remains in the session header or control rail.
+- Top-level navigation is the native tab container (react-native-screens
+  `Tabs.Host`: UITabBarController on iOS, Material bottom navigation on Android
+  phones). Every device shows the same four items in the same order, with the
+  same labels and Review badge and matching icons. Content, the session screen,
+  and the board stay custom and use the direction A tokens.
+- iPhone: the floating glass tab bar at the bottom.
+- iPad: the same items in the floating glass tab bar at the top, in both
+  orientations and at Split View widths that keep a regular width (owner
+  decision, revised 2026-11-07). There is no sidebar and no sidebar toggle: the
+  host uses the plain tab bar mode. The iPad top bar is text only (labels and
+  the Review badge, no icons), as the system draws it; the owner accepted this.
+- iPhone Duo: the app never overrides bar placement. The system rules apply on
+  both displays: a vertical column on the hardware side on the outer display
+  (on the right in portrait), and on the inner display a vertical column in
+  landscape and horizontal bars in portrait.
+- Android phones (< 600 dp): Material bottom navigation, labels always shown.
+- Android tablets and unfolded foldables (>= 600 dp, Material medium and
+  expanded widths): a Material navigation rail on the leading edge. The native
+  host has no Android rail, so the app draws it (80 dp, pill indicator, labels
+  below the icons) and hides the host's bottom navigation at these widths. iOS
+  never uses it.
+- Android uses the app theme for navigation colors, not Material You dynamic
+  color.
+- Content uses the safe-area insets the tab host reports, so it never sits
+  under the tab bar, the Duo column, or the Android rail.
+- Active practice and review sessions hide all global navigation chrome in
+  every class and use the full window. The exit/close affordance remains in the
+  session header or control rail.
+- In-session controls are the same set, order, icons, and labels on every
+  device. Only their arrangement changes: stacked below the board, or in a rail
+  beside it. On iPhone Duo, custom in-session chrome uses the side the system
+  reports rather than a hard-coded edge.
+- The Interaction Lab cannot render the native container. It draws a
+  placeholder of the same chrome, which does not prove Liquid Glass; native
+  evidence comes from simulators.
 
 Safe-area rules:
 
@@ -153,7 +186,7 @@ Safe-area rules:
 Practice Home:
 
 - Compact portrait keeps the current task-first list.
-- Compact landscape shows a left navigation rail plus a two-column content area: mode shortcuts and progress/review summary. Avoid a wide desktop dashboard.
+- Compact landscape shows a two-column content area: mode shortcuts and progress/review summary. Avoid a wide desktop dashboard.
 - Regular width uses two columns: primary practice modes on the left, progress/review/resume cards on the right. Keep the active "Start" affordance close to the mode row.
 
 Active Sprint:
@@ -347,6 +380,11 @@ highlights, and arrows keep their own palette; #610 owns the board in dark mode.
   ships with its license text and is listed in `THIRD_PARTY_NOTICES.md`. Add a
   glyph by extending the map and rerunning
   `apps/mobile/scripts/build-material-symbols-subset.py`.
+- Tab icons (#612) use the same map: Practice `target` / `target`, Review
+  `arrow.counterclockwise` / `replay`, History `clock.arrow.circlepath` /
+  `history`, Settings `gearshape` / `settings`. The native Android bottom
+  navigation cannot draw a font, so the subset script also writes those glyphs
+  as vector drawables (`res/drawable/ic_tab_*.xml`) from the same font instance.
 
 ### Motion And Haptics
 
@@ -841,7 +879,8 @@ Required labels/test IDs:
 - `settings-puzzle-data-license`
 - `settings-support-email`
 - `adaptive-layout-root`
-- `primary-navigation-rail`
+- `practice-tab`, `review-tab`, `history-tab`, `settings-tab` (native tab
+  items; on the iPad top bar the ID is on two views, so tests match the first)
 - `session-control-rail`
 - `analysis-side-panel`
 
@@ -874,4 +913,3 @@ Accessibility rules:
 ## Open Design Questions
 
 - Whether custom max mistakes is part of v1 custom sprint or should remain fixed by scoring mode.
-- Whether regular-width iPad navigation should always show text labels or collapse to icon-only in smaller split-view widths.

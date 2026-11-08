@@ -6114,17 +6114,12 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-tab")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
     expect(() => findByTestId(renderer, "packs-tab")).toThrow();
-    expect(findByTestId(renderer, "practice-tab-icon")).toBeTruthy();
-    expect(findByTestId(renderer, "review-tab-icon")).toBeTruthy();
-    expect(findByTestId(renderer, "history-tab-icon")).toBeTruthy();
-    expect(findByTestId(renderer, "settings-tab-icon")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "practice-tab-icon"))).toBe("");
-    expect(collectText(findByTestId(renderer, "history-tab-icon"))).toBe("");
-    expect(hasStyleEntry(findByTestId(renderer, "practice-tab-icon"), "backgroundColor", lightTheme.colors.accent.s100)).toBe(false);
-    expect(findByTestId(renderer, "practice-tab-target-outer")).toBeTruthy();
-    expect(findByTestId(renderer, "practice-tab-target-inner")).toBeTruthy();
-    expect(findByTestId(renderer, "history-tab-clock-outline")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "settings-tab-icon"))).toBe("");
+    // The tab chrome is the native tab host (#612); Jest renders its placeholder.
+    expect(findByTestId(renderer, "native-tab-chrome-bottomBar")).toBeTruthy();
+    for (const tabID of ["practice-tab", "review-tab", "history-tab", "settings-tab"]) {
+      expect(findByTestId(renderer, `${tabID}-icon`)).toBeTruthy();
+    }
+    expect(findByTestId(renderer, "practice-tab").props.accessibilityState).toEqual({ selected: true });
     expect(collectText(renderer.root)).not.toContain("⚙");
     expect(() => findByTestId(renderer, "analysis-tab")).toThrow();
     expect(findByTestId(renderer, "practice-mode-standard")).toBeTruthy();
@@ -6425,15 +6420,15 @@ describe("PracticePocScreen", () => {
   });
 
   it.each([
-    { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 204, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
-    { label: "modern iPhone portrait", width: 430, height: 932, scale: 3, layout: "compactPortrait", boardSize: 398, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false },
-    { label: "compact wide-short window", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, sideRail: true, railWidth: 64, sessionRail: true, homeColumns: true },
-    { label: "iPad-on-Mac wide-short window", width: 993, height: 346, scale: 2, layout: "compactLandscape", boardSize: 314, sideRail: true, railWidth: 168, sessionRail: true, homeColumns: true },
-    { label: "iPad A16 portrait", width: 820, height: 1180, scale: 2, layout: "regularPortrait", boardSize: 788, sideRail: true, railWidth: 76, sessionRail: false, homeColumns: false },
-    { label: "iPad Pro portrait", width: 1032, height: 1376, scale: 2, layout: "regularPortrait", boardSize: 860, sideRail: true, railWidth: 168, sessionRail: false, homeColumns: true },
-    { label: "iPad landscape", width: 1180, height: 820, scale: 2, layout: "regularLandscape", boardSize: 640, sideRail: true, railWidth: 168, sessionRail: true, homeColumns: true },
-    { label: "iPad split-width portrait", width: 694, height: 1024, scale: 2, layout: "compactPortrait", boardSize: 560, sideRail: false, railWidth: null, sessionRail: false, homeColumns: false }
-  ])("renders the core practice surfaces in a %s viewport", ({ width, height, scale, layout, boardSize, sideRail, railWidth, sessionRail, homeColumns }) => {
+    { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 204, chrome: "bottomBar", sessionRail: false, homeColumns: false },
+    { label: "modern iPhone portrait", width: 430, height: 932, scale: 3, layout: "compactPortrait", boardSize: 398, chrome: "bottomBar", sessionRail: false, homeColumns: false },
+    { label: "compact wide-short window", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, chrome: "bottomBar", sessionRail: true, homeColumns: true },
+    { label: "iPad-on-Mac wide-short window", width: 993, height: 346, scale: 2, layout: "compactLandscape", boardSize: 314, chrome: "bottomBar", sessionRail: true, homeColumns: true },
+    { label: "iPad A16 portrait", width: 820, height: 1180, scale: 2, layout: "regularPortrait", boardSize: 788, chrome: "topBar", sessionRail: false, homeColumns: false },
+    { label: "iPad Pro portrait", width: 1032, height: 1376, scale: 2, layout: "regularPortrait", boardSize: 860, chrome: "topBar", sessionRail: false, homeColumns: true },
+    { label: "iPad landscape", width: 1180, height: 820, scale: 2, layout: "regularLandscape", boardSize: 640, chrome: "topBar", sessionRail: true, homeColumns: true },
+    { label: "iPad split-width portrait", width: 694, height: 1024, scale: 2, layout: "compactPortrait", boardSize: 560, chrome: "bottomBar", sessionRail: false, homeColumns: false }
+  ])("renders the core practice surfaces in a %s viewport", ({ width, height, scale, layout, boardSize, chrome, sessionRail, homeColumns }) => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
     }).__setWindowDimensions?.({ width, height, scale, fontScale: 1 });
@@ -6447,15 +6442,14 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "practice-review-strip")).toThrow();
     expect(findByTestId(renderer, "practice-tab")).toBeTruthy();
     expect(findByTestId(renderer, "settings-tab")).toBeTruthy();
-    if (sideRail) {
-      const rail = findByTestId(renderer, "navigation-rail");
-      expect(rail).toBeTruthy();
-      expect(flattenTestStyle(rail.props.style).width).toBe(railWidth);
-    } else {
-      expect(() => findByTestId(renderer, "navigation-rail")).toThrow();
-    }
+    expect(findByTestId(renderer, `native-tab-chrome-${chrome}`)).toBeTruthy();
+    expect(() => findByTestId(renderer, "navigation-rail")).toThrow();
 
     startStandardSprint(renderer);
+
+    // An active Run hides every piece of navigation chrome.
+    expect(renderer.root.findAll((node) => String(node.props.testID).startsWith("native-tab-chrome-"))).toHaveLength(0);
+    expect(() => findByTestId(renderer, "practice-tab")).toThrow();
 
     const board = findByTestId(renderer, "session-board");
     const boardStyle = flattenTestStyle(board.props.style);
@@ -6500,18 +6494,6 @@ describe("PracticePocScreen", () => {
       .toBe("auto");
   });
 
-  it("keeps expanded navigation labels on one line in an iPad-on-Mac wide-short window", () => {
-    (ReactNative as unknown as {
-      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
-    }).__setWindowDimensions?.({ width: 993, height: 346, scale: 2, fontScale: 1 });
-
-    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
-
-    for (const testID of ["practice-tab", "review-tab", "history-tab", "settings-tab"]) {
-      const label = findByTestId(renderer, `${testID}-label`);
-      expect(label.props.numberOfLines).toBe(1);
-    }
-  });
 
   it("resets Practice stack direction and column widths across a live resize", () => {
     const windowDimensions = ReactNative as unknown as {
@@ -6554,15 +6536,6 @@ describe("PracticePocScreen", () => {
     });
   });
 
-  it("does not constrain compact bottom-navigation labels to one line", () => {
-    (ReactNative as unknown as {
-      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
-    }).__setWindowDimensions?.({ width: 430, height: 932, scale: 3, fontScale: 1 });
-
-    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
-
-    expect(findByTestId(renderer, "practice-tab-label").props.numberOfLines).toBeUndefined();
-  });
 
   it("reserves vertical session chrome inside a foldable landscape viewport", () => {
     const densityScale = 420 / 160;
@@ -6887,7 +6860,7 @@ describe("PracticePocScreen", () => {
       }).__setWindowDimensions?.({ width: 1032, height: 1376, scale: 2, fontScale: 2 });
     });
     const largeTextRenderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
-    expect(flattenTestStyle(findByTestId(largeTextRenderer, "navigation-rail").props.style).width).toBe(76);
+    expect(findByTestId(largeTextRenderer, "native-tab-chrome-topBar")).toBeTruthy();
     expect(styleEntryMatches(findByTestId(largeTextRenderer, "practice-home-layout").props.style, "flexDirection", "row")).toBe(false);
     startStandardSprint(largeTextRenderer);
     expect(flattenTestStyle(findByTestId(largeTextRenderer, "session-board").props.style).width).toBeLessThanOrEqual(860);
@@ -13143,7 +13116,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-tab-badge"))).toBe("1");
-    expect(hasStyleEntry(findByTestId(renderer, "review-tab-badge"), "backgroundColor", lightTheme.colors.danger.s600)).toBe(false);
+    expect(findByTestId(renderer, "review-tab").props.accessibilityLabel).toBe("Review tab, 1 due reviews");
     expect(() => findByTestId(renderer, "app-shell-header")).toThrow();
     expect(collectText(findByTestId(renderer, "review-action-header"))).not.toContain("Due reviews");
     expect(collectText(findByTestId(renderer, "review-action-header"))).toContain("Review");
@@ -14466,52 +14439,29 @@ describe("PracticePocScreen", () => {
   });
 
   it.each([
-    { label: "iPhone 17 Pro Max bottom tabs", width: 440, height: 956, scale: 3, rail: false, badgeTop: -8 },
-    { label: "iPad expanded rail", width: 1180, height: 820, scale: 2, rail: true, badgeTop: -7 }
-  ])("lets a two-digit review badge fit native font metrics at the icon's upper-right in $label", ({
-    width,
+    { label: "iPhone bottom tab bar", width: 440, height: 956, chrome: "bottomBar" },
+    { label: "iPad top tab bar", width: 1180, height: 820, chrome: "topBar" }
+  ])("passes a two-digit review badge and its label to the native tab item in the $label", ({
+    chrome,
     height,
-    scale,
-    rail,
-    badgeTop
+    width
   }) => {
     (ReactNative as unknown as {
       __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
-    }).__setWindowDimensions?.({ width, height, scale, fontScale: 1 });
+    }).__setWindowDimensions?.({ width, height, scale: 2, fontScale: 1 });
     jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
 
     const renderer = renderScreen({ practiceService: createDueReviewService(18) });
-    const badge = findByTestId(renderer, "review-tab-badge");
-    const badgeStyle = flattenTestStyle(badge.props.style);
-    const iconStyle = flattenTestStyle(findByTestId(renderer, "review-tab-icon").props.style);
 
-    expect(collectText(badge)).toBe("18");
-    expect(badge.props.allowFontScaling).toBe(false);
-    expect(badge.props.numberOfLines).toBe(1);
-    expect(badgeStyle.left).toBe(24);
-    expect(badgeStyle.right).toBeUndefined();
-    expect(badgeStyle.top).toBe(badgeTop);
-    expect(badgeStyle.minHeight).toBe(18);
-    expect(badgeStyle.minWidth).toBe(18);
-    expect(badgeStyle.width).toBeUndefined();
-    expect(badgeStyle.paddingHorizontal).toBe(4);
-    expect(iconStyle.overflow).toBe("visible");
-    expect(iconStyle.width).toBe(32);
-    if (rail) {
-      expect(findByTestId(renderer, "navigation-rail").props.accessibilityLabel).toBe("Primary navigation rail");
-    } else {
-      expect(() => findByTestId(renderer, "navigation-rail")).toThrow();
-    }
+    expect(findByTestId(renderer, `native-tab-chrome-${chrome}`)).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "review-tab-badge"))).toBe("18");
+    expect(findByTestId(renderer, "review-tab").props.accessibilityLabel).toMatch(/^Review tab, 18 due reviews/);
   });
 
   it("caps a large review badge without wrapping", () => {
     jest.setSystemTime(new Date("2026-06-21T12:00:00.000Z"));
     const renderer = renderScreen({ practiceService: createDueReviewService(100) });
-    const badge = findByTestId(renderer, "review-tab-badge");
-
-    expect(collectText(badge)).toBe("99+");
-    expect(badge.props.numberOfLines).toBe(1);
-    expect(flattenTestStyle(badge.props.style).width).toBeUndefined();
+    expect(collectText(findByTestId(renderer, "review-tab-badge"))).toBe("99+");
   });
 
   it("auto-advances a wrong due Arrow Duel review and keeps it in today's history", async () => {

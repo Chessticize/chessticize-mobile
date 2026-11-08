@@ -30,7 +30,14 @@ export const ICONS = {
   remove: { sf: "minus", material: "remove", codepoint: 0xe15b },
   restore: { sf: "arrow.uturn.backward", material: "undo", codepoint: 0xe166 },
   standard: { sf: "target", material: "target", codepoint: 0xe719 },
-  survival: { sf: "shield", material: "shield", codepoint: 0xe9e0 }
+  survival: { sf: "shield", material: "shield", codepoint: 0xe9e0 },
+  // Top-level tabs (#612). The native Android bottom navigation draws these from
+  // vector drawables (res/drawable/ic_tab_*.xml) that the subset script writes
+  // from the same font instance; see TAB_DRAWABLES there.
+  tabHistory: { sf: "clock.arrow.circlepath", material: "history", codepoint: 0xe8b3 },
+  tabPractice: { sf: "target", material: "target", codepoint: 0xe719 },
+  tabReview: { sf: "arrow.counterclockwise", material: "replay", codepoint: 0xe042 },
+  tabSettings: { sf: "gearshape", material: "settings", codepoint: 0xe8b8 }
 } as const satisfies Record<string, IconSpec>;
 
 export type IconName = keyof typeof ICONS;

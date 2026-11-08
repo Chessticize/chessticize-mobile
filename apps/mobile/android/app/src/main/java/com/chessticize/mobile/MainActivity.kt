@@ -11,6 +11,7 @@ import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.swmansion.rnscreens.fragment.restoration.RNScreensFragmentFactory
 
 interface ReactNativeBackCallbackController {
   fun setReactNativeBackHandlingEnabled(enabled: Boolean)
@@ -39,7 +40,11 @@ class MainActivity : ReactActivity(), ReactNativeBackCallbackController, ReviewR
 
   override fun onCreate(savedInstanceState: Bundle?) {
     ChessticizeTestLaunchArguments.capture(intent)
-    super.onCreate(savedInstanceState)
+    // react-native-screens: discard fragment state restored across Activity
+    // restarts. The app always starts on Practice with fresh JavaScript state,
+    // so the native tab host must not restore the previous tab selection (#612).
+    supportFragmentManager.fragmentFactory = RNScreensFragmentFactory()
+    super.onCreate(null)
     syncNavigationBarIcons()
   }
 

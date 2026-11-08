@@ -16,7 +16,8 @@ const {
   waitForElementTextContaining,
   failStandardSprint,
   grantAndroidRuntimePermission,
-  withAndroidUiDiagnostics
+  withAndroidUiDiagnostics,
+  topLevelTab,
 } = require('./helpers');
 const {
   findUniqueAndroidUiNodeByLabel,
@@ -505,7 +506,7 @@ async function dismissSprintSummary() {
   // The app chrome (tab bar) is hidden while the sprint summary is open;
   // leave via Done before navigating tabs.
   await element(by.id('back-practice-button')).tap();
-  await waitFor(element(by.id('practice-tab'))).toBeVisible().withTimeout(10000);
+  await waitFor(topLevelTab('practice-tab')).toBeVisible().withTimeout(10000);
 }
 
 async function launchAppAt(nowMs, deleteData, extraLaunchArgs = {}) {

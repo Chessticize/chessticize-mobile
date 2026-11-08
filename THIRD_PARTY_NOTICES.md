@@ -64,6 +64,8 @@ the complete license texts shipped in this repository.
 - Files shipped:
   - `apps/mobile/android/app/src/main/assets/fonts/ChessticizeSymbols.ttf`
   - `apps/mobile/android/app/src/main/assets/fonts/ChessticizeSymbols-LICENSE.txt`
+  - `apps/mobile/android/app/src/main/res/drawable/ic_tab_*.xml` (the tab
+    glyphs as vector drawables for the native Android bottom navigation)
 - License: Apache License 2.0; the full text ships beside the font.
 - Source: https://github.com/google/material-design-icons/tree/master/variablefont
 - Notes: The Android app and the Interaction Lab draw interface icons from this
@@ -98,6 +100,7 @@ installed package manifests currently report:
 | `react-native-gesture-handler` | `3.0.2` | MIT | https://github.com/software-mansion/react-native-gesture-handler |
 | `react-native-reanimated` | `4.4.1` | MIT | https://github.com/software-mansion/react-native-reanimated |
 | `react-native-safe-area-context` | `5.8.0` | MIT | https://github.com/AppAndFlow/react-native-safe-area-context |
+| `react-native-screens` | `4.30.1` | MIT | https://github.com/software-mansion/react-native-screens |
 | `react-native-worklets` | `0.9.2` | MIT | https://github.com/software-mansion/react-native-reanimated |
 | `chess.js` | `1.4.0` | BSD-2-Clause | https://github.com/jhlywa/chess.js |
 
@@ -105,6 +108,10 @@ The React Native `0.86.0` package has a local build-path portability fix in
 `patches/react-native@0.86.0.patch`. It replaces an absolute Hermes compiler
 path in the evaluated CocoaPods specification with a stable `PODS_ROOT`-based
 path; it does not change app behavior.
+
+The `react-native-screens` `4.30.1` package has a local patch in
+`patches/react-native-screens@4.30.1.patch`. It carries each tab's test ID onto
+the iOS `UITab` so the iPad floating tab bar exposes it.
 
 Before each App Store submission, refresh this inventory against the exact
 lockfile used for the submitted build.

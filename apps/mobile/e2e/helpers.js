@@ -175,11 +175,16 @@ async function completeFirstUseSessionGuides() {
     }
     if (await detoxElementExists('practice-session-guide-start')) {
       try {
-        await element(by.id('practice-main-scroll')).scrollTo('top');
-        await waitFor(element(by.id('practice-session-guide-start')))
-          .toBeVisible()
-          .whileElement(by.id('practice-main-scroll'))
-          .scroll(100, 'down', 0.5, 0.5);
+        // The guide callout is a modal overlay and can cover the point where
+        // a scroll gesture would start, so only scroll when the guide's
+        // action is not already on screen.
+        if (!(await detoxElementIsVisible('practice-session-guide-start'))) {
+          await element(by.id('practice-main-scroll')).scrollTo('top');
+          await waitFor(element(by.id('practice-session-guide-start')))
+            .toBeVisible()
+            .whileElement(by.id('practice-main-scroll'))
+            .scroll(100, 'down', 0.5, 0.5);
+        }
         await element(by.id('practice-session-guide-start')).tap();
       } catch (error) {
         // The guide can remount while Detox resolves its scroll, visibility, or
@@ -1031,12 +1036,28 @@ function androidBoardTapPoint(frame, square, flipped, metrics) {
   };
 }
 
+// Top-level tabs are native items (#612). The iPad floating tab bar exposes a
+// tab's test ID on both its cell and its item view, so match the first.
+function topLevelTab(tabTestID) {
+  return element(by.id(tabTestID)).atIndex(0);
+}
+
 async function openTab(tabTestID, contentTestID) {
-  await waitFor(element(by.id(tabTestID))).toExist().withTimeout(180000);
-  await element(by.id(tabTestID)).tap();
-  // Tabs share one scroll view, so the previous tab's scroll offset persists;
-  // container panels are taller than the viewport, so assert on a child.
+  await waitFor(topLevelTab(tabTestID)).toExist().withTimeout(180000);
+  await topLevelTab(tabTestID).tap();
+  // The screen content mounts in the selected native tab after JavaScript
+  // handles the selection (#612). Container panels are taller than the
+  // viewport, so assert on a child.
+  await waitFor(element(by.id('practice-main-scroll'))).toExist().withTimeout(10000);
   await element(by.id('practice-main-scroll')).scrollTo('top');
+  // The native tab switch animates; let a target near the top settle before
+  // scrolling for one further down.
+  try {
+    await waitFor(element(by.id(contentTestID))).toBeVisible().withTimeout(3000);
+    return;
+  } catch {
+    // Not in the first viewport: scroll for it below.
+  }
   await waitForVisibleInPracticeScroll(contentTestID);
 }
 
@@ -1114,6 +1135,7 @@ module.exports = {
   elementText,
   historyAttemptRowTestIDForResult,
   openTab,
+  topLevelTab,
   openStandardHistoryTrend,
   launchWithDisabledSynchronization,
   launchWithFreshAndroidRuntimePermission,
