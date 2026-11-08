@@ -2,9 +2,11 @@ package com.chessticize.mobile
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.OnBackPressedCallback
+import androidx.core.view.WindowCompat
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -38,6 +40,18 @@ class MainActivity : ReactActivity(), ReactNativeBackCallbackController, ReviewR
   override fun onCreate(savedInstanceState: Bundle?) {
     ChessticizeTestLaunchArguments.capture(intent)
     super.onCreate(savedInstanceState)
+    syncNavigationBarIcons()
+  }
+
+  override fun onConfigurationChanged(newConfig: Configuration) {
+    super.onConfigurationChanged(newConfig)
+    syncNavigationBarIcons()
+  }
+
+  /** Dark navigation bar icons on the light system appearance, light icons on dark. */
+  private fun syncNavigationBarIcons() {
+    val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+    WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = !night
   }
 
   override fun onNewIntent(intent: Intent) {
