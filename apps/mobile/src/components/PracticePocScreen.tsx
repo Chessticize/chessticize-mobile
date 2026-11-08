@@ -16707,13 +16707,16 @@ function SettingsRow({
       onPress={onPress}
     >
       <View style={styles.settingsRowCopy}>
-        <AppText
-          tone={tint === "accent" ? "accent" : undefined}
-          style={destructive ? styles.settingsDestructiveText : null}
-          variant="body"
-        >
-          {label}
-        </AppText>
+        <View style={styles.settingsRowTitleLine}>
+          <AppText
+            tone={tint === "accent" ? "accent" : undefined}
+            style={[styles.settingsRowLabel, destructive ? styles.settingsDestructiveText : null]}
+            variant="body"
+          >
+            {label}
+          </AppText>
+          {value ? <AppText style={styles.settingsRowValue} tone="secondary" variant="body">{value}</AppText> : null}
+        </View>
         {detail && showDetail ? <AppText tone="secondary" variant="footnote">{detail}</AppText> : null}
         {detail && !showDetail ? (
           <View
@@ -16722,13 +16725,8 @@ function SettingsRow({
           />
         ) : null}
       </View>
-      {value || onPress ? (
-        <View style={styles.settingsRowMeta}>
-          {value ? <AppText style={styles.settingsRowValue} tone="secondary" variant="body">{value}</AppText> : null}
-          {onPress ? (
-            <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
-          ) : null}
-        </View>
+      {onPress ? (
+        <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
       ) : null}
     </Pressable>
   );
@@ -16763,14 +16761,14 @@ function SettingsExternalLinkRow({
       onPress={onPress}
     >
       <View style={styles.settingsRowCopy}>
-        <AppText variant="body">{label}</AppText>
+        <View style={styles.settingsRowTitleLine}>
+          <AppText style={styles.settingsRowLabel} variant="body">{label}</AppText>
+          <AppText style={styles.settingsRowValue} tone="secondary" variant="body">{value}</AppText>
+        </View>
         <AppText tone="secondary" variant="footnote">{detail}</AppText>
         <AppText tone="accent" variant="footnote">{linkLabel}</AppText>
       </View>
-      <View style={styles.settingsRowMeta}>
-        <AppText style={styles.settingsRowValue} tone="secondary" variant="body">{value}</AppText>
-        <Icon color={appTheme.colors.text.tertiary} name="external" size={15} weight="semibold" />
-      </View>
+      <Icon color={appTheme.colors.text.tertiary} name="external" size={15} weight="semibold" />
     </Pressable>
   );
 }
@@ -21305,16 +21303,21 @@ const useStyles = makeStyles((theme) => ({
     gap: 2,
     minWidth: 0
   },
-  settingsRowMeta: {
-    alignItems: "center",
+  // Label and value share the first line; an explanation spans the full row
+  // below them so long copy never runs in a narrow column.
+  settingsRowTitleLine: {
+    alignItems: "flex-start",
     flexDirection: "row",
-    flexShrink: 1,
-    gap: 6,
-    justifyContent: "flex-end",
-    maxWidth: "45%"
+    gap: theme.spacing.row,
+    justifyContent: "space-between"
+  },
+  settingsRowLabel: {
+    flexGrow: 1,
+    flexShrink: 1
   },
   settingsRowValue: {
     flexShrink: 1,
+    maxWidth: "50%",
     textAlign: "right"
   },
   settingsActionButtonRow: {
