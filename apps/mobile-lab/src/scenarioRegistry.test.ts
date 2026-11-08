@@ -52,11 +52,16 @@ test("every typed navigation coverage entry points to a registered scenario", ()
 test("New Scenario Markers derive catalog tags from issue ownership", () => {
   const scenarios = Object.values(scenarioRegistry);
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
-  const issue609Scenarios = [
+  const issue609VisualDirection = [
     "visual-direction-a-grouped-native-tokens",
     "visual-direction-a-grouped-native-phone",
     "visual-direction-a-grouped-native-ipad"
   ];
+  const issue609SprintResultRedesign = Object.values(scenarioRegistry)
+    .filter((scenario) => scenario.group === "Sprint Result redesign")
+    .map((scenario) => scenario.id);
+  assert.ok(issue609SprintResultRedesign.length >= 10);
+  const issue609Scenarios = [...issue609VisualDirection, ...issue609SprintResultRedesign];
   assert.deepEqual(newScenarios.map((scenario) => scenario.id), issue609Scenarios);
   assert.deepEqual(
     newScenarios
@@ -64,7 +69,7 @@ test("New Scenario Markers derive catalog tags from issue ownership", () => {
       .map((scenario) => scenario.id),
     issue609Scenarios
   );
-  for (const id of issue609Scenarios) {
+  for (const id of issue609VisualDirection) {
     assert.equal(scenarioRegistry[id as LabScenarioId].group, "Visual Direction");
   }
   // The #609 design track reset the merged #611 guide markers; the scenarios stay.

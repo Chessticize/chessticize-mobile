@@ -22,5 +22,93 @@
         "changeNote": "Chosen direction A Grouped Native at iPad landscape: Practice Home with the navigation rail and the session board lane, light and dark."
       }
     ]
+  },
+  "sprint-result-redesign-passed": {
+    "issues": [
+      {
+        "issueNumber": 609,
+        "changeNote": "Sprint Result redesign (design only): full-screen result with a centered outcome hero, Solved / target and pass bar, one three-column stats card, the review row and Play again."
+      }
+    ]
+  },
+  "sprint-result-redesign-failed-mistakes": {
+    "issues": [
+      {
+        "issueNumber": 609,
+        "changeNote": "Sprint Result redesign: failed on mistakes, with the red outcome, negative Rating change and Replay mistakes."
+      }
+    ]
+  },
+  "sprint-result-redesign-failed-time": {
+    "issues": [
+      {
+        "issueNumber": 609,
+        "changeNote": "Sprint Result redesign: time ran out, keeping the final-puzzle Unclear question."
+      }
+    ]
+  },
+  "sprint-result-redesign-abandoned": {
+    "issues": [
+      {
+        "issueNumber": 609,
+        "changeNote": "Sprint Result redesign: abandoned, with a neutral grey outcome."
+      }
+    ]
+  },
+  "sprint-result-redesign-review-and-mistakes": {
+    "issues": [
+      {
+        "issueNumber": 609,
+        "changeNote": "Sprint Result redesign: items to review and mistakes, one Replay row with an info button."
+      }
+    ]
+  },
+  "sprint-result-redesign-review-explanation": {
+    "issues": [
+      {
+        "issueNumber": 609,
+        "changeNote": "Sprint Result redesign: the review explanation behind the info button."
+      }
+    ]
+  },
+  "sprint-result-redesign-zero-review-hidden": {
+    "issues": [
+      {
+        "issueNumber": 609,
+        "changeNote": "Sprint Result redesign: nothing to review, variant A hides the section."
+      }
+    ]
+  },
+  "sprint-result-redesign-zero-review-line": {
+    "issues": [
+      {
+        "issueNumber": 609,
+        "changeNote": "Sprint Result redesign: nothing to review, variant B shows a Nothing to review line."
+      }
+    ]
+  },
+  "sprint-result-redesign-arrow-duel": {
+    "issues": [
+      {
+        "issueNumber": 609,
+        "changeNote": "Sprint Result redesign: Arrow Duel result."
+      }
+    ]
+  },
+  "sprint-result-redesign-focused-run": {
+    "issues": [
+      {
+        "issueNumber": 609,
+        "changeNote": "Sprint Result redesign: unrated Focused Run with elapsed time and average solve against the usual pace."
+      }
+    ]
+  },
+  "sprint-result-redesign-largest-text": {
+    "issues": [
+      {
+        "issueNumber": 609,
+        "changeNote": "Sprint Result redesign at the largest accessibility text size."
+      }
+    ]
   }
 }
