@@ -453,7 +453,7 @@ function StatsCard({
             {/* A word value (Unrated) uses the row numeral size so it fits one line. */}
             <AppText
               numberOfLines={1}
-              style={[column.valueIsWord ? styles.statWordValue : styles.statValue, styles.centeredText]}
+              style={[column.valueIsWord ? styles.statWordValue : null, styles.centeredText]}
               tone={column.valueTone}
               variant={column.valueIsWord ? "numeral" : "numeralLarge"}
             >
@@ -759,14 +759,10 @@ const useStyles = makeStyles((theme) => ({
     gap: 2,
     minWidth: 0
   },
-  statValue: {
-    // Matches the Practice Home Progress card numerals (#636).
-    fontSize: 28,
-    lineHeight: 34
-  },
+  // Column values use numeralLarge, the Practice Home Progress card numeral.
+  // A word value keeps the same line box so the three columns stay aligned.
   statWordValue: {
-    // Same line box as the numerals so the three columns stay aligned.
-    lineHeight: 34
+    lineHeight: theme.typography.numeralLarge.lineHeight
   },
   statDivider: {
     alignSelf: "stretch",
