@@ -6939,6 +6939,93 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
   });
 
+  // iPhone Duo fold/unfold and Split View resize the window mid-Run. The
+  // sizes follow the Duo outer display (measured), the inner panel in both
+  // orientations and Split View halves and thirds (display profile), with a
+  // one-sided status-bar column. Device Hub drives the real gesture; this
+  // drives the same window-size change through the public screen.
+  const DUO_RESIZE_SEQUENCE: Array<{
+    height: number;
+    insets: PracticeSafeAreaInsets;
+    label: string;
+    layout: string;
+    width: number;
+  }> = [
+    { label: "outer display", width: 466, height: 678, insets: { top: 0, right: 84, bottom: 34, left: 0 }, layout: "compactPortrait" },
+    { label: "unfolded landscape", width: 951, height: 669, insets: { top: 0, right: 84, bottom: 20, left: 0 }, layout: "regularLandscape" },
+    { label: "Split View half", width: 475, height: 669, insets: { top: 24, right: 0, bottom: 20, left: 0 }, layout: "compactPortrait" },
+    { label: "Split View third", width: 317, height: 669, insets: { top: 24, right: 0, bottom: 20, left: 0 }, layout: "compactPortrait" },
+    { label: "unfolded portrait", width: 669, height: 951, insets: { top: 24, right: 0, bottom: 20, left: 0 }, layout: "compactPortrait" },
+    { label: "folded again", width: 466, height: 678, insets: { top: 0, right: 84, bottom: 34, left: 0 }, layout: "compactPortrait" }
+  ];
+
+  it("keeps the Sprint's puzzle, clock and board position through fold, unfold and Split View", async () => {
+    const service = createMobilePracticeService("familiar15");
+    const [first] = DUO_RESIZE_SEQUENCE;
+    setPracticeViewport({ width: first!.width, height: first!.height, scale: 3, insets: first!.insets });
+    const renderer = renderScreen({ practiceService: service });
+
+    startStandardSprint(renderer);
+    // Leave a mistake on the clock so the score and the next puzzle are part
+    // of the state that must survive the resizes.
+    await boardMove(renderer, "c2b3");
+    act(() => {
+      jest.advanceTimersByTime(2000);
+    });
+    const sprint = activeSprintForTest(service);
+    const before = {
+      fen: findByTestId(renderer, "mock-chessboard").props.fen,
+      mistakes: sprint.mistakeCount,
+      puzzleId: sprint.currentPuzzle?.puzzle.id,
+      sprintId: sprint.id,
+      startedAt: sprint.startedAt,
+      timer: collectText(findByTestId(renderer, "session-timer"))
+    };
+    expect(before.mistakes).toBe(1);
+    const board = findByTestId(renderer, "mock-chessboard");
+
+    for (const step of DUO_RESIZE_SEQUENCE.slice(1)) {
+      act(() => {
+        setPracticeViewport({ width: step.width, height: step.height, scale: 3, insets: step.insets });
+      });
+
+      expect({ label: step.label, layout: findByTestId(renderer, "adaptive-layout").props.accessibilityLabel })
+        .toEqual({ label: step.label, layout: `Layout ${step.layout}` });
+      const current = activeSprintForTest(service);
+      expect({
+        fen: findByTestId(renderer, "mock-chessboard").props.fen,
+        mistakes: current.mistakeCount,
+        puzzleId: current.currentPuzzle?.puzzle.id,
+        sprintId: current.id,
+        startedAt: current.startedAt,
+        timer: collectText(findByTestId(renderer, "session-timer"))
+      }).toEqual(before);
+      // The native board keeps its instance, so an in-progress gesture and
+      // its piece sprites are not remounted by the resize.
+      expect(findByTestId(renderer, "mock-chessboard")).toBe(board);
+    }
+  });
+
+  it("keeps the first-use guide on its current step through fold and unfold", () => {
+    const [outer, unfolded] = DUO_RESIZE_SEQUENCE;
+    setPracticeViewport({ width: outer!.width, height: outer!.height, scale: 3, insets: outer!.insets });
+    const renderer = renderLabScenario("practice-active-session-guide");
+    press(renderer, "practice-session-guide-start");
+    const progress = collectText(findByTestId(renderer, "practice-session-guide-coach-progress"));
+    expect(progress).toMatch(/^2 of \d+$/);
+
+    act(() => {
+      setPracticeViewport({ width: unfolded!.width, height: unfolded!.height, scale: 3, insets: unfolded!.insets });
+    });
+    expect(findByTestId(renderer, "adaptive-layout").props.accessibilityLabel).toBe("Layout regularLandscape");
+    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(progress);
+
+    act(() => {
+      setPracticeViewport({ width: outer!.width, height: outer!.height, scale: 3, insets: outer!.insets });
+    });
+    expect(collectText(findByTestId(renderer, "practice-session-guide-coach-progress"))).toBe(progress);
+  });
+
   it("removes the Sprint Moves action and centers its title", () => {
     const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
 

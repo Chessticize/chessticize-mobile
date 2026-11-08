@@ -100,6 +100,34 @@ test("the Duo inner landscape preset centres a height-filling session row", () =
   assert.equal(layout.sessionRailWidth, 296);
 });
 
+test("the Duo inner portrait and Split View presets keep their sizes and lay out the session", () => {
+  const expected = {
+    duoInnerPortrait: { size: "669x951", className: "compactPortrait" },
+    duoSplitViewHalf: { size: "475x669", className: "compactPortrait" },
+    duoSplitViewThird: { size: "317x669", className: "compactPortrait" }
+  } as const;
+  for (const [key, { className, size }] of Object.entries(expected)) {
+    const viewport = LAB_DEVICE_VIEWPORTS[key as keyof typeof expected];
+    assert.equal(`${viewport.width}x${viewport.height}`, size);
+    assert.deepEqual(labSafeAreaMetricsForViewport(viewport.width, viewport.height).insets, viewport.insets);
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height: viewport.height,
+      insets: viewport.insets,
+      width: viewport.width
+    });
+    assert.equal(layout.className, className);
+    assert.ok(layout.boardSize >= 200, `${key} board ${layout.boardSize}`);
+    assert.ok(layout.boardSize <= viewport.width - 32, `${key} board fits the width`);
+  }
+  // Rotating the inner landscape preset in the Storybook toolbar lands on the
+  // inner portrait preset rather than a swapped-inset guess.
+  assert.deepEqual(
+    labDeviceViewportForGlobal({ value: "duoInnerLandscape", isRotated: true }),
+    LAB_DEVICE_VIEWPORTS.duoInnerPortrait
+  );
+});
+
 test("non-device desktop viewports do not invent device Safe Area insets", () => {
   assert.deepEqual(labSafeAreaMetricsForViewport(1024, 768), {
     frame: { x: 0, y: 0, width: 1024, height: 768 },

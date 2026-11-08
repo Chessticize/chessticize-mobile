@@ -362,5 +362,19 @@ describe("buildPracticeAdaptiveLayout", () => {
     } else {
       expect(layout.boardSize).toBeLessThanOrEqual(safeWidth - 2 * PRACTICE_UI_PADDING);
     }
+    if (layout.className === "compactPortrait") {
+      // The locked live session (status, prompt, board, details, feedback)
+      // fits the window without scrolling in every pose (#639).
+      const chrome = COMPACT_PORTRAIT_SESSION_CHROME;
+      expect(
+        PRACTICE_UI_PADDING * 2
+          + chrome.status
+          + chrome.stackGap * 3
+          + layout.promptFrameHeight
+          + layout.boardSize
+          + chrome.boardDetails
+          + compactPortraitFeedbackHeight(layout.sessionColumnWidth)
+      ).toBeLessThanOrEqual(safeHeight);
+    }
   });
 });

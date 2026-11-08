@@ -207,6 +207,30 @@ const preview: Preview = {
             height: `${LAB_DEVICE_VIEWPORTS.duoInnerLandscape.height}px`
           },
           type: "tablet"
+        },
+        duoInnerPortrait: {
+          name: "iPhone Duo inner portrait",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.duoInnerPortrait.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.duoInnerPortrait.height}px`
+          },
+          type: "tablet"
+        },
+        duoSplitViewHalf: {
+          name: "iPhone Duo inner Split View · half",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.duoSplitViewHalf.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.duoSplitViewHalf.height}px`
+          },
+          type: "mobile"
+        },
+        duoSplitViewThird: {
+          name: "iPhone Duo inner Split View · one third",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.duoSplitViewThird.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.duoSplitViewThird.height}px`
+          },
+          type: "mobile"
         }
       }
     }
