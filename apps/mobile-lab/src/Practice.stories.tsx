@@ -603,6 +603,17 @@ export const RemoveRunConfirmation: Story = {
   }
 };
 
+export const StartBesideUnfinishedRun: Story = {
+  name: "Start beside an unfinished Run",
+  args: { scenarioId: "practice-start-conflict" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-resume-card");
+    await clickTestId(canvasElement, "practice-run-start");
+    await waitForTestId(canvasElement, "practice-start-conflict");
+    expectTestIdAbsent(canvasElement, "error-panel");
+  }
+};
+
 export const EmptyHomeAndRestore: Story = {
   name: "Empty Home and restore",
   args: { scenarioId: "practice-runs-empty" },

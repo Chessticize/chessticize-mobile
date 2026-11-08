@@ -416,6 +416,7 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-run-arrow-duel-editor",
     "practice-custom-rating-editor",
     "practice-run-remove-confirmation",
+    "practice-start-conflict",
     "practice-runs-empty"
   ].includes(scenarioId);
 }
@@ -1487,6 +1488,18 @@ function createScenarioRuntime(scenarioId: LabScenarioId): ScenarioRuntime {
             : undefined
         );
     screenProps.runManagementEnabled = true;
+    if (scenarioId === "practice-start-conflict") {
+      service.startSprint(
+        {
+          mode: "standard",
+          durationSeconds: 300,
+          perPuzzleSeconds: 20,
+          targetCorrect: 15,
+          maxMistakes: 3
+        },
+        new Date(LAB_NOW_MS).toISOString()
+      );
+    }
     if (scenarioId === "practice-personal-best-record") {
       screenProps.sprintRulesDesignPreview = {
         initialActiveState: service.getActiveSprint()
