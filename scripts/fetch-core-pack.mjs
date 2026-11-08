@@ -1,9 +1,8 @@
 import { createHash } from "node:crypto";
-import { createReadStream, createWriteStream, existsSync, statSync } from "node:fs";
-import { mkdir, readFile, rename, rm } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
+import { createReadStream, existsSync, statSync } from "node:fs";
+import { readFile, rm } from "node:fs/promises";
+import { resolve } from "node:path";
+import { downloadVerified, retryOptionsFromEnv } from "./core-pack-download.mjs";
 
 const DEFAULT_ARTIFACT_URL =
   "https://github.com/Chessticize/chessticize-mobile/releases/download/core-pack-v5/bundled-core-pack.sqlite";
@@ -31,39 +30,21 @@ if (existsSync(artifactPath)) {
 }
 
 console.log(`Downloading core pack (${(expectedBytes / 1024 / 1024).toFixed(0)} MB) from ${artifactUrl}`);
-const response = await fetch(artifactUrl, { redirect: "follow" });
-if (!response.ok || !response.body) {
-  console.error(`Download failed: HTTP ${response.status} ${response.statusText}`);
+try {
+  // Transient failures (5xx, 429, network, stalls) are retried with backoff; a hash mismatch never is.
+  // Tune with CORE_PACK_FETCH_ATTEMPTS, _BASE_DELAY_MS, _MAX_DELAY_MS and _IDLE_TIMEOUT_MS.
+  await downloadVerified({
+    url: artifactUrl,
+    destPath: artifactPath,
+    expectedBytes,
+    expectedHash,
+    ...retryOptionsFromEnv()
+  });
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 }
 
-const tempPath = `${artifactPath}.download`;
-await mkdir(dirname(artifactPath), { recursive: true });
-const digest = createHash("sha256");
-let downloadedBytes = 0;
-await pipeline(
-  Readable.fromWeb(response.body),
-  async function* (source) {
-    for await (const chunk of source) {
-      digest.update(chunk);
-      downloadedBytes += chunk.length;
-      yield chunk;
-    }
-  },
-  createWriteStream(tempPath)
-);
-
-const actualHash = digest.digest("hex");
-if (downloadedBytes !== expectedBytes || actualHash !== expectedHash) {
-  await rm(tempPath, { force: true });
-  console.error(
-    `Downloaded artifact mismatch: got ${downloadedBytes} bytes sha256:${actualHash}, ` +
-      `expected ${expectedBytes} bytes sha256:${expectedHash}.`
-  );
-  process.exit(1);
-}
-
-await rename(tempPath, artifactPath);
 console.log(`Core pack fetched and verified at ${artifactPath}.`);
 
 function fileSha256(path) {

@@ -9,6 +9,7 @@ const {
   openTab,
   sleep,
   textFromAttributes,
+  topLevelTab,
   waitForVisibleInPracticeScroll,
 } = require('./helpers');
 const {
@@ -459,8 +460,11 @@ async function assertNativeResponsiveLayout(frame) {
           + 'of its control rail.'
         );
       }
-    } else {
+    } else if (device.getPlatform() === 'android') {
       await expect(element(by.id('navigation-rail'))).toExist();
+    } else {
+      // iPad: the native top tab bar (#612).
+      await expect(topLevelTab('practice-tab')).toExist();
     }
   }
 }
@@ -505,13 +509,25 @@ async function assertRequiredFrameGeometry(frame) {
     return;
   }
 
+  if (device.getPlatform() !== 'android') {
+    // iPad: the scrolling content viewport starts below the native top tab
+    // bar (#612). Sections inside it may be scrolled up under its clipped top
+    // edge, so the viewport, not each section, is checked.
+    const tabFrame = await frameFor(topLevelTab('practice-tab'));
+    assertPositiveFrame(tabFrame, `${frame.id} top tab bar item`);
+    const tabBarBottom = tabFrame.y + tabFrame.height;
+    const contentFrame = await frameFor(element(by.id('practice-main-scroll')));
+    if (contentFrame.y < tabBarBottom - 1) {
+      throw new Error(
+        `${frame.id} content viewport overlaps the top tab bar: `
+        + `content=${JSON.stringify(contentFrame)}, `
+        + `tab=${JSON.stringify(tabFrame)}`
+      );
+    }
+    return;
+  }
   const navigationFrame = await frameFor(element(by.id('navigation-rail')));
   assertPositiveFrame(navigationFrame, `${frame.id} navigation rail`);
-  expectFrameContained(
-    navigationFrame,
-    screenFrame,
-    `${frame.id} navigation rail`
-  );
   const navigationRight = navigationFrame.x + navigationFrame.width;
   for (const required of requiredFrames) {
     if (required.frame.x < navigationRight - 1) {

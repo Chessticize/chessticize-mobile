@@ -1,0 +1,49 @@
+name: Mobile core pack cache
+
+# PR runs can only restore caches saved on their base branch (main), not on other
+# PR branches. Keep the cache that Mobile JS restores warm on main so PRs do not
+# each download the pack from the GitHub release.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mobile-core-pack-cache.yml"
+      - "fixtures/puzzles/bundled-core-pack.manifest.json"
+      - "scripts/core-pack-download.mjs"
+      - "scripts/fetch-core-pack.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-core-pack-cache
+  cancel-in-progress: false
+
+jobs:
+  warm-core-pack-cache:
+    name: Warm core pack cache
+    # Caches saved from other refs are not readable by PRs; only main warms it.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.x
+
+      # Same path and key as Mobile JS. A hit refreshes the entry's 7-day eviction clock.
+      - name: Cache core puzzle pack
+        uses: actions/cache@v4
+        with:
+          path: fixtures/puzzles/bundled-core-pack.sqlite
+          key: core-pack-${{ hashFiles('fixtures/puzzles/bundled-core-pack.manifest.json') }}
+
+      - name: Fetch core puzzle pack
+        run: node scripts/fetch-core-pack.mjs

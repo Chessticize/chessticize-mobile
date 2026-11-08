@@ -9,6 +9,8 @@ module.exports = {
     '\\.(png)$': '<rootDir>/__mocks__/asset.js',
     '^react-native$': '<rootDir>/__mocks__/react-native.js',
     '^react-native-safe-area-context$': '<rootDir>/__mocks__/react-native-safe-area-context.js',
+    // The native tab container cannot run under Jest; use the maintained fake.
+    '^react-native-screens$': '<rootDir>/src/navigation/nativeTabsFake.tsx',
   },
   transformIgnorePatterns: [],
   testPathIgnorePatterns: ['/node_modules/', '/\\._'],

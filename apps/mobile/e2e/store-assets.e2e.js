@@ -9,7 +9,8 @@ const {
   sleep,
   startPracticeMode,
   textFromAttributes,
-  waitForVisibleInPracticeScroll
+  waitForVisibleInPracticeScroll,
+  topLevelTab,
 } = require('./helpers');
 const { expectFrameContained } = require('./screenshotAssertions');
 const { expectSessionGuideContained } = require('./sessionGuideAssertions');
@@ -46,7 +47,7 @@ describeStoreAssets('App Store screenshot capture', () => {
     await failArrowDuelSprint();
 
     await element(by.id('back-practice-button')).tap();
-    await waitFor(element(by.id('practice-tab'))).toBeVisible().withTimeout(10000);
+    await waitFor(topLevelTab('practice-tab')).toBeVisible().withTimeout(10000);
     await device.terminateApp();
     await launchStoreAssetApp(reviewNowMs, false, false);
 
@@ -187,7 +188,12 @@ async function captureMainTabScenes() {
   await openTab('practice-tab', 'practice-run-arrow-duel');
   await element(by.id('practice-run-select-arrow-duel')).tap();
   await expect(element(by.id('practice-review-strip'))).not.toExist();
-  await expect(element(by.id('review-tab-badge'))).toExist();
+  // The Review badge is drawn by the native tab bar (#612); its count is in the
+  // tab item's accessibility label.
+  const reviewTabLabel = accessibilityLabelFromAttributes(await topLevelTab('review-tab').getAttributes());
+  if (!reviewTabLabel.includes('due reviews')) {
+    throw new Error(`Expected the Practice screenshot to show the Review badge, got "${reviewTabLabel}"`);
+  }
   const ratingText = textFromAttributes(await element(by.id('practice-mode-arrow-duel-rating')).getAttributes());
   if (ratingText === '600') {
     throw new Error('Expected the Practice screenshot to show a populated Arrow Duel rating');
@@ -255,7 +261,7 @@ async function captureSprintScenes() {
   await element(by.id('session-abandon-confirm')).tap();
   await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
   await element(by.id('back-practice-button')).tap();
-  await waitFor(element(by.id('practice-tab'))).toBeVisible().withTimeout(10000);
+  await waitFor(topLevelTab('practice-tab')).toBeVisible().withTimeout(10000);
 
   await startPracticeMode('arrow-duel');
   await waitForVisibleInPracticeScroll('session-board');

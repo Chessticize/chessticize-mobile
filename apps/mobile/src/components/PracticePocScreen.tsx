@@ -237,6 +237,12 @@ import {
   type AdaptiveLayout
 } from "./adaptivePracticeLayout.ts";
 import { usePracticeViewport } from "./PracticeViewport.tsx";
+import { NativeTabHost, TabContentInsetsReporter } from "../navigation/NativeTabHost.tsx";
+import {
+  isTopLevelChromeVisible,
+  topLevelTabIntent,
+  type TopLevelTab
+} from "../navigation/topLevelNavigation.ts";
 import { SafeAreaModalBackdrop } from "./SafeAreaModalBackdrop.tsx";
 import { SessionGuideOverlay } from "./SessionGuideOverlay.tsx";
 import {
@@ -688,12 +694,8 @@ const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: st
   { source: "bundledCore", label: "Core Pack" },
   { source: "familiar15", label: "Familiar 15" }
 ];
-const PRIMARY_TABS: ReadonlyArray<{ tab: Exclude<Tab, "analysis">; label: string; testID: string }> = [
-  { tab: "practice", label: "Practice", testID: "practice-tab" },
-  { tab: "review", label: "Review", testID: "review-tab" },
-  { tab: "history", label: "History", testID: "history-tab" },
-  { tab: "settings", label: "Settings", testID: "settings-tab" }
-];
+// Space below the last tab content row, added to the tab chrome's bottom inset.
+const CONTENT_BOTTOM_PADDING = 40;
 const PRACTICE_MODE_DESCRIPTIONS: Record<SprintMode, string> = {
   standard: "Find the best move",
   arrow_duel: "Choose the best move",
@@ -1147,9 +1149,36 @@ export function PracticePocScreen({
     refreshKey: aggregateRevision
   });
 
+  // Top-level navigation (#612). Global navigation is hidden whenever a focused
+  // surface owns the screen (an open Run, its feedback snapshot, guides,
+  // Survival setup and records, an open review). The screen stays in the
+  // selected tab (so stateful panels such as Review keep their session); the
+  // host hides all its chrome and the surface is laid out with the window
+  // insets. Otherwise tab content uses the insets the host reports for its
+  // chrome (the bottom glass bar, the iPhone Duo column, the iPad top bar, the
+  // Android rail).
+  const topLevelChromeVisible = isTopLevelChromeVisible({
+    feedbackSnapshotVisible: feedbackSnapshot !== null,
+    openSession: state?.status === "active" || state?.status === "paused",
+    personalBestGuideVisible,
+    personalBestHubVisible,
+    personalBestRecordsVisible,
+    reviewSurfaceOpen: reviewSessionSource !== null
+      || historyReviewEntries.length > 0
+      || historyUnavailableAttempt !== null,
+    sessionGuideVisible: state === null
+      && sessionGuide?.plan.steps[sessionGuide.stepIndex] !== undefined
+  });
+  const [tabContentInsets, setTabContentInsets] = useState<{
+    bottom: number;
+    left: number;
+    right: number;
+    top: number;
+  } | null>(null);
+  const layoutInsets = topLevelChromeVisible && tabContentInsets ? tabContentInsets : insets;
   const adaptiveLayout = useMemo(
-    () => buildPracticeAdaptiveLayout({ fontScale, height, insets, width }),
-    [fontScale, height, insets, width]
+    () => buildPracticeAdaptiveLayout({ fontScale, height, insets: layoutInsets, width }),
+    [fontScale, height, layoutInsets, width]
   );
   const boardSize = adaptiveLayout.boardSize;
   const progressV2Diagnostics = service.getProgressV2Diagnostics();
@@ -4594,16 +4623,11 @@ export function PracticePocScreen({
     };
   }, [systemBack]);
 
-  const appChromeVisible = !isOpenSession
-    && !isShowingFeedbackSnapshot
-    && !isSessionGuideVisible
-    && !personalBestGuideVisible
-    && !personalBestHubVisible
-    && !personalBestRecordsVisible
-    && !reviewSurfaceOpen;
+  const appChromeVisible = topLevelChromeVisible;
   const appHeaderVisible = appChromeVisible && !contentOwnsHeader;
-  const sideNavigationVisible = appChromeVisible && adaptiveLayout.usesSideNavigation;
-  const bottomTabsVisible = appChromeVisible && !sideNavigationVisible;
+  // Stockfish diagnostics (dev only) open from Settings, so they keep the
+  // Settings tab selected.
+  const hostTab: TopLevelTab = tab === "analysis" ? "settings" : tab;
   const sessionUsesRail = shouldShowSessionBoard && adaptiveLayout.usesSessionRail;
   // The first-use guide previews the session row at full session width; the
   // 1120-point wide-content cap would clip its board and rail (#602).
@@ -5048,35 +5072,27 @@ export function PracticePocScreen({
           : `${personalBestActivePresentation ? "Survival" : `${modeLabel(mode)} sprint`}. ${sideToMoveAccessibilityLabel(displayedSideToMove)}. ${state?.correctCount ?? 0} solved, ${state?.mistakeCount ?? 0} mistakes.`
         : `${screenTitle} screen`;
 
-  return (
-    <GestureHandlerRootView
-      style={styles.predictiveBackStage}
-      testID="practice-gesture-root"
-    >
-      {mobileBackPreview ? (
-        <View
-          accessible={false}
-          style={styles.predictiveBackDestination}
-          testID="mobile-back-destination-preview"
-        >
-          <Text style={styles.predictiveBackEyebrow}>Back to</Text>
-          <Text style={styles.predictiveBackDestinationLabel} testID="mobile-back-destination-preview-label">
-            {mobileBackPreview.label}
-          </Text>
-          <Text style={FABRIC_SAFE_HIDDEN_TEXT_STYLE} testID="mobile-back-destination-preview-id">
-            {mobileBackPreview.testID}
-          </Text>
-        </View>
-      ) : null}
+  function selectTopLevelTab(nextTab: TopLevelTab): void {
+    const intent = topLevelTabIntent(nextTab);
+    if (intent.kind === "open-review-queue") {
+      openReviewQueue();
+      return;
+    }
+    navigateToTab(intent.tab);
+  }
+
+  const appShell = (
       <View
         testID="safe-area-shell"
         style={[
           styles.safeArea,
           {
-            paddingBottom: insets.bottom,
-            paddingLeft: insets.left,
-            paddingRight: insets.right,
-            paddingTop: insets.top
+            // iOS tab content scrolls beneath the floating glass bar; the
+            // opaque Android bottom navigation ends the content above it.
+            paddingBottom: appChromeVisible && Platform.OS === "ios" ? 0 : layoutInsets.bottom,
+            paddingLeft: layoutInsets.left,
+            paddingRight: layoutInsets.right,
+            paddingTop: layoutInsets.top
           },
           mobileBackPreview
             ? {
@@ -5103,22 +5119,6 @@ export function PracticePocScreen({
           style={styles.accessibilityAnnouncement}
           testID="practice-announcement"
         />
-        {sideNavigationVisible ? (
-          <NavigationRail
-            activeTab={tab}
-            dueReviewCount={dueTodayCount}
-            expanded={adaptiveLayout.sideNavigationExpanded}
-            overdueReviewCount={overdueCount}
-            width={adaptiveLayout.sideNavigationWidth}
-            onSelectTab={(nextTab) => {
-              if (nextTab === "review") {
-                openReviewQueue();
-                return;
-              }
-              navigateToTab(nextTab);
-            }}
-          />
-        ) : null}
         <View style={styles.appContentShell}>
           {appHeaderVisible ? (
             <View
@@ -5158,7 +5158,12 @@ export function PracticePocScreen({
               adaptiveLayout.usesWideContent && !sessionLayoutUsesRail
                 ? styles.contentWide
                 : null,
-              bottomTabsVisible ? styles.contentWithBottomTabs : null,
+              appChromeVisible
+                ? {
+                  paddingBottom: (Platform.OS === "ios" ? layoutInsets.bottom : 0)
+                    + CONTENT_BOTTOM_PADDING
+                }
+                : null,
               sessionLayoutUsesRail ? styles.contentSessionRail : null
             ]}
           >
@@ -5817,34 +5822,6 @@ export function PracticePocScreen({
               <StockfishDiagnosticsPanel stockfish={stockfish} />
             ) : null}
           </LegacyScrollView>
-          {bottomTabsVisible ? (
-            <View style={styles.bottomTabs}>
-              {PRIMARY_TABS.map((item) => (
-                <TabButton
-                  key={item.tab}
-                  active={tab === item.tab}
-                  badgeAccessibilityLabel={
-                    item.tab === "review" && dueTodayCount > 0
-                      ? `${dueTodayCount} due reviews${overdueCount > 0 ? `, ${overdueCount} overdue` : ""}`
-                      : undefined
-                  }
-                  badgeCount={item.tab === "review" ? dueTodayCount : 0}
-                  badgeTone={item.tab === "review" && overdueCount > 0 ? "danger" : "default"}
-                  label={item.label}
-                  presentation="bottom"
-                  tab={item.tab}
-                  testID={item.testID}
-                  onPress={() => {
-                    if (item.tab === "review") {
-                      openReviewQueue();
-                      return;
-                    }
-                    navigateToTab(item.tab);
-                  }}
-                />
-              ))}
-            </View>
-          ) : null}
         </View>
         {startingMode ? (
           <View
@@ -5923,6 +5900,52 @@ export function PracticePocScreen({
         />
       ) : null}
       </View>
+  );
+
+  return (
+    <GestureHandlerRootView
+      style={styles.predictiveBackStage}
+      testID="practice-gesture-root"
+    >
+      {mobileBackPreview ? (
+        <View
+          accessible={false}
+          style={styles.predictiveBackDestination}
+          testID="mobile-back-destination-preview"
+        >
+          <Text style={styles.predictiveBackEyebrow}>Back to</Text>
+          <Text style={styles.predictiveBackDestinationLabel} testID="mobile-back-destination-preview-label">
+            {mobileBackPreview.label}
+          </Text>
+          <Text style={FABRIC_SAFE_HIDDEN_TEXT_STYLE} testID="mobile-back-destination-preview-id">
+            {mobileBackPreview.testID}
+          </Text>
+        </View>
+      ) : null}
+      <NativeTabHost
+        chromeHidden={!appChromeVisible}
+        colorScheme={appTheme.name}
+        colors={{
+          accent: appTheme.colors.accent.s600,
+          androidBarBackground: appTheme.colors.surface,
+          androidIndicator: appTheme.colors.accent.s100,
+          androidInactive: appTheme.colors.text.secondary,
+          background: appTheme.colors.surfaceRaised,
+          badgeBackground: appTheme.colors.danger.s600,
+          badgeDangerBackground: appTheme.colors.danger.s600,
+          badgeText: appTheme.colors.text.onAccent
+        }}
+        dueReviewCount={dueTodayCount}
+        overdueReviewCount={overdueCount}
+        selectedTab={hostTab}
+        onSelectionOutcome={(outcome) => selectTopLevelTab(outcome.tab)}
+        renderTab={(candidate) => candidate === hostTab ? (
+          <>
+            {appChromeVisible ? <TabContentInsetsReporter onChange={setTabContentInsets} /> : null}
+            {appShell}
+          </>
+        ) : null}
+      />
     </GestureHandlerRootView>
   );
 }
@@ -6672,7 +6695,7 @@ function SprintRulesGuide({
           testID="practice-sprint-rules-dismiss"
           onPress={onDismiss}
         >
-          <Text style={styles.sprintRulesDismissText}>Got it</Text>
+          <Text numberOfLines={1} style={styles.sprintRulesDismissText}>Got it</Text>
         </Pressable>
       </View>
 
@@ -7170,6 +7193,7 @@ function PracticeRunCard({
       </Pressable>
       <View style={[styles.homeRowMeta, editing ? styles.homeRowEditingMeta : null]}>
         <AppText
+          numberOfLines={1}
           style={styles.homeRowRating}
           testID={run.kind === "standard"
             ? "practice-mode-standard-rating"
@@ -8857,7 +8881,7 @@ function ResumeSprintCard({
           : `${modeLabel(sprint.config.mode)} · ${sprint.correctCount} solved · ${remaining} left · ${sprint.mistakeCount} mistakes`}
         testID="practice-resume-card"
         title={isTacticalFocus ? "Resume Focused Run" : "Resume sprint"}
-        trailing={<AppText tone="accent" variant="headline">Resume</AppText>}
+        trailing={<AppText numberOfLines={1} tone="accent" variant="headline">Resume</AppText>}
         onPress={onResume}
       />
     </Section>
@@ -8981,7 +9005,7 @@ function PracticeModeCard({
       </View>
       <View style={styles.homeRowMeta}>
         {ratingLabel ? (
-          <AppText tone="secondary" testID={`practice-mode-${modeTestId}-rating`} variant="subheadline">{ratingLabel}</AppText>
+          <AppText numberOfLines={1} tone="secondary" testID={`practice-mode-${modeTestId}-rating`} variant="subheadline">{ratingLabel}</AppText>
         ) : null}
         {active ? (
           <Icon color={appTheme.colors.accent.s600} name="check" size={18} testID={`practice-mode-${modeTestId}-selected`} weight="semibold" />
@@ -17331,174 +17355,6 @@ function OptionButton({
   );
 }
 
-function NavigationRail({
-  activeTab,
-  dueReviewCount,
-  expanded,
-  overdueReviewCount,
-  width,
-  onSelectTab
-}: {
-  activeTab: Tab;
-  dueReviewCount: number;
-  expanded: boolean;
-  overdueReviewCount: number;
-  width: number;
-  onSelectTab: (tab: Exclude<Tab, "analysis">) => void;
-}): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View
-      accessibilityLabel={expanded ? "Primary navigation rail" : "Compact navigation rail"}
-      style={[styles.navigationRail, { width }]}
-      testID="navigation-rail"
-    >
-      {PRIMARY_TABS.map((item) => (
-        <TabButton
-          key={item.tab}
-          active={activeTab === item.tab}
-          badgeAccessibilityLabel={
-            item.tab === "review" && dueReviewCount > 0
-              ? `${dueReviewCount} due reviews${overdueReviewCount > 0 ? `, ${overdueReviewCount} overdue` : ""}`
-              : undefined
-          }
-          badgeCount={item.tab === "review" ? dueReviewCount : 0}
-          badgeTone={item.tab === "review" && overdueReviewCount > 0 ? "danger" : "default"}
-          expanded={expanded}
-          label={item.label}
-          presentation="rail"
-          tab={item.tab}
-          testID={item.testID}
-          onPress={() => onSelectTab(item.tab)}
-        />
-      ))}
-    </View>
-  );
-}
-
-function TabButton({
-  active,
-  badgeAccessibilityLabel,
-  badgeCount = 0,
-  badgeTone = "default",
-  expanded = true,
-  label,
-  presentation,
-  tab,
-  testID,
-  onPress
-}: {
-  active: boolean;
-  badgeAccessibilityLabel?: string;
-  badgeCount?: number;
-  badgeTone?: "default" | "danger";
-  expanded?: boolean;
-  label: string;
-  presentation: "bottom" | "rail";
-  tab: Exclude<Tab, "analysis">;
-  testID: string;
-  onPress: () => void;
-}): React.JSX.Element {
-  const styles = useStyles();
-  const hasBadge = badgeCount > 0;
-  const badgeText = badgeCount > 99 ? "99+" : `${badgeCount}`;
-  return (
-    <Pressable
-      accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
-      accessibilityLabel={[`${label} tab`, hasBadge ? badgeAccessibilityLabel : null].filter(Boolean).join(", ")}
-      testID={testID}
-      style={[
-        styles.tabButton,
-        presentation === "rail" ? styles.tabButtonRail : null,
-        presentation === "rail" && expanded ? styles.tabButtonRailExpanded : null,
-        presentation === "rail" && expanded && hasBadge ? styles.tabButtonRailExpandedWithBadge : null,
-        active ? styles.tabButtonActive : null
-      ]}
-      onPress={onPress}
-    >
-      <View style={styles.tabIconBadge} testID={`${testID}-icon`}>
-        <TabGlyph tab={tab} active={active} />
-        {hasBadge ? (
-          <Text
-            allowFontScaling={false}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            numberOfLines={1}
-            style={[
-              styles.tabCountBadge,
-              presentation === "rail" ? styles.tabCountBadgeRail : styles.tabCountBadgeBottom,
-              badgeTone === "danger" ? styles.tabCountBadgeDanger : null
-            ]}
-            testID={`${testID}-badge`}
-          >
-            {badgeText}
-          </Text>
-        ) : null}
-      </View>
-      {presentation === "bottom" || expanded ? (
-        <Text
-          numberOfLines={presentation === "rail" && expanded ? 1 : undefined}
-          style={[styles.tabText, presentation === "rail" ? styles.tabTextRail : null, active ? styles.tabTextActive : null]}
-          testID={`${testID}-label`}
-        >
-          {label}
-        </Text>
-      ) : null}
-    </Pressable>
-  );
-}
-
-function TabGlyph({
-  active,
-  tab
-}: {
-  active: boolean;
-  tab: Exclude<Tab, "analysis">;
-}): React.JSX.Element {
-  const styles = useStyles();
-  const appTheme = useTheme();
-  const color = active ? appTheme.colors.accent.s600 : appTheme.colors.text.tertiary;
-  if (tab === "practice") {
-    return (
-      <View style={styles.tabGlyphCanvas}>
-        <View testID="practice-tab-target-outer" style={[styles.tabPracticeTargetOuter, { borderColor: color }]} />
-        <View testID="practice-tab-target-inner" style={[styles.tabPracticeTargetInner, { borderColor: color }]} />
-      </View>
-    );
-  }
-  if (tab === "review") {
-    return <View style={[styles.tabDiamondGlyph, { borderColor: color }]} />;
-  }
-  if (tab === "history") {
-    return (
-      <View style={styles.tabGlyphCanvas}>
-        <View
-          style={[styles.tabClockGlyph, { borderColor: color }]}
-          testID="history-tab-clock-outline"
-        >
-          <View style={[styles.tabClockMinuteHand, { backgroundColor: color }]} />
-          <View style={[styles.tabClockHourHand, { backgroundColor: color }]} />
-          <View style={[styles.tabClockCenter, { backgroundColor: color }]} />
-        </View>
-      </View>
-    );
-  }
-  return (
-    <View style={styles.tabSliderGlyph}>
-      <View style={[styles.tabSliderLine, { backgroundColor: color }]}>
-        <View style={[styles.tabSliderKnob, styles.tabSliderKnobLeft, { backgroundColor: color }]} />
-      </View>
-      <View style={[styles.tabSliderLine, { backgroundColor: color }]}>
-        <View style={[styles.tabSliderKnob, styles.tabSliderKnobRight, { backgroundColor: color }]} />
-      </View>
-      <View style={[styles.tabSliderLine, { backgroundColor: color }]}>
-        <View style={[styles.tabSliderKnob, styles.tabSliderKnobMiddle, { backgroundColor: color }]} />
-      </View>
-    </View>
-  );
-}
-
 function formatUci(move: MoveResult["move"]): string {
   const promotion = move.promotion ? move.promotion.toLowerCase() : "";
   return `${move.from}${move.to}${promotion}`;
@@ -17889,6 +17745,7 @@ const useStyles = makeStyles((theme) => ({
     flex: 1,
     minWidth: 0
   },
+
   sprintLoadingOverlay: {
     alignItems: "center",
     backgroundColor: theme.colors.veil,
@@ -17937,212 +17794,6 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 22,
     fontWeight: "700"
   },
-  bottomTabs: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderTopColor: theme.colors.border.default,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingHorizontal: 6,
-    paddingTop: 6,
-    paddingBottom: 4
-  },
-  navigationRail: {
-    alignItems: "stretch",
-    backgroundColor: theme.colors.surface,
-    borderRightColor: theme.colors.border.default,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-    justifyContent: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 16
-  },
-  tabButton: {
-    alignItems: "center",
-    flex: 1,
-    gap: 2,
-    minHeight: 48,
-    justifyContent: "center",
-    paddingHorizontal: 2
-  },
-  tabButtonRail: {
-    borderRadius: 8,
-    flex: 0,
-    flexDirection: "column",
-    minHeight: 54,
-    paddingHorizontal: 6,
-    paddingVertical: 6
-  },
-  tabButtonRailExpanded: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "flex-start",
-    minHeight: 50,
-    paddingHorizontal: 12
-  },
-  tabButtonRailExpandedWithBadge: {
-    gap: 22
-  },
-  tabButtonActive: {
-    backgroundColor: "transparent"
-  },
-  tabIconBadge: {
-    alignItems: "center",
-    borderRadius: 999,
-    height: 20,
-    justifyContent: "center",
-    overflow: "visible",
-    position: "relative",
-    width: 32
-  },
-  tabCountBadge: {
-    backgroundColor: theme.colors.accent.fill,
-    borderColor: theme.colors.surface,
-    borderRadius: 999,
-    borderWidth: 1,
-    color: theme.colors.text.onAccent,
-    fontSize: 9,
-    fontWeight: "900",
-    includeFontPadding: false,
-    lineHeight: 14,
-    minHeight: 18,
-    minWidth: 18,
-    overflow: "hidden",
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    position: "absolute",
-    textAlign: "center",
-    textAlignVertical: "center",
-    zIndex: 1
-  },
-  tabCountBadgeBottom: {
-    left: 24,
-    top: -8
-  },
-  tabCountBadgeRail: {
-    left: 24,
-    top: -7
-  },
-  tabCountBadgeDanger: {
-    backgroundColor: theme.colors.danger.s600,
-    color: theme.colors.text.onTone
-  },
-  tabText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 10,
-    fontWeight: "700"
-  },
-  tabTextRail: {
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  tabTextActive: {
-    color: theme.colors.accent.s600
-  },
-  tabGlyphCanvas: {
-    alignItems: "center",
-    height: 16,
-    justifyContent: "center",
-    width: 16
-  },
-  tabPracticeTargetOuter: {
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 15,
-    position: "absolute",
-    width: 15
-  },
-  tabPracticeTargetInner: {
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 7,
-    position: "absolute",
-    width: 7
-  },
-  tabDiamondGlyph: {
-    borderRadius: 2,
-    borderWidth: 2,
-    height: 12,
-    transform: [{ rotate: "45deg" }],
-    width: 12
-  },
-  tabClockGlyph: {
-    alignItems: "center",
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 15,
-    justifyContent: "center",
-    width: 15
-  },
-  tabClockMinuteHand: {
-    borderRadius: 999,
-    height: 5,
-    left: 4.5,
-    position: "absolute",
-    top: 1,
-    width: 2
-  },
-  tabClockHourHand: {
-    borderRadius: 999,
-    height: 2,
-    left: 6.5,
-    position: "absolute",
-    top: 5,
-    width: 4
-  },
-  tabClockCenter: {
-    borderRadius: 999,
-    height: 2,
-    left: 4.5,
-    position: "absolute",
-    top: 5,
-    width: 2
-  },
-  tabPackHandle: {
-    borderBottomWidth: 0,
-    borderRadius: 2,
-    borderWidth: 2,
-    height: 4,
-    position: "absolute",
-    top: 2,
-    width: 8
-  },
-  tabPackBody: {
-    borderRadius: 3,
-    borderWidth: 2,
-    height: 12,
-    position: "absolute",
-    top: 4,
-    width: 14
-  },
-  tabSliderGlyph: {
-    gap: 3,
-    width: 16
-  },
-  tabSliderLine: {
-    borderRadius: 999,
-    height: 2,
-    position: "relative",
-    width: 16
-  },
-  tabSliderKnob: {
-    borderRadius: 999,
-    height: 5,
-    position: "absolute",
-    top: -1.5,
-    width: 5
-  },
-  tabSliderKnobLeft: {
-    left: 1
-  },
-  tabSliderKnobMiddle: {
-    left: 6
-  },
-  tabSliderKnobRight: {
-    right: 1
-  },
   content: {
     gap: 12,
     padding: UI_PADDING,
@@ -18152,9 +17803,6 @@ const useStyles = makeStyles((theme) => ({
     alignSelf: "center",
     maxWidth: 1120,
     width: "100%"
-  },
-  contentWithBottomTabs: {
-    paddingBottom: 96
   },
   contentSessionRail: {
     flexGrow: 1,
@@ -18326,8 +17974,9 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     gap: 16
   },
+  // Labels stretch to the column rather than shrink-wrapping their text: see
+  // "Text width rounding" in docs/ui-design/MOBILE_UI_DESIGN.md (#633).
   homeProgressMetric: {
-    alignItems: "flex-start",
     flex: 1,
     gap: 2,
     minWidth: 0

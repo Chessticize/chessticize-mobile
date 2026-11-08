@@ -15,6 +15,13 @@ export async function clickTestId(canvasElement: HTMLElement, testID: string): P
   await userEvent.click(await page.findByTestId(testID, {}, { timeout: 4_000 }));
 }
 
+// Native tab bars draw no web focus ring; blur after the click so the
+// placeholder chrome matches the device (#612).
+async function selectTopLevelTab(canvasElement: HTMLElement, testID: string): Promise<void> {
+  await clickTestId(canvasElement, testID);
+  (canvasElement.ownerDocument.activeElement as HTMLElement | null)?.blur?.();
+}
+
 export async function waitForTestId(canvasElement: HTMLElement, testID: string): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
   await page.findByTestId(testID, {}, { timeout: 4_000 });
@@ -452,16 +459,16 @@ export async function openPracticeSession(canvasElement: HTMLElement): Promise<v
 }
 
 export async function openReviewQueue(canvasElement: HTMLElement): Promise<void> {
-  await clickTestId(canvasElement, "review-tab");
+  await selectTopLevelTab(canvasElement, "review-tab");
   await waitForTestId(canvasElement, "review-panel");
 }
 
 export async function openHistory(canvasElement: HTMLElement): Promise<void> {
-  await clickTestId(canvasElement, "history-tab");
+  await selectTopLevelTab(canvasElement, "history-tab");
   await waitForTestId(canvasElement, "history-panel");
 }
 
 export async function openSettings(canvasElement: HTMLElement): Promise<void> {
-  await clickTestId(canvasElement, "settings-tab");
+  await selectTopLevelTab(canvasElement, "settings-tab");
   await waitForTestId(canvasElement, "settings-panel");
 }

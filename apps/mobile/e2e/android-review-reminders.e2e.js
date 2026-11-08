@@ -19,6 +19,7 @@ const {
   waitForElementTextContaining,
   waitForVisibleInPracticeScroll,
   withAndroidUiDiagnostics,
+  topLevelTab,
 } = require('./helpers');
 
 const APP_ID = 'com.chessticize.mobile';
@@ -103,7 +104,7 @@ describe('Android Review reminders through public and system surfaces', () => {
       await openTab('practice-tab', 'practice-run-standard');
       await failStandardSprint();
       await element(by.id('back-practice-button')).tap();
-      await waitFor(element(by.id('practice-tab'))).toBeVisible().withTimeout(10000);
+      await waitFor(topLevelTab('practice-tab')).toBeVisible().withTimeout(10000);
 
       await openTab('settings-tab', 'settings-review-reminders');
       await waitForVisibleInPracticeScroll('settings-review-reminder-fixed-1900');

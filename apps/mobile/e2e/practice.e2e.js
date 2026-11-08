@@ -48,7 +48,10 @@ if (SURVIVAL_RECORDS_CAPTURE_ORIENTATION
   );
 }
 
-async function waitForRunFramesToSettle(sourceTestID, targetTestID, timeoutMs = 5000) {
+// Each frame read takes about 0.8 s on iOS 26+ while the system glass tab bar
+// is on screen (#612), so allow enough time for four stable samples after the
+// scroll comes to rest.
+async function waitForRunFramesToSettle(sourceTestID, targetTestID, timeoutMs = 12000) {
   const startedAt = Date.now();
   let previousSourceFrame;
   let previousTargetFrame;
@@ -508,11 +511,19 @@ describe('Practice POC', () => {
       try {
         await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
       } catch {
-        // On compact Android the trailing action can sit only a few pixels
-        // below the viewport. A bounded public swipe reaches it reliably;
-        // Detox's stale-at-edge auto-scroll can otherwise wait indefinitely.
-        await element(by.id('practice-main-scroll')).swipe('up', 'fast', 0.75, 0.5, 0.9);
-        await sleep(500);
+        if (device.getPlatform() === 'android') {
+          // On compact Android the trailing action can sit only a few pixels
+          // below the viewport. A bounded public swipe reaches it reliably;
+          // Detox's stale-at-edge auto-scroll can otherwise wait indefinitely.
+          await element(by.id('practice-main-scroll')).swipe('up', 'fast', 0.75, 0.5, 0.9);
+          await sleep(500);
+        } else {
+          // On iOS the hidden tab bar's container stays over the bottom of
+          // the screen (touches pass through, but Detox counts it as covering
+          // the view). Scroll the action clear of it without a fling, so the
+          // next tap does not land on a still-moving list (#612).
+          await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
+        }
       }
       await expect(element(by.id('review-schedule-control'))).toBeVisible();
       await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();

@@ -68,7 +68,7 @@ export function Button({
     >
       <View style={styles.content}>
         {icon ? <Icon color={labelColor} name={icon} size={17} weight="semibold" /> : null}
-        <Text style={[styles.label, styles[`${variant}Label`]]}>{label}</Text>
+        <Text style={[styles.label, icon ? null : styles.labelFill, styles[`${variant}Label`]]}>{label}</Text>
       </View>
     </Pressable>
   );
@@ -94,8 +94,12 @@ const useStyles = makeStyles((theme) => ({
   stretch: {
     alignSelf: "stretch"
   },
+  // The content spans the button and an icon-less label fills it, so a
+  // stretched button's label has slack against Android width rounding (#633).
+  // A button that hugs its label has no slack; its label still wraps by design.
   content: {
     alignItems: "center",
+    alignSelf: "stretch",
     flexDirection: "row",
     gap: 6,
     justifyContent: "center"
@@ -104,6 +108,9 @@ const useStyles = makeStyles((theme) => ({
     ...theme.typography.headline,
     flexShrink: 1,
     textAlign: "center"
+  },
+  labelFill: {
+    flexGrow: 1
   },
   primary: {
     backgroundColor: theme.colors.accent.fill
