@@ -120,6 +120,7 @@ assert.deepEqual(workflowFiles, [
   "mobile-android-github-release.yml",
   "mobile-android-release-candidate.yml",
   "mobile-android-source-recovery.yml",
+  "mobile-core-pack-cache.yml",
   "mobile-js.yml",
   "mobile-lab.yml",
   "pages.yml",
@@ -181,6 +182,15 @@ assert.equal(count(mobileWorkflow, "run: pnpm mobile:e2e:build:ios"), 0);
 assert.equal(count(mobileWorkflow, "DETOX_ACTIVE_SUITE: flows"), 0);
 assert.equal(count(mobileWorkflow, "DETOX_ACTIVE_SUITE: practice"), 0);
 assert.equal(count(mobileWorkflow, "matrix:"), 0);
+
+// The Core Pack cache warm-up lives in its own main-only workflow so mobile-js.yml
+// stays PR-only; both must keep the same cache key for PRs to restore from main.
+const corePackCacheWorkflow = read(".github/workflows/mobile-core-pack-cache.yml");
+const corePackCacheKey =
+  "key: core-pack-${{ hashFiles('fixtures/puzzles/bundled-core-pack.manifest.json') }}";
+assert.equal(count(mobileWorkflow, corePackCacheKey), 1);
+assert.equal(count(corePackCacheWorkflow, corePackCacheKey), 1);
+assert.match(corePackCacheWorkflow, /if: github\.ref == 'refs\/heads\/main'/);
 
 // Guidance routes to owning policies instead of copying their wording. Keep
 // build/runtime assertions below separate from editorial policy review.

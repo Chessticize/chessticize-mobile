@@ -6174,8 +6174,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-home"))).not.toContain("Offline puzzle training");
     expect(findByTestId(renderer, "practice-progress-summary")).toBeTruthy();
     expect(flattenTestStyle(findByTestId(renderer, "practice-progress-summary").props.style).alignItems).toBe("flex-start");
-    expect(flattenTestStyle(findByTestId(renderer, "practice-progress-rating-metric").props.style).alignItems).toBe("flex-start");
-    expect(flattenTestStyle(findByTestId(renderer, "practice-progress-weekly-metric").props.style).alignItems).toBe("flex-start");
+    // The metric labels stretch to their column instead of shrink-wrapping,
+    // so Android width rounding cannot wrap and clip them (#633).
+    expect(flattenTestStyle(findByTestId(renderer, "practice-progress-rating-metric").props.style).alignItems).toBeUndefined();
+    expect(flattenTestStyle(findByTestId(renderer, "practice-progress-weekly-metric").props.style).alignItems).toBeUndefined();
     expect(collectText(findByTestId(renderer, "practice-progress-rating-delta"))).toBe("No rating change");
     expect(hasStyleEntry(findByTestId(renderer, "practice-progress-rating-delta"), "color", lightTheme.colors.text.tertiary)).toBe(true);
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("0");

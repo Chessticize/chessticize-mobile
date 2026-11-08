@@ -293,6 +293,25 @@ session use tabular figures.
 | Numeral XL | 34 / 41 | Semibold, tabular | Large scores; 28 / 34 inside compact metric cards |
 | Numeral L | 22 / 28 | Semibold, tabular | Session timer, progress, ratings |
 
+#### Text width rounding
+
+On Android, a text view that is exactly as wide as its own measured text is
+fragile. If the measured width lands just under a whole pixel (for example
+160.99999 px), a later layout of the same text can round that width down. The
+last word then wraps onto a second line, and the one-line height clips it.
+"This Week" showing as "This" after a tab switch (#633) was this bug.
+
+Text is shrink-wrapped in this way when its container is `flex-start`,
+`center` or a row. To avoid it:
+
+- Let labels stretch to their container: the default `alignItems: "stretch"`,
+  or `alignSelf: "stretch"` on the text. Keep the visual alignment with
+  `textAlign`.
+- A label that is single-line by design (a badge, capsule, trailing value or
+  short action) gets `numberOfLines={1}`. That draws the whole text at the
+  same width.
+- Do not add padding to make up the difference.
+
 ### Color Roles
 
 All text roles meet WCAG AA (4.5:1) on the background, surface, and raised
