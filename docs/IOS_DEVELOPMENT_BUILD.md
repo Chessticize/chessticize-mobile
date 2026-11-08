@@ -46,12 +46,32 @@ pnpm mobile:ios:dev:device
 With more than one physical device attached, select one explicitly:
 
 ```sh
-pnpm mobile:ios:dev:device -- "Device Name or UDID"
+pnpm mobile:ios:dev:device "Device Name or UDID"
 ```
+
+pnpm 11 forwards a literal `--` to the script, which then fails with a usage
+error, so pass the device name without it.
 
 The command is pinned to the Debug configuration. Do not pass `--mode Release`
 or install a locally built Release app on a personal daily-use device for
 pre-release testing.
+
+### Standalone Install Without Metro
+
+A Debug build normally loads JavaScript from Metro and does not embed the
+bundle. For a daily-driver install that must run away from this Mac, force
+bundling in Debug:
+
+```sh
+FORCE_BUNDLING=1 pnpm mobile:ios:dev:device "Device Name or UDID"
+```
+
+Before relying on it, confirm `main.jsbundle` (about 10 MB) exists in the built
+`Chessticize.app` under
+`~/Library/Developer/Xcode/DerivedData/ChessticizeMobile-*/Build/Products/Debug-iphoneos/`.
+Then launch with no Metro running (`lsof -iTCP:8081 -sTCP:LISTEN` is empty). The
+"Cannot start server in new windows" message from `react-native run-ios` is
+harmless.
 
 After the first install, verify both `Chessticize` and `Chessticize Dev` are
 present. In Dev, leave iCloud Sync enabled, complete a small practice run, use
