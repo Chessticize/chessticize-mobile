@@ -1,4 +1,14 @@
 import { userEvent, waitFor, within } from "storybook/test";
+import { lightTheme } from "../../mobile/src/theme/index.ts";
+
+// Icon glyphs on the web come from a Private Use Area icon font; they are
+// decoration, not copy, so text assertions ignore them.
+const ICON_GLYPHS = /[\uE000-\uF8FF]/g;
+
+function rgbFromHex(hex: string): string {
+  const value = Number.parseInt(hex.slice(1), 16);
+  return `rgb(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255})`;
+}
 
 export async function clickTestId(canvasElement: HTMLElement, testID: string): Promise<void> {
   const page = within(canvasElement.ownerDocument.body);
@@ -75,7 +85,7 @@ export async function expectTestIdText(
   const page = within(canvasElement.ownerDocument.body);
   const element = await page.findByTestId(testID, {}, { timeout: 4_000 });
   await waitFor(() => {
-    if (element.textContent?.trim() !== expectedText) {
+    if (element.textContent?.replace(ICON_GLYPHS, "").trim() !== expectedText) {
       throw new Error(`Expected ${testID} to render "${expectedText}"`);
     }
   });
@@ -319,8 +329,9 @@ export async function expectRunCardInsets(
   }
   await waitFor(() => {
     const style = view.getComputedStyle(card);
-    if (style.paddingLeft !== "12px" || style.paddingRight !== "12px") {
-      throw new Error(`Expected ${testID} to preserve 12px horizontal content insets`);
+    // Direction A grouped-list rows (#609) inset content 16 pt from the section edge.
+    if (style.paddingLeft !== "16px" || style.paddingRight !== "16px") {
+      throw new Error(`Expected ${testID} to preserve 16px horizontal content insets`);
     }
     if (style.paddingTop !== "10px" || style.paddingBottom !== "10px") {
       throw new Error(`Expected ${testID} to preserve 10px edit-mode vertical insets`);
@@ -349,7 +360,7 @@ export async function expectRunInsertionTarget(
     if (
       style?.borderStyle !== "dashed"
       || style.borderWidth !== "2px"
-      || style.borderColor !== "rgb(37, 99, 235)"
+      || style.borderColor !== rgbFromHex(lightTheme.colors.accent.s600)
     ) {
       throw new Error(`Expected the ${position} insertion slot to use a blue dashed outline`);
     }

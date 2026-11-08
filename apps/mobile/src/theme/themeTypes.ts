@@ -170,6 +170,61 @@ export type ThemeColors = {
   };
 };
 
+// Semantic scales for visual direction A "Grouped Native" (#609).
+
+export type TypeRole =
+  | "largeTitle"
+  | "title"
+  | "headline"
+  | "body"
+  | "subheadline"
+  | "footnote"
+  | "caption"
+  | "numeral"
+  | "numeralLarge";
+
+export type TypeStyle = {
+  fontSize: number;
+  lineHeight: number;
+  fontWeight: "400" | "600" | "700";
+  fontVariant?: "tabular-nums"[];
+};
+
+export type ThemeTypography = Record<TypeRole, TypeStyle>;
+
+export type ThemeShape = {
+  // Buttons, rail items, inputs.
+  control: number;
+  // Inset grouped sections and cards.
+  card: number;
+  // Sheets and large panels.
+  sheet: number;
+  // Icon tiles.
+  tile: number;
+  // Segmented controls, badges, tab bar.
+  capsule: number;
+};
+
+export type ThemeSpacing = {
+  // Horizontal screen padding.
+  screen: number;
+  // Between sections.
+  section: number;
+  // Between a section header and its content, and between grouped items.
+  group: number;
+  // Between stacked rows or session elements.
+  row: number;
+  // Between inline items such as an icon and its label.
+  inline: number;
+};
+
+export type ThemeMetrics = {
+  rowMinHeight: number;
+  minTarget: number;
+  iconTile: number;
+};
+
+/** @deprecated Use ThemeSpacing. */
 export type ThemeSpace = {
   1: number;
   2: number;
@@ -270,9 +325,17 @@ export type Theme = {
   // Status bar icon style that stays legible over the theme's canvas.
   statusBarStyle: "dark-content" | "light-content";
   colors: ThemeColors;
+  typography: ThemeTypography;
+  shape: ThemeShape;
+  spacing: ThemeSpacing;
+  metrics: ThemeMetrics;
+  /** @deprecated Use spacing. */
   space: ThemeSpace;
+  /** @deprecated Use shape. */
   radius: ThemeRadius;
+  /** @deprecated Use typography. */
   fontSize: ThemeFontSize;
+  /** @deprecated Use typography. */
   fontWeight: ThemeFontWeight;
   fontFamily: { mono: string | undefined };
   elevation: ThemeElevation;

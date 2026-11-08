@@ -12,6 +12,7 @@ import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native";
 import type { SprintState } from "../../../../packages/core/src/types.ts";
 import { ResultReviewImpactCard } from "./ResultReviewImpactCard.tsx";
 import { ResultTrophyGlyph } from "./ResultTrophyGlyph.tsx";
+import { ListRow, Section } from "./ui/index.tsx";
 
 const SURVIVAL_DISCLOSURE_MOTION_DURATION_MS = 200;
 
@@ -114,23 +115,19 @@ export function PersonalBestHomeCard({
   presentation: PersonalBestChallengeDesignPreview;
   onOpenHub: (run?: PersonalBestPausedRunPresentation) => void;
 }): React.JSX.Element {
-  const styles = useStyles();
   const latestPaused = presentation.pausedRuns?.[0];
   return (
-    <Pressable
-      accessibilityLabel="Open Survival Challenge. See how far you can go, at your own pace."
-      accessibilityHint="Opens Survival setup"
-      accessibilityRole="button"
-      style={styles.homeCard}
-      testID="personal-best-home-card"
-      onPress={() => onOpenHub(latestPaused)}
-    >
-      <View style={styles.homeEntryCopy}>
-        <Text style={styles.homeTitle}>Survival Challenge</Text>
-        <Text style={styles.homeDescription}>See how far you can go, at your own pace.</Text>
-      </View>
-      <Text accessibilityElementsHidden style={styles.homeChevron}>›</Text>
-    </Pressable>
+    <Section rows>
+      <ListRow
+        accessibilityHint="Opens Survival setup"
+        accessibilityLabel="Open Survival Challenge. See how far you can go, at your own pace."
+        icon="survival"
+        subtitle="See how far you can go, at your own pace."
+        testID="personal-best-home-card"
+        title="Survival Challenge"
+        onPress={() => onOpenHub(latestPaused)}
+      />
+    </Section>
   );
 }
 
@@ -1625,40 +1622,6 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 19,
     fontWeight: "900",
     marginTop: 2
-  },
-  homeCard: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s300,
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 12,
-    minHeight: 76,
-    paddingHorizontal: 16,
-    paddingVertical: 12
-  },
-  homeChevron: {
-    color: theme.colors.accent.s600,
-    fontSize: 25,
-    fontWeight: "400",
-    lineHeight: 27
-  },
-  homeDescription: {
-    color: theme.colors.text.secondary,
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 17,
-    marginTop: 3
-  },
-  homeEntryCopy: {
-    flex: 1
-  },
-  homeTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 18,
-    fontWeight: "900"
   },
   primaryAction: {
     alignItems: "center",

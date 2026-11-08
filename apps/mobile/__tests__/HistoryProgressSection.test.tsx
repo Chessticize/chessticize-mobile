@@ -4,6 +4,7 @@ import {
   HistoryProgressScreen,
   type HistoryProgressPresentation
 } from "../src/components/HistoryProgressSection";
+import { lightTheme } from "../src/theme";
 import { flattenTestStyle } from "../test-support/testRendererSupport";
 
 test("renders an unavailable historical point as a gray placeholder", () => {
@@ -56,8 +57,8 @@ test("renders an unavailable historical point as a gray placeholder", () => {
   const placeholder = root.findByProps({ testID: "history-strength-bar-0" });
   const available = root.findByProps({ testID: "history-strength-bar-1" });
 
-  expect(flattenTestStyle(placeholder.props.style).backgroundColor).toBe("#CBD5E1");
-  expect(flattenTestStyle(available.props.style).backgroundColor).toBe("#3B82F6");
+  expect(flattenTestStyle(placeholder.props.style).backgroundColor).toBe(lightTheme.colors.fillMuted);
+  expect(flattenTestStyle(available.props.style).backgroundColor).toBe(lightTheme.colors.accent.s500);
   const placeholderSample = root.findByProps({
     testID: "history-strength-sample-0"
   });

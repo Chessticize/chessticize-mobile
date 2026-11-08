@@ -97,6 +97,9 @@ class AnimatedValue {
 
 module.exports = {
   ActivityIndicator: component('ActivityIndicator'),
+  requireNativeComponent(name) {
+    return component(name);
+  },
   Animated: {
     Value: AnimatedValue,
     View: component('Animated.View'),

@@ -428,8 +428,8 @@ describe("PracticePocScreen", () => {
       "Was the previous puzzle clear?"
     );
     expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Mark as unclear");
-    expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, "#FFFBEB")).toBe(true);
-    expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, "#F59E0B")).toBe(true);
+    expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, lightTheme.colors.warning.s50)).toBe(true);
+    expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, lightTheme.colors.warning.s500)).toBe(true);
     const promptStyle = findByTestId(renderer, "sprint-unclear-prompt").props.style;
     press(renderer, "sprint-unclear-toggle");
     const attemptId = (service.listHistory() as AttemptEvent[])[0]?.id;
@@ -437,10 +437,10 @@ describe("PracticePocScreen", () => {
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
     expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
     expect(flattenTestStyle(findByTestId(renderer, "sprint-unclear-marked").props.style))
-      .toMatchObject({ backgroundColor: "#EFF6FF", borderColor: "#93C5FD" });
+      .toMatchObject({ backgroundColor: lightTheme.colors.accent.s50, borderColor: lightTheme.colors.accent.s300 });
     expect(flattenTestStyle(
       findByTestId(renderer, "sprint-unclear-marked").findByType(ReactNative.Text).props.style
-    ).color).toBe("#1D4ED8");
+    ).color).toBe(lightTheme.colors.accent.s700);
     expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
     expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
     expect(findByTestId(renderer, "sprint-unclear-prompt").props.style).toEqual(promptStyle);
@@ -926,8 +926,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-run-management")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-run-standard"))).toContain("Standard");
     expect(collectText(findByTestId(renderer, "practice-run-tactics-focus"))).toContain("Tactics Focus");
-    expect(findByTestId(renderer, "practice-run-tactics-focus-glyph-standard-outer")).toBeTruthy();
-    expect(findByTestId(renderer, "practice-run-candidate-sprint-glyph-arrow-a-shaft")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-run-tactics-focus-icon")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-run-candidate-sprint-icon")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-progress-summary"))).toContain("Standard rating");
 
     press(renderer, "practice-run-home-edit");
@@ -990,8 +990,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-run-move-up-tactics-focus")).toBeTruthy();
     expect(findByTestId(renderer, "practice-run-move-down-tactics-focus")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-run-edit-tactics-focus"))).toBe("Edit rating");
-    expect(hasStyleEntry(findByTestId(renderer, "practice-run-tactics-focus"), "borderColor", "#CBD5E1")).toBe(true);
-    expect(hasStyleEntry(findByTestId(renderer, "practice-run-tactics-focus"), "borderStyle", "solid")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-run-tactics-focus"), "backgroundColor", lightTheme.colors.surface)).toBe(true);
 
     press(renderer, "practice-run-move-down-tactics-focus");
     press(renderer, "practice-run-edit-tactics-focus");
@@ -1155,7 +1154,7 @@ describe("PracticePocScreen", () => {
     expect(onIntent).not.toHaveBeenCalled();
     const insertionOutline = findByTestId(renderer, "practice-run-insertion-outline");
     expect(flattenTestStyle(insertionOutline.props.style)).toEqual(expect.objectContaining({
-      borderColor: "#2563EB",
+      borderColor: lightTheme.colors.accent.s600,
       borderStyle: "dashed",
       borderWidth: 2,
       height: 100,
@@ -2037,7 +2036,7 @@ describe("PracticePocScreen", () => {
       "Edit"
     );
     expect(collectText(findByTestId(renderer, "practice-run-home-utilities"))).toContain(
-      "+ Add Run"
+      "Add Run"
     );
     expect(() => findByTestId(renderer, "practice-sprint-rules-guide")).toThrow();
     expect(collectText(findByTestId(renderer, "practice-sprint-rules-open"))).toContain(
@@ -2807,7 +2806,7 @@ describe("PracticePocScreen", () => {
     }
   });
 
-  it("lets the TIMEOUT badge expand for Android large text without changing its baseline width", () => {
+  it("gives every Sprint rule badge one minimum width that follows the text size", () => {
     setPracticeViewport({
       fontScale: 1.5,
       height: 914,
@@ -2816,14 +2815,36 @@ describe("PracticePocScreen", () => {
       width: 412
     });
     const renderer = renderLabScenario("practice-first-sprint-guide");
-    const badge = findByTestId(renderer, "practice-sprint-rule-puzzle-timeout-badge");
-    const badgeStyle = flattenTestStyle(badge.props.style);
-    const badgeText = badge.findByType(ReactNative.Text);
+    const ruleIds = ["time-limit", "mistake-limit", "slow-warning", "puzzle-timeout"];
+    const badgeWidths = ruleIds.map((ruleId) => flattenTestStyle(
+      findByTestId(renderer, `practice-sprint-rule-${ruleId}-badge`).props.style
+    ).minWidth);
+    const timeoutBadge = findByTestId(renderer, "practice-sprint-rule-puzzle-timeout-badge");
 
-    expect(collectText(badge)).toBe("TIMEOUT");
-    expect(badgeStyle.minWidth).toBe(72);
-    expect(badgeStyle.width).toBeUndefined();
-    expect(badgeText.props.numberOfLines).toBe(1);
+    expect(collectText(timeoutBadge)).toBe("TIMEOUT");
+    expect(badgeWidths).toEqual([108, 108, 108, 108]);
+    expect(flattenTestStyle(timeoutBadge.props.style).width).toBeUndefined();
+    expect(timeoutBadge.findByType(ReactNative.Text).props.numberOfLines).toBe(1);
+  });
+
+  it("stacks Sprint rule badges above their copy when the scaled badge would crowd a narrow card", () => {
+    setPracticeViewport({
+      fontScale: 2,
+      height: 914,
+      insets: { top: 32, right: 0, bottom: 24, left: 0 },
+      scale: 2.625,
+      width: 412
+    });
+    const renderer = renderLabScenario("practice-first-sprint-guide");
+    const list = findByTestId(renderer, "practice-sprint-rules-list");
+    act(() => {
+      list.props.onLayout({ nativeEvent: { layout: { height: 600, width: 340, x: 0, y: 0 } } });
+    });
+
+    const row = findByTestId(renderer, "practice-sprint-rule-puzzle-timeout");
+    const badge = findByTestId(renderer, "practice-sprint-rule-puzzle-timeout-badge");
+    expect(flattenTestStyle(row.props.style).flexDirection).toBe("column");
+    expect(flattenTestStyle(badge.props.style).minWidth).toBeUndefined();
   });
 
   it("uses the selected saved Run to calculate the first Sprint pass target", () => {
@@ -3746,7 +3767,7 @@ describe("PracticePocScreen", () => {
 
     await boardMove(correct, ARROW_DUEL_REPLY_LAB_MOVES.default.correctChoice);
     expect(findByTestId(correct, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(correct.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(hasStyleValue(correct.root, lightTheme.colors.positive.flash)).toBe(true);
     expect(collectText(findByTestId(correct, "arrow-duel-reply-challenge"))).toContain(
       "Choose the best move"
     );
@@ -3782,7 +3803,7 @@ describe("PracticePocScreen", () => {
     await boardMove(correct, ARROW_DUEL_REPLY_LAB_MOVES.default.expectedReply);
     expect(collectText(correct.root)).not.toContain("Solved");
     expect(findByTestId(correct, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(correct.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(hasStyleValue(correct.root, lightTheme.colors.positive.flash)).toBe(true);
     expect(findByTestId(correct, "session-score-strip").props.accessibilityLabel).toContain(
       "solved 1, mistakes 0"
     );
@@ -3831,7 +3852,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(wrongChoice.root)).not.toContain("Choice missed");
     expect(collectText(wrongChoice.root)).not.toContain("One mistake · added to Review");
     expect(findByTestId(wrongChoice, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(wrongChoice.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expect(hasStyleValue(wrongChoice.root, lightTheme.colors.danger.flash)).toBe(true);
     expect(findByTestId(wrongChoice, "session-score-strip").props.accessibilityLabel).toContain(
       "solved 0, mistakes 1"
     );
@@ -3861,7 +3882,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(wrongReply.root)).not.toContain("Reply missed");
     expect(collectText(wrongReply.root)).not.toContain("One mistake · added to Review");
     expect(findByTestId(wrongReply, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(wrongReply.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expect(hasStyleValue(wrongReply.root, lightTheme.colors.danger.flash)).toBe(true);
     expect(findByTestId(wrongReply, "session-score-strip").props.accessibilityLabel).toContain(
       "solved 0, mistakes 1"
     );
@@ -4807,7 +4828,7 @@ describe("PracticePocScreen", () => {
       expect(hasStyleEntry(
         findByTestId(renderer, "session-puzzle-timing-label"),
         "color",
-        "#B45309"
+        lightTheme.colors.warning.s700
       )).toBe(true);
       expect(findByTestId(renderer, "active-session-control-rail-content")).toBeTruthy();
     }
@@ -5004,11 +5025,11 @@ describe("PracticePocScreen", () => {
     );
     expect(flattenTestStyle(
       findByTestId(renderer, "sprint-previous-attempt-notice-status").props.style
-    )).toMatchObject({ backgroundColor: "#EFF6FF", borderColor: "#93C5FD" });
+    )).toMatchObject({ backgroundColor: lightTheme.colors.accent.s50, borderColor: lightTheme.colors.accent.s300 });
     expect(flattenTestStyle(
       findByTestId(renderer, "sprint-previous-attempt-notice-status")
         .findByType(ReactNative.Text).props.style
-    ).color).toBe("#1D4ED8");
+    ).color).toBe(lightTheme.colors.accent.s700);
     expect(() => findByTestId(renderer, "sprint-unclear-prompt")).toThrow();
     expect(() => findByTestId(renderer, "sprint-unclear-marked")).toThrow();
     expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
@@ -5324,7 +5345,7 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(
       findByTestId(renderer, "history-attempt-history-timeout-badge"),
       "backgroundColor",
-      "#DC2626"
+      lightTheme.colors.danger.s600
     )).toBe(true);
     expect(() => findByTestId(renderer, "history-attempt-history-timeout-unclear")).toThrow();
     expect(collectText(findByTestId(renderer, "history-attempt-history-incomplete-fast-result"))).toBe(
@@ -5337,7 +5358,7 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(
       findByTestId(renderer, "history-attempt-history-incomplete-fast-badge"),
       "backgroundColor",
-      "#64748B"
+      lightTheme.colors.text.tertiary
     )).toBe(true);
     expect(() => findByTestId(renderer, "history-attempt-history-incomplete-fast-unclear")).toThrow();
     expect(() => findByTestId(renderer, "history-attempt-history-incomplete-fast-slow")).toThrow();
@@ -5377,7 +5398,7 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(
       findByTestId(renderer, "history-advanced-filters"),
       "borderColor",
-      "#CBD5E1"
+      lightTheme.colors.border.strong
     )).toBe(true);
     expect(hasStyleEntry(
       findByTestId(renderer, "history-advanced-filters"),
@@ -5394,7 +5415,7 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(
       findByTestId(renderer, "history-source-sprint"),
       "backgroundColor",
-      "#2563EB"
+      lightTheme.colors.accent.fill
     )).toBe(true);
     expect(collectText(findByTestId(renderer, "history-source-filters"))).toContain("All sources");
     expect(collectText(findByTestId(renderer, "history-result-filters"))).toBe(
@@ -5502,7 +5523,7 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(
       findByTestId(renderer, "history-source-sprint"),
       "backgroundColor",
-      "#2563EB"
+      lightTheme.colors.accent.fill
     )).toBe(true);
 
     press(renderer, "history-attention-all");
@@ -6099,7 +6120,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "settings-tab-icon")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-tab-icon"))).toBe("");
     expect(collectText(findByTestId(renderer, "history-tab-icon"))).toBe("");
-    expect(hasStyleEntry(findByTestId(renderer, "practice-tab-icon"), "backgroundColor", "#DBEAFE")).toBe(false);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-tab-icon"), "backgroundColor", lightTheme.colors.accent.s100)).toBe(false);
     expect(findByTestId(renderer, "practice-tab-target-outer")).toBeTruthy();
     expect(findByTestId(renderer, "practice-tab-target-inner")).toBeTruthy();
     expect(findByTestId(renderer, "history-tab-clock-outline")).toBeTruthy();
@@ -6108,19 +6129,15 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "analysis-tab")).toThrow();
     expect(findByTestId(renderer, "practice-mode-standard")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-standard").props.accessibilityState).toEqual({ selected: true });
-    expect(hasStyleEntry(findByTestId(renderer, "practice-mode-standard"), "borderColor", "#93C5FD")).toBe(true);
-    expect(hasStyleEntry(findByTestId(renderer, "practice-mode-standard-icon"), "backgroundColor", "#DBEAFE")).toBe(true);
+    expect(findByTestId(renderer, "practice-mode-standard-selected")).toBeTruthy();
+    expect(hasStyleEntry(findByTestId(renderer, "practice-mode-standard-icon"), "backgroundColor", lightTheme.colors.accent.s100)).toBe(true);
     expect(findByTestId(renderer, "practice-mode-arrow-duel")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-arrow-duel").props.accessibilityState).toEqual({ selected: false });
-    expect(hasStyleEntry(findByTestId(renderer, "practice-mode-arrow-duel"), "borderColor", "#93C5FD")).toBe(false);
+    expect(() => findByTestId(renderer, "practice-mode-arrow-duel-selected")).toThrow();
     expect(() => findByTestId(renderer, "practice-mode-blitz")).toThrow();
     expect(findByTestId(renderer, "practice-mode-custom")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-mode-standard-icon"))).toBe("");
     expect(collectText(findByTestId(renderer, "practice-mode-arrow-duel-icon"))).toBe("");
-    expect(findByTestId(renderer, "practice-mode-arrow-duel-arrow-a")).toBeTruthy();
-    expect(findByTestId(renderer, "practice-mode-arrow-duel-arrow-b")).toBeTruthy();
-    expect(findByTestId(renderer, "practice-mode-arrow-duel-arrow-a-shaft")).toBeTruthy();
-    expect(findByTestId(renderer, "practice-mode-arrow-duel-arrow-b-shaft")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-mode-custom-icon"))).toBe("");
     expect(() => findByTestId(renderer, "practice-mode-standard-start")).toThrow();
     expect(() => findByTestId(renderer, "practice-mode-arrow-duel-start")).toThrow();
@@ -6129,13 +6146,18 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-mode-custom"))).not.toContain("Rating");
     expect(findByTestId(renderer, "practice-mode-custom").props.accessibilityLabel).toBe("Open Custom sprint setup, Configure time, theme, and rating");
     expect(findByTestId(renderer, "practice-start-button")).toBeTruthy();
-    expect(findByTestId(renderer, "practice-start-button").props.accessibilityRole).toBe("button");
-    expect(findByTestId(renderer, "practice-start-button").props.accessibilityLabel).toBe("Start Standard sprint");
+    expect(hostByTestId(renderer, "practice-start-button").props.accessibilityRole).toBe("button");
+    expect(hostByTestId(renderer, "practice-start-button").props.accessibilityLabel).toBe("Start Standard sprint");
     expect(collectText(findByTestId(renderer, "practice-start-button"))).toBe("Start");
-    expect(flattenTestStyle(findByTestId(renderer, "practice-action-header").props.style).minHeight).toBe(40);
-    expect(flattenTestStyle(findByTestId(renderer, "practice-header-title").props.style).fontSize).toBe(17);
-    expect(flattenTestStyle(findByTestId(renderer, "practice-header-title").props.style).textAlign).toBe("left");
-    expect(flattenTestStyle(findByTestId(renderer, "practice-start-button").props.style).height).toBe(40);
+    expect(flattenTestStyle(findByTestId(renderer, "practice-action-header").props.style).minHeight).toBe(lightTheme.metrics.minTarget);
+    expect(flattenTestStyle(hostByTestId(renderer, "practice-header-title").props.style)).toMatchObject({
+      fontSize: lightTheme.typography.title.fontSize,
+      fontWeight: lightTheme.typography.title.fontWeight
+    });
+    const startButtonStyle = hostByTestId(renderer, "practice-start-button").props.style;
+    expect(flattenTestStyle(
+      typeof startButtonStyle === "function" ? startButtonStyle({ pressed: false }) : startButtonStyle
+    ).minHeight).toBe(lightTheme.metrics.minTarget);
     expect(findByTestId(renderer, "practice-mode-standard-details").props.accessibilityLabel).toBe("5 min · 20s pace · Rating 600");
     expect(findByTestId(renderer, "practice-mode-arrow-duel-details").props.accessibilityLabel).toBe("5 min · 30s pace · Rating 600");
     expect(collectText(findByTestId(renderer, "practice-mode-standard-rating"))).toBe("Rating 600");
@@ -6157,10 +6179,10 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "practice-home"))).not.toContain("Offline puzzle training");
     expect(findByTestId(renderer, "practice-progress-summary")).toBeTruthy();
     expect(flattenTestStyle(findByTestId(renderer, "practice-progress-summary").props.style).alignItems).toBe("flex-start");
-    expect(flattenTestStyle(findByTestId(renderer, "practice-progress-rating-metric").props.style).alignItems).toBe("center");
-    expect(flattenTestStyle(findByTestId(renderer, "practice-progress-weekly-metric").props.style).alignItems).toBe("center");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-progress-rating-metric").props.style).alignItems).toBe("flex-start");
+    expect(flattenTestStyle(findByTestId(renderer, "practice-progress-weekly-metric").props.style).alignItems).toBe("flex-start");
     expect(collectText(findByTestId(renderer, "practice-progress-rating-delta"))).toBe("No rating change");
-    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-rating-delta"), "color", "#64748B")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-rating-delta"), "color", lightTheme.colors.text.tertiary)).toBe(true);
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-solved"))).toBe("0");
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-delta"))).toBe("Start training");
     expect(findByTestId(renderer, "practice-progress-summary").props.accessibilityLabel).toContain(
@@ -6168,7 +6190,7 @@ describe("PracticePocScreen", () => {
     );
     expect(findByTestId(renderer, "practice-progress-summary").props.accessibilityLabel).toContain("No attempts yet");
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-context"))).toBe("No attempts yet");
-    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", "#64748B")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", lightTheme.colors.text.tertiary)).toBe(true);
     expect(() => findByTestId(renderer, "practice-review-strip")).toThrow();
     expect(findByTestId(renderer, "review-tab")).toBeTruthy();
     press(renderer, "review-tab");
@@ -6194,7 +6216,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "practice-home")).toBeTruthy();
     expect(findByTestId(renderer, "practice-mode-standard").props.accessibilityState).toEqual({ selected: false });
     expect(findByTestId(renderer, "practice-mode-arrow-duel").props.accessibilityState).toEqual({ selected: true });
-    expect(hasStyleEntry(findByTestId(renderer, "practice-mode-arrow-duel"), "borderColor", "#93C5FD")).toBe(true);
+    expect(findByTestId(renderer, "practice-mode-arrow-duel-selected")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "practice-progress-rating-metric"))).toContain("Arrow Duel rating");
     expect(collectText(findByTestId(renderer, "practice-progress-rating-metric"))).toContain("900");
     expect(() => findByTestId(renderer, "session-board")).toThrow();
@@ -6990,8 +7012,8 @@ describe("PracticePocScreen", () => {
       /Standard rating \d+, \+\d+ this week/
     );
     expect(findByTestId(renderer, "practice-progress-summary").props.accessibilityLabel).toContain("100% accuracy · 0 mistakes");
-    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-rating-delta"), "color", "#16A34A")).toBe(true);
-    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", "#16A34A")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-rating-delta"), "color", lightTheme.colors.positive.s600)).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", lightTheme.colors.positive.s600)).toBe(true);
   });
 
   it("shows a persisted Custom config's weekly progress after relaunch", async () => {
@@ -7058,8 +7080,8 @@ describe("PracticePocScreen", () => {
       "Standard rating 600, No rating change"
     );
     expect(findByTestId(renderer, "practice-progress-summary").props.accessibilityLabel).toContain("0% accuracy · 1 mistake");
-    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-rating-delta"), "color", "#64748B")).toBe(true);
-    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", "#DC2626")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-rating-delta"), "color", lightTheme.colors.text.tertiary)).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", lightTheme.colors.danger.s600)).toBe(true);
   });
 
   it("starts a selected sprint from the explicit header action", () => {
@@ -7661,19 +7683,19 @@ describe("PracticePocScreen", () => {
     const rawBundledPuzzleLabel = String(seededPuzzleCount());
     expect(collectText(renderer.root)).not.toContain(`Offline-ready · ${bundledPuzzleLabel} puzzles`);
     expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain(`Offline-ready · ${rawBundledPuzzleLabel} puzzles`);
-    expect(hasStyleEntry(findByTestId(renderer, "test-puzzle-source-bundledCore"), "borderColor", "#2563EB")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "test-puzzle-source-bundledCore"), "borderColor", lightTheme.colors.accent.s600)).toBe(true);
     expect(() => findByTestId(renderer, "test-puzzle-source-random1000")).toThrow();
 
     press(renderer, "test-puzzle-source-familiar15");
     expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain("Offline-ready · 15 puzzles");
-    expect(hasStyleEntry(findByTestId(renderer, "test-puzzle-source-familiar15"), "borderColor", "#2563EB")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "test-puzzle-source-familiar15"), "borderColor", lightTheme.colors.accent.s600)).toBe(true);
     expect(() => findByTestId(renderer, "test-puzzle-source-promotionSample")).toThrow();
     expect(seededPuzzleCount("familiar15")).toBe(15);
     expect(familiarService.getPuzzle("04Phf")?.themes).toContain("promotion");
 
     press(renderer, "test-puzzle-source-bundledCore");
     expect(findByTestId(renderer, "app-shell-header").props.accessibilityLabel).toContain(`Offline-ready · ${rawBundledPuzzleLabel} puzzles`);
-    expect(hasStyleEntry(findByTestId(renderer, "test-puzzle-source-bundledCore"), "borderColor", "#2563EB")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "test-puzzle-source-bundledCore"), "borderColor", lightTheme.colors.accent.s600)).toBe(true);
   });
 
   it("keeps the same backend service when switching test puzzle sources", () => {
@@ -7912,7 +7934,7 @@ describe("PracticePocScreen", () => {
     const pausedRun = service.listResumableSurvivalRuns()[0];
     expect(pausedRun?.currentPuzzle?.puzzle.id).toBe(pausedPuzzleId);
     expect(collectText(findByTestId(renderer, "personal-best-home-card"))).toBe(
-      "Survival ChallengeSee how far you can go, at your own pace.›"
+      "Survival ChallengeSee how far you can go, at your own pace."
     );
 
     press(renderer, "personal-best-home-card");
@@ -7995,8 +8017,8 @@ describe("PracticePocScreen", () => {
   });
 
   it.each([
-    { feedbackColor: "rgba(22, 163, 74, 0.34)", move: "e6e7", result: "correct" },
-    { feedbackColor: "rgba(220, 38, 38, 0.32)", move: "e6d6", result: "wrong" }
+    { feedbackColor: lightTheme.colors.positive.flash, move: "e6e7", result: "correct" },
+    { feedbackColor: lightTheme.colors.danger.flash, move: "e6d6", result: "wrong" }
   ])("keeps production Survival $result feedback and the next entry animation after the synthetic Sprint deadline", async ({
     feedbackColor,
     move
@@ -8150,12 +8172,12 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("practice-home");
 
     const homeCard = findByTestId(renderer, "personal-best-home-card");
-    expect(homeCard.props.accessibilityRole).toBe("button");
+    expect(homeCard.findAllByProps({ accessibilityRole: "button" }).length).toBeGreaterThan(0);
     expect(homeCard.props.accessibilityLabel).toBe(
       "Open Survival Challenge. See how far you can go, at your own pace."
     );
     expect(collectText(homeCard)).toBe(
-      "Survival ChallengeSee how far you can go, at your own pace.›"
+      "Survival ChallengeSee how far you can go, at your own pace."
     );
     expect(collectText(homeCard)).not.toContain("paused");
     expect(collectText(homeCard)).not.toContain("mistakes");
@@ -8596,7 +8618,7 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(
       findByTestId(renderer, "session-mistake-dot-0"),
       "backgroundColor",
-      "#DC2626"
+      lightTheme.colors.danger.s600
     )).toBe(true);
     expect(() => findByTestId(renderer, "personal-best-mistakes")).toThrow();
     expect(collectText(findByTestId(renderer, "personal-best-progress-title"))).toBe(
@@ -8764,7 +8786,7 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(
       findByTestId(renderer, "session-mistake-dot-1"),
       "backgroundColor",
-      "#DC2626"
+      lightTheme.colors.danger.s600
     )).toBe(true);
     expect(hasStyleEntry(
       findByTestId(renderer, "session-mistake-dot-2"),
@@ -8845,7 +8867,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, arrow.wrongMove);
 
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.danger.flash)).toBe(true);
     expect(service.getActiveSprint()?.mistakeCount).toBe(1);
     expect(service.listHistory({ sessionId: service.getActiveSprint()?.id })).toEqual([
       expect.objectContaining({ result: "wrong", submittedMove: arrow.wrongMove })
@@ -8934,15 +8956,15 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("practice-personal-best-result");
 
     expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-hero").props.style))
-      .toMatchObject({ backgroundColor: "#EFF6FF", borderColor: "#93C5FD" });
+      .toMatchObject({ backgroundColor: lightTheme.colors.accent.s50, borderColor: lightTheme.colors.accent.s300 });
     expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-badge").props.style))
-      .toMatchObject({ backgroundColor: "#DBEAFE" });
+      .toMatchObject({ backgroundColor: lightTheme.colors.accent.s100 });
     expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-badge-text").props.style))
-      .toMatchObject({ color: "#1D4ED8" });
+      .toMatchObject({ color: lightTheme.colors.accent.s700 });
     expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-score").props.style))
-      .toMatchObject({ color: "#1D4ED8" });
+      .toMatchObject({ color: lightTheme.colors.accent.s700 });
     expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-comparison").props.style))
-      .toMatchObject({ color: "#1D4ED8" });
+      .toMatchObject({ color: lightTheme.colors.accent.s700 });
     expect(findByTestId(renderer, "personal-best-result-trophy")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "personal-best-result-trophy"))).toBe("");
     expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("19");
@@ -8970,7 +8992,7 @@ describe("PracticePocScreen", () => {
       "3 mistakes · Included in replay"
     );
     expect(flattenTestStyle(findByTestId(renderer, "personal-best-result-review-count").props.style))
-      .toMatchObject({ color: "#991B1B" });
+      .toMatchObject({ color: lightTheme.colors.danger.s800 });
     expect(collectText(renderer.root)).not.toContain("Sprint failed");
 
     press(renderer, "personal-best-result-done");
@@ -9007,15 +9029,15 @@ describe("PracticePocScreen", () => {
     renderers.push(neutralRenderer);
 
     expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-hero").props.style))
-      .toMatchObject({ backgroundColor: "#FFFFFF", borderColor: "#E2E8F0" });
+      .toMatchObject({ backgroundColor: "#FFFFFF", borderColor: lightTheme.colors.border.default });
     expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-badge").props.style))
-      .toMatchObject({ backgroundColor: "#E2E8F0" });
+      .toMatchObject({ backgroundColor: lightTheme.colors.surfaceStrong });
     expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-badge-text").props.style))
-      .toMatchObject({ color: "#475569" });
+      .toMatchObject({ color: lightTheme.colors.text.secondary });
     expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-score").props.style))
-      .toMatchObject({ color: "#0F172A" });
+      .toMatchObject({ color: lightTheme.colors.text.primary });
     expect(flattenTestStyle(findByTestId(neutralRenderer, "personal-best-result-comparison").props.style))
-      .toMatchObject({ color: "#64748B" });
+      .toMatchObject({ color: lightTheme.colors.text.tertiary });
     expect(() => findByTestId(neutralRenderer, "personal-best-result-trophy")).toThrow();
   });
 
@@ -9286,7 +9308,7 @@ describe("PracticePocScreen", () => {
     expect(promptLayoutSlotTestIDs(renderer)).toEqual(unsolvedPromptLayout);
     expect(() => findByTestId(renderer, "mock-promotion-dialog")).toThrow();
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
     expectText(renderer, "1 / 15");
     expectSessionMistakes(renderer, 0);
 
@@ -9370,7 +9392,7 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "mock-chessboard").props.draggableColor).toBeNull();
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
     expect(hasStyleEntry(findByTestId(renderer, "move-feedback-overlay"), "borderWidth", 2)).toBe(false);
 
     await settleFeedbackSnapshot();
@@ -9387,12 +9409,12 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "board-input-blocker")).toThrow();
     // The page never scrolls while the session board is on screen.
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(false);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(false);
     expect(countStyleValue(renderer.root, "rgba(37, 99, 235, 0.3)")).toBeGreaterThanOrEqual(2);
 
     await boardMove(renderer, "e6f7");
     expectSessionMistakes(renderer, 0);
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
     expect(countStyleValue(renderer.root, "rgba(37, 99, 235, 0.3)")).toBe(0);
     await settleFeedbackSnapshot();
 
@@ -9596,7 +9618,7 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "1 / 15");
     expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
     expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
 
@@ -9633,7 +9655,7 @@ describe("PracticePocScreen", () => {
 
     expectText(renderer, "1 / 15");
     expectSessionMistakes(renderer, 0);
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
   });
 
   it("keeps only the latest playable premove queued during an opponent reply", async () => {
@@ -9760,7 +9782,7 @@ describe("PracticePocScreen", () => {
 
     expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
   });
 
   it("drops illegal drags during the opponent reply without stalling the board", async () => {
@@ -9794,7 +9816,7 @@ describe("PracticePocScreen", () => {
 
     expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
   });
 
   it("does not count animated opponent replies as user mistakes", async () => {
@@ -9826,8 +9848,8 @@ describe("PracticePocScreen", () => {
 
     expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
-    expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(false);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.danger.flash)).toBe(false);
   });
 
   it("plays the first seven standard puzzles without ignored move callbacks or missing feedback", async () => {
@@ -9858,8 +9880,8 @@ describe("PracticePocScreen", () => {
       await boardMove(renderer, move);
       expectSessionMistakes(renderer, 0);
       expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-      expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
-      expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(false);
+      expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
+      expect(hasStyleValue(renderer.root, lightTheme.colors.danger.flash)).toBe(false);
       await settleFeedbackSnapshot();
     }
 
@@ -9886,9 +9908,9 @@ describe("PracticePocScreen", () => {
     expectSessionMistakes(renderer, 1);
     expect(findByTestId(renderer, "session-mistakes").props.accessibilityLabel).toBe("Mistakes 1 of 3");
     expect(collectText(findByTestId(renderer, "session-mistakes"))).toBe("");
-    expect(hasStyleEntry(findByTestId(renderer, "session-mistake-dot-0"), "backgroundColor", "#DC2626")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, "session-mistake-dot-0"), "backgroundColor", lightTheme.colors.danger.s600)).toBe(true);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.danger.flash)).toBe(true);
     expect(countStyleValue(renderer.root, "rgba(37, 99, 235, 0.3)")).toBe(0);
 
     abandonSprint(renderer);
@@ -9934,11 +9956,11 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain("between the two arrows");
     expect(findByTestId(renderer, "practice-prompt-side-glyph")).toBeTruthy();
     expectText(renderer, "Be ready for a quick reply check.");
-    const neutralArrowBodies = countStyleEntry(findByTestId(renderer, "session-board"), "backgroundColor", "#2563EB");
+    const neutralArrowBodies = countStyleEntry(findByTestId(renderer, "session-board"), "backgroundColor", lightTheme.colors.accent.s600);
     expect(neutralArrowBodies).toBeGreaterThan(0);
-    expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", "#2563EB")).toBe(neutralArrowBodies);
+    expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", lightTheme.colors.accent.s600)).toBe(neutralArrowBodies);
     expect(countStyleEntry(findByTestId(renderer, "session-board"), "opacity", 0.68)).toBe(neutralArrowBodies * 2);
-    expect(hasStyleValue(findByTestId(renderer, "session-board"), "#DC2626")).toBe(false);
+    expect(hasStyleValue(findByTestId(renderer, "session-board"), lightTheme.colors.danger.s600)).toBe(false);
   });
 
   it("keeps Standard, Arrow Duel, Review, and Replay prompts in one shared frame", () => {
@@ -10131,11 +10153,11 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "0 / 10");
     expect(collectText(renderer.root)).not.toContain("Correct");
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
-    expect(countStyleEntry(findByTestId(renderer, "session-board"), "backgroundColor", "#16A34A")).toBe(0);
-    expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", "#16A34A")).toBe(0);
-    expect(countStyleEntry(findByTestId(renderer, "session-board"), "backgroundColor", "#DC2626")).toBe(0);
-    expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", "#DC2626")).toBe(0);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
+    expect(countStyleEntry(findByTestId(renderer, "session-board"), "backgroundColor", lightTheme.colors.positive.s600)).toBe(0);
+    expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", lightTheme.colors.positive.s600)).toBe(0);
+    expect(countStyleEntry(findByTestId(renderer, "session-board"), "backgroundColor", lightTheme.colors.danger.s600)).toBe(0);
+    expect(countStyleEntry(findByTestId(renderer, "session-board"), "borderLeftColor", lightTheme.colors.danger.s600)).toBe(0);
     expect(() => findByTestId(renderer, "feedback-panel")).toThrow();
     expect(service.listHistory()).toHaveLength(0);
 
@@ -10193,7 +10215,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
     expect(findByTestId(renderer, "board-input-blocker")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
     expect(collectText(findByTestId(renderer, "arrow-duel-reply-challenge"))).toContain(
       "Choose the best move"
     );
@@ -10236,7 +10258,7 @@ describe("PracticePocScreen", () => {
       "What if you made the other move? Find the opponent’s reply in 10 seconds. Optional · Turn off in Settings"
     );
     expect(flattenTestStyle(whatIfOverlay.props.style)).toEqual(expect.objectContaining({
-      backgroundColor: "rgba(15, 23, 42, 0.90)",
+      backgroundColor: lightTheme.colors.scrimStrong,
       bottom: 0,
       justifyContent: "center",
       left: 0,
@@ -10670,7 +10692,7 @@ describe("PracticePocScreen", () => {
     expectSessionMistakes(renderer, 0);
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(boardFen);
     expect(() => findByTestId(renderer, "move-feedback-overlay")).toThrow();
-    expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(false);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.danger.flash)).toBe(false);
 
     abandonSprint(renderer);
     press(renderer, "history-tab");
@@ -11461,7 +11483,7 @@ describe("PracticePocScreen", () => {
     expect(historyAttemptRow).toBeTruthy();
     const historyAttemptId = historyAttemptRow.props.testID.replace("history-attempt-", "");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-badge`))).toBe("");
-    expect(hasStyleEntry(findByTestId(renderer, `history-attempt-${historyAttemptId}-badge`), "backgroundColor", "#DC2626")).toBe(true);
+    expect(hasStyleEntry(findByTestId(renderer, `history-attempt-${historyAttemptId}-badge`), "backgroundColor", lightTheme.colors.danger.s600)).toBe(true);
     expect(findByTestId(renderer, "result-badge-wrong-glyph")).toBeTruthy();
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-result`))).toBe("Wrong move");
     expect(() => findByTestId(renderer, `history-attempt-${historyAttemptId}-move`)).toThrow();
@@ -12698,7 +12720,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "f2g3");
 
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.danger.flash)).toBe(true);
     expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toContain(
       "Follow the blue line to see why this move fails."
     );
@@ -12752,7 +12774,7 @@ describe("PracticePocScreen", () => {
     startStandardSprint(renderer);
     await boardMove(renderer, "c4b5");
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.danger.flash)).toBe(true);
     expect(countStyleValue(renderer.root, "rgba(37, 99, 235, 0.3)")).toBe(0);
     await settleFeedbackSnapshot();
     await boardMove(renderer, "g6g5");
@@ -12761,7 +12783,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.danger.flash)).toBe(true);
     expect(countStyleValue(renderer.root, "rgba(37, 99, 235, 0.3)")).toBe(0);
     expect(collectText(renderer.root)).not.toContain("Sprint failed");
 
@@ -12784,8 +12806,8 @@ describe("PracticePocScreen", () => {
     expect(reviewButton).toBeTruthy();
     expect(playAgainButton).toBeTruthy();
     expect(collectText(reviewButton)).toContain("Replay 3 attempts");
-    expect(hasStyleEntry(reviewButton, "backgroundColor", "#2563EB")).toBe(true);
-    expect(hasStyleEntry(playAgainButton, "backgroundColor", "#2563EB")).toBe(false);
+    expect(hasStyleEntry(reviewButton, "backgroundColor", lightTheme.colors.accent.fill)).toBe(true);
+    expect(hasStyleEntry(playAgainButton, "backgroundColor", lightTheme.colors.accent.fill)).toBe(false);
   });
 
   it("previews two Unclear and two In Review attempts as a four-entry Replay with status actions", async () => {
@@ -12999,7 +13021,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, firstExpectedReviewMove);
 
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(false);
 
     await settleFeedbackSnapshot();
@@ -13009,7 +13031,7 @@ describe("PracticePocScreen", () => {
     const secondExpectedReviewMove = collectText(findByTestId(renderer, "review-current-expected-move"));
     await boardMove(renderer, secondExpectedReviewMove);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(22, 163, 74, 0.34)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.positive.flash)).toBe(true);
 
     await settleFeedbackSnapshot();
     expectText(renderer, "1 / 3 · Standard");
@@ -13119,7 +13141,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-tab-badge"))).toBe("1");
-    expect(hasStyleEntry(findByTestId(renderer, "review-tab-badge"), "backgroundColor", "#DC2626")).toBe(false);
+    expect(hasStyleEntry(findByTestId(renderer, "review-tab-badge"), "backgroundColor", lightTheme.colors.danger.s600)).toBe(false);
     expect(() => findByTestId(renderer, "app-shell-header")).toThrow();
     expect(collectText(findByTestId(renderer, "review-action-header"))).not.toContain("Due reviews");
     expect(collectText(findByTestId(renderer, "review-action-header"))).toContain("Review");
@@ -13301,7 +13323,7 @@ describe("PracticePocScreen", () => {
     expect(hasStyleEntry(
       findByTestId(renderer, "review-due-item-review-badge-0-standard-standard-5-20-badge"),
       "backgroundColor",
-      "#2563EB"
+      lightTheme.colors.accent.fill
     )).toBe(true);
 
     press(renderer, "review-today-to-review-toggle");
@@ -14287,8 +14309,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(renderer.root)).not.toContain("You chose:");
     press(renderer, "review-analysis-button");
     expect(findByTestId(renderer, "analysis-arrow-overlay")).toBeTruthy();
-    expect(countStyleEntry(findByTestId(renderer, "review-board"), "backgroundColor", "#16A34A")).toBeGreaterThan(0);
-    expect(countStyleEntry(findByTestId(renderer, "review-board"), "backgroundColor", "#DC2626")).toBeGreaterThan(0);
+    expect(countStyleEntry(findByTestId(renderer, "review-board"), "backgroundColor", lightTheme.colors.positive.s600)).toBeGreaterThan(0);
+    expect(countStyleEntry(findByTestId(renderer, "review-board"), "backgroundColor", lightTheme.colors.danger.s600)).toBeGreaterThan(0);
     press(renderer, "review-close-analysis");
 
     const initialPromptLayout = promptLayoutSlotTestIDs(renderer);
@@ -14300,7 +14322,7 @@ describe("PracticePocScreen", () => {
     const initialPerspective = findByTestId(renderer, "mock-chessboard").props.flipped;
     await boardMove(renderer, wrongMoves[0] as string);
     expect(findByTestId(renderer, "move-feedback-overlay")).toBeTruthy();
-    expect(hasStyleValue(renderer.root, "rgba(220, 38, 38, 0.32)")).toBe(true);
+    expect(hasStyleValue(renderer.root, lightTheme.colors.danger.flash)).toBe(true);
     expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toContain(
       "Follow the blue line to see why this move fails."
     );
@@ -14391,8 +14413,8 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "mock-chessboard").props.fen).toBe(solvedReviewFen);
     expect(findByTestId(renderer, "mock-chessboard").props.gestureEnabled).toBe(true);
-    expect(countStyleEntry(findByTestId(renderer, "review-board"), "backgroundColor", "#16A34A")).toBe(0);
-    expect(countStyleEntry(findByTestId(renderer, "review-board"), "backgroundColor", "#DC2626")).toBe(0);
+    expect(countStyleEntry(findByTestId(renderer, "review-board"), "backgroundColor", lightTheme.colors.positive.s600)).toBe(0);
+    expect(countStyleEntry(findByTestId(renderer, "review-board"), "backgroundColor", lightTheme.colors.danger.s600)).toBe(0);
 
     expect(() => findByTestId(renderer, "review-arrow-duel-candidate-overlay")).toThrow();
   });
@@ -17539,6 +17561,16 @@ async function waitForAssertion(assertion: () => void, attempts = 10): Promise<v
 
 function findByTestId(renderer: TestRenderer.ReactTestRenderer, testID: string): TestRenderer.ReactTestInstance {
   return renderer.root.findByProps({ testID });
+}
+
+// The host element (View, Text, Pressable) that carries a testID, below any
+// shared primitive component that forwards the same testID.
+function hostByTestId(renderer: TestRenderer.ReactTestRenderer, testID: string): TestRenderer.ReactTestInstance {
+  const hosts = renderer.root.findAll((node) => typeof node.type === "string" && node.props.testID === testID);
+  if (hosts.length === 0) {
+    throw new Error(`No host element with testID ${testID}`);
+  }
+  return hosts[0];
 }
 
 function safeTestIdForTest(value: string): string {

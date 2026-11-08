@@ -177,36 +177,35 @@ const useStyles = makeStyles((theme) => ({
     borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
-    gap: theme.space[12],
+    gap: theme.spacing.row,
     justifyContent: "space-between",
-    minHeight: 66,
-    paddingHorizontal: theme.space[12],
-    paddingVertical: theme.space[10]
+    minHeight: theme.metrics.rowMinHeight,
+    paddingHorizontal: theme.spacing.row,
+    paddingVertical: theme.spacing.row
   },
   rowCopy: {
     flex: 1,
     flexShrink: 1,
-    gap: theme.space[2],
+    gap: theme.spacing.inline / 2,
     minWidth: 0
   },
   rowLabel: {
+    ...theme.typography.subheadline,
     color: theme.colors.text.heading,
-    fontSize: theme.fontSize[14],
-    fontWeight: theme.fontWeight.heavy
+    fontWeight: theme.typography.headline.fontWeight
   },
   helperText: {
-    color: theme.colors.text.tertiary,
-    fontSize: theme.fontSize[12],
-    lineHeight: 17
+    ...theme.typography.footnote,
+    color: theme.colors.text.tertiary
   },
   switchTrack: {
     backgroundColor: theme.colors.fillMuted,
     borderColor: theme.colors.border.heavy,
-    borderRadius: theme.radius.pill,
+    borderRadius: theme.shape.capsule,
     borderWidth: 1,
     height: 30,
     justifyContent: "center",
-    paddingHorizontal: theme.space[2],
+    paddingHorizontal: 2,
     width: 50
   },
   switchTrackEnabled: {
@@ -215,7 +214,7 @@ const useStyles = makeStyles((theme) => ({
   },
   switchThumb: {
     backgroundColor: theme.colors.thumb,
-    borderRadius: theme.radius.pill,
+    borderRadius: theme.shape.capsule,
     height: 24,
     ...theme.elevation.low,
     width: 24
@@ -226,43 +225,41 @@ const useStyles = makeStyles((theme) => ({
   previewBlock: {
     borderBottomColor: theme.colors.border.default,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: theme.space[10],
-    paddingHorizontal: theme.space[12],
-    paddingVertical: theme.space[12]
+    gap: theme.spacing.row,
+    paddingHorizontal: theme.spacing.row,
+    paddingVertical: theme.spacing.row
   },
   previewHeading: {
-    gap: theme.space[2]
+    gap: theme.spacing.inline / 2
   },
   previewButtons: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: theme.space[8]
+    gap: theme.spacing.group
   },
   previewButton: {
     backgroundColor: theme.colors.surfaceRaised,
     borderColor: theme.colors.border.strong,
-    borderRadius: theme.radius[8],
+    borderRadius: theme.shape.control,
     borderWidth: 1,
-    gap: theme.space[1],
-    minHeight: 48,
+    gap: 2,
+    minHeight: theme.metrics.minTarget,
     minWidth: 96,
-    paddingHorizontal: theme.space[10],
-    paddingVertical: theme.space[8]
+    paddingHorizontal: theme.spacing.row,
+    paddingVertical: theme.spacing.group
   },
   previewButtonLabel: {
+    ...theme.typography.footnote,
     color: theme.colors.accent.s700,
-    fontSize: theme.fontSize[12],
-    fontWeight: theme.fontWeight.black
+    fontWeight: theme.typography.headline.fontWeight
   },
   previewButtonDetail: {
-    color: theme.colors.text.tertiary,
-    fontSize: theme.fontSize[11],
-    fontWeight: theme.fontWeight.bold
+    ...theme.typography.caption,
+    color: theme.colors.text.tertiary
   },
   previewStatus: {
+    ...theme.typography.footnote,
     color: theme.colors.text.strong,
-    fontSize: theme.fontSize[12],
-    fontWeight: theme.fontWeight.bold,
-    lineHeight: 17
+    fontWeight: theme.typography.headline.fontWeight
   }
 }));

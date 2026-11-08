@@ -124,7 +124,7 @@ export const Home: Story = {
     await expectTestIdText(
       canvasElement,
       "personal-best-home-card",
-      "Survival ChallengeSee how far you can go, at your own pace.›"
+      "Survival ChallengeSee how far you can go, at your own pace."
     );
     await expectTestIdsInOrder(canvasElement, [
       "practice-progress-summary",
@@ -147,6 +147,9 @@ export const Home: Story = {
     await waitForTestId(canvasElement, "personal-best-home-card");
     await clickTestId(canvasElement, "personal-best-home-card");
     await waitForTestId(canvasElement, "personal-best-hub");
+    // End on Home so the story's resting state is the Home design under review.
+    await clickTestId(canvasElement, "personal-best-hub-close");
+    await waitForTestId(canvasElement, "personal-best-home-card");
   }
 };
 

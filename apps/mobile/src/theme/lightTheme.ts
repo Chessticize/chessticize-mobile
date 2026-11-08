@@ -1,109 +1,126 @@
-import { createElevation, fontFamily, fontSize, fontWeight, radius, space } from "./scales.ts";
+import {
+  createElevation,
+  fontFamily,
+  fontSize,
+  fontWeight,
+  metrics,
+  radius,
+  shape,
+  space,
+  spacing,
+  typography
+} from "./scales.ts";
 import type { Theme, ThemeColors } from "./themeTypes.ts";
 
-// The only place color literals live. Values reproduce the app's current
-// light appearance exactly (Tailwind slate/blue based).
+// Light palette for visual direction A "Grouped Native" (#609), the light counterpart of
+// darkTheme. The named roles come from docs/ui-design/MOBILE_UI_DESIGN.md: grouped
+// background #F2F2F7 (surfaceRaised, the app canvas), white sections (surface), separator
+// #D8D8DC, secondary text #636366, accent fill #0066D6 and accent text #0062CC, and the
+// AA-safe positive #1F7A35, negative #C8102E and warning #9A5400 with their soft fills.
+// Roles the direction does not define (tonal ramps, scrims) are derived in the same
+// system-gray and system-blue family. Ramp steps keep their role: s50 is the faint tint,
+// s900 the strongest text. Board, launch and back-gesture colors are unchanged here.
 const colors: ThemeColors = {
   surface: "#FFFFFF",
-  surfaceRaised: "#F8FAFC",
-  surfaceSunken: "#F1F5F9",
-  surfaceStrong: "#E2E8F0",
-  surfaceInverse: "#0F172A",
-  surfaceFloating: "#F8FAFC",
+  surfaceRaised: "#F2F2F7",
+  surfaceSunken: "#F2F2F7",
+  surfaceStrong: "#E5E5EA",
+  surfaceInverse: "#1C1C1E",
+  surfaceFloating: "#FFFFFF",
   thumb: "#FFFFFF",
-  fillMuted: "#CBD5E1",
-  fillStrong: "#94A3B8",
-  fillDisabled: "#64748B",
+  fillMuted: "#D1D1D6",
+  fillStrong: "#8E8E93",
+  fillDisabled: "#8E8E93",
   glass: "rgba(255, 255, 255, 0.66)",
-  glassStrong: "rgba(255, 255, 255, 0.94)",
-  veil: "rgba(248, 250, 252, 0.92)",
-  scrim: "rgba(15, 23, 42, 0.55)",
-  scrimSoft: "rgba(15, 23, 42, 0.48)",
-  scrimStrong: "rgba(15, 23, 42, 0.90)",
-  shadow: "#0F172A",
+  glassStrong: "rgba(249, 249, 251, 0.94)",
+  veil: "rgba(242, 242, 247, 0.92)",
+  scrim: "rgba(0, 0, 0, 0.45)",
+  scrimSoft: "rgba(0, 0, 0, 0.38)",
+  scrimStrong: "rgba(0, 0, 0, 0.85)",
+  shadow: "#000000",
   text: {
-    primary: "#0F172A",
-    heading: "#1E293B",
-    strong: "#334155",
-    secondary: "#475569",
-    tertiary: "#64748B",
-    faint: "#94A3B8",
+    primary: "#000000",
+    heading: "#1C1C1E",
+    strong: "#3A3A3C",
+    secondary: "#48484A",
+    tertiary: "#636366",
+    faint: "#616165",
     onAccent: "#FFFFFF",
     onTone: "#FFFFFF",
-    ink: "#111827",
-    inverse: "#E2E8F0"
+    ink: "#000000",
+    inverse: "#F2F2F7"
   },
   border: {
-    default: "#E2E8F0",
-    strong: "#CBD5E1",
-    heavy: "#94A3B8"
+    default: "#D8D8DC",
+    strong: "#C7C7CC",
+    heavy: "#8E8E93"
   },
   accent: {
-    s50: "#EFF6FF",
-    s100: "#DBEAFE",
-    s200: "#BFDBFE",
-    s300: "#93C5FD",
-    s400: "#60A5FA",
-    s500: "#3B82F6",
-    s600: "#2563EB",
-    s700: "#1D4ED8",
-    s800: "#1E40AF",
-    s900: "#1E3A8A",
-    wash: "#F8FBFF",
-    fill: "#2563EB",
-    dropZone: "rgba(37, 99, 235, 0.025)",
-    glassFill: "rgba(219, 234, 254, 0.14)",
-    glassBorder: "rgba(147, 197, 253, 0.48)"
+    s50: "#F0F6FE",
+    s100: "#E3EEFC",
+    s200: "#C7DCF8",
+    s300: "#9CC1F2",
+    s400: "#4F94E8",
+    s500: "#1F78DE",
+    s600: "#0062CC",
+    s700: "#0053AD",
+    s800: "#00458F",
+    s900: "#003873",
+    wash: "#F7FAFE",
+    fill: "#0066D6",
+    dropZone: "rgba(0, 102, 214, 0.04)",
+    glassFill: "rgba(227, 238, 252, 0.14)",
+    glassBorder: "rgba(156, 193, 242, 0.48)"
   },
   success: {
-    s50: "#ECFDF5",
-    s100: "#D1FAE5",
-    s200: "#A7F3D0",
-    s300: "#6EE7B7",
-    s700: "#047857",
-    s800: "#065F46"
+    s50: "#EEF8F0",
+    s100: "#E3F4E7",
+    s200: "#BFE5C7",
+    s300: "#8CD19A",
+    s700: "#1A6B2E",
+    s800: "#17602A"
   },
   positive: {
-    s100: "#DCFCE7",
-    s600: "#16A34A",
-    s700: "#15803D",
-    flash: "rgba(22, 163, 74, 0.34)"
+    s100: "#E3F4E7",
+    s600: "#1B6F31",
+    s700: "#1A6B2E",
+    flash: "rgba(31, 122, 53, 0.30)"
   },
   warning: {
-    s50: "#FFFBEB",
-    s100: "#FEF3C7",
-    s200: "#FDE68A",
-    s300: "#FCD34D",
-    s400: "#FBBF24",
-    s500: "#F59E0B",
-    s600: "#D97706",
-    s700: "#B45309",
-    s800: "#92400E",
-    s900: "#78350F"
+    s50: "#FEF8EE",
+    s100: "#FDF0DE",
+    s200: "#F8DDB0",
+    s300: "#F2C27A",
+    s400: "#E8A340",
+    s500: "#A35A00",
+    s600: "#9A5400",
+    s700: "#8A4B00",
+    s800: "#6E3C00",
+    s900: "#5A3100"
   },
   caution: {
-    s50: "#FFF7ED",
-    s100: "#FFEDD5",
-    s200: "#FED7AA",
-    s700: "#C2410C",
-    s800: "#9A3412",
-    s900: "#7C2D12"
+    s50: "#FFF4EA",
+    s100: "#FFE8D4",
+    s200: "#FFCFA3",
+    s700: "#A04000",
+    s800: "#8F3900",
+    s900: "#702D00"
   },
   danger: {
-    s50: "#FEF2F2",
-    s100: "#FEE2E2",
-    s200: "#FECACA",
-    s300: "#FCA5A5",
-    s500: "#EF4444",
-    s600: "#DC2626",
-    s700: "#B91C1C",
-    s800: "#991B1B",
-    flash: "rgba(220, 38, 38, 0.32)"
+    s50: "#FEF1F2",
+    s100: "#FCE6E8",
+    s200: "#F7C4CA",
+    s300: "#EF97A1",
+    s500: "#E0263C",
+    s600: "#C8102E",
+    s700: "#A80D26",
+    s800: "#870A1F",
+    flash: "rgba(200, 16, 46, 0.30)"
   },
   hairline: {
-    neutral: "rgba(100, 116, 139, 0.22)",
-    warning: "rgba(245, 158, 11, 0.28)",
-    warningStrong: "rgba(180, 83, 9, 0.22)"
+    neutral: "rgba(60, 60, 67, 0.18)",
+    warning: "rgba(154, 84, 0, 0.25)",
+    warningStrong: "rgba(154, 84, 0, 0.22)"
   },
   board: {
     lightSquare: "#E6E8EB",
@@ -140,6 +157,10 @@ export const lightTheme: Theme = {
   name: "light",
   statusBarStyle: "dark-content",
   colors,
+  typography,
+  shape,
+  spacing,
+  metrics,
   space,
   radius,
   fontSize,

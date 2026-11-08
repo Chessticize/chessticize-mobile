@@ -7,6 +7,7 @@ import {
 import { PracticeViewportProvider } from "../../mobile/src/components/PracticeViewport.tsx";
 import { darkTheme, lightTheme, ThemeProvider } from "../../mobile/src/theme/index.ts";
 import "../src/lab.css";
+import { installLabIconFont } from "../src/labIconFont.ts";
 import { LabDeviceStatusBar } from "../src/LabDeviceStatusBar.tsx";
 import {
   LAB_DEVICE_VIEWPORTS,
@@ -70,6 +71,8 @@ function LabThemeScope({
     </ThemeProvider>
   );
 }
+
+installLabIconFont();
 
 const preview: Preview = {
   decorators: [
