@@ -1000,6 +1000,32 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
+  it("shows the selected Home run with a tinted row and keeps ratings in one muted column", () => {
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ onIntent: jest.fn() })
+    });
+    const runIds = ["standard", "tactics-focus"];
+    const selectedIds = runIds.filter((id) =>
+      findByTestId(renderer, `practice-run-select-${id}`).props.accessibilityState?.selected === true
+    );
+    expect(selectedIds).toHaveLength(1);
+    const rowIsTinted = (id: string): boolean => renderer.root
+      .findAllByProps({ testID: `practice-run-${id}` })
+      .some((node) => flattenTestStyle(node.props.style).backgroundColor === lightTheme.colors.accent.s100);
+    for (const id of runIds) {
+      expect(rowIsTinted(id)).toBe(id === selectedIds[0]);
+    }
+    // No trailing check: the selected rating stays in the same column.
+    expect(() => findByTestId(renderer, `practice-run-selected-${selectedIds[0]}`)).toThrow();
+    expect(flattenTestStyle(hostByTestId(renderer, "practice-mode-standard-rating").props.style)).toMatchObject({
+      // AppText's secondary tone (direction A textSecondary).
+      color: lightTheme.colors.text.tertiary,
+      fontSize: lightTheme.typography.numeralRow.fontSize,
+      fontWeight: lightTheme.typography.numeralRow.fontWeight,
+      textAlign: "right"
+    });
+  });
+
   it("keeps native Run transforms mounted after leaving Edit Runs", () => {
     const renderer = renderScreen({ runManagementEnabled: true });
 

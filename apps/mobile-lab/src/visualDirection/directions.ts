@@ -14,7 +14,8 @@ export type TypeRole =
   | "footnote"
   | "caption"
   | "numeralXL"
-  | "numeralL";
+  | "numeralL"
+  | "numeralRow";
 
 export type TypeStyle = {
   size: number;
@@ -95,15 +96,16 @@ export const GROUPED_NATIVE: VisualDirection = {
     "Selection tick on segmented controls and run choice, light impact on Start, success/warning notification on Sprint result.",
   iconStroke: 2,
   type: {
-    largeTitle: { size: 34, lineHeight: 41, weight: "700", tracking: 0.4 },
-    title: { size: 22, lineHeight: 28, weight: "700" },
-    headline: { size: 17, lineHeight: 22, weight: "600" },
-    body: { size: 17, lineHeight: 22, weight: "400" },
-    subheadline: { size: 15, lineHeight: 20, weight: "400" },
-    footnote: { size: 13, lineHeight: 18, weight: "400" },
+    largeTitle: { size: 30, lineHeight: 36, weight: "700", tracking: 0.4 },
+    title: { size: 20, lineHeight: 25, weight: "600" },
+    headline: { size: 16, lineHeight: 21, weight: "600" },
+    body: { size: 15, lineHeight: 20, weight: "400" },
+    subheadline: { size: 14, lineHeight: 19, weight: "400" },
+    footnote: { size: 12, lineHeight: 16, weight: "400" },
     caption: { size: 12, lineHeight: 16, weight: "400" },
-    numeralXL: { size: 34, lineHeight: 41, weight: "600", tabular: true },
-    numeralL: { size: 22, lineHeight: 28, weight: "600", tabular: true }
+    numeralXL: { size: 28, lineHeight: 34, weight: "600", tabular: true },
+    numeralL: { size: 22, lineHeight: 28, weight: "600", tabular: true },
+    numeralRow: { size: 15, lineHeight: 20, weight: "600", tabular: true }
   },
   radius: { control: 12, card: 20, sheet: 34, badge: 999 },
   spacing: { screen: 16, section: 32, group: 8, row: 12, inline: 8 },

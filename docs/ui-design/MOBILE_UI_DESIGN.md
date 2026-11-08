@@ -283,15 +283,16 @@ session use tabular figures.
 
 | Role | Size / line height (pt) | Weight | Use |
 | --- | --- | --- | --- |
-| Large title | 34 / 41 | Bold | Tab root titles such as Practice |
-| Title | 22 / 28 | Bold | Section titles and result headlines |
-| Headline | 17 / 22 | Semibold | Row titles, navigation titles, button labels |
-| Body | 17 / 22 | Regular | Body copy and row values |
-| Subheadline | 15 / 20 | Regular | Row subtitles and helper copy |
-| Footnote | 13 / 18 | Regular | Metadata and section footers |
+| Large title | 30 / 36 | Bold | Tab root titles such as Practice |
+| Title | 20 / 25 | Semibold | Section titles and result headlines |
+| Headline | 16 / 21 | Semibold | Row titles, navigation titles, button labels |
+| Body | 15 / 20 | Regular | Body copy and row values |
+| Subheadline | 14 / 19 | Regular | Row subtitles and helper copy |
+| Footnote | 12 / 16 | Regular | Metadata and section footers |
 | Caption | 12 / 16 | Regular | Metric labels and badges |
-| Numeral XL | 34 / 41 | Semibold, tabular | Large scores; 28 / 34 inside compact metric cards |
-| Numeral L | 22 / 28 | Semibold, tabular | Session timer, progress, ratings |
+| Numeral XL | 28 / 34 | Semibold, tabular | Large scores and the Progress card |
+| Numeral L | 22 / 28 | Semibold, tabular | Session timer, progress, metric tiles |
+| Numeral row | 15 / 20 | Semibold, tabular | Numbers inside list rows, such as run ratings (secondary color) |
 
 #### Text width rounding
 

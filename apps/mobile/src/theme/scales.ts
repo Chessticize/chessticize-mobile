@@ -20,15 +20,16 @@ import type {
 // default Large size; React Native Text scales them with the user's text size.
 
 export const typography: ThemeTypography = {
-  largeTitle: { fontSize: 34, lineHeight: 41, fontWeight: "700" },
-  title: { fontSize: 22, lineHeight: 28, fontWeight: "700" },
-  headline: { fontSize: 17, lineHeight: 22, fontWeight: "600" },
-  body: { fontSize: 17, lineHeight: 22, fontWeight: "400" },
-  subheadline: { fontSize: 15, lineHeight: 20, fontWeight: "400" },
-  footnote: { fontSize: 13, lineHeight: 18, fontWeight: "400" },
+  largeTitle: { fontSize: 30, lineHeight: 36, fontWeight: "700" },
+  title: { fontSize: 20, lineHeight: 25, fontWeight: "600" },
+  headline: { fontSize: 16, lineHeight: 21, fontWeight: "600" },
+  body: { fontSize: 15, lineHeight: 20, fontWeight: "400" },
+  subheadline: { fontSize: 14, lineHeight: 19, fontWeight: "400" },
+  footnote: { fontSize: 12, lineHeight: 16, fontWeight: "400" },
   caption: { fontSize: 12, lineHeight: 16, fontWeight: "400" },
   numeral: { fontSize: 22, lineHeight: 28, fontWeight: "600", fontVariant: ["tabular-nums"] },
-  numeralLarge: { fontSize: 34, lineHeight: 41, fontWeight: "600", fontVariant: ["tabular-nums"] }
+  numeralLarge: { fontSize: 28, lineHeight: 34, fontWeight: "600", fontVariant: ["tabular-nums"] },
+  numeralRow: { fontSize: 15, lineHeight: 20, fontWeight: "600", fontVariant: ["tabular-nums"] }
 };
 
 export const shape: ThemeShape = {

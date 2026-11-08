@@ -181,7 +181,8 @@ export type TypeRole =
   | "footnote"
   | "caption"
   | "numeral"
-  | "numeralLarge";
+  | "numeralLarge"
+  | "numeralRow";
 
 export type TypeStyle = {
   fontSize: number;

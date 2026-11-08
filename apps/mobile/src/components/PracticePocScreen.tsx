@@ -7152,6 +7152,7 @@ function PracticeRunCard({
       style={[
         styles.homeRow,
         homeRowPositionStyle(styles, dragging ? "only" : position),
+        active && !editing ? styles.homeRowSelected : null,
         editing ? styles.homeRowEditing : null,
         dragging ? styles.homeRowDragging : null
       ]}
@@ -7200,13 +7201,11 @@ function PracticeRunCard({
             : run.kind === "arrow_duel"
               ? "practice-mode-arrow-duel-rating"
               : undefined}
-          variant="numeral"
+          tone="secondary"
+          variant="numeralRow"
         >
           {run.elo}
         </AppText>
-        {active && !editing ? (
-          <Icon color={appTheme.colors.accent.s600} name="check" size={18} testID={`practice-run-selected-${safeTestId(run.id)}`} weight="semibold" />
-        ) : null}
         {editing ? (
           <View style={styles.runEditActions}>
             <Pressable
@@ -17937,9 +17936,14 @@ const useStyles = makeStyles((theme) => ({
     paddingLeft: theme.metrics.iconTile + theme.spacing.row,
     width: "100%"
   },
+  // Ratings form one right-aligned, muted column; selection is shown by the
+  // row tint, so no trailing check shifts a selected rating.
   homeRowRating: {
-    fontSize: 20,
-    lineHeight: 26
+    minWidth: 44,
+    textAlign: "right"
+  },
+  homeRowSelected: {
+    backgroundColor: theme.colors.accent.s100
   },
   homeRowIconButton: {
     alignItems: "center",
