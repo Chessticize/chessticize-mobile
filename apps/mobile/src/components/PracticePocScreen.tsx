@@ -2364,8 +2364,9 @@ export function PracticePocScreen({
     setStartConflict(null);
     try {
       service.abandonSprint(captureLiveNowIso());
-    } catch (caught) {
-      setError(errorMessage(caught));
+    } catch {
+      // The Run could not be discarded; keep it resumable instead of starting.
+      refreshState();
       return;
     }
     refreshState();
@@ -8196,9 +8197,10 @@ function StartConflictPrompt({
   return (
     <Modal animationType="fade" onRequestClose={onCancel} transparent visible>
       <SafeAreaModalBackdrop style={styles.accessibleMoveModalBackdrop}>
-        <View
+        <ScrollView
           accessibilityViewIsModal
-          style={styles.feedbackHandoffConfirmation}
+          contentContainerStyle={styles.startConflictContent}
+          style={[styles.feedbackHandoffConfirmation, styles.startConflictCard]}
           testID="practice-start-conflict"
         >
           <AppText variant="title">Unfinished Run</AppText>
@@ -8232,7 +8234,7 @@ function StartConflictPrompt({
               onPress={onCancel}
             />
           </View>
-        </View>
+        </ScrollView>
       </SafeAreaModalBackdrop>
     </Modal>
   );
@@ -21331,11 +21333,21 @@ const useStyles = makeStyles((theme) => ({
   },
   feedbackHandoffConfirmation: {
     backgroundColor: theme.colors.surfaceRaised,
+    // Dark surfaceRaised matches the dimmed Home, so the card needs an edge.
+    borderColor: theme.colors.border.default,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: theme.shape.sheet,
     gap: theme.spacing.row,
     maxWidth: 430,
     padding: 24,
     width: "100%"
+  },
+  startConflictCard: {
+    flexGrow: 0,
+    flexShrink: 1
+  },
+  startConflictContent: {
+    gap: theme.spacing.row
   },
   feedbackHandoffActions: {
     gap: theme.spacing.group,
