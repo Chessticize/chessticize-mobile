@@ -147,7 +147,7 @@ export const TacticalFocusGuide: Story = {
     await waitForText(canvasElement, "Track your Focused Run");
     await waitForText(
       canvasElement,
-      "Puzzles done and time so far. There’s no overall time limit, and this Run is unrated."
+      "Puzzles done and time so far. There’s no overall time limit."
     );
     await waitForText(canvasElement, "1 of 3");
     await waitForText(canvasElement, "Unrated");

@@ -420,7 +420,7 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
   ].includes(scenarioId);
 }
 
-function sprintRulesDesignPreviewFor(
+export function sprintRulesDesignPreviewFor(
   scenarioId: LabScenarioId
 ): React.ComponentProps<typeof PracticePocScreen>["sprintRulesDesignPreview"] {
   const firstRunGuide = {

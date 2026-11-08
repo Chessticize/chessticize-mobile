@@ -24,7 +24,7 @@ export function sessionGuideStepCopy(
     case "session_progress":
       return focusedRun
         ? {
-            detail: "Puzzles done and time so far. There’s no overall time limit, and this Run is unrated.",
+            detail: "Puzzles done and time so far. There’s no overall time limit.",
             preferred: ["below", "trailing"],
             title: "Track your Focused Run"
           }
