@@ -11521,9 +11521,11 @@ describe("PracticePocScreen", () => {
     );
     const historyAttemptThemes = collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-themes`));
     expect(historyAttemptThemes).toMatch(/^[A-Z]/);
-    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-pace`))).toContain("20s pace");
+    // Tags stay on one horizontally scrolling line; many tags never grow the row.
+    expect(findByTestId(renderer, `history-attempt-${historyAttemptId}-themes`).findByType(ReactNative.ScrollView).props.horizontal).toBe(true);
+    expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toContain("20s pace");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toMatch(
-      /Sprint · \d+s · (Today|Yesterday|Scheduled|[A-Z][a-z]{2} \d{1,2}(, \d{4})?)$/
+      /^Sprint · \d+s · \d+s pace · (Today|Yesterday|Scheduled|[A-Z][a-z]{2} \d{1,2}(, \d{4})?)$/
     );
     expect(() => findByTestId(renderer, `history-attempt-${historyAttemptId}-status`)).toThrow();
     expect(findByTestId(renderer, `history-attempt-${historyAttemptId}-chevron`)).toBeTruthy();
@@ -11619,7 +11621,7 @@ describe("PracticePocScreen", () => {
     expect(themes).toContain("Mate in 3");
     expect(themes).toContain("Sacrifice");
     expect(themes).not.toContain("Endgame");
-    expect(findByTestId(renderer, "history-attempt-curated-density-pace")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "history-attempt-curated-density-meta"))).toContain("pace");
 
     press(renderer, "history-filter-toggle");
     expect(findByTestId(renderer, "history-theme-catalog-motion").props).toMatchObject({
@@ -12210,7 +12212,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "history-attention-all");
 
     expect(collectText(findByTestId(renderer, "history-attempt-same-day-attempt-meta"))).toBe(
-      "Sprint · 5s · Yesterday"
+      "Sprint · 5s · 20s pace · Yesterday"
     );
     expect(findByTestId(renderer, "history-attempt-same-day-attempt").props.accessibilityLabel).toContain(
       formatLocalCalendarDate(completedAt)

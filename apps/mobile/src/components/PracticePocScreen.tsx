@@ -12458,8 +12458,8 @@ function HistoryAttemptRow({
   const compactContext = [themeContext, paceLabel].filter(Boolean).join(" · ");
   const puzzleIdentity = `ID ${attempt.puzzleId} · Rating ${attempt.puzzleRating}`;
   const durationLabel = detail.elapsedSeconds === null ? "Duration unavailable" : `${detail.elapsedSeconds}s`;
-  const compactMeta = `${sourceLabel} · ${durationLabel} · ${dateLabel}`;
-  const accessibleMeta = `${sourceLabel} · ${durationLabel} · ${accessibleDateLabel}`;
+  const compactMeta = [sourceLabel, durationLabel, paceLabel, dateLabel].filter(Boolean).join(" · ");
+  const accessibleMeta = [sourceLabel, durationLabel, paceLabel, accessibleDateLabel].filter(Boolean).join(" · ");
   const rowAccessibilityLabel = [
     `Replay ${historyAttemptModeLabel(detail.mode)} puzzle`,
     resultLabel,
@@ -12501,24 +12501,19 @@ function HistoryAttemptRow({
         <AppText testID={`history-attempt-${attempt.id}-identity`} tone="secondary" variant="footnote">{puzzleIdentity}</AppText>
         {visibleThemes.length > 0 ? (
           <HistoryThemeList attemptId={attempt.id} themes={visibleThemes} />
-        ) : (
-          <AppText testID={`history-attempt-${attempt.id}-context`} tone="secondary" variant="footnote">{compactContext}</AppText>
-        )}
-        {visibleThemes.length > 0 && paceLabel ? (
-          <AppText testID={`history-attempt-${attempt.id}-pace`} tone="secondary" variant="footnote">{paceLabel}</AppText>
         ) : null}
         <AppText testID={`history-attempt-${attempt.id}-meta`} tone="secondary" variant="footnote">{compactMeta}</AppText>
-        {isUnclear || timingStatus === "slow" ? (
-          <View style={styles.attemptRowBadges}>
-            {isUnclear ? (
-              <Badge label="Unclear" testID={`history-attempt-${attempt.id}-unclear`} tone="warning" />
-            ) : null}
-            {timingStatus === "slow" ? (
-              <Badge label="Slow" testID={`history-attempt-${attempt.id}-${timingStatus}`} tone="warning" />
-            ) : null}
-          </View>
-        ) : null}
       </View>
+      {isUnclear || timingStatus === "slow" ? (
+        <View style={styles.attemptRowTrailingBadges}>
+          {isUnclear ? (
+            <Badge label="Unclear" testID={`history-attempt-${attempt.id}-unclear`} tone="warning" />
+          ) : null}
+          {timingStatus === "slow" ? (
+            <Badge label="Slow" testID={`history-attempt-${attempt.id}-${timingStatus}`} tone="warning" />
+          ) : null}
+        </View>
+      ) : null}
       <View style={styles.attemptRowChevron} testID={`history-attempt-${attempt.id}-chevron`}>
         <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
       </View>
@@ -12534,33 +12529,20 @@ function HistoryThemeList({
   themes: readonly string[];
 }): React.JSX.Element {
   return (
-    <ThemeTagRail testID={`history-attempt-${attemptId}-themes`} themes={themes} wrap />
+    <ThemeTagRail testID={`history-attempt-${attemptId}-themes`} themes={themes} />
   );
 }
 
 function ThemeTagRail({
   centered = false,
   testID,
-  themes,
-  wrap = false
+  themes
 }: {
   centered?: boolean;
   testID: string;
   themes: readonly string[];
-  wrap?: boolean;
 }): React.JSX.Element {
   const styles = useStyles();
-  if (wrap) {
-    return (
-      <View style={[styles.historyThemeRail, styles.historyThemeRailWrapped]} testID={testID}>
-        {themes.map((theme) => (
-          <View key={theme} style={styles.historyThemeChip} testID={`${testID}-${safeTestId(theme)}`}>
-            <Text style={styles.historyThemeChipText}>{customThemeLabel(theme)}</Text>
-          </View>
-        ))}
-      </View>
-    );
-  }
   return (
     <ScrollView
       horizontal
@@ -20637,11 +20619,11 @@ const useStyles = makeStyles((theme) => ({
     gap: 2,
     minWidth: 0
   },
-  attemptRowBadges: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    paddingTop: 4
+  attemptRowTrailingBadges: {
+    alignItems: "flex-end",
+    alignSelf: "center",
+    flexShrink: 0,
+    gap: 4
   },
   attemptRowChevron: {
     alignSelf: "center"
@@ -21116,10 +21098,6 @@ const useStyles = makeStyles((theme) => ({
     gap: 4,
     paddingRight: 10,
     paddingTop: 2
-  },
-  historyThemeRailWrapped: {
-    flexWrap: "wrap",
-    paddingRight: 0
   },
   historyThemeRailCentered: {
     paddingLeft: 10,
