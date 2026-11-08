@@ -155,6 +155,10 @@ export function SprintResultScreen({
 
   return (
     <View onLayout={measure("screen")} style={[styles.screen, style]} testID="sprint-summary-panel">
+      {/* Remount the content when Dynamic Type changes: iOS keeps some text
+          measurements from the previous size otherwise, leaving rows and
+          buttons at their old heights after the user shrinks the text. */}
+      <React.Fragment key={`text-scale-${fontScale}`}>
       <TopBar
         fontScale={fontScale}
         onBack={actions.onBack}
@@ -210,6 +214,7 @@ export function SprintResultScreen({
           {actionButtons}
         </View>
       ) : null}
+      </React.Fragment>
     </View>
   );
 }
