@@ -175,8 +175,10 @@ describe("public landing page", () => {
       /<link[^>]+rel=["'](?:stylesheet|icon)["'][^>]+href=["']https?:\/\//i
     );
     expect(styles).not.toMatch(/@import|url\(\s*["']?https?:\/\//i);
+    expect(notFoundPage).toContain('href="/styles.css"');
     expect(notFoundPage).toContain('href="/chessticize-mobile/styles.css"');
-    expect(notFoundPage).toContain('href="/chessticize-mobile/"');
+    expect(notFoundPage).toContain('href="/"');
+    expect(notFoundPage).toContain('href="https://app.chessticize.com"');
     expect(landingPageDoc).toMatch(
       /no analytics, database, CDN, remote fonts, or\s+runtime JavaScript/
     );
