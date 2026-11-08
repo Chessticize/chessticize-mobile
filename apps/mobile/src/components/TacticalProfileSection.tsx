@@ -970,8 +970,7 @@ const useStyles = makeStyles((theme) => ({
   },
   cardActionSeparator: {
     backgroundColor: theme.colors.border.default,
-    height: StyleSheet.hairlineWidth,
-    marginLeft: 16
+    height: StyleSheet.hairlineWidth
   },
   cardAction: {
     alignItems: "center",

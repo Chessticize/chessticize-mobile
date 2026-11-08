@@ -1017,6 +1017,16 @@ describe("PracticePocScreen", () => {
     }
     // No trailing check: the selected rating stays in the same column.
     expect(() => findByTestId(renderer, `practice-run-selected-${selectedIds[0]}`)).toThrow();
+    // Run separators are full-bleed: they start at the card's left edge.
+    const runSeparators = findByTestId(renderer, "practice-run-management").findAll((node) =>
+      typeof node.type === "string"
+      && node.props.pointerEvents === "none"
+      && flattenTestStyle(node.props.style).height === ReactNative.StyleSheet.hairlineWidth
+    );
+    expect(runSeparators.length).toBeGreaterThan(0);
+    for (const separator of runSeparators) {
+      expect(flattenTestStyle(separator.props.style)).toMatchObject({ left: 0, right: 0 });
+    }
     expect(flattenTestStyle(hostByTestId(renderer, "practice-mode-standard-rating").props.style)).toMatchObject({
       // AppText's "secondary" tone renders the theme's text.tertiary token, which
       // holds direction A's textSecondary color (#636366 in light).

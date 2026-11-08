@@ -5,7 +5,8 @@ import { AppText } from "./AppText.tsx";
 
 // An inset grouped section: an optional title row, one opaque surface on the
 // grouped background, and an optional footnote. With `rows`, each child is a
-// row separated by an inset hairline; otherwise the surface pads its content.
+// row separated by a full-bleed hairline (edge to edge, one per boundary);
+// otherwise the surface pads its content.
 
 export function Section({
   children,
@@ -14,7 +15,7 @@ export function Section({
   headerAccessory,
   headerTestID,
   rows = false,
-  separatorInset = 16,
+  separatorInset = 0,
   style,
   surfaceStyle,
   testID

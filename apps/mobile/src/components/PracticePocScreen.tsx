@@ -7829,7 +7829,7 @@ function RunCardDropSurface({
           ...webStyle,
           boxShadow: dragging
             ? appTheme.elevation.web.raised
-            : appTheme.elevation.web.resting,
+            : "none",
           boxSizing: "border-box",
           cursor: draggable ? (dragging ? "grabbing" : "grab") : "default",
           display: "flex",
@@ -17892,7 +17892,7 @@ const useStyles = makeStyles((theme) => ({
   homeRowSeparator: {
     backgroundColor: theme.colors.border.default,
     height: StyleSheet.hairlineWidth,
-    left: 16,
+    left: 0,
     position: "absolute",
     right: 0,
     top: 0
@@ -20286,8 +20286,7 @@ const useStyles = makeStyles((theme) => ({
   },
   groupedSeparator: {
     backgroundColor: theme.colors.border.default,
-    height: StyleSheet.hairlineWidth,
-    marginLeft: 16
+    height: StyleSheet.hairlineWidth
   },
   groupedEmpty: {
     paddingHorizontal: 16,
@@ -20360,8 +20359,7 @@ const useStyles = makeStyles((theme) => ({
   },
   reviewForecastDividerStacked: {
     backgroundColor: theme.colors.border.default,
-    height: StyleSheet.hairlineWidth,
-    marginLeft: 16
+    height: StyleSheet.hairlineWidth
   },
   reviewForecastDivider: {
     alignSelf: "stretch",
