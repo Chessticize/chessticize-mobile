@@ -67,7 +67,7 @@ describe("buildPracticeAdaptiveLayout", () => {
     expect(layout.boardSize).toBe(408);
   });
 
-  it("keeps an expanded navigation rail readable in a wide, short window", () => {
+  it("uses wide content in a wide, short window", () => {
     const layout = buildPracticeAdaptiveLayout({
       fontScale: 1,
       height: 346,
@@ -76,8 +76,20 @@ describe("buildPracticeAdaptiveLayout", () => {
     });
 
     expect(layout.className).toBe("compactLandscape");
-    expect(layout.sideNavigationExpanded).toBe(true);
-    expect(layout.sideNavigationWidth).toBe(168);
+    expect(layout.contentWidth).toBe(993);
+    expect(layout.usesWideContent).toBe(true);
+  });
+
+  it("narrows tab content by the tab chrome the host reports as insets", () => {
+    // Android tablet (1280 x 800 dp) with the 80 dp navigation rail (#612).
+    const layout = buildPracticeAdaptiveLayout({
+      fontScale: 1,
+      height: 800,
+      insets: { top: 24, right: 0, bottom: 24, left: 80 },
+      width: 1280
+    });
+
+    expect(layout.contentWidth).toBe(1200);
     expect(layout.usesWideContent).toBe(true);
   });
 
@@ -90,7 +102,7 @@ describe("buildPracticeAdaptiveLayout", () => {
     });
 
     expect(layout.className).toBe("compactLandscape");
-    expect(layout.contentWidth).toBe(686);
+    expect(layout.contentWidth).toBe(750);
     expect(layout.usesWideContent).toBe(false);
     expect(layout.usesHomeColumns).toBe(true);
   });
@@ -196,8 +208,7 @@ describe("buildPracticeAdaptiveLayout", () => {
       board: layout.boardSize,
       rail: layout.usesSessionRail
     }).toEqual(expected);
-    expect(layout.contentWidth + (layout.usesSideNavigation ? layout.sideNavigationWidth : 0))
-      .toBe(width - insets.left - insets.right);
+    expect(layout.contentWidth).toBe(width - insets.left - insets.right);
   });
 
   // Sizes that cannot yet be measured headlessly (see docs/DEVICE_TARGETS.md):

@@ -36,6 +36,8 @@ const PHONE_WIDTH = 393;
 const PHONE_HEIGHT = 852;
 const IPAD_WIDTH = 1180;
 const IPAD_HEIGHT = 820;
+// Width of the reference sidebar drawn in the iPad prototype frame.
+const PROTOTYPE_RAIL_WIDTH = 168;
 const SAMPLE_FEN = "8/3k4/8/8/8/8/4P3/4K3 w - - 1 2";
 // Web stand-in for a native material/blur view behind floating chrome.
 const CHROME_BLUR = { backdropFilter: "blur(24px) saturate(1.8)" } as unknown as ViewStyle;
@@ -728,7 +730,7 @@ export function PracticeHomeWide(): React.JSX.Element {
   const layout = regularLandscapeLayout();
   return (
     <View accessibilityLabel="Practice Home, iPad landscape" style={{ backgroundColor: c.background, flexDirection: "row", height: IPAD_HEIGHT, width: IPAD_WIDTH }}>
-      <NavigationRail width={layout.sideNavigationWidth} />
+      <NavigationRail width={PROTOTYPE_RAIL_WIDTH} />
       <ScrollView contentContainerStyle={{ gap: d.spacing.section, padding: 32 }} style={{ flex: 1 }}>
         <T role="largeTitle">Practice</T>
         <View style={{ flexDirection: "row", gap: 32 }}>

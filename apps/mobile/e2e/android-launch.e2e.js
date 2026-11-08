@@ -1,6 +1,7 @@
 const {
   launchWithDisabledSynchronization,
   withAndroidUiDiagnostics,
+  topLevelTab,
 } = require('./helpers');
 
 describe('Android launch baseline', () => {
@@ -17,7 +18,7 @@ describe('Android launch baseline', () => {
     await withAndroidUiDiagnostics(async () => {
       await waitFor(element(by.id('app-shell-header'))).toBeVisible().withTimeout(180000);
       await waitFor(element(by.id('practice-home'))).toExist().withTimeout(180000);
-      await expect(element(by.id('practice-tab'))).toBeVisible();
+      await expect(topLevelTab('practice-tab')).toBeVisible();
     });
   });
 });

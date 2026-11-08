@@ -8,6 +8,7 @@ const {
   waitForElementTextContaining,
   waitForVisibleInPracticeScroll,
   withAndroidUiDiagnostics,
+  topLevelTab,
 } = require('./helpers');
 const {
   findUniqueAndroidUiNodeByLabel,
@@ -140,7 +141,7 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await expect(element(by.id('review-close-analysis'))).not.toExist();
       await device.pressBack();
       await waitFor(element(by.id('history-panel'))).toExist().withTimeout(10000);
-      await element(by.id('practice-tab')).tap();
+      await topLevelTab('practice-tab').tap();
       await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(10000);
       await device.pressBack();
       await waitFor(element(by.id('practice-run-management'))).toExist().withTimeout(10000);

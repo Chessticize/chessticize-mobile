@@ -24,9 +24,6 @@ export type AdaptiveLayout = {
   sessionPackedRowWidth: number;
   sessionRailGap: number;
   sessionRailWidth: number;
-  sideNavigationExpanded: boolean;
-  sideNavigationWidth: number;
-  usesSideNavigation: boolean;
   usesHomeColumns: boolean;
   usesSessionRail: boolean;
   usesWideContent: boolean;
@@ -54,6 +51,10 @@ const COMPACT_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 332;
 const REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 240;
 const HOME_COLUMNS_MIN_CONTENT_WIDTH = 650;
 
+// Top-level navigation chrome is drawn by the native tab host (#612). Its space
+// (the bottom glass bar, the iPhone Duo column, the iPad top bar, the Android
+// rail) arrives as part of `insets` for tab content, so content width is
+// simply the inset viewport.
 export function buildPracticeAdaptiveLayout({
   fontScale,
   height,
@@ -74,20 +75,9 @@ export function buildPracticeAdaptiveLayout({
   const className: AdaptiveLayoutClass = isRegularWidth
     ? isLandscape ? "regularLandscape" : "regularPortrait"
     : isLandscape ? "compactLandscape" : "compactPortrait";
-  const usesSideNavigation = isCompactLandscape || isRegularWidth;
-  const sideNavigationExpanded = usesSideNavigation && viewportWidth >= 960 && !isLargeText;
-  const sideNavigationWidth = sideNavigationExpanded
-    ? 168
-    : isRegularWidth ? 76 : 64;
-  const contentWidth = Math.max(
-    0,
-    viewportWidth - (usesSideNavigation ? sideNavigationWidth : 0)
-  );
+  const contentWidth = viewportWidth;
   const sessionContentWidth = viewportWidth;
-  const usesWideContent = (
-    contentWidth >= 860
-      || (sideNavigationExpanded && contentWidth >= 820)
-  ) && !isLargeText;
+  const usesWideContent = contentWidth >= 860 && !isLargeText;
   const usesHomeColumns = (
     usesWideContent
       || (isLandscape && contentWidth >= HOME_COLUMNS_MIN_CONTENT_WIDTH)
@@ -162,9 +152,6 @@ export function buildPracticeAdaptiveLayout({
     sessionPackedRowWidth: boardSize + sessionRailWidth + sessionRailGap,
     sessionRailGap,
     sessionRailWidth,
-    sideNavigationExpanded,
-    sideNavigationWidth,
-    usesSideNavigation,
     usesHomeColumns,
     usesSessionRail,
     usesWideContent
