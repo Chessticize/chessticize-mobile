@@ -283,10 +283,9 @@ jobs:
           verify_public_url "$STORYBOOK_URL"
           verify_public_url "${IMMUTABLE_URL}storybook/"
           verify_public_url "${STORYBOOK_URL}storybook/"
-          for root in "$IMMUTABLE_URL" "$STORYBOOK_URL"; do
-            actual_sha="$(curl --fail --silent --show-error "${root}codex-build.json" | jq -r .sourceSha)"
-            [[ "$actual_sha" == "$GITHUB_SHA" ]] || { echo "::error::Deployed source SHA mismatch"; exit 1; }
-          done
+          # The alias can lag behind the deployment for a short time; poll for up
+          # to about 90 s and still fail if the wrong commit persists.
+          node scripts/storybook-ci.mjs verify-deployed "$GITHUB_SHA" "$IMMUTABLE_URL" "$STORYBOOK_URL"
 
           {
             echo "## Storybook deployment"
