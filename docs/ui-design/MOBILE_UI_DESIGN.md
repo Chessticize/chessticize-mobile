@@ -356,6 +356,9 @@ highlights, and arrows keep their own palette; #610 owns the board in dark mode.
   no inset. This differs from stock iOS, which insets them to the text column;
   the owner prefers one continuous line, including next to a tinted selected
   row. Rows draw no other border or shadow at that boundary.
+- In attempt rows with stacked detail lines (History, Review), the leading
+  icon tile sits level with the first line; trailing badges and the chevron
+  stay vertically centered on the row.
 - Rows are at least 52 pt tall. Every hit target is at least 44 x 44 pt,
   including circular icon buttons.
 - Radius: control 12 (buttons, rail items, inputs), card 20 (inset sections and

@@ -11574,10 +11574,20 @@ describe("PracticePocScreen", () => {
     );
     const historyAttemptThemes = collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-themes`));
     expect(historyAttemptThemes).toMatch(/^[A-Z]/);
-    // The result icon is vertically centered on the row.
+    // The result icon sits level with the first line, like Review's tiles:
+    // it is a direct child of a top-aligned row and is not centered itself.
+    const historyRowHost = hostByTestId(renderer, `history-attempt-${historyAttemptId}`);
+    const historyTile = hostByTestId(renderer, `history-attempt-${historyAttemptId}-badge`);
+    const historyRowStyle = historyRowHost.props.style;
     expect(flattenTestStyle(
-      findByTestId(renderer, `history-attempt-${historyAttemptId}-badge`).parent?.props.style
-    ).alignSelf).toBe("center");
+      typeof historyRowStyle === "function" ? historyRowStyle({ pressed: false }) : historyRowStyle
+    ).alignItems).toBe("flex-start");
+    expect(flattenTestStyle(historyTile.props.style).alignSelf).toBeUndefined();
+    let tileHostParent = historyTile.parent;
+    while (tileHostParent && typeof tileHostParent.type !== "string") {
+      tileHostParent = tileHostParent.parent;
+    }
+    expect(tileHostParent).toBe(historyRowHost);
     // Tags stay on one horizontally scrolling line; many tags never grow the row.
     expect(findByTestId(renderer, `history-attempt-${historyAttemptId}-themes`).findByType(ReactNative.ScrollView).props.horizontal).toBe(true);
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toContain("20s pace");
