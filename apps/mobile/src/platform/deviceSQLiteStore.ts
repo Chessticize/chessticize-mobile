@@ -22,12 +22,12 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
     this.nativeDb = nativeDb;
   }
 
-  static open(name = MOBILE_DATABASE_LAYOUT.progressDatabaseName): DeviceSQLiteStore {
+  static open(name: string = MOBILE_DATABASE_LAYOUT.progressDatabaseName): DeviceSQLiteStore {
     return new DeviceSQLiteStore(open({ name }));
   }
 
   static openTacticalProfileRepository(
-    name = MOBILE_DATABASE_LAYOUT.tacticalProfileCacheDatabaseName
+    name: string = MOBILE_DATABASE_LAYOUT.tacticalProfileCacheDatabaseName
   ): SQLiteTacticalProfileRepository {
     const location = tacticalProfileCacheLocation();
     return new SQLiteTacticalProfileRepository(
@@ -36,6 +36,26 @@ export class DeviceSQLiteStore extends SyncSQLiteStore {
         ...(location === undefined ? {} : { location })
       }))
     );
+  }
+
+  /** Raw synchronous database for small Dev-only state; callers own its schema. */
+  static openDatabase(name: string): SyncSqliteDatabase {
+    return new OPSqliteDatabase(open({ name }));
+  }
+
+  /** Removes a progress database file. Callers pass only names they own. */
+  static deleteDatabase(name: string): void {
+    open({ name }).delete();
+  }
+
+  static deleteTacticalProfileCacheDatabase(
+    name: string = MOBILE_DATABASE_LAYOUT.tacticalProfileCacheDatabaseName
+  ): void {
+    const location = tacticalProfileCacheLocation();
+    open({
+      name,
+      ...(location === undefined ? {} : { location })
+    }).delete();
   }
 
   static async openReadOnlyPuzzlePack(

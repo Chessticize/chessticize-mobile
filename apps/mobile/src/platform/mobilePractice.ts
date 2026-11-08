@@ -34,6 +34,10 @@ import {
 import { productionTacticalProfileCalibration } from "../backend/tacticalProfileCalibration.ts";
 import { arePracticeTestControlsEnabled } from "../releaseConfig.ts";
 import type { MobileTestControlCapabilities } from "./mobilePlatformCapabilities.ts";
+import type {
+  DevSimulationProfileControls,
+  SimulationProfile
+} from "./devSimulationProfile.ts";
 
 declare const __DEV__: boolean;
 
@@ -62,6 +66,13 @@ let persistentPracticeService: PracticeService | undefined;
 let persistentProgressDatabasePath: string | undefined;
 const seededPuzzleSources = new WeakMap<PracticeService, Set<string>>();
 const packBackedServices = new WeakSet<PracticeService>();
+// Dev-only: the simulation-profile controls of each device-persistent service,
+// and whether that service runs on the simulation databases.
+const simulationProfileServices = new WeakMap<
+  PracticeService,
+  { controls: DevSimulationProfileControls; active: boolean }
+>();
+let persistentDatabaseLayout: PersistentDatabaseLayout | undefined;
 let persistentPracticeServicePromise: Promise<PracticeService> | undefined;
 
 export function createMobilePracticeService(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): PracticeService {
@@ -107,7 +118,8 @@ export function createPersistentMobilePracticeServiceSync(): PracticeService | u
   if (!DeviceSQLiteStore.canOpenBundledReadOnlyPuzzlePack()) {
     return undefined;
   }
-  const userStore = DeviceSQLiteStore.open(MOBILE_DATABASE_LAYOUT.progressDatabaseName);
+  const layout = resolvePersistentDatabaseLayout();
+  const userStore = DeviceSQLiteStore.open(layout.progressDatabaseName);
   userStore.migrate();
   return createPersistentService(
     userStore,
@@ -123,8 +135,9 @@ export function createPersistentMobilePracticeServiceSync(): PracticeService | u
       return source;
     }),
     openTacticalProfileRepositoryWithFallback(
-      () => DeviceSQLiteStore.openTacticalProfileRepository()
-    )
+      () => DeviceSQLiteStore.openTacticalProfileRepository(layout.tacticalProfileCacheDatabaseName)
+    ),
+    layout
   );
 }
 
@@ -134,7 +147,8 @@ async function createPersistentMobilePracticeServiceImpl(): Promise<PracticeServ
   }
 
   const { DeviceSQLiteStore } = require("./deviceSQLiteStore.ts") as typeof import("./deviceSQLiteStore.ts");
-  const userStore = DeviceSQLiteStore.open(MOBILE_DATABASE_LAYOUT.progressDatabaseName);
+  const layout = resolvePersistentDatabaseLayout();
+  const userStore = DeviceSQLiteStore.open(layout.progressDatabaseName);
   userStore.migrate();
   const packSource = await DeviceSQLiteStore.openReadOnlyPuzzlePack(
     bundledCorePackDatabaseName,
@@ -146,8 +160,9 @@ async function createPersistentMobilePracticeServiceImpl(): Promise<PracticeServ
     userStore,
     packSource,
     openTacticalProfileRepositoryWithFallback(
-      () => DeviceSQLiteStore.openTacticalProfileRepository()
-    )
+      () => DeviceSQLiteStore.openTacticalProfileRepository(layout.tacticalProfileCacheDatabaseName)
+    ),
+    layout
   );
 }
 
@@ -179,15 +194,80 @@ export function openTacticalProfileRepositoryWithFallback(
   }
 }
 
+type PersistentDatabaseLayout = {
+  progressDatabaseName: string;
+  tacticalProfileCacheDatabaseName: string;
+  /** Dev builds only: the simulation-profile state this process started with. */
+  simulationProfile?: { controls: DevSimulationProfileControls; active: boolean };
+};
+
+/**
+ * Resolves once per process which databases the persistent service opens. A
+ * Dev build with the simulation profile on opens the separate simulation
+ * databases; every other build (always, in Release) opens the real ones.
+ */
+function resolvePersistentDatabaseLayout(): PersistentDatabaseLayout {
+  persistentDatabaseLayout ??= (() => {
+    const simulation = developmentSimulationProfile();
+    if (simulation === undefined) {
+      return realDatabaseLayout();
+    }
+    const controls = simulation.controls();
+    const profile = { controls, active: controls.active };
+    return controls.active
+      ? { ...simulation.databaseLayout, simulationProfile: profile }
+      : { ...realDatabaseLayout(), simulationProfile: profile };
+  })();
+  return persistentDatabaseLayout;
+}
+
+function realDatabaseLayout(): PersistentDatabaseLayout {
+  return {
+    progressDatabaseName: MOBILE_DATABASE_LAYOUT.progressDatabaseName,
+    tacticalProfileCacheDatabaseName: MOBILE_DATABASE_LAYOUT.tacticalProfileCacheDatabaseName
+  };
+}
+
+// Keep this a literal `__DEV__` branch: Metro inlines it as false in Release
+// bundles and drops the require, so the simulation profile is unreachable there.
+function developmentSimulationProfile(): SimulationProfile | undefined {
+  return __DEV__
+    ? (require("./devSimulationProfile.ts") as typeof import("./devSimulationProfile.ts"))
+      .deviceSimulationProfile()
+    : undefined;
+}
+
+function registerSimulationProfileService(
+  service: PracticeService,
+  simulation: { controls: DevSimulationProfileControls; active: boolean }
+): void {
+  if (simulation.active) {
+    // Simulation data never syncs: iCloud is off before anything is read or
+    // written, and the platform composition withholds the sync client.
+    service.saveSettings({
+      ...service.getSettings(),
+      sync: { ...service.getSettings().sync, iCloudEnabled: false }
+    });
+  }
+  simulationProfileServices.set(service, simulation);
+}
+
+/** True when the service runs on the Dev simulation databases. */
+export function isSimulationProfileService(service: PracticeService): boolean {
+  return simulationProfileServices.get(service)?.active === true;
+}
+
 function createPersistentService(
   userStore: InstanceType<typeof import("./deviceSQLiteStore.ts").DeviceSQLiteStore>,
   packSource: PuzzleSource,
-  tacticalProfileRepository: TacticalProfileRepository
+  tacticalProfileRepository: TacticalProfileRepository,
+  layout: PersistentDatabaseLayout
 ): PracticeService {
   const service = composePackBackedMobilePracticeService(
     userStore,
     packSource,
-    tacticalProfileRepository
+    tacticalProfileRepository,
+    layout.simulationProfile
   );
   persistentProgressDatabasePath = userStore.databasePath();
   persistentPracticeService = service;
@@ -202,7 +282,8 @@ function createPersistentService(
 export function composePackBackedMobilePracticeService(
   userStore: PracticeStore,
   packSource: PuzzleSource,
-  tacticalProfileRepository: TacticalProfileRepository
+  tacticalProfileRepository: TacticalProfileRepository,
+  simulation?: { controls: DevSimulationProfileControls; active: boolean }
 ): PracticeService {
   const store = new PackBackedPracticeStore(userStore, packSource);
   const service = new PracticeService(
@@ -210,6 +291,9 @@ export function composePackBackedMobilePracticeService(
     createTacticalProfileService(store, packSource, tacticalProfileRepository),
     survivalPracticeServiceOptions()
   );
+  if (simulation) {
+    registerSimulationProfileService(service, simulation);
+  }
   packBackedServices.add(service);
   configureMobilePracticePuzzleSource(service, DEFAULT_PUZZLE_SOURCE);
   return service;
@@ -592,10 +676,18 @@ export function createMobilePracticeTestControls(service: PracticeService):
       ? {
           seedTacticalHistory: (scenario, now, onProgress) =>
             (require("./devTacticalHistorySeed.ts") as typeof import("./devTacticalHistorySeed.ts"))
-              .seedDevTacticalHistory(service, scenario, now, onProgress)
+              .seedDevTacticalHistory(service, scenario, now, onProgress),
+          ...simulationProfileControl(service)
         }
       : {})
   };
+}
+
+function simulationProfileControl(
+  service: PracticeService
+): { simulationProfile: DevSimulationProfileControls } | Record<string, never> {
+  const simulation = simulationProfileServices.get(service);
+  return simulation ? { simulationProfile: simulation.controls } : {};
 }
 
 export function seededPuzzleCount(source: MobilePuzzleSource = DEFAULT_PUZZLE_SOURCE): number {
