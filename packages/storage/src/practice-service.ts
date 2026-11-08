@@ -184,6 +184,14 @@ export class PracticeRunAvailabilityError extends Error {
   }
 }
 
+/** Thrown when a Run is started while another Run is active or paused. */
+export class ActiveSprintConflictError extends Error {
+  constructor() {
+    super("Cannot start a new sprint while another sprint is active");
+    this.name = "ActiveSprintConflictError";
+  }
+}
+
 export class FocusedRunUnavailableError extends Error {
   readonly reason: Exclude<PrepareFocusedRunResult, { status: "ready" }>["reason"];
 
@@ -295,7 +303,7 @@ export class PracticeService {
 
   startSprint(command: StartSprintCommand, now = new Date().toISOString()): SprintState {
     if (this.activeSprint && (this.activeSprint.status === "active" || this.activeSprint.status === "paused")) {
-      throw new Error("Cannot start a new sprint while another sprint is active");
+      throw new ActiveSprintConflictError();
     }
     const practiceRun = command.practiceRunId === undefined
       ? undefined
@@ -858,7 +866,7 @@ export class PracticeService {
     randomSeed: string | number = now
   ): SprintState {
     if (this.activeSprint && isOpenSprint(this.activeSprint)) {
-      throw new Error("Cannot start a new sprint while another sprint is active");
+      throw new ActiveSprintConflictError();
     }
     const result = this.prepareFocusedRun(taskFamily, now, randomSeed);
     if (result.status !== "ready") {
@@ -872,7 +880,7 @@ export class PracticeService {
     now = new Date().toISOString()
   ): SprintState {
     if (this.activeSprint && isOpenSprint(this.activeSprint)) {
-      throw new Error("Cannot start a new sprint while another sprint is active");
+      throw new ActiveSprintConflictError();
     }
     assertPreparedFocusedRun(prepared);
     const rating = this.store.getRating(prepared.config.ratingKey);

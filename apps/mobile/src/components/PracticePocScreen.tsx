@@ -118,6 +118,7 @@ import type {
   UciEngineTransport
 } from "../../../../packages/core/src/index.ts";
 import {
+  ActiveSprintConflictError,
   FocusedRunUnavailableError,
   type PracticeService
 } from "../../../../packages/storage/src/practice-service.ts";
@@ -957,6 +958,11 @@ export function PracticePocScreen({
   const [error, setError] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => currentTimeMs());
   const [resumableSprint, setResumableSprint] = useState<SprintState | null>(null);
+  // A Run the user asked to start while another Run is waiting to resume.
+  const [startConflict, setStartConflict] = useState<{
+    sprint: SprintState;
+    start: () => void;
+  } | null>(null);
   const [personalBestGuideIntent, setPersonalBestGuideIntent] = useState<PersonalBestGuideIntent | null>(null);
   const [personalBestFirstEntryGuideAcknowledged, setPersonalBestFirstEntryGuideAcknowledged] =
     useState(false);
@@ -2239,6 +2245,9 @@ export function PracticePocScreen({
     if (startingModeRef.current !== null) {
       return;
     }
+    if (holdStartForUnfinishedRun(() => startSprint(nextMode, useCustomTiming, practiceRunId))) {
+      return;
+    }
     if (beginFirstUseSessionGuides(nextMode, useCustomTiming, practiceRunId)) {
       return;
     }
@@ -2259,6 +2268,9 @@ export function PracticePocScreen({
     onUnavailable: (error: unknown) => void
   ): void {
     if (startingModeRef.current !== null) {
+      return;
+    }
+    if (holdStartForUnfinishedRun(() => requestFocusedRunStart(taskFamily, onUnavailable))) {
       return;
     }
     const nextMode = taskFamily === "arrow_duel" ? "arrow_duel" : "standard";
@@ -2317,6 +2329,48 @@ export function PracticePocScreen({
       return;
     }
     performStartFocusedRun(taskFamily, onUnavailable);
+  }
+
+  // Starting beside an unfinished Run cannot succeed. Ask what to do with it
+  // instead of letting the service invariant reach the user.
+  function holdStartForUnfinishedRun(start: () => void): boolean {
+    const open = service.getActiveSprint();
+    if (
+      !open
+      || (open.status !== "active" && open.status !== "paused")
+      || stateRef.current?.id === open.id
+    ) {
+      return false;
+    }
+    setError(null);
+    setStartConflict({ sprint: open, start });
+    return true;
+  }
+
+  function resumeUnfinishedRun(): void {
+    if (!startConflict) {
+      return;
+    }
+    const { sprint } = startConflict;
+    setStartConflict(null);
+    resumeSprint(sprint);
+  }
+
+  function discardUnfinishedRunAndStart(): void {
+    if (!startConflict) {
+      return;
+    }
+    const { start } = startConflict;
+    setStartConflict(null);
+    try {
+      service.abandonSprint(captureLiveNowIso());
+    } catch {
+      // The Run could not be discarded; keep it resumable instead of starting.
+      refreshState();
+      return;
+    }
+    refreshState();
+    start();
   }
 
   function finishDelayedFocusedRunStart(
@@ -2384,7 +2438,12 @@ export function PracticePocScreen({
         captureLiveNowIso()
       ));
     } catch (caught) {
-      onUnavailable(caught);
+      if (caught instanceof ActiveSprintConflictError) {
+        refreshState();
+        holdStartForUnfinishedRun(() => requestFocusedRunStart(taskFamily, onUnavailable));
+      } else {
+        onUnavailable(caught);
+      }
     } finally {
       startingModeRef.current = null;
       startingPracticeRunIdRef.current = null;
@@ -2495,7 +2554,12 @@ export function PracticePocScreen({
       );
       adoptStartedSprint(started);
     } catch (caught) {
-      setError(errorMessage(caught));
+      if (caught instanceof ActiveSprintConflictError) {
+        refreshState();
+        holdStartForUnfinishedRun(() => startSprint(nextMode, useCustomTiming, practiceRunId));
+      } else {
+        setError(errorMessage(caught));
+      }
     } finally {
       startingModeRef.current = null;
       startingPracticeRunIdRef.current = null;
@@ -5181,6 +5245,14 @@ export function PracticePocScreen({
           style={styles.accessibilityAnnouncement}
           testID="practice-announcement"
         />
+        {startConflict ? (
+          <StartConflictPrompt
+            canDiscard={startConflict.sprint.config.survival === undefined}
+            onCancel={() => setStartConflict(null)}
+            onDiscard={discardUnfinishedRunAndStart}
+            onResume={resumeUnfinishedRun}
+          />
+        ) : null}
         <View style={styles.appContentShell}>
           {appHeaderVisible ? (
             <View
@@ -8108,6 +8180,64 @@ function presentationRunPress(
   onIntent: PracticeRunManagementPresentation["onIntent"]
 ): void {
   onIntent(editing ? { type: "edit-run", runId } : { type: "select-run", runId });
+}
+
+function StartConflictPrompt({
+  canDiscard,
+  onCancel,
+  onDiscard,
+  onResume
+}: {
+  canDiscard: boolean;
+  onCancel: () => void;
+  onDiscard: () => void;
+  onResume: () => void;
+}): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <Modal animationType="fade" onRequestClose={onCancel} transparent visible>
+      <SafeAreaModalBackdrop style={styles.accessibleMoveModalBackdrop}>
+        <ScrollView
+          accessibilityViewIsModal
+          contentContainerStyle={styles.startConflictContent}
+          style={[styles.feedbackHandoffConfirmation, styles.startConflictCard]}
+          testID="practice-start-conflict"
+        >
+          <AppText variant="title">Unfinished Run</AppText>
+          <AppText tone="secondary" variant="body">
+            Resume it, or discard it to start a new Run.
+          </AppText>
+          <View style={styles.feedbackHandoffActions}>
+            <Button
+              accessibilityLabel="Resume the unfinished Run"
+              label="Resume"
+              stretch
+              testID="practice-start-conflict-resume"
+              onPress={onResume}
+            />
+            {canDiscard ? (
+              <Button
+                accessibilityLabel="Discard the unfinished Run and start a new Run"
+                label="Discard and start"
+                stretch
+                testID="practice-start-conflict-discard"
+                variant="destructive"
+                onPress={onDiscard}
+              />
+            ) : null}
+            <Button
+              accessibilityLabel="Keep the unfinished Run and cancel"
+              label="Cancel"
+              stretch
+              testID="practice-start-conflict-cancel"
+              variant="secondary"
+              onPress={onCancel}
+            />
+          </View>
+        </ScrollView>
+      </SafeAreaModalBackdrop>
+    </Modal>
+  );
 }
 
 function RunRemovalConfirmation({
@@ -21197,11 +21327,21 @@ const useStyles = makeStyles((theme) => ({
   },
   feedbackHandoffConfirmation: {
     backgroundColor: theme.colors.surfaceRaised,
+    // Dark surfaceRaised matches the dimmed Home, so the card needs an edge.
+    borderColor: theme.colors.border.default,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: theme.shape.sheet,
     gap: theme.spacing.row,
     maxWidth: 430,
     padding: 24,
     width: "100%"
+  },
+  startConflictCard: {
+    flexGrow: 0,
+    flexShrink: 1
+  },
+  startConflictContent: {
+    gap: theme.spacing.row
   },
   feedbackHandoffActions: {
     gap: theme.spacing.group,

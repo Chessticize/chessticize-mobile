@@ -7590,6 +7590,125 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "practice-resume-card")).toThrow();
   });
 
+  describe("starting a Run beside an unfinished Run", () => {
+    function serviceWithUnfinishedRun() {
+      const service = createMobilePracticeService("random1000");
+      service.startSprint(
+        { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 15, maxMistakes: 3 },
+        new Date(Date.now()).toISOString()
+      );
+      return service;
+    }
+
+    for (const [home, startTestId, options] of [
+      ["fallback mode Home", "practice-start-button", {}],
+      ["managed Run Home", "practice-run-start", { runManagementEnabled: true }]
+    ] as const) {
+      it(`asks to resume or discard instead of surfacing a raw error on ${home}`, () => {
+        const service = serviceWithUnfinishedRun();
+        const unfinishedId = service.getActiveSprint()?.id;
+        const renderer = renderScreen({ practiceService: service, ...options });
+
+        press(renderer, startTestId);
+
+        expect(() => findByTestId(renderer, "error-panel")).toThrow();
+        expect(collectText(renderer.root)).not.toContain("Cannot start a new sprint");
+        const prompt = findByTestId(renderer, "practice-start-conflict");
+        expect(collectText(prompt)).toContain("Unfinished Run");
+        expect(findByTestId(renderer, "practice-start-conflict-resume")).toBeTruthy();
+        expect(findByTestId(renderer, "practice-start-conflict-discard")).toBeTruthy();
+        expect(() => findByTestId(renderer, "session-board")).toThrow();
+        expect(service.getActiveSprint()?.id).toBe(unfinishedId);
+      });
+
+      it(`discards the unfinished Run and starts the chosen Run on ${home}`, () => {
+        const service = serviceWithUnfinishedRun();
+        const unfinishedId = service.getActiveSprint()?.id;
+        const renderer = renderScreen({ practiceService: service, ...options });
+
+        press(renderer, startTestId);
+        press(renderer, "practice-start-conflict-discard");
+
+        expect(() => findByTestId(renderer, "practice-start-conflict")).toThrow();
+        expect(() => findByTestId(renderer, "error-panel")).toThrow();
+        expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+        expect(service.getActiveSprint()?.id).not.toBe(unfinishedId);
+        expect(service.listSprintSessions().find((session) => session.id === unfinishedId)?.status)
+          .toBe("abandoned");
+      });
+
+      it(`resumes the unfinished Run from the prompt on ${home}`, () => {
+        const service = serviceWithUnfinishedRun();
+        const unfinishedId = service.getActiveSprint()?.id;
+        const renderer = renderScreen({ practiceService: service, ...options });
+
+        press(renderer, startTestId);
+        press(renderer, "practice-start-conflict-resume");
+
+        expect(() => findByTestId(renderer, "practice-start-conflict")).toThrow();
+        expect(findByTestId(renderer, "active-session-shell")).toBeTruthy();
+        expect(service.getActiveSprint()?.id).toBe(unfinishedId);
+      });
+    }
+
+    it("asks before replacing an unfinished Run when starting a Focused Run", async () => {
+      jest.setSystemTime(new Date(ARROW_PROFILE_FIXTURE_NOW));
+      const service = createArrowFocusedPracticeService();
+      service.startSprint(
+        { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 15, maxMistakes: 3 },
+        new Date(Date.now()).toISOString()
+      );
+      const unfinishedId = service.getActiveSprint()?.id;
+      const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
+
+      press(renderer, "training-focus-open-profile");
+      press(renderer, "tactical-profile-preview-run");
+      press(renderer, "focused-run-start");
+
+      expect(() => findByTestId(renderer, "error-panel")).toThrow();
+      expect(collectText(renderer.root)).not.toContain("Cannot start a new sprint");
+      expect(findByTestId(renderer, "practice-start-conflict")).toBeTruthy();
+      expect(service.getActiveSprint()?.id).toBe(unfinishedId);
+
+      press(renderer, "practice-start-conflict-discard");
+      await settleEntryPreview();
+      expect(() => findByTestId(renderer, "practice-start-conflict")).toThrow();
+      expect(() => findByTestId(renderer, "error-panel")).toThrow();
+      expect(service.getActiveSprint()?.id).not.toBe(unfinishedId);
+      expect(service.getActiveSprint()?.config.tacticalFocus).toBeDefined();
+    });
+
+    it("closes the prompt like Cancel on a system dismiss such as hardware Back", () => {
+      const service = serviceWithUnfinishedRun();
+      const unfinishedId = service.getActiveSprint()?.id;
+      const renderer = renderScreen({ practiceService: service });
+
+      press(renderer, "practice-start-button");
+      const modal = renderer.root.findAllByType(ReactNative.Modal)
+        .find((candidate) => candidate.props.visible === true);
+      act(() => {
+        modal?.props.onRequestClose();
+      });
+
+      expect(() => findByTestId(renderer, "practice-start-conflict")).toThrow();
+      expect(findByTestId(renderer, "practice-resume-card")).toBeTruthy();
+      expect(service.getActiveSprint()?.id).toBe(unfinishedId);
+    });
+
+    it("keeps the unfinished Run when the prompt is dismissed", () => {
+      const service = serviceWithUnfinishedRun();
+      const unfinishedId = service.getActiveSprint()?.id;
+      const renderer = renderScreen({ practiceService: service });
+
+      press(renderer, "practice-start-button");
+      press(renderer, "practice-start-conflict-cancel");
+
+      expect(() => findByTestId(renderer, "practice-start-conflict")).toThrow();
+      expect(findByTestId(renderer, "practice-resume-card")).toBeTruthy();
+      expect(service.getActiveSprint()?.id).toBe(unfinishedId);
+    });
+  });
+
   it("keeps an ordinary Arrow Duel resume card distinct from a Focused Run", () => {
     jest.setSystemTime(new Date("2026-08-19T12:00:05.000Z"));
     const service = createMobilePracticeService("familiar15");

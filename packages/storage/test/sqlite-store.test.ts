@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { buildPracticeProgressSummary, PracticeService, SQLiteStore } from "../src/index.ts";
+import { ActiveSprintConflictError, buildPracticeProgressSummary, PracticeService, SQLiteStore } from "../src/index.ts";
 import type { AttemptHistoryRow, HistoryFilter } from "../src/index.ts";
 import { historyAttemptReplayAvailability, normalizeHistoryAttemptDetail } from "../../core/src/index.ts";
 import type { Puzzle, ReviewContext } from "../../core/src/index.ts";
@@ -1440,6 +1440,14 @@ test("PracticeService rejects starting a second sprint while one is active", asy
           "2026-06-20T00:00:01.000Z"
         ),
       /another sprint is active/
+    );
+    assert.throws(
+      () =>
+        service.startSprint(
+          { mode: "standard", durationSeconds: 300, perPuzzleSeconds: 20, targetCorrect: 5, maxMistakes: 3 },
+          "2026-06-20T00:00:01.000Z"
+        ),
+      (error) => error instanceof ActiveSprintConflictError
     );
   } finally {
     store.close();
