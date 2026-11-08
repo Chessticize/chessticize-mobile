@@ -16518,11 +16518,28 @@ function createProductionSurvivalService(options: { bestScore?: number } = {}): 
   });
 }
 
+// isServerCompatibleArrowDuelPuzzle replays each puzzle with the chess engine, so
+// filtering the whole 1000-puzzle fixture costs seconds. Scan lazily and stop as
+// soon as `count` puzzles qualify; the result equals filter(...).slice(0, count).
+function takeServerCompatibleArrowDuelPuzzles(
+  count: number,
+  accepts: (puzzle: Puzzle) => boolean = () => true
+): Puzzle[] {
+  const selected: Puzzle[] = [];
+  for (const puzzle of tacticalProfilePuzzleFixture) {
+    if (accepts(puzzle) && isServerCompatibleArrowDuelPuzzle(puzzle)) {
+      selected.push(puzzle);
+      if (selected.length === count) {
+        break;
+      }
+    }
+  }
+  return selected;
+}
+
 function createProductionArrowSurvivalService(): PracticeService {
   const store = new MemoryStore();
-  store.seedPuzzles(tacticalProfilePuzzleFixture
-    .filter(isServerCompatibleArrowDuelPuzzle)
-    .slice(0, 12)
+  store.seedPuzzles(takeServerCompatibleArrowDuelPuzzles(12)
     .map((puzzle, index) => ({
       ...puzzle,
       id: `component-survival-arrow-${index}`,
@@ -16883,13 +16900,10 @@ function createArrowFocusedPracticeService(
   inventoryAvailable = true,
   exposeStore?: (store: MemoryStore) => void
 ): PracticeService {
-  const candidates = tacticalProfilePuzzleFixture
-    .filter((puzzle) =>
-      puzzle.rating >= 1700
-      && puzzle.rating <= 1900
-      && isServerCompatibleArrowDuelPuzzle(puzzle)
-    )
-    .slice(0, 44);
+  const candidates = takeServerCompatibleArrowDuelPuzzles(
+    44,
+    (puzzle) => puzzle.rating >= 1700 && puzzle.rating <= 1900
+  );
   if (candidates.length < 44) {
     throw new Error("Tactical Profile component fixture needs 44 Arrow Duel puzzles");
   }
@@ -17006,9 +17020,7 @@ function createDualFamilyFocusedPracticeService(
     COMPONENT_TACTICAL_PROFILE_CALIBRATION,
   arrowSessionCount = 3
 ): PracticeService {
-  const candidates = tacticalProfilePuzzleFixture
-    .filter(isServerCompatibleArrowDuelPuzzle)
-    .slice(0, 24);
+  const candidates = takeServerCompatibleArrowDuelPuzzles(24);
   if (candidates.length < 24) {
     throw new Error("Dual-family Tactical Profile fixture needs 24 puzzles");
   }
