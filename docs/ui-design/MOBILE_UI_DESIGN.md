@@ -707,9 +707,10 @@ New Run behavior:
   expanding. In the applied-filter summary below the view selector, show the
   theme name for one selection or `{n} themes selected` for multiple
   selections, including `24 themes selected` when every named theme is checked.
-- Place the expanded advanced-filter region in one bordered container above
-  `Needs attention / All`. Keep Themes visually lightweight inside that
-  container, without its own full-width card border or background.
+- Place the expanded advanced-filter region in one grouped container (a
+  direction A surface, without a border) above `Needs attention / All`. Keep
+  Themes visually lightweight inside that container, without its own card or
+  background.
 - Selecting a rating bucket supplies the mode, sprint config, and sprint-speed
   context for rating history. Do not show separate History mode or speed chips
   while the view can be focused through rating bucket chips.

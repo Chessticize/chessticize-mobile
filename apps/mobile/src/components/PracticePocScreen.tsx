@@ -317,7 +317,7 @@ export type {
   HistoryStrengthSeries
 } from "./historyProgressPresentation.ts";
 import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
-import { AppText, Button, Icon, IconTile, ListRow, Section, type IconName } from "./ui/index.tsx";
+import { AppText, Badge, Button, Icon, IconTile, ListRow, Section, SegmentedControl, useListRowStyle, type IconName } from "./ui/index.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -5130,7 +5130,7 @@ export function PracticePocScreen({
               testID="app-shell-header"
             >
               <View>
-                <Text style={[styles.title, tab === "practice" ? styles.titleLarge : null]}>{screenTitle}</Text>
+                <Text style={[styles.title, tab === "practice" || tab === "settings" ? styles.titleLarge : null]}>{screenTitle}</Text>
               </View>
             </View>
           ) : null}
@@ -11581,6 +11581,7 @@ function HistoryPanel({
   onAttentionOnlyChange: (attentionOnly: boolean) => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
   const visibleAttempts = attempts;
   const attentionOnly = attentionReasons.length > 0;
   const ratingPoints = performance.charts.rating;
@@ -11601,32 +11602,30 @@ function HistoryPanel({
   return (
     <View style={[styles.historyPanel, adaptiveLayout.usesWideContent ? styles.historyPanelWide : null]} testID="history-panel">
       <View style={styles.historyHeaderRow} testID="history-action-header">
-        <Text style={styles.screenTitle}>History</Text>
+        <AppText accessibilityRole="header" style={styles.destinationTitle} variant="largeTitle">History</AppText>
         <View style={styles.historyHeaderActions}>
           {onOpenProgress ? (
             <HistoryProgressEntryButton onPress={onOpenProgress} />
           ) : null}
           {filtersExpanded ? (
-            <Pressable
-              accessibilityRole="button"
+            <Button
               accessibilityLabel="Reset history filters"
+              label="Reset filters"
+              size="compact"
               testID="history-filter-reset"
-              style={styles.historyResetButton}
+              variant="plain"
               onPress={onResetFilters}
-            >
-              <Text style={styles.historyResetButtonText}>Reset filters</Text>
-            </Pressable>
+            />
           ) : null}
-          <Pressable
-            accessibilityRole="button"
+          <ToolbarIconButton
             accessibilityLabel={filtersExpanded ? "Hide history filters" : "Show history filters"}
             accessibilityState={{ expanded: filtersExpanded }}
+            active={filtersExpanded}
             testID="history-filter-toggle"
-            style={[styles.reviewFilterButton, filtersExpanded ? styles.reviewFilterButtonActive : null]}
             onPress={() => onFiltersExpandedChange(!filtersExpanded)}
           >
             <FilterGlyph active={filtersExpanded} />
-          </Pressable>
+          </ToolbarIconButton>
         </View>
       </View>
 
@@ -11669,7 +11668,7 @@ function HistoryPanel({
             style={styles.historyFilterGroup}
             testID="history-attention-flags"
           >
-            <Text style={styles.historyFilterGroupLabel}>Attention</Text>
+            <AppText style={styles.historyFilterGroupLabel} tone="secondary" variant="footnote">Attention</AppText>
             <HistoryChipRow testID="history-attention-flag-options">
               <FilterButton
                 active={attentionReasons.includes("unclear")}
@@ -11729,24 +11728,24 @@ function HistoryPanel({
           onChange={onAttentionOnlyChange}
         />
         {attentionOnly ? (
-          <Text style={styles.helperText} testID="history-attention-explanation">
+          <AppText style={styles.historyFootnote} testID="history-attention-explanation" tone="secondary" variant="footnote">
             Needs attention includes Incomplete, Unclear, or In Review Sprint attempts.
-          </Text>
+          </AppText>
         ) : null}
       </View>
 
       {selectedRatingKey ? (
         <View style={styles.historyPerformanceCard} testID="history-performance-card">
           <View style={styles.historyPerformanceHeader}>
-            <View>
-              <Text style={styles.panelTitle}>Rating Trend</Text>
-              <Text testID="history-performance-context" style={styles.helperText}>
+            <View style={styles.settingsRowCopy}>
+              <AppText variant="headline">Rating Trend</AppText>
+              <AppText testID="history-performance-context" tone="secondary" variant="footnote">
                 {`${historyRatingKeyLabel(selectedRatingKey, selectedRun?.name, selectedRun?.perPuzzleSeconds)} · ${historyRangeLabel(timeRange)}`}
-              </Text>
+              </AppText>
             </View>
             <View style={styles.historyMetricSummary}>
-              <Text testID="history-chart-value" style={styles.historyAccuracy}>{latestRating ? String(latestRating) : "—"}</Text>
-              <Text testID="history-chart-label" style={styles.helperText}>Rating</Text>
+              <AppText testID="history-chart-value" style={styles.historyAccuracy} variant="numeral">{latestRating ? String(latestRating) : "—"}</AppText>
+              <AppText testID="history-chart-label" tone="secondary" variant="caption">Rating</AppText>
             </View>
           </View>
           <HistoryRatingTrendChart points={ratingPoints} />
@@ -11756,51 +11755,56 @@ function HistoryPanel({
       <HistoryActiveFilterStrip compact labels={activeFilterLabels} />
 
       <View style={styles.historyPageRow}>
-        <Text style={styles.helperText}>
+        <AppText tone="secondary" variant="footnote">
           {page.total === 0 ? "0 results" : `${page.offset + 1}-${Math.min(page.offset + attempts.length, page.total)} of ${page.total}`}
-        </Text>
+        </AppText>
         <View style={styles.iconButtonRow}>
-          <Pressable
-            accessibilityRole="button"
+          <ToolbarIconButton
             accessibilityLabel="Previous history page"
             accessibilityState={{ disabled: page.offset === 0 }}
             disabled={page.offset === 0}
             testID="history-page-previous"
-            style={[styles.iconButton, page.offset === 0 ? styles.disabledButton : null]}
             onPress={() => onPageOffsetChange(Math.max(0, page.offset - page.limit))}
           >
-            <ChevronGlyph direction="left" />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
+            <Icon color={appTheme.colors.accent.s600} name="chevronLeft" size={17} testID="chevron-left-glyph" weight="semibold" />
+          </ToolbarIconButton>
+          <ToolbarIconButton
             accessibilityLabel="Next history page"
             accessibilityState={{ disabled: !page.hasMore }}
             disabled={!page.hasMore}
             testID="history-page-next"
-            style={[styles.iconButton, !page.hasMore ? styles.disabledButton : null]}
             onPress={() => onPageOffsetChange(page.offset + page.limit)}
           >
-            <ChevronGlyph direction="right" />
-          </Pressable>
+            <Icon color={appTheme.colors.accent.s600} name="chevronRight" size={17} testID="chevron-right-glyph" weight="semibold" />
+          </ToolbarIconButton>
         </View>
       </View>
       {visibleAttempts.length === 0 ? (
-        <Text
-          accessibilityLabel="History has no attempts"
-          style={styles.listText}
-          testID="history-empty-state"
-        >
-          No attempts
-        </Text>
-      ) : null}
-      {visibleAttempts.map((attempt) => (
-        <HistoryAttemptRow
-          key={attempt.id}
-          attempt={attempt}
-          nowMs={nowMs}
-          onOpen={() => onOpenAttempt(attempt.id)}
-        />
-      ))}
+        <View style={styles.groupedList}>
+          <AppText
+            accessibilityLabel="History has no attempts"
+            style={styles.groupedEmpty}
+            testID="history-empty-state"
+            tone="secondary"
+            variant="body"
+          >
+            No attempts
+          </AppText>
+        </View>
+      ) : (
+        <View style={styles.groupedList} testID="history-attempts">
+          {visibleAttempts.map((attempt, index) => (
+            <React.Fragment key={attempt.id}>
+              {index > 0 ? <View style={styles.groupedSeparator} /> : null}
+              <HistoryAttemptRow
+                attempt={attempt}
+                nowMs={nowMs}
+                onOpen={() => onOpenAttempt(attempt.id)}
+              />
+            </React.Fragment>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -11833,16 +11837,17 @@ function HistoryThemeCatalogFilter({
         onPress={() => setExpanded((current) => !current)}
       >
         <View style={styles.historyThemeDisclosureCopy}>
-          <Text style={styles.themeCatalogTitle}>Themes</Text>
-          <Text
+          <AppText variant="headline">Themes</AppText>
+          <AppText
             accessibilityLabel={`Selected themes: ${selectedThemeDetail}`}
             ellipsizeMode="tail"
             numberOfLines={1}
-            style={styles.historyThemeSummary}
             testID="history-theme-selection-detail"
+            tone="secondary"
+            variant="footnote"
           >
             {selectedThemeDetail}
-          </Text>
+          </AppText>
         </View>
         <DisclosureChevron
           expanded={expanded}
@@ -11868,9 +11873,10 @@ function HistoryThemeCatalogFilter({
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
+                style={styles.historyChipScroller}
                 testID={`history-theme-filter-rail-${safeTestId(group.label)}`}
               >
-                <View style={styles.themeCatalogRailContent}>
+                <View style={[styles.themeCatalogRailContent, styles.historyChipScrollerContent]}>
                   {group.themes.map((theme) => (
                     <FilterButton
                       key={theme}
@@ -11970,29 +11976,21 @@ function HistoryActiveFilterStrip({
 }): React.JSX.Element {
   const styles = useStyles();
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      testID="history-active-filter-summary"
-    >
+    <View testID="history-active-filter-summary">
       <View style={compact ? styles.historyCompactFilterSummary : styles.historyChipContent}>
         {labels.map((label, index) => (
-          <React.Fragment key={`${label}-${index}`}>
-            {compact && index > 0 ? (
-              <Text style={styles.historyCompactFilterSeparator}>·</Text>
-            ) : null}
-            <View
-              style={compact ? styles.historyCompactFilterLabel : styles.historyActiveFilterChip}
-              testID={`history-active-filter-${index}`}
-            >
-              <Text style={compact ? styles.historyCompactFilterText : styles.historyActiveFilterText}>
-                {label}
-              </Text>
-            </View>
-          </React.Fragment>
+          <View
+            key={`${label}-${index}`}
+            style={compact ? styles.historyCompactFilterLabel : styles.historyActiveFilterChip}
+            testID={`history-active-filter-${index}`}
+          >
+            <Text style={compact ? styles.historyCompactFilterText : styles.historyActiveFilterText}>
+              {label}
+            </Text>
+          </View>
         ))}
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -12277,29 +12275,19 @@ function historyRatingKeyLabel(
 }
 
 function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "incomplete" }): React.JSX.Element {
-  const styles = useStyles();
+  const appTheme = useTheme();
   if (tone === "correct") {
     return (
-      <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-correct-glyph">
-        <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCheckShort]} />
-        <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCheckLong]} />
-      </View>
+      <Icon color={appTheme.colors.positive.s600} name="check" size={18} testID="result-badge-correct-glyph" weight="semibold" />
     );
   }
-
   if (tone === "incomplete") {
     return (
-      <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-incomplete-glyph">
-        <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeIncompleteDash]} />
-      </View>
+      <Icon color={appTheme.colors.text.tertiary} name="remove" size={18} testID="result-badge-incomplete-glyph" weight="semibold" />
     );
   }
-
   return (
-    <View style={styles.resultBadgeGlyphCanvas} testID="result-badge-wrong-glyph">
-      <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCrossForward]} />
-      <View style={[styles.resultBadgeGlyphLine, styles.resultBadgeCrossBackward]} />
-    </View>
+    <Icon color={appTheme.colors.danger.s600} name="close" size={18} testID="result-badge-wrong-glyph" weight="semibold" />
   );
 }
 
@@ -12317,9 +12305,10 @@ function HistoryChipRow({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.historyChipScroller}
       testID={testID}
     >
-      <View style={[styles.historyChipContent, contentStyle]}>
+      <View style={[styles.historyChipContent, styles.historyChipScrollerContent, contentStyle]}>
         {children}
       </View>
     </ScrollView>
@@ -12455,6 +12444,8 @@ function HistoryAttemptRow({
   onOpen: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
+  const rowStyle = useListRowStyle();
   const detail = normalizeHistoryAttemptDetail(attempt);
   const persistedTimingStatus = attempt.timingStatus
     ?? (attempt.result === "timed_out" ? "timed_out" : null);
@@ -12491,8 +12482,8 @@ function HistoryAttemptRow({
   const compactContext = [themeContext, paceLabel].filter(Boolean).join(" · ");
   const puzzleIdentity = `ID ${attempt.puzzleId} · Rating ${attempt.puzzleRating}`;
   const durationLabel = detail.elapsedSeconds === null ? "Duration unavailable" : `${detail.elapsedSeconds}s`;
-  const compactMeta = `${sourceLabel} · ${durationLabel} · ${dateLabel}`;
-  const accessibleMeta = `${sourceLabel} · ${durationLabel} · ${accessibleDateLabel}`;
+  const compactMeta = [sourceLabel, durationLabel, paceLabel, dateLabel].filter(Boolean).join(" · ");
+  const accessibleMeta = [sourceLabel, durationLabel, paceLabel, accessibleDateLabel].filter(Boolean).join(" · ");
   const rowAccessibilityLabel = [
     `Replay ${historyAttemptModeLabel(detail.mode)} puzzle`,
     resultLabel,
@@ -12509,67 +12500,55 @@ function HistoryAttemptRow({
       accessibilityRole="button"
       accessibilityLabel={rowAccessibilityLabel}
       testID={`history-attempt-${attempt.id}`}
-      style={styles.historyAttemptCard}
+      style={({ pressed }) => [rowStyle, styles.attemptRow, pressed ? styles.settingsRowPressed : null]}
       onPress={onOpen}
     >
-      <View
-        style={[
-          styles.historyResultBadge,
-          isIncomplete
-            ? styles.historyResultIncomplete
+      <View style={styles.attemptRowLeading}>
+        <AttemptStatusTile
+          testID={`history-attempt-${attempt.id}-badge`}
+          tone={isIncomplete
+            ? "incomplete"
             : isTimedOut || isWrong
-            ? styles.historyResultWrong
-            : isCorrect ? styles.historyResultCorrect : styles.historyResultUnknown
-        ]}
-        testID={`history-attempt-${attempt.id}-badge`}
-      >
-        {isIncomplete || isTimedOut || isWrong || isCorrect ? (
-          <ResultBadgeGlyph tone={isIncomplete ? "incomplete" : isTimedOut || isWrong ? "wrong" : "correct"} />
-        ) : (
-          <Text style={styles.historyResultUnknownText}>?</Text>
-        )}
+              ? "wrong"
+              : isCorrect ? "correct" : "unknown"}
+        />
       </View>
-      <View style={styles.historyAttemptCopy}>
+      <View style={styles.attemptRowCopy}>
         <View style={styles.historyAttemptHeader}>
-          <Text style={styles.historyRowTitle}>{attempt.runName ?? historyAttemptModeLabel(detail.mode)}</Text>
-          <Text testID={`history-attempt-${attempt.id}-result`} style={styles.helperText}>{resultLabel}</Text>
+          <AppText variant="headline">{attempt.runName ?? historyAttemptModeLabel(detail.mode)}</AppText>
+          <AppText
+            testID={`history-attempt-${attempt.id}-result`}
+            tone={isCorrect ? "positive" : isTimedOut || isWrong ? "negative" : "secondary"}
+            variant="subheadline"
+          >
+            {resultLabel}
+          </AppText>
         </View>
-        <Text testID={`history-attempt-${attempt.id}-identity`} style={styles.helperText}>{puzzleIdentity}</Text>
+        <View accessibilityLabel={puzzleIdentity} style={styles.attemptRowIdentity} testID={`history-attempt-${attempt.id}-identity`}>
+          <AppText ellipsizeMode="tail" numberOfLines={1} style={styles.attemptRowIdentityId} tone="secondary" variant="footnote">
+            {`ID ${attempt.puzzleId}`}
+          </AppText>
+          <AppText numberOfLines={1} style={styles.attemptRowIdentityRating} tone="secondary" variant="footnote">
+            {`\u00A0· Rating ${attempt.puzzleRating}`}
+          </AppText>
+        </View>
         {visibleThemes.length > 0 ? (
           <HistoryThemeList attemptId={attempt.id} themes={visibleThemes} />
-        ) : (
-          <Text testID={`history-attempt-${attempt.id}-context`} style={styles.helperText}>{compactContext}</Text>
-        )}
-        {visibleThemes.length > 0 && paceLabel ? (
-          <Text testID={`history-attempt-${attempt.id}-pace`} style={styles.helperText}>{paceLabel}</Text>
         ) : null}
-        <Text testID={`history-attempt-${attempt.id}-meta`} style={styles.helperText}>{compactMeta}</Text>
+        <AppText testID={`history-attempt-${attempt.id}-meta`} tone="secondary" variant="footnote">{compactMeta}</AppText>
       </View>
-      {isUnclear ? (
-        <View style={styles.historyUnclearBadge} testID={`history-attempt-${attempt.id}-unclear`}>
-          <Text style={styles.historyUnclearBadgeText}>Unclear</Text>
+      {isUnclear || timingStatus === "slow" ? (
+        <View style={styles.attemptRowTrailingBadges}>
+          {isUnclear ? (
+            <Badge label="Unclear" testID={`history-attempt-${attempt.id}-unclear`} tone="warning" />
+          ) : null}
+          {timingStatus === "slow" ? (
+            <Badge label="Slow" testID={`history-attempt-${attempt.id}-${timingStatus}`} tone="warning" />
+          ) : null}
         </View>
       ) : null}
-      {timingStatus === "slow" ? (
-        <View
-          style={[
-            styles.historyTimingBadge,
-            styles.historyTimingBadgeSlow
-          ]}
-          testID={`history-attempt-${attempt.id}-${timingStatus}`}
-        >
-          <Text
-            style={[
-              styles.historyTimingBadgeText,
-              styles.historyTimingBadgeTextSlow
-            ]}
-          >
-            Slow
-          </Text>
-        </View>
-      ) : null}
-      <View style={styles.historyAttemptChevron} testID={`history-attempt-${attempt.id}-chevron`}>
-        <ChevronGlyph direction="right" />
+      <View style={styles.attemptRowChevron} testID={`history-attempt-${attempt.id}-chevron`}>
+        <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
       </View>
     </Pressable>
   );
@@ -12583,20 +12562,35 @@ function HistoryThemeList({
   themes: readonly string[];
 }): React.JSX.Element {
   return (
-    <ThemeTagRail testID={`history-attempt-${attemptId}-themes`} themes={themes} />
+    <ThemeTagRail fadeEnd testID={`history-attempt-${attemptId}-themes`} themes={themes} />
   );
 }
 
 function ThemeTagRail({
   centered = false,
+  fadeEnd = false,
   testID,
   themes
 }: {
   centered?: boolean;
+  /** Fades the trailing edge so an overflowing chip does not end in a hard cut. */
+  fadeEnd?: boolean;
   testID: string;
   themes: readonly string[];
 }): React.JSX.Element {
   const styles = useStyles();
+  if (fadeEnd) {
+    return (
+      <View style={styles.themeTagRailFadeFrame}>
+        <ThemeTagRail centered={centered} testID={testID} themes={themes} />
+        <View pointerEvents="none" style={styles.themeTagRailFade}>
+          {THEME_TAG_RAIL_FADE_STEPS.map((opacity) => (
+            <View key={opacity} style={[styles.themeTagRailFadeStep, { opacity }]} />
+          ))}
+        </View>
+      </View>
+    );
+  }
   return (
     <ScrollView
       horizontal
@@ -12618,6 +12612,9 @@ function ThemeTagRail({
     </ScrollView>
   );
 }
+
+// Opacities of the surface-colored strips that fade the rail's trailing edge.
+const THEME_TAG_RAIL_FADE_STEPS = [0.25, 0.5, 0.75, 1] as const;
 
 function historyAttemptModeLabel(mode: SprintMode | null): string {
   return mode === null ? "Unknown mode" : modeLabel(mode);
@@ -12643,6 +12640,7 @@ function FilterButton({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
+      hitSlop={4}
       testID={testID}
       style={[styles.filterButton, active ? styles.filterButtonActive : null]}
       onPress={onPress}
@@ -12653,20 +12651,85 @@ function FilterButton({
 }
 
 function FilterGlyph({ active }: { active: boolean }): React.JSX.Element {
+  const appTheme = useTheme();
+  return (
+    <Icon
+      color={active ? appTheme.colors.accent.s600 : appTheme.colors.text.primary}
+      name="filter"
+      size={20}
+      testID="filter-glyph"
+      weight="semibold"
+    />
+  );
+}
+
+// A 44-pt circular toolbar button for a destination header (filters, paging).
+function ToolbarIconButton({
+  accessibilityLabel,
+  accessibilityState,
+  active = false,
+  children,
+  disabled = false,
+  testID,
+  onPress
+}: {
+  accessibilityLabel: string;
+  accessibilityState?: { disabled?: boolean; expanded?: boolean };
+  active?: boolean;
+  children: React.ReactNode;
+  disabled?: boolean;
+  testID: string;
+  onPress: () => void;
+}): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={accessibilityState}
+      disabled={disabled}
+      testID={testID}
+      style={({ pressed }) => [
+        styles.toolbarIconButton,
+        active ? styles.toolbarIconButtonActive : null,
+        pressed && !disabled ? styles.filterButtonPressed : null,
+        disabled ? styles.disabledButton : null
+      ]}
+      onPress={onPress}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+// Status tile for a History or Review attempt row: tinted like an IconTile and
+// carrying the result glyph.
+function AttemptStatusTile({
+  testID,
+  tone
+}: {
+  testID: string;
+  tone: "correct" | "wrong" | "incomplete" | "unknown";
+}): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
-  const color = active ? appTheme.colors.accent.s600 : appTheme.colors.text.strong;
   return (
-    <View style={styles.filterGlyph} testID="filter-glyph">
-      <View style={[styles.filterGlyphLine, { backgroundColor: color }]}>
-        <View style={[styles.filterGlyphKnob, styles.filterGlyphKnobRight, { backgroundColor: color }]} />
-      </View>
-      <View style={[styles.filterGlyphLine, { backgroundColor: color }]}>
-        <View style={[styles.filterGlyphKnob, styles.filterGlyphKnobLeft, { backgroundColor: color }]} />
-      </View>
-      <View style={[styles.filterGlyphLine, { backgroundColor: color }]}>
-        <View style={[styles.filterGlyphKnob, styles.filterGlyphKnobMiddle, { backgroundColor: color }]} />
-      </View>
+    <View
+      style={[
+        styles.attemptStatusTile,
+        tone === "correct"
+          ? styles.attemptStatusTileCorrect
+          : tone === "wrong"
+            ? styles.attemptStatusTileWrong
+            : styles.attemptStatusTileNeutral
+      ]}
+      testID={testID}
+    >
+      {tone === "unknown" ? (
+        <Icon color={appTheme.colors.text.tertiary} name="help" size={18} weight="semibold" />
+      ) : (
+        <ResultBadgeGlyph tone={tone} />
+      )}
     </View>
   );
 }
@@ -12899,6 +12962,7 @@ function AnimatedDisclosureChevron({
   testID?: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
   const progress = useRef(new Animated.Value(expanded ? 1 : 0)).current;
   useEffect(() => {
     progress.stopAnimation();
@@ -12919,7 +12983,7 @@ function AnimatedDisclosureChevron({
       style={[styles.disclosureChevronMotion, { transform: [{ rotate }] }]}
       testID={testID}
     >
-      <ChevronGlyph direction="down" />
+      <Icon color={appTheme.colors.text.tertiary} name="chevronDown" size={15} testID="chevron-down-glyph" weight="semibold" />
     </Animated.View>
   );
 }
@@ -13192,6 +13256,8 @@ function ReviewPanel({
     : "No matching scheduled reviews";
   const reviewDueSubline = reviewDueCardSubline(queueSummary.oldestDueLabel);
   const reviewFilterControlActive = filtersExpanded || queueFilter !== "all";
+  // Three side-by-side counts break their labels mid-word at large text sizes.
+  const forecastStacked = useWindowDimensions().fontScale >= REVIEW_FORECAST_STACK_FONT_SCALE;
 
   useEffect(() => {
     if (appliedPreferredEntriesKeyRef.current === preferredEntriesKey) {
@@ -13344,17 +13410,16 @@ function ReviewPanel({
   return (
     <View style={styles.reviewQueuePanel} testID="review-panel">
       <View style={styles.historyHeaderRow} testID="review-action-header">
-        <Text style={styles.screenTitle}>Review</Text>
-        <Pressable
-          accessibilityRole="button"
+        <AppText accessibilityRole="header" style={styles.destinationTitle} variant="largeTitle">Review</AppText>
+        <ToolbarIconButton
           accessibilityLabel={`${filtersExpanded ? "Hide" : "Show"} review filters${queueFilter === "all" ? "" : `, ${selectedReviewFilterLabel} selected`}`}
           accessibilityState={{ expanded: filtersExpanded }}
+          active={reviewFilterControlActive}
           testID="review-filter-toggle"
-          style={[styles.reviewFilterButton, reviewFilterControlActive ? styles.reviewFilterButtonActive : null]}
           onPress={() => onFiltersExpandedChange(!filtersExpanded)}
         >
           <FilterGlyph active={reviewFilterControlActive} />
-        </Pressable>
+        </ToolbarIconButton>
       </View>
 
       <View
@@ -13365,31 +13430,34 @@ function ReviewPanel({
         testID="review-due-card"
       >
         <View style={styles.reviewDueCopy}>
-          <Text style={styles.reviewDueTitle}>Today</Text>
-          <Text testID="review-due-summary" style={styles.helperText}>
+          <AppText variant="headline">Today</AppText>
+          <AppText testID="review-due-summary" tone="secondary" variant="subheadline">
             {reviewDueSummaryLabel}
-          </Text>
-          <Text
+          </AppText>
+          <AppText
             accessibilityLabel={queueSummary.oldestDueLabel}
             testID="review-next-due"
-            style={styles.helperText}
+            tone="secondary"
+            variant="footnote"
           >
             {reviewDueSubline}
-          </Text>
+          </AppText>
         </View>
         <View style={styles.reviewDueCountBlock}>
-          <Text testID="review-due-count" style={styles.reviewDueBigCount}>{dailyReviewProgressLabel}</Text>
+          <AppText testID="review-due-count" style={styles.reviewDueBigCount} tone="accent" variant="numeralLarge">{dailyReviewProgressLabel}</AppText>
         </View>
       </View>
 
       <View
         accessibilityLabel={`${reviewCountLabel(queueSummary.tomorrowCount)} tomorrow, ${reviewCountLabel(queueSummary.nextSevenDaysCount)} in the next 7 days, ${reviewCountLabel(queueSummary.totalCount)} total`}
-        style={styles.reviewForecastRow}
+        style={[styles.reviewForecastRow, forecastStacked ? styles.reviewForecastRowStacked : null]}
         testID="review-forecast"
       >
-        <ReviewForecastMetric label="Tomorrow" count={queueSummary.tomorrowCount} countTestID="review-tomorrow-count" />
-        <ReviewForecastMetric label="Next 7 days" count={queueSummary.nextSevenDaysCount} countTestID="review-next-seven-days-count" />
-        <ReviewForecastMetric label="Total" count={queueSummary.totalCount} countTestID="review-total-count" />
+        <ReviewForecastMetric label="Tomorrow" count={queueSummary.tomorrowCount} countTestID="review-tomorrow-count" stacked={forecastStacked} />
+        <View style={forecastStacked ? styles.reviewForecastDividerStacked : styles.reviewForecastDivider} />
+        <ReviewForecastMetric label="Next 7 days" count={queueSummary.nextSevenDaysCount} countTestID="review-next-seven-days-count" stacked={forecastStacked} />
+        <View style={forecastStacked ? styles.reviewForecastDividerStacked : styles.reviewForecastDivider} />
+        <ReviewForecastMetric label="Total" count={queueSummary.totalCount} countTestID="review-total-count" stacked={forecastStacked} />
       </View>
 
       <View style={styles.reviewFilterControlSlot} testID="review-filter-controls">
@@ -13397,50 +13465,46 @@ function ReviewPanel({
         {reviewFilterSummaryRegion}
       </View>
 
-      <Pressable
-        accessibilityRole="button"
+      <Button
         accessibilityLabel="Start due review"
-        accessibilityState={{ disabled: filteredDueEntries.length === 0 }}
         disabled={filteredDueEntries.length === 0}
+        icon="play"
+        label={`Review ${queueSummary.filteredCount}`}
+        stretch
         testID="review-start-due"
-        style={[styles.primaryButton, styles.reviewStartButton, filteredDueEntries.length === 0 ? styles.disabledButton : null]}
         onPress={() => startReviewEntries(filteredDueEntries)}
-      >
-        <Text style={styles.primaryButtonText}>Review {queueSummary.filteredCount}</Text>
-      </Pressable>
+      />
 
       {onPromoteNextFutureReviewsToDue || onScheduleTestReviewReminder ? (
         <View style={styles.reviewDevControls} testID="review-dev-controls">
           {onPromoteNextFutureReviewsToDue ? (
-            <Pressable
-              accessibilityRole="button"
+            <Button
               accessibilityLabel="Make next future review date due today"
+              label="Make next due today"
+              size="compact"
               testID="review-dev-promote-next-due"
-              style={styles.secondaryButton}
+              variant="secondary"
               onPress={() => {
                 const result = onPromoteNextFutureReviewsToDue();
                 setDevStatus(reviewDuePromotionStatus(result));
               }}
-            >
-              <Text style={styles.secondaryButtonText}>Make next due today</Text>
-            </Pressable>
+            />
           ) : null}
           {onScheduleTestReviewReminder ? (
-            <Pressable
-              accessibilityRole="button"
+            <Button
               accessibilityLabel="Schedule a test review notification"
+              label="Test notification"
+              size="compact"
               testID="review-dev-test-notification"
-              style={styles.secondaryButton}
+              variant="secondary"
               onPress={() => {
                 void onScheduleTestReviewReminder().then((result) => {
                   setDevStatus(result.scheduled ? `Test notification scheduled ${formatLocalCalendarDate(result.scheduledAt ?? "")}` : "No test notification scheduled");
                 });
               }}
-            >
-              <Text style={styles.secondaryButtonText}>Test notification</Text>
-            </Pressable>
+            />
           ) : null}
-          {devStatus ? <Text style={styles.helperText} testID="review-dev-status">{devStatus}</Text> : null}
+          {devStatus ? <AppText testID="review-dev-status" tone="secondary" variant="footnote">{devStatus}</AppText> : null}
           {reviewReminderScheduleStatus ? (
             <Text style={styles.reviewDueHiddenMetric} testID="review-dev-reminder-status">{reviewReminderScheduleStatus}</Text>
           ) : null}
@@ -13460,22 +13524,24 @@ function ReviewPanel({
           contentStyle={styles.reviewSectionItems}
           expanded={todayReviewsExpanded}
         >
-          {filteredReviewToday.dueItems.length > 0 ? filteredReviewToday.dueItems.map((entry) => (
-            <ReviewQueueItemCard
-              key={`${entry.item.review.puzzleId}:${entry.item.review.mode}:${entry.item.review.ratingKey}`}
-              presentation={entry}
-              nowMs={nowMs}
-              onPress={() => startReviewEntries([buildServiceReviewEntry(service, {
-                puzzle: entry.item.puzzle,
-                mode: entry.item.review.mode,
-                ratingKey: entry.item.review.ratingKey,
-                source: "due"
-              })])}
-            />
+          {filteredReviewToday.dueItems.length > 0 ? filteredReviewToday.dueItems.map((entry, index) => (
+            <React.Fragment key={`${entry.item.review.puzzleId}:${entry.item.review.mode}:${entry.item.review.ratingKey}`}>
+              {index > 0 ? <View style={styles.groupedSeparator} /> : null}
+              <ReviewQueueItemCard
+                presentation={entry}
+                nowMs={nowMs}
+                onPress={() => startReviewEntries([buildServiceReviewEntry(service, {
+                  puzzle: entry.item.puzzle,
+                  mode: entry.item.review.mode,
+                  ratingKey: entry.item.review.ratingKey,
+                  source: "due"
+                })])}
+              />
+            </React.Fragment>
           )) : (
-            <Text style={styles.helperText} testID="review-today-to-review-empty">
+            <AppText style={styles.groupedEmpty} testID="review-today-to-review-empty" tone="secondary" variant="subheadline">
               No reviews match this filter.
-            </Text>
+            </AppText>
           )}
         </CollapsibleRegion>
       </View>
@@ -13493,16 +13559,18 @@ function ReviewPanel({
           contentStyle={styles.reviewSectionItems}
           expanded={completedReviewsExpanded}
         >
-          {filteredCompletedReviews.length > 0 ? filteredCompletedReviews.map((item) => (
-            <TodayReviewAttemptRow
-              key={item.attempt.id}
-              item={item}
-              onOpen={() => openCompletedReview(item.attempt.id)}
-            />
+          {filteredCompletedReviews.length > 0 ? filteredCompletedReviews.map((item, index) => (
+            <React.Fragment key={item.attempt.id}>
+              {index > 0 ? <View style={styles.groupedSeparator} /> : null}
+              <TodayReviewAttemptRow
+                item={item}
+                onOpen={() => openCompletedReview(item.attempt.id)}
+              />
+            </React.Fragment>
           )) : (
-            <Text style={styles.helperText} testID="review-today-history-empty">
+            <AppText style={styles.groupedEmpty} testID="review-today-history-empty" tone="secondary" variant="subheadline">
               No completed reviews match this filter.
-            </Text>
+            </AppText>
           )}
         </CollapsibleRegion>
       </View>
@@ -13540,8 +13608,8 @@ function ReviewFilterSummary({ label }: { label: string }): React.JSX.Element {
       testID="review-active-filter-summary"
     >
       <View style={styles.historyChipContent}>
-        <View style={styles.historyActiveFilterChip} testID="review-active-filter-0">
-          <Text style={styles.historyActiveFilterText}>{label}</Text>
+        <View style={[styles.filterButton, styles.filterButtonActive]} testID="review-active-filter-0">
+          <Text style={[styles.filterButtonText, styles.filterButtonTextActive]}>{label}</Text>
         </View>
       </View>
     </View>
@@ -13593,6 +13661,8 @@ function ReviewQueueItemCard({
   onPress: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
+  const rowStyle = useListRowStyle();
   const { history, item } = presentation;
   const activityLabel = reviewTodayActivityLabel(history, nowMs);
   const source = reviewItemSourceSprintLabel(item.review);
@@ -13613,20 +13683,22 @@ function ReviewQueueItemCard({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       testID={rowTestId}
-      style={styles.reviewItemCard}
+      style={({ pressed }) => [rowStyle, styles.attemptRow, pressed ? styles.settingsRowPressed : null]}
       onPress={onPress}
     >
-      <View style={styles.reviewRetryBadge} testID={`${rowTestId}-badge`}>
-        <Text style={styles.reviewRetryGlyph}>↻</Text>
+      <View testID={`${rowTestId}-badge`}>
+        <IconTile name="review" />
       </View>
-      <View style={styles.reviewItemCopy}>
-        <Text style={styles.historyRowTitle}>{modeLabel(item.review.mode)}</Text>
-        <Text testID={`${rowTestId}-context`} style={styles.helperText}>{activityLabel}</Text>
-        <Text testID={`${rowTestId}-meta`} style={styles.helperText}>
+      <View style={styles.attemptRowCopy}>
+        <AppText variant="headline">{modeLabel(item.review.mode)}</AppText>
+        <AppText testID={`${rowTestId}-context`} tone="secondary" variant="subheadline">{activityLabel}</AppText>
+        <AppText testID={`${rowTestId}-meta`} tone="secondary" variant="footnote">
           {[attemptSummaryLabel, compactSource].filter(Boolean).join(" · ")}
-        </Text>
+        </AppText>
       </View>
-      <ChevronGlyph direction="right" />
+      <View style={styles.attemptRowChevron}>
+        <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
+      </View>
     </Pressable>
   );
 }
@@ -13659,9 +13731,9 @@ function ReviewSectionToggle({
       style={styles.reviewSectionToggle}
       onPress={onPress}
     >
-      <Text style={styles.sectionLabel}>{label}</Text>
+      <AppText style={styles.reviewSectionTitle} variant="title">{label}</AppText>
       <View style={styles.reviewSectionToggleMeta} testID={`${toggleTestID}-meta`}>
-        <Text style={styles.reviewSectionCount} testID={`${toggleTestID}-count`}>{count}</Text>
+        <AppText style={styles.reviewSectionCount} testID={`${toggleTestID}-count`} tone="secondary" variant="body">{count}</AppText>
         <View style={styles.reviewSectionToggleChevron} testID={`${toggleTestID}-chevron`}>
           <DisclosureChevron
             expanded={expanded}
@@ -13681,6 +13753,8 @@ function TodayReviewAttemptRow({
   onOpen: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
+  const rowStyle = useListRowStyle();
   const isWrong = item.attempt.result === "wrong";
   const resultLabel = isWrong ? "Wrong" : "Correct";
   const elapsedSeconds = Math.max(
@@ -13692,49 +13766,60 @@ function TodayReviewAttemptRow({
       accessibilityRole="button"
       accessibilityLabel={`Open ${modeLabel(item.attempt.mode)} ${resultLabel.toLowerCase()} review for analysis or retry`}
       testID={`review-today-attempt-${item.attempt.id}`}
-      style={styles.historyAttemptCard}
+      style={({ pressed }) => [rowStyle, styles.attemptRow, pressed ? styles.settingsRowPressed : null]}
       onPress={onOpen}
     >
-      <View
-        style={[styles.historyResultBadge, isWrong ? styles.historyResultWrong : styles.historyResultCorrect]}
+      <AttemptStatusTile
         testID={`review-today-attempt-${item.attempt.id}-badge`}
-      >
-        <ResultBadgeGlyph tone={isWrong ? "wrong" : "correct"} />
-      </View>
-      <View style={styles.historyAttemptCopy}>
+        tone={isWrong ? "wrong" : "correct"}
+      />
+      <View style={styles.attemptRowCopy}>
         <View style={styles.historyAttemptHeader}>
-          <Text style={styles.historyRowTitle}>{modeLabel(item.attempt.mode)}</Text>
-          <Text
+          <AppText variant="headline">{modeLabel(item.attempt.mode)}</AppText>
+          <AppText
             testID={`review-today-attempt-${item.attempt.id}-result`}
-            style={[styles.historyReviewState, isWrong ? styles.errorText : styles.positive]}
+            tone={isWrong ? "negative" : "positive"}
+            variant="subheadline"
           >
             {resultLabel}
-          </Text>
+          </AppText>
         </View>
-        <Text style={styles.helperText}>Puzzle {item.puzzle.id} · {elapsedSeconds}s</Text>
-        <Text style={styles.helperText}>{formatLocalCalendarDate(item.attempt.completedAt)} · Review or retry</Text>
+        <AppText tone="secondary" variant="footnote">Puzzle {item.puzzle.id} · {elapsedSeconds}s</AppText>
+        <AppText tone="secondary" variant="footnote">{formatLocalCalendarDate(item.attempt.completedAt)} · Review or retry</AppText>
       </View>
-      <View style={styles.historyAttemptChevron}>
-        <ChevronGlyph direction="right" />
+      <View style={styles.attemptRowChevron}>
+        <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
       </View>
     </Pressable>
   );
 }
 
+const REVIEW_FORECAST_STACK_FONT_SCALE = 1.5;
+
 function ReviewForecastMetric({
   count,
   label,
-  countTestID
+  countTestID,
+  stacked = false
 }: {
   count: number;
   label: string;
   countTestID: string;
+  stacked?: boolean;
 }): React.JSX.Element {
   const styles = useStyles();
+  if (stacked) {
+    return (
+      <View style={styles.reviewForecastMetricStacked}>
+        <AppText style={styles.reviewForecastLabelStacked} tone="secondary" variant="body">{label}</AppText>
+        <AppText testID={countTestID} variant="numeral">{count}</AppText>
+      </View>
+    );
+  }
   return (
     <View style={styles.reviewForecastMetric}>
-      <Text style={styles.reviewForecastCount} testID={countTestID}>{count}</Text>
-      <Text style={styles.reviewForecastLabel}>{label}</Text>
+      <AppText testID={countTestID} variant="numeral">{count}</AppText>
+      <AppText tone="secondary" variant="caption">{label}</AppText>
     </View>
   );
 }
@@ -15812,26 +15897,19 @@ function SettingsPanel({
             detail={iCloudSyncStatus}
             testID="settings-sync-status"
           />
-          <View style={styles.settingsInlineControls} testID="settings-icloud-sync-controls">
-            <SettingsPreferenceButton
-              active={iCloudSyncEnabled}
-              label="On"
-              testID="settings-icloud-sync-on"
-              onPress={() => {
-                onSaveICloudSyncEnabled(true);
-                setStatusMessage("iCloud sync enabled");
-              }}
-            />
-            <SettingsPreferenceButton
-              active={!iCloudSyncEnabled}
-              label="Off"
-              testID="settings-icloud-sync-off"
-              onPress={() => {
-                onSaveICloudSyncEnabled(false);
-                setStatusMessage("iCloud sync disabled");
-              }}
-            />
-          </View>
+          <SettingsSegmentedRow
+            accessibilityLabel="Progress Sync"
+            options={[
+              { value: "on", label: "On", testID: "settings-icloud-sync-on" },
+              { value: "off", label: "Off", testID: "settings-icloud-sync-off" }
+            ]}
+            testID="settings-icloud-sync-controls"
+            value={iCloudSyncEnabled ? "on" : "off"}
+            onChange={(next) => {
+              onSaveICloudSyncEnabled(next === "on");
+              setStatusMessage(next === "on" ? "iCloud sync enabled" : "iCloud sync disabled");
+            }}
+          />
           {iCloudSyncEnabled ? (
             <>
               <SettingsActionButton
@@ -15880,29 +15958,21 @@ function SettingsPanel({
               : "New Arrow Duel play checks only your arrow choice, including Survival. A correct choice completes the puzzle; a wrong choice enters Review. Paused sessions keep their existing rule. Turning this back on restores each saved Run’s reply choice and time."}
             testID="settings-arrow-duel-opponent-reply"
           />
-          <View
-            style={styles.settingsInlineControls}
+          <SettingsSegmentedRow
+            accessibilityLabel="Find the opponent’s best reply"
+            options={[
+              { value: "on", label: "On", testID: "settings-arrow-duel-opponent-reply-on" },
+              { value: "off", label: "Off", testID: "settings-arrow-duel-opponent-reply-off" }
+            ]}
             testID="settings-arrow-duel-opponent-reply-controls"
-          >
-            <SettingsPreferenceButton
-              active={arrowDuelOpponentReplyGlobalSetting.enabled}
-              label="On"
-              testID="settings-arrow-duel-opponent-reply-on"
-              onPress={() => {
-                arrowDuelOpponentReplyGlobalSetting.onChange(true);
-                setStatusMessage("Opponent replies are available, including in Survival");
-              }}
-            />
-            <SettingsPreferenceButton
-              active={!arrowDuelOpponentReplyGlobalSetting.enabled}
-              label="Off"
-              testID="settings-arrow-duel-opponent-reply-off"
-              onPress={() => {
-                arrowDuelOpponentReplyGlobalSetting.onChange(false);
-                setStatusMessage("Arrow Duel now checks only your arrow choice");
-              }}
-            />
-          </View>
+            value={arrowDuelOpponentReplyGlobalSetting.enabled ? "on" : "off"}
+            onChange={(next) => {
+              arrowDuelOpponentReplyGlobalSetting.onChange(next === "on");
+              setStatusMessage(next === "on"
+                ? "Opponent replies are available, including in Survival"
+                : "Arrow Duel now checks only your arrow choice");
+            }}
+          />
         </SettingsSection>
       ) : null}
 
@@ -15918,26 +15988,29 @@ function SettingsPanel({
           })}
           testID="settings-review-reminders"
         />
-        <View style={styles.settingsInlineControls} testID="settings-review-reminder-preferences">
-          <SettingsPreferenceButton
-            active={reviewReminderPreference.mode === "smart"}
-            label="Smart"
-            testID="settings-review-reminder-smart"
-            onPress={() => onSaveReviewReminderPreference({ mode: "smart" })}
-          />
-          <SettingsPreferenceButton
-            active={reviewReminderPreference.mode === "fixed" && reviewReminderPreference.fixedLocalTime === "19:00"}
-            label="19:00"
-            testID="settings-review-reminder-fixed-1900"
-            onPress={() => onSaveReviewReminderPreference({ mode: "fixed", fixedLocalTime: "19:00" })}
-          />
-          <SettingsPreferenceButton
-            active={reviewReminderPreference.mode === "off"}
-            label="Off"
-            testID="settings-review-reminder-off"
-            onPress={() => onSaveReviewReminderPreference({ mode: "off" })}
-          />
-        </View>
+        <SettingsSegmentedRow
+          accessibilityLabel="Review Reminders"
+          options={[
+            { value: "smart", label: "Smart", testID: "settings-review-reminder-smart" },
+            { value: "fixed-1900", label: "19:00", testID: "settings-review-reminder-fixed-1900" },
+            { value: "off", label: "Off", testID: "settings-review-reminder-off" }
+          ]}
+          testID="settings-review-reminder-preferences"
+          value={reviewReminderPreference.mode === "smart"
+            ? "smart"
+            : reviewReminderPreference.mode === "off"
+              ? "off"
+              : reviewReminderPreference.fixedLocalTime === "19:00" ? "fixed-1900" : "other"}
+          onChange={(next) => {
+            if (next === "smart") {
+              onSaveReviewReminderPreference({ mode: "smart" });
+            } else if (next === "fixed-1900") {
+              onSaveReviewReminderPreference({ mode: "fixed", fixedLocalTime: "19:00" });
+            } else if (next === "off") {
+              onSaveReviewReminderPreference({ mode: "off" });
+            }
+          }}
+        />
         {notificationPermissionStatus === "not_determined" && reviewReminderPreference.mode !== "off" ? (
           <SettingsActionRow
             label="Enable Notifications"
@@ -15994,26 +16067,17 @@ function SettingsPanel({
         testID="settings-appearance-section"
         wide={adaptiveLayout.usesWideContent}
       >
-        <View style={styles.settingsInlineControls} testID="settings-appearance-options">
-          <SettingsPreferenceButton
-            active={appearance === "system"}
-            label="System"
-            testID="settings-appearance-system"
-            onPress={() => onAppearanceChange("system")}
-          />
-          <SettingsPreferenceButton
-            active={appearance === "light"}
-            label="Light"
-            testID="settings-appearance-light"
-            onPress={() => onAppearanceChange("light")}
-          />
-          <SettingsPreferenceButton
-            active={appearance === "dark"}
-            label="Dark"
-            testID="settings-appearance-dark"
-            onPress={() => onAppearanceChange("dark")}
-          />
-        </View>
+        <SettingsSegmentedRow
+          accessibilityLabel="Appearance"
+          options={[
+            { value: "system", label: "System", testID: "settings-appearance-system" },
+            { value: "light", label: "Light", testID: "settings-appearance-light" },
+            { value: "dark", label: "Dark", testID: "settings-appearance-dark" }
+          ]}
+          testID="settings-appearance-options"
+          value={appearance}
+          onChange={onAppearanceChange}
+        />
       </SettingsSection>
 
       {showRatingControls ? (
@@ -16039,47 +16103,36 @@ function SettingsPanel({
 
       {showSprintGuideReset ? (
         <SettingsSection title="Guidance" testID="settings-guidance-section" wide={adaptiveLayout.usesWideContent}>
-          <View style={styles.settingsGuidanceResetCard} testID="settings-guidance-reset-card">
+          <View style={styles.settingsBlock} testID="settings-guidance-reset-card">
             <View style={styles.settingsRowCopy}>
-              <Text style={styles.listText}>Replay practice guides</Text>
-              <Text style={styles.helperText}>
+              <AppText variant="body">Replay practice guides</AppText>
+              <AppText tone="secondary" variant="footnote">
                 Reset the Sprint rules, active-session, and Arrow Duel guides so they appear again when each applies. Runs, ratings, and History stay unchanged.
-              </Text>
+              </AppText>
             </View>
-            <Pressable
-              accessibilityRole="button"
+            <Button
               accessibilityLabel={sprintGuideReady ? "Practice guides reset" : "Reset practice guides"}
-              accessibilityState={{ disabled: sprintGuideReady }}
               disabled={sprintGuideReady}
-              style={[
-                styles.settingsGuidanceResetButton,
-                sprintGuideReady ? styles.settingsGuidanceResetButtonComplete : null
-              ]}
+              icon={sprintGuideReady ? "check" : "restore"}
+              label={sprintGuideReady ? "Guides reset" : "Reset guides"}
+              size="compact"
               testID="settings-show-sprint-guide"
+              variant="secondary"
               onPress={() => {
                 onResetSprintGuides();
                 setSprintGuideReady(true);
               }}
-            >
-              <Text
-                style={[
-                  styles.settingsGuidanceResetButtonText,
-                  sprintGuideReady ? styles.settingsGuidanceResetButtonTextComplete : null
-                ]}
-              >
-                {sprintGuideReady ? "Guides reset" : "Reset guides"}
-              </Text>
-            </Pressable>
+            />
           </View>
           {sprintGuideReady ? (
             <View
               accessibilityLiveRegion="polite"
-              style={styles.sprintGuideReadyStatus}
+              style={styles.settingsBlock}
               testID="settings-sprint-guide-ready"
             >
-              <Text style={styles.sprintGuideReadyStatusText}>
+              <AppText tone="positive" variant="footnote">
                 Guides reset. Each guide will replay the next time it applies.
-              </Text>
+              </AppText>
             </View>
           ) : null}
         </SettingsSection>
@@ -16156,17 +16209,20 @@ function SettingsPanel({
         />
       </SettingsSection>
 
-      {statusMessage ? <Text style={styles.settingsStatusText} testID="settings-status-message">{statusMessage}</Text> : null}
+      {statusMessage ? (
+        <AppText style={styles.settingsStatusText} testID="settings-status-message" tone="secondary" variant="footnote">
+          {statusMessage}
+        </AppText>
+      ) : null}
       {onOpenDiagnostics ? (
-        <Pressable
-          accessibilityRole="button"
+        <Button
           accessibilityLabel="Open Stockfish diagnostics"
+          label="Stockfish Diagnostics"
+          size="compact"
           testID="settings-stockfish-diagnostics"
-          style={styles.secondaryButton}
+          variant="secondary"
           onPress={onOpenDiagnostics}
-        >
-          <Text style={styles.secondaryButtonText}>Stockfish Diagnostics</Text>
-        </Pressable>
+        />
       ) : null}
     </View>
   );
@@ -16188,6 +16244,7 @@ function FeedbackSupportCard({
   wide: boolean;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
   const [confirmationVisible, setConfirmationVisible] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
 
@@ -16208,48 +16265,41 @@ function FeedbackSupportCard({
 
   return (
     <SettingsSection
-      cardStyle={styles.feedbackSupportSectionCard}
       title="Help & Feedback"
       testID="settings-feedback-section"
       wide={wide}
     >
-      <View style={styles.feedbackSupportCard}>
+      <View style={styles.settingsBlock}>
         <View style={styles.feedbackSupportHeader}>
-          <View style={styles.feedbackSupportIcon}>
-            <Text style={styles.feedbackSupportIconText}>?</Text>
-          </View>
-          <View style={styles.feedbackSupportCopy}>
-            <Text style={styles.feedbackSupportTitle}>Help improve Chessticize</Text>
-            <Text style={styles.feedbackSupportDetail}>
+          <IconTile name="help" />
+          <View style={styles.settingsRowCopy}>
+            <AppText variant="headline">Help improve Chessticize</AppText>
+            <AppText tone="secondary" variant="subheadline">
               Report a bug, request a feature, or see whether someone has already raised it.
-            </Text>
+            </AppText>
           </View>
         </View>
-        <View style={styles.feedbackPrivacyStrip}>
-          <Text style={styles.feedbackPrivacyTitle}>Your data stays in the app</Text>
-          <Text style={styles.feedbackPrivacyCopy}>
+        <View style={styles.settingsRowCopy}>
+          <AppText style={styles.settingsEmphasis} variant="footnote">Your data stays in the app</AppText>
+          <AppText tone="secondary" variant="footnote">
             GitHub opens in your browser. Ratings, history, and puzzle data are not attached.
-          </Text>
+          </AppText>
         </View>
-        <Pressable
-          accessibilityRole="button"
+        <Button
           accessibilityLabel="Open GitHub Issues in browser"
+          icon="external"
+          label="Open GitHub Issues"
+          stretch
           testID="settings-feedback-open-github"
-          style={({ pressed }) => [
-            styles.feedbackSupportButton,
-            pressed ? styles.feedbackSupportButtonPressed : null
-          ]}
+          variant="secondary"
           onPress={() => {
             setHandoffError(null);
             setConfirmationVisible(true);
           }}
-        >
-          <Text style={styles.feedbackSupportButtonText}>Open GitHub Issues</Text>
-          <Text style={styles.feedbackSupportButtonArrow}>↗</Text>
-        </Pressable>
-        <Text style={styles.feedbackSubmissionCopy}>
+        />
+        <AppText tone="secondary" variant="footnote">
           You will review and submit your issue on GitHub.
-        </Text>
+        </AppText>
       </View>
       {supportBundle ? (
         <ICloudSyncSupportDiagnosticsEntry presentation={supportBundle} />
@@ -16277,44 +16327,45 @@ function FeedbackSupportCard({
               style={styles.feedbackHandoffConfirmation}
               testID="settings-feedback-handoff-confirmation"
             >
-              <View style={styles.feedbackExternalBadge}>
-                <Text style={styles.feedbackExternalBadgeText}>EXTERNAL BROWSER</Text>
-              </View>
-              <Text style={styles.feedbackHandoffTitle}>Continue to GitHub?</Text>
-              <Text style={styles.feedbackHandoffCopy}>
+              <Badge label="EXTERNAL BROWSER" tone="accent" />
+              <AppText variant="title">Continue to GitHub?</AppText>
+              <AppText variant="body">
                 A new issue will open on github.com in your default browser. Chessticize does not attach your account, rating, history, or puzzle data.
-              </Text>
-              <View style={styles.feedbackHandoffPrivacyCard}>
-                <Text style={styles.feedbackHandoffPrivacyTitle}>You stay in control</Text>
-                <Text style={styles.feedbackHandoffPrivacyCopy}>
+              </AppText>
+              <View style={styles.settingsRowCopy}>
+                <AppText style={styles.settingsEmphasis} variant="footnote">You stay in control</AppText>
+                <AppText tone="secondary" variant="footnote">
                   Review what you share and submit it on GitHub. This is not an in-app submission.
-                </Text>
+                </AppText>
               </View>
               {handoffError ? (
-                <Text style={styles.errorText} testID="settings-feedback-handoff-error">
+                <AppText testID="settings-feedback-handoff-error" tone="negative" variant="footnote">
                   {handoffError}
-                </Text>
+                </AppText>
               ) : null}
-              <View style={styles.confirmationActionRow}>
-                <Pressable
-                  accessibilityRole="button"
+              <View style={styles.feedbackHandoffActions}>
+                <Button
                   accessibilityLabel="Stay in Settings"
-                  style={styles.feedbackHandoffCancelButton}
+                  label="Not now"
+                  stretch
                   testID="settings-feedback-handoff-cancel"
+                  variant="secondary"
                   onPress={closeConfirmation}
-                >
-                  <Text style={styles.feedbackHandoffCancelButtonText}>Not now</Text>
-                </Pressable>
+                />
                 <Pressable
                   accessibilityRole="link"
                   accessibilityLabel="Continue to GitHub Issues"
-                  style={styles.feedbackHandoffContinueButton}
+                  style={({ pressed }) => [
+                    styles.feedbackHandoffContinueButton,
+                    pressed ? styles.settingsActionButtonPressed : null
+                  ]}
                   testID="settings-feedback-handoff-continue"
                   onPress={() => {
                     void continueToGitHub();
                   }}
                 >
-                  <Text style={styles.feedbackHandoffContinueButtonText}>Continue to GitHub</Text>
+                  <Icon color={appTheme.colors.text.onAccent} name="external" size={17} weight="semibold" />
+                  <AppText tone="onAccent" variant="headline">Continue to GitHub</AppText>
                 </Pressable>
               </View>
             </View>
@@ -16363,30 +16414,30 @@ function ReviewReminderPermissionPrompt({
   );
 }
 
-function SettingsPreferenceButton({
-  active,
-  label,
-  onPress,
-  testID
+function SettingsSegmentedRow<T extends string>({
+  accessibilityLabel,
+  options,
+  testID,
+  value,
+  onChange
 }: {
-  active: boolean;
-  label: string;
-  onPress: () => void;
+  accessibilityLabel: string;
+  options: ReadonlyArray<{ value: T; label: string; testID: string }>;
   testID: string;
+  value: T;
+  onChange: (next: T) => void;
 }): React.JSX.Element {
   const styles = useStyles();
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      testID={testID}
-      style={[styles.settingsPreferenceButton, active ? styles.settingsPreferenceButtonActive : null]}
-      onPress={onPress}
-    >
-      <Text style={[styles.settingsPreferenceButtonText, active ? styles.settingsPreferenceButtonTextActive : null]}>
-        {label}
-      </Text>
-    </Pressable>
+    <View style={styles.settingsControlRow}>
+      <SegmentedControl
+        accessibilityLabel={accessibilityLabel}
+        options={options}
+        testID={testID}
+        value={value}
+        onChange={onChange}
+      />
+    </View>
   );
 }
 
@@ -16401,22 +16452,7 @@ function SettingsActionRow({
   onPress: () => void;
   testID: string;
 }): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${label}, ${detail}`}
-      testID={testID}
-      style={styles.settingsActionRow}
-      onPress={onPress}
-    >
-      <View style={styles.settingsRowCopy}>
-        <Text style={styles.listText}>{label}</Text>
-        <Text style={styles.helperText}>{detail}</Text>
-      </View>
-      <ChevronGlyph direction="right" />
-    </Pressable>
-  );
+  return <SettingsRow detail={detail} label={label} testID={testID} tint="accent" onPress={onPress} />;
 }
 
 function SettingsActionButton({
@@ -16436,17 +16472,18 @@ function SettingsActionButton({
   const appTheme = useTheme();
   return (
     <View style={styles.settingsActionButtonRow}>
-      <Text style={[styles.helperText, styles.settingsActionButtonDetail]} testID={`${testID}-detail`}>
+      <AppText style={styles.settingsActionButtonDetail} testID={`${testID}-detail`} tone="secondary" variant="footnote">
         {detail}
-      </Text>
+      </AppText>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={loading ? "Syncing progress" : label}
         accessibilityState={{ busy: loading, disabled: loading }}
         disabled={loading}
         testID={testID}
-        style={[
+        style={({ pressed }) => [
           styles.settingsActionButton,
+          pressed && !loading ? styles.settingsActionButtonPressed : null,
           loading ? styles.settingsActionButtonDisabled : null
         ]}
         onPress={onPress}
@@ -16458,9 +16495,9 @@ function SettingsActionButton({
             testID={`${testID}-spinner`}
           />
         ) : null}
-        <Text style={styles.settingsActionButtonText} testID={`${testID}-label`}>
+        <AppText style={styles.settingsActionButtonText} testID={`${testID}-label`} tone="onAccent" variant="headline">
           {loading ? "Syncing…" : label}
-        </Text>
+        </AppText>
       </Pressable>
     </View>
   );
@@ -16576,10 +16613,12 @@ function AdvancedRatingsPanel({
   const styles = useStyles();
   return (
     <View style={styles.advancedRatingsPanel} testID="settings-advanced-ratings-panel">
-      <Text style={styles.sectionLabel}>Difficulty controls</Text>
-      <Text style={styles.helperText}>
-        Each rating helps Chessticize choose the right puzzle difficulty.
-      </Text>
+      <View style={styles.settingsRowCopy}>
+        <AppText variant="headline">Difficulty controls</AppText>
+        <AppText tone="secondary" variant="footnote">
+          Each rating helps Chessticize choose the right puzzle difficulty.
+        </AppText>
+      </View>
       <View style={styles.advancedRatingRows}>
         {ratings.map(({ label, record }) => (
           <AdvancedRatingRow
@@ -16607,12 +16646,13 @@ function AdvancedRatingRow({
   testID: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
   const decrementDisabled = record.rating <= RATING_FLOOR;
   return (
     <View style={styles.advancedRatingRow} testID={testID}>
       <View style={styles.advancedRatingCopy}>
-        <Text style={styles.listText}>{label}</Text>
-        <Text style={styles.helperText}>{advancedRatingBucketLabel(label, record.key)}</Text>
+        <AppText variant="body">{label}</AppText>
+        <AppText tone="secondary" variant="footnote">{advancedRatingBucketLabel(label, record.key)}</AppText>
       </View>
       <View style={styles.advancedRatingControls}>
         <Pressable
@@ -16621,20 +16661,24 @@ function AdvancedRatingRow({
           accessibilityState={{ disabled: decrementDisabled }}
           disabled={decrementDisabled}
           testID={`${testID}-decrease`}
-          style={[styles.customStepperButton, decrementDisabled ? styles.disabledButton : null]}
+          style={({ pressed }) => [
+            styles.settingsStepperButton,
+            pressed && !decrementDisabled ? styles.settingsActionButtonPressed : null,
+            decrementDisabled ? styles.disabledButton : null
+          ]}
           onPress={() => onAdjust(record.key, stepManualRating(record.rating, -1))}
         >
-          <MinusGlyph />
+          <Icon color={appTheme.colors.accent.s600} name="remove" size={18} weight="semibold" />
         </Pressable>
-        <Text style={styles.settingsRowValue} testID={`${testID}-value`}>Rating {record.rating}</Text>
+        <AppText style={styles.advancedRatingValue} testID={`${testID}-value`} variant="body">Rating {record.rating}</AppText>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Increase ${label} rating`}
           testID={`${testID}-increase`}
-          style={styles.customStepperButton}
+          style={({ pressed }) => [styles.settingsStepperButton, pressed ? styles.settingsActionButtonPressed : null]}
           onPress={() => onAdjust(record.key, stepManualRating(record.rating, 1))}
         >
-          <PlusGlyph />
+          <Icon color={appTheme.colors.accent.s600} name="add" size={18} weight="semibold" />
         </Pressable>
       </View>
     </View>
@@ -16674,12 +16718,15 @@ function SettingsSection({
 }): React.JSX.Element {
   const styles = useStyles();
   return (
-    <View style={[styles.settingsSection, wide ? styles.settingsSectionWide : null]} testID={testID}>
-      <Text style={styles.sectionLabel}>{title}</Text>
-      <View style={[styles.settingsSectionCard, cardStyle]}>
-        {children}
-      </View>
-    </View>
+    <Section
+      header={title}
+      rows
+      style={wide ? styles.settingsSectionWide : null}
+      surfaceStyle={cardStyle}
+      testID={testID}
+    >
+      {children}
+    </Section>
   );
 }
 
@@ -16690,6 +16737,7 @@ function SettingsRow({
   onPress,
   showDetail = true,
   testID,
+  tint,
   value
 }: {
   destructive?: boolean;
@@ -16698,9 +16746,12 @@ function SettingsRow({
   onPress?: () => void;
   showDetail?: boolean;
   testID: string;
+  tint?: "accent";
   value?: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
+  const rowStyle = useListRowStyle();
   const accessibilityLabel = [label, value, detail].filter(Boolean).join(", ");
   return (
     <Pressable
@@ -16708,12 +16759,21 @@ function SettingsRow({
       accessibilityRole={onPress ? "button" : undefined}
       accessibilityLabel={accessibilityLabel}
       testID={testID}
-      style={styles.settingsRow}
+      style={({ pressed }) => [rowStyle, styles.settingsRow, onPress && pressed ? styles.settingsRowPressed : null]}
       onPress={onPress}
     >
       <View style={styles.settingsRowCopy}>
-        <Text style={[styles.listText, destructive ? styles.settingsDestructiveText : null]}>{label}</Text>
-        {detail && showDetail ? <Text style={styles.helperText}>{detail}</Text> : null}
+        <View style={styles.settingsRowTitleLine}>
+          <AppText
+            tone={tint === "accent" ? "accent" : undefined}
+            style={[styles.settingsRowLabel, destructive ? styles.settingsDestructiveText : null]}
+            variant="body"
+          >
+            {label}
+          </AppText>
+          {value ? <AppText style={styles.settingsRowValue} tone="secondary" variant="body">{value}</AppText> : null}
+        </View>
+        {detail && showDetail ? <AppText tone="secondary" variant="footnote">{detail}</AppText> : null}
         {detail && !showDetail ? (
           <View
             accessibilityLabel={detail}
@@ -16721,10 +16781,9 @@ function SettingsRow({
           />
         ) : null}
       </View>
-      <View style={styles.settingsRowMeta}>
-        {value ? <Text style={styles.settingsRowValue}>{value}</Text> : null}
-        {onPress ? <ChevronGlyph direction="right" /> : null}
-      </View>
+      {onPress ? (
+        <Icon color={appTheme.colors.text.tertiary} name="chevronRight" size={15} testID="chevron-right-glyph" weight="semibold" />
+      ) : null}
     </Pressable>
   );
 }
@@ -16745,6 +16804,8 @@ function SettingsExternalLinkRow({
   value: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
+  const rowStyle = useListRowStyle();
   const accessibilityLabel = [label, value, detail, linkLabel].join(", ");
   return (
     <Pressable
@@ -16752,18 +16813,18 @@ function SettingsExternalLinkRow({
       accessibilityRole="link"
       accessibilityLabel={accessibilityLabel}
       testID={testID}
-      style={styles.settingsRow}
+      style={({ pressed }) => [rowStyle, styles.settingsRow, pressed ? styles.settingsRowPressed : null]}
       onPress={onPress}
     >
       <View style={styles.settingsRowCopy}>
-        <Text style={styles.listText}>{label}</Text>
-        <Text style={styles.helperText}>{detail}</Text>
-        <Text style={styles.settingsLinkText}>{linkLabel}</Text>
+        <View style={styles.settingsRowTitleLine}>
+          <AppText style={styles.settingsRowLabel} variant="body">{label}</AppText>
+          <AppText style={styles.settingsRowValue} tone="secondary" variant="body">{value}</AppText>
+        </View>
+        <AppText tone="secondary" variant="footnote">{detail}</AppText>
+        <AppText tone="accent" variant="footnote">{linkLabel}</AppText>
       </View>
-      <View style={styles.settingsRowMeta}>
-        <Text style={styles.settingsRowValue}>{value}</Text>
-        <ChevronGlyph direction="right" />
-      </View>
+      <Icon color={appTheme.colors.text.tertiary} name="external" size={15} weight="semibold" />
     </Pressable>
   );
 }
@@ -18245,14 +18306,20 @@ const useStyles = makeStyles((theme) => ({
   },
   historyHeaderRow: {
     alignItems: "center",
+    columnGap: theme.spacing.row,
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
-    minHeight: 38
+    minHeight: theme.metrics.minTarget,
+    rowGap: theme.spacing.inline
   },
   historyHeaderActions: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8
+    flexWrap: "wrap",
+    gap: theme.spacing.inline,
+    justifyContent: "flex-end",
+    marginLeft: "auto"
   },
   historyResetButton: {
     alignItems: "center",
@@ -18307,10 +18374,9 @@ const useStyles = makeStyles((theme) => ({
     gap: 10
   },
   reviewQueuePanel: {
-    gap: 12
+    gap: theme.spacing.row
   },
   reviewFilterControlSlot: {
-    height: 32,
     overflow: "hidden"
   },
   reviewFilterButton: {
@@ -18356,13 +18422,10 @@ const useStyles = makeStyles((theme) => ({
   reviewDueCard: {
     alignItems: "center",
     backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: theme.shape.card,
     flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 76,
-    padding: 12
+    gap: theme.spacing.row,
+    padding: 16
   },
   reviewDueCopy: {
     flex: 1,
@@ -18375,44 +18438,33 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: "800"
   },
   reviewDueBigCount: {
-    color: theme.colors.accent.s600,
-    fontSize: 24,
-    fontWeight: "900",
-    lineHeight: 28,
-    textAlign: "center"
+    textAlign: "right"
   },
   reviewDueCountBlock: {
-    alignItems: "center",
-    gap: 2,
-    justifyContent: "center",
-    minWidth: 58
+    alignItems: "flex-end",
+    flexShrink: 0
   },
   reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   reviewFilterScroller: {
     marginHorizontal: -UI_PADDING
   },
+  // Matches the summary chip row so the slot keeps one height when toggled.
   reviewFilterContent: {
     gap: 8,
-    paddingHorizontal: UI_PADDING
+    paddingHorizontal: UI_PADDING,
+    paddingVertical: 4
   },
   reviewForecastRow: {
     backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: theme.shape.card,
     flexDirection: "row",
-    overflow: "hidden"
+    paddingVertical: 12
   },
   reviewForecastMetric: {
     alignItems: "center",
-    borderRightColor: theme.colors.border.default,
-    borderRightWidth: 1,
     flex: 1,
     gap: 2,
-    justifyContent: "center",
-    minHeight: 62,
-    paddingHorizontal: 6,
-    paddingVertical: 10
+    paddingHorizontal: 8
   },
   reviewForecastCount: {
     color: theme.colors.text.ink,
@@ -18426,27 +18478,23 @@ const useStyles = makeStyles((theme) => ({
     textAlign: "center"
   },
   reviewItemList: {
-    gap: 8
+    gap: theme.spacing.group
   },
   reviewSectionToggle: {
     alignItems: "center",
     flexDirection: "row",
-    height: 44,
+    gap: theme.spacing.row,
     justifyContent: "space-between",
+    minHeight: theme.metrics.minTarget,
+    paddingHorizontal: 4
   },
   reviewSectionToggleMeta: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 6,
-    height: 18
+    gap: theme.spacing.inline
   },
   reviewSectionCount: {
-    color: theme.colors.accent.s600,
-    fontSize: 14,
-    fontWeight: "800",
-    includeFontPadding: false,
-    lineHeight: 18,
-    textAlignVertical: "center"
+    fontVariant: ["tabular-nums"]
   },
   reviewSectionToggleChevron: {
     alignItems: "center",
@@ -18455,7 +18503,9 @@ const useStyles = makeStyles((theme) => ({
     width: 18
   },
   reviewSectionItems: {
-    gap: 8
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shape.card,
+    overflow: "hidden"
   },
   reviewItemCard: {
     alignItems: "center",
@@ -18494,13 +18544,8 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 0
   },
   reviewDevControls: {
-    alignItems: "stretch",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 10
+    alignItems: "flex-start",
+    gap: theme.spacing.group
   },
   activeSessionAdaptiveLayout: {
     alignSelf: "center",
@@ -20184,15 +20229,14 @@ const useStyles = makeStyles((theme) => ({
   },
   filterButton: {
     alignItems: "center",
-    borderColor: theme.colors.accent.s600,
-    borderRadius: 8,
-    borderWidth: 1,
-    minHeight: 32,
+    backgroundColor: theme.colors.surfaceStrong,
+    borderRadius: theme.shape.capsule,
     justifyContent: "center",
-    paddingHorizontal: 10
+    minHeight: 36,
+    paddingHorizontal: 14
   },
   filterButtonActive: {
-    backgroundColor: theme.colors.accent.fill
+    backgroundColor: theme.colors.accent.s100
   },
   filterButtonContent: {
     alignItems: "center",
@@ -20200,15 +20244,127 @@ const useStyles = makeStyles((theme) => ({
     gap: 4
   },
   filterButtonText: {
-    color: theme.colors.accent.s600,
-    fontSize: 12,
-    fontWeight: "800"
+    ...theme.typography.subheadline,
+    color: theme.colors.text.primary
   },
   filterButtonTextActive: {
-    color: theme.colors.text.onAccent
+    color: theme.colors.accent.s600,
+    fontWeight: theme.typography.headline.fontWeight
+  },
+  destinationTitle: {
+    flexShrink: 0
+  },
+  historyFootnote: {
+    paddingHorizontal: 4
+  },
+  toolbarIconButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shape.capsule,
+    height: theme.metrics.minTarget,
+    justifyContent: "center",
+    width: theme.metrics.minTarget
+  },
+  toolbarIconButtonActive: {
+    backgroundColor: theme.colors.accent.s100
+  },
+  filterButtonPressed: {
+    opacity: 0.7
+  },
+  groupedList: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shape.card,
+    overflow: "hidden"
+  },
+  groupedSeparator: {
+    backgroundColor: theme.colors.border.default,
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 16 + theme.metrics.iconTile + theme.spacing.row
+  },
+  groupedEmpty: {
+    paddingHorizontal: 16,
+    paddingVertical: 16
+  },
+  attemptRow: {
+    alignItems: "flex-start",
+    paddingVertical: 12
+  },
+  attemptRowCopy: {
+    flex: 1,
+    flexShrink: 1,
+    gap: 2,
+    minWidth: 0
+  },
+  // The History result icon is centered on the whole row (owner decision).
+  attemptRowLeading: {
+    alignSelf: "center"
+  },
+  attemptRowIdentity: {
+    flexDirection: "row",
+    minWidth: 0
+  },
+  attemptRowIdentityId: {
+    flexShrink: 1
+  },
+  attemptRowIdentityRating: {
+    flexShrink: 0
+  },
+  attemptRowTrailingBadges: {
+    alignItems: "flex-end",
+    alignSelf: "center",
+    flexShrink: 0,
+    gap: 4
+  },
+  attemptRowChevron: {
+    alignSelf: "center"
+  },
+  attemptStatusTile: {
+    alignItems: "center",
+    borderRadius: theme.shape.tile,
+    height: theme.metrics.iconTile,
+    justifyContent: "center",
+    width: theme.metrics.iconTile
+  },
+  attemptStatusTileCorrect: {
+    backgroundColor: theme.colors.positive.s100
+  },
+  attemptStatusTileWrong: {
+    backgroundColor: theme.colors.danger.s100
+  },
+  attemptStatusTileNeutral: {
+    backgroundColor: theme.colors.surfaceStrong
+  },
+  reviewForecastRowStacked: {
+    flexDirection: "column",
+    paddingVertical: 4
+  },
+  reviewForecastMetricStacked: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.row,
+    justifyContent: "space-between",
+    minHeight: theme.metrics.minTarget,
+    paddingHorizontal: 16,
+    paddingVertical: 6
+  },
+  reviewForecastLabelStacked: {
+    flexShrink: 1
+  },
+  reviewForecastDividerStacked: {
+    backgroundColor: theme.colors.border.default,
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 16
+  },
+  reviewForecastDivider: {
+    alignSelf: "stretch",
+    backgroundColor: theme.colors.border.default,
+    width: StyleSheet.hairlineWidth
+  },
+  reviewSectionTitle: {
+    flex: 1
   },
   historyPanel: {
-    gap: 10
+    gap: theme.spacing.row
   },
   historyPanelWide: {
     alignSelf: "center",
@@ -20216,34 +20372,35 @@ const useStyles = makeStyles((theme) => ({
     width: "100%"
   },
   historyTopFilterStack: {
-    gap: 8
+    gap: theme.spacing.group
   },
   historyAttentionFilter: {
     backgroundColor: theme.colors.surfaceStrong,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 9,
-    borderWidth: 1,
+    borderRadius: theme.shape.capsule,
     flexDirection: "row",
-    padding: 2
+    padding: 3
   },
   historyAttentionOption: {
     alignItems: "center",
-    borderRadius: 7,
+    borderRadius: theme.shape.capsule,
     flex: 1,
     justifyContent: "center",
-    minHeight: 40,
-    paddingHorizontal: 10
+    minHeight: theme.metrics.minTarget - 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6
   },
   historyAttentionOptionActive: {
-    backgroundColor: theme.colors.surface
+    backgroundColor: theme.name === "dark" ? theme.colors.fillMuted : theme.colors.surface,
+    ...theme.elevation.low,
+    shadowOpacity: theme.name === "dark" ? 0 : 0.12
   },
   historyAttentionOptionText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 13,
-    fontWeight: "800"
+    ...theme.typography.subheadline,
+    color: theme.colors.text.primary,
+    textAlign: "center"
   },
   historyAttentionOptionTextActive: {
-    color: theme.colors.accent.s700
+    fontWeight: theme.typography.headline.fontWeight
   },
   historyQuickFilterRow: {
     alignItems: "center",
@@ -20326,20 +20483,15 @@ const useStyles = makeStyles((theme) => ({
   },
   historyAdvancedFilters: {
     backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 8,
-    padding: 10
+    borderRadius: theme.shape.card,
+    gap: theme.spacing.row,
+    padding: 16
   },
   historyFilterGroup: {
-    gap: 4
+    gap: 6
   },
   historyFilterGroupLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "900",
-    marginLeft: 2
+    fontWeight: theme.typography.headline.fontWeight
   },
   historyThemeFilterSection: {
     gap: 8
@@ -20369,26 +20521,21 @@ const useStyles = makeStyles((theme) => ({
   },
   historyPerformanceCard: {
     backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 12
+    borderRadius: theme.shape.card,
+    gap: theme.spacing.row,
+    padding: 16
   },
   historyPerformanceHeader: {
-    alignItems: "center",
+    alignItems: "flex-start",
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12
+    gap: theme.spacing.row,
+    justifyContent: "space-between"
   },
   historyMetricSummary: {
-    alignItems: "flex-end",
-    minWidth: 74
+    alignItems: "flex-end"
   },
   historyAccuracy: {
-    color: theme.colors.text.ink,
-    fontSize: 28,
-    fontWeight: "900"
+    color: theme.colors.text.primary
   },
   historyChart: {
     alignItems: "flex-end",
@@ -20498,10 +20645,19 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 9,
     fontWeight: "600"
   },
+  // The advanced-filter surface pads its content by 16; scrolling chip rows
+  // extend to its edges so chips are not cut off square at the padding.
+  historyChipScroller: {
+    marginHorizontal: -16
+  },
+  historyChipScrollerContent: {
+    paddingHorizontal: 16
+  },
   historyChipContent: {
+    alignItems: "center",
     flexDirection: "row",
-    gap: 8,
-    paddingRight: 2
+    gap: theme.spacing.inline,
+    paddingVertical: 4
   },
   historyActiveFilterChip: {
     backgroundColor: theme.colors.surfaceRaised,
@@ -20520,22 +20676,20 @@ const useStyles = makeStyles((theme) => ({
   historyCompactFilterSummary: {
     alignItems: "center",
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 6,
-    minHeight: 20,
-    paddingRight: 2
+    paddingHorizontal: 4
   },
   historyCompactFilterLabel: {
-    justifyContent: "center"
-  },
-  historyCompactFilterSeparator: {
-    color: theme.colors.text.faint,
-    fontSize: 12,
-    fontWeight: "700"
+    backgroundColor: theme.colors.surfaceStrong,
+    borderRadius: theme.shape.capsule,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 2
   },
   historyCompactFilterText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "700"
+    ...theme.typography.footnote,
+    color: theme.colors.text.secondary
   },
   historyAttemptCard: {
     alignItems: "center",
@@ -20617,6 +20771,22 @@ const useStyles = makeStyles((theme) => ({
     flex: 1,
     gap: 3
   },
+  themeTagRailFadeFrame: {
+    minWidth: 0,
+    position: "relative"
+  },
+  themeTagRailFade: {
+    bottom: 0,
+    flexDirection: "row",
+    position: "absolute",
+    right: 0,
+    top: 0,
+    width: 24
+  },
+  themeTagRailFadeStep: {
+    backgroundColor: theme.colors.surface,
+    flex: 1
+  },
   themeTagRailViewport: {
     flexShrink: 1,
     maxWidth: "100%",
@@ -20640,17 +20810,15 @@ const useStyles = makeStyles((theme) => ({
     paddingRight: 10
   },
   historyThemeChip: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 7,
-    paddingVertical: 3
+    backgroundColor: theme.colors.surfaceStrong,
+    borderRadius: theme.shape.capsule,
+    paddingHorizontal: 8,
+    paddingVertical: 2
   },
   historyThemeChipText: {
+    ...theme.typography.caption,
     color: theme.colors.text.secondary,
-    fontSize: 10,
-    fontWeight: "800"
+    fontWeight: theme.typography.headline.fontWeight
   },
   historyUnclearBadge: {
     alignItems: "center",
@@ -20769,9 +20937,10 @@ const useStyles = makeStyles((theme) => ({
     width: "100%"
   },
   historyAttemptHeader: {
-    alignItems: "center",
+    alignItems: "baseline",
+    columnGap: 8,
     flexDirection: "row",
-    gap: 8
+    flexWrap: "wrap"
   },
   historyAttemptChevron: {
     alignItems: "center",
@@ -20798,25 +20967,28 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 8
+    paddingLeft: 4
   },
   settingsPanel: {
-    gap: 12
+    gap: theme.spacing.section
   },
   settingsPanelWide: {
     alignSelf: "center",
+    columnGap: theme.spacing.screen,
     flexDirection: "row",
     flexWrap: "wrap",
     maxWidth: 980,
     width: "100%"
   },
-  settingsSection: {
-    gap: 8
-  },
   settingsSectionWide: {
     flexBasis: "48%",
     flexGrow: 1,
     minWidth: 300
+  },
+  // Still used by the run timing editor and packs panel, which have not moved
+  // to the ui/ primitives yet.
+  settingsSection: {
+    gap: 8
   },
   settingsSectionCard: {
     backgroundColor: theme.colors.surface,
@@ -20825,221 +20997,53 @@ const useStyles = makeStyles((theme) => ({
     borderWidth: 1,
     overflow: "hidden"
   },
-  sprintGuideReadyStatus: {
-    backgroundColor: theme.colors.success.s50,
-    borderTopColor: theme.colors.success.s200,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 12,
-    paddingVertical: 9
+  settingsBlock: {
+    gap: theme.spacing.row,
+    paddingHorizontal: 16,
+    paddingVertical: 14
   },
-  sprintGuideReadyStatusText: {
-    color: theme.colors.success.s700,
-    fontSize: 12,
-    fontWeight: "800"
+  settingsControlRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 10
   },
-  settingsGuidanceResetCard: {
-    gap: 12,
-    padding: 12
-  },
-  settingsGuidanceResetButton: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: theme.colors.accent.fill,
-    borderColor: theme.colors.accent.s600,
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: 16
-  },
-  settingsGuidanceResetButtonComplete: {
-    backgroundColor: theme.colors.success.s50,
-    borderColor: theme.colors.success.s300
-  },
-  settingsGuidanceResetButtonText: {
-    color: theme.colors.text.onAccent,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  settingsGuidanceResetButtonTextComplete: {
-    color: theme.colors.success.s700
-  },
-  feedbackSupportSectionCard: {
-    borderColor: theme.colors.accent.s200,
-    borderRadius: 14
-  },
-  feedbackSupportCard: {
-    gap: 14,
-    padding: 16
+  settingsEmphasis: {
+    color: theme.colors.text.primary,
+    fontWeight: theme.typography.headline.fontWeight
   },
   feedbackSupportHeader: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 12
-  },
-  feedbackSupportIcon: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.s100,
-    borderRadius: 999,
-    height: 42,
-    justifyContent: "center",
-    width: 42
-  },
-  feedbackSupportIconText: {
-    color: theme.colors.accent.s700,
-    fontSize: 22,
-    fontWeight: "900"
-  },
-  feedbackSupportCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0
-  },
-  feedbackSupportTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 18,
-    fontWeight: "900"
-  },
-  feedbackSupportDetail: {
-    color: theme.colors.text.secondary,
-    fontSize: 13,
-    fontWeight: "600",
-    lineHeight: 18
-  },
-  feedbackPrivacyStrip: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderRadius: 9,
-    gap: 2,
-    padding: 11
-  },
-  feedbackPrivacyTitle: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  feedbackPrivacyCopy: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 16
-  },
-  feedbackSupportButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 9,
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "center",
-    minHeight: 46,
-    paddingHorizontal: 16
-  },
-  feedbackSupportButtonPressed: {
-    backgroundColor: theme.colors.accent.s700
-  },
-  feedbackSupportButtonText: {
-    color: theme.colors.text.onAccent,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  feedbackSupportButtonArrow: {
-    color: theme.colors.text.onAccent,
-    fontSize: 18,
-    fontWeight: "900",
-    marginLeft: 8
-  },
-  feedbackSubmissionCopy: {
-    color: theme.colors.text.tertiary,
-    fontSize: 10,
-    fontWeight: "700",
-    textAlign: "center"
+    gap: theme.spacing.row
   },
   feedbackHandoffConfirmation: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 16,
-    gap: 14,
+    backgroundColor: theme.colors.surfaceRaised,
+    borderRadius: theme.shape.sheet,
+    gap: theme.spacing.row,
     maxWidth: 430,
-    padding: 20,
+    padding: 24,
     width: "100%"
   },
-  feedbackExternalBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: theme.colors.accent.s100,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 5
-  },
-  feedbackExternalBadgeText: {
-    color: theme.colors.accent.s700,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 0.8
-  },
-  feedbackHandoffTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 22,
-    fontWeight: "900"
-  },
-  feedbackHandoffCopy: {
-    color: theme.colors.text.secondary,
-    fontSize: 14,
-    fontWeight: "600",
-    lineHeight: 20
-  },
-  feedbackHandoffPrivacyCard: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderRadius: 9,
-    gap: 3,
-    padding: 12
-  },
-  feedbackHandoffPrivacyTitle: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  feedbackHandoffPrivacyCopy: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 16
-  },
-  feedbackHandoffCancelButton: {
-    alignItems: "center",
-    borderColor: theme.colors.border.strong,
-    borderRadius: 9,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: 15
-  },
-  feedbackHandoffCancelButtonText: {
-    color: theme.colors.text.secondary,
-    fontSize: 13,
-    fontWeight: "800"
+  feedbackHandoffActions: {
+    gap: theme.spacing.group,
+    marginTop: 4
   },
   feedbackHandoffContinueButton: {
     alignItems: "center",
+    alignSelf: "stretch",
     backgroundColor: theme.colors.accent.fill,
-    borderRadius: 9,
+    borderRadius: theme.shape.control,
+    flexDirection: "row",
+    gap: 6,
     justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: 16
-  },
-  feedbackHandoffContinueButtonText: {
-    color: theme.colors.text.onAccent,
-    fontSize: 13,
-    fontWeight: "900",
-    textAlign: "center"
+    minHeight: 50,
+    paddingHorizontal: 20,
+    paddingVertical: 12
   },
   settingsRow: {
-    alignItems: "center",
-    borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-    minHeight: 58,
-    paddingHorizontal: 12,
-    paddingVertical: 10
+    justifyContent: "space-between"
+  },
+  settingsRowPressed: {
+    backgroundColor: theme.colors.surfaceStrong
   },
   settingsRowCopy: {
     flex: 1,
@@ -21047,79 +21051,36 @@ const useStyles = makeStyles((theme) => ({
     gap: 2,
     minWidth: 0
   },
-  settingsRowMeta: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexShrink: 0,
-    gap: 4,
-    justifyContent: "flex-end",
-    maxWidth: "36%"
-  },
-  settingsRowValue: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "800",
-    flexShrink: 1,
-    textAlign: "right"
-  },
-  settingsLinkText: {
-    color: theme.colors.accent.s600,
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 16
-  },
-  settingsInlineControls: {
-    borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  // Label and value share the first line; an explanation spans the full row
+  // below them so long copy never runs in a narrow column.
+  // When label and value do not fit side by side (large text, long values),
+  // the value moves to its own line at the trailing edge instead of being
+  // squeezed until it breaks mid-word.
+  settingsRowTitleLine: {
+    alignItems: "flex-start",
+    columnGap: theme.spacing.row,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  settingsPreferenceButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 8,
-    borderWidth: 1,
-    minHeight: 34,
-    justifyContent: "center",
-    paddingHorizontal: 12
-  },
-  settingsPreferenceButtonActive: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s600
-  },
-  settingsPreferenceButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  settingsPreferenceButtonTextActive: {
-    color: theme.colors.accent.s700
-  },
-  settingsActionRow: {
-    alignItems: "center",
-    borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 10,
     justifyContent: "space-between",
-    minHeight: 58,
-    paddingHorizontal: 12,
-    paddingVertical: 10
+    rowGap: 2
+  },
+  settingsRowLabel: {
+    flexShrink: 1
+  },
+  settingsRowValue: {
+    flexShrink: 0,
+    marginLeft: "auto",
+    maxWidth: "100%",
+    textAlign: "right"
   },
   settingsActionButtonRow: {
     alignItems: "center",
-    borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: theme.spacing.row,
     justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 10
+    paddingHorizontal: 16,
+    paddingVertical: 12
   },
   settingsActionButtonDetail: {
     flex: 1,
@@ -21128,22 +21089,24 @@ const useStyles = makeStyles((theme) => ({
   settingsActionButton: {
     alignItems: "center",
     backgroundColor: theme.colors.accent.fill,
-    borderRadius: 8,
+    borderRadius: theme.shape.control,
     flexDirection: "row",
     gap: 8,
     justifyContent: "center",
     marginLeft: "auto",
-    minHeight: 40,
+    minHeight: theme.metrics.minTarget,
     minWidth: 128,
-    paddingHorizontal: 16
+    paddingHorizontal: 16,
+    paddingVertical: 8
+  },
+  settingsActionButtonPressed: {
+    opacity: 0.85
   },
   settingsActionButtonDisabled: {
     backgroundColor: theme.colors.fillDisabled
   },
   settingsActionButtonText: {
-    color: theme.colors.text.onAccent,
-    fontSize: 13,
-    fontWeight: "800"
+    textAlign: "center"
   },
   settingsDestructiveText: {
     color: theme.colors.danger.s600
@@ -21171,43 +21134,50 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "flex-end"
   },
   advancedRatingsPanel: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderBottomColor: theme.colors.border.default,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10
+    gap: theme.spacing.row,
+    paddingHorizontal: 16,
+    paddingVertical: 14
   },
   advancedRatingRows: {
-    gap: 6
+    borderTopColor: theme.colors.border.default,
+    borderTopWidth: StyleSheet.hairlineWidth
   },
   advancedRatingRow: {
     alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderBottomColor: theme.colors.border.default,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.row,
     justifyContent: "space-between",
-    minHeight: 48,
-    paddingHorizontal: 10,
+    minHeight: theme.metrics.rowMinHeight,
     paddingVertical: 8
   },
   advancedRatingCopy: {
     flex: 1,
     gap: 2,
-    minWidth: 0
+    minWidth: 140
   },
   advancedRatingControls: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8
+    gap: theme.spacing.group,
+    marginLeft: "auto"
+  },
+  advancedRatingValue: {
+    fontVariant: ["tabular-nums"],
+    textAlign: "center"
+  },
+  settingsStepperButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.accent.s100,
+    borderRadius: theme.shape.capsule,
+    justifyContent: "center",
+    minHeight: theme.metrics.minTarget,
+    minWidth: theme.metrics.minTarget
   },
   settingsStatusText: {
-    color: theme.colors.text.strong,
-    fontSize: 13,
-    fontWeight: "700",
-    paddingHorizontal: 2
+    paddingHorizontal: 16
   },
   packsPanel: {
     gap: 12

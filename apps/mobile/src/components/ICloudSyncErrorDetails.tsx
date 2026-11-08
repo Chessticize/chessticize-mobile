@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +10,16 @@ import {
 } from "react-native";
 import { SafeAreaModalBackdrop } from "./SafeAreaModalBackdrop.tsx";
 import { makeStyles, useTheme } from "../theme/index.ts";
+import {
+  AppText,
+  Badge,
+  Button,
+  Icon,
+  IconTile,
+  useListRowStyle,
+  type IconName,
+  type IconTone
+} from "./ui/index.tsx";
 
 export type ICloudSyncSupportBundleResult = {
   bundleUrl?: string;
@@ -66,6 +75,7 @@ export function ICloudSyncErrorDetails({
 }): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
+  const rowStyle = useListRowStyle();
   const [visible, setVisible] = useState(false);
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const [panel, setPanel] = useState<Panel>(
@@ -197,6 +207,13 @@ export function ICloudSyncErrorDetails({
         ? "BUNDLE READY"
         : "SUPPORT BUNDLE";
 
+  const statusBadgeTone = panel === "details" || (panel === "ready" && bundleResult?.kind === "partial")
+    ? "warning"
+    : panel === "ready"
+      ? "positive"
+      : "accent";
+  const shareBusy = shareState === "sharing" || shareState === "shared";
+
   return (
     <>
       <Pressable
@@ -215,34 +232,28 @@ export function ICloudSyncErrorDetails({
           setShareState("idle");
           setVisible(true);
         }}
-        style={entryVariant === "support" ? styles.supportEntry : styles.entry}
+        style={({ pressed }) => [rowStyle, pressed ? styles.entryPressed : null]}
         testID={entryVariant === "support"
           ? "settings-sync-support-bundle-entry"
           : "settings-sync-error-details"}
       >
-        <View style={entryVariant === "support" ? styles.supportEntryIndicator : styles.entryIndicator}>
-          <Text style={entryVariant === "support"
-            ? styles.supportEntryIndicatorText
-            : styles.entryIndicatorText}
-          >
-            {entryVariant === "support" ? "↥" : "!"}
-          </Text>
-        </View>
-        <View style={styles.entryCopy}>
-          <Text style={entryVariant === "support" ? styles.supportEntryTitle : styles.entryTitle}>
+        <IconTile
+          name={entryVariant === "support" ? "share" : "warning"}
+          tone={entryVariant === "support" ? "accent" : "warning"}
+        />
+        <View style={styles.copy}>
+          <AppText variant="body">
             {entryVariant === "support" ? "Export Support Diagnostics" : "View Error Details"}
-          </Text>
-          <Text style={entryVariant === "support" ? styles.supportEntryDetail : styles.entryDetail}>
+          </AppText>
+          <AppText tone="secondary" variant="footnote">
             {entryVariant === "support"
               ? isAndroidSupportBundle
                 ? "Share a local SQLite snapshot and diagnostic details."
                 : "Share a local database snapshot, iCloud progress records, and diagnostic details."
               : `Last failed ${presentation.occurredAtLabel}. Copy technical information for support.`}
-          </Text>
+          </AppText>
         </View>
-        <Text style={entryVariant === "support" ? styles.supportEntryChevron : styles.entryChevron}>
-          ›
-        </Text>
+        <Icon color={theme.colors.text.tertiary} name="chevronRight" size={15} weight="semibold" />
       </Pressable>
 
       <Modal
@@ -272,12 +283,10 @@ export function ICloudSyncErrorDetails({
                 : "settings-sync-error-details-scroll"}
             >
               <View style={styles.header}>
-                <View style={styles.headerCopy}>
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{modalBadge}</Text>
-                  </View>
-                  <Text style={styles.title}>{modalTitle}</Text>
-                  <Text style={styles.subtitle}>
+                <View style={styles.copy}>
+                  <Badge label={modalBadge} tone={statusBadgeTone} />
+                  <AppText variant="title">{modalTitle}</AppText>
+                  <AppText tone="secondary" variant="subheadline">
                     {panel === "details"
                       ? "These details can help support understand why the last sync failed."
                       : panel === "export-confirmation"
@@ -289,45 +298,41 @@ export function ICloudSyncErrorDetails({
                           : isAndroidSupportBundle
                             ? "Review what was included before opening Android share options."
                             : "Review what was included before opening the iOS Share Sheet."}
-                  </Text>
+                  </AppText>
                 </View>
                 <Pressable
                   accessibilityLabel={entryVariant === "support"
                     ? "Close support diagnostics"
                     : "Close iCloud sync error details"}
                   accessibilityRole="button"
-                  hitSlop={8}
                   onPress={close}
-                  style={styles.closeIconButton}
+                  style={({ pressed }) => [styles.closeIconButton, pressed ? styles.entryPressed : null]}
                   testID="settings-sync-error-details-close-icon"
                 >
-                  <Text style={styles.closeIcon}>×</Text>
+                  <Icon color={theme.colors.text.secondary} name="close" size={17} weight="semibold" />
                 </Pressable>
               </View>
 
               {panel === "details" ? (
                 <>
-                  <View style={styles.messageCard}>
-                    <Text style={styles.cardLabel}>WHAT HAPPENED</Text>
+                  <View style={styles.block}>
+                    <AppText style={styles.label} tone="secondary" variant="caption">WHAT HAPPENED</AppText>
                     <Text selectable style={styles.message} testID="settings-sync-error-message">
                       {presentation.message}
                     </Text>
                   </View>
 
-                  <View style={styles.privacyCard}>
-                    <Text style={styles.privacyTitle}>Your progress stays private</Text>
-                    <Text style={styles.privacyCopy}>
-                      Nothing is uploaded. These error details do not include your iCloud account,
-                      ratings, history, puzzles, or saved progress. You choose where to paste them
-                      after copying.
-                    </Text>
-                  </View>
+                  <Note title="Your progress stays private">
+                    Nothing is uploaded. These error details do not include your iCloud account,
+                    ratings, history, puzzles, or saved progress. You choose where to paste them
+                    after copying.
+                  </Note>
 
-                  <View style={styles.technicalSection}>
-                    <Text style={styles.technicalTitle}>Technical details</Text>
-                    <Text style={styles.technicalHelp}>
+                  <View style={styles.block}>
+                    <AppText variant="headline">Technical details</AppText>
+                    <AppText tone="secondary" variant="footnote">
                       You can select this text manually if copying is unavailable.
-                    </Text>
+                    </AppText>
                     <View style={styles.technicalCard}>
                       <Text
                         selectable
@@ -340,77 +345,68 @@ export function ICloudSyncErrorDetails({
                   </View>
 
                   {copyState === "copied" ? (
-                    <Text
+                    <AppText
                       accessibilityLiveRegion="polite"
-                      style={styles.copySuccess}
                       testID="settings-sync-error-copy-success"
+                      tone="positive"
+                      variant="footnote"
                     >
                       Copied. Paste these details into your support message.
-                    </Text>
+                    </AppText>
                   ) : null}
                   {copyState === "failed" ? (
-                    <Text
+                    <AppText
                       accessibilityLiveRegion="polite"
-                      style={styles.copyFailure}
                       testID="settings-sync-error-copy-failure"
+                      tone="negative"
+                      variant="footnote"
                     >
                       Couldn&apos;t copy automatically. Select the technical details above to copy
                       them manually.
-                    </Text>
+                    </AppText>
                   ) : null}
 
                   <View style={styles.actions}>
-                    <Pressable
+                    <Button
                       accessibilityLabel="Close iCloud sync error details"
-                      accessibilityRole="button"
-                      onPress={close}
-                      style={styles.secondaryButton}
+                      label="Close"
+                      stretch
                       testID="settings-sync-error-details-close"
-                    >
-                      <Text style={styles.secondaryButtonText}>Close</Text>
-                    </Pressable>
-                    <Pressable
+                      variant="secondary"
+                      onPress={close}
+                    />
+                    <Button
                       accessibilityLabel="Copy iCloud sync error details"
-                      accessibilityRole="button"
-                      accessibilityState={{ disabled: copyState === "copying" }}
                       disabled={copyState === "copying"}
+                      label={copyState === "copying" ? "Copying…" : "Copy Error Details"}
+                      stretch
+                      testID="settings-sync-error-copy"
                       onPress={() => {
                         void copyDetails();
                       }}
-                      style={[
-                        styles.primaryButton,
-                        copyState === "copying" ? styles.primaryButtonDisabled : null
-                      ]}
-                      testID="settings-sync-error-copy"
-                    >
-                      <Text style={styles.primaryButtonText}>
-                        {copyState === "copying" ? "Copying…" : "Copy Error Details"}
-                      </Text>
-                    </Pressable>
+                    />
                   </View>
 
                   {presentation.supportBundle ? (
-                    <View style={styles.exportCard}>
-                      <View style={styles.exportCardCopy}>
-                        <Text style={styles.exportTitle}>Need help reproducing the problem?</Text>
-                        <Text style={styles.exportCopy}>
-                          {isAndroidSupportBundle
-                            ? "Export the local SQLite database and this diagnostic in one support bundle."
-                            : "Export the local database, iCloud progress records, and this diagnostic in one support bundle."}
-                        </Text>
-                      </View>
-                      <Pressable
+                    <View style={[styles.block, styles.divided]}>
+                      <AppText variant="headline">Need help reproducing the problem?</AppText>
+                      <AppText tone="secondary" variant="footnote">
+                        {isAndroidSupportBundle
+                          ? "Export the local SQLite database and this diagnostic in one support bundle."
+                          : "Export the local database, iCloud progress records, and this diagnostic in one support bundle."}
+                      </AppText>
+                      <Button
                         accessibilityLabel="Export support diagnostics bundle"
-                        accessibilityRole="button"
+                        icon="share"
+                        label="Export Support Bundle"
+                        size="compact"
+                        testID="settings-sync-support-bundle-open"
+                        variant="secondary"
                         onPress={() => {
                           setPrepareError(null);
                           setPanel("export-confirmation");
                         }}
-                        style={styles.exportButton}
-                        testID="settings-sync-support-bundle-open"
-                      >
-                        <Text style={styles.exportButtonText}>Export Support Bundle</Text>
-                      </Pressable>
+                      />
                     </View>
                   ) : null}
                 </>
@@ -418,20 +414,20 @@ export function ICloudSyncErrorDetails({
 
               {panel === "export-confirmation" ? (
                 <>
-                  <View style={styles.sensitiveCard}>
-                    <Text style={styles.sensitiveTitle}>This bundle contains progress data</Text>
-                    <Text style={styles.sensitiveCopy}>
-                      It may include ratings, attempts and history, review queue entries, settings,
-                      run configuration, and timestamps. Review where you send it.
-                    </Text>
-                  </View>
+                  <Callout icon="warning" title="This bundle contains progress data" tone="warning">
+                    It may include ratings, attempts and history, review queue entries, settings,
+                    run configuration, and timestamps. Review where you send it.
+                  </Callout>
 
                   <View style={styles.actions}>
-                    <Pressable
+                    <Button
                       accessibilityLabel={entryVariant === "support"
                         ? "Cancel support diagnostics export"
                         : "Back to iCloud sync error details"}
-                      accessibilityRole="button"
+                      label={entryVariant === "support" ? "Cancel" : "Back"}
+                      stretch
+                      testID="settings-sync-support-bundle-back"
+                      variant="secondary"
                       onPress={() => {
                         if (entryVariant === "support") {
                           close();
@@ -439,28 +435,20 @@ export function ICloudSyncErrorDetails({
                         }
                         setPanel("details");
                       }}
-                      style={styles.secondaryButton}
-                      testID="settings-sync-support-bundle-back"
-                    >
-                      <Text style={styles.secondaryButtonText}>
-                        {entryVariant === "support" ? "Cancel" : "Back"}
-                      </Text>
-                    </Pressable>
-                    <Pressable
+                    />
+                    <Button
                       accessibilityLabel="Prepare support diagnostics bundle"
-                      accessibilityRole="button"
+                      label="Prepare Support Bundle"
+                      stretch
+                      testID="settings-sync-support-bundle-prepare"
                       onPress={() => {
                         void prepareSupportBundle();
                       }}
-                      style={styles.primaryButton}
-                      testID="settings-sync-support-bundle-prepare"
-                    >
-                      <Text style={styles.primaryButtonText}>Prepare Support Bundle</Text>
-                    </Pressable>
+                    />
                   </View>
 
-                  <View style={styles.fileSection}>
-                    <Text style={styles.technicalTitle}>Files prepared</Text>
+                  <View style={styles.block}>
+                    <AppText variant="headline">Files prepared</AppText>
                     <BundleFile
                       description="A transactionally consistent snapshot of progress stored on this device."
                       name="local-progress.sqlite"
@@ -491,31 +479,28 @@ export function ICloudSyncErrorDetails({
                     />
                   </View>
 
-                  <View style={styles.excludedCard}>
-                    <Text style={styles.excludedTitle}>Not included</Text>
-                    <Text style={styles.excludedCopy}>
-                      {isAndroidSupportBundle
-                        ? "Your Google account, credentials, hardware identifiers, and the bundled puzzle pack are not included."
-                        : "Your Apple ID, iCloud credentials, hardware identifiers, and the bundled puzzle pack are not included. The progress data does contain the app-generated sync ID needed to reproduce merge behavior."}
-                    </Text>
-                  </View>
+                  <Note title="Not included">
+                    {isAndroidSupportBundle
+                      ? "Your Google account, credentials, hardware identifiers, and the bundled puzzle pack are not included."
+                      : "Your Apple ID, iCloud credentials, hardware identifiers, and the bundled puzzle pack are not included. The progress data does contain the app-generated sync ID needed to reproduce merge behavior."}
+                  </Note>
 
-                  <Text style={styles.noUploadCopy}>
+                  <AppText tone="secondary" variant="footnote">
                     {isAndroidSupportBundle
                       ? "Nothing is uploaded automatically. After preparation, Android lets you choose where to send the bundle."
                       : "Nothing is uploaded automatically. After preparation, the iOS Share Sheet lets you choose where to send the bundle."}
-                  </Text>
+                  </AppText>
 
                   {prepareError ? (
-                    <Text
+                    <AppText
                       accessibilityLiveRegion="polite"
-                      style={styles.copyFailure}
                       testID="settings-sync-support-bundle-prepare-error"
+                      tone="negative"
+                      variant="footnote"
                     >
                       {prepareError} Try again, or copy the error details instead.
-                    </Text>
+                    </AppText>
                   ) : null}
-
                 </>
               ) : null}
 
@@ -526,62 +511,61 @@ export function ICloudSyncErrorDetails({
                   testID="settings-sync-support-bundle-preparing"
                 >
                   <ActivityIndicator color={theme.colors.accent.s600} size="large" />
-                  <Text style={styles.preparingTitle}>Preparing files…</Text>
-                  <Text style={styles.preparingCopy}>
+                  <AppText variant="headline">Preparing files…</AppText>
+                  <AppText style={styles.centered} tone="secondary" variant="footnote">
                     Keep Chessticize open. Your data stays on this device until you choose a share
                     destination.
-                  </Text>
+                  </AppText>
                 </View>
               ) : null}
 
               {panel === "ready" && bundleResult ? (
                 <>
                   {bundleResult.kind === "partial" ? (
-                    <View
-                      style={styles.partialCard}
+                    <Callout
+                      icon="warning"
                       testID="settings-sync-support-bundle-partial"
+                      title={isAndroidSupportBundle
+                        ? "Local SQLite snapshot couldn't be included"
+                        : "iCloud progress capture couldn't be completed"}
+                      tone="warning"
                     >
-                      <Text style={styles.partialTitle}>
-                        {isAndroidSupportBundle
-                          ? "Local SQLite snapshot couldn't be included"
-                          : "iCloud progress capture couldn't be completed"}
-                      </Text>
-                      <Text style={styles.partialCopy}>
+                      <AppText tone="secondary" variant="footnote">
                         {bundleResult.unavailableReason
                           ?? (isAndroidSupportBundle
                             ? "The local progress snapshot was unavailable."
                             : "CloudKit did not return a complete progress capture.")}
-                      </Text>
-                      <Text style={styles.partialHelp}>
+                      </AppText>
+                      <AppText tone="secondary" variant="footnote">
                         {isAndroidSupportBundle
                           ? "The diagnostic and manifest can still help, but this bundle does not include the local progress database needed for reproduction."
                           : "The local database and diagnostic can still help, but this bundle is not a complete reproduction."}
-                      </Text>
-                    </View>
+                      </AppText>
+                    </Callout>
                   ) : (
-                    <View
-                      style={styles.completeCard}
+                    <Callout
+                      icon="check"
                       testID="settings-sync-support-bundle-complete"
+                      title={isAndroidSupportBundle
+                        ? "Android diagnostics bundle ready"
+                        : "Complete reproduction bundle"}
+                      tone="positive"
                     >
-                      <Text style={styles.completeTitle}>
-                        {isAndroidSupportBundle
-                          ? "Android diagnostics bundle ready"
-                          : "Complete reproduction bundle"}
-                      </Text>
-                      <Text style={styles.completeCopy}>
-                        {isAndroidSupportBundle
-                          ? "The consistent local SQLite snapshot and diagnostic details are included."
-                          : "The local database and a complete read-only V2 CloudKit capture are included."}
-                      </Text>
-                    </View>
+                      {isAndroidSupportBundle
+                        ? "The consistent local SQLite snapshot and diagnostic details are included."
+                        : "The local database and a complete read-only V2 CloudKit capture are included."}
+                    </Callout>
                   )}
 
                   <View style={styles.actions}>
-                    <Pressable
+                    <Button
                       accessibilityLabel={entryVariant === "support"
                         ? "Close support diagnostics"
                         : "Back to iCloud sync error details"}
-                      accessibilityRole="button"
+                      label={entryVariant === "support" ? "Close" : "Back to Details"}
+                      stretch
+                      testID="settings-sync-support-bundle-details"
+                      variant="secondary"
                       onPress={() => {
                         if (entryVariant === "support") {
                           close();
@@ -589,85 +573,66 @@ export function ICloudSyncErrorDetails({
                         }
                         setPanel("details");
                       }}
-                      style={styles.secondaryButton}
-                      testID="settings-sync-support-bundle-details"
-                    >
-                      <Text style={styles.secondaryButtonText}>
-                        {entryVariant === "support" ? "Close" : "Back to Details"}
-                      </Text>
-                    </Pressable>
-                    <Pressable
+                    />
+                    <Button
                       accessibilityLabel="Share support diagnostics bundle"
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        disabled: shareState === "sharing" || shareState === "shared"
-                      }}
-                      disabled={shareState === "sharing" || shareState === "shared"}
+                      disabled={shareBusy}
+                      icon="share"
+                      label={shareState === "sharing"
+                        ? "Opening…"
+                        : shareState === "shared"
+                          ? isAndroidSupportBundle
+                            ? "Share Options Opened"
+                            : "Bundle Removed"
+                          : "Share Support Bundle"}
+                      stretch
+                      testID="settings-sync-support-bundle-share"
                       onPress={() => {
                         void shareSupportBundle();
                       }}
-                      style={[
-                        styles.primaryButton,
-                        shareState === "sharing" || shareState === "shared"
-                          ? styles.primaryButtonDisabled
-                          : null
-                      ]}
-                      testID="settings-sync-support-bundle-share"
-                    >
-                      <Text style={styles.primaryButtonText}>
-                        {shareState === "sharing"
-                          ? "Opening…"
-                          : shareState === "shared"
-                            ? isAndroidSupportBundle
-                              ? "Share Options Opened"
-                              : "Bundle Removed"
-                            : "Share Support Bundle"}
-                      </Text>
-                    </Pressable>
+                    />
                   </View>
 
-                  <View style={styles.fileSection}>
-                    <Text style={styles.technicalTitle}>Included files</Text>
+                  <View style={styles.block}>
+                    <AppText variant="headline">Included files</AppText>
                     {bundleResult.files.map((file) => (
                       <View key={file} style={styles.readyFileRow}>
-                        <Text style={styles.readyFileCheck}>✓</Text>
-                        <Text style={styles.readyFileName}>{file}</Text>
+                        <Icon color={theme.colors.positive.s600} name="check" size={15} weight="semibold" />
+                        <Text style={styles.fileName}>{file}</Text>
                       </View>
                     ))}
                   </View>
 
-                  <View style={styles.privacyCard}>
-                    <Text style={styles.privacyTitle}>You control the handoff</Text>
-                    <Text style={styles.privacyCopy}>
-                      {isAndroidSupportBundle
-                        ? "The next action asks Android to open its share options. Chessticize does not choose a recipient or upload the bundle."
-                        : "The next action asks iOS to open its Share Sheet. Chessticize does not choose a recipient or upload the bundle."}
-                    </Text>
-                  </View>
+                  <Note title="You control the handoff">
+                    {isAndroidSupportBundle
+                      ? "The next action asks Android to open its share options. Chessticize does not choose a recipient or upload the bundle."
+                      : "The next action asks iOS to open its Share Sheet. Chessticize does not choose a recipient or upload the bundle."}
+                  </Note>
 
                   {shareState === "shared" ? (
-                    <Text
+                    <AppText
                       accessibilityLiveRegion="polite"
-                      style={styles.copySuccess}
                       testID="settings-sync-support-bundle-shared"
+                      tone="positive"
+                      variant="footnote"
                     >
                       {isAndroidSupportBundle
                         ? "Android share options opened. The temporary bundle expires automatically."
                         : "Share Sheet closed. The temporary bundle was removed."}
-                    </Text>
+                    </AppText>
                   ) : null}
                   {shareState === "failed" ? (
-                    <Text
+                    <AppText
                       accessibilityLiveRegion="polite"
-                      style={styles.copyFailure}
                       testID="settings-sync-support-bundle-share-error"
+                      tone="negative"
+                      variant="footnote"
                     >
                       {isAndroidSupportBundle
                         ? "Android share options couldn't be opened. Your prepared bundle remains available while this window is open."
                         : "The Share Sheet couldn't be opened. Your prepared bundle remains available while this window is open."}
-                    </Text>
+                    </AppText>
                   ) : null}
-
                 </>
               ) : null}
             </ScrollView>
@@ -675,6 +640,45 @@ export function ICloudSyncErrorDetails({
         </SafeAreaModalBackdrop>
       </Modal>
     </>
+  );
+}
+
+// A short titled footnote, used instead of a nested card for supporting copy.
+function Note({ children, title }: { children: React.ReactNode; title: string }): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <View style={styles.note}>
+      <AppText style={styles.noteTitle} variant="footnote">{title}</AppText>
+      <AppText tone="secondary" variant="footnote">{children}</AppText>
+    </View>
+  );
+}
+
+// A status line with a tinted icon tile: a caution, a partial result or a completed bundle.
+function Callout({
+  children,
+  icon,
+  testID,
+  title,
+  tone
+}: {
+  children: React.ReactNode;
+  icon: IconName;
+  testID?: string;
+  title: string;
+  tone: IconTone;
+}): React.JSX.Element {
+  const styles = useStyles();
+  return (
+    <View style={styles.callout} testID={testID}>
+      <IconTile name={icon} tone={tone} />
+      <View style={styles.copy}>
+        <AppText variant="headline">{title}</AppText>
+        {typeof children === "string"
+          ? <AppText tone="secondary" variant="footnote">{children}</AppText>
+          : children}
+      </View>
+    </View>
   );
 }
 
@@ -686,496 +690,129 @@ function BundleFile({
   name: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const theme = useTheme();
   return (
     <View style={styles.fileRow}>
-      <View style={styles.fileIcon}>
-        <Text style={styles.fileIconText}>✓</Text>
-      </View>
-      <View style={styles.fileCopy}>
+      <Icon color={theme.colors.positive.s600} name="check" size={15} weight="semibold" />
+      <View style={styles.copy}>
         <Text style={styles.fileName}>{name}</Text>
-        <Text style={styles.fileDescription}>{description}</Text>
+        <AppText tone="secondary" variant="footnote">{description}</AppText>
       </View>
     </View>
   );
 }
 
 const useStyles = makeStyles((theme) => ({
-  entry: {
-    alignItems: "center",
-    backgroundColor: theme.colors.caution.s50,
-    borderBottomColor: theme.colors.caution.s200,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 10,
-    minHeight: 68,
-    paddingHorizontal: 12,
-    paddingVertical: 11
+  entryPressed: {
+    backgroundColor: theme.colors.surfaceStrong
   },
-  entryIndicator: {
-    alignItems: "center",
-    backgroundColor: theme.colors.caution.s100,
-    borderRadius: 999,
-    height: 30,
-    justifyContent: "center",
-    width: 30
-  },
-  entryIndicatorText: {
-    color: theme.colors.caution.s700,
-    fontSize: 17,
-    fontWeight: "900"
-  },
-  entryCopy: {
+  copy: {
     flex: 1,
+    flexShrink: 1,
     gap: 2,
     minWidth: 0
-  },
-  entryTitle: {
-    color: theme.colors.caution.s800,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  entryDetail: {
-    color: theme.colors.caution.s900,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 16
-  },
-  entryChevron: {
-    color: theme.colors.caution.s700,
-    fontSize: 26,
-    fontWeight: "500"
-  },
-  supportEntry: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderBottomColor: theme.colors.border.strong,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 10,
-    minHeight: 68,
-    paddingHorizontal: 12,
-    paddingVertical: 11
-  },
-  supportEntryIndicator: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.s100,
-    borderRadius: 999,
-    height: 30,
-    justifyContent: "center",
-    width: 30
-  },
-  supportEntryIndicatorText: {
-    color: theme.colors.accent.s700,
-    fontSize: 17,
-    fontWeight: "900"
-  },
-  supportEntryTitle: {
-    color: theme.colors.accent.s900,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  supportEntryDetail: {
-    color: theme.colors.text.strong,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 16
-  },
-  supportEntryChevron: {
-    color: theme.colors.accent.s600,
-    fontSize: 26,
-    fontWeight: "500"
   },
   backdrop: {
     alignItems: "center",
     backgroundColor: theme.colors.scrim,
     flex: 1,
     justifyContent: "center",
-    padding: 18
+    padding: theme.spacing.screen
   },
   modal: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 18,
-    maxHeight: "92%",
-    maxWidth: 520,
+    backgroundColor: theme.colors.surfaceRaised,
+    borderRadius: theme.shape.sheet,
+    maxHeight: "100%",
+    maxWidth: 560,
     overflow: "hidden",
     width: "100%"
   },
-  supportModal: {
-    height: "92%"
+  supportModal: {},
+  modalScroll: {
+    flexGrow: 0,
+    flexShrink: 1
   },
   modalContent: {
-    gap: 16,
-    padding: 20
-  },
-  modalScroll: {
-    flex: 1
+    gap: 20,
+    padding: 24
   },
   header: {
     alignItems: "flex-start",
     flexDirection: "row",
-    gap: 12
-  },
-  headerCopy: {
-    flex: 1,
-    gap: 7,
-    minWidth: 0
-  },
-  badge: {
-    alignSelf: "flex-start",
-    backgroundColor: theme.colors.caution.s100,
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 5
-  },
-  badgeText: {
-    color: theme.colors.caution.s800,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 0.8
-  },
-  title: {
-    color: theme.colors.text.primary,
-    fontSize: 23,
-    fontWeight: "900"
-  },
-  subtitle: {
-    color: theme.colors.text.secondary,
-    fontSize: 13,
-    fontWeight: "600",
-    lineHeight: 19
+    gap: theme.spacing.row
   },
   closeIconButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.surfaceSunken,
-    borderRadius: 999,
-    height: 34,
+    backgroundColor: theme.colors.surfaceStrong,
+    borderRadius: theme.shape.capsule,
+    height: theme.metrics.minTarget,
     justifyContent: "center",
-    width: 34
+    width: theme.metrics.minTarget
   },
-  closeIcon: {
-    color: theme.colors.text.secondary,
-    fontSize: 24,
-    fontWeight: "500",
-    lineHeight: 27
+  block: {
+    gap: theme.spacing.group
   },
-  messageCard: {
-    backgroundColor: theme.colors.caution.s50,
-    borderColor: theme.colors.caution.s200,
-    borderRadius: 11,
-    borderWidth: 1,
-    gap: 6,
-    padding: 13
+  divided: {
+    borderTopColor: theme.colors.border.default,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 20
   },
-  cardLabel: {
-    color: theme.colors.caution.s800,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 0.8
+  label: {
+    fontWeight: theme.typography.headline.fontWeight,
+    letterSpacing: 0.4
   },
   message: {
-    color: theme.colors.caution.s900,
-    fontSize: 14,
-    fontWeight: "700",
-    lineHeight: 20
+    ...theme.typography.body,
+    color: theme.colors.text.primary
   },
-  privacyCard: {
-    backgroundColor: theme.colors.accent.s50,
-    borderRadius: 11,
-    gap: 4,
-    padding: 13
+  note: {
+    gap: 2
   },
-  privacyTitle: {
-    color: theme.colors.accent.s900,
-    fontSize: 13,
-    fontWeight: "900"
-  },
-  privacyCopy: {
-    color: theme.colors.accent.s800,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 17
-  },
-  exportCard: {
-    alignItems: "stretch",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 11,
-    borderWidth: 1,
-    gap: 12,
-    padding: 13
-  },
-  exportCardCopy: {
-    gap: 4
-  },
-  exportTitle: {
+  noteTitle: {
     color: theme.colors.text.primary,
-    fontSize: 13,
-    fontWeight: "900"
+    fontWeight: theme.typography.headline.fontWeight
   },
-  exportCopy: {
-    color: theme.colors.text.secondary,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 17
+  callout: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: theme.spacing.row
   },
-  exportButton: {
-    alignItems: "center",
-    borderColor: theme.colors.accent.s600,
-    borderRadius: 9,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 42,
-    paddingHorizontal: 14
+  technicalCard: {
+    backgroundColor: theme.colors.surfaceStrong,
+    borderRadius: theme.shape.control,
+    padding: 12
   },
-  exportButtonText: {
-    color: theme.colors.accent.s700,
-    fontSize: 12,
-    fontWeight: "900"
+  technicalText: {
+    ...theme.typography.footnote,
+    color: theme.colors.text.primary,
+    fontFamily: theme.fontFamily.mono
   },
-  sensitiveCard: {
-    backgroundColor: theme.colors.danger.s50,
-    borderColor: theme.colors.danger.s200,
-    borderRadius: 11,
-    borderWidth: 1,
-    gap: 5,
-    padding: 13
-  },
-  sensitiveTitle: {
-    color: theme.colors.danger.s800,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  sensitiveCopy: {
-    color: theme.colors.danger.s800,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 17
-  },
-  fileSection: {
-    gap: 10
+  actions: {
+    gap: theme.spacing.group
   },
   fileRow: {
     alignItems: "flex-start",
     flexDirection: "row",
-    gap: 10
-  },
-  fileIcon: {
-    alignItems: "center",
-    backgroundColor: theme.colors.positive.s100,
-    borderRadius: 999,
-    height: 23,
-    justifyContent: "center",
-    marginTop: 1,
-    width: 23
-  },
-  fileIconText: {
-    color: theme.colors.positive.s700,
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  fileCopy: {
-    flex: 1,
-    gap: 2
+    gap: theme.spacing.inline,
+    paddingTop: 2
   },
   fileName: {
+    ...theme.typography.footnote,
     color: theme.colors.text.primary,
-    fontFamily: Platform.select({
-      android: "monospace",
-      default: "monospace",
-      ios: "Menlo"
-    }),
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  fileDescription: {
-    color: theme.colors.text.tertiary,
-    fontSize: 10,
-    fontWeight: "600",
-    lineHeight: 15
-  },
-  excludedCard: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderRadius: 11,
-    gap: 4,
-    padding: 13
-  },
-  excludedTitle: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  excludedCopy: {
-    color: theme.colors.text.secondary,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 17
-  },
-  noUploadCopy: {
-    color: theme.colors.text.strong,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 17
-  },
-  preparing: {
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 30
-  },
-  preparingTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 16,
-    fontWeight: "900"
-  },
-  preparingCopy: {
-    color: theme.colors.text.secondary,
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 18,
-    maxWidth: 340,
-    textAlign: "center"
-  },
-  partialCard: {
-    backgroundColor: theme.colors.caution.s50,
-    borderColor: theme.colors.caution.s200,
-    borderRadius: 11,
-    borderWidth: 1,
-    gap: 5,
-    padding: 13
-  },
-  partialTitle: {
-    color: theme.colors.caution.s800,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  partialCopy: {
-    color: theme.colors.caution.s700,
-    fontSize: 11,
-    fontWeight: "800",
-    lineHeight: 17
-  },
-  partialHelp: {
-    color: theme.colors.caution.s900,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 17
-  },
-  completeCard: {
-    backgroundColor: theme.colors.success.s50,
-    borderColor: theme.colors.success.s200,
-    borderRadius: 11,
-    borderWidth: 1,
-    gap: 5,
-    padding: 13
-  },
-  completeTitle: {
-    color: theme.colors.success.s800,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  completeCopy: {
-    color: theme.colors.success.s700,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 17
+    fontFamily: theme.fontFamily.mono,
+    fontWeight: theme.typography.headline.fontWeight
   },
   readyFileRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8
+    gap: theme.spacing.inline
   },
-  readyFileCheck: {
-    color: theme.colors.positive.s700,
-    fontSize: 13,
-    fontWeight: "900"
-  },
-  readyFileName: {
-    color: theme.colors.text.strong,
-    fontFamily: Platform.select({
-      android: "monospace",
-      default: "monospace",
-      ios: "Menlo"
-    }),
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  technicalSection: {
-    gap: 7
-  },
-  technicalTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  technicalHelp: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "600",
-    lineHeight: 16
-  },
-  technicalCard: {
-    backgroundColor: theme.colors.surfaceInverse,
-    borderRadius: 11,
-    padding: 13
-  },
-  technicalText: {
-    color: theme.colors.text.inverse,
-    fontFamily: Platform.select({
-      android: "monospace",
-      default: "monospace",
-      ios: "Menlo"
-    }),
-    fontSize: 11,
-    lineHeight: 17
-  },
-  copySuccess: {
-    color: theme.colors.success.s700,
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 17
-  },
-  copyFailure: {
-    color: theme.colors.danger.s700,
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 17
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 9,
-    justifyContent: "flex-end"
-  },
-  secondaryButton: {
+  preparing: {
     alignItems: "center",
-    borderColor: theme.colors.border.strong,
-    borderRadius: 9,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 45,
-    paddingHorizontal: 16
+    gap: theme.spacing.row,
+    paddingVertical: 24
   },
-  secondaryButtonText: {
-    color: theme.colors.text.secondary,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 9,
-    flexGrow: 1,
-    justifyContent: "center",
-    minHeight: 45,
-    minWidth: 190,
-    paddingHorizontal: 18
-  },
-  primaryButtonDisabled: {
-    opacity: 0.6
-  },
-  primaryButtonText: {
-    color: theme.colors.text.onAccent,
-    fontSize: 13,
-    fontWeight: "900"
+  centered: {
+    textAlign: "center"
   }
 }));

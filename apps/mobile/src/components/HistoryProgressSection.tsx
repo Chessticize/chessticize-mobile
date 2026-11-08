@@ -6,7 +6,8 @@ import {
   Text,
   View
 } from "react-native";
-import { makeStyles } from "../theme/index.ts";
+import { makeStyles, useTheme } from "../theme/index.ts";
+import { AppText, Badge, Button, Icon, IconTile, SegmentedControl } from "./ui/index.tsx";
 import type {
   TacticalFocusReason,
   TacticalProfileTaskFamily
@@ -30,21 +31,16 @@ export function HistoryProgressEntryButton({
 }: {
   onPress: () => void;
 }): React.JSX.Element {
-  const styles = useStyles();
   return (
-    <Pressable
+    <Button
       accessibilityLabel="Open tactical progress"
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.entryButton,
-        pressed ? styles.pressed : null
-      ]}
+      icon="profile"
+      label="Progress"
+      size="compact"
       testID="history-progress-button"
-    >
-      <ProgressGlyph />
-      <Text style={styles.entryButtonText}>Progress</Text>
-    </Pressable>
+      variant="secondary"
+      onPress={onPress}
+    />
   );
 }
 
@@ -56,6 +52,7 @@ export function HistoryProgressScreen({
   presentation: HistoryProgressPresentation;
 }): React.JSX.Element {
   const styles = useStyles();
+  const theme = useTheme();
   const [selectedSeriesId, setSelectedSeriesId] = useState(
     presentation.initialSeriesId
   );
@@ -77,6 +74,7 @@ export function HistoryProgressScreen({
         (candidate) => candidate.themeId === series.themeId
       ) === index
     );
+  const balanced = presentation.noWeaknessTone === "balanced";
 
   return (
     <View style={styles.screen} testID="history-progress-screen">
@@ -84,6 +82,7 @@ export function HistoryProgressScreen({
         <Pressable
           accessibilityLabel="Back to History"
           accessibilityRole="button"
+          hitSlop={4}
           onPress={onBack}
           style={({ pressed }) => [
             styles.backButton,
@@ -91,21 +90,18 @@ export function HistoryProgressScreen({
           ]}
           testID="history-progress-back"
         >
-          <Text style={styles.backArrow}>‹</Text>
-          <Text style={styles.backLabel}>History</Text>
+          <Icon color={theme.colors.accent.s600} name="chevronLeft" size={20} weight="semibold" />
+          <AppText tone="accent" variant="body">History</AppText>
         </Pressable>
         <View style={styles.headerCopy}>
-          <Text style={styles.title}>Tactical progress</Text>
-          <Text style={styles.subtitle}>
+          <AppText accessibilityRole="header" variant="largeTitle">Tactical progress</AppText>
+          <AppText tone="secondary" variant="subheadline">
             {presentation.periodLabel} · {presentation.sampleLabel}
-          </Text>
+          </AppText>
           {presentation.assurance === "provisional" ? (
-            <Text
-              style={styles.earlyEstimate}
-              testID="history-progress-early-estimate"
-            >
-              Early estimate
-            </Text>
+            <View style={styles.badgeRow}>
+              <Badge label="Early estimate" testID="history-progress-early-estimate" tone="warning" />
+            </View>
           ) : null}
         </View>
       </View>
@@ -116,18 +112,25 @@ export function HistoryProgressScreen({
           testID="history-progress-controls"
         >
           {selectedSeries && taskFamilies.length > 1 ? (
-            <HistoryTaskFamilySelector
-              activeTaskFamily={selectedSeries.taskFamily}
-              onSelect={(taskFamily) => {
-                const firstSeries = presentation.strengths.find(
-                  (series) => series.taskFamily === taskFamily
-                );
-                if (firstSeries) {
-                  setSelectedSeriesId(firstSeries.id);
-                }
-              }}
-              taskFamilies={taskFamilies}
-            />
+            <View testID="history-progress-task-family-selector">
+              <SegmentedControl
+                accessibilityLabel="Choose progress mode"
+                options={taskFamilies.map((taskFamily) => ({
+                  value: taskFamily,
+                  label: TASK_FAMILY_LABELS[taskFamily],
+                  testID: `history-progress-task-family-${taskFamily}`
+                }))}
+                value={selectedSeries.taskFamily}
+                onChange={(taskFamily) => {
+                  const firstSeries = presentation.strengths.find(
+                    (series) => series.taskFamily === taskFamily
+                  );
+                  if (firstSeries) {
+                    setSelectedSeriesId(firstSeries.id);
+                  }
+                }}
+              />
+            </View>
           ) : null}
 
           <ScrollView
@@ -143,11 +146,13 @@ export function HistoryProgressScreen({
                     accessibilityLabel={`Show ${series.label} progress`}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
+                    hitSlop={4}
                     key={series.id}
                     onPress={() => setSelectedSeriesId(series.id)}
-                    style={[
+                    style={({ pressed }) => [
                       styles.selector,
-                      selected ? styles.selectorSelected : null
+                      selected ? styles.selectorSelected : null,
+                      pressed ? styles.pressed : null
                     ]}
                     testID={`history-progress-strength-${series.id}`}
                   >
@@ -167,14 +172,12 @@ export function HistoryProgressScreen({
         </View>
       ) : null}
 
-      <View style={styles.section} testID="history-strength-over-time">
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleCopy}>
-            <Text style={styles.eyebrow}>Progress over time</Text>
-            <Text style={styles.sectionTitle}>
-              {selectedSeries?.label ?? "No progress data yet"}
-            </Text>
-          </View>
+      <View style={styles.card} testID="history-strength-over-time">
+        <View style={styles.cardHeader}>
+          <AppText style={styles.eyebrow} tone="accent" variant="footnote">Progress over time</AppText>
+          <AppText variant="title">
+            {selectedSeries?.label ?? "No progress data yet"}
+          </AppText>
         </View>
 
         {selectedSeries ? (
@@ -185,30 +188,16 @@ export function HistoryProgressScreen({
               series={selectedThemeSeries}
             />
             <View style={styles.metricContextRow}>
-              <Text style={styles.metricLabel}>{selectedSeries.metricLabel}</Text>
-              <View
-                accessibilityLabel={selectedSeries.changeLabel}
-                style={[
-                  styles.changePill,
-                  selectedSeries.changeTone === "steady"
-                    ? styles.changePillSteady
+              <AppText style={styles.metricLabel} tone="secondary" variant="footnote">{selectedSeries.metricLabel}</AppText>
+              <View accessibilityLabel={selectedSeries.changeLabel}>
+                <Badge
+                  label={selectedSeries.changeLabel}
+                  tone={selectedSeries.changeTone === "steady"
+                    ? "neutral"
                     : selectedSeries.changeTone === "worsened"
-                      ? styles.changePillWorsened
-                      : null
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.changePillText,
-                    selectedSeries.changeTone === "steady"
-                      ? styles.changePillTextSteady
-                      : selectedSeries.changeTone === "worsened"
-                        ? styles.changePillTextWorsened
-                        : null
-                  ]}
-                >
-                  {selectedSeries.changeLabel}
-                </Text>
+                      ? "negative"
+                      : "positive"}
+                />
               </View>
             </View>
             <StrengthTrendChart
@@ -216,19 +205,19 @@ export function HistoryProgressScreen({
               series={selectedSeries}
             />
             <View
-              style={styles.chartNote}
+              style={styles.note}
               testID="history-progress-chart-note"
             >
-              <Text style={styles.chartNoteTitle}>
+              <AppText style={styles.noteTitle} variant="footnote">
                 {progressMetricNoteTitle(selectedSeries.kind)}
-              </Text>
-              <Text style={styles.chartNoteBody}>
+              </AppText>
+              <AppText tone="secondary" variant="footnote">
                 {selectedSeries.baselineLabel}. {selectedSeries.summary}
-              </Text>
+              </AppText>
             </View>
           </>
         ) : (
-          <Text style={styles.summary}>No progress data is available yet.</Text>
+          <AppText tone="secondary" variant="subheadline">No progress data is available yet.</AppText>
         )}
       </View>
 
@@ -237,92 +226,25 @@ export function HistoryProgressScreen({
       ) : (
         <View
           accessibilityLabel={`${presentation.noWeaknessTitle}. ${presentation.noWeaknessLabel}`}
-          style={[
-            styles.noWeaknessCard,
-            presentation.noWeaknessTone === "balanced"
-              ? styles.noWeaknessCardBalanced
-              : null
-          ]}
+          style={[styles.card, styles.noWeaknessCard]}
           testID="history-no-clear-weakness"
         >
           <View
             accessibilityElementsHidden
-            style={[
-              styles.noWeaknessIcon,
-              presentation.noWeaknessTone === "balanced"
-                ? styles.noWeaknessIconBalanced
-                : null
-            ]}
-            testID={presentation.noWeaknessTone === "balanced"
-              ? "history-balanced-check"
-              : "history-collecting-icon"}
+            testID={balanced ? "history-balanced-check" : "history-collecting-icon"}
           >
-            <Text
-              style={[
-                styles.noWeaknessIconText,
-                presentation.noWeaknessTone === "balanced"
-                  ? styles.noWeaknessIconTextBalanced
-                  : null
-              ]}
-            >
-              {presentation.noWeaknessTone === "balanced" ? "✓" : "—"}
-            </Text>
+            <IconTile name={balanced ? "check" : "remove"} tone={balanced ? "positive" : "neutral"} />
           </View>
-          <View style={styles.noWeaknessCopy}>
-            <Text style={styles.noWeaknessTitle}>
+          <View style={styles.copy}>
+            <AppText variant="headline">
               {presentation.noWeaknessTitle}
-            </Text>
-            <Text style={styles.noWeaknessBody}>
+            </AppText>
+            <AppText tone="secondary" variant="subheadline">
               {presentation.noWeaknessLabel}
-            </Text>
+            </AppText>
           </View>
         </View>
       )}
-    </View>
-  );
-}
-
-function HistoryTaskFamilySelector({
-  activeTaskFamily,
-  onSelect,
-  taskFamilies
-}: {
-  activeTaskFamily: TacticalProfileTaskFamily;
-  onSelect: (taskFamily: TacticalProfileTaskFamily) => void;
-  taskFamilies: readonly TacticalProfileTaskFamily[];
-}): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View
-      accessibilityLabel="Choose progress mode"
-      style={styles.taskFamilySelector}
-      testID="history-progress-task-family-selector"
-    >
-      {taskFamilies.map((taskFamily) => {
-        const selected = taskFamily === activeTaskFamily;
-        return (
-          <Pressable
-            accessibilityRole="tab"
-            accessibilityState={{ selected }}
-            key={taskFamily}
-            onPress={() => onSelect(taskFamily)}
-            style={[
-              styles.taskFamilyTab,
-              selected ? styles.taskFamilyTabSelected : null
-            ]}
-            testID={`history-progress-task-family-${taskFamily}`}
-          >
-            <Text
-              style={[
-                styles.taskFamilyTabTitle,
-                selected ? styles.taskFamilyTabTitleSelected : null
-              ]}
-            >
-              {TASK_FAMILY_LABELS[taskFamily]}
-            </Text>
-          </Pressable>
-        );
-      })}
     </View>
   );
 }
@@ -353,28 +275,19 @@ function ProgressMetricSelector({
             accessibilityState={{ selected }}
             key={candidate.id}
             onPress={() => onSelect(candidate.id)}
-            style={[
+            style={({ pressed }) => [
               styles.progressMetricCard,
-              selected ? styles.progressMetricCardSelected : null
+              selected ? styles.progressMetricCardSelected : null,
+              pressed ? styles.pressed : null
             ]}
             testID={`history-progress-metric-${candidate.kind}`}
           >
-            <Text
-              style={[
-                styles.progressMetricCardLabel,
-                selected ? styles.progressMetricCardLabelSelected : null
-              ]}
-            >
+            <AppText tone={selected ? "accent" : "secondary"} variant="footnote">
               {progressMetricLabel(candidate.kind)}
-            </Text>
-            <Text
-              style={[
-                styles.progressMetricCardValue,
-                selected ? styles.progressMetricCardValueSelected : null
-              ]}
-            >
+            </AppText>
+            <AppText tone={selected ? "accent" : "primary"} variant="numeral">
               {latest?.valueLabel ?? "—"}
-            </Text>
+            </AppText>
           </Pressable>
         );
       })}
@@ -452,13 +365,13 @@ function WeaknessCard({
 }): React.JSX.Element {
   const styles = useStyles();
   return (
-    <View style={styles.weaknessCard} testID="history-clear-weakness">
-      <View style={styles.sectionHeader}>
-        <View style={styles.sectionTitleCopy}>
-          <Text style={styles.weaknessEyebrow}>Clear weakness</Text>
-          <Text style={styles.sectionTitle}>{weakness.label}</Text>
+    <View style={styles.card} testID="history-clear-weakness">
+      <View style={styles.weaknessHeader}>
+        <View style={styles.cardHeader}>
+          <AppText style={styles.eyebrow} tone="negative" variant="footnote">Clear weakness</AppText>
+          <AppText variant="title">{weakness.label}</AppText>
         </View>
-        <ModelSignalPill kind={weakness.reason} weakness />
+        <Badge label={modelSignalLabel(weakness.reason)} tone="negative" />
       </View>
       <View style={styles.weaknessEffects}>
         {weakness.effects.map((effect) => (
@@ -467,49 +380,26 @@ function WeaknessCard({
             style={styles.weaknessEffect}
             testID={`history-weakness-effect-${effect.kind}`}
           >
-            <Text style={styles.effectKindLabel}>
+            <AppText tone="secondary" variant="footnote">
               {modelSignalLabel(effect.kind)}
-            </Text>
+            </AppText>
             <View style={styles.weaknessMetricRow}>
-              <Text style={styles.weaknessValue}>{effect.valueLabel}</Text>
-              <Text style={styles.weaknessMetric}>{effect.metricLabel}</Text>
+              <AppText tone="negative" variant="numeral">{effect.valueLabel}</AppText>
+              <AppText tone="secondary" variant="footnote">{effect.metricLabel}</AppText>
             </View>
-            <Text style={styles.comparisonLabel}>{effect.comparisonLabel}</Text>
+            <AppText tone="secondary" variant="footnote">{effect.comparisonLabel}</AppText>
           </View>
         ))}
       </View>
-      <View style={styles.evidenceNote}>
-        <Text style={styles.evidenceTitle}>Why this stands out</Text>
-        <Text style={styles.evidenceBody}>{weakness.explanation}</Text>
-        <Text style={styles.evidenceMeta}>{weakness.evidenceLabel}</Text>
+      <View style={styles.note}>
+        <AppText style={styles.noteTitle} variant="footnote">Why this stands out</AppText>
+        <AppText tone="secondary" variant="footnote">{weakness.explanation}</AppText>
+        <AppText tone="secondary" variant="caption">{weakness.evidenceLabel}</AppText>
       </View>
-      <View style={styles.modelNote}>
-        <Text style={styles.modelNoteTitle}>How this is measured</Text>
-        <Text style={styles.modelNoteBody}>{weakness.eligibilityLabel}</Text>
+      <View style={styles.note}>
+        <AppText style={styles.noteTitle} variant="footnote">How this is measured</AppText>
+        <AppText tone="secondary" variant="footnote">{weakness.eligibilityLabel}</AppText>
       </View>
-    </View>
-  );
-}
-
-function ModelSignalPill({
-  kind,
-  weakness = false
-}: {
-  kind: TacticalFocusReason;
-  weakness?: boolean;
-}): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View style={[styles.signalPill, weakness ? styles.signalPillWeakness : null]}>
-      <Text
-        numberOfLines={2}
-        style={[
-          styles.signalPillText,
-          weakness ? styles.signalPillTextWeakness : null
-        ]}
-      >
-        {modelSignalLabel(kind)}
-      </Text>
     </View>
   );
 }
@@ -538,17 +428,6 @@ function progressMetricNoteTitle(
     : "How accuracy is counted";
 }
 
-function ProgressGlyph(): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View accessibilityElementsHidden style={styles.glyph}>
-      <View style={[styles.glyphBar, styles.glyphBarShort]} />
-      <View style={[styles.glyphBar, styles.glyphBarMedium]} />
-      <View style={[styles.glyphBar, styles.glyphBarTall]} />
-    </View>
-  );
-}
-
 const TASK_FAMILY_LABELS = {
   line: "Puzzle solving",
   arrow_duel: "Arrow Duel"
@@ -556,334 +435,143 @@ const TASK_FAMILY_LABELS = {
 
 const useStyles = makeStyles((theme) => ({
   screen: {
-    gap: 16,
+    gap: theme.spacing.screen,
     width: "100%"
   },
   screenHeader: {
-    alignItems: "flex-start",
-    gap: 10
+    gap: theme.spacing.group
   },
   backButton: {
     alignItems: "center",
     alignSelf: "flex-start",
-    borderRadius: 10,
-    flexDirection: "row",
-    gap: 3,
-    minHeight: 36,
-    paddingHorizontal: 6
-  },
-  backArrow: {
-    color: theme.colors.accent.s600,
-    fontSize: 28,
-    lineHeight: 28
-  },
-  backLabel: {
-    color: theme.colors.accent.s600,
-    fontSize: 15,
-    fontWeight: "700"
-  },
-  headerCopy: {
-    gap: 3
-  },
-  title: {
-    color: theme.colors.text.primary,
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: -0.5
-  },
-  subtitle: {
-    color: theme.colors.text.tertiary,
-    fontSize: 13,
-    lineHeight: 19
-  },
-  earlyEstimate: {
-    alignSelf: "flex-start",
-    backgroundColor: theme.colors.warning.s100,
-    borderRadius: 999,
-    color: theme.colors.warning.s800,
-    fontSize: 10,
-    fontWeight: "800",
-    marginTop: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    textTransform: "uppercase"
-  },
-  entryButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s200,
-    borderRadius: 12,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 7,
-    minHeight: 40,
-    paddingHorizontal: 11
-  },
-  entryButtonText: {
-    color: theme.colors.accent.s700,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  pressed: {
-    opacity: 0.72
-  },
-  glyph: {
-    alignItems: "flex-end",
     flexDirection: "row",
     gap: 2,
-    height: 15
+    minHeight: theme.metrics.minTarget,
+    paddingRight: 8
   },
-  glyphBar: {
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 2,
-    width: 3
+  pressed: {
+    opacity: 0.6
   },
-  glyphBarShort: {
-    height: 6
+  headerCopy: {
+    gap: 4
   },
-  glyphBarMedium: {
-    height: 10
+  badgeRow: {
+    flexDirection: "row",
+    paddingTop: 2
   },
-  glyphBarTall: {
-    height: 15
+  progressControls: {
+    gap: theme.spacing.row
   },
-  section: {
+  selectorRow: {
+    flexDirection: "row",
+    gap: theme.spacing.inline,
+    paddingVertical: 4
+  },
+  selector: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceStrong,
+    borderRadius: theme.shape.capsule,
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: 14
+  },
+  selectorSelected: {
+    backgroundColor: theme.colors.accent.s100
+  },
+  selectorText: {
+    ...theme.typography.subheadline,
+    color: theme.colors.text.primary
+  },
+  selectorTextSelected: {
+    color: theme.colors.accent.s600,
+    fontWeight: theme.typography.headline.fontWeight
+  },
+  card: {
     backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 18,
-    borderWidth: 1,
-    gap: 13,
+    borderRadius: theme.shape.card,
+    gap: theme.spacing.row,
     padding: 16
   },
-  sectionHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between"
-  },
-  sectionTitleCopy: {
+  cardHeader: {
     flex: 1,
-    gap: 3,
+    gap: 2,
     minWidth: 0
   },
   eyebrow: {
-    color: theme.colors.accent.s600,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.8,
-    textTransform: "uppercase"
+    fontWeight: theme.typography.headline.fontWeight
   },
-  weaknessEyebrow: {
-    color: theme.colors.warning.s700,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.8,
-    textTransform: "uppercase"
-  },
-  sectionTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 20,
-    fontWeight: "800",
-    lineHeight: 25
-  },
-  progressControls: {
-    gap: 10
-  },
-  taskFamilySelector: {
-    backgroundColor: theme.colors.surfaceStrong,
-    borderRadius: 16,
-    flexDirection: "row",
-    gap: 4,
-    padding: 4
-  },
-  taskFamilyTab: {
-    alignItems: "center",
-    borderRadius: 12,
+  copy: {
     flex: 1,
-    justifyContent: "center",
-    minHeight: 42,
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  taskFamilyTabSelected: {
-    backgroundColor: theme.colors.surface
-  },
-  taskFamilyTabTitle: {
-    color: theme.colors.text.tertiary,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  taskFamilyTabTitleSelected: {
-    color: theme.colors.text.primary
+    gap: 2,
+    minWidth: 0
   },
   progressMetricSelector: {
     flexDirection: "row",
-    gap: 10
+    gap: theme.spacing.group
   },
   progressMetricCard: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 14,
-    borderWidth: 1,
+    backgroundColor: theme.colors.surfaceStrong,
+    borderRadius: theme.shape.control,
     flex: 1,
-    gap: 3,
-    minHeight: 66,
+    gap: 2,
+    minHeight: theme.metrics.minTarget,
     paddingHorizontal: 12,
     paddingVertical: 10
   },
   progressMetricCardSelected: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s400
-  },
-  progressMetricCardLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "700"
-  },
-  progressMetricCardLabelSelected: {
-    color: theme.colors.accent.s700
-  },
-  progressMetricCardValue: {
-    color: theme.colors.text.strong,
-    fontSize: 20,
-    fontWeight: "800",
-    lineHeight: 24
-  },
-  progressMetricCardValueSelected: {
-    color: theme.colors.accent.s700
-  },
-  signalPill: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s200,
-    borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: "center",
-    paddingHorizontal: 9,
-    paddingVertical: 5
-  },
-  signalPillWeakness: {
-    backgroundColor: theme.colors.warning.s100,
-    borderColor: theme.colors.warning.s300,
-    maxWidth: 142
-  },
-  signalPillText: {
-    color: theme.colors.accent.s700,
-    fontSize: 10,
-    fontWeight: "800",
-    lineHeight: 13,
-    textAlign: "center"
-  },
-  signalPillTextUnselected: {
-    color: theme.colors.text.tertiary
-  },
-  signalPillTextWeakness: {
-    color: theme.colors.warning.s800
-  },
-  changePill: {
-    backgroundColor: theme.colors.positive.s100,
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 5
-  },
-  changePillText: {
-    color: theme.colors.positive.s700,
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  changePillSteady: {
-    backgroundColor: theme.colors.surfaceSunken
-  },
-  changePillWorsened: {
-    backgroundColor: theme.colors.danger.s100
-  },
-  changePillTextSteady: {
-    color: theme.colors.text.secondary
-  },
-  changePillTextWorsened: {
-    color: theme.colors.danger.s700
-  },
-  selectorRow: {
-    flexDirection: "row",
-    gap: 8
-  },
-  selector: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 7
-  },
-  selectorSelected: {
-    backgroundColor: theme.colors.accent.s100,
-    borderColor: theme.colors.accent.s400
-  },
-  selectorText: {
-    color: theme.colors.text.secondary,
-    fontSize: 12,
-    fontWeight: "700"
-  },
-  selectorTextSelected: {
-    color: theme.colors.accent.s700
-  },
-  metricLabel: {
-    color: theme.colors.text.tertiary,
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "700"
+    backgroundColor: theme.colors.accent.s100
   },
   metricContextRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8,
+    flexWrap: "wrap",
+    gap: theme.spacing.inline,
     justifyContent: "space-between"
   },
+  metricLabel: {
+    flexShrink: 1
+  },
   chart: {
-    height: 192,
-    justifyContent: "flex-end",
-    overflow: "hidden",
+    height: 176,
     position: "relative"
   },
   chartGuideTop: {
-    backgroundColor: theme.colors.surfaceStrong,
+    backgroundColor: theme.colors.border.default,
     height: StyleSheet.hairlineWidth,
     left: 0,
     position: "absolute",
     right: 0,
-    top: 34
+    top: 22
   },
   chartGuideMiddle: {
-    backgroundColor: theme.colors.surfaceStrong,
+    backgroundColor: theme.colors.border.default,
     height: StyleSheet.hairlineWidth,
     left: 0,
     position: "absolute",
     right: 0,
-    top: 92
+    top: 78
   },
   chartColumns: {
-    alignItems: "flex-end",
+    flex: 1,
     flexDirection: "row",
-    gap: 7,
-    height: 192
+    gap: 6
   },
   chartColumn: {
     alignItems: "center",
     flex: 1,
-    gap: 5,
-    height: 192,
-    justifyContent: "flex-end",
-    minWidth: 28
+    gap: 4,
+    minWidth: 0
   },
   chartValue: {
-    color: theme.colors.text.strong,
-    fontSize: 10,
-    fontWeight: "800"
+    ...theme.typography.caption,
+    color: theme.colors.text.secondary,
+    fontVariant: ["tabular-nums"],
+    fontWeight: theme.typography.headline.fontWeight
   },
   chartBarTrack: {
-    backgroundColor: theme.colors.accent.s50,
+    backgroundColor: theme.colors.surfaceStrong,
     borderRadius: 6,
-    height: 112,
+    flex: 1,
     justifyContent: "flex-end",
     overflow: "hidden",
     width: "72%"
@@ -891,175 +579,55 @@ const useStyles = makeStyles((theme) => ({
   chartBar: {
     backgroundColor: theme.colors.accent.s500,
     borderRadius: 6,
-    minHeight: 8,
     width: "100%"
   },
   chartBarUnavailable: {
     backgroundColor: theme.colors.fillMuted
   },
   chartLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 9,
-    textAlign: "center",
-    width: "100%"
+    ...theme.typography.caption,
+    color: theme.colors.text.secondary
   },
   chartSample: {
-    color: theme.colors.text.faint,
-    fontSize: 9,
-    textAlign: "center",
-    width: "100%"
-  },
-  chartNote: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderRadius: 10,
-    gap: 3,
-    paddingHorizontal: 11,
-    paddingVertical: 9
-  },
-  chartNoteTitle: {
-    color: theme.colors.text.secondary,
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  chartNoteBody: {
+    ...theme.typography.caption,
     color: theme.colors.text.tertiary,
-    fontSize: 11,
-    lineHeight: 16
+    fontVariant: ["tabular-nums"]
   },
-  summary: {
-    color: theme.colors.text.secondary,
-    fontSize: 13,
-    lineHeight: 20
+  note: {
+    gap: 2
   },
-  weaknessCard: {
-    backgroundColor: theme.colors.warning.s50,
-    borderColor: theme.colors.warning.s300,
-    borderRadius: 18,
-    borderWidth: 1,
-    gap: 14,
-    padding: 16
+  noteTitle: {
+    color: theme.colors.text.primary,
+    fontWeight: theme.typography.headline.fontWeight
+  },
+  noWeaknessCard: {
+    alignItems: "flex-start",
+    flexDirection: "row"
+  },
+  weaknessHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.inline,
+    justifyContent: "space-between"
   },
   weaknessEffects: {
-    gap: 10
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.group
   },
   weaknessEffect: {
-    backgroundColor: theme.colors.glass,
-    borderColor: theme.colors.hairline.warning,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
+    backgroundColor: theme.colors.surfaceStrong,
+    borderRadius: theme.shape.control,
+    flexBasis: 150,
+    flexGrow: 1,
+    gap: 2,
     padding: 12
-  },
-  effectKindLabel: {
-    color: theme.colors.warning.s800,
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-    textTransform: "uppercase"
   },
   weaknessMetricRow: {
     alignItems: "baseline",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 7
-  },
-  weaknessValue: {
-    color: theme.colors.warning.s800,
-    fontSize: 26,
-    fontWeight: "900"
-  },
-  weaknessMetric: {
-    color: theme.colors.warning.s900,
-    fontSize: 12,
-    fontWeight: "700"
-  },
-  comparisonLabel: {
-    color: theme.colors.warning.s900,
-    fontSize: 13,
-    lineHeight: 19
-  },
-  evidenceNote: {
-    backgroundColor: theme.colors.glass,
-    borderRadius: 12,
-    gap: 4,
-    padding: 12
-  },
-  evidenceTitle: {
-    color: theme.colors.warning.s900,
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  evidenceBody: {
-    color: theme.colors.warning.s900,
-    fontSize: 12,
-    lineHeight: 18
-  },
-  evidenceMeta: {
-    color: theme.colors.warning.s800,
-    fontSize: 11,
-    lineHeight: 16
-  },
-  modelNote: {
-    borderTopColor: theme.colors.hairline.warningStrong,
-    borderTopWidth: 1,
-    gap: 4,
-    paddingTop: 12
-  },
-  modelNoteTitle: {
-    color: theme.colors.warning.s900,
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  modelNoteBody: {
-    color: theme.colors.warning.s800,
-    fontSize: 11,
-    lineHeight: 17
-  },
-  noWeaknessCard: {
-    alignItems: "flex-start",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 18,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    padding: 16
-  },
-  noWeaknessCardBalanced: {
-    backgroundColor: theme.colors.success.s50,
-    borderColor: theme.colors.success.s200
-  },
-  noWeaknessIcon: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surfaceStrong,
-    borderRadius: 16,
-    height: 32,
-    justifyContent: "center",
-    width: 32
-  },
-  noWeaknessIconBalanced: {
-    backgroundColor: theme.colors.success.s100
-  },
-  noWeaknessIconText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 18,
-    fontWeight: "800"
-  },
-  noWeaknessIconTextBalanced: {
-    color: theme.colors.success.s700
-  },
-  noWeaknessCopy: {
-    flex: 1,
-    gap: 4
-  },
-  noWeaknessTitle: {
-    color: theme.colors.text.strong,
-    fontSize: 15,
-    fontWeight: "800"
-  },
-  noWeaknessBody: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    lineHeight: 18
+    gap: 6
   }
 }));
