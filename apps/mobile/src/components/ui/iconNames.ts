@@ -18,19 +18,26 @@ export const ICONS = {
   arrowDuel: { sf: "arrow.up.right", material: "north_east", codepoint: 0xf1e1 },
   check: { sf: "checkmark", material: "check", codepoint: 0xe668 },
   chevronDown: { sf: "chevron.down", material: "expand_more", codepoint: 0xe5cf },
+  chevronLeft: { sf: "chevron.left", material: "chevron_left", codepoint: 0xe5cb },
   chevronRight: { sf: "chevron.right", material: "chevron_right", codepoint: 0xe5cc },
   chevronUp: { sf: "chevron.up", material: "expand_less", codepoint: 0xe5ce },
+  clock: { sf: "clock", material: "schedule", codepoint: 0xefd6 },
   close: { sf: "xmark", material: "close", codepoint: 0xe5cd },
   custom: { sf: "slider.horizontal.3", material: "tune", codepoint: 0xe429 },
   edit: { sf: "pencil", material: "edit", codepoint: 0xf097 },
+  external: { sf: "arrow.up.right.square", material: "open_in_new", codepoint: 0xe89e },
+  filter: { sf: "line.3.horizontal.decrease", material: "filter_list", codepoint: 0xe152 },
   focus: { sf: "scope", material: "my_location", codepoint: 0xe55c },
   help: { sf: "questionmark.circle", material: "help", codepoint: 0xe8fd },
   play: { sf: "play.fill", material: "play_arrow", codepoint: 0xe037 },
   profile: { sf: "chart.bar", material: "bar_chart", codepoint: 0xe26b },
   remove: { sf: "minus", material: "remove", codepoint: 0xe15b },
   restore: { sf: "arrow.uturn.backward", material: "undo", codepoint: 0xe166 },
+  review: { sf: "arrow.counterclockwise", material: "replay", codepoint: 0xe042 },
+  share: { sf: "square.and.arrow.up", material: "ios_share", codepoint: 0xe6b8 },
   standard: { sf: "target", material: "target", codepoint: 0xe719 },
-  survival: { sf: "shield", material: "shield", codepoint: 0xe9e0 }
+  survival: { sf: "shield", material: "shield", codepoint: 0xe9e0 },
+  warning: { sf: "exclamationmark.triangle", material: "warning", codepoint: 0xf083 }
 } as const satisfies Record<string, IconSpec>;
 
 export type IconName = keyof typeof ICONS;
