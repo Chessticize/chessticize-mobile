@@ -18196,9 +18196,9 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     backgroundColor: theme.colors.accent.s100,
     borderRadius: theme.shape.control,
-    height: theme.metrics.minTarget,
     justifyContent: "center",
-    width: theme.metrics.minTarget
+    minHeight: theme.metrics.minTarget,
+    minWidth: theme.metrics.minTarget
   },
   homeRowIconButtonDisabled: {
     opacity: 0.4
