@@ -4387,6 +4387,33 @@ describe("PracticePocScreen", () => {
     );
   });
 
+  it("stacks the Review forecast into label and count rows at large text sizes", async () => {
+    setPracticeViewport({
+      fontScale: 1,
+      height: 874,
+      insets: { top: 62, right: 0, bottom: 34, left: 0 },
+      scale: 3,
+      width: 402
+    });
+    const regular = renderLabScenario("review-due");
+    await flushMicrotasks();
+    press(regular, "review-tab");
+    expect(flattenTestStyle(findByTestId(regular, "review-forecast").props.style).flexDirection).toBe("row");
+
+    setPracticeViewport({
+      fontScale: 2,
+      height: 874,
+      insets: { top: 62, right: 0, bottom: 34, left: 0 },
+      scale: 3,
+      width: 402
+    });
+    const large = renderLabScenario("review-due");
+    await flushMicrotasks();
+    press(large, "review-tab");
+    expect(flattenTestStyle(findByTestId(large, "review-forecast").props.style).flexDirection).toBe("column");
+    expect(collectText(findByTestId(large, "review-forecast"))).toContain("Tomorrow");
+  });
+
   it("previews consistent collapse motion across Review, History, and New Run", async () => {
     const reviewRenderer = renderLabScenario("review-due");
     await flushMicrotasks();
@@ -5379,7 +5406,7 @@ describe("PracticePocScreen", () => {
       "Needs attention includes Incomplete, Unclear, or In Review Sprint attempts."
     );
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
-      "7 days·All puzzles·Source: Sprint"
+      "7 daysAll puzzlesSource: Sprint"
     );
     expect(findByTestId(renderer, "history-attempt-history-correct")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
@@ -5513,7 +5540,7 @@ describe("PracticePocScreen", () => {
     expect(historyFilterSelected(renderer, "history-attention-flag-in-review")).toBe(true);
     expect(historyFilterSelected(renderer, "history-attention-flag-incomplete")).toBe(true);
     expect(collectText(findByTestId(renderer, "history-active-filter-summary"))).toBe(
-      "7 days·All puzzles·Source: Sprint"
+      "7 daysAll puzzlesSource: Sprint"
     );
     expect(findByTestId(renderer, "history-attempt-history-wrong")).toBeTruthy();
     expect(findByTestId(renderer, "history-attempt-history-timeout")).toBeTruthy();

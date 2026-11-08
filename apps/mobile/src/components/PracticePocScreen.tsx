@@ -11849,9 +11849,10 @@ function HistoryThemeCatalogFilter({
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
+                style={styles.historyChipScroller}
                 testID={`history-theme-filter-rail-${safeTestId(group.label)}`}
               >
-                <View style={styles.themeCatalogRailContent}>
+                <View style={[styles.themeCatalogRailContent, styles.historyChipScrollerContent]}>
                   {group.themes.map((theme) => (
                     <FilterButton
                       key={theme}
@@ -11954,19 +11955,15 @@ function HistoryActiveFilterStrip({
     <View testID="history-active-filter-summary">
       <View style={compact ? styles.historyCompactFilterSummary : styles.historyChipContent}>
         {labels.map((label, index) => (
-          <React.Fragment key={`${label}-${index}`}>
-            {compact && index > 0 ? (
-              <Text style={styles.historyCompactFilterSeparator}>·</Text>
-            ) : null}
-            <View
-              style={compact ? styles.historyCompactFilterLabel : styles.historyActiveFilterChip}
-              testID={`history-active-filter-${index}`}
-            >
-              <Text style={compact ? styles.historyCompactFilterText : styles.historyActiveFilterText}>
-                {label}
-              </Text>
-            </View>
-          </React.Fragment>
+          <View
+            key={`${label}-${index}`}
+            style={compact ? styles.historyCompactFilterLabel : styles.historyActiveFilterChip}
+            testID={`history-active-filter-${index}`}
+          >
+            <Text style={compact ? styles.historyCompactFilterText : styles.historyActiveFilterText}>
+              {label}
+            </Text>
+          </View>
         ))}
       </View>
     </View>
@@ -12284,9 +12281,10 @@ function HistoryChipRow({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.historyChipScroller}
       testID={testID}
     >
-      <View style={[styles.historyChipContent, contentStyle]}>
+      <View style={[styles.historyChipContent, styles.historyChipScrollerContent, contentStyle]}>
         {children}
       </View>
     </ScrollView>
@@ -13225,6 +13223,8 @@ function ReviewPanel({
     : "No matching scheduled reviews";
   const reviewDueSubline = reviewDueCardSubline(queueSummary.oldestDueLabel);
   const reviewFilterControlActive = filtersExpanded || queueFilter !== "all";
+  // Three side-by-side counts break their labels mid-word at large text sizes.
+  const forecastStacked = useWindowDimensions().fontScale >= REVIEW_FORECAST_STACK_FONT_SCALE;
 
   useEffect(() => {
     if (appliedPreferredEntriesKeyRef.current === preferredEntriesKey) {
@@ -13417,14 +13417,14 @@ function ReviewPanel({
 
       <View
         accessibilityLabel={`${reviewCountLabel(queueSummary.tomorrowCount)} tomorrow, ${reviewCountLabel(queueSummary.nextSevenDaysCount)} in the next 7 days, ${reviewCountLabel(queueSummary.totalCount)} total`}
-        style={styles.reviewForecastRow}
+        style={[styles.reviewForecastRow, forecastStacked ? styles.reviewForecastRowStacked : null]}
         testID="review-forecast"
       >
-        <ReviewForecastMetric label="Tomorrow" count={queueSummary.tomorrowCount} countTestID="review-tomorrow-count" />
-        <View style={styles.reviewForecastDivider} />
-        <ReviewForecastMetric label="Next 7 days" count={queueSummary.nextSevenDaysCount} countTestID="review-next-seven-days-count" />
-        <View style={styles.reviewForecastDivider} />
-        <ReviewForecastMetric label="Total" count={queueSummary.totalCount} countTestID="review-total-count" />
+        <ReviewForecastMetric label="Tomorrow" count={queueSummary.tomorrowCount} countTestID="review-tomorrow-count" stacked={forecastStacked} />
+        <View style={forecastStacked ? styles.reviewForecastDividerStacked : styles.reviewForecastDivider} />
+        <ReviewForecastMetric label="Next 7 days" count={queueSummary.nextSevenDaysCount} countTestID="review-next-seven-days-count" stacked={forecastStacked} />
+        <View style={forecastStacked ? styles.reviewForecastDividerStacked : styles.reviewForecastDivider} />
+        <ReviewForecastMetric label="Total" count={queueSummary.totalCount} countTestID="review-total-count" stacked={forecastStacked} />
       </View>
 
       <View style={styles.reviewFilterControlSlot} testID="review-filter-controls">
@@ -13761,16 +13761,28 @@ function TodayReviewAttemptRow({
   );
 }
 
+const REVIEW_FORECAST_STACK_FONT_SCALE = 1.5;
+
 function ReviewForecastMetric({
   count,
   label,
-  countTestID
+  countTestID,
+  stacked = false
 }: {
   count: number;
   label: string;
   countTestID: string;
+  stacked?: boolean;
 }): React.JSX.Element {
   const styles = useStyles();
+  if (stacked) {
+    return (
+      <View style={styles.reviewForecastMetricStacked}>
+        <AppText style={styles.reviewForecastLabelStacked} tone="secondary" variant="body">{label}</AppText>
+        <AppText testID={countTestID} variant="numeral">{count}</AppText>
+      </View>
+    );
+  }
   return (
     <View style={styles.reviewForecastMetric}>
       <AppText testID={countTestID} variant="numeral">{count}</AppText>
@@ -20650,6 +20662,27 @@ const useStyles = makeStyles((theme) => ({
   attemptStatusTileNeutral: {
     backgroundColor: theme.colors.surfaceStrong
   },
+  reviewForecastRowStacked: {
+    flexDirection: "column",
+    paddingVertical: 4
+  },
+  reviewForecastMetricStacked: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.row,
+    justifyContent: "space-between",
+    minHeight: theme.metrics.minTarget,
+    paddingHorizontal: 16,
+    paddingVertical: 6
+  },
+  reviewForecastLabelStacked: {
+    flexShrink: 1
+  },
+  reviewForecastDividerStacked: {
+    backgroundColor: theme.colors.border.default,
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 16
+  },
   reviewForecastDivider: {
     alignSelf: "stretch",
     backgroundColor: theme.colors.border.default,
@@ -20940,6 +20973,14 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 9,
     fontWeight: "600"
   },
+  // The advanced-filter surface pads its content by 16; scrolling chip rows
+  // extend to its edges so chips are not cut off square at the padding.
+  historyChipScroller: {
+    marginHorizontal: -16
+  },
+  historyChipScrollerContent: {
+    paddingHorizontal: 16
+  },
   historyChipContent: {
     alignItems: "center",
     flexDirection: "row",
@@ -20968,11 +21009,11 @@ const useStyles = makeStyles((theme) => ({
     paddingHorizontal: 4
   },
   historyCompactFilterLabel: {
-    justifyContent: "center"
-  },
-  historyCompactFilterSeparator: {
-    ...theme.typography.footnote,
-    color: theme.colors.text.tertiary
+    backgroundColor: theme.colors.surfaceStrong,
+    borderRadius: theme.shape.capsule,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 2
   },
   historyCompactFilterText: {
     ...theme.typography.footnote,
@@ -21212,9 +21253,10 @@ const useStyles = makeStyles((theme) => ({
     width: "100%"
   },
   historyAttemptHeader: {
-    alignItems: "center",
+    alignItems: "baseline",
+    columnGap: 8,
     flexDirection: "row",
-    gap: 8
+    flexWrap: "wrap"
   },
   historyAttemptChevron: {
     alignItems: "center",
