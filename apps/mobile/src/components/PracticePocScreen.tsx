@@ -11171,12 +11171,13 @@ function SessionScoreMetric({
     >
       {showLabel ? (
         <Text
-          adjustsFontSizeToFit={compact}
+          adjustsFontSizeToFit
           maxFontSizeMultiplier={SCORE_LABEL_MAX_TEXT_SCALE}
-          minimumFontScale={0.75}
+          minimumFontScale={0.6}
           numberOfLines={1}
           style={[
             styles.sessionScoreLabel,
+            showLabel ? styles.sessionScoreTextStretch : null,
             compact ? styles.sessionScoreLabelCompact : null
           ]}
         >
@@ -11188,7 +11189,7 @@ function SessionScoreMetric({
       <Text
         maxFontSizeMultiplier={SCORE_VALUE_MAX_TEXT_SCALE}
         numberOfLines={1}
-        style={styles.sessionScoreValue}
+        style={[styles.sessionScoreValue, showLabel ? styles.sessionScoreTextStretch : null]}
         testID={`${metricTestID}-value`}
       >
         {value}
@@ -19272,6 +19273,13 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: 999,
     height: 2.25,
     width: 8
+  },
+  // Labeled (Focused Run) score texts span their column so a narrow strip
+  // centers them without rounding their width down: see "Text width
+  // rounding" in docs/ui-design/MOBILE_UI_DESIGN.md (#633).
+  sessionScoreTextStretch: {
+    alignSelf: "stretch",
+    textAlign: "center"
   },
   sessionScoreValue: {
     color: theme.colors.text.ink,
