@@ -7678,6 +7678,23 @@ describe("PracticePocScreen", () => {
       expect(service.getActiveSprint()?.config.tacticalFocus).toBeDefined();
     });
 
+    it("closes the prompt like Cancel on a system dismiss such as hardware Back", () => {
+      const service = serviceWithUnfinishedRun();
+      const unfinishedId = service.getActiveSprint()?.id;
+      const renderer = renderScreen({ practiceService: service });
+
+      press(renderer, "practice-start-button");
+      const modal = renderer.root.findAllByType(ReactNative.Modal)
+        .find((candidate) => candidate.props.visible === true);
+      act(() => {
+        modal?.props.onRequestClose();
+      });
+
+      expect(() => findByTestId(renderer, "practice-start-conflict")).toThrow();
+      expect(findByTestId(renderer, "practice-resume-card")).toBeTruthy();
+      expect(service.getActiveSprint()?.id).toBe(unfinishedId);
+    });
+
     it("keeps the unfinished Run when the prompt is dismissed", () => {
       const service = serviceWithUnfinishedRun();
       const unfinishedId = service.getActiveSprint()?.id;

@@ -1,6 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-native-web-vite";
 import { LabScenario, type LabStoryPresentation } from "./LabScenario.tsx";
 import {
+  LabTextSize,
+  LARGEST_ACCESSIBILITY_FONT_SCALE
+} from "./sprintResultRedesign/SprintResultPrototype.tsx";
+import {
   centerTestId,
   clickTestId,
   dragTestId,
@@ -611,6 +615,21 @@ export const StartBesideUnfinishedRun: Story = {
     await clickTestId(canvasElement, "practice-run-start");
     await waitForTestId(canvasElement, "practice-start-conflict");
     expectTestIdAbsent(canvasElement, "error-panel");
+  }
+};
+
+export const StartBesideUnfinishedRunLargestText: Story = {
+  name: "Start beside an unfinished Run · largest text",
+  args: { scenarioId: "practice-start-conflict" },
+  render: (args) => (
+    <LabTextSize fontScale={LARGEST_ACCESSIBILITY_FONT_SCALE}>
+      <LabScenario {...args} />
+    </LabTextSize>
+  ),
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-resume-card");
+    await clickTestId(canvasElement, "practice-run-start");
+    await waitForTestId(canvasElement, "practice-start-conflict");
   }
 };
 
