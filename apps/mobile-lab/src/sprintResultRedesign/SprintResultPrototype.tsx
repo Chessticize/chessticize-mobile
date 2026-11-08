@@ -53,18 +53,27 @@ export function LabTextSize({
 }
 
 // A display numeral for the hero score. It caps its growth (native would set
-// maxFontSizeMultiplier) so the score never pushes the result off screen.
-const HERO_NUMERAL = { fontSize: 56, lineHeight: 64, maxScale: 1.5 } as const;
-const TOP_BAR_TITLE_MAX_SCALE = 1.5;
+// maxFontSizeMultiplier) so the score never pushes the result off screen. The
+// navigation title and the hero's glyphs cap the same way.
+const HERO_NUMERAL = { fontSize: 56, lineHeight: 64 } as const;
+const CAPPED_SCALE = 1.5;
 const CONTENT_MAX_WIDTH = 560;
+const SPLIT_DETAILS_MAX_WIDTH = 400;
+// Phone landscape gives the details pane a little more room than the hero.
+const SPLIT_DETAILS_FLEX = 1.2;
+// Below this column width a stat value or its detail line would wrap, so the
+// card switches to label and value rows (narrow phones, phone landscape split).
+const STAT_COLUMN_MIN_WIDTH = 112;
 
 export function SprintResultPrototype({
   data,
   initialInfoOpen = false,
+  initialMarkedUnclear = false,
   zeroReview = "hidden"
 }: {
   data: SprintResultPrototypeData;
   initialInfoOpen?: boolean;
+  initialMarkedUnclear?: boolean;
   zeroReview?: ZeroReviewVariant;
 }): React.JSX.Element {
   const styles = useStyles();
@@ -78,28 +87,48 @@ export function SprintResultPrototype({
     insets,
     width: viewport.width
   });
-  const [markedUnclear, setMarkedUnclear] = useState(false);
+  const [markedUnclear, setMarkedUnclear] = useState(initialMarkedUnclear);
   const [infoOpen, setInfoOpen] = useState(initialInfoOpen);
+  const [measured, setMeasured] = useState({ bar: 0, body: 0, actions: 0 });
+  const measure = (key: keyof typeof measured) => (event: { nativeEvent: { layout: { height: number } } }) => {
+    const height = Math.round(event.nativeEvent.layout.height);
+    setMeasured((current) => (current[key] === height ? current : { ...current, [key]: height }));
+  };
   const result = presentSprintResult(data, { markedUnclear });
 
   const usesSplit = layout.className === "compactLandscape" && !layout.isLargeText;
-  const pinsActions = layout.className === "compactPortrait" && !layout.isLargeText;
+  // Phone portrait pins the actions to the bottom when everything fits;
+  // otherwise (a short phone, a long review list) they scroll with the content.
+  const pinnedChrome = theme.spacing.screen * 2 + theme.spacing.row + theme.spacing.group + insets.bottom;
+  const fitsPinned = measured.body === 0
+    || measured.bar + measured.body + measured.actions + pinnedChrome <= viewport.height;
+  const pinsActions = layout.className === "compactPortrait" && !layout.isLargeText && fitsPinned;
   const isRegular = layout.isRegularWidth;
+  const contentWidth = Math.max(0, layout.contentWidth - theme.spacing.screen * 2);
+  const detailsWidth = usesSplit
+    ? Math.min(
+      SPLIT_DETAILS_MAX_WIDTH,
+      ((contentWidth - theme.spacing.section) * SPLIT_DETAILS_FLEX) / (1 + SPLIT_DETAILS_FLEX)
+    )
+    : Math.min(CONTENT_MAX_WIDTH, contentWidth);
+  const statColumnWidth = (detailsWidth - theme.spacing.row * 2) / 3;
+  const stacksStats = layout.isLargeText || statColumnWidth < STAT_COLUMN_MIN_WIDTH;
   const horizontalInset = {
     paddingLeft: insets.left + theme.spacing.screen,
     paddingRight: insets.right + theme.spacing.screen
   };
 
-  const hero = <ResultHero result={result} fontScale={fontScale} />;
+  const hero = <ResultHero fontScale={fontScale} result={result} stacked={layout.isLargeText} />;
   const details = (
     <View style={styles.details}>
-      <StatsCard columns={result.stats} stacked={layout.isLargeText} />
+      <StatsCard columns={result.stats} layout={layout.isLargeText ? "vertical" : stacksStats ? "rows" : "columns"} />
       <ReviewArea
         data={data}
-        stacked={layout.isLargeText}
+        fontScale={fontScale}
         infoOpen={infoOpen}
         markedUnclear={markedUnclear}
         result={result}
+        stacked={layout.isLargeText}
         zeroReview={zeroReview}
         onMarkUnclear={() => setMarkedUnclear(true)}
         onToggleInfo={() => setInfoOpen((open) => !open)}
@@ -107,9 +136,10 @@ export function SprintResultPrototype({
     </View>
   );
   const actions = (
-    <View style={styles.actions} testID="sprint-result-redesign-actions">
+    <View onLayout={measure("actions")} style={styles.actions} testID="sprint-result-redesign-actions">
       {result.showReplayMistakes ? (
         <Button
+          accessibilityLabel={result.replayMistakesAccessibilityLabel}
           label="Replay mistakes"
           stretch
           testID="sprint-result-redesign-replay-mistakes"
@@ -125,40 +155,52 @@ export function SprintResultPrototype({
       />
     </View>
   );
+  const scrollPadding = {
+    paddingBottom: (pinsActions ? 0 : insets.bottom) + theme.spacing.screen,
+    paddingTop: theme.spacing.screen
+  };
 
   return (
     <View style={[styles.screen, { height: viewport.height }]} testID="sprint-result-redesign">
       <TopBar
         fontScale={fontScale}
+        onLayout={measure("bar")}
         showTrend={result.showTrendAction}
         style={[horizontalInset, { paddingTop: insets.top + theme.spacing.group }]}
         title={result.title}
       />
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          horizontalInset,
-          { paddingBottom: (pinsActions ? 0 : insets.bottom) + theme.spacing.screen },
-          isRegular ? styles.scrollContentCentered : null
-        ]}
-        style={styles.scroll}
-      >
-        {usesSplit ? (
-          <View style={styles.split} testID="sprint-result-redesign-split">
-            <View style={styles.splitHero}>{hero}</View>
-            <View style={styles.splitDetails}>
-              {details}
-              {actions}
-            </View>
-          </View>
-        ) : (
-          <View style={styles.column}>
-            {hero}
+      {usesSplit ? (
+        // Phone landscape: the hero stays put on the left while the details
+        // and actions scroll on the right; both center in their pane.
+        <View style={[styles.split, horizontalInset]} testID="sprint-result-redesign-split">
+          <View style={[styles.splitHero, { paddingBottom: insets.bottom }]}>{hero}</View>
+          <ScrollView
+            contentContainerStyle={[styles.splitScrollContent, scrollPadding]}
+            style={[styles.splitDetails, { flex: SPLIT_DETAILS_FLEX, maxWidth: SPLIT_DETAILS_MAX_WIDTH }]}
+          >
             {details}
+            {actions}
+          </ScrollView>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            horizontalInset,
+            scrollPadding,
+            isRegular ? styles.scrollContentCentered : null
+          ]}
+          style={styles.scroll}
+        >
+          <View style={styles.column}>
+            <View onLayout={measure("body")} style={styles.column}>
+              {hero}
+              {details}
+            </View>
             {pinsActions ? null : actions}
           </View>
-        )}
-      </ScrollView>
+        </ScrollView>
+      )}
       {pinsActions ? (
         <View
           style={[
@@ -176,20 +218,24 @@ export function SprintResultPrototype({
 
 function TopBar({
   fontScale,
+  onLayout,
   showTrend,
   style,
   title
 }: {
   fontScale: number;
+  onLayout: React.ComponentProps<typeof View>["onLayout"];
   showTrend: boolean;
   style: React.ComponentProps<typeof View>["style"];
   title: string;
 }): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
-  const titleScale = Math.min(fontScale, TOP_BAR_TITLE_MAX_SCALE);
+  const titleScale = Math.min(fontScale, CAPPED_SCALE);
+  // iOS keeps navigation-bar buttons at the screen's leading and trailing
+  // edges on iPad too, even when the content column is centered.
   return (
-    <View style={[styles.topBar, style]} testID="sprint-result-redesign-top-bar">
+    <View onLayout={onLayout} style={[styles.topBar, style]} testID="sprint-result-redesign-top-bar">
       <Pressable
         accessibilityLabel="Done"
         accessibilityRole="button"
@@ -201,7 +247,7 @@ function TopBar({
       </Pressable>
       <AppText
         accessibilityRole="header"
-        maxFontSizeMultiplier={TOP_BAR_TITLE_MAX_SCALE}
+        maxFontSizeMultiplier={CAPPED_SCALE}
         numberOfLines={1}
         style={[
           styles.topBarTitle,
@@ -233,10 +279,12 @@ function TopBar({
 
 function ResultHero({
   fontScale,
-  result
+  result,
+  stacked
 }: {
   fontScale: number;
   result: ReturnType<typeof presentSprintResult>;
+  stacked: boolean;
 }): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
@@ -250,35 +298,46 @@ function ResultHero({
     negative: theme.colors.danger.s100,
     neutral: theme.colors.surfaceStrong
   }[result.outcomeTone];
-  const barFill = result.outcomeTone === "neutral" ? theme.colors.fillStrong : toneColor;
-  const heroScale = Math.min(fontScale, HERO_NUMERAL.maxScale);
+  const heroScale = Math.min(fontScale, CAPPED_SCALE);
   const heroNumeral: TextStyle = {
     ...theme.typography.numeralLarge,
     fontSize: HERO_NUMERAL.fontSize * heroScale,
     lineHeight: HERO_NUMERAL.lineHeight * heroScale
   };
   const [solved, target] = result.scoreLabel.split(" / ");
+  const badge = (
+    <View
+      style={[
+        styles.statusBadge,
+        { backgroundColor: toneSoft, height: 26 * heroScale, width: 26 * heroScale }
+      ]}
+    >
+      <Icon color={toneColor} name={result.outcomeIcon} size={Math.round(16 * heroScale)} weight="bold" />
+    </View>
+  );
+  // At large text sizes the badge sits above the outcome, and each part of the
+  // outcome and summary takes its own centered line instead of breaking at "·".
+  const summaryParts = result.summaryLine.split(" · ");
   return (
     <View style={styles.hero} testID="sprint-result-redesign-hero">
       <View
         accessible
         accessibilityLabel={result.outcomeLabel}
-        style={styles.outcomeLine}
+        style={stacked ? styles.outcomeStack : styles.outcomeLine}
         testID="sprint-result-redesign-outcome"
       >
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: toneSoft, height: 26 * heroScale, width: 26 * heroScale }
-          ]}
-        >
-          <Icon color={toneColor} name={result.outcomeIcon} size={Math.round(16 * heroScale)} weight="bold" />
-        </View>
-        <AppText style={styles.outcomeText} variant="headline">{result.outcomeLabel}</AppText>
+        {badge}
+        {stacked ? (
+          result.outcomeParts.map((part) => (
+            <AppText key={part} style={styles.centeredText} variant="headline">{part}</AppText>
+          ))
+        ) : (
+          <AppText style={styles.outcomeText} variant="headline">{result.outcomeLabel}</AppText>
+        )}
       </View>
       <AppText
         accessibilityLabel={result.scoreAccessibilityLabel}
-        maxFontSizeMultiplier={HERO_NUMERAL.maxScale}
+        maxFontSizeMultiplier={CAPPED_SCALE}
         style={[heroNumeral, styles.centeredText]}
         testID="sprint-result-redesign-score"
       >
@@ -294,28 +353,67 @@ function ResultHero({
         <View
           style={[
             styles.progressFill,
-            { backgroundColor: barFill, width: `${Math.round(result.progress * 100)}%` }
+            {
+              backgroundColor: result.outcomeTone === "neutral" ? theme.colors.text.tertiary : toneColor,
+              width: `${Math.round(result.progress * 100)}%`
+            }
           ]}
         />
       </View>
-      <AppText style={styles.centeredText} tone="secondary" variant="subheadline">
-        {result.summaryLine}
-      </AppText>
+      {stacked ? (
+        <View testID="sprint-result-redesign-summary">
+          {summaryParts.map((part) => (
+            <AppText key={part} style={styles.centeredText} tone="secondary" variant="subheadline">{part}</AppText>
+          ))}
+        </View>
+      ) : (
+        <AppText
+          style={styles.centeredText}
+          testID="sprint-result-redesign-summary"
+          tone="secondary"
+          variant="subheadline"
+        >
+          {result.summaryLine}
+        </AppText>
+      )}
     </View>
   );
 }
 
 function StatsCard({
   columns,
-  stacked
+  layout
 }: {
   columns: StatColumn[];
-  stacked: boolean;
+  layout: "columns" | "rows" | "vertical";
 }): React.JSX.Element {
   const styles = useStyles();
-  if (stacked) {
-    // At large text sizes three columns cannot hold the numbers; the card
-    // becomes label/value rows, as iOS grouped lists do.
+  if (layout === "vertical") {
+    // Accessibility text sizes: each stat reads top to bottom, label first,
+    // so the value and its detail have the full width.
+    return (
+      <Section rows testID="sprint-result-redesign-stats">
+        {columns.map((column) => (
+          <View
+            accessible
+            accessibilityLabel={column.accessibilityLabel}
+            key={column.key}
+            style={styles.statVertical}
+            testID={`sprint-result-redesign-stat-${column.key}`}
+          >
+            <AppText tone="secondary" variant="subheadline">{column.label}</AppText>
+            <AppText tone={column.valueTone} variant="numeral">{column.value}</AppText>
+            {column.detail ? (
+              <AppText style={styles.tabular} tone="secondary" variant="footnote">{column.detail}</AppText>
+            ) : null}
+          </View>
+        ))}
+      </Section>
+    );
+  }
+  if (layout === "rows") {
+    // Where three columns cannot hold the values (narrow phones) the card
+    // becomes label and value rows, as iOS grouped lists do.
     return (
       <Section rows testID="sprint-result-redesign-stats">
         {columns.map((column) => (
@@ -334,7 +432,9 @@ function StatsCard({
                 {column.value}
               </AppText>
               {column.detail ? (
-                <AppText style={styles.endText} tone="secondary" variant="footnote">{column.detail}</AppText>
+                <AppText style={[styles.endText, styles.tabular]} tone="secondary" variant="footnote">
+                  {column.detail}
+                </AppText>
               ) : null}
             </View>
           </View>
@@ -353,12 +453,25 @@ function StatsCard({
             style={styles.statColumn}
             testID={`sprint-result-redesign-stat-${column.key}`}
           >
-            <AppText style={styles.centeredText} tone="secondary" variant="footnote">{column.label}</AppText>
-            <AppText style={[styles.statValue, styles.centeredText]} tone={column.valueTone} variant="numeralLarge">
+            <AppText numberOfLines={1} style={styles.centeredText} tone="secondary" variant="footnote">
+              {column.label}
+            </AppText>
+            {/* A word value (Unrated) uses the row numeral size so it fits one line. */}
+            <AppText
+              numberOfLines={1}
+              style={[column.valueIsWord ? styles.statWordValue : styles.statValue, styles.centeredText]}
+              tone={column.valueTone}
+              variant={column.valueIsWord ? "numeral" : "numeralLarge"}
+            >
               {column.value}
             </AppText>
             {column.detail ? (
-              <AppText style={[styles.statDetail, styles.centeredText]} tone="secondary" variant="footnote">
+              <AppText
+                numberOfLines={1}
+                style={[styles.tabular, styles.centeredText]}
+                tone="secondary"
+                variant="footnote"
+              >
                 {column.detail}
               </AppText>
             ) : null}
@@ -371,6 +484,7 @@ function StatsCard({
 
 function ReviewArea({
   data,
+  fontScale,
   infoOpen,
   markedUnclear,
   result,
@@ -380,10 +494,11 @@ function ReviewArea({
   onToggleInfo
 }: {
   data: SprintResultPrototypeData;
-  stacked: boolean;
+  fontScale: number;
   infoOpen: boolean;
   markedUnclear: boolean;
   result: ReturnType<typeof presentSprintResult>;
+  stacked: boolean;
   zeroReview: ZeroReviewVariant;
   onMarkUnclear: () => void;
   onToggleInfo: () => void;
@@ -391,6 +506,8 @@ function ReviewArea({
   const styles = useStyles();
   const theme = useTheme();
   const review = result.review;
+  const glyphScale = Math.min(fontScale, CAPPED_SCALE);
+  const infoTarget = theme.metrics.minTarget * glyphScale;
   const rows: React.ReactNode[] = [];
 
   if (data.unclearPrompt) {
@@ -400,7 +517,9 @@ function ReviewArea({
         style={[styles.row, stacked ? styles.rowStacked : null]}
         testID="sprint-result-redesign-unclear-prompt"
       >
-        <AppText style={stacked ? null : styles.rowTitle} variant="body">{data.unclearPrompt.question}</AppText>
+        <AppText style={stacked ? null : styles.rowTitle} variant="headline">
+          {data.unclearPrompt.question}
+        </AppText>
         {markedUnclear ? (
           <Badge label="Marked" testID="sprint-result-redesign-unclear-marked" />
         ) : (
@@ -434,15 +553,18 @@ function ReviewArea({
               <AppText variant="headline">{review.title}</AppText>
             </View>
             <Pressable
-              accessibilityLabel="About review items"
+              accessibilityLabel="About the puzzles to review"
               accessibilityRole="button"
               accessibilityState={{ expanded: infoOpen }}
-              hitSlop={8}
-              style={({ pressed }) => [styles.infoButton, pressed ? styles.pressed : null]}
+              style={({ pressed }) => [
+                styles.infoButton,
+                { height: infoTarget, width: infoTarget },
+                pressed ? styles.pressed : null
+              ]}
               testID="sprint-result-redesign-review-info"
               onPress={onToggleInfo}
             >
-              <LabIcon color={theme.colors.accent.s600} name="info" size={20} />
+              <LabIcon color={theme.colors.accent.s600} name="info" size={Math.round(20 * glyphScale)} />
             </Pressable>
           </View>
           <View pointerEvents="none" style={styles.reviewTrailing}>
@@ -452,6 +574,16 @@ function ReviewArea({
         </View>
       </View>
     );
+    if (infoOpen) {
+      // The explanation opens inside the same group, directly under its row.
+      rows.push(
+        <View key="explanation" style={styles.explanation} testID="sprint-result-redesign-review-explanation">
+          {review.explanation.map((line) => (
+            <AppText key={line} tone="secondary" variant="footnote">{line}</AppText>
+          ))}
+        </View>
+      );
+    }
   }
 
   if (rows.length === 0) {
@@ -468,17 +600,7 @@ function ReviewArea({
   }
 
   return (
-    <Section
-      footer={review && infoOpen ? (
-        <View style={styles.explanation} testID="sprint-result-redesign-review-explanation">
-          {review.explanation.map((line) => (
-            <AppText key={line} tone="secondary" variant="footnote">{line}</AppText>
-          ))}
-        </View>
-      ) : undefined}
-      rows
-      testID="sprint-result-redesign-review"
-    >
+    <Section rows testID="sprint-result-redesign-review">
       {rows}
     </Section>
   );
@@ -548,8 +670,7 @@ const useStyles = makeStyles((theme) => ({
   },
   scrollContent: {
     alignItems: "center",
-    flexGrow: 1,
-    paddingTop: theme.spacing.screen
+    flexGrow: 1
   },
   scrollContentCentered: {
     justifyContent: "center"
@@ -560,21 +681,23 @@ const useStyles = makeStyles((theme) => ({
     width: "100%"
   },
   split: {
-    alignItems: "center",
-    alignSelf: "stretch",
+    flex: 1,
     flexDirection: "row",
-    flexGrow: 1,
     gap: theme.spacing.section
   },
   splitHero: {
     flex: 1,
+    justifyContent: "center",
     minWidth: 0
   },
   splitDetails: {
     flex: 1,
-    gap: theme.spacing.screen,
-    maxWidth: 400,
     minWidth: 0
+  },
+  splitScrollContent: {
+    flexGrow: 1,
+    gap: theme.spacing.screen,
+    justifyContent: "center"
   },
   details: {
     gap: theme.spacing.screen
@@ -590,19 +713,27 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing.inline,
     maxWidth: "100%"
   },
+  outcomeStack: {
+    alignItems: "center",
+    gap: theme.spacing.inline
+  },
   statusBadge: {
     alignItems: "center",
     borderRadius: theme.shape.capsule,
     justifyContent: "center"
   },
   outcomeText: {
-    flexShrink: 1
+    flexShrink: 1,
+    textAlign: "center"
   },
   centeredText: {
     textAlign: "center"
   },
   endText: {
     textAlign: "right"
+  },
+  tabular: {
+    fontVariant: ["tabular-nums"]
   },
   scoreTarget: {
     fontWeight: theme.typography.numeralLarge.fontWeight
@@ -639,13 +770,20 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 28,
     lineHeight: 34
   },
-  statDetail: {
-    fontVariant: ["tabular-nums"]
+  statWordValue: {
+    // Same line box as the numerals so the three columns stay aligned.
+    lineHeight: 34
   },
   statDivider: {
     alignSelf: "stretch",
     backgroundColor: theme.colors.border.default,
     width: StyleSheet.hairlineWidth
+  },
+  statVertical: {
+    gap: 2,
+    minHeight: theme.metrics.rowMinHeight,
+    paddingHorizontal: 16,
+    paddingVertical: 10
   },
   statRow: {
     alignItems: "center",
@@ -662,13 +800,14 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "stretch",
     flexShrink: 1
   },
+  // Rows match ListRow: at least 52 pt, 16 pt sides, 10 pt top and bottom.
   row: {
     alignItems: "center",
     flexDirection: "row",
     gap: theme.spacing.row,
     minHeight: theme.metrics.rowMinHeight,
     paddingHorizontal: 16,
-    paddingVertical: 4
+    paddingVertical: 10
   },
   rowTitle: {
     flex: 1
@@ -679,12 +818,6 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "column",
     gap: theme.spacing.group,
     paddingVertical: theme.spacing.row
-  },
-  reviewLeadStacked: {
-    alignSelf: "stretch",
-    flexBasis: "auto",
-    flexGrow: 0,
-    flexShrink: 0
   },
   rowPressed: {
     backgroundColor: theme.colors.surfaceStrong
@@ -698,14 +831,23 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     minWidth: 0
   },
+  reviewLeadStacked: {
+    alignSelf: "stretch",
+    flexBasis: "auto",
+    flexGrow: 0,
+    flexShrink: 0
+  },
   reviewTitle: {
     flexShrink: 1
   },
+  // The 44 pt target overlaps the row's vertical padding; the glyph stays
+  // optically next to the title.
   infoButton: {
     alignItems: "center",
-    height: theme.metrics.minTarget,
     justifyContent: "center",
-    width: theme.metrics.minTarget
+    marginVertical: -10,
+    minHeight: theme.metrics.minTarget,
+    minWidth: theme.metrics.minTarget
   },
   reviewTrailing: {
     alignItems: "center",
@@ -713,7 +855,9 @@ const useStyles = makeStyles((theme) => ({
     gap: 4
   },
   explanation: {
-    gap: 2
+    gap: 4,
+    paddingHorizontal: 16,
+    paddingVertical: theme.spacing.row
   },
   actions: {
     gap: theme.spacing.row

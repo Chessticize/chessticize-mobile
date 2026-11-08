@@ -7,7 +7,7 @@ test("the redesign shows a rating change with a real minus sign and arrow", () =
   const result = presentSprintResult(SPRINT_RESULT_FIXTURES.abandoned);
   const rating = result.stats.find((column) => column.key === "rating");
   assert.equal(rating?.value, "−15");
-  assert.equal(rating?.detail, "709 → 694");
+  assert.equal(rating?.detail, "709 → 694");
   assert.equal(rating?.valueTone, "negative");
   assert.equal(result.outcomeLabel, "Sprint abandoned");
   assert.equal(result.outcomeTone, "neutral");
@@ -19,12 +19,12 @@ test("the review row counts the Unclear and In Review union once and explains it
   const result = presentSprintResult(SPRINT_RESULT_FIXTURES.reviewAndMistakes);
   assert.equal(result.review?.title, "3 to review");
   assert.deepEqual(result.review?.explanation, [
-    "2 Unclear + 2 in Review · 1 in both · 3 total",
-    "Unclear: 1 marked by you · 1 marked after Slow",
-    "Unclear does not affect your Sprint result.",
-    "Replay does not change Review scheduling."
+    "3 puzzles to look at again: 2 Unclear and 2 In Review (1 is both).",
+    "Unclear: 1 marked by you, 1 marked after Slow. Unclear does not change your Sprint result.",
+    "Replaying them does not change when they come back in Review."
   ]);
   assert.equal(result.showReplayMistakes, true);
+  assert.equal(result.replayMistakesAccessibilityLabel, "Replay only the 2 mistakes");
 });
 
 test("a run with nothing to review has no review row and no Replay mistakes", () => {
@@ -59,6 +59,7 @@ test("a Focused Run stays unrated, drops the trend action and shows its pace", (
 test("outcome tones follow passed, failed and abandoned", () => {
   assert.equal(presentSprintResult(SPRINT_RESULT_FIXTURES.passed).outcomeTone, "positive");
   assert.equal(presentSprintResult(SPRINT_RESULT_FIXTURES.failedMistakes).outcomeLabel, "Sprint failed · 3 mistakes");
+  assert.deepEqual(presentSprintResult(SPRINT_RESULT_FIXTURES.failedTime).outcomeParts, ["Sprint failed", "Time ran out"]);
   assert.equal(presentSprintResult(SPRINT_RESULT_FIXTURES.failedTime).outcomeTone, "negative");
   assert.equal(presentSprintResult(SPRINT_RESULT_FIXTURES.arrowDuel).outcomeLabel, "Arrow Duel passed");
 });

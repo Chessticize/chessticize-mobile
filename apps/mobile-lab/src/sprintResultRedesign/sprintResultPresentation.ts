@@ -54,6 +54,8 @@ export type StatColumn = {
   value: string;
   valueTone: "primary" | "positive" | "negative";
   detail?: string;
+  /** A word rather than a number (Unrated), drawn smaller so it fits one line. */
+  valueIsWord?: boolean;
   accessibilityLabel: string;
 };
 
@@ -61,6 +63,8 @@ export type SprintResultPresentation = {
   title: string;
   showTrendAction: boolean;
   outcomeLabel: string;
+  /** The outcome in parts that may stack at large text sizes. */
+  outcomeParts: string[];
   outcomeTone: "positive" | "negative" | "neutral";
   outcomeIcon: "check" | "close" | "remove";
   scoreLabel: string;
@@ -77,6 +81,7 @@ export type SprintResultPresentation = {
   } | null;
   primaryActionLabel: string;
   showReplayMistakes: boolean;
+  replayMistakesAccessibilityLabel: string;
 };
 
 const MINUS = "−";
@@ -109,22 +114,23 @@ function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-function outcomeLabelFor(data: SprintResultPrototypeData): string {
+/** The outcome, split where it may break onto two lines (never at the separator). */
+function outcomePartsFor(data: SprintResultPrototypeData): string[] {
   if (data.kind === "focusedRun") {
-    return data.outcome === "abandoned" ? "Focused Run ended" : "Focused Run complete";
+    return [data.outcome === "abandoned" ? "Focused Run ended" : "Focused Run complete"];
   }
   const subject = data.mode === "arrowDuel" ? "Arrow Duel" : "Sprint";
   switch (data.endReason) {
     case "target_reached":
-      return `${subject} passed`;
+      return [`${subject} passed`];
     case "max_mistakes":
-      return `${subject} failed · ${plural(data.mistakeCount, "mistake", "mistakes")}`;
+      return [`${subject} failed`, plural(data.mistakeCount, "mistake", "mistakes")];
     case "time_expired":
-      return `${subject} failed · Time ran out`;
+      return [`${subject} failed`, "Time ran out"];
     case "abandoned":
-      return `${subject} abandoned`;
+      return [`${subject} abandoned`];
     default:
-      return `${subject} complete`;
+      return [`${subject} complete`];
   }
 }
 
@@ -132,24 +138,31 @@ export function unclearCount(review: SprintResultPrototypeData["review"]): numbe
   return review.unclear.markedByYou + review.unclear.afterSlow + review.unclear.afterTimedOut;
 }
 
-/** The long explanation behind the review row's info button, from the current screen's copy. */
+/**
+ * The explanation behind the review row's info button. It keeps the facts of
+ * the current screen's note (the Unclear and In Review union, the Unclear
+ * sources, and that Replay leaves Review scheduling alone) in plainer words.
+ */
 export function reviewExplanation(review: SprintResultPrototypeData["review"]): string[] {
   const unclear = unclearCount(review);
   const total = unclear + review.inReviewCount - review.overlapCount;
+  const groups = [
+    unclear > 0 ? `${unclear} Unclear` : null,
+    review.inReviewCount > 0 ? `${review.inReviewCount} In Review` : null
+  ].filter((part): part is string => part !== null).join(" and ");
   const sources = [
     review.unclear.markedByYou > 0 ? `${review.unclear.markedByYou} marked by you` : null,
     review.unclear.afterSlow > 0 ? `${review.unclear.afterSlow} marked after Slow` : null,
     review.unclear.afterTimedOut > 0 ? `${review.unclear.afterTimedOut} marked after Timed out` : null
   ].filter((part): part is string => part !== null);
   return [
-    [
-      `${unclear} Unclear + ${review.inReviewCount} in Review`,
-      review.overlapCount > 0 ? `${review.overlapCount} in both` : null,
-      `${total} total`
-    ].filter((part): part is string => part !== null).join(" \u00b7 "),
-    sources.length > 0 ? `Unclear: ${sources.join(" \u00b7 ")}` : null,
-    unclear > 0 ? "Unclear does not affect your Sprint result." : null,
-    "Replay does not change Review scheduling."
+    `${plural(total, "puzzle", "puzzles")} to look at again: ${groups}${
+      review.overlapCount > 0 ? ` (${review.overlapCount} ${review.overlapCount === 1 ? "is" : "are"} both)` : ""
+    }.`,
+    sources.length > 0
+      ? `Unclear: ${sources.join(", ")}. Unclear does not change your Sprint result.`
+      : null,
+    "Replaying them does not change when they come back in Review."
   ].filter((line): line is string => line !== null);
 }
 
@@ -175,6 +188,7 @@ export function presentSprintResult(
         key: "rating",
         label: "Rating",
         value: "Unrated",
+        valueIsWord: true,
         valueTone: "primary",
         detail: `${data.ratingBefore} unchanged`,
         accessibilityLabel: `Rating unrated, ${data.ratingBefore} unchanged`
@@ -184,7 +198,8 @@ export function presentSprintResult(
         label: "Rating",
         value: signedNumber(delta),
         valueTone: delta < 0 ? "negative" : delta > 0 ? "positive" : "primary",
-        detail: `${data.ratingBefore} ${ARROW} ${ratingAfter}`,
+        // No-break spaces keep the range on one line instead of breaking at the arrow.
+        detail: `${data.ratingBefore} ${ARROW} ${ratingAfter}`,
         accessibilityLabel: `Rating ${
           delta < 0 ? `minus ${-delta}` : delta > 0 ? `plus ${delta}` : "unchanged"
         }, from ${data.ratingBefore} to ${ratingAfter}`
@@ -222,7 +237,8 @@ export function presentSprintResult(
   return {
     title: isFocusedRun ? "Focused Run Result" : "Sprint Result",
     showTrendAction: !isFocusedRun,
-    outcomeLabel: outcomeLabelFor(data),
+    outcomeLabel: outcomePartsFor(data).join(" \u00b7 "),
+    outcomeParts: outcomePartsFor(data),
     outcomeTone,
     outcomeIcon: outcomeTone === "positive" ? "check" : outcomeTone === "negative" ? "close" : "remove",
     scoreLabel: `${data.solved} / ${data.target}`,
@@ -241,6 +257,7 @@ export function presentSprintResult(
         }
       : null,
     primaryActionLabel: isFocusedRun ? "Back to Practice" : "Play again",
-    showReplayMistakes: data.mistakeCount > 0
+    showReplayMistakes: data.mistakeCount > 0,
+    replayMistakesAccessibilityLabel: `Replay only the ${plural(data.mistakeCount, "mistake", "mistakes")}`
   };
 }

@@ -47,6 +47,14 @@
       }
     ]
   },
+  "sprint-result-redesign-failed-time-marked": {
+    "issues": [
+      {
+        "issueNumber": 609,
+        "changeNote": "Sprint Result redesign: the final puzzle marked unclear, showing Marked and the updated review count."
+      }
+    ]
+  },
   "sprint-result-redesign-abandoned": {
     "issues": [
       {

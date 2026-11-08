@@ -73,6 +73,16 @@ export const FailedTimeRanOut: Story = {
   }
 };
 
+export const FailedTimeMarkedUnclear: Story = {
+  name: "Failed · time ran out, marked unclear",
+  args: { data: SPRINT_RESULT_FIXTURES.failedTime, initialMarkedUnclear: true },
+  play: async ({ canvasElement }: Canvas) => {
+    await expectTestIdText(canvasElement, "sprint-result-redesign-unclear-marked", "Marked");
+    expectTestIdAbsent(canvasElement, "sprint-result-redesign-mark-unclear");
+    await waitForText(canvasElement, "2 to review");
+  }
+};
+
 export const Abandoned: Story = {
   args: { data: SPRINT_RESULT_FIXTURES.abandoned },
   play: async ({ canvasElement }: Canvas) => {
@@ -100,8 +110,8 @@ export const ReviewExplanation: Story = {
   args: { data: SPRINT_RESULT_FIXTURES.reviewAndMistakes, initialInfoOpen: true },
   play: async ({ canvasElement }: Canvas) => {
     await waitForTestId(canvasElement, "sprint-result-redesign-review-explanation");
-    await waitForText(canvasElement, "2 Unclear + 2 in Review · 1 in both · 3 total");
-    await waitForText(canvasElement, "Replay does not change Review scheduling.");
+    await waitForText(canvasElement, "3 puzzles to look at again: 2 Unclear and 2 In Review (1 is both).");
+    await waitForText(canvasElement, "Replaying them does not change when they come back in Review.");
   }
 };
 
