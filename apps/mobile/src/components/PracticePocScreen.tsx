@@ -10222,7 +10222,9 @@ function PuzzleTimingIndicator({
       onLayout={onTargetLayout}
     >
       <Text
+        adjustsFontSizeToFit
         maxFontSizeMultiplier={SESSION_CHROME_MAX_TEXT_SCALE}
+        minimumFontScale={0.6}
         numberOfLines={1}
         style={[
           styles.puzzleTimingIndicatorText,
@@ -10995,7 +10997,7 @@ function PracticePrompt({
             accessible={!layoutCopyHidden}
             accessibilityElementsHidden={layoutCopyHidden}
             importantForAccessibility={layoutCopyHidden ? "no-hide-descendants" : "auto"}
-            maxFontSizeMultiplier={SESSION_CHROME_MAX_TEXT_SCALE}
+            maxFontSizeMultiplier={PROMPT_MAX_TEXT_SCALE}
             style={[styles.promptTitle, layoutCopyHidden ? styles.promptSolvedLayoutCopy : null]}
             testID="practice-prompt-title-layout"
           >
@@ -11006,7 +11008,7 @@ function PracticePrompt({
           accessible={!layoutContextHidden}
           accessibilityElementsHidden={layoutContextHidden}
           importantForAccessibility={layoutContextHidden ? "no-hide-descendants" : "auto"}
-          maxFontSizeMultiplier={SESSION_CHROME_MAX_TEXT_SCALE}
+          maxFontSizeMultiplier={PROMPT_MAX_TEXT_SCALE}
           style={[styles.promptText, layoutContextHidden ? styles.promptSolvedLayoutCopy : null]}
           testID="practice-prompt-context"
         >
@@ -11016,7 +11018,7 @@ function PracticePrompt({
           accessible={!layoutHintHidden}
           accessibilityElementsHidden={layoutHintHidden}
           importantForAccessibility={layoutHintHidden ? "no-hide-descendants" : "auto"}
-          maxFontSizeMultiplier={SESSION_CHROME_MAX_TEXT_SCALE}
+          maxFontSizeMultiplier={PROMPT_MAX_TEXT_SCALE}
           numberOfLines={reserveDefaultLayout ? undefined : promptHintNumberOfLines}
           style={[
             styles.promptHint,
@@ -11184,7 +11186,7 @@ function SessionScoreMetric({
         <SessionScoreGlyph tone={tone} />
       )}
       <Text
-        maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
+        maxFontSizeMultiplier={SCORE_VALUE_MAX_TEXT_SCALE}
         numberOfLines={1}
         style={styles.sessionScoreValue}
         testID={`${metricTestID}-value`}
@@ -13833,10 +13835,15 @@ const HUD_LARGE_TEXT_FONT_SCALE = 1.5;
 const HUD_MAX_TEXT_SCALE = 2;
 // The prompt, puzzle timing and score labels sit in frames sized for the
 // board; they grow at most this much, and board coordinates do not scale.
+// On small phones the prompt card is only as wide as the board, so its copy
+// grows less than other chrome to keep whole words on each line.
 const SESSION_CHROME_MAX_TEXT_SCALE = 1.5;
+const PROMPT_MAX_TEXT_SCALE = 1.25;
 // The uppercase score labels share a board-width strip with three columns;
-// they stay at their designed size so all three read at one size.
+// they stay at their designed size so all three read at one size, and the
+// values grow only as far as the strip's slot allows.
 const SCORE_LABEL_MAX_TEXT_SCALE = 1;
+const SCORE_VALUE_MAX_TEXT_SCALE = 1.3;
 
 function ReviewForecastMetric({
   count,
