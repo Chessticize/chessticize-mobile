@@ -6,6 +6,7 @@ import {
   createPersistentMobilePracticeService,
   createPersistentMobilePracticeServiceSync,
   getPersistentMobileProgressDatabasePath,
+  isSimulationProfileService,
 } from './mobilePractice.ts';
 import { createNativeAndroidSupportDiagnosticsClient } from './androidSupportDiagnostics.ts';
 import {
@@ -63,8 +64,11 @@ export function composeAndroidMobilePlatformCapabilities(
     },
     reminders: {
       platform: 'android',
-      scheduler: createNativeReviewReminderScheduler(),
-      notificationClient: createNativeReviewReminderNotificationClient(),
+      // Dev simulation data must not schedule notifications over the real profile's.
+      scheduler: isSimulationProfileService(service) ? null : createNativeReviewReminderScheduler(),
+      notificationClient: isSimulationProfileService(service)
+        ? null
+        : createNativeReviewReminderNotificationClient(),
     },
     moveFeedback: {
       client: createNativeMoveFeedbackClient(),

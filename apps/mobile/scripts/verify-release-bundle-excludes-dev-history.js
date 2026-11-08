@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-// Build-config check: the Dev-only seeded Tactical Profile history and the
-// simulated player must be absent from a production (`--dev false`) JS
+// Build-config check: the Dev-only seeded Tactical Profile history, the
+// simulation profile and the simulated player must be absent from a production (`--dev false`) JS
 // bundle for each platform, and present in a development bundle as a positive
 // control, so the check cannot pass by grepping for the wrong marker.
 
@@ -14,6 +14,8 @@ const APP_DIR = resolve(__dirname, '..');
 const DEV_ONLY_MARKERS = Object.freeze([
   'Seeded history needs empty progress',
   'Simulated player needs an active Run',
+  // The Dev simulation profile's database name lives only in its Dev-only module.
+  'chessticize-mobile-simulation.sqlite',
 ]);
 
 function bundle(platform, dev, outputDir) {

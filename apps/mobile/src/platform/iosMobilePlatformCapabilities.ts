@@ -8,6 +8,7 @@ import {
   createPersistentMobilePracticeService,
   createPersistentMobilePracticeServiceSync,
   getPersistentMobileProgressDatabasePath,
+  isSimulationProfileService,
 } from './mobilePractice.ts';
 import {
   type MobileApplicationMetadata,
@@ -43,6 +44,10 @@ export function composeIOSMobilePlatformCapabilities(
   applicationMetadata: MobileApplicationMetadata = readNativeApplicationMetadata(),
 ): MobilePlatformCapabilities {
   const testControls = createMobilePracticeTestControls(service);
+  // Dev simulation data stays on this device: no iCloud sync client and no
+  // Review reminders, so nothing simulated reaches CloudKit or schedules
+  // notifications over the real profile's.
+  const simulatedProfile = isSimulationProfileService(service);
   return {
     storage: {
       practiceService: service,
@@ -53,20 +58,24 @@ export function composeIOSMobilePlatformCapabilities(
     progressProtection: {
       kind: 'icloud_sync',
     },
-    progressSync: {
-      client: createNativeICloudProgressSyncClient(),
-      diagnostics: createNativeICloudSyncDiagnosticsClient(
-        getPersistentMobileProgressDatabasePath(),
-      ),
-    },
+    progressSync: simulatedProfile
+      ? { client: null, diagnostics: null }
+      : {
+          client: createNativeICloudProgressSyncClient(),
+          diagnostics: createNativeICloudSyncDiagnosticsClient(
+            getPersistentMobileProgressDatabasePath(),
+          ),
+        },
     stockfish: {
       createTransport: createNativeStockfishTransport,
       prewarm: prewarmNativeStockfishTransport,
     },
     reminders: {
       platform: 'ios',
-      scheduler: createNativeReviewReminderScheduler(),
-      notificationClient: createNativeReviewReminderNotificationClient(),
+      scheduler: simulatedProfile ? null : createNativeReviewReminderScheduler(),
+      notificationClient: simulatedProfile
+        ? null
+        : createNativeReviewReminderNotificationClient(),
     },
     moveFeedback: {
       client: createNativeMoveFeedbackClient(),

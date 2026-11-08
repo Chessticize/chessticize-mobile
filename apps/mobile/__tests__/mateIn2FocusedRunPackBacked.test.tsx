@@ -3,13 +3,13 @@ import { resolve } from 'path';
 import { DatabaseSync } from 'node:sqlite';
 import { MemoryStore } from '../../../packages/storage/src/memory-store.ts';
 import { SQLitePuzzlePackSource } from '../../../packages/storage/src/sqlite-puzzle-pack-source.ts';
-import type { SyncSqliteDatabase } from '../../../packages/storage/src/sync-sqlite-store.ts';
 import type { PracticeService } from '../../../packages/storage/src/practice-service.ts';
 import { MemoryTacticalProfileRepository } from '../../../packages/storage/src/tactical-profile-repository.ts';
 import {
   composePackBackedMobilePracticeService,
   injectMateIn2FocusedRun,
 } from '../src/platform/mobilePractice';
+import { nodeSyncSqliteDatabase } from '../src/testing/nodeSqliteDatabase';
 
 const corePackPath = resolve(__dirname, '../../../fixtures/puzzles/bundled-core-pack.sqlite');
 const NOW = '2026-08-19T12:00:00.000Z';
@@ -19,24 +19,6 @@ const NOW = '2026-08-19T12:00:00.000Z';
 const packAvailable = existsSync(corePackPath);
 const describeWithPack = packAvailable || process.env.CI ? describe : describe.skip;
 
-// Node's SQLite driver behind the same synchronous contract the app's device
-// driver implements for the read-only Core Pack.
-function nodePackDatabase(db: DatabaseSync): SyncSqliteDatabase {
-  return {
-    exec: (sql) => db.exec(sql),
-    prepare: (sql) => {
-      const statement = db.prepare(sql);
-      return {
-        run: (...params) => {
-          statement.run(...(params as never[]));
-        },
-        get: (...params) => statement.get(...(params as never[])),
-        all: (...params) => statement.all(...(params as never[])),
-      };
-    },
-  };
-}
-
 function withPackBackedService<T>(run: (service: PracticeService) => T): T {
   const packDb = new DatabaseSync(corePackPath, { readOnly: true });
   const userStore = new MemoryStore();
@@ -44,7 +26,7 @@ function withPackBackedService<T>(run: (service: PracticeService) => T): T {
     return run(
       composePackBackedMobilePracticeService(
         userStore,
-        new SQLitePuzzlePackSource(nodePackDatabase(packDb), {
+        new SQLitePuzzlePackSource(nodeSyncSqliteDatabase(packDb), {
           arrowDuelEligibility: 'all',
         }),
         new MemoryTacticalProfileRepository(),

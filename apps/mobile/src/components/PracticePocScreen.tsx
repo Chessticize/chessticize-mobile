@@ -768,6 +768,7 @@ export function PracticePocScreen({
   const configurePuzzleSource = platformCapabilities.storage.configurePuzzleSource;
   const injectMateIn2FocusedRun = platformCapabilities.testControls?.injectMateIn2FocusedRun;
   const seedTacticalHistory = platformCapabilities.testControls?.seedTacticalHistory;
+  const simulationProfile = platformCapabilities.testControls?.simulationProfile;
   const stockfish = platformCapabilities.stockfish;
   const scheduler = platformCapabilities.reminders.scheduler;
   const notificationClient = platformCapabilities.reminders.notificationClient;
@@ -2525,6 +2526,37 @@ export function PracticePocScreen({
 
   function seedTestTacticalHistory(scenario: SimulatedHistoryScenarioId): void {
     if (!seedTacticalHistory || isActive || seedingHistoryRef.current) {
+      return;
+    }
+    if (simulationProfile?.active) {
+      // Simulation data is disposable: a scenario replaces it without asking.
+      // The platform reopens on a fresh simulation database, then seeds it.
+      runSimulationProfileAction(() => simulationProfile.replaceWithSeed(scenario));
+      return;
+    }
+    runTestTacticalHistorySeed(scenario);
+  }
+
+  function runSimulationProfileAction(action: () => void): void {
+    setError(null);
+    try {
+      action();
+    } catch (caught) {
+      setError(errorMessage(caught));
+    }
+  }
+
+  useEffect(() => {
+    const pendingSeed = simulationProfile?.takePendingSeed();
+    if (pendingSeed !== undefined) {
+      runTestTacticalHistorySeed(pendingSeed);
+    }
+    // Once per mount: the request is consumed from device storage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function runTestTacticalHistorySeed(scenario: SimulatedHistoryScenarioId): void {
+    if (!seedTacticalHistory || seedingHistoryRef.current) {
       return;
     }
     seedingHistoryRef.current = true;
@@ -5132,6 +5164,11 @@ export function PracticePocScreen({
               <View>
                 <Text style={[styles.title, tab === "practice" || tab === "settings" ? styles.titleLarge : null]}>{screenTitle}</Text>
               </View>
+              {simulationProfile?.active ? (
+                <Text style={styles.simulationBadge} testID="simulation-profile-indicator">
+                  Simulation data
+                </Text>
+              ) : null}
             </View>
           ) : null}
 
@@ -5564,6 +5601,17 @@ export function PracticePocScreen({
                       ? { onSeedTacticalHistory: seedTestTacticalHistory }
                       : {})}
                     seededHistoryStatus={seededHistoryStatus}
+                    {...(simulationProfile
+                      ? {
+                          simulationActive: simulationProfile.active,
+                          onToggleSimulation: () => runSimulationProfileAction(
+                            () => simulationProfile.setActive(!simulationProfile.active)
+                          ),
+                          onClearSimulation: () => runSimulationProfileAction(
+                            () => simulationProfile.clear()
+                          )
+                        }
+                      : {})}
                   />
                 ) : null}
               </>
@@ -9782,17 +9830,48 @@ function TestPuzzleSourceControl({
   onChange,
   onInjectMateIn2FocusedRun,
   onSeedTacticalHistory,
-  seededHistoryStatus
+  seededHistoryStatus,
+  simulationActive,
+  onToggleSimulation,
+  onClearSimulation
 }: {
   source: MobilePuzzleSource;
   onChange: (next: MobilePuzzleSource) => void;
   onInjectMateIn2FocusedRun?: () => void;
   onSeedTacticalHistory?: (scenario: SimulatedHistoryScenarioId) => void;
   seededHistoryStatus?: string | null;
+  simulationActive?: boolean;
+  onToggleSimulation?: () => void;
+  onClearSimulation?: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
   return (
     <View style={styles.testPanel} testID="test-puzzle-source-control">
+      {onToggleSimulation ? (
+        <>
+          <View style={styles.optionRow}>
+            <OptionButton
+              active={simulationActive === true}
+              label="Use simulation data"
+              testID="test-simulation-profile-toggle"
+              onPress={onToggleSimulation}
+            />
+            {simulationActive && onClearSimulation ? (
+              <OptionButton
+                active={false}
+                label="Clear simulation data"
+                testID="test-simulation-profile-clear"
+                onPress={onClearSimulation}
+              />
+            ) : null}
+          </View>
+          {simulationActive ? (
+            <Text style={styles.simulationNotice} testID="test-simulation-profile-notice">
+              Simulation data is on. Your Dev progress is untouched.
+            </Text>
+          ) : null}
+        </>
+      ) : null}
       <Text style={styles.helperText}>Test puzzle source</Text>
       <View style={styles.optionRow}>
         {TEST_PUZZLE_SOURCES.map((option) => (
@@ -20226,6 +20305,23 @@ const useStyles = makeStyles((theme) => ({
     color: theme.colors.text.tertiary,
     fontSize: 12,
     fontWeight: "600"
+  },
+  simulationNotice: {
+    color: theme.colors.warning.s600,
+    fontSize: 12,
+    fontWeight: "600"
+  },
+  simulationBadge: {
+    backgroundColor: theme.colors.warning.s100,
+    borderColor: theme.colors.warning.s500,
+    borderRadius: theme.shape.capsule,
+    borderWidth: 1,
+    color: theme.colors.warning.s600,
+    fontSize: 12,
+    fontWeight: "700",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 4
   },
   filterButton: {
     alignItems: "center",

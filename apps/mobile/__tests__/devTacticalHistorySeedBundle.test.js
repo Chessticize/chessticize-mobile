@@ -1,7 +1,7 @@
 const { readFileSync, readdirSync, statSync } = require('node:fs');
 const { join, relative, resolve } = require('node:path');
 
-// Release bundles must not contain the seeded Dev history. Metro drops the
+// Release bundles must not contain the seeded Dev history or the Dev simulation profile. Metro drops the
 // module only when its sole runtime reference is a literal `__DEV__` branch;
 // `pnpm mobile:verify:release-bundle:dev-history` checks the built bundles.
 describe('Dev-only seeded history bundle boundary', () => {
@@ -17,13 +17,15 @@ describe('Dev-only seeded history bundle boundary', () => {
     for (const file of files) {
       const source = readFileSync(file, 'utf8');
       const runtimeImport =
-        /^import\s+(?!type\b)[^;]*from\s+["'][^"']*(?:devTacticalHistorySeed|\/simulation\/)[^"']*["']/m;
+        /^import\s+(?!type\b)[^;]*from\s+["'][^"']*(?:devTacticalHistorySeed|devSimulationProfile|\/simulation\/)[^"']*["']/m;
       if (runtimeImport.test(source)) {
         runtimeReferences.push(`${relative(appRoot, file)}: static import`);
       }
-      for (const match of source.matchAll(/require\(\s*["'][^"']*(?:devTacticalHistorySeed|\/simulation\/)[^"']*["']\s*\)/g)) {
+      for (const match of source.matchAll(/require\(\s*["'][^"']*(?:devTacticalHistorySeed|devSimulationProfile|\/simulation\/)[^"']*["']\s*\)/g)) {
         const preceding = source.slice(Math.max(0, (match.index ?? 0) - 400), match.index);
-        const guarded = /\.\.\.\(__DEV__\s*\?\s*\{\s*seedTacticalHistory:[\s\S]*$/.test(preceding);
+        const guarded =
+          /\.\.\.\(__DEV__\s*\?\s*\{\s*seedTacticalHistory:[\s\S]*$/.test(preceding) ||
+          /return __DEV__\s*\?\s*\(\s*$/.test(preceding);
         if (!guarded) {
           runtimeReferences.push(`${relative(appRoot, file)}: unguarded require`);
         }
@@ -33,6 +35,9 @@ describe('Dev-only seeded history bundle boundary', () => {
     expect(runtimeReferences).toEqual([]);
     const mobilePractice = readFileSync(join(sourceRoot, 'platform/mobilePractice.ts'), 'utf8');
     expect(mobilePractice).toMatch(/\.\.\.\(__DEV__\s*\?\s*\{\s*seedTacticalHistory:/);
+    expect(mobilePractice).toMatch(
+      /return __DEV__\s*\?\s*\(require\("\.\/devSimulationProfile\.ts"\)/
+    );
   });
 });
 
@@ -42,6 +47,8 @@ function sourceFiles(directory) {
     if (statSync(path).isDirectory()) {
       return sourceFiles(path);
     }
-    return /\.(ts|tsx|js)$/.test(entry) && entry !== 'devTacticalHistorySeed.ts' ? [path] : [];
+    return /\.(ts|tsx|js)$/.test(entry) && entry !== 'devTacticalHistorySeed.ts' && entry !== 'devSimulationProfile.ts'
+      ? [path]
+      : [];
   });
 }

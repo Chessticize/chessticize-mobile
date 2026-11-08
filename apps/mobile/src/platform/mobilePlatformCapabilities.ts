@@ -6,6 +6,7 @@ import type { ICloudSyncDiagnosticsClient } from './iCloudSyncDiagnostics.ts';
 import type { MobilePuzzleSource } from './mobilePractice.ts';
 import type { SimulatedHistoryScenarioId } from '../../../../packages/storage/src/simulation/scenarios.ts';
 import type { DevTacticalHistorySeedResult } from './devTacticalHistorySeed.ts';
+import type { DevSimulationProfileControls } from './devSimulationProfile.ts';
 import type {
   ReviewReminderNotificationClient,
   ReviewReminderScheduler,
@@ -26,6 +27,8 @@ export interface MobileTestControlCapabilities {
     now: string,
     onProgress?: (completedRuns: number, totalRuns: number) => void,
   ) => Promise<DevTacticalHistorySeedResult>;
+  /** Dev builds on a device-persistent service only; absent from Release bundles. */
+  simulationProfile?: DevSimulationProfileControls;
 }
 
 export interface MobileProgressSyncCapabilities {

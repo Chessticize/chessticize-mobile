@@ -13,6 +13,7 @@ import {
   type MobileApplicationMetadata,
   type MobilePlatformCapabilities,
   type MobileProgressProtectionCapabilities,
+  type MobileTestControlCapabilities,
   type MobileStockfishCapabilities,
 } from '../platform/mobilePlatformCapabilities.ts';
 import type {
@@ -40,6 +41,7 @@ export interface TestMobilePlatformCapabilityOverrides {
   applicationMetadata?: Partial<MobileApplicationMetadata>;
   moveFeedbackClient?: MoveFeedbackClient | null;
   appStoreReviewRequestClient?: AppStoreReviewRequestClient | null;
+  testControls?: Partial<MobileTestControlCapabilities>;
 }
 
 export function createTestMobilePlatformCapabilities(
@@ -54,7 +56,10 @@ export function createTestMobilePlatformCapabilities(
   const supportsPuzzleSourceConfiguration =
     overrides.practiceService === undefined ||
     overrides.configurePuzzleSource !== undefined;
-  const testControls = createMobilePracticeTestControls(service);
+  const baseTestControls = createMobilePracticeTestControls(service);
+  const testControls = baseTestControls && overrides.testControls
+    ? { ...baseTestControls, ...overrides.testControls }
+    : baseTestControls;
 
   return {
     storage: {

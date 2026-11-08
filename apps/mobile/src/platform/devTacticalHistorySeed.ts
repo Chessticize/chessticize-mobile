@@ -48,7 +48,9 @@ export async function seedDevTacticalHistory(
     throw new Error("Finish the current Run before seeding a history");
   }
   if (service.countHistory() > 0 || service.listSprintSessions().length > 0) {
-    throw new Error("Seeded history needs empty progress; delete the Dev app data first");
+    throw new Error(
+      "Seeded history needs empty progress; turn on Use simulation data to seed without touching Dev progress"
+    );
   }
   service.saveSettings({
     ...service.getSettings(),

@@ -3,8 +3,15 @@ const { join } = require("node:path");
 
 const appRoot = process.cwd();
 
+// Dev-only modules that Release bundles drop behind a literal `__DEV__` branch;
+// `pnpm mobile:verify:release-bundle:dev-history` proves their absence.
+const DEV_ONLY_MODULES = new Set(["devSimulationProfile.ts"]);
+
 function readSourceFiles(dir) {
   return readdirSync(dir).flatMap((entry) => {
+    if (DEV_ONLY_MODULES.has(entry)) {
+      return [];
+    }
     const fullPath = join(dir, entry);
     const stat = statSync(fullPath);
     if (stat.isDirectory()) {

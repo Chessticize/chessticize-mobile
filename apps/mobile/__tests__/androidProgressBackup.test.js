@@ -85,8 +85,11 @@ describe('Android Progress Backup', () => {
     );
     expect(deviceStore).toContain('return new DeviceSQLiteStore(open({ name }))');
     expect(deviceStore).toContain('`${libraryPath}/Caches`');
+    // The persistent service opens the production database unless the Dev-only
+    // simulation profile (never in Release) selects its separate database.
+    expect(mobilePractice).toContain('DeviceSQLiteStore.open(layout.progressDatabaseName)');
     expect(mobilePractice).toContain(
-      'DeviceSQLiteStore.open(MOBILE_DATABASE_LAYOUT.progressDatabaseName)',
+      'progressDatabaseName: MOBILE_DATABASE_LAYOUT.progressDatabaseName',
     );
     expect(migrationJourney).toContain('ReleasedDatabaseFixtureInstallerTest');
     expect(fixtureInstaller).toContain('const val DATABASE_NAME = "chessticize-mobile.sqlite"');
