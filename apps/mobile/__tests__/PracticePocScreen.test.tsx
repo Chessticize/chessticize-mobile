@@ -25,7 +25,8 @@ import {
 } from "../src/components/PersonalBestChallengeDesign";
 import {
   ARROW_DUEL_REPLY_LAB_MOVES,
-  LabScenario
+  LabScenario,
+  sprintRulesDesignPreviewFor
 } from "../../mobile-lab/src/LabScenario";
 import {
   createMobilePracticeService,
@@ -9194,6 +9195,24 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "personal-best-hub")).toBeTruthy();
   });
 
+  it("shows a Focused Run average alone while usual pace is unknown, and a dash without solves", () => {
+    const preview = sprintRulesDesignPreviewFor("practice-tactical-focus-result");
+    const withoutUsual = renderScreen({
+      sprintRulesDesignPreview: { ...preview, resultFocusedRunPace: { averageSolveSeconds: 17 } }
+    });
+    const averageOnly = findByTestId(withoutUsual, "sprint-result-average-solve");
+    expect(collectText(averageOnly)).toBe("Avg Solve17s");
+    expect(averageOnly.props.accessibilityLabel).toBe("Average solve 17 seconds");
+    expect(() => findByTestId(withoutUsual, "sprint-result-usual-solve")).toThrow();
+
+    const withoutAverage = renderScreen({
+      sprintRulesDesignPreview: { ...preview, resultFocusedRunPace: {} }
+    });
+    const unavailable = findByTestId(withoutAverage, "sprint-result-average-solve");
+    expect(collectText(unavailable)).toBe("Avg Solve—");
+    expect(unavailable.props.accessibilityLabel).toBe("Average solve time unavailable");
+  });
+
   it("explains a completed Tactical Focus Run as fixed, unrated training", () => {
     const renderer = renderLabScenario("practice-tactical-focus-result");
 
@@ -9210,6 +9229,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-rating-range"))).toBe(
       "1087 unchanged"
     );
+    // Average solve against the player's usual pace replaces Best Streak.
+    const averageSolve = findByTestId(renderer, "sprint-result-average-solve");
+    expect(collectText(averageSolve)).toBe("Avg Solve17sUsually 24s");
+    expect(averageSolve.props.accessibilityLabel).toBe(
+      "Average solve 17 seconds, usually 24 seconds on these themes"
+    );
+    expect(() => findByTestId(renderer, "sprint-result-best-streak")).toThrow();
     expect(() => findByTestId(renderer, "sprint-result-history-trend")).toThrow();
     expect(() => findByTestId(renderer, "sprint-result-history-button")).toThrow();
     expect(() => findByTestId(renderer, "sprint-result-goal-label")).toThrow();
@@ -9234,6 +9260,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-score-left").props.accessibilityLabel)
       .toBe("Left 5");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("10 / 15");
+    // No overall clock: the Run timer counts elapsed time up.
+    const timer = findByTestId(renderer, "session-timer-block");
+    expect(timer.props.accessibilityLabel).toMatch(/^Elapsed \d\d:\d\d$/);
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("02:00");
   });
 
   it("keeps Focused Run metric labels readable in the maintained landscape rail", () => {
@@ -9259,8 +9289,10 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("practice-tactical-focus-guide");
 
     expectText(renderer, "Track your Focused Run");
-    expectText(renderer, "This Run is unrated.");
+    expectText(renderer, "There’s no overall time limit.");
     expectText(renderer, "Unrated");
+    // The guide's header clock starts at zero and counts up.
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("00:00");
     expect(
       collectText(findByTestId(renderer, "practice-session-guide-start"))
     ).toBe("Next");

@@ -9,6 +9,7 @@ import {
   pauseSprint,
   resumeSprint,
   serializeSprintView,
+  sprintHasRunDeadline,
   startSprint,
   submitSprintMove
 } from "../src/index.ts";
@@ -928,6 +929,75 @@ test("Tactical Focus stops at the fixed attempt ceiling without changing Rating"
   assert.equal(state.endReason, "attempt_limit");
   assert.equal(state.correctCount + state.mistakeCount, 3);
   assert.equal(state.ratingAfter, undefined);
+});
+
+function untimedFocusConfig(maxAttempts: number) {
+  return buildSprintConfig({
+    mode: "standard",
+    durationSeconds: 300,
+    perPuzzleSeconds: 20,
+    targetCorrect: maxAttempts,
+    maxMistakes: maxAttempts,
+    maxAttempts,
+    ratingPolicy: "unrated",
+    runClock: "untimed",
+    tacticalFocus: {
+      taskFamily: "line",
+      themes: ["fork"],
+      mixedControlCount: 1,
+      ratingAnchor: 900,
+      minRating: 800,
+      maxRating: 1000
+    }
+  });
+}
+
+test("an untimed Focused Run outlives its source Run clock and ends after every puzzle", () => {
+  let state = startSprint({
+    config: untimedFocusConfig(3),
+    puzzles: [oneMovePuzzle("p1"), oneMovePuzzle("p2"), oneMovePuzzle("p3")],
+    ratingBefore: 900,
+    now: NOW
+  });
+  // Each solve takes 50 s of a 60 s Timeout, so the Run passes the source
+  // Run's 300-second clock without ending early.
+  state = submitSprintMove(state, "e6e7", "2026-06-20T00:00:50.000Z").state;
+  state = advanceSprintTime(state, "2026-06-20T00:06:00.000Z").state;
+  assert.equal(state.status, "active", "no Run deadline");
+  assert.equal(state.mistakeCount, 1, "the per-puzzle Timeout still applies");
+  state = submitSprintMove(state, "e6e7", "2026-06-20T00:06:50.000Z").state;
+
+  assert.equal(state.status, "won");
+  assert.equal(state.endReason, "attempt_limit");
+  assert.equal(state.correctCount + state.mistakeCount, 3);
+  assert.equal(state.ratingAfter, undefined);
+});
+
+test("only Focused Runs may be untimed, and legacy configs keep their countdown", () => {
+  assert.equal(untimedFocusConfig(3).runClock, "untimed");
+  assert.throws(
+    () => buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      runClock: "untimed"
+    }),
+    /Only Focused Runs can be untimed/
+  );
+  assert.throws(
+    () => buildSprintConfig({
+      mode: "standard",
+      durationSeconds: 300,
+      perPuzzleSeconds: 20,
+      runClock: "forever" as "untimed"
+    }),
+    /runClock/
+  );
+  assert.equal(defaultSprintConfig("standard").runClock, undefined);
+  assert.equal(sprintHasRunDeadline(defaultSprintConfig("standard")), true);
+  assert.equal(sprintHasRunDeadline(untimedFocusConfig(3)), false);
+  const { runClock: _runClock, ...legacyFocus } = untimedFocusConfig(3);
+  assert.equal(sprintHasRunDeadline(legacyFocus), true);
 });
 
 function samplePuzzle(id: string): Puzzle {

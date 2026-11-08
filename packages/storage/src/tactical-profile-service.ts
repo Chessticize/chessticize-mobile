@@ -7,6 +7,7 @@ import {
   evaluateTacticalProfile,
   namedThemesForSelection,
   tacticalProfileCalibrationAssurance,
+  tacticalProfileUsualSolveSeconds,
   tacticalThemeFrequencyAtRating,
   tacticalThemeInventoryUpperBound
 } from "../../core/src/index.ts";
@@ -247,6 +248,34 @@ export class TacticalProfileService {
         [],
         this.calibration.evidence
       );
+    }
+  }
+
+  /**
+   * The player's usual completed-solve time on these themes from the derived
+   * Profile cells, for comparing a Focused Run's pace. Undefined while the
+   * Profile is building, unavailable, or has too few ordinary solves.
+   */
+  getUsualSolveSeconds(
+    taskFamily: TacticalProfileTaskFamily,
+    themes: readonly string[],
+    now = new Date().toISOString()
+  ): number | undefined {
+    const snapshot = this.getSnapshot(now);
+    if (snapshot.phase === "building") {
+      return undefined;
+    }
+    try {
+      return tacticalProfileUsualSolveSeconds({
+        cells: this.repository.listDailyCells(this.identity),
+        calibration: this.calibration,
+        now: snapshot.buildState.evaluatedAt ?? now,
+        taskFamily,
+        themes
+      });
+    } catch (error) {
+      this.recordCacheFailure(error);
+      return undefined;
     }
   }
 
@@ -1102,6 +1131,9 @@ export class TacticalProfileService {
         maxMistakes: puzzles.length,
         maxAttempts: puzzles.length,
         ratingPolicy: "unrated",
+        // A Focused Run trains a slow theme, so it must not be cut short by
+        // the source Run's overall clock; each puzzle keeps its own timing.
+        runClock: "untimed",
         tacticalFocus: {
           taskFamily: exactPlan.taskFamily,
           themes: exactPlan.reasons.map((reason) => reason.theme),

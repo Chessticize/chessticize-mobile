@@ -1900,6 +1900,7 @@ for (const backend of ["memory", "sqlite"] as const) {
         maxMistakes: 2,
         maxAttempts: 2,
         ratingPolicy: "unrated",
+        runClock: "untimed",
         tacticalFocus: {
           taskFamily: "line",
           themes: ["mateIn2"],
@@ -1928,10 +1929,17 @@ for (const backend of ["memory", "sqlite"] as const) {
       assert.equal(restored?.status, "paused");
       assert.equal(restored?.pausedAt, started.currentPuzzleStartedAt);
       assert.equal(restored?.currentPuzzle?.puzzle.id, focusedPuzzle.id);
+      assert.equal(restored?.config.runClock, "untimed");
 
+      // An hour later is far past the source Run's 300-second clock; the
+      // untimed Focused Run resumes instead of expiring.
       const resumed = restarted.resumeSprint("2026-08-19T13:00:00.000Z");
       assert.equal(resumed.status, "active");
       assert.equal(resumed.currentPuzzle?.puzzle.id, focusedPuzzle.id);
+      assert.equal(
+        restarted.advanceSprintTime("2026-08-19T13:00:30.000Z").state.status,
+        "active"
+      );
     } finally {
       if (store instanceof SQLiteStore) {
         store.close();

@@ -420,7 +420,7 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
   ].includes(scenarioId);
 }
 
-function sprintRulesDesignPreviewFor(
+export function sprintRulesDesignPreviewFor(
   scenarioId: LabScenarioId
 ): React.ComponentProps<typeof PracticePocScreen>["sprintRulesDesignPreview"] {
   const firstRunGuide = {
@@ -525,7 +525,7 @@ function sprintRulesDesignPreviewFor(
           focusedRun: true
         }),
         presentation: {
-          durationLabel: "5:00",
+          durationLabel: "00:00",
           focusedRun: true,
           maxAttempts: 15,
           maxMistakes: 15,
@@ -641,6 +641,7 @@ function sprintRulesDesignPreviewFor(
           maxMistakes: 15,
           maxAttempts: 15,
           ratingPolicy: "unrated",
+          runClock: "untimed",
           tacticalFocus: {
             taskFamily: "line",
             themes: ["fork"],
@@ -650,7 +651,8 @@ function sprintRulesDesignPreviewFor(
             maxRating: 1187
           }
         }
-      }
+      },
+      resultFocusedRunPace: { averageSolveSeconds: 17, usualSolveSeconds: 24 }
     };
   }
   if (
@@ -1210,6 +1212,7 @@ function tacticalFocusActiveState(
       maxAttempts: 15,
       maxMistakes: 15,
       ratingPolicy: "unrated",
+      runClock: "untimed",
       tacticalFocus: {
         taskFamily,
         themes: [isArrowDuel ? "pin" : "fork"],

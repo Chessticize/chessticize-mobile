@@ -16,6 +16,7 @@ import {
   shouldReevaluateTacticalProfile,
   tacticalProfileSolveBaselineFeatures,
   tacticalProfileSpeedBaselineFeatures,
+  tacticalProfileUsualSolveSeconds,
   type TacticalProfileAttemptInput,
   type TacticalProfileCalibrationArtifact
 } from "../src/tactical-profile.ts";
@@ -1074,6 +1075,53 @@ test("completed speed compares a theme with the user's own comparable solves", (
   assert.ok(estimate.speedEvidenceWeight > 0);
   assert.ok(estimate.completedTimeMultiplier > 0.95);
   assert.ok(estimate.completedTimeMultiplier < 1.05);
+});
+
+test("usual solve time on focus themes comes from ordinary correct solves only", () => {
+  const forkSolve = (index: number, elapsedMs: number, overrides: Parameters<typeof tacticalAttempt>[0] = {}) =>
+    tacticalAttempt({
+      ...overrides,
+      attempt: {
+        id: `fork-${index}`,
+        sessionId: `fork-session-${index % 2}`,
+        puzzleId: `fork-puzzle-${index}`,
+        elapsedMs,
+        ...overrides.attempt
+      },
+      puzzle: { id: `fork-puzzle-${index}`, themes: ["fork"], ...overrides.puzzle }
+    });
+  const inputs = [
+    ...[20_000, 45_000, 20_000, 45_000, 20_000, 45_000].map((elapsedMs, index) =>
+      forkSolve(index, elapsedMs)
+    ),
+    // Misses, Focused Runs and other themes never shape the usual pace.
+    forkSolve(10, 5_000, { attempt: { result: "wrong" } }),
+    forkSolve(11, 5_000, {
+      sessionConfig: {
+        tacticalFocus: {
+          taskFamily: "line",
+          themes: ["fork"],
+          mixedControlCount: 5,
+          ratingAnchor: 1500,
+          minRating: 1400,
+          maxRating: 1600
+        }
+      }
+    }),
+    forkSolve(12, 5_000, { puzzle: { themes: ["pin"] } })
+  ];
+  const usual = (themes: string[], cells = buildTacticalProfileDailyCells(inputs, CALIBRATION)) =>
+    tacticalProfileUsualSolveSeconds({
+      cells,
+      calibration: CALIBRATION,
+      now: "2026-07-20T12:00:00.000Z",
+      taskFamily: "line",
+      themes
+    });
+
+  assert.ok(Math.abs((usual(["fork"]) ?? 0) - 30) < 1e-6);
+  assert.equal(usual(["fork"], buildTacticalProfileDailyCells(inputs.slice(0, 4), CALIBRATION)), undefined);
+  assert.equal(usual(["skewer"]), undefined);
 });
 
 test("personal speed expectations adjust for puzzle Rating relative to the player", () => {

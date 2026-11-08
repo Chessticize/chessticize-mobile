@@ -153,6 +153,45 @@ test("a recommendation leads to a Focused Run that records every attempt without
   }
 });
 
+// #616 item 3. A player who is genuinely slow on the focus theme used to run
+// out of the source Run's 300-second clock before finishing the Focused Run.
+test("a player slow on the focus theme completes every Focused Run puzzle", (t) => {
+  const history = playHistory({
+    player: {
+      ...BALANCED_SIMULATED_PLAYER,
+      themeSpeedMultipliers: { fork: 1.8 }
+    },
+    seed: "slow-focused-run",
+    plan: {
+      runs: 12,
+      stopWhen: (record) => record.signals.some(
+        (signal) => signal.id === "line:fork" && signal.status === "recommended"
+      )
+    }
+  });
+  try {
+    const { practice } = history.world;
+    const { clock, player } = history;
+    clock.advanceTo(clock.nowMs() + 60_000);
+    const started = practice.startFocusedRun("line", clock.now(), "slow-focused-run");
+
+    const result = playActiveRun({ practice, player, clock });
+    const runSeconds = (Date.parse(result.completedAt) - Date.parse(result.startedAt)) / 1000;
+    t.diagnostic(`Focused Run took ${Math.round(runSeconds)} s, ended ${result.endReason}`);
+
+    assert.ok(runSeconds > started.config.durationSeconds, "the Run outlasted the source clock");
+    assert.equal(result.endReason, "attempt_limit");
+    assert.equal(result.attemptCount, started.puzzles.length);
+    const attempts = practice.listHistory({ sessionId: started.id });
+    assert.equal(attempts.length, started.puzzles.length);
+    assert.ok(attempts.every((attempt) => attempt.result !== "incomplete"));
+    assert.equal(result.ratingAfter, undefined);
+    assert.equal(started.config.runClock, "untimed");
+  } finally {
+    history.world.close();
+  }
+});
+
 test("randomized histories never throw and never produce non-finite signals", (t) => {
   const themes = ["fork", "pin", "mateIn1", "mateIn2", "sacrifice", "discoveredAttack", "advancedPawn"];
   const played = { arrowDuel: 0, focused: 0, runs: 0 };

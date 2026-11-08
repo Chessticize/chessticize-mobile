@@ -24,7 +24,7 @@ export function sessionGuideStepCopy(
     case "session_progress":
       return focusedRun
         ? {
-            detail: "Puzzles done and time left. This Run is unrated. The clock waits until you start.",
+            detail: "Puzzles done and time so far. There’s no overall time limit.",
             preferred: ["below", "trailing"],
             title: "Track your Focused Run"
           }
@@ -53,7 +53,9 @@ export function sessionGuideStepCopy(
       };
     case "arrow_duel_reply":
       return {
-        detail: "Next we play the other move. Find Black’s best reply in 10 seconds. Sprint time pauses.",
+        detail: focusedRun
+          ? "Next we play the other move. Find Black’s best reply in 10 seconds."
+          : "Next we play the other move. Find Black’s best reply in 10 seconds. Sprint time pauses.",
         // Same order as the choice step, so both board steps sit in one place.
         preferred: ["trailing", "below", "above", "leading"],
         title: "Then reply for Black"
