@@ -46,6 +46,15 @@ export type GuideCalloutGeometryInput = {
   // overlay re-measures it at the returned width. Defaults to the measured
   // width, which disables narrowing.
   maxCalloutWidth?: number;
+  // Heights the callout has actually been measured at, by rendered width. They
+  // replace the area estimate, so a choice between a narrow side placement and
+  // a full-width one above or below rests on real heights and settles instead
+  // of alternating as each re-measure changes the estimate.
+  knownCalloutHeights?: ReadonlyMap<number, number>;
+  // Shortest the callout may become when no side has room for all of it. Its
+  // copy then scrolls inside the callout instead of the callout covering the
+  // target. Omit to always overlap in that case.
+  minCalloutHeight?: number;
   // Preferred placements, tried in order before the remaining ones.
   preferred?: readonly GuidePlacement[];
   isRTL?: boolean;
@@ -55,7 +64,10 @@ export type GuideCalloutGeometryInput = {
 export type GuideMetrics = {
   // Space kept between the callout and each Safe Area edge.
   edgeMargin: number;
-  // Distance from the cut-out edge to the callout edge. The pointer sits in it.
+  // Distance from the cut-out edge to the callout edge. It is shorter than the
+  // pointer, so the pointer tip reaches into the cut-out's padding (but never
+  // the target) and nothing behind the scrim shows between callout and
+  // cut-out. Keep gap + cutoutPadding >= pointerReach.
   gap: number;
   // Extra space drawn around the target by the cut-out.
   cutoutPadding: number;
@@ -70,6 +82,9 @@ export type GuideMetrics = {
 
 export type GuideCalloutGeometry = {
   callout: GuideRect;
+  // True when the callout was shortened to `minCalloutHeight` or more so it
+  // could stay clear of the target; its copy scrolls.
+  compressed: boolean;
   cutout: GuideRect & { radius: number };
   // True when no side of the target had room, so the callout was clamped over
   // part of the cut-out and the pointer is hidden.
@@ -86,12 +101,16 @@ export const DEFAULT_GUIDE_METRICS: GuideMetrics = {
   cutoutPadding: 6,
   cutoutRadius: 12,
   edgeMargin: 12,
-  gap: 14,
+  gap: 4,
   minCalloutWidth: 240,
   pointerReach: 8
 };
 
 export const GUIDE_CALLOUT_MAX_WIDTH = 360;
+// On regular-width windows (iPad, wide Split View) the callout may be a little
+// wider, so a long start label and Back fit equal slots around the progress.
+export const GUIDE_CALLOUT_MAX_WIDTH_REGULAR = 400;
+const REGULAR_SAFE_WIDTH = 600;
 
 const DEFAULT_PLACEMENT_ORDER: readonly GuidePlacement[] = [
   "below",
@@ -122,9 +141,10 @@ export function guideCalloutMaxWidth(
   insets: GuideInsets,
   edgeMargin = DEFAULT_GUIDE_METRICS.edgeMargin
 ): number {
+  const safeWidth = guideSafeFrame(container, insets, edgeMargin).width;
   return Math.min(
-    GUIDE_CALLOUT_MAX_WIDTH,
-    guideSafeFrame(container, insets, edgeMargin).width
+    safeWidth >= REGULAR_SAFE_WIDTH ? GUIDE_CALLOUT_MAX_WIDTH_REGULAR : GUIDE_CALLOUT_MAX_WIDTH,
+    safeWidth
   );
 }
 
@@ -142,9 +162,10 @@ export function placeGuideCallout(
   const measuredArea = input.callout.width * input.callout.height;
   const sizeAt = (width: number): GuideSize => ({
     height: Math.min(
-      width === input.callout.width
-        ? input.callout.height
-        : Math.ceil(measuredArea / Math.max(1, width)),
+      input.knownCalloutHeights?.get(Math.round(width))
+        ?? (width === input.callout.width
+          ? input.callout.height
+          : Math.ceil(measuredArea / Math.max(1, width))),
       safeFrame.height
     ),
     width
@@ -165,35 +186,68 @@ export function placeGuideCallout(
     };
   });
   const fitting = candidates.find((candidate) => candidate.fits);
-  const chosen = fitting ?? candidates
-    // With no room on any side, keep the callout above or below the target
-    // where the most of it fits, and let the clamp cover part of the cut-out.
+  const roomiest = candidates
     .filter(({ placement }) => isVertical(placement))
     .reduce((best, candidate) => candidate.space > best.space ? candidate : best);
+  // With no room on any side, shorten the callout into the roomiest space above
+  // or below the target when it can keep its title and navigation there.
+  // Otherwise keep it where most of it fits and let the clamp cover part of
+  // the cut-out.
+  const compressed = fitting === undefined
+    && input.minCalloutHeight !== undefined
+    && roomiest.space >= input.minCalloutHeight;
+  const chosen = fitting ?? roomiest;
   const placement = chosen.placement;
-  const { height, width } = chosen.size;
+  const width = chosen.size.width;
+  const height = compressed ? Math.floor(roomiest.space) : chosen.size.height;
   const physicalSide = physicalPlacement(placement, input.isRTL === true);
   const cutoutCenterX = cutout.x + cutout.width / 2;
   const cutoutCenterY = cutout.y + cutout.height / 2;
 
+  // Across the placement axis the callout stays centred in the safe frame
+  // while its pointer can reach the cut-out centre from there, so it does not
+  // jump between steps. A target it cannot reach (a control in the iPad
+  // landscape side panel) gets the callout centred on it instead, keeping it
+  // within that column rather than straddling the board and the panel.
+  const pointerInset = metrics.calloutRadius + metrics.pointerReach;
+  // A callout centred on a target near an edge keeps a little more room from
+  // that edge than the safe-frame margin, so it does not look pinned to it.
+  const targetCentredInset = 8;
+  const centredOn = (
+    safeStart: number,
+    safeLength: number,
+    size: number,
+    targetCentre: number
+  ): number => {
+    const centred = safeStart + (safeLength - size) / 2;
+    const reachable = targetCentre >= centred + pointerInset
+      && targetCentre <= centred + size - pointerInset;
+    return reachable
+      ? centred
+      : clamp(
+          targetCentre - size / 2,
+          safeStart + targetCentredInset,
+          safeStart + safeLength - size - targetCentredInset
+        );
+  };
   let x: number;
   let y: number;
   switch (physicalSide) {
     case "above":
-      x = cutoutCenterX - width / 2;
+      x = centredOn(safeFrame.x, safeFrame.width, width, cutoutCenterX);
       y = cutout.y - metrics.gap - height;
       break;
     case "below":
-      x = cutoutCenterX - width / 2;
+      x = centredOn(safeFrame.x, safeFrame.width, width, cutoutCenterX);
       y = cutout.y + cutout.height + metrics.gap;
       break;
     case "left":
       x = cutout.x - metrics.gap - width;
-      y = cutoutCenterY - height / 2;
+      y = centredOn(safeFrame.y, safeFrame.height, height, cutoutCenterY);
       break;
     case "right":
       x = cutout.x + cutout.width + metrics.gap;
-      y = cutoutCenterY - height / 2;
+      y = centredOn(safeFrame.y, safeFrame.height, height, cutoutCenterY);
       break;
   }
   x = clamp(x, safeFrame.x, safeFrame.x + safeFrame.width - width);
@@ -203,6 +257,7 @@ export function placeGuideCallout(
 
   return {
     callout,
+    compressed,
     cutout,
     overlapsTarget,
     placement,

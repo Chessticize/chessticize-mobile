@@ -4,6 +4,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  useWindowDimensions,
   View,
   type LayoutChangeEvent
 } from "react-native";
@@ -38,9 +39,13 @@ export type SessionGuideOverlayProps = {
   onBack: () => void;
   onExit: () => void;
   onNext: () => void;
+  // The scroll view that holds the target, when that is not the screen's own
+  // scroll (the session side panel in landscape). A target it clips is
+  // scrolled into its viewport before the spotlight appears.
+  clipRef?: React.RefObject<unknown>;
   // Asks the screen to scroll by this many points when the target sits outside
-  // the safe frame, for example with very large text.
-  onRequestScroll?: (deltaY: number) => void;
+  // the safe frame ("screen"), or outside its clipping scroll view ("clip").
+  onRequestScroll?: (deltaY: number, scope: "clip" | "screen") => void;
 };
 
 type Measurement = {
@@ -59,6 +64,37 @@ const POINTER_SIDE = Math.round(DEFAULT_GUIDE_METRICS.pointerReach * Math.SQRT2)
 // Re-measure once more after late layout such as the board's first paint.
 const SETTLE_MEASURE_DELAY_MS = 250;
 const MAX_SCROLL_REQUESTS_PER_STEP = 2;
+// The screen scrolls a target into view with its default animation; the
+// cut-out and callout wait until it has settled instead of trailing it.
+const SCROLL_SETTLE_MS = 320;
+// Fixed vertical parts of the callout, matching its styles: padding, border
+// and the two gaps between header, copy and navigation.
+const CALLOUT_VERTICAL_CHROME = 14 + 12 + 2 + 10 * 2;
+// A shortened callout keeps at least one line of body copy visible; the rest
+// scrolls.
+const MIN_VISIBLE_COPY_LINES = 1;
+// The callout's text follows the system text size up to this multiplier, so
+// at accessibility sizes it can still sit beside its target with its title
+// and navigation visible. The session screen behind it scales fully.
+export const GUIDE_MAX_TEXT_SCALE = 1.4;
+const DETAIL_LINE_HEIGHT = 21;
+const EXIT_GLYPH_SIZE = 22;
+const NAV_SIDE_GAP = 8;
+const NAV_PROGRESS_MIN_WIDTH = 48;
+const NAV_BACK_MIN_WIDTH = 72;
+const NAV_SYMMETRIC_TOLERANCE = 24;
+
+type CalloutParts = {
+  copy?: number;
+  header?: number;
+  navigation?: number;
+};
+
+type NavigationWidths = {
+  back?: number;
+  next?: number;
+  row?: number;
+};
 
 // The first-use guide overlay (#611): a dimmed scrim with a rounded cut-out
 // around one measured target of the real session screen, and one callout whose
@@ -76,6 +112,7 @@ export function SessionGuideOverlay({
   stepTestID,
   targetRef,
   testID,
+  clipRef,
   title,
   totalSteps,
   onBack,
@@ -84,10 +121,29 @@ export function SessionGuideOverlay({
   onRequestScroll
 }: SessionGuideOverlayProps): React.JSX.Element {
   const styles = useStyles();
+  const { fontScale } = useWindowDimensions();
+  const textScale = Math.min(Math.max(fontScale || 1, 1), GUIDE_MAX_TEXT_SCALE);
   const rootRef = useRef<View>(null);
   const calloutRef = useRef<View>(null);
+  const copyScrollRef = useRef<ScrollView>(null);
+  const [parts, setParts] = useState<CalloutParts>({});
+  const [navigationWidths, setNavigationWidths] = useState<NavigationWidths>({});
+  const rememberPart = useCallback((key: keyof CalloutParts, value: number) => {
+    setParts((current) => current[key] === value ? current : { ...current, [key]: value });
+  }, []);
+  const rememberNavigationWidth = useCallback((key: keyof NavigationWidths, value: number) => {
+    setNavigationWidths((current) => current[key] === value
+      ? current
+      : { ...current, [key]: value });
+  }, []);
   const [containerSize, setContainerSize] = useState<GuideSize | null>(null);
   const [measurement, setMeasurement] = useState<Measurement | null>(null);
+  // Natural callout heights seen at each rendered width during this step.
+  const knownHeightsRef = useRef({ heights: new Map<number, number>(), key: measureKey });
+  if (knownHeightsRef.current.key !== measureKey) {
+    knownHeightsRef.current = { heights: new Map(), key: measureKey };
+  }
+  const [scrolling, setScrolling] = useState(false);
   const measureGenerationRef = useRef(0);
   const scrollRequestsRef = useRef({ count: 0, key: measureKey });
   const onRequestScrollRef = useRef(onRequestScroll);
@@ -106,7 +162,19 @@ export function SessionGuideOverlay({
     }
     const generation = measureGenerationRef.current + 1;
     measureGenerationRef.current = generation;
-    root.measureInWindow((rootX, rootY, rootWidth, rootHeight) => {
+    const clip = clipRef?.current as MeasurableView | null | undefined;
+    const measureClip = (
+      done: (frame: GuideRect | null) => void
+    ): void => {
+      if (typeof clip?.measureInWindow !== "function") {
+        done(null);
+        return;
+      }
+      clip.measureInWindow((x, y, width, height) => {
+        done(width > 0 && height > 0 ? { height, width, x, y } : null);
+      });
+    };
+    measureClip((clipFrame) => root.measureInWindow((rootX, rootY, rootWidth, rootHeight) => {
       target.measureInWindow?.((targetX, targetY, targetWidth, targetHeight) => {
         callout.measureInWindow?.((_calloutX, _calloutY, calloutWidth, calloutHeight) => {
           if (generation !== measureGenerationRef.current) {
@@ -125,13 +193,27 @@ export function SessionGuideOverlay({
               y: targetY - rootY
             }
           };
+          // A target clipped by its own scroll view is revealed there first;
+          // otherwise the screen scrolls it inside the safe frame.
+          const clipDelta = clipFrame
+            ? overflowDelta(
+                targetY,
+                targetHeight,
+                clipFrame.y,
+                clipFrame.height,
+                0
+              )
+            : 0;
           const safeFrame = guideSafeFrame(next.container, insets, 0);
-          const deltaY = next.target.y < safeFrame.y
-            ? next.target.y - safeFrame.y
-            : next.target.y + next.target.height > safeFrame.y + safeFrame.height
-              ? next.target.y + next.target.height - (safeFrame.y + safeFrame.height)
-                + DEFAULT_GUIDE_METRICS.edgeMargin
-              : 0;
+          const screenDelta = overflowDelta(
+            next.target.y,
+            next.target.height,
+            safeFrame.y,
+            safeFrame.height,
+            DEFAULT_GUIDE_METRICS.edgeMargin
+          );
+          const scope = Math.abs(clipDelta) > 1 ? "clip" : "screen";
+          const deltaY = scope === "clip" ? clipDelta : screenDelta;
           const requests = scrollRequestsRef.current;
           if (
             Math.abs(deltaY) > 1
@@ -139,14 +221,18 @@ export function SessionGuideOverlay({
             && requests.count < MAX_SCROLL_REQUESTS_PER_STEP
           ) {
             requests.count += 1;
-            onRequestScrollRef.current(deltaY);
-            setTimeout(() => measureRef.current(), 50);
+            onRequestScrollRef.current(deltaY, scope);
+            setScrolling(true);
+            setTimeout(() => {
+              setScrolling(false);
+              measureRef.current();
+            }, SCROLL_SETTLE_MS);
           }
           setMeasurement((current) => sameMeasurement(current, next) ? current : next);
         });
       });
-    });
-  }, [insets, targetRef]);
+    }));
+  }, [clipRef, insets, targetRef]);
   const measureRef = useRef(measure);
   measureRef.current = measure;
 
@@ -172,26 +258,78 @@ export function SessionGuideOverlay({
   const container = containerSize ?? measurement?.container ?? null;
   const calloutWidth = container ? guideCalloutMaxWidth(container, insets) : undefined;
   const safeFrame = container ? guideSafeFrame(container, insets) : null;
+  // The callout's natural height comes from its parts, so it stays known while
+  // the callout is shortened and its copy scrolls.
+  const hasParts = parts.copy !== undefined
+    && parts.header !== undefined
+    && parts.navigation !== undefined;
+  const fixedHeight = hasParts
+    ? CALLOUT_VERTICAL_CHROME + (parts.header ?? 0) + (parts.navigation ?? 0)
+    : null;
+  const naturalHeight = fixedHeight !== null ? fixedHeight + (parts.copy ?? 0) : null;
+  const minCalloutHeight = fixedHeight !== null
+    ? fixedHeight + Math.min(
+        parts.copy ?? 0,
+        MIN_VISIBLE_COPY_LINES * DETAIL_LINE_HEIGHT * textScale
+      )
+    : undefined;
   const geometry: GuideCalloutGeometry | null = measurement
     && container
     && measurement.container.width === container.width
     && measurement.container.height === container.height
     ? placeGuideCallout({
-        callout: measurement.callout,
+        callout: {
+          // Parts are measured at the rendered width, which measureInWindow
+          // reports, so the natural height matches that width.
+          height: naturalHeight ?? measurement.callout.height,
+          width: measurement.callout.width
+        },
         container,
         insets,
         // The Jest host has no I18nManager; treat it as left-to-right.
         isRTL: I18nManager?.isRTL === true,
+        knownCalloutHeights: knownHeightsRef.current.heights,
         maxCalloutWidth: calloutWidth,
+        minCalloutHeight,
         preferred,
         target: measurement.target
       })
     : null;
+  // Back and Next share equal side slots so "n of m" sits in the centre, as
+  // long as both slots and the progress fit on one row.
+  const sideSlotWidth = Math.max(navigationWidths.back ?? 0, navigationWidths.next ?? 0);
+  // Equal slots only read as centred when Back and Start are close in width;
+  // beside a much wider start label the progress centres in the visible gap.
+  const symmetricNavigation = navigationWidths.next !== undefined
+    && navigationWidths.row !== undefined
+    && Math.abs(navigationWidths.next - (navigationWidths.back ?? NAV_BACK_MIN_WIDTH))
+      <= NAV_SYMMETRIC_TOLERANCE
+    && navigationWidths.row
+      >= sideSlotWidth * 2 + NAV_SIDE_GAP * 2 + NAV_PROGRESS_MIN_WIDTH * textScale;
+  // Without equal slots, Start keeps to the right and the progress centres in
+  // the gap between the buttons; it only wraps to its own row when the row
+  // cannot hold Back, the progress and Start.
+  const navigationWraps = navigationWidths.row === undefined
+    || navigationWidths.next === undefined
+    || navigationWidths.row < (navigationWidths.back ?? 0) + navigationWidths.next
+      + NAV_SIDE_GAP * 2 + NAV_PROGRESS_MIN_WIDTH * textScale;
+  const exitSize = EXIT_GLYPH_SIZE * textScale;
+  useEffect(() => {
+    if (measurement) {
+      knownHeightsRef.current.heights.set(
+        Math.round(measurement.callout.width),
+        naturalHeight ?? measurement.callout.height
+      );
+    }
+  }, [measurement, naturalHeight]);
   // Show the callout once it has been measured at the width it is placed at.
-  const isPlaced = geometry !== null
+  const isPlaced = !scrolling
+    && geometry !== null
     && measurement !== null
     && Math.abs(geometry.callout.width - measurement.callout.width) < 1;
-  const scrimPieces = geometry && container ? scrimPiecesFor(geometry.cutout, container) : null;
+  const scrimPieces = geometry && container && !scrolling
+    ? scrimPiecesFor(geometry.cutout, container)
+    : null;
 
   return (
     <View
@@ -227,7 +365,11 @@ export function SessionGuideOverlay({
             ))}
             <View
               pointerEvents="none"
-              style={[styles.scrimHole, scrimPieces.hole]}
+              style={[
+                styles.scrimHole,
+                scrimPieces.hole,
+                { borderRadius: geometry?.cutout.radius ?? 0 }
+              ]}
               testID="practice-session-guide-cutout"
             />
           </>
@@ -245,7 +387,10 @@ export function SessionGuideOverlay({
             opacity: isPlaced ? 1 : 0,
             top: geometry?.callout.y ?? safeFrame?.y ?? 0,
             width: geometry?.callout.width ?? calloutWidth
-          }
+          },
+          geometry?.compressed && fixedHeight !== null
+            ? { height: wholeLineHeight(geometry.callout.height, fixedHeight, textScale) }
+            : null
         ]}
         testID="practice-session-guide-callout"
         onLayout={() => measureRef.current()}
@@ -257,64 +402,147 @@ export function SessionGuideOverlay({
             testID="practice-session-guide-pointer"
           />
         ) : null}
-        <View style={styles.header}>
-          <Text accessibilityRole="header" style={styles.title} testID="practice-session-guide-title">
+        <View
+          style={styles.header}
+          onLayout={(event) => rememberPart("header", event.nativeEvent.layout.height)}
+        >
+          <Text
+            accessibilityRole="header"
+            maxFontSizeMultiplier={GUIDE_MAX_TEXT_SCALE}
+            style={styles.title}
+            testID="practice-session-guide-title"
+          >
             {title}
           </Text>
           <Pressable
             accessibilityLabel="Exit guide"
             accessibilityRole="button"
-            hitSlop={11}
-            style={styles.exitButton}
+            hitSlop={Math.max(0, (44 - exitSize) / 2)}
+            style={[styles.exitButton, { height: exitSize, width: exitSize }]}
             testID="practice-session-guide-exit"
             onPress={onExit}
           >
-            <View style={[styles.exitGlyphLine, styles.exitGlyphForward]} />
-            <View style={[styles.exitGlyphLine, styles.exitGlyphBackward]} />
+            <View
+              style={[
+                styles.exitGlyphLine,
+                styles.exitGlyphForward,
+                { height: 2 * textScale, width: 14 * textScale }
+              ]}
+            />
+            <View
+              style={[
+                styles.exitGlyphLine,
+                styles.exitGlyphBackward,
+                { height: 2 * textScale, width: 14 * textScale }
+              ]}
+            />
           </Pressable>
         </View>
         <ScrollView
+          ref={copyScrollRef}
           bounces={false}
           style={styles.copyScroll}
           contentContainerStyle={styles.copy}
           testID={stepTestID}
+          onContentSizeChange={(_width, height) => rememberPart("copy", height)}
+          onLayout={() => {
+            if (geometry?.compressed) {
+              copyScrollRef.current?.flashScrollIndicators?.();
+            }
+          }}
         >
-          <Text style={styles.detail} testID="practice-session-guide-detail">{detail}</Text>
+          <Text
+            maxFontSizeMultiplier={GUIDE_MAX_TEXT_SCALE}
+            style={styles.detail}
+            testID="practice-session-guide-detail"
+          >
+            {detail}
+          </Text>
           {note ? (
-            <Text style={styles.note} testID="practice-session-guide-note">{note}</Text>
+            <Text
+              maxFontSizeMultiplier={GUIDE_MAX_TEXT_SCALE}
+              style={styles.note}
+              testID="practice-session-guide-note"
+            >
+              {note}
+            </Text>
           ) : null}
         </ScrollView>
-        <View style={styles.navigation} testID="practice-session-guide-navigation">
-          {canGoBack ? (
-            <Pressable
-              accessibilityLabel="Previous guide"
-              accessibilityRole="button"
-              style={styles.backButton}
-              testID="practice-session-guide-back"
-              onPress={onBack}
-            >
-              <Text numberOfLines={1} style={styles.backText}>Back</Text>
-            </Pressable>
-          ) : (
-            <View style={styles.backSpacer} />
-          )}
+        <View
+          style={styles.navigation}
+          testID="practice-session-guide-navigation"
+          onLayout={(event) => {
+            rememberPart("navigation", event.nativeEvent.layout.height);
+            rememberNavigationWidth("row", event.nativeEvent.layout.width);
+          }}
+        >
+          <View
+            style={[
+              styles.navigationSlot,
+              symmetricNavigation ? { minWidth: sideSlotWidth } : null
+            ]}
+          >
+            {canGoBack ? (
+              <Pressable
+                accessibilityLabel="Previous guide"
+                accessibilityRole="button"
+                style={styles.backButton}
+                testID="practice-session-guide-back"
+                onLayout={(event) => rememberNavigationWidth(
+                  "back",
+                  event.nativeEvent.layout.width
+                )}
+                onPress={onBack}
+              >
+                <Text
+                  maxFontSizeMultiplier={GUIDE_MAX_TEXT_SCALE}
+                  numberOfLines={1}
+                  style={styles.backText}
+                >
+                  Back
+                </Text>
+              </Pressable>
+            ) : (
+              <View style={styles.backSpacer} />
+            )}
+          </View>
           <Text
             accessibilityLabel={`Guide ${stepNumber} of ${totalSteps}`}
+            maxFontSizeMultiplier={GUIDE_MAX_TEXT_SCALE}
             numberOfLines={1}
             style={styles.progress}
             testID="practice-session-guide-coach-progress"
           >
             {stepNumber} of {totalSteps}
           </Text>
-          <Pressable
-            accessibilityLabel={nextLabel}
-            accessibilityRole="button"
-            style={styles.nextButton}
-            testID="practice-session-guide-start"
-            onPress={onNext}
+          <View
+            style={[
+              styles.navigationSlot,
+              styles.navigationSlotEnd,
+              navigationWraps ? styles.navigationSlotEndWrapped : null,
+              symmetricNavigation ? { minWidth: sideSlotWidth } : null
+            ]}
           >
-            <Text numberOfLines={1} style={styles.nextText}>{nextLabel}</Text>
-          </Pressable>
+            <Pressable
+              accessibilityLabel={nextLabel}
+              accessibilityRole="button"
+              style={styles.nextButton}
+              testID="practice-session-guide-start"
+              onLayout={(event) => rememberNavigationWidth(
+                "next",
+                event.nativeEvent.layout.width
+              )}
+              onPress={onNext}
+            >
+              <Text
+                maxFontSizeMultiplier={GUIDE_MAX_TEXT_SCALE}
+                numberOfLines={1}
+                style={styles.nextText}
+              >
+                {nextLabel}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </View>
@@ -398,6 +626,30 @@ function scrimPiecesFor(
   };
 }
 
+// A shortened callout ends its visible copy on a whole line, so the next line
+// is hidden entirely rather than cut in half at the scroll edge.
+function wholeLineHeight(height: number, fixedHeight: number, textScale: number): number {
+  const lineHeight = DETAIL_LINE_HEIGHT * textScale;
+  const copyHeight = Math.max(lineHeight, height - fixedHeight);
+  return fixedHeight + Math.floor(copyHeight / lineHeight) * lineHeight;
+}
+
+// How far a target must move to sit inside a viewport: negative scrolls toward
+// the start, positive toward the end, zero when it already fits.
+function overflowDelta(
+  targetStart: number,
+  targetLength: number,
+  viewportStart: number,
+  viewportLength: number,
+  margin: number
+): number {
+  if (targetStart < viewportStart) {
+    return targetStart - viewportStart;
+  }
+  const overflow = targetStart + targetLength - (viewportStart + viewportLength);
+  return overflow > 0 ? overflow + margin : 0;
+}
+
 function sameMeasurement(current: Measurement | null, next: Measurement): boolean {
   return current !== null
     && current.callout.width === next.callout.width
@@ -436,7 +688,12 @@ const useStyles = makeStyles((theme) => ({
     borderColor: theme.colors.scrim,
     position: "absolute"
   },
+  // A ring at the cut-out edge. Dimming alone cannot set the target apart
+  // where the canvas is already black (dark theme), so the ring marks it in
+  // both themes.
   scrimHole: {
+    borderColor: theme.colors.accent.s400,
+    borderWidth: 2,
     position: "absolute"
   },
   callout: {
@@ -476,9 +733,7 @@ const useStyles = makeStyles((theme) => ({
   },
   exitButton: {
     alignItems: "center",
-    height: 22,
-    justifyContent: "center",
-    width: 22
+    justifyContent: "center"
   },
   exitGlyphLine: {
     backgroundColor: theme.colors.text.secondary,
@@ -521,6 +776,16 @@ const useStyles = makeStyles((theme) => ({
     minHeight: 44,
     rowGap: theme.space[8]
   },
+  navigationSlot: {
+    alignItems: "flex-start",
+    flexShrink: 0
+  },
+  navigationSlotEnd: {
+    alignItems: "flex-end"
+  },
+  navigationSlotEndWrapped: {
+    marginLeft: "auto"
+  },
   backButton: {
     alignItems: "center",
     flexShrink: 0,
@@ -552,7 +817,6 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     backgroundColor: theme.colors.accent.fill,
     flexShrink: 0,
-    marginLeft: "auto",
     borderRadius: theme.radius[8],
     justifyContent: "center",
     minHeight: 44,

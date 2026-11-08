@@ -1091,6 +1091,7 @@ export function PracticePocScreen({
   });
   const [sessionGuideTargetRevision, setSessionGuideTargetRevision] = useState(0);
   const sessionGuideTargetRef = useRef<View>(null);
+  const sessionRailScrollRef = useRef<ScrollView>(null);
   const [historyFiltersExpanded, setHistoryFiltersExpanded] = useState(false);
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
   const [settingsAdvancedRatingsOpen, setSettingsAdvancedRatingsOpen] = useState(false);
@@ -5266,6 +5267,7 @@ export function PracticePocScreen({
                     </View>
                     {sessionLayoutUsesRail ? (
                       <ScrollView
+                        ref={sessionRailScrollRef}
                         style={[
                           styles.activeSessionControlRailScroll,
                           {
@@ -5890,13 +5892,26 @@ export function PracticePocScreen({
           onBack={showPreviousSessionGuideStep}
           onExit={dismissSessionGuide}
           onNext={continueSessionGuide}
-          onRequestScroll={(deltaY) => {
+          clipRef={sessionLayoutUsesRail && sessionGuideStep !== "arrow_duel_choice"
+            && sessionGuideStep !== "arrow_duel_reply"
+            ? sessionRailScrollRef
+            : undefined}
+          onRequestScroll={(deltaY, scope) => {
+            if (scope === "clip") {
+              const rail = sessionRailScrollRef.current;
+              if (deltaY > 0) {
+                rail?.scrollToEnd({ animated: true });
+              } else {
+                rail?.scrollTo({ animated: true, y: 0 });
+              }
+              return;
+            }
             const scrollView = practiceMainScrollRef.current;
             if (!scrollView) {
               return;
             }
             scrollView.scrollTo({
-              animated: false,
+              animated: true,
               y: Math.max(0, practiceMainScrollMetricsRef.current.offsetY + deltaY)
             });
           }}

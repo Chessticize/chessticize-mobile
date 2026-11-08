@@ -54,7 +54,8 @@ export function sessionGuideStepCopy(
     case "arrow_duel_reply":
       return {
         detail: "Next we play the other move. Find Black’s best reply in 10 seconds. Sprint time pauses.",
-        preferred: ["below", "trailing", "above", "leading"],
+        // Same order as the choice step, so both board steps sit in one place.
+        preferred: ["trailing", "below", "above", "leading"],
         title: "Then reply for Black"
       };
   }

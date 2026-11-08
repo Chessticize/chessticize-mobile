@@ -167,6 +167,30 @@ const preview: Preview = {
             height: `${LAB_DEVICE_VIEWPORTS.regularWidth.height}px`
           },
           type: "desktop"
+        },
+        splitViewHalf: {
+          name: "iPad 13-inch Split View · half",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.splitViewHalf.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.splitViewHalf.height}px`
+          },
+          type: "tablet"
+        },
+        splitViewThird: {
+          name: "iPad 13-inch Split View · one third",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.splitViewThird.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.splitViewThird.height}px`
+          },
+          type: "mobile"
+        },
+        stageManagerShort: {
+          name: "iPad Stage Manager · short window",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.stageManagerShort.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.stageManagerShort.height}px`
+          },
+          type: "tablet"
         }
       }
     }

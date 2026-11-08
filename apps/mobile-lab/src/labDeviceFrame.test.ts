@@ -85,3 +85,20 @@ test("non-device desktop viewports do not invent device Safe Area insets", () =>
     insets: { top: 0, right: 0, bottom: 0, left: 0 }
   });
 });
+
+test("Split View and Stage Manager presets keep their window sizes and insets", () => {
+  assert.deepEqual(
+    [
+      LAB_DEVICE_VIEWPORTS.splitViewHalf,
+      LAB_DEVICE_VIEWPORTS.splitViewThird,
+      LAB_DEVICE_VIEWPORTS.stageManagerShort
+    ].map(({ height, width }) => `${width}x${height}`),
+    ["684x1032", "458x1032", "800x600"]
+  );
+  assert.deepEqual(labSafeAreaMetricsForViewport(458, 1032).insets, {
+    top: 24,
+    right: 0,
+    bottom: 20,
+    left: 0
+  });
+});

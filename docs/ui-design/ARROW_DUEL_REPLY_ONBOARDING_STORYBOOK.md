@@ -111,12 +111,37 @@ session's own responsive rules. A pure geometry function
 - It tries the step's preferred sides (for the board: trailing, below, above,
   leading), flips to a side with room, and clamps the callout inside the Safe
   Area with each inset applied to its own edge.
-- When no side has room (very large text on a small phone), the callout covers
-  part of the cut-out and the pointer is hidden rather than leaving the screen.
-- The callout copy scrolls inside the callout before its navigation row is
-  squeezed, so Back, progress and Next always stay visible.
-- Back, Next and Start keep 44-point targets; Exit sits in the callout header
-  with a 44-point hit area.
+- Across the placement axis it stays centred in the safe frame while its
+  pointer can reach the target from there, so it does not move between steps.
+  A target it cannot reach, such as a control in the iPad landscape side
+  panel, gets the callout centred on it instead, so the callout stays in that
+  column rather than straddling the board and the panel.
+- The callout is up to 360 points wide, or 400 on regular-width windows.
+- The callout sits 4 points from the cut-out. The pointer reaches into the
+  cut-out's padding but never the target, so no caption or card edge shows
+  between the callout and the highlight.
+- When no side has room for the whole callout (large text on a small phone),
+  it first shortens into the roomiest space above or below the target, keeping
+  its title, at least one whole line of copy and the navigation, and the copy
+  scrolls. Callout text follows the system size up to 1.4x, so this works at
+  accessibility sizes; the session behind it scales fully. Only
+  when even that does not fit does it cover part of the cut-out and hide the
+  pointer.
+- When a target sits below the visible screen (iPhone SE and the iPhone Duo
+  outer display on the Mark as unclear step), the session scrolls with an
+  animation and the cut-out and callout appear once it settles. A target
+  clipped by the landscape side panel's own scroll view (Mark as unclear on a
+  landscape phone) is scrolled into view there instead. A callout centred on a
+  target near a screen edge keeps 8 points more from that edge.
+- Back and Next sit in equal side slots so the progress stays centred when
+  the two are close in width. Beside a much wider start label ("Start Arrow
+  Duel") the progress centres in the gap between the buttons instead, and when
+  the row cannot hold all three, Start wraps to its own row.
+- A 2-point ring in `accent.s400` marks the cut-out edge. Dimming a black
+  dark-theme canvas leaves it black, so the ring is what sets the target
+  apart there.
+- Back, Next and Start keep 44-point targets. Exit sits in the callout header,
+  grows with the text size and keeps a 44-point hit area.
 
 ## Storybook reference
 

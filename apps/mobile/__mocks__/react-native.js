@@ -40,6 +40,9 @@ const MockScrollView = React.forwardRef(function MockScrollView(props, ref) {
     },
     scrollTo(options) {
       scrollViewCommands.push({ ...options });
+    },
+    scrollToEnd(options) {
+      scrollViewCommands.push({ ...options, end: true });
     }
   }));
   return React.createElement('ScrollView', props, props.children);
