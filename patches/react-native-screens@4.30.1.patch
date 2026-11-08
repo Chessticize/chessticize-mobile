@@ -1,7 +1,7 @@
 diff --git a/ios/tabs/host/RNSTabBarController.mm b/ios/tabs/host/RNSTabBarController.mm
 --- a/ios/tabs/host/RNSTabBarController.mm
 +++ b/ios/tabs/host/RNSTabBarController.mm
-@@ -755,12 +755,19 @@
+@@ -755,12 +755,21 @@
      return searchTab;
    }
  
@@ -21,7 +21,9 @@ diff --git a/ios/tabs/host/RNSTabBarController.mm b/ios/tabs/host/RNSTabBarContr
 +  // takes its accessibility identifier from the UITab, not from tabBarItem (where
 +  // updateTabBarA11yIfNeeded puts tabBarItemTestID), so tabBarItemTestID was not
 +  // exposed there. Carry it onto the UITab too. UITab adopts
-+  // UIAccessibilityIdentification from iOS 18.
++  // UIAccessibilityIdentification from iOS 18. Re-validate this hunk on every
++  // react-native-screens upgrade. Upstream report:
++  // https://github.com/software-mansion/react-native-screens/issues/4748#issuecomment-6719382223
 +  tab.accessibilityIdentifier = screenController.tabScreenComponentView.tabItemTestID;
 +  return tab;
  }
