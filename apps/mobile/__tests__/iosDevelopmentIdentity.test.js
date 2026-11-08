@@ -116,7 +116,8 @@ describe('iOS development identity isolation', () => {
   it('provides a Dev-only physical-device command and configurable release simulator validation', () => {
     const rootPackage = JSON.parse(readText(join(repoRoot, 'package.json')));
     const mobilePackage = JSON.parse(readText(join(appRoot, 'package.json')));
-    const deviceRunner = readText(join(appRoot, 'scripts', 'ios-run-dev-device.sh'));
+    const deviceEntry = readText(join(appRoot, 'scripts', 'ios-run-dev-device.sh'));
+    const deviceRunner = readText(join(appRoot, 'scripts', 'ios-run-dev-device.js'));
     const e2eRunner = readText(
       join(
         repoRoot,
@@ -137,9 +138,13 @@ describe('iOS development identity isolation', () => {
     expect(mobilePackage.scripts['ios:dev:device']).toBe(
       'bash scripts/ios-run-dev-device.sh',
     );
-    expect(deviceRunner).toContain('--mode Debug');
-    expect(deviceRunner).toContain('--device');
-    expect(deviceRunner).not.toContain('--mode Release');
+    expect(deviceEntry).toContain('node scripts/ios-run-dev-device.js');
+    expect(deviceRunner).toContain('const CONFIGURATION = "Debug"');
+    expect(deviceRunner).toContain('const DEV_BUNDLE_ID = "com.chessticize.mobile.dev"');
+    expect(deviceRunner).toContain('"-destination", `id=${device.udid}`');
+    expect(deviceRunner).toContain('FORCE_BUNDLING: "1"');
+    expect(deviceRunner).not.toContain('Release"');
+    expect(`${deviceEntry}${deviceRunner}`).not.toContain('run-ios');
     expect(e2eRunner).toContain('CHESSTICIZE_E2E_VARIANTS');
     expect(e2eRunner).toContain('debug|release|both');
     expect(e2eRunner).toContain('ios.sim.debug');

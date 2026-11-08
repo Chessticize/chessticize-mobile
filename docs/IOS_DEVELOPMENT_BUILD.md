@@ -40,38 +40,41 @@ disposable test data boundary, not a release data source.
 Connect and trust the iPhone, then run:
 
 ```sh
-pnpm mobile:ios:dev:device
-```
-
-With more than one physical device attached, select one explicitly:
-
-```sh
 pnpm mobile:ios:dev:device "Device Name or UDID"
 ```
 
+The device name or UDID is optional when exactly one physical iPhone or iPad is
+paired. It is resolved through `xcrun devicectl list devices`, which also wakes
+a paired device that `xctrace` still reports as offline. Simulators and Vision
+Pro devices are ignored, and an ambiguous name is an error rather than a guess.
 pnpm 11 forwards a literal `--` to the script, which then fails with a usage
 error, so pass the device name without it.
 
-The command is pinned to the Debug configuration. Do not pass `--mode Release`
-or install a locally built Release app on a personal daily-use device for
-pre-release testing.
+The command does not need or use any iOS Simulator. It runs these steps in
+order:
 
-### Standalone Install Without Metro
+1. Resolve the device and sync the iOS version config.
+2. Fetch the Core Pack (`pnpm fetch:core-pack`) when it is missing or does not
+   match its manifest; the build fails without it.
+3. Install the locked CocoaPods when `ios/Pods` is missing or stale.
+4. `xcodebuild -configuration Debug -destination id=<UDID>` with
+   `FORCE_BUNDLING=1`, so the JavaScript bundle is embedded and the app runs
+   without Metro. No separate flag is needed for a standalone install.
+5. Confirm the built app is `com.chessticize.mobile.dev` and contains
+   `main.jsbundle` (about 10 MB) before touching the device.
+6. `xcrun devicectl device install app`, then
+   `devicectl device process launch --terminate-existing`.
 
-A Debug build normally loads JavaScript from Metro and does not embed the
-bundle. For a daily-driver install that must run away from this Mac, force
-bundling in Debug:
+Add `--dry-run` to print the resolved device and the exact commands without
+building or installing anything.
 
-```sh
-FORCE_BUNDLING=1 pnpm mobile:ios:dev:device "Device Name or UDID"
-```
+The command is pinned to the Debug configuration and the Dev identity; it
+accepts no `--mode` or configuration option. Do not install a locally built
+Release app on a personal daily-use device for pre-release testing.
 
-Before relying on it, confirm `main.jsbundle` (about 10 MB) exists in the built
-`Chessticize.app` under
-`~/Library/Developer/Xcode/DerivedData/ChessticizeMobile-*/Build/Products/Debug-iphoneos/`.
-Then launch with no Metro running (`lsof -iTCP:8081 -sTCP:LISTEN` is empty). The
-"Cannot start server in new windows" message from `react-native run-ios` is
-harmless.
+The built app is `apps/mobile/ios/build/Build/Products/Debug-iphoneos/Chessticize.app`.
+To confirm a standalone launch, make sure no Metro is running
+(`lsof -iTCP:8081 -sTCP:LISTEN` is empty) and open the app from the Home Screen.
 
 After the first install, verify both `Chessticize` and `Chessticize Dev` are
 present. In Dev, leave iCloud Sync enabled, complete a small practice run, use
