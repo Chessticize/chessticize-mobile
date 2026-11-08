@@ -11184,9 +11184,7 @@ function SessionScoreMetric({
         <SessionScoreGlyph tone={tone} />
       )}
       <Text
-        adjustsFontSizeToFit
         maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
-        minimumFontScale={0.5}
         numberOfLines={1}
         style={styles.sessionScoreValue}
         testID={`${metricTestID}-value`}
@@ -13836,7 +13834,9 @@ const HUD_MAX_TEXT_SCALE = 2;
 // The prompt, puzzle timing and score labels sit in frames sized for the
 // board; they grow at most this much, and board coordinates do not scale.
 const SESSION_CHROME_MAX_TEXT_SCALE = 1.5;
-const SCORE_LABEL_MAX_TEXT_SCALE = 1.3;
+// The uppercase score labels share a board-width strip with three columns;
+// they stay at their designed size so all three read at one size.
+const SCORE_LABEL_MAX_TEXT_SCALE = 1;
 
 function ReviewForecastMetric({
   count,
