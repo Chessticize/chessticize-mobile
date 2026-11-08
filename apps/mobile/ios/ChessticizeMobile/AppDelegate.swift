@@ -46,6 +46,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 }
 
 class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
+  // Match the launch screen so the window never shows the default system background
+  // (black in dark appearance) between the launch screen and the first React frame.
+  override func customize(_ rootView: RCTRootView) {
+    if let background = UIColor(named: "LaunchBackground") {
+      rootView.backgroundColor = background
+    }
+  }
+
   override func sourceURL(for bridge: RCTBridge) -> URL? {
     self.bundleURL()
   }

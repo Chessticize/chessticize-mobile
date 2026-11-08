@@ -1,6 +1,6 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
-import { lightTheme, makeStyles, ThemeProvider, useTheme } from "../src/theme";
+import { darkTheme, lightTheme, makeStyles, ThemeProvider, themeForAppearance, useTheme } from "../src/theme";
 import type { Theme } from "../src/theme";
 
 const useStyles = makeStyles((theme) => ({
@@ -17,6 +17,54 @@ function render(element: React.ReactElement): void {
     TestRenderer.create(element);
   });
 }
+
+const reactNativeMock = require("react-native") as { __setColorScheme: (scheme: string) => void };
+
+describe("appearance", () => {
+  afterEach(() => {
+    act(() => {
+      reactNativeMock.__setColorScheme("light");
+    });
+  });
+
+  it("resolves the theme from the preference and the system scheme", () => {
+    expect(themeForAppearance("system", "dark")).toBe(darkTheme);
+    expect(themeForAppearance("system", "light")).toBe(lightTheme);
+    expect(themeForAppearance("system", null)).toBe(lightTheme);
+    expect(themeForAppearance("dark", "light")).toBe(darkTheme);
+    expect(themeForAppearance("light", "dark")).toBe(lightTheme);
+  });
+
+  it("follows the system appearance live and lets an override win", () => {
+    const seen: Theme[] = [];
+    const probe = <Probe onRender={(theme) => seen.push(theme)} />;
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    act(() => {
+      renderer = TestRenderer.create(<ThemeProvider appearance="system">{probe}</ThemeProvider>);
+    });
+    expect(seen[seen.length - 1]).toBe(lightTheme);
+
+    act(() => {
+      reactNativeMock.__setColorScheme("dark");
+    });
+    expect(seen[seen.length - 1]).toBe(darkTheme);
+
+    act(() => {
+      renderer!.update(<ThemeProvider appearance="light">{probe}</ThemeProvider>);
+    });
+    expect(seen[seen.length - 1]).toBe(lightTheme);
+
+    act(() => {
+      renderer!.update(<ThemeProvider appearance="dark">{probe}</ThemeProvider>);
+    });
+    expect(seen[seen.length - 1]).toBe(darkTheme);
+  });
+
+  it("uses a dark status bar style for light and a light one for dark", () => {
+    expect(lightTheme.statusBarStyle).toBe("dark-content");
+    expect(darkTheme.statusBarStyle).toBe("light-content");
+  });
+});
 
 describe("theme", () => {
   it("falls back to the light theme without a provider", () => {

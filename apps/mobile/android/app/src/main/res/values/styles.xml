@@ -4,6 +4,8 @@
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <!-- Painted before the JS UI loads; values-night swaps the color. -->
+        <item name="android:windowBackground">@color/window_background</item>
     </style>
 
 </resources>

@@ -155,6 +155,7 @@ export function loadAppStoreMarketingCaptureFixture(
     includeSavedCustomRun: frameId !== "focus-your-practice"
   }));
   practiceService.saveSettings({
+    appearance: "system",
     arrowDuel: {
       opponentReplyEnabled: true
     },
@@ -232,6 +233,7 @@ function marketingLocalData({
   return {
     schemaVersion: 1,
     settings: {
+      appearance: "system",
       arrowDuel: {
         opponentReplyEnabled: true
       },

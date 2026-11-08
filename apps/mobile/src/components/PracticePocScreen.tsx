@@ -309,7 +309,7 @@ export type {
   HistoryWeaknessEffect,
   HistoryStrengthSeries
 } from "./historyProgressPresentation.ts";
-import { makeStyles, useTheme, type Theme } from "../theme/index.ts";
+import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -664,7 +664,12 @@ function chessboardColorsFor(theme: Theme): ChessboardColors {
       checkmateHighlight: board.checkmateHighlight,
       promotionPieceButton: board.promotionPieceButton,
       validMoveDot: board.validMoveDot,
-      validMoveCapture: board.validMoveCapture
+      validMoveCapture: board.validMoveCapture,
+      promotionOverlay: board.promotionOverlay,
+      promotionContainer: board.promotionContainer,
+      promotionBorder: board.promotionBorder,
+      promotionShadow: board.promotionShadow,
+      promotionPieceBorder: board.promotionPieceBorder
     };
     chessboardColorCache.set(theme, colors);
   }
@@ -1105,6 +1110,10 @@ export function PracticePocScreen({
   const [moveFeedbackPreferences, setMoveFeedbackPreferences] = useState<MoveFeedbackPreferences>(
     () => service.getSettings().moveFeedback
   );
+  const [appearance, setAppearancePreference] = useState<AppearancePreference>(
+    () => service.getSettings().appearance
+  );
+  const { setAppearance } = useAppearance();
   const [, setSettingsRevision] = useState(0);
   const internalRunManagement = usePracticeRunManagement({
     enabled: runManagementEnabled && runManagementPresentation === undefined,
@@ -1744,6 +1753,15 @@ export function PracticePocScreen({
     });
     setMoveFeedbackPreferences(saved.moveFeedback);
     setSettingsRevision((current) => current + 1);
+  }
+
+  function saveAppearance(next: AppearancePreference): void {
+    const saved = service.saveSettings({
+      ...service.getSettings(),
+      appearance: next
+    });
+    setAppearancePreference(saved.appearance);
+    setAppearance(saved.appearance);
   }
 
   function playCommittedMoveFeedback(
@@ -5761,6 +5779,7 @@ export function PracticePocScreen({
                 iCloudSyncInProgress={iCloudSyncInProgress}
                 iCloudSyncStatus={iCloudSyncErrorDetails ? "iCloud sync failed" : iCloudSyncStatus}
                 iCloudSyncSupportBundle={effectiveSupportBundle}
+                appearance={appearance}
                 moveFeedbackPreferences={moveFeedbackPreferences}
                 moveFeedbackPreviewer={moveFeedbackSettings?.preview}
                 showSprintGuideReset={
@@ -5769,6 +5788,7 @@ export function PracticePocScreen({
                 }
                 advancedRatingsOpen={settingsAdvancedRatingsOpen}
                 onAdvancedRatingsOpenChange={setSettingsAdvancedRatingsOpen}
+                onAppearanceChange={saveAppearance}
                 onMoveFeedbackPreferencesChange={saveMoveFeedbackPreferences}
                 onOpenNotificationSettings={openReviewReminderSystemSettings}
                 onRequestReviewReminderPermission={() => requestReviewReminderPermission()}
@@ -8089,6 +8109,7 @@ function PracticeRunEditor({
               <Text style={styles.requiredFieldLabel}>Required · unique</Text>
             </View>
             <TextInput
+              keyboardAppearance={appTheme.name}
               accessibilityLabel="Run name"
               autoCapitalize="words"
               autoCorrect={false}
@@ -8279,6 +8300,7 @@ function ArrowDuelReplyChallengeSetting({
   onToggle: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
   return (
     <View style={styles.settingsSection} testID="practice-run-arrow-duel-reply-setting">
       <View style={styles.runTimingSectionCopy}>
@@ -8360,6 +8382,7 @@ function ArrowDuelReplyChallengeSetting({
               ]}
             >
               <TextInput
+                keyboardAppearance={appTheme.name}
                 accessibilityLabel="Time to find the opponent’s reply in seconds"
                 accessibilityState={{ disabled: !enabled }}
                 editable={enabled}
@@ -8586,6 +8609,7 @@ function PracticeRunEloRow({
   value: number;
 }): React.JSX.Element {
   const styles = useStyles();
+  const appTheme = useTheme();
   if (directEntry) {
     const parsedInput = Number(inputValue);
     const stepValue = /^\d{1,4}$/.test(inputValue ?? "") && Number.isInteger(parsedInput)
@@ -8621,6 +8645,7 @@ function PracticeRunEloRow({
               testID="practice-run-elo-input-shell"
             >
               <TextInput
+                keyboardAppearance={appTheme.name}
                 accessibilityLabel={isCreate ? "Starting rating" : "Current rating"}
                 inputMode="numeric"
                 keyboardType="number-pad"
@@ -15620,6 +15645,7 @@ function iCloudAccountStatusMessage(status: ICloudAccountStatus): string {
 function SettingsPanel({
   advancedRatingsOpen,
   adaptiveLayout,
+  appearance,
   applicationMetadata,
   arrowDuelOpponentReplyGlobalSetting,
   captureBottomInset,
@@ -15642,6 +15668,7 @@ function SettingsPanel({
   moveFeedbackPreferences,
   moveFeedbackPreviewer,
   notificationPermissionStatus,
+  onAppearanceChange,
   onMoveFeedbackPreferencesChange,
   reminderPlatform,
   ratings,
@@ -15675,9 +15702,11 @@ function SettingsPanel({
   iCloudSyncInProgress: boolean;
   iCloudSyncStatus: string;
   iCloudSyncSupportBundle?: ICloudSyncSupportBundlePresentation;
+  appearance: AppearancePreference;
   moveFeedbackPreferences: MoveFeedbackPreferences;
   moveFeedbackPreviewer?: MoveFeedbackPreviewer;
   notificationPermissionStatus: ReviewReminderPermissionStatus;
+  onAppearanceChange: (appearance: AppearancePreference) => void;
   onMoveFeedbackPreferencesChange: (preferences: MoveFeedbackPreferences) => void;
   reminderPlatform: MobilePlatformCapabilities["reminders"]["platform"];
   ratings: Array<{ label: string; record: RatingRecord }>;
@@ -15890,6 +15919,33 @@ function SettingsPanel({
           onPreferencesChange={onMoveFeedbackPreferencesChange}
           onPreview={moveFeedbackPreviewer}
         />
+      </SettingsSection>
+
+      <SettingsSection
+        title="Appearance"
+        testID="settings-appearance-section"
+        wide={adaptiveLayout.usesWideContent}
+      >
+        <View style={styles.settingsInlineControls} testID="settings-appearance-options">
+          <SettingsPreferenceButton
+            active={appearance === "system"}
+            label="System"
+            testID="settings-appearance-system"
+            onPress={() => onAppearanceChange("system")}
+          />
+          <SettingsPreferenceButton
+            active={appearance === "light"}
+            label="Light"
+            testID="settings-appearance-light"
+            onPress={() => onAppearanceChange("light")}
+          />
+          <SettingsPreferenceButton
+            active={appearance === "dark"}
+            label="Dark"
+            testID="settings-appearance-dark"
+            onPress={() => onAppearanceChange("dark")}
+          />
+        </View>
       </SettingsSection>
 
       {showRatingControls ? (
@@ -17837,7 +17893,7 @@ const useStyles = makeStyles((theme) => ({
     width: 32
   },
   tabCountBadge: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderColor: theme.colors.surface,
     borderRadius: 999,
     borderWidth: 1,
@@ -17865,7 +17921,8 @@ const useStyles = makeStyles((theme) => ({
     top: -7
   },
   tabCountBadgeDanger: {
-    backgroundColor: theme.colors.danger.s600
+    backgroundColor: theme.colors.danger.s600,
+    color: theme.colors.text.onTone
   },
   tabText: {
     color: theme.colors.text.tertiary,
@@ -18113,7 +18170,7 @@ const useStyles = makeStyles((theme) => ({
   },
   sprintRulesDismissButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 8,
     minHeight: 44,
     justifyContent: "center",
@@ -18185,7 +18242,7 @@ const useStyles = makeStyles((theme) => ({
   },
   primaryCompactButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 8,
     height: 36,
     justifyContent: "center",
@@ -18999,7 +19056,7 @@ const useStyles = makeStyles((theme) => ({
   },
   reviewRetryBadge: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     height: 28,
     justifyContent: "center",
@@ -19231,7 +19288,7 @@ const useStyles = makeStyles((theme) => ({
   puzzleTimingCountdown: {
     backgroundColor: theme.colors.warning.s500,
     borderRadius: 999,
-    color: theme.colors.text.onAccent,
+    color: theme.colors.text.onTone,
     fontFamily: "menlo",
     fontSize: 10,
     fontWeight: "900",
@@ -19415,12 +19472,12 @@ const useStyles = makeStyles((theme) => ({
     width: 16
   },
   coordinateTextOnLight: {
-    color: theme.colors.text.strong,
-    textShadowColor: theme.colors.halo
+    color: theme.colors.board.coordinateOnLightSquare,
+    textShadowColor: theme.colors.board.coordinateHaloOnLightSquare
   },
   coordinateTextOnDark: {
-    color: theme.colors.surfaceRaised,
-    textShadowColor: theme.colors.scrim
+    color: theme.colors.board.coordinateOnDarkSquare,
+    textShadowColor: theme.colors.board.coordinateHaloOnDarkSquare
   },
   promptPanel: {
     alignItems: "center",
@@ -19475,7 +19532,7 @@ const useStyles = makeStyles((theme) => ({
     gap: 1
   },
   arrowDuelReplyTimer: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     color: theme.colors.text.onAccent,
     fontFamily: "menlo",
@@ -19743,7 +19800,7 @@ const useStyles = makeStyles((theme) => ({
   },
   sprintHeaderStartButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 8,
     height: 40,
     justifyContent: "center",
@@ -20086,7 +20143,7 @@ const useStyles = makeStyles((theme) => ({
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 8,
     flex: 1,
     height: 42,
@@ -20100,7 +20157,7 @@ const useStyles = makeStyles((theme) => ({
   },
   primarySmallButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 8,
     height: 38,
     justifyContent: "center",
@@ -20139,7 +20196,7 @@ const useStyles = makeStyles((theme) => ({
     paddingHorizontal: 14
   },
   destructiveButtonText: {
-    color: theme.colors.text.onAccent,
+    color: theme.colors.text.onTone,
     fontSize: 13,
     fontWeight: "800"
   },
@@ -20354,7 +20411,7 @@ const useStyles = makeStyles((theme) => ({
     width: 22
   },
   resultTrendGlyphDot: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     height: 5,
     position: "absolute",
@@ -20373,7 +20430,7 @@ const useStyles = makeStyles((theme) => ({
     top: 2
   },
   resultTrendGlyphLine: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     height: 2,
     position: "absolute"
@@ -20720,7 +20777,7 @@ const useStyles = makeStyles((theme) => ({
     paddingHorizontal: 10
   },
   filterButtonActive: {
-    backgroundColor: theme.colors.accent.s600
+    backgroundColor: theme.colors.accent.fill
   },
   filterButtonContent: {
     alignItems: "center",
@@ -20797,7 +20854,7 @@ const useStyles = makeStyles((theme) => ({
     paddingHorizontal: 8
   },
   historyQuickChipActive: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderColor: theme.colors.accent.s600
   },
   historyQuickChipCompact: {
@@ -20841,10 +20898,10 @@ const useStyles = makeStyles((theme) => ({
     width: 42
   },
   historyToggleTrackActive: {
-    backgroundColor: theme.colors.accent.s600
+    backgroundColor: theme.colors.accent.fill
   },
   historyToggleThumb: {
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.thumb,
     borderRadius: 10,
     height: 20,
     width: 20
@@ -20945,7 +21002,7 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "flex-end"
   },
   historyChartBar: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 4,
     minHeight: 4
   },
@@ -20983,7 +21040,7 @@ const useStyles = makeStyles((theme) => ({
     top: 8
   },
   historyLineSegment: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     height: 2,
     opacity: 0.82,
@@ -20997,7 +21054,7 @@ const useStyles = makeStyles((theme) => ({
     width: StyleSheet.hairlineWidth
   },
   historyLineSelectionPoint: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderColor: theme.colors.surface,
     borderRadius: 999,
     borderWidth: 2,
@@ -21017,7 +21074,7 @@ const useStyles = makeStyles((theme) => ({
     width: HISTORY_LINE_TOOLTIP_WIDTH
   },
   historyLineTooltipRating: {
-    color: theme.colors.text.onAccent,
+    color: theme.colors.text.onTone,
     fontSize: 12,
     fontWeight: "800"
   },
@@ -21097,7 +21154,7 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.colors.text.tertiary
   },
   historyResultUnknownText: {
-    color: theme.colors.text.onAccent,
+    color: theme.colors.text.onTone,
     fontSize: 16,
     fontWeight: "800"
   },
@@ -21372,7 +21429,7 @@ const useStyles = makeStyles((theme) => ({
   settingsGuidanceResetButton: {
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderColor: theme.colors.accent.s600,
     borderRadius: 8,
     borderWidth: 1,
@@ -21453,7 +21510,7 @@ const useStyles = makeStyles((theme) => ({
   },
   feedbackSupportButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 9,
     flexDirection: "row",
     gap: 8,
@@ -21546,7 +21603,7 @@ const useStyles = makeStyles((theme) => ({
   },
   feedbackHandoffContinueButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 9,
     justifyContent: "center",
     minHeight: 44,
@@ -21655,7 +21712,7 @@ const useStyles = makeStyles((theme) => ({
   },
   settingsActionButton: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 8,
     flexDirection: "row",
     gap: 8,
@@ -21666,7 +21723,7 @@ const useStyles = makeStyles((theme) => ({
     paddingHorizontal: 16
   },
   settingsActionButtonDisabled: {
-    backgroundColor: theme.colors.text.tertiary
+    backgroundColor: theme.colors.fillDisabled
   },
   settingsActionButtonText: {
     color: theme.colors.text.onAccent,
@@ -21882,7 +21939,7 @@ const useStyles = makeStyles((theme) => ({
     width: 18
   },
   plusGlyphLine: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderRadius: 999,
     position: "absolute"
   },
@@ -22090,7 +22147,7 @@ const useStyles = makeStyles((theme) => ({
     width: 52
   },
   switchButtonActive: {
-    backgroundColor: theme.colors.accent.s600,
+    backgroundColor: theme.colors.accent.fill,
     borderColor: theme.colors.accent.s600
   },
   switchGlyph: {

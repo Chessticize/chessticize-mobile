@@ -3,10 +3,15 @@ import {
   type ArrowDuelReplyCueStage,
   type ReviewReminderSettings
 } from "../../core/src/index.ts";
-import type { PracticeSettings, ReviewReminderPreference } from "./practice-store.ts";
+import type {
+  AppearancePreference,
+  PracticeSettings,
+  ReviewReminderPreference
+} from "./practice-store.ts";
 
 export function defaultPracticeSettings(): PracticeSettings {
   return {
+    appearance: "system",
     sync: {
       iCloudEnabled: true
     },
@@ -28,6 +33,7 @@ export function defaultPracticeSettings(): PracticeSettings {
 
 export function clonePracticeSettings(settings: PracticeSettings): PracticeSettings {
   return normalizePracticeSettings({
+    appearance: normalizeAppearancePreference(settings.appearance),
     sync: {
       iCloudEnabled: settings.sync.iCloudEnabled
     },
@@ -55,6 +61,7 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
 
 export function normalizePracticeSettings(settings: PracticeSettings): PracticeSettings {
   return {
+    appearance: normalizeAppearancePreference(settings.appearance),
     sync: {
       iCloudEnabled: Boolean(settings.sync.iCloudEnabled)
     },
@@ -78,6 +85,10 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
       )
     }
   };
+}
+
+export function normalizeAppearancePreference(value: unknown): AppearancePreference {
+  return value === "light" || value === "dark" ? value : "system";
 }
 
 function normalizeArrowDuelReplyCueStage(

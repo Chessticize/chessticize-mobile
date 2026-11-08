@@ -36,6 +36,11 @@ The viewport toolbar includes:
 - Phone landscape: 874 × 402, with the iPhone 17 Release Safe Area.
 - Regular width: 1180 × 820.
 
+The **Theme** toolbar item switches every story between the light and dark
+themes (`darkTheme` and `lightTheme` from `apps/mobile/src/theme`). Open a
+story directly in dark with `?globals=theme:dark` on the story or `iframe.html`
+URL, for example `/?path=/story/practice--home&globals=theme:dark`.
+
 ## Validate the lab
 
 ```sh
@@ -78,8 +83,10 @@ The summary lists scenarios compared, changed, added and removed, and exits
 non-zero when anything differs. Diff images (changed pixels in red) and
 `summary.json` are written under `scratch/visual-regression/`, which is
 git-ignored along with the baseline and current captures. Options:
-`--viewports phonePortrait,regularWidth`, `--only <story-id substring>`,
-`--skip-build`, `--concurrency N`, and `--out <dir>`. Omit `--ref` to capture
+`--viewports phonePortrait,regularWidth`, `--themes light,dark` (dark captures land
+in `<viewport>--dark/`), `--audit`, `--only <story-id substring>`, `--skip-build`,
+`--concurrency N`, and `--out <dir>`. `--audit` also runs a contrast check over the
+rendered dark pages and lists text below WCAG AA and pure white or black surfaces. Omit `--ref` to capture
 the baseline from the current checkout.
 
 The tool uses Playwright's Chromium when installed

@@ -209,6 +209,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
     const store = new SQLiteStore(dbPath);
     store.migrate();
     assert.deepEqual(store.getSettings(), {
+      appearance: "system",
       arrowDuel: { opponentReplyEnabled: true },
       sync: { iCloudEnabled: false },
       notifications: { reviewReminder: { mode: "fixed", fixedLocalTime: "19:00" } },
@@ -223,6 +224,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
     });
 
     store.saveSettings({
+      appearance: "system",
       arrowDuel: { opponentReplyEnabled: false },
       sync: { iCloudEnabled: true },
       notifications: { reviewReminder: { mode: "off" } },
@@ -263,6 +265,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
     assert.ok(columns.some((column) => column.name === "sprint_focused_run_guide_seen"));
     assert.ok(columns.some((column) => column.name === "sprint_arrow_duel_reply_cue_stage"));
     assert.deepEqual({ ...settings }, {
+      appearance: "system",
       id: "default",
       sync_icloud_enabled: 1,
       sync_upload_allowed: 0,
@@ -869,6 +872,7 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
       const service = new PracticeService(store);
       try {
         assert.deepEqual(service.getSettings(), {
+          appearance: "system",
           arrowDuel: {
             opponentReplyEnabled: true
           },
@@ -894,6 +898,7 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
         });
 
         service.saveSettings({
+          appearance: "system",
           arrowDuel: {
             opponentReplyEnabled: false
           },
@@ -935,6 +940,7 @@ test("PracticeService persists SQLite settings across store reopen", async () =>
       const service = new PracticeService(store);
       try {
         assert.deepEqual(service.getSettings(), {
+          appearance: "system",
           arrowDuel: {
             opponentReplyEnabled: false
           },
@@ -1786,3 +1792,34 @@ function legacyHistoryAttemptIds(
     )
     .all(ratingKey ?? null, ratingKey ?? null, since ?? null, since ?? null, until) as Array<{ id: string }>).map((row) => row.id);
 }
+
+test("PracticeService persists the appearance override across SQLite store reopen", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-appearance-"));
+  const databasePath = join(directory, "appearance.sqlite");
+  try {
+    for (const appearance of ["dark", "light", "system"] as const) {
+      const store = new SQLiteStore(databasePath);
+      store.migrate();
+      const service = new PracticeService(store);
+      try {
+        const before = service.getSettings();
+        service.saveSettings({ ...before, appearance });
+        assert.equal(service.getSettings().appearance, appearance);
+      } finally {
+        store.close();
+      }
+
+      const reopened = new SQLiteStore(databasePath);
+      reopened.migrate();
+      try {
+        const settings = new PracticeService(reopened).getSettings();
+        assert.equal(settings.appearance, appearance);
+        assert.equal(settings.moveFeedback.hapticsEnabled, true);
+      } finally {
+        reopened.close();
+      }
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

@@ -79,6 +79,7 @@ test("rejects malformed nested progress records", () => {
     ["settings", (value) => { value.data.settings.sync.iCloudEnabled = "yes"; }],
     ["Arrow Duel setting", (value) => { value.data.settings.arrowDuel.opponentReplyEnabled = "yes"; }],
     ["reply cue stage", (value) => { value.data.settings.sprintGuides.arrowDuelReplyCueStage = 4; }],
+    ["appearance", (value) => { value.data.settings.appearance = "sepia"; }],
     ["rating", (value) => { value.data.ratings[0].games = "one"; }],
     ["attempt", (value) => { value.data.attempts[0].source = "unknown"; }],
     ["review", (value) => { value.data.reviewQueue[0].lastResult = "timed_out"; }],
@@ -229,3 +230,12 @@ function canonicalSnapshot() {
     }
   };
 }
+
+test("accepts snapshots with or without the appearance override", () => {
+  assert.equal(isCanonicalProgressSyncSnapshot(canonicalSnapshot()), true);
+  for (const appearance of ["system", "light", "dark"]) {
+    const candidate = canonicalSnapshot();
+    candidate.data.settings.appearance = appearance;
+    assert.equal(isCanonicalProgressSyncSnapshot(candidate), true, appearance);
+  }
+});

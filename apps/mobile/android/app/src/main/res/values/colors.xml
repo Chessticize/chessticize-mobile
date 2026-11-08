@@ -1,3 +1,4 @@
 <resources>
     <color name="launcher_background">#EDF2F8</color>
+    <color name="window_background">#F8FAFC</color>
 </resources>

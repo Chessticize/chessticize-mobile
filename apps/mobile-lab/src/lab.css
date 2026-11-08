@@ -18,6 +18,11 @@ html {
   overflow-y: auto;
 }
 
+:root[data-lab-theme="dark"] {
+  background: #000000;
+  color-scheme: dark;
+}
+
 .lab-scenario-shell,
 .lab-app-surface {
   height: 100%;
@@ -47,6 +52,11 @@ html {
   right: 0;
   top: 0;
   z-index: 10;
+}
+
+:root[data-lab-theme="dark"] .lab-device-status-bar {
+  background: #000000;
+  color: #ffffff;
 }
 
 .lab-device-status-bar--dynamic-island {

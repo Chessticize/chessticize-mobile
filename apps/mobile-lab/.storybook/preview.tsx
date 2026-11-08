@@ -5,7 +5,7 @@ import {
   SafeAreaInsetsContext
 } from "react-native-safe-area-context";
 import { PracticeViewportProvider } from "../../mobile/src/components/PracticeViewport.tsx";
-import { ThemeProvider } from "../../mobile/src/theme/index.ts";
+import { darkTheme, lightTheme, ThemeProvider } from "../../mobile/src/theme/index.ts";
 import "../src/lab.css";
 import { LabDeviceStatusBar } from "../src/LabDeviceStatusBar.tsx";
 import {
@@ -53,12 +53,30 @@ function LabDeviceFrame({
   );
 }
 
+// Wraps a story in the selected Lab theme and mirrors it onto the document so
+// lab.css can switch color-scheme and the fake device chrome.
+function LabThemeScope({
+  children,
+  themeGlobal
+}: React.PropsWithChildren<{ themeGlobal: unknown }>): React.JSX.Element {
+  const labTheme = themeGlobal === "dark" ? "dark" : "light";
+  React.useLayoutEffect(() => {
+    document.documentElement.dataset.labTheme = labTheme;
+  }, [labTheme]);
+
+  return (
+    <ThemeProvider theme={labTheme === "dark" ? darkTheme : lightTheme}>
+      {children}
+    </ThemeProvider>
+  );
+}
+
 const preview: Preview = {
   decorators: [
-    (Story) => (
-      <ThemeProvider>
+    (Story, context) => (
+      <LabThemeScope themeGlobal={context.globals.theme}>
         <Story />
-      </ThemeProvider>
+      </LabThemeScope>
     ),
     (Story, context) => (
       <LabDeviceFrame
@@ -69,7 +87,22 @@ const preview: Preview = {
       </LabDeviceFrame>
     )
   ],
+  globalTypes: {
+    theme: {
+      description: "Interaction Lab theme",
+      toolbar: {
+        dynamicTitle: true,
+        icon: "circlehollow",
+        items: [
+          { title: "Light", value: "light" },
+          { title: "Dark", value: "dark" }
+        ],
+        title: "Theme"
+      }
+    }
+  },
   initialGlobals: {
+    theme: "light",
     viewport: {
       value: "phonePortrait",
       isRotated: false

@@ -97,7 +97,11 @@ export interface LocalDataImportObserver {
   ): void;
 }
 
+// Device appearance override: follow the system, or force light or dark.
+export type AppearancePreference = "system" | "light" | "dark";
+
 export interface PracticeSettings {
+  appearance: AppearancePreference;
   sync: {
     iCloudEnabled: boolean;
   };

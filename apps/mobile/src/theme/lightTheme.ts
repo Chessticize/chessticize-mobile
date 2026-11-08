@@ -9,12 +9,14 @@ const colors: ThemeColors = {
   surfaceSunken: "#F1F5F9",
   surfaceStrong: "#E2E8F0",
   surfaceInverse: "#0F172A",
+  surfaceFloating: "#F8FAFC",
+  thumb: "#FFFFFF",
   fillMuted: "#CBD5E1",
   fillStrong: "#94A3B8",
+  fillDisabled: "#64748B",
   glass: "rgba(255, 255, 255, 0.66)",
   glassStrong: "rgba(255, 255, 255, 0.94)",
   veil: "rgba(248, 250, 252, 0.92)",
-  halo: "rgba(248, 250, 252, 0.85)",
   scrim: "rgba(15, 23, 42, 0.55)",
   scrimSoft: "rgba(15, 23, 42, 0.48)",
   scrimStrong: "rgba(15, 23, 42, 0.90)",
@@ -27,6 +29,7 @@ const colors: ThemeColors = {
     tertiary: "#64748B",
     faint: "#94A3B8",
     onAccent: "#FFFFFF",
+    onTone: "#FFFFFF",
     ink: "#111827",
     inverse: "#E2E8F0"
   },
@@ -47,6 +50,7 @@ const colors: ThemeColors = {
     s800: "#1E40AF",
     s900: "#1E3A8A",
     wash: "#F8FBFF",
+    fill: "#2563EB",
     dropZone: "rgba(37, 99, 235, 0.025)",
     glassFill: "rgba(219, 234, 254, 0.14)",
     glassBorder: "rgba(147, 197, 253, 0.48)"
@@ -114,7 +118,16 @@ const colors: ThemeColors = {
     promotionContainer: "#F8FAFC",
     promotionBorder: "#D8E0E8",
     promotionShadow: "#000",
-    promotionPieceBorder: "#CBD5E1"
+    promotionPieceBorder: "#CBD5E1",
+    coordinateOnLightSquare: "#334155",
+    coordinateOnDarkSquare: "#F8FAFC",
+    coordinateHaloOnLightSquare: "rgba(248, 250, 252, 0.85)",
+    coordinateHaloOnDarkSquare: "rgba(15, 23, 42, 0.55)"
+  },
+  launch: {
+    background: "#F7F7F2",
+    title: "#1D201F",
+    detail: "#6B6258"
   },
   backGesture: {
     stage: "#DCE7F5",

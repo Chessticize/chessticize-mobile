@@ -2,6 +2,8 @@ const React = require('react');
 const appStateListeners = new Set();
 const backHandlerListeners = new Set();
 const windowDimensionListeners = new Set();
+const colorSchemeListeners = new Set();
+let colorScheme = 'light';
 const defaultWindowDimensions = { width: 390, height: 844, scale: 3, fontScale: 1 };
 let windowDimensions = { ...defaultWindowDimensions };
 let scrollViewCommands = [];
@@ -246,6 +248,22 @@ module.exports = {
   Image: component('Image'),
   Modal: component('Modal'),
   View: MockView,
+  useColorScheme() {
+    return React.useSyncExternalStore(
+      (listener) => {
+        colorSchemeListeners.add(listener);
+        return () => colorSchemeListeners.delete(listener);
+      },
+      () => colorScheme,
+      () => colorScheme
+    );
+  },
+  __setColorScheme(nextScheme) {
+    colorScheme = nextScheme;
+    for (const listener of Array.from(colorSchemeListeners)) {
+      listener();
+    }
+  },
   useWindowDimensions() {
     return React.useSyncExternalStore(
       (listener) => {

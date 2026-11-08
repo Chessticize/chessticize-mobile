@@ -19,8 +19,13 @@ import {
 // current checkout. Usage and output are documented in apps/mobile-lab/README.md.
 
 type ViewportKey = keyof typeof LAB_DEVICE_VIEWPORTS;
+type ThemeKey = "light" | "dark";
+type Variant = { viewport: ViewportKey; theme: ThemeKey; name: string };
+
+type AuditIssue = { kind: "text" | "surface"; detail: string };
 type Mode = "baseline" | "compare";
 
+const auditScript = readFileSync(new URL("./lab-audit-page.js", import.meta.url), "utf8");
 const labRoot = fileURLToPath(new URL("../", import.meta.url));
 const repoRoot = resolve(labRoot, "../..");
 const defaultViewports: ViewportKey[] = ["phonePortrait", "phoneLandscape", "regularWidth"];
@@ -71,8 +76,10 @@ async function runCompare(): Promise<void> {
 
   // A filtered run only compares what it captured.
   const inSelection = (file: string): boolean => {
-    const [viewport, name] = file.split("/") as [ViewportKey, string];
+    const [variant, name] = file.split("/") as [string, string];
+    const [viewport, suffix] = variant.split("--") as [ViewportKey, string | undefined];
     return options.viewports.includes(viewport)
+      && options.themes.includes(suffix === "dark" ? "dark" : "light")
       && (options.only === undefined || name.includes(options.only));
   };
   const baselineFiles = new Set((await listPngs(baselineDir)).filter(inSelection));
@@ -140,9 +147,15 @@ async function capture(checkoutRoot: string, targetDir: string): Promise<void> {
   const storyIds = registryStoryIds()
     .filter((storyId) => indexed.has(storyId) && (options.only === undefined
       || storyId.includes(options.only)));
-  const jobs = options.viewports.flatMap((viewport) =>
-    storyIds.map((storyId) => ({ storyId, viewport }))
+  const variants: Variant[] = options.viewports.flatMap((viewport) =>
+    options.themes.map((theme) => ({
+      name: theme === "light" ? viewport : `${viewport}--${theme}`,
+      theme,
+      viewport
+    }))
   );
+  const jobs = variants.flatMap((variant) => storyIds.map((storyId) => ({ storyId, variant })));
+  const auditIssues: Record<string, AuditIssue[]> = {};
 
   const server = await serve(staticDir);
   const browser = await launchBrowser();
@@ -155,15 +168,24 @@ async function capture(checkoutRoot: string, targetDir: string): Promise<void> {
       while (next < jobs.length) {
         const job = jobs[next++]!;
         try {
-          await screenshot(browser, server.url, job.storyId, job.viewport, targetDir);
+          const issues = await screenshot(browser, server.url, job.storyId, job.variant, targetDir);
+          if (issues.length > 0) auditIssues[`${job.variant.name}/${job.storyId}`] = issues;
         } catch (error) {
-          failures.push(`${job.viewport}/${job.storyId}: ${(error as Error).message}`);
+          failures.push(`${job.variant.name}/${job.storyId}: ${(error as Error).message}`);
         }
         if (++done % 25 === 0 || done === jobs.length) {
           console.log(`Captured ${done}/${jobs.length}`);
         }
       }
     }));
+    if (options.audit) {
+      await writeFile(join(targetDir, "audit.json"), `${JSON.stringify(auditIssues, null, 2)}\n`);
+      const flagged = Object.entries(auditIssues);
+      console.log(`Dark audit: ${flagged.length} of ${jobs.length} captures have contrast or surface issues.`);
+      for (const [key, issues] of flagged.slice(0, 40)) {
+        console.log(`  ${key}: ${issues.length} (${issues.slice(0, 2).map((issue) => issue.detail).join("; ")})`);
+      }
+    }
     if (failures.length > 0) {
       throw new Error(`Capture failed for ${failures.length} scenario(s):\n${failures.join("\n")}`);
     }
@@ -177,33 +199,40 @@ async function screenshot(
   browser: Browser,
   baseUrl: string,
   storyId: string,
-  viewport: ViewportKey,
+  variant: Variant,
   targetDir: string
-): Promise<void> {
+): Promise<AuditIssue[]> {
   // Load the scenario twice: cells that differ between frames or between loads (ticking
   // timers, spinners, layout races) are recorded so comparisons can ignore them.
   const frames: Buffer[] = [];
+  let issues: AuditIssue[] = [];
   for (let load = 0; load < 2; load += 1) {
-    frames.push(...await sampleFrames(browser, baseUrl, storyId, viewport));
+    const sampled = await sampleFrames(
+      browser, baseUrl, storyId, variant, load === 0 && options.audit && variant.theme === "dark"
+    );
+    frames.push(...sampled.frames);
+    if (load === 0) issues = sampled.issues;
   }
-  await mkdir(join(targetDir, viewport), { recursive: true });
-  await writeFile(join(targetDir, viewport, `${storyId}.png`), frames[frames.length - 1]!);
+  await mkdir(join(targetDir, variant.name), { recursive: true });
+  await writeFile(join(targetDir, variant.name, `${storyId}.png`), frames[frames.length - 1]!);
   const dynamic = await dynamicCells(frames);
   if (dynamic.size > 0) {
     await writeFile(
-      join(targetDir, viewport, `${storyId}.dynamic.json`),
+      join(targetDir, variant.name, `${storyId}.dynamic.json`),
       JSON.stringify([...dynamic])
     );
   }
+  return issues;
 }
 
 async function sampleFrames(
   browser: Browser,
   baseUrl: string,
   storyId: string,
-  viewport: ViewportKey
-): Promise<Buffer[]> {
-  const { width, height } = LAB_DEVICE_VIEWPORTS[viewport];
+  variant: Variant,
+  audit: boolean
+): Promise<{ frames: Buffer[]; issues: AuditIssue[] }> {
+  const { width, height } = LAB_DEVICE_VIEWPORTS[variant.viewport];
   const context = await browser.newContext({
     deviceScaleFactor: 1,
     reducedMotion: "reduce",
@@ -211,7 +240,7 @@ async function sampleFrames(
   });
   try {
     const page = await context.newPage();
-    await page.goto(storyUrl(baseUrl, storyId, viewport), { waitUntil: "load" });
+    await page.goto(storyUrl(baseUrl, storyId, variant.viewport, variant.theme), { waitUntil: "load" });
     await waitForStoryRender(page);
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(options.settleMs);
@@ -220,7 +249,7 @@ async function sampleFrames(
       if (index > 0) await page.waitForTimeout(options.frameIntervalMs);
       frames.push(await page.screenshot({ animations: "disabled", caret: "hide" }));
     }
-    return frames;
+    return { frames, issues: audit ? await page.evaluate(auditScript) : [] };
   } finally {
     await context.close();
   }
@@ -332,9 +361,10 @@ async function decode(path: string) {
 
 async function listPngs(dir: string): Promise<string[]> {
   const files: string[] = [];
-  for (const viewport of await readdir(dir)) {
-    for (const file of await readdir(join(dir, viewport))) {
-      if (file.endsWith(".png")) files.push(`${viewport}/${file}`);
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    for (const file of await readdir(join(dir, entry.name))) {
+      if (file.endsWith(".png")) files.push(`${entry.name}/${file}`);
     }
   }
   return files;
@@ -354,7 +384,7 @@ function parseArguments(argv: string[]) {
   const [modeArgument, ...rest] = argv;
   if (modeArgument !== "baseline" && modeArgument !== "compare") {
     console.error(
-      "Usage: visual-regression <baseline|compare> [--ref <git-ref>] [--viewports a,b] "
+      "Usage: visual-regression <baseline|compare> [--ref <git-ref>] [--viewports a,b] [--themes light,dark] [--audit] "
       + "[--only <substring>] [--skip-build] [--concurrency N] [--out dir]"
     );
     process.exit(2);
@@ -371,7 +401,9 @@ function parseArguments(argv: string[]) {
     frames: 4,
     frameIntervalMs: 400,
     skipBuild: false,
-    viewports: defaultViewports
+    viewports: defaultViewports,
+    themes: ["light"] as ThemeKey[],
+    audit: false
   };
   for (let index = 0; index < rest.length; index += 1) {
     const flag = rest[index];
@@ -383,6 +415,8 @@ function parseArguments(argv: string[]) {
     switch (flag) {
       case "--ref": parsed.ref = value(); break;
       case "--viewports": parsed.viewports = value().split(",") as ViewportKey[]; break;
+      case "--themes": parsed.themes = value().split(",") as ThemeKey[]; break;
+      case "--audit": parsed.audit = true; break;
       case "--only": parsed.only = value(); break;
       case "--out": parsed.out = value(); break;
       case "--concurrency": parsed.concurrency = Number(value()); break;

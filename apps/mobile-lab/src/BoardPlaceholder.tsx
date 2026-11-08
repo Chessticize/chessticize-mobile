@@ -1,6 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 import { Chess, type Color, type PieceSymbol, type Square } from "chess.js";
+import { useTheme } from "../../mobile/src/theme/index.ts";
 import { currentExpectedMove } from "../../../packages/core/src/index.ts";
 import {
   getLabPracticeService,
@@ -228,6 +229,11 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
   }));
 
   const squareSize = boardSize / 8;
+  const theme = useTheme();
+  // The placeholder keeps its historic light squares; dark uses the board tokens.
+  const darkSquares = theme.name === "dark"
+    ? { dark: theme.colors.board.darkSquare, light: theme.colors.board.lightSquare }
+    : undefined;
   const squares = useMemo(
     () => Array.from({ length: 64 }, (_, index) => ({
       id: index,
@@ -257,6 +263,7 @@ const BoardPlaceholder = forwardRef<BoardPlaceholderRef, BoardPlaceholderProps>(
             style={[
               styles.square,
               square.dark ? styles.darkSquare : styles.lightSquare,
+              darkSquares ? { backgroundColor: square.dark ? darkSquares.dark : darkSquares.light } : null,
               { height: squareSize, width: squareSize }
             ]}
           />

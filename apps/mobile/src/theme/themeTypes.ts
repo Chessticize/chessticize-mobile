@@ -16,6 +16,8 @@ export type AccentColors = {
   s800: string;
   s900: string;
   wash: string;
+  // Fill of buttons and active controls. Text drawn on it uses text.onAccent.
+  fill: string;
   // Faint fill of a drop target and the tint of accent hints drawn on a dark scrim.
   dropZone: string;
   glassFill: string;
@@ -90,6 +92,11 @@ export type BoardColors = {
   promotionBorder: string;
   promotionShadow: string;
   promotionPieceBorder: string;
+  // Coordinate labels drawn over the squares, with their legibility halo.
+  coordinateOnLightSquare: string;
+  coordinateOnDarkSquare: string;
+  coordinateHaloOnLightSquare: string;
+  coordinateHaloOnDarkSquare: string;
 };
 
 export type ThemeColors = {
@@ -99,14 +106,19 @@ export type ThemeColors = {
   surfaceSunken: string;
   surfaceStrong: string;
   surfaceInverse: string;
+  // Callouts and popovers drawn above content.
+  surfaceFloating: string;
+  // Knob of a toggle; stays light so it reads against both track states.
+  thumb: string;
   // Solid fills for tracks, dots and disabled controls, light to dark.
   fillMuted: string;
   fillStrong: string;
+  // Fill of a disabled button; its label stays text.onAccent.
+  fillDisabled: string;
   // Translucent fills layered over tinted surfaces.
   glass: string;
   glassStrong: string;
   veil: string;
-  halo: string;
   scrim: string;
   scrimSoft: string;
   scrimStrong: string;
@@ -119,6 +131,8 @@ export type ThemeColors = {
     tertiary: string;
     faint: string;
     onAccent: string;
+    // Labels on tone fills (danger, positive, warning, neutral) and on the inverse surface.
+    onTone: string;
     // Darkest ink, used by headings that sit on the app canvas.
     ink: string;
     // Text drawn on the dark inverse surface.
@@ -142,6 +156,12 @@ export type ThemeColors = {
     warningStrong: string;
   };
   board: BoardColors;
+  // Loading screen shown before the app UI is ready; matches the native launch screen.
+  launch: {
+    background: string;
+    title: string;
+    detail: string;
+  };
   // Stage drawn while the predictive-back preview is shown.
   backGesture: {
     stage: string;
@@ -242,6 +262,8 @@ export type ThemeElevation = {
     resting: string;
   };
 };
+
+export type AppearancePreference = "system" | "light" | "dark";
 
 export type Theme = {
   name: "light" | "dark";

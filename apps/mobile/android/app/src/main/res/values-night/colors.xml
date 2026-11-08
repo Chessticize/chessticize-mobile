@@ -1,0 +1,4 @@
+<resources>
+    <!-- Dark window background so a cold launch in dark appearance never flashes light. -->
+    <color name="window_background">#000000</color>
+</resources>

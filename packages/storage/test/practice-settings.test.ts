@@ -112,3 +112,27 @@ test("move feedback settings are cloned independently", () => {
     hapticsEnabled: true
   });
 });
+
+test("appearance defaults to following the system and normalizes unknown values", () => {
+  assert.equal(defaultPracticeSettings().appearance, "system");
+
+  const legacySettings = {
+    sync: { iCloudEnabled: true },
+    notifications: { reviewReminder: { mode: "smart" as const } }
+  } as PracticeSettings;
+  assert.equal(clonePracticeSettings(legacySettings).appearance, "system");
+
+  for (const appearance of ["light", "dark", "system"] as const) {
+    assert.equal(
+      clonePracticeSettings({ ...defaultPracticeSettings(), appearance }).appearance,
+      appearance
+    );
+  }
+  assert.equal(
+    clonePracticeSettings({
+      ...defaultPracticeSettings(),
+      appearance: "sepia" as unknown as PracticeSettings["appearance"]
+    }).appearance,
+    "system"
+  );
+});
