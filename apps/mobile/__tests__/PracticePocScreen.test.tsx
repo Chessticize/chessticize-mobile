@@ -6492,7 +6492,7 @@ describe("PracticePocScreen", () => {
   });
 
   it.each([
-    { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 204, chrome: "bottomBar", sessionRail: false, homeColumns: false },
+    { label: "iPhone SE-sized portrait", width: 320, height: 568, scale: 2, layout: "compactPortrait", boardSize: 148, chrome: "bottomBar", sessionRail: false, homeColumns: false },
     { label: "modern iPhone portrait", width: 430, height: 932, scale: 3, layout: "compactPortrait", boardSize: 398, chrome: "bottomBar", sessionRail: false, homeColumns: false },
     { label: "compact wide-short window", width: 844, height: 390, scale: 3, layout: "compactLandscape", boardSize: 358, chrome: "bottomBar", sessionRail: true, homeColumns: true },
     { label: "iPad-on-Mac wide-short window", width: 993, height: 346, scale: 2, layout: "compactLandscape", boardSize: 314, chrome: "bottomBar", sessionRail: true, homeColumns: true },

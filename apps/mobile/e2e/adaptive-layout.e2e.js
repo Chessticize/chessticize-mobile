@@ -125,6 +125,22 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       });
     }
 
+    if (device.getPlatform() === 'ios') {
+      // The post-answer feedback row is the last item in the locked session
+      // stack, so it is the first to fall off a short phone (#639). Familiar 15
+      // puzzle one accepts c2b1 (mate) and then offers Mark as unclear; puzzle
+      // two's legal-wrong c4b5 then shows the previous-attempt notice.
+      const orientation = includeLandscape ? 'landscape' : initialOrientation;
+      await playBoardMove('session-board', 'c2b1');
+      await waitFor(element(by.id('sprint-unclear-prompt'))).toExist().withTimeout(10000);
+      await expectSessionControlsContained(orientation, ['sprint-unclear-prompt', 'sprint-unclear-toggle']);
+      await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-standard-unclear-prompt`);
+      await playBoardMove('session-board', 'c4b5');
+      await waitFor(element(by.id('sprint-previous-attempt-notice'))).toExist().withTimeout(10000);
+      await expectSessionControlsContained(orientation, ['sprint-previous-attempt-notice']);
+      await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-standard-previous-attempt-notice`);
+    }
+
     if (
       needsPortraitRestore
       && device.getPlatform() !== 'android'
@@ -143,14 +159,18 @@ async function assertFirstUseSprintRulesGuideLayout() {
   const badge = element(by.id('practice-sprint-rule-puzzle-timeout-badge'));
   const copy = element(by.id('practice-sprint-rule-puzzle-timeout-copy'));
 
+  await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(10000);
+  const guideFrame = await frameFor(element(by.id('practice-sprint-rules-guide')));
+  const homeFrame = await frameFor(element(by.id('adaptive-layout')));
   if (
     deviceLabel.includes('large-text')
     || (onlyOrientation === 'landscape' && deviceLabel.includes('phone'))
+    || guideFrame.y + guideFrame.height > homeFrame.y + homeFrame.height
   ) {
-    // An enlarged rules card, or one on a short landscape phone, can be taller
-    // than Detox's 75% visibility threshold allows; the frame checks below
-    // still cover its layout.
-    await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(10000);
+    // An enlarged rules card, one on a short landscape phone, or one that runs
+    // past the first screen of a short portrait phone (iPhone SE) can be
+    // taller than Detox's 75% visibility threshold allows; the frame checks
+    // below still cover its layout.
     await waitFor(element(by.text('TIMEOUT'))).toExist().withTimeout(10000);
   } else {
     await waitFor(element(by.id('practice-sprint-rules-guide'))).toBeVisible().withTimeout(10000);
@@ -240,14 +260,17 @@ async function startStandardSprintThroughContainedGuide(orientation) {
   }
 }
 
-async function expectSessionControlsContained(orientation) {
+async function expectSessionControlsContained(orientation, feedbackTestIDs = []) {
   const screenFrame = await frameFor(element(by.id('adaptive-layout')));
   for (const testID of [
     'session-board',
     'session-status-metrics',
+    'practice-prompt-stack',
+    'session-puzzle-timing',
     'session-score-strip',
     'session-abandon',
-    'session-pause'
+    'session-pause',
+    ...feedbackTestIDs
   ]) {
     const frame = await frameForIfPresent(testID);
     if (!frame) {
