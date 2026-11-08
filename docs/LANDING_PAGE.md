@@ -7,10 +7,24 @@ change reaches `main`.
 
 Public routes:
 
-- Developer website: `https://chessticize.github.io/chessticize-mobile/`
-- Support: `https://chessticize.github.io/chessticize-mobile/support/`
-- Accessibility: `https://chessticize.github.io/chessticize-mobile/accessibility/`
-- Android install guide: `https://chessticize.github.io/chessticize-mobile/android/`
+- Developer website: `https://chessticize.com/`
+- Support: `https://chessticize.com/support/`
+- Accessibility: `https://chessticize.com/accessibility/`
+- Android install guide: `https://chessticize.com/android/`
+
+The site is served from the custom domain `chessticize.com`. Once the custom
+domain is set in the repository's Pages settings, the old
+`https://chessticize.github.io/chessticize-mobile/...` URLs redirect
+automatically to the same path on `chessticize.com`, so existing app, store, and
+shared links keep working. The web app lives separately at
+`https://app.chessticize.com`; `site/404.html` points visitors who land on a
+missing page there.
+
+Pages use relative asset and link paths so they work from the domain root. Only
+`404.html` needs root-absolute paths because it is served for any missing URL
+at any depth. It references its stylesheet and icon at both `/` and the legacy
+`/chessticize-mobile/` prefix, so it also renders during the transition on the
+`github.io` project path.
 
 ## Updating the marketing images
 

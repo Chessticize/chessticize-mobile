@@ -4,11 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <link
-      rel="icon"
-      href="/chessticize-mobile/assets/app-icon-192.png"
-      sizes="192x192"
-    >
+    <!-- Served for any missing URL at any depth, so asset paths cannot be
+         relative. Root paths serve chessticize.com; the /chessticize-mobile/
+         copies keep it styled on the legacy github.io project path. -->
+    <link rel="icon" href="/assets/app-icon-192.png" sizes="192x192">
+    <link rel="icon" href="/chessticize-mobile/assets/app-icon-192.png" sizes="192x192">
+    <link rel="stylesheet" href="/styles.css">
     <link rel="stylesheet" href="/chessticize-mobile/styles.css">
     <title>Page not found — Chessticize</title>
   </head>
@@ -18,9 +19,13 @@
         <p class="eyebrow">404</p>
         <h1>This puzzle has no solution here.</h1>
         <p>The page moved, or the link was incomplete.</p>
-        <a class="button button-primary" href="/chessticize-mobile/">
+        <a class="button button-primary" href="/">
           <strong>Return to Chessticize</strong>
         </a>
+        <p>
+          Looking for the Chessticize web app? It has moved to
+          <a href="https://app.chessticize.com">app.chessticize.com</a>.
+        </p>
       </div>
     </main>
   </body>
