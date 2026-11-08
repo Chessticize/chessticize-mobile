@@ -154,13 +154,16 @@ export function NativeTabHost({
       })}
     </Tabs.Host>
   );
-  if (!usesAndroidRail) {
+  if (Platform.OS !== "android") {
     return host;
   }
   // The rail floats over the host's leading edge, and tab content treats it as
-  // a leading inset.
+  // a leading inset. Android always renders this wrapper so the host keeps its
+  // place in the tree when rotation or folding crosses the rail width: a
+  // remounted host would restart its selection history (provenance) and lose
+  // every tab's content.
   return (
-    <View style={styles.railLayout} testID="native-tab-host-with-rail">
+    <View style={styles.railLayout} testID="native-tab-host-android">
       {host}
       {railShown ? (
         <View style={styles.railOverlay}>

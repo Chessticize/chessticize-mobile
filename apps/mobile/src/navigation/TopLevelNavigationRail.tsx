@@ -54,7 +54,11 @@ export function TopLevelNavigationRail({
             testID={item.testID}
             onPress={() => onSelect(item.tab)}
           >
-            <View style={[styles.indicator, active ? styles.indicatorActive : null]}>
+            <View style={styles.indicator}>
+              {/* Mount the pill with its colour and radius together: on Android,
+                  adding a background to an existing rounded view on reselection
+                  drew it with square corners. */}
+              {active ? <View style={styles.indicatorPill} testID={`${item.testID}-indicator`} /> : null}
               <Icon color={color} name={item.icon} size={24} testID={`${item.testID}-icon`} />
               {itemBadge ? (
                 <Text
@@ -90,13 +94,18 @@ const useStyles = makeStyles((theme) => ({
   },
   indicator: {
     alignItems: "center",
-    borderRadius: 16,
     height: 32,
     justifyContent: "center",
     width: 56
   },
-  indicatorActive: {
-    backgroundColor: theme.colors.accent.s100
+  indicatorPill: {
+    backgroundColor: theme.colors.accent.s100,
+    borderRadius: 16,
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
   },
   label: {
     fontSize: 12,
@@ -112,7 +121,7 @@ const useStyles = makeStyles((theme) => ({
     color: theme.colors.text.onAccent,
     fontSize: 11,
     fontWeight: "600",
-    left: 30,
+    left: 34,
     lineHeight: 16,
     minWidth: 16,
     overflow: "hidden",

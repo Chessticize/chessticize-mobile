@@ -257,4 +257,33 @@ describe("NativeTabHost", () => {
     });
     expect(textOf(renderer, "content-practice")).toBe("0 0 24 0");
   });
+
+  it("keeps following native selections after an Android window crosses the rail width and back", () => {
+    // Rotating a phone or folding a foldable switches between the bottom
+    // navigation and the rail. The native host must survive the switch: a
+    // remounted host restarts its selection history, and the app would then
+    // ignore the next tab a person picks.
+    (Platform as { OS: string }).OS = "android";
+    reactNative.__setWindowDimensions({ height: 915, width: 412 });
+    const renderer = render(<Harness />);
+    press(renderer, "settings-tab");
+    press(renderer, "history-tab");
+    press(renderer, "settings-tab");
+    expect(textOf(renderer, "app-selected-tab")).toBe("settings");
+
+    act(() => {
+      reactNative.__setWindowDimensions({ height: 412, width: 915 });
+    });
+    expect(hasTestID(renderer, "navigation-rail")).toBe(true);
+    press(renderer, "review-tab");
+    expect(textOf(renderer, "app-selected-tab")).toBe("review");
+
+    act(() => {
+      reactNative.__setWindowDimensions({ height: 915, width: 412 });
+    });
+    expect(hasTestID(renderer, "native-tab-chrome-bottomNavigation")).toBe(true);
+    press(renderer, "practice-tab");
+    expect(textOf(renderer, "app-selected-tab")).toBe("practice");
+    expect(hasTestID(renderer, "content-practice")).toBe(true);
+  });
 });
