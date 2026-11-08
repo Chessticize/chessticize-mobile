@@ -35,6 +35,7 @@ import {
 import {
   analyzeFenWithUciEngine,
   ALL_THEME_SELECTION,
+  canPresentWhatsNew,
   applyMovesToFen,
   arrowDuelReplyCuePresentationFor,
   beginArrowDuelPuzzle,
@@ -247,6 +248,9 @@ import {
 } from "../navigation/topLevelNavigation.ts";
 import { SafeAreaModalBackdrop } from "./SafeAreaModalBackdrop.tsx";
 import { SessionGuideOverlay } from "./SessionGuideOverlay.tsx";
+import { WhatsNewSheet } from "./WhatsNewSheet.tsx";
+import { useWhatsNew } from "../whatsNew/useWhatsNew.ts";
+import { WHATS_NEW_SETTINGS_LABEL } from "../whatsNew/whatsNewContent.ts";
 import {
   sessionGuideContainerTestID,
   sessionGuideStartLabel,
@@ -5207,6 +5211,28 @@ export function PracticePocScreen({
     navigateToTab(intent.tab);
   }
 
+  // The What's New notes wait for an idle Practice home: no Run on screen or
+  // resumable, and no first-use guide, setup flow or loading screen in the way.
+  const whatsNew = useWhatsNew({
+    appVersion: platformCapabilities.applicationMetadata.versionName,
+    platform: reminderPlatform,
+    presentable: canPresentWhatsNew({
+      practiceTabSelected: tab === "practice",
+      openRun: state !== null,
+      resumableRun: resumableSprint !== null,
+      otherSurfaceActive: personalBestGuideVisible
+        || personalBestHubVisible
+        || personalBestRecordsVisible
+        || isSessionGuideVisible
+        || sprintRulesGuideVisible
+        || startingMode !== null
+        || (resolvedTacticalProfilePresentation?.screen ?? "home") !== "home"
+        || (activeRunManagementScreen !== undefined && activeRunManagementScreen !== "home")
+        || (activeRunManagementScreen === undefined && mode === "custom")
+    }),
+    service
+  });
+
   const appShell = (
       <View
         testID="safe-area-shell"
@@ -5709,6 +5735,8 @@ export function PracticePocScreen({
                       ? { onSeedTacticalHistory: seedTestTacticalHistory }
                       : {})}
                     seededHistoryStatus={seededHistoryStatus}
+                    onShowWhatsNew={whatsNew.open}
+                    onSimulateWhatsNewUpdate={whatsNew.simulateUpdate}
                     {...(simulationProfile
                       ? {
                           simulationActive: simulationProfile.active,
@@ -5931,6 +5959,7 @@ export function PracticePocScreen({
                   { label: "Arrow Duel", record: service.getRating(defaultSprintConfig("arrow_duel").ratingKey) }
                 ]}
                 onOpenDiagnostics={arePracticeTestControlsEnabled() ? () => navigateToTab("analysis") : undefined}
+                onOpenWhatsNew={whatsNew.open}
                 onAdjustRating={(ratingKey, nextRating) => {
                   const next = service.setRating(ratingKey, nextRating);
                   setSettingsRevision((current) => current + 1);
@@ -6055,6 +6084,11 @@ export function PracticePocScreen({
           }}
         />
       ) : null}
+      <WhatsNewSheet
+        content={whatsNew.content}
+        visible={whatsNew.visible}
+        onContinue={whatsNew.dismiss}
+      />
       </View>
   );
 
@@ -9998,7 +10032,9 @@ function TestPuzzleSourceControl({
   seededHistoryStatus,
   simulationActive,
   onToggleSimulation,
-  onClearSimulation
+  onClearSimulation,
+  onShowWhatsNew,
+  onSimulateWhatsNewUpdate
 }: {
   source: MobilePuzzleSource;
   onChange: (next: MobilePuzzleSource) => void;
@@ -10008,6 +10044,8 @@ function TestPuzzleSourceControl({
   simulationActive?: boolean;
   onToggleSimulation?: () => void;
   onClearSimulation?: () => void;
+  onShowWhatsNew?: () => void;
+  onSimulateWhatsNewUpdate?: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
   return (
@@ -10070,6 +10108,29 @@ function TestPuzzleSourceControl({
                 onPress={() => onSeedTacticalHistory(scenario)}
               />
             ))}
+          </View>
+        </>
+      ) : null}
+      {onShowWhatsNew || onSimulateWhatsNewUpdate ? (
+        <>
+          <Text style={styles.helperText}>What’s New (Dev only)</Text>
+          <View style={styles.optionRow}>
+            {onShowWhatsNew ? (
+              <OptionButton
+                active={false}
+                label="Show What’s New"
+                testID="test-whats-new-show"
+                onPress={onShowWhatsNew}
+              />
+            ) : null}
+            {onSimulateWhatsNewUpdate ? (
+              <OptionButton
+                active={false}
+                label="Simulate update to 1.6.0"
+                testID="test-whats-new-simulate-update"
+                onPress={onSimulateWhatsNewUpdate}
+              />
+            ) : null}
           </View>
         </>
       ) : null}
@@ -16094,6 +16155,7 @@ function SettingsPanel({
   progressProtection,
   onOpenDiagnostics,
   onOpenNotificationSettings,
+  onOpenWhatsNew,
   onAdjustRating,
   onAdvancedRatingsOpenChange,
   onRequestReviewReminderPermission,
@@ -16131,6 +16193,7 @@ function SettingsPanel({
   progressProtection: MobilePlatformCapabilities["progressProtection"];
   onOpenDiagnostics?: () => void;
   onOpenNotificationSettings: () => Promise<void>;
+  onOpenWhatsNew: () => void;
   onAdjustRating: (ratingKey: string, nextRating: number) => RatingRecord;
   onAdvancedRatingsOpenChange: (open: boolean) => void;
   onRequestReviewReminderPermission: () => Promise<ReviewReminderPermissionStatus>;
@@ -16436,6 +16499,11 @@ function SettingsPanel({
       />
 
       <SettingsSection title="About" testID="settings-about-section" wide={adaptiveLayout.usesWideContent}>
+        <SettingsRow
+          label={WHATS_NEW_SETTINGS_LABEL}
+          testID="settings-whats-new"
+          onPress={onOpenWhatsNew}
+        />
         <SettingsRow
           label="App Version"
           value={applicationMetadata.buildNumber

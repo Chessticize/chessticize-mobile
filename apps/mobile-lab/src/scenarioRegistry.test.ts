@@ -52,26 +52,23 @@ test("every typed navigation coverage entry points to a registered scenario", ()
 test("New Scenario Markers derive catalog tags from issue ownership", () => {
   const scenarios = Object.values(scenarioRegistry);
   assert.deepEqual(newScenarios, scenarios.filter((scenario) => scenario.isNew));
-  const issue609VisualDirection = [
-    "visual-direction-a-grouped-native-tokens",
-    "visual-direction-a-grouped-native-phone",
-    "visual-direction-a-grouped-native-ipad"
+  const issue651Scenarios = [
+    "settings-whats-new",
+    "release-notes-ios",
+    "release-notes-android"
   ];
-  const issue609SprintResultRedesign = Object.values(scenarioRegistry)
-    .filter((scenario) => scenario.group === "Sprint Result redesign")
-    .map((scenario) => scenario.id);
-  assert.ok(issue609SprintResultRedesign.length >= 10);
-  const issue609Scenarios = [...issue609VisualDirection, ...issue609SprintResultRedesign];
-  assert.deepEqual(newScenarios.map((scenario) => scenario.id), issue609Scenarios);
+  assert.deepEqual(newScenarios.map((scenario) => scenario.id), issue651Scenarios);
   assert.deepEqual(
     newScenarios
-      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 609))
+      .filter((scenario) => scenario.issues.some((issue) => issue.issueNumber === 651))
       .map((scenario) => scenario.id),
-    issue609Scenarios
+    issue651Scenarios
   );
-  for (const id of issue609VisualDirection) {
-    assert.equal(scenarioRegistry[id as LabScenarioId].group, "Visual Direction");
-  }
+  assert.equal(scenarioRegistry["release-notes-ios" as LabScenarioId].group, "Release Notes");
+  assert.equal(scenarioRegistry["release-notes-android" as LabScenarioId].group, "Release Notes");
+  assert.equal(scenarioRegistry["settings-whats-new" as LabScenarioId].group, "Settings");
+  // The #651 design track reset the #609 Visual Direction markers; the scenarios stay.
+  assert.deepEqual(storyTagsForScenario("visual-direction-a-grouped-native-phone"), []);
   // The #609 design track reset the merged #611 guide markers; the scenarios stay.
   assert.deepEqual(storyTagsForScenario("practice-active-session-guide"), []);
 

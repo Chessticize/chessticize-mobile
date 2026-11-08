@@ -44,6 +44,12 @@ themes (`darkTheme` and `lightTheme` from `apps/mobile/src/theme`). Open a
 story directly in dark with `?globals=theme:dark` on the story or `iframe.html`
 URL, for example `/?path=/story/practice--home&globals=theme:dark`.
 
+A story can preview large text with the `labTextScale` parameter (for example
+`parameters: { labTextScale: 1.8 }`). React Native Web does not apply the user's
+text size, so the Lab multiplies the theme's type sizes and line heights, the way
+Dynamic Type scales the same points on a device. A story can also start in a given
+viewport and theme with story-level `globals`.
+
 ## Validate the lab
 
 ```sh

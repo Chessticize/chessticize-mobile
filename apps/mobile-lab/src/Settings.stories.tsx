@@ -5,6 +5,7 @@ import {
   clickTestId,
   expectTestIdAbsent,
   openSettings,
+  waitForAbsentTestId,
   waitForDisabledTestId,
   waitForTestId,
   waitForText
@@ -246,5 +247,49 @@ export const StockfishDiagnostics: Story = {
     await openSettings(canvasElement);
     await clickTestId(canvasElement, "settings-stockfish-diagnostics");
     await waitForTestId(canvasElement, "stockfish-diagnostics-panel");
+  }
+};
+
+// Issue #651: About gains a What’s New row that reopens the latest release notes.
+export const WhatsNewRow: Story = {
+  name: "What’s New row",
+  tags: ["new"],
+  args: { scenarioId: "settings-whats-new" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "settings-about-section");
+    await waitForTestId(canvasElement, "settings-whats-new");
+    expectTestIdAbsent(canvasElement, "whats-new-sheet");
+    await centerTestId(canvasElement, "settings-whats-new");
+  }
+};
+
+export const WhatsNewRowDark: Story = {
+  name: "What’s New row · dark",
+  tags: ["new"],
+  args: {
+    scenarioId: "settings-whats-new",
+    storyPresentation: { storyId: "settings--whats-new-row-dark", title: "What’s New row · dark" }
+  },
+  globals: { theme: "dark" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "settings-whats-new");
+    await centerTestId(canvasElement, "settings-whats-new");
+  }
+};
+
+export const WhatsNewRowReopened: Story = {
+  name: "What’s New row · reopened",
+  tags: ["new"],
+  args: {
+    scenarioId: "settings-whats-new",
+    storyPresentation: { storyId: "settings--whats-new-row-reopened", title: "What’s New row · reopened" }
+  },
+  play: async ({ canvasElement }) => {
+    await clickTestId(canvasElement, "settings-whats-new");
+    await waitForTestId(canvasElement, "whats-new-sheet");
+    await waitForText(canvasElement, "What’s New in Chessticize");
+    await clickTestId(canvasElement, "whats-new-continue");
+    await waitForAbsentTestId(canvasElement, "whats-new-sheet");
+    await waitForTestId(canvasElement, "settings-panel");
   }
 };

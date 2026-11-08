@@ -71,7 +71,7 @@ import type {
   ReviewQueueDuePromotionResult
 } from "./practice-store.ts";
 import { exportReviewQueueState, normalizeImportedReviewQueueState } from "./practice-store.ts";
-import { clonePracticeSettings, defaultPracticeSettings, normalizeAppearancePreference, normalizeReviewReminderPreference, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
+import { clonePracticeSettings, defaultPracticeSettings, normalizeAppearancePreference, normalizeReviewReminderPreference, normalizeWhatsNewSeenVersion, reviewReminderPreferenceToSettings } from "./practice-settings.ts";
 import {
   selectUniquePuzzles,
   selectUniquePuzzlesForRatingBands
@@ -258,6 +258,7 @@ interface AppSettingsRow {
   sync_upload_allowed: number;
   arrow_duel_opponent_reply_enabled: number;
   appearance: PracticeSettings["appearance"];
+  whats_new_seen_version: string | null;
   review_reminder_mode: PracticeSettings["notifications"]["reviewReminder"]["mode"];
   review_reminder_fixed_local_time: string | null;
   move_feedback_sound_enabled: number;
@@ -364,7 +365,7 @@ export interface SyncSQLiteStoreOptions {
   randomId: () => string;
 }
 
-export const CURRENT_SCHEMA_VERSION = 23;
+export const CURRENT_SCHEMA_VERSION = 24;
 const MAX_SQL_ID_FILTER_VALUES = 400;
 
 interface SQLiteMigration {
@@ -396,7 +397,8 @@ const SQLITE_MIGRATIONS: readonly SQLiteMigration[] = [
   { from: 19, to: 20, apply: migrateV19ToV20 },
   { from: 20, to: 21, apply: migrateV20ToV21 },
   { from: 21, to: 22, apply: migrateV21ToV22 },
-  { from: 22, to: 23, apply: migrateV22ToV23 }
+  { from: 22, to: 23, apply: migrateV22ToV23 },
+  { from: 23, to: 24, apply: migrateV23ToV24 }
 ];
 
 export class SyncSQLiteStore implements PracticeStore {
@@ -1022,6 +1024,7 @@ export class SyncSQLiteStore implements PracticeStore {
           sync_upload_allowed,
           arrow_duel_opponent_reply_enabled,
           appearance,
+          whats_new_seen_version,
           review_reminder_mode,
           review_reminder_fixed_local_time,
           move_feedback_sound_enabled,
@@ -1031,12 +1034,13 @@ export class SyncSQLiteStore implements PracticeStore {
           sprint_arrow_duel_guide_seen,
           sprint_focused_run_guide_seen,
           sprint_arrow_duel_reply_cue_stage
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           sync_icloud_enabled = excluded.sync_icloud_enabled,
           sync_upload_allowed = excluded.sync_upload_allowed,
           arrow_duel_opponent_reply_enabled = excluded.arrow_duel_opponent_reply_enabled,
           appearance = excluded.appearance,
+          whats_new_seen_version = excluded.whats_new_seen_version,
           review_reminder_mode = excluded.review_reminder_mode,
           review_reminder_fixed_local_time = excluded.review_reminder_fixed_local_time,
           move_feedback_sound_enabled = excluded.move_feedback_sound_enabled,
@@ -1052,6 +1056,7 @@ export class SyncSQLiteStore implements PracticeStore {
         0,
         boolToInt(cloned.arrowDuel.opponentReplyEnabled),
         cloned.appearance,
+        cloned.whatsNewSeenVersion ?? null,
         cloned.notifications.reviewReminder.mode,
         cloned.notifications.reviewReminder.mode === "fixed"
           ? cloned.notifications.reviewReminder.fixedLocalTime
@@ -3138,11 +3143,13 @@ function repairKnownSchemaDrift(db: SyncSqliteDatabase): void {
   migrateV20ToV21(db);
   migrateV21ToV22(db);
   migrateV22ToV23(db);
+  migrateV23ToV24(db);
 }
 
 function hasCurrentSettingsColumns(db: SyncSqliteDatabase): boolean {
   return hasColumn(db, "app_settings", "arrow_duel_opponent_reply_enabled") &&
     hasColumn(db, "app_settings", "appearance") &&
+    hasColumn(db, "app_settings", "whats_new_seen_version") &&
     hasColumn(db, "app_settings", "move_feedback_sound_enabled") &&
     hasColumn(db, "app_settings", "move_feedback_haptics_enabled") &&
     hasColumn(db, "app_settings", "sprint_rules_guide_seen") &&
@@ -3978,6 +3985,17 @@ function migrateV22ToV23(db: SyncSqliteDatabase): void {
   );
 }
 
+// Device-local: the progress sync triggers watch only the synced preference
+// columns, so recording this version never enqueues an iCloud change.
+function migrateV23ToV24(db: SyncSqliteDatabase): void {
+  ensureColumn(
+    db,
+    "app_settings",
+    "whats_new_seen_version",
+    "ALTER TABLE app_settings ADD COLUMN whats_new_seen_version TEXT"
+  );
+}
+
 function migrateV21ToV22(db: SyncSqliteDatabase): void {
   ensureColumn(
     db,
@@ -4140,6 +4158,11 @@ function reviewRemovalFromRow(row: ReviewRemovalRow): ReviewScheduleRemoval {
   };
 }
 
+function whatsNewSeenVersionField(value: string | null): { whatsNewSeenVersion?: string } {
+  const version = normalizeWhatsNewSeenVersion(value);
+  return version === undefined ? {} : { whatsNewSeenVersion: version };
+}
+
 function settingsFromRow(row: AppSettingsRow): PracticeSettings {
   const reminder = normalizeReviewReminderPreference(
     row.review_reminder_mode === "fixed"
@@ -4148,6 +4171,7 @@ function settingsFromRow(row: AppSettingsRow): PracticeSettings {
   );
   return {
     appearance: normalizeAppearancePreference(row.appearance),
+    ...whatsNewSeenVersionField(row.whats_new_seen_version),
     sync: {
       iCloudEnabled: intToBool(row.sync_icloud_enabled)
     },

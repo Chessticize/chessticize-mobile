@@ -717,6 +717,24 @@ export class PracticeService {
     return this.store.countAttempts(filter);
   }
 
+  /**
+   * Whether this database shows the user has practiced here before: an attempt,
+   * a rated Run, or a first-use guide they already got past. The settings row
+   * itself says nothing (it is created on every launch), and a user who never
+   * completed a puzzle or dismissed a guide is indistinguishable from a new
+   * install. What's New uses this to tell an update from a fresh install.
+   */
+  hasPracticeActivity(): boolean {
+    if (this.countHistory() > 0 || this.listPlayedRatings().length > 0) {
+      return true;
+    }
+    const guides = this.getSettings().sprintGuides;
+    return guides.rulesSeen
+      || guides.activeSessionSeen
+      || guides.arrowDuelSeen
+      || guides.focusedRunSeen === true;
+  }
+
   getSprintResultSummary(
     state: Pick<SprintState, "id" | "correctCount" | "mistakeCount">
   ): SprintResultSummary {

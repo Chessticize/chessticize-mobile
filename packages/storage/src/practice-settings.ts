@@ -1,5 +1,6 @@
 import {
   defaultSprintGuideProgress,
+  parseReleaseVersion,
   type ArrowDuelReplyCueStage,
   type ReviewReminderSettings
 } from "../../core/src/index.ts";
@@ -34,6 +35,7 @@ export function defaultPracticeSettings(): PracticeSettings {
 export function clonePracticeSettings(settings: PracticeSettings): PracticeSettings {
   return normalizePracticeSettings({
     appearance: normalizeAppearancePreference(settings.appearance),
+    ...whatsNewSeenVersionField(settings.whatsNewSeenVersion),
     sync: {
       iCloudEnabled: settings.sync.iCloudEnabled
     },
@@ -62,6 +64,7 @@ export function clonePracticeSettings(settings: PracticeSettings): PracticeSetti
 export function normalizePracticeSettings(settings: PracticeSettings): PracticeSettings {
   return {
     appearance: normalizeAppearancePreference(settings.appearance),
+    ...whatsNewSeenVersionField(settings.whatsNewSeenVersion),
     sync: {
       iCloudEnabled: Boolean(settings.sync.iCloudEnabled)
     },
@@ -89,6 +92,20 @@ export function normalizePracticeSettings(settings: PracticeSettings): PracticeS
 
 export function normalizeAppearancePreference(value: unknown): AppearancePreference {
   return value === "light" || value === "dark" ? value : "system";
+}
+
+/** A recorded What's New version must read as a release version; anything else counts as unrecorded. */
+export function normalizeWhatsNewSeenVersion(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return parseReleaseVersion(trimmed) === undefined ? undefined : trimmed;
+}
+
+function whatsNewSeenVersionField(value: unknown): { whatsNewSeenVersion?: string } {
+  const version = normalizeWhatsNewSeenVersion(value);
+  return version === undefined ? {} : { whatsNewSeenVersion: version };
 }
 
 function normalizeArrowDuelReplyCueStage(

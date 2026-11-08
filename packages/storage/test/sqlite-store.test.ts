@@ -266,6 +266,7 @@ test("SQLite migration preserves legacy settings while adding current safety and
     assert.ok(columns.some((column) => column.name === "sprint_arrow_duel_reply_cue_stage"));
     assert.deepEqual({ ...settings }, {
       appearance: "system",
+      whats_new_seen_version: null,
       id: "default",
       sync_icloud_enabled: 1,
       sync_upload_allowed: 0,
@@ -1826,6 +1827,77 @@ test("PracticeService persists the appearance override across SQLite store reope
       } finally {
         reopened.close();
       }
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("PracticeService persists the What's New seen version across SQLite store reopen without touching other settings", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-whats-new-"));
+  const databasePath = join(directory, "whats-new.sqlite");
+  try {
+    const store = new SQLiteStore(databasePath);
+    store.migrate();
+    const service = new PracticeService(store);
+    try {
+      const before = service.getSettings();
+      assert.equal("whatsNewSeenVersion" in before, false);
+      service.saveSettings({ ...before, whatsNewSeenVersion: "1.5.3" });
+      assert.equal(service.getSettings().whatsNewSeenVersion, "1.5.3");
+      // Saving settings elsewhere keeps the recorded version.
+      service.saveSettings({ ...service.getSettings(), appearance: "dark" });
+      assert.equal(service.getSettings().whatsNewSeenVersion, "1.5.3");
+    } finally {
+      store.close();
+    }
+
+    const reopened = new SQLiteStore(databasePath);
+    reopened.migrate();
+    try {
+      const reopenedService = new PracticeService(reopened);
+      assert.equal(reopenedService.getSettings().whatsNewSeenVersion, "1.5.3");
+      assert.equal(reopenedService.getSettings().appearance, "dark");
+      reopenedService.saveSettings({ ...reopenedService.getSettings(), whatsNewSeenVersion: "1.6.0" });
+    } finally {
+      reopened.close();
+    }
+
+    const final = new SQLiteStore(databasePath);
+    final.migrate();
+    try {
+      assert.equal(new PracticeService(final).getSettings().whatsNewSeenVersion, "1.6.0");
+    } finally {
+      final.close();
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("recording the What's New seen version stays device-local and never queues an iCloud change", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "chessticize-whats-new-sync-"));
+  const databasePath = join(directory, "whats-new-sync.sqlite");
+  try {
+    const store = new SQLiteStore(databasePath);
+    store.migrate();
+    try {
+      const service = new PracticeService(store);
+      const queued = (): number =>
+        (store.db.prepare("SELECT COUNT(*) AS count FROM progress_v2_outbox WHERE kind = 'preferences'").get() as {
+          count: number;
+        }).count;
+      // Creating the default settings row queues it once; drain that, then
+      // change only the seen version.
+      const settings = service.getSettings();
+      store.db.exec("DELETE FROM progress_v2_outbox");
+      service.saveSettings({ ...settings, whatsNewSeenVersion: "1.6.0" });
+      assert.equal(queued(), 0);
+      // A synced preference still queues, proving the trigger is live.
+      service.saveSettings({ ...service.getSettings(), moveFeedback: { soundEnabled: true, hapticsEnabled: true } });
+      assert.equal(queued(), 1);
+    } finally {
+      store.close();
     }
   } finally {
     await rm(directory, { recursive: true, force: true });

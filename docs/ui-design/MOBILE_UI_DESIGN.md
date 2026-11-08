@@ -795,6 +795,8 @@ New Run behavior:
 - On regular-width iPad, Settings should use grouped navigation plus a detail panel; do not make each settings row stretch across the full display.
 - Rating difficulty controls should be hidden behind an `Edit rating` row to keep the
   default Settings surface compact.
+- About starts with a `What’s New` row that reopens the latest release notes
+  (Issue #651). Reopening never changes whether the notes count as seen.
 - Settings must not expose incomplete local data actions. Do not show local
   storage copy, export, local-history deletion, or rating-reset rows unless a
   complete user-facing workflow is implemented.
@@ -812,6 +814,31 @@ New Run behavior:
 - On phone widths, About rows must leave enough horizontal room for label,
   detail, and link text. Keep right-side values short and do not combine
   multiple unrelated links into one row.
+
+### What’s New
+
+A one-time sheet (Issue #651) introduces a release after an update.
+
+- Who sees it: the first launch after an update to the release the notes are
+  keyed to (`WHATS_NEW_RELEASE_VERSION` in `apps/mobile/src/whatsNew/whatsNewContent.ts`),
+  when the last-seen version is lower or was never recorded and the device holds
+  practice progress. A fresh install never sees it. The decision lives in
+  `packages/core/src/whats-new.ts`; the last-seen version is device-local
+  `app_settings` state (schema v24) that iCloud sync and local-data import do not
+  carry.
+- When: it never interrupts a Run. It waits for an idle Practice home: no open
+  or resumable Run, no first-use guide, setup flow or loading screen. Settings
+  reopens it on demand.
+- Layout: a large title, three highlights (30-pt tinted icon tile, headline,
+  one line) and a primary Continue button. Compact windows anchor it to the
+  bottom like a system sheet; regular and landscape windows center it at a
+  maximum width of 540. Highlights scroll under large text; Continue stays in
+  view.
+- Copy lives in `whatsNewContent.ts` and differs per platform only where the
+  navigation differs: iOS names the glass tab bar, Android the bottom bar and
+  side rail.
+- Dev builds show it from the test panel (`Show What’s New`, and `Simulate update
+  to 1.6.0`, which seeds the previous last-seen version).
 
 ### Review Reminder Notifications
 

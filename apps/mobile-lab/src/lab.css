@@ -251,3 +251,8 @@ html {
   padding: 7px 9px;
   text-decoration: none;
 }
+
+/* The web Modal focuses the first scrollable container; a device draws no focus ring there. */
+[data-testid="whats-new-scroll"]:focus {
+  outline: none;
+}
