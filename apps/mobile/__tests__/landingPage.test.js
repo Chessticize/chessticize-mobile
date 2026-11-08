@@ -178,7 +178,10 @@ describe("public landing page", () => {
     expect(notFoundPage).toContain('href="/styles.css"');
     expect(notFoundPage).toContain('href="/chessticize-mobile/styles.css"');
     expect(notFoundPage).toContain('href="/"');
-    expect(notFoundPage).toContain('href="https://app.chessticize.com"');
+    expect(notFoundPage).toContain("The Chessticize web app has been retired.");
+    expect(notFoundPage).toContain("iPhone, iPad and Android app");
+    expect(notFoundPage).not.toContain("app.chessticize.com");
+    expect(landingPageDoc).toMatch(/has been\s+retired/);
     expect(landingPageDoc).toMatch(
       /no analytics, database, CDN, remote fonts, or\s+runtime JavaScript/
     );
