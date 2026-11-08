@@ -145,7 +145,10 @@ export const TacticalFocusGuide: Story = {
   parameters: { __id: "practice--tactical-focus-guide" },
   play: async ({ canvasElement }) => {
     await waitForText(canvasElement, "Track your Focused Run");
-    await waitForText(canvasElement, "There’s no overall time limit, and this Run is unrated.");
+    await waitForText(
+      canvasElement,
+      "Puzzles done and time so far. There’s no overall time limit, and this Run is unrated."
+    );
     await waitForText(canvasElement, "1 of 3");
     await waitForText(canvasElement, "Unrated");
   }
