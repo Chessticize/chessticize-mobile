@@ -36,7 +36,7 @@ export function ListRowContent({
   icon,
   iconTone,
   subtitle,
-  subtitleLines = 2,
+  subtitleLines,
   title,
   titleLines,
   titleTestID,
