@@ -103,9 +103,27 @@ export type LabScenarioId =
   | "system-full-app"
   | "visual-direction-a-grouped-native-tokens"
   | "visual-direction-a-grouped-native-phone"
-  | "visual-direction-a-grouped-native-ipad";
+  | "visual-direction-a-grouped-native-ipad"
+  | "sprint-result-redesign-passed"
+  | "sprint-result-redesign-failed-mistakes"
+  | "sprint-result-redesign-failed-time"
+  | "sprint-result-redesign-failed-time-marked"
+  | "sprint-result-redesign-abandoned"
+  | "sprint-result-redesign-review-and-mistakes"
+  | "sprint-result-redesign-review-explanation"
+  | "sprint-result-redesign-zero-review"
+  | "sprint-result-redesign-arrow-duel"
+  | "sprint-result-redesign-focused-run"
+  | "sprint-result-redesign-largest-text";
 
-export type LabScenarioGroup = "Practice" | "Review" | "History" | "Settings" | "System" | "Visual Direction";
+export type LabScenarioGroup =
+  | "Practice"
+  | "Review"
+  | "History"
+  | "Settings"
+  | "System"
+  | "Visual Direction"
+  | "Sprint Result redesign";
 
 type LabScenarioMetadata = {
   id: LabScenarioId;
@@ -361,6 +379,17 @@ const scenarioDefinitions: Record<LabScenarioId, LabScenarioMetadata> = {
   "visual-direction-a-grouped-native-tokens": defineScenario("visual-direction-a-grouped-native-tokens", "Visual Direction", "A Grouped Native Tokens", "visual-direction--a-grouped-native-tokens", "A Grouped Native token sheet: type scale and weights, light and dark color roles with contrast, radius, 4-pt spacing, surfaces, and primitive specimens.", "system", ["Type scale and weights", "Light and dark color roles", "Radius and spacing", "Surfaces and elevation", "Buttons, rows, segmented control, badges", "Icon sample"], ["None (static Issue #609 prototype)"], "contained"),
   "visual-direction-a-grouped-native-phone": defineScenario("visual-direction-a-grouped-native-phone", "Visual Direction", "A Grouped Native Phone", "visual-direction--a-grouped-native-phone", "A Grouped Native applied to Practice Home, the Standard Sprint HUD around the board, and Sprint Result on iPhone, light and dark.", "system", ["Practice Home", "Session HUD", "Sprint Result", "Light and dark"], ["None (static Issue #609 prototype)"], "contained"),
   "visual-direction-a-grouped-native-ipad": defineScenario("visual-direction-a-grouped-native-ipad", "Visual Direction", "A Grouped Native iPad", "visual-direction--a-grouped-native-ipad", "A Grouped Native applied to Practice Home with the navigation rail and the session HUD board lane plus control rail at iPad landscape width, light and dark.", "system", ["Practice Home with navigation rail", "Session board lane and control rail", "Light and dark"], ["None (static Issue #609 prototype)"], "contained"),
+  "sprint-result-redesign-passed": defineScenario("sprint-result-redesign-passed", "Sprint Result redesign", "Passed", "sprint-result-redesign--passed", "A passed Standard Sprint: green outcome line, 15 / 15 hero with a full pass-target bar, the three-column Rating, Time and Best streak card, a 1 to review Replay row and Play again.", "practice", ["Full-screen top bar", "Rating trend icon", "Centered outcome hero", "Solved / target numeral", "Pass-target progress bar", "Three-column stats card", "Review row with info", "Play again"], ["None (design-only Issue #609 prototype)"], "contained"),
+  "sprint-result-redesign-failed-mistakes": defineScenario("sprint-result-redesign-failed-mistakes", "Sprint Result redesign", "Failed · mistakes", "sprint-result-redesign--failed-mistakes", "A Sprint failed on three mistakes: red outcome line, a negative Rating change with a real minus sign, 3 to review, and Replay mistakes above Play again.", "practice", ["Red failed outcome", "Mistake count in outcome", "Negative Rating change", "Review row", "Replay mistakes", "Play again"], ["None (design-only Issue #609 prototype)"], "contained"),
+  "sprint-result-redesign-failed-time-marked": defineScenario("sprint-result-redesign-failed-time-marked", "Sprint Result redesign", "Failed · time ran out, marked unclear", "sprint-result-redesign--failed-time-marked-unclear", "After Mark as unclear, the final-puzzle row shows the existing Marked status and the review count includes that attempt.", "practice", ["Marked status", "No Mark as unclear action", "Review count includes the marked attempt"], ["None (design-only Issue #609 prototype)"], "contained"),
+  "sprint-result-redesign-failed-time": defineScenario("sprint-result-redesign-failed-time", "Sprint Result redesign", "Failed · time ran out", "sprint-result-redesign--failed-time-ran-out", "A Sprint that ran out of time keeps the existing Was the final puzzle unclear? question as a row with Mark as unclear, which adds the attempt to the review count.", "practice", ["Red failed outcome", "Time ran out", "Final-puzzle Unclear question", "Mark as unclear", "Review count update", "Replay mistakes"], ["None (design-only Issue #609 prototype)"], "contained"),
+  "sprint-result-redesign-abandoned": defineScenario("sprint-result-redesign-abandoned", "Sprint Result redesign", "Abandoned", "sprint-result-redesign--abandoned", "An abandoned Sprint uses a neutral grey outcome line and, with nothing to review, hides the review section (variant A).", "practice", ["Neutral abandoned outcome", "1 / 15", "1 attempted · 100% accuracy", "709 → 694", "No review section"], ["None (design-only Issue #609 prototype)"], "contained"),
+  "sprint-result-redesign-review-and-mistakes": defineScenario("sprint-result-redesign-review-and-mistakes", "Sprint Result redesign", "Items to review and mistakes", "sprint-result-redesign--review-and-mistakes", "A passed Sprint with Unclear and In Review attempts: one 3 to review Replay row with an info button, and Replay mistakes because the run had mistakes.", "practice", ["Review row", "Unclear and In Review union", "Info button", "Replay mistakes", "Play again"], ["None (design-only Issue #609 prototype)"], "contained"),
+  "sprint-result-redesign-review-explanation": defineScenario("sprint-result-redesign-review-explanation", "Sprint Result redesign", "Review explanation (info open)", "sprint-result-redesign--review-explanation", "The review row's info button expanded: the long Unclear + In Review explanation moves out of the main layout into a footnote under the row.", "practice", ["Expanded info", "Unclear + In Review total", "Unclear sources", "Replay does not change Review scheduling"], ["None (design-only Issue #609 prototype)"], "contained"),
+  "sprint-result-redesign-zero-review": defineScenario("sprint-result-redesign-zero-review", "Sprint Result redesign", "Zero review", "sprint-result-redesign--zero-review", "With nothing to review, the review section is hidden entirely (owner-chosen variant A).", "practice", ["No review section", "No Replay mistakes", "Play again"], ["None (design-only Issue #609 prototype)"], "contained"),
+  "sprint-result-redesign-arrow-duel": defineScenario("sprint-result-redesign-arrow-duel", "Sprint Result redesign", "Arrow Duel", "sprint-result-redesign--arrow-duel", "A passed Arrow Duel Sprint with its own Rating, 2 to review and Replay mistakes.", "practice", ["Arrow Duel outcome", "Arrow Duel Rating", "Review row", "Replay mistakes"], ["None (design-only Issue #609 prototype)"], "contained"),
+  "sprint-result-redesign-focused-run": defineScenario("sprint-result-redesign-focused-run", "Sprint Result redesign", "Focused Run", "sprint-result-redesign--focused-run", "An unrated Focused Run result: no trend action, Unrated with the unchanged Rating, elapsed time, and average solve against the usual pace (#616), returning to Practice.", "practice", ["Focused Run Result title", "No trend action", "Unrated", "Elapsed time", "Average solve against usual pace", "Back to Practice", "Replay mistakes"], ["None (design-only Issue #609 prototype)"], "contained"),
+  "sprint-result-redesign-largest-text": defineScenario("sprint-result-redesign-largest-text", "Sprint Result redesign", "Largest accessibility text", "sprint-result-redesign--largest-text", "The items-to-review state at the largest accessibility text size (simulated AX5): stats become label and value rows and the actions scroll with the content.", "practice", ["Simulated AX5 text", "Stacked stats rows", "Wrapping rows", "Scrolling actions", "Capped hero numeral"], ["None (design-only Issue #609 prototype)"], "contained"),
 };
 
 export const scenarioRegistry = Object.fromEntries(

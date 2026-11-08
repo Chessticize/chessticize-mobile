@@ -118,7 +118,7 @@ const preview: Preview = {
     layout: "fullscreen",
     options: {
       storySort: {
-        order: ["00 What's New", "Practice", "Review", "History", "Settings", "System", "Visual Direction"]
+        order: ["00 What's New", "Practice", "Review", "History", "Settings", "System", "Visual Direction", "Sprint Result redesign"]
       }
     },
     viewport: {

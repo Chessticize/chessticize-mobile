@@ -293,6 +293,7 @@ session use tabular figures.
 | Numeral XL | 28 / 34 | Semibold, tabular | Large scores and the Progress card |
 | Numeral L | 22 / 28 | Semibold, tabular | Session timer, progress, metric tiles |
 | Numeral row | 15 / 20 | Semibold, tabular | Numbers inside list rows, such as run ratings (secondary color) |
+| Display | 56 / 64 | Semibold, tabular | The single hero score on a result screen (Sprint Result `Solved / target`); grows at most 1.5x with Dynamic Type |
 
 #### Text width rounding
 

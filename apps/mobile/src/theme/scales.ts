@@ -29,7 +29,10 @@ export const typography: ThemeTypography = {
   caption: { fontSize: 12, lineHeight: 16, fontWeight: "400" },
   numeral: { fontSize: 22, lineHeight: 28, fontWeight: "600", fontVariant: ["tabular-nums"] },
   numeralLarge: { fontSize: 28, lineHeight: 34, fontWeight: "600", fontVariant: ["tabular-nums"] },
-  numeralRow: { fontSize: 15, lineHeight: 20, fontWeight: "600", fontVariant: ["tabular-nums"] }
+  numeralRow: { fontSize: 15, lineHeight: 20, fontWeight: "600", fontVariant: ["tabular-nums"] },
+  // The one hero score on a result screen (Sprint Result, #609). Cap its
+  // Dynamic Type growth at 1.5x (maxFontSizeMultiplier) so it stays on screen.
+  display: { fontSize: 56, lineHeight: 64, fontWeight: "600", fontVariant: ["tabular-nums"] }
 };
 
 export const shape: ThemeShape = {
