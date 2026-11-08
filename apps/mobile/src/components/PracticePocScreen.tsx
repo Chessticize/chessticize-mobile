@@ -18636,15 +18636,20 @@ const useStyles = makeStyles((theme) => ({
   },
   historyHeaderRow: {
     alignItems: "center",
+    columnGap: theme.spacing.row,
     flexDirection: "row",
-    gap: theme.spacing.row,
+    flexWrap: "wrap",
     justifyContent: "space-between",
-    minHeight: theme.metrics.minTarget
+    minHeight: theme.metrics.minTarget,
+    rowGap: theme.spacing.inline
   },
   historyHeaderActions: {
     alignItems: "center",
     flexDirection: "row",
-    gap: theme.spacing.inline
+    flexWrap: "wrap",
+    gap: theme.spacing.inline,
+    justifyContent: "flex-end",
+    marginLeft: "auto"
   },
   historyResetButton: {
     alignItems: "center",
@@ -20577,7 +20582,7 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: theme.typography.headline.fontWeight
   },
   destinationTitle: {
-    flexShrink: 1
+    flexShrink: 0
   },
   historyFootnote: {
     paddingHorizontal: 4
