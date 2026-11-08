@@ -18,7 +18,9 @@ export function Badge({
   const styles = useStyles();
   return (
     <View style={[styles.badge, styles[`${tone}Fill`]]} testID={testID}>
-      <Text style={[styles.label, styles[`${tone}Label`]]}>{label}</Text>
+      {/* Capsules are single-line by design. numberOfLines also stops Android
+          from wrapping a shrink-wrapped label at a rounded-down width (#633). */}
+      <Text numberOfLines={1} style={[styles.label, styles[`${tone}Label`]]}>{label}</Text>
     </View>
   );
 }
