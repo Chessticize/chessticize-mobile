@@ -586,12 +586,14 @@ const useStyles = makeStyles((theme) => ({
   },
   chartLabel: {
     ...theme.typography.caption,
-    color: theme.colors.text.secondary
+    color: theme.colors.text.secondary,
+    textAlign: "center"
   },
   chartSample: {
     ...theme.typography.caption,
     color: theme.colors.text.tertiary,
-    fontVariant: ["tabular-nums"]
+    fontVariant: ["tabular-nums"],
+    textAlign: "center"
   },
   note: {
     gap: 2

@@ -350,6 +350,10 @@ highlights, and arrows keep their own palette; #610 owns the board in dark mode.
 - Screen horizontal padding 16. Gap between sections 32. Gap between a section
   header and its content, and between grouped items, 8. Gap between stacked
   session elements 12.
+- Hairline separators between rows start at the row's leading content edge
+  (the 16-pt row padding, the left edge of the icon tile) and run to the
+  trailing edge. This differs from stock iOS, which insets them to the text
+  column; the owner prefers the line to run under the icon.
 - Rows are at least 52 pt tall. Every hit target is at least 44 x 44 pt,
   including circular icon buttons.
 - Radius: control 12 (buttons, rail items, inputs), card 20 (inset sections and

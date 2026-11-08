@@ -6239,6 +6239,15 @@ describe("PracticePocScreen", () => {
     );
     expect(findByTestId(renderer, "practice-progress-summary").props.accessibilityLabel).toContain("No attempts yet");
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-context"))).toBe("No attempts yet");
+    // Each Progress column centers its texts, as before direction A. The texts
+    // stretch to the column and center with textAlign; shrink-wrapping them with
+    // alignItems would bring back the Android width-rounding clip (#633).
+    for (const id of ["practice-progress-weekly-context", "practice-progress-weekly-solved", "practice-progress-rating-delta"]) {
+      expect(flattenTestStyle(hostByTestId(renderer, id).props.style).textAlign).toBe("center");
+    }
+    for (const id of ["practice-progress-rating-metric", "practice-progress-weekly-metric"]) {
+      expect(flattenTestStyle(findByTestId(renderer, id).props.style).alignItems).toBeUndefined();
+    }
     expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", lightTheme.colors.text.tertiary)).toBe(true);
     expect(() => findByTestId(renderer, "practice-review-strip")).toThrow();
     expect(findByTestId(renderer, "review-tab")).toBeTruthy();
