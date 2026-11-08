@@ -2,7 +2,6 @@ import React from "react";
 import {
   Platform,
   Text,
-  processColor,
   requireNativeComponent,
   type HostComponent,
   type ViewProps
@@ -20,7 +19,8 @@ type NativeSymbolProps = ViewProps & {
   symbolName: string;
   pointSize: number;
   symbolWeight: IconWeight;
-  symbolColor: ReturnType<typeof processColor>;
+  // Theme color string; the native view parses "#RRGGBB(AA)" and "rgba()".
+  symbolColor: string;
 };
 
 type IconWeight = "regular" | "semibold" | "bold";
@@ -55,7 +55,7 @@ export function Icon({
         pointerEvents="none"
         pointSize={size}
         style={{ height: size, width: size }}
-        symbolColor={processColor(color)}
+        symbolColor={color}
         symbolName={spec.sf}
         symbolWeight={weight}
         testID={testID}

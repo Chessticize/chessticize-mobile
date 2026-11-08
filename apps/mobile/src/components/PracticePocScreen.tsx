@@ -18260,12 +18260,10 @@ const useStyles = makeStyles((theme) => ({
     marginLeft: "auto"
   },
   sprintRulesGuide: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s300,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 12,
-    padding: 14
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shape.card,
+    gap: theme.spacing.row,
+    padding: 16
   },
   sprintRulesGuideHeader: {
     alignItems: "flex-start",
@@ -18279,47 +18277,44 @@ const useStyles = makeStyles((theme) => ({
     minWidth: 0
   },
   sprintRulesEyebrow: {
-    color: theme.colors.accent.s700,
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 0.8
+    ...theme.typography.footnote,
+    color: theme.colors.accent.s600,
+    fontWeight: theme.typography.headline.fontWeight,
+    letterSpacing: 0.4
   },
   sprintRulesGuideTitle: {
-    color: theme.colors.text.ink,
-    fontSize: 19,
-    fontWeight: "900",
-    lineHeight: 24
+    ...theme.typography.title,
+    color: theme.colors.text.primary
   },
   sprintRulesDismissButton: {
     alignItems: "center",
     backgroundColor: theme.colors.accent.fill,
-    borderRadius: 8,
-    minHeight: 44,
+    borderRadius: theme.shape.control,
     justifyContent: "center",
-    paddingHorizontal: 12
+    minHeight: theme.metrics.minTarget,
+    paddingHorizontal: 16
   },
   sprintRulesDismissText: {
-    color: theme.colors.text.onAccent,
-    fontSize: 12,
-    fontWeight: "900"
+    ...theme.typography.headline,
+    color: theme.colors.text.onAccent
   },
   sprintRulesList: {
-    gap: 8
+    gap: theme.spacing.row
   },
   sprintRuleRow: {
     alignItems: "flex-start",
     flexDirection: "row",
-    gap: 10,
-    minHeight: 54
+    gap: theme.spacing.row,
+    minHeight: theme.metrics.minTarget
   },
   sprintRuleBadge: {
     alignItems: "center",
     backgroundColor: theme.colors.accent.s100,
-    borderRadius: 8,
-    height: 36,
+    borderRadius: theme.shape.tile,
     justifyContent: "center",
+    minHeight: 32,
     minWidth: 72,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8
   },
   sprintRuleBadgeDanger: {
     backgroundColor: theme.colors.danger.s100
@@ -18328,39 +18323,37 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.colors.warning.s100
   },
   sprintRuleBadgeText: {
-    color: theme.colors.accent.s700,
-    fontFamily: "menlo",
-    fontSize: 13,
-    fontWeight: "900"
+    ...theme.typography.footnote,
+    color: theme.colors.accent.s600,
+    fontFamily: theme.fontFamily.mono,
+    fontWeight: theme.typography.headline.fontWeight
   },
   sprintRuleBadgeTextDanger: {
-    color: theme.colors.danger.s700
+    color: theme.colors.danger.s600
   },
   sprintRuleBadgeTextWarning: {
-    color: theme.colors.warning.s700
+    color: theme.colors.warning.s600
   },
   sprintRuleCopy: {
     flex: 1,
-    gap: 1,
+    gap: 2,
     minWidth: 0
   },
   sprintRuleLabel: {
-    color: theme.colors.text.ink,
-    fontSize: 13,
-    fontWeight: "800"
+    ...theme.typography.subheadline,
+    color: theme.colors.text.primary,
+    fontWeight: theme.typography.headline.fontWeight
   },
   sprintRuleDetail: {
-    color: theme.colors.text.secondary,
-    fontSize: 11,
-    lineHeight: 15
+    ...theme.typography.footnote,
+    color: theme.colors.text.tertiary
   },
   sprintRulesGuideFootnote: {
-    borderTopColor: theme.colors.accent.s200,
+    ...theme.typography.footnote,
+    borderTopColor: theme.colors.border.default,
     borderTopWidth: StyleSheet.hairlineWidth,
-    color: theme.colors.text.strong,
-    fontSize: 11,
-    lineHeight: 16,
-    paddingTop: 10
+    color: theme.colors.text.tertiary,
+    paddingTop: theme.spacing.row
   },
   runNotice: {
     backgroundColor: theme.colors.accent.s50,

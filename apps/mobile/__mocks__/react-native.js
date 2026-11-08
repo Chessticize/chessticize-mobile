@@ -97,9 +97,6 @@ module.exports = {
   requireNativeComponent(name) {
     return component(name);
   },
-  processColor(color) {
-    return color;
-  },
   Animated: {
     Value: AnimatedValue,
     View: component('Animated.View'),
