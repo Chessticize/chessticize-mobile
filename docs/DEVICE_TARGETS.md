@@ -84,7 +84,14 @@ DeviceHub window and `simctl` exposes no fold or posture command. Inner,
 Split View and fold/unfold window sizes and insets therefore remain to be
 measured with DeviceHub. Until then the layout unit tests cover the inner
 panel sizes and the Split View fractions with no, left-only and right-only
-side insets.
+side insets. The Interaction Lab's "iPhone Duo inner landscape" viewport
+(951 × 669, an estimated 84-point right status-bar column) is where the inner
+landscape session is reviewed.
+
+Regular landscape sessions (iPad, Duo inner display) size the board to the
+largest square the Safe Area height and the width beside the rail allow, up to
+640 points, and centre the board and the rail's content block vertically.
+Compact layouts keep their top-aligned session.
 
 The full-screen iPhone portrait lock stays. It no longer constrains the inner
 display, which follows the scene size, and lifting it would also rotate every

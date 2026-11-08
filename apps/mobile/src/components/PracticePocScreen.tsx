@@ -5125,7 +5125,9 @@ export function PracticePocScreen({
       collapsable={false}
       style={[
         styles.activeSessionBottomFeedback,
-        sessionUsesRail ? styles.activeSessionRailBottomFeedback : null,
+        sessionUsesRail && !adaptiveLayout.sessionCentersRow
+          ? styles.activeSessionRailBottomFeedback
+          : null,
         { width: sessionUsesRail ? adaptiveLayout.sessionRailWidth : boardSize }
       ]}
     >
@@ -5329,7 +5331,10 @@ export function PracticePocScreen({
                     + CONTENT_BOTTOM_PADDING
                 }
                 : null,
-              sessionLayoutUsesRail ? styles.contentSessionRail : null
+              sessionLayoutUsesRail ? styles.contentSessionRail : null,
+              sessionLayoutUsesRail && adaptiveLayout.sessionCentersRow
+                ? styles.contentSessionRailCentered
+                : null
             ]}
           >
             {reviewReminderPermissionPromptVisible ? (
@@ -5462,6 +5467,9 @@ export function PracticePocScreen({
                         <View
                           style={[
                             styles.activeSessionControlRail,
+                            adaptiveLayout.sessionCentersRow
+                              ? styles.activeSessionControlRailCentered
+                              : null,
                             {
                               minHeight: boardSize,
                               width: adaptiveLayout.sessionRailWidth
@@ -7202,7 +7210,9 @@ function buildSessionGuideStageNodes({
         collapsable={false}
         style={[
           styles.activeSessionBottomFeedback,
-          usesRail ? styles.activeSessionRailBottomFeedback : null,
+          usesRail && !adaptiveLayout.sessionCentersRow
+            ? styles.activeSessionRailBottomFeedback
+            : null,
           { width: slotWidth }
         ]}
       >
@@ -18164,6 +18174,12 @@ const useStyles = makeStyles((theme) => ({
     flexGrow: 1,
     justifyContent: "flex-start"
   },
+  // The board lane holds only the board in rail layouts, so centring the row
+  // centres the board; equal top and bottom padding keeps it exact.
+  contentSessionRailCentered: {
+    justifyContent: "center",
+    paddingBottom: UI_PADDING
+  },
   practiceHome: {
     gap: theme.spacing.section
   },
@@ -18938,6 +18954,9 @@ const useStyles = makeStyles((theme) => ({
   activeSessionControlRail: {
     flexGrow: 1,
     gap: 10
+  },
+  activeSessionControlRailCentered: {
+    justifyContent: "center"
   },
   activeSessionBottomFeedback: {
     alignSelf: "center"

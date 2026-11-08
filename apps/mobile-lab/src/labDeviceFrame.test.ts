@@ -79,6 +79,27 @@ test("the calibrated landscape frame produces the Release board and control-rail
   assert.equal(layout.sessionRailGap, 90);
 });
 
+test("the Duo inner landscape preset centres a height-filling session row", () => {
+  const viewport = LAB_DEVICE_VIEWPORTS.duoInnerLandscape;
+  assert.deepEqual(labSafeAreaMetricsForViewport(951, 669).insets, {
+    top: 0,
+    right: 84,
+    bottom: 20,
+    left: 0
+  });
+  const layout = buildPracticeAdaptiveLayout({
+    fontScale: 1,
+    height: viewport.height,
+    insets: viewport.insets,
+    width: viewport.width
+  });
+
+  assert.equal(layout.className, "regularLandscape");
+  assert.equal(layout.sessionCentersRow, true);
+  assert.equal(layout.boardSize, 525);
+  assert.equal(layout.sessionRailWidth, 296);
+});
+
 test("non-device desktop viewports do not invent device Safe Area insets", () => {
   assert.deepEqual(labSafeAreaMetricsForViewport(1024, 768), {
     frame: { x: 0, y: 0, width: 1024, height: 768 },

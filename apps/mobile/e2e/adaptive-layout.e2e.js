@@ -61,6 +61,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     const puzzleID = await elementText('session-current-puzzle-id');
     await captureSprint(initialOrientation);
     await expectSessionControlsContained(initialOrientation);
+    await expectRegularLandscapeSessionCentered(initialOrientation);
 
     if (includeLandscape && initialOrientation === 'portrait') {
       await setAdaptiveOrientation('landscape');
@@ -75,6 +76,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       // containment contract applies to iPhone Duo fold/unfold and Split View
       // resizes, which the simulator cannot yet perform headlessly.
       await expectSessionControlsContained('landscape');
+      await expectRegularLandscapeSessionCentered('landscape');
     }
 
     const needsPortraitRestore = includeLandscape || initialOrientation === 'landscape';
@@ -252,6 +254,39 @@ async function expectSessionControlsContained(orientation) {
       throw new Error(`${deviceLabel} ${orientation} session is missing ${testID}`);
     }
     expectFrameContained(frame, screenFrame, `${deviceLabel} ${orientation} ${testID}`);
+  }
+}
+
+// Regular landscape sessions (iPad, iPhone Duo inner display) centre the
+// board vertically in the Safe Area and centre the rail's content block beside
+// it, so neither reads as pinned to the top.
+async function expectRegularLandscapeSessionCentered(orientation) {
+  const layoutAttributes = await element(by.id('adaptive-layout')).getAttributes();
+  const layoutLabel = (Array.isArray(layoutAttributes) ? layoutAttributes[0] : layoutAttributes).label;
+  if (layoutLabel !== 'Layout regularLandscape') {
+    return;
+  }
+  const screenFrame = await frameFor(element(by.id('adaptive-layout')));
+  const boardFrame = await frameFor(element(by.id('session-board')));
+  const topGap = boardFrame.y - screenFrame.y;
+  const bottomGap = screenFrame.y + screenFrame.height - (boardFrame.y + boardFrame.height);
+  // Test builds render the hidden puzzle-ID text above the board, and the
+  // board wrapper's 3-point gap shifts the board by that much in test runs.
+  if (Math.abs(topGap - bottomGap) > 4) {
+    throw new Error(
+      `${deviceLabel} ${orientation} session board is not vertically centred: `
+      + `top=${topGap} bottom=${bottomGap} board=${JSON.stringify(boardFrame)}`
+    );
+  }
+  const railTop = await frameFor(element(by.id('session-shell-nav')));
+  const railBottom = await frameFor(element(by.id('session-score-strip')));
+  const railAbove = railTop.y - boardFrame.y;
+  const railBelow = boardFrame.y + boardFrame.height - (railBottom.y + railBottom.height);
+  if (Math.abs(railAbove - railBelow) > 4) {
+    throw new Error(
+      `${deviceLabel} ${orientation} session rail is not centred beside the board: `
+      + `above=${railAbove} below=${railBelow}`
+    );
   }
 }
 

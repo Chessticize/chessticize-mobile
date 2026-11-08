@@ -138,7 +138,10 @@ describe("buildPracticeAdaptiveLayout", () => {
       width: 1080,
       height: 720,
       insets: { top: 0, right: 44, bottom: 21, left: 44 },
-      expected: { board: 579, gap: 68, rail: 297, row: 944 }
+      // The board fills the height the rail layout leaves (720 - 21 - 32),
+      // capped at the 640-point landscape maximum, so the gap is the content
+      // padding allowance rather than a balanced gutter.
+      expected: { board: 640, gap: 23, rail: 297, row: 960 }
     }
   ])("balances $label gutters without exceeding its safe viewport", ({
     expected,
@@ -169,9 +172,66 @@ describe("buildPracticeAdaptiveLayout", () => {
       .toBeLessThanOrEqual(
         width - insets.left - insets.right - 2 * PRACTICE_UI_PADDING
       );
-    expect(Math.abs(
-      (width - layout.sessionPackedRowWidth) / 2 - layout.sessionRailGap
-    )).toBeLessThanOrEqual(1);
+    const fillsSafeWidth = layout.sessionPackedRowWidth
+      === width - insets.left - insets.right - 2 * PRACTICE_UI_PADDING;
+    if (!fillsSafeWidth) {
+      expect(Math.abs(
+        (width - layout.sessionPackedRowWidth) / 2 - layout.sessionRailGap
+      )).toBeLessThanOrEqual(1);
+    }
+  });
+
+  // iPhone Duo inner display in landscape: 2853 x 2007 pixels at 3x from the
+  // simulator display profile. The profile does not carry Safe Area insets and
+  // simctl cannot capture the unfolded display, so the status-bar and camera
+  // column is modelled on the outer display's measured 84-point right column,
+  // and the bottom on the landscape home indicator.
+  it.each([
+    {
+      label: "status-bar column on the right",
+      insets: { top: 0, right: 84, bottom: 20, left: 0 },
+      expected: { board: 525, rail: 296 }
+    },
+    {
+      label: "no side insets",
+      insets: { top: 0, right: 0, bottom: 20, left: 0 },
+      expected: { board: 609, rail: 296 }
+    }
+  ])("fills the Duo inner landscape height with the session board ($label)", ({
+    expected,
+    insets
+  }) => {
+    const width = 951;
+    const height = 669;
+    const layout = buildPracticeAdaptiveLayout({ fontScale: 1, height, insets, width });
+    const safeWidth = width - insets.left - insets.right;
+    const safeHeight = height - insets.top - insets.bottom;
+
+    expect(layout.className).toBe("regularLandscape");
+    expect(layout.sessionCentersRow).toBe(true);
+    expect({ board: layout.boardSize, rail: layout.sessionRailWidth }).toEqual(expected);
+    // The board is the largest square the row allows: bound by the safe height
+    // or by the width left after the rail, minimum gap and padding.
+    expect(layout.boardSize).toBe(Math.min(
+      safeHeight - 2 * PRACTICE_UI_PADDING,
+      safeWidth - 2 * PRACTICE_UI_PADDING - layout.sessionRailWidth - 14
+    ));
+  });
+
+  it.each([
+    { label: "iPad Pro 13-inch landscape", width: 1376, height: 1032, insets: { top: 10, right: 0, bottom: 20, left: 0 }, centers: true, board: 640 },
+    { label: "iPad Pro 11-inch landscape", width: 1210, height: 834, insets: { top: 10, right: 0, bottom: 20, left: 0 }, centers: true, board: 640 },
+    { label: "iPad Pro 11-inch Split View two thirds", width: 790, height: 834, insets: { top: 10, right: 0, bottom: 20, left: 0 }, centers: false, board: 532 },
+    { label: "Android tablet landscape", width: 1280, height: 800, insets: { top: 24, right: 0, bottom: 48, left: 0 }, centers: true, board: 640 },
+    { label: "maintained phone landscape", width: 874, height: 402, insets: { top: 0, right: 62, bottom: 21, left: 62 }, centers: false, board: 349 },
+    { label: "phone portrait", width: 402, height: 874, insets: { top: 62, right: 0, bottom: 34, left: 0 }, centers: false, board: 370 },
+    { label: "iPad Pro 13-inch Split View half", width: 684, height: 1032, insets: { top: 24, right: 0, bottom: 20, left: 0 }, centers: false, board: 560 },
+    { label: "iPad Stage Manager short window", width: 800, height: 600, insets: { top: 24, right: 0, bottom: 20, left: 0 }, centers: false, board: 430 }
+  ])("centres only regular landscape sessions ($label)", ({ board, centers, height, insets, width }) => {
+    const layout = buildPracticeAdaptiveLayout({ fontScale: 1, height, insets, width });
+
+    expect(layout.sessionCentersRow).toBe(centers);
+    expect(layout.boardSize).toBe(board);
   });
 
   // Window sizes and Safe Area insets measured with the iOS 27.1 Release app

@@ -6546,6 +6546,38 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it.each([
+    { label: "Duo inner landscape", width: 951, height: 669, insets: { top: 0, right: 84, bottom: 20, left: 0 }, centered: true, boardSize: 525 },
+    { label: "iPad landscape", width: 1180, height: 820, insets: { top: 0, right: 0, bottom: 20, left: 0 }, centered: true, boardSize: 640 },
+    { label: "phone landscape", width: 874, height: 402, insets: { top: 0, right: 62, bottom: 21, left: 62 }, centered: false, boardSize: 349 }
+  ])("centres the $label session row only in regular landscape", ({ boardSize, centered, height, insets, width }) => {
+    setPracticeViewport({ width, height, scale: 3, insets });
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("random1000") });
+
+    startStandardSprint(renderer);
+
+    expect(flattenTestStyle(findByTestId(renderer, "session-board").props.style).width).toBe(boardSize);
+    const content = flattenTestStyle(
+      findByTestId(renderer, "practice-main-scroll").props.contentContainerStyle
+    );
+    const rail = flattenTestStyle(
+      findByTestId(renderer, "active-session-control-rail-content").props.style
+    );
+    if (centered) {
+      // The board lane holds only the board, so centring the row centres the
+      // board; the rail's content block is centred beside it.
+      expect(content).toEqual(expect.objectContaining({
+        justifyContent: "center",
+        padding: 16,
+        paddingBottom: 16
+      }));
+      expect(rail.justifyContent).toBe("center");
+    } else {
+      expect(content.justifyContent).toBe("flex-start");
+      expect(rail.justifyContent).toBeUndefined();
+    }
+  });
+
   it("keeps Home in two columns inside the maintained phone landscape Safe Area", () => {
     setPracticeViewport({
       width: 874,
