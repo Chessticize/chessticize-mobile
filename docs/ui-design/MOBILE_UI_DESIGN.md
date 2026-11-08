@@ -283,15 +283,16 @@ session use tabular figures.
 
 | Role | Size / line height (pt) | Weight | Use |
 | --- | --- | --- | --- |
-| Large title | 34 / 41 | Bold | Tab root titles such as Practice |
-| Title | 22 / 28 | Bold | Section titles and result headlines |
-| Headline | 17 / 22 | Semibold | Row titles, navigation titles, button labels |
-| Body | 17 / 22 | Regular | Body copy and row values |
-| Subheadline | 15 / 20 | Regular | Row subtitles and helper copy |
-| Footnote | 13 / 18 | Regular | Metadata and section footers |
+| Large title | 30 / 36 | Bold | Tab root titles such as Practice |
+| Title | 20 / 25 | Semibold | Section titles and result headlines |
+| Headline | 16 / 21 | Semibold | Row titles, navigation titles, button labels |
+| Body | 15 / 20 | Regular | Body copy and row values |
+| Subheadline | 14 / 19 | Regular | Row subtitles and helper copy |
+| Footnote | 12 / 16 | Regular | Metadata and section footers |
 | Caption | 12 / 16 | Regular | Metric labels and badges |
-| Numeral XL | 34 / 41 | Semibold, tabular | Large scores; 28 / 34 inside compact metric cards |
-| Numeral L | 22 / 28 | Semibold, tabular | Session timer, progress, ratings |
+| Numeral XL | 28 / 34 | Semibold, tabular | Large scores and the Progress card |
+| Numeral L | 22 / 28 | Semibold, tabular | Session timer, progress, metric tiles |
+| Numeral row | 15 / 20 | Semibold, tabular | Numbers inside list rows, such as run ratings (secondary color) |
 
 #### Text width rounding
 
@@ -349,6 +350,11 @@ highlights, and arrows keep their own palette; #610 owns the board in dark mode.
 - Screen horizontal padding 16. Gap between sections 32. Gap between a section
   header and its content, and between grouped items, 8. Gap between stacked
   session elements 12.
+- Hairline separators between rows in grouped sections are full-bleed: one
+  line per row boundary, from the section's left edge to its right edge, with
+  no inset. This differs from stock iOS, which insets them to the text column;
+  the owner prefers one continuous line, including next to a tinted selected
+  row. Rows draw no other border or shadow at that boundary.
 - Rows are at least 52 pt tall. Every hit target is at least 44 x 44 pt,
   including circular icon buttons.
 - Radius: control 12 (buttons, rail items, inputs), card 20 (inset sections and

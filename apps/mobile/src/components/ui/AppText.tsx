@@ -56,5 +56,6 @@ const useStyles = makeStyles((theme) => ({
   footnote: theme.typography.footnote,
   caption: theme.typography.caption,
   numeral: theme.typography.numeral,
-  numeralLarge: theme.typography.numeralLarge
+  numeralLarge: theme.typography.numeralLarge,
+  numeralRow: theme.typography.numeralRow
 }));

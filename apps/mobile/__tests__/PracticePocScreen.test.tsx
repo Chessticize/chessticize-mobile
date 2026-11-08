@@ -1000,6 +1000,43 @@ describe("PracticePocScreen", () => {
     ]);
   });
 
+  it("shows the selected Home run with a tinted row and keeps ratings in one muted column", () => {
+    const renderer = renderScreen({
+      runManagementPresentation: runManagementPresentation({ onIntent: jest.fn() })
+    });
+    const runIds = ["standard", "tactics-focus"];
+    const selectedIds = runIds.filter((id) =>
+      findByTestId(renderer, `practice-run-select-${id}`).props.accessibilityState?.selected === true
+    );
+    expect(selectedIds).toHaveLength(1);
+    const rowIsTinted = (id: string): boolean => renderer.root
+      .findAllByProps({ testID: `practice-run-${id}` })
+      .some((node) => flattenTestStyle(node.props.style).backgroundColor === lightTheme.colors.accent.s100);
+    for (const id of runIds) {
+      expect(rowIsTinted(id)).toBe(id === selectedIds[0]);
+    }
+    // No trailing check: the selected rating stays in the same column.
+    expect(() => findByTestId(renderer, `practice-run-selected-${selectedIds[0]}`)).toThrow();
+    // Run separators are full-bleed: they start at the card's left edge.
+    const runSeparators = findByTestId(renderer, "practice-run-management").findAll((node) =>
+      typeof node.type === "string"
+      && node.props.pointerEvents === "none"
+      && flattenTestStyle(node.props.style).height === ReactNative.StyleSheet.hairlineWidth
+    );
+    expect(runSeparators.length).toBeGreaterThan(0);
+    for (const separator of runSeparators) {
+      expect(flattenTestStyle(separator.props.style)).toMatchObject({ left: 0, right: 0 });
+    }
+    expect(flattenTestStyle(hostByTestId(renderer, "practice-mode-standard-rating").props.style)).toMatchObject({
+      // AppText's "secondary" tone renders the theme's text.tertiary token, which
+      // holds direction A's textSecondary color (#636366 in light).
+      color: lightTheme.colors.text.tertiary,
+      fontSize: lightTheme.typography.numeralRow.fontSize,
+      fontWeight: lightTheme.typography.numeralRow.fontWeight,
+      textAlign: "right"
+    });
+  });
+
   it("keeps native Run transforms mounted after leaving Edit Runs", () => {
     const renderer = renderScreen({ runManagementEnabled: true });
 
@@ -6212,6 +6249,15 @@ describe("PracticePocScreen", () => {
     );
     expect(findByTestId(renderer, "practice-progress-summary").props.accessibilityLabel).toContain("No attempts yet");
     expect(collectText(findByTestId(renderer, "practice-progress-weekly-context"))).toBe("No attempts yet");
+    // Each Progress column centers its texts, as before direction A. The texts
+    // stretch to the column and center with textAlign; shrink-wrapping them with
+    // alignItems would bring back the Android width-rounding clip (#633).
+    for (const id of ["practice-progress-weekly-context", "practice-progress-weekly-solved", "practice-progress-rating-delta"]) {
+      expect(flattenTestStyle(hostByTestId(renderer, id).props.style).textAlign).toBe("center");
+    }
+    for (const id of ["practice-progress-rating-metric", "practice-progress-weekly-metric"]) {
+      expect(flattenTestStyle(findByTestId(renderer, id).props.style).alignItems).toBeUndefined();
+    }
     expect(hasStyleEntry(findByTestId(renderer, "practice-progress-weekly-delta"), "color", lightTheme.colors.text.tertiary)).toBe(true);
     expect(() => findByTestId(renderer, "practice-review-strip")).toThrow();
     expect(findByTestId(renderer, "review-tab")).toBeTruthy();

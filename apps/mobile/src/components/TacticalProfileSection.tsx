@@ -67,17 +67,20 @@ export function TacticalProfileHomeCard({
         ) : null}
       </View>
       {canOpen ? (
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.cardAction, pressed ? styles.cardActionPressed : null]}
-          testID="training-focus-open-profile"
-          onPress={() => presentation.onIntent({ type: "open-profile" })}
-        >
-          <AppText style={styles.cardActionText} tone="accent" variant="body">
-            {homeActionLabel(presentation, recommendationCount)}
-          </AppText>
-          <Icon color={theme.colors.text.tertiary} name="chevronRight" size={15} weight="semibold" />
-        </Pressable>
+        <>
+          <View style={styles.cardActionSeparator} />
+          <Pressable
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.cardAction, pressed ? styles.cardActionPressed : null]}
+            testID="training-focus-open-profile"
+            onPress={() => presentation.onIntent({ type: "open-profile" })}
+          >
+            <AppText style={styles.cardActionText} tone="accent" variant="body">
+              {homeActionLabel(presentation, recommendationCount)}
+            </AppText>
+            <Icon color={theme.colors.text.tertiary} name="chevronRight" size={15} weight="semibold" />
+          </Pressable>
+        </>
       ) : null}
     </Section>
   );
@@ -965,10 +968,12 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: "700",
     lineHeight: 18
   },
+  cardActionSeparator: {
+    backgroundColor: theme.colors.border.default,
+    height: StyleSheet.hairlineWidth
+  },
   cardAction: {
     alignItems: "center",
-    borderTopColor: theme.colors.border.default,
-    borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: theme.spacing.inline,
     justifyContent: "space-between",

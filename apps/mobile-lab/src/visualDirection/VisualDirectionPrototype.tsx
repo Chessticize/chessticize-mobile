@@ -949,7 +949,8 @@ const TYPE_ROLE_LABELS: Record<TypeRole, string> = {
   footnote: "Footnote",
   caption: "Caption",
   numeralXL: "Numeral XL",
-  numeralL: "Numeral L"
+  numeralL: "Numeral L",
+  numeralRow: "Numeral row"
 };
 
 const TYPE_ROLE_SAMPLES: Record<TypeRole, string> = {
@@ -961,7 +962,8 @@ const TYPE_ROLE_SAMPLES: Record<TypeRole, string> = {
   footnote: "12 attempted · 92% Accuracy",
   caption: "Mistakes",
   numeralXL: "03:12  925",
-  numeralL: "03:12  925"
+  numeralL: "03:12  925",
+  numeralRow: "925  1040"
 };
 
 const WEIGHT_NAMES: Record<string, string> = {

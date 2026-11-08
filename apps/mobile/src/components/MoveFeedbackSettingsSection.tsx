@@ -177,8 +177,7 @@ function capitalize(value: string): string {
 const useStyles = makeStyles((theme) => ({
   separator: {
     backgroundColor: theme.colors.border.default,
-    height: StyleSheet.hairlineWidth,
-    marginLeft: 16
+    height: StyleSheet.hairlineWidth
   },
   toggleRow: {
     alignItems: "center",

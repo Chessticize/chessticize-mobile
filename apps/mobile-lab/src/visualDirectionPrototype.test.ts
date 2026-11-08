@@ -24,15 +24,16 @@ test("Grouped Native matches the values recorded in MOBILE_UI_DESIGN.md", () => 
   assert.deepEqual(
     Object.fromEntries(Object.entries(GROUPED_NATIVE.type).map(([role, style]) => [role, [style.size, style.lineHeight, style.weight]])),
     {
-      largeTitle: [34, 41, "700"],
-      title: [22, 28, "700"],
-      headline: [17, 22, "600"],
-      body: [17, 22, "400"],
-      subheadline: [15, 20, "400"],
-      footnote: [13, 18, "400"],
+      largeTitle: [30, 36, "700"],
+      title: [20, 25, "600"],
+      headline: [16, 21, "600"],
+      body: [15, 20, "400"],
+      subheadline: [14, 19, "400"],
+      footnote: [12, 16, "400"],
       caption: [12, 16, "400"],
-      numeralXL: [34, 41, "600"],
-      numeralL: [22, 28, "600"]
+      numeralXL: [28, 34, "600"],
+      numeralL: [22, 28, "600"],
+      numeralRow: [15, 20, "600"]
     }
   );
 });

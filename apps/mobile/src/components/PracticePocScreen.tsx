@@ -6678,7 +6678,6 @@ function PracticeRunHome({
           footer="Restoring a run keeps its existing rating and history."
           header="Restore to Home"
           rows
-          separatorInset={16 + appTheme.metrics.iconTile + appTheme.spacing.row}
           testID="practice-run-restore-section"
         >
           {presentation.hiddenRuns.map((run) => (
@@ -7200,6 +7199,7 @@ function PracticeRunCard({
       style={[
         styles.homeRow,
         homeRowPositionStyle(styles, dragging ? "only" : position),
+        active && !editing ? styles.homeRowSelected : null,
         editing ? styles.homeRowEditing : null,
         dragging ? styles.homeRowDragging : null
       ]}
@@ -7248,13 +7248,11 @@ function PracticeRunCard({
             : run.kind === "arrow_duel"
               ? "practice-mode-arrow-duel-rating"
               : undefined}
-          variant="numeral"
+          tone="secondary"
+          variant="numeralRow"
         >
           {run.elo}
         </AppText>
-        {active && !editing ? (
-          <Icon color={appTheme.colors.accent.s600} name="check" size={18} testID={`practice-run-selected-${safeTestId(run.id)}`} weight="semibold" />
-        ) : null}
         {editing ? (
           <View style={styles.runEditActions}>
             <Pressable
@@ -7879,7 +7877,7 @@ function RunCardDropSurface({
           ...webStyle,
           boxShadow: dragging
             ? appTheme.elevation.web.raised
-            : appTheme.elevation.web.resting,
+            : "none",
           boxSizing: "border-box",
           cursor: draggable ? (dragging ? "grabbing" : "grab") : "default",
           display: "flex",
@@ -8876,16 +8874,16 @@ function PracticeProgressCard({
         testID="practice-progress-summary"
       >
         <View style={styles.homeProgressMetric} testID="practice-progress-rating-metric">
-          <AppText tone="secondary" variant="footnote">{ratingContextLabel ?? modeLabel(mode)} rating</AppText>
-          <AppText style={styles.homeProgressValue} variant="numeralLarge">{currentRating}</AppText>
-          <AppText testID="practice-progress-rating-delta" style={ratingDeltaTone} variant="footnote">{ratingDeltaLabel}</AppText>
+          <AppText style={styles.homeProgressText} tone="secondary" variant="footnote">{ratingContextLabel ?? modeLabel(mode)} rating</AppText>
+          <AppText style={[styles.homeProgressValue, styles.homeProgressText]} variant="numeralLarge">{currentRating}</AppText>
+          <AppText testID="practice-progress-rating-delta" style={[ratingDeltaTone, styles.homeProgressText]} variant="footnote">{ratingDeltaLabel}</AppText>
         </View>
         <View style={styles.homeProgressDivider} testID="practice-progress-divider" />
         <View style={styles.homeProgressMetric} testID="practice-progress-weekly-metric">
-          <AppText tone="secondary" variant="footnote">This Week</AppText>
-          <AppText testID="practice-progress-weekly-solved" style={styles.homeProgressValue} variant="numeralLarge">{progress.correctThisWeek}</AppText>
-          <AppText testID="practice-progress-weekly-delta" style={progressTone} variant="footnote">{progressDelta}</AppText>
-          <AppText testID="practice-progress-weekly-context" tone="secondary" variant="footnote">{progressContext}</AppText>
+          <AppText style={styles.homeProgressText} tone="secondary" variant="footnote">This Week</AppText>
+          <AppText testID="practice-progress-weekly-solved" style={[styles.homeProgressValue, styles.homeProgressText]} variant="numeralLarge">{progress.correctThisWeek}</AppText>
+          <AppText testID="practice-progress-weekly-delta" style={[progressTone, styles.homeProgressText]} variant="footnote">{progressDelta}</AppText>
+          <AppText style={styles.homeProgressText} testID="practice-progress-weekly-context" tone="secondary" variant="footnote">{progressContext}</AppText>
         </View>
       </View>
     </Section>
@@ -13561,6 +13559,7 @@ function ReviewPanel({
               accessibilityLabel="Make next future review date due today"
               label="Make next due today"
               size="compact"
+              stretch
               testID="review-dev-promote-next-due"
               variant="secondary"
               onPress={() => {
@@ -13574,6 +13573,7 @@ function ReviewPanel({
               accessibilityLabel="Schedule a test review notification"
               label="Test notification"
               size="compact"
+              stretch
               testID="review-dev-test-notification"
               variant="secondary"
               onPress={() => {
@@ -16376,7 +16376,7 @@ function FeedbackSupportCard({
             setConfirmationVisible(true);
           }}
         />
-        <AppText tone="secondary" variant="footnote">
+        <AppText style={styles.settingsCaptionCentered} tone="secondary" variant="footnote">
           You will review and submit your issue on GitHub.
         </AppText>
       </View>
@@ -17971,7 +17971,7 @@ const useStyles = makeStyles((theme) => ({
   homeRowSeparator: {
     backgroundColor: theme.colors.border.default,
     height: StyleSheet.hairlineWidth,
-    left: 16 + theme.metrics.iconTile + theme.spacing.row,
+    left: 0,
     position: "absolute",
     right: 0,
     top: 0
@@ -18016,9 +18016,13 @@ const useStyles = makeStyles((theme) => ({
     paddingLeft: theme.metrics.iconTile + theme.spacing.row,
     width: "100%"
   },
+  // Ratings form one right-aligned, muted column; selection is shown by the
+  // row tint, so no trailing check shifts a selected rating.
   homeRowRating: {
-    fontSize: 20,
-    lineHeight: 26
+    textAlign: "right"
+  },
+  homeRowSelected: {
+    backgroundColor: theme.colors.accent.s100
   },
   homeRowIconButton: {
     alignItems: "center",
@@ -18059,6 +18063,9 @@ const useStyles = makeStyles((theme) => ({
     flex: 1,
     gap: 2,
     minWidth: 0
+  },
+  homeProgressText: {
+    textAlign: "center"
   },
   homeProgressValue: {
     fontSize: 28,
@@ -18543,6 +18550,7 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     flex: 1,
     gap: 2,
+    justifyContent: "center",
     paddingHorizontal: 8
   },
   reviewForecastCount: {
@@ -18623,7 +18631,7 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 0
   },
   reviewDevControls: {
-    alignItems: "flex-start",
+    alignItems: "stretch",
     gap: theme.spacing.group
   },
   activeSessionAdaptiveLayout: {
@@ -20374,8 +20382,7 @@ const useStyles = makeStyles((theme) => ({
   },
   groupedSeparator: {
     backgroundColor: theme.colors.border.default,
-    height: StyleSheet.hairlineWidth,
-    marginLeft: 16 + theme.metrics.iconTile + theme.spacing.row
+    height: StyleSheet.hairlineWidth
   },
   groupedEmpty: {
     paddingHorizontal: 16,
@@ -20448,8 +20455,7 @@ const useStyles = makeStyles((theme) => ({
   },
   reviewForecastDividerStacked: {
     backgroundColor: theme.colors.border.default,
-    height: StyleSheet.hairlineWidth,
-    marginLeft: 16
+    height: StyleSheet.hairlineWidth
   },
   reviewForecastDivider: {
     alignSelf: "stretch",
@@ -20622,7 +20628,7 @@ const useStyles = makeStyles((theme) => ({
     padding: 16
   },
   historyPerformanceHeader: {
-    alignItems: "flex-start",
+    alignItems: "center",
     flexDirection: "row",
     gap: theme.spacing.row,
     justifyContent: "space-between"
@@ -21101,6 +21107,9 @@ const useStyles = makeStyles((theme) => ({
   settingsControlRow: {
     paddingHorizontal: 16,
     paddingVertical: 10
+  },
+  settingsCaptionCentered: {
+    textAlign: "center"
   },
   settingsEmphasis: {
     color: theme.colors.text.primary,
