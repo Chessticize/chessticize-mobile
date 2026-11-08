@@ -35,6 +35,14 @@ test("normalizes legacy snapshots to the device-local Arrow Duel default", () =>
   );
 });
 
+test("accepts an untimed Focused Run clock and rejects an unknown one", () => {
+  const snapshot = canonicalSnapshot();
+  snapshot.data.sprintSessions[0].config.runClock = "untimed";
+  assert.equal(isCanonicalProgressSyncSnapshot(snapshot), true);
+  snapshot.data.sprintSessions[0].config.runClock = "forever";
+  assert.equal(isCanonicalProgressSyncSnapshot(snapshot), false);
+});
+
 test("accepts exported synthetic review session configs", () => {
   const snapshot = canonicalSnapshot();
   snapshot.data.sprintSessions[0].config = {

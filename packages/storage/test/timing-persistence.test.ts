@@ -323,7 +323,11 @@ for (const backend of ["memory", "sqlite"] as const) {
       );
       assert.equal(marked.unclear, true);
       assert.equal(service.listHistory().find((attempt) => attempt.id === previousAttempt?.id)?.unclear, true);
-      assert.deepEqual(service.getSprintResultSummary(expired.state), {
+      const { averageSolveSeconds, ...resultSummary } =
+        service.getSprintResultSummary(expired.state);
+      // The incomplete final puzzle is not a solve; only the 59-second one is.
+      assert.ok(Math.abs((averageSolveSeconds ?? 0) - 59) < 1e-9);
+      assert.deepEqual(resultSummary, {
         accuracyPercent: 100,
         attemptCount: 1,
         unclear: {

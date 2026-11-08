@@ -114,7 +114,17 @@ export interface SprintConfig {
   };
   /** Fixed-level, locally resumable Survival challenge identity. */
   survival?: SurvivalSprintConfig;
+  /**
+   * How the overall Run clock behaves. Absent means "countdown": the Run
+   * fails with time_expired at `durationSeconds`. "untimed" (Focused Runs
+   * only) has no overall limit and ends after every puzzle is attempted;
+   * per-puzzle Slow and Timeout still apply. `durationSeconds` stays
+   * populated so older clients can still parse the config.
+   */
+  runClock?: SprintRunClock;
 }
+
+export type SprintRunClock = "countdown" | "untimed";
 
 export interface PuzzleTimingPolicy {
   slowAfterSeconds: number | null;

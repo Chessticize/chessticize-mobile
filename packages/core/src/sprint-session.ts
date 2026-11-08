@@ -19,7 +19,8 @@ import {
 } from "./puzzle-session.ts";
 import {
   resolveOpponentReplyConfig,
-  resolvePuzzleTimingPolicy
+  resolvePuzzleTimingPolicy,
+  sprintHasRunDeadline
 } from "./sprint-config.ts";
 import { isUnclearAttemptEligible } from "./attempt-clarity.ts";
 
@@ -153,7 +154,10 @@ export function advanceSprintTime(state: SprintState, now: string): SprintComman
     }
     return applyOpponentReplyTimeout(state, now);
   }
-  if (!state.config.survival && new Date(now).getTime() >= new Date(state.deadlineAt).getTime()) {
+  if (
+    sprintHasRunDeadline(state.config) &&
+    new Date(now).getTime() >= new Date(state.deadlineAt).getTime()
+  ) {
     return {
       state: completeSprintForPolicy(state, "failed", "time_expired", state.deadlineAt),
       attempt: buildIncompleteAttempt(state)

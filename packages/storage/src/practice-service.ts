@@ -10,6 +10,7 @@ import {
   assertValidPracticeRunRating,
   buildSessionReplay,
   buildSprintConfig,
+  sprintHasRunDeadline,
   buildSprintResultSummary,
   beginSurvivalSitting,
   beginArrowDuelReply as beginArrowDuelReplyCore,
@@ -456,6 +457,7 @@ export class PracticeService {
     if (
       this.activeSprint.status === "active" &&
       !opponentReplyClocksPaused &&
+      sprintHasRunDeadline(this.activeSprint.config) &&
       new Date(now).getTime() >= new Date(this.activeSprint.deadlineAt).getTime()
     ) {
       return this.advanceSprintTime(now);
@@ -806,6 +808,21 @@ export class PracticeService {
 
   getTacticalProfileProgress(now = new Date().toISOString()): TacticalProfileProgress | undefined {
     return this.tacticalProfile?.getProgress(now);
+  }
+
+  /**
+   * The player's usual solve time on a Focused Run's themes, from ordinary
+   * mixed Runs in the Tactical Profile. Undefined for other Runs or when the
+   * Profile has too few such solves.
+   */
+  getFocusedRunUsualSolveSeconds(
+    config: Pick<SprintConfig, "tacticalFocus">,
+    now = new Date().toISOString()
+  ): number | undefined {
+    const focus = config.tacticalFocus;
+    return focus === undefined
+      ? undefined
+      : this.tacticalProfile?.getUsualSolveSeconds(focus.taskFamily, focus.themes, now);
   }
 
   preflightFocusedRun(

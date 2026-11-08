@@ -2,7 +2,8 @@ import type {
   OpponentReplyConfig,
   PuzzleTimingPolicy,
   SprintConfig,
-  SprintMode
+  SprintMode,
+  SprintRunClock
 } from "./types.ts";
 import { namedThemesForSelection } from "./theme-catalog.ts";
 
@@ -40,9 +41,20 @@ export function buildSprintConfig(input: {
   ratingPolicy?: SprintConfig["ratingPolicy"];
   tacticalFocus?: SprintConfig["tacticalFocus"];
   opponentReply?: OpponentReplyConfig;
+  runClock?: SprintRunClock;
 }): SprintConfig {
   if (!Number.isInteger(input.durationSeconds) || input.durationSeconds <= 0) {
     throw new Error("durationSeconds must be a positive integer");
+  }
+  if (
+    input.runClock !== undefined &&
+    input.runClock !== "countdown" &&
+    input.runClock !== "untimed"
+  ) {
+    throw new Error("runClock must be countdown or untimed");
+  }
+  if (input.runClock === "untimed" && input.tacticalFocus === undefined) {
+    throw new Error("Only Focused Runs can be untimed");
   }
   if (!Number.isInteger(input.perPuzzleSeconds) || input.perPuzzleSeconds <= 0) {
     throw new Error("perPuzzleSeconds must be a positive integer");
@@ -103,8 +115,20 @@ export function buildSprintConfig(input: {
             ...input.tacticalFocus,
             themes: [...(tacticalFocusThemes ?? [])]
           }
-        })
+        }),
+    ...(input.runClock === "untimed" ? { runClock: "untimed" as const } : {})
   };
+}
+
+/**
+ * Whether the overall Run clock can end this Run. Survival and untimed
+ * Focused Runs have no Run deadline; legacy configs without `runClock` count
+ * down.
+ */
+export function sprintHasRunDeadline(
+  config: Pick<SprintConfig, "runClock" | "survival">
+): boolean {
+  return config.survival === undefined && config.runClock !== "untimed";
 }
 
 export function resolveOpponentReplyConfig(

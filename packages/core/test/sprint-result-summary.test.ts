@@ -16,6 +16,23 @@ const baseAttempt = {
   ratingBefore: 600
 } as const;
 
+test("the average solve time is the geometric mean of correct solves only", () => {
+  const attempts: AttemptEvent[] = [
+    { ...baseAttempt, id: "fast", puzzleId: "p1", result: "correct", completedAt: "2026-07-25T12:00:10.000Z", elapsedMs: 10_000 },
+    { ...baseAttempt, id: "slow", puzzleId: "p2", result: "correct", completedAt: "2026-07-25T12:00:50.000Z", elapsedMs: 40_000 },
+    { ...baseAttempt, id: "miss", puzzleId: "p3", result: "wrong", completedAt: "2026-07-25T12:01:00.000Z", elapsedMs: 5_000 }
+  ];
+
+  const summary = buildSprintResultSummary({ correctCount: 2, mistakeCount: 1 }, attempts);
+
+  assert.ok(Math.abs((summary.averageSolveSeconds ?? 0) - 20) < 1e-9);
+  assert.equal(
+    buildSprintResultSummary({ correctCount: 0, mistakeCount: 1 }, [attempts[2] as AttemptEvent])
+      .averageSolveSeconds,
+    undefined
+  );
+});
+
 const incompleteBaseAttempt = {
   source: "sprint",
   sessionId: "session-1",

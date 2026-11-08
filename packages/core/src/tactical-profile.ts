@@ -1020,6 +1020,54 @@ export function estimateTacticalProfileThemes(input: {
   }));
 }
 
+/** Fewest recency-weighted completed solves that define a usual pace. */
+export const TACTICAL_PROFILE_USUAL_PACE_MIN_SOLVES = 5;
+
+/**
+ * The player's usual completed-solve time on any of `themes` in ordinary
+ * mixed Runs, as a recency-weighted geometric mean in seconds. It reads the
+ * speed head's full-weight theme statistics, so Focused Runs never shape it.
+ * Undefined when the Profile holds too few such solves.
+ */
+export function tacticalProfileUsualSolveSeconds(input: {
+  cells: readonly TacticalProfileDailyCell[];
+  calibration: TacticalProfileCalibrationArtifact;
+  now: string;
+  taskFamily: TacticalProfileTaskFamily;
+  themes: readonly string[];
+}): number | undefined {
+  const nowMs = new Date(input.now).getTime();
+  if (!Number.isFinite(nowMs)) {
+    throw new Error("Tactical Profile evaluation time must be a valid ISO timestamp");
+  }
+  const nowDay = new Date(nowMs).toISOString().slice(0, 10);
+  const themes = new Set(input.themes);
+  let weight = 0;
+  let logSecondsSum = 0;
+  for (const cell of input.cells) {
+    if (
+      !sameCacheIdentity(cell, input.calibration) ||
+      cell.taskFamily !== input.taskFamily ||
+      !themes.has(cell.theme) ||
+      cell.completedDay > nowDay
+    ) {
+      continue;
+    }
+    const decay = recencyWeight(
+      cell.completedDay,
+      nowMs,
+      input.calibration.recencyHalfLifeDays
+    );
+    // The first speed feature is the constant 1, so its response sum is the
+    // sum of log seconds.
+    weight += decay * cell.speedControlExclusion.weight;
+    logSecondsSum += decay * (cell.speedControlExclusion.responseFeatureSums[0] ?? 0);
+  }
+  return weight >= TACTICAL_PROFILE_USUAL_PACE_MIN_SOLVES
+    ? Math.exp(logSecondsSum / weight)
+    : undefined;
+}
+
 export function approximateSolveThemePosterior(
   observations: readonly SolveThemeObservation[],
   priorSd: number

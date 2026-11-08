@@ -5,6 +5,11 @@ import { isAttemptMarkedUnclear } from "./attempt-clarity.ts";
 export interface SprintResultSummary {
   accuracyPercent: number;
   attemptCount: number;
+  /**
+   * Geometric mean of correct solve times in seconds, the same statistic the
+   * Profile uses for usual pace. Undefined without a timed correct solve.
+   */
+  averageSolveSeconds?: number;
   unclear: {
     slowMarkedCount: number;
     timedOutMarkedCount: number;
@@ -44,7 +49,23 @@ export function buildSprintResultSummary(
     (attempt) => isAttemptMistake(attempt.result)
   ).length;
 
+  const solveSeconds = scoredSprintAttempts
+    .filter((attempt) => attempt.result === "correct")
+    .map((attempt) => attempt.elapsedMs)
+    .filter((elapsedMs): elapsedMs is number =>
+      typeof elapsedMs === "number" && Number.isFinite(elapsedMs) && elapsedMs > 0
+    )
+    .map((elapsedMs) => elapsedMs / 1000);
+
   return {
+    ...(solveSeconds.length === 0
+      ? {}
+      : {
+          averageSolveSeconds: Math.exp(
+            solveSeconds.reduce((sum, seconds) => sum + Math.log(seconds), 0) /
+              solveSeconds.length
+          )
+        }),
     accuracyPercent: Math.round(
       (result.correctCount / Math.max(1, scoredSprintAttempts.length)) * 100
     ),

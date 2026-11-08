@@ -252,7 +252,10 @@ function isSprintConfig(value: unknown): value is SprintConfig {
     isOptional(value.ratingPolicy, (candidate) =>
       candidate === "rated" || candidate === "unrated"
     ) &&
-    isOptional(value.tacticalFocus, isTacticalFocus);
+    isOptional(value.tacticalFocus, isTacticalFocus) &&
+    isOptional(value.runClock, (candidate) =>
+      candidate === "countdown" || candidate === "untimed"
+    );
 }
 
 function isTacticalFocus(value: unknown): boolean {
