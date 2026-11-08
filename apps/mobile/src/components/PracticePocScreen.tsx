@@ -5121,7 +5121,10 @@ export function PracticePocScreen({
           {appHeaderVisible ? (
             <View
               accessibilityLabel={screenSubtitle ? `${screenTitle}, ${screenSubtitle}` : screenTitle}
-              style={styles.header}
+              style={[
+                styles.header,
+                adaptiveLayout.usesWideContent && !sessionLayoutUsesRail ? styles.contentWide : null
+              ]}
               testID="app-shell-header"
             >
               <View>
