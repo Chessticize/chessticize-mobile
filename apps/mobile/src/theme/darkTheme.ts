@@ -129,7 +129,7 @@ const colors: ThemeColors = {
     checkmateHighlight: "rgba(0, 0, 0, 0)",
     validMoveDot: "rgba(0, 0, 0, 0.38)",
     validMoveCapture: "rgba(0, 0, 0, 0.58)",
-    lastMoveSquare: "rgba(10, 111, 224, 0.20)",
+    lastMoveSquare: "rgba(10, 111, 224, 0.34)",
     promotionOverlay: "rgba(0, 0, 0, 0.62)",
     promotionContainer: "#1C1C1E",
     promotionBorder: "#38383A",

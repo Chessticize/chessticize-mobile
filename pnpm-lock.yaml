@@ -18,7 +18,7 @@ overrides:
 
 patchedDependencies:
   detox@20.51.4: 3a8c46f110f1595c57b5a00c22330a6bbee2f23941ebc32eb6885a8c7ed6b7ae
-  react-native-chessboard@0.2.0: abdd325d91ea70b730755e083bcf9e514ca4efe1e6cae8b4896bb44f2aa5b061
+  react-native-chessboard@0.2.0: f9c40ba994a1681c77b1d9e855aba20196c7b98b697b2229ba498259ee15e700
   react-native-screens@4.30.1: d3894b8f4670eeb106598cc5a2992c4df96fe3a32c6b284652a33f2a92f8ad59
   react-native@0.86.0: 44a1d416a056ef1fd6a9e4eb4f29839b207a0e8c3259bb187feb16c2985bd1af
 
@@ -59,7 +59,7 @@ importers:
         version: 0.86.0(patch_hash=44a1d416a056ef1fd6a9e4eb4f29839b207a0e8c3259bb187feb16c2985bd1af)(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.1.0(supports-color@8.1.1)(typescript@5.9.3))(@react-native/jest-preset@0.86.0(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1)
       react-native-chessboard:
         specifier: 0.2.0
-        version: 0.2.0(patch_hash=abdd325d91ea70b730755e083bcf9e514ca4efe1e6cae8b4896bb44f2aa5b061)(8217e7c4075a8355ddd60ac60a0b8d65)
+        version: 0.2.0(patch_hash=f9c40ba994a1681c77b1d9e855aba20196c7b98b697b2229ba498259ee15e700)(8217e7c4075a8355ddd60ac60a0b8d65)
       react-native-gesture-handler:
         specifier: ^3.0.2
         version: 3.0.2(react-native@0.86.0(patch_hash=44a1d416a056ef1fd6a9e4eb4f29839b207a0e8c3259bb187feb16c2985bd1af)(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.1.0(supports-color@8.1.1)(typescript@5.9.3))(@react-native/jest-preset@0.86.0(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
@@ -12692,7 +12692,7 @@ snapshots:
 
   react-is@19.2.7: {}
 
-  react-native-chessboard@0.2.0(patch_hash=abdd325d91ea70b730755e083bcf9e514ca4efe1e6cae8b4896bb44f2aa5b061)(8217e7c4075a8355ddd60ac60a0b8d65):
+  react-native-chessboard@0.2.0(patch_hash=f9c40ba994a1681c77b1d9e855aba20196c7b98b697b2229ba498259ee15e700)(8217e7c4075a8355ddd60ac60a0b8d65):
     dependencies:
       '@shopify/react-native-skia': 2.6.5(react-native-reanimated@4.4.1(bdd195351bd4ab2886716efbaeff8b7f))(react-native@0.86.0(patch_hash=44a1d416a056ef1fd6a9e4eb4f29839b207a0e8c3259bb187feb16c2985bd1af)(@babel/core@7.29.7(supports-color@8.1.1))(@react-native-community/cli@20.1.0(supports-color@8.1.1)(typescript@5.9.3))(@react-native/jest-preset@0.86.0(@babel/core@7.29.7(supports-color@8.1.1))(react@19.2.3)(supports-color@8.1.1))(@react-native/metro-config@0.86.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.2.17)(react@19.2.3)(supports-color@8.1.1))(react@19.2.3)
       chess.js: 1.4.0

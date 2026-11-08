@@ -1988,7 +1988,7 @@ index 70c2cecb9088e81c71bbda522458e5602b3ccfe6..5445a48d5e9faf642f4462debe9b0989
        chess.reset();
      } else {
 diff --git a/lib/typescript/components/skia/gesture-board.d.ts b/lib/typescript/components/skia/gesture-board.d.ts
-index 879929871b8cf9abe7953a6992f7c038f0592d5f..0cf3fb49da52ead8bed993476d48d67e0b0884ee 100644
+index 879929871b8cf9abe7953a6992f7c038f0592d5f..6f6dcbdca8c30769e833fcd58fd1cdd716f9032e 100644
 --- a/lib/typescript/components/skia/gesture-board.d.ts
 +++ b/lib/typescript/components/skia/gesture-board.d.ts
 @@ -1,5 +1,6 @@
@@ -1998,7 +1998,7 @@ index 879929871b8cf9abe7953a6992f7c038f0592d5f..0cf3fb49da52ead8bed993476d48d67e
  import type { Square } from 'chess.js';
  import { MoveResult } from '../../state/move-executor';
  import { ChessboardRef } from '../../hooks/use-chessboard-ref';
-@@ -8,6 +9,9 @@ export interface GestureBoardProps {
+@@ -8,6 +9,13 @@ export interface GestureBoardProps {
      onMove?: (result: MoveResult) => void;
      onIllegalMove?: (from: Square, to: Square) => void;
      renderEffect?: (params: EffectParams) => React.ReactNode;
@@ -2006,6 +2006,10 @@ index 879929871b8cf9abe7953a6992f7c038f0592d5f..0cf3fb49da52ead8bed993476d48d67e
 +    blocksExternalGesture?: React.RefObject<GestureType | undefined>;
 +    positionKey?: string;
      spriteSource?: ImageSourcePropType;
++    squareHighlights?: ReadonlyArray<{
++        square: Square;
++        color: string;
++    }>;
  }
  export declare const GestureBoard: React.ForwardRefExoticComponent<GestureBoardProps & React.RefAttributes<ChessboardRef>>;
 diff --git a/lib/typescript/hooks/use-board-gesture.d.ts b/lib/typescript/hooks/use-board-gesture.d.ts
@@ -2050,7 +2054,7 @@ index b3a8a75fde04559b7e81ef8b8aef53d9081e5924..2891ce73615664cb9c791ee6d3e813ce
  }
  interface UseChessboardRefProps {
 diff --git a/lib/typescript/index.d.ts b/lib/typescript/index.d.ts
-index ac1a1357c8b5352dd97d856282ef96f056f45622..dff5c745aaa140b59141673e76365c033f9dac95 100644
+index ac1a1357c8b5352dd97d856282ef96f056f45622..b0ff7d2b7ff9987c70573b0be019c1c72978a810 100644
 --- a/lib/typescript/index.d.ts
 +++ b/lib/typescript/index.d.ts
 @@ -1,5 +1,6 @@
@@ -2074,6 +2078,21 @@ index ac1a1357c8b5352dd97d856282ef96f056f45622..dff5c745aaa140b59141673e76365c03
      /**
       * Optional custom piece sprite sheet. Must match the standard
       * 6×2 / 128px-cell layout (row 0 = white p,n,b,r,q,k; row 1 =
+@@ -22,6 +30,14 @@ export interface ChessboardProps extends Omit<BoardStateProviderProps, 'children
+      * system font when omitted.
+      */
+     fontSource?: ImageSourcePropType;
++    /**
++     * Chessticize: square tints (for example the last move) drawn beneath the
++     * pieces, unlike sibling overlays, which would wash out the piece artwork.
++     */
++    squareHighlights?: ReadonlyArray<{
++        square: Square;
++        color: string;
++    }>;
+ }
+ declare const Chessboard: React.ForwardRefExoticComponent<ChessboardProps & React.RefAttributes<ChessboardRef>>;
+ export default Chessboard;
 diff --git a/lib/typescript/state/board-state-context.d.ts b/lib/typescript/state/board-state-context.d.ts
 index 9df5d29a4e894d52f6ff4c7036342a60eb2529f7..a1179eda7258a44362521fceb030b5a2f3595fef 100644
 --- a/lib/typescript/state/board-state-context.d.ts
@@ -2289,7 +2308,7 @@ index a3f67bf02f45b674772813bdf03f4b25c56f070e..82b0a9414620d14010296422c974664f
      );
    }
 diff --git a/src/components/skia/gesture-board.tsx b/src/components/skia/gesture-board.tsx
-index b4a278cc2ada84715a4916324b459952ab33c942..4b9b85bedfec21907e498f2fa422fad90655f917 100644
+index b4a278cc2ada84715a4916324b459952ab33c942..c228081804c1e2f84acdf23d6cd2569bc10781f7 100644
 --- a/src/components/skia/gesture-board.tsx
 +++ b/src/components/skia/gesture-board.tsx
 @@ -2,11 +2,13 @@ import React, {
@@ -2327,7 +2346,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..4b9b85bedfec21907e498f2fa422fad9
  interface PromotionInfo {
    from: Square;
    to: Square;
-@@ -53,16 +66,51 @@ export interface GestureBoardProps {
+@@ -53,16 +66,53 @@ export interface GestureBoardProps {
    onMove?: (result: MoveResult) => void;
    onIllegalMove?: (from: Square, to: Square) => void;
    renderEffect?: (params: EffectParams) => React.ReactNode;
@@ -2335,6 +2354,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..4b9b85bedfec21907e498f2fa422fad9
 +  blocksExternalGesture?: React.RefObject<GestureType | undefined>;
 +  positionKey?: string;
    spriteSource?: ImageSourcePropType;
++  squareHighlights?: ReadonlyArray<{ square: Square; color: string }>;
  }
  
  export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
@@ -2348,6 +2368,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..4b9b85bedfec21907e498f2fa422fad9
 +      blocksExternalGesture,
 +      positionKey,
 +      spriteSource,
++      squareHighlights,
 +    },
 +    ref
 +  ) => {
@@ -2380,7 +2401,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..4b9b85bedfec21907e498f2fa422fad9
      // Effect state for shader effects (all SharedValues for reactivity)
      const effectCenterX = useSharedValue(0);
      const effectCenterY = useSharedValue(0);
-@@ -71,30 +119,46 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -71,30 +121,46 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
        'checkmate' | 'check' | 'stalemate' | ''
      >('');
  
@@ -2432,7 +2453,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..4b9b85bedfec21907e498f2fa422fad9
        // The drag gesture animated the pawn into the back-rank target square
        // and raised its zIndex; chess.move() was deferred until the user picked
        // a promotion piece. Cancel means we never execute the move, so snap
-@@ -121,9 +185,31 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -121,9 +187,31 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
          info.cancel();
        }
        promotionInfoRef.current = null;
@@ -2465,7 +2486,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..4b9b85bedfec21907e498f2fa422fad9
      // Trigger effect on game events
      const triggerEffect = useCallback(
        (trigger: EffectTrigger, kingColor: 'w' | 'b') => {
-@@ -208,6 +294,7 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -208,6 +296,7 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
        boardState,
        moveExecutor,
        defaultHighlightColor: config.colors.lastMoveHighlight,
@@ -2473,7 +2494,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..4b9b85bedfec21907e498f2fa422fad9
      });
  
      const gesture = useBoardGesture({
-@@ -217,6 +304,7 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -217,6 +306,7 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
        // Lock the board while the promotion picker is open so a second drag
        // can't start (and re-trigger) another promotion.
        gestureEnabled: config.gestureEnabled && !showPromotion,
@@ -2481,7 +2502,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..4b9b85bedfec21907e498f2fa422fad9
        onIllegalMove,
      });
  
-@@ -244,25 +332,27 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
+@@ -244,25 +334,28 @@ export const GestureBoard = forwardRef<ChessboardRef, GestureBoardProps>(
  
      return (
        <GestureHandlerRootView style={containerStyle}>
@@ -2497,6 +2518,7 @@ index b4a278cc2ada84715a4916324b459952ab33c942..4b9b85bedfec21907e498f2fa422fad9
 +                spriteImage={spriteImage}
 +                renderEffect={renderEffect}
 +                effectParams={effectParams}
++                squareHighlights={squareHighlights}
 +              />
 +            </View>
 +          </GestureDetector>
@@ -2527,14 +2549,64 @@ index b4a278cc2ada84715a4916324b459952ab33c942..4b9b85bedfec21907e498f2fa422fad9
      );
    }
 diff --git a/src/components/skia/skia-board.tsx b/src/components/skia/skia-board.tsx
-index 759d04e3d374ee79388c2acddc541cfceb0ee7db..c46b6e4e785df632ae3361ac337cefab954d5892 100644
+index 759d04e3d374ee79388c2acddc541cfceb0ee7db..731d5b78907b15d80e0fff7beecd2fca345901ac 100644
 --- a/src/components/skia/skia-board.tsx
 +++ b/src/components/skia/skia-board.tsx
-@@ -42,12 +42,12 @@ export const SkiaBoard: React.FC<SkiaBoardProps> = React.memo(
+@@ -1,9 +1,11 @@
+ import React from 'react';
+-import { Canvas, Group } from '@shopify/react-native-skia';
++import { Canvas, Group, Rect } from '@shopify/react-native-skia';
+ import type { SkImage } from '@shopify/react-native-skia';
+ import { useDerivedValue } from 'react-native-reanimated';
+ import { StyleSheet } from 'react-native';
++import type { Square } from 'chess.js';
+ import type { BoardConfig, BoardState } from '../../state';
++import { squareToPosition } from '../../state/use-board-state';
+ import type { EffectParams } from '../../types';
+ import { BoardBackground } from './board-background';
+ import { SkiaHighlights } from './skia-highlights';
+@@ -22,11 +24,19 @@ interface SkiaBoardProps {
+   spriteImage: SkImage | null;
+   renderEffect?: (params: EffectParams) => React.ReactNode;
+   effectParams?: EffectParams;
++  squareHighlights?: ReadonlyArray<{ square: Square; color: string }>;
+ }
+ 
+ export const SkiaBoard: React.FC<SkiaBoardProps> = React.memo(
+-  ({ config, boardState, spriteImage, renderEffect, effectParams }) => {
+-    const { boardSize, pieceSize } = config;
++  ({
++    config,
++    boardState,
++    spriteImage,
++    renderEffect,
++    effectParams,
++    squareHighlights,
++  }) => {
++    const { boardSize, pieceSize, flipped } = config;
+ 
+     const progressSV = effectParams?.progress;
+     const effectOpacity = useDerivedValue(() => {
+@@ -42,12 +52,27 @@ export const SkiaBoard: React.FC<SkiaBoardProps> = React.memo(
        <>
          <BoardBackground config={config} />
          <SkiaHighlights config={config} boardState={boardState} />
 -        <SkiaDots config={config} boardState={boardState} />
++        {/* Chessticize: consumer square tints (last move, move feedback) paint
++            beneath the pieces so the piece artwork keeps its own contrast. */}
++        {squareHighlights?.map(({ square, color }, index) => {
++          const position = squareToPosition(square, pieceSize, flipped);
++          return (
++            <Rect
++              key={`${square}-${index}`}
++              x={position.x}
++              y={position.y}
++              width={pieceSize}
++              height={pieceSize}
++              color={color}
++            />
++          );
++        })}
          <SkiaPiecesAtlas
            spriteImage={spriteImage}
            boardState={boardState}
@@ -3006,7 +3078,7 @@ index e1a1653b60bc39a2ac617a9d8b0e0c5c1399dd35..d9040314b24f129923a913a07ca73871
  
    const getState = useCallback((): ChessboardState => {
 diff --git a/src/index.tsx b/src/index.tsx
-index a50f36cba22769b8a484a1c4429a3135e661dcf3..cfc883fb8cab34b3e13120c18e2dee4f258029ec 100644
+index a50f36cba22769b8a484a1c4429a3135e661dcf3..f0a026094a1740f172bb8b2445625878b144eff4 100644
 --- a/src/index.tsx
 +++ b/src/index.tsx
 @@ -1,5 +1,6 @@
@@ -3030,7 +3102,19 @@ index a50f36cba22769b8a484a1c4429a3135e661dcf3..cfc883fb8cab34b3e13120c18e2dee4f
    /**
     * Optional custom piece sprite sheet. Must match the standard
     * 6×2 / 128px-cell layout (row 0 = white p,n,b,r,q,k; row 1 =
-@@ -34,6 +42,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+@@ -26,6 +34,11 @@ export interface ChessboardProps
+    * system font when omitted.
+    */
+   fontSource?: ImageSourcePropType;
++  /**
++   * Chessticize: square tints (for example the last move) drawn beneath the
++   * pieces, unlike sibling overlays, which would wash out the piece artwork.
++   */
++  squareHighlights?: ReadonlyArray<{ square: Square; color: string }>;
+ }
+ 
+ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+@@ -34,6 +47,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
        fen,
        boardSize,
        gestureEnabled,
@@ -3038,7 +3122,7 @@ index a50f36cba22769b8a484a1c4429a3135e661dcf3..cfc883fb8cab34b3e13120c18e2dee4f
        flipped,
        withLetters,
        withNumbers,
-@@ -42,6 +51,8 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+@@ -42,8 +56,11 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
        onMove,
        onIllegalMove,
        renderEffect,
@@ -3046,8 +3130,11 @@ index a50f36cba22769b8a484a1c4429a3135e661dcf3..cfc883fb8cab34b3e13120c18e2dee4f
 +      blocksExternalGesture,
        spriteSource,
        fontSource,
++      squareHighlights,
      },
-@@ -52,6 +63,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+     ref
+   ) => {
+@@ -52,6 +69,7 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
          fen={fen}
          boardSize={boardSize}
          gestureEnabled={gestureEnabled}
@@ -3055,7 +3142,7 @@ index a50f36cba22769b8a484a1c4429a3135e661dcf3..cfc883fb8cab34b3e13120c18e2dee4f
          flipped={flipped}
          withLetters={withLetters}
          withNumbers={withNumbers}
-@@ -64,6 +76,9 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
+@@ -64,7 +82,11 @@ const Chessboard = forwardRef<ChessboardRef, ChessboardProps>(
            onMove={onMove}
            onIllegalMove={onIllegalMove}
            renderEffect={renderEffect}
@@ -3063,8 +3150,10 @@ index a50f36cba22769b8a484a1c4429a3135e661dcf3..cfc883fb8cab34b3e13120c18e2dee4f
 +          blocksExternalGesture={blocksExternalGesture}
 +          positionKey={fen}
            spriteSource={spriteSource}
++          squareHighlights={squareHighlights}
          />
        </BoardStateProvider>
+     );
 diff --git a/src/state/board-state-context.tsx b/src/state/board-state-context.tsx
 index 2f2990b96a62e49047a101e225317ab1a01b20ae..49b3ca47ff47230e756b5c6baede95d1d4bd528a 100644
 --- a/src/state/board-state-context.tsx
