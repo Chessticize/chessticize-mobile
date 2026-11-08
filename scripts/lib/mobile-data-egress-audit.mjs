@@ -14,6 +14,8 @@ export const APPROVED_RUNTIME_DEPENDENCIES = Object.freeze({
     "react-native-gesture-handler",
     "react-native-reanimated",
     "react-native-safe-area-context",
+    // Native tab host (#612). Reviewed: no network APIs in its JS or native code.
+    "react-native-screens",
     "react-native-worklets"
   ])
 });

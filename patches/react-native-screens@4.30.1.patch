@@ -1,0 +1,29 @@
+diff --git a/ios/tabs/host/RNSTabBarController.mm b/ios/tabs/host/RNSTabBarController.mm
+--- a/ios/tabs/host/RNSTabBarController.mm
++++ b/ios/tabs/host/RNSTabBarController.mm
+@@ -755,12 +755,19 @@
+     return searchTab;
+   }
+ 
+-  return [[UITab alloc] initWithTitle:[screenController.tabScreenComponentView title] ?: @""
+-                                image:nil
+-                           identifier:[screenController.tabScreenComponentView screenKey]
+-               viewControllerProvider:^UIViewController *(UITab *) {
+-                 return weakScreenController;
+-               }];
++  UITab *tab = [[UITab alloc] initWithTitle:[screenController.tabScreenComponentView title] ?: @""
++                                       image:nil
++                                  identifier:[screenController.tabScreenComponentView screenKey]
++                      viewControllerProvider:^UIViewController *(UITab *) {
++                        return weakScreenController;
++                      }];
++  // Chessticize (#612): on this UITab path (iOS 26.1+) the iPad floating tab bar
++  // takes its accessibility identifier from the UITab, not from tabBarItem (where
++  // updateTabBarA11yIfNeeded puts tabBarItemTestID), so tabBarItemTestID was not
++  // exposed there. Carry it onto the UITab too. UITab adopts
++  // UIAccessibilityIdentification from iOS 18.
++  tab.accessibilityIdentifier = screenController.tabScreenComponentView.tabItemTestID;
++  return tab;
+ }
+ 
+ #endif // RNS_UITAB_API_SDK_AVAILABLE
