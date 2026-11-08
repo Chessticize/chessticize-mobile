@@ -2806,7 +2806,7 @@ describe("PracticePocScreen", () => {
     }
   });
 
-  it("lets the TIMEOUT badge expand for Android large text without changing its baseline width", () => {
+  it("gives every Sprint rule badge one minimum width that follows the text size", () => {
     setPracticeViewport({
       fontScale: 1.5,
       height: 914,
@@ -2815,14 +2815,36 @@ describe("PracticePocScreen", () => {
       width: 412
     });
     const renderer = renderLabScenario("practice-first-sprint-guide");
-    const badge = findByTestId(renderer, "practice-sprint-rule-puzzle-timeout-badge");
-    const badgeStyle = flattenTestStyle(badge.props.style);
-    const badgeText = badge.findByType(ReactNative.Text);
+    const ruleIds = ["time-limit", "mistake-limit", "slow-warning", "puzzle-timeout"];
+    const badgeWidths = ruleIds.map((ruleId) => flattenTestStyle(
+      findByTestId(renderer, `practice-sprint-rule-${ruleId}-badge`).props.style
+    ).minWidth);
+    const timeoutBadge = findByTestId(renderer, "practice-sprint-rule-puzzle-timeout-badge");
 
-    expect(collectText(badge)).toBe("TIMEOUT");
-    expect(badgeStyle.minWidth).toBe(72);
-    expect(badgeStyle.width).toBeUndefined();
-    expect(badgeText.props.numberOfLines).toBe(1);
+    expect(collectText(timeoutBadge)).toBe("TIMEOUT");
+    expect(badgeWidths).toEqual([108, 108, 108, 108]);
+    expect(flattenTestStyle(timeoutBadge.props.style).width).toBeUndefined();
+    expect(timeoutBadge.findByType(ReactNative.Text).props.numberOfLines).toBe(1);
+  });
+
+  it("stacks Sprint rule badges above their copy when the scaled badge would crowd a narrow card", () => {
+    setPracticeViewport({
+      fontScale: 2,
+      height: 914,
+      insets: { top: 32, right: 0, bottom: 24, left: 0 },
+      scale: 2.625,
+      width: 412
+    });
+    const renderer = renderLabScenario("practice-first-sprint-guide");
+    const list = findByTestId(renderer, "practice-sprint-rules-list");
+    act(() => {
+      list.props.onLayout({ nativeEvent: { layout: { height: 600, width: 340, x: 0, y: 0 } } });
+    });
+
+    const row = findByTestId(renderer, "practice-sprint-rule-puzzle-timeout");
+    const badge = findByTestId(renderer, "practice-sprint-rule-puzzle-timeout-badge");
+    expect(flattenTestStyle(row.props.style).flexDirection).toBe("column");
+    expect(flattenTestStyle(badge.props.style).minWidth).toBeUndefined();
   });
 
   it("uses the selected saved Run to calculate the first Sprint pass target", () => {

@@ -15,6 +15,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View
 } from "react-native";
 import type { ImageSourcePropType } from "react-native";
@@ -6627,6 +6628,14 @@ function SprintRulesGuide({
 }): React.JSX.Element {
   const styles = useStyles();
   const mistakeLimitDetail = `The ${ordinalWord(presentation.maxMistakes)} mistake ends the Sprint.`;
+  // One badge width for every rule so the descriptions share a column. The
+  // width follows the text size; when it would take more than a third of the
+  // card (narrow screens at accessibility sizes), badges stack above their copy.
+  const { fontScale } = useWindowDimensions();
+  const [listWidth, setListWidth] = useState(0);
+  const badgeMinWidth = Math.ceil(SPRINT_RULE_BADGE_MIN_WIDTH * Math.max(1, fontScale));
+  const stacked = listWidth > 0 && badgeMinWidth > listWidth / 3;
+  const ruleLayout = { badgeMinWidth, stacked };
 
   return (
     <View
@@ -6652,25 +6661,33 @@ function SprintRulesGuide({
         </Pressable>
       </View>
 
-      <View style={styles.sprintRulesList}>
+      <View
+        style={styles.sprintRulesList}
+        testID="practice-sprint-rules-list"
+        onLayout={(event) => setListWidth(event.nativeEvent.layout.width)}
+      >
         <SprintRuleRow
+          layout={ruleLayout}
           badge={presentation.durationLabel}
           detail="Finish the goal before the Sprint clock reaches zero. At zero, the active puzzle is saved as Incomplete, not as a mistake, and needs attention. If it is Slow, it is also marked Unclear."
           label="Time limit"
         />
         <SprintRuleRow
+          layout={ruleLayout}
           badge={String(presentation.maxMistakes)}
           detail={mistakeLimitDetail}
           label="Mistake limit"
           tone="danger"
         />
         <SprintRuleRow
+          layout={ruleLayout}
           badge="SLOW"
           detail="The puzzle timer turns amber when you are taking too long. If you solve after that, it is marked Unclear for another look, not as a mistake."
           label="Slow warning"
           tone="warning"
         />
         <SprintRuleRow
+          layout={ruleLayout}
           badge="TIMEOUT"
           detail="When the puzzle timer runs out, it counts as a mistake, is added to Review, and the Sprint moves on. Mistakes are not marked Unclear."
           label="Puzzle timeout"
@@ -6685,24 +6702,32 @@ function SprintRulesGuide({
   );
 }
 
+const SPRINT_RULE_BADGE_MIN_WIDTH = 72;
+
 function SprintRuleRow({
   badge,
   detail,
   label,
+  layout,
   tone = "default"
 }: {
   badge: string;
   detail: string;
   label: string;
+  layout: { badgeMinWidth: number; stacked: boolean };
   tone?: "default" | "danger" | "warning";
 }): React.JSX.Element {
   const styles = useStyles();
   const ruleTestId = safeTestId(label);
 
   return (
-    <View style={styles.sprintRuleRow} testID={`practice-sprint-rule-${ruleTestId}`}>
+    <View
+      style={[styles.sprintRuleRow, layout.stacked ? styles.sprintRuleRowStacked : null]}
+      testID={`practice-sprint-rule-${ruleTestId}`}
+    >
       <View style={[
         styles.sprintRuleBadge,
+        layout.stacked ? null : { minWidth: layout.badgeMinWidth },
         tone === "danger" ? styles.sprintRuleBadgeDanger : null,
         tone === "warning" ? styles.sprintRuleBadgeWarning : null
       ]} testID={`practice-sprint-rule-${ruleTestId}-badge`}>
@@ -18249,17 +18274,17 @@ const useStyles = makeStyles((theme) => ({
   homeToneNeutral: {
     color: theme.colors.text.tertiary
   },
+  // Plain buttons carry their own 8-pt padding, so the toolbar adds no gaps;
+  // this keeps the link and actions on one line in a phone-landscape column.
   runManagementToolbar: {
     alignItems: "center",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
     justifyContent: "space-between"
   },
   runManagementToolbarActions: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8,
     marginLeft: "auto"
   },
   sprintRulesGuide: {
@@ -18310,13 +18335,16 @@ const useStyles = makeStyles((theme) => ({
     gap: theme.spacing.row,
     minHeight: theme.metrics.minTarget
   },
+  sprintRuleRowStacked: {
+    flexDirection: "column",
+    gap: theme.spacing.inline
+  },
   sprintRuleBadge: {
     alignItems: "center",
     backgroundColor: theme.colors.accent.s100,
     borderRadius: theme.shape.tile,
     justifyContent: "center",
     minHeight: 32,
-    minWidth: 72,
     paddingHorizontal: 8
   },
   sprintRuleBadgeDanger: {
@@ -18338,7 +18366,9 @@ const useStyles = makeStyles((theme) => ({
     color: theme.colors.warning.s600
   },
   sprintRuleCopy: {
-    flex: 1,
+    alignSelf: "stretch",
+    flexGrow: 1,
+    flexShrink: 1,
     gap: 2,
     minWidth: 0
   },
