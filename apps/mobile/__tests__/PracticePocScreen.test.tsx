@@ -8649,7 +8649,8 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "personal-best-hub-close").props.accessibilityLabel).toBe(
       "Back to Practice"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-hub-close"))).toBe("‹");
+    expect(findByTestId(renderer, "personal-best-hub-close").findAll((node) => node.props.name === "chevronLeft").length)
+      .toBeGreaterThan(0);
     expect(collectText(findByTestId(renderer, "personal-best-level-900"))).toBe(
       "Recommended900–999Best 19"
     );
@@ -9026,18 +9027,14 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "personal-best-source-unavailable-message"))).toContain(
       "Your saved Rating source is no longer available."
     );
-    expect(findByTestId(renderer, "personal-best-hub-start").props.accessibilityState).toEqual({
-      disabled: true
-    });
+    expect(findByTestId(renderer, "personal-best-hub-start").props.disabled).toBe(true);
     press(renderer, "personal-best-use-another-run");
     expect(findByTestId(renderer, "personal-best-source-unavailable")).toBeTruthy();
     press(renderer, "personal-best-source-standard");
     expect(collectText(findByTestId(renderer, "personal-best-reference-source"))).toContain(
       "Based on Standard · Rating 925"
     );
-    expect(findByTestId(renderer, "personal-best-hub-start").props.accessibilityState).toEqual({
-      disabled: false
-    });
+    expect(findByTestId(renderer, "personal-best-hub-start").props.disabled).toBe(false);
   });
 
   it("uses Standard's default Rating as a clearly labeled starting level when it has no games", () => {
@@ -9391,8 +9388,10 @@ describe("PracticePocScreen", () => {
     const hubWidth = flattenTestStyle(findByTestId(renderer, "personal-best-hub").props.style).width;
 
     expect(collectText(findByTestId(renderer, "personal-best-hub-records"))).toBe(
-      "Survival recordsPuzzle and Arrow Duel bests by level›"
+      "Survival recordsPuzzle and Arrow Duel bests by level"
     );
+    expect(findByTestId(renderer, "personal-best-hub-records").findAll((node) => node.props.name === "chevronRight").length)
+      .toBeGreaterThan(0);
     press(renderer, "personal-best-hub-records");
 
     const recordsScreen = findByTestId(renderer, "personal-best-records-screen");
