@@ -638,7 +638,7 @@ test("PackBackedPracticeStore keeps a pack-wide scope when practice seeded only 
 
   const partiallySeeded = store.selectPuzzles({ mode: "standard", limit: 10, includeIds: ids });
   assert.deepEqual(partiallySeeded.map((puzzle) => puzzle.id).sort(), ids);
-  assert.equal(store.countPuzzles({ includeIds: ids }), ids.length);
+  assert.equal(store.countPuzzles({ mode: "standard", limit: 10, includeIds: ids }), ids.length);
 
   // A scope the user store holds in full (a loaded fixture) is still served locally.
   userStore.seedPuzzles(puzzles);
