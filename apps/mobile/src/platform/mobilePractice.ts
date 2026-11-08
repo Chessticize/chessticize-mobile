@@ -9,6 +9,7 @@ import {
 import { MemoryStore } from "../../../../packages/storage/src/memory-store.ts";
 import { PackBackedPracticeStore } from "../../../../packages/storage/src/pack-backed-practice-store.ts";
 import { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
+import type { PracticeStore } from "../../../../packages/storage/src/practice-store.ts";
 import { selectUniquePuzzlesForRatingBands } from "../../../../packages/storage/src/puzzle-selection.ts";
 import {
   MemoryTacticalProfileRepository,
@@ -183,16 +184,34 @@ function createPersistentService(
   packSource: PuzzleSource,
   tacticalProfileRepository: TacticalProfileRepository
 ): PracticeService {
+  const service = composePackBackedMobilePracticeService(
+    userStore,
+    packSource,
+    tacticalProfileRepository
+  );
+  persistentProgressDatabasePath = userStore.databasePath();
+  persistentPracticeService = service;
+  return service;
+}
+
+/**
+ * The production service composition: a user progress store wrapped by the
+ * read-only Core Pack. Exposed so tests can run the app's service against the
+ * real pack with an in-memory progress store instead of the device database.
+ */
+export function composePackBackedMobilePracticeService(
+  userStore: PracticeStore,
+  packSource: PuzzleSource,
+  tacticalProfileRepository: TacticalProfileRepository
+): PracticeService {
   const store = new PackBackedPracticeStore(userStore, packSource);
   const service = new PracticeService(
     store,
     createTacticalProfileService(store, packSource, tacticalProfileRepository),
     survivalPracticeServiceOptions()
   );
-  persistentProgressDatabasePath = userStore.databasePath();
   packBackedServices.add(service);
   configureMobilePracticePuzzleSource(service, DEFAULT_PUZZLE_SOURCE);
-  persistentPracticeService = service;
   return service;
 }
 

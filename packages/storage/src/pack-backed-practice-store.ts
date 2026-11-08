@@ -61,10 +61,22 @@ export class PackBackedPracticeStore implements PracticeStore {
     if (filter === undefined) {
       return this.puzzleSource.countPuzzles();
     }
-    const localScopeIsSeeded = filter.includeIds?.some((id) => this.userStore.getPuzzle(id) !== undefined) ?? false;
+    const localScopeIsSeeded = this.scopeIsFullySeeded(filter.includeIds);
     return localScopeIsSeeded
       ? this.userStore.countPuzzles(filter)
       : this.puzzleSource.countPuzzles(filter);
+  }
+
+  /**
+   * A scope is served locally only when the user store holds all of it (a
+   * loaded fixture). Practice seeds the puzzles it serves, so a pack-wide scope
+   * is often partly present locally; that must not shrink the scope to the few
+   * puzzles the player happened to see.
+   */
+  private scopeIsFullySeeded(includeIds: readonly string[] | undefined): boolean {
+    return includeIds !== undefined &&
+      includeIds.length > 0 &&
+      includeIds.every((id) => this.userStore.getPuzzle(id) !== undefined);
   }
 
   getPuzzle(id: string): Puzzle | undefined {
@@ -72,7 +84,7 @@ export class PackBackedPracticeStore implements PracticeStore {
   }
 
   selectPuzzles(filter: PuzzleSelectionFilter): Puzzle[] {
-    const localScopeIsSeeded = filter.includeIds?.some((id) => this.userStore.getPuzzle(id) !== undefined) ?? false;
+    const localScopeIsSeeded = this.scopeIsFullySeeded(filter.includeIds);
     const localScopedPuzzles = localScopeIsSeeded ? this.userStore.selectPuzzles(filter) : [];
     const puzzles = localScopeIsSeeded ? localScopedPuzzles : this.puzzleSource.selectPuzzles(filter);
     if (puzzles.length > 0) {

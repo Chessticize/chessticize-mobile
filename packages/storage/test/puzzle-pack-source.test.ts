@@ -16,6 +16,7 @@ import {
   encodeUciMoveLine
 } from "../src/puzzle-pack-binary-codec.ts";
 import {
+  MemoryStore,
   NodeSqliteDatabase,
   PackBackedPracticeStore,
   PracticeService,
@@ -620,6 +621,31 @@ test("SQLitePuzzlePackSource seeded selection reaches beyond one fixed candidate
   } finally {
     packDb.close();
   }
+});
+
+test("PackBackedPracticeStore keeps a pack-wide scope when practice seeded only part of it", () => {
+  const packSource = new MemoryStore();
+  const ids = ["scope-a", "scope-b", "scope-c", "scope-d"];
+  const kingRanks = ["K7", "1K6", "2K5", "3K4"];
+  const puzzles = ids.map((id, index) => ({
+    ...selectionPuzzle(id, 900, ["mateIn2"]),
+    initialFen: `8/8/8/8/8/8/${kingRanks[index]}/6k1 w - - 0 1`
+  }));
+  packSource.seedPuzzles(puzzles);
+  const userStore = new MemoryStore();
+  userStore.seedPuzzles([puzzles[0] as Puzzle]);
+  const store = new PackBackedPracticeStore(userStore, packSource);
+
+  const partiallySeeded = store.selectPuzzles({ mode: "standard", limit: 10, includeIds: ids });
+  assert.deepEqual(partiallySeeded.map((puzzle) => puzzle.id).sort(), ids);
+  assert.equal(store.countPuzzles({ includeIds: ids }), ids.length);
+
+  // A scope the user store holds in full (a loaded fixture) is still served locally.
+  userStore.seedPuzzles(puzzles);
+  assert.deepEqual(
+    store.selectPuzzles({ mode: "standard", limit: 10, includeIds: ids }).map((puzzle) => puzzle.id).sort(),
+    ids
+  );
 });
 
 test("PackBackedPracticeStore queries pack puzzles without preloading the user database", async () => {
