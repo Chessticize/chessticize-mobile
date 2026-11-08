@@ -1018,7 +1018,8 @@ describe("PracticePocScreen", () => {
     // No trailing check: the selected rating stays in the same column.
     expect(() => findByTestId(renderer, `practice-run-selected-${selectedIds[0]}`)).toThrow();
     expect(flattenTestStyle(hostByTestId(renderer, "practice-mode-standard-rating").props.style)).toMatchObject({
-      // AppText's secondary tone (direction A textSecondary).
+      // AppText's "secondary" tone renders the theme's text.tertiary token, which
+      // holds direction A's textSecondary color (#636366 in light).
       color: lightTheme.colors.text.tertiary,
       fontSize: lightTheme.typography.numeralRow.fontSize,
       fontWeight: lightTheme.typography.numeralRow.fontWeight,
