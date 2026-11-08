@@ -67,6 +67,12 @@ const config: StorybookConfig = {
             replacement: fileURLToPath(new URL("../src/BoardPlaceholder.tsx", import.meta.url))
           },
           {
+            // The native tab container cannot render on the web; the fake draws
+            // a faithful placeholder of the system tab chrome (#612).
+            find: /^react-native-screens$/,
+            replacement: fileURLToPath(new URL("../../mobile/src/navigation/nativeTabsFake.tsx", import.meta.url))
+          },
+          {
             find: /^.*\/mobilePractice\.ts$/,
             replacement: fileURLToPath(new URL("../src/browserMobilePractice.ts", import.meta.url))
           },
