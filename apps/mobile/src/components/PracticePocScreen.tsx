@@ -12498,7 +12498,14 @@ function HistoryAttemptRow({
             {resultLabel}
           </AppText>
         </View>
-        <AppText testID={`history-attempt-${attempt.id}-identity`} tone="secondary" variant="footnote">{puzzleIdentity}</AppText>
+        <View accessibilityLabel={puzzleIdentity} style={styles.attemptRowIdentity} testID={`history-attempt-${attempt.id}-identity`}>
+          <AppText ellipsizeMode="tail" numberOfLines={1} style={styles.attemptRowIdentityId} tone="secondary" variant="footnote">
+            {`ID ${attempt.puzzleId}`}
+          </AppText>
+          <AppText numberOfLines={1} style={styles.attemptRowIdentityRating} tone="secondary" variant="footnote">
+            {`\u00A0· Rating ${attempt.puzzleRating}`}
+          </AppText>
+        </View>
         {visibleThemes.length > 0 ? (
           <HistoryThemeList attemptId={attempt.id} themes={visibleThemes} />
         ) : null}
@@ -20637,6 +20644,16 @@ const useStyles = makeStyles((theme) => ({
     gap: 2,
     minWidth: 0
   },
+  attemptRowIdentity: {
+    flexDirection: "row",
+    minWidth: 0
+  },
+  attemptRowIdentityId: {
+    flexShrink: 1
+  },
+  attemptRowIdentityRating: {
+    flexShrink: 0
+  },
   attemptRowTrailingBadges: {
     alignItems: "flex-end",
     alignSelf: "center",
@@ -21109,7 +21126,7 @@ const useStyles = makeStyles((theme) => ({
     position: "absolute",
     right: 0,
     top: 0,
-    width: 16
+    width: 24
   },
   themeTagRailFadeStep: {
     backgroundColor: theme.colors.surface,

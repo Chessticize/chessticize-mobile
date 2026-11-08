@@ -11517,7 +11517,7 @@ describe("PracticePocScreen", () => {
     expect(historyAttemptRow.props.accessibilityLabel).not.toContain("Review due");
     expect(collectText(historyAttemptRow)).not.toContain("Played g6g5 · Best f4g3");
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-identity`))).toMatch(
-      /^ID .+ · Rating \d+$/
+      /^ID .+\s· Rating \d+$/
     );
     const historyAttemptThemes = collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-themes`));
     expect(historyAttemptThemes).toMatch(/^[A-Z]/);
@@ -12168,7 +12168,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-arrow-attempt-review-due")).toThrow();
     expect(findByTestId(renderer, "history-attempt-arrow-attempt").props.accessibilityLabel).not.toContain("Review due");
     expect(collectText(findByTestId(renderer, "history-attempt-arrow-attempt-identity"))).toBe(
-      "ID shared-history · Rating 900"
+      "ID shared-history\u00A0· Rating 900"
     );
     expect(() => findByTestId(renderer, "history-attempt-arrow-attempt-difficulty")).toThrow();
 
@@ -12176,7 +12176,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "history-performance-context"))).toBe("Standard · 20s pace · All Time");
     expect(() => findByTestId(renderer, "history-attempt-standard-attempt-review-due")).toThrow();
     expect(collectText(findByTestId(renderer, "history-attempt-standard-attempt-identity"))).toBe(
-      "ID shared-history · Rating 900"
+      "ID shared-history\u00A0· Rating 900"
     );
     expect(() => findByTestId(renderer, "history-attempt-standard-attempt-difficulty")).toThrow();
   });
@@ -13833,7 +13833,7 @@ describe("PracticePocScreen", () => {
     });
     const historyAttemptRow = historyAttemptRows(renderer)[0];
     expect(collectText(findByTestId(renderer, `${historyAttemptRow!.props.testID}-identity`))).toMatch(
-      /^ID .+ · Rating \d+$/
+      /^ID .+\s· Rating \d+$/
     );
     expect(collectText(findByTestId(renderer, `${historyAttemptRow!.props.testID}-meta`))).toContain("Review · 5s");
   });
