@@ -35,6 +35,9 @@ The viewport toolbar includes:
 - Phone portrait: 402 × 874, with the iPhone 17 Release Safe Area.
 - Phone landscape: 874 × 402, with the iPhone 17 Release Safe Area.
 - Regular width: 1180 × 820.
+- iPad Split View half (684 × 1032), one third (458 × 1032), and a short
+  Stage Manager window (800 × 600). The simulator cannot resize these windows
+  headlessly, so the Lab is where their layouts are reviewed.
 
 The **Theme** toolbar item switches every story between the light and dark
 themes (`darkTheme` and `lightTheme` from `apps/mobile/src/theme`). Open a

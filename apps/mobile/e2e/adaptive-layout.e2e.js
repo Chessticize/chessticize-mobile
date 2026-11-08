@@ -141,9 +141,13 @@ async function assertFirstUseSprintRulesGuideLayout() {
   const badge = element(by.id('practice-sprint-rule-puzzle-timeout-badge'));
   const copy = element(by.id('practice-sprint-rule-puzzle-timeout-copy'));
 
-  if (deviceLabel.includes('large-text')) {
-    // An enlarged rules card can be taller than Detox's 75% visibility
-    // threshold allows; the frame checks below still cover its layout.
+  if (
+    deviceLabel.includes('large-text')
+    || (onlyOrientation === 'landscape' && deviceLabel.includes('phone'))
+  ) {
+    // An enlarged rules card, or one on a short landscape phone, can be taller
+    // than Detox's 75% visibility threshold allows; the frame checks below
+    // still cover its layout.
     await waitFor(element(by.id('practice-sprint-rules-guide'))).toExist().withTimeout(10000);
     await waitFor(element(by.text('TIMEOUT'))).toExist().withTimeout(10000);
   } else {
@@ -223,7 +227,13 @@ async function startStandardSprintThroughContainedGuide(orientation) {
     }
     await expectSessionGuideContained(`${deviceLabel} ${orientation} guide step ${step}`);
     await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-standard-guide-${step}`);
+    // "n of n" is the last step: its Start leaves the guide, which can still
+    // be mounted for a moment after the tap.
+    const progress = /(\d+) of (\d+)/.exec(await elementText('practice-session-guide-coach-progress'));
     await element(by.id('practice-session-guide-start')).tap();
+    if (progress && progress[1] === progress[2]) {
+      break;
+    }
     await sleep(300);
   }
 }

@@ -41,6 +41,24 @@ export const LAB_DEVICE_VIEWPORTS = {
     width: 1180,
     height: 820,
     insets: { top: 0, right: 0, bottom: 20, left: 0 }
+  },
+  // iPad Split View and Stage Manager windows. The simulator cannot resize
+  // these headlessly, so the Lab is where their layouts are reviewed. Sizes
+  // match the windows in adaptivePracticeLayout.test.tsx.
+  splitViewHalf: {
+    width: 684,
+    height: 1032,
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
+  },
+  splitViewThird: {
+    width: 458,
+    height: 1032,
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
+  },
+  stageManagerShort: {
+    width: 800,
+    height: 600,
+    insets: { top: 24, right: 0, bottom: 20, left: 0 }
   }
 } as const satisfies Record<string, LabDeviceViewport>;
 

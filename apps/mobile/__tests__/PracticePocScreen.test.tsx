@@ -3228,8 +3228,9 @@ describe("PracticePocScreen", () => {
     const placed = calloutStyle();
     expect(placed.opacity).toBe(1);
     expect(placed.width).toBe(358);
-    // Below the 6-point cut-out padding plus the 14-point pointer gap.
-    expect(placed.top).toBe(64 + 52 + 6 + 14);
+    // Below the 6-point cut-out padding plus the 4-point gap; the pointer
+    // reaches into the padding.
+    expect(placed.top).toBe(64 + 52 + 6 + 4);
     expect(placed.left).toBeGreaterThanOrEqual(12);
     expect(Number(placed.left) + 358).toBeLessThanOrEqual(466 - 84 - 12);
     expect(findByTestId(renderer, "practice-session-guide-pointer")).toBeTruthy();
@@ -3237,6 +3238,165 @@ describe("PracticePocScreen", () => {
       findByTestId(renderer, "practice-session-guide-cutout").props.style
     );
     expect(cutout).toMatchObject({ height: 64, left: 10, top: 58, width: 362 });
+    // A theme-token ring marks the spotlight, which dimming alone cannot do on
+    // a black dark-theme canvas.
+    expect(cutout).toMatchObject({ borderRadius: 12, borderWidth: 2 });
+    expect(typeof cutout.borderColor).toBe("string");
+  });
+
+  it("scrolls a target below the safe frame into view and waits for the scroll to settle", () => {
+    // iPhone SE: the session stack ends below the 667-point window.
+    setPracticeViewport({
+      width: 375,
+      height: 667,
+      scale: 2,
+      insets: { top: 20, right: 0, bottom: 0, left: 0 }
+    });
+    const mock = ReactNative as unknown as {
+      __getScrollViewCommands?: () => Array<{ animated: boolean; y: number }>;
+      __setViewFrame?: (
+        testID: string,
+        frame: { height: number; width: number; x: number; y: number }
+      ) => void;
+    };
+    mock.__setViewFrame?.("practice-active-session-guide", { x: 0, y: 0, width: 375, height: 667 });
+    mock.__setViewFrame?.("session-puzzle-timing", { x: 140, y: 650, width: 95, height: 28 });
+    mock.__setViewFrame?.("practice-session-guide-callout", { x: 0, y: 0, width: 351, height: 150 });
+    const renderer = renderLabScenario("practice-active-session-guide");
+    press(renderer, "practice-session-guide-start");
+
+    act(() => {
+      jest.advanceTimersByTime(20);
+    });
+
+    expect(mock.__getScrollViewCommands?.()[0]).toEqual({
+      animated: true,
+      y: 678 - 667 + 12
+    });
+    expect(flattenTestStyle(
+      findByTestId(renderer, "practice-session-guide-callout").props.style
+    ).opacity).toBe(0);
+    expect(() => findByTestId(renderer, "practice-session-guide-cutout")).toThrow();
+
+    mock.__setViewFrame?.("session-puzzle-timing", { x: 140, y: 627, width: 95, height: 28 });
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+
+    expect(flattenTestStyle(
+      findByTestId(renderer, "practice-session-guide-callout").props.style
+    ).opacity).toBe(1);
+    expect(findByTestId(renderer, "practice-session-guide-cutout")).toBeTruthy();
+  });
+
+  it("scrolls the landscape side panel to reveal a target it clips", () => {
+    // Phone landscape: the side panel is a scroll view as tall as the board,
+    // and the puzzle timer sits below its visible area.
+    setPracticeViewport({
+      width: 923,
+      height: 411,
+      scale: 2.625,
+      insets: { top: 52, right: 48, bottom: 0, left: 54 }
+    });
+    const mock = ReactNative as unknown as {
+      __getScrollViewCommands?: () => Array<{ animated?: boolean; end?: boolean; y?: number }>;
+      __setScrollViewFrame?: (frame: { height: number; width: number; x: number; y: number }) => void;
+      __setViewFrame?: (
+        testID: string,
+        frame: { height: number; width: number; x: number; y: number }
+      ) => void;
+    };
+    mock.__setScrollViewFrame?.({ x: 560, y: 60, width: 300, height: 320 });
+    mock.__setViewFrame?.("practice-active-session-guide", { x: 0, y: 0, width: 923, height: 411 });
+    mock.__setViewFrame?.("session-puzzle-timing", { x: 660, y: 372, width: 100, height: 28 });
+    mock.__setViewFrame?.("practice-session-guide-callout", { x: 0, y: 0, width: 360, height: 150 });
+    const renderer = renderLabScenario("practice-active-session-guide");
+    expect(findByTestId(renderer, "active-session-control-rail")).toBeTruthy();
+    press(renderer, "practice-session-guide-start");
+
+    act(() => {
+      jest.advanceTimersByTime(20);
+    });
+
+    // The panel scrolls, not the screen, which already shows the timer.
+    expect(mock.__getScrollViewCommands?.()).toEqual([{ animated: true, end: true }]);
+    expect(flattenTestStyle(
+      findByTestId(renderer, "practice-session-guide-callout").props.style
+    ).opacity).toBe(0);
+  });
+
+  it("centres the guide progress between equal Back and Start slots", () => {
+    const renderer = renderLabScenario("practice-active-session-guide");
+    press(renderer, "practice-session-guide-start");
+    const layout = (testID: string, width: number, height = 44): void => {
+      act(() => {
+        findByTestId(renderer, testID).props.onLayout({
+          nativeEvent: { layout: { height, width, x: 0, y: 0 } }
+        });
+      });
+    };
+    const slotsWithMinWidth = (width: number) => findByTestId(
+      renderer,
+      "practice-session-guide-navigation"
+    ).findAll((node) => typeof node.type === "string"
+      && node.props.style !== undefined
+      && flattenTestStyle(node.props.style).minWidth === width);
+
+    // Back and Next are close in width: equal slots centre the progress.
+    layout("practice-session-guide-navigation", 330);
+    layout("practice-session-guide-back", 80);
+    layout("practice-session-guide-start", 96);
+    expect(slotsWithMinWidth(96)).toHaveLength(2);
+    expect(slotsWithMinWidth(96).every((slot) => (
+      flattenTestStyle(slot.props.style).width === undefined
+    ))).toBe(true);
+    expect(flattenTestStyle(
+      findByTestId(renderer, "practice-session-guide-coach-progress").props.style
+    )).toEqual(expect.objectContaining({ flexGrow: 1, textAlign: "center" }));
+
+    // A much wider start label: no equal slots and no auto margin, so the
+    // progress centres in the gap between the buttons.
+    press(renderer, "practice-session-guide-start");
+    layout("practice-session-guide-navigation", 360);
+    layout("practice-session-guide-back", 80);
+    layout("practice-session-guide-start", 150);
+    expect(slotsWithMinWidth(150)).toHaveLength(0);
+    const endSlot = findByTestId(renderer, "practice-session-guide-start").parent?.parent;
+    expect(flattenTestStyle(endSlot?.props.style).marginLeft).toBeUndefined();
+
+    // Too narrow for one row: Start wraps to its own row on the right.
+    layout("practice-session-guide-navigation", 250);
+    expect(flattenTestStyle(
+      findByTestId(renderer, "practice-session-guide-start").parent?.parent?.props.style
+    ).marginLeft).toBe("auto");
+  });
+
+  it("scales the guide Exit control and copy with the text size up to the callout cap", () => {
+    setPracticeViewport({ width: 402, height: 874, scale: 3, fontScale: 1.2 });
+    const renderer = renderLabScenario("practice-active-session-guide");
+    const exitSize = (): number => Number(flattenTestStyle(
+      findByTestId(renderer, "practice-session-guide-exit").props.style
+    ).width);
+
+    expect(exitSize()).toBeCloseTo(22 * 1.2);
+    expect(findByTestId(renderer, "practice-session-guide-exit").props.hitSlop)
+      .toBeCloseTo((44 - 22 * 1.2) / 2);
+    act(() => renderer.unmount());
+
+    // Accessibility text sizes stop at 1.4x inside the callout, so it can stay
+    // beside its target; the session behind it scales fully.
+    setPracticeViewport({ width: 402, height: 874, scale: 3, fontScale: 2 });
+    const large = renderLabScenario("practice-active-session-guide");
+    expect(Number(flattenTestStyle(
+      findByTestId(large, "practice-session-guide-exit").props.style
+    ).width)).toBeCloseTo(22 * 1.4);
+    for (const testID of [
+      "practice-session-guide-title",
+      "practice-session-guide-detail",
+      "practice-session-guide-coach-progress"
+    ]) {
+      expect(findByTestId(large, testID).props.maxFontSizeMultiplier).toBe(1.4);
+    }
   });
 
   it("keeps the guide navigation operable with large text on a compact phone", () => {

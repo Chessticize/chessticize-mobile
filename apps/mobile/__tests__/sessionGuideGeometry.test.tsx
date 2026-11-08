@@ -60,7 +60,7 @@ describe("first-use guide geometry", () => {
 
     expect(geometry.placement).toBe("below");
     expect(geometry.cutout).toEqual({ height: 60, radius: 12, width: 382, x: 10, y: 114 });
-    expect(geometry.callout).toEqual({ height: 140, width: 340, x: 31, y: 188 });
+    expect(geometry.callout).toEqual({ height: 140, width: 340, x: 31, y: 178 });
     expect(geometry.pointer).toEqual({ offset: 170, side: "top" });
     expect(geometry.overlapsTarget).toBe(false);
   });
@@ -70,7 +70,7 @@ describe("first-use guide geometry", () => {
     const geometry = place({ target });
 
     expect(geometry.placement).toBe("above");
-    expect(geometry.callout.y + geometry.callout.height).toBe(target.y - 6 - 14);
+    expect(geometry.callout.y + geometry.callout.height).toBe(target.y - 6 - 4);
     expect(geometry.pointer?.side).toBe("bottom");
     expect(overlaps(geometry.callout, geometry.cutout)).toBe(false);
   });
@@ -96,8 +96,10 @@ describe("first-use guide geometry", () => {
     });
 
     expect(geometry.placement).toBe("trailing");
-    expect(geometry.callout.x).toBe(126 + 640 + 6 + 14);
-    expect(geometry.pointer).toEqual({ offset: 75, side: "left" });
+    expect(geometry.callout.x).toBe(126 + 640 + 6 + 4);
+    // Centred in the safe frame (y 22 to 1000); the pointer reaches the board centre.
+    expect(geometry.callout.y).toBe(22 + (978 - 150) / 2);
+    expect(geometry.pointer).toEqual({ offset: 516 - 436, side: "left" });
     expectInside(geometry.callout, geometry.safeFrame);
   });
 
@@ -116,7 +118,7 @@ describe("first-use guide geometry", () => {
       target: board
     });
 
-    const space = 874 - 62 - 12 - (90 + 350 + 6 + 14);
+    const space = 874 - 62 - 12 - (90 + 350 + 6 + 4);
     expect(wide.placement).toBe("trailing");
     expect(wide.callout.width).toBe(space);
     expect(wide.callout.height).toBe(Math.ceil(150 * 360 / space));
@@ -135,6 +137,35 @@ describe("first-use guide geometry", () => {
     expect(settled.callout.width).toBe(space);
     expect(settled.callout.height).toBe(170);
     expect(settled.pointer?.side).toBe("left");
+  });
+
+  it("settles between a narrow side placement and a full-width one using measured heights", () => {
+    // A short landscape window: below the panel target there is 160 points.
+    const container = { height: 400, width: 900 };
+    const target = { height: 40, width: 200, x: 640, y: 188 };
+    const narrow = { height: 180, width: 300 };
+    const input = {
+      callout: narrow,
+      container,
+      insets: NO_INSETS,
+      maxCalloutWidth: 360,
+      preferred: ["below", "leading"] as const,
+      target
+    };
+
+    // Estimated from the narrow measurement, the full-width callout would be
+    // 150 tall and fit below; measured, it is 175 and does not.
+    expect(placeGuideCallout(input).placement).toBe("below");
+    const settled = placeGuideCallout({
+      ...input,
+      knownCalloutHeights: new Map([[360, 175], [300, 180]])
+    });
+    expect(settled.placement).toBe("leading");
+    expect(placeGuideCallout({
+      ...input,
+      callout: { height: 175, width: 360 },
+      knownCalloutHeights: new Map([[360, 175], [300, 180]])
+    }).placement).toBe("leading");
   });
 
   it("widens a narrowed callout again for an above or below placement", () => {
@@ -190,7 +221,7 @@ describe("first-use guide geometry", () => {
     });
 
     expect(geometry.placement).toBe("leading");
-    expect(geometry.callout.x + geometry.callout.width).toBe(880 - 6 - 14);
+    expect(geometry.callout.x + geometry.callout.width).toBe(880 - 6 - 4);
     expect(geometry.pointer?.side).toBe("right");
   });
 
@@ -221,7 +252,7 @@ describe("first-use guide geometry", () => {
       target
     });
 
-    expect(geometry.callout.x).toBe(84 + 12);
+    expect(geometry.callout.x).toBe(84 + 12 + 8);
     expect(geometry.callout.y).toBeGreaterThanOrEqual(24 + 12);
     expectInside(geometry.callout, geometry.safeFrame);
     // The pointer stays on the straight part of the callout edge.
@@ -234,6 +265,141 @@ describe("first-use guide geometry", () => {
     expect(geometry.cutout.x).toBe(0);
     expect(geometry.cutout.x + geometry.cutout.width).toBe(IPHONE_17.width);
     expect(geometry.cutout.radius).toBe(8);
+  });
+
+  it("keeps the callout in one place across steps whose targets it can point at", () => {
+    // iPhone 17 Standard guide: header metrics, puzzle timer, Mark as unclear.
+    const header = place({ target: { height: 48, width: 370, x: 16, y: 120 } });
+    const timer = place({ target: { height: 28, width: 120, x: 141, y: 560 } });
+    const unclear = place({
+      preferred: ["above"],
+      target: { height: 40, width: 130, x: 244, y: 780 }
+    });
+
+    expect(header.callout.x).toBe(31);
+    expect(timer.callout.x).toBe(31);
+    expect(unclear.callout.x).toBe(31);
+    expect(unclear.pointer?.offset).toBe(244 + 65 - 31);
+  });
+
+  it("centres the callout on a target it cannot reach from the middle", () => {
+    // iPad 13 portrait: the content column is centred, Mark as unclear sits right.
+    const container = { height: 1376, width: 1032 };
+    const insets = { bottom: 20, left: 0, right: 0, top: 32 };
+    const unclear = placeGuideCallout({
+      callout: { height: 150, width: 360 },
+      container,
+      insets,
+      preferred: ["above"],
+      target: { height: 40, width: 140, x: 806, y: 1250 }
+    });
+    const header = placeGuideCallout({
+      callout: { height: 150, width: 360 },
+      container,
+      insets,
+      target: { height: 52, width: 860, x: 86, y: 140 }
+    });
+
+    expect(header.callout.x).toBe(12 + (1008 - 360) / 2);
+    // Centred on the button, then kept 8 points inside the safe frame's edge.
+    expect(unclear.callout.x).toBe(1020 - 8 - 360);
+    expect(unclear.pointer?.offset).toBe(876 - 652);
+  });
+
+  it("keeps an iPad landscape side-panel callout in the panel column", () => {
+    // iPad 11 landscape: board on the left, controls in a panel on the right.
+    const container = { height: 834, width: 1210 };
+    const insets = { bottom: 20, left: 0, right: 0, top: 10 };
+    const panelTimer = { height: 28, width: 110, x: 945, y: 330 };
+    const geometry = placeGuideCallout({
+      callout: { height: 150, width: 360 },
+      container,
+      insets,
+      preferred: ["above", "below", "leading"],
+      target: panelTimer
+    });
+
+    expect(geometry.placement).toBe("above");
+    expect(geometry.callout.x).toBe(1000 - 180);
+    expect(geometry.callout.x).toBeGreaterThan(780);
+    expect(geometry.pointer).toEqual({ offset: 180, side: "bottom" });
+  });
+
+  it("allows a wider callout on regular-width windows", () => {
+    expect(guideCalloutMaxWidth({ height: 1376, width: 1032 }, NO_INSETS)).toBe(400);
+    expect(guideCalloutMaxWidth({ height: 1032, width: 684 }, NO_INSETS)).toBe(400);
+    expect(guideCalloutMaxWidth({ height: 1032, width: 458 }, NO_INSETS)).toBe(360);
+  });
+
+  it("keeps the pointer tip inside the cut-out padding and off the target", () => {
+    for (const [target, preferred] of [
+      [{ height: 48, width: 370, x: 16, y: 120 }, ["below"]],
+      [{ height: 56, width: 370, x: 16, y: 740 }, ["above"]],
+      [{ height: 300, width: 180, x: 16, y: 200 }, ["trailing"]],
+      [{ height: 300, width: 180, x: 206, y: 200 }, ["leading"]]
+    ] as const) {
+      const geometry = place({
+        callout: { height: 140, width: 160 },
+        preferred,
+        target
+      });
+      const pointer = geometry.pointer;
+      if (!pointer) {
+        throw new Error("expected a pointer");
+      }
+      const { callout } = geometry;
+      const reach = 8;
+      const tip = pointer.side === "top"
+        ? { x: callout.x + pointer.offset, y: callout.y - reach }
+        : pointer.side === "bottom"
+          ? { x: callout.x + pointer.offset, y: callout.y + callout.height + reach }
+          : pointer.side === "left"
+            ? { x: callout.x - reach, y: callout.y + pointer.offset }
+            : { x: callout.x + callout.width + reach, y: callout.y + pointer.offset };
+      expectInside({ height: 0, width: 0, ...tip }, geometry.cutout);
+      const insideTarget = tip.x > target.x
+        && tip.x < target.x + target.width
+        && tip.y > target.y
+        && tip.y < target.y + target.height;
+      expect(insideTarget).toBe(false);
+    }
+  });
+
+  it("shortens the callout so its copy scrolls rather than covering the board", () => {
+    // Large text at 320 points: no side of the Arrow Duel board has room for
+    // the whole callout, but the space above it holds the title and buttons.
+    const container = { height: 693, width: 320 };
+    const insets = { bottom: 34, left: 0, right: 0, top: 47 };
+    const board = { height: 288, width: 288, x: 16, y: 330 };
+    const geometry = placeGuideCallout({
+      callout: { height: 420, width: 296 },
+      container,
+      insets,
+      minCalloutHeight: 200,
+      target: board
+    });
+
+    expect(geometry.compressed).toBe(true);
+    expect(geometry.overlapsTarget).toBe(false);
+    expect(geometry.placement).toBe("above");
+    expect(geometry.callout.y).toBe(47 + 12);
+    expect(geometry.callout.y + geometry.callout.height).toBeLessThanOrEqual(330 - 6 - 4);
+    expect(geometry.pointer?.side).toBe("bottom");
+    expect(overlaps(geometry.callout, geometry.cutout)).toBe(false);
+  });
+
+  it("still overlaps when even the shortest callout has no room", () => {
+    const geometry = placeGuideCallout({
+      callout: { height: 420, width: 296 },
+      container: { height: 693, width: 320 },
+      insets: { bottom: 34, left: 0, right: 0, top: 47 },
+      minCalloutHeight: 320,
+      target: { height: 288, width: 288, x: 16, y: 330 }
+    });
+
+    expect(geometry.compressed).toBe(false);
+    expect(geometry.overlapsTarget).toBe(true);
+    expect(geometry.pointer).toBeNull();
   });
 
   it("overlaps the target and hides the pointer only when no side has room", () => {
