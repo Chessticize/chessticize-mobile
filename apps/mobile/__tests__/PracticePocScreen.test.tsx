@@ -11521,6 +11521,10 @@ describe("PracticePocScreen", () => {
     );
     const historyAttemptThemes = collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-themes`));
     expect(historyAttemptThemes).toMatch(/^[A-Z]/);
+    // The result icon is vertically centered on the row.
+    expect(flattenTestStyle(
+      findByTestId(renderer, `history-attempt-${historyAttemptId}-badge`).parent?.props.style
+    ).alignSelf).toBe("center");
     // Tags stay on one horizontally scrolling line; many tags never grow the row.
     expect(findByTestId(renderer, `history-attempt-${historyAttemptId}-themes`).findByType(ReactNative.ScrollView).props.horizontal).toBe(true);
     expect(collectText(findByTestId(renderer, `history-attempt-${historyAttemptId}-meta`))).toContain("20s pace");
