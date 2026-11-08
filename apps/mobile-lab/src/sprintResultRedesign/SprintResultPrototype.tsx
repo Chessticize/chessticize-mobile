@@ -521,7 +521,9 @@ function ReviewArea({
           {data.unclearPrompt.question}
         </AppText>
         {markedUnclear ? (
-          <Badge label="Marked" testID="sprint-result-redesign-unclear-marked" />
+          <View style={stacked ? null : styles.centeredSelf}>
+            <Badge label="Marked" testID="sprint-result-redesign-unclear-marked" />
+          </View>
         ) : (
           <Button
             accessibilityLabel="Mark this attempt as unclear"
@@ -569,7 +571,12 @@ function ReviewArea({
           </View>
           <View pointerEvents="none" style={styles.reviewTrailing}>
             <AppText numberOfLines={1} tone="accent" variant="body">Replay</AppText>
-            <Icon color={theme.colors.text.tertiary} name="chevronRight" size={15} weight="semibold" />
+            <Icon
+              color={theme.colors.text.tertiary}
+              name="chevronRight"
+              size={Math.round(15 * glyphScale)}
+              weight="semibold"
+            />
           </View>
         </View>
       </View>
@@ -728,6 +735,9 @@ const useStyles = makeStyles((theme) => ({
   },
   centeredText: {
     textAlign: "center"
+  },
+  centeredSelf: {
+    alignSelf: "center"
   },
   endText: {
     textAlign: "right"

@@ -7,6 +7,7 @@ import type { SprintResultPrototypeData } from "./sprintResultPresentation.ts";
 const noUnclear = { markedByYou: 0, afterSlow: 0, afterTimedOut: 0 };
 
 export const SPRINT_RESULT_FIXTURES = {
+  // A clean pass whose one review item is a solve marked Unclear after Slow.
   passed: {
     kind: "sprint",
     mode: "standard",
