@@ -45,12 +45,12 @@ export function TacticalProfileHomeCard({
             {presentation.phase === "building" ? (
               <ActivityIndicator color={theme.colors.accent.s700} size="small" testID="training-focus-building-indicator" />
             ) : null}
-            <Text style={[styles.statusPillText, statusPillTextStyle(styles, content.tone)]}>
+            <Text numberOfLines={1} style={[styles.statusPillText, statusPillTextStyle(styles, content.tone)]}>
               {content.status}
             </Text>
           </View>
           {presentation.assurance === "provisional" ? (
-            <Text style={styles.earlyEstimateLabel} testID="training-focus-early-estimate">
+            <Text numberOfLines={1} style={styles.earlyEstimateLabel} testID="training-focus-early-estimate">
               Early estimate
             </Text>
           ) : null}

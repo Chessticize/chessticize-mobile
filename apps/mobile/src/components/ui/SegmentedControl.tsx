@@ -68,8 +68,11 @@ const useStyles = makeStyles((theme) => ({
     ...theme.elevation.low,
     shadowOpacity: theme.name === "dark" ? 0 : 0.12
   },
+  // The label spans the segment instead of shrink-wrapping its text, so it
+  // keeps slack against Android width rounding (#633) and still wraps.
   label: {
     ...theme.typography.subheadline,
+    alignSelf: "stretch",
     color: theme.colors.text.primary,
     textAlign: "center"
   },

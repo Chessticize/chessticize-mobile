@@ -6672,7 +6672,7 @@ function SprintRulesGuide({
           testID="practice-sprint-rules-dismiss"
           onPress={onDismiss}
         >
-          <Text style={styles.sprintRulesDismissText}>Got it</Text>
+          <Text numberOfLines={1} style={styles.sprintRulesDismissText}>Got it</Text>
         </Pressable>
       </View>
 
@@ -7170,6 +7170,7 @@ function PracticeRunCard({
       </Pressable>
       <View style={[styles.homeRowMeta, editing ? styles.homeRowEditingMeta : null]}>
         <AppText
+          numberOfLines={1}
           style={styles.homeRowRating}
           testID={run.kind === "standard"
             ? "practice-mode-standard-rating"
@@ -8857,7 +8858,7 @@ function ResumeSprintCard({
           : `${modeLabel(sprint.config.mode)} · ${sprint.correctCount} solved · ${remaining} left · ${sprint.mistakeCount} mistakes`}
         testID="practice-resume-card"
         title={isTacticalFocus ? "Resume Focused Run" : "Resume sprint"}
-        trailing={<AppText tone="accent" variant="headline">Resume</AppText>}
+        trailing={<AppText numberOfLines={1} tone="accent" variant="headline">Resume</AppText>}
         onPress={onResume}
       />
     </Section>
@@ -8981,7 +8982,7 @@ function PracticeModeCard({
       </View>
       <View style={styles.homeRowMeta}>
         {ratingLabel ? (
-          <AppText tone="secondary" testID={`practice-mode-${modeTestId}-rating`} variant="subheadline">{ratingLabel}</AppText>
+          <AppText numberOfLines={1} tone="secondary" testID={`practice-mode-${modeTestId}-rating`} variant="subheadline">{ratingLabel}</AppText>
         ) : null}
         {active ? (
           <Icon color={appTheme.colors.accent.s600} name="check" size={18} testID={`practice-mode-${modeTestId}-selected`} weight="semibold" />
@@ -18265,8 +18266,9 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     gap: 16
   },
+  // Labels stretch to the column rather than shrink-wrapping their text: see
+  // "Text width rounding" in docs/ui-design/MOBILE_UI_DESIGN.md (#633).
   homeProgressMetric: {
-    alignItems: "flex-start",
     flex: 1,
     gap: 2,
     minWidth: 0
