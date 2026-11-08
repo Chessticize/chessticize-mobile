@@ -12529,20 +12529,35 @@ function HistoryThemeList({
   themes: readonly string[];
 }): React.JSX.Element {
   return (
-    <ThemeTagRail testID={`history-attempt-${attemptId}-themes`} themes={themes} />
+    <ThemeTagRail fadeEnd testID={`history-attempt-${attemptId}-themes`} themes={themes} />
   );
 }
 
 function ThemeTagRail({
   centered = false,
+  fadeEnd = false,
   testID,
   themes
 }: {
   centered?: boolean;
+  /** Fades the trailing edge so an overflowing chip does not end in a hard cut. */
+  fadeEnd?: boolean;
   testID: string;
   themes: readonly string[];
 }): React.JSX.Element {
   const styles = useStyles();
+  if (fadeEnd) {
+    return (
+      <View style={styles.themeTagRailFadeFrame}>
+        <ThemeTagRail centered={centered} testID={testID} themes={themes} />
+        <View pointerEvents="none" style={styles.themeTagRailFade}>
+          {THEME_TAG_RAIL_FADE_STEPS.map((opacity) => (
+            <View key={opacity} style={[styles.themeTagRailFadeStep, { opacity }]} />
+          ))}
+        </View>
+      </View>
+    );
+  }
   return (
     <ScrollView
       horizontal
@@ -12564,6 +12579,9 @@ function ThemeTagRail({
     </ScrollView>
   );
 }
+
+// Opacities of the surface-colored strips that fade the rail's trailing edge.
+const THEME_TAG_RAIL_FADE_STEPS = [0.25, 0.5, 0.75, 1] as const;
 
 function historyAttemptModeLabel(mode: SprintMode | null): string {
   return mode === null ? "Unknown mode" : modeLabel(mode);
@@ -21080,6 +21098,22 @@ const useStyles = makeStyles((theme) => ({
   historyAttemptCopy: {
     flex: 1,
     gap: 3
+  },
+  themeTagRailFadeFrame: {
+    minWidth: 0,
+    position: "relative"
+  },
+  themeTagRailFade: {
+    bottom: 0,
+    flexDirection: "row",
+    position: "absolute",
+    right: 0,
+    top: 0,
+    width: 16
+  },
+  themeTagRailFadeStep: {
+    backgroundColor: theme.colors.surface,
+    flex: 1
   },
   themeTagRailViewport: {
     flexShrink: 1,
