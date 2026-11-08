@@ -21327,19 +21327,24 @@ const useStyles = makeStyles((theme) => ({
   },
   // Label and value share the first line; an explanation spans the full row
   // below them so long copy never runs in a narrow column.
+  // When label and value do not fit side by side (large text, long values),
+  // the value moves to its own line at the trailing edge instead of being
+  // squeezed until it breaks mid-word.
   settingsRowTitleLine: {
     alignItems: "flex-start",
+    columnGap: theme.spacing.row,
     flexDirection: "row",
-    gap: theme.spacing.row,
-    justifyContent: "space-between"
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 2
   },
   settingsRowLabel: {
-    flexGrow: 1,
     flexShrink: 1
   },
   settingsRowValue: {
-    flexShrink: 1,
-    maxWidth: "50%",
+    flexShrink: 0,
+    marginLeft: "auto",
+    maxWidth: "100%",
     textAlign: "right"
   },
   settingsActionButtonRow: {
