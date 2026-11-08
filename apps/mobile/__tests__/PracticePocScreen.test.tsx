@@ -9210,6 +9210,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-rating-range"))).toBe(
       "1087 unchanged"
     );
+    // Average solve against the player's usual pace replaces Best Streak.
+    const averageSolve = findByTestId(renderer, "sprint-result-average-solve");
+    expect(collectText(averageSolve)).toBe("Avg Solve17sUsually 24s");
+    expect(averageSolve.props.accessibilityLabel).toBe(
+      "Average solve 17 seconds, usually 24 seconds on these themes"
+    );
+    expect(() => findByTestId(renderer, "sprint-result-best-streak")).toThrow();
     expect(() => findByTestId(renderer, "sprint-result-history-trend")).toThrow();
     expect(() => findByTestId(renderer, "sprint-result-history-button")).toThrow();
     expect(() => findByTestId(renderer, "sprint-result-goal-label")).toThrow();
@@ -9234,6 +9241,10 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "session-score-left").props.accessibilityLabel)
       .toBe("Left 5");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("10 / 15");
+    // No overall clock: the Run timer counts elapsed time up.
+    const timer = findByTestId(renderer, "session-timer-block");
+    expect(timer.props.accessibilityLabel).toMatch(/^Elapsed \d\d:\d\d$/);
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("02:00");
   });
 
   it("keeps Focused Run metric labels readable in the maintained landscape rail", () => {
@@ -9259,8 +9270,10 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("practice-tactical-focus-guide");
 
     expectText(renderer, "Track your Focused Run");
-    expectText(renderer, "This Run is unrated.");
+    expectText(renderer, "There’s no overall time limit, and this Run is unrated.");
     expectText(renderer, "Unrated");
+    // The guide's header clock starts at zero and counts up.
+    expect(collectText(findByTestId(renderer, "session-timer"))).toBe("00:00");
     expect(
       collectText(findByTestId(renderer, "practice-session-guide-start"))
     ).toBe("Next");

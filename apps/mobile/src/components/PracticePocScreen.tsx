@@ -76,6 +76,7 @@ import {
   submitLineMove,
   SERVER_CURATED_THEME_PRESENTATION,
   SERVER_CURATED_THEMES,
+  sprintHasRunDeadline,
   sprintSessionGuidePlanFor,
   stepManualRating
 } from "../../../../packages/core/src/index.ts";
@@ -412,6 +413,8 @@ export type SprintRulesDesignPreview = {
   initialResultState?: SprintState;
   resultReplayItems?: readonly SprintResultReplayDesignItem[];
   resultUnclearSummary?: SprintResultUnclearSummaryPresentation;
+  /** Focused Run pace for a design-preview result, in seconds. */
+  resultFocusedRunPace?: { averageSolveSeconds?: number; usualSolveSeconds?: number };
   showRunEditorSummary?: boolean;
   showSettingsReset?: boolean;
   timeoutCountsAsMistake?: boolean;
@@ -1342,6 +1345,13 @@ export function PracticePocScreen({
     }
     return service.getSprintResultSummary(state);
   }, [aggregateRevision, isFinished, service, sprintRulesDesignPreview?.initialResultState, state]);
+  const focusedRunUsualSolveSeconds = useMemo<number | undefined>(() => {
+    void aggregateRevision;
+    if (!isFinished || !state?.config.tacticalFocus) {
+      return undefined;
+    }
+    return service.getFocusedRunUsualSolveSeconds(state.config);
+  }, [aggregateRevision, isFinished, service, state]);
   const storedSprintReplayItems = useMemo<SessionReplayItem[]>(() => {
     void aggregateRevision;
     if (
@@ -1548,7 +1558,9 @@ export function PracticePocScreen({
         ? new Date(state.currentPuzzle.replyDeadlineAt).getTime()
         : null;
     const replyDeadlineReached = replyDeadlineMs !== null && nowMs >= replyDeadlineMs;
-    const sprintDeadlineReached = !opponentReplyClocksPaused && nowMs >= sprintDeadlineMs;
+    const sprintDeadlineReached = !opponentReplyClocksPaused
+      && sprintHasRunDeadline(state.config)
+      && nowMs >= sprintDeadlineMs;
     const puzzleDeadlineReached =
       !opponentReplyClocksPaused &&
       puzzleDeadlineMs !== null &&
@@ -2273,9 +2285,10 @@ export function PracticePocScreen({
         undefined,
         pendingStart,
         {
-          durationLabel: formatSprintDurationLabel(
-            prepared.prepared.config.durationSeconds
-          ),
+          // A new Focused Run is untimed; its header clock counts up from zero.
+          durationLabel: prepared.prepared.config.runClock === "untimed"
+            ? formatDuration(0)
+            : formatSprintDurationLabel(prepared.prepared.config.durationSeconds),
           focusedRun: true,
           maxAttempts: prepared.prepared.config.maxAttempts,
           maxMistakes: prepared.prepared.config.maxMistakes,
@@ -4129,7 +4142,24 @@ export function PracticePocScreen({
   const remainingMs = state
     ? Math.max(0, new Date(state.deadlineAt).getTime() - effectiveSessionNowMs)
     : 0;
-  const timerText = formatDuration(Math.max(0, Math.floor(remainingMs / 1000)));
+  // An untimed Focused Run has no Run deadline, so its clock counts up. It
+  // keeps counting through an Arrow Duel reply, which only pauses countdowns.
+  const isUntimedRun = state?.config.runClock === "untimed";
+  const untimedRunElapsedMs = state && isUntimedRun
+    ? Math.max(
+        0,
+        (state.completedAt
+          ? new Date(state.completedAt).getTime()
+          : state.status === "paused" && state.pausedAt
+            ? new Date(state.pausedAt).getTime()
+            : nowMs) -
+          new Date(state.startedAt).getTime() -
+          (state.totalPausedMs ?? 0)
+      )
+    : 0;
+  const timerText = formatDuration(Math.max(0, Math.floor(
+    (isUntimedRun ? untimedRunElapsedMs : remainingMs) / 1000
+  )));
   const arrowDuelReplySecondsRemaining =
     arrowDuelReplyChallengePreviewVisible
       ? arrowDuelReplySeconds
@@ -5551,7 +5581,13 @@ export function PracticePocScreen({
                         sprintGuidanceEnabled
                         || sprintRulesDesignPreview?.initialResultState !== undefined
                       }
-                      elapsedMs={Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
+                      elapsedMs={isUntimedRun
+                        ? untimedRunElapsedMs
+                        : Math.min(sprintElapsedMs, state ? state.config.durationSeconds * 1000 : sprintElapsedMs)}
+                      usualSolveSeconds={focusedRunUsualSolveSeconds
+                        ?? sprintRulesDesignPreview?.resultFocusedRunPace?.usualSolveSeconds}
+                      averageSolveSeconds={storedSprintResultSummary?.averageSolveSeconds
+                        ?? sprintRulesDesignPreview?.resultFocusedRunPace?.averageSolveSeconds}
                       unclearPrompt={unclearPrompt}
                       unclearSummary={
                         sprintRulesDesignPreview?.resultUnclearSummary
@@ -6915,6 +6951,7 @@ function sessionGuideDemoState(
         ? {
             maxAttempts: presentation.maxAttempts ?? presentation.targetCorrect,
             ratingPolicy: "unrated" as const,
+            runClock: "untimed" as const,
             tacticalFocus: {
               taskFamily: mode === "arrow_duel" ? "arrow_duel" as const : "line" as const,
               themes: ["fork"],
@@ -10117,7 +10154,7 @@ function SessionStatusBar({
         </View>
         {isPersonalBest ? null : (
           <View
-            accessibilityLabel={`Timer ${timerText}`}
+            accessibilityLabel={state.config.runClock === "untimed" ? `Elapsed ${timerText}` : `Timer ${timerText}`}
             style={styles.sessionMetricBlock}
             testID="session-timer-block"
           >
@@ -10364,6 +10401,8 @@ function SprintSummary({
   unclearSummary,
   replayItems,
   resultSummary,
+  averageSolveSeconds,
+  usualSolveSeconds,
   onToggleUnclear,
   onReplay,
   onBack,
@@ -10378,6 +10417,10 @@ function SprintSummary({
   unclearSummary?: SprintResultUnclearSummaryPresentation;
   replayItems?: readonly SprintResultReplayDesignItem[];
   resultSummary?: SprintResultSummary;
+  /** This Run's average solve time, in seconds. */
+  averageSolveSeconds?: number;
+  /** The player's usual solve time on a Focused Run's themes, when known. */
+  usualSolveSeconds?: number;
   onToggleUnclear: () => void;
   onReplay: () => void;
   onBack: () => void;
@@ -10547,12 +10590,33 @@ function SprintSummary({
           <Text style={styles.resultMetricLabel}>Time</Text>
           <Text style={styles.resultMetricValue}>{formatDuration(Math.floor(elapsedMs / 1000))}</Text>
         </View>
-        <View style={styles.resultMetric} testID="sprint-result-best-streak">
-          <Text style={styles.resultMetricLabel}>Best Streak</Text>
-          <Text style={styles.resultMetricValue}>
-            {state.bestStreak}
-          </Text>
-        </View>
+        {isTacticalFocus ? (
+          <View
+            accessibilityLabel={focusedRunPaceAccessibilityLabel(
+              averageSolveSeconds,
+              usualSolveSeconds
+            )}
+            style={styles.resultMetric}
+            testID="sprint-result-average-solve"
+          >
+            <Text style={styles.resultMetricLabel}>Avg Solve</Text>
+            <Text style={styles.resultMetricValue}>
+              {formatSolveSeconds(averageSolveSeconds)}
+            </Text>
+            {usualSolveSeconds === undefined ? null : (
+              <Text style={styles.resultMetricSubtext} testID="sprint-result-usual-solve">
+                Usually {formatSolveSeconds(usualSolveSeconds)}
+              </Text>
+            )}
+          </View>
+        ) : (
+          <View style={styles.resultMetric} testID="sprint-result-best-streak">
+            <Text style={styles.resultMetricLabel}>Best Streak</Text>
+            <Text style={styles.resultMetricValue}>
+              {state.bestStreak}
+            </Text>
+          </View>
+        )}
       </View>
 
       {resolvedUnclearSummary && unclearCount > 0 ? (
@@ -10674,6 +10738,23 @@ function ResultHistoryShortcut({
       </View>
     </Pressable>
   );
+}
+
+function formatSolveSeconds(seconds: number | undefined): string {
+  return seconds === undefined ? "—" : `${Math.round(seconds)}s`;
+}
+
+function focusedRunPaceAccessibilityLabel(
+  averageSolveSeconds: number | undefined,
+  usualSolveSeconds: number | undefined
+): string {
+  if (averageSolveSeconds === undefined) {
+    return "Average solve time unavailable";
+  }
+  const average = `Average solve ${Math.round(averageSolveSeconds)} seconds`;
+  return usualSolveSeconds === undefined
+    ? average
+    : `${average}, usually ${Math.round(usualSolveSeconds)} seconds on these themes`;
 }
 
 function SprintResultStatusGlyph({ status }: { status: "won" | "failed" }): React.JSX.Element {
