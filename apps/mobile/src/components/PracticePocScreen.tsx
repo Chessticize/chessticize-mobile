@@ -17939,7 +17939,6 @@ const useStyles = makeStyles((theme) => ({
   // Ratings form one right-aligned, muted column; selection is shown by the
   // row tint, so no trailing check shifts a selected rating.
   homeRowRating: {
-    minWidth: 44,
     textAlign: "right"
   },
   homeRowSelected: {
