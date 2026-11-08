@@ -17,8 +17,7 @@ import { LUCIDE_ICONS, type LucideIconName } from "../visualDirection/lucideIcon
 import {
   presentSprintResult,
   type SprintResultPrototypeData,
-  type StatColumn,
-  type ZeroReviewVariant
+  type StatColumn
 } from "./sprintResultPresentation.ts";
 
 // React Native scales text uniformly by the system font scale; the browser
@@ -52,10 +51,9 @@ export function LabTextSize({
   );
 }
 
-// A display numeral for the hero score. It caps its growth (native would set
-// maxFontSizeMultiplier) so the score never pushes the result off screen. The
-// navigation title and the hero's glyphs cap the same way.
-const HERO_NUMERAL = { fontSize: 56, lineHeight: 64 } as const;
+// The hero score uses the `display` type token and caps its growth at 1.5x
+// (native sets maxFontSizeMultiplier) so it never pushes the result off
+// screen. The navigation title and the hero's glyphs cap the same way.
 const CAPPED_SCALE = 1.5;
 const CONTENT_MAX_WIDTH = 560;
 const SPLIT_DETAILS_MAX_WIDTH = 400;
@@ -68,13 +66,11 @@ const STAT_COLUMN_MIN_WIDTH = 112;
 export function SprintResultPrototype({
   data,
   initialInfoOpen = false,
-  initialMarkedUnclear = false,
-  zeroReview = "hidden"
+  initialMarkedUnclear = false
 }: {
   data: SprintResultPrototypeData;
   initialInfoOpen?: boolean;
   initialMarkedUnclear?: boolean;
-  zeroReview?: ZeroReviewVariant;
 }): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
@@ -129,7 +125,6 @@ export function SprintResultPrototype({
         markedUnclear={markedUnclear}
         result={result}
         stacked={layout.isLargeText}
-        zeroReview={zeroReview}
         onMarkUnclear={() => setMarkedUnclear(true)}
         onToggleInfo={() => setInfoOpen((open) => !open)}
       />
@@ -139,8 +134,7 @@ export function SprintResultPrototype({
     <View onLayout={measure("actions")} style={styles.actions} testID="sprint-result-redesign-actions">
       {result.showReplayMistakes ? (
         <Button
-          accessibilityLabel={result.replayMistakesAccessibilityLabel}
-          label="Replay mistakes"
+          label={result.replayMistakesLabel}
           stretch
           testID="sprint-result-redesign-replay-mistakes"
           variant="secondary"
@@ -300,9 +294,9 @@ function ResultHero({
   }[result.outcomeTone];
   const heroScale = Math.min(fontScale, CAPPED_SCALE);
   const heroNumeral: TextStyle = {
-    ...theme.typography.numeralLarge,
-    fontSize: HERO_NUMERAL.fontSize * heroScale,
-    lineHeight: HERO_NUMERAL.lineHeight * heroScale
+    ...baseTypography.display,
+    fontSize: baseTypography.display.fontSize * heroScale,
+    lineHeight: baseTypography.display.lineHeight * heroScale
   };
   const [solved, target] = result.scoreLabel.split(" / ");
   const badge = (
@@ -489,7 +483,6 @@ function ReviewArea({
   markedUnclear,
   result,
   stacked,
-  zeroReview,
   onMarkUnclear,
   onToggleInfo
 }: {
@@ -499,7 +492,6 @@ function ReviewArea({
   markedUnclear: boolean;
   result: ReturnType<typeof presentSprintResult>;
   stacked: boolean;
-  zeroReview: ZeroReviewVariant;
   onMarkUnclear: () => void;
   onToggleInfo: () => void;
 }): React.JSX.Element | null {
@@ -593,17 +585,9 @@ function ReviewArea({
     }
   }
 
+  // Owner decision: with nothing to review the section is hidden entirely.
   if (rows.length === 0) {
-    return zeroReview === "line" ? (
-      <AppText
-        style={styles.centeredText}
-        testID="sprint-result-redesign-nothing-to-review"
-        tone="secondary"
-        variant="footnote"
-      >
-        Nothing to review
-      </AppText>
-    ) : null;
+    return null;
   }
 
   return (

@@ -46,8 +46,6 @@ export type SprintResultPrototypeData = {
   unclearPrompt?: { question: string };
 };
 
-export type ZeroReviewVariant = "hidden" | "line";
-
 export type StatColumn = {
   key: "rating" | "time" | "streak" | "pace";
   label: string;
@@ -81,7 +79,8 @@ export type SprintResultPresentation = {
   } | null;
   primaryActionLabel: string;
   showReplayMistakes: boolean;
-  replayMistakesAccessibilityLabel: string;
+  /** "Replay N mistakes": only the mistakes, while the review row replays everything to review. */
+  replayMistakesLabel: string;
 };
 
 const MINUS = "−";
@@ -217,9 +216,9 @@ export function presentSprintResult(
         label: "Avg solve",
         value: `${data.pace.averageSolveSeconds}s`,
         valueTone: "primary",
-        detail: data.pace.usualSolveSeconds === undefined
-          ? undefined
-          : `Usually ${data.pace.usualSolveSeconds}s`,
+        ...(data.pace.usualSolveSeconds === undefined
+          ? {}
+          : { detail: `Usually ${data.pace.usualSolveSeconds}s` }),
         accessibilityLabel: `Average solve ${data.pace.averageSolveSeconds} seconds${
           data.pace.usualSolveSeconds === undefined
             ? ""
@@ -258,6 +257,6 @@ export function presentSprintResult(
       : null,
     primaryActionLabel: isFocusedRun ? "Back to Practice" : "Play again",
     showReplayMistakes: data.mistakeCount > 0,
-    replayMistakesAccessibilityLabel: `Replay only the ${plural(data.mistakeCount, "mistake", "mistakes")}`
+    replayMistakesLabel: `Replay ${plural(data.mistakeCount, "mistake", "mistakes")}`
   };
 }

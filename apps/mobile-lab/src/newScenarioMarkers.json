@@ -79,19 +79,11 @@
       }
     ]
   },
-  "sprint-result-redesign-zero-review-hidden": {
+  "sprint-result-redesign-zero-review": {
     "issues": [
       {
         "issueNumber": 609,
-        "changeNote": "Sprint Result redesign: nothing to review, variant A hides the section."
-      }
-    ]
-  },
-  "sprint-result-redesign-zero-review-line": {
-    "issues": [
-      {
-        "issueNumber": 609,
-        "changeNote": "Sprint Result redesign: nothing to review, variant B shows a Nothing to review line."
+        "changeNote": "Sprint Result redesign: with nothing to review the section is hidden (owner-chosen variant A)."
       }
     ]
   },

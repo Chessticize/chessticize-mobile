@@ -24,7 +24,8 @@ test("the review row counts the Unclear and In Review union once and explains it
     "Replaying them does not change when they come back in Review."
   ]);
   assert.equal(result.showReplayMistakes, true);
-  assert.equal(result.replayMistakesAccessibilityLabel, "Replay only the 2 mistakes");
+  assert.equal(result.replayMistakesLabel, "Replay 2 mistakes");
+  assert.equal(presentSprintResult(SPRINT_RESULT_FIXTURES.failedTime).replayMistakesLabel, "Replay 1 mistake");
 });
 
 test("a run with nothing to review has no review row and no Replay mistakes", () => {

@@ -182,7 +182,8 @@ export type TypeRole =
   | "caption"
   | "numeral"
   | "numeralLarge"
-  | "numeralRow";
+  | "numeralRow"
+  | "display";
 
 export type TypeStyle = {
   fontSize: number;

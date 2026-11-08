@@ -70,6 +70,7 @@ export const FailedTimeRanOut: Story = {
     await waitForText(canvasElement, "Was the final puzzle unclear?");
     await waitForTestId(canvasElement, "sprint-result-redesign-mark-unclear");
     await waitForText(canvasElement, "1 to review");
+    await expectTestIdText(canvasElement, "sprint-result-redesign-replay-mistakes", "Replay 1 mistake");
   }
 };
 
@@ -100,7 +101,7 @@ export const ReviewAndMistakes: Story = {
     await expectHeroAndStats(canvasElement, "15 / 15", "Sprint passed");
     await waitForText(canvasElement, "3 to review");
     await waitForTestId(canvasElement, "sprint-result-redesign-review-info");
-    await waitForTestId(canvasElement, "sprint-result-redesign-replay-mistakes");
+    await expectTestIdText(canvasElement, "sprint-result-redesign-replay-mistakes", "Replay 2 mistakes");
     expectTestIdAbsent(canvasElement, "sprint-result-redesign-review-explanation");
   }
 };
@@ -115,23 +116,14 @@ export const ReviewExplanation: Story = {
   }
 };
 
-export const ZeroReviewHidden: Story = {
-  name: "Zero review · A hidden",
-  args: { data: SPRINT_RESULT_FIXTURES.zeroReview, zeroReview: "hidden" },
+// Owner decision: with nothing to review, the review section is hidden entirely.
+export const ZeroReview: Story = {
+  name: "Zero review",
+  args: { data: SPRINT_RESULT_FIXTURES.zeroReview },
   play: async ({ canvasElement }: Canvas) => {
     await expectHeroAndStats(canvasElement, "15 / 15", "Sprint passed");
     expectTestIdAbsent(canvasElement, "sprint-result-redesign-review");
-    expectTestIdAbsent(canvasElement, "sprint-result-redesign-nothing-to-review");
-  }
-};
-
-export const ZeroReviewLine: Story = {
-  name: "Zero review · B Nothing to review",
-  args: { data: SPRINT_RESULT_FIXTURES.zeroReview, zeroReview: "line" },
-  play: async ({ canvasElement }: Canvas) => {
-    await expectHeroAndStats(canvasElement, "15 / 15", "Sprint passed");
-    expectTestIdAbsent(canvasElement, "sprint-result-redesign-review");
-    await expectTestIdText(canvasElement, "sprint-result-redesign-nothing-to-review", "Nothing to review");
+    expectTestIdAbsent(canvasElement, "sprint-result-redesign-replay-mistakes");
   }
 };
 
