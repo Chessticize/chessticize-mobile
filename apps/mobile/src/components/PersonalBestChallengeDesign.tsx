@@ -267,7 +267,10 @@ export function PersonalBestChallengeHub({
   const styles = useStyles();
   const theme = useTheme();
   const rowStyle = useListRowStyle();
-  const { width: viewportWidth } = useWindowDimensions();
+  const { fontScale, width: viewportWidth } = useWindowDimensions();
+  // Level cards widen with Dynamic Type so labels such as "Recommended" wrap
+  // the grid onto more rows instead of breaking mid-word.
+  const levelCardMinWidth = { minWidth: Math.round(96 * Math.max(1, fontScale)) };
   const initialType = initialSelection?.challengeType ?? presentation.challengeType ?? "puzzle";
   const [challengeType, setChallengeType] = React.useState<PersonalBestChallengeType>(initialType);
   const pausedRuns = presentation.pausedRuns ?? [];
@@ -604,6 +607,7 @@ export function PersonalBestChallengeHub({
                     accessibilityState={{ selected }}
                     style={({ pressed }) => [
                       styles.levelCard,
+                      levelCardMinWidth,
                       selected ? styles.selectedFill : null,
                       pressed && !selected ? styles.pressed : null
                     ]}
