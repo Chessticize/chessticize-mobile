@@ -6674,6 +6674,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "session-abandon");
 
     const confirmation = findByTestId(renderer, "session-abandon-confirmation");
+    expect(collectText(confirmation)).toContain("This ends the Sprint and records it as abandoned.");
     // Out of flow: it is anchored below the HUD it belongs to and drawn above
     // the prompt, board and counts that follow, so none of them move.
     expect(flattenTestStyle(confirmation.props.style)).toEqual(expect.objectContaining({

@@ -476,7 +476,7 @@ export function SessionStatusBar({
             <Text style={styles.helperText}>
               {isTacticalFocus
                 ? "This ends the Focused Run. Completed puzzles stay in History and your Rating stays unchanged."
-                : "This ends the run and records a failed sprint."}
+                : "This ends the Sprint and records it as abandoned."}
             </Text>
           </View>
           <View

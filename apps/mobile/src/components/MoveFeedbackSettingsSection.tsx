@@ -69,7 +69,7 @@ export function MoveFeedbackSettingsSection({
       />
       <View style={styles.separator} />
       <FeedbackToggleRow
-        detail="Light touch feedback for moves and captures."
+        detail="Touch feedback for moves, captures, and controls."
         enabled={preferences.hapticsEnabled}
         label="Haptic feedback"
         controlTestID="settings-move-haptics-toggle"
