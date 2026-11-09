@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { formatCompactDuration, modeLabel } from "../shared/practiceUtils.ts";
+import { formatCompactDuration, modeLabel, STACKED_ACTIONS_FONT_SCALE } from "../shared/practiceUtils.ts";
 import type { SprintMode, SprintState } from "../../../../../../packages/core/src/index.ts";
 import type { PersonalBestChallengeDesignPreview } from "../../PersonalBestChallengeDesign.tsx";
 import { usePracticeViewport } from "../../PracticeViewport.tsx";
@@ -178,6 +178,10 @@ export function SessionStatusBar({
   // safety net.
   const { fontScale } = usePracticeViewport();
   const stacksTimer = compactMetrics && fontScale >= HUD_LARGE_TEXT_FONT_SCALE;
+  // At large text the leave sheets stack their buttons full width, and the
+  // abandon confirmation stacks its copy above them.
+  const stacksLeaveActions = fontScale >= STACKED_ACTIONS_FONT_SCALE;
+  const stacksLeaveConfirmation = stackLeaveConfirmation || stacksLeaveActions;
   const [metricsWidth, setMetricsWidth] = useState<number | null>(null);
   const progressText = isPersonalBest
     ? `${state.correctCount} solved`
@@ -415,12 +419,18 @@ export function SessionStatusBar({
               Your puzzle is hidden. Resume here, or leave it paused and continue any time.
             </Text>
           </View>
-          <View style={styles.survivalExitPrimaryActions}>
+          <View
+            style={[
+              styles.survivalExitPrimaryActions,
+              stacksLeaveActions ? styles.leaveActionsStacked : null
+            ]}
+          >
             <Button
               accessibilityLabel="Leave Survival paused"
               label="Leave paused"
               size="compact"
-              style={styles.survivalExitAction}
+              stretch={stacksLeaveActions}
+              style={stacksLeaveActions ? null : styles.survivalExitAction}
               testID="personal-best-pause-and-leave"
               variant="secondary"
               onPress={() => {
@@ -432,7 +442,8 @@ export function SessionStatusBar({
               accessibilityLabel="Resume Survival"
               label="Resume"
               size="compact"
-              style={styles.survivalExitAction}
+              stretch={stacksLeaveActions}
+              style={stacksLeaveActions ? null : styles.survivalExitAction}
               testID="session-abandon-cancel"
               onPress={() => {
                 onResume?.();
@@ -446,7 +457,7 @@ export function SessionStatusBar({
           style={[
             styles.sessionLeaveConfirmationOverlay,
             styles.sessionAbandonConfirm,
-            stackLeaveConfirmation ? styles.sessionAbandonConfirmStacked : null,
+            stacksLeaveConfirmation ? styles.sessionAbandonConfirmStacked : null,
             leaveConfirmationMinHeight === undefined
               ? null
               : { minHeight: leaveConfirmationMinHeight }
@@ -456,7 +467,7 @@ export function SessionStatusBar({
           <View
             style={[
               styles.sessionAbandonCopy,
-              stackLeaveConfirmation ? styles.sessionAbandonCopyStacked : null
+              stacksLeaveConfirmation ? styles.sessionAbandonCopyStacked : null
             ]}
           >
             <Text style={styles.listText}>
@@ -471,7 +482,8 @@ export function SessionStatusBar({
           <View
             style={[
               styles.sessionAbandonActions,
-              stackLeaveConfirmation ? styles.sessionAbandonActionsStacked : null
+              stacksLeaveConfirmation ? styles.sessionAbandonActionsStacked : null,
+              stacksLeaveActions ? styles.leaveActionsStacked : null
             ]}
           >
             <Button
@@ -480,6 +492,7 @@ export function SessionStatusBar({
                 : "Cancel abandon sprint"}
               label="Cancel"
               size="compact"
+              stretch={stacksLeaveActions}
               testID="session-abandon-cancel"
               variant="secondary"
               onPress={() => onConfirmAbandonChange(false)}
@@ -490,6 +503,7 @@ export function SessionStatusBar({
                 : "Confirm abandon sprint"}
               label="Abandon"
               size="compact"
+              stretch={stacksLeaveActions}
               testID="session-abandon-confirm"
               variant="destructive"
               onPress={() => {
@@ -771,6 +785,9 @@ const useStyles = makeStyles((theme) => ({
   },
   sessionAbandonActionsStacked: {
     justifyContent: "flex-end"
+  },
+  leaveActionsStacked: {
+    flexDirection: "column"
   },
   sessionAbandonActions: {
     flexDirection: "row",

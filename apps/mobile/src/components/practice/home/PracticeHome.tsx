@@ -23,7 +23,7 @@ import {
 import type { PracticeProgressSummary } from "../../../../../../packages/storage/src/rating-history.ts";
 import type { PracticeRunManagementPresentation, PracticeRunPresentation } from "../../practiceRunPresentation.ts";
 import type { TacticalProfilePresentation } from "../../tacticalProfilePresentation.ts";
-import { formatSprintTimingLabel, modeLabel, safeTestId } from "../shared/practiceUtils.ts";
+import { formatSprintTimingLabel, modeLabel, safeTestId, STACKED_ACTIONS_FONT_SCALE } from "../shared/practiceUtils.ts";
 import { PracticeProgressCard } from "../shared/PracticeProgressCard.tsx";
 import { TacticalProfileHomeCard } from "../../TacticalProfileSection.tsx";
 import { makeStyles, useTheme } from "../../../theme/index.ts";
@@ -1908,6 +1908,8 @@ export function PausedSessionPanel({
   state: SprintState;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { fontScale } = usePracticeViewport();
+  const stackActions = fontScale >= STACKED_ACTIONS_FONT_SCALE;
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
   const completedCount = state.correctCount + state.mistakeCount;
   const remaining = Math.max(
@@ -1935,13 +1937,14 @@ export function PausedSessionPanel({
             : `${modeLabel(state.config.mode)} · ${state.correctCount} solved · ${remaining} left · ${state.mistakeCount} mistakes`}
         </Text>
       </View>
-      <View style={styles.pausedSessionActions}>
+      <View style={[styles.pausedSessionActions, stackActions ? styles.pausedSessionActionsStacked : null]}>
         <Button
           accessibilityLabel={isTacticalFocus
             ? "Abandon paused Focused Run"
             : "Abandon paused sprint"}
           label="Abandon"
           size="compact"
+          stretch={stackActions}
           testID="paused-session-abandon"
           variant="secondary"
           onPress={onAbandon}
@@ -1952,7 +1955,8 @@ export function PausedSessionPanel({
             : "Resume paused sprint"}
           label="Resume"
           size="compact"
-          style={styles.pausedSessionResume}
+          stretch={stackActions}
+          style={stackActions ? null : styles.pausedSessionResume}
           testID="paused-session-resume"
           onPress={onResume}
         />
@@ -2464,6 +2468,9 @@ const useStyles = makeStyles((theme) => ({
   },
   pausedSessionResume: {
     flex: 1
+  },
+  pausedSessionActionsStacked: {
+    flexDirection: "column"
   },
   pausedSessionActions: {
     flexDirection: "row",

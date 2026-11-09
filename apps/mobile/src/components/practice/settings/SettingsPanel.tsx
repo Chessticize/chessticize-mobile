@@ -64,7 +64,14 @@ import { AppModal } from "../../AppModal.tsx";
 import type { PracticeService } from "../../../../../../packages/storage/src/practice-service.ts";
 import { ChevronGlyph, CloseGlyph } from "../shared/Glyphs.tsx";
 import { normalizeUci } from "../../../backend/premove.ts";
-import { ANALYSIS_DEPTH, errorMessage, FABRIC_SAFE_HIDDEN_TEXT_STYLE, safeTestId } from "../shared/practiceUtils.ts";
+import {
+  ANALYSIS_DEPTH,
+  errorMessage,
+  FABRIC_SAFE_HIDDEN_TEXT_STYLE,
+  safeTestId,
+  STACKED_ACTIONS_FONT_SCALE
+} from "../shared/practiceUtils.ts";
+import { usePracticeViewport } from "../../PracticeViewport.tsx";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 
 const LICHESS_PUZZLE_DATABASE_URL = "https://database.lichess.org/#puzzles";
@@ -722,17 +729,20 @@ export function ReviewReminderPermissionPrompt({
   onEnable: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { fontScale } = usePracticeViewport();
+  const stackActions = fontScale >= STACKED_ACTIONS_FONT_SCALE;
   return (
     <View style={styles.reviewReminderPrompt} testID="review-reminder-permission-prompt">
       <View style={styles.reviewReminderPromptCopy}>
         <Text style={styles.sectionLabel}>Review reminders</Text>
         <Text style={styles.helperText}>Get a local reminder when missed puzzles are ready again.</Text>
       </View>
-      <View style={styles.confirmationActionRow}>
+      <View style={[styles.confirmationActionRow, stackActions ? styles.confirmationActionsStacked : null]}>
         <Button
           accessibilityLabel="Dismiss review reminder permission prompt"
           label="Not Now"
           size="compact"
+          stretch={stackActions}
           testID="review-reminder-permission-dismiss"
           variant="secondary"
           onPress={onDismiss}
@@ -741,6 +751,7 @@ export function ReviewReminderPermissionPrompt({
           accessibilityLabel="Enable review reminders"
           label="Enable"
           size="compact"
+          stretch={stackActions}
           testID="review-reminder-permission-enable"
           onPress={onEnable}
         />
@@ -1936,6 +1947,9 @@ const useStyles = makeStyles((theme) => ({
     flex: 1,
     gap: 2,
     minWidth: 180
+  },
+  confirmationActionsStacked: {
+    flexDirection: "column"
   },
   confirmationActionRow: {
     flexDirection: "row",
