@@ -896,6 +896,15 @@ footer {
     background: white;
   }
 
+  .notice .notice-lead .button-primary {
+    color: #071735;
+  }
+
+  .skip-link {
+    background: #071735;
+    color: white;
+  }
+
   .button-secondary:hover,
   .button-light:hover {
     background: #18365d;
