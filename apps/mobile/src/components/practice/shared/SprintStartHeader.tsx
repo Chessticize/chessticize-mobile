@@ -1,6 +1,11 @@
+import React from "react";
+import { Pressable, View } from "react-native";
+import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { AppText, Button, Icon } from "../../ui/index.tsx";
+
 // Close, centered title and the primary action, matching the other direction A
 // sub-screens (#609). The side slots share one width so the title stays centered.
-function SprintStartHeader({
+export function SprintStartHeader({
   actionLabel = "Start",
   closeAccessibilityLabel,
   closeTestID,
@@ -65,6 +70,7 @@ function SprintStartHeader({
   );
 }
 
+const useStyles = makeStyles((theme) => ({
   // Run editor and custom setup rows (#609 direction A, increment 3b).
   sprintHeaderSideSlotTrailing: {
     alignItems: "flex-end"
@@ -97,3 +103,4 @@ function SprintStartHeader({
   sprintScreenTitleLeading: {
     textAlign: "left"
   },
+}));

@@ -1,3 +1,29 @@
+import React, { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ALL_THEMES_FILTER,
+  type CustomThemeFilter,
+  customThemeLabel,
+  type ThemeCatalogPresentation
+} from "../shared/themeCatalog.ts";
+import { type CustomSprintConfigRecord, SERVER_CURATED_THEMES, type ThemeChoiceIntent } from "../../../../../../packages/core/src/index.ts";
+import type { PracticeProgressSummary } from "../../../../../../packages/storage/src/rating-history.ts";
+import { AppText, Icon, ListRow, Section, useListRowStyle } from "../../ui/index.tsx";
+import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { CollapsibleRegion, DisclosureChevron } from "../shared/CollapsibleRegion.tsx";
+import {
+  CUSTOM_INITIAL_RATING_MAX,
+  CUSTOM_INITIAL_RATING_MIN,
+  formatDurationLabel,
+  formatSprintTimingLabel,
+  safeTestId
+} from "../shared/practiceUtils.ts";
+import { historyRatingKeyLabel } from "../history/HistoryRatingChart.tsx";
+import { normalizeStoredThemeChoiceSelection } from "../../useThemeChoiceSelection.ts";
+import { SprintStartHeader } from "../shared/SprintStartHeader.tsx";
+import { PracticeProgressCard } from "../shared/PracticeProgressCard.tsx";
+import { StepperButton, useEditorRowLayout } from "../shared/editorControls.tsx";
+
 const CUSTOM_DURATION_OPTIONS = [3 * 60, 5 * 60, 10 * 60] as const;
 
 const CUSTOM_PER_PUZZLE_OPTIONS = [10, 20, 30] as const;
@@ -9,7 +35,7 @@ const CUSTOM_THEME_OPTIONS: ReadonlyArray<CustomThemeFilter> = [
   ...SERVER_CURATED_THEMES
 ];
 
-function CustomSprintSetup({
+export function CustomSprintSetup({
   availablePuzzleCount,
   customMode,
   durationSeconds,
@@ -192,7 +218,7 @@ function CustomEligibilityNotice({
   );
 }
 
-function CustomModeChoiceRow({
+export function CustomModeChoiceRow({
   onChange,
   testID,
   value
@@ -336,7 +362,7 @@ function CustomRatingStepper({
   );
 }
 
-function CustomValueRow({
+export function CustomValueRow({
   detail,
   label,
   testID,
@@ -373,7 +399,7 @@ function CustomValueRow({
   );
 }
 
-function CustomThemeChoiceRow({
+export function CustomThemeChoiceRow({
   onChange,
   selectedThemes,
   showDisclosure = false,
@@ -592,7 +618,7 @@ function ThemeChoiceChip({
   );
 }
 
-function CustomOptionRow<T extends number>({
+export function CustomOptionRow<T extends number>({
   label,
   onChange,
   options,
@@ -662,7 +688,7 @@ type PreviousCustomConfig = {
   rating: number;
 };
 
-function PreviousCustomConfigRow({
+export function PreviousCustomConfigRow({
   config,
   onPress
 }: {
@@ -712,7 +738,7 @@ function customThemeSelectionLabel(themes: readonly CustomThemeFilter[]): string
   return themes.map(customThemeLabel).join(", ");
 }
 
-function previousCustomConfigRowModel(
+export function previousCustomConfigRowModel(
   config: CustomSprintConfigRecord,
   rating: number
 ): PreviousCustomConfig {
@@ -746,6 +772,7 @@ function formatConfigLastPlayed(lastStartedAt: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+const useStyles = makeStyles((theme) => ({
   editorRowLabel: {
     flex: 1,
     gap: 2,
@@ -869,3 +896,4 @@ function formatConfigLastPlayed(lastStartedAt: string): string {
   historyThemeAllRow: {
     alignItems: "flex-start"
   },
+}));

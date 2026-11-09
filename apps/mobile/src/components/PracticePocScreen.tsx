@@ -12,14 +12,12 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View
 } from "react-native";
 import type {
   LayoutChangeEvent
 } from "react-native";
-import type { ViewStyle } from "react-native";
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
@@ -56,7 +54,6 @@ import {
   OPPONENT_REPLY_MAX_SECONDS,
   OPPONENT_REPLY_MIN_SECONDS,
   pauseSprint as pauseSprintState,
-  PRACTICE_RUN_NAME_MAX_LENGTH,
   RATING_FLOOR,
   resetSprintGuideProgress,
   resolvePuzzleTimingPolicy,
@@ -69,17 +66,14 @@ import {
   submitArrowDuelReply,
   submitLineMove,
   SERVER_CURATED_THEME_PRESENTATION,
-  SERVER_CURATED_THEMES,
   sprintHasRunDeadline,
-  sprintSessionGuidePlanFor,
-  stepManualRating
+  sprintSessionGuidePlanFor
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
   AttemptSource,
   ArrowDuelState,
   CurrentPuzzleState,
-  CustomSprintConfigRecord,
   EngineAnalysisLine,
   HistoryAttemptView,
   HistoryAttemptReplayAvailability,
@@ -103,7 +97,6 @@ import type {
   SprintSessionGuidePlan,
   SprintSessionGuideStep,
   TacticalProfileTaskFamily,
-  ThemeChoiceIntent,
   SprintState
 } from "../../../../packages/core/src/index.ts";
 import {
@@ -165,11 +158,6 @@ import { arePracticeTestControlsEnabled, isPracticeDebugEnabled } from "../relea
 import { isStoreAssetCaptureEnabled } from "../platform/testLaunchConfig.ts";
 import { usePracticeRunManagement } from "./usePracticeRunManagement.ts";
 import {
-  puzzleTimingEditorState,
-  updatePuzzleTimingFromEditor
-} from "./puzzleTimingEditor.ts";
-import {
-  normalizeStoredThemeChoiceSelection,
   useThemeChoiceSelection
 } from "./useThemeChoiceSelection.ts";
 import type {
@@ -336,8 +324,12 @@ import { FilterButton } from "./practice/shared/FilterButton.tsx";
 import { AttemptStatusTile } from "./practice/shared/AttemptStatusTile.tsx";
 import {
   ANALYSIS_DEPTH,
+  CUSTOM_INITIAL_RATING_MIN,
   errorMessage,
   FABRIC_SAFE_HIDDEN_TEXT_STYLE,
+  formatCompactDuration,
+  formatSprintDurationLabel,
+  formatSprintTimingLabel,
   modeLabel,
   safeTestId
 } from "./practice/shared/practiceUtils.ts";
@@ -352,8 +344,6 @@ import {
   StockfishDiagnosticsPanel
 } from "./practice/settings/SettingsPanel.tsx";
 import {
-  ALL_THEMES_FILTER,
-  type CustomThemeFilter,
   customThemeLabel,
   type CustomThemeSelection,
   type ThemeCatalogPresentation
@@ -366,7 +356,10 @@ import {
   type HistoryResultFilter,
   ThemeTagRail
 } from "./practice/history/HistoryPanel.tsx";
-import { emptyHistoryPerformance, historyRatingKeyLabel } from "./practice/history/HistoryRatingChart.tsx";
+import { emptyHistoryPerformance } from "./practice/history/HistoryRatingChart.tsx";
+import { PracticeProgressCard } from "./practice/shared/PracticeProgressCard.tsx";
+import { CustomSprintSetup } from "./practice/customSetup/CustomSprintSetup.tsx";
+import { PracticeRunEditor, RunRemovalConfirmation } from "./practice/runEditor/PracticeRunEditor.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;

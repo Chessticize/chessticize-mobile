@@ -1,4 +1,12 @@
-function PracticeProgressCard({
+import React from "react";
+import { StyleSheet, View } from "react-native";
+import type { SprintMode } from "../../../../../../packages/core/src/index.ts";
+import type { PracticeProgressSummary } from "../../../../../../packages/storage/src/rating-history.ts";
+import { AppText, Section } from "../../ui/index.tsx";
+import { modeLabel } from "./practiceUtils.ts";
+import { makeStyles } from "../../../theme/index.ts";
+
+export function PracticeProgressCard({
   currentRating,
   mode,
   progress,
@@ -55,6 +63,7 @@ function PracticeProgressCard({
   );
 }
 
+const useStyles = makeStyles((theme) => ({
   homeProgressMetrics: {
     alignItems: "flex-start",
     flexDirection: "row",
@@ -88,3 +97,4 @@ function PracticeProgressCard({
   homeToneNeutral: {
     color: theme.colors.text.tertiary
   },
+}));

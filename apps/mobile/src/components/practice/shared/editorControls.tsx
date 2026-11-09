@@ -1,5 +1,11 @@
+import React from "react";
+import { Pressable, useWindowDimensions, View, type ViewStyle } from "react-native";
+import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { Icon } from "../../ui/index.tsx";
+import { typography as baseTypography } from "../../../theme/scales.ts";
+
 // A grouped-row switch (51 x 31 pt track) with a 44 pt tall hit target.
-function EditorSwitch({
+export function EditorSwitch({
   accessibilityLabel,
   enabled,
   testID,
@@ -29,7 +35,7 @@ function EditorSwitch({
 }
 
 // One half of a stepper: a filled 36 x 32 pt button whose hit area reaches 44 pt.
-function StepperButton({
+export function StepperButton({
   accessibilityLabel,
   direction,
   disabled,
@@ -74,7 +80,7 @@ const STEPPER_HIT_SLOP = { bottom: 6, left: 4, right: 4, top: 6 };
 
 // Short numeric fields grow with the text size up to 1.5x, then cap their
 // text there, so four digits never clip inside a fixed-width field.
-const NUMERIC_FIELD_MAX_TEXT_SCALE = 1.5;
+export const NUMERIC_FIELD_MAX_TEXT_SCALE = 1.5;
 
 // Above this text scale an editor row stacks: its label spans the row and the
 // control (field, stepper or switch) sits below it, trailing.
@@ -89,7 +95,7 @@ function useEditorTextScale(): number {
   return Math.max(1, fontScale, themeScale);
 }
 
-function useEditorRowLayout(): {
+export function useEditorRowLayout(): {
   controls: ViewStyle;
   copy: ViewStyle;
   line: ViewStyle;
@@ -115,10 +121,11 @@ function useEditorRowLayout(): {
       };
 }
 
-function useNumericFieldScale(): number {
+export function useNumericFieldScale(): number {
   return Math.min(NUMERIC_FIELD_MAX_TEXT_SCALE, useEditorTextScale());
 }
 
+const useStyles = makeStyles((theme) => ({
   // Editor rows keep the copy and its control on one line; with large text
   // they stack, the copy spanning the row and the control trailing below it.
   editorInlineRow: {
@@ -171,6 +178,9 @@ function useNumericFieldScale(): number {
     justifyContent: "center",
     width: 36
   },
+  disabledButton: {
+    opacity: 0.36
+  },
   historyToggleTrack: {
     backgroundColor: theme.colors.fillMuted,
     borderRadius: 15.5,
@@ -191,3 +201,4 @@ function useNumericFieldScale(): number {
   historyToggleThumbActive: {
     transform: [{ translateX: 20 }]
   },
+}));

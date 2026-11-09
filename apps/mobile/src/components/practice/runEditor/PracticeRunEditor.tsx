@@ -1,3 +1,44 @@
+import React from "react";
+import { StyleSheet, TextInput, View } from "react-native";
+import type { PracticeRunManagementPresentation, PracticeRunPresentation } from "../../practiceRunPresentation.ts";
+import { AppText, Button, ListRow, Section, useListRowStyle } from "../../ui/index.tsx";
+import type { ThemeCatalogPresentation } from "../shared/themeCatalog.ts";
+import { makeStyles, useTheme } from "../../../theme/index.ts";
+import {
+  buildSprintConfig,
+  DEFAULT_OPPONENT_REPLY_SECONDS,
+  OPPONENT_REPLY_MAX_SECONDS,
+  PRACTICE_RUN_NAME_MAX_LENGTH,
+  RATING_FLOOR,
+  type SprintConfig,
+  stepManualRating
+} from "../../../../../../packages/core/src/index.ts";
+import { typography as baseTypography } from "../../../theme/scales.ts";
+import { puzzleTimingEditorState, updatePuzzleTimingFromEditor } from "../../puzzleTimingEditor.ts";
+import {
+  EditorSwitch,
+  NUMERIC_FIELD_MAX_TEXT_SCALE,
+  StepperButton,
+  useEditorRowLayout,
+  useNumericFieldScale
+} from "../shared/editorControls.tsx";
+import {
+  CustomModeChoiceRow,
+  CustomOptionRow,
+  CustomThemeChoiceRow,
+  CustomValueRow,
+  PreviousCustomConfigRow,
+  previousCustomConfigRowModel
+} from "../customSetup/CustomSprintSetup.tsx";
+import {
+  CUSTOM_INITIAL_RATING_MAX,
+  CUSTOM_INITIAL_RATING_MIN,
+  formatCompactDuration,
+  formatDurationLabel,
+  formatSprintDurationLabel
+} from "../shared/practiceUtils.ts";
+import { SprintStartHeader } from "../shared/SprintStartHeader.tsx";
+
 const PRACTICE_RUN_DURATION_OPTIONS = [
   3 * 60,
   5 * 60,
@@ -10,7 +51,7 @@ const PRACTICE_RUN_DURATION_OPTIONS = [
 
 const PRACTICE_RUN_PER_PUZZLE_OPTIONS = [5, 10, 15, 20, 30, 60] as const;
 
-function RunRemovalConfirmation({
+export function RunRemovalConfirmation({
   onIntent,
   run
 }: {
@@ -51,7 +92,7 @@ function RunRemovalConfirmation({
   );
 }
 
-function PracticeRunEditor({
+export function PracticeRunEditor({
   arrowDuelOpponentReplyGlobalEnabled,
   arrowDuelReplyChallenge,
   presentation,
@@ -774,6 +815,13 @@ function PracticeRunEloRow({
   );
 }
 
+const useStyles = makeStyles((theme) => ({
+  homeRowCopy: {
+    flex: 1,
+    flexShrink: 1,
+    gap: 2,
+    minWidth: 0
+  },
   homeRemovalConfirmation: {
     backgroundColor: theme.colors.surface,
     borderTopColor: theme.colors.border.default,
@@ -887,8 +935,19 @@ function PracticeRunEloRow({
     flexDirection: "column",
     gap: 6
   },
+  editorRowLabel: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0
+  },
   editorInputError: {
     borderColor: theme.colors.danger.s600
+  },
+  customSetupPanel: {
+    alignSelf: "center",
+    gap: theme.spacing.section,
+    maxWidth: 760,
+    width: "100%"
   },
   runTimingSectionCopy: {
     gap: 2,
@@ -929,8 +988,14 @@ function PracticeRunEloRow({
     minWidth: 44,
     textAlign: "center"
   },
+  customConfigValue: {
+    flexShrink: 1,
+    marginLeft: "auto",
+    textAlign: "right"
+  },
   // Still used by the run timing editor and packs panel, which have not moved
   // to the ui/ primitives yet.
   settingsSection: {
     gap: 8
   },
+}));
