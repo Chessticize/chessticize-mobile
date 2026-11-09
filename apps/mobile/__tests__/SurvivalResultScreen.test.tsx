@@ -125,16 +125,18 @@ describe("Survival result screen", () => {
       .toMatchObject({ color: lightTheme.colors.accent.s600 });
     // Like the in-Run milestone, the bar gives way once the best is passed.
     expect(has(renderer, "personal-best-result-progress")).toBe(false);
-    expect(collect(byId(renderer, "personal-best-result-summary"))).toBe("19 solved · 12:48 active · 3 sittings");
+    // The Sprint Result's summary: attempted and accuracy.
+    expect(collect(byId(renderer, "personal-best-result-summary"))).toBe("22 attempted · 86% accuracy");
     expect(collect(byId(renderer, "personal-best-result-end-reason"))).toBe("The Run ended normally after 3 mistakes.");
-    expect(collect(byId(renderer, "personal-best-result-accuracy"))).toBe("Accuracy86%");
     expect(collect(byId(renderer, "personal-best-result-active-time"))).toBe("Active time12:48");
     expect(collect(byId(renderer, "personal-best-result-best-streak"))).toBe("Best streak9");
+    expect(collect(byId(renderer, "personal-best-result-sittings"))).toBe("Sittings3");
     expect(byId(renderer, "personal-best-result-active-time").props.accessibilityLabel)
       .toBe("Active time 12 minutes 48 seconds");
-    expect(collect(byId(renderer, "personal-best-result-level"))).toBe("Puzzle · 900–999This level keeps its own best");
-    expect(collect(byId(renderer, "personal-best-result-review-detail"))).toBe("3 mistakes · Included in replay");
-    expect(collect(byId(renderer, "personal-best-result-review-count"))).toBe("3");
+    expect(byId(renderer, "personal-best-result-sittings").props.accessibilityLabel).toBe("3 sittings");
+    expect(plain(collect(byId(renderer, "personal-best-result-level")))).toBe("Puzzle · 900–999This level keeps its own best");
+    expect(collect(byId(renderer, "personal-best-result-review"))).toBe("In Review3");
+    expect(byId(renderer, "personal-best-result-review").props.accessibilityLabel).toBe("In Review, 3 mistakes");
     expect(flattenTestStyle(hostById(renderer, "personal-best-result-review-count").props.style))
       .toMatchObject({ color: lightTheme.colors.danger.s600 });
 
@@ -146,6 +148,15 @@ describe("Survival result screen", () => {
     expect(actions.onReplayMistakes).toHaveBeenCalledTimes(1);
     expect(actions.onPlayAgain).toHaveBeenCalledTimes(1);
     expect(actions.onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a level range on one line in the outcome and the level row", () => {
+    const { renderer } = renderResult(data({ endReason: "pool_cleared", level: { minRating: 2100, maxRating: 2200 } }));
+
+    // Word joiners around the en dash remove its line-break opportunity.
+    expect(collect(byId(renderer, "personal-best-result-headline"))).toBe("Perfect clear at 2100⁠–⁠2200");
+    expect(collect(byId(renderer, "personal-best-result-level"))).toContain("2100⁠–⁠2200");
+    expect(byId(renderer, "personal-best-result-outcome").props.accessibilityLabel).toBe("Perfect clear at 2100–2200");
   });
 
   it("orders the actions like the Sprint Result: Replay mistakes, the primary Play again, then Done", () => {
@@ -178,7 +189,8 @@ describe("Survival result screen", () => {
       .toMatchObject({ color: lightTheme.colors.text.tertiary });
     expect(collect(byId(renderer, "personal-best-result-comparison"))).toBe("2 short of best 8");
     expect(has(renderer, "personal-best-result-progress")).toBe(true);
-    expect(collect(byId(renderer, "personal-best-result-summary"))).toBe("6 solved · 1:34 active · 1 sitting");
+    expect(collect(byId(renderer, "personal-best-result-summary"))).toBe("9 attempted · 67% accuracy");
+    expect(byId(renderer, "personal-best-result-sittings").props.accessibilityLabel).toBe("1 sitting");
   });
 
   it("names a first score at a level without a bar toward a best", () => {
@@ -204,13 +216,13 @@ describe("Survival result screen", () => {
     expect(collect(byId(renderer, "personal-best-result-title"))).toBe("Arrow Duel Result");
     expect(byId(renderer, "personal-best-result-outcome").props.accessibilityLabel).toBe("Perfect clear at 2100–2200");
     expect(collect(byId(renderer, "personal-best-result-score"))).toBe("88,894");
-    expect(collect(byId(renderer, "personal-best-result-summary"))).toBe("All 88,894 solved · 51:12:00 active · 84 sittings");
+    expect(collect(byId(renderer, "personal-best-result-summary"))).toBe("88,895 attempted · 100% accuracy");
     expect(collect(byId(renderer, "personal-best-result-end-reason"))).toBe(
       "You cleared every available Arrow Duel in this level."
       + "Loading and selection errors never count as a clear."
     );
     expect(collect(byId(renderer, "personal-best-result"))).not.toContain("ended normally");
-    expect(collect(byId(renderer, "personal-best-result-review-detail"))).toBe("1 mistake · Included in replay");
+    expect(byId(renderer, "personal-best-result-review").props.accessibilityLabel).toBe("In Review, 1 mistake");
     expect(collect(byId(renderer, "personal-best-result-replay"))).toBe("Replay 1 mistake");
   });
 
@@ -227,16 +239,28 @@ describe("Survival result screen", () => {
     expect(has(renderer, "personal-best-result-try-again")).toBe(true);
   });
 
+  it("never truncates a long active time: the stats leave columns when a value would not fit", () => {
+    const long = data({ activeElapsedMs: (51 * 3600 + 12 * 60) * 1000 });
+    // A phone column cannot hold 51:12:00 at the column numeral size.
+    const phone = renderResult(long).renderer;
+    expect(collect(byId(phone, "personal-best-result-active-time"))).toBe("Active time51:12:00");
+    expect(flattenTestStyle(byId(phone, "personal-best-result-active-time").props.style)).toMatchObject({ flexDirection: "row" });
+    // An iPad column can.
+    const ipad = renderResult(long, { width: 1180, height: 820, insets: { top: 0, right: 0, bottom: 20, left: 0 } }).renderer;
+    expect(flattenTestStyle(byId(ipad, "personal-best-result-active-time").props.style)).toMatchObject({ flex: 1 });
+  });
+
   it("adapts its layout to phone landscape, iPad, narrow phones and the largest text size", () => {
     const portrait = renderResult(data()).renderer;
     expect(has(portrait, "personal-best-result-split")).toBe(false);
     expect(flattenTestStyle(byId(portrait, "personal-best-result-active-time").props.style)).toMatchObject({ flex: 1 });
 
-    const landscape = renderResult(data(), {
+    const landscapeViewport = {
       width: 874,
       height: 402,
       insets: { top: 0, right: 62, bottom: 21, left: 62 }
-    }).renderer;
+    };
+    const landscape = renderResult(data(), landscapeViewport).renderer;
     expect(has(landscape, "personal-best-result-split")).toBe(true);
 
     const ipad = renderResult(data(), { width: 1180, height: 820, insets: { top: 0, right: 0, bottom: 20, left: 0 } }).renderer;
@@ -250,9 +274,14 @@ describe("Survival result screen", () => {
     expect(flattenTestStyle(byId(largest, "personal-best-result-active-time").props.style).flexDirection).toBeUndefined();
     expect(byId(largest, "personal-best-result-score").props.maxFontSizeMultiplier).toBe(1.5);
     expect(byId(largest, "personal-best-result-title").props.maxFontSizeMultiplier).toBe(1.5);
-    // The In Review count moves under its copy instead of squeezing it.
-    expect(flattenTestStyle(hostById(largest, "personal-best-result-review").props.style))
-      .toMatchObject({ flexDirection: "column" });
+    // Portrait keeps the top bar fixed above the scrolling content.
+    expect(byId(largest, "personal-best-result-scroll").findAllByProps({ testID: "personal-best-result-top-bar" })).toHaveLength(0);
+
+    // Phone landscape at accessibility sizes: the top bar scrolls away with the content.
+    const largestLandscape = renderResult(data(), { ...landscapeViewport, fontScale: 3.571 }).renderer;
+    expect(has(largestLandscape, "personal-best-result-split")).toBe(false);
+    expect(byId(largestLandscape, "personal-best-result-scroll").findAllByProps({ testID: "personal-best-result-top-bar" }).length)
+      .toBeGreaterThan(0);
   });
 });
 
@@ -276,7 +305,13 @@ describe("Survival result view data", () => {
     expect(formatActiveTime(59_999)).toBe("0:59");
     expect(formatActiveTime(3_600_000)).toBe("1:00:00");
     const result = presentSurvivalResult(data({ score: 2, mistakeCount: 1, activeElapsedMs: 3_661_000 }));
-    expect(result.stats.map((stat) => stat.value)).toEqual(["67%", "1:01:01", "9"]);
-    expect(result.stats[1]?.accessibilityLabel).toBe("Active time 1 hour 1 minute 1 second");
+    expect(result.summaryParts).toEqual(["3 attempted", "67% accuracy"]);
+    expect(result.stats.map((stat) => stat.value)).toEqual(["1:01:01", "9", "3"]);
+    expect(result.stats[0]?.accessibilityLabel).toBe("Active time 1 hour 1 minute 1 second");
   });
 });
+
+/** Text as read, without the word joiners that keep level ranges on one line. */
+function plain(text: string): string {
+  return text.replaceAll("⁠", "");
+}

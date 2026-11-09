@@ -407,6 +407,7 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-personal-best-record",
     "practice-personal-best-result",
     "practice-personal-best-result-no-best",
+    "practice-personal-best-result-first-score",
     "practice-personal-best-pool-cleared",
     "practice-personal-best-records",
     "practice-first-sprint-guide",
@@ -453,6 +454,12 @@ export function sprintRulesDesignPreviewFor(
   if (scenarioId === "practice-personal-best-result") {
     return {
       initialResultState: personalBestResultState(),
+      resultReplayItems: personalBestReplayDesignItems()
+    };
+  }
+  if (scenarioId === "practice-personal-best-result-first-score") {
+    return {
+      initialResultState: personalBestFirstScoreResultState(),
       resultReplayItems: personalBestReplayDesignItems()
     };
   }
@@ -947,6 +954,19 @@ function personalBestChallengePreviewFor(
       }
     };
   }
+  if (scenarioId === "practice-personal-best-result-first-score") {
+    return {
+      ...common,
+      bestScore: 7,
+      result: {
+        activeElapsedMs: 4 * 60 * 1000 + 22 * 1000,
+        endReason: "max_mistakes",
+        isNewBest: true,
+        previousBestScore: null,
+        sittings: 1
+      }
+    };
+  }
   if (scenarioId === "practice-personal-best-pool-cleared") {
     return {
       ...common,
@@ -1070,6 +1090,17 @@ function personalBestResultState(): SprintState {
   };
 }
 
+function personalBestFirstScoreResultState(): SprintState {
+  return {
+    ...personalBestResultState(),
+    bestStreak: 4,
+    correctCount: 7,
+    currentPuzzleIndex: 9,
+    id: "personal-best-result-first-score",
+    startedAt: new Date(LAB_NOW_MS - (4 * 60 + 22) * 1000).toISOString()
+  };
+}
+
 function personalBestNoBestResultState(): SprintState {
   return {
     ...personalBestResultState(),
@@ -1089,7 +1120,7 @@ function personalBestPoolClearedState(): SprintState {
     bestStreak: 312,
     correctCount: 88_894,
     id: "personal-best-result-pool-cleared",
-    mistakeCount: 2,
+    mistakeCount: 0,
     status: "won"
   };
 }

@@ -26,30 +26,39 @@ export type SurvivalResultPresentation = {
   title: string;
   /** New bests use the product blue; every other result stays neutral. */
   tone: "best" | "neutral";
+  /** The outcome as spoken and as the plain text it shows. */
   outcomeLabel: string;
+  /** The drawn outcome: a level range never breaks across lines. */
+  outcomeDisplay: string;
   scoreLabel: string;
   scoreAccessibilityLabel: string;
   /** 0...1 toward the standing best, only while short of it. */
   progressTowardBest: number | null;
   comparison: string;
+  /** The Sprint Result's summary: attempted and accuracy. */
   summaryParts: string[];
   endReasonLines: string[];
   levelTitle: string;
+  levelTitleDisplay: string;
   levelDetail: string;
   stats: ResultStat[];
   /** The neutral In Review row, or null when the Run made no mistakes. */
-  review: { count: number; detail: string; accessibilityLabel: string } | null;
+  review: { count: number; accessibilityLabel: string } | null;
   replayMistakesLabel: string;
 };
 
 const DOT = " · ";
+// Word joiners keep "900–999" on one line: an en dash is otherwise a line
+// break opportunity.
+const WORD_JOINER = "⁠";
 
 function plural(count: number, one: string, many: string): string {
   return `${count.toLocaleString("en-US")} ${count === 1 ? one : many}`;
 }
 
-function levelLabel(level: SurvivalResultData["level"]): string {
-  return `${level.minRating}–${level.maxRating}`;
+function levelLabel(level: SurvivalResultData["level"], unbreakable = false): string {
+  const dash = unbreakable ? `${WORD_JOINER}–${WORD_JOINER}` : "–";
+  return `${level.minRating}${dash}${level.maxRating}`;
 }
 
 function challengeTypeLabel(challengeType: SurvivalResultData["challengeType"]): string {
@@ -121,14 +130,17 @@ export function presentSurvivalResult(data: SurvivalResultData): SurvivalResultP
       ? `Previous best ${previousBest.toLocaleString("en-US")}`
       : `${Math.max(0, previousBest - data.score).toLocaleString("en-US")} short of best ${previousBest.toLocaleString("en-US")}`;
 
+  const outcome = (range: string) => isPerfectClear
+    ? `Perfect clear at ${range}`
+    : data.isNewBest
+      ? `New best at ${range}`
+      : "Run complete";
+
   return {
     title: `${typeLabel} Result`,
     tone: data.isNewBest ? "best" : "neutral",
-    outcomeLabel: isPerfectClear
-      ? `Perfect clear at ${level}`
-      : data.isNewBest
-        ? `New best at ${level}`
-        : "Run complete",
+    outcomeLabel: outcome(level),
+    outcomeDisplay: outcome(levelLabel(data.level, true)),
     scoreLabel,
     scoreAccessibilityLabel: `${scoreLabel} solved`,
     // Like the in-Run meter, the bar shows the way to the standing best and
@@ -137,11 +149,7 @@ export function presentSurvivalResult(data: SurvivalResultData): SurvivalResultP
       ? Math.min(1, Math.max(0, data.score / previousBest))
       : null,
     comparison,
-    summaryParts: [
-      `${isPerfectClear ? `All ${scoreLabel}` : scoreLabel} solved`,
-      `${activeTime} active`,
-      plural(data.sittings, "sitting", "sittings")
-    ],
+    summaryParts: [`${attempts.toLocaleString("en-US")} attempted`, `${accuracy}% accuracy`],
     endReasonLines: isPerfectClear
       ? [
           `You cleared every available ${typeLabel} in this level.`,
@@ -149,15 +157,9 @@ export function presentSurvivalResult(data: SurvivalResultData): SurvivalResultP
         ]
       : [`The Run ended normally after ${plural(data.mistakeCount, "mistake", "mistakes")}.`],
     levelTitle: `${typeLabel}${DOT}${level}`,
+    levelTitleDisplay: `${typeLabel}${DOT}${levelLabel(data.level, true)}`,
     levelDetail: "This level keeps its own best",
     stats: [
-      {
-        key: "accuracy",
-        label: "Accuracy",
-        value: `${accuracy}%`,
-        valueTone: "primary",
-        accessibilityLabel: `Accuracy ${accuracy} percent`
-      },
       {
         key: "time",
         label: "Active time",
@@ -171,13 +173,19 @@ export function presentSurvivalResult(data: SurvivalResultData): SurvivalResultP
         value: data.bestStreak.toLocaleString("en-US"),
         valueTone: "primary",
         accessibilityLabel: `Best streak ${data.bestStreak}`
+      },
+      {
+        key: "sittings",
+        label: "Sittings",
+        value: data.sittings.toLocaleString("en-US"),
+        valueTone: "primary",
+        accessibilityLabel: plural(data.sittings, "sitting", "sittings")
       }
     ],
     review: data.mistakeCount > 0
       ? {
           count: data.mistakeCount,
-          detail: `${plural(data.mistakeCount, "mistake", "mistakes")}${DOT}Included in replay`,
-          accessibilityLabel: `In Review, ${plural(data.mistakeCount, "mistake", "mistakes")}, included in replay`
+          accessibilityLabel: `In Review, ${plural(data.mistakeCount, "mistake", "mistakes")}`
         }
       : null,
     replayMistakesLabel: `Replay ${plural(data.mistakeCount, "mistake", "mistakes")}`

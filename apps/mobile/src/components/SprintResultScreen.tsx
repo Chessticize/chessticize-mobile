@@ -111,6 +111,7 @@ export function SprintResultScreen({
       renderHero={({ fontScale, stacked }) => <ResultHero fontScale={fontScale} result={result} stacked={stacked} />}
       notice={notice}
       paddingInsets={paddingInsets}
+      stats={result.stats}
       onBack={actions.onBack}
       style={style}
       testID="sprint-summary-panel"

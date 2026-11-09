@@ -9311,7 +9311,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("practice-personal-best-pool-cleared");
 
     expect(collectText(findByTestId(renderer, "personal-best-result-score"))).toBe("88,894");
-    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
+    expect(findByTestId(renderer, "personal-best-result-outcome").props.accessibilityLabel).toBe(
       "Perfect clear at 2100–2200"
     );
     expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
@@ -9320,15 +9320,19 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
       "Loading and selection errors never count as a clear."
     );
-    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
-      "51:12:00 active"
+    expect(collectText(findByTestId(renderer, "personal-best-result-active-time"))).toBe(
+      "Active time51:12:00"
     );
-    expect(collectText(findByTestId(renderer, "personal-best-result"))).toContain(
-      "All 88,894 solved"
+    expect(collectText(findByTestId(renderer, "personal-best-result-sittings"))).toBe("Sittings84");
+    expect(collectText(findByTestId(renderer, "personal-best-result-summary"))).toBe(
+      "88,894 attempted · 100% accuracy"
     );
     expect(collectText(findByTestId(renderer, "personal-best-result"))).not.toContain(
       "ended normally after"
     );
+    // No mistakes: nothing in Review and nothing to replay.
+    expect(() => findByTestId(renderer, "personal-best-result-review")).toThrow();
+    expect(() => findByTestId(renderer, "personal-best-result-replay")).toThrow();
   });
 
   it("treats the third Survival mistake as a normal result and preserves the record context", () => {
@@ -9359,12 +9363,13 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "personal-best-result-end-reason"))).toBe(
       "The Run ended normally after 3 mistakes."
     );
-    expect(collectText(findByTestId(renderer, "personal-best-result-level"))).toBe(
+    expect(collectText(findByTestId(renderer, "personal-best-result-level")).replaceAll("⁠", "")).toBe(
       "Puzzle · 900–999This level keeps its own best"
     );
     expect(collectText(findByTestId(renderer, "personal-best-result-summary"))).toBe(
-      "19 solved · 12:48 active · 3 sittings"
+      "22 attempted · 86% accuracy"
     );
+    expect(collectText(findByTestId(renderer, "personal-best-result-sittings"))).toBe("Sittings3");
     expect(collectText(findByTestId(renderer, "personal-best-result-replay"))).toBe(
       "Replay 3 mistakes"
     );
@@ -9374,8 +9379,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "personal-best-result-try-again"))).toBe("Play again");
     expect(collectText(findByTestId(renderer, "personal-best-result-done"))).toBe("Done");
     expect(() => findByTestId(renderer, "personal-best-result-change-challenge")).toThrow();
-    expect(collectText(findByTestId(renderer, "personal-best-result-review-detail"))).toBe(
-      "3 mistakes · Included in replay"
+    expect(findByTestId(renderer, "personal-best-result-review").props.accessibilityLabel).toBe(
+      "In Review, 3 mistakes"
     );
     // The In Review row stays neutral; only its count is red.
     expect(flattenTestStyle(hostByTestId(renderer, "personal-best-result-review-count").props.style))

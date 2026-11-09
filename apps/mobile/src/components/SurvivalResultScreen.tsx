@@ -34,7 +34,7 @@ import { AppText, Button, Icon, ListRow, Section } from "./ui/index.tsx";
 const NUMERAL_MAX_SCALE = 2;
 
 const STAT_TEST_IDS: Record<string, string> = {
-  accuracy: "personal-best-result-accuracy",
+  sittings: "personal-best-result-sittings",
   streak: "personal-best-result-best-streak",
   time: "personal-best-result-active-time"
 };
@@ -95,7 +95,7 @@ export function SurvivalResultScreen({
       )}
       backAccessibilityLabel="Back to Practice"
       backTestID="personal-best-result-back"
-      renderDetails={({ stacked, statsLayout }) => (
+      renderDetails={({ statsLayout }) => (
         <>
           <ResultStatsCard
             columns={result.stats}
@@ -103,12 +103,13 @@ export function SurvivalResultScreen({
             testID="personal-best-result-stats"
             testIDs={STAT_TEST_IDS}
           />
-          <DetailRows result={result} stacked={stacked} />
+          <DetailRows result={result} />
         </>
       )}
       renderHero={({ fontScale, stacked }) => <SurvivalHero fontScale={fontScale} result={result} stacked={stacked} />}
       notice={notice}
       paddingInsets={paddingInsets}
+      stats={result.stats}
       onBack={onBack}
       style={style}
       testID="personal-best-result"
@@ -148,7 +149,7 @@ function SurvivalHero({
             )}
           </ResultStatusGlyph>
         )}
-        parts={[result.outcomeLabel]}
+        parts={[result.outcomeDisplay]}
         stacked={stacked}
         testIDPrefix="personal-best-result"
       />
@@ -187,14 +188,7 @@ function SurvivalHero({
   );
 }
 
-function DetailRows({
-  result,
-  stacked
-}: {
-  result: SurvivalResultPresentation;
-  stacked: boolean;
-}): React.JSX.Element {
-  const styles = useStyles();
+function DetailRows({ result }: { result: SurvivalResultPresentation }): React.JSX.Element {
   const review = result.review;
   return (
     <Section rows testID="personal-best-result-details">
@@ -202,62 +196,33 @@ function DetailRows({
         accessibilityLabel={`${result.levelTitle}. ${result.levelDetail}`}
         subtitle={result.levelDetail}
         testID="personal-best-result-level"
-        title={result.levelTitle}
+        title={result.levelTitleDisplay}
       />
       {review ? (
         // The neutral In Review row; only its count is red (Survival contract).
-        <View
-          accessible
+        <ListRow
           accessibilityLabel={review.accessibilityLabel}
-          style={[styles.row, stacked ? styles.rowStacked : null]}
           testID="personal-best-result-review"
-        >
-          <View style={styles.rowCopy}>
-            <AppText variant="headline">In Review</AppText>
-            <AppText testID="personal-best-result-review-detail" tone="secondary" variant="subheadline">
-              {review.detail}
+          title="In Review"
+          trailing={(
+            <AppText
+              maxFontSizeMultiplier={NUMERAL_MAX_SCALE}
+              numberOfLines={1}
+              testID="personal-best-result-review-count"
+              tone="negative"
+              variant="numeral"
+            >
+              {String(review.count)}
             </AppText>
-          </View>
-          <AppText
-            maxFontSizeMultiplier={NUMERAL_MAX_SCALE}
-            numberOfLines={1}
-            testID="personal-best-result-review-count"
-            tone="negative"
-            variant="numeral"
-          >
-            {String(review.count)}
-          </AppText>
-        </View>
+          )}
+        />
       ) : null}
     </Section>
   );
 }
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles(() => ({
   centeredText: {
     textAlign: "center"
-  },
-  // Rows match ListRow: at least 52 pt, 16 pt sides, 10 pt top and bottom.
-  row: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: theme.spacing.row,
-    minHeight: theme.metrics.rowMinHeight,
-    paddingHorizontal: 16,
-    paddingVertical: 10
-  },
-  // At large text sizes the count moves under the copy instead of squeezing it.
-  rowStacked: {
-    alignItems: "flex-start",
-    flexDirection: "column",
-    gap: theme.spacing.inline,
-    paddingVertical: theme.spacing.row
-  },
-  rowCopy: {
-    alignSelf: "stretch",
-    flexGrow: 1,
-    flexShrink: 1,
-    gap: 2,
-    minWidth: 0
   }
 }));

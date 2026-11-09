@@ -39,6 +39,8 @@ const SPLIT_DETAILS_FLEX = 1.2;
 // Below this column width a stat value or its detail line would wrap, so the
 // card switches to label and value rows (narrow phones).
 const STAT_COLUMN_MIN_WIDTH = 112;
+// Conservative advance of one tabular numeral glyph, as a share of the font size.
+const STAT_NUMERAL_CHARACTER_WIDTH = 0.6;
 
 export type ResultStatsLayout = "columns" | "rows" | "vertical";
 
@@ -65,6 +67,7 @@ export function ResultScreenLayout({
   notice,
   onBack,
   paddingInsets,
+  stats = [],
   style,
   testID,
   testIDPrefix,
@@ -82,6 +85,8 @@ export function ResultScreenLayout({
   onBack: () => void;
   /** Insets to pad by. Defaults to the safe area; pass zero when the parent pads. */
   paddingInsets?: ResultInsets | undefined;
+  /** The stats card's columns, so the card can leave columns when a value would not fit one. */
+  stats?: readonly ResultStat[];
   style?: StyleProp<ViewStyle>;
   testID: string;
   /** Prefix of the layout's own test IDs: `-top-bar`, `-title`, `-split`, `-scroll`, `-actions`. */
@@ -123,18 +128,37 @@ export function ResultScreenLayout({
     )
     : Math.min(CONTENT_MAX_WIDTH, contentWidth);
   const statColumnWidth = (detailsWidth - theme.spacing.row * 2) / 3;
+  // A long numeral (an active time past one hour, 51:12:00) needs a wider
+  // column than the default; values never truncate.
+  const longestStatValue = Math.max(0, ...stats.filter((stat) => !stat.valueIsWord).map((stat) => stat.value.length));
+  const statValueWidth = longestStatValue * theme.typography.numeralLarge.fontSize * STAT_NUMERAL_CHARACTER_WIDTH;
   const context: ResultScreenContext = {
     fontScale,
     stacked: layout.isLargeText,
     statsLayout: layout.isLargeText
       ? "vertical"
-      : statColumnWidth < STAT_COLUMN_MIN_WIDTH ? "rows" : "columns"
+      : statColumnWidth < Math.max(STAT_COLUMN_MIN_WIDTH, statValueWidth) ? "rows" : "columns"
   };
+  // Phone landscape at accessibility sizes has no room for a fixed bar: the
+  // top bar scrolls away with the content.
+  const barScrolls = layout.className === "compactLandscape" && layout.isLargeText;
   const horizontalInset = {
     paddingLeft: insets.left + theme.spacing.screen,
     paddingRight: insets.right + theme.spacing.screen
   };
 
+  const topBar = (barStyle: StyleProp<ViewStyle>) => (
+    <TopBar
+      backAccessibilityLabel={backAccessibilityLabel}
+      backTestID={backTestID}
+      onBack={onBack}
+      onLayout={measure("bar")}
+      style={barStyle}
+      testIDPrefix={testIDPrefix}
+      title={title}
+      trailingAction={trailingAction}
+    />
+  );
   const heroNode = renderHero(context);
   const detailsNode = <View style={styles.details}>{renderDetails(context)}</View>;
   const actionButtons = (
@@ -153,16 +177,7 @@ export function ResultScreenLayout({
           measurements from the previous size otherwise, leaving rows and
           buttons at their old heights after the user shrinks the text. */}
       <React.Fragment key={`text-scale-${fontScale}`}>
-      <TopBar
-        backAccessibilityLabel={backAccessibilityLabel}
-        backTestID={backTestID}
-        onBack={onBack}
-        onLayout={measure("bar")}
-        style={[horizontalInset, { paddingTop: insets.top + theme.spacing.group }]}
-        testIDPrefix={testIDPrefix}
-        title={title}
-        trailingAction={trailingAction}
-      />
+      {barScrolls ? null : topBar([horizontalInset, { paddingTop: insets.top + theme.spacing.group }])}
       {usesSplit ? (
         // Phone landscape: the hero stays put on the left while the details
         // and actions scroll on the right; both center in their pane.
@@ -189,6 +204,7 @@ export function ResultScreenLayout({
           style={styles.scroll}
           testID={`${testIDPrefix}-scroll`}
         >
+          {barScrolls ? topBar([styles.scrolledTopBar, { paddingTop: insets.top }]) : null}
           <View style={styles.column}>
             <View onLayout={measure("body")} style={styles.column}>
               {notice}
@@ -589,6 +605,10 @@ const useStyles = makeStyles((theme) => ({
   },
   scrollContentCentered: {
     justifyContent: "center"
+  },
+  scrolledTopBar: {
+    alignSelf: "stretch",
+    marginBottom: theme.spacing.screen
   },
   column: {
     gap: theme.spacing.section,

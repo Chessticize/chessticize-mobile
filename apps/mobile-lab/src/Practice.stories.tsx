@@ -1192,14 +1192,9 @@ export const PersonalBestResult: Story = {
     await expectTestIdText(canvasElement, "personal-best-result-score", "19");
     await expectTestIdText(canvasElement, "personal-best-result-comparison", "Previous best 18");
     await waitForTestId(canvasElement, "personal-best-result-trophy");
-    await waitForText(canvasElement, "New best at 900–999");
-    await waitForText(canvasElement, "19 solved · 12:48 active · 3 sittings");
-    await waitForTestId(canvasElement, "personal-best-result-review");
-    await expectTestIdText(
-      canvasElement,
-      "personal-best-result-review-detail",
-      "3 mistakes · Included in replay"
-    );
+    expectOutcomeLabel(canvasElement, "New best at 900–999");
+    await expectTestIdText(canvasElement, "personal-best-result-summary", "22 attempted · 86% accuracy");
+    await expectTestIdText(canvasElement, "personal-best-result-review", "In Review3");
     await expectTestIdText(canvasElement, "personal-best-result-replay", "Replay 3 mistakes");
     await expectTestIdText(canvasElement, "personal-best-result-try-again", "Play again");
     await waitForTestId(canvasElement, "personal-best-result-back");
@@ -1208,6 +1203,28 @@ export const PersonalBestResult: Story = {
     expectTestIdAbsent(canvasElement, "personal-best-result-progress");
   }
 };
+
+export const SurvivalResultFirstScore: Story = {
+  name: "Survival · first score",
+  args: { scenarioId: "practice-personal-best-result-first-score" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "personal-best-result");
+    await expectTestIdText(canvasElement, "personal-best-result-score", "7");
+    await expectTestIdText(canvasElement, "personal-best-result-comparison", "First score at this level");
+    await waitForTestId(canvasElement, "personal-best-result-trophy");
+    expectTestIdAbsent(canvasElement, "personal-best-result-progress");
+  }
+};
+
+// The drawn outcome keeps its level range on one line with word joiners, so
+// the plain outcome is read from its accessibility label.
+function expectOutcomeLabel(canvasElement: HTMLElement, label: string): void {
+  const outcome = canvasElement.querySelector('[data-testid="personal-best-result-outcome"]');
+  const actual = outcome?.getAttribute("aria-label");
+  if (actual !== label) {
+    throw new Error(`Expected the Survival outcome "${label}", found "${actual ?? "nothing"}"`);
+  }
+}
 
 export const PersonalBestResultLargestText: Story = {
   name: "Survival · new record · largest text",
@@ -1232,8 +1249,8 @@ export const SurvivalResultNoBest: Story = {
     await expectTestIdText(canvasElement, "personal-best-result-score", "14");
     await expectTestIdText(canvasElement, "personal-best-result-comparison", "5 short of best 19");
     await waitForTestId(canvasElement, "personal-best-result-progress");
-    await waitForText(canvasElement, "Run complete");
-    await waitForText(canvasElement, "14 solved · 9:05 active · 1 sitting");
+    expectOutcomeLabel(canvasElement, "Run complete");
+    await expectTestIdText(canvasElement, "personal-best-result-summary", "17 attempted · 82% accuracy");
     expectTestIdAbsent(canvasElement, "personal-best-result-trophy");
     await expectTestIdText(canvasElement, "personal-best-result-try-again", "Play again");
   }
@@ -1259,8 +1276,11 @@ export const SurvivalPerfectClear: Story = {
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "personal-best-result");
     await expectTestIdText(canvasElement, "personal-best-result-score", "88,894");
-    await waitForText(canvasElement, "All 88,894 solved · 51:12:00 active · 84 sittings");
-    await waitForText(canvasElement, "Perfect clear at 2100–2200");
+    await expectTestIdText(canvasElement, "personal-best-result-summary", "88,894 attempted · 100% accuracy");
+    expectOutcomeLabel(canvasElement, "Perfect clear at 2100–2200");
+    // A Run without mistakes has nothing in Review and nothing to replay.
+    expectTestIdAbsent(canvasElement, "personal-best-result-review");
+    expectTestIdAbsent(canvasElement, "personal-best-result-replay");
     await waitForText(canvasElement, "You cleared every available Puzzle in this level.");
     await waitForText(canvasElement, "Loading and selection errors never count as a clear.");
   }
