@@ -1,9 +1,11 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { makeStyles } from "../../theme/makeStyles.ts";
+import { useUiHaptics } from "../../platform/uiHaptics.ts";
 
 // iOS-style capsule segmented control. Each segment is at least 44 pt tall and
-// its label wraps under large text instead of truncating.
+// its label wraps under large text instead of truncating. Changing the
+// selection plays selection feedback (#609).
 
 export type SegmentOption<T extends string> = {
   value: T;
@@ -25,6 +27,7 @@ export function SegmentedControl<T extends string>({
   onChange: (next: T) => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const uiHaptics = useUiHaptics();
   return (
     <View accessibilityLabel={accessibilityLabel} accessibilityRole="tablist" style={styles.track} testID={testID}>
       {options.map((option) => {
@@ -37,7 +40,12 @@ export function SegmentedControl<T extends string>({
             key={option.value}
             style={[styles.segment, selected ? styles.segmentSelected : null]}
             testID={option.testID}
-            onPress={() => onChange(option.value)}
+            onPress={() => {
+              if (!selected) {
+                uiHaptics("selection");
+              }
+              onChange(option.value);
+            }}
           >
             <Text style={[styles.label, selected ? styles.labelSelected : null]}>{option.label}</Text>
           </Pressable>

@@ -26,6 +26,35 @@ internal object MoveFeedbackPolicy {
       musicStreamVolume > 0
 }
 
+// UI haptics for primary actions (#609). The JS gate applies the app's Haptic
+// feedback setting; View.performHapticFeedback also honours the system touch
+// feedback setting because it never passes FLAG_IGNORE_GLOBAL_SETTING.
+internal object UiHapticPolicy {
+  fun feedbackConstant(intent: String, sdkInt: Int): Int? =
+    when (intent) {
+      "selection" ->
+        if (sdkInt >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+          HapticFeedbackConstants.SEGMENT_TICK
+        } else {
+          HapticFeedbackConstants.CLOCK_TICK
+        }
+      "impactLight" -> HapticFeedbackConstants.VIRTUAL_KEY
+      "success" ->
+        if (sdkInt >= Build.VERSION_CODES.R) {
+          HapticFeedbackConstants.CONFIRM
+        } else {
+          HapticFeedbackConstants.VIRTUAL_KEY
+        }
+      "warning" ->
+        if (sdkInt >= Build.VERSION_CODES.R) {
+          HapticFeedbackConstants.REJECT
+        } else {
+          HapticFeedbackConstants.LONG_PRESS
+        }
+      else -> null
+    }
+}
+
 class MoveFeedbackModule(
   reactContext: ReactApplicationContext,
 ) : ReactContextBaseJavaModule(reactContext) {
@@ -93,6 +122,27 @@ class MoveFeedbackModule(
           ?.decorView
           ?.performHapticFeedback(feedbackConstant)
       }
+    }
+
+    promise.resolve(null)
+  }
+
+  @ReactMethod
+  fun playUiHaptic(intent: String, promise: Promise) {
+    val feedbackConstant = UiHapticPolicy.feedbackConstant(intent, Build.VERSION.SDK_INT)
+    if (feedbackConstant == null) {
+      promise.reject(
+        "invalid_intent",
+        "UI haptic intent must be selection, impactLight, success or warning.",
+      )
+      return
+    }
+
+    reactApplicationContext.runOnUiQueueThread {
+      reactApplicationContext.currentActivity
+        ?.window
+        ?.decorView
+        ?.performHapticFeedback(feedbackConstant)
     }
 
     promise.resolve(null)

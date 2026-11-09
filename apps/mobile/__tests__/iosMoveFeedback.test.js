@@ -8,8 +8,42 @@ describe("iOS move feedback", () => {
   );
 
   it("uses a medium impact for committed player moves", () => {
-    expect(source).toContain("UIImpactFeedbackStyleMedium");
-    expect(source).not.toContain("UIImpactFeedbackStyleLight");
+    const init = source.slice(
+      source.indexOf("- (instancetype)init"),
+      source.indexOf("- (void)dealloc")
+    );
+
+    expect(init).toContain("UIImpactFeedbackStyleMedium");
+    expect(init).not.toContain("UIImpactFeedbackStyleLight");
+  });
+
+  it("maps each UI haptic intent to its UIKit generator on main (#609)", () => {
+    const exported = source.slice(
+      source.indexOf("RCT_EXPORT_METHOD(playUiHaptic:"),
+      source.indexOf("- (void)playUiHapticOnMainQueue:")
+    );
+    const onMain = source.slice(
+      source.indexOf("- (void)playUiHapticOnMainQueue:"),
+      source.indexOf("- (void)playSoundForCue:")
+    );
+
+    expect(exported).toContain(
+      '@[@"selection", @"impactLight", @"success", @"warning"]'
+    );
+    expect(exported).toContain('reject(@"invalid_intent"');
+    expect(exported).toMatch(
+      /dispatch_async\(dispatch_get_main_queue\(\), \^\{\s*\[self playUiHapticOnMainQueue:intent\];\s*\}\);/
+    );
+    expect(onMain).toMatch(
+      /@"selection"[\s\S]*UISelectionFeedbackGenerator[\s\S]*selectionChanged/
+    );
+    expect(onMain).toMatch(
+      /@"impactLight"[\s\S]*UIImpactFeedbackStyleLight[\s\S]*impactOccurred/
+    );
+    expect(onMain).toMatch(
+      /@"success"\]\s*\?\s*UINotificationFeedbackTypeSuccess\s*:\s*UINotificationFeedbackTypeWarning/
+    );
+    expect(onMain).not.toContain("AVAudio");
   });
 
   it("keeps haptics on main while audio stays asynchronous", () => {

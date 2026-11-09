@@ -118,6 +118,18 @@ export function survivalResultDataFromSession(input: {
   };
 }
 
+/**
+ * The notification haptic the result plays when it appears (#609): success for
+ * a new best, warning for a Run the third mistake ended. A perfect clear that
+ * only ties the best stays silent.
+ */
+export function survivalResultHapticIntent(data: SurvivalResultData): "success" | "warning" | null {
+  if (data.isNewBest) {
+    return "success";
+  }
+  return data.endReason === "max_mistakes" ? "warning" : null;
+}
+
 export function presentSurvivalResult(data: SurvivalResultData): SurvivalResultPresentation {
   const isPerfectClear = data.endReason === "pool_cleared";
   const level = levelLabel(data.level);

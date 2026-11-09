@@ -12,6 +12,7 @@ import type { SprintState } from "../../../../packages/core/src/types.ts";
 import { formatActiveTime } from "./survivalResultPresentation.ts";
 import { AppText, Badge, Button, Icon, IconTile, ListRow, Section, useListRowStyle } from "./ui/index.tsx";
 import { useTheme } from "../theme/ThemeProvider.ts";
+import { useUiHaptics } from "../platform/uiHaptics.ts";
 
 const SURVIVAL_DISCLOSURE_MOTION_DURATION_MS = 200;
 
@@ -265,6 +266,7 @@ export function PersonalBestChallengeHub({
   const styles = useStyles();
   const theme = useTheme();
   const rowStyle = useListRowStyle();
+  const uiHaptics = useUiHaptics();
   const { fontScale, width: viewportWidth } = useWindowDimensions();
   // Level cards widen with Dynamic Type so labels such as "Recommended" wrap
   // the grid onto more rows instead of breaking mid-word.
@@ -455,7 +457,12 @@ export function PersonalBestChallengeHub({
                 pressed && !selected ? styles.pressed : null
               ]}
               testID={`personal-best-type-${type}`}
-              onPress={() => chooseChallengeType(type)}
+              onPress={() => {
+                if (!selected) {
+                  uiHaptics("selection");
+                }
+                chooseChallengeType(type);
+              }}
             >
               <AppText style={styles.centeredText} tone={selected ? "accent" : "primary"} variant="headline">
                 {challengeTypeLabel(type)}
@@ -612,7 +619,12 @@ export function PersonalBestChallengeHub({
                       pressed && !selected ? styles.pressed : null
                     ]}
                     testID={`personal-best-level-${level.minRating}`}
-                    onPress={() => setSelectedBand({ minRating: level.minRating, maxRating: level.maxRating })}
+                    onPress={() => {
+                      if (!selected) {
+                        uiHaptics("selection");
+                      }
+                      setSelectedBand({ minRating: level.minRating, maxRating: level.maxRating });
+                    }}
                   >
                     <AppText tone={selected ? "accent" : "secondary"} variant="footnote">
                       {level.label}
@@ -665,7 +677,12 @@ export function PersonalBestChallengeHub({
                         selected ? styles.selectedFill : null,
                         pressed && !selected ? styles.pressed : null
                       ]}
-                      onPress={() => setSelectedBand(level)}
+                      onPress={() => {
+                        if (!selected) {
+                          uiHaptics("selection");
+                        }
+                        setSelectedBand(level);
+                      }}
                     >
                       <AppText tone={selected ? "accent" : "primary"} variant="numeralRow">{levelLabel(level)}</AppText>
                     </Pressable>

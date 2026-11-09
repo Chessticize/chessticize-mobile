@@ -12,6 +12,7 @@ import type {
   ReviewReminderScheduler,
 } from './reviewReminderScheduler.ts';
 import type { MoveFeedbackClient } from './moveFeedback.ts';
+import type { UiHapticsClient } from './uiHaptics.ts';
 import type { AppStoreReviewRequestClient } from './appStoreReviewRequest.ts';
 
 export interface MobileStorageCapabilities {
@@ -55,6 +56,10 @@ export interface MobileMoveFeedbackCapabilities {
   client: MoveFeedbackClient | null;
 }
 
+export interface MobileUiHapticsCapabilities {
+  client: UiHapticsClient | null;
+}
+
 export interface MobileAppReviewCapabilities {
   client: AppStoreReviewRequestClient | null;
 }
@@ -96,6 +101,7 @@ export interface MobilePlatformCapabilities {
   stockfish: MobileStockfishCapabilities;
   reminders: MobileReminderCapabilities;
   moveFeedback: MobileMoveFeedbackCapabilities;
+  uiHaptics: MobileUiHapticsCapabilities;
   appReview: MobileAppReviewCapabilities;
   applicationMetadata: MobileApplicationMetadata;
 }

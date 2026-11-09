@@ -2,13 +2,15 @@ import React from "react";
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { makeStyles } from "../../theme/makeStyles.ts";
 import { useTheme } from "../../theme/ThemeProvider.ts";
+import { useUiHaptics } from "../../platform/uiHaptics.ts";
 import { Icon } from "./Icon.tsx";
 import type { IconName } from "./iconNames.ts";
 
 // Direction A buttons: rounded rectangles (radius 12) with a headline label.
 // `regular` is 50 pt tall for primary page actions; `compact` meets the 44 pt
 // minimum for header and toolbar actions. Labels wrap under large text rather
-// than truncating, so the button grows instead of clipping.
+// than truncating, so the button grows instead of clipping. A primary press
+// plays a light impact (#609); the other variants stay silent.
 
 export type ButtonVariant = "primary" | "secondary" | "plain" | "destructive";
 
@@ -39,6 +41,7 @@ export function Button({
 }): React.JSX.Element {
   const styles = useStyles();
   const theme = useTheme();
+  const uiHaptics = useUiHaptics();
   const labelColor = {
     primary: theme.colors.text.onAccent,
     secondary: theme.colors.accent.s600,
@@ -64,7 +67,12 @@ export function Button({
         style
       ]}
       testID={testID}
-      onPress={onPress}
+      onPress={() => {
+        if (variant === "primary") {
+          uiHaptics("impactLight");
+        }
+        onPress();
+      }}
     >
       <View style={styles.content}>
         {icon ? <Icon color={labelColor} name={icon} size={17} weight="semibold" /> : null}

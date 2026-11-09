@@ -247,6 +247,15 @@ export function reviewExplanation(review: SprintResultData["review"]): string[] 
   ].filter((line): line is string => line !== null);
 }
 
+/**
+ * The notification haptic the result plays when it appears (#609): success for
+ * a passed Sprint, warning for a failed one. Focused Runs, ended and abandoned
+ * Sprints stay silent.
+ */
+export function sprintResultHapticIntent(data: SprintResultData): "success" | "warning" | null {
+  return data.outcome === "passed" ? "success" : data.outcome === "failed" ? "warning" : null;
+}
+
 export function presentSprintResult(data: SprintResultData): SprintResultPresentation {
   const isFocusedRun = data.kind === "focusedRun";
   const outcomeTone = data.outcome === "passed" || data.outcome === "completed"
