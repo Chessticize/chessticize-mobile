@@ -2006,10 +2006,15 @@ describe('Detox suite configuration', () => {
     expect(ACTIVE_E2E_TEST_MATCH).not.toContain(ANDROID_ADAPTIVE_LAYOUT_TEST_MATCH[0]);
 
     const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/adaptive-layout.e2e.js'), 'utf8');
-    const screen = fs.readFileSync(
+    // The practice screen and the feature modules it is split into (#685).
+    const practiceDir = path.resolve(__dirname, '../src/components/practice');
+    const screen = [
       path.resolve(__dirname, '../src/components/PracticePocScreen.tsx'),
-      'utf8'
-    );
+      ...fs.readdirSync(practiceDir, { recursive: true })
+        .map(String)
+        .filter((name) => /\.tsx?$/.test(name))
+        .map((name) => path.join(practiceDir, name))
+    ].map((file) => fs.readFileSync(file, 'utf8')).join('\n');
     const evidence = fs.readFileSync(
       path.resolve(__dirname, '../scripts/android-adaptive-layout-evidence.sh'),
       'utf8'
