@@ -480,6 +480,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
   });
 
+
   it.each([
     { height: 932, label: "portrait", width: 430 },
     { height: 390, label: "landscape", width: 844 }
@@ -6661,6 +6662,35 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it.each([2, 3.5])("gives accessibility-size Review copy a full-width column at %sx without losing the puzzle", (fontScale) => {
+    const viewport = { width: 874, height: 402, scale: 3, insets: { top: 0, right: 62, bottom: 21, left: 62 } };
+    setPracticeViewport({ ...viewport, fontScale: 1 });
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
+      practiceService: createDueReviewService(1)
+    });
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    const boardLabel = findByTestId(renderer, "review-board").props.accessibilityLabel;
+    const progress = collectText(findByTestId(renderer, "review-progress"));
+    expect(findByTestId(renderer, "review-session-adaptive-layout")).toBeTruthy();
+
+    act(() => setPracticeViewport({ ...viewport, fontScale }));
+
+    expect(findByTestId(renderer, "review-session-stacked-layout")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-session-control-rail")).toThrow();
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    expect(renderedTestIdCount(renderer, "review-board")).toBe(1);
+    expect(findByTestId(renderer, "review-board").props.accessibilityLabel).toBe(boardLabel);
+    expect(collectText(findByTestId(renderer, "review-progress"))).toBe(progress);
+
+    act(() => setPracticeViewport({ ...viewport, fontScale: 1 }));
+
+    expect(findByTestId(renderer, "review-session-adaptive-layout")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+    expect(findByTestId(renderer, "review-board").props.accessibilityLabel).toBe(boardLabel);
+  });
+
   it.each([
     { label: "Duo Split View third", width: 317, height: 669, insets: { top: 24, right: 0, bottom: 20, left: 0 }, stacked: true },
     { label: "iPhone SE", width: 375, height: 667, insets: { top: 20, right: 0, bottom: 0, left: 0 }, stacked: false },
@@ -6674,6 +6704,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "session-abandon");
 
     const confirmation = findByTestId(renderer, "session-abandon-confirmation");
+    expect(collectText(confirmation)).toContain("This ends the Sprint and records it as abandoned.");
     // Out of flow: it is anchored below the HUD it belongs to and drawn above
     // the prompt, board and counts that follow, so none of them move.
     expect(flattenTestStyle(confirmation.props.style)).toEqual(expect.objectContaining({
@@ -12302,6 +12333,8 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
     expect(collectText(findByTestId(renderer, "review-schedule-add"))).toBe("Add to Review");
+    expectCompactReviewActionSurface(renderer, "review-schedule-add", "secondary");
+    expectCompactReviewActionSurface(renderer, "history-attempt-clear-unclear", "secondary");
     expect(service.listHistory()).toHaveLength(1);
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
 
@@ -12313,6 +12346,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-exit");
     expect(findByTestId(renderer, "history-attempt-unclear-history-attempt")).toBeTruthy();
     press(renderer, "history-attempt-unclear-history-attempt");
+    expectCompactReviewActionSurface(renderer, "review-schedule-remove", "destructive");
     press(renderer, "review-schedule-remove");
     // The confirmation keeps a landscape window in landscape instead of
     // forcing React Native's portrait-only Modal default.
@@ -18182,6 +18216,19 @@ function hostByTestId(renderer: TestRenderer.ReactTestRenderer, testID: string):
     throw new Error(`No host element with testID ${testID}`);
   }
   return hosts[0];
+}
+
+function expectCompactReviewActionSurface(
+  renderer: TestRenderer.ReactTestRenderer,
+  testID: string,
+  variant: "secondary" | "destructive"
+): void {
+  const style = flattenTestStyle(hostByTestId(renderer, testID).props.style({ pressed: false }));
+  expect(style).toMatchObject({
+    backgroundColor: variant === "secondary" ? lightTheme.colors.accent.s100 : lightTheme.colors.danger.s100,
+    borderRadius: lightTheme.shape.control,
+    minHeight: lightTheme.metrics.minTarget
+  });
 }
 
 function safeTestIdForTest(value: string): string {

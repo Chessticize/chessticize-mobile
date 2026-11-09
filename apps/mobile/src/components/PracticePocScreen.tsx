@@ -1015,6 +1015,9 @@ export function PracticePocScreen({
   // insets. Otherwise tab content uses the insets the host reports for its
   // chrome (the bottom glass bar, the iPhone Duo column, the iPad top bar, the
   // Android rail).
+  const reviewSurfaceOpen = reviewSessionSource !== null
+    || historyReviewEntries.length > 0
+    || historyUnavailableAttempt !== null;
   const topLevelChromeVisible = isTopLevelChromeVisible({
     feedbackSnapshotVisible: feedbackSnapshot !== null,
     openSession: state?.status === "active" || state?.status === "paused",
@@ -1022,9 +1025,7 @@ export function PracticePocScreen({
     personalBestHubVisible,
     personalBestRecordsVisible,
     sprintResultVisible,
-    reviewSurfaceOpen: reviewSessionSource !== null
-      || historyReviewEntries.length > 0
-      || historyUnavailableAttempt !== null,
+    reviewSurfaceOpen,
     sessionGuideVisible: state === null
       && sessionGuide?.plan.steps[sessionGuide.stepIndex] !== undefined
   });
@@ -1036,8 +1037,16 @@ export function PracticePocScreen({
   } | null>(null);
   const layoutInsets = topLevelChromeVisible && tabContentInsets ? tabContentInsets : insets;
   const adaptiveLayout = useMemo(
-    () => buildPracticeAdaptiveLayout({ fontScale, height, insets: layoutInsets, width }),
-    [fontScale, height, layoutInsets, width]
+    () => {
+      const layout = buildPracticeAdaptiveLayout({ fontScale, height, insets: layoutInsets, width });
+      // At accessibility sizes a narrow rail cannot fit whole headline words
+      // beside its leading tiles. Review keeps the same board and puzzle in a
+      // full-width scrolling column instead. The live Run layout is unchanged.
+      return reviewSurfaceOpen && fontScale >= 2 && layout.usesSessionRail && layout.sessionRailWidth < 360
+        ? { ...layout, usesSessionRail: false }
+        : layout;
+    },
+    [fontScale, height, layoutInsets, reviewSurfaceOpen, width]
   );
   const boardSize = adaptiveLayout.boardSize;
 
@@ -3839,7 +3848,6 @@ export function PracticePocScreen({
   const visibleHistoryAttempts = historyView?.attempts ?? [];
   const visibleHistoryPage = historyView?.page;
   const contentOwnsHeader = tab === "review" || tab === "history";
-  const reviewSurfaceOpen = reviewBoardVisible || historyUnavailableAttempt !== null;
   const survivalBackTransient: MobileBackTransient | null = personalBestRecordsVisible
     ? "survival-records"
     : personalBestGuideVisible
