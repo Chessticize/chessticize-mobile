@@ -13241,6 +13241,9 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "review-guided-move-overlay")).toBeTruthy();
     expect(findByTestId(renderer, "review-guided-eval-list")).toBeTruthy();
+    // The current-position evaluation names the position once, not again as its label.
+    const guidedEvalText = collectText(findByTestId(renderer, "review-guided-eval-line-0"));
+    expect(guidedEvalText.match(/Current position/g)).toHaveLength(1);
     expect(collectVisibleText(findByTestId(renderer, "practice-prompt"))).toContain(
       "Follow the blue line to see why this move fails."
     );
