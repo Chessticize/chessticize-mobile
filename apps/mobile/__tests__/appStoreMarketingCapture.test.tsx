@@ -3,7 +3,7 @@ import {
   appStoreMarketingReleaseCampaignFrameIds,
   appStoreMarketingCaptureStory,
   loadAppStoreMarketingCaptureFixture
-} from "../src/testing/appStoreMarketingCapture.ts";
+} from "../src/testing/appStoreMarketingCapture.tsx";
 import { createMobilePracticeService } from "../src/platform/mobilePractice.ts";
 import { reviewQueueForecast } from "../../../packages/core/src/index.ts";
 

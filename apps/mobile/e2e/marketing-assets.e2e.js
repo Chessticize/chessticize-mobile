@@ -213,8 +213,11 @@ async function prepareFrame(frame) {
       // Keep both approved Home controls wholly above the native tab bar. On
       // the calibrated iPhone viewport, 53–74 points is the feasible interval:
       // 64 clears the bar while preserving Start below the app safe-area top.
-      if (target.deviceFamily === 'iphone') {
-        await element(by.id('practice-main-scroll')).scroll(64, 'down', 0.5, 0.5);
+      // Android needs 32 dp to reveal the complete Training focus card.
+      if (target.deviceFamily === 'iphone' || target.deviceFamily === 'android-phone') {
+        await element(by.id('practice-main-scroll')).scroll(
+          target.deviceFamily === 'iphone' ? 64 : 32, 'down', 0.5, 0.5
+        );
       }
       return;
     case 'dark-arrow-duel':
@@ -239,7 +242,7 @@ async function prepareFrame(frame) {
       return;
     case 'review':
       await openTab('review-tab', 'review-due-card');
-      await element(by.id('practice-main-scroll')).scrollTo('top');
+      await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
       return;
     case 'build-tactical-intuition':
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
@@ -255,7 +258,7 @@ async function prepareFrame(frame) {
       return;
     case 'make-every-mistake-count':
       await openTab('review-tab', 'review-due-card');
-      await element(by.id('practice-main-scroll')).scrollTo('top');
+      await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
       return;
     case 'see-your-progress':
       await prepareRatingTrend();
@@ -299,7 +302,7 @@ async function prepareCustomRun() {
   await element(by.id('custom-theme-fork')).tap();
   await waitForVisibleInPracticeScroll('custom-theme-pin');
   await element(by.id('custom-theme-pin')).tap();
-  await element(by.id('practice-main-scroll')).scrollTo('bottom');
+  await element(by.id('practice-main-scroll')).scrollTo('bottom', 0.5, 0.5);
   await waitFor(element(by.id('practice-run-duration-stepper')))
     .toExist()
     .withTimeout(10000);
@@ -321,13 +324,13 @@ async function prepareCustomRun() {
     String(story.fictionalUser.customRun.startingRating)
   );
   await element(by.id('practice-run-elo-input')).tapReturnKey();
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   await waitFor(element(by.id('practice-run-editor-title')))
     .toBeVisible()
     .withTimeout(5000);
   await element(by.id('practice-run-editor-title')).tap();
   await sleep(500);
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
   if (isGooglePlayCapture && target.deviceFamily === 'android-phone') {
     await element(by.id('practice-main-scroll')).scroll(80, 'down', 0.5, 0.5);
   }
@@ -403,7 +406,7 @@ async function prepareRatingTrend() {
   await element(by.id('history-range-90d')).tap();
   await waitForVisibleInPracticeScroll('history-filter-toggle');
   await element(by.id('history-filter-toggle')).tap();
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await element(by.id('practice-main-scroll')).scrollTo('top', 0.5, 0.5);
 }
 
 async function assertFrameContract(frame) {
