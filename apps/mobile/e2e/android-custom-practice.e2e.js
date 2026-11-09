@@ -112,11 +112,11 @@ describe(`Android Custom Practice completion (${practiceFixture.puzzle.id})`, ()
       await waitFor(element(by.text('For black.'))).toExist().withTimeout(10000);
       await playBoardMove('session-board', practiceFixture.userMoves[1], true);
 
-      await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
-      await waitForElementTextContaining('sprint-result-solved', 'Solved 1', 10000);
+      await waitFor(element(by.id('sprint-result-outcome'))).toBeVisible().withTimeout(30000);
+      await waitForElementTextContaining('sprint-result-solved', '1 / ', 10000);
       await waitForElementTextContaining(
         'sprint-result-rating-range',
-        `600 -> ${practiceFixture.expectedRatingAfter}`,
+        `600\u00a0\u2192\u00a0${practiceFixture.expectedRatingAfter}`,
         10000
       );
 

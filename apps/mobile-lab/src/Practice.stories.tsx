@@ -3,7 +3,7 @@ import { LabScenario, type LabStoryPresentation } from "./LabScenario.tsx";
 import {
   LabTextSize,
   LARGEST_ACCESSIBILITY_FONT_SCALE
-} from "./sprintResultRedesign/SprintResultPrototype.tsx";
+} from "./LabTextSize.tsx";
 import {
   centerTestId,
   clickTestId,
@@ -1244,13 +1244,12 @@ export const SprintResultGoalClarity: Story = {
   name: "Sprint result · Goal clarity",
   args: { scenarioId: "practice-sprint-result-goal" },
   play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "sprint-result-goal-label");
-    await waitForTestId(canvasElement, "sprint-result-solved");
-    await waitForTestId(canvasElement, "sprint-result-unclear-count-column");
-    await waitForTestId(canvasElement, "sprint-result-mistakes-count-column");
-    await waitForTestId(canvasElement, "sprint-result-review-note");
-    await expectTestIdText(canvasElement, "review-mistakes-button", "Replay 4 attempts");
-    await waitForVisibleTestId(canvasElement, "review-mistakes-button");
+    await expectTestIdText(canvasElement, "sprint-result-solved", "11 / 15");
+    await expectTestIdText(canvasElement, "sprint-result-reason", "Time ran out");
+    await expectTestIdText(canvasElement, "sprint-result-review-count", "4 to review");
+    await expectTestIdText(canvasElement, "review-mistakes-button", "Replay 2 mistakes");
+    await waitForVisibleTestId(canvasElement, "play-again-button");
+    expectTestIdAbsent(canvasElement, "app-shell-header");
   }
 };
 
@@ -1273,8 +1272,8 @@ export const SprintResultFlaggedReplay: Story = {
   name: "Sprint result · Flagged replay",
   args: { scenarioId: "practice-sprint-result-replay" },
   play: async ({ canvasElement }) => {
-    await waitForVisibleTestId(canvasElement, "review-mistakes-button");
-    await clickTestId(canvasElement, "review-mistakes-button");
+    await waitForVisibleTestId(canvasElement, "sprint-result-replay");
+    await clickTestId(canvasElement, "sprint-result-replay");
     await waitForTestId(canvasElement, "review-session");
     await expectTestIdText(canvasElement, "review-title", "Replay");
     expectTestIdAbsent(canvasElement, "review-source-pill");
@@ -1290,10 +1289,8 @@ export const SprintResultExtraAttempt: Story = {
   name: "Sprint result · Extra attempt",
   args: { scenarioId: "practice-sprint-result-extra-attempt" },
   play: async ({ canvasElement }) => {
-    await waitForTestId(canvasElement, "sprint-result-goal-label");
-    await waitForTestId(canvasElement, "sprint-result-solved");
-    await waitForTestId(canvasElement, "sprint-result-unclear-count-column");
-    await waitForTestId(canvasElement, "sprint-result-mistakes-count-column");
+    await expectTestIdText(canvasElement, "sprint-result-solved", "15 / 15");
+    await waitForText(canvasElement, "16 attempted \u00b7 94% accuracy");
   }
 };
 
@@ -1302,7 +1299,7 @@ export const AppStoreReviewRequestEligiblePuzzleMilestone: Story = {
   args: { scenarioId: "practice-app-store-review-request" },
   play: async ({ canvasElement }) => {
     await waitForTestId(canvasElement, "sprint-summary-panel");
-    await expectTestIdText(canvasElement, "sprint-result-solved", "Solved 15");
+    await expectTestIdText(canvasElement, "sprint-result-solved", "15 / 15");
     await expectTestIdText(canvasElement, "play-again-button", "Play again");
     await waitForTestId(canvasElement, "lab-native-boundary");
   }

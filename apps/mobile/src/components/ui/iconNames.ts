@@ -31,6 +31,7 @@ export const ICONS = {
   filter: { sf: "line.3.horizontal.decrease", material: "filter_list", codepoint: 0xe152 },
   focus: { sf: "scope", material: "my_location", codepoint: 0xe55c },
   help: { sf: "questionmark.circle", material: "help", codepoint: 0xe8fd },
+  info: { sf: "info.circle", material: "info", codepoint: 0xe88e },
   navigation: { sf: "dock.rectangle", material: "bottom_navigation", codepoint: 0xe98c },
   play: { sf: "play.fill", material: "play_arrow", codepoint: 0xe037 },
   profile: { sf: "chart.bar", material: "bar_chart", codepoint: 0xe26b },
@@ -40,6 +41,7 @@ export const ICONS = {
   share: { sf: "square.and.arrow.up", material: "ios_share", codepoint: 0xe6b8 },
   standard: { sf: "target", material: "target", codepoint: 0xe719 },
   survival: { sf: "shield", material: "shield", codepoint: 0xe9e0 },
+  trend: { sf: "chart.line.uptrend.xyaxis", material: "trending_up", codepoint: 0xe8e5 },
   warning: { sf: "exclamationmark.triangle", material: "warning", codepoint: 0xf083 },
   whatsNew: { sf: "sparkles", material: "auto_awesome", codepoint: 0xe65f },
   // Top-level tabs (#612). The native Android bottom navigation draws these from

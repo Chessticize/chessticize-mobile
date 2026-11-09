@@ -736,11 +736,22 @@ async function waitForVisibleInPracticeScroll(testID) {
     // scroll view when the target actually needs scrolling; Android's
     // scrollTo can otherwise wait indefinitely for an already-satisfied edge.
   }
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  // The full-screen Sprint Result (#609) owns its own scroll view.
+  const scrollID = await existingTestID('sprint-result-scroll') ? 'sprint-result-scroll' : 'practice-main-scroll';
+  await element(by.id(scrollID)).scrollTo('top');
   await waitFor(target)
     .toBeVisible()
-    .whileElement(by.id('practice-main-scroll'))
+    .whileElement(by.id(scrollID))
     .scroll(100, 'down', 0.5, 0.5);
+}
+
+async function existingTestID(testID) {
+  try {
+    await expect(element(by.id(testID))).toExist();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function tapUntilExists(tapTestID, expectedTestID, attempts) {

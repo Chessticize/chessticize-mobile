@@ -43,7 +43,16 @@ export const PRACTICE_PROMPT_BASE_HEIGHT = 96;
 const SESSION_RAIL_GAP_MIN = 14;
 const PRACTICE_PROMPT_NARROW_WIDTH = 300;
 const PRACTICE_PROMPT_NARROW_EXTRA_HEIGHT = 16;
-const PRACTICE_PROMPT_FONT_SCALE_EXTRA_HEIGHT = 48;
+// Prompt copy grows at most this much with Dynamic Type (#652), so its frame
+// grows with the capped scale rather than the system scale.
+export const PRACTICE_PROMPT_MAX_TEXT_SCALE = 1.25;
+// The post-answer feedback row under the board grows at most this much with
+// Dynamic Type (#652); a phone's locked session reserves its height up front.
+export const PRACTICE_FEEDBACK_MAX_TEXT_SCALE = 1.25;
+// Session HUD values and the puzzle timing under the board grow at most this
+// much before they shrink to fit (#652).
+export const PRACTICE_SESSION_HUD_MAX_TEXT_SCALE = 2;
+export const PRACTICE_PUZZLE_TIMING_MAX_TEXT_SCALE = 1.5;
 const COMPACT_LANDSCAPE_RAIL_MIN = 220;
 const COMPACT_LANDSCAPE_RAIL_MAX = 300;
 const REGULAR_RAIL_MIN = 296;
@@ -55,39 +64,93 @@ const REGULAR_PORTRAIT_BOARD_MAX = 860;
 // Compact portrait locks the outer scroll while the board accepts input, so
 // everything stacked with the board must fit the viewport: the status bar,
 // prompt, board details (puzzle timing and counts) and the post-answer
-// feedback row. Heights measured on the live session (iPhone SE, iOS 27,
-// default text size); the prompt height comes from this layout.
-// - status bar: close/pause row 53 + 8 gap + metrics 36
-// - board details: 3 + timing 18 + 3 + counts 46
+// feedback row. Heights measured on the live session (iPhone SE, iOS 27);
+// the prompt height comes from this layout.
+// - status bar: close/pause row 53 + 8 gap + metrics 36. The metrics row
+//   holds one line of 28-point numerals that grows with text size up to the
+//   HUD cap (40 at Extra Extra Extra Large, 52.5 at Accessibility Medium).
+// - board details: 3 + timing 18 + 3 + counts 46. The timing line is 13
+//   points at default size and grows up to its cap; the counts stay 46.
 // - feedback: the taller of the Mark as unclear row and the previous-attempt
 //   notice. The rows span the content width; at 343 points (iPhone SE) they
 //   are 46 and 58, and at 283 points the notice wraps to 72.5, which covers
-//   the 288-point column of a 320-point phone.
+//   the 288-point column of a 320-point phone. At the feedback text cap the
+//   notice measures 86 at 343 points; the narrow column adds one more line
+//   of detail at that size.
 export const COMPACT_PORTRAIT_SESSION_CHROME = {
   boardDetails: 70,
   feedback: 58,
+  feedbackAtTextCap: 86,
+  metricsLineHeight: 28,
+  metricsMinHeight: 36,
   narrowColumnFeedback: 73,
+  narrowColumnFeedbackAtTextCap: 104,
   narrowColumnWidth: 340,
   stackGap: 12,
-  status: 97
+  status: 97,
+  timingLineHeight: 13,
+  timingMinHeight: 18
 } as const;
 const REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 240;
 const HOME_COLUMNS_MIN_CONTENT_WIDTH = 650;
 
-export function compactPortraitFeedbackHeight(columnWidth: number): number {
-  const chrome = COMPACT_PORTRAIT_SESSION_CHROME;
-  return columnWidth < chrome.narrowColumnWidth ? chrome.narrowColumnFeedback : chrome.feedback;
+function cappedTextScale(fontScale: number, cap: number): number {
+  return Math.min(Math.max(fontScale, 1), cap);
 }
 
-function compactPortraitSessionChromeHeight(promptHeight: number, columnWidth: number): number {
+export function compactPortraitFeedbackHeight(columnWidth: number, fontScale = 1): number {
   const chrome = COMPACT_PORTRAIT_SESSION_CHROME;
-  return chrome.status
+  const narrow = columnWidth < chrome.narrowColumnWidth;
+  const base = narrow ? chrome.narrowColumnFeedback : chrome.feedback;
+  const atCap = narrow ? chrome.narrowColumnFeedbackAtTextCap : chrome.feedbackAtTextCap;
+  const progress = (cappedTextScale(fontScale, PRACTICE_FEEDBACK_MAX_TEXT_SCALE) - 1)
+    / (PRACTICE_FEEDBACK_MAX_TEXT_SCALE - 1);
+  return Math.ceil(base + (atCap - base) * progress);
+}
+
+export function compactPortraitStatusHeight(fontScale = 1): number {
+  const chrome = COMPACT_PORTRAIT_SESSION_CHROME;
+  const metricsHeight = Math.max(
+    chrome.metricsMinHeight,
+    Math.ceil(chrome.metricsLineHeight * cappedTextScale(fontScale, PRACTICE_SESSION_HUD_MAX_TEXT_SCALE)) + 3
+  );
+  return chrome.status - chrome.metricsMinHeight + metricsHeight;
+}
+
+export function compactPortraitBoardDetailsHeight(fontScale = 1): number {
+  const chrome = COMPACT_PORTRAIT_SESSION_CHROME;
+  const timingHeight = Math.max(
+    chrome.timingMinHeight,
+    Math.ceil(chrome.timingLineHeight * cappedTextScale(fontScale, PRACTICE_PUZZLE_TIMING_MAX_TEXT_SCALE))
+  );
+  return chrome.boardDetails - chrome.timingMinHeight + timingHeight;
+}
+
+function compactPortraitSessionChromeHeight(
+  promptHeight: number,
+  columnWidth: number,
+  fontScale: number
+): number {
+  const chrome = COMPACT_PORTRAIT_SESSION_CHROME;
+  return compactPortraitStatusHeight(fontScale)
     + chrome.stackGap
     + promptHeight
     + chrome.stackGap
-    + chrome.boardDetails
+    + compactPortraitBoardDetailsHeight(fontScale)
     + chrome.stackGap
-    + compactPortraitFeedbackHeight(columnWidth);
+    + compactPortraitFeedbackHeight(columnWidth, fontScale);
+}
+
+// The prompt frame for a slot width: narrow slots need an extra line, and
+// enlarged text grows with the prompt's capped scale.
+function promptFrameHeightFor(slotWidth: number, fontScale: number): number {
+  const narrowExtraHeight = slotWidth < PRACTICE_PROMPT_NARROW_WIDTH
+    ? PRACTICE_PROMPT_NARROW_EXTRA_HEIGHT
+    : 0;
+  const fontScaleExtraHeight = Math.round(
+    Math.max(0, Math.min(fontScale, PRACTICE_PROMPT_MAX_TEXT_SCALE) - 1) * PRACTICE_PROMPT_BASE_HEIGHT
+  );
+  return PRACTICE_PROMPT_BASE_HEIGHT + Math.max(narrowExtraHeight, fontScaleExtraHeight);
 }
 
 // Top-level navigation chrome is drawn by the native tab host (#612). Its space
@@ -133,28 +196,25 @@ export function buildPracticeAdaptiveLayout({
   // the rail beside the board, so the board only gives up the content padding.
   const sessionBoardSlotHeight = Math.max(0, contentHeight - PRACTICE_UI_PADDING * 2);
   const portraitBoardSlotWidth = Math.max(0, sessionContentWidth - PRACTICE_UI_PADDING * 2);
-  const largeTextReservedHeight = isLargeText
-    ? Math.min(180, Math.round((fontScale - 1) * 120))
-    : 0;
   // The rows stacked with a compact-portrait board span the content width,
-  // so the prompt's height is known before the board is sized.
+  // so their heights at the current text size are known before the board is
+  // sized (#639, #652).
   const compactPortraitColumnWidth = portraitBoardSlotWidth;
-  const compactPortraitPromptHeight = PRACTICE_PROMPT_BASE_HEIGHT + (
-    compactPortraitColumnWidth < PRACTICE_PROMPT_NARROW_WIDTH
-      ? PRACTICE_PROMPT_NARROW_EXTRA_HEIGHT
-      : 0
-  );
   const portraitBoardSlotHeight = (() => {
     if (isLandscape) {
       return portraitBoardSlotWidth;
     }
-    const reservedControlsHeight = isRegularWidth
+    // Regular portrait (iPad) stacks the same rows with the board. At large
+    // text it reserves their measured heights too; its rows are at least as
+    // wide as a phone's, so the phone budget covers them (#652).
+    const reservedControlsHeight = isRegularWidth && !isLargeText
       ? REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT
-      : compactPortraitSessionChromeHeight(compactPortraitPromptHeight, compactPortraitColumnWidth);
-    return Math.max(
-      0,
-      contentHeight - PRACTICE_UI_PADDING * 2 - reservedControlsHeight - largeTextReservedHeight
-    );
+      : compactPortraitSessionChromeHeight(
+        promptFrameHeightFor(compactPortraitColumnWidth, fontScale),
+        compactPortraitColumnWidth,
+        fontScale
+      );
+    return Math.max(0, contentHeight - PRACTICE_UI_PADDING * 2 - reservedControlsHeight);
   })();
   const boardMax = isRegularWidth
     ? isLandscape ? REGULAR_LANDSCAPE_BOARD_MAX : REGULAR_PORTRAIT_BOARD_MAX
@@ -168,17 +228,7 @@ export function buildPracticeAdaptiveLayout({
     : isRegularWidth
       ? boardSize
       : compactPortraitColumnWidth;
-  const promptSlotWidth = sessionColumnWidth;
-  const promptNarrowExtraHeight = promptSlotWidth < PRACTICE_PROMPT_NARROW_WIDTH
-    ? PRACTICE_PROMPT_NARROW_EXTRA_HEIGHT
-    : 0;
-  const promptFontScaleExtraHeight = Math.round(
-    Math.max(0, fontScale - 1) * PRACTICE_PROMPT_FONT_SCALE_EXTRA_HEIGHT
-  );
-  const promptFrameHeight = PRACTICE_PROMPT_BASE_HEIGHT + Math.max(
-    promptNarrowExtraHeight,
-    promptFontScaleExtraHeight
-  );
+  const promptFrameHeight = promptFrameHeightFor(sessionColumnWidth, fontScale);
   const maximumSessionRailGap = Math.max(
     0,
     sessionContentWidth - PRACTICE_UI_PADDING * 2 - boardSize - sessionRailWidth

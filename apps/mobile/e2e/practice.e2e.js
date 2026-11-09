@@ -339,7 +339,7 @@ describe('Practice POC', () => {
     await expect(element(by.text('Focused Run complete'))).toBeVisible();
     await expect(element(by.text('Focused Run Result'))).toBeVisible();
     await expect(element(by.id('sprint-result-solved'))).toHaveText('15 / 15');
-    await expect(element(by.id('sprint-result-accuracy'))).toHaveText('100% Accuracy');
+    await expect(element(by.id('sprint-result-accuracy'))).toHaveText('15 attempted \u00b7 100% accuracy');
   });
 
   it('renders the standard sprint board', async () => {

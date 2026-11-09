@@ -116,7 +116,7 @@ export function topLevelTabIntent(tab: TopLevelTab): TopLevelTabIntent {
 
 // Global navigation is hidden whenever a focused surface owns the screen:
 // an active session, its feedback snapshot, guides and Personal Best surfaces,
-// and an open review session.
+// the full-screen Sprint Result (#609), and an open review session.
 export type TopLevelChromeInputs = {
   feedbackSnapshotVisible: boolean;
   openSession: boolean;
@@ -125,6 +125,7 @@ export type TopLevelChromeInputs = {
   personalBestRecordsVisible: boolean;
   reviewSurfaceOpen: boolean;
   sessionGuideVisible: boolean;
+  sprintResultVisible: boolean;
 };
 
 export function isTopLevelChromeVisible(inputs: TopLevelChromeInputs): boolean {
@@ -134,7 +135,8 @@ export function isTopLevelChromeVisible(inputs: TopLevelChromeInputs): boolean {
     && !inputs.personalBestGuideVisible
     && !inputs.personalBestHubVisible
     && !inputs.personalBestRecordsVisible
-    && !inputs.reviewSurfaceOpen;
+    && !inputs.reviewSurfaceOpen
+    && !inputs.sprintResultVisible;
 }
 
 export type ReviewTabBadge = {

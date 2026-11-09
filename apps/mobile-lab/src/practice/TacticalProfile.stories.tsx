@@ -172,9 +172,9 @@ export const TacticalFocusResult: Story = {
   parameters: { __id: "practice--tactical-focus-result" },
   play: async ({ canvasElement }) => {
     await waitForText(canvasElement, "Focused Run complete");
-    await waitForText(canvasElement, "Planned puzzles complete");
+    await waitForText(canvasElement, "Focused Run Result");
     await waitForText(canvasElement, "Unrated");
-    await waitForText(canvasElement, "Avg Solve");
+    await waitForText(canvasElement, "Avg solve");
     await waitForText(canvasElement, "Usually 24s");
     await waitForText(canvasElement, "Back to Practice");
   }

@@ -14,7 +14,7 @@ test("the flagged Replay story stops on the first Unclear attempt", async () => 
   assert.ok(storyEnd > storyStart, "the next story must bound SprintResultFlaggedReplay");
 
   const story = source.slice(storyStart, storyEnd);
-  assert.match(story, /clickTestId\(canvasElement, "review-mistakes-button"\)/);
+  assert.match(story, /clickTestId\(canvasElement, "sprint-result-replay"\)/);
   assert.match(story, /expectTestIdText\(canvasElement, "history-attempt-clear-unclear", "Mark clear"\)/);
   assert.doesNotMatch(
     story,

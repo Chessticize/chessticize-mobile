@@ -1,4 +1,5 @@
 import { isAttemptMarkedUnclear } from "./attempt-clarity.ts";
+import { isAttemptMistake } from "./attempt-outcome.ts";
 import { reviewContextKey } from "./review-schedule-change.ts";
 import type {
   AttemptEvent,
@@ -44,4 +45,15 @@ export function buildSessionReplay(input: {
   }
 
   return items;
+}
+
+/**
+ * The mistakes within a Sprint's Replay set (wrong and timed-out attempts), in
+ * the same order. Sprint Result offers them as "Replay N mistakes" beside the
+ * full Replay of everything to review.
+ */
+export function selectMistakeReplayItems(
+  items: readonly SessionReplayItem[]
+): SessionReplayItem[] {
+  return items.filter((item) => isAttemptMistake(item.attempt.result));
 }

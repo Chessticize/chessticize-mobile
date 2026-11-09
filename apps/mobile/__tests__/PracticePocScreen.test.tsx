@@ -144,7 +144,7 @@ describe("PracticePocScreen", () => {
     const systemBack = createTestSystemBackSource("android");
     const renderer = renderScreen({ systemBack });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-filter-toggle");
     expect(findByTestId(renderer, "history-advanced-filters")).toBeTruthy();
 
@@ -266,7 +266,7 @@ describe("PracticePocScreen", () => {
     systemBack.cancelPredictive();
 
     expect(service.getActiveSprint()).toBeUndefined();
-    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("Time expired");
+    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("Time ran out");
   });
 
   it("cancels a pending Arrow Duel start before its delayed callback can enter practice", () => {
@@ -429,6 +429,10 @@ describe("PracticePocScreen", () => {
       "Was the previous puzzle clear?"
     );
     expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Mark as unclear");
+    // The locked phone session reserves this row at its capped text size (#652).
+    for (const node of findByTestId(renderer, "sprint-unclear-prompt").findAllByType(ReactNative.Text)) {
+      expect(node.props.maxFontSizeMultiplier).toBe(1.25);
+    }
     expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, lightTheme.colors.warning.s50)).toBe(true);
     expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, lightTheme.colors.warning.s500)).toBe(true);
     const promptStyle = findByTestId(renderer, "sprint-unclear-prompt").props.style;
@@ -454,16 +458,16 @@ describe("PracticePocScreen", () => {
       unclear: true
     });
     expect(collectText(findByTestId(renderer, "sprint-unclear-marked"))).toBe("Marked");
-    expect(collectText(findByTestId(renderer, "sprint-result-unclear-summary"))).toContain(
-      "Included in replay"
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("1 to review");
+    expect(findByTestId(renderer, "sprint-result-replay").props.accessibilityLabel).toBe(
+      "Replay 1 attempt to review"
     );
-    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
-      "Replay 1 attempt"
-    );
+    // A correct Unclear attempt is not a mistake, so only the full Replay is offered.
+    expect(() => findByTestId(renderer, "review-mistakes-button")).toThrow();
 
     const historyCountBeforeReplay = service.listHistory().length;
     const ratingBeforeReplay = service.getRating("standard 5/20");
-    press(renderer, "review-mistakes-button");
+    press(renderer, "sprint-result-replay");
 
     expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
     expect(collectText(findByTestId(renderer, "history-attempt-clear-unclear"))).toBe(
@@ -4128,7 +4132,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("history-populated");
     await flushMicrotasks();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
 
     const railTestIDs = new Set(
       collectTestIds(findByTestId(renderer, "history-attempt-history-unclear-themes"))
@@ -4143,7 +4147,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("history-progress");
     await flushMicrotasks();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     await flushMicrotasks();
     expect(findByTestId(renderer, "history-progress-button")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-progress-screen")).toThrow();
@@ -4215,7 +4219,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("history-progress-weakness");
     await flushMicrotasks();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     await flushMicrotasks();
     press(renderer, "history-progress-button");
 
@@ -4240,7 +4244,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("history-progress-speed-weakness");
     await flushMicrotasks();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-progress-button");
 
     const weakness = findByTestId(renderer, "history-clear-weakness");
@@ -4269,7 +4273,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen();
     await flushMicrotasks();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     expect(findByTestId(renderer, "history-progress-button")).toBeTruthy();
 
     press(renderer, "history-progress-button");
@@ -4285,7 +4289,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ systemBack });
     await flushMicrotasks();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     await flushMicrotasks();
     press(renderer, "history-progress-button");
 
@@ -4313,7 +4317,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderScreen({ practiceService: service });
     await flushMicrotasks();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     await flushMicrotasks();
     const visibleHistoryQueryCount = historyViewSpy.mock.calls.length;
     expect(visibleHistoryQueryCount).toBeGreaterThan(0);
@@ -4323,7 +4327,7 @@ describe("PracticePocScreen", () => {
     expect(historyViewSpy).toHaveBeenCalledTimes(visibleHistoryQueryCount);
 
     press(renderer, "settings-tab");
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     expect(() => findByTestId(renderer, "history-progress-screen")).toThrow();
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
   });
@@ -4335,7 +4339,7 @@ describe("PracticePocScreen", () => {
     });
     await flushMicrotasks();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-progress-button");
 
     const progress = findByTestId(renderer, "history-progress-screen");
@@ -4355,7 +4359,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("history-attempt-detail");
     await flushMicrotasks();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attempt-history-unclear");
     expect(findByTestId(renderer, "practice-announcement").props.accessibilityLabel).toBe(
       "Replay screen"
@@ -4380,7 +4384,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("history-filters");
     await flushMicrotasks();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-filter-toggle");
     expect(findByTestId(renderer, "history-theme-disclosure").props.accessibilityState).toEqual({
       expanded: false
@@ -5046,10 +5050,8 @@ describe("PracticePocScreen", () => {
     });
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "1 attempt · Included in replay"
-    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("1 to review");
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe("Replay 1 mistake");
   });
 
   it("automatically marks a Slow correct attempt Unclear and explains the read-only handoff", async () => {
@@ -5161,10 +5163,8 @@ describe("PracticePocScreen", () => {
     press(renderer, "session-abandon");
     press(renderer, "session-abandon-confirm");
 
-    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "1 attempt · Included in replay"
-    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("1 to review");
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe("Replay 1 mistake");
     expect(() => findByTestId(renderer, "sprint-result-unclear-summary")).toThrow();
     expect(service.listReviewQueue()).toHaveLength(1);
   });
@@ -5215,10 +5215,8 @@ describe("PracticePocScreen", () => {
     });
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "1 attempt · Included in replay"
-    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("1 to review");
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe("Replay 1 mistake");
   });
 
   it("summarizes a wrong answer that ends the Sprint instead of showing a next-puzzle notice", async () => {
@@ -5259,7 +5257,7 @@ describe("PracticePocScreen", () => {
 
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
     expect(() => findByTestId(renderer, "sprint-previous-attempt-notice")).toThrow();
-    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe("Replay 1 mistake");
     expect(service.listReviewQueue()).toHaveLength(1);
   });
 
@@ -5374,7 +5372,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("history-populated");
     await flushMicrotasks();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     expect(findByTestId(renderer, "history-attention-filter").props.role).toBe("radiogroup");
     expect(findByTestId(renderer, "history-attention-filter").props.accessibilityLabel).toBe(
       "History view"
@@ -5649,7 +5647,7 @@ describe("PracticePocScreen", () => {
       practiceService: new PracticeService(store)
     });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
 
     expect(findByTestId(renderer, "history-attempt-original-sprint-mistake")).toBeTruthy();
     expect(() => findByTestId(renderer, "history-attempt-correct-review-attempt")).toThrow();
@@ -5699,7 +5697,7 @@ describe("PracticePocScreen", () => {
     const renderer = renderLabScenario("history-populated");
     await flushMicrotasks();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-filter-toggle");
     press(renderer, "history-result-wrong");
 
@@ -6906,7 +6904,7 @@ describe("PracticePocScreen", () => {
       currentTimeMs: () => Date.parse("2026-07-17T12:02:00.000Z"),
       practiceService: createUnclearHistoryReviewService()
     });
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attempt-responsive-unclear-attempt");
 
     const actions = findByTestId(renderer, actionContainer);
@@ -7147,7 +7145,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "practice-mode-custom");
     expect(findByTestId(renderer, "custom-sprint-setup")).toBeTruthy();
     press(renderer, "custom-close");
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
     press(renderer, "review-tab");
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
@@ -7281,6 +7279,8 @@ describe("PracticePocScreen", () => {
     expect(styleEntryMatches(findByTestId(renderer, "session-progress-block").props.style, "flex", 1)).toBe(true);
     expect(styleEntryMatches(findByTestId(renderer, "session-timer-block").props.style, "flex", 1)).toBe(true);
     expect(styleEntryMatches(findByTestId(renderer, "session-mistakes-block").props.style, "flex", 1)).toBe(true);
+    // The mistake pips end at the content edge, under the prompt card's edge.
+    expect(flattenTestStyle(findByTestId(renderer, "session-mistakes-block").props.style).alignItems).toBe("flex-end");
     expect(findByTestId(renderer, "chessboard-king-white-sprite")).toBeTruthy();
     expect(findByTestId(renderer, "practice-prompt-side-glyph")).toBeTruthy();
     expect(flattenTestStyle(findByTestId(renderer, "chessboard-king-white-sprite").props.style).width).toBe(
@@ -7302,7 +7302,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("Rating");
     expect(collectText(findByTestId(renderer, "session-status-metrics"))).not.toContain("0/3");
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("0 / 15");
-    expect(styleEntryMatches(findByTestId(renderer, "session-progress").props.style, "fontSize", 21)).toBe(true);
+    expect(styleEntryMatches(findByTestId(renderer, "session-progress").props.style, "fontSize", lightTheme.typography.numeral.fontSize)).toBe(true);
     expect(styleEntryMatches(findByTestId(renderer, "practice-prompt").props.style, "borderWidth", 1)).toBe(true);
     expect(findByTestId(renderer, "practice-prompt-icon")).toBeTruthy();
     expectText(renderer, "Find the best move");
@@ -7677,14 +7677,14 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     expectText(renderer, "Sprint failed");
-    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("Three mistakes");
+    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("3 mistakes");
     expect(() => findByTestId(renderer, "sprint-unclear-question")).toThrow();
     expect(() => findByTestId(renderer, "sprint-unclear-toggle")).toThrow();
     expect(service.listHistory({ sessionId: service.listSprintSessions().at(-1)?.id })
       .some((attempt) => attempt.unclear === true)).toBe(false);
-    expect(() => findByTestId(renderer, "sprint-result-unclear-count")).toThrow();
-    expect(() => findByTestId(renderer, "sprint-result-unclear-count-column")).toThrow();
-    expect(findByTestId(renderer, "sprint-result-mistakes-count-column")).toBeTruthy();
+    // Three mistakes, no Unclear attempts: Replay opens exactly those three.
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("3 to review");
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe("Replay 3 mistakes");
   });
 
   it("offers resume before starting a new sprint when the service has an active session", () => {
@@ -8097,7 +8097,7 @@ describe("PracticePocScreen", () => {
     await settleArrowDuelReplyHandoff();
     await boardMove(renderer, arrow.puzzle.solutionMoves[1]!);
     await settleFeedbackSnapshot();
-    expectText(renderer, "Sprint complete");
+    expectText(renderer, "Arrow Duel passed");
     expect(collectText(findByTestId(renderer, "sprint-result-solved"))).toContain("1 / 1");
   });
 
@@ -8132,11 +8132,10 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "e2e4");
     await settleFeedbackSnapshot();
 
-    expectText(renderer, "Sprint complete");
-    expect(collectText(findByTestId(renderer, "sprint-result-goal-label"))).toBe("Solve 1 to pass");
-    expect(collectText(findByTestId(renderer, "sprint-result-solved"))).toBe("Solved 1");
+    expectText(renderer, "Sprint passed");
+    expect(collectText(findByTestId(renderer, "sprint-result-solved"))).toBe("1 / 1");
     expect(collectText(findByTestId(renderer, "sprint-result-accuracy"))).toBe(
-      "2 attempted · 50% Accuracy"
+      "2 attempted · 50% accuracy"
     );
   });
 
@@ -8889,11 +8888,16 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "session-timer-block")).toThrow();
     expect(() => findByTestId(renderer, "session-timer")).toThrow();
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("14 solved");
+    // The HUD sizes its values up to the 2x cap itself (#652) and keeps
+    // shrink-to-fit as a safety net.
     expect(findByTestId(renderer, "session-progress").props).toMatchObject({
       adjustsFontSizeToFit: true,
-      minimumFontScale: 0.75,
+      allowFontScaling: false,
+      minimumFontScale: 0.5,
       numberOfLines: 1
     });
+    expect(flattenTestStyle(findByTestId(renderer, "session-progress").props.style).textAlign)
+      .toBe("left");
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
       "Mistakes 1 of 3"
     );
@@ -9438,7 +9442,7 @@ describe("PracticePocScreen", () => {
       sprintRulesDesignPreview: { ...preview, resultFocusedRunPace: { averageSolveSeconds: 17 } }
     });
     const averageOnly = findByTestId(withoutUsual, "sprint-result-average-solve");
-    expect(collectText(averageOnly)).toBe("Avg Solve17s");
+    expect(collectText(averageOnly)).toBe("Avg solve17s");
     expect(averageOnly.props.accessibilityLabel).toBe("Average solve 17 seconds");
     expect(() => findByTestId(withoutUsual, "sprint-result-usual-solve")).toThrow();
 
@@ -9446,7 +9450,7 @@ describe("PracticePocScreen", () => {
       sprintRulesDesignPreview: { ...preview, resultFocusedRunPace: {} }
     });
     const unavailable = findByTestId(withoutAverage, "sprint-result-average-solve");
-    expect(collectText(unavailable)).toBe("Avg Solve—");
+    expect(collectText(unavailable)).toBe("Avg solve—");
     expect(unavailable.props.accessibilityLabel).toBe("Average solve time unavailable");
   });
 
@@ -9457,9 +9461,8 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "sprint-result-top-bar"))).toContain(
       "Focused Run Result"
     );
-    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe(
-      "Planned puzzles complete"
-    );
+    // A Focused Run completes its planned puzzles; the outcome needs no reason line.
+    expect(() => findByTestId(renderer, "sprint-result-reason")).toThrow();
     expect(collectText(findByTestId(renderer, "sprint-result-rating-change"))).toContain(
       "Unrated"
     );
@@ -9468,7 +9471,7 @@ describe("PracticePocScreen", () => {
     );
     // Average solve against the player's usual pace replaces Best Streak.
     const averageSolve = findByTestId(renderer, "sprint-result-average-solve");
-    expect(collectText(averageSolve)).toBe("Avg Solve17sUsually 24s");
+    expect(collectText(averageSolve)).toBe("Avg solve17sUsually 24s");
     expect(averageSolve.props.accessibilityLabel).toBe(
       "Average solve 17 seconds, usually 24 seconds on these themes"
     );
@@ -9518,8 +9521,62 @@ describe("PracticePocScreen", () => {
       .findAllByType(ReactNative.Text)
       .find((node) => collectText(node) === "Completed");
 
-    expect(flattenTestStyle(unratedText?.props.style).fontSize).toBe(16);
+    expect(flattenTestStyle(unratedText?.props.style).fontSize).toBe(lightTheme.typography.numeralRow.fontSize);
     expect(completedText?.props.adjustsFontSizeToFit).toBe(true);
+  });
+
+  // #652: at the largest text size on a short phone the HUD keeps one row so
+  // the board keeps its room; the three values share one size that fits the
+  // row's thirds, and shrink-to-fit stays on as a safety net.
+  it("keeps the phone HUD on one row with one shared value size at the largest text", () => {
+    setPracticeViewport({
+      width: 375,
+      height: 667,
+      scale: 2,
+      fontScale: 3.571,
+      insets: { top: 20, right: 0, bottom: 0, left: 0 }
+    });
+    const renderer = renderLabScenario("practice-tactical-focus-active");
+    const unratedText = (): ReactNative.Text | undefined => findByTestId(renderer, "session-rating-policy")
+      .findAllByType(ReactNative.Text)
+      .find((node) => collectText(node) === "Unrated") as unknown as ReactNative.Text | undefined;
+    const valueSizes = (): number[] => [
+      findByTestId(renderer, "session-progress"),
+      findByTestId(renderer, "session-timer"),
+      unratedText() as unknown as TestRenderer.ReactTestInstance
+    ].map((node) => Number(flattenTestStyle(node.props.style).fontSize));
+
+    expect(styleEntryMatches(findByTestId(renderer, "session-timer-block").props.style, "flexGrow", 0)).toBe(false);
+    // Before the row is measured, values grow to the HUD cap.
+    expect(valueSizes()).toEqual([44, 44, 44]);
+    act(() => {
+      findByTestId(renderer, "session-status-metrics").props.onLayout({
+        nativeEvent: { layout: { height: 59, width: 343, x: 16, y: 97 } }
+      });
+    });
+    // "10 / 15" and "Unrated" are the longest values: (343 - 12) / 3 points
+    // per value at 0.6 em per character.
+    const shared = Math.round(22 * ((343 - 12) / 3 / (7 * 0.6 * 22)) * 10) / 10;
+    expect(valueSizes()).toEqual([shared, shared, shared]);
+    for (const testID of ["session-progress", "session-timer"]) {
+      const value = findByTestId(renderer, testID);
+      expect(value.props.allowFontScaling).toBe(false);
+      expect(value.props.adjustsFontSizeToFit).toBe(true);
+    }
+    // The row lines up with the prompt and score strip: progress at the
+    // leading edge, the timer centred, Unrated at the trailing edge.
+    expect(flattenTestStyle(findByTestId(renderer, "session-progress").props.style).textAlign).toBe("left");
+    expect(flattenTestStyle(findByTestId(renderer, "session-timer").props.style).textAlign).toBe("center");
+    expect(flattenTestStyle(unratedText()?.props.style).textAlign).toBe("right");
+  });
+
+  it("caps the previous-attempt notice copy so the locked phone session keeps it on screen", () => {
+    const renderer = renderLabScenario("practice-slow-unclear-notice");
+    const texts = findByTestId(renderer, "sprint-previous-attempt-notice").findAllByType(ReactNative.Text);
+    expect(texts.length).toBeGreaterThan(1);
+    for (const node of texts) {
+      expect(node.props.maxFontSizeMultiplier).toBe(1.25);
+    }
   });
 
   it("explains fixed and unrated semantics before a first Focused Run", () => {
@@ -9543,32 +9600,31 @@ describe("PracticePocScreen", () => {
   it("separates the fixed pass goal from actual attempts in the Storybook result designs", () => {
     const failed = renderLabScenario("practice-sprint-result-goal");
 
-    expect(collectText(findByTestId(failed, "sprint-result-goal-label"))).toBe("Solve 15 to pass");
-    expect(collectText(findByTestId(failed, "sprint-result-solved"))).toBe("Solved 11");
+    // The hero shows Solved against the pass target; the line below reports attempts.
+    expect(collectText(findByTestId(failed, "sprint-result-solved"))).toBe("11 / 15");
+    expect(findByTestId(failed, "sprint-result-solved").props.accessibilityLabel).toBe(
+      "Solved 11 of 15 to pass"
+    );
     expect(collectText(findByTestId(failed, "sprint-result-accuracy"))).toBe(
-      "12 attempted · 92% Accuracy"
+      "12 attempted · 92% accuracy"
     );
     expect(() => findByTestId(failed, "sprint-unclear-prompt")).toThrow();
     expect(() => findByTestId(failed, "sprint-unclear-toggle")).toThrow();
-    expect(collectText(findByTestId(failed, "sprint-result-unclear-sources"))).toBe(
-      "1 marked by you · 1 marked after Slow"
+    expect(collectText(findByTestId(failed, "sprint-result-review-count"))).toBe("4 to review");
+    expect(() => findByTestId(failed, "sprint-result-review-note")).toThrow();
+    press(failed, "sprint-result-review-info");
+    expect(collectText(findByTestId(failed, "sprint-result-review-note"))).toContain(
+      "4 puzzles to look at again: 2 Unclear and 2 In Review."
     );
-    expect(collectText(findByTestId(failed, "sprint-result-unclear-count"))).toBe("2");
-    expect(findByTestId(failed, "sprint-result-unclear-count-column")).toBeTruthy();
-    expect(findByTestId(failed, "sprint-result-mistakes-count-column")).toBeTruthy();
+    expect(collectText(findByTestId(failed, "sprint-result-review-note"))).toContain(
+      "Unclear: 1 marked by you, 1 marked after Slow. Unclear does not change your Sprint result."
+    );
 
     const passed = renderLabScenario("practice-sprint-result-extra-attempt");
 
-    expect(collectText(findByTestId(passed, "sprint-result-goal-label"))).toBe("Solve 15 to pass");
-    expect(collectText(findByTestId(passed, "sprint-result-solved"))).toBe("Solved 15");
+    expect(collectText(findByTestId(passed, "sprint-result-solved"))).toBe("15 / 15");
     expect(collectText(findByTestId(passed, "sprint-result-accuracy"))).toBe(
-      "16 attempted · 94% Accuracy"
-    );
-    expect(collectText(findByTestId(passed, "sprint-result-unclear-sources"))).toBe(
-      "1 marked after Slow"
-    );
-    expect(collectText(findByTestId(passed, "sprint-result-unclear-summary"))).toContain(
-      "Does not affect your Sprint result"
+      "16 attempted · 94% accuracy"
     );
   });
 
@@ -9631,7 +9687,7 @@ describe("PracticePocScreen", () => {
     expectText(renderer, "1 / 15");
 
     abandonSprint(renderer);
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     expectHistoryRowAccessibility(renderer, "Move c2b1");
   });
@@ -9739,7 +9795,7 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     abandonSprint(renderer);
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     expectHistoryRowAccessibility(renderer, "Move e6f7");
     expect(collectText(renderer.root)).not.toContain("000hf · standard");
@@ -9760,7 +9816,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "error-panel"))).toContain("Practice write failed");
     expect(moveFeedbackClient.requests).toEqual([]);
     abandonSprint(renderer);
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     expect(findByTestId(renderer, "history-empty-state").props.accessibilityLabel).toBe("History has no attempts");
     expect(collectText(findByTestId(renderer, "history-empty-state"))).toBe("No attempts");
     expect(historyAttemptRows(renderer)).toHaveLength(0);
@@ -9789,8 +9845,11 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
 
-    // Leaving the session restores scrolling.
+    // Leaving the session restores scrolling. An abandoned Sprint with a
+    // submitted move first shows its full-screen result; Done returns home.
     abandonSprint(renderer);
+    expect(collectText(findByTestId(renderer, "sprint-result-outcome"))).toBe("Sprint abandoned");
+    press(renderer, "back-practice-button");
     expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
   });
 
@@ -10152,7 +10211,7 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     abandonSprint(renderer);
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     expectText(renderer, "No attempts");
   });
 
@@ -10234,7 +10293,7 @@ describe("PracticePocScreen", () => {
     expect(hasBoardSquareTint(renderer.root, lightTheme.colors.board.lastMoveSquare)).toBe(false);
 
     abandonSprint(renderer);
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     expectHistoryRowAccessibility(renderer, "Played e6d7 · Best e6f7");
   });
 
@@ -10789,10 +10848,8 @@ describe("PracticePocScreen", () => {
     });
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "1 attempt · Included in replay"
-    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("1 to review");
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe("Replay 1 mistake");
   });
 
   it("shows a terminal Arrow Duel reply timeout before opening the summary", async () => {
@@ -10835,10 +10892,8 @@ describe("PracticePocScreen", () => {
     });
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "1 attempt · Included in replay"
-    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("1 to review");
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe("Replay 1 mistake");
   });
 
   it("shows a terminal Arrow Duel choice timeout when its board callback reaches the deadline first", async () => {
@@ -10881,10 +10936,8 @@ describe("PracticePocScreen", () => {
     });
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "1 attempt · Included in replay"
-    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("1 to review");
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe("Replay 1 mistake");
   });
 
   it("shows a terminal Arrow Duel reply timeout when its board callback reaches the deadline first", async () => {
@@ -10930,10 +10983,8 @@ describe("PracticePocScreen", () => {
     });
     expect(() => findByTestId(renderer, "session-puzzle-timeout-overlay")).toThrow();
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "1 attempt · Included in replay"
-    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("1 to review");
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe("Replay 1 mistake");
   });
 
   it("excludes the opponent-reply pause from Sprint Result time", async () => {
@@ -10968,7 +11019,7 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-time"))).toBe("Time00:05");
+    expect(collectText(findByTestId(renderer, "sprint-result-time"))).toBe("Time0:05");
   });
 
   it("ignores non-candidate Arrow Duel board moves without recording attempts", async () => {
@@ -10995,7 +11046,7 @@ describe("PracticePocScreen", () => {
     expect(trace.some((event) => event.type === "move-ignored" && event.reason === "arrow-duel-non-candidate")).toBe(true);
 
     abandonSprint(renderer);
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     expectText(renderer, "No attempts");
   });
 
@@ -11015,7 +11066,7 @@ describe("PracticePocScreen", () => {
     expect(hasBoardSquareTint(renderer.root, lightTheme.colors.danger.flash)).toBe(false);
 
     abandonSprint(renderer);
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     expectText(renderer, "No attempts");
   });
 
@@ -11492,51 +11543,44 @@ describe("PracticePocScreen", () => {
       jest.advanceTimersByTime(301_000);
     });
 
-    expectText(renderer, "Sprint failed");
-    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("Time expired");
-    expect(findByTestId(renderer, "sprint-result-reason").props.accessibilityLabel).toBe("Result: Time expired");
-    expect(collectText(renderer.root)).not.toContain("Result: Time expired");
-    expect(findByTestId(renderer, "sprint-result-top-bar")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-top-bar"))).toContain("Sprint Result");
-    expect(collectText(findByTestId(renderer, "sprint-result-top-bar"))).not.toContain("History");
+    // Direction A full-screen result (#609): no Practice title or tab bar.
+    expect(() => findByTestId(renderer, "app-shell-header")).toThrow();
+    expect(() => findByTestId(renderer, "practice-main-scroll")).toThrow();
+    expect(collectText(findByTestId(renderer, "sprint-result-headline"))).toBe("Sprint failed");
+    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("Time ran out");
+    expect(findByTestId(renderer, "sprint-result-outcome").props.accessibilityLabel).toBe(
+      "Sprint failed · Time ran out"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-title"))).toBe("Sprint Result");
     expect(findByTestId(renderer, "sprint-result-hero")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-result-status-glyph")).toBeTruthy();
-    expect(findByTestId(renderer, "sprint-result-failed-glyph")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "sprint-result-status-glyph"))).toBe("");
-    expect(findByTestId(renderer, "sprint-result-solved")).toBeTruthy();
-    expect(findByTestId(renderer, "sprint-result-accuracy")).toBeTruthy();
-    expect(findByTestId(renderer, "sprint-result-rating-change")).toBeTruthy();
+    expect(collectText(findByTestId(renderer, "sprint-result-solved"))).toBe("0 / 15");
+    expect(collectText(findByTestId(renderer, "sprint-result-accuracy"))).toBe("0 attempted · 0% accuracy");
     expect(findByTestId(renderer, "sprint-result-time")).toBeTruthy();
     expect(findByTestId(renderer, "sprint-result-best-streak")).toBeTruthy();
-    expect(findByTestId(renderer, "sprint-result-mistakes")).toBeTruthy();
-    expect(() => findByTestId(renderer, "sprint-result-details")).toThrow();
-    expect(() => findByTestId(renderer, "sprint-result-rating-card")).toThrow();
-    expect(collectText(findByTestId(renderer, "sprint-result-rating-range"))).toContain("600");
-    expect(collectText(findByTestId(renderer, "sprint-result-rating-change"))).toContain("600 -> 600");
-    expect(findByTestId(renderer, "sprint-result-review-impact")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("In Review");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("0 attempts");
-    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("0");
-    expect(() => findByTestId(renderer, "sprint-result-rating-snapshot")).toThrow();
-    expect(findByTestId(renderer, "sprint-result-history-trend")).toBeTruthy();
-    expect(() => findByTestId(renderer, "sprint-result-trend-plot")).toThrow();
-    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("History");
-    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).toContain("View performance trend");
-    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).not.toContain("Rating Trend");
-    expect(collectText(findByTestId(renderer, "sprint-result-history-trend"))).not.toContain("History keeps the full performance chart");
-    expect(findByTestId(renderer, "sprint-result-history-trend").props.accessibilityLabel).toContain("rating 600 to 600");
-    expect(collectText(findByTestId(renderer, "sprint-result-trend-start"))).toBe("600");
-    expect(collectText(findByTestId(renderer, "sprint-result-trend-current"))).toBe("600");
-    expectText(renderer, "In Review");
-    expect(findByTestId(renderer, "sprint-result-history-button")).toBeTruthy();
-    expect(collectText(findByTestId(renderer, "sprint-result-history-button"))).toBe("");
-    expect(findByTestId(renderer, "sprint-result-history-button").props.accessibilityLabel).toBe("View history trends");
-    expect(findByTestId(renderer, "result-trend-glyph")).toBeTruthy();
-    expect(findByTestId(renderer, "back-practice-button")).toBeTruthy();
-    expect(() => findByTestId(renderer, "sprint-result-done-button")).toThrow();
-    press(renderer, "sprint-result-history-trend");
+    expect(collectText(findByTestId(renderer, "sprint-result-rating-change"))).toBe("Rating0600\u00a0\u2192\u00a0600");
+    expect(findByTestId(renderer, "sprint-result-rating-change").props.accessibilityLabel).toBe(
+      "Rating unchanged, from 600 to 600"
+    );
+    // The History rating row is gone; the trend lives in the top-bar button.
+    expect(() => findByTestId(renderer, "sprint-result-history-trend")).toThrow();
+    // Time ran out mid-puzzle: the final Incomplete attempt ran past Slow, so it
+    // is already Unclear and is the one item to review. There were no mistakes,
+    // so there is no Replay mistakes action.
+    expect(collectText(findByTestId(renderer, "sprint-unclear-question"))).toBe("Was the final puzzle unclear?");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("1 to review");
+    expect(() => findByTestId(renderer, "review-mistakes-button")).toThrow();
+    expect(collectText(findByTestId(renderer, "play-again-button"))).toBe("Play again");
+    expect(findByTestId(renderer, "sprint-result-history-button").props.accessibilityLabel).toBe(
+      "View rating trend in History"
+    );
+    expect(findByTestId(renderer, "back-practice-button").props.accessibilityLabel).toBe("Done");
+    press(renderer, "sprint-result-history-button");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
+    // Practice still holds the finished Sprint, so returning shows its result.
     press(renderer, "practice-tab");
+    expect(findByTestId(renderer, "sprint-summary-panel")).toBeTruthy();
     press(renderer, "sprint-result-history-button");
     expect(findByTestId(renderer, "history-panel")).toBeTruthy();
     expect(findByTestId(renderer, "history-performance-card")).toBeTruthy();
@@ -11588,7 +11632,7 @@ describe("PracticePocScreen", () => {
       press(renderer, "back-practice-button");
     }
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-filter-toggle");
     press(renderer, "history-rating-standard 5/20");
     const plotWidth = 300;
@@ -11650,7 +11694,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "g6g5");
     abandonSprint(renderer);
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     expect(() => findByTestId(renderer, "app-shell-header")).toThrow();
     expect(collectText(findByTestId(renderer, "history-action-header"))).not.toContain("Filters");
@@ -11922,7 +11966,7 @@ describe("PracticePocScreen", () => {
       }
     });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     const themes = collectText(findByTestId(renderer, "history-attempt-curated-density-themes"));
     expect(themes).toContain("Advanced Pawn");
@@ -12029,7 +12073,7 @@ describe("PracticePocScreen", () => {
       practiceService: service
     });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     expect(findByTestId(renderer, "history-empty-state")).toBeTruthy();
     press(renderer, "history-attention-all");
     expect(findByTestId(renderer, "history-attempt-clean-manual-review-attempt")).toBeTruthy();
@@ -12073,7 +12117,7 @@ describe("PracticePocScreen", () => {
       practiceService: service
     });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     expect(() => findByTestId(renderer, "history-quick-filters")).toThrow();
     expect(findByTestId(renderer, "history-attention-needs-attention").props.accessibilityState).toEqual({
       checked: true
@@ -12140,7 +12184,7 @@ describe("PracticePocScreen", () => {
       practiceService: service
     });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     press(renderer, "history-attempt-review-removal-failure");
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Due today");
@@ -12191,7 +12235,7 @@ describe("PracticePocScreen", () => {
     });
     await act(async () => {});
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     press(renderer, "history-attempt-review-reminder-failure");
     press(renderer, "review-schedule-remove");
@@ -12208,7 +12252,7 @@ describe("PracticePocScreen", () => {
 
     startStandardSprint(renderer);
     abandonSprint(renderer);
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     expect(() => findByTestId(renderer, "history-filter-reset")).toThrow();
 
     press(renderer, "history-filter-toggle");
@@ -12278,7 +12322,7 @@ describe("PracticePocScreen", () => {
       })
     });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
 
@@ -12309,7 +12353,7 @@ describe("PracticePocScreen", () => {
     }
     const renderer = renderScreen({ practiceService: service });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-rating-standard 5/20");
@@ -12395,7 +12439,7 @@ describe("PracticePocScreen", () => {
       practiceService: new PracticeService(store)
     });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attempt-attention-wrong");
     expectText(renderer, "1 / 3 · Standard");
     expect(findByTestId(renderer, "review-next").props.disabled).toBe(false);
@@ -12422,7 +12466,7 @@ describe("PracticePocScreen", () => {
     }
     const renderer = renderScreen({ practiceService: service });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-rating-standard 5/20");
@@ -12463,7 +12507,7 @@ describe("PracticePocScreen", () => {
     }, "2026-06-20T00:01:00.000Z");
     const renderer = renderScreen({ practiceService: new PracticeService(store) });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-range-max");
@@ -12517,7 +12561,7 @@ describe("PracticePocScreen", () => {
 
     nowMs = new Date(2026, 6, 28, 0, 10).getTime();
     jest.setSystemTime(nowMs);
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
 
     expect(collectText(findByTestId(renderer, "history-attempt-same-day-attempt-meta"))).toBe(
@@ -12548,7 +12592,7 @@ describe("PracticePocScreen", () => {
     service.archivePracticeRun(run.id, "2026-06-20T12:01:00.000Z");
     const renderer = renderScreen({ practiceService: service, runManagementEnabled: true });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-range-max");
@@ -12569,7 +12613,7 @@ describe("PracticePocScreen", () => {
     }));
     const renderer = renderScreen({ practiceService: new PracticeService(store) });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-range-max");
@@ -12662,7 +12706,7 @@ describe("PracticePocScreen", () => {
       systemBack
     });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-range-max");
@@ -12751,7 +12795,7 @@ describe("PracticePocScreen", () => {
     });
     const renderer = renderScreen({ practiceService: new PracticeService(store) });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     press(renderer, "history-filter-toggle");
     press(renderer, "history-range-max");
@@ -12825,7 +12869,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "g6g5");
     abandonSprint(renderer);
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     const correctAttemptRow = historyAttemptRows(renderer)
       .find((row) => collectText(row).includes("Correct"));
@@ -12911,7 +12955,7 @@ describe("PracticePocScreen", () => {
     await boardMove(renderer, "g6g5");
     abandonSprint(renderer);
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     const historyAttemptRows = renderer.root.findAll(
       (node) => typeof node.props.testID === "string" && node.props.testID.startsWith("history-attempt-")
@@ -12961,7 +13005,7 @@ describe("PracticePocScreen", () => {
     }, completedAt);
     const renderer = renderScreen({ practiceService: service });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-filter-toggle");
     press(renderer, "history-source-review");
     press(renderer, "history-rating-arrow duel 5/30");
@@ -13126,46 +13170,44 @@ describe("PracticePocScreen", () => {
     await settleFeedbackSnapshot();
 
     expectText(renderer, "Sprint failed");
-    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("Three mistakes");
-    expect(findByTestId(renderer, "sprint-result-reason").props.accessibilityLabel).toBe("Result: Three mistakes");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain("In Review");
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "3 attempts · Included in replay"
+    expect(collectText(findByTestId(renderer, "sprint-result-reason"))).toBe("3 mistakes");
+    expect(findByTestId(renderer, "sprint-result-outcome").props.accessibilityLabel).toBe(
+      "Sprint failed · 3 mistakes"
+    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("3 to review");
+    press(renderer, "sprint-result-review-info");
+    expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
+      "3 puzzles to look at again: 3 In Review."
     );
     expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
-      "0 Unclear + 3 in Review · 3 total"
+      "Replaying them does not change when they come back in Review."
     );
-    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("3");
     expect(collectText(renderer.root)).not.toContain("Start new sprint");
     const reviewButton = findByTestId(renderer, "review-mistakes-button");
     const playAgainButton = findByTestId(renderer, "play-again-button");
-    expect(reviewButton).toBeTruthy();
-    expect(playAgainButton).toBeTruthy();
-    expect(collectText(reviewButton)).toContain("Replay 3 attempts");
-    expect(hasStyleEntry(reviewButton, "backgroundColor", lightTheme.colors.accent.fill)).toBe(true);
-    expect(hasStyleEntry(playAgainButton, "backgroundColor", lightTheme.colors.accent.fill)).toBe(false);
+    expect(collectText(reviewButton)).toBe("Replay 3 mistakes");
+    // Play again is the primary action at the bottom; Replay mistakes sits above it.
+    expect(flattenTestStyle(playAgainButton.findByType(ReactNative.Text).props.style).color)
+      .toBe(lightTheme.colors.text.onAccent);
+    expect(flattenTestStyle(reviewButton.findByType(ReactNative.Text).props.style).color)
+      .toBe(lightTheme.colors.accent.s600);
+    expect(testIdOrder(renderer, "review-mistakes-button", "play-again-button")).toBeLessThan(0);
   });
 
   it("previews two Unclear and two In Review attempts as a four-entry Replay with status actions", async () => {
     const renderer = renderLabScenario("practice-sprint-result-replay");
 
-    expect(collectText(findByTestId(renderer, "sprint-result-unclear-summary"))).toContain(
-      "Included in replay"
-    );
-    expect(collectText(findByTestId(renderer, "sprint-result-review-impact"))).toContain(
-      "In Review"
-    );
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("4 to review");
+    press(renderer, "sprint-result-review-info");
     expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
-      "2 Unclear + 2 in Review"
+      "4 puzzles to look at again: 2 Unclear and 2 In Review."
     );
-    expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
-      "4 total"
-    );
+    // The row replays all four; the button replays only the two mistakes.
     expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
-      "Replay 4 attempts"
+      "Replay 2 mistakes"
     );
 
-    press(renderer, "review-mistakes-button");
+    press(renderer, "sprint-result-replay");
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
     expect(collectText(findByTestId(renderer, "review-title"))).toBe("Replay");
@@ -13254,12 +13296,13 @@ describe("PracticePocScreen", () => {
       }
     });
 
+    expect(collectText(findByTestId(renderer, "sprint-result-review-count"))).toBe("3 to review");
+    press(renderer, "sprint-result-review-info");
     expect(collectText(findByTestId(renderer, "sprint-result-review-note"))).toContain(
-      "2 Unclear + 2 in Review · 1 in both · 3 total"
+      "3 puzzles to look at again: 2 Unclear and 2 In Review (1 is both)."
     );
-    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe(
-      "Replay 3 attempts"
-    );
+    // All three attempts were correct, so there are no mistakes to replay.
+    expect(() => findByTestId(renderer, "review-mistakes-button")).toThrow();
   });
 
   it("opens a one-shot mistake review after a timeout-only sprint failure", async () => {
@@ -13291,7 +13334,7 @@ describe("PracticePocScreen", () => {
       jest.advanceTimersByTime(800);
     });
     expectText(renderer, "Sprint failed");
-    expect(collectText(findByTestId(renderer, "sprint-result-mistakes"))).toBe("1");
+    expect(collectText(findByTestId(renderer, "review-mistakes-button"))).toBe("Replay 1 mistake");
     press(renderer, "review-mistakes-button");
 
     expect(findByTestId(renderer, "review-session")).toBeTruthy();
@@ -14021,7 +14064,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "review-line-continue")).toThrow();
     expect(findByTestId(renderer, "review-panel")).toBeTruthy();
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-filter-toggle");
     press(renderer, "history-source-review");
     expectHistoryRowAccessibility(renderer, "Played c4b5 · Best e2e6");
@@ -14133,7 +14176,7 @@ describe("PracticePocScreen", () => {
     });
 
     press(renderer, "review-exit");
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-filter-toggle");
     press(renderer, "history-source-review");
 
@@ -14781,7 +14824,7 @@ describe("PracticePocScreen", () => {
     });
     const renderer = renderScreen({ practiceService: new PracticeService(store) });
 
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-attention-all");
     press(renderer, "history-attempt-final-position-analysis");
     await settleEntryPreview();
@@ -15117,7 +15160,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "move-feedback-overlay")).toThrow();
 
     abandonSprint(renderer);
-    press(renderer, "history-tab");
+    pressHistoryTab(renderer);
     press(renderer, "history-filter-toggle");
     press(renderer, "history-rating-standard 5/20");
     expect(collectText(findByTestId(renderer, "history-performance-card"))).toContain("Rating Trend");
@@ -17065,7 +17108,7 @@ function renderStoredArrowDuelReplay(): TestRenderer.ReactTestRenderer {
   }, completedAt);
   const renderer = renderScreen({ practiceService: service });
 
-  press(renderer, "history-tab");
+  pressHistoryTab(renderer);
   press(renderer, "history-filter-toggle");
   press(renderer, "history-source-review");
   press(renderer, "history-rating-arrow duel 5/30");
@@ -17636,6 +17679,15 @@ function requireArrowDuelState(state: SprintState | undefined): ArrowDuelState {
     throw new Error("Expected an active Arrow Duel puzzle");
   }
   return state.currentPuzzle;
+}
+
+// The full-screen Sprint Result hides the tab bar (#609); leave it with Done
+// before switching tabs, as a user would.
+function pressHistoryTab(renderer: TestRenderer.ReactTestRenderer): void {
+  if (renderer.root.findAllByProps({ testID: "back-practice-button" }).length > 0) {
+    press(renderer, "back-practice-button");
+  }
+  press(renderer, "history-tab");
 }
 
 function press(renderer: TestRenderer.ReactTestRenderer, testID: string): void {

@@ -4,6 +4,8 @@ import { useWindowDimensions } from "react-native";
 export type PracticeViewportOverride = {
   width: number;
   height: number;
+  /** Simulated Dynamic Type scale (Interaction Lab); native reads the system value. */
+  fontScale?: number;
 };
 
 const PracticeViewportContext = createContext<PracticeViewportOverride | null>(null);

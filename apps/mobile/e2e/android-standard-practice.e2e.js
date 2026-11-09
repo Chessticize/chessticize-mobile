@@ -60,15 +60,15 @@ describe(`Android Standard Practice offline persistence (${standardFixture.puzzl
     await waitFor(element(by.text('For black.'))).toExist().withTimeout(10000);
     await playBoardMove('session-board', standardFixture.userMoves[1], true);
 
-    await waitFor(element(by.text('Sprint complete'))).toBeVisible().withTimeout(30000);
+    await waitFor(element(by.id('sprint-result-outcome'))).toBeVisible().withTimeout(30000);
     await waitForElementTextContaining(
       'sprint-result-solved',
-      `Solved ${standardFixture.targetCorrect}`,
+      `${standardFixture.targetCorrect} / `,
       10000
     );
     await waitForElementTextContaining(
       'sprint-result-rating-range',
-      `${standardFixture.expectedRatingBefore} -> ${standardFixture.expectedRatingAfter}`,
+      `${standardFixture.expectedRatingBefore}\u00a0\u2192\u00a0${standardFixture.expectedRatingAfter}`,
       10000
     );
 

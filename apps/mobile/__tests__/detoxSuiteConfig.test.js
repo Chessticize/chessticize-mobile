@@ -981,13 +981,16 @@ describe('Detox suite configuration', () => {
     const helper = helpers.slice(helperStart, helperEnd);
     const waitForExist = helper.indexOf('.toExist().withTimeout(180000)');
     const acceptAlreadyVisible = helper.indexOf('await expect(target).toBeVisible()');
-    const restoreTop = helper.indexOf("element(by.id('practice-main-scroll')).scrollTo('top')");
+    // The full-screen Sprint Result owns its own scroll view (#609).
+    const chooseScroll = helper.indexOf("existingTestID('sprint-result-scroll') ? 'sprint-result-scroll' : 'practice-main-scroll'");
+    const restoreTop = helper.indexOf("element(by.id(scrollID)).scrollTo('top')");
     const requireVisible = helper.indexOf('.toBeVisible()', restoreTop);
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
 
     expect(waitForExist).toBeGreaterThan(0);
     expect(acceptAlreadyVisible).toBeGreaterThan(waitForExist);
-    expect(restoreTop).toBeGreaterThan(acceptAlreadyVisible);
+    expect(chooseScroll).toBeGreaterThan(acceptAlreadyVisible);
+    expect(restoreTop).toBeGreaterThan(chooseScroll);
     expect(restoreTop).toBeGreaterThan(waitForExist);
     expect(requireVisible).toBeGreaterThan(restoreTop);
     expect(scrollDown).toBeGreaterThan(requireVisible);
