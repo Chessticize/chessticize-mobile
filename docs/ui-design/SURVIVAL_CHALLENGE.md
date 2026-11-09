@@ -254,11 +254,12 @@ The Challenge Hub opens a dedicated `Survival records` page that owns:
 Back from records returns to the Challenge Hub, preserving the user's current
 type, Rating source, and level selection.
 
-The result keeps Review impact in the same neutral `In Review` card used by a
-Sprint; only its compact count remains red. `Play again` is the explicit
-continue action. A top-left Back control and the bottom `Done` action both
-return to Practice Home; the result does not push the player into challenge
-setup.
+The result is a full-screen sibling of the Sprint Result (direction A, #609;
+layout in [Mobile UI Design](./MOBILE_UI_DESIGN.md#sprint-results)). It keeps
+Review impact in a neutral `In Review` row; only its compact count is red.
+`Play again` is the primary continue action. A top-left Back control and the
+bottom `Done` action both return to Practice Home; the result does not push
+the player into challenge setup.
 
 ## Arrow Duel
 

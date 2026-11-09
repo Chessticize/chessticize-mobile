@@ -1205,6 +1205,51 @@ export const PersonalBestResult: Story = {
     await waitForTestId(canvasElement, "personal-best-result-back");
     await expectTestIdText(canvasElement, "personal-best-result-done", "Done");
     expectTestIdAbsent(canvasElement, "personal-best-result-change-challenge");
+    expectTestIdAbsent(canvasElement, "personal-best-result-progress");
+  }
+};
+
+export const PersonalBestResultLargestText: Story = {
+  name: "Survival · new record · largest text",
+  args: { scenarioId: "practice-personal-best-result" },
+  render: (args) => (
+    <LabTextSize fontScale={LARGEST_ACCESSIBILITY_FONT_SCALE}>
+      <LabScenario {...args} />
+    </LabTextSize>
+  ),
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "personal-best-result");
+    await expectTestIdText(canvasElement, "personal-best-result-score", "19");
+    expectTestIdAbsent(canvasElement, "personal-best-result-split");
+  }
+};
+
+export const SurvivalResultNoBest: Story = {
+  name: "Survival · result without a new best",
+  args: { scenarioId: "practice-personal-best-result-no-best" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "personal-best-result");
+    await expectTestIdText(canvasElement, "personal-best-result-score", "14");
+    await expectTestIdText(canvasElement, "personal-best-result-comparison", "5 short of best 19");
+    await waitForTestId(canvasElement, "personal-best-result-progress");
+    await waitForText(canvasElement, "Run complete");
+    await waitForText(canvasElement, "14 solved · 9:05 active · 1 sitting");
+    expectTestIdAbsent(canvasElement, "personal-best-result-trophy");
+    await expectTestIdText(canvasElement, "personal-best-result-try-again", "Play again");
+  }
+};
+
+export const SurvivalResultNoBestLargestText: Story = {
+  name: "Survival · result without a new best · largest text",
+  args: { scenarioId: "practice-personal-best-result-no-best" },
+  render: (args) => (
+    <LabTextSize fontScale={LARGEST_ACCESSIBILITY_FONT_SCALE}>
+      <LabScenario {...args} />
+    </LabTextSize>
+  ),
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "personal-best-result");
+    await expectTestIdText(canvasElement, "personal-best-result-score", "14");
   }
 };
 

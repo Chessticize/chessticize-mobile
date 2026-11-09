@@ -406,6 +406,7 @@ function isRunManagementScenario(scenarioId: LabScenarioId): boolean {
     "practice-personal-best-active",
     "practice-personal-best-record",
     "practice-personal-best-result",
+    "practice-personal-best-result-no-best",
     "practice-personal-best-pool-cleared",
     "practice-personal-best-records",
     "practice-first-sprint-guide",
@@ -452,6 +453,12 @@ export function sprintRulesDesignPreviewFor(
   if (scenarioId === "practice-personal-best-result") {
     return {
       initialResultState: personalBestResultState(),
+      resultReplayItems: personalBestReplayDesignItems()
+    };
+  }
+  if (scenarioId === "practice-personal-best-result-no-best") {
+    return {
+      initialResultState: personalBestNoBestResultState(),
       resultReplayItems: personalBestReplayDesignItems()
     };
   }
@@ -927,6 +934,19 @@ function personalBestChallengePreviewFor(
       }
     };
   }
+  if (scenarioId === "practice-personal-best-result-no-best") {
+    return {
+      ...common,
+      bestScore: 19,
+      result: {
+        activeElapsedMs: 9 * 60 * 1000 + 5 * 1000,
+        endReason: "max_mistakes",
+        isNewBest: false,
+        previousBestScore: 19,
+        sittings: 1
+      }
+    };
+  }
   if (scenarioId === "practice-personal-best-pool-cleared") {
     return {
       ...common,
@@ -1047,6 +1067,17 @@ function personalBestResultState(): SprintState {
     ratingBefore: PERSONAL_BEST_BAND.currentRating,
     startedAt,
     status: "failed"
+  };
+}
+
+function personalBestNoBestResultState(): SprintState {
+  return {
+    ...personalBestResultState(),
+    bestStreak: 6,
+    correctCount: 14,
+    currentPuzzleIndex: 16,
+    id: "personal-best-result-no-best",
+    startedAt: new Date(LAB_NOW_MS - (9 * 60 + 5) * 1000).toISOString()
   };
 }
 

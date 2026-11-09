@@ -784,7 +784,8 @@ New Run behavior:
 
 Sprint Result is a full-screen destination in direction A (#609; the
 approved spec is in PR #650). The tab bar and the Practice title are hidden
-while it shows. The Survival result keeps its own layout.
+while it shows. The Survival result is its sibling on the same frame
+(`ResultScreenLayout`); see the end of this section.
 
 - Top bar: Done (back) on the left, the title (`Sprint Result` or `Focused
   Run Result`) in the middle, and the rating-trend icon button on the right,
@@ -808,6 +809,29 @@ while it shows. The Survival result keeps its own layout.
 - Actions: `Replay N mistakes` (secondary, only with mistakes, replaying just
   the mistakes) above the primary `Play again` (`Back to Practice` for a
   Focused Run). Phone portrait pins them to the bottom when the content fits.
+
+The Survival result (#609) uses the same full-screen frame, layouts and
+large-text rules. Its semantics follow
+[Survival Challenge Design](./SURVIVAL_CHALLENGE.md): no time limit, and the
+third mistake ends the Run normally.
+
+- Top bar: Back on the left (`Back to Practice`) and `Puzzle Result` or
+  `Arrow Duel Result`. Survival has no rating, so there is no trend button.
+- Hero: the outcome line (`New best at 900–999`, `Run complete`, or `Perfect
+  clear at 2100–2200`), the solved score in the `display` numeral, the
+  comparison (`Previous best 18`, `5 short of best 19`, `First score at this
+  level`), `19 solved · 12:48 active · 3 sittings`, and the end reason. A new
+  best puts the shared monochrome trophy in a blue badge and draws the score
+  and comparison in the product blue; any other result stays neutral with a
+  grey check. Like the in-Run meter, a thin neutral bar shows the way to the
+  standing best only while the Run is short of it.
+- One stats card: Accuracy, Active time and Best streak.
+- One group: the level row (`Puzzle · 900–999`, `This level keeps its own
+  best`) and the neutral `In Review` row, whose count alone is red. The In
+  Review row is hidden when the Run made no mistakes.
+- Actions: `Replay N mistakes` (secondary, only with something to replay),
+  the primary `Play again`, and a plain `Done`. Back and Done both return to
+  Practice Home.
 
 ### Settings
 
