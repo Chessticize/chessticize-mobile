@@ -14,6 +14,7 @@ const {
 } = require('./helpers');
 const {
   expectFrameContained,
+  expectScreenshotHasDarkChrome,
   waitForBoardScreenshotContainsPieces,
 } = require('./screenshotAssertions');
 const { waitForAndroidUiState } = require('./androidPublicUiEvidence');
@@ -100,11 +101,14 @@ describeMarketingAssets('deterministic store marketing journey', () => {
       await assertFrameContract(frame);
       await assertNativeResponsiveLayout(frame);
       await assertCompositionViewport(frame);
+      await assertRequiredFrameGeometry(frame);
       if (verifyIosLandscapeLayout) {
-        await assertRequiredFrameGeometry(frame);
         continue;
       }
       const screenshotPath = await takeReadyScreenshot(frame);
+      if (frame.appearance === 'dark') {
+        expectScreenshotHasDarkChrome(screenshotPath);
+      }
       records.push(captureMarketingScreenshot({
         frame,
         outputRoot,
@@ -482,10 +486,17 @@ async function assertNativeResponsiveLayout(frame) {
       + `${target.orientation}: ${JSON.stringify(screenFrame)}`
     );
   }
+  if (frame.id === 'practice-home') {
+    const practiceTab = topLevelTab('practice-tab');
+    await waitFor(practiceTab).toExist().withTimeout(10000);
+    const tabFrame = await frameFor(practiceTab);
+    assertPositiveFrame(tabFrame, `${frame.id} native Practice tab`);
+  }
   if (isWideTabletTarget()) {
     const isActiveSessionFrame = (
       frame.id === 'build-tactical-intuition'
       || frame.id === 'choose-the-best-move'
+      || frame.id === 'dark-arrow-duel'
     );
     if (isActiveSessionFrame) {
       const layoutFrame = await frameFor(element(by.id('active-session-adaptive-layout')));
@@ -539,7 +550,7 @@ async function assertRequiredFrameGeometry(frame) {
   assertPositiveFrame(screenFrame, `${frame.id} app root`);
 
   const requiredFrames = [];
-  for (const testID of frame.source.requiredVisibleTestIds) {
+  for (const testID of frame.requiredVisibleTestIds ?? frame.source?.requiredVisibleTestIds ?? []) {
     const requiredElement = element(by.id(testID));
     await waitFor(requiredElement).toExist().withTimeout(10000);
     const requiredFrame = await frameFor(requiredElement);
@@ -563,6 +574,7 @@ async function assertRequiredFrameGeometry(frame) {
   if (!isWideTabletTarget() || [
     'build-tactical-intuition',
     'choose-the-best-move',
+    'dark-arrow-duel',
   ].includes(frame.id)) {
     return;
   }
@@ -634,6 +646,7 @@ async function takeReadyScreenshot(frame) {
   if (
     frame.id !== 'build-tactical-intuition'
     && frame.id !== 'choose-the-best-move'
+    && frame.id !== 'dark-arrow-duel'
   ) {
     return device.takeScreenshot(frame.captureId);
   }

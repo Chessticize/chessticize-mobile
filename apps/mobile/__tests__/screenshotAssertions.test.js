@@ -8,6 +8,7 @@ const {
   expectBoardScreenshotContainsPieces,
   expectBoardScreenshotMatchesOccupiedSquares,
   expectFrameContained,
+  expectScreenshotHasDarkChrome,
   waitForBoardScreenshotContainsPieces,
 } = require('../e2e/screenshotAssertions');
 const {
@@ -35,6 +36,14 @@ describe('screenshot assertions', () => {
       .toThrow('foldable portrait restore frame is outside its container');
     expect(() => expectFrameContained(childFrame, parentFrame, 'foldable portrait restore', 8))
       .not.toThrow();
+  });
+
+  it('accepts dark native chrome and rejects bright captures', () => {
+    const dark = writeSolidScreenshot('dark-chrome.png', [25, 30, 38, 255]);
+    const light = writeSolidScreenshot('light-chrome.png', [245, 247, 250, 255]);
+
+    expect(() => expectScreenshotHasDarkChrome(dark)).not.toThrow();
+    expect(() => expectScreenshotHasDarkChrome(light)).toThrow('Expected dark native chrome');
   });
 
   it('detects a low-material board from square-local contrast', () => {
@@ -843,6 +852,20 @@ describe('screenshot assertions', () => {
     expect(delay).not.toHaveBeenCalled();
   });
 });
+
+function writeSolidScreenshot(filename, color) {
+  const width = 20;
+  const height = 20;
+  const data = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      writePixel(data, width, x, y, color);
+    }
+  }
+  const screenshotPath = path.join(temporaryDirectory, filename);
+  fs.writeFileSync(screenshotPath, encodeRgbaPng({data, height, width}));
+  return screenshotPath;
+}
 
 function writeSyntheticBoard(filename, pieces = []) {
   const png = syntheticBoard();

@@ -25,7 +25,7 @@ function resolveMarketingCampaign(story, campaignId) {
     storyId: campaign.id,
     issue: campaign.issue,
     sourceBuild: {
-      kind: campaign.captureRequirements.source,
+      kind: 'integrated-main-preparation',
       puzzlePack: story.sourceBuild.puzzlePack,
     },
     campaign: {

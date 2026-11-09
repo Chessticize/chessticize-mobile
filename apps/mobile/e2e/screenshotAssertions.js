@@ -24,6 +24,23 @@ function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenF
   }
 }
 
+function expectScreenshotHasDarkChrome(screenshotPath) {
+  const png = readRgbaPng(screenshotPath);
+  const samples = [
+    [0.05, 0.08], [0.5, 0.08], [0.95, 0.08],
+    [0.05, 0.92], [0.5, 0.92], [0.95, 0.92]
+  ].map(([x, y]) => pixelAt(png, png.width * x, png.height * y));
+  const darkSamples = samples.filter(([red, green, blue, alpha]) =>
+    alpha > 128 && ((red + green + blue) / 3) < 110
+  );
+  if (darkSamples.length < 4) {
+    throw new Error(
+      `Expected dark native chrome; darkSamples=${darkSamples.length}; `
+      + `samples=${JSON.stringify(samples)}`
+    );
+  }
+}
+
 function expectBoardScreenshotMatchesOccupiedSquares(
   screenshotPath,
   boardFrame,
@@ -511,5 +528,6 @@ module.exports = {
   expectBoardScreenshotContainsPieces,
   expectBoardScreenshotMatchesOccupiedSquares,
   expectFrameContained,
+  expectScreenshotHasDarkChrome,
   waitForBoardScreenshotContainsPieces,
 };
