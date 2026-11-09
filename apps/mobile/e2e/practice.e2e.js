@@ -298,7 +298,8 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(15000);
     await element(by.id('sprint-result-scroll')).scrollTo('top');
     await waitFor(element(by.id('sprint-result-top-bar'))).toBeVisible().withTimeout(10000);
-    await waitFor(element(by.label('Sprint abandoned'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('sprint-result-headline'))).toHaveText('Sprint abandoned').withTimeout(10000);
+    await expect(element(by.id('sprint-result-headline'))).toBeVisible(100);
     await element(by.id('back-practice-button')).tap();
 
     await openTab('settings-tab', 'settings-show-sprint-guide');
@@ -466,7 +467,8 @@ describe('Practice POC', () => {
     expectFrameContained(abandonFrame, abandonScreenFrame, 'Sprint abandon action');
     console.log('[review-setup-abandon-frame]', abandonFrame);
     await element(by.id('session-abandon-confirm')).tap();
-    await waitFor(element(by.label('Sprint abandoned'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('sprint-result-headline'))).toHaveText('Sprint abandoned').withTimeout(10000);
+    await expect(element(by.id('sprint-result-headline'))).toBeVisible(100);
 
     // Recreate the process so History reads the marker from SQLite rather than
     // relying on transient result-screen presentation from the sprint that

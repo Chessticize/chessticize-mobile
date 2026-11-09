@@ -1252,7 +1252,8 @@ describe('Detox suite configuration', () => {
       caseStart
     );
     const responsiveHistoryCase = practiceSpec.slice(caseStart, caseEnd);
-    expect(responsiveHistoryCase).toContain("by.label('Sprint abandoned')");
+    expect(responsiveHistoryCase).toContain("by.id('sprint-result-headline')");
+    expect(responsiveHistoryCase).toContain("toHaveText('Sprint abandoned')");
     expect(responsiveHistoryCase).not.toContain("by.text('Sprint failed')");
     const normalizeOuterScroll = responsiveHistoryCase.indexOf(
       "element(by.id('practice-main-scroll')).scrollTo('top')"
@@ -1316,7 +1317,8 @@ describe('Detox suite configuration', () => {
     expect(requireResultExists).toBeGreaterThan(0);
     expect(normalizeResultScroll).toBeGreaterThan(requireResultExists);
     expect(requireResultTopBarVisible).toBeGreaterThan(normalizeResultScroll);
-    expect(firstUseCase).toContain("by.label('Sprint abandoned')");
+    expect(firstUseCase).toContain("by.id('sprint-result-headline')");
+    expect(firstUseCase).toContain("toHaveText('Sprint abandoned')");
     expect(firstUseCase).not.toContain("by.text('Sprint failed')");
   });
 
