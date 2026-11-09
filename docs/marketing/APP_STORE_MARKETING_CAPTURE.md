@@ -103,6 +103,13 @@ and fully visible capture controls before writing each raw image.
 The fictional player completes yesterday's scheduled reviews and two reviews
 on capture day through the real service. The scheduler supplies the due dates,
 so the Review frame has current work without an overdue backlog.
+The mixed-Run history is generated on the host by the maintained simulated
+player, then imported from `fixtures/marketing-mobile-1.6-history.json`.
+Regenerate it with `node --experimental-strip-types
+scripts/generate-marketing-campaign-history.mjs` (or verify with `--check`).
+Only row identifiers are canonicalized. The fixture records the source-puzzle
+hash, scenario, seed, and clock; normal Production bundles exclude the
+Dev-only simulation engine.
 
 The capture tooling and test-only fixture adapters are available. There is no
 substitute or fallback from v1: a 1.6 capture manifest exists only after this

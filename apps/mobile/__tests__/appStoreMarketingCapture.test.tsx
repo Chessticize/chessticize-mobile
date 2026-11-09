@@ -56,6 +56,8 @@ describe("App Store marketing capture fixture", () => {
     const profile = loadFixture("tactical-profile");
     const focusedRun = loadFixture("focused-run");
     const arrowDuel = loadFixture("dark-arrow-duel");
+    expect(profile.practiceService.exportLocalData())
+      .toEqual(focusedRun.practiceService.exportLocalData());
 
     expect(profile.fixture.campaign).toEqual({
       id: "mobile-1.6-en-us",

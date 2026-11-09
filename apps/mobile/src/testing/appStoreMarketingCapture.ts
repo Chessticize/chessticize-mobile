@@ -15,12 +15,6 @@ import {
   type SprintState
 } from "../../../../packages/core/src/index.ts";
 import type { PracticeService } from "../../../../packages/storage/src/practice-service.ts";
-import {
-  playSimulatedHistoryScenario
-} from "../../../../packages/storage/src/simulation/scenarios.ts";
-import {
-  createSimulationClock
-} from "../../../../packages/storage/src/simulation/simulated-player.ts";
 import type {
   ExportedSprintSession,
   LocalDataImport
@@ -270,6 +264,8 @@ function loadReleaseCampaignFixture({
 }): AppStoreMarketingCaptureFixture {
   const captureInstant = marketingStory.captureClock.instant;
   practiceService.loadFixturePuzzles(bundledPuzzles);
+  const history = require("../../../../fixtures/marketing-mobile-1.6-history.json") as { data: LocalDataImport };
+  practiceService.importLocalData(history.data);
   practiceService.saveSettings({
     appearance: frame.appearance,
     arrowDuel: { opponentReplyEnabled: true },
@@ -282,13 +278,6 @@ function loadReleaseCampaignFixture({
       arrowDuelSeen: true,
       focusedRunSeen: true
     }
-  });
-  playSimulatedHistoryScenario({
-    practice: practiceService,
-    clock: createSimulationClock(Date.parse(captureInstant) - 7 * 24 * 60 * 60 * 1_000),
-    scenario: "slow-fork-speed",
-    seed: "marketing-1.6-release-campaign",
-    plan: { arrowDuelShare: 0, runs: 12 }
   });
   completeCampaignScheduledReviews(practiceService, captureInstant);
   const snapshot = practiceService.getTacticalProfileSnapshot(captureInstant);
