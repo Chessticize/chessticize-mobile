@@ -820,8 +820,10 @@ third mistake ends the Run normally.
 - Hero: the outcome line (`New best at 900–999`, `Run complete`, or `Perfect
   clear at 2100–2200`), the solved score in the `display` numeral, the
   comparison (`Previous best 18`, `5 short of best 19`, `First score at this
-  level`), the Sprint Result's `N attempted · X% accuracy`, and the end
-  reason. A level range never breaks across lines. A new best puts the shared
+  level`), and the Sprint Result's `N attempted · X% accuracy`. Only a
+  Perfect clear adds an end-reason line: the third mistake is how every other
+  Run ends, so it is not repeated. A level range never breaks across lines.
+  A new best puts the shared
   monochrome trophy in a blue badge and draws the score and comparison in the
   product blue; any other result stays neutral with a grey check. Like the
   in-Run meter, a thin neutral bar shows the way to the standing best only
@@ -829,9 +831,9 @@ third mistake ends the Run normally.
 - One stats card: Active time, Best streak and Sittings. A value too long for
   a column (an active time past one hour) switches the card to label and value
   rows; values never truncate.
-- One group: the level row (`Puzzle · 900–999`, `This level keeps its own
-  best`) and the neutral `In Review` row, whose count alone is red. The In
-  Review row is hidden when the Run made no mistakes.
+- One group: the level row (`Puzzle · 900–999`, with no detail line) and the
+  neutral `In Review` row, whose count alone is red. The In Review row is
+  hidden when the Run made no mistakes.
 - Phone landscape at accessibility text sizes (both results): the top bar
   scrolls away with the content instead of staying fixed.
 - Actions: `Replay N mistakes` (secondary, only with something to replay),

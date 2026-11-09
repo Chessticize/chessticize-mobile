@@ -179,11 +179,13 @@ function SurvivalHero({
         {result.comparison}
       </AppText>
       <ResultSummaryLine parts={result.summaryParts} stacked={stacked} testID="personal-best-result-summary" />
-      <View testID="personal-best-result-end-reason">
-        {result.endReasonLines.map((line) => (
-          <AppText key={line} style={styles.centeredText} tone="secondary" variant="footnote">{line}</AppText>
-        ))}
-      </View>
+      {result.endReasonLines.length > 0 ? (
+        <View testID="personal-best-result-end-reason">
+          {result.endReasonLines.map((line) => (
+            <AppText key={line} style={styles.centeredText} tone="secondary" variant="footnote">{line}</AppText>
+          ))}
+        </View>
+      ) : null}
     </ResultHeroFrame>
   );
 }
@@ -193,8 +195,7 @@ function DetailRows({ result }: { result: SurvivalResultPresentation }): React.J
   return (
     <Section rows testID="personal-best-result-details">
       <ListRow
-        accessibilityLabel={`${result.levelTitle}. ${result.levelDetail}`}
-        subtitle={result.levelDetail}
+        accessibilityLabel={result.levelTitle}
         testID="personal-best-result-level"
         title={result.levelTitleDisplay}
       />

@@ -9360,11 +9360,10 @@ describe("PracticePocScreen", () => {
       "Previous best 18"
     );
     expect(() => findByTestId(renderer, "personal-best-result-progress")).toThrow();
-    expect(collectText(findByTestId(renderer, "personal-best-result-end-reason"))).toBe(
-      "The Run ended normally after 3 mistakes."
-    );
+    // A third-mistake ending needs no end-reason line, and the level row no detail.
+    expect(() => findByTestId(renderer, "personal-best-result-end-reason")).toThrow();
     expect(collectText(findByTestId(renderer, "personal-best-result-level")).replace(/\u2060/g, "").replace(/\u00A0/g, " ")).toBe(
-      "Puzzle · 900–999This level keeps its own best"
+      "Puzzle · 900–999"
     );
     expect(collectText(findByTestId(renderer, "personal-best-result-summary"))).toBe(
       "22 attempted · 86% accuracy"

@@ -8,6 +8,7 @@
 
 import React, { useContext, useState } from "react";
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -41,6 +42,9 @@ const SPLIT_DETAILS_FLEX = 1.2;
 const STAT_COLUMN_MIN_WIDTH = 112;
 // Conservative advance of one tabular numeral glyph, as a share of the font size.
 const STAT_NUMERAL_CHARACTER_WIDTH = 0.6;
+// iPadOS draws its 24-pt status bar over full-screen landscape windows while
+// reporting little or no top safe-area inset there; the top bar stays below it.
+const IOS_REGULAR_STATUS_BAR_HEIGHT = 24;
 
 export type ResultStatsLayout = "columns" | "rows" | "vertical";
 
@@ -142,6 +146,13 @@ export function ResultScreenLayout({
   // Phone landscape at accessibility sizes has no room for a fixed bar: the
   // top bar scrolls away with the content.
   const barScrolls = layout.className === "compactLandscape" && layout.isLargeText;
+  // The top bar starts below the status bar: the safe-area inset (padded
+  // here or by the parent), raised to the iPad status bar where iOS reports
+  // less, then the standard top-bar spacing.
+  const statusBarClearance = Platform.OS === "ios" && layout.isRegularWidth
+    ? Math.max(0, IOS_REGULAR_STATUS_BAR_HEIGHT - safeInsets.top)
+    : 0;
+  const barTop = insets.top + statusBarClearance;
   const horizontalInset = {
     paddingLeft: insets.left + theme.spacing.screen,
     paddingRight: insets.right + theme.spacing.screen
@@ -168,7 +179,8 @@ export function ResultScreenLayout({
   );
   const scrollPadding = {
     paddingBottom: (pinsActions ? 0 : insets.bottom) + theme.spacing.screen,
-    paddingTop: theme.spacing.screen
+    // A scrolling top bar starts where the fixed one would.
+    paddingTop: barScrolls ? theme.spacing.group : theme.spacing.screen
   };
 
   return (
@@ -177,7 +189,7 @@ export function ResultScreenLayout({
           measurements from the previous size otherwise, leaving rows and
           buttons at their old heights after the user shrinks the text. */}
       <React.Fragment key={`text-scale-${fontScale}`}>
-      {barScrolls ? null : topBar([horizontalInset, { paddingTop: insets.top + theme.spacing.group }])}
+      {barScrolls ? null : topBar([horizontalInset, { paddingTop: barTop + theme.spacing.group }])}
       {usesSplit ? (
         // Phone landscape: the hero stays put on the left while the details
         // and actions scroll on the right; both center in their pane.
@@ -204,7 +216,7 @@ export function ResultScreenLayout({
           style={styles.scroll}
           testID={`${testIDPrefix}-scroll`}
         >
-          {barScrolls ? topBar([styles.scrolledTopBar, { paddingTop: insets.top }]) : null}
+          {barScrolls ? topBar([styles.scrolledTopBar, { paddingTop: barTop }]) : null}
           <View style={styles.column}>
             <View onLayout={measure("body")} style={styles.column}>
               {notice}

@@ -127,14 +127,16 @@ describe("Survival result screen", () => {
     expect(has(renderer, "personal-best-result-progress")).toBe(false);
     // The Sprint Result's summary: attempted and accuracy.
     expect(collect(byId(renderer, "personal-best-result-summary"))).toBe("22 attempted · 86% accuracy");
-    expect(collect(byId(renderer, "personal-best-result-end-reason"))).toBe("The Run ended normally after 3 mistakes.");
+    // The third mistake is how every Survival Run ends: no end-reason line.
+    expect(has(renderer, "personal-best-result-end-reason")).toBe(false);
+    expect(collect(byId(renderer, "personal-best-result"))).not.toContain("ended normally");
     expect(collect(byId(renderer, "personal-best-result-active-time"))).toBe("Active time12:48");
     expect(collect(byId(renderer, "personal-best-result-best-streak"))).toBe("Best streak9");
     expect(collect(byId(renderer, "personal-best-result-sittings"))).toBe("Sittings3");
     expect(byId(renderer, "personal-best-result-active-time").props.accessibilityLabel)
       .toBe("Active time 12 minutes 48 seconds");
     expect(byId(renderer, "personal-best-result-sittings").props.accessibilityLabel).toBe("3 sittings");
-    expect(plain(collect(byId(renderer, "personal-best-result-level")))).toBe("Puzzle · 900–999This level keeps its own best");
+    expect(plain(collect(byId(renderer, "personal-best-result-level")))).toBe("Puzzle · 900–999");
     expect(collect(byId(renderer, "personal-best-result-review"))).toBe("In Review3");
     expect(byId(renderer, "personal-best-result-review").props.accessibilityLabel).toBe("In Review, 3 mistakes");
     expect(flattenTestStyle(hostById(renderer, "personal-best-result-review-count").props.style))
@@ -266,6 +268,11 @@ describe("Survival result screen", () => {
 
     const ipad = renderResult(data(), { width: 1180, height: 820, insets: { top: 0, right: 0, bottom: 20, left: 0 } }).renderer;
     expect(has(ipad, "personal-best-result-split")).toBe(false);
+    // iPad landscape reports no top inset under its 24-pt status bar: the
+    // top bar still starts below it, then the standard 8-pt spacing.
+    expect(flattenTestStyle(hostById(ipad, "personal-best-result-top-bar").props.style)).toMatchObject({ paddingTop: 32 });
+    const ipadPortrait = renderResult(data(), { width: 820, height: 1180, insets: { top: 24, right: 0, bottom: 20, left: 0 } }).renderer;
+    expect(flattenTestStyle(hostById(ipadPortrait, "personal-best-result-top-bar").props.style)).toMatchObject({ paddingTop: 32 });
 
     const narrow = renderResult(data(), { width: 320, height: 693, insets: { top: 47, right: 0, bottom: 34, left: 0 } }).renderer;
     expect(flattenTestStyle(byId(narrow, "personal-best-result-active-time").props.style)).toMatchObject({ flexDirection: "row" });

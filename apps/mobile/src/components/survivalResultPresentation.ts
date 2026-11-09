@@ -37,10 +37,13 @@ export type SurvivalResultPresentation = {
   comparison: string;
   /** The Sprint Result's summary: attempted and accuracy. */
   summaryParts: string[];
+  /**
+   * Only a Perfect clear explains its ending; the third mistake is how every
+   * other Survival Run ends, so it needs no line.
+   */
   endReasonLines: string[];
   levelTitle: string;
   levelTitleDisplay: string;
-  levelDetail: string;
   stats: ResultStat[];
   /** The neutral In Review row, or null when the Run made no mistakes. */
   review: { count: number; accessibilityLabel: string } | null;
@@ -155,11 +158,10 @@ export function presentSurvivalResult(data: SurvivalResultData): SurvivalResultP
           `You cleared every available ${typeLabel} in this level.`,
           "Loading and selection errors never count as a clear."
         ]
-      : [`The Run ended normally after ${plural(data.mistakeCount, "mistake", "mistakes")}.`],
+      : [],
     levelTitle: `${typeLabel}${DOT}${level}`,
     // A no-break space keeps the separator with the range when the row wraps.
     levelTitleDisplay: `${typeLabel} · ${levelLabel(data.level, true)}`,
-    levelDetail: "This level keeps its own best",
     stats: [
       {
         key: "time",
