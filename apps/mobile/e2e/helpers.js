@@ -149,9 +149,7 @@ async function dragAndroidElementToElement(
 async function startSelectedPracticeRun() {
   await element(by.id('practice-main-scroll')).scrollTo('top');
   if (await detoxElementExists('practice-sprint-rules-dismiss')) {
-    await waitFor(element(by.id('practice-sprint-rules-dismiss')))
-      .toBeVisible()
-      .withTimeout(10000);
+    await waitForVisibleInPracticeScroll('practice-sprint-rules-dismiss');
     await tapUntilExists('practice-sprint-rules-dismiss', 'practice-sprint-rules-open', 3);
     await element(by.id('practice-main-scroll')).scrollTo('top');
   }

@@ -1066,10 +1066,14 @@ describe('Detox suite configuration', () => {
     const retryRulesDismiss = helper.indexOf(
       "tapUntilExists('practice-sprint-rules-dismiss', 'practice-sprint-rules-open', 3)"
     );
+    const revealRulesDismiss = helper.indexOf(
+      "waitForVisibleInPracticeScroll('practice-sprint-rules-dismiss')"
+    );
     const tapStart = helper.indexOf("element(by.id('practice-run-start')).tap()");
 
     expect(findRulesDismiss).toBeGreaterThan(0);
-    expect(retryRulesDismiss).toBeGreaterThan(findRulesDismiss);
+    expect(revealRulesDismiss).toBeGreaterThan(findRulesDismiss);
+    expect(retryRulesDismiss).toBeGreaterThan(revealRulesDismiss);
     expect(tapStart).toBeGreaterThan(retryRulesDismiss);
   });
 
@@ -1861,6 +1865,27 @@ describe('Detox suite configuration', () => {
   it('keeps the App Store screenshot spec available through its opt-in command', () => {
     expect(resolveDetoxTestMatch({ CHESSTICIZE_CAPTURE_STORE_ASSETS: '1' }))
       .toEqual(STORE_ASSETS_TEST_MATCH);
+  });
+
+  it('captures the current full-screen Sprint results without using the hidden main scroll', () => {
+    const spec = fs.readFileSync(path.resolve(__dirname, '../e2e/store-assets.e2e.js'), 'utf8');
+    const resultStart = spec.indexOf('async function failArrowDuelSprint');
+    const resultEnd = spec.indexOf('async function completeOneWrongReview', resultStart);
+    const result = spec.slice(resultStart, resultEnd);
+    expect(result).toContain("by.label('Arrow Duel failed · 3 mistakes')");
+    expect(result).toContain("by.id('sprint-result-review-count')");
+    expect(result).not.toContain("by.text('Sprint failed')");
+    const abandonStart = spec.indexOf('async function captureSprintScenes');
+    const abandonEnd = spec.indexOf('async function takePortraitScreenshotAtTop', abandonStart);
+    expect(spec.slice(abandonStart, abandonEnd)).toContain("by.label('Sprint abandoned')");
+    for (const helperName of ['takePortraitScreenshotAtTop', 'takeLandscapeScreenshot']) {
+      const start = spec.indexOf(`async function ${helperName}`);
+      const end = spec.indexOf('\nasync function ', start + 1);
+      const capture = spec.slice(start, end);
+      expect(capture).toContain('scrollStoreAssetToTop()');
+      expect(capture).not.toContain("by.id('practice-main-scroll')");
+    }
+    expect(spec).toContain("by.id('sprint-result-scroll')");
   });
 
   it('keeps marketing capture separate from the release-QA screenshot suite', () => {

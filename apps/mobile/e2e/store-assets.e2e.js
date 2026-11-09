@@ -62,6 +62,7 @@ async function captureFirstUseSprintRulesGuide() {
   await expect(element(by.id('test-puzzle-source-control'))).not.toExist();
   await takePortraitScreenshotAtTop('app-store-09-sprint-rules-guide');
   await takeLandscapeScreenshot('app-store-09-sprint-rules-guide');
+  await waitForVisibleInPracticeScroll('practice-sprint-rules-dismiss');
   await element(by.id('practice-sprint-rules-dismiss')).tap();
   await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
 }
@@ -149,7 +150,7 @@ async function failArrowDuelSprint() {
     }
   }
 
-  await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(30000);
+  await waitFor(element(by.label('Arrow Duel failed · 3 mistakes'))).toBeVisible().withTimeout(30000);
   await waitFor(element(by.id('sprint-result-review-count'))).toHaveText('3 to review').withTimeout(10000);
   await takePortraitScreenshotAtTop('app-store-15-sprint-result');
   await takeLandscapeScreenshot('app-store-15-sprint-result');
@@ -259,7 +260,7 @@ async function captureSprintScenes() {
   await element(by.id('session-abandon')).tap();
   await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
   await element(by.id('session-abandon-confirm')).tap();
-  await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
+  await waitFor(element(by.label('Sprint abandoned'))).toBeVisible().withTimeout(10000);
   await element(by.id('back-practice-button')).tap();
   await waitFor(topLevelTab('practice-tab')).toBeVisible().withTimeout(10000);
 
@@ -275,7 +276,7 @@ async function takePortraitScreenshotAtTop(name) {
     return;
   }
 
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await scrollStoreAssetToTop();
   await takePortraitScreenshot(name);
 }
 
@@ -294,11 +295,23 @@ async function takeLandscapeScreenshot(name, assertLayout) {
     return;
   }
 
-  await element(by.id('practice-main-scroll')).scrollTo('top');
+  await scrollStoreAssetToTop();
   await waitForScreenOrientation('landscape');
   await assertLayout?.();
   await sleep(500);
   await device.takeScreenshot(`${name}-landscape`);
+}
+
+async function scrollStoreAssetToTop() {
+  // The full-screen result replaces Practice's main scroll container.
+  let scrollID = 'practice-main-scroll';
+  try {
+    await expect(element(by.id('sprint-result-scroll'))).toExist();
+    scrollID = 'sprint-result-scroll';
+  } catch {
+    // Home, live practice and Review keep the main scroll container.
+  }
+  await element(by.id(scrollID)).scrollTo('top');
 }
 
 async function waitForScreenOrientation(orientation) {
