@@ -83,16 +83,40 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
       await expectRegularLandscapeSessionCentered('landscape');
     }
 
+    let androidCapturedRegularLandscapeFeedback = false;
     if (device.getPlatform() === 'android') {
       // Keep the public wrong-move journey in the same regular-landscape
       // state captured above. A previous-attempt notice used to recenter the
       // whole rail; compare its live native frames with the no-notice rail.
       const feedbackOrientation = includeLandscape ? 'landscape' : initialOrientation;
-      await captureAndroidPreviousAttemptNotice(feedbackOrientation);
-      puzzleID = await elementText('session-current-puzzle-id');
+      androidCapturedRegularLandscapeFeedback = await isRegularLandscape();
+      if (androidCapturedRegularLandscapeFeedback) {
+        await captureAndroidPreviousAttemptNotice(feedbackOrientation);
+      }
     }
 
     const needsPortraitRestore = includeLandscape || initialOrientation === 'landscape';
+    if (
+      device.getPlatform() === 'android'
+      && needsPortraitRestore
+      && !androidCapturedRegularLandscapeFeedback
+    ) {
+      // Compact Android sessions retain their existing portrait wrong-move
+      // journey. API 36 large-screen activities ignore requested-orientation
+      // hints, so reacquire the public root after returning from landscape.
+      await setAdaptiveOrientation('portrait');
+      await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
+      await waitForSettledSprintLayout('portrait', { containmentTolerance: 16 });
+      await waitFor(element(by.id('adaptive-layout'))).toBeVisible().withTimeout(10000);
+      const restoredPuzzleID = await elementText('session-current-puzzle-id');
+      if (restoredPuzzleID !== puzzleID) {
+        throw new Error(`Portrait restoration replaced the active puzzle: ${puzzleID} -> ${restoredPuzzleID}`);
+      }
+    }
+
+    if (device.getPlatform() === 'android' && !androidCapturedRegularLandscapeFeedback) {
+      await completeAndroidWrongMoves();
+    }
 
     if (device.getPlatform() === 'ios') {
       // The post-answer feedback row is the last item in the locked session
@@ -279,6 +303,14 @@ async function expectRegularLandscapeSessionCentered(orientation) {
 }
 
 async function captureAndroidPreviousAttemptNotice(orientation) {
+  await completeAndroidWrongMoves();
+  await waitFor(element(by.id('sprint-previous-attempt-notice'))).toExist().withTimeout(10000);
+  await expectSessionControlsContained(orientation, ['sprint-previous-attempt-notice']);
+  await expectRegularLandscapeRailAnchored(orientation, 'previous-attempt-notice');
+  await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-standard-previous-attempt-notice`);
+}
+
+async function completeAndroidWrongMoves() {
   await withAndroidUiDiagnostics(async () => {
     // Familiar 15's first Standard puzzle is a versioned product fixture:
     // c2b3 is legal but wrong, while alternate mate c2b1 is accepted.
@@ -298,11 +330,13 @@ async function captureAndroidPreviousAttemptNotice(orientation) {
     await playBoardMove('session-board', 'c4b5');
     await waitFor(element(by.label('Mistakes 2 of 3')).atIndex(0)).toExist().withTimeout(10000);
     await waitFor(element(by.id('session-progress'))).toHaveText('0 / 15').withTimeout(10000);
-    await waitFor(element(by.id('sprint-previous-attempt-notice'))).toExist().withTimeout(10000);
-    await expectSessionControlsContained(orientation, ['sprint-previous-attempt-notice']);
-    await expectRegularLandscapeRailAnchored(orientation, 'previous-attempt-notice');
-    await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-standard-previous-attempt-notice`);
   });
+}
+
+async function isRegularLandscape() {
+  const layoutAttributes = await element(by.id('adaptive-layout')).getAttributes();
+  const layoutLabel = (Array.isArray(layoutAttributes) ? layoutAttributes[0] : layoutAttributes).label;
+  return layoutLabel === 'Layout regularLandscape';
 }
 
 async function expectRegularLandscapeRailAnchored(orientation, state) {
