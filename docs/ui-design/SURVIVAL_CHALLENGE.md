@@ -229,7 +229,8 @@ appearing or disappearing abruptly:
   It includes already-saved live best values in the ordinary type-and-level
   rows while the Hub remains the only place that manages resumable Runs.
 - `Survival records` is a full page on the Practice canvas, not a page wrapped
-  in one large card. Only the individual level records retain card borders.
+  in one large card. Only the individual level records are cards: borderless
+  surface tiles on the grouped background (direction A, #609).
 - The `More levels` control keeps spacing above its focus outline so browser and
   keyboard focus never touches the selected level card. The deterministic Hub
   preview opens the full inventory without a synthetic click, so it never leaves

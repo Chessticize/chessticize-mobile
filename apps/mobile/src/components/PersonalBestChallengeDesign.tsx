@@ -12,7 +12,8 @@ import type { LayoutChangeEvent, StyleProp, ViewStyle } from "react-native";
 import type { SprintState } from "../../../../packages/core/src/types.ts";
 import { ResultReviewImpactCard } from "./ResultReviewImpactCard.tsx";
 import { ResultTrophyGlyph } from "./ResultTrophyGlyph.tsx";
-import { ListRow, Section } from "./ui/index.tsx";
+import { AppText, Badge, Button, Icon, IconTile, ListRow, Section, useListRowStyle } from "./ui/index.tsx";
+import { useTheme } from "../theme/ThemeProvider.ts";
 
 const SURVIVAL_DISCLOSURE_MOTION_DURATION_MS = 200;
 
@@ -143,6 +144,7 @@ export function PersonalBestGuide({
   onClose: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const rowStyle = useListRowStyle();
   const challengeType = presentation.challengeType ?? "puzzle";
   const typeLabel = challengeTypeLabel(challengeType);
   const opponentReplyEnabled = presentation.opponentReplyEnabled !== false;
@@ -178,62 +180,61 @@ export function PersonalBestGuide({
   ];
   return (
     <View style={styles.guideScreen} testID="personal-best-guide">
-      <View style={styles.guideTopBar}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={backAccessibilityLabel}
-          style={styles.closeButton}
-          testID="personal-best-guide-close"
-          onPress={onClose}
-        >
-          <Text style={styles.recordsBackText}>‹</Text>
-        </Pressable>
-        <Text style={styles.guideTopBarTitle}>Survival</Text>
-        <View style={styles.closeButton} />
-      </View>
+      <SurvivalTopBar
+        backAccessibilityLabel={backAccessibilityLabel}
+        backTestID="personal-best-guide-close"
+        title="Survival"
+        onBack={onClose}
+      />
 
       <View style={styles.guideHero}>
-        <Text style={styles.guideTitle}>How far can you go?</Text>
-        <Text style={styles.guideIntro}>
+        <AppText accessibilityRole="header" style={styles.centeredText} variant="largeTitle">
+          How far can you go?
+        </AppText>
+        <AppText style={styles.centeredText} tone="secondary" variant="body">
           Solve as many as you can at one fixed level.
-        </Text>
+        </AppText>
         <View style={styles.guideBandRow}>
-          <Text style={styles.guideBandPrimary}>{typeLabel} · {levelLabel(presentation.band)}</Text>
-          <Text style={styles.guideBandSecondary}>
+          <AppText tone="accent" variant="headline">{typeLabel} · {levelLabel(presentation.band)}</AppText>
+          <AppText tone="secondary" variant="subheadline">
             {presentation.bestScore === null ? "Set your first best" : `Best ${presentation.bestScore}`}
-          </Text>
+          </AppText>
         </View>
       </View>
 
-      <View style={styles.ruleList}>
+      <Section rows>
         {rules.map((rule) => (
-          <View key={rule.title} style={styles.ruleRow}>
+          <View key={rule.title} style={rowStyle}>
             <View style={styles.ruleMarker}>
-              <Text style={styles.ruleMarkerText}>{rule.marker}</Text>
+              <AppText numberOfLines={1} style={styles.ruleMarkerText} tone="accent" variant="caption">
+                {rule.marker}
+              </AppText>
             </View>
-            <View style={styles.ruleCopy}>
-              <Text style={styles.ruleTitle}>{rule.title}</Text>
-              <Text style={styles.ruleDetail}>{rule.detail}</Text>
+            <View style={styles.rowCopy}>
+              <AppText variant="headline">{rule.title}</AppText>
+              <AppText tone="secondary" variant="subheadline">{rule.detail}</AppText>
             </View>
           </View>
         ))}
-      </View>
+      </Section>
 
-      <View style={styles.guideBestRow}>
-        <Text style={styles.guideBestLabel}>Best at {levelLabel(presentation.band)}</Text>
-        <Text style={styles.guideBestValue} testID="personal-best-guide-score">
-          {presentation.bestScore ?? "—"}
-        </Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
+      <Section rows>
+        <View style={rowStyle}>
+          <AppText style={styles.rowCopy} tone="secondary" variant="body">
+            Best at {levelLabel(presentation.band)}
+          </AppText>
+          <AppText testID="personal-best-guide-score" variant="numeral">
+            {presentation.bestScore ?? "—"}
+          </AppText>
+        </View>
+      </Section>
+      <Button
         accessibilityLabel="Acknowledge Survival rules"
-        style={styles.guideStartAction}
+        label="Got it"
+        stretch
         testID="personal-best-guide-start"
         onPress={onAcknowledge}
-      >
-        <Text style={styles.primaryActionText}>Got it</Text>
-      </Pressable>
+      />
     </View>
   );
 }
@@ -264,7 +265,12 @@ export function PersonalBestChallengeHub({
   onStart: (selection: PersonalBestChallengeSelection) => void;
 }): React.JSX.Element {
   const styles = useStyles();
-  const { width: viewportWidth } = useWindowDimensions();
+  const theme = useTheme();
+  const rowStyle = useListRowStyle();
+  const { fontScale, width: viewportWidth } = useWindowDimensions();
+  // Level cards widen with Dynamic Type so labels such as "Recommended" wrap
+  // the grid onto more rows instead of breaking mid-word.
+  const levelCardMinWidth = { minWidth: Math.round(96 * Math.max(1, fontScale)) };
   const initialType = initialSelection?.challengeType ?? presentation.challengeType ?? "puzzle";
   const [challengeType, setChallengeType] = React.useState<PersonalBestChallengeType>(initialType);
   const pausedRuns = presentation.pausedRuns ?? [];
@@ -398,51 +404,44 @@ export function PersonalBestChallengeHub({
 
   return (
     <View
-      style={[styles.hubScreen, { width: Math.min(680, Math.max(0, viewportWidth - 32)) }]}
+      style={styles.hubScreen}
       testID="personal-best-hub"
     >
-      <View style={styles.guideTopBar}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back to Practice"
-          style={styles.closeButton}
-          testID="personal-best-hub-close"
-          onPress={onClose}
-        >
-          <Text style={styles.recordsBackText}>‹</Text>
-        </Pressable>
-        <Text style={styles.hubTopBarTitle}>Survival</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="How Survival works"
-          style={styles.hubHelpButton}
-          testID="personal-best-hub-help"
-          onPress={showGuide}
-        >
-          <Text style={styles.hubHelpButtonText}>?</Text>
-        </Pressable>
-      </View>
+      <SurvivalTopBar
+        backAccessibilityLabel="Back to Practice"
+        backTestID="personal-best-hub-close"
+        title="Survival"
+        trailing={(
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="How Survival works"
+            hitSlop={4}
+            style={({ pressed }) => [styles.topBarButton, pressed ? styles.pressed : null]}
+            testID="personal-best-hub-help"
+            onPress={showGuide}
+          >
+            <Icon color={theme.colors.accent.s600} name="help" size={22} weight="semibold" />
+          </Pressable>
+        )}
+        onBack={onClose}
+      />
 
       <View style={styles.hubIntro}>
-        <Text style={styles.hubTitle}>Choose your Survival Run</Text>
-        <Text style={styles.hubIntroText}>
+        <AppText accessibilityRole="header" variant="largeTitle">Choose your Survival Run</AppText>
+        <AppText tone="secondary" variant="subheadline">
           Stay at one level. Solve as many as you can before your third mistake.
-        </Text>
+        </AppText>
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Open Survival records. Puzzle and Arrow Duel bests by level."
-        style={styles.recordsEntry}
-        testID="personal-best-hub-records"
-        onPress={onOpenRecords}
-      >
-        <View style={styles.recordsEntryCopy}>
-          <Text style={styles.recordsEntryTitle}>Survival records</Text>
-          <Text style={styles.recordsEntryDetail}>Puzzle and Arrow Duel bests by level</Text>
-        </View>
-        <Text style={styles.recordsEntryChevron}>›</Text>
-      </Pressable>
+      <Section rows>
+        <ListRow
+          accessibilityLabel="Open Survival records. Puzzle and Arrow Duel bests by level."
+          subtitle="Puzzle and Arrow Duel bests by level"
+          testID="personal-best-hub-records"
+          title="Survival records"
+          onPress={onOpenRecords}
+        />
+      </Section>
 
       <View accessibilityRole="tablist" style={styles.typeSelector} testID="personal-best-type-selector">
         {(["puzzle", "arrow_duel"] as const).map((type) => {
@@ -452,16 +451,20 @@ export function PersonalBestChallengeHub({
               key={type}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
-              style={[styles.typeOption, selected ? styles.typeOptionSelected : null]}
+              style={({ pressed }) => [
+                styles.typeOption,
+                selected ? styles.selectedFill : null,
+                pressed && !selected ? styles.pressed : null
+              ]}
               testID={`personal-best-type-${type}`}
               onPress={() => chooseChallengeType(type)}
             >
-              <Text style={[styles.typeOptionText, selected ? styles.typeOptionTextSelected : null]}>
+              <AppText style={styles.centeredText} tone={selected ? "accent" : "primary"} variant="headline">
                 {challengeTypeLabel(type)}
-              </Text>
-              <Text style={[styles.typeOptionDetail, selected ? styles.typeOptionDetailSelected : null]}>
+              </AppText>
+              <AppText style={styles.centeredText} tone="secondary" variant="footnote">
                 {type === "puzzle" ? "Play the best line" : "Candidate + reply"}
-              </Text>
+              </AppText>
             </Pressable>
           );
         })}
@@ -478,8 +481,8 @@ export function PersonalBestChallengeHub({
             onPress={() => setInProgressVisible((visible) => !visible)}
           >
             <View style={styles.hubSectionTitleRow}>
-              <Text style={styles.hubSectionTitle}>In progress</Text>
-              <Text style={styles.hubSectionCount}>{inProgress.length}</Text>
+              <AppText accessibilityRole="header" variant="title">In progress</AppText>
+              <Badge label={String(inProgress.length)} tone="neutral" />
             </View>
             <SurvivalDisclosureChevron
               expanded={inProgressVisible}
@@ -490,28 +493,29 @@ export function PersonalBestChallengeHub({
             contentTestID="personal-best-in-progress-content"
             expanded={inProgressVisible}
           >
-            {inProgress.map((run) => (
-              <View key={run.id} style={styles.pausedRunCard} testID={`personal-best-paused-${run.id}`}>
-                <View style={styles.pausedRunCopy}>
-                  <Text style={styles.pausedRunTitle}>{challengeTypeLabel(run.challengeType)} · {levelLabel(run)}</Text>
-                  <Text style={styles.pausedRunDetail}>
-                    {run.score} solved · {run.mistakeCount} of 3 mistakes · {run.phaseLabel ?? "Puzzle saved"}
-                  </Text>
-                  <Text style={styles.pausedRunMeta}>
-                    {formatElapsed(run.activeElapsedMs)} active · {run.sittings} sittings · {run.lastTouchedLabel}
-                  </Text>
+            <Section rows>
+              {inProgress.map((run) => (
+                <View key={run.id} style={[rowStyle, styles.pausedRunRow]} testID={`personal-best-paused-${run.id}`}>
+                  <View style={styles.rowCopy}>
+                    <AppText variant="headline">{challengeTypeLabel(run.challengeType)} · {levelLabel(run)}</AppText>
+                    <AppText tone="secondary" variant="subheadline">
+                      {run.score} solved · {run.mistakeCount} of 3 mistakes · {run.phaseLabel ?? "Puzzle saved"}
+                    </AppText>
+                    <AppText tone="secondary" variant="footnote">
+                      {formatElapsed(run.activeElapsedMs)} active · {run.sittings} sittings · {run.lastTouchedLabel}
+                    </AppText>
+                  </View>
+                  <Button
+                    accessibilityLabel={`Continue ${challengeTypeLabel(run.challengeType)} ${levelLabel(run)}`}
+                    label="Continue"
+                    size="compact"
+                    style={styles.pausedRunContinue}
+                    testID={`personal-best-paused-continue-${run.id}`}
+                    onPress={() => onContinue(run.id)}
+                  />
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Continue ${challengeTypeLabel(run.challengeType)} ${levelLabel(run)}`}
-                  style={styles.pausedRunContinue}
-                  testID={`personal-best-paused-continue-${run.id}`}
-                  onPress={() => onContinue(run.id)}
-                >
-                  <Text style={styles.pausedRunContinueText}>Continue</Text>
-                </Pressable>
-              </View>
-            ))}
+              ))}
+            </Section>
           </SurvivalCollapsibleRegion>
         </View>
       ) : null}
@@ -526,66 +530,64 @@ export function PersonalBestChallengeHub({
         />
       ) : (
         <>
-          <View style={styles.hubSection}>
-            <Text style={styles.hubSectionTitle}>
-              {sourceUnavailable
-                ? "Rating source unavailable"
-                : sourceAboveAvailableLevels
-                ? "Highest available level"
-                : source?.games === 0
-                  ? "Starting level"
-                  : "Recommended level"}
-            </Text>
-            <View style={styles.sourceCard} testID="personal-best-reference-source">
-              <View style={styles.sourceCardCopy}>
+          <Section
+            footer={sourceUnavailable
+              ? "Your saved choice is preserved until you replace it."
+              : sourceAboveAvailableLevels
+              ? "This is the highest level in your installed Core Pack. Survival has no time limit."
+              : source?.isOnHome === false
+                ? `${source.name} remains your Rating source even when hidden from Home.`
+                : "This only changes the suggested level. Survival has no time limit."}
+            header={sourceUnavailable
+              ? "Rating source unavailable"
+              : sourceAboveAvailableLevels
+              ? "Highest available level"
+              : source?.games === 0
+                ? "Starting level"
+                : "Recommended level"}
+            rows
+          >
+            <View style={[rowStyle, styles.sourceRow]} testID="personal-best-reference-source">
+              <View style={styles.rowCopy}>
                 {sourceUnavailable ? (
                   <>
-                    <Text style={styles.sourceTitle} testID="personal-best-source-unavailable-message">
+                    <AppText testID="personal-best-source-unavailable-message" variant="headline">
                       Your saved Rating source is no longer available.
-                    </Text>
-                    <Text style={styles.sourceTiming}>Choose a replacement before starting Survival.</Text>
+                    </AppText>
+                    <AppText tone="secondary" variant="subheadline">Choose a replacement before starting Survival.</AppText>
                   </>
                 ) : (
                   <>
-                    <Text style={styles.sourceLevel} testID="personal-best-recommended-level">
+                    <AppText testID="personal-best-recommended-level" variant="numeral">
                       {levelLabel(recommendedBand)}
-                    </Text>
-                    <Text style={styles.sourceTitle}>
+                    </AppText>
+                    <AppText variant="subheadline">
                       {source?.games === 0
                         ? `Based on ${source.name}’s starting Rating`
                         : `Based on ${source?.name ?? "default Run"} · Rating ${source?.rating ?? presentation.band.currentRating}`}
-                    </Text>
+                    </AppText>
                     {source ? (
-                      <Text style={styles.sourceTiming}>{source.durationLabel} · {source.perPuzzleLabel}</Text>
+                      <AppText tone="secondary" variant="footnote">{source.durationLabel} · {source.perPuzzleLabel}</AppText>
                     ) : null}
                   </>
                 )}
               </View>
               {hasAlternativeSource || sourceUnavailable ? (
-                <Pressable
-                  accessibilityRole="button"
+                <Button
                   accessibilityLabel={`Use another ${challengeTypeLabel(challengeType)} Run`}
-                  style={styles.sourceChangeButton}
+                  label="Use another Run"
+                  size="compact"
                   testID="personal-best-use-another-run"
+                  style={styles.sourceChange}
+                  variant="plain"
                   onPress={() => onSourcePickerVisibilityChange(true)}
-                >
-                  <Text style={styles.sourceChangeText}>Use another Run</Text>
-                </Pressable>
+                />
               ) : null}
             </View>
-            <Text style={styles.sourceHelper}>
-              {sourceUnavailable
-                ? "Your saved choice is preserved until you replace it."
-                : sourceAboveAvailableLevels
-                ? "This is the highest level in your installed Core Pack. Survival has no time limit."
-                : source?.isOnHome === false
-                  ? `${source.name} remains your Rating source even when hidden from Home.`
-                  : "This only changes the suggested level. Survival has no time limit."}
-            </Text>
-          </View>
+          </Section>
 
           <View style={styles.hubSection}>
-            <Text style={styles.hubSectionTitle}>Choose your level</Text>
+            <AppText accessibilityRole="header" style={styles.sectionTitle} variant="title">Choose your level</AppText>
             <View style={styles.levelGrid} testID="personal-best-level-options">
               {adjacentLevels.map((level) => {
                 const selected = selectedBand.minRating === level.minRating;
@@ -605,32 +607,32 @@ export function PersonalBestChallengeHub({
                     key={level.label}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
-                    style={[styles.levelCard, selected ? styles.levelCardSelected : null]}
+                    style={({ pressed }) => [
+                      styles.levelCard,
+                      levelCardMinWidth,
+                      selected ? styles.selectedFill : null,
+                      pressed && !selected ? styles.pressed : null
+                    ]}
                     testID={`personal-best-level-${level.minRating}`}
                     onPress={() => setSelectedBand({ minRating: level.minRating, maxRating: level.maxRating })}
                   >
-                    <Text style={[styles.levelCardLabel, selected ? styles.levelCardLabelSelected : null]}>
+                    <AppText tone={selected ? "accent" : "secondary"} variant="footnote">
                       {level.label}
-                    </Text>
-                    <Text
+                    </AppText>
+                    <AppText
                       adjustsFontSizeToFit
                       minimumFontScale={0.75}
                       numberOfLines={compactFourDigitLevelRanges && level.minRating >= 1000 ? 2 : 1}
-                      style={[
-                        styles.levelCardRange,
-                        compactFourDigitLevelRanges && level.minRating >= 1000
-                          ? styles.levelCardRangeCompact
-                          : null,
-                        selected ? styles.levelCardRangeSelected : null
-                      ]}
+                      tone={selected ? "accent" : "primary"}
+                      variant="numeralRow"
                     >
                       {compactFourDigitLevelRanges && level.minRating >= 1000
                         ? `${level.minRating}–\n${level.maxRating}`
                         : levelLabel(level)}
-                    </Text>
-                    <Text style={styles.levelCardBest}>
+                    </AppText>
+                    <AppText tone="secondary" variant="footnote">
                       {best === null ? "No best yet" : `Best ${best}`}
-                    </Text>
+                    </AppText>
                   </Pressable>
                 );
               })}
@@ -638,11 +640,11 @@ export function PersonalBestChallengeHub({
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ expanded: moreLevelsVisible }}
-              style={styles.moreLevelsButton}
+              style={({ pressed }) => [styles.moreLevelsButton, pressed ? styles.pressedText : null]}
               testID="personal-best-more-levels"
               onPress={() => setMoreLevelsVisible((visible) => !visible)}
             >
-              <Text style={styles.moreLevelsText}>{moreLevelsVisible ? "Hide more levels" : "More levels"}</Text>
+              <AppText tone="accent" variant="body">{moreLevelsVisible ? "Hide more levels" : "More levels"}</AppText>
               <SurvivalDisclosureChevron
                 expanded={moreLevelsVisible}
                 testID="personal-best-more-levels-chevron"
@@ -653,58 +655,61 @@ export function PersonalBestChallengeHub({
               contentStyle={styles.moreLevelGrid}
               expanded={moreLevelsVisible}
             >
-                {otherLevels.map((level) => (
-                  <Pressable
-                    key={level.minRating}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: selectedBand.minRating === level.minRating }}
-                    style={[
-                      styles.moreLevelChip,
-                      selectedBand.minRating === level.minRating ? styles.moreLevelChipSelected : null
-                    ]}
-                    onPress={() => setSelectedBand(level)}
-                  >
-                    <Text style={styles.moreLevelChipText}>{levelLabel(level)}</Text>
-                  </Pressable>
-                ))}
-                <Text style={styles.moreLevelsAvailability} testID="personal-best-level-availability">
+                {otherLevels.map((level) => {
+                  const selected = selectedBand.minRating === level.minRating;
+                  return (
+                    <Pressable
+                      key={level.minRating}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      style={({ pressed }) => [
+                        styles.moreLevelChip,
+                        selected ? styles.selectedFill : null,
+                        pressed && !selected ? styles.pressed : null
+                      ]}
+                      onPress={() => setSelectedBand(level)}
+                    >
+                      <AppText tone={selected ? "accent" : "primary"} variant="numeralRow">{levelLabel(level)}</AppText>
+                    </Pressable>
+                  );
+                })}
+                <AppText style={styles.fullWidth} testID="personal-best-level-availability" tone="secondary" variant="footnote">
                   Showing every Survival level in this Core Pack: {availableLevels[0]?.minRating}–{availableLevels[availableLevels.length - 1]?.maxRating}.
-                </Text>
+                </AppText>
             </SurvivalCollapsibleRegion>
           </View>
 
-          <View style={styles.rulesSummary} testID="personal-best-rules-summary">
-            <Text style={styles.rulesSummaryTitle}>{challengeTypeLabel(challengeType)} · {levelLabel(selectedBand)}</Text>
-            <Text style={styles.rulesSummaryLine}>
-              {challengeType === "arrow_duel"
-                ? !selectedOpponentReplyEnabled
-                  ? "Choose the better arrow · "
-                  : "Candidate + required reply · "
-                : ""}No time limit · 3 mistakes
-            </Text>
-            <Text style={styles.rulesSummaryHint}>
-              {selectedInProgress
-                ? `${selectedInProgress.score} solved · ${selectedInProgress.mistakeCount} of 3 mistakes · paused`
-                : selectedBest === null
-                  ? "No best yet · solve 1 to set it"
-                  : `Best ${selectedBest} at this level`}
-            </Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
+          <Section rows>
+            <View style={rowStyle} testID="personal-best-rules-summary">
+              <View style={styles.rowCopy}>
+                <AppText variant="headline">{challengeTypeLabel(challengeType)} · {levelLabel(selectedBand)}</AppText>
+                <AppText tone="secondary" variant="subheadline">
+                  {challengeType === "arrow_duel"
+                    ? !selectedOpponentReplyEnabled
+                      ? "Choose the better arrow · "
+                      : "Candidate + required reply · "
+                    : ""}No time limit · 3 mistakes
+                </AppText>
+                <AppText tone="accent" variant="subheadline">
+                  {selectedInProgress
+                    ? `${selectedInProgress.score} solved · ${selectedInProgress.mistakeCount} of 3 mistakes · paused`
+                    : selectedBest === null
+                      ? "No best yet · solve 1 to set it"
+                      : `Best ${selectedBest} at this level`}
+                </AppText>
+              </View>
+            </View>
+          </Section>
+          <Button
             accessibilityLabel={selectedInProgress
               ? `Continue ${challengeTypeLabel(challengeType)} Survival at ${levelLabel(selectedBand)}`
               : `Start ${challengeTypeLabel(challengeType)} Survival at ${levelLabel(selectedBand)}`}
-            style={[styles.hubStartButton, sourceUnavailable ? styles.hubStartButtonDisabled : null]}
-            testID="personal-best-hub-start"
-            accessibilityState={{ disabled: sourceUnavailable }}
             disabled={sourceUnavailable}
+            label={selectedInProgress ? "Continue Survival" : "Start Survival"}
+            stretch
+            testID="personal-best-hub-start"
             onPress={() => selectedInProgress ? onContinue(selectedInProgress.id) : startSelection()}
-          >
-            <Text style={styles.primaryActionText}>
-              {selectedInProgress ? "Continue Survival" : "Start Survival"}
-            </Text>
-          </Pressable>
+          />
         </>
       )}
     </View>
@@ -725,6 +730,8 @@ function PersonalBestSourcePicker({
   onSelect: (source: PersonalBestReferenceRunPresentation) => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const theme = useTheme();
+  const rowStyle = useListRowStyle();
   const sources = (presentation.referenceRuns ?? []).filter((source) => (
     source.challengeType === challengeType
     && (source.isOnHome !== false || source.id === selectedSourceId)
@@ -732,34 +739,40 @@ function PersonalBestSourcePicker({
   const selectedSourceUnavailable = selectedSourceId !== undefined
     && !sources.some((source) => source.id === selectedSourceId);
   return (
-    <View style={styles.sourcePicker} testID="personal-best-source-picker">
-      <View style={styles.sourcePickerHeader}>
-        <View style={styles.sourcePickerTitleBlock}>
-          <Text style={styles.hubSectionTitle}>Choose a Rating source</Text>
-          <Text style={styles.sourcePickerIntro}>Only compatible mixed {challengeTypeLabel(challengeType)} Runs appear here.</Text>
-        </View>
+    <Section
+      footer={`Focused, themed, and candidate-only Runs are excluded. Your choice is remembered for future ${challengeTypeLabel(challengeType)} Survival Runs; paused Runs never change level.`}
+      header="Choose a Rating source"
+      headerAccessory={(
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close Rating source picker"
-          style={styles.sourcePickerClose}
+          hitSlop={4}
+          style={({ pressed }) => [styles.topBarButton, pressed ? styles.pressed : null]}
           testID="personal-best-source-picker-close"
           onPress={onCancel}
         >
-          <Text style={styles.closeButtonText}>×</Text>
+          <Icon color={theme.colors.text.tertiary} name="close" size={18} weight="semibold" />
         </Pressable>
+      )}
+      rows
+      style={styles.hubSection}
+      testID="personal-best-source-picker"
+    >
+      <View style={rowStyle}>
+        <AppText style={styles.rowCopy} tone="secondary" variant="subheadline">
+          Only compatible mixed {challengeTypeLabel(challengeType)} Runs appear here.
+        </AppText>
       </View>
       {selectedSourceUnavailable ? (
         <View
           accessibilityLabel="Saved Rating source unavailable"
-          style={[styles.sourceOption, styles.sourceOptionUnavailable]}
+          style={rowStyle}
           testID="personal-best-source-unavailable"
         >
-          <View style={styles.sourceOptionCheck}>
-            <Text style={styles.sourceOptionCheckText}>!</Text>
-          </View>
-          <View style={styles.sourceOptionCopy}>
-            <Text style={styles.sourceOptionTitle}>Saved Run unavailable</Text>
-            <Text style={styles.sourceOptionDetail}>Choose one of the available Runs below.</Text>
+          <IconTile name="warning" tone="negative" />
+          <View style={styles.rowCopy}>
+            <AppText variant="headline">Saved Run unavailable</AppText>
+            <AppText tone="secondary" variant="subheadline">Choose one of the available Runs below.</AppText>
           </View>
         </View>
       ) : null}
@@ -771,27 +784,22 @@ function PersonalBestSourcePicker({
             key={source.id}
             accessibilityRole="radio"
             accessibilityState={{ checked: selected }}
-            style={[styles.sourceOption, selected ? styles.sourceOptionSelected : null]}
+            style={({ pressed }) => [rowStyle, selected ? styles.selectedFill : null, pressed ? styles.pressed : null]}
             testID={`personal-best-source-${source.id}`}
             onPress={() => onSelect(source)}
           >
-            <View style={styles.sourceOptionCheck}>
-              <Text style={styles.sourceOptionCheckText}>{selected ? "✓" : ""}</Text>
-            </View>
-            <View style={styles.sourceOptionCopy}>
-              <Text style={styles.sourceOptionTitle}>{source.name}</Text>
-              <Text style={styles.sourceOptionDetail}>
+            <View style={styles.rowCopy}>
+              <AppText variant="headline">{source.name}</AppText>
+              <AppText tone="secondary" variant="subheadline">
                 {source.games === 0 ? "Starting Rating" : `Rating ${source.rating}`} · {levelLabel(band)}
-              </Text>
-              <Text style={styles.sourceOptionTiming}>{source.durationLabel} · {source.perPuzzleLabel}</Text>
+              </AppText>
+              <AppText tone="secondary" variant="footnote">{source.durationLabel} · {source.perPuzzleLabel}</AppText>
             </View>
+            {selected ? <Icon color={theme.colors.accent.s600} name="check" size={18} weight="semibold" /> : null}
           </Pressable>
         );
       })}
-      <Text style={styles.sourcePickerFootnote}>
-        Focused, themed, and candidate-only Runs are excluded. Your choice is remembered for future {challengeTypeLabel(challengeType)} Survival Runs; paused Runs never change level.
-      </Text>
-    </View>
+    </Section>
   );
 }
 
@@ -832,43 +840,30 @@ export function PersonalBestProgressBanner({
         : `${score} solved, ${remaining} more to beat best ${bestScore}`}
       style={[
         styles.progressBanner,
-        showsRecordMilestone ? styles.progressBannerRecord : null,
         compact ? styles.progressBannerCompact : null
       ]}
       testID="personal-best-progress"
     >
       {showsRecordMilestone ? (
-        <>
-          <View style={styles.recordMilestoneRow}>
-            <View
-              style={[styles.resultBadge, styles.resultBadgeBest, styles.recordMilestoneBadge]}
-              testID="personal-best-record-badge"
-            >
-              <Text
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-                numberOfLines={1}
-                style={[styles.resultBadgeText, styles.resultBadgeTextBest]}
-              >
-                NEW BEST {score.toLocaleString("en-US")}
-              </Text>
-            </View>
-            <Text
-              adjustsFontSizeToFit
-              minimumFontScale={0.85}
-              numberOfLines={1}
-              style={styles.recordPreviousBest}
-              testID="personal-best-record-previous"
-            >
-              {visibleRecordContext}
-            </Text>
-          </View>
-        </>
+        <View style={styles.recordMilestoneRow}>
+          <Badge label={`NEW BEST ${score.toLocaleString("en-US")}`} testID="personal-best-record-badge" tone="accent" />
+          <AppText
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+            numberOfLines={1}
+            style={styles.recordPreviousBest}
+            testID="personal-best-record-previous"
+            tone="secondary"
+            variant="footnote"
+          >
+            {visibleRecordContext}
+          </AppText>
+        </View>
       ) : (
         <View style={styles.progressCopyAndTrack}>
           <View style={styles.progressCopyRow}>
-            <Text style={styles.progressTitle} testID="personal-best-progress-title">{title}</Text>
-            <Text style={styles.progressScore}>{score} solved</Text>
+            <AppText style={styles.rowCopy} testID="personal-best-progress-title" variant="subheadline">{title}</AppText>
+            <AppText tone="secondary" variant="footnote">{score} solved</AppText>
           </View>
           <View style={styles.progressTrack}>
             <View
@@ -1057,6 +1052,7 @@ export function PersonalBestRecordsScreen({
 }): React.JSX.Element {
   const styles = useStyles();
   const { width: viewportWidth } = useWindowDimensions();
+  // Two columns in portrait, four at landscape or regular width.
   const usesWideRecordGrid = viewportWidth >= 700;
   const records = presentation.levelRecords ?? [];
   const pausedRuns = presentation.pausedRuns ?? [];
@@ -1070,38 +1066,28 @@ export function PersonalBestRecordsScreen({
       accessibilityLabel={recordsAreEmpty
         ? "Survival records. No bests yet. Solve one puzzle in Survival to set your first best. Puzzle and Arrow Duel bests are separate by level."
         : `Survival bests by level. ${recordSummary}. Puzzle and Arrow Duel records are separate.`}
-      style={[
-        styles.recordsScreen,
-        { width: Math.min(680, Math.max(0, viewportWidth - 32)) }
-      ]}
+      style={styles.recordsScreen}
       testID="personal-best-records-screen"
     >
-      <View style={styles.guideTopBar}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back to Survival Challenge Hub"
-          style={styles.closeButton}
-          testID="personal-best-records-back"
-          onPress={onBack}
-        >
-          <Text style={styles.recordsBackText}>‹</Text>
-        </Pressable>
-        <Text style={styles.hubTopBarTitle}>Survival records</Text>
-        <View style={styles.closeButtonSpacer} />
-      </View>
+      <SurvivalTopBar
+        backAccessibilityLabel="Back to Survival Challenge Hub"
+        backTestID="personal-best-records-back"
+        title="Survival records"
+        onBack={onBack}
+      />
       <View
-        style={styles.recordsIntro}
+        style={styles.hubIntro}
         testID={recordsAreEmpty ? "personal-best-records-empty" : undefined}
       >
-        <Text style={styles.historyEyebrow}>YOUR BESTS</Text>
-        <Text style={styles.historyTitle}>
+        <AppText tone="accent" variant="footnote">YOUR BESTS</AppText>
+        <AppText accessibilityRole="header" variant="largeTitle">
           {recordsAreEmpty ? "No Survival bests yet" : "Every level stands on its own"}
-        </Text>
-        <Text style={styles.recordsIntroText}>
+        </AppText>
+        <AppText tone="secondary" variant="subheadline">
           {recordsAreEmpty
             ? "Solve one puzzle in Survival to set your first best. Puzzle and Arrow Duel keep separate bests at each level."
             : "Puzzle and Arrow Duel keep separate records. A higher score at an easier level never replaces a best at a harder one."}
-        </Text>
+        </AppText>
       </View>
       {recordsAreEmpty ? null : (["puzzle", "arrow_duel"] as const).map((type) => {
         const typeRecords = records.filter((record) => record.challengeType === type);
@@ -1109,25 +1095,23 @@ export function PersonalBestRecordsScreen({
           return null;
         }
         return (
-          <View key={type} style={styles.historyRecordSection} testID={`personal-best-records-${type}`}>
-            <Text style={styles.historyRecordSectionTitle}>{challengeTypeLabel(type)}</Text>
-            <View style={styles.historyRecordGrid}>
+          <View key={type} style={styles.hubSection} testID={`personal-best-records-${type}`}>
+            <AppText accessibilityRole="header" style={styles.sectionTitle} variant="title">{challengeTypeLabel(type)}</AppText>
+            <View style={styles.recordGrid}>
               {typeRecords.map((record) => {
                 const best = survivalBestForLevel(record, pausedRuns);
                 return (
                   <View
                     key={`${type}-${record.minRating}`}
                     accessibilityLabel={`${challengeTypeLabel(type)} ${levelLabel(record)}, best ${best}`}
-                    style={[
-                      styles.historyRecordRow,
-                      usesWideRecordGrid ? styles.historyRecordRowWide : null
-                    ]}
+                    accessible
+                    style={[styles.recordCard, usesWideRecordGrid ? styles.recordCardWide : null]}
                     testID={`personal-best-record-${type}-${record.minRating}`}
                   >
-                    <Text style={styles.historyRecordTitle}>{levelLabel(record)}</Text>
-                    <View style={styles.historyRecordBestRow}>
-                      <Text style={styles.historyRecordScoreLabel}>Best</Text>
-                      <Text style={styles.historyRecordScore}>{best}</Text>
+                    <AppText variant="numeralRow">{levelLabel(record)}</AppText>
+                    <View style={styles.recordBestRow}>
+                      <AppText tone="secondary" variant="footnote">Best</AppText>
+                      <AppText variant="numeral">{best}</AppText>
                     </View>
                   </View>
                 );
@@ -1136,6 +1120,41 @@ export function PersonalBestRecordsScreen({
           </View>
         );
       })}
+    </View>
+  );
+}
+
+// Back chevron, centered title and an optional trailing control, matching the
+// other direction A sub-screens (#609).
+function SurvivalTopBar({
+  backAccessibilityLabel,
+  backTestID,
+  onBack,
+  title,
+  trailing
+}: {
+  backAccessibilityLabel: string;
+  backTestID: string;
+  onBack: () => void;
+  title: string;
+  trailing?: React.ReactNode;
+}): React.JSX.Element {
+  const styles = useStyles();
+  const theme = useTheme();
+  return (
+    <View style={styles.topBar}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={backAccessibilityLabel}
+        hitSlop={4}
+        style={({ pressed }) => [styles.topBarButton, pressed ? styles.pressed : null]}
+        testID={backTestID}
+        onPress={onBack}
+      >
+        <Icon color={theme.colors.accent.s600} name="chevronLeft" size={20} weight="semibold" />
+      </Pressable>
+      <AppText numberOfLines={1} style={styles.topBarTitle} variant="headline">{title}</AppText>
+      {trailing ?? <View style={styles.topBarButton} />}
     </View>
   );
 }
@@ -1232,6 +1251,7 @@ function SurvivalDisclosureChevron({
   testID: string;
 }): React.JSX.Element {
   const styles = useStyles();
+  const theme = useTheme();
   const progress = React.useRef(new Animated.Value(expanded ? 1 : 0)).current;
 
   React.useEffect(() => {
@@ -1254,7 +1274,7 @@ function SurvivalDisclosureChevron({
       style={[styles.survivalDisclosureChevronMotion, { transform: [{ rotate }] }]}
       testID={testID}
     >
-      <Text style={styles.moreLevelsChevron}>⌄</Text>
+      <Icon color={theme.colors.text.tertiary} name="chevronDown" size={15} weight="semibold" />
     </Animated.View>
   );
 }
@@ -1374,264 +1394,111 @@ function referenceRunFor(
 }
 
 const useStyles = makeStyles((theme) => ({
-  actionRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "flex-end",
-    marginTop: 16
+  centeredText: {
+    textAlign: "center"
   },
-  chart: {
-    alignItems: "flex-end",
-    flexDirection: "row",
-    gap: 8,
-    height: 112,
-    justifyContent: "space-between"
-  },
-  chartBar: {
-    backgroundColor: theme.colors.accent.s400,
-    borderRadius: 6,
-    minHeight: 12,
+  fullWidth: {
     width: "100%"
-  },
-  chartBarBest: {
-    backgroundColor: theme.colors.warning.s500
-  },
-  chartBlock: {
-    borderTopColor: theme.colors.accent.s100,
-    borderTopWidth: 1,
-    gap: 10,
-    marginTop: 16,
-    paddingTop: 14
-  },
-  chartColumn: {
-    alignItems: "center",
-    flex: 1,
-    gap: 4,
-    height: "100%"
-  },
-  chartLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 10,
-    fontWeight: "600"
-  },
-  chartTitle: {
-    color: theme.colors.text.secondary,
-    fontSize: 12,
-    fontWeight: "700"
-  },
-  chartTrack: {
-    backgroundColor: theme.colors.surfaceStrong,
-    borderRadius: 6,
-    flex: 1,
-    justifyContent: "flex-end",
-    overflow: "hidden",
-    width: 22
-  },
-  chartValue: {
-    color: theme.colors.text.primary,
-    fontSize: 11,
-    fontWeight: "800"
-  },
-  closeButton: {
-    alignItems: "center",
-    height: 44,
-    justifyContent: "center",
-    width: 44
-  },
-  closeButtonSpacer: {
-    height: 44,
-    width: 44
-  },
-  closeButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 26,
-    fontWeight: "400"
-  },
-  eyebrow: {
-    color: theme.colors.accent.s600,
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.8
-  },
-  guideBandPrimary: {
-    color: theme.colors.accent.s900,
-    fontSize: 13,
-    fontWeight: "800"
   },
   guideBandRow: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s200,
-    borderRadius: 14,
-    borderWidth: 1,
+    backgroundColor: theme.colors.accent.s100,
+    borderRadius: theme.shape.capsule,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: theme.spacing.inline,
     justifyContent: "center",
-    marginTop: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  guideBandSecondary: {
-    color: theme.colors.text.secondary,
-    fontSize: 12,
-    fontWeight: "600"
-  },
-  guideBestLabel: {
-    color: theme.colors.text.secondary,
-    fontSize: 13,
-    fontWeight: "700"
-  },
-  guideBestRow: {
-    alignItems: "center",
-    borderTopColor: theme.colors.border.default,
-    borderTopWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 4,
-    paddingTop: 16
-  },
-  guideBestValue: {
-    color: theme.colors.warning.s700,
-    fontSize: 24,
-    fontWeight: "900"
+    marginTop: theme.spacing.inline,
+    paddingHorizontal: 14,
+    paddingVertical: 6
   },
   guideHero: {
     alignItems: "center",
-    paddingHorizontal: 6,
-    paddingVertical: 8
-  },
-  guideIntro: {
-    color: theme.colors.text.secondary,
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 8,
-    maxWidth: 500,
-    textAlign: "center"
+    gap: theme.spacing.inline
   },
   guideScreen: {
     alignSelf: "center",
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.default,
-    borderRadius: 20,
-    borderWidth: 1,
+    gap: theme.spacing.section,
     maxWidth: 620,
-    paddingBottom: 18,
-    paddingHorizontal: 18,
     width: "100%"
   },
-  guideStartAction: {
+  hubIntro: {
+    gap: theme.spacing.inline
+  },
+  // Fill the container (not the window) up to 680 pt so Split View and
+  // other insets never clip the page.
+  hubScreen: {
+    alignSelf: "center",
+    gap: theme.spacing.section,
+    maxWidth: 680,
+    width: "100%"
+  },
+  hubSection: {
+    gap: theme.spacing.group
+  },
+  hubSectionTitleRow: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 12,
+    flexDirection: "row",
+    gap: theme.spacing.inline
+  },
+  levelCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shape.control,
+    flex: 1,
+    gap: 2,
+    minWidth: 96,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  levelGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.group
+  },
+  moreLevelChip: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shape.capsule,
     justifyContent: "center",
-    marginTop: 16,
-    minHeight: 48,
-    paddingHorizontal: 18,
-    paddingVertical: 13
+    minHeight: theme.metrics.minTarget,
+    paddingHorizontal: 14
   },
-  guideTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 27,
-    fontWeight: "900",
-    letterSpacing: -0.5,
-    textAlign: "center"
+  moreLevelGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.inline,
+    paddingBottom: theme.spacing.inline
   },
-  guideTopBar: {
+  moreLevelsButton: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    marginHorizontal: -8,
-    minHeight: 52
+    minHeight: theme.metrics.minTarget,
+    paddingHorizontal: 4
   },
-  guideTopBarTitle: {
-    color: theme.colors.text.strong,
-    fontSize: 14,
-    fontWeight: "800"
+  pausedRunContinue: {
+    alignSelf: "flex-end"
   },
-  historyBandPill: {
-    backgroundColor: theme.colors.accent.s100,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6
+  pausedRunRow: {
+    alignItems: "stretch",
+    flexDirection: "column",
+    gap: theme.spacing.inline,
+    paddingVertical: 12
   },
-  historyBandPillText: {
-    color: theme.colors.accent.s800,
-    fontSize: 12,
-    fontWeight: "800"
+  // The source copy keeps the full row width; "Use another Run" sits below it.
+  sourceChange: {
+    marginLeft: -14
   },
-  historyBestBlock: {
-    borderRightColor: theme.colors.accent.s100,
-    borderRightWidth: 1,
-    minWidth: 94,
-    paddingRight: 20
+  sourceRow: {
+    alignItems: "stretch",
+    flexDirection: "column",
+    gap: 4,
+    paddingVertical: 12
   },
-  historyBestLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "700"
+  pressed: {
+    backgroundColor: theme.colors.surfaceStrong
   },
-  historyBestValue: {
-    color: theme.colors.accent.s700,
-    fontSize: 38,
-    fontWeight: "900",
-    letterSpacing: -1
-  },
-  historyCard: {
-    backgroundColor: theme.colors.accent.wash,
-    borderColor: theme.colors.accent.s200,
-    borderRadius: 18,
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 16
-  },
-  historyEyebrow: {
-    color: theme.colors.accent.s600,
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 0.9
-  },
-  historyHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  historySummaryCopy: {
-    flex: 1,
-    gap: 4
-  },
-  historySummaryPrimary: {
-    color: theme.colors.text.primary,
-    fontSize: 14,
-    fontWeight: "800"
-  },
-  historySummaryRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 20,
-    marginTop: 16
-  },
-  historySummarySecondary: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    fontWeight: "600"
-  },
-  historyTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 19,
-    fontWeight: "900",
-    marginTop: 2
-  },
-  primaryAction: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 11,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 11
+  pressedText: {
+    opacity: 0.6
   },
   primaryActionText: {
     color: theme.colors.text.onAccent,
@@ -1639,11 +1506,9 @@ const useStyles = makeStyles((theme) => ({
     fontWeight: "800"
   },
   progressBanner: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s200,
-    borderRadius: 13,
-    borderWidth: 1,
-    gap: 8,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shape.control,
+    gap: theme.spacing.inline,
     paddingHorizontal: 12,
     paddingVertical: 10,
     width: "100%"
@@ -1652,57 +1517,70 @@ const useStyles = makeStyles((theme) => ({
     paddingHorizontal: 10,
     paddingVertical: 8
   },
-  progressBannerRecord: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s300
-  },
   progressCopyAndTrack: {
-    gap: 8
+    gap: theme.spacing.inline
   },
   progressCopyRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8,
+    gap: theme.spacing.inline,
     justifyContent: "space-between"
   },
   progressFill: {
     backgroundColor: theme.colors.accent.fill,
-    borderRadius: 999,
+    borderRadius: theme.shape.capsule,
     height: "100%"
   },
-  progressScore: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "700"
-  },
-  progressTitle: {
-    color: theme.colors.accent.s900,
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "800"
-  },
   progressTrack: {
-    backgroundColor: theme.colors.accent.s100,
-    borderRadius: 999,
+    backgroundColor: theme.colors.fillMuted,
+    borderRadius: theme.shape.capsule,
     height: 6,
     overflow: "hidden"
+  },
+  recordBestRow: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  recordCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shape.control,
+    gap: 2,
+    minHeight: 68,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    width: "48.5%"
+  },
+  recordCardWide: {
+    width: "24%"
+  },
+  recordGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.group
   },
   recordMilestoneRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8,
+    gap: theme.spacing.inline,
     justifyContent: "space-between"
   },
-  recordMilestoneBadge: {
-    flexShrink: 1,
-    maxWidth: "60%",
-    paddingHorizontal: 8
-  },
   recordPreviousBest: {
-    color: theme.colors.text.tertiary,
-    flexShrink: 1,
-    fontSize: 11,
-    fontWeight: "700"
+    flexShrink: 1
+  },
+  recordsBackText: {
+    color: theme.colors.text.strong,
+    fontSize: 34,
+    fontWeight: "300",
+    lineHeight: 36
+  },
+  // Fill the container (not the window) up to 680 pt so Split View and
+  // other insets never clip the page.
+  recordsScreen: {
+    alignSelf: "center",
+    gap: theme.spacing.section,
+    maxWidth: 680,
+    width: "100%"
   },
   resultBadge: {
     alignItems: "center",
@@ -1874,531 +1752,34 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 14,
     fontWeight: "800"
   },
-  ruleCopy: {
-    flex: 1
-  },
-  ruleDetail: {
-    color: theme.colors.text.tertiary,
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 3
-  },
-  ruleList: {
-    gap: 10,
-    marginVertical: 16
+  rowCopy: {
+    flex: 1,
+    flexShrink: 1,
+    gap: 2,
+    minWidth: 0
   },
   ruleMarker: {
     alignItems: "center",
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s200,
-    borderRadius: 18,
-    borderWidth: 1,
-    height: 36,
+    backgroundColor: theme.colors.accent.s100,
+    borderRadius: theme.shape.tile,
+    height: theme.metrics.iconTile,
     justifyContent: "center",
-    width: 36
+    minWidth: theme.metrics.iconTile,
+    paddingHorizontal: 4
   },
   ruleMarkerText: {
-    color: theme.colors.accent.s700,
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  ruleRow: {
-    alignItems: "flex-start",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.default,
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 12,
-    padding: 13
-  },
-  ruleTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 14,
-    fontWeight: "800"
-  },
-  secondaryAction: {
-    alignItems: "center",
-    borderColor: theme.colors.accent.s300,
-    borderRadius: 11,
-    borderWidth: 1,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 11
+    fontWeight: theme.typography.headline.fontWeight
   },
   secondaryActionText: {
     color: theme.colors.accent.s700,
     fontSize: 14,
     fontWeight: "800"
   },
-  historyRecordBestRow: {
-    alignItems: "baseline",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 6
-  },
-  historyRecordGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 8
-  },
-  historyRecordRow: {
-    borderColor: theme.colors.border.default,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 68,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    width: "48.5%"
-  },
-  historyRecordRowWide: {
-    width: "24%"
-  },
-  historyRecordScore: {
-    color: theme.colors.text.primary,
-    fontSize: 20,
-    fontWeight: "900"
-  },
-  historyRecordScoreLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    fontWeight: "700"
-  },
-  historyRecordSection: {
-    marginTop: 16
-  },
-  historyRecordSectionTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 15,
-    fontWeight: "900"
-  },
-  historyRecordTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  hubHelpButton: {
-    alignItems: "center",
-    borderColor: theme.colors.border.strong,
-    borderRadius: 18,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: "center",
-    width: 36
-  },
-  hubHelpButtonText: {
-    color: theme.colors.text.strong,
-    fontSize: 16,
-    fontWeight: "900"
-  },
-  hubIntro: {
-    marginTop: 8
-  },
-  hubIntroText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 5
-  },
-  hubScreen: {
-    alignSelf: "center",
-    maxWidth: 680
-  },
-  hubSection: {
-    marginTop: 18
-  },
-  hubSectionCount: {
-    backgroundColor: theme.colors.surfaceStrong,
-    borderRadius: 999,
-    color: theme.colors.text.secondary,
-    fontSize: 11,
-    fontWeight: "800",
-    overflow: "hidden",
-    paddingHorizontal: 8,
-    paddingVertical: 3
-  },
-  hubSectionTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  hubSectionTitleRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 7
-  },
-  hubStartButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 12,
-    justifyContent: "center",
-    marginTop: 14,
-    minHeight: 50,
-    padding: 13
-  },
-  hubStartButtonDisabled: {
-    opacity: 0.45
-  },
-  hubTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 24,
-    fontWeight: "900",
-    letterSpacing: -0.5
-  },
-  hubTopBarTitle: {
-    color: theme.colors.text.strong,
-    fontSize: 15,
-    fontWeight: "900"
-  },
-  levelCard: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.default,
-    borderRadius: 13,
-    borderWidth: 1,
-    flex: 1,
-    minWidth: 96,
-    padding: 11
-  },
-  levelCardBest: {
-    color: theme.colors.text.tertiary,
-    fontSize: 10,
-    fontWeight: "600",
-    marginTop: 6
-  },
-  levelCardLabel: {
-    color: theme.colors.text.tertiary,
-    fontSize: 10,
-    fontWeight: "800"
-  },
-  levelCardLabelSelected: {
-    color: theme.colors.accent.s700
-  },
-  levelCardRange: {
-    color: theme.colors.text.primary,
-    fontSize: 16,
-    fontWeight: "900",
-    marginTop: 5
-  },
-  levelCardRangeCompact: {
-    fontSize: 14,
-    letterSpacing: -0.25,
-    lineHeight: 15
-  },
-  levelCardRangeSelected: {
-    color: theme.colors.accent.s900
-  },
-  levelCardSelected: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s600,
-    borderWidth: 2,
-    padding: 10
-  },
-  levelGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 9
-  },
-  moreLevelChip: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 11,
-    paddingVertical: 8
-  },
-  moreLevelChipSelected: {
-    backgroundColor: theme.colors.accent.s100,
-    borderColor: theme.colors.accent.s600
-  },
-  moreLevelChipText: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  moreLevelGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 7,
-    marginTop: 9
-  },
-  moreLevelsAvailability: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 3,
-    paddingBottom: 6,
-    width: "100%"
-  },
-  moreLevelsButton: {
-    alignItems: "center",
-    borderRadius: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-    minHeight: 42,
-    paddingHorizontal: 8,
-    paddingVertical: 7
-  },
-  moreLevelsChevron: {
-    color: theme.colors.text.tertiary,
-    fontSize: 16
-  },
-  moreLevelsText: {
-    color: theme.colors.accent.s700,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  pausedRunCard: {
-    alignItems: "stretch",
-    backgroundColor: theme.colors.warning.s50,
-    borderColor: theme.colors.warning.s200,
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "column",
-    gap: 8,
-    marginTop: 8,
-    padding: 11
-  },
-  pausedRunContinue: {
-    alignSelf: "flex-end",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: 9,
-    paddingHorizontal: 11,
-    paddingVertical: 9
-  },
-  pausedRunContinueText: {
-    color: theme.colors.text.onAccent,
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  pausedRunCopy: {
-    flex: 1
-  },
-  pausedRunDetail: {
-    color: theme.colors.text.secondary,
-    fontSize: 11,
-    fontWeight: "600",
-    marginTop: 3
-  },
-  pausedRunMeta: {
-    color: theme.colors.text.tertiary,
-    fontSize: 10,
-    marginTop: 3
-  },
-  pausedRunTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 13,
-    fontWeight: "900"
-  },
-  recordsBackText: {
-    color: theme.colors.text.strong,
-    fontSize: 34,
-    fontWeight: "300",
-    lineHeight: 36
-  },
-  recordsEntry: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12
-  },
-  recordsEntryChevron: {
-    color: theme.colors.text.tertiary,
-    fontSize: 26,
-    fontWeight: "500"
-  },
-  recordsEntryCopy: {
-    flex: 1
-  },
-  recordsEntryDetail: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    marginTop: 3
-  },
-  recordsEntryTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  recordsIntro: {
-    marginTop: 8
-  },
-  recordsIntroText: {
-    color: theme.colors.text.tertiary,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 6
-  },
-  recordsScreen: {
-    alignSelf: "center",
-    maxWidth: 680
-  },
-  rulesSummary: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.default,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 18,
-    padding: 13
-  },
-  rulesSummaryHint: {
-    color: theme.colors.accent.s700,
-    fontSize: 12,
-    fontWeight: "800",
-    marginTop: 6
-  },
-  rulesSummaryLine: {
-    color: theme.colors.text.secondary,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 4
-  },
-  rulesSummaryTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  sourceCard: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s300,
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    justifyContent: "space-between",
-    marginTop: 9,
-    padding: 12
-  },
-  sourceCardCopy: {
-    flex: 1
-  },
-  sourceChangeButton: {
-    paddingHorizontal: 5,
-    paddingVertical: 8
-  },
-  sourceChangeText: {
-    color: theme.colors.accent.s700,
-    fontSize: 12,
-    fontWeight: "800"
-  },
-  sourceHelper: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 7
-  },
-  sourceLevel: {
-    color: theme.colors.accent.s900,
-    fontSize: 21,
-    fontWeight: "900"
-  },
-  sourceOption: {
-    alignItems: "center",
-    borderColor: theme.colors.border.default,
-    borderRadius: 13,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 9,
-    padding: 11
-  },
-  sourceOptionCheck: {
-    alignItems: "center",
-    borderColor: theme.colors.accent.s300,
-    borderRadius: 10,
-    borderWidth: 1,
-    height: 20,
-    justifyContent: "center",
-    width: 20
-  },
-  sourceOptionCheckText: {
-    color: theme.colors.accent.s700,
-    fontSize: 12,
-    fontWeight: "900"
-  },
-  sourceOptionCopy: {
-    flex: 1
-  },
-  sourceOptionDetail: {
-    color: theme.colors.text.secondary,
-    fontSize: 12,
-    marginTop: 3
-  },
-  sourceOptionSelected: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s600
-  },
-  sourceOptionUnavailable: {
-    backgroundColor: theme.colors.danger.s50,
-    borderColor: theme.colors.danger.s300
-  },
-  sourceOptionTiming: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    marginTop: 2
-  },
-  sourceOptionTitle: {
-    color: theme.colors.text.primary,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  sourcePicker: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.strong,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginTop: 18,
-    padding: 13
-  },
-  sourcePickerClose: {
-    alignItems: "center",
-    height: 36,
-    justifyContent: "center",
-    width: 36
-  },
-  sourcePickerFootnote: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 11
-  },
-  sourcePickerHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  sourcePickerIntro: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 3
-  },
-  sourcePickerTitleBlock: {
-    flex: 1
-  },
-  sourceTiming: {
-    color: theme.colors.text.tertiary,
-    fontSize: 11,
-    marginTop: 3
-  },
-  sourceTitle: {
-    color: theme.colors.text.strong,
-    fontSize: 12,
-    fontWeight: "700",
-    marginTop: 3
+  sectionTitle: {
+    paddingHorizontal: 4
+  },
+  selectedFill: {
+    backgroundColor: theme.colors.accent.s100
   },
   survivalDisclosureChevronMotion: {
     alignItems: "center",
@@ -2408,10 +1789,9 @@ const useStyles = makeStyles((theme) => ({
   },
   survivalDisclosureHeader: {
     alignItems: "center",
-    borderRadius: 10,
     flexDirection: "row",
     justifyContent: "space-between",
-    minHeight: 40,
+    minHeight: theme.metrics.minTarget,
     paddingHorizontal: 4
   },
   survivalDisclosureMotionClip: {
@@ -2424,38 +1804,36 @@ const useStyles = makeStyles((theme) => ({
     right: 0,
     top: 0
   },
-  typeOption: {
+  topBar: {
     alignItems: "center",
-    borderColor: theme.colors.border.strong,
-    borderRadius: 12,
-    borderWidth: 1,
+    flexDirection: "row",
+    gap: theme.spacing.inline,
+    justifyContent: "space-between",
+    minHeight: theme.metrics.minTarget
+  },
+  topBarButton: {
+    alignItems: "center",
+    borderRadius: theme.shape.capsule,
+    height: theme.metrics.minTarget,
+    justifyContent: "center",
+    width: theme.metrics.minTarget
+  },
+  topBarTitle: {
     flex: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 11
+    textAlign: "center"
   },
-  typeOptionDetail: {
-    color: theme.colors.text.tertiary,
-    fontSize: 10,
-    marginTop: 3
-  },
-  typeOptionDetailSelected: {
-    color: theme.colors.accent.s700
-  },
-  typeOptionSelected: {
-    backgroundColor: theme.colors.accent.s50,
-    borderColor: theme.colors.accent.s600
-  },
-  typeOptionText: {
-    color: theme.colors.text.strong,
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  typeOptionTextSelected: {
-    color: theme.colors.accent.s900
+  typeOption: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.shape.control,
+    flex: 1,
+    gap: 2,
+    justifyContent: "center",
+    minHeight: theme.metrics.rowMinHeight,
+    paddingHorizontal: 12,
+    paddingVertical: 10
   },
   typeSelector: {
     flexDirection: "row",
-    gap: 8,
-    marginTop: 16
+    gap: theme.spacing.group
   }
 }));
