@@ -183,9 +183,6 @@ async function launchMarketingFrame(frame) {
       chessticizeTestNowMs: String(Date.parse(story.captureClock.instant)),
     },
   });
-  if (!verifyIosLandscapeLayout) {
-    await setMarketingOrientationBeforeNavigation();
-  }
   if (device.getPlatform() === 'android' && story.campaign
     && ['practice-home', 'review'].includes(frame.id)) {
     // The fictional player has existing history when 1.6 first opens. Finish
@@ -196,6 +193,9 @@ async function launchMarketingFrame(frame) {
     }, { timeoutMs: 180000 });
     tapAndroidUiNode(nodes['whats-new-continue']);
     await waitForAndroidUiState({ absentResourceIds: ['whats-new-continue'] });
+  }
+  if (!verifyIosLandscapeLayout) {
+    await setMarketingOrientationBeforeNavigation();
   }
   await waitFor(element(by.id('adaptive-layout'))).toExist().withTimeout(180000);
   await waitForStableOrientation(target.orientation);
