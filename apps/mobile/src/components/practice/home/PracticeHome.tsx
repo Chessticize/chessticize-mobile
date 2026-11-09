@@ -1,5 +1,43 @@
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  Animated,
+  LayoutAnimation,
+  type LayoutChangeEvent,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View
+} from "react-native";
+import { Gesture, GestureDetector, type GestureType } from "react-native-gesture-handler";
+import { defaultSprintConfig, type SprintConfig, type SprintMode, type SprintState } from "../../../../../../packages/core/src/index.ts";
+import type { AdaptiveLayout } from "../../adaptivePracticeLayout.ts";
+import {
+  type PersonalBestChallengeDesignPreview,
+  PersonalBestHomeCard,
+  type PersonalBestPausedRunPresentation
+} from "../../PersonalBestChallengeDesign.tsx";
+import type { PracticeProgressSummary } from "../../../../../../packages/storage/src/rating-history.ts";
+import type { PracticeRunManagementPresentation, PracticeRunPresentation } from "../../practiceRunPresentation.ts";
+import type { TacticalProfilePresentation } from "../../tacticalProfilePresentation.ts";
+import { formatSprintTimingLabel, modeLabel, safeTestId } from "../shared/practiceUtils.ts";
+import { PracticeProgressCard } from "../shared/PracticeProgressCard.tsx";
+import { TacticalProfileHomeCard } from "../../TacticalProfileSection.tsx";
+import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { AppText, Button, Icon, type IconName, IconTile, ListRow, Section } from "../../ui/index.tsx";
+import { RunRemovalConfirmation } from "../runEditor/PracticeRunEditor.tsx";
+import { customThemeLabel } from "../shared/themeCatalog.ts";
+import { SafeAreaModalBackdrop } from "../../SafeAreaModalBackdrop.tsx";
+
 export type RunReorderPickupFeedback = {
   haptic: "medium";
+};
+
+export type RunReorderDesignPreview = {
+  pickedUpRunId: string;
 };
 
 export type SprintRulesGuidePresentation = {
@@ -15,13 +53,13 @@ const PRACTICE_MODE_DESCRIPTIONS: Record<SprintMode, string> = {
   custom: "Time, theme, rating"
 };
 
-type PracticeModeSummary = {
+export type PracticeModeSummary = {
   mode: SprintMode;
   config: SprintConfig;
   rating?: number;
 };
 
-function PracticeHome({
+export function PracticeHome({
   adaptiveLayout,
   mode,
   modes,
@@ -61,7 +99,7 @@ function PracticeHome({
   onStartMode: (next: SprintMode) => void;
   onResumeSprint: (sprint: SprintState) => void;
   nativeRunReorderScrollController: NativeRunReorderScrollController;
-  runReorderDesignPreview?: Props["runReorderDesignPreview"];
+  runReorderDesignPreview?: RunReorderDesignPreview;
   onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
 }): React.JSX.Element {
   const styles = useStyles();
@@ -175,7 +213,7 @@ function PracticeRunHome({
   onDismissSprintRulesGuide: () => void;
   onOpenSprintRulesGuide: () => void;
   nativeRunReorderScrollController: NativeRunReorderScrollController;
-  runReorderDesignPreview?: Props["runReorderDesignPreview"];
+  runReorderDesignPreview?: RunReorderDesignPreview;
   onRunReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
 }): React.JSX.Element {
   const styles = useStyles();
@@ -989,13 +1027,13 @@ type NativeRunLayout = {
   y: number;
 };
 
-type NativeRunReorderMeasureElement = {
+export type NativeRunReorderMeasureElement = {
   measureInWindow: (
     callback: (x: number, y: number, width: number, height: number) => void
   ) => void;
 };
 
-type NativeRunReorderScrollSnapshot = {
+export type NativeRunReorderScrollSnapshot = {
   contentHeight: number;
   offsetY: number;
   reorderWindowBottom: number;
@@ -1005,7 +1043,7 @@ type NativeRunReorderScrollSnapshot = {
   windowTop: number;
 };
 
-type NativeRunReorderScrollController = {
+export type NativeRunReorderScrollController = {
   scrollGestureRef: React.RefObject<GestureType | undefined>;
   getSnapshot: () => NativeRunReorderScrollSnapshot | null;
   refreshBounds: (reorderElement?: NativeRunReorderMeasureElement | null) => void;
@@ -1745,7 +1783,7 @@ function presentationRunPress(
   onIntent(editing ? { type: "edit-run", runId } : { type: "select-run", runId });
 }
 
-function StartConflictPrompt({
+export function StartConflictPrompt({
   canDiscard,
   onCancel,
   onDiscard,
@@ -1847,7 +1885,7 @@ function ResumeSprintCard({
   );
 }
 
-function PausedSessionPanel({
+export function PausedSessionPanel({
   onAbandon,
   onResume,
   state
@@ -2100,6 +2138,14 @@ function ordinalWord(value: number): string {
   return `${value}${suffix}`;
 }
 
+const useStyles = makeStyles((theme) => ({
+  accessibleMoveModalBackdrop: {
+    alignItems: "center",
+    backgroundColor: theme.colors.scrimSoft,
+    flex: 1,
+    justifyContent: "center",
+    padding: 20
+  },
   practiceHome: {
     gap: theme.spacing.section
   },
@@ -2423,6 +2469,39 @@ function ordinalWord(value: number): string {
     flexDirection: "row",
     gap: 10
   },
+  primaryButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.accent.fill,
+    borderRadius: 8,
+    flex: 1,
+    height: 42,
+    justifyContent: "center",
+    paddingHorizontal: 14
+  },
+  primaryButtonText: {
+    color: theme.colors.text.onAccent,
+    fontSize: 13,
+    fontWeight: "800"
+  },
+  secondaryButton: {
+    alignItems: "center",
+    borderColor: theme.colors.border.strong,
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 42,
+    justifyContent: "center",
+    paddingHorizontal: 14
+  },
+  secondaryButtonText: {
+    color: theme.colors.text.strong,
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  helperText: {
+    color: theme.colors.text.tertiary,
+    fontSize: 12,
+    fontWeight: "600"
+  },
   feedbackHandoffConfirmation: {
     backgroundColor: theme.colors.surfaceRaised,
     // Dark surfaceRaised matches the dimmed Home, so the card needs an edge.
@@ -2445,3 +2524,4 @@ function ordinalWord(value: number): string {
     gap: theme.spacing.group,
     marginTop: 4
   },
+}));

@@ -1,4 +1,10 @@
-const SIMULATED_HISTORY_SCENARIOS: ReadonlyArray<{ scenario: SimulatedHistoryScenarioId; label: string }> = [
+import React from "react";
+import { Pressable, Text, View } from "react-native";
+import type { SimulatedHistoryScenarioId } from "../../../../../../packages/storage/src/simulation/scenarios.ts";
+import type { MobilePuzzleSource } from "../../../platform/mobilePractice.ts";
+import { makeStyles } from "../../../theme/index.ts";
+
+export const SIMULATED_HISTORY_SCENARIOS: ReadonlyArray<{ scenario: SimulatedHistoryScenarioId; label: string }> = [
   { scenario: "slow-fork-speed", label: "Slow fork" },
   { scenario: "weak-fork-solve", label: "Weak fork" },
   { scenario: "balanced", label: "Balanced" },
@@ -10,7 +16,7 @@ const TEST_PUZZLE_SOURCES: ReadonlyArray<{ source: MobilePuzzleSource; label: st
   { source: "familiar15", label: "Familiar 15" }
 ];
 
-function TestPuzzleSourceControl({
+export function TestPuzzleSourceControl({
   source,
   onChange,
   onInjectMateIn2FocusedRun,
@@ -155,6 +161,7 @@ function OptionButton({
   );
 }
 
+const useStyles = makeStyles((theme) => ({
   testPanel: {
     backgroundColor: theme.colors.surfaceRaised,
     borderColor: theme.colors.border.strong,
@@ -191,8 +198,14 @@ function OptionButton({
   optionButtonTextActive: {
     color: theme.colors.accent.s700
   },
+  helperText: {
+    color: theme.colors.text.tertiary,
+    fontSize: 12,
+    fontWeight: "600"
+  },
   simulationNotice: {
     color: theme.colors.warning.s600,
     fontSize: 12,
     fontWeight: "600"
   },
+}));

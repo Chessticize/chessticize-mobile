@@ -1,9 +1,7 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
   AppState,
-  LayoutAnimation,
   Linking,
   Modal,
   Platform,
@@ -21,8 +19,6 @@ import type {
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
-  Gesture,
-  GestureDetector,
   GestureHandlerRootView,
   LegacyScrollView,
   type GestureType
@@ -120,7 +116,6 @@ import {
   fingerprintOpaqueToken,
   syncPracticeProgressV2
 } from "../../../../packages/storage/src/progress-sync-v2.ts";
-import type { PracticeProgressSummary } from "../../../../packages/storage/src/rating-history.ts";
 import type { SimulatedHistoryScenarioId } from "../../../../packages/storage/src/simulation/scenarios.ts";
 import {
   getBundledCorePackManifest,
@@ -204,8 +199,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chess, type Move, type PieceSymbol, type Square } from "chess.js";
 import type {
-  PracticeRunManagementPresentation,
-  PracticeRunPresentation
+  PracticeRunManagementPresentation
 } from "./practiceRunPresentation.ts";
 import {
   PRACTICE_FEEDBACK_MAX_TEXT_SCALE,
@@ -239,8 +233,7 @@ import {
 import { usePuzzleEntryPreview } from "./usePuzzleEntryPreview.ts";
 import { puzzleEntryPreviewPlan } from "./puzzleEntryPreview.ts";
 import {
-  TacticalProfileFlow,
-  TacticalProfileHomeCard
+  TacticalProfileFlow
 } from "./TacticalProfileSection.tsx";
 import type { TacticalProfilePresentation } from "./tacticalProfilePresentation.ts";
 import { useTacticalProfilePresentation } from "./useTacticalProfilePresentation.ts";
@@ -260,7 +253,6 @@ import {
 import {
   PersonalBestChallengeHub,
   PersonalBestGuide,
-  PersonalBestHomeCard,
   PersonalBestProgressBanner,
   type PersonalBestChallengeDesignPreview,
   type PersonalBestChallengeSelection,
@@ -301,9 +293,13 @@ export type {
   ThemeCatalogGroup,
   ThemeCatalogPresentation
 } from "./practice/shared/themeCatalog.ts";
+export type {
+  RunReorderPickupFeedback,
+  SprintRulesGuidePresentation
+} from "./practice/home/PracticeHome.tsx";
 import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
 import { typography as baseTypography } from "../theme/scales.ts";
-import { AppText, Button, Icon, IconTile, ListRow, Section, useListRowStyle, type IconName } from "./ui/index.tsx";
+import { AppText, Button, Icon, IconTile, useListRowStyle } from "./ui/index.tsx";
 import type { MoveSide } from "./practice/shared/moveSide.ts";
 import { CHESS_PIECE_SPRITE } from "./practice/shared/chessPieceSprite.ts";
 import {
@@ -329,7 +325,6 @@ import {
   FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   formatCompactDuration,
   formatSprintDurationLabel,
-  formatSprintTimingLabel,
   modeLabel,
   safeTestId
 } from "./practice/shared/practiceUtils.ts";
@@ -343,10 +338,9 @@ import {
   SettingsPanel,
   StockfishDiagnosticsPanel
 } from "./practice/settings/SettingsPanel.tsx";
-import {
-  customThemeLabel,
-  type CustomThemeSelection,
-  type ThemeCatalogPresentation
+import type {
+  CustomThemeSelection,
+  ThemeCatalogPresentation
 } from "./practice/shared/themeCatalog.ts";
 import {
   historyAttentionQueryForSelection,
@@ -357,9 +351,21 @@ import {
   ThemeTagRail
 } from "./practice/history/HistoryPanel.tsx";
 import { emptyHistoryPerformance } from "./practice/history/HistoryRatingChart.tsx";
-import { PracticeProgressCard } from "./practice/shared/PracticeProgressCard.tsx";
 import { CustomSprintSetup } from "./practice/customSetup/CustomSprintSetup.tsx";
-import { PracticeRunEditor, RunRemovalConfirmation } from "./practice/runEditor/PracticeRunEditor.tsx";
+import { PracticeRunEditor } from "./practice/runEditor/PracticeRunEditor.tsx";
+import {
+  type NativeRunReorderMeasureElement,
+  type NativeRunReorderScrollController,
+  type NativeRunReorderScrollSnapshot,
+  PausedSessionPanel,
+  PracticeHome,
+  type PracticeModeSummary,
+  type RunReorderDesignPreview,
+  type RunReorderPickupFeedback,
+  type SprintRulesGuidePresentation,
+  StartConflictPrompt
+} from "./practice/home/PracticeHome.tsx";
+import { SIMULATED_HISTORY_SCENARIOS, TestPuzzleSourceControl } from "./practice/home/TestPuzzleSourceControl.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -382,9 +388,7 @@ interface Props {
   puzzleSelectionSeed?: string;
   runManagementEnabled?: boolean;
   runManagementPresentation?: PracticeRunManagementPresentation;
-  runReorderDesignPreview?: {
-    pickedUpRunId: string;
-  };
+  runReorderDesignPreview?: RunReorderDesignPreview;
   runReorderFeedbackPreview?: (feedback: RunReorderPickupFeedback) => void;
   runEloEditingMovedToHome?: boolean;
   settingsCaptureBottomInset?: number;
