@@ -46,6 +46,29 @@ describe('screenshot assertions', () => {
     expect(() => expectScreenshotHasDarkChrome(light)).toThrow('Expected dark native chrome');
   });
 
+  it('checks the surface around caption pixels without accepting a light surface with dark text', () => {
+    const writeCaptionSurface = (name, background, caption) => {
+      const width = 100;
+      const height = 100;
+      const data = Buffer.alloc(width * height * 4);
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          writePixel(data, width, x, y, y >= 88 && y <= 96 ? [10, 111, 224, 255] : background);
+        }
+      }
+      for (const x of [5, 50, 95]) {
+        writePixel(data, width, x, 8, caption);
+      }
+      const target = path.join(temporaryDirectory, name);
+      fs.writeFileSync(target, encodeRgbaPng({data, width, height}));
+      return target;
+    };
+    const dark = writeCaptionSurface('caption-on-dark.png', [0, 0, 0, 255], [144, 144, 147, 255]);
+    const light = writeCaptionSurface('caption-on-light.png', [245, 247, 250, 255], [0, 0, 0, 255]);
+    expect(() => expectScreenshotHasDarkChrome(dark, 3)).not.toThrow();
+    expect(() => expectScreenshotHasDarkChrome(light, 3)).toThrow('Expected dark native chrome');
+  });
+
   it('detects a low-material board from square-local contrast', () => {
     const png = syntheticBoard();
     paintPiece(png, 6, 2, [20, 25, 32, 255]);

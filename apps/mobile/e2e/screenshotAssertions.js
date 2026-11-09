@@ -29,7 +29,21 @@ function expectScreenshotHasDarkChrome(screenshotPath, minimumDarkSamples = 4) {
   const samples = [
     [0.05, 0.08], [0.5, 0.08], [0.95, 0.08],
     [0.05, 0.92], [0.5, 0.92], [0.95, 0.92]
-  ].map(([x, y]) => pixelAt(png, png.width * x, png.height * y));
+  ].map(([x, y]) => {
+    // Inspect the surrounding surface rather than one antialiased text pixel.
+    // A caption can cross a probe while the native surface remains dark.
+    const centerX = Math.floor(png.width * x);
+    const centerY = Math.floor(png.height * y);
+    const radiusX = Math.max(3, Math.floor(png.width * 0.015));
+    const radiusY = Math.max(3, Math.floor(png.height * 0.008));
+    const channels = [[], [], [], []];
+    for (let py = Math.max(0, centerY - radiusY); py <= Math.min(png.height - 1, centerY + radiusY); py += 1) {
+      for (let px = Math.max(0, centerX - radiusX); px <= Math.min(png.width - 1, centerX + radiusX); px += 1) {
+        pixelAt(png, px, py).forEach((value, channel) => channels[channel].push(value));
+      }
+    }
+    return channels.map((values) => values.sort((left, right) => left - right)[Math.floor(values.length / 2)]);
+  });
   const darkSamples = samples.filter(([red, green, blue, alpha]) =>
     alpha > 128 && ((red + green + blue) / 3) < 110
   );
