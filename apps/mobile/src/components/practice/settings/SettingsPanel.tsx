@@ -1949,7 +1949,8 @@ const useStyles = makeStyles((theme) => ({
     minWidth: 180
   },
   confirmationActionsStacked: {
-    flexDirection: "column"
+    flexDirection: "column",
+    width: "100%"
   },
   confirmationActionRow: {
     flexDirection: "row",

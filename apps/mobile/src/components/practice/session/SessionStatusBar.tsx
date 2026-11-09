@@ -759,9 +759,11 @@ const useStyles = makeStyles((theme) => ({
     flex: 0,
     minWidth: PERSONAL_BEST_MISTAKES_BLOCK_WIDTH
   },
+  // A neutral surface keeps the tinted destructive Abandon button distinct;
+  // the danger border still marks the sheet as a warning.
   sessionAbandonConfirm: {
     alignItems: "center",
-    backgroundColor: theme.colors.danger.s50,
+    backgroundColor: theme.colors.surface,
     borderColor: theme.colors.danger.s300,
     borderRadius: 8,
     borderWidth: 1,
