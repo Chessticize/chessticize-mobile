@@ -7,7 +7,7 @@
 // `react-native-screens` to the maintained fake in nativeTabsFake.tsx, which
 // draws a faithful placeholder of the same chrome.
 import React from "react";
-import { Platform, StyleSheet, View, type ColorValue } from "react-native";
+import { Platform, StyleSheet, View, useWindowDimensions, type ColorValue } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Tabs } from "react-native-screens";
 import { usePracticeViewport } from "../components/PracticeViewport.tsx";
@@ -15,6 +15,7 @@ import { NAVIGATION_RAIL_WIDTH, TopLevelNavigationRail } from "./TopLevelNavigat
 import {
   ANDROID_NAVIGATION_RAIL_MIN_WIDTH,
   TOP_LEVEL_TABS,
+  androidTabLabelFontSize,
   initialNativeTabSelection,
   iosMajorVersion,
   nativeTabBarMinimizeBehavior,
@@ -73,6 +74,8 @@ export function NativeTabHost({
   const [selection, setSelection] = React.useState(() => initialNativeTabSelection(selectedTab));
   const windowInsets = useSafeAreaInsets();
   const { height, width } = usePracticeViewport();
+  const { fontScale } = useWindowDimensions();
+  const androidLabelFontSize = androidTabLabelFontSize(fontScale);
   const badge = reviewTabBadge(dueReviewCount, overdueReviewCount);
   const iosMajor = Platform.OS === "ios" ? iosMajorVersion(Platform.Version) : 0;
   const controllerMode = nativeTabControllerMode(
@@ -136,6 +139,8 @@ export function NativeTabHost({
               standardAppearance: {
                 tabBarBackgroundColor: colors.androidBarBackground,
                 tabBarItemLabelVisibilityMode: "labeled",
+                tabBarItemTitleSmallLabelFontSize: androidLabelFontSize,
+                tabBarItemTitleLargeLabelFontSize: androidLabelFontSize,
                 tabBarItemActiveIndicatorColor: colors.androidIndicator,
                 tabBarItemBadgeBackgroundColor: itemBadge?.tone === "danger" ? colors.badgeDangerBackground : colors.badgeBackground,
                 tabBarItemBadgeTextColor: colors.badgeText,

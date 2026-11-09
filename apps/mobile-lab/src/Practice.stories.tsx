@@ -319,6 +319,19 @@ export const FirstSprintGuide: Story = {
   }
 };
 
+export const FirstSprintGuideLargestText: Story = {
+  name: "First Sprint guide · largest text",
+  args: { scenarioId: "practice-first-sprint-guide" },
+  render: (args) => (
+    <LabTextSize fontScale={LARGEST_ACCESSIBILITY_FONT_SCALE}>
+      <LabScenario {...args} />
+    </LabTextSize>
+  ),
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "practice-sprint-rules-guide");
+  }
+};
+
 export const EditAndReorderRuns: Story = {
   name: "Edit and reorder runs",
   args: { scenarioId: "practice-home-edit" },

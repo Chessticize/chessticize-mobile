@@ -9,12 +9,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View
 } from "react-native";
 import { Gesture, GestureDetector, type GestureType } from "react-native-gesture-handler";
 import { defaultSprintConfig, type SprintConfig, type SprintMode, type SprintState } from "../../../../../../packages/core/src/index.ts";
 import type { AdaptiveLayout } from "../../adaptivePracticeLayout.ts";
+import { usePracticeViewport } from "../../PracticeViewport.tsx";
+import { HEADLINE_MAX_FONT_SCALE, TITLE_MAX_FONT_SCALE } from "../../../theme/scales.ts";
 import {
   type PersonalBestChallengeDesignPreview,
   PersonalBestHomeCard,
@@ -712,11 +713,18 @@ function SprintRulesGuide({
   // One badge width for every rule so the descriptions share a column. The
   // width follows the text size; when it would take more than a third of the
   // card (narrow screens at accessibility sizes), badges stack above their copy.
-  const { fontScale } = useWindowDimensions();
+  const { fontScale, width: viewportWidth } = usePracticeViewport();
   const [listWidth, setListWidth] = useState(0);
   const badgeMinWidth = Math.ceil(SPRINT_RULE_BADGE_MIN_WIDTH * Math.max(1, fontScale));
   const stacked = listWidth > 0 && badgeMinWidth > listWidth / 3;
   const ruleLayout = { badgeMinWidth, stacked };
+  // The dismiss button never shrinks, so at accessibility sizes it takes most
+  // of the header row and squeezes the title to one word per line. Past a third
+  // of the card it moves below the title, which then gets the full width.
+  const dismissMinWidth = Math.ceil(SPRINT_RULES_DISMISS_MIN_WIDTH * Math.max(1, fontScale));
+  // Until the list reports its width, estimate it from the screen (page and card
+  // padding) so the first frame does not flip from side by side to stacked.
+  const dismissStacked = dismissMinWidth > (listWidth > 0 ? listWidth : viewportWidth - 64) / 3;
 
   return (
     <View
@@ -724,21 +732,24 @@ function SprintRulesGuide({
       style={styles.sprintRulesGuide}
       testID="practice-sprint-rules-guide"
     >
-      <View style={styles.sprintRulesGuideHeader}>
-        <View style={styles.sprintRulesGuideTitleBlock}>
+      <View
+        style={[styles.sprintRulesGuideHeader, dismissStacked ? styles.sprintRulesGuideHeaderStacked : null]}
+        testID="practice-sprint-rules-header"
+      >
+        <View style={[styles.sprintRulesGuideTitleBlock, dismissStacked ? styles.sprintRulesGuideTitleBlockStacked : null]}>
           <Text style={styles.sprintRulesEyebrow}>YOUR FIRST SPRINT</Text>
-          <Text style={styles.sprintRulesGuideTitle}>
+          <Text maxFontSizeMultiplier={TITLE_MAX_FONT_SCALE} style={styles.sprintRulesGuideTitle}>
             Solve {presentation.targetCorrect} puzzles to pass
           </Text>
         </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Dismiss Sprint rules"
-          style={styles.sprintRulesDismissButton}
+          style={[styles.sprintRulesDismissButton, dismissStacked ? styles.sprintRulesDismissButtonStacked : null]}
           testID="practice-sprint-rules-dismiss"
           onPress={onDismiss}
         >
-          <Text numberOfLines={1} style={styles.sprintRulesDismissText}>Got it</Text>
+          <Text maxFontSizeMultiplier={HEADLINE_MAX_FONT_SCALE} numberOfLines={1} style={styles.sprintRulesDismissText}>Got it</Text>
         </Pressable>
       </View>
 
@@ -784,6 +795,8 @@ function SprintRulesGuide({
 }
 
 const SPRINT_RULE_BADGE_MIN_WIDTH = 72;
+// "Got it" at the headline size plus the button's horizontal padding.
+const SPRINT_RULES_DISMISS_MIN_WIDTH = 80;
 
 function SprintRuleRow({
   badge,
@@ -2300,9 +2313,14 @@ const useStyles = makeStyles((theme) => ({
     flexWrap: "wrap",
     justifyContent: "space-between"
   },
+  // Edit and Add Run wrap onto a second line when large text makes them wider
+  // than the screen, instead of running off its edge.
   runManagementToolbarActions: {
     alignItems: "center",
     flexDirection: "row",
+    flexShrink: 1,
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
     marginLeft: "auto"
   },
   sprintRulesGuide: {
@@ -2317,10 +2335,17 @@ const useStyles = makeStyles((theme) => ({
     gap: 12,
     justifyContent: "space-between"
   },
+  sprintRulesGuideHeaderStacked: {
+    flexDirection: "column"
+  },
   sprintRulesGuideTitleBlock: {
     flex: 1,
     gap: 2,
     minWidth: 0
+  },
+  sprintRulesGuideTitleBlockStacked: {
+    alignSelf: "stretch",
+    flex: 0
   },
   sprintRulesEyebrow: {
     ...theme.typography.footnote,
@@ -2339,6 +2364,9 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "center",
     minHeight: theme.metrics.minTarget,
     paddingHorizontal: 16
+  },
+  sprintRulesDismissButtonStacked: {
+    alignSelf: "flex-start"
   },
   sprintRulesDismissText: {
     ...theme.typography.headline,

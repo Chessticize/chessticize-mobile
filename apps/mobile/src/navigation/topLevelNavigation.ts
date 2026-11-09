@@ -188,6 +188,25 @@ export function nativeTabBarMinimizeBehavior(iosMajorVersion: number): "never" |
   return iosMajorVersion >= IOS_TAB_BAR_MINIMIZE_MIN_VERSION ? "never" : undefined;
 }
 
+// Material bottom navigation labels are 12 sp (design_bottom_navigation_text_size).
+// Scaled with the system font scale they fill each tab's width at large sizes:
+// "Practice" and "Settings" touch the screen edges at 2.0. Labels follow the
+// font scale up to this multiplier and stay there beyond it, like the iOS tab
+// bar, which stops growing past its large sizes. Other text is unaffected.
+export const ANDROID_TAB_LABEL_BASE_SP = 12;
+export const ANDROID_TAB_LABEL_MAX_FONT_SCALE = 1.3;
+
+// Value for react-native-screens' tabBarItemTitle*LabelFontSize, which the
+// native bar converts from sp with the system font scale again. Dividing by the
+// scale makes the result base * max (the cap). Undefined at or below the cap
+// keeps the Material default.
+export function androidTabLabelFontSize(fontScale: number): number | undefined {
+  if (!Number.isFinite(fontScale) || fontScale <= ANDROID_TAB_LABEL_MAX_FONT_SCALE) {
+    return undefined;
+  }
+  return (ANDROID_TAB_LABEL_BASE_SP * ANDROID_TAB_LABEL_MAX_FONT_SCALE) / fontScale;
+}
+
 // Major version from React Native's Platform.Version on iOS ("26.1" or 26).
 export function iosMajorVersion(version: string | number): number {
   const major = Number.parseInt(String(version), 10);

@@ -1,6 +1,7 @@
 import { ICONS } from "../src/components/ui/iconNames";
 import {
   TOP_LEVEL_TABS,
+  androidTabLabelFontSize,
   initialNativeTabSelection,
   iosMajorVersion,
   nativeTabBarMinimizeBehavior,
@@ -181,6 +182,16 @@ describe("tab chrome placement", () => {
     { label: "Android tablet", width: 1280, height: 800, expected: "navigationRail" }
   ] as const)("$label uses $expected on Android", ({ expected, height, width }) => {
     expect(resolveTopLevelChromePlacement({ height, idiom: "phone", insets: noInsets, platform: "android", width })).toBe(expected);
+  });
+
+  it("keeps the Material default tab label size up to 1.3x and caps it beyond", () => {
+    expect(androidTabLabelFontSize(0.85)).toBeUndefined();
+    expect(androidTabLabelFontSize(1)).toBeUndefined();
+    expect(androidTabLabelFontSize(1.3)).toBeUndefined();
+    // The native bar multiplies by the font scale again: 12 sp * 1.3 at every size.
+    for (const fontScale of [1.5, 2]) {
+      expect((androidTabLabelFontSize(fontScale) ?? 0) * fontScale).toBeCloseTo(15.6);
+    }
   });
 
   it("guesses the placeholder idiom from the window", () => {

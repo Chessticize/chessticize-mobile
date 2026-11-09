@@ -6,7 +6,12 @@ import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { makeStyles, useTheme } from "../theme";
 import { Icon } from "../components/ui/Icon.tsx";
-import { TOP_LEVEL_TABS, reviewTabBadge, type TopLevelTab } from "./topLevelNavigation.ts";
+import {
+  ANDROID_TAB_LABEL_MAX_FONT_SCALE,
+  TOP_LEVEL_TABS,
+  reviewTabBadge,
+  type TopLevelTab
+} from "./topLevelNavigation.ts";
 
 export const NAVIGATION_RAIL_WIDTH = 80;
 
@@ -70,7 +75,12 @@ export function TopLevelNavigationRail({
                 </Text>
               ) : null}
             </View>
-            <Text numberOfLines={1} style={[styles.label, { color }, active ? styles.labelActive : null]}>
+            {/* Rail labels share the bottom navigation's 1.3x cap. At 2.0 the
+                bold 12 sp label was wider than the 80 dp rail and ended in "...". */}
+            <Text
+              maxFontSizeMultiplier={ANDROID_TAB_LABEL_MAX_FONT_SCALE}
+              style={[styles.label, { color }, active ? styles.labelActive : null]}
+            >
               {item.label}
             </Text>
           </Pressable>

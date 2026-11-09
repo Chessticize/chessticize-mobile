@@ -3,6 +3,7 @@ import { Chess } from "chess.js";
 import androidPracticeFixture from "../../../fixtures/puzzles/android-standard-practice.fixture.json";
 import { AppState } from "react-native";
 import * as ReactNative from "react-native";
+import { HEADLINE_MAX_FONT_SCALE, TITLE_MAX_FONT_SCALE } from "../src/theme/scales";
 import * as SafeAreaContext from "react-native-safe-area-context";
 import TestRenderer, { act } from "react-test-renderer";
 import { darkTheme, lightTheme, ThemeProvider } from "../src/theme";
@@ -2886,6 +2887,52 @@ describe("PracticePocScreen", () => {
     expect(flattenTestStyle(badge.props.style).minWidth).toBeUndefined();
   });
 
+  it("moves the first Sprint dismiss button below the title when the scaled button would squeeze it", () => {
+    const render = (fontScale: number) => {
+      setPracticeViewport({
+        fontScale,
+        height: 914,
+        insets: { top: 32, right: 0, bottom: 24, left: 0 },
+        scale: 2.625,
+        width: 412
+      });
+      const renderer = renderLabScenario("practice-first-sprint-guide");
+      act(() => {
+        findByTestId(renderer, "practice-sprint-rules-list").props.onLayout({
+          nativeEvent: { layout: { height: 600, width: 340, x: 0, y: 0 } }
+        });
+      });
+      return {
+        button: flattenTestStyle(findByTestId(renderer, "practice-sprint-rules-dismiss").props.style),
+        header: flattenTestStyle(findByTestId(renderer, "practice-sprint-rules-header").props.style)
+      };
+    };
+
+    expect(render(1).header.flexDirection).toBe("row");
+    const large = render(2);
+    expect(large.header.flexDirection).toBe("column");
+    expect(large.button.alignSelf).toBe("flex-start");
+  });
+
+  it("keeps the first Sprint heading under the page title cap and wraps Edit and Add Run under large text", () => {
+    const renderer = renderLabScenario("practice-first-sprint-guide");
+    const heading = renderer.root
+      .findAllByType(ReactNative.Text)
+      .find((text) => collectText(text).startsWith("Solve"));
+    expect(heading?.props.maxFontSizeMultiplier).toBe(TITLE_MAX_FONT_SCALE);
+    const dismissText = renderer.root
+      .findAllByType(ReactNative.Text)
+      .find((text) => collectText(text) === "Got it");
+    expect(dismissText?.props.maxFontSizeMultiplier).toBe(HEADLINE_MAX_FONT_SCALE);
+    // The nearest row above Add Run is the actions row (Edit and Add Run).
+    let row: TestRenderer.ReactTestInstance | null = hostByTestId(renderer, "practice-add-run").parent;
+    while (row && flattenTestStyle(row.props.style).flexDirection !== "row") {
+      row = row.parent;
+    }
+    const actions = flattenTestStyle(row?.props.style);
+    expect(actions.flexWrap).toBe("wrap");
+  });
+
   it("uses the selected saved Run to calculate the first Sprint pass target", () => {
     const renderer = renderScreen({
       runManagementEnabled: true,
@@ -5370,7 +5417,7 @@ describe("PracticePocScreen", () => {
     await flushMicrotasks();
 
     pressHistoryTab(renderer);
-    expect(findByTestId(renderer, "history-attention-filter").props.role).toBe("radiogroup");
+    expect(hostByTestId(renderer, "history-attention-filter").props.role).toBe("radiogroup");
     expect(findByTestId(renderer, "history-attention-filter").props.accessibilityLabel).toBe(
       "History view"
     );
