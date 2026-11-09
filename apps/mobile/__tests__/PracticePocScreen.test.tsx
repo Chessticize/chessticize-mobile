@@ -12303,6 +12303,8 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "bookmark-glyph")).toThrow();
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
     expect(collectText(findByTestId(renderer, "review-schedule-add"))).toBe("Add to Review");
+    expectCompactReviewActionSurface(renderer, "review-schedule-add", "secondary");
+    expectCompactReviewActionSurface(renderer, "history-attempt-clear-unclear", "secondary");
     expect(service.listHistory()).toHaveLength(1);
     expect((service.listHistory() as AttemptEvent[])[0]).toMatchObject({ unclear: true });
 
@@ -12314,6 +12316,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "review-exit");
     expect(findByTestId(renderer, "history-attempt-unclear-history-attempt")).toBeTruthy();
     press(renderer, "history-attempt-unclear-history-attempt");
+    expectCompactReviewActionSurface(renderer, "review-schedule-remove", "destructive");
     press(renderer, "review-schedule-remove");
     // The confirmation keeps a landscape window in landscape instead of
     // forcing React Native's portrait-only Modal default.
@@ -18183,6 +18186,19 @@ function hostByTestId(renderer: TestRenderer.ReactTestRenderer, testID: string):
     throw new Error(`No host element with testID ${testID}`);
   }
   return hosts[0];
+}
+
+function expectCompactReviewActionSurface(
+  renderer: TestRenderer.ReactTestRenderer,
+  testID: string,
+  variant: "secondary" | "destructive"
+): void {
+  const style = flattenTestStyle(hostByTestId(renderer, testID).props.style({ pressed: false }));
+  expect(style).toMatchObject({
+    backgroundColor: variant === "secondary" ? lightTheme.colors.accent.s100 : lightTheme.colors.danger.s100,
+    borderRadius: lightTheme.shape.control,
+    minHeight: lightTheme.metrics.minTarget
+  });
 }
 
 function safeTestIdForTest(value: string): string {

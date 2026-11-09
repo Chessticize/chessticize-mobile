@@ -1870,18 +1870,15 @@ function RowTextAction({
   testID: string;
   onPress: () => void;
 }): React.JSX.Element {
-  const styles = useStyles();
   return (
-    <Pressable
+    <Button
       accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      hitSlop={4}
-      style={({ pressed }) => [styles.rowTextAction, pressed ? styles.pressed : null]}
+      label={label}
+      size="compact"
       testID={testID}
+      variant={destructive ? "destructive" : "secondary"}
       onPress={onPress}
-    >
-      <AppText numberOfLines={2} tone={destructive ? "negative" : "accent"} variant="headline">{label}</AppText>
-    </Pressable>
+    />
   );
 }
 
@@ -2505,10 +2502,6 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 1,
     gap: 2,
     minWidth: 96
-  },
-  rowTextAction: {
-    justifyContent: "center",
-    minHeight: theme.metrics.minTarget
   },
   unavailableMessage: {
     alignItems: "center",
