@@ -1913,6 +1913,29 @@ describe('Detox suite configuration', () => {
     expect(launchHelper.indexOf('setMarketingOrientationBeforeNavigation'))
       .toBeGreaterThan(launchHelper.indexOf('launchWithDisabledSynchronization'));
 
+    const prepareHelperStart = spec.indexOf('async function prepareFrame');
+    const prepareHelperEnd = spec.indexOf('async function assertCompositionViewport', prepareHelperStart);
+    const prepareHelper = spec.slice(prepareHelperStart, prepareHelperEnd);
+    // Campaign screen roots may be taller than the viewport. Readiness uses
+    // existence; the capture controls themselves are later required to be
+    // visible and geometrically contained before a screenshot is taken.
+    expect(prepareHelper).toContain(
+      "waitFor(element(by.id('practice-home'))).toExist().withTimeout(30000)"
+    );
+    expect(prepareHelper).toContain(
+      "waitFor(element(by.id('tactical-profile-screen'))).toExist().withTimeout(30000)"
+    );
+    expect(prepareHelper).toContain(
+      "waitFor(element(by.id('focused-run-preview'))).toExist().withTimeout(30000)"
+    );
+    expect(prepareHelper).toContain(
+      "waitFor(element(by.id('personal-best-hub'))).toExist().withTimeout(30000)"
+    );
+    expect(prepareHelper).toContain(
+      "element(by.id('practice-main-scroll')).scroll(64, 'down', 0.5, 0.5)"
+    );
+    expect(spec).toContain('await assertRequiredFrameGeometry(frame)');
+
     const customRunHelperStart = spec.indexOf('async function prepareCustomRun');
     const customRunHelperEnd = spec.indexOf(
       'async function assertCompositionViewport',

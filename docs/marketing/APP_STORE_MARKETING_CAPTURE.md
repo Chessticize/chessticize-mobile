@@ -70,7 +70,7 @@ Recheck the
 [live Apple screenshot specification](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications)
 before App Store upload.
 
-## Run the complete capture
+## Run the complete v1 capture
 
 Commit the intended source first, keep the tracked worktree clean, then run:
 
@@ -78,23 +78,52 @@ Commit the intended source first, keep the tracked worktree clean, then run:
 pnpm mobile:capture:marketing-assets:ios
 ```
 
-The command performs iOS preflight, builds the Release simulator app once,
-captures all six frames on the iPhone in portrait, captures the same six
-frames on the iPad in its real responsive landscape layout, and verifies one
-combined manifest. It does not require manual tapping.
+This legacy-default command performs iOS preflight, builds the Release
+simulator app once, captures the approved v1 six frames on the iPhone in
+portrait, captures the same six frames on the iPad in its real responsive
+landscape layout, and verifies one combined manifest. It does not require
+manual tapping.
+
+## Run the 1.6 campaign capture
+
+The 1.6 campaign is an explicit path; the legacy command above stays bound to
+v1. After the selected integrated source is clean and the native states have
+been reviewed, run:
+
+```sh
+pnpm mobile:capture:marketing-assets:ios:1.6
+```
+
+The command captures the six `releaseCampaign.frames` in order:
+`practice-home`, `dark-arrow-duel`, `tactical-profile`, `focused-run`,
+`survival`, and `review`. It uses one deterministic fictional player through
+real public screens, retains the provisional early-estimate disclosure, and
+checks the native Home navigation, dark appearance, Arrow Duel reply state,
+and fully visible capture controls before writing each raw image.
+
+The capture tooling and test-only fixture adapters are available. There is no
+substitute or fallback from v1: a 1.6 capture manifest exists only after this
+native command succeeds on its recorded source. Do not relabel legacy raw
+screenshots as 1.6 evidence.
 
 The wrapper waits up to 60 seconds by default for the exact Simulator window
 to become available on a clean machine. Set
 `CHESSTICIZE_SIMULATOR_WINDOW_WAIT_ATTEMPTS` only when a slower host needs more
 quarter-second attempts; the value must be a positive integer.
 
-By default, output is written below:
+The v1 default output is:
 
 ```text
 scratch/store-assets/marketing/<full-source-commit>/
 ```
 
-Override this with `CHESSTICIZE_MARKETING_OUTPUT_ROOT`. The generated
+The explicit 1.6 command instead writes an isolated campaign handoff:
+
+```text
+scratch/store-assets/marketing/mobile-1.6-en-us/<full-source-commit>/
+```
+
+Override either location with `CHESSTICIZE_MARKETING_OUTPUT_ROOT`. The generated
 directory is ignored by Git.
 
 ## Artifact contract
@@ -110,12 +139,31 @@ Each run contains:
 
 The finalizer fails unless both device sets:
 
-- use the approved six-frame order and final copy keys;
+- use the approved six-frame order and capture IDs (v1 retains its final copy
+  keys; 1.6 binds `releaseCampaign.frames[].id` as both frame and capture ID);
 - come from the same full source commit and fictional-user contract;
 - use the required native orientation and exact App Store pixel dimensions;
 - retain the expected source screen, locale, and bundled puzzle-pack identity;
   and
 - still match every PNG's recorded dimensions and SHA-256.
+
+### 1.6 schema-v2 receipt
+
+The 1.6 device and combined manifests use `schemaVersion: 2`. Their top-level
+campaign is exactly:
+
+```json
+{"id":"mobile-1.6-en-us","publicVersion":"1.6.0","status":"capture-plan"}
+```
+
+They intentionally omit the v1 top-level `storyId` and legacy `copyKey` /
+`supporting` fields. Each frame records the release-frame receipt (headline,
+appearance, highlights, source story, required visible controls, capture anchor,
+and any `moment` or `previewActions`) plus immutable per-device PNG hashes.
+The source build kind is `integrated-main-preparation`: it records the actual
+integrated source SHA and does not claim that a store release candidate was
+allocated. `capture-plan` remains preparation status until the owner accepts
+the newly captured raw set and its composed export receipt.
 
 ## Composition handoff
 
@@ -126,7 +174,17 @@ contact sheets, and export the twelve Photo Studio A App Store PNGs. Keep the
 raw capture directory immutable; write composed assets to the separate ignored
 `scratch/store-assets/marketing-composed/<full-source-commit>/` directory.
 
-The launch profile freezes the approved clock and imports the deterministic
+For the 1.6 campaign, pass its explicit identity to the composition CLI:
+
+```sh
+pnpm app-store:compose-marketing -- \
+  --capture-root <campaign-raw-capture-directory> \
+  --output-dir <separate-composed-directory> \
+  --campaign mobile-1.6-en-us \
+  --platform app-store
+```
+
+The v1 launch profile freezes the approved clock and imports the deterministic
 fixture through the normal persistent mobile practice service backed by the
 app's writable SQLite path. Detox deletes the dedicated simulator app sandbox
 before every frame, so fixture state cannot leak between frames or into a
@@ -134,6 +192,11 @@ normal first run. The profile does not enable developer controls, persist the
 active Sprint snapshots, or navigate to or render Tactical Profile,
 Tactical Progress, inferred weaknesses, or model recommendations. The separate
 release-QA capture remains unchanged.
+
+The 1.6 path uses a separate test-only fixture adapter through the same
+maintained simulation and public-screen interfaces. It intentionally renders
+the approved Tactical Profile and Focused Run states for its coherent
+fictional player, retaining the Early estimate disclosure.
 
 ## CI and release integration
 

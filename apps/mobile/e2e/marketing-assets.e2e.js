@@ -183,7 +183,16 @@ async function launchMarketingFrame(frame) {
 async function prepareFrame(frame) {
   switch (frame.id) {
     case 'practice-home':
-      await waitFor(element(by.id('practice-home'))).toBeVisible().withTimeout(30000);
+      // These campaign roots are scroll surfaces. Detox's visibility matcher
+      // requires coverage of the whole native view, which a deliberately
+      // scrollable screen cannot provide. Existence establishes readiness;
+      // assertRequiredFrameGeometry then proves the meaningful controls and
+      // disclosures are fully inside the capture viewport.
+      await waitFor(element(by.id('practice-home'))).toExist().withTimeout(30000);
+      // Keep both approved Home controls wholly above the native tab bar. On
+      // the calibrated iPhone viewport, 53–74 points is the feasible interval:
+      // 64 clears the bar while preserving Start below the app safe-area top.
+      await element(by.id('practice-main-scroll')).scroll(64, 'down', 0.5, 0.5);
       return;
     case 'dark-arrow-duel':
       await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(30000);
@@ -192,13 +201,13 @@ async function prepareFrame(frame) {
         .withTimeout(10000);
       return;
     case 'tactical-profile':
-      await waitFor(element(by.id('tactical-profile-screen'))).toBeVisible().withTimeout(30000);
+      await waitFor(element(by.id('tactical-profile-screen'))).toExist().withTimeout(30000);
       return;
     case 'focused-run':
-      await waitFor(element(by.id('focused-run-preview'))).toBeVisible().withTimeout(30000);
+      await waitFor(element(by.id('focused-run-preview'))).toExist().withTimeout(30000);
       return;
     case 'survival':
-      await waitFor(element(by.id('personal-best-hub'))).toBeVisible().withTimeout(30000);
+      await waitFor(element(by.id('personal-best-hub'))).toExist().withTimeout(30000);
       return;
     case 'review':
       await openTab('review-tab', 'review-due-card');
@@ -601,6 +610,20 @@ async function assertRequiredFrameGeometry(frame) {
     expectFrameContained(controlFrame, screenFrame, `${frame.id} ${testID}`);
     if (!requiredFrames.some((required) => required.testID === testID)) {
       requiredFrames.push({testID, frame: controlFrame});
+    }
+  }
+
+  if (frame.id === 'practice-home' && device.getPlatform() === 'ios') {
+    const tabFrame = await frameFor(topLevelTab('practice-tab'));
+    assertPositiveFrame(tabFrame, `${frame.id} native tab bar item`);
+    for (const required of requiredFrames) {
+      if (captureControlTestIDs.includes(required.testID)
+        && required.frame.y + required.frame.height > tabFrame.y + 1) {
+        throw new Error(
+          `${frame.id} ${required.testID} is obscured by the native tab bar: `
+          + `control=${JSON.stringify(required.frame)}, tab=${JSON.stringify(tabFrame)}`
+        );
+      }
     }
   }
 
