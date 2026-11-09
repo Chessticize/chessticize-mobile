@@ -15693,6 +15693,48 @@ describe("PracticePocScreen", () => {
     }));
   });
 
+  it.each([
+    {
+      fontScale: 1,
+      height: 390,
+      insets: { bottom: 21, left: 0, right: 0, top: 0 },
+      platform: "android",
+      width: 844
+    },
+    {
+      fontScale: 2,
+      height: 874,
+      insets: { bottom: 34, left: 0, right: 0, top: 62 },
+      platform: "ios",
+      width: 402
+    }
+  ])("keeps the GitHub handoff card padding in its scrollable content at $platform $fontScale× text", ({
+    fontScale,
+    height,
+    insets,
+    platform: targetPlatform,
+    width
+  }) => {
+    const platform = ReactNative.Platform as unknown as { OS: string };
+    const previousPlatform = platform.OS;
+    platform.OS = targetPlatform;
+    try {
+      setPracticeViewport({ fontScale, height, insets, scale: 3, width });
+      const renderer = renderScreen();
+
+      press(renderer, "settings-tab");
+      press(renderer, "settings-feedback-open-github");
+
+      const confirmation = findByTestId(renderer, "settings-feedback-handoff-confirmation");
+      expect(flattenTestStyle(confirmation.props.contentContainerStyle)).toEqual(expect.objectContaining({
+        padding: 24
+      }));
+      expect(flattenTestStyle(confirmation.props.style).padding).toBeUndefined();
+    } finally {
+      platform.OS = previousPlatform;
+    }
+  });
+
   it("routes feedback to GitHub only after an explicit privacy handoff", async () => {
     const renderer = renderScreen();
     const openURLSpy = jest.spyOn(ReactNative.Linking, "openURL").mockResolvedValue(undefined);
