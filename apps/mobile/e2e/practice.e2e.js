@@ -528,15 +528,23 @@ describe('Practice POC', () => {
       await expect(element(by.id('review-schedule-control'))).toBeVisible();
       await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
     }
-    await waitForVisibleInPracticeScroll('review-schedule-add');
-
+    await waitForVisibleInPracticeScroll('history-attempt-clear-unclear', 100);
+    console.log('[review-action-frame] Clear', await frameFor(element(by.id('history-attempt-clear-unclear'))));
+    await device.takeScreenshot('review-clear-unclear-visible');
+    await waitForVisibleInPracticeScroll('review-schedule-add', 100);
+    console.log('[review-action-frame] Add', await frameFor(element(by.id('review-schedule-add'))));
+    await device.takeScreenshot('review-schedule-add-visible');
     await element(by.id('review-schedule-add')).tap();
     await waitFor(element(by.id('review-schedule-state'))).toHaveText('Due tomorrow').withTimeout(10000);
     await waitFor(element(by.id('history-attempt-clear-unclear'))).not.toExist().withTimeout(10000);
 
+    await waitForVisibleInPracticeScroll('review-schedule-remove', 100);
+    console.log('[review-action-frame] Remove', await frameFor(element(by.id('review-schedule-remove'))));
+    await device.takeScreenshot('review-schedule-remove-visible');
     await element(by.id('review-schedule-remove')).tap();
     await waitFor(element(by.id('review-schedule-removal-confirmation'))).toBeVisible().withTimeout(10000);
     await sleep(500);
+    await device.takeScreenshot('review-schedule-removal-confirmation');
     await element(by.id('review-schedule-removal-confirm')).tap();
     await waitFor(element(by.id('review-schedule-state')))
       .toHaveText('Not scheduled for Review')
