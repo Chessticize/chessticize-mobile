@@ -114,14 +114,16 @@ import {
 
 type AnalysisEngineStatus = "idle" | "thinking" | "stockfish" | "fallback" | "error";
 
-// The top bar title and progress grow at most 1.5x with the text size, as the
-// Sprint Result top bar does, so the board keeps its room at accessibility sizes.
+// The top bar title, progress and countdown grow at most 1.5x with the text
+// size, as the Sprint Result top bar does, so the board keeps its room at
+// accessibility sizes.
 const REVIEW_HEADER_MAX_TEXT_SCALE = 1.5;
 // Top bar text at the capped text size. The size is computed from the base
 // type roles and the system text scale (rather than maxFontSizeMultiplier) so
 // the Interaction Lab's simulated text sizes honor the same cap.
 function useReviewHeaderTextStyles(): {
   subtitle: { fontSize: number; lineHeight: number };
+  timer: { fontSize: number; lineHeight: number };
   title: { fontSize: number; lineHeight: number };
 } {
   const { fontScale } = usePracticeViewport();
@@ -130,14 +132,16 @@ function useReviewHeaderTextStyles(): {
     fontSize: Math.round(role.fontSize * scale * 10) / 10,
     lineHeight: Math.ceil(role.lineHeight * scale)
   });
-  return { subtitle: scaled(baseTypography.footnote), title: scaled(baseTypography.headline) };
+  return {
+    subtitle: scaled(baseTypography.footnote),
+    timer: scaled(baseTypography.numeral),
+    title: scaled(baseTypography.headline)
+  };
 }
 
 // Narrowest top bar whose title keeps about 140 pt between two paired button
 // groups (2 x 96 pt plus gaps).
 const REVIEW_HEADER_PAIRED_MIN_WIDTH = 348;
-// The countdown uses the session HUD's numeral cap.
-const REVIEW_TIMER_MAX_TEXT_SCALE = 2;
 
 export type ReviewBackCommand = {
   id: number;
@@ -1350,10 +1354,14 @@ export function ReviewSession({
         {reviewRemainingSeconds !== null && !reviewReplyPromptActive ? (
           <View style={styles.reviewTimerSlot} testID="review-timer-slot">
             <Text
-              maxFontSizeMultiplier={REVIEW_TIMER_MAX_TEXT_SCALE}
+              allowFontScaling={false}
               numberOfLines={1}
               testID="review-timer"
-              style={[styles.reviewTimerText, reviewTimerExpired ? styles.reviewTimerTextExpired : null]}
+              style={[
+                styles.reviewTimerText,
+                headerTextStyles.timer,
+                reviewTimerExpired ? styles.reviewTimerTextExpired : null
+              ]}
             >
               {reviewTimerExpired ? "Time expired" : formatDuration(reviewRemainingSeconds)}
             </Text>
