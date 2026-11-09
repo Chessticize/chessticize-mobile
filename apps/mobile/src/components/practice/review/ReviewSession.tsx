@@ -2528,11 +2528,10 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 1
   },
   reviewScheduleConfirmation: {
-    backgroundColor: theme.colors.surfaceRaised,
-    // Dark surfaceRaised matches the dimmed screen, so the card needs an edge.
-    borderColor: theme.colors.border.default,
+    // The floating sheet surface, as in the What's New sheet: white in light,
+    // #2C2C2E in dark, so it separates from the dimmed screen without an edge.
+    backgroundColor: theme.colors.surfaceFloating,
     borderRadius: theme.shape.sheet,
-    borderWidth: StyleSheet.hairlineWidth,
     flexGrow: 0,
     flexShrink: 1,
     maxWidth: 430,
