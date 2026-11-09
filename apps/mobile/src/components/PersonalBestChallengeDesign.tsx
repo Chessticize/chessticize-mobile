@@ -767,7 +767,7 @@ function PersonalBestSourcePicker({
           style={rowStyle}
           testID="personal-best-source-unavailable"
         >
-          <IconTile alignFirstLine name="warning" tone="negative" />
+          <IconTile name="warning" tone="negative" />
           <View style={styles.rowCopy}>
             <AppText variant="headline">Saved Run unavailable</AppText>
             <AppText tone="secondary" variant="subheadline">Choose one of the available Runs below.</AppText>
@@ -1743,7 +1743,6 @@ const useStyles = makeStyles((theme) => ({
   },
   ruleMarker: {
     alignItems: "center",
-    alignSelf: "flex-start",
     backgroundColor: theme.colors.accent.s100,
     borderRadius: theme.shape.tile,
     height: theme.metrics.iconTile,
