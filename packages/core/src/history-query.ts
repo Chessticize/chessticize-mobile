@@ -330,6 +330,60 @@ function normalizeHistoryOutcome(value: unknown): AttemptOutcome | null {
     : null;
 }
 
+/** A History rating band; "all" applies no rating bound. */
+export type HistoryRatingRangeFilter = "all" | "under1000" | "1000-1399" | "1400-plus";
+/** A History result filter; "all" applies no result filter. */
+export type HistoryResultFilter = "all" | HistoryResult;
+
+/** The filters a History screen selects. "all" and empty lists mean no filter. */
+export interface HistoryFilterSelection {
+  timeRange: HistoryTimeRange;
+  ratingKey?: string | null;
+  ratingRange: HistoryRatingRangeFilter;
+  source: "all" | AttemptSource;
+  result: HistoryResultFilter;
+  side: "all" | PuzzleSide;
+  themes: readonly string[];
+  attentionReasons: readonly HistoryAttentionReason[];
+}
+
+export function historyRatingRangeQuery(
+  filter: HistoryRatingRangeFilter
+): Pick<HistoryQuery, "minRating" | "maxRating"> {
+  if (filter === "under1000") {
+    return { maxRating: 999 };
+  }
+  if (filter === "1000-1399") {
+    return { minRating: 1000, maxRating: 1399 };
+  }
+  if (filter === "1400-plus") {
+    return { minRating: 1400 };
+  }
+  return {};
+}
+
+/** Builds the History query for a filter selection, leaving out every filter set to "all". */
+export function historyQueryForSelection(
+  selection: HistoryFilterSelection,
+  now: string,
+  page?: HistoryPageQuery
+): HistoryQuery {
+  return {
+    now,
+    timeRange: selection.timeRange,
+    ...(selection.ratingKey ? { ratingKey: selection.ratingKey } : {}),
+    ...historyRatingRangeQuery(selection.ratingRange),
+    ...(selection.source === "all" ? {} : { source: selection.source }),
+    ...(selection.result === "all" ? {} : { result: selection.result }),
+    ...(selection.side === "all" ? {} : { side: selection.side }),
+    ...(selection.themes.length === 0 ? {} : { themes: [...selection.themes] }),
+    ...(selection.attentionReasons.length === 0
+      ? {}
+      : { attentionReasons: [...selection.attentionReasons] }),
+    ...(page ? { page } : {})
+  };
+}
+
 export function validateHistoryQuery(query: HistoryQuery): HistoryQuery {
   resolveHistoryRange(query.now, query.timeRange);
   validateOptionalRatingBound("minRating", query.minRating);

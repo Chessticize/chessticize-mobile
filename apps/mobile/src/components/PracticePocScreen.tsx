@@ -43,12 +43,8 @@ import {
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
-  AttemptSource,
   ArrowDuelState,
   CurrentPuzzleState,
-  HistoryAttentionReason,
-  HistoryTimeRange,
-  PuzzleSide,
   PuzzleFeedback,
   PracticeRunRecord,
   ReviewQueueItem,
@@ -244,13 +240,10 @@ import type {
   ThemeCatalogPresentation
 } from "./practice/shared/themeCatalog.ts";
 import {
-  historyAttentionQueryForSelection,
-  HistoryPanel,
-  type HistoryRatingRangeFilter,
-  historyRatingRangeFilterToQuery,
-  type HistoryResultFilter
+  HistoryPanel
 } from "./practice/history/HistoryPanel.tsx";
 import { emptyHistoryPerformance } from "./practice/history/HistoryRatingChart.tsx";
+import { useHistoryController } from "./practice/history/useHistoryController.ts";
 import { CustomSprintSetup } from "./practice/customSetup/CustomSprintSetup.tsx";
 import { PracticeRunEditor } from "./practice/runEditor/PracticeRunEditor.tsx";
 import {
@@ -579,11 +572,6 @@ function openFeedbackIssuesInBrowser(url: string): Promise<void> {
 const CHESSBOARD_DURATIONS = { move: BOARD_MOVE_ANIMATION_MS } as const;
 // Space below the last tab content row, added to the tab chrome's bottom inset.
 const CONTENT_BOTTOM_PADDING = 40;
-const ALL_HISTORY_ATTENTION_REASONS: readonly HistoryAttentionReason[] = [
-  "unclear",
-  "in_review",
-  "incomplete"
-];
 
 export function PracticePocScreen({
   platformCapabilities,
@@ -915,22 +903,38 @@ export function PracticePocScreen({
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
   const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
-  const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
-  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
-  const historyAttentionReasonOptions = ALL_HISTORY_ATTENTION_REASONS;
-  const [historyResultFilter, setHistoryResultFilter] = useState<HistoryResultFilter>("all");
-  const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
-  const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
-  const [historyAttentionReasons, setHistoryAttentionReasons] = useState<HistoryAttentionReason[]>(
-    () => [...historyAttentionReasonOptions]
-  );
-  const [historyPageOffset, setHistoryPageOffset] = useState(0);
-  const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
+  const {
+    applyHistoryThemeIntent,
+    changeHistoryAttentionOnly,
+    changeHistoryRatingKey,
+    changeHistoryRatingRangeFilter,
+    changeHistoryResultFilter,
+    changeHistorySideFilter,
+    changeHistorySourceFilter,
+    changeHistoryTimeRange,
+    historyAttentionReasons,
+    historyFiltersExpanded,
+    historyPageOffset,
+    historyProgressOpen,
+    historyQuery,
+    historyRatingKey,
+    historyRatingRangeFilter,
+    historyResultFilter,
+    historySideFilter,
+    historySourceFilter,
+    historyThemeChoices,
+    historyTimeRange,
+    openHistoryProgress,
+    resetHistoryFilters,
+    setHistoryFiltersExpanded,
+    setHistoryPageOffset,
+    setHistoryProgressOpen,
+    toggleHistoryAttentionReason
+  } = useHistoryController();
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
   const [reviewBoardTouchActive, setReviewBoardTouchActive] = useState(false);
   const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryUnavailableAttempt | null>(null);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
-  const [historyProgressOpen, setHistoryProgressOpen] = useState(false);
   const [reviewSessionSource, setReviewSessionSource] = useState<ReviewEntry["source"] | null>(null);
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
@@ -952,7 +956,6 @@ export function PracticePocScreen({
   const [sessionGuideTargetRevision, setSessionGuideTargetRevision] = useState(0);
   const sessionGuideTargetRef = useRef<View>(null);
   const sessionRailScrollRef = useRef<ScrollView>(null);
-  const [historyFiltersExpanded, setHistoryFiltersExpanded] = useState(false);
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
   const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
   const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
@@ -972,7 +975,6 @@ export function PracticePocScreen({
     controlledSelection: customThemeSelection?.selectedThemes,
     onControlledSelectionChange: customThemeSelection?.onChange
   });
-  const historyThemeChoices = useThemeChoiceSelection();
   const resolvedHistoryProgressPresentation = useHistoryProgressPresentation({
     enabled: tab === "history" || historyProgressOpen,
     service,
@@ -1088,7 +1090,6 @@ export function PracticePocScreen({
   }, [isOpenSession, practiceExitConfirmationVisible]);
   const selectedCustomThemes = customThemeChoices.selection;
   const selectedSprintThemes = customThemeChoices.namedThemes;
-  const selectedHistoryThemes = historyThemeChoices.namedThemes;
   const selectedConfig = useMemo(
     () => sprintConfigFor(
       mode === "custom" ? customSprintMode : mode,
@@ -3000,17 +3001,7 @@ export function PracticePocScreen({
   function openHistoryReview(attemptId: string): void {
     // Computed on demand: the unpaged review view scans the full attempt history,
     // which is too expensive to rebuild on every render.
-    const historyReviewView = service.getHistoryView({
-      now: nowIso(),
-      timeRange: historyTimeRange,
-      ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
-      ...historyRatingRangeQuery,
-      ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-      ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
-      ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
-      ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
-      ...historyAttentionQueryForSelection(historyAttentionReasons)
-    });
+    const historyReviewView = service.getHistoryView(historyQuery(nowIso()));
     const historyReviewAttempts = historyReviewView.attempts;
     const selectedAttempt = historyReviewAttempts.find((attempt) => attempt.id === attemptId);
     if (!selectedAttempt) {
@@ -3825,7 +3816,6 @@ export function PracticePocScreen({
       : [])
   );
   const activeHistoryRatingKey = historyRatingKey;
-  const historyRatingRangeQuery = historyRatingRangeFilterToQuery(historyRatingRangeFilter);
   // History views scan the full attempt history, so they are computed only while
   // the history panel is on screen. Recomputing them on every render made active
   // sprints progressively laggy: the 500ms countdown tick re-rendered this screen
@@ -3836,32 +3826,13 @@ export function PracticePocScreen({
     historyReviewEntries.length === 0 &&
     historyUnavailableAttempt === null;
   const historyBaseView = historyPanelVisible
-    ? service.getHistoryView({
-        now: nowIso(),
-        timeRange: historyTimeRange,
-        ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
-        ...historyRatingRangeQuery,
-        ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
-        ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
-        ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
-        ...historyAttentionQueryForSelection(historyAttentionReasons),
-        page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
-      })
+    ? service.getHistoryView(
+        historyQuery(nowIso(), { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset })
+      )
     : null;
   const historyView = historyBaseView;
   const historyPerformanceView = historyPanelVisible && activeHistoryRatingKey
-    ? service.getHistoryView({
-        now: nowIso(),
-        timeRange: historyTimeRange,
-        ratingKey: activeHistoryRatingKey,
-        ...historyRatingRangeQuery,
-        ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
-        ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
-        ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
-        ...historyAttentionQueryForSelection(historyAttentionReasons)
-      })
+    ? service.getHistoryView(historyQuery(nowIso()))
     : null;
   const visibleHistoryAttempts = historyView?.attempts ?? [];
   const visibleHistoryPage = historyView?.page;
@@ -4842,8 +4813,7 @@ export function PracticePocScreen({
               onBack={resetToIdle}
               onMarkUnclear={toggleUnclearPrompt}
               onOpenHistory={() => {
-                setHistoryRatingKey(state.config.ratingKey);
-                setHistoryPageOffset(0);
+                changeHistoryRatingKey(state.config.ratingKey);
                 navigateToTab("history");
               }}
               onPlayAgain={() => {
@@ -5339,74 +5309,19 @@ export function PracticePocScreen({
                   themeCatalogPresentation={themeCatalogPresentation}
                   filtersExpanded={historyFiltersExpanded}
                   onFiltersExpandedChange={setHistoryFiltersExpanded}
-                  onRatingKeyChange={(ratingKey) => {
-                    setHistoryRatingKey(ratingKey);
-                    setHistoryPageOffset(0);
-                  }}
-                  onTimeRangeChange={(range) => {
-                    setHistoryTimeRange(range);
-                    setHistoryPageOffset(0);
-                  }}
-                  onSourceFilterChange={(source) => {
-                    setHistorySourceFilter(source);
-                    if (source !== "sprint") {
-                      setHistoryAttentionReasons([]);
-                    }
-                    setHistoryPageOffset(0);
-                  }}
-                  onResultFilterChange={(result) => {
-                    setHistoryResultFilter(result);
-                    setHistoryPageOffset(0);
-                  }}
-                  onRatingRangeFilterChange={(ratingRange) => {
-                    setHistoryRatingRangeFilter(ratingRange);
-                    setHistoryPageOffset(0);
-                  }}
-                  onSideFilterChange={(side) => {
-                    setHistorySideFilter(side);
-                    setHistoryPageOffset(0);
-                  }}
-                  onThemeFilterIntent={(intent) => {
-                    historyThemeChoices.dispatch(intent);
-                    setHistoryPageOffset(0);
-                  }}
-                  onAttentionReasonChange={(reason) => {
-                    setHistorySourceFilter("sprint");
-                    setHistoryAttentionReasons((current) => current.includes(reason)
-                      ? current.filter((candidate) => candidate !== reason)
-                      : [...current, reason]);
-                    setHistoryPageOffset(0);
-                  }}
-                  onAttentionOnlyChange={(attentionOnly) => {
-                    setHistoryPageOffset(0);
-                    if (attentionOnly) {
-                      setHistorySourceFilter("sprint");
-                    }
-                    setHistoryAttentionReasons((current) => attentionOnly
-                      ? current.length > 0
-                        ? current
-                        : [...historyAttentionReasonOptions]
-                      : []);
-                  }}
+                  onRatingKeyChange={changeHistoryRatingKey}
+                  onTimeRangeChange={changeHistoryTimeRange}
+                  onSourceFilterChange={changeHistorySourceFilter}
+                  onResultFilterChange={changeHistoryResultFilter}
+                  onRatingRangeFilterChange={changeHistoryRatingRangeFilter}
+                  onSideFilterChange={changeHistorySideFilter}
+                  onThemeFilterIntent={applyHistoryThemeIntent}
+                  onAttentionReasonChange={toggleHistoryAttentionReason}
+                  onAttentionOnlyChange={changeHistoryAttentionOnly}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
-                  onOpenProgress={resolvedHistoryProgressPresentation
-                    ? () => {
-                        setHistoryFiltersExpanded(false);
-                        setHistoryProgressOpen(true);
-                      }
-                    : undefined}
-                  onResetFilters={() => {
-                    setHistoryTimeRange("7d");
-                    setHistorySourceFilter("sprint");
-                    setHistoryResultFilter("all");
-                    setHistorySideFilter("all");
-                    historyThemeChoices.dispatch({ type: "select-all-themes" });
-                    setHistoryRatingRangeFilter("all");
-                    setHistoryAttentionReasons([...historyAttentionReasonOptions]);
-                    setHistoryPageOffset(0);
-                    setHistoryRatingKey(null);
-                  }}
+                  onOpenProgress={resolvedHistoryProgressPresentation ? openHistoryProgress : undefined}
+                  onResetFilters={resetHistoryFilters}
                 />
               ) : null
             ) : null}

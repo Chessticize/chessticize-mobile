@@ -11,8 +11,11 @@ import {
   normalizeHistoryAttemptDetail,
   resolveHistoryRange,
   sideToMoveForHistoryPuzzle,
+  historyQueryForSelection,
+  historyRatingRangeQuery,
   validateHistoryQuery
 } from "../src/index.ts";
+import type { HistoryFilterSelection } from "../src/index.ts";
 import type { HistoryAttemptView, Puzzle, ReviewQueueState } from "../src/index.ts";
 
 test("history query accepts optional ratingKey and resolves supported time ranges", () => {
@@ -1039,6 +1042,66 @@ test("history replay availability validates persisted Arrow candidates against t
     status: "unavailable",
     reason: "arrow-candidates-unavailable"
   });
+});
+
+test("history rating bands map to inclusive rating bounds", () => {
+  assert.deepEqual(historyRatingRangeQuery("all"), {});
+  assert.deepEqual(historyRatingRangeQuery("under1000"), { maxRating: 999 });
+  assert.deepEqual(historyRatingRangeQuery("1000-1399"), { minRating: 1000, maxRating: 1399 });
+  assert.deepEqual(historyRatingRangeQuery("1400-plus"), { minRating: 1400 });
+});
+
+test("a History filter selection leaves out every filter set to all", () => {
+  const selection: HistoryFilterSelection = {
+    timeRange: "7d",
+    ratingKey: null,
+    ratingRange: "all",
+    source: "all",
+    result: "all",
+    side: "all",
+    themes: [],
+    attentionReasons: []
+  };
+  const now = "2026-06-21T12:00:00.000Z";
+
+  assert.deepEqual(historyQueryForSelection(selection, now), { now, timeRange: "7d" });
+  assert.deepEqual(historyQueryForSelection(selection, now, { limit: 20, offset: 40 }), {
+    now,
+    timeRange: "7d",
+    page: { limit: 20, offset: 40 }
+  });
+});
+
+test("a History filter selection maps each chosen filter into the query", () => {
+  const themes = ["fork", "pin"];
+  const attentionReasons = ["unclear", "in_review"] as const;
+  const selection: HistoryFilterSelection = {
+    timeRange: "30d",
+    ratingKey: "standard 5/30",
+    ratingRange: "1000-1399",
+    source: "sprint",
+    result: "incomplete",
+    side: "black",
+    themes,
+    attentionReasons
+  };
+  const now = "2026-06-21T12:00:00.000Z";
+  const query = historyQueryForSelection(selection, now);
+
+  assert.deepEqual(query, {
+    now,
+    timeRange: "30d",
+    ratingKey: "standard 5/30",
+    minRating: 1000,
+    maxRating: 1399,
+    source: "sprint",
+    result: "incomplete",
+    side: "black",
+    themes: ["fork", "pin"],
+    attentionReasons: ["unclear", "in_review"]
+  });
+  assert.notEqual(query.themes, themes, "the query owns its theme list");
+  assert.deepEqual(validateHistoryQuery(query).ratingKey, "standard 5/30");
 });
 
 type AttemptFixtureInput = {
