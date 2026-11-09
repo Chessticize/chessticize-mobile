@@ -216,6 +216,7 @@ export type {
   SprintRulesGuidePresentation
 } from "./practice/home/PracticeHome.tsx";
 import { makeStyles, useTheme, type Theme } from "../theme/index.ts";
+import { LARGE_TITLE_MAX_FONT_SCALE } from "../theme/scales.ts";
 import { CHESS_PIECE_SPRITE } from "./practice/shared/chessPieceSprite.ts";
 import {
   CUSTOM_INITIAL_RATING_MIN,
@@ -4842,7 +4843,12 @@ export function PracticePocScreen({
               testID="app-shell-header"
             >
               <View>
-                <Text style={[styles.title, tab === "practice" || tab === "settings" ? styles.titleLarge : null]}>{screenTitle}</Text>
+                <Text
+                  maxFontSizeMultiplier={tab === "practice" || tab === "settings" ? LARGE_TITLE_MAX_FONT_SCALE : undefined}
+                  style={[styles.title, tab === "practice" || tab === "settings" ? styles.titleLarge : null]}
+                >
+                  {screenTitle}
+                </Text>
               </View>
               {simulationProfile?.active ? (
                 <Text style={styles.simulationBadge} testID="simulation-profile-indicator">

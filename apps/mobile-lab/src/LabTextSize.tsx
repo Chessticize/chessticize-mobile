@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { PracticeViewportProvider, usePracticeViewport } from "../../mobile/src/components/PracticeViewport.tsx";
 import { ThemeProvider, useTheme } from "../../mobile/src/theme/index.ts";
+import { LARGE_TITLE_MAX_FONT_SCALE } from "../../mobile/src/theme/scales.ts";
 import type { Theme } from "../../mobile/src/theme/index.ts";
 
 // React Native scales text by the system font scale; the browser cannot, so the
@@ -15,8 +16,13 @@ import type { Theme } from "../../mobile/src/theme/index.ts";
 // React Native's iOS multiplier at the largest accessibility size (AX5).
 export const LARGEST_ACCESSIBILITY_FONT_SCALE = 3.571;
 // Mirrors maxFontSizeMultiplier on device: the hero score caps at 1.5x and
-// numerals (HUD values, stat values) at 2x.
-const CAPPED_ROLES: Record<string, number> = { display: 1.5, numeral: 2, numeralRow: 2 };
+// numerals (HUD values, stat values) and large titles at 2x.
+const CAPPED_ROLES: Record<string, number> = {
+  display: 1.5,
+  largeTitle: LARGE_TITLE_MAX_FONT_SCALE,
+  numeral: 2,
+  numeralRow: 2
+};
 
 function scaledTheme(theme: Theme, fontScale: number): Theme {
   const typography = Object.fromEntries(

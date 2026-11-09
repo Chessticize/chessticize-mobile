@@ -159,6 +159,9 @@ Navigation rules (#612, owner decision 2026-11-07):
   host has no Android rail, so the app draws it (80 dp, pill indicator, labels
   below the icons) and hides the host's bottom navigation at these widths. iOS
   never uses it.
+- Android tab labels (the bottom navigation and the rail) follow the system
+  font scale up to 1.3x and stay there, so `Practice` and `Settings` keep clear
+  margins and are never truncated at font scale 2.0.
 - Android uses the app theme for navigation colors, not Material You dynamic
   color.
 - Content uses the safe-area insets the tab host reports, so it never sits
@@ -283,7 +286,7 @@ session use tabular figures.
 
 | Role | Size / line height (pt) | Weight | Use |
 | --- | --- | --- | --- |
-| Large title | 30 / 36 | Bold | Tab root titles such as Practice |
+| Large title | 30 / 36 | Bold | Tab root titles such as Practice; grows at most 2x with Dynamic Type (`LARGE_TITLE_MAX_FONT_SCALE`, applied by `AppText`) |
 | Title | 20 / 25 | Semibold | Section titles and result headlines |
 | Headline | 16 / 21 | Semibold | Row titles, navigation titles, button labels |
 | Body | 15 / 20 | Regular | Body copy and row values |
@@ -294,6 +297,12 @@ session use tabular figures.
 | Numeral L | 22 / 28 | Semibold, tabular | Session timer, progress, metric tiles |
 | Numeral row | 15 / 20 | Semibold, tabular | Numbers inside list rows, such as run ratings (secondary color) |
 | Display | 56 / 64 | Semibold, tabular | The single hero score on a result screen (Sprint Result `Solved / target`); grows at most 1.5x with Dynamic Type |
+
+Large titles stop at 2x because at the largest iOS accessibility size (3.57x)
+`Practice` no longer fits an iPhone SE and broke inside the word. 2x is 60 pt,
+still larger than body text at that size (53 pt). The cap is one rule on the
+`largeTitle` variant of `AppText`; raw `Text` that uses the role passes the same
+constant.
 
 #### Session text at accessibility sizes
 

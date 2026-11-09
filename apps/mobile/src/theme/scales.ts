@@ -19,6 +19,14 @@ import type {
 // migrated components use only these. Sizes are Dynamic Type points at the
 // default Large size; React Native Text scales them with the user's text size.
 
+// Large titles (`largeTitle`: Practice, Review, History, Settings, sheet and
+// hub titles) grow at most 2x with Dynamic Type. At the largest accessibility
+// size (3.57x) a 30 pt title would be 107 pt and "Practice" no longer fits
+// an iPhone SE, so it broke inside the word. 2x is 60 pt, still larger than
+// body text at that size (53 pt), and keeps every title word on one line.
+// AppText applies it to the variant; raw Text that uses the role passes it too.
+export const LARGE_TITLE_MAX_FONT_SCALE = 2;
+
 export const typography: ThemeTypography = {
   largeTitle: { fontSize: 30, lineHeight: 36, fontWeight: "700" },
   title: { fontSize: 20, lineHeight: 25, fontWeight: "600" },
