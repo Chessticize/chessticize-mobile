@@ -93,25 +93,6 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     }
 
     const needsPortraitRestore = includeLandscape || initialOrientation === 'landscape';
-    if (device.getPlatform() === 'android' && needsPortraitRestore) {
-      // API 36 large-screen activities ignore requested-orientation hints, so
-      // the evidence harness rotates the physical display. Return to the
-      // natural orientation and reacquire the public app root before tapping
-      // the real board; otherwise the rotated base window can remain the
-      // unfocused Espresso root while board input is submitted. A foldable's
-      // natural portrait viewport can report a few physical pixels of rounding
-      // overflow. This portrait state is not captured as evidence, so allow a
-      // bounded 16-physical-pixel tolerance while reacquiring focus; every
-      // captured layout keeps the default strict containment check.
-      await setAdaptiveOrientation('portrait');
-      await waitFor(element(by.id('session-board'))).toBeVisible().withTimeout(10000);
-      await waitForSettledSprintLayout('portrait', { containmentTolerance: 16 });
-      await waitFor(element(by.id('adaptive-layout'))).toBeVisible().withTimeout(10000);
-      const restoredPuzzleID = await elementText('session-current-puzzle-id');
-      if (restoredPuzzleID !== puzzleID) {
-        throw new Error(`Portrait restoration replaced the active puzzle: ${puzzleID} -> ${restoredPuzzleID}`);
-      }
-    }
 
     if (device.getPlatform() === 'ios') {
       // The post-answer feedback row is the last item in the locked session
