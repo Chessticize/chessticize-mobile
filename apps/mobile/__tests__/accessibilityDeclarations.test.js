@@ -55,7 +55,7 @@ describe("App Store accessibility declarations", () => {
 
   it("publishes one puzzle-specific accessibility URL without overstating support", () => {
     expect(contract.accessibilityUrl).toBe(
-      "https://chessticize.github.io/chessticize-mobile/accessibility/"
+      "https://chessticize.com/accessibility/"
     );
     expect(storeAssets).toContain(contract.accessibilityUrl);
     expect(accessibilityPage).toContain("common chess puzzle task");

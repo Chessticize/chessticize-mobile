@@ -69,10 +69,10 @@ Also included
 ```
 
 - Support email: `support@chessticize.com`
-- Support URL: `https://chessticize.github.io/chessticize-mobile/support/`
-- Marketing URL: `https://chessticize.github.io/chessticize-mobile/`
-- Android install URL: `https://chessticize.github.io/chessticize-mobile/android/`
-- Accessibility URL: `https://chessticize.github.io/chessticize-mobile/accessibility/`
+- Support URL: `https://chessticize.com/support/`
+- Marketing URL: `https://chessticize.com/`
+- Android install URL: `https://chessticize.com/android/`
+- Accessibility URL: `https://chessticize.com/accessibility/`
 - Privacy policy: `https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md`
 - Source: `https://github.com/Chessticize/chessticize-mobile`
 

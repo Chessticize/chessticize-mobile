@@ -44,9 +44,9 @@ Connect's stricter 100-byte reference.
 | Subtitle | `Build Tactical Intuition` | State the training benefit without repeating the product category; 24 / 30 characters. |
 | Promotional text | `Free, offline, no-ads, open-source app to practice rating-matched chess puzzles and prevent blunders with Arrow Duel. Learn from mistakes with scheduled Review.` | 160 / 170 characters. |
 | Keywords | `chess,puzzle,tactics,blunder,review,training,elo,analysis,stockfish,checkmate,offline` | 85 / 100 UTF-8 bytes; owner-approved search terms in submission order, with no spaces after commas, repeated entries, category names, or competitor terms. |
-| Support URL | `https://chessticize.github.io/chessticize-mobile/support/` | Stable public support, bug-report, feature-request, and private-contact entry point. |
-| Marketing URL | `https://chessticize.github.io/chessticize-mobile/` | Stable public product page with iOS and Android install paths. |
-| Accessibility URL | `https://chessticize.github.io/chessticize-mobile/accessibility/` | Current support and known limitations; do not use this page to imply an undeclared feature. |
+| Support URL | `https://chessticize.com/support/` | Stable public support, bug-report, feature-request, and private-contact entry point. |
+| Marketing URL | `https://chessticize.com/` | Stable public product page with iOS and Android install paths. |
+| Accessibility URL | `https://chessticize.com/accessibility/` | Current support and known limitations; do not use this page to imply an undeclared feature. |
 | Privacy policy URL | `https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md` | Must match `docs/APP_PRIVACY_DISCLOSURE.md`. |
 | Primary category | `Games` | App Store Connect selection. |
 | Secondary category | `Education` | App Store Connect selection. |
