@@ -8,6 +8,8 @@ on:
       - ".github/workflows/pages.yml"
       - "scripts/lib/android-download-page.mjs"
       - "scripts/render-android-download-page.mjs"
+      - "scripts/fingerprint-site-styles.mjs"
+      - "scripts/lib/site-asset-fingerprint.mjs"
       - "site/**"
   workflow_run:
     workflows:
@@ -48,6 +50,9 @@ jobs:
           node scripts/render-android-download-page.mjs \
             --template site/android/index.template.html \
             --output "$RUNNER_TEMP/pages-site/android/index.html"
+
+      - name: Version the stylesheet by content
+        run: node scripts/fingerprint-site-styles.mjs "$RUNNER_TEMP/pages-site"
 
       - name: Upload static site
         uses: actions/upload-pages-artifact@v4
