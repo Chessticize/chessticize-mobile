@@ -129,54 +129,66 @@ footer nav a:hover {
 }
 
 .notice {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: 28px 64px;
+  align-items: start;
   margin-top: 24px;
-  padding: 24px 28px;
+  padding: clamp(24px, 4vw, 40px);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--ice);
   color: #3f4f68;
 }
 
+.notice-lead {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+}
+
 .notice h2 {
-  margin: 0 0 16px;
+  margin: 0;
   color: var(--ink);
-  font-size: clamp(1.4rem, 2.4vw, 1.75rem);
-  line-height: 1.2;
+  font-size: clamp(1.5rem, 2.6vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
 }
 
-.notice-cta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 18px;
-  align-items: center;
-  margin-bottom: 20px;
+.notice-lead p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.5;
 }
 
-.notice .notice-cta p {
-  color: var(--ink);
-  font-weight: 650;
-}
-
-.notice .notice-cta .button-primary {
+.notice .notice-lead .button-primary {
   color: #fff;
+  font-weight: 700;
 }
 
-.notice p {
-  max-width: 760px;
+.notice-body p {
+  max-width: 64ch;
   margin: 0;
 }
 
-.notice p + p {
-  margin-top: 10px;
+.notice-body p + p {
+  margin-top: 16px;
 }
 
-.notice a {
+.notice-body a {
   color: var(--blue-dark);
   font-weight: 650;
 }
 
 .notice + .hero {
   padding-top: clamp(48px, 7vw, 96px);
+}
+
+@media (max-width: 920px) {
+  .notice {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .hero {
