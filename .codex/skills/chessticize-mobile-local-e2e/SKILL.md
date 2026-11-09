@@ -100,9 +100,9 @@ Expect both files to exceed 1 MB. Pointer files can compile and be copied into t
 
 The currently verified local combination is Homebrew Ruby 3.3 plus Bundler 2.4.22. Do not use:
 
-- macOS system Ruby 2.6 with Xcode 26: native gem headers are unavailable.
+- macOS system Ruby 2.6: the `Gemfile` requires Ruby 3.1 or newer (Active Support 7.2).
 - Ruby 3.4 with the current Gemfile: CocoaPods can fail loading `base64`.
-- Ruby 4 with the current lock: `minitest` 5.25.4 requires Ruby below 4.
+- Ruby 4: not verified with the current lock.
 
 Prepare Ruby and the repo-local bundle:
 
