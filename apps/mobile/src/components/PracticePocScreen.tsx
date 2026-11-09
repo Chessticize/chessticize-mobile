@@ -3,8 +3,6 @@ import {
   ActivityIndicator,
   Animated,
   AppState,
-  Easing,
-  Image,
   LayoutAnimation,
   Linking,
   Modal,
@@ -18,7 +16,6 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
-import type { ImageSourcePropType } from "react-native";
 import type {
   LayoutChangeEvent
 } from "react-native";
@@ -330,6 +327,24 @@ export type {
 import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
 import { typography as baseTypography } from "../theme/scales.ts";
 import { AppText, Badge, Button, Icon, IconTile, ListRow, Section, SegmentedControl, useListRowStyle, type IconName } from "./ui/index.tsx";
+import type { MoveSide } from "./practice/shared/moveSide.ts";
+import { CHESS_PIECE_SPRITE } from "./practice/shared/chessPieceSprite.ts";
+import {
+  ChevronGlyph,
+  CloseGlyph,
+  FilterGlyph,
+  FlipGlyph,
+  MoreGlyph,
+  MoveSideGlyph,
+  PauseGlyph,
+  PlayGlyph,
+  SearchGlyph,
+  SessionScoreGlyph
+} from "./practice/shared/Glyphs.tsx";
+import { CollapsibleRegion, DisclosureChevron } from "./practice/shared/CollapsibleRegion.tsx";
+import { ToolbarIconButton } from "./practice/shared/ToolbarIconButton.tsx";
+import { FilterButton } from "./practice/shared/FilterButton.tsx";
+import { AttemptStatusTile } from "./practice/shared/AttemptStatusTile.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;
@@ -492,8 +507,6 @@ type BoardResetSlide = BoardMove & {
   durationMs?: number;
 };
 
-type MoveSide = "w" | "b";
-
 function moveSideDisplayName(side: MoveSide): "Black" | "White" {
   return side === "b" ? "Black" : "White";
 }
@@ -629,7 +642,6 @@ const ARROW_DUEL_OPTIONAL_SETTINGS_COPY =
   "This extra challenge is optional — turn it off in Settings.";
 // Shared by the practice and review boards so they animate at the same speed.
 const BOARD_MOVE_ANIMATION_MS = 200;
-const DISCLOSURE_MOTION_DURATION_MS = 200;
 const ANALYSIS_DEPTH = 20;
 const CUSTOM_DURATION_OPTIONS = [3 * 60, 5 * 60, 10 * 60] as const;
 const CUSTOM_PER_PUZZLE_OPTIONS = [10, 20, 30] as const;
@@ -725,7 +737,6 @@ const ALL_HISTORY_ATTENTION_REASONS: readonly HistoryAttentionReason[] = [
   "in_review",
   "incomplete"
 ];
-const CHESS_PIECE_SPRITE = require("../assets/chess-pieces-sprite.png") as ImageSourcePropType;
 const LICHESS_PUZZLE_DATABASE_URL = "https://database.lichess.org/#puzzles";
 const ANALYSIS_DIAGNOSTIC_POSITIONS = [
   {
@@ -11544,70 +11555,6 @@ function SessionScoreMetric({
   );
 }
 
-function SessionScoreGlyph({ tone }: { tone: "positive" | "negative" | "neutral" }): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View
-      style={[
-        styles.sessionScoreIcon,
-        tone === "positive" ? styles.sessionScoreDotPositive : null,
-        tone === "negative" ? styles.sessionScoreDotNegative : null,
-        tone === "neutral" ? styles.sessionScoreDotNeutral : null
-      ]}
-      testID={`session-score-${tone}-glyph`}
-    >
-      {tone === "positive" ? (
-        <>
-          <View style={[styles.sessionScoreGlyphLine, styles.sessionScoreCheckShort]} />
-          <View style={[styles.sessionScoreGlyphLine, styles.sessionScoreCheckLong]} />
-        </>
-      ) : null}
-      {tone === "negative" ? (
-        <>
-          <View style={[styles.sessionScoreGlyphLine, styles.sessionScoreCrossForward]} />
-          <View style={[styles.sessionScoreGlyphLine, styles.sessionScoreCrossBackward]} />
-        </>
-      ) : null}
-      {tone === "neutral" ? <View style={styles.sessionScoreNeutralLine} /> : null}
-    </View>
-  );
-}
-
-function MoveSideGlyph({
-  kingPieceSize = 22,
-  side,
-  testID = `move-side-${side === "w" ? "white" : "black"}-glyph`
-}: {
-  kingPieceSize?: number;
-  side: MoveSide;
-  testID?: string;
-}): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View
-      style={[styles.moveSideKingGlyph, { height: kingPieceSize, width: kingPieceSize }]}
-      testID={testID}
-    >
-      <Image
-        accessible={false}
-        accessibilityIgnoresInvertColors
-        resizeMode="stretch"
-        source={CHESS_PIECE_SPRITE}
-        style={[
-          styles.moveSideKingSprite,
-          {
-            height: kingPieceSize * 2,
-            left: -kingPieceSize * 5,
-            top: side === "w" ? 0 : -kingPieceSize,
-            width: kingPieceSize * 6
-          }
-        ]}
-        testID={`chessboard-king-${side === "w" ? "white" : "black"}-sprite`}
-      />
-    </View>
-  );
-}
-
 function kingGlyphSizeForBoard(boardSize: number): number {
   return Math.max(1, Math.round(boardSize / 8));
 }
@@ -12648,23 +12595,6 @@ function historyRatingKeyLabel(
   return `${runName ?? ratingLabelFromKey(ratingKey)}${speedLabel}`;
 }
 
-function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "incomplete" }): React.JSX.Element {
-  const appTheme = useTheme();
-  if (tone === "correct") {
-    return (
-      <Icon color={appTheme.colors.positive.s600} name="check" size={18} testID="result-badge-correct-glyph" weight="semibold" />
-    );
-  }
-  if (tone === "incomplete") {
-    return (
-      <Icon color={appTheme.colors.text.tertiary} name="remove" size={18} testID="result-badge-incomplete-glyph" weight="semibold" />
-    );
-  }
-  return (
-    <Icon color={appTheme.colors.danger.s600} name="close" size={18} testID="result-badge-wrong-glyph" weight="semibold" />
-  );
-}
-
 function HistoryChipRow({
   children,
   contentStyle,
@@ -12994,360 +12924,6 @@ function historyAttemptModeLabel(mode: SprintMode | null): string {
 
 function historyAttemptSourceLabel(source: AttemptSource | null): string {
   return source === "scheduled_review" ? "Review" : source === "sprint" ? "Sprint" : "Unknown source";
-}
-
-function FilterButton({
-  active,
-  label,
-  testID,
-  onPress
-}: {
-  active: boolean;
-  label: string;
-  testID: string;
-  onPress: () => void;
-}): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      hitSlop={4}
-      testID={testID}
-      style={[styles.filterButton, active ? styles.filterButtonActive : null]}
-      onPress={onPress}
-    >
-      <Text style={[styles.filterButtonText, active ? styles.filterButtonTextActive : null]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function FilterGlyph({ active }: { active: boolean }): React.JSX.Element {
-  const appTheme = useTheme();
-  return (
-    <Icon
-      color={active ? appTheme.colors.accent.s600 : appTheme.colors.text.primary}
-      name="filter"
-      size={20}
-      testID="filter-glyph"
-      weight="semibold"
-    />
-  );
-}
-
-// A 44-pt circular toolbar button for a destination header (filters, paging).
-function ToolbarIconButton({
-  accessibilityLabel,
-  accessibilityState,
-  active = false,
-  children,
-  disabled = false,
-  testID,
-  onPress
-}: {
-  accessibilityLabel: string;
-  accessibilityState?: { disabled?: boolean; expanded?: boolean };
-  active?: boolean;
-  children: React.ReactNode;
-  disabled?: boolean;
-  testID: string;
-  onPress: () => void;
-}): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={accessibilityState}
-      disabled={disabled}
-      testID={testID}
-      style={({ pressed }) => [
-        styles.toolbarIconButton,
-        active ? styles.toolbarIconButtonActive : null,
-        pressed && !disabled ? styles.filterButtonPressed : null,
-        disabled ? styles.disabledButton : null
-      ]}
-      onPress={onPress}
-    >
-      {children}
-    </Pressable>
-  );
-}
-
-// Status tile for a History or Review attempt row: tinted like an IconTile and
-// carrying the result glyph.
-function AttemptStatusTile({
-  testID,
-  tone
-}: {
-  testID: string;
-  tone: "correct" | "wrong" | "incomplete" | "unknown";
-}): React.JSX.Element {
-  const styles = useStyles();
-  const appTheme = useTheme();
-  return (
-    <View
-      style={[
-        styles.attemptStatusTile,
-        tone === "correct"
-          ? styles.attemptStatusTileCorrect
-          : tone === "wrong"
-            ? styles.attemptStatusTileWrong
-            : styles.attemptStatusTileNeutral
-      ]}
-      testID={testID}
-    >
-      {tone === "unknown" ? (
-        <Icon color={appTheme.colors.text.tertiary} name="help" size={18} weight="semibold" />
-      ) : (
-        <ResultBadgeGlyph tone={tone} />
-      )}
-    </View>
-  );
-}
-
-function CloseGlyph({
-  color,
-  testID = "close-glyph"
-}: {
-  color?: string;
-  testID?: string;
-} = {}): React.JSX.Element {
-  const styles = useStyles();
-  const appTheme = useTheme();
-  const glyphColor = color ?? appTheme.colors.text.ink;
-  return (
-    <View style={styles.closeGlyph} testID={testID}>
-      <View style={[styles.closeGlyphLine, styles.closeGlyphForward, { backgroundColor: glyphColor }]} />
-      <View style={[styles.closeGlyphLine, styles.closeGlyphBackward, { backgroundColor: glyphColor }]} />
-    </View>
-  );
-}
-
-function MoreGlyph(): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View style={styles.moreGlyph} testID="more-glyph">
-      <View style={styles.moreGlyphDot} />
-      <View style={styles.moreGlyphDot} />
-      <View style={styles.moreGlyphDot} />
-    </View>
-  );
-}
-
-function PauseGlyph(): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View style={styles.pauseGlyph} testID="pause-glyph">
-      <View style={styles.pauseGlyphBar} />
-      <View style={styles.pauseGlyphBar} />
-    </View>
-  );
-}
-
-function PlayGlyph(): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View style={styles.playGlyph} testID="play-glyph" />
-  );
-}
-
-function ChevronGlyph({
-  direction
-}: {
-  direction: "down" | "left" | "right" | "up";
-}): React.JSX.Element {
-  const styles = useStyles();
-  const directionStyle = direction === "left"
-    ? styles.chevronGlyphLeft
-    : direction === "right"
-      ? styles.chevronGlyphRight
-      : direction === "up"
-        ? styles.chevronGlyphUp
-        : styles.chevronGlyphDown;
-  return (
-    <View style={styles.chevronGlyphCanvas} testID={`chevron-${direction}-glyph`}>
-      <View style={[styles.chevronGlyph, directionStyle]} />
-    </View>
-  );
-}
-
-function CollapsibleRegion({
-  children,
-  contentTestID,
-  contentStyle,
-  expanded
-}: {
-  children: React.ReactNode;
-  contentTestID: string;
-  contentStyle?: StyleProp<ViewStyle>;
-  expanded: boolean;
-}): React.JSX.Element | null {
-  return (
-    <AnimatedCollapsibleRegion
-      contentTestID={contentTestID}
-      contentStyle={contentStyle}
-      expanded={expanded}
-    >
-      {children}
-    </AnimatedCollapsibleRegion>
-  );
-}
-
-function AnimatedCollapsibleRegion({
-  children,
-  contentTestID,
-  contentStyle,
-  expanded
-}: {
-  children: React.ReactNode;
-  contentTestID: string;
-  contentStyle?: StyleProp<ViewStyle>;
-  expanded: boolean;
-}): React.JSX.Element | null {
-  const styles = useStyles();
-  const progress = useRef(new Animated.Value(expanded ? 1 : 0)).current;
-  const [contentHeight, setContentHeight] = useState(0);
-  const durationMs = DISCLOSURE_MOTION_DURATION_MS;
-
-  useEffect(() => {
-    progress.stopAnimation();
-    Animated.timing(progress, {
-      duration: durationMs,
-      easing: Easing.out(Easing.cubic),
-      toValue: expanded ? 1 : 0,
-      useNativeDriver: false
-    }).start();
-  }, [durationMs, expanded, progress]);
-
-  useEffect(() => {
-    if (!expanded || contentHeight <= 0) {
-      return;
-    }
-    progress.stopAnimation();
-    Animated.timing(progress, {
-      duration: durationMs,
-      easing: Easing.out(Easing.cubic),
-      toValue: 1,
-      useNativeDriver: false
-    }).start();
-  }, [contentHeight, durationMs, expanded, progress]);
-
-  const animatedHeight = contentHeight > 0
-    ? progress.interpolate({ inputRange: [0, 1], outputRange: [0, contentHeight] })
-    : expanded
-      ? undefined
-      : 0;
-  const shouldMeasureInFlow = expanded && contentHeight === 0;
-  const opacity = progress.interpolate({
-    inputRange: [0, 0.35, 1],
-    outputRange: [0, 0.55, 1]
-  });
-  const translateY = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-4, 0]
-  });
-
-  return (
-    <Animated.View
-      aria-hidden={!expanded}
-      accessibilityElementsHidden={!expanded}
-      importantForAccessibility={expanded ? "auto" : "no-hide-descendants"}
-      pointerEvents={expanded ? "auto" : "none"}
-      style={[
-        styles.collapsibleMotionClip,
-        { height: animatedHeight, opacity, transform: [{ translateY }] }
-      ]}
-      testID={`${contentTestID}-motion`}
-    >
-      <View
-        style={[
-          contentStyle,
-          shouldMeasureInFlow ? null : styles.collapsibleMotionContent
-        ]}
-        testID={contentTestID}
-        onLayout={(event: LayoutChangeEvent) => {
-          const nextHeight = Math.ceil(event.nativeEvent.layout.height);
-          if (nextHeight > 0 && nextHeight !== contentHeight) {
-            setContentHeight(nextHeight);
-          }
-        }}
-      >
-        {children}
-      </View>
-    </Animated.View>
-  );
-}
-
-function DisclosureChevron({
-  expanded,
-  testID
-}: {
-  expanded: boolean;
-  testID?: string;
-}): React.JSX.Element {
-  return (
-    <AnimatedDisclosureChevron
-      expanded={expanded}
-      testID={testID}
-    />
-  );
-}
-
-function AnimatedDisclosureChevron({
-  expanded,
-  testID
-}: {
-  expanded: boolean;
-  testID?: string;
-}): React.JSX.Element {
-  const styles = useStyles();
-  const appTheme = useTheme();
-  const progress = useRef(new Animated.Value(expanded ? 1 : 0)).current;
-  useEffect(() => {
-    progress.stopAnimation();
-    Animated.timing(progress, {
-      duration: DISCLOSURE_MOTION_DURATION_MS,
-      easing: Easing.out(Easing.cubic),
-      toValue: expanded ? 1 : 0,
-      useNativeDriver: false
-    }).start();
-  }, [expanded, progress]);
-
-  const rotate = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "180deg"]
-  });
-  return (
-    <Animated.View
-      style={[styles.disclosureChevronMotion, { transform: [{ rotate }] }]}
-      testID={testID}
-    >
-      <Icon color={appTheme.colors.text.tertiary} name="chevronDown" size={15} testID="chevron-down-glyph" weight="semibold" />
-    </Animated.View>
-  );
-}
-
-function FlipGlyph(): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View style={styles.flipGlyph} testID="flip-glyph">
-      <View style={styles.flipGlyphTrackTop} />
-      <View style={styles.flipGlyphTrackBottom} />
-      <View style={styles.flipGlyphHeadRight} />
-      <View style={styles.flipGlyphHeadLeft} />
-    </View>
-  );
-}
-
-function SearchGlyph(): React.JSX.Element {
-  const styles = useStyles();
-  return (
-    <View style={styles.searchGlyph} testID="search-glyph">
-      <View style={styles.searchGlyphLens} />
-      <View style={styles.searchGlyphHandle} />
-    </View>
-  );
 }
 
 function reviewItemSpeedSeconds(
@@ -19068,13 +18644,6 @@ const useStyles = makeStyles((theme) => ({
     color: theme.colors.text.ink,
     textAlign: "center"
   },
-  moveSideKingGlyph: {
-    overflow: "hidden",
-    position: "relative"
-  },
-  moveSideKingSprite: {
-    position: "absolute"
-  },
   timerText: {
     ...theme.typography.numeral,
     color: theme.colors.text.ink,
@@ -19526,61 +19095,6 @@ const useStyles = makeStyles((theme) => ({
   sessionScoreLabelCompact: {
     fontSize: 9,
     letterSpacing: 0
-  },
-  sessionScoreIcon: {
-    alignItems: "center",
-    height: 20,
-    justifyContent: "center",
-    overflow: "hidden",
-    borderRadius: 999,
-    position: "relative",
-    width: 20
-  },
-  sessionScoreDotPositive: {
-    backgroundColor: theme.colors.positive.s600
-  },
-  sessionScoreDotNegative: {
-    backgroundColor: theme.colors.danger.s600
-  },
-  sessionScoreDotNeutral: {
-    backgroundColor: theme.colors.surfaceRaised,
-    borderColor: theme.colors.border.heavy,
-    borderWidth: 1.5
-  },
-  sessionScoreGlyphLine: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 999,
-    position: "absolute"
-  },
-  sessionScoreCheckShort: {
-    height: 2,
-    left: 5,
-    top: 10,
-    transform: [{ rotate: "45deg" }],
-    width: 6
-  },
-  sessionScoreCheckLong: {
-    height: 2,
-    right: 4,
-    top: 9,
-    transform: [{ rotate: "-48deg" }],
-    width: 10
-  },
-  sessionScoreCrossForward: {
-    height: 2.25,
-    transform: [{ rotate: "45deg" }],
-    width: 10
-  },
-  sessionScoreCrossBackward: {
-    height: 2.25,
-    transform: [{ rotate: "-45deg" }],
-    width: 10
-  },
-  sessionScoreNeutralLine: {
-    backgroundColor: theme.colors.text.tertiary,
-    borderRadius: 999,
-    height: 2.25,
-    width: 8
   },
   // Labeled (Focused Run) score texts span their column so a narrow strip
   // centers them without rounding their width down: see "Text width
@@ -20267,20 +19781,6 @@ const useStyles = makeStyles((theme) => ({
   historyFootnote: {
     paddingHorizontal: 4
   },
-  toolbarIconButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.shape.capsule,
-    height: theme.metrics.minTarget,
-    justifyContent: "center",
-    width: theme.metrics.minTarget
-  },
-  toolbarIconButtonActive: {
-    backgroundColor: theme.colors.accent.s100
-  },
-  filterButtonPressed: {
-    opacity: 0.7
-  },
   groupedList: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.shape.card,
@@ -20322,22 +19822,6 @@ const useStyles = makeStyles((theme) => ({
   },
   attemptRowChevron: {
     alignSelf: "center"
-  },
-  attemptStatusTile: {
-    alignItems: "center",
-    borderRadius: theme.shape.tile,
-    height: theme.metrics.iconTile,
-    justifyContent: "center",
-    width: theme.metrics.iconTile
-  },
-  attemptStatusTileCorrect: {
-    backgroundColor: theme.colors.positive.s100
-  },
-  attemptStatusTileWrong: {
-    backgroundColor: theme.colors.danger.s100
-  },
-  attemptStatusTileNeutral: {
-    backgroundColor: theme.colors.surfaceStrong
   },
   reviewForecastRowStacked: {
     flexDirection: "column",
@@ -21288,180 +20772,6 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 12,
     fontWeight: "600",
     lineHeight: 17
-  },
-  closeGlyph: {
-    alignItems: "center",
-    height: 18,
-    justifyContent: "center",
-    width: 18
-  },
-  closeGlyphLine: {
-    backgroundColor: theme.colors.text.ink,
-    borderRadius: 999,
-    height: 2.25,
-    position: "absolute",
-    width: 16
-  },
-  closeGlyphForward: {
-    transform: [{ rotate: "45deg" }]
-  },
-  closeGlyphBackward: {
-    transform: [{ rotate: "-45deg" }]
-  },
-  moreGlyph: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 3,
-    justifyContent: "center",
-    width: 18
-  },
-  moreGlyphDot: {
-    backgroundColor: theme.colors.text.ink,
-    borderRadius: 999,
-    height: 4,
-    width: 4
-  },
-  pauseGlyph: {
-    flexDirection: "row",
-    gap: 4
-  },
-  pauseGlyphBar: {
-    backgroundColor: theme.colors.text.ink,
-    borderRadius: 999,
-    height: 16,
-    width: 4
-  },
-  playGlyph: {
-    borderBottomColor: "transparent",
-    borderBottomWidth: 8,
-    borderLeftColor: theme.colors.text.ink,
-    borderLeftWidth: 13,
-    borderTopColor: "transparent",
-    borderTopWidth: 8,
-    height: 0,
-    marginLeft: 3,
-    width: 0
-  },
-  chevronGlyphCanvas: {
-    alignItems: "center",
-    height: 18,
-    justifyContent: "center",
-    width: 18
-  },
-  disclosureChevronMotion: {
-    alignItems: "center",
-    height: 18,
-    justifyContent: "center",
-    width: 18
-  },
-  collapsibleMotionClip: {
-    overflow: "hidden",
-    width: "100%"
-  },
-  collapsibleMotionContent: {
-    left: 0,
-    position: "absolute",
-    right: 0,
-    top: 0
-  },
-  chevronGlyph: {
-    borderColor: theme.colors.text.strong,
-    height: 9,
-    width: 9
-  },
-  chevronGlyphLeft: {
-    borderBottomWidth: 2.5,
-    borderLeftWidth: 2.5,
-    transform: [{ rotate: "45deg" }]
-  },
-  chevronGlyphRight: {
-    borderRightWidth: 2.5,
-    borderTopWidth: 2.5,
-    transform: [{ rotate: "45deg" }]
-  },
-  chevronGlyphUp: {
-    borderLeftWidth: 2.5,
-    borderTopWidth: 2.5,
-    transform: [{ rotate: "45deg" }]
-  },
-  chevronGlyphDown: {
-    borderBottomWidth: 2.5,
-    borderRightWidth: 2.5,
-    transform: [{ rotate: "45deg" }]
-  },
-  flipGlyph: {
-    height: 18,
-    position: "relative",
-    width: 18
-  },
-  flipGlyphTrackTop: {
-    backgroundColor: theme.colors.text.strong,
-    borderRadius: 999,
-    height: 2,
-    left: 3,
-    position: "absolute",
-    top: 5,
-    width: 11
-  },
-  flipGlyphTrackBottom: {
-    backgroundColor: theme.colors.text.strong,
-    borderRadius: 999,
-    height: 2,
-    left: 4,
-    position: "absolute",
-    top: 11,
-    width: 11
-  },
-  flipGlyphHeadRight: {
-    borderBottomColor: "transparent",
-    borderBottomWidth: 4,
-    borderLeftColor: theme.colors.text.strong,
-    borderLeftWidth: 5,
-    borderTopColor: "transparent",
-    borderTopWidth: 4,
-    height: 0,
-    position: "absolute",
-    right: 1,
-    top: 2,
-    width: 0
-  },
-  flipGlyphHeadLeft: {
-    borderBottomColor: "transparent",
-    borderBottomWidth: 4,
-    borderRightColor: theme.colors.text.strong,
-    borderRightWidth: 5,
-    borderTopColor: "transparent",
-    borderTopWidth: 4,
-    height: 0,
-    left: 1,
-    position: "absolute",
-    top: 8,
-    width: 0
-  },
-  searchGlyph: {
-    height: 18,
-    position: "relative",
-    width: 18
-  },
-  searchGlyphLens: {
-    borderColor: theme.colors.surfaceInverse,
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 10,
-    left: 3,
-    position: "absolute",
-    top: 3,
-    width: 10
-  },
-  searchGlyphHandle: {
-    backgroundColor: theme.colors.surfaceInverse,
-    borderRadius: 999,
-    height: 2.5,
-    left: 11,
-    position: "absolute",
-    top: 12,
-    transform: [{ rotate: "45deg" }],
-    width: 6
   },
   switchButton: {
     alignItems: "center",
