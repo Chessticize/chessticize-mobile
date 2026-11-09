@@ -70,3 +70,8 @@ export function sleep(ms: number): Promise<void> {
     setTimeout(resolve, ms);
   });
 }
+
+// From this text scale a row of two action buttons stacks into full-width
+// buttons: a one-word headline label outgrows half a phone row, and the
+// shared Button wraps labels rather than shrinking them.
+export const STACKED_ACTIONS_FONT_SCALE = 1.5;

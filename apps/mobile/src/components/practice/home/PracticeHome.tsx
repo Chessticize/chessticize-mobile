@@ -14,7 +14,7 @@ import { Gesture, GestureDetector, type GestureType } from "react-native-gesture
 import { defaultSprintConfig, type SprintConfig, type SprintMode, type SprintState } from "../../../../../../packages/core/src/index.ts";
 import type { AdaptiveLayout } from "../../adaptivePracticeLayout.ts";
 import { usePracticeViewport } from "../../PracticeViewport.tsx";
-import { HEADLINE_MAX_FONT_SCALE, TITLE_MAX_FONT_SCALE } from "../../../theme/scales.ts";
+import { TITLE_MAX_FONT_SCALE } from "../../../theme/scales.ts";
 import {
   type PersonalBestChallengeDesignPreview,
   PersonalBestHomeCard,
@@ -23,7 +23,7 @@ import {
 import type { PracticeProgressSummary } from "../../../../../../packages/storage/src/rating-history.ts";
 import type { PracticeRunManagementPresentation, PracticeRunPresentation } from "../../practiceRunPresentation.ts";
 import type { TacticalProfilePresentation } from "../../tacticalProfilePresentation.ts";
-import { formatSprintTimingLabel, modeLabel, safeTestId } from "../shared/practiceUtils.ts";
+import { formatSprintTimingLabel, modeLabel, safeTestId, STACKED_ACTIONS_FONT_SCALE } from "../shared/practiceUtils.ts";
 import { PracticeProgressCard } from "../shared/PracticeProgressCard.tsx";
 import { TacticalProfileHomeCard } from "../../TacticalProfileSection.tsx";
 import { makeStyles, useTheme } from "../../../theme/index.ts";
@@ -743,15 +743,14 @@ function SprintRulesGuide({
             Solve {presentation.targetCorrect} puzzles to pass
           </Text>
         </View>
-        <Pressable
-          accessibilityRole="button"
+        <Button
           accessibilityLabel="Dismiss Sprint rules"
-          style={[styles.sprintRulesDismissButton, dismissStacked ? styles.sprintRulesDismissButtonStacked : null]}
+          label="Got it"
+          size="compact"
+          style={dismissStacked ? styles.sprintRulesDismissButtonStacked : null}
           testID="practice-sprint-rules-dismiss"
           onPress={onDismiss}
-        >
-          <Text maxFontSizeMultiplier={HEADLINE_MAX_FONT_SCALE} numberOfLines={1} style={styles.sprintRulesDismissText}>Got it</Text>
-        </Pressable>
+        />
       </View>
 
       <View
@@ -1909,6 +1908,8 @@ export function PausedSessionPanel({
   state: SprintState;
 }): React.JSX.Element {
   const styles = useStyles();
+  const { fontScale } = usePracticeViewport();
+  const stackActions = fontScale >= STACKED_ACTIONS_FONT_SCALE;
   const isTacticalFocus = state.config.tacticalFocus !== undefined;
   const completedCount = state.correctCount + state.mistakeCount;
   const remaining = Math.max(
@@ -1936,29 +1937,29 @@ export function PausedSessionPanel({
             : `${modeLabel(state.config.mode)} · ${state.correctCount} solved · ${remaining} left · ${state.mistakeCount} mistakes`}
         </Text>
       </View>
-      <View style={styles.pausedSessionActions}>
-        <Pressable
-          accessibilityRole="button"
+      <View style={[styles.pausedSessionActions, stackActions ? styles.pausedSessionActionsStacked : null]}>
+        <Button
           accessibilityLabel={isTacticalFocus
             ? "Abandon paused Focused Run"
             : "Abandon paused sprint"}
+          label="Abandon"
+          size="compact"
+          stretch={stackActions}
           testID="paused-session-abandon"
-          style={styles.secondaryButton}
+          variant="secondary"
           onPress={onAbandon}
-        >
-          <Text style={styles.secondaryButtonText}>Abandon</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
+        />
+        <Button
           accessibilityLabel={isTacticalFocus
             ? "Resume paused Focused Run"
             : "Resume paused sprint"}
+          label="Resume"
+          size="compact"
+          stretch={stackActions}
+          style={stackActions ? null : styles.pausedSessionResume}
           testID="paused-session-resume"
-          style={styles.primaryButton}
           onPress={onResume}
-        >
-          <Text style={styles.primaryButtonText}>Resume</Text>
-        </Pressable>
+        />
       </View>
     </View>
   );
@@ -2153,7 +2154,7 @@ function ordinalWord(value: number): string {
 }
 
 const useStyles = makeStyles((theme) => ({
-  ...pickPracticeStyles(theme, ["accessibleMoveModalBackdrop", "feedbackHandoffActions", "feedbackHandoffConfirmation", "helperText", "homeRowCopy", "primaryButton", "primaryButtonText", "secondaryButton", "secondaryButtonText", "sectionLabel"]),
+  ...pickPracticeStyles(theme, ["accessibleMoveModalBackdrop", "feedbackHandoffActions", "feedbackHandoffConfirmation", "helperText", "homeRowCopy", "sectionLabel"]),
   practiceHome: {
     gap: theme.spacing.section
   },
@@ -2346,20 +2347,8 @@ const useStyles = makeStyles((theme) => ({
     ...theme.typography.title,
     color: theme.colors.text.primary
   },
-  sprintRulesDismissButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.accent.fill,
-    borderRadius: theme.shape.control,
-    justifyContent: "center",
-    minHeight: theme.metrics.minTarget,
-    paddingHorizontal: 16
-  },
   sprintRulesDismissButtonStacked: {
     alignSelf: "flex-start"
-  },
-  sprintRulesDismissText: {
-    ...theme.typography.headline,
-    color: theme.colors.text.onAccent
   },
   sprintRulesList: {
     gap: theme.spacing.row
@@ -2476,6 +2465,12 @@ const useStyles = makeStyles((theme) => ({
   },
   pausedSessionCopy: {
     gap: 4
+  },
+  pausedSessionResume: {
+    flex: 1
+  },
+  pausedSessionActionsStacked: {
+    flexDirection: "column"
   },
   pausedSessionActions: {
     flexDirection: "row",

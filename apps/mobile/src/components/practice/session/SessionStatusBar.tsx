@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { formatCompactDuration, modeLabel } from "../shared/practiceUtils.ts";
+import { formatCompactDuration, modeLabel, STACKED_ACTIONS_FONT_SCALE } from "../shared/practiceUtils.ts";
 import type { SprintMode, SprintState } from "../../../../../../packages/core/src/index.ts";
 import type { PersonalBestChallengeDesignPreview } from "../../PersonalBestChallengeDesign.tsx";
 import { usePracticeViewport } from "../../PracticeViewport.tsx";
@@ -10,6 +10,7 @@ import { CloseGlyph, MoreGlyph, PauseGlyph, PlayGlyph, SessionScoreGlyph } from 
 import { PRACTICE_PUZZLE_TIMING_MAX_TEXT_SCALE, PRACTICE_SESSION_HUD_MAX_TEXT_SCALE } from "../../adaptivePracticeLayout.ts";
 import { makeStyles } from "../../../theme/index.ts";
 import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
+import { Button } from "../../ui/index.tsx";
 
 export type SessionTimingState = {
   elapsedSeconds: number;
@@ -177,6 +178,10 @@ export function SessionStatusBar({
   // safety net.
   const { fontScale } = usePracticeViewport();
   const stacksTimer = compactMetrics && fontScale >= HUD_LARGE_TEXT_FONT_SCALE;
+  // At large text the leave sheets stack their buttons full width, and the
+  // abandon confirmation stacks its copy above them.
+  const stacksLeaveActions = fontScale >= STACKED_ACTIONS_FONT_SCALE;
+  const stacksLeaveConfirmation = stackLeaveConfirmation || stacksLeaveActions;
   const [metricsWidth, setMetricsWidth] = useState<number | null>(null);
   const progressText = isPersonalBest
     ? `${state.correctCount} solved`
@@ -414,31 +419,37 @@ export function SessionStatusBar({
               Your puzzle is hidden. Resume here, or leave it paused and continue any time.
             </Text>
           </View>
-          <View style={styles.survivalExitPrimaryActions}>
-            <Pressable
-              accessibilityRole="button"
+          <View
+            style={[
+              styles.survivalExitPrimaryActions,
+              stacksLeaveActions ? styles.leaveActionsStacked : null
+            ]}
+          >
+            <Button
               accessibilityLabel="Leave Survival paused"
+              label="Leave paused"
+              size="compact"
+              stretch={stacksLeaveActions}
+              style={stacksLeaveActions ? null : styles.survivalExitAction}
               testID="personal-best-pause-and-leave"
-              style={[styles.secondaryButton, styles.survivalExitAction]}
+              variant="secondary"
               onPress={() => {
                 onConfirmAbandonChange(false);
                 onPauseAndLeave?.();
               }}
-            >
-              <Text style={styles.secondaryButtonText}>Leave paused</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
+            />
+            <Button
               accessibilityLabel="Resume Survival"
+              label="Resume"
+              size="compact"
+              stretch={stacksLeaveActions}
+              style={stacksLeaveActions ? null : styles.survivalExitAction}
               testID="session-abandon-cancel"
-              style={[styles.primaryButton, styles.survivalExitAction]}
               onPress={() => {
                 onResume?.();
                 onConfirmAbandonChange(false);
               }}
-            >
-              <Text style={styles.primaryButtonText}>Resume</Text>
-            </Pressable>
+            />
           </View>
         </View>
       ) : confirmAbandon ? (
@@ -446,7 +457,7 @@ export function SessionStatusBar({
           style={[
             styles.sessionLeaveConfirmationOverlay,
             styles.sessionAbandonConfirm,
-            stackLeaveConfirmation ? styles.sessionAbandonConfirmStacked : null,
+            stacksLeaveConfirmation ? styles.sessionAbandonConfirmStacked : null,
             leaveConfirmationMinHeight === undefined
               ? null
               : { minHeight: leaveConfirmationMinHeight }
@@ -456,7 +467,7 @@ export function SessionStatusBar({
           <View
             style={[
               styles.sessionAbandonCopy,
-              stackLeaveConfirmation ? styles.sessionAbandonCopyStacked : null
+              stacksLeaveConfirmation ? styles.sessionAbandonCopyStacked : null
             ]}
           >
             <Text style={styles.listText}>
@@ -471,34 +482,35 @@ export function SessionStatusBar({
           <View
             style={[
               styles.sessionAbandonActions,
-              stackLeaveConfirmation ? styles.sessionAbandonActionsStacked : null
+              stacksLeaveConfirmation ? styles.sessionAbandonActionsStacked : null,
+              stacksLeaveActions ? styles.leaveActionsStacked : null
             ]}
           >
-            <Pressable
-              accessibilityRole="button"
+            <Button
               accessibilityLabel={isTacticalFocus
                 ? "Cancel abandoning Focused Run"
                 : "Cancel abandon sprint"}
+              label="Cancel"
+              size="compact"
+              stretch={stacksLeaveActions}
               testID="session-abandon-cancel"
-              style={styles.secondaryButton}
+              variant="secondary"
               onPress={() => onConfirmAbandonChange(false)}
-            >
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
+            />
+            <Button
               accessibilityLabel={isTacticalFocus
                 ? "Confirm abandoning Focused Run"
                 : "Confirm abandon sprint"}
+              label="Abandon"
+              size="compact"
+              stretch={stacksLeaveActions}
               testID="session-abandon-confirm"
-              style={styles.destructiveButton}
+              variant="destructive"
               onPress={() => {
                 onConfirmAbandonChange(false);
                 onAbandon?.();
               }}
-            >
-              <Text style={styles.destructiveButtonText}>Abandon</Text>
-            </Pressable>
+            />
           </View>
         </View>
       ) : null}
@@ -636,7 +648,7 @@ const SCORE_LABEL_MAX_TEXT_SCALE = 1;
 const SCORE_VALUE_MAX_TEXT_SCALE = 1.15;
 
 const useStyles = makeStyles((theme) => ({
-  ...pickPracticeStyles(theme, ["helperText", "listText", "primaryButton", "primaryButtonText", "secondaryButton", "secondaryButtonText"]),
+  ...pickPracticeStyles(theme, ["helperText", "listText"]),
   activeSessionShell: {
     gap: 8
   },
@@ -747,9 +759,11 @@ const useStyles = makeStyles((theme) => ({
     flex: 0,
     minWidth: PERSONAL_BEST_MISTAKES_BLOCK_WIDTH
   },
+  // A neutral surface keeps the tinted destructive Abandon button distinct;
+  // the danger border still marks the sheet as a warning.
   sessionAbandonConfirm: {
     alignItems: "center",
-    backgroundColor: theme.colors.danger.s50,
+    backgroundColor: theme.colors.surface,
     borderColor: theme.colors.danger.s300,
     borderRadius: 8,
     borderWidth: 1,
@@ -773,6 +787,9 @@ const useStyles = makeStyles((theme) => ({
   },
   sessionAbandonActionsStacked: {
     justifyContent: "flex-end"
+  },
+  leaveActionsStacked: {
+    flexDirection: "column"
   },
   sessionAbandonActions: {
     flexDirection: "row",
@@ -918,18 +935,5 @@ const useStyles = makeStyles((theme) => ({
     fontSize: 15,
     fontWeight: "900",
     lineHeight: 17
-  },
-  destructiveButton: {
-    alignItems: "center",
-    backgroundColor: theme.colors.danger.s600,
-    borderRadius: 8,
-    height: 42,
-    justifyContent: "center",
-    paddingHorizontal: 14
-  },
-  destructiveButtonText: {
-    color: theme.colors.text.onTone,
-    fontSize: 13,
-    fontWeight: "800"
   },
 }));
