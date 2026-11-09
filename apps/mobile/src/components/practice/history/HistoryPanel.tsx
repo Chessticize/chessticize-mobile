@@ -16,7 +16,8 @@ import {
   type HistoryAttemptView,
   type HistoryAttentionReason,
   type HistoryPerformance,
-  type HistoryResult,
+  type HistoryRatingRangeFilter,
+  type HistoryResultFilter,
   type HistoryTimeRange,
   isAttemptMarkedUnclear,
   normalizeHistoryAttemptDetail,
@@ -36,10 +37,6 @@ import { modeLabel, safeTestId } from "../shared/practiceUtils.ts";
 import { AttemptStatusTile } from "../shared/AttemptStatusTile.tsx";
 import { ALL_THEMES_FILTER, customThemeLabel, type ThemeCatalogPresentation } from "../shared/themeCatalog.ts";
 import { historyRatingKeyLabel, HistoryRatingTrendChart } from "./HistoryRatingChart.tsx";
-
-export type HistoryRatingRangeFilter = "all" | "under1000" | "1000-1399" | "1400-plus";
-
-export type HistoryResultFilter = "all" | HistoryResult;
 
 export function HistoryPanel({
   adaptiveLayout,
@@ -489,14 +486,6 @@ function historyActiveFilterLabels({
   return labels;
 }
 
-export function historyAttentionQueryForSelection(
-  attentionReasons: readonly HistoryAttentionReason[]
-): { attentionReasons?: HistoryAttentionReason[] } {
-  return attentionReasons.length === 0
-    ? {}
-    : { attentionReasons: [...attentionReasons] };
-}
-
 function HistoryActiveFilterStrip({
   compact = false,
   labels
@@ -530,19 +519,6 @@ const HISTORY_RATING_RANGE_FILTERS: ReadonlyArray<{ id: HistoryRatingRangeFilter
   { id: "1000-1399", label: "1000-1399" },
   { id: "1400-plus", label: "1400+" }
 ];
-
-export function historyRatingRangeFilterToQuery(filter: HistoryRatingRangeFilter): { minRating?: number; maxRating?: number } {
-  if (filter === "under1000") {
-    return { maxRating: 999 };
-  }
-  if (filter === "1000-1399") {
-    return { minRating: 1000, maxRating: 1399 };
-  }
-  if (filter === "1400-plus") {
-    return { minRating: 1400 };
-  }
-  return {};
-}
 
 function HistoryChipRow({
   children,

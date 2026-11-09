@@ -43,12 +43,8 @@ import {
 } from "../../../../packages/core/src/index.ts";
 import type {
   AttemptEvent,
-  AttemptSource,
   ArrowDuelState,
   CurrentPuzzleState,
-  HistoryAttentionReason,
-  HistoryTimeRange,
-  PuzzleSide,
   PuzzleFeedback,
   PracticeRunRecord,
   ReviewQueueItem,
@@ -244,13 +240,10 @@ import type {
   ThemeCatalogPresentation
 } from "./practice/shared/themeCatalog.ts";
 import {
-  historyAttentionQueryForSelection,
-  HistoryPanel,
-  type HistoryRatingRangeFilter,
-  historyRatingRangeFilterToQuery,
-  type HistoryResultFilter
+  HistoryPanel
 } from "./practice/history/HistoryPanel.tsx";
 import { emptyHistoryPerformance } from "./practice/history/HistoryRatingChart.tsx";
+import { useHistoryController } from "./practice/history/useHistoryController.ts";
 import { CustomSprintSetup } from "./practice/customSetup/CustomSprintSetup.tsx";
 import { PracticeRunEditor } from "./practice/runEditor/PracticeRunEditor.tsx";
 import {
@@ -910,6 +903,34 @@ export function PracticePocScreen({
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
   const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
+  const {
+    applyHistoryThemeIntent,
+    changeHistoryAttentionOnly,
+    changeHistoryRatingKey,
+    changeHistoryRatingRangeFilter,
+    changeHistoryResultFilter,
+    changeHistorySideFilter,
+    changeHistorySourceFilter,
+    changeHistoryTimeRange,
+    historyAttentionReasons,
+    historyFiltersExpanded,
+    historyPageOffset,
+    historyProgressOpen,
+    historyQuery,
+    historyRatingKey,
+    historyRatingRangeFilter,
+    historyResultFilter,
+    historySideFilter,
+    historySourceFilter,
+    historyThemeChoices,
+    historyTimeRange,
+    openHistoryProgress,
+    resetHistoryFilters,
+    setHistoryFiltersExpanded,
+    setHistoryPageOffset,
+    setHistoryProgressOpen,
+    toggleHistoryAttentionReason
+  } = useHistoryController();
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
   const [reviewBoardTouchActive, setReviewBoardTouchActive] = useState(false);
   const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryUnavailableAttempt | null>(null);
@@ -1069,7 +1090,6 @@ export function PracticePocScreen({
   }, [isOpenSession, practiceExitConfirmationVisible]);
   const selectedCustomThemes = customThemeChoices.selection;
   const selectedSprintThemes = customThemeChoices.namedThemes;
-  const selectedHistoryThemes = historyThemeChoices.namedThemes;
   const selectedConfig = useMemo(
     () => sprintConfigFor(
       mode === "custom" ? customSprintMode : mode,
@@ -2981,17 +3001,7 @@ export function PracticePocScreen({
   function openHistoryReview(attemptId: string): void {
     // Computed on demand: the unpaged review view scans the full attempt history,
     // which is too expensive to rebuild on every render.
-    const historyReviewView = service.getHistoryView({
-      now: nowIso(),
-      timeRange: historyTimeRange,
-      ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
-      ...historyRatingRangeQuery,
-      ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-      ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
-      ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
-      ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
-      ...historyAttentionQueryForSelection(historyAttentionReasons)
-    });
+    const historyReviewView = service.getHistoryView(historyQuery(nowIso()));
     const historyReviewAttempts = historyReviewView.attempts;
     const selectedAttempt = historyReviewAttempts.find((attempt) => attempt.id === attemptId);
     if (!selectedAttempt) {
@@ -3806,7 +3816,6 @@ export function PracticePocScreen({
       : [])
   );
   const activeHistoryRatingKey = historyRatingKey;
-  const historyRatingRangeQuery = historyRatingRangeFilterToQuery(historyRatingRangeFilter);
   // History views scan the full attempt history, so they are computed only while
   // the history panel is on screen. Recomputing them on every render made active
   // sprints progressively laggy: the 500ms countdown tick re-rendered this screen
@@ -3817,32 +3826,13 @@ export function PracticePocScreen({
     historyReviewEntries.length === 0 &&
     historyUnavailableAttempt === null;
   const historyBaseView = historyPanelVisible
-    ? service.getHistoryView({
-        now: nowIso(),
-        timeRange: historyTimeRange,
-        ...(activeHistoryRatingKey ? { ratingKey: activeHistoryRatingKey } : {}),
-        ...historyRatingRangeQuery,
-        ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
-        ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
-        ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
-        ...historyAttentionQueryForSelection(historyAttentionReasons),
-        page: { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset }
-      })
+    ? service.getHistoryView(
+        historyQuery(nowIso(), { limit: HISTORY_PAGE_LIMIT, offset: historyPageOffset })
+      )
     : null;
   const historyView = historyBaseView;
   const historyPerformanceView = historyPanelVisible && activeHistoryRatingKey
-    ? service.getHistoryView({
-        now: nowIso(),
-        timeRange: historyTimeRange,
-        ratingKey: activeHistoryRatingKey,
-        ...historyRatingRangeQuery,
-        ...(historySourceFilter === "all" ? {} : { source: historySourceFilter }),
-        ...(historyResultFilter === "all" ? {} : { result: historyResultFilter }),
-        ...(historySideFilter === "all" ? {} : { side: historySideFilter }),
-        ...(selectedHistoryThemes.length === 0 ? {} : { themes: selectedHistoryThemes }),
-        ...historyAttentionQueryForSelection(historyAttentionReasons)
-      })
+    ? service.getHistoryView(historyQuery(nowIso()))
     : null;
   const visibleHistoryAttempts = historyView?.attempts ?? [];
   const visibleHistoryPage = historyView?.page;
@@ -4823,8 +4813,7 @@ export function PracticePocScreen({
               onBack={resetToIdle}
               onMarkUnclear={toggleUnclearPrompt}
               onOpenHistory={() => {
-                setHistoryRatingKey(state.config.ratingKey);
-                setHistoryPageOffset(0);
+                changeHistoryRatingKey(state.config.ratingKey);
                 navigateToTab("history");
               }}
               onPlayAgain={() => {
@@ -5320,74 +5309,19 @@ export function PracticePocScreen({
                   themeCatalogPresentation={themeCatalogPresentation}
                   filtersExpanded={historyFiltersExpanded}
                   onFiltersExpandedChange={setHistoryFiltersExpanded}
-                  onRatingKeyChange={(ratingKey) => {
-                    setHistoryRatingKey(ratingKey);
-                    setHistoryPageOffset(0);
-                  }}
-                  onTimeRangeChange={(range) => {
-                    setHistoryTimeRange(range);
-                    setHistoryPageOffset(0);
-                  }}
-                  onSourceFilterChange={(source) => {
-                    setHistorySourceFilter(source);
-                    if (source !== "sprint") {
-                      setHistoryAttentionReasons([]);
-                    }
-                    setHistoryPageOffset(0);
-                  }}
-                  onResultFilterChange={(result) => {
-                    setHistoryResultFilter(result);
-                    setHistoryPageOffset(0);
-                  }}
-                  onRatingRangeFilterChange={(ratingRange) => {
-                    setHistoryRatingRangeFilter(ratingRange);
-                    setHistoryPageOffset(0);
-                  }}
-                  onSideFilterChange={(side) => {
-                    setHistorySideFilter(side);
-                    setHistoryPageOffset(0);
-                  }}
-                  onThemeFilterIntent={(intent) => {
-                    historyThemeChoices.dispatch(intent);
-                    setHistoryPageOffset(0);
-                  }}
-                  onAttentionReasonChange={(reason) => {
-                    setHistorySourceFilter("sprint");
-                    setHistoryAttentionReasons((current) => current.includes(reason)
-                      ? current.filter((candidate) => candidate !== reason)
-                      : [...current, reason]);
-                    setHistoryPageOffset(0);
-                  }}
-                  onAttentionOnlyChange={(attentionOnly) => {
-                    setHistoryPageOffset(0);
-                    if (attentionOnly) {
-                      setHistorySourceFilter("sprint");
-                    }
-                    setHistoryAttentionReasons((current) => attentionOnly
-                      ? current.length > 0
-                        ? current
-                        : [...historyAttentionReasonOptions]
-                      : []);
-                  }}
+                  onRatingKeyChange={changeHistoryRatingKey}
+                  onTimeRangeChange={changeHistoryTimeRange}
+                  onSourceFilterChange={changeHistorySourceFilter}
+                  onResultFilterChange={changeHistoryResultFilter}
+                  onRatingRangeFilterChange={changeHistoryRatingRangeFilter}
+                  onSideFilterChange={changeHistorySideFilter}
+                  onThemeFilterIntent={applyHistoryThemeIntent}
+                  onAttentionReasonChange={toggleHistoryAttentionReason}
+                  onAttentionOnlyChange={changeHistoryAttentionOnly}
                   onPageOffsetChange={setHistoryPageOffset}
                   onOpenAttempt={openHistoryReview}
-                  onOpenProgress={resolvedHistoryProgressPresentation
-                    ? () => {
-                        setHistoryFiltersExpanded(false);
-                        setHistoryProgressOpen(true);
-                      }
-                    : undefined}
-                  onResetFilters={() => {
-                    setHistoryTimeRange("7d");
-                    setHistorySourceFilter("sprint");
-                    setHistoryResultFilter("all");
-                    setHistorySideFilter("all");
-                    historyThemeChoices.dispatch({ type: "select-all-themes" });
-                    setHistoryRatingRangeFilter("all");
-                    setHistoryAttentionReasons([...historyAttentionReasonOptions]);
-                    setHistoryPageOffset(0);
-                    setHistoryRatingKey(null);
-                  }}
+                  onOpenProgress={resolvedHistoryProgressPresentation ? openHistoryProgress : undefined}
+                  onResetFilters={resetHistoryFilters}
                 />
               ) : null
             ) : null}
