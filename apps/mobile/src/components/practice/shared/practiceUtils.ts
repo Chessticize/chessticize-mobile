@@ -1,3 +1,5 @@
+import type { SprintMode } from "../../../../../../packages/core/src/index.ts";
+
 export const ANALYSIS_DEPTH = 20;
 
 export function safeTestId(value: string): string {
@@ -15,3 +17,10 @@ export const FABRIC_SAFE_HIDDEN_TEXT_STYLE = {
   opacity: 0,
   width: 0
 } as const;
+
+export function modeLabel(mode: SprintMode): string {
+  if (mode === "arrow_duel") {
+    return "Arrow Duel";
+  }
+  return mode.charAt(0).toUpperCase() + mode.slice(1);
+}
