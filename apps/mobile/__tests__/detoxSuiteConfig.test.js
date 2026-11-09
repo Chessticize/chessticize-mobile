@@ -1932,10 +1932,10 @@ describe('Detox suite configuration', () => {
       "waitFor(element(by.id('personal-best-hub'))).toExist().withTimeout(30000)"
     );
     expect(prepareHelper).toContain(
-      "element(by.id('practice-main-scroll')).scroll(64, 'down', 0.5, 0.5)"
+      "target.deviceFamily === 'iphone' ? 64 : 72, 'down', 0.5, 0.5"
     );
     expect(prepareHelper).toContain(
-      "element(by.id('practice-main-scroll')).scroll(125, 'down', 0.5, 0.5)"
+      "element(by.id('practice-main-scroll')).scroll(136, 'down', 0.5, 0.5)"
     );
     expect(prepareHelper).toContain("target.deviceFamily === 'iphone'");
     expect(spec).toContain('await assertRequiredFrameGeometry(frame)');
