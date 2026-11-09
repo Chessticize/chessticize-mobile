@@ -480,6 +480,7 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "history-attempt-clear-unclear")).toThrow();
   });
 
+
   it.each([
     { height: 932, label: "portrait", width: 430 },
     { height: 390, label: "landscape", width: 844 }
@@ -6659,6 +6660,35 @@ describe("PracticePocScreen", () => {
       expect(panel.minHeight).toBeUndefined();
       expect(rail.justifyContent).toBeUndefined();
     }
+  });
+
+  it.each([2, 3.5])("gives accessibility-size Review copy a full-width column at %sx without losing the puzzle", (fontScale) => {
+    const viewport = { width: 874, height: 402, scale: 3, insets: { top: 0, right: 62, bottom: 21, left: 62 } };
+    setPracticeViewport({ ...viewport, fontScale: 1 });
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
+      practiceService: createDueReviewService(1)
+    });
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+    const boardLabel = findByTestId(renderer, "review-board").props.accessibilityLabel;
+    const progress = collectText(findByTestId(renderer, "review-progress"));
+    expect(findByTestId(renderer, "review-session-adaptive-layout")).toBeTruthy();
+
+    act(() => setPracticeViewport({ ...viewport, fontScale }));
+
+    expect(findByTestId(renderer, "review-session-stacked-layout")).toBeTruthy();
+    expect(() => findByTestId(renderer, "review-session-control-rail")).toThrow();
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(true);
+    expect(renderedTestIdCount(renderer, "review-board")).toBe(1);
+    expect(findByTestId(renderer, "review-board").props.accessibilityLabel).toBe(boardLabel);
+    expect(collectText(findByTestId(renderer, "review-progress"))).toBe(progress);
+
+    act(() => setPracticeViewport({ ...viewport, fontScale: 1 }));
+
+    expect(findByTestId(renderer, "review-session-adaptive-layout")).toBeTruthy();
+    expect(findByTestId(renderer, "practice-main-scroll").props.scrollEnabled).toBe(false);
+    expect(findByTestId(renderer, "review-board").props.accessibilityLabel).toBe(boardLabel);
   });
 
   it.each([
