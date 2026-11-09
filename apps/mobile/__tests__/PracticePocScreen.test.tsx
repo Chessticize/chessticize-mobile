@@ -12245,6 +12245,16 @@ describe("PracticePocScreen", () => {
     expect(findByTestId(renderer, "history-attempt-unclear-history-attempt")).toBeTruthy();
     press(renderer, "history-attempt-unclear-history-attempt");
     press(renderer, "review-schedule-remove");
+    // The confirmation keeps a landscape window in landscape instead of
+    // forcing React Native's portrait-only Modal default.
+    const removalModal = renderer.root.find(
+      (node) => node.props.visible === true
+        && Array.isArray(node.props.supportedOrientations)
+        && node.findAll((child) => child.props.testID === "review-schedule-removal-confirmation").length > 0
+    );
+    expect(removalModal.props.supportedOrientations).toEqual(
+      expect.arrayContaining(["portrait", "landscape-left", "landscape-right"])
+    );
     press(renderer, "review-schedule-removal-confirm");
     expect(collectText(findByTestId(renderer, "review-schedule-state"))).toBe("Not scheduled for Review");
 

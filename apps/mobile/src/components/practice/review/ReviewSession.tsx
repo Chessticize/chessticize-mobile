@@ -142,6 +142,16 @@ function useReviewHeaderTextStyles(): {
 // Narrowest top bar whose title keeps about 140 pt between two paired button
 // groups (2 x 96 pt plus gaps).
 const REVIEW_HEADER_PAIRED_MIN_WIDTH = 348;
+// The removal confirmation keeps the current orientation. React Native's iOS
+// Modal defaults to portrait only, which rotates a landscape phone and crashes
+// a landscape-only window.
+const MODAL_ORIENTATIONS: React.ComponentProps<typeof Modal>["supportedOrientations"] = [
+  "portrait",
+  "portrait-upside-down",
+  "landscape",
+  "landscape-left",
+  "landscape-right"
+];
 
 export type ReviewBackCommand = {
   id: number;
@@ -1940,6 +1950,7 @@ function ReviewScheduleControl({
           <Modal
             animationType="fade"
             onRequestClose={() => setConfirmationVisible(false)}
+            supportedOrientations={MODAL_ORIENTATIONS}
             transparent
             visible={confirmationVisible}
           >
