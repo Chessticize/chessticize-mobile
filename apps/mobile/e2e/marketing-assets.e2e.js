@@ -17,7 +17,7 @@ const {
   expectScreenshotHasDarkChrome,
   waitForBoardScreenshotContainsPieces,
 } = require('./screenshotAssertions');
-const { waitForAndroidUiState } = require('./androidPublicUiEvidence');
+const { tapAndroidUiNode, waitForAndroidUiState } = require('./androidPublicUiEvidence');
 const {
   captureMarketingScreenshot,
   resolveIosLandscapeValidationTarget,
@@ -134,7 +134,7 @@ describeMarketingAssets('deterministic store marketing journey', () => {
       const screenshotPath = await takeReadyScreenshot(frame);
       if (frame.appearance === 'dark') {
         // Survival's reachable Start position intentionally scrolls the
-        // full-screen hub: its three status-bar samples remain dark while the
+        // full-screen hub: its three upper surface samples remain dark while the
         // lower samples contain the blue action. Arrow Duel retains all four.
         expectScreenshotHasDarkChrome(
           screenshotPath,
@@ -185,6 +185,17 @@ async function launchMarketingFrame(frame) {
   });
   if (!verifyIosLandscapeLayout) {
     await setMarketingOrientationBeforeNavigation();
+  }
+  if (device.getPlatform() === 'android' && story.campaign
+    && ['practice-home', 'review'].includes(frame.id)) {
+    // The fictional player has existing history when 1.6 first opens. Finish
+    // the real update notes before querying the underlying Espresso root;
+    // that root correctly has no window focus while the native sheet is up.
+    const { nodes } = await waitForAndroidUiState({
+      presentResourceIds: ['whats-new-continue'],
+    }, { timeoutMs: 180000 });
+    tapAndroidUiNode(nodes['whats-new-continue']);
+    await waitForAndroidUiState({ absentResourceIds: ['whats-new-continue'] });
   }
   await waitFor(element(by.id('adaptive-layout'))).toExist().withTimeout(180000);
   await waitForStableOrientation(target.orientation);
