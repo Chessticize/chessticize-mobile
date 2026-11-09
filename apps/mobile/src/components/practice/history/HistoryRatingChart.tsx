@@ -1,3 +1,13 @@
+import React, { useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import {
+  formatLocalCalendarDate,
+  type HistoryPerformance,
+  type HistoryPerformancePoint
+} from "../../../../../../packages/core/src/index.ts";
+import { ratingLabelFromKey } from "../settings/SettingsPanel.tsx";
+import { makeStyles } from "../../../theme/index.ts";
+
 // Cap the rendered points so long ranges stay smooth without stacking
 // hundreds of segment Views; downsampling always keeps first and last.
 const HISTORY_LINE_CHART_MAX_POINTS = 64;
@@ -38,7 +48,7 @@ function downsampleHistoryRatingPoints(
   return sampled;
 }
 
-function HistoryRatingTrendChart({
+export function HistoryRatingTrendChart({
   points
 }: {
   points: HistoryPerformancePoint[];
@@ -238,7 +248,7 @@ function historyRatingPointLabel(point: HistoryPerformancePoint): string {
   return `${dateLabel} · Rating ${point.value}`;
 }
 
-function emptyHistoryPerformance(): HistoryPerformance {
+export function emptyHistoryPerformance(): HistoryPerformance {
   return {
     correctCount: 0,
     wrongCount: 0,
@@ -254,7 +264,7 @@ function emptyHistoryPerformance(): HistoryPerformance {
   };
 }
 
-function historyRatingKeyLabel(
+export function historyRatingKeyLabel(
   ratingKey: string,
   runName?: string,
   runPerPuzzleSeconds?: number
@@ -264,6 +274,12 @@ function historyRatingKeyLabel(
   return `${runName ?? ratingLabelFromKey(ratingKey)}${speedLabel}`;
 }
 
+const useStyles = makeStyles((theme) => ({
+  helperText: {
+    color: theme.colors.text.tertiary,
+    fontSize: 12,
+    fontWeight: "600"
+  },
   historyChartEmpty: {
     alignItems: "center",
     backgroundColor: theme.colors.surfaceRaised,
@@ -351,3 +367,4 @@ function historyRatingKeyLabel(
     fontSize: 9,
     fontWeight: "600"
   },
+}));

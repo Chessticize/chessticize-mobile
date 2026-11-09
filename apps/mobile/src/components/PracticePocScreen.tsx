@@ -19,7 +19,7 @@ import {
 import type {
   LayoutChangeEvent
 } from "react-native";
-import type { StyleProp, ViewStyle } from "react-native";
+import type { ViewStyle } from "react-native";
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
@@ -31,7 +31,6 @@ import {
 } from "react-native-gesture-handler";
 import {
   analyzeFenWithUciEngine,
-  ALL_THEME_SELECTION,
   canPresentWhatsNew,
   applyMovesToFen,
   arrowDuelReplyCuePresentationFor,
@@ -46,11 +45,8 @@ import {
   DEFAULT_OPPONENT_REPLY_SECONDS,
   defaultSprintConfig,
   formatLocalCalendarDate,
-  formatLocalCalendarDateLabel,
   formatReviewDay,
   historyAttemptReplayAvailability,
-  historyAttemptSpeedSeconds,
-  isAttemptMarkedUnclear,
   selectMistakeReplayItems,
   isUnclearAttemptEligible,
   isReviewOverdue,
@@ -88,9 +84,6 @@ import type {
   HistoryAttemptView,
   HistoryAttemptReplayAvailability,
   HistoryAttentionReason,
-  HistoryPerformance,
-  HistoryPerformancePoint,
-  HistoryResult,
   HistoryTimeRange,
   PuzzleSide,
   Puzzle,
@@ -268,7 +261,6 @@ import type {
   ICloudSyncSupportBundlePresentation
 } from "./ICloudSyncErrorDetails.tsx";
 import {
-  HistoryProgressEntryButton,
   HistoryProgressScreen
 } from "./HistoryProgressSection.tsx";
 import type {
@@ -316,9 +308,14 @@ export type {
   HistoryWeaknessEffect,
   HistoryStrengthSeries
 } from "./historyProgressPresentation.ts";
+export type {
+  CustomThemeSelection,
+  ThemeCatalogGroup,
+  ThemeCatalogPresentation
+} from "./practice/shared/themeCatalog.ts";
 import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
 import { typography as baseTypography } from "../theme/scales.ts";
-import { AppText, Badge, Button, Icon, IconTile, ListRow, Section, useListRowStyle, type IconName } from "./ui/index.tsx";
+import { AppText, Button, Icon, IconTile, ListRow, Section, useListRowStyle, type IconName } from "./ui/index.tsx";
 import type { MoveSide } from "./practice/shared/moveSide.ts";
 import { CHESS_PIECE_SPRITE } from "./practice/shared/chessPieceSprite.ts";
 import {
@@ -337,18 +334,39 @@ import { CollapsibleRegion, DisclosureChevron } from "./practice/shared/Collapsi
 import { ToolbarIconButton } from "./practice/shared/ToolbarIconButton.tsx";
 import { FilterButton } from "./practice/shared/FilterButton.tsx";
 import { AttemptStatusTile } from "./practice/shared/AttemptStatusTile.tsx";
-import { ANALYSIS_DEPTH, errorMessage, FABRIC_SAFE_HIDDEN_TEXT_STYLE, safeTestId } from "./practice/shared/practiceUtils.ts";
+import {
+  ANALYSIS_DEPTH,
+  errorMessage,
+  FABRIC_SAFE_HIDDEN_TEXT_STYLE,
+  modeLabel,
+  safeTestId
+} from "./practice/shared/practiceUtils.ts";
 import {
   iCloudAccountStatusMessage,
   localReminderTarget,
   progressSyncStatusMessage,
-  ratingLabelFromKey,
   ReviewReminderPermissionPrompt,
   reviewReminderScheduleStatusLabel,
   scheduledReviewAttemptCount,
   SettingsPanel,
   StockfishDiagnosticsPanel
 } from "./practice/settings/SettingsPanel.tsx";
+import {
+  ALL_THEMES_FILTER,
+  type CustomThemeFilter,
+  customThemeLabel,
+  type CustomThemeSelection,
+  type ThemeCatalogPresentation
+} from "./practice/shared/themeCatalog.ts";
+import {
+  historyAttentionQueryForSelection,
+  HistoryPanel,
+  type HistoryRatingRangeFilter,
+  historyRatingRangeFilterToQuery,
+  type HistoryResultFilter,
+  ThemeTagRail
+} from "./practice/history/HistoryPanel.tsx";
+import { emptyHistoryPerformance, historyRatingKeyLabel } from "./practice/history/HistoryRatingChart.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;

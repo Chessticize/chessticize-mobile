@@ -1,3 +1,5 @@
+import { ALL_THEME_SELECTION } from "../../../../../../packages/core/src/index.ts";
+
 export type CustomThemeSelection = {
   selectedThemes: readonly CustomThemeFilter[];
   onChange: (selectedThemes: CustomThemeFilter[]) => void;
@@ -12,11 +14,11 @@ export type ThemeCatalogPresentation = {
   groups: readonly ThemeCatalogGroup[];
 };
 
-type CustomThemeFilter = string;
+export type CustomThemeFilter = string;
 
-const ALL_THEMES_FILTER: CustomThemeFilter = ALL_THEME_SELECTION;
+export const ALL_THEMES_FILTER: CustomThemeFilter = ALL_THEME_SELECTION;
 
-function customThemeLabel(theme: CustomThemeFilter): string {
+export function customThemeLabel(theme: CustomThemeFilter): string {
   if (theme === ALL_THEMES_FILTER) {
     return "All";
   }

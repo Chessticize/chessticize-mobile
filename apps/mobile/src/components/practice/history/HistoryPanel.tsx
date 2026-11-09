@@ -1,8 +1,47 @@
-type HistoryRatingRangeFilter = "all" | "under1000" | "1000-1399" | "1400-plus";
+import React, { useState } from "react";
+import {
+  Pressable,
+  ScrollView,
+  type StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle
+} from "react-native";
+import {
+  type AttemptSource,
+  formatLocalCalendarDate,
+  formatLocalCalendarDateLabel,
+  historyAttemptSpeedSeconds,
+  type HistoryAttemptView,
+  type HistoryAttentionReason,
+  type HistoryPerformance,
+  type HistoryResult,
+  type HistoryTimeRange,
+  isAttemptMarkedUnclear,
+  normalizeHistoryAttemptDetail,
+  type PuzzleSide,
+  type SprintMode,
+  type ThemeChoiceIntent
+} from "../../../../../../packages/core/src/index.ts";
+import type { AdaptiveLayout } from "../../adaptivePracticeLayout.ts";
+import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { AppText, Badge, Button, Icon, useListRowStyle } from "../../ui/index.tsx";
+import { HistoryProgressEntryButton } from "../../HistoryProgressSection.tsx";
+import { ToolbarIconButton } from "../shared/ToolbarIconButton.tsx";
+import { FilterGlyph } from "../shared/Glyphs.tsx";
+import { CollapsibleRegion, DisclosureChevron } from "../shared/CollapsibleRegion.tsx";
+import { FilterButton } from "../shared/FilterButton.tsx";
+import { modeLabel, safeTestId } from "../shared/practiceUtils.ts";
+import { AttemptStatusTile } from "../shared/AttemptStatusTile.tsx";
+import { ALL_THEMES_FILTER, customThemeLabel, type ThemeCatalogPresentation } from "../shared/themeCatalog.ts";
+import { historyRatingKeyLabel, HistoryRatingTrendChart } from "./HistoryRatingChart.tsx";
 
-type HistoryResultFilter = "all" | HistoryResult;
+export type HistoryRatingRangeFilter = "all" | "under1000" | "1000-1399" | "1400-plus";
 
-function HistoryPanel({
+export type HistoryResultFilter = "all" | HistoryResult;
+
+export function HistoryPanel({
   adaptiveLayout,
   attempts,
   filtersExpanded,
@@ -450,7 +489,7 @@ function historyActiveFilterLabels({
   return labels;
 }
 
-function historyAttentionQueryForSelection(
+export function historyAttentionQueryForSelection(
   attentionReasons: readonly HistoryAttentionReason[]
 ): { attentionReasons?: HistoryAttentionReason[] } {
   return attentionReasons.length === 0
@@ -492,7 +531,7 @@ const HISTORY_RATING_RANGE_FILTERS: ReadonlyArray<{ id: HistoryRatingRangeFilter
   { id: "1400-plus", label: "1400+" }
 ];
 
-function historyRatingRangeFilterToQuery(filter: HistoryRatingRangeFilter): { minRating?: number; maxRating?: number } {
+export function historyRatingRangeFilterToQuery(filter: HistoryRatingRangeFilter): { minRating?: number; maxRating?: number } {
   if (filter === "under1000") {
     return { maxRating: 999 };
   }
@@ -778,7 +817,7 @@ function HistoryThemeList({
   );
 }
 
-function ThemeTagRail({
+export function ThemeTagRail({
   centered = false,
   fadeEnd = false,
   testID,
@@ -852,6 +891,16 @@ function historyRangeLabel(range: HistoryTimeRange): string {
   return "All Time";
 }
 
+const useStyles = makeStyles((theme) => ({
+  historyHeaderRow: {
+    alignItems: "center",
+    columnGap: theme.spacing.row,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    minHeight: theme.metrics.minTarget,
+    rowGap: theme.spacing.inline
+  },
   historyHeaderActions: {
     alignItems: "center",
     flexDirection: "row",
@@ -863,10 +912,25 @@ function historyRangeLabel(range: HistoryTimeRange): string {
   themeCatalogGroup: {
     gap: 6
   },
+  themeCatalogGroupLabel: {
+    color: theme.colors.text.tertiary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    textTransform: "uppercase"
+  },
   themeCatalogRailContent: {
     flexDirection: "row",
     gap: 6,
     paddingRight: 12
+  },
+  iconButtonRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
+  },
+  destinationTitle: {
+    flexShrink: 0
   },
   historyFootnote: {
     paddingHorizontal: 4
@@ -875,6 +939,24 @@ function historyRangeLabel(range: HistoryTimeRange): string {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.shape.card,
     overflow: "hidden"
+  },
+  groupedSeparator: {
+    backgroundColor: theme.colors.border.default,
+    height: StyleSheet.hairlineWidth
+  },
+  groupedEmpty: {
+    paddingHorizontal: 16,
+    paddingVertical: 16
+  },
+  attemptRow: {
+    alignItems: "flex-start",
+    paddingVertical: 12
+  },
+  attemptRowCopy: {
+    flex: 1,
+    flexShrink: 1,
+    gap: 2,
+    minWidth: 0
   },
   attemptRowIdentity: {
     flexDirection: "row",
@@ -891,6 +973,17 @@ function historyRangeLabel(range: HistoryTimeRange): string {
     alignSelf: "center",
     flexShrink: 0,
     gap: 4
+  },
+  attemptRowChevron: {
+    alignSelf: "center"
+  },
+  historyPanel: {
+    gap: theme.spacing.row
+  },
+  historyPanelWide: {
+    alignSelf: "center",
+    maxWidth: 980,
+    width: "100%"
   },
   historyTopFilterStack: {
     gap: theme.spacing.group
@@ -941,6 +1034,20 @@ function historyRangeLabel(range: HistoryTimeRange): string {
   historyThemeCatalogContent: {
     gap: 8
   },
+  historyThemeDisclosure: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 44
+  },
+  historyThemeDisclosureCopy: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 8
+  },
+  historyThemeAllRow: {
+    alignItems: "flex-start"
+  },
   historyPerformanceCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.shape.card,
@@ -966,6 +1073,12 @@ function historyRangeLabel(range: HistoryTimeRange): string {
   },
   historyChipScrollerContent: {
     paddingHorizontal: 16
+  },
+  historyChipContent: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.inline,
+    paddingVertical: 4
   },
   historyActiveFilterChip: {
     backgroundColor: theme.colors.surfaceRaised,
@@ -1048,11 +1161,20 @@ function historyRangeLabel(range: HistoryTimeRange): string {
     color: theme.colors.text.secondary,
     fontWeight: theme.typography.headline.fontWeight
   },
+  historyAttemptHeader: {
+    alignItems: "baseline",
+    columnGap: 8,
+    flexDirection: "row",
+    flexWrap: "wrap"
+  },
   historyPageRow: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
     paddingLeft: 4
+  },
+  settingsRowPressed: {
+    backgroundColor: theme.colors.surfaceStrong
   },
   settingsRowCopy: {
     flex: 1,
@@ -1060,3 +1182,4 @@ function historyRangeLabel(range: HistoryTimeRange): string {
     gap: 2,
     minWidth: 0
   },
+}));
