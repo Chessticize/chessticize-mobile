@@ -242,7 +242,7 @@ describe("Sprint Result screen", () => {
     const narrow = renderResult(data(), { width: 320, height: 693, insets: { top: 47, right: 0, bottom: 34, left: 0 } }).renderer;
     expect(flattenTestStyle(byId(narrow, "sprint-result-time").props.style)).toMatchObject({ flexDirection: "row" });
 
-    const largest = renderResult(data(), { ...PHONE, fontScale: 3.12 }).renderer;
+    const largest = renderResult(data(), { ...PHONE, fontScale: 3.571 }).renderer;
     // Largest text: no split, stats read label over value, rows stack, and the
     // hero numeral and nav title cap their growth at 1.5x.
     const largestTime = flattenTestStyle(byId(largest, "sprint-result-time").props.style);

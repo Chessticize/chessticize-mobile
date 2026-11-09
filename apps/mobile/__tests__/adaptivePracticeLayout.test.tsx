@@ -1,7 +1,9 @@
 import {
   buildPracticeAdaptiveLayout,
   COMPACT_PORTRAIT_SESSION_CHROME,
+  compactPortraitBoardDetailsHeight,
   compactPortraitFeedbackHeight,
+  compactPortraitStatusHeight,
   PRACTICE_UI_PADDING,
   type PracticeSafeAreaInsets
 } from "../src/components/adaptivePracticeLayout";
@@ -64,29 +66,59 @@ describe("buildPracticeAdaptiveLayout", () => {
   // The live compact-portrait session stacks the status bar, prompt, board,
   // board details and the post-answer feedback row with the scroll locked, so
   // their measured heights must fit the safe height without scrolling (#639).
+  // Enlarged text grows the HUD, prompt, timing and feedback up to their caps,
+  // and the board gives up that height instead (#652). iOS reports 1.353 at
+  // Extra Extra Extra Large, 1.786 at Accessibility Medium and 3.571 at the
+  // largest accessibility size; Android's largest font scale is 2.
+  const iPhoneSE = { label: "iPhone SE (3rd generation)", width: 375, height: 667, insets: { top: 20, right: 0, bottom: 0, left: 0 } };
+  const iPhone17 = { label: "iPhone 17", width: 402, height: 874, insets: { top: 62, right: 0, bottom: 34, left: 0 } };
   it.each([
-    { label: "iPhone SE (3rd generation)", width: 375, height: 667, insets: { top: 20, right: 0, bottom: 0, left: 0 }, board: 258 },
-    { label: "iPhone Duo outer display", width: 466, height: 678, insets: { top: 0, right: 84, bottom: 34, left: 0 }, board: 255 },
-    { label: "iPhone 16", width: 393, height: 852, insets: { top: 59, right: 0, bottom: 34, left: 0 }, board: 361 },
-    { label: "iPhone 17", width: 402, height: 874, insets: { top: 62, right: 0, bottom: 34, left: 0 }, board: 370 },
-    { label: "iPhone 17 Pro Max", width: 440, height: 956, insets: { top: 62, right: 0, bottom: 34, left: 0 }, board: 408 }
-  ])("fits the whole live session on $label without scrolling", ({ board, height, insets, width }) => {
-    const layout = buildPracticeAdaptiveLayout({ fontScale: 1, height, insets, width });
+    { ...iPhoneSE, fontScale: 1, board: 258 },
+    { label: "iPhone Duo outer display", width: 466, height: 678, insets: { top: 0, right: 84, bottom: 34, left: 0 }, fontScale: 1, board: 255 },
+    { label: "iPhone 16", width: 393, height: 852, insets: { top: 59, right: 0, bottom: 34, left: 0 }, fontScale: 1, board: 361 },
+    { ...iPhone17, fontScale: 1, board: 370 },
+    { label: "iPhone 17 Pro Max", width: 440, height: 956, insets: { top: 62, right: 0, bottom: 34, left: 0 }, fontScale: 1, board: 408 },
+    { ...iPhoneSE, fontScale: 1.353, board: 201 },
+    { ...iPhoneSE, fontScale: 1.786, board: 186 },
+    { ...iPhoneSE, fontScale: 3.571, board: 181 },
+    { ...iPhone17, fontScale: 1.786, board: 317 },
+    { ...iPhone17, fontScale: 3.571, board: 312 },
+    { label: "Android phone", width: 412, height: 915, insets: { top: 24, right: 0, bottom: 48, left: 0 }, fontScale: 2, board: 377 }
+  ])("fits the whole live session on $label at text scale $fontScale without scrolling", ({
+    board,
+    fontScale,
+    height,
+    insets,
+    width
+  }) => {
+    const layout = buildPracticeAdaptiveLayout({ fontScale, height, insets, width });
     const chrome = COMPACT_PORTRAIT_SESSION_CHROME;
     const stackedHeight = PRACTICE_UI_PADDING
-      + chrome.status
+      + compactPortraitStatusHeight(fontScale)
       + chrome.stackGap
       + layout.promptFrameHeight
       + chrome.stackGap
       + layout.boardSize
-      + chrome.boardDetails
+      + compactPortraitBoardDetailsHeight(fontScale)
       + chrome.stackGap
-      + compactPortraitFeedbackHeight(layout.sessionColumnWidth)
+      + compactPortraitFeedbackHeight(layout.sessionColumnWidth, fontScale)
       + PRACTICE_UI_PADDING;
 
     expect(layout.className).toBe("compactPortrait");
     expect(layout.boardSize).toBe(board);
     expect(stackedHeight).toBeLessThanOrEqual(layout.contentHeight);
+  });
+
+  it("grows the compact-portrait chrome only up to each text cap", () => {
+    expect(compactPortraitStatusHeight(1)).toBe(COMPACT_PORTRAIT_SESSION_CHROME.status);
+    expect(compactPortraitStatusHeight(2)).toBe(compactPortraitStatusHeight(3.571));
+    expect(compactPortraitBoardDetailsHeight(1)).toBe(COMPACT_PORTRAIT_SESSION_CHROME.boardDetails);
+    expect(compactPortraitBoardDetailsHeight(1.5)).toBe(compactPortraitBoardDetailsHeight(3.571));
+    expect(compactPortraitFeedbackHeight(343, 1)).toBe(COMPACT_PORTRAIT_SESSION_CHROME.feedback);
+    expect(compactPortraitFeedbackHeight(343, 1.25)).toBe(COMPACT_PORTRAIT_SESSION_CHROME.feedbackAtTextCap);
+    expect(compactPortraitFeedbackHeight(343, 3.571)).toBe(COMPACT_PORTRAIT_SESSION_CHROME.feedbackAtTextCap);
+    expect(compactPortraitFeedbackHeight(288, 3.571))
+      .toBe(COMPACT_PORTRAIT_SESSION_CHROME.narrowColumnFeedbackAtTextCap);
   });
 
   it("keeps the iPhone 17 session board width-bound", () => {

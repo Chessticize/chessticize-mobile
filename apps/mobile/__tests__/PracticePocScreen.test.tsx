@@ -429,6 +429,10 @@ describe("PracticePocScreen", () => {
       "Was the previous puzzle clear?"
     );
     expect(collectText(findByTestId(renderer, "sprint-unclear-toggle"))).toBe("Mark as unclear");
+    // The locked phone session reserves this row at its capped text size (#652).
+    for (const node of findByTestId(renderer, "sprint-unclear-prompt").findAllByType(ReactNative.Text)) {
+      expect(node.props.maxFontSizeMultiplier).toBe(1.25);
+    }
     expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, lightTheme.colors.warning.s50)).toBe(true);
     expect(styleContains(findByTestId(renderer, "sprint-unclear-toggle").props.style, lightTheme.colors.warning.s500)).toBe(true);
     const promptStyle = findByTestId(renderer, "sprint-unclear-prompt").props.style;
@@ -9513,6 +9517,55 @@ describe("PracticePocScreen", () => {
 
     expect(flattenTestStyle(unratedText?.props.style).fontSize).toBe(lightTheme.typography.numeralRow.fontSize);
     expect(completedText?.props.adjustsFontSizeToFit).toBe(true);
+  });
+
+  // #652: at the largest text size on a short phone the HUD keeps one row so
+  // the board keeps its room; the three values share one size that fits the
+  // row's thirds, and shrink-to-fit stays on as a safety net.
+  it("keeps the phone HUD on one row with one shared value size at the largest text", () => {
+    setPracticeViewport({
+      width: 375,
+      height: 667,
+      scale: 2,
+      fontScale: 3.571,
+      insets: { top: 20, right: 0, bottom: 0, left: 0 }
+    });
+    const renderer = renderLabScenario("practice-tactical-focus-active");
+    const unratedText = (): ReactNative.Text | undefined => findByTestId(renderer, "session-rating-policy")
+      .findAllByType(ReactNative.Text)
+      .find((node) => collectText(node) === "Unrated") as unknown as ReactNative.Text | undefined;
+    const valueSizes = (): number[] => [
+      findByTestId(renderer, "session-progress"),
+      findByTestId(renderer, "session-timer"),
+      unratedText() as unknown as TestRenderer.ReactTestInstance
+    ].map((node) => Number(flattenTestStyle(node.props.style).fontSize));
+
+    expect(styleEntryMatches(findByTestId(renderer, "session-timer-block").props.style, "flexGrow", 0)).toBe(false);
+    // Before the row is measured, values grow to the HUD cap.
+    expect(valueSizes()).toEqual([44, 44, 44]);
+    act(() => {
+      findByTestId(renderer, "session-status-metrics").props.onLayout({
+        nativeEvent: { layout: { height: 59, width: 343, x: 16, y: 97 } }
+      });
+    });
+    // "10 / 15" and "Unrated" are the longest values: (343 - 12) / 3 points
+    // per value at 0.6 em per character.
+    const shared = Math.round(22 * ((343 - 12) / 3 / (7 * 0.6 * 22)) * 10) / 10;
+    expect(valueSizes()).toEqual([shared, shared, shared]);
+    for (const testID of ["session-progress", "session-timer"]) {
+      const value = findByTestId(renderer, testID);
+      expect(value.props.allowFontScaling).toBe(false);
+      expect(value.props.adjustsFontSizeToFit).toBe(true);
+    }
+  });
+
+  it("caps the previous-attempt notice copy so the locked phone session keeps it on screen", () => {
+    const renderer = renderLabScenario("practice-slow-unclear-notice");
+    const texts = findByTestId(renderer, "sprint-previous-attempt-notice").findAllByType(ReactNative.Text);
+    expect(texts.length).toBeGreaterThan(1);
+    for (const node of texts) {
+      expect(node.props.maxFontSizeMultiplier).toBe(1.25);
+    }
   });
 
   it("explains fixed and unrated semantics before a first Focused Run", () => {

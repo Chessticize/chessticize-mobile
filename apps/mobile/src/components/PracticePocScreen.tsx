@@ -236,7 +236,10 @@ import type {
   PracticeRunPresentation
 } from "./practiceRunPresentation.ts";
 import {
+  PRACTICE_FEEDBACK_MAX_TEXT_SCALE,
   PRACTICE_PROMPT_MAX_TEXT_SCALE,
+  PRACTICE_PUZZLE_TIMING_MAX_TEXT_SCALE,
+  PRACTICE_SESSION_HUD_MAX_TEXT_SCALE,
   buildPracticeAdaptiveLayout,
   PRACTICE_UI_PADDING as UI_PADDING,
   type AdaptiveLayout
@@ -325,6 +328,7 @@ export type {
   HistoryStrengthSeries
 } from "./historyProgressPresentation.ts";
 import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
+import { typography as baseTypography } from "../theme/scales.ts";
 import { AppText, Badge, Button, Icon, IconTile, ListRow, Section, SegmentedControl, useListRowStyle, type IconName } from "./ui/index.tsx";
 
 interface Props {
@@ -10224,7 +10228,7 @@ function PuzzleTimingIndicator({
     >
       <Text
         adjustsFontSizeToFit
-        maxFontSizeMultiplier={SESSION_CHROME_MAX_TEXT_SCALE}
+        maxFontSizeMultiplier={PUZZLE_TIMING_MAX_TEXT_SCALE}
         minimumFontScale={0.6}
         numberOfLines={1}
         style={[
@@ -10238,7 +10242,7 @@ function PuzzleTimingIndicator({
       {countdownSeconds === null ? null : (
         <Text
           accessibilityElementsHidden
-          maxFontSizeMultiplier={SESSION_CHROME_MAX_TEXT_SCALE}
+          maxFontSizeMultiplier={PUZZLE_TIMING_MAX_TEXT_SCALE}
           style={styles.puzzleTimingCountdown}
           testID="session-puzzle-countdown"
         >
@@ -10247,6 +10251,42 @@ function PuzzleTimingIndicator({
       )}
     </View>
   );
+}
+
+// An estimate of a HUD value's advance width per character, in ems: tabular
+// digits and the letters of "Unrated" are about 0.6 em, and spaces and the
+// slash are narrower.
+const HUD_VALUE_EM_PER_CHARACTER = 0.6;
+const HUD_METRIC_GAP = 6;
+
+// One text size for the HUD values that share a line: the system text scale
+// up to the HUD cap, reduced to what the longest value fits in its slot but
+// never below the default size (shrink-to-fit handles the rest). The size is
+// computed from the base type role, so the HUD reads the same in the Lab.
+function hudValueTextSize({
+  fontScale,
+  role,
+  slotCount,
+  texts,
+  width
+}: {
+  fontScale: number;
+  role: { fontSize: number; lineHeight: number };
+  slotCount: number;
+  texts: Array<string | null>;
+  width: number | null;
+}): { fontSize: number; lineHeight: number } {
+  let scale = Math.min(fontScale, HUD_MAX_TEXT_SCALE);
+  const longest = Math.max(0, ...texts.map((text) => text?.length ?? 0));
+  if (scale > 1 && width !== null && longest > 0) {
+    const slotWidth = (width - HUD_METRIC_GAP * (slotCount - 1)) / slotCount;
+    const fittingScale = slotWidth / (longest * HUD_VALUE_EM_PER_CHARACTER * role.fontSize);
+    scale = Math.max(1, Math.min(scale, fittingScale));
+  }
+  return {
+    fontSize: Math.round(role.fontSize * scale * 10) / 10,
+    lineHeight: Math.ceil(role.lineHeight * scale)
+  };
 }
 
 function SessionStatusBar({
@@ -10294,9 +10334,35 @@ function SessionStatusBar({
   const plannedAttempts = state.config.maxAttempts ?? state.config.targetCorrect;
   const showsSessionHeaderAction = Boolean(onClose || onAbandon)
     && !(isPersonalBest && confirmAbandon);
-  // At accessibility text sizes (#652) the timer takes its own line above the
-  // other metrics, and every HUD value shrinks to fit instead of truncating.
-  const largeText = usePracticeViewport().fontScale >= HUD_LARGE_TEXT_FONT_SCALE;
+  // HUD values never truncate at large text (#652). At accessibility sizes in
+  // the narrow rail, the timer takes its own line above the other metrics; the
+  // full-width phone and iPad row keeps all three on one line so a short phone
+  // keeps room for the board. Values that share a line share one size, as
+  // large as their slots allow up to the HUD cap, and shrink to fit as a
+  // safety net.
+  const { fontScale } = usePracticeViewport();
+  const stacksTimer = compactMetrics && fontScale >= HUD_LARGE_TEXT_FONT_SCALE;
+  const [metricsWidth, setMetricsWidth] = useState<number | null>(null);
+  const progressText = isPersonalBest
+    ? `${state.correctCount} solved`
+    : isTacticalFocus
+    ? `${completedAttempts} / ${plannedAttempts}`
+    : `${state.correctCount} / ${state.config.targetCorrect}`;
+  const policyText = isTacticalFocus ? "Unrated" : null;
+  const hudValueRole = compactMetrics ? baseTypography.numeralRow : baseTypography.numeral;
+  const sharedValueTexts = stacksTimer
+    ? [progressText, policyText]
+    : [progressText, isPersonalBest ? null : timerText, policyText];
+  const sharedValueStyle = hudValueTextSize({
+    fontScale,
+    role: hudValueRole,
+    slotCount: stacksTimer ? 2 : 3,
+    texts: sharedValueTexts,
+    width: metricsWidth
+  });
+  const timerValueStyle = stacksTimer
+    ? hudValueTextSize({ fontScale, role: hudValueRole, slotCount: 1, texts: [timerText], width: metricsWidth })
+    : sharedValueStyle;
   const progressMetric = (
     <View
       accessibilityLabel={isPersonalBest
@@ -10312,38 +10378,38 @@ function SessionStatusBar({
     >
       <Text
         adjustsFontSizeToFit
-        maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
+        allowFontScaling={false}
         minimumFontScale={0.5}
         numberOfLines={1}
         testID="session-progress"
         style={[
           styles.sessionProgressValue,
-          compactMetrics ? styles.sessionMetricTextCompact : null
+          styles.sessionMetricValueFill,
+          compactMetrics ? styles.sessionMetricTextCompact : null,
+          sharedValueStyle
         ]}
       >
-        {isPersonalBest
-          ? `${state.correctCount} solved`
-          : isTacticalFocus
-          ? `${completedAttempts} / ${plannedAttempts}`
-          : `${state.correctCount} / ${state.config.targetCorrect}`}
+        {progressText}
       </Text>
     </View>
   );
   const timerMetric = isPersonalBest ? null : (
     <View
       accessibilityLabel={state.config.runClock === "untimed" ? `Elapsed ${timerText}` : `Timer ${timerText}`}
-      style={[styles.sessionMetricBlock, largeText ? styles.sessionMetricBlockFullRow : null]}
+      style={[styles.sessionMetricBlock, stacksTimer ? styles.sessionMetricBlockFullRow : null]}
       testID="session-timer-block"
     >
       <Text
         adjustsFontSizeToFit
-        maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
+        allowFontScaling={false}
         minimumFontScale={0.5}
         numberOfLines={1}
         testID="session-timer"
         style={[
           styles.timerText,
-          compactMetrics ? styles.sessionMetricTextCompact : null
+          styles.sessionMetricValueFill,
+          compactMetrics ? styles.sessionMetricTextCompact : null,
+          timerValueStyle
         ]}
       >
         {timerText}
@@ -10358,12 +10424,14 @@ function SessionStatusBar({
     >
       <Text
         adjustsFontSizeToFit
-        maxFontSizeMultiplier={HUD_MAX_TEXT_SCALE}
+        allowFontScaling={false}
         minimumFontScale={0.5}
         numberOfLines={1}
         style={[
           styles.timerText,
-          compactMetrics ? styles.sessionMetricTextCompact : null
+          styles.sessionMetricValueFill,
+          compactMetrics ? styles.sessionMetricTextCompact : null,
+          sharedValueStyle
         ]}
       >
         Unrated
@@ -10446,12 +10514,16 @@ function SessionStatusBar({
         style={[
           styles.sessionActiveMetricRow,
           compactMetrics ? styles.sessionActiveMetricRowCompact : null,
-          largeText ? styles.sessionActiveMetricRowLargeText : null
+          stacksTimer ? styles.sessionActiveMetricRowLargeText : null
         ]}
         testID="session-status-metrics"
-        onLayout={onMetricsLayout}
+        onLayout={(event) => {
+          const width = Math.round(event.nativeEvent.layout.width);
+          setMetricsWidth((current) => current === width ? current : width);
+          onMetricsLayout?.();
+        }}
       >
-        {largeText ? (
+        {stacksTimer ? (
           <>
             {timerMetric}
             <View style={styles.sessionMetricLargeTextRow}>
@@ -10586,8 +10658,16 @@ function PreviousAttemptNotice({
       testID="sprint-previous-attempt-notice"
     >
       <View style={styles.previousAttemptNoticeCopy}>
-        <Text style={styles.previousAttemptNoticeTitle}>{presentation.title}</Text>
-        <Text style={styles.previousAttemptNoticeDetail}>
+        <Text
+          maxFontSizeMultiplier={FEEDBACK_MAX_TEXT_SCALE}
+          style={styles.previousAttemptNoticeTitle}
+        >
+          {presentation.title}
+        </Text>
+        <Text
+          maxFontSizeMultiplier={FEEDBACK_MAX_TEXT_SCALE}
+          style={styles.previousAttemptNoticeDetail}
+        >
           {presentation.detail}
         </Text>
       </View>
@@ -10595,7 +10675,10 @@ function PreviousAttemptNotice({
         style={styles.readOnlyAttemptStatus}
         testID="sprint-previous-attempt-notice-status"
       >
-        <Text style={styles.readOnlyAttemptStatusText}>
+        <Text
+          maxFontSizeMultiplier={FEEDBACK_MAX_TEXT_SCALE}
+          style={styles.readOnlyAttemptStatusText}
+        >
           {presentation.status}
         </Text>
       </View>
@@ -10630,11 +10713,19 @@ function UnclearAttemptPrompt({
       onLayout={targetsPrompt ? onTargetLayout : undefined}
     >
       <View style={styles.unclearPromptCopy}>
-        <Text style={styles.unclearPromptQuestion} testID="sprint-unclear-question">{question}</Text>
+        <Text
+          maxFontSizeMultiplier={FEEDBACK_MAX_TEXT_SCALE}
+          style={styles.unclearPromptQuestion}
+          testID="sprint-unclear-question"
+        >
+          {question}
+        </Text>
       </View>
       {marked ? (
         <View style={styles.readOnlyAttemptStatus} testID="sprint-unclear-marked">
-          <Text style={styles.readOnlyAttemptStatusText}>Marked</Text>
+          <Text maxFontSizeMultiplier={FEEDBACK_MAX_TEXT_SCALE} style={styles.readOnlyAttemptStatusText}>
+            Marked
+          </Text>
         </View>
       ) : (
         <Pressable
@@ -10646,7 +10737,9 @@ function UnclearAttemptPrompt({
           onPress={onToggle}
           onLayout={targetsPrompt ? undefined : onTargetLayout}
         >
-          <Text style={styles.unclearPromptButtonText}>Mark as unclear</Text>
+          <Text maxFontSizeMultiplier={FEEDBACK_MAX_TEXT_SCALE} style={styles.unclearPromptButtonText}>
+            Mark as unclear
+          </Text>
         </Pressable>
       )}
     </View>
@@ -13834,13 +13927,15 @@ const REVIEW_FORECAST_STACK_FONT_SCALE = 1.5;
 // Session HUD at accessibility text sizes (#652): reflow at this scale, and
 // let HUD values grow at most this much before they shrink to fit.
 const HUD_LARGE_TEXT_FONT_SCALE = 1.5;
-const HUD_MAX_TEXT_SCALE = 2;
-// The prompt, puzzle timing and score labels sit in frames sized for the
-// board; they grow at most this much, and board coordinates do not scale.
-// On small phones the prompt card is only as wide as the board, so its copy
-// grows less than other chrome to keep whole words on each line.
-const SESSION_CHROME_MAX_TEXT_SCALE = 1.5;
+const HUD_MAX_TEXT_SCALE = PRACTICE_SESSION_HUD_MAX_TEXT_SCALE;
+// The puzzle timing under the board grows at most this much, and board
+// coordinates do not scale.
+const PUZZLE_TIMING_MAX_TEXT_SCALE = PRACTICE_PUZZLE_TIMING_MAX_TEXT_SCALE;
+// A phone's locked session stacks the prompt and the post-answer feedback row
+// with the board, and the layout reserves their height before sizing the board
+// (adaptivePracticeLayout.ts), so their copy grows less than other chrome.
 const PROMPT_MAX_TEXT_SCALE = PRACTICE_PROMPT_MAX_TEXT_SCALE;
+const FEEDBACK_MAX_TEXT_SCALE = PRACTICE_FEEDBACK_MAX_TEXT_SCALE;
 // The uppercase score labels share a board-width strip with three columns;
 // they stay at their designed size so all three read at one size, and the
 // values grow only as far as the strip's slot allows.
@@ -18688,6 +18783,11 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "center",
     flexDirection: "row",
     gap: 6
+  },
+  // HUD values span their metric block so shrink-to-fit measures against
+  // the block width rather than the text's own width (#652).
+  sessionMetricValueFill: {
+    alignSelf: "stretch"
   },
   sessionMetricBlockFullRow: {
     flexBasis: "auto",
