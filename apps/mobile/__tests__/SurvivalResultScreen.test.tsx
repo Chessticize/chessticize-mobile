@@ -155,7 +155,8 @@ describe("Survival result screen", () => {
 
     // Word joiners around the en dash remove its line-break opportunity.
     expect(collect(byId(renderer, "personal-best-result-headline"))).toBe("Perfect clear at 2100⁠–⁠2200");
-    expect(collect(byId(renderer, "personal-best-result-level"))).toContain("2100⁠–⁠2200");
+    // The level row's separator stays with the range when the row wraps.
+    expect(collect(byId(renderer, "personal-best-result-level"))).toContain("· 2100⁠–⁠2200");
     expect(byId(renderer, "personal-best-result-outcome").props.accessibilityLabel).toBe("Perfect clear at 2100–2200");
   });
 
@@ -313,5 +314,5 @@ describe("Survival result view data", () => {
 
 /** Text as read, without the word joiners that keep level ranges on one line. */
 function plain(text: string): string {
-  return text.replaceAll("⁠", "");
+  return text.replace(/\u2060/g, "").replace(/\u00A0/g, " ");
 }

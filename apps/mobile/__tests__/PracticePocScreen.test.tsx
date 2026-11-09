@@ -9363,7 +9363,7 @@ describe("PracticePocScreen", () => {
     expect(collectText(findByTestId(renderer, "personal-best-result-end-reason"))).toBe(
       "The Run ended normally after 3 mistakes."
     );
-    expect(collectText(findByTestId(renderer, "personal-best-result-level")).replaceAll("⁠", "")).toBe(
+    expect(collectText(findByTestId(renderer, "personal-best-result-level")).replace(/\u2060/g, "").replace(/\u00A0/g, " ")).toBe(
       "Puzzle · 900–999This level keeps its own best"
     );
     expect(collectText(findByTestId(renderer, "personal-best-result-summary"))).toBe(

@@ -157,7 +157,8 @@ export function presentSurvivalResult(data: SurvivalResultData): SurvivalResultP
         ]
       : [`The Run ended normally after ${plural(data.mistakeCount, "mistake", "mistakes")}.`],
     levelTitle: `${typeLabel}${DOT}${level}`,
-    levelTitleDisplay: `${typeLabel}${DOT}${levelLabel(data.level, true)}`,
+    // A no-break space keeps the separator with the range when the row wraps.
+    levelTitleDisplay: `${typeLabel} · ${levelLabel(data.level, true)}`,
     levelDetail: "This level keeps its own best",
     stats: [
       {
