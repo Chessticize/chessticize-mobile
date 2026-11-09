@@ -31,7 +31,7 @@ const appStoreUrl =
   "https://apps.apple.com/us/app/chessticize/id6788610123";
 const googlePlayUrl =
   "https://play.google.com/store/apps/details?id=com.chessticize.mobile";
-const websiteUrl = "https://chessticize.github.io/chessticize-mobile/";
+const websiteUrl = "https://chessticize.com/";
 const androidUrl = `${websiteUrl}android/`;
 const supportUrl = `${websiteUrl}support/`;
 const accessibilityUrl = `${websiteUrl}accessibility/`;

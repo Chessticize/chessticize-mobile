@@ -310,7 +310,7 @@ assert.match(
 assert.match(landingPage, /assets\/download-on-the-app-store\.svg/);
 assert.match(landingPage, /assets\/get-it-on-google-play\.png/);
 assert.match(landingPageAndroid, /assets\/get-it-on-google-play\.png/);
-assert.match(rootReadme, /https:\/\/chessticize\.github\.io\/chessticize-mobile\/android\//);
+assert.match(rootReadme, /https:\/\/chessticize\.com\/android\//);
 assert.match(rootReadme, /site\/assets\/screenshots\/contact-sheet\.webp/);
 assert.match(rootReadme, /docs\/STORYBOOK_DEPLOYMENT\.md/);
 assert.match(landingPageDoc, /pnpm landing-page:assets/);

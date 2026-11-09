@@ -22,7 +22,7 @@ Apple's common-task threshold.
 
 Use this public accessibility URL after deployment:
 
-`https://chessticize.github.io/chessticize-mobile/accessibility/`
+`https://chessticize.com/accessibility/`
 
 The local audit environment did not contain App Store Connect API credentials.
 Saving the URL and retaining an App Store Connect screenshot or export is an
