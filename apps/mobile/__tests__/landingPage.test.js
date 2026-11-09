@@ -141,7 +141,12 @@ describe("public landing page", () => {
     expect(androidPage).toContain("Google Play Services");
     expect(supportPage).toContain("support@chessticize.com");
     expect(supportPage).toContain("/issues/new?title=Bug");
-    expect(supportPage).toContain("/issues/new?title=Feature");
+    expect(supportPage).toContain(
+      "chessticize-mobile/discussions/new?category=ideas"
+    );
+    expect(homepage).toContain(
+      'href="https://github.com/Chessticize/chessticize-mobile/discussions"'
+    );
     expect(accessibilityPage).toContain("/issues/new?title=Accessibility");
     expect(accessibilityPage).toContain("common chess puzzle task");
     expect(accessibilityPageText).toContain("Broad remediation is not currently scheduled");
