@@ -62,7 +62,7 @@ async function captureFirstUseSprintRulesGuide() {
   await expect(element(by.id('test-puzzle-source-control'))).not.toExist();
   await takePortraitScreenshotAtTop('app-store-09-sprint-rules-guide');
   await takeLandscapeScreenshot('app-store-09-sprint-rules-guide');
-  await waitForVisibleInPracticeScroll('practice-sprint-rules-dismiss');
+  await waitForVisibleInPracticeScroll('practice-sprint-rules-dismiss', 100);
   await element(by.id('practice-sprint-rules-dismiss')).tap();
   await waitFor(element(by.id('practice-run-home-edit'))).toBeVisible().withTimeout(10000);
 }

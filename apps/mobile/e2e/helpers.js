@@ -149,7 +149,7 @@ async function dragAndroidElementToElement(
 async function startSelectedPracticeRun() {
   await element(by.id('practice-main-scroll')).scrollTo('top');
   if (await detoxElementExists('practice-sprint-rules-dismiss')) {
-    await waitForVisibleInPracticeScroll('practice-sprint-rules-dismiss');
+    await waitForVisibleInPracticeScroll('practice-sprint-rules-dismiss', 100);
     await tapUntilExists('practice-sprint-rules-dismiss', 'practice-sprint-rules-open', 3);
     await element(by.id('practice-main-scroll')).scrollTo('top');
   }
@@ -723,11 +723,11 @@ async function selectTestPuzzleSource(source) {
   await element(by.id(sourceButtonId)).tap();
 }
 
-async function waitForVisibleInPracticeScroll(testID) {
+async function waitForVisibleInPracticeScroll(testID, visibilityPercent = 75) {
   const target = element(by.id(testID));
   await waitFor(target).toExist().withTimeout(180000);
   try {
-    await expect(target).toBeVisible();
+    await expect(target).toBeVisible(visibilityPercent);
     return;
   } catch {
     // The common case is already visible. Only normalize and search the
@@ -738,7 +738,7 @@ async function waitForVisibleInPracticeScroll(testID) {
   const scrollID = await existingTestID('sprint-result-scroll') ? 'sprint-result-scroll' : 'practice-main-scroll';
   await element(by.id(scrollID)).scrollTo('top');
   await waitFor(target)
-    .toBeVisible()
+    .toBeVisible(visibilityPercent)
     .whileElement(by.id(scrollID))
     .scroll(100, 'down', 0.5, 0.5);
 }

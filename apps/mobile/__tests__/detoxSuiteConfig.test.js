@@ -980,11 +980,11 @@ describe('Detox suite configuration', () => {
     const helperEnd = helpers.indexOf('async function tapUntilExists', helperStart);
     const helper = helpers.slice(helperStart, helperEnd);
     const waitForExist = helper.indexOf('.toExist().withTimeout(180000)');
-    const acceptAlreadyVisible = helper.indexOf('await expect(target).toBeVisible()');
+    const acceptAlreadyVisible = helper.indexOf('await expect(target).toBeVisible(visibilityPercent)');
     // The full-screen Sprint Result owns its own scroll view (#609).
     const chooseScroll = helper.indexOf("existingTestID('sprint-result-scroll') ? 'sprint-result-scroll' : 'practice-main-scroll'");
     const restoreTop = helper.indexOf("element(by.id(scrollID)).scrollTo('top')");
-    const requireVisible = helper.indexOf('.toBeVisible()', restoreTop);
+    const requireVisible = helper.indexOf('.toBeVisible(visibilityPercent)', restoreTop);
     const scrollDown = helper.indexOf(".scroll(100, 'down', 0.5, 0.5)");
 
     expect(waitForExist).toBeGreaterThan(0);
@@ -1067,7 +1067,7 @@ describe('Detox suite configuration', () => {
       "tapUntilExists('practice-sprint-rules-dismiss', 'practice-sprint-rules-open', 3)"
     );
     const revealRulesDismiss = helper.indexOf(
-      "waitForVisibleInPracticeScroll('practice-sprint-rules-dismiss')"
+      "waitForVisibleInPracticeScroll('practice-sprint-rules-dismiss', 100)"
     );
     const tapStart = helper.indexOf("element(by.id('practice-run-start')).tap()");
 
