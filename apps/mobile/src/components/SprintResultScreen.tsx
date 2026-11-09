@@ -65,7 +65,7 @@ export function SprintResultScreen({
 }): React.JSX.Element {
   const [infoOpen, setInfoOpen] = useState(initialInfoOpen);
   const result = presentSprintResult(data);
-  useUiHapticOnAppear(sprintResultHapticIntent(data));
+  useUiHapticOnAppear(sprintResultHapticIntent(data), data.sessionId);
 
   return (
     <ResultScreenLayout

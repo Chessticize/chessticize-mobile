@@ -106,21 +106,34 @@ export function useUiHaptics(): UiHaptics {
   return useContext(UiHapticsContext);
 }
 
+// The last appearance key each provider played, so returning to the same
+// result (for example from another tab) does not replay its outcome.
+const lastAppearanceKeys = new WeakMap<UiHaptics, string>();
+
 /**
  * Plays an intent once when the calling screen appears, for example a result
- * outcome. Later renders never replay it.
+ * outcome. Later renders never replay it, and neither does a later appearance
+ * with the same key.
  */
-export function useUiHapticOnAppear(intent: UiHapticIntent | null): void {
+export function useUiHapticOnAppear(intent: UiHapticIntent | null, key?: string): void {
   const uiHaptics = useUiHaptics();
-  const pending = useRef<{ intent: UiHapticIntent | null; uiHaptics: UiHaptics } | null>({
+  const pending = useRef<{ intent: UiHapticIntent | null; key: string | undefined; uiHaptics: UiHaptics } | null>({
     intent,
+    key,
     uiHaptics
   });
   useEffect(() => {
     const first = pending.current;
     pending.current = null;
-    if (first?.intent) {
-      first.uiHaptics(first.intent);
+    if (!first?.intent) {
+      return;
     }
+    if (first.key !== undefined) {
+      if (lastAppearanceKeys.get(first.uiHaptics) === first.key) {
+        return;
+      }
+      lastAppearanceKeys.set(first.uiHaptics, first.key);
+    }
+    first.uiHaptics(first.intent);
   }, []);
 }

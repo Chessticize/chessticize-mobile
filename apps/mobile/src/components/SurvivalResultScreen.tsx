@@ -66,7 +66,7 @@ export function SurvivalResultScreen({
   style?: StyleProp<ViewStyle>;
 }): React.JSX.Element {
   const result = presentSurvivalResult(data);
-  useUiHapticOnAppear(survivalResultHapticIntent(data));
+  useUiHapticOnAppear(survivalResultHapticIntent(data), data.sessionId);
   return (
     <ResultScreenLayout
       actions={(

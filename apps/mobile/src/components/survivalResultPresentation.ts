@@ -8,6 +8,8 @@ import type { SprintState } from "../../../../packages/core/src/index.ts";
 import type { ResultStat } from "./resultStat.ts";
 
 export type SurvivalResultData = {
+  /** The finished session, so its outcome haptic plays once per result. */
+  sessionId?: string;
   challengeType: "puzzle" | "arrow_duel";
   level: { minRating: number; maxRating: number };
   /** A Survival Run ends only after the third mistake or when the level's pool is cleared. */
@@ -105,6 +107,7 @@ export function survivalResultDataFromSession(input: {
   };
 }): SurvivalResultData {
   return {
+    ...(input.state.id ? { sessionId: input.state.id } : {}),
     challengeType: input.challengeType,
     level: { minRating: input.level.minRating, maxRating: input.level.maxRating },
     endReason: input.result.endReason ?? "max_mistakes",

@@ -284,6 +284,34 @@ describe("result outcome haptics", () => {
     expect(client.played).toEqual(expected);
   });
 
+  it("does not replay a session's outcome when its result appears again, as after a tab switch", () => {
+    const client = new FakeUiHapticsClient();
+    const sprint = (sessionId: string): React.JSX.Element => resultFrame(
+      <SprintResultScreen data={sprintData({ outcome: "passed", sessionId })} {...sprintActions()} />
+    );
+    const survival = (sessionId: string): React.JSX.Element => resultFrame(
+      <SurvivalResultScreen
+        data={survivalData({ isNewBest: false, sessionId })}
+        onBack={jest.fn()}
+        onDone={jest.fn()}
+        onPlayAgain={jest.fn()}
+      />
+    );
+    const renderer = renderWithHaptics(client, sprint("session-1"));
+
+    act(() => renderer.update(withHaptics(client, null)));
+    act(() => renderer.update(withHaptics(client, sprint("session-1"))));
+    expect(client.played).toEqual(["success"]);
+
+    act(() => renderer.update(withHaptics(client, null)));
+    act(() => renderer.update(withHaptics(client, sprint("session-2"))));
+    act(() => renderer.update(withHaptics(client, null)));
+    act(() => renderer.update(withHaptics(client, survival("session-3"))));
+    act(() => renderer.update(withHaptics(client, null)));
+    act(() => renderer.update(withHaptics(client, survival("session-3"))));
+    expect(client.played).toEqual(["success", "success", "warning"]);
+  });
+
   it("stays silent when the setting is off", () => {
     const client = new FakeUiHapticsClient();
     let renderer: TestRenderer.ReactTestRenderer | undefined;
