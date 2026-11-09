@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatCompactDuration, modeLabel, STACKED_ACTIONS_FONT_SCALE } from "../shared/practiceUtils.ts";
 import type { SprintMode, SprintState } from "../../../../../../packages/core/src/index.ts";
 import type { PersonalBestChallengeDesignPreview } from "../../PersonalBestChallengeDesign.tsx";
@@ -176,7 +177,22 @@ export function SessionStatusBar({
   // keeps room for the board. Values that share a line share one size, as
   // large as their slots allow up to the HUD cap, and shrink to fit as a
   // safety net.
-  const { fontScale } = usePracticeViewport();
+  const { fontScale, height: viewportHeight } = usePracticeViewport();
+  const insets = useSafeAreaInsets();
+  const shellRef = useRef<View>(null);
+  const [confirmationMaxHeight, setConfirmationMaxHeight] = useState<number | null>(null);
+  const measureConfirmationSpace = useCallback(() => {
+    if (state.status === "paused" || isPersonalBest) return;
+    shellRef.current?.measureInWindow((_x, y, _width, height) => {
+      // Keep the active board and HUD stationary. A tall confirmation scrolls
+      // inside the space below the HUD, above the bottom safe area.
+      const available = Math.max(1, Math.floor(viewportHeight - insets.bottom - y - height - 8));
+      setConfirmationMaxHeight((current) => current === available ? current : available);
+    });
+  }, [insets.bottom, isPersonalBest, state.status, viewportHeight]);
+  useLayoutEffect(() => {
+    measureConfirmationSpace();
+  }, [confirmAbandon, fontScale, measureConfirmationSpace]);
   const stacksTimer = compactMetrics && fontScale >= HUD_LARGE_TEXT_FONT_SCALE;
   // At large text the leave sheets stack their buttons full width, and the
   // abandon confirmation stacks its copy above them.
@@ -301,8 +317,63 @@ export function SessionStatusBar({
       />
     </View>
   );
+  const abandonConfirmationContent = (
+    <>
+      <View
+        style={[
+          styles.sessionAbandonCopy,
+          stacksLeaveConfirmation ? styles.sessionAbandonCopyStacked : null
+        ]}
+      >
+        <Text style={styles.listText} testID="session-abandon-title">
+          {isTacticalFocus ? "Abandon Focused Run?" : "Abandon sprint?"}
+        </Text>
+        <Text style={styles.helperText} testID="session-abandon-description">
+          {isTacticalFocus
+            ? "This ends the Focused Run. Completed puzzles stay in History and your Rating stays unchanged."
+            : "This ends the Sprint and records it as abandoned."}
+        </Text>
+      </View>
+      <View
+        style={[
+          styles.sessionAbandonActions,
+          stacksLeaveConfirmation ? styles.sessionAbandonActionsStacked : null,
+          stacksLeaveActions ? styles.leaveActionsStacked : null
+        ]}
+      >
+        <Button
+          accessibilityLabel={isTacticalFocus
+            ? "Cancel abandoning Focused Run"
+            : "Cancel abandon sprint"}
+          label="Cancel"
+          size="compact"
+          stretch={stacksLeaveActions}
+          testID="session-abandon-cancel"
+          variant="secondary"
+          onPress={() => onConfirmAbandonChange(false)}
+        />
+        <Button
+          accessibilityLabel={isTacticalFocus
+            ? "Confirm abandoning Focused Run"
+            : "Confirm abandon sprint"}
+          label="Abandon"
+          size="compact"
+          stretch={stacksLeaveActions}
+          testID="session-abandon-confirm"
+          variant="destructive"
+          onPress={() => {
+            onConfirmAbandonChange(false);
+            onAbandon?.();
+          }}
+        />
+      </View>
+    </>
+  );
   return (
     <View
+      collapsable={false}
+      ref={shellRef}
+      onLayout={measureConfirmationSpace}
       style={[
         styles.activeSessionShell,
         confirmAbandon ? styles.activeSessionShellRaised : null
@@ -458,61 +529,36 @@ export function SessionStatusBar({
             styles.sessionLeaveConfirmationOverlay,
             state.status === "paused" ? styles.sessionLeaveConfirmationInFlow : null,
             styles.sessionAbandonConfirm,
-            stacksLeaveConfirmation ? styles.sessionAbandonConfirmStacked : null,
-            leaveConfirmationMinHeight === undefined
-              ? null
-              : { minHeight: leaveConfirmationMinHeight }
+            state.status !== "paused" && confirmationMaxHeight !== null
+              ? { maxHeight: confirmationMaxHeight }
+              : null
           ]}
           testID="session-abandon-confirmation"
         >
-          <View
-            style={[
-              styles.sessionAbandonCopy,
-              stacksLeaveConfirmation ? styles.sessionAbandonCopyStacked : null
-            ]}
-          >
-            <Text style={styles.listText} testID="session-abandon-title">
-              {isTacticalFocus ? "Abandon Focused Run?" : "Abandon sprint?"}
-            </Text>
-            <Text style={styles.helperText} testID="session-abandon-description">
-              {isTacticalFocus
-                ? "This ends the Focused Run. Completed puzzles stay in History and your Rating stays unchanged."
-                : "This ends the Sprint and records it as abandoned."}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.sessionAbandonActions,
-              stacksLeaveConfirmation ? styles.sessionAbandonActionsStacked : null,
-              stacksLeaveActions ? styles.leaveActionsStacked : null
-            ]}
-          >
-            <Button
-              accessibilityLabel={isTacticalFocus
-                ? "Cancel abandoning Focused Run"
-                : "Cancel abandon sprint"}
-              label="Cancel"
-              size="compact"
-              stretch={stacksLeaveActions}
-              testID="session-abandon-cancel"
-              variant="secondary"
-              onPress={() => onConfirmAbandonChange(false)}
-            />
-            <Button
-              accessibilityLabel={isTacticalFocus
-                ? "Confirm abandoning Focused Run"
-                : "Confirm abandon sprint"}
-              label="Abandon"
-              size="compact"
-              stretch={stacksLeaveActions}
-              testID="session-abandon-confirm"
-              variant="destructive"
-              onPress={() => {
-                onConfirmAbandonChange(false);
-                onAbandon?.();
-              }}
-            />
-          </View>
+          {state.status === "paused" ? (
+            <View style={[
+              styles.sessionAbandonContent,
+              stacksLeaveConfirmation ? styles.sessionAbandonConfirmStacked : null,
+              leaveConfirmationMinHeight === undefined ? null : { minHeight: leaveConfirmationMinHeight }
+            ]}>
+              {abandonConfirmationContent}
+            </View>
+          ) : (
+            <ScrollView
+              contentContainerStyle={[
+                styles.sessionAbandonContent,
+                stacksLeaveConfirmation ? styles.sessionAbandonConfirmStacked : null,
+                leaveConfirmationMinHeight === undefined ? null : {
+                  minHeight: Math.min(leaveConfirmationMinHeight, Math.max(0, (confirmationMaxHeight ?? leaveConfirmationMinHeight + 2) - 2))
+                }
+              ]}
+              nestedScrollEnabled
+              style={styles.sessionAbandonScroll}
+              testID="session-abandon-scroll"
+            >
+              {abandonConfirmationContent}
+            </ScrollView>
+          )}
         </View>
       ) : null}
     </View>
@@ -769,11 +815,17 @@ const useStyles = makeStyles((theme) => ({
   // A neutral surface keeps the tinted destructive Abandon button distinct;
   // the danger border still marks the sheet as a warning.
   sessionAbandonConfirm: {
-    alignItems: "center",
     backgroundColor: theme.colors.surface,
     borderColor: theme.colors.danger.s300,
     borderRadius: 8,
-    borderWidth: 1,
+    borderWidth: 1
+  },
+  sessionAbandonScroll: {
+    borderRadius: 8,
+    flexGrow: 0
+  },
+  sessionAbandonContent: {
+    alignItems: "center",
     flexDirection: "row",
     gap: 10,
     justifyContent: "space-between",

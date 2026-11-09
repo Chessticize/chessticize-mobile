@@ -1193,6 +1193,16 @@ export const ExitConfirmation: Story = {
   }
 };
 
+export const ActiveExitConfirmation: Story = {
+  name: "Active session · exit confirmation",
+  args: { scenarioId: "practice-active" },
+  play: async ({ canvasElement }) => {
+    await waitForTestId(canvasElement, "session-abandon");
+    await clickTestId(canvasElement, "session-abandon");
+    await waitForTestId(canvasElement, "session-abandon-scroll");
+  }
+};
+
 export const SprintSummary: Story = {
   name: "Sprint summary",
   args: { scenarioId: "practice-summary" },

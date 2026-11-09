@@ -6794,8 +6794,6 @@ describe("PracticePocScreen", () => {
     // the prompt, board and counts that follow, so none of them move.
     expect(flattenTestStyle(confirmation.props.style)).toEqual(expect.objectContaining({
       left: 0,
-      // It fills the prompt card's slot rather than half-covering the card.
-      minHeight: buildPracticeAdaptiveLayout({ fontScale: 1, height, insets, width }).promptFrameHeight + 4,
       position: "absolute",
       right: 0,
       top: "100%"
@@ -6804,7 +6802,11 @@ describe("PracticePocScreen", () => {
       .toBeGreaterThan(0);
     // In a column or rail under 320 points the copy sits above the buttons
     // instead of wrapping to a word per line beside them.
-    expect(flattenTestStyle(confirmation.props.style).flexDirection).toBe(stacked ? "column" : "row");
+    const scroll = findByTestId(renderer, "session-abandon-scroll");
+    expect(flattenTestStyle(scroll.props.contentContainerStyle)).toEqual(expect.objectContaining({
+      minHeight: buildPracticeAdaptiveLayout({ fontScale: 1, height, insets, width }).promptFrameHeight + 2,
+      flexDirection: stacked ? "column" : "row"
+    }));
     // The covered prompt card leaves the accessibility tree while covered.
     expect(findByTestId(renderer, "practice-prompt-stack").props.accessibilityElementsHidden).toBe(true);
     expect(findByTestId(renderer, "session-abandon-cancel")).toBeTruthy();
@@ -10026,6 +10028,7 @@ describe("PracticePocScreen", () => {
     press(renderer, "session-abandon");
     expect(findByTestId(renderer, "session-abandon-confirmation")).toBeTruthy();
     expectText(renderer, "Abandon sprint?");
+    expect(findByTestId(renderer, "session-abandon-scroll").props.nestedScrollEnabled).toBe(true);
     press(renderer, "session-abandon-cancel");
     expect(() => findByTestId(renderer, "session-abandon-confirmation")).toThrow();
     expect(findByTestId(renderer, "session-board")).toBeTruthy();
