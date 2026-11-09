@@ -1262,7 +1262,7 @@ describe('Detox suite configuration', () => {
       "element(by.id('review-session-control-rail')).scrollTo('bottom')"
     );
     const requireUnclearVisible = responsiveHistoryCase.indexOf(
-      "expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible()"
+      "expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible(100)"
     );
 
     expect(normalizeOuterScroll).toBeGreaterThan(0);
@@ -1827,7 +1827,7 @@ describe('Detox suite configuration', () => {
     expect(helpers).toContain('not.toBeVisible()');
     expect(helpers).toContain("'Show history filters'");
     expect(practiceSpec).toContain("element(by.text('Correct')).atIndex(0)");
-    expect(practiceSpec).toContain("expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible()");
+    expect(practiceSpec).toContain("expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible(100)");
     expect(practiceSpec).toContain("historyAttemptRowTestIDForResult('Correct')");
     expect(practiceSpec).toContain("historyAttemptRowTestIDForResult('Wrong move')");
     expect(practiceSpec).not.toContain('async function tapVisibleHistoryResult');
@@ -1838,7 +1838,8 @@ describe('Detox suite configuration', () => {
     expect(practiceSpec).toContain("orientation: 'portrait'");
     expect(practiceSpec).toContain("by.id('review-context-actions-bottom')");
     expect(practiceSpec).toContain("screenshotLabel: 'history-review-actions-ipad-landscape'");
-    expect(practiceSpec).not.toContain("device.setOrientation('landscape')");
+    expect(practiceSpec).toContain("process.env.CHESSTICIZE_REVIEW_ACTIONS_LANDSCAPE === '1'");
+    expect(practiceSpec).toContain("if (REVIEW_ACTIONS_LANDSCAPE) await device.setOrientation('landscape');");
     expect(practiceSpec).not.toContain("for (const orientation of ['portrait', 'landscape'])");
     expect(practiceSpec).not.toContain('history-filter-unclear');
     expect(practiceSpec).not.toContain("endsWith('-result')");

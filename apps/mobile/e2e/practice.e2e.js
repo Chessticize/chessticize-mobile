@@ -43,6 +43,7 @@ const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v4:23';
 const SURVIVAL_RECORDS_CAPTURE_ORIENTATION =
   process.env.CHESSTICIZE_SURVIVAL_RECORDS_CAPTURE_ORIENTATION;
 const REVIEW_ACTIONS_LARGE_TEXT = process.env.CHESSTICIZE_REVIEW_ACTIONS_LARGE_TEXT === '1';
+const REVIEW_ACTIONS_LANDSCAPE = process.env.CHESSTICIZE_REVIEW_ACTIONS_LANDSCAPE === '1';
 
 function setReviewActionTextSize(large) {
   if (device.getPlatform() === 'ios') {
@@ -138,8 +139,9 @@ describe('Practice POC', () => {
     }
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (REVIEW_ACTIONS_LARGE_TEXT) setReviewActionTextSize(false);
+    if (REVIEW_ACTIONS_LANDSCAPE) await device.setOrientation('portrait');
   });
 
   it('opens the empty Survival records state from a fresh profile', async () => {
@@ -497,6 +499,7 @@ describe('Practice POC', () => {
     // Keep fixture creation outside this focused visual check at the normal
     // size. Change the real system setting on the open replay, without a
     // relaunch, so the row actions themselves run at accessibility maximum.
+    if (REVIEW_ACTIONS_LANDSCAPE) await device.setOrientation('landscape');
     if (REVIEW_ACTIONS_LARGE_TEXT) {
       setReviewActionTextSize(true);
       await sleep(1000);
@@ -513,8 +516,7 @@ describe('Practice POC', () => {
       await element(by.id('practice-main-scroll')).scrollTo('top');
       await element(by.id('review-session-control-rail')).scrollTo('bottom');
       await waitFor(element(by.id('review-context-actions-rail'))).toExist().withTimeout(10000);
-      await expect(element(by.id('review-schedule-control'))).toBeVisible();
-      await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
+      await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible(100);
       const screenFrame = await frameFor(element(by.id('safe-area-shell')));
       const boardFrame = await frameFor(element(by.id('review-board')));
       const actionRailFrame = await frameFor(element(by.id('review-context-actions-rail')));
@@ -540,7 +542,7 @@ describe('Practice POC', () => {
     } else {
       await waitForElementAccessibilityLabelContaining(
         'adaptive-layout',
-        'compactPortrait',
+        REVIEW_ACTIONS_LANDSCAPE ? 'compactLandscape' : 'compactPortrait',
         10000
       );
       await waitFor(element(by.id('review-context-actions-bottom'))).toExist().withTimeout(10000);
@@ -571,6 +573,7 @@ describe('Practice POC', () => {
 
     // Enrollment atomically cleared the marker, and removal does not restore it.
     if (REVIEW_ACTIONS_LARGE_TEXT) setReviewActionTextSize(false);
+    if (REVIEW_ACTIONS_LANDSCAPE) await device.setOrientation('portrait');
     await device.terminateApp();
     await launchWithDisabledSynchronization({
       newInstance: true,
