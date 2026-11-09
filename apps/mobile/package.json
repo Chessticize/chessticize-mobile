@@ -55,6 +55,21 @@
     "version:ios:sync": "node scripts/ios-release-version.js",
     "version:ios:check": "node scripts/ios-release-version.js --check"
   },
+  "codegenConfig": {
+    "name": "ChessticizeMobileSpec",
+    "type": "components",
+    "jsSrcsDir": "src/components/ui",
+    "android": {
+      "javaPackageName": "com.chessticize.mobile.specs"
+    },
+    "ios": {
+      "components": {
+        "ChessticizeSymbolView": {
+          "className": "ChessticizeSymbolView"
+        }
+      }
+    }
+  },
   "dependencies": {
     "@op-engineering/op-sqlite": "17.1.1",
     "@shopify/react-native-skia": "^2.6.5",
