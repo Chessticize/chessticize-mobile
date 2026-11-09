@@ -8886,12 +8886,16 @@ describe("PracticePocScreen", () => {
     expect(() => findByTestId(renderer, "session-timer-block")).toThrow();
     expect(() => findByTestId(renderer, "session-timer")).toThrow();
     expect(collectText(findByTestId(renderer, "session-progress"))).toBe("14 solved");
+    // The HUD sizes its values up to the 2x cap itself (#652) and keeps
+    // shrink-to-fit as a safety net.
     expect(findByTestId(renderer, "session-progress").props).toMatchObject({
       adjustsFontSizeToFit: true,
-      maxFontSizeMultiplier: 2,
+      allowFontScaling: false,
       minimumFontScale: 0.5,
       numberOfLines: 1
     });
+    expect(flattenTestStyle(findByTestId(renderer, "session-progress").props.style).textAlign)
+      .toBe("left");
     expect(findByTestId(renderer, "session-mistakes-block").props.accessibilityLabel).toBe(
       "Mistakes 1 of 3"
     );

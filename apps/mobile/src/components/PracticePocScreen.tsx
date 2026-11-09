@@ -10258,6 +10258,8 @@ function PuzzleTimingIndicator({
 // slash are narrower.
 const HUD_VALUE_EM_PER_CHARACTER = 0.6;
 const HUD_METRIC_GAP = 6;
+// Survival's mistakes block keeps this width beside the solved count.
+const PERSONAL_BEST_MISTAKES_BLOCK_WIDTH = 64;
 
 // One text size for the HUD values that share a line: the system text scale
 // up to the HUD cap, reduced to what the longest value fits in its slot but
@@ -10266,20 +10268,17 @@ const HUD_METRIC_GAP = 6;
 function hudValueTextSize({
   fontScale,
   role,
-  slotCount,
-  texts,
-  width
+  slotWidth,
+  texts
 }: {
   fontScale: number;
   role: { fontSize: number; lineHeight: number };
-  slotCount: number;
+  slotWidth: number | null;
   texts: Array<string | null>;
-  width: number | null;
 }): { fontSize: number; lineHeight: number } {
   let scale = Math.min(fontScale, HUD_MAX_TEXT_SCALE);
   const longest = Math.max(0, ...texts.map((text) => text?.length ?? 0));
-  if (scale > 1 && width !== null && longest > 0) {
-    const slotWidth = (width - HUD_METRIC_GAP * (slotCount - 1)) / slotCount;
+  if (scale > 1 && slotWidth !== null && longest > 0) {
     const fittingScale = slotWidth / (longest * HUD_VALUE_EM_PER_CHARACTER * role.fontSize);
     scale = Math.max(1, Math.min(scale, fittingScale));
   }
@@ -10353,15 +10352,21 @@ function SessionStatusBar({
   const sharedValueTexts = stacksTimer
     ? [progressText, policyText]
     : [progressText, isPersonalBest ? null : timerText, policyText];
+  const slotWidth = (slotCount: number): number | null => metricsWidth === null
+    ? null
+    : (metricsWidth - HUD_METRIC_GAP * (slotCount - 1)) / slotCount;
   const sharedValueStyle = hudValueTextSize({
     fontScale,
     role: hudValueRole,
-    slotCount: stacksTimer ? 2 : 3,
-    texts: sharedValueTexts,
-    width: metricsWidth
+    slotWidth: isPersonalBest
+      ? metricsWidth === null
+        ? null
+        : metricsWidth - HUD_METRIC_GAP - PERSONAL_BEST_MISTAKES_BLOCK_WIDTH
+      : slotWidth(stacksTimer ? 2 : 3),
+    texts: sharedValueTexts
   });
   const timerValueStyle = stacksTimer
-    ? hudValueTextSize({ fontScale, role: hudValueRole, slotCount: 1, texts: [timerText], width: metricsWidth })
+    ? hudValueTextSize({ fontScale, role: hudValueRole, slotWidth: slotWidth(1), texts: [timerText] })
     : sharedValueStyle;
   const progressMetric = (
     <View
@@ -10385,6 +10390,7 @@ function SessionStatusBar({
         style={[
           styles.sessionProgressValue,
           styles.sessionMetricValueFill,
+          isPersonalBest ? styles.personalBestProgressValue : null,
           compactMetrics ? styles.sessionMetricTextCompact : null,
           sharedValueStyle
         ]}
@@ -18805,10 +18811,13 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "flex-start",
     flex: 1
   },
+  personalBestProgressValue: {
+    textAlign: "left"
+  },
   personalBestMistakesMetricBlock: {
     alignItems: "flex-end",
     flex: 0,
-    minWidth: 64
+    minWidth: PERSONAL_BEST_MISTAKES_BLOCK_WIDTH
   },
   sessionAbandonConfirm: {
     alignItems: "center",
