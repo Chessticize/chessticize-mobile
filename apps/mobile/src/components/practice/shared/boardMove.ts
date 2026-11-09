@@ -1,10 +1,10 @@
-type BoardMove = {
+export type BoardMove = {
   from: string;
   to: string;
   promotion?: string;
 };
 
-function arrowFromTo(move: string): BoardMove | null {
+export function arrowFromTo(move: string): BoardMove | null {
   const match = /^([a-h][1-8])([a-h][1-8])(?:[nbrqk]?)?$/.exec(move);
   if (!match) {
     return null;

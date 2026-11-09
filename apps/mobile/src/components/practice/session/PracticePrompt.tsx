@@ -1,8 +1,18 @@
-type PreviousAttemptNoticeReason = "slow" | "timed_out" | "wrong";
+import React from "react";
+import { type LayoutChangeEvent, Pressable, Text, View } from "react-native";
+import type { ArrowDuelState, CurrentPuzzleState, SprintMode } from "../../../../../../packages/core/src/index.ts";
+import type { ArrowDuelReplyChallengePhase } from "../../arrowDuelReplyChallengePreview.ts";
+import { type MoveSide, moveSideDisplayName, sideToMove } from "../shared/moveSide.ts";
+import { MoveSideGlyph } from "../shared/Glyphs.tsx";
+import { FABRIC_SAFE_HIDDEN_TEXT_STYLE, formatCompactDuration, modeLabel } from "../shared/practiceUtils.ts";
+import { PRACTICE_FEEDBACK_MAX_TEXT_SCALE, PRACTICE_PROMPT_MAX_TEXT_SCALE } from "../../adaptivePracticeLayout.ts";
+import { makeStyles } from "../../../theme/index.ts";
+
+export type PreviousAttemptNoticeReason = "slow" | "timed_out" | "wrong";
 
 const PRACTICE_PROMPT_COPY_GAP = 5;
 
-function PreviousAttemptNotice({
+export function PreviousAttemptNotice({
   reason
 }: {
   reason: PreviousAttemptNoticeReason;
@@ -61,7 +71,7 @@ function PreviousAttemptNotice({
   );
 }
 
-function UnclearAttemptPrompt({
+export function UnclearAttemptPrompt({
   marked,
   onToggle,
   onTargetLayout,
@@ -121,7 +131,7 @@ function UnclearAttemptPrompt({
   );
 }
 
-function ErrorPanel({ error }: { error: string }): React.JSX.Element {
+export function ErrorPanel({ error }: { error: string }): React.JSX.Element {
   const styles = useStyles();
   return (
     <View
@@ -137,7 +147,7 @@ function ErrorPanel({ error }: { error: string }): React.JSX.Element {
   );
 }
 
-function ArrowDuelReplyChallengePrompt({
+export function ArrowDuelReplyChallengePrompt({
   currentPuzzle,
   explicitReplySideCopy = false,
   frameHeight,
@@ -276,7 +286,7 @@ function ArrowDuelReplyChallengePrompt({
   );
 }
 
-function PracticePrompt({
+export function PracticePrompt({
   currentPuzzle,
   frameHeight,
   kingPieceSize,
@@ -429,6 +439,7 @@ const PROMPT_MAX_TEXT_SCALE = PRACTICE_PROMPT_MAX_TEXT_SCALE;
 
 const FEEDBACK_MAX_TEXT_SCALE = PRACTICE_FEEDBACK_MAX_TEXT_SCALE;
 
+const useStyles = makeStyles((theme) => ({
   promptPanel: {
     alignItems: "center",
     backgroundColor: theme.colors.surface,
@@ -608,3 +619,9 @@ const FEEDBACK_MAX_TEXT_SCALE = PRACTICE_FEEDBACK_MAX_TEXT_SCALE;
     marginTop: 8,
     padding: 12
   },
+  errorText: {
+    color: theme.colors.danger.s800,
+    fontSize: 14,
+    fontWeight: "700"
+  },
+}));

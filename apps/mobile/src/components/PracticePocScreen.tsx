@@ -13,9 +13,6 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
-import type {
-  LayoutChangeEvent
-} from "react-native";
 import type { MoveResult } from "react-native-chessboard";
 import Chessboard, { type ChessboardRef } from "react-native-chessboard";
 import {
@@ -202,10 +199,6 @@ import type {
   PracticeRunManagementPresentation
 } from "./practiceRunPresentation.ts";
 import {
-  PRACTICE_FEEDBACK_MAX_TEXT_SCALE,
-  PRACTICE_PROMPT_MAX_TEXT_SCALE,
-  PRACTICE_PUZZLE_TIMING_MAX_TEXT_SCALE,
-  PRACTICE_SESSION_HUD_MAX_TEXT_SCALE,
   buildPracticeAdaptiveLayout,
   PRACTICE_UI_PADDING as UI_PADDING,
   type AdaptiveLayout
@@ -262,7 +255,6 @@ import { SprintResultScreen } from "./SprintResultScreen.tsx";
 import { sprintResultDataFromSession } from "./sprintResultPresentation.ts";
 import { SurvivalResultScreen } from "./SurvivalResultScreen.tsx";
 import { survivalResultDataFromSession } from "./survivalResultPresentation.ts";
-import { SessionMistakeIndicator } from "./SessionMistakeIndicator.tsx";
 import {
   buildSurvivalChallengePresentation,
   survivalSelectionLevel
@@ -298,7 +290,6 @@ export type {
   SprintRulesGuidePresentation
 } from "./practice/home/PracticeHome.tsx";
 import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
-import { typography as baseTypography } from "../theme/scales.ts";
 import { AppText, Button, Icon, IconTile, useListRowStyle } from "./ui/index.tsx";
 import type { MoveSide } from "./practice/shared/moveSide.ts";
 import { CHESS_PIECE_SPRITE } from "./practice/shared/chessPieceSprite.ts";
@@ -307,12 +298,7 @@ import {
   CloseGlyph,
   FilterGlyph,
   FlipGlyph,
-  MoreGlyph,
-  MoveSideGlyph,
-  PauseGlyph,
-  PlayGlyph,
-  SearchGlyph,
-  SessionScoreGlyph
+  SearchGlyph
 } from "./practice/shared/Glyphs.tsx";
 import { CollapsibleRegion, DisclosureChevron } from "./practice/shared/CollapsibleRegion.tsx";
 import { ToolbarIconButton } from "./practice/shared/ToolbarIconButton.tsx";
@@ -323,7 +309,6 @@ import {
   CUSTOM_INITIAL_RATING_MIN,
   errorMessage,
   FABRIC_SAFE_HIDDEN_TEXT_STYLE,
-  formatCompactDuration,
   formatSprintDurationLabel,
   modeLabel,
   safeTestId
@@ -366,6 +351,36 @@ import {
   StartConflictPrompt
 } from "./practice/home/PracticeHome.tsx";
 import { SIMULATED_HISTORY_SCENARIOS, TestPuzzleSourceControl } from "./practice/home/TestPuzzleSourceControl.tsx";
+import { moveSideDisplayName, sideToMove, sideToMoveAccessibilityLabel } from "./practice/shared/moveSide.ts";
+import { arrowFromTo, type BoardMove } from "./practice/shared/boardMove.ts";
+import {
+  ArrowCandidateOverlay,
+  ArrowDuelWhatIfOverlay,
+  ArrowHint,
+  BoardCoordinateOverlay,
+  BoardInputBlocker,
+  boardMoveSquareTints,
+  kingGlyphSizeForBoard,
+  LastMoveOverlay,
+  MoveFeedbackOverlay,
+  moveFeedbackTint,
+  sessionBoardAccessibilityLabel,
+  useBoardMoveSquareTints
+} from "./practice/session/boardOverlays.tsx";
+import {
+  PuzzleTimingIndicator,
+  SessionScoreStrip,
+  SessionStatusBar,
+  type SessionTimingState
+} from "./practice/session/SessionStatusBar.tsx";
+import {
+  ArrowDuelReplyChallengePrompt,
+  ErrorPanel,
+  PracticePrompt,
+  PreviousAttemptNotice,
+  type PreviousAttemptNoticeReason,
+  UnclearAttemptPrompt
+} from "./practice/session/PracticePrompt.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;

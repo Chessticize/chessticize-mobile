@@ -1,3 +1,11 @@
+import React, { useMemo } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { Square } from "chess.js";
+import { type MoveSide, sideToMoveAccessibilityLabel } from "../shared/moveSide.ts";
+import { MoveSideGlyph } from "../shared/Glyphs.tsx";
+import { makeStyles, type Theme, useTheme } from "../../../theme/index.ts";
+import { arrowFromTo, type BoardMove } from "../shared/boardMove.ts";
+
 const BOARD_FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
 
 const BOARD_FILES_FLIPPED = ["h", "g", "f", "e", "d", "c", "b", "a"] as const;
@@ -6,7 +14,7 @@ const BOARD_RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 
 const BOARD_RANKS_FLIPPED = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
 
-function ArrowDuelWhatIfOverlay({
+export function ArrowDuelWhatIfOverlay({
   actionLabel,
   compactTitle = false,
   detail,
@@ -126,7 +134,7 @@ function ArrowDuelWhatIfOverlay({
   );
 }
 
-function BoardInputBlocker(): React.JSX.Element {
+export function BoardInputBlocker(): React.JSX.Element {
   const styles = useStyles();
   return (
     <Pressable
@@ -139,11 +147,11 @@ function BoardInputBlocker(): React.JSX.Element {
   );
 }
 
-function kingGlyphSizeForBoard(boardSize: number): number {
+export function kingGlyphSizeForBoard(boardSize: number): number {
   return Math.max(1, Math.round(boardSize / 8));
 }
 
-function BoardCoordinateOverlay({
+export function BoardCoordinateOverlay({
   boardSize,
   flipped
 }: {
@@ -212,7 +220,7 @@ function coordinateTextStyle(styles: ReturnType<typeof useStyles>, row: number, 
 // Accessible marker for the last move. The board itself paints the tint
 // beneath its pieces (`useBoardMoveSquareTints`); a tinted view here would sit
 // over the piece artwork and wash it out (#629).
-function LastMoveOverlay({
+export function LastMoveOverlay({
   boardSize,
   move,
   overlayTestID
@@ -238,7 +246,7 @@ type BoardSquareTint = { square: Square; color: string };
 
 // Tints a move's origin and target. The board draws them beneath its pieces so
 // black and white piece artwork keeps its own contrast (#629).
-function boardMoveSquareTints(move: BoardMove, color: string): BoardSquareTint[] {
+export function boardMoveSquareTints(move: BoardMove, color: string): BoardSquareTint[] {
   return [
     { square: move.from as Square, color },
     { square: move.to as Square, color }
@@ -246,7 +254,7 @@ function boardMoveSquareTints(move: BoardMove, color: string): BoardSquareTint[]
 }
 
 // Memoized per move and color so clock re-renders leave the board layer alone.
-function useBoardMoveSquareTints(move: BoardMove | null, color: string): BoardSquareTint[] | undefined {
+export function useBoardMoveSquareTints(move: BoardMove | null, color: string): BoardSquareTint[] | undefined {
   const from = move?.from ?? null;
   const to = move?.to ?? null;
   return useMemo(
@@ -255,11 +263,11 @@ function useBoardMoveSquareTints(move: BoardMove | null, color: string): BoardSq
   );
 }
 
-function moveFeedbackTint(theme: Theme, result: "correct" | "wrong"): string {
+export function moveFeedbackTint(theme: Theme, result: "correct" | "wrong"): string {
   return result === "correct" ? theme.colors.positive.flash : theme.colors.danger.flash;
 }
 
-function sessionBoardAccessibilityLabel(
+export function sessionBoardAccessibilityLabel(
   side: MoveSide | null,
   lastMove: BoardMove | null
 ): string {
@@ -275,7 +283,7 @@ function sessionBoardAccessibilityLabel(
 
 // Marks the submitted move's feedback window. The board paints the correct or
 // wrong tint beneath its pieces (`useBoardMoveSquareTints`).
-function MoveFeedbackOverlay({ boardSize }: { boardSize: number }): React.JSX.Element {
+export function MoveFeedbackOverlay({ boardSize }: { boardSize: number }): React.JSX.Element {
   const styles = useStyles();
   return (
     <View
@@ -286,7 +294,7 @@ function MoveFeedbackOverlay({ boardSize }: { boardSize: number }): React.JSX.El
   );
 }
 
-function ArrowCandidateOverlay({
+export function ArrowCandidateOverlay({
   boardSize,
   flipped,
   candidates,
@@ -342,7 +350,7 @@ function ArrowCandidateOverlay({
   );
 }
 
-function ArrowHint({
+export function ArrowHint({
   boardSize,
   squareSize,
   flipped,
@@ -439,6 +447,7 @@ function squareToPixel(square: string, squareSize: number, flipped: boolean): { 
   };
 }
 
+const useStyles = makeStyles((theme) => ({
   boardInputBlocker: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "transparent",
@@ -586,6 +595,11 @@ function squareToPixel(square: string, squareSize: number, flipped: boolean): { 
     color: theme.colors.board.coordinateOnDarkSquare,
     textShadowColor: theme.colors.board.coordinateHaloOnDarkSquare
   },
+  arrowLayer: {
+    position: "absolute",
+    top: 0,
+    left: 0
+  },
   arrowLineWrap: {
     left: 0,
     position: "absolute",
@@ -603,3 +617,4 @@ function squareToPixel(square: string, squareSize: number, flipped: boolean): { 
     position: "absolute",
     width: 0
   },
+}));

@@ -1,9 +1,21 @@
-type SessionTimingState = {
+import React, { useState } from "react";
+import { Pressable, Text, View } from "react-native";
+import { formatCompactDuration, modeLabel } from "../shared/practiceUtils.ts";
+import type { SprintMode, SprintState } from "../../../../../../packages/core/src/index.ts";
+import type { PersonalBestChallengeDesignPreview } from "../../PersonalBestChallengeDesign.tsx";
+import { usePracticeViewport } from "../../PracticeViewport.tsx";
+import { typography as baseTypography } from "../../../theme/scales.ts";
+import { SessionMistakeIndicator } from "../../SessionMistakeIndicator.tsx";
+import { CloseGlyph, MoreGlyph, PauseGlyph, PlayGlyph, SessionScoreGlyph } from "../shared/Glyphs.tsx";
+import { PRACTICE_PUZZLE_TIMING_MAX_TEXT_SCALE, PRACTICE_SESSION_HUD_MAX_TEXT_SCALE } from "../../adaptivePracticeLayout.ts";
+import { makeStyles } from "../../../theme/index.ts";
+
+export type SessionTimingState = {
   elapsedSeconds: number;
   phase: "normal" | "slow" | "timed_out";
 };
 
-function PuzzleTimingIndicator({
+export function PuzzleTimingIndicator({
   elapsedSeconds,
   onTargetLayout,
   phase,
@@ -105,7 +117,7 @@ function hudValueTextSize({
   };
 }
 
-function SessionStatusBar({
+export function SessionStatusBar({
   closeAccessibilityLabel = "Abandon sprint",
   compactMetrics = false,
   confirmAbandon,
@@ -493,7 +505,7 @@ function SessionStatusBar({
   );
 }
 
-function SessionScoreStrip({
+export function SessionScoreStrip({
   compact = false,
   state
 }: {
@@ -622,6 +634,7 @@ const SCORE_LABEL_MAX_TEXT_SCALE = 1;
 
 const SCORE_VALUE_MAX_TEXT_SCALE = 1.15;
 
+const useStyles = makeStyles((theme) => ({
   activeSessionShell: {
     gap: 8
   },
@@ -918,8 +931,41 @@ const SCORE_VALUE_MAX_TEXT_SCALE = 1.15;
     fontSize: 13,
     fontWeight: "800"
   },
+  secondaryButton: {
+    alignItems: "center",
+    borderColor: theme.colors.border.strong,
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 42,
+    justifyContent: "center",
+    paddingHorizontal: 14
+  },
+  secondaryButtonText: {
+    color: theme.colors.text.strong,
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  destructiveButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.danger.s600,
+    borderRadius: 8,
+    height: 42,
+    justifyContent: "center",
+    paddingHorizontal: 14
+  },
+  destructiveButtonText: {
+    color: theme.colors.text.onTone,
+    fontSize: 13,
+    fontWeight: "800"
+  },
   listText: {
     color: theme.colors.text.strong,
     fontSize: 13,
     fontWeight: "600"
   },
+  helperText: {
+    color: theme.colors.text.tertiary,
+    fontSize: 12,
+    fontWeight: "600"
+  },
+}));
