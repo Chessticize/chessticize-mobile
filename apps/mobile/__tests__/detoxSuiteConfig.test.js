@@ -1252,6 +1252,8 @@ describe('Detox suite configuration', () => {
       caseStart
     );
     const responsiveHistoryCase = practiceSpec.slice(caseStart, caseEnd);
+    expect(responsiveHistoryCase).toContain("by.label('Sprint abandoned')");
+    expect(responsiveHistoryCase).not.toContain("by.text('Sprint failed')");
     const normalizeOuterScroll = responsiveHistoryCase.indexOf(
       "element(by.id('practice-main-scroll')).scrollTo('top')"
     );
@@ -1306,7 +1308,7 @@ describe('Detox suite configuration', () => {
       "waitFor(element(by.id('sprint-summary-panel'))).toExist()"
     );
     const normalizeResultScroll = firstUseCase.indexOf(
-      "element(by.id('practice-main-scroll')).scrollTo('top')",
+      "element(by.id('sprint-result-scroll')).scrollTo('top')",
       requireResultExists
     );
     const requireResultTopBarVisible = firstUseCase.indexOf(
@@ -1316,6 +1318,8 @@ describe('Detox suite configuration', () => {
     expect(requireResultExists).toBeGreaterThan(0);
     expect(normalizeResultScroll).toBeGreaterThan(requireResultExists);
     expect(requireResultTopBarVisible).toBeGreaterThan(normalizeResultScroll);
+    expect(firstUseCase).toContain("by.label('Sprint abandoned')");
+    expect(firstUseCase).not.toContain("by.text('Sprint failed')");
   });
 
   it('returns from the active Tactical Profile through its public header control', () => {
