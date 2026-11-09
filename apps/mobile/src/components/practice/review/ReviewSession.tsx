@@ -77,13 +77,13 @@ import {
 } from "../session/boardOverlays.tsx";
 import {
   ANALYSIS_DEPTH,
-  FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   formatDuration,
   modeLabel,
   replyPreparationInstruction,
   type SessionFeedback,
   sleep
 } from "../shared/practiceUtils.ts";
+import { pickPracticeStyles } from "../shared/practiceStyles.tsx";
 import { boardMoveToUci, consumeSuppressedBoardMove } from "../../boardMoveSuppression.ts";
 import { fenAfterMove, fenAfterMoves, normalizeUci } from "../../../backend/premove.ts";
 import { ArrowDuelReplyChallengePrompt, PracticePrompt } from "../session/PracticePrompt.tsx";
@@ -1285,7 +1285,7 @@ export function ReviewSession({
               : () => onReturnToOwner(currentEntry.source)}
           />
         </View>
-        <View style={styles.reviewTitleBlock}>
+        <View style={styles.editorRowLabel}>
           <AppText
             accessibilityRole="header"
             allowFontScaling={false}
@@ -1379,14 +1379,14 @@ export function ReviewSession({
       <View
         key="review-analysis-column"
         style={[
-          styles.reviewAnalysisColumn,
+          styles.historyPanel,
           adaptiveLayout.usesSessionRail ? styles.reviewAnalysisPanelWide : null,
           adaptiveLayout.usesSessionRail ? { width: adaptiveLayout.sessionRailWidth } : null
         ]}
         testID="review-analysis-column"
       >
         {hasAnalysisPanelContent ? (
-          <View style={styles.analysisPanel} testID="review-analysis-panel">
+          <View style={styles.historyPanel} testID="review-analysis-panel">
             {!analysisEnabled && guidedEvalLines.length > 0 ? (
               <Section rows testID="review-guided-eval-list">
                 {guidedEvalLines.map((line, index) => (
@@ -1429,7 +1429,7 @@ export function ReviewSession({
                     </View>
                     <AppText
                       numberOfLines={1}
-                      style={[styles.analysisEngineStatus, styles.tabularText]}
+                      style={[styles.customConfigValue, styles.tabularText]}
                       testID="review-analysis-engine-status"
                       tone="secondary"
                       variant="footnote"
@@ -1492,7 +1492,7 @@ export function ReviewSession({
                           .join(" ")}
                         accessibilityState={{ disabled: !line.move }}
                         disabled={!line.move}
-                        style={({ pressed }) => [styles.analysisLineRow, pressed && line.move ? styles.rowPressed : null]}
+                        style={({ pressed }) => [styles.analysisLineRow, pressed && line.move ? styles.settingsRowPressed : null]}
                         testID={`review-analysis-line-${index}`}
                         onPress={() => {
                           if (line.move) {
@@ -1526,7 +1526,7 @@ export function ReviewSession({
   return (
     <View
       style={[
-        styles.reviewSessionPanel,
+        styles.historyPanel,
         adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null,
         // Regular landscape Review and Replay centre their board and rail row
         // in the content height, as the live session does. The panel spans
@@ -1566,7 +1566,7 @@ export function ReviewSession({
                 width: adaptiveLayout.sessionPackedRowWidth
               }
             ]
-          : styles.reviewBoardLayout}
+          : styles.historyPanel}
         testID={adaptiveLayout.usesSessionRail
           ? "review-session-adaptive-layout"
           : "review-session-stacked-layout"}
@@ -1810,7 +1810,7 @@ function AnalysisLineContent({
       <AppText numberOfLines={1} style={[styles.analysisEvalText, styles.tabularText]} variant="headline">{score}</AppText>
       <AppText numberOfLines={1} style={styles.analysisMoveText} variant="headline">{move}</AppText>
       {label === move ? null : (
-        <AppText numberOfLines={1} style={styles.analysisLineLabel} tone="secondary" variant="footnote">{label}</AppText>
+        <AppText numberOfLines={1} style={styles.customConfigValue} tone="secondary" variant="footnote">{label}</AppText>
       )}
     </>
   );
@@ -1983,7 +1983,7 @@ function ReviewScheduleControl({
                   Future reviews for this puzzle will be removed. Your attempts, History, analysis, and ratings stay unchanged. Review workload and reminders may change.
                 </AppText>
                 {failure ? <AppText tone="negative" variant="footnote">{failure}</AppText> : null}
-                <View style={styles.confirmationActions}>
+                <View style={styles.feedbackHandoffActions}>
                   <Button
                     accessibilityLabel="Confirm removing this puzzle from Review"
                     label="Remove from Review"
@@ -2037,7 +2037,7 @@ export function HistoryAttemptReplayUnavailable({
   const reviewContext = reviewContextForHistoryAttempt(attempt);
   return (
     <View
-      style={[styles.reviewSessionPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]}
+      style={[styles.historyPanel, adaptiveLayout.usesWideContent ? styles.reviewSessionPanelWide : null]}
       testID="review-session"
     >
       <View style={styles.reviewHeaderRow}>
@@ -2045,7 +2045,7 @@ export function HistoryAttemptReplayUnavailable({
           <View style={styles.reviewTopNavSide}>
             <ReviewCircleButton accessibilityLabel="Exit replay" icon="close" testID="review-exit" onPress={onReturn} />
           </View>
-          <View style={styles.reviewTitleBlock}>
+          <View style={styles.editorRowLabel}>
             <AppText
               accessibilityRole="header"
               allowFontScaling={false}
@@ -2305,6 +2305,7 @@ function perPuzzleSecondsForReviewEntry(entry: ReviewEntry): number {
 }
 
 const useStyles = makeStyles((theme) => ({
+  ...pickPracticeStyles(theme, ["accessibleMoveModalBackdrop", "customConfigValue", "editorRowLabel", "feedbackHandoffActions", "historyPanel", "reviewDueHiddenMetric", "settingsRowPressed"]),
   accessibilityAnnouncement: {
     height: 1,
     left: -10000,
@@ -2313,14 +2314,6 @@ const useStyles = makeStyles((theme) => ({
     top: 0,
     width: 1
   },
-  accessibleMoveModalBackdrop: {
-    alignItems: "center",
-    backgroundColor: theme.colors.scrimSoft,
-    flex: 1,
-    justifyContent: "center",
-    padding: 20
-  },
-  reviewDueHiddenMetric: FABRIC_SAFE_HIDDEN_TEXT_STYLE,
   activeSessionAdaptiveLayout: {
     alignSelf: "center",
     alignItems: "center",
@@ -2383,9 +2376,6 @@ const useStyles = makeStyles((theme) => ({
   pressed: {
     opacity: 0.7
   },
-  rowPressed: {
-    backgroundColor: theme.colors.surfaceStrong
-  },
   disabledButton: {
     opacity: 0.4
   },
@@ -2394,9 +2384,6 @@ const useStyles = makeStyles((theme) => ({
   },
   tabularText: {
     fontVariant: ["tabular-nums"]
-  },
-  reviewSessionPanel: {
-    gap: theme.spacing.row
   },
   reviewSessionPanelWide: {
     alignSelf: "center",
@@ -2423,11 +2410,6 @@ const useStyles = makeStyles((theme) => ({
   },
   reviewTopNavSideTrailing: {
     justifyContent: "flex-end"
-  },
-  reviewTitleBlock: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0
   },
   reviewContextStrip: {
     alignItems: "center",
@@ -2457,21 +2439,12 @@ const useStyles = makeStyles((theme) => ({
     maxWidth: "100%",
     minWidth: 0,
   },
-  reviewBoardLayout: {
-    gap: theme.spacing.row
-  },
   reviewBoardLane: {
     alignItems: "center",
     flex: 1,
     gap: theme.spacing.row,
     justifyContent: "center",
     minWidth: 0
-  },
-  reviewAnalysisColumn: {
-    gap: theme.spacing.row
-  },
-  analysisPanel: {
-    gap: theme.spacing.row
   },
   reviewAnalysisPanelWide: {
     flexGrow: 0,
@@ -2486,11 +2459,6 @@ const useStyles = makeStyles((theme) => ({
   analysisToolbarButtons: {
     flexDirection: "row",
     gap: theme.spacing.inline
-  },
-  analysisEngineStatus: {
-    flexShrink: 1,
-    marginLeft: "auto",
-    textAlign: "right"
   },
   // Engine lines are compact single-line rows that still meet the 44 pt
   // target.
@@ -2508,11 +2476,6 @@ const useStyles = makeStyles((theme) => ({
   },
   analysisMoveText: {
     flexShrink: 1
-  },
-  analysisLineLabel: {
-    flexShrink: 1,
-    marginLeft: "auto",
-    textAlign: "right"
   },
   actionRowContent: {
     alignItems: "center",
@@ -2569,10 +2532,6 @@ const useStyles = makeStyles((theme) => ({
   reviewScheduleConfirmationContent: {
     gap: theme.spacing.row,
     padding: 24
-  },
-  confirmationActions: {
-    gap: theme.spacing.group,
-    marginTop: 4
   },
   arrowLayer: {
     position: "absolute",
