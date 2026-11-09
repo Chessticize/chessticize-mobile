@@ -120,11 +120,12 @@ describe("public landing page", () => {
     expect(homepage).toContain("./accessibility/");
     expect(
       homepage.match(/href="https:\/\/app\.chessticize\.com"/g)
-    ).toHaveLength(4);
+    ).toHaveLength(5);
     expect(homepage).toContain("<strong>Play online</strong>");
     expect(homepage).toContain(
       'href="https://github.com/Chessticize/chessticize-web/discussions"'
     );
+    expect(homepage).toContain("Open the web app");
     expect(homepage).toContain("docs/PRIVACY_POLICY.md");
     expect(homepage).toContain("/LICENSE");
     expect(androidPage).toContain("{{ANDROID_APK_URL}}");
