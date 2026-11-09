@@ -21,6 +21,9 @@ export type AdaptiveLayout = {
   isLargeText: boolean;
   isRegularWidth: boolean;
   promptFrameHeight: number;
+  // Regular landscape sessions centre the board and rail row, and the rail's
+  // content block, in the available height. Compact layouts keep top alignment.
+  sessionCentersRow: boolean;
   sessionPackedRowWidth: number;
   sessionRailGap: number;
   sessionRailWidth: number;
@@ -44,7 +47,6 @@ const COMPACT_LANDSCAPE_BOARD_MAX = 430;
 const PHONE_PORTRAIT_BOARD_MAX = 560;
 const REGULAR_LANDSCAPE_BOARD_MAX = 640;
 const REGULAR_PORTRAIT_BOARD_MAX = 860;
-const REGULAR_LANDSCAPE_RESERVED_SESSION_CHROME_HEIGHT = 120;
 // Compact portrait locks the outer scroll while the board accepts input, so
 // this budget must also keep the post-answer Unclear action inside the viewport.
 const COMPACT_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 332;
@@ -90,12 +92,9 @@ export function buildPracticeAdaptiveLayout({
     0,
     sessionContentWidth - PRACTICE_UI_PADDING * 2 - sessionRailWidth - SESSION_RAIL_GAP_MIN
   );
-  const sessionBoardSlotHeight = Math.max(
-    0,
-    contentHeight - (isRegularWidth && isLandscape
-      ? REGULAR_LANDSCAPE_RESERVED_SESSION_CHROME_HEIGHT
-      : PRACTICE_UI_PADDING * 2)
-  );
+  // In rail layouts the session chrome (header, metrics, prompt, counts) sits in
+  // the rail beside the board, so the board only gives up the content padding.
+  const sessionBoardSlotHeight = Math.max(0, contentHeight - PRACTICE_UI_PADDING * 2);
   const portraitBoardSlotWidth = Math.max(0, sessionContentWidth - PRACTICE_UI_PADDING * 2);
   const portraitReservedControlsHeight = (
     isRegularWidth
@@ -149,6 +148,7 @@ export function buildPracticeAdaptiveLayout({
     isLargeText,
     isRegularWidth,
     promptFrameHeight,
+    sessionCentersRow: isRegularWidth && isLandscape,
     sessionPackedRowWidth: boardSize + sessionRailWidth + sessionRailGap,
     sessionRailGap,
     sessionRailWidth,

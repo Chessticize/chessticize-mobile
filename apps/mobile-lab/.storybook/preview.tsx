@@ -199,6 +199,14 @@ const preview: Preview = {
             height: `${LAB_DEVICE_VIEWPORTS.stageManagerShort.height}px`
           },
           type: "tablet"
+        },
+        duoInnerLandscape: {
+          name: "iPhone Duo inner landscape",
+          styles: {
+            width: `${LAB_DEVICE_VIEWPORTS.duoInnerLandscape.width}px`,
+            height: `${LAB_DEVICE_VIEWPORTS.duoInnerLandscape.height}px`
+          },
+          type: "tablet"
         }
       }
     }

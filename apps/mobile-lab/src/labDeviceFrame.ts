@@ -59,6 +59,15 @@ export const LAB_DEVICE_VIEWPORTS = {
     width: 800,
     height: 600,
     insets: { top: 24, right: 0, bottom: 20, left: 0 }
+  },
+  // iPhone Duo inner display in landscape: 2853 x 2007 pixels at 3x from the
+  // simulator display profile. simctl cannot capture the unfolded display, so
+  // the right status-bar and camera column uses the outer display's measured
+  // 84 points and the bottom uses the landscape home indicator.
+  duoInnerLandscape: {
+    width: 951,
+    height: 669,
+    insets: { top: 0, right: 84, bottom: 20, left: 0 }
   }
 } as const satisfies Record<string, LabDeviceViewport>;
 
