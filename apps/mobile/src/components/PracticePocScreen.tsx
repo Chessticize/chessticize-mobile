@@ -579,11 +579,6 @@ function openFeedbackIssuesInBrowser(url: string): Promise<void> {
 const CHESSBOARD_DURATIONS = { move: BOARD_MOVE_ANIMATION_MS } as const;
 // Space below the last tab content row, added to the tab chrome's bottom inset.
 const CONTENT_BOTTOM_PADDING = 40;
-const ALL_HISTORY_ATTENTION_REASONS: readonly HistoryAttentionReason[] = [
-  "unclear",
-  "in_review",
-  "incomplete"
-];
 
 export function PracticePocScreen({
   platformCapabilities,
@@ -915,22 +910,10 @@ export function PracticePocScreen({
   const [boardInputLockMode, setBoardInputLockMode] = useState<BoardInputLockMode>("hard");
   const [readyArrowDuelBoardKey, setReadyArrowDuelBoardKey] = useState<string | null>(null);
   const [chessboardDebugEvents, setChessboardDebugEvents] = useState<string[]>([]);
-  const [historyTimeRange, setHistoryTimeRange] = useState<HistoryTimeRange>("7d");
-  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | AttemptSource>("sprint");
-  const historyAttentionReasonOptions = ALL_HISTORY_ATTENTION_REASONS;
-  const [historyResultFilter, setHistoryResultFilter] = useState<HistoryResultFilter>("all");
-  const [historySideFilter, setHistorySideFilter] = useState<"all" | PuzzleSide>("all");
-  const [historyRatingRangeFilter, setHistoryRatingRangeFilter] = useState<HistoryRatingRangeFilter>("all");
-  const [historyAttentionReasons, setHistoryAttentionReasons] = useState<HistoryAttentionReason[]>(
-    () => [...historyAttentionReasonOptions]
-  );
-  const [historyPageOffset, setHistoryPageOffset] = useState(0);
-  const [historyRatingKey, setHistoryRatingKey] = useState<string | null>(null);
   const [historyReviewEntries, setHistoryReviewEntries] = useState<ReviewEntry[]>([]);
   const [reviewBoardTouchActive, setReviewBoardTouchActive] = useState(false);
   const [historyUnavailableAttempt, setHistoryUnavailableAttempt] = useState<HistoryUnavailableAttempt | null>(null);
   const [historyReviewInitialIndex, setHistoryReviewInitialIndex] = useState(0);
-  const [historyProgressOpen, setHistoryProgressOpen] = useState(false);
   const [reviewSessionSource, setReviewSessionSource] = useState<ReviewEntry["source"] | null>(null);
   const [customSprintMode, setCustomSprintMode] = useState<"custom" | "arrow_duel">("custom");
   const [customDurationSeconds, setCustomDurationSeconds] = useState(5 * 60);
@@ -952,7 +935,6 @@ export function PracticePocScreen({
   const [sessionGuideTargetRevision, setSessionGuideTargetRevision] = useState(0);
   const sessionGuideTargetRef = useRef<View>(null);
   const sessionRailScrollRef = useRef<ScrollView>(null);
-  const [historyFiltersExpanded, setHistoryFiltersExpanded] = useState(false);
   const [reviewFiltersExpanded, setReviewFiltersExpanded] = useState(false);
   const [customRatingEditorOpen, setCustomRatingEditorOpen] = useState(false);
   const [reviewAnalysisOpen, setReviewAnalysisOpen] = useState(false);
@@ -972,7 +954,6 @@ export function PracticePocScreen({
     controlledSelection: customThemeSelection?.selectedThemes,
     onControlledSelectionChange: customThemeSelection?.onChange
   });
-  const historyThemeChoices = useThemeChoiceSelection();
   const resolvedHistoryProgressPresentation = useHistoryProgressPresentation({
     enabled: tab === "history" || historyProgressOpen,
     service,
