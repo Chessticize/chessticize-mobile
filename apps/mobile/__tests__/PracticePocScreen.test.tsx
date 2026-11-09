@@ -15729,7 +15729,7 @@ describe("PracticePocScreen", () => {
       expect(flattenTestStyle(confirmation.props.contentContainerStyle)).toEqual(expect.objectContaining({
         padding: 24
       }));
-      expect(flattenTestStyle(confirmation.props.style).padding).toBeUndefined();
+      expect(flattenTestStyle(confirmation.props.style).padding).toBe(0);
     } finally {
       platform.OS = previousPlatform;
     }

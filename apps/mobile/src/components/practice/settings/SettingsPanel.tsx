@@ -674,8 +674,8 @@ function FeedbackSupportCard({
           <SafeAreaModalBackdrop style={styles.accessibleMoveModalBackdrop}>
             <ScrollView
               accessibilityViewIsModal
-              contentContainerStyle={[styles.feedbackHandoffConfirmation, styles.feedbackHandoffContent]}
-              style={styles.feedbackHandoffCard}
+              contentContainerStyle={styles.feedbackHandoffContent}
+              style={[styles.feedbackHandoffConfirmation, styles.feedbackHandoffCard]}
               testID="settings-feedback-handoff-confirmation"
             >
               <Badge label="EXTERNAL BROWSER" tone="accent" />
@@ -1955,11 +1955,11 @@ const useStyles = makeStyles((theme) => ({
   feedbackHandoffCard: {
     flexGrow: 0,
     flexShrink: 1,
-    maxWidth: 430,
-    width: "100%"
+    padding: 0
   },
   feedbackHandoffContent: {
-    gap: theme.spacing.row
+    gap: theme.spacing.row,
+    padding: 24
   },
   confirmationActionsStacked: {
     flexDirection: "column",
