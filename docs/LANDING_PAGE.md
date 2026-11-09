@@ -26,6 +26,15 @@ at any depth. It references its stylesheet and icon at both `/` and the legacy
 `/chessticize-mobile/` prefix, so it also renders during the transition on the
 `github.io` project path.
 
+## Preparing the 1.6 refresh
+
+The landing page uses the existing approved, sanitized product screenshots while
+the final 1.6 marketing set is prepared. They continue to illustrate established
+puzzle-practice states and must be replaced only through
+`pnpm landing-page:assets` once the approved 1.6 source pack is available. That
+command preserves the current filenames and updates the manifest, so no page
+markup changes are needed for the asset swap.
+
 ## Updating the marketing images
 
 The committed website images are web-sized derivatives of the approved,

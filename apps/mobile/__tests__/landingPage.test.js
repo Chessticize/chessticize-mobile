@@ -53,7 +53,7 @@ describe("public landing page", () => {
     expect(homepage).toContain("rating-matched puzzle Sprints");
     expect(homepage).toContain("Custom Runs");
     expect(homepage).toContain("scheduled Review");
-    expect(homepage).toContain("build tactical intuition");
+    expect(homepage).toContain("A cleaner design for chess puzzle practice.");
     expect(publicCopy).not.toMatch(/Tactical Profile/i);
     expect(publicCopy).not.toMatch(/\badaptive practice\b/i);
     expect(publicCopy).not.toMatch(/\bweakness(?:es)?\b/i);
@@ -61,6 +61,15 @@ describe("public landing page", () => {
 
   it("leads with offline, ad-free practice and explains Arrow Duel by benefit", () => {
     expect(homepage).toContain("Free · Offline · Ad-free · Open source");
+    expect(homepage).toContain(
+      "A cleaner design for chess puzzle practice."
+    );
+    expect(homepage).toMatch(
+      /New navigation keeps iPhone, iPad, iPhone\s+Duo, Android phones, and Android tablets easy to use\./
+    );
+    expect(homepage).toMatch(
+      /Dark mode\s+follows your system, or you can set it in Settings\./
+    );
     expect(homepage).toMatch(
       /Learn to reject tempting\s+blunders in Arrow Duel\./
     );
@@ -82,13 +91,24 @@ describe("public landing page", () => {
     }
   });
 
-  it("leads with an iPhone product view and keeps iPad support secondary", () => {
+  it("uses system dark appearance for the 1.6 landing refresh", () => {
+    expect(styles).toContain("@media (prefers-color-scheme: dark)");
+    expect(styles).toContain("color-scheme: dark");
+    expect(landingPageDoc).toContain("Preparing the 1.6 refresh");
+  });
+
+  it("keeps an iPhone product view while covering the broader navigation", () => {
     expect(homepage).toContain('src="./assets/screenshots/iphone-01.webp"');
     expect(homepage).toContain(
       'alt="Chessticize running a Standard puzzle Sprint on iPhone"'
     );
-    expect(homepage).toContain("<strong>Also on iPad.</strong>");
-    expect(homepage).toContain("optional private iCloud Sync");
+    expect(homepage).toContain(
+      "<strong>New navigation, wherever you practice.</strong>"
+    );
+    expect(homepage).toContain(
+      "Android uses a bottom bar on phones and a side rail on tablets."
+    );
+    expect(homepage).toMatch(/Optional\s+private iCloud Sync/);
     expect(homepage).not.toContain("Landscape-first on iPad");
     expect(homepage).not.toContain('class="ipad-section');
     expect(homepage).not.toMatch(/src="\.\/assets\/screenshots\/ipad-/);
