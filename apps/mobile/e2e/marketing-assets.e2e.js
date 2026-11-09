@@ -213,10 +213,11 @@ async function prepareFrame(frame) {
       // Keep both approved Home controls wholly above the native tab bar. On
       // the calibrated iPhone viewport, 53–74 points is the feasible interval:
       // 64 clears the bar while preserving Start below the app safe-area top.
-      // Android needs 32 dp to reveal the complete Training focus card.
+      // Android needs 72 dp to clear the title and reveal the complete
+      // Training focus card including its profile action.
       if (target.deviceFamily === 'iphone' || target.deviceFamily === 'android-phone') {
         await element(by.id('practice-main-scroll')).scroll(
-          target.deviceFamily === 'iphone' ? 64 : 32, 'down', 0.5, 0.5
+          target.deviceFamily === 'iphone' ? 64 : 72, 'down', 0.5, 0.5
         );
       }
       return;
@@ -236,7 +237,7 @@ async function prepareFrame(frame) {
       await waitFor(element(by.id('personal-best-hub'))).toExist().withTimeout(30000);
       // Clear Start and the trailing title glyph together on the calibrated
       // iPhone viewport; the type selector and full disclosure remain visible.
-      if (target.deviceFamily === 'iphone') {
+      if (target.deviceFamily === 'iphone' || target.deviceFamily === 'android-phone') {
         await element(by.id('practice-main-scroll')).scroll(136, 'down', 0.5, 0.5);
       }
       return;
