@@ -1,6 +1,12 @@
+import React from "react";
+import { View } from "react-native";
+import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { Icon } from "../../ui/index.tsx";
+import { ResultBadgeGlyph } from "./Glyphs.tsx";
+
 // Status tile for a History or Review attempt row: tinted like an IconTile and
 // carrying the result glyph.
-function AttemptStatusTile({
+export function AttemptStatusTile({
   testID,
   tone
 }: {
@@ -30,6 +36,7 @@ function AttemptStatusTile({
   );
 }
 
+const useStyles = makeStyles((theme) => ({
   attemptStatusTile: {
     alignItems: "center",
     borderRadius: theme.shape.tile,
@@ -46,3 +53,4 @@ function AttemptStatusTile({
   attemptStatusTileNeutral: {
     backgroundColor: theme.colors.surfaceStrong
   },
+}));

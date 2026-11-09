@@ -1,6 +1,18 @@
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Easing,
+  type LayoutChangeEvent,
+  type StyleProp,
+  View,
+  type ViewStyle
+} from "react-native";
+import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { Icon } from "../../ui/index.tsx";
+
 const DISCLOSURE_MOTION_DURATION_MS = 200;
 
-function CollapsibleRegion({
+export function CollapsibleRegion({
   children,
   contentTestID,
   contentStyle,
@@ -107,7 +119,7 @@ function AnimatedCollapsibleRegion({
   );
 }
 
-function DisclosureChevron({
+export function DisclosureChevron({
   expanded,
   testID
 }: {
@@ -156,6 +168,7 @@ function AnimatedDisclosureChevron({
   );
 }
 
+const useStyles = makeStyles(() => ({
   disclosureChevronMotion: {
     alignItems: "center",
     height: 18,
@@ -172,3 +185,4 @@ function AnimatedDisclosureChevron({
     right: 0,
     top: 0
   },
+}));

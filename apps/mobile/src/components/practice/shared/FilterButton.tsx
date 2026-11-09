@@ -1,4 +1,8 @@
-function FilterButton({
+import React from "react";
+import { Pressable, Text } from "react-native";
+import { makeStyles } from "../../../theme/index.ts";
+
+export function FilterButton({
   active,
   label,
   testID,
@@ -23,3 +27,25 @@ function FilterButton({
     </Pressable>
   );
 }
+
+const useStyles = makeStyles((theme) => ({
+  filterButton: {
+    alignItems: "center",
+    backgroundColor: theme.colors.surfaceStrong,
+    borderRadius: theme.shape.capsule,
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: 14
+  },
+  filterButtonActive: {
+    backgroundColor: theme.colors.accent.s100
+  },
+  filterButtonText: {
+    ...theme.typography.subheadline,
+    color: theme.colors.text.primary
+  },
+  filterButtonTextActive: {
+    color: theme.colors.accent.s600,
+    fontWeight: theme.typography.headline.fontWeight
+  },
+}));

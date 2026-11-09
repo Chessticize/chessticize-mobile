@@ -1,1 +1,1 @@
-type MoveSide = "w" | "b";
+export type MoveSide = "w" | "b";

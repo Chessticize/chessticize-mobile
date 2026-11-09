@@ -3,8 +3,6 @@ import {
   ActivityIndicator,
   Animated,
   AppState,
-  Easing,
-  Image,
   LayoutAnimation,
   Linking,
   Modal,
@@ -18,7 +16,6 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
-import type { ImageSourcePropType } from "react-native";
 import type {
   LayoutChangeEvent
 } from "react-native";
@@ -330,6 +327,24 @@ export type {
 import { makeStyles, useAppearance, useTheme, type AppearancePreference, type Theme } from "../theme/index.ts";
 import { typography as baseTypography } from "../theme/scales.ts";
 import { AppText, Badge, Button, Icon, IconTile, ListRow, Section, SegmentedControl, useListRowStyle, type IconName } from "./ui/index.tsx";
+import type { MoveSide } from "./practice/shared/moveSide.ts";
+import { CHESS_PIECE_SPRITE } from "./practice/shared/chessPieceSprite.ts";
+import {
+  ChevronGlyph,
+  CloseGlyph,
+  FilterGlyph,
+  FlipGlyph,
+  MoreGlyph,
+  MoveSideGlyph,
+  PauseGlyph,
+  PlayGlyph,
+  SearchGlyph,
+  SessionScoreGlyph
+} from "./practice/shared/Glyphs.tsx";
+import { CollapsibleRegion, DisclosureChevron } from "./practice/shared/CollapsibleRegion.tsx";
+import { ToolbarIconButton } from "./practice/shared/ToolbarIconButton.tsx";
+import { FilterButton } from "./practice/shared/FilterButton.tsx";
+import { AttemptStatusTile } from "./practice/shared/AttemptStatusTile.tsx";
 
 interface Props {
   platformCapabilities: MobilePlatformCapabilities;

@@ -1,4 +1,11 @@
-function SessionScoreGlyph({ tone }: { tone: "positive" | "negative" | "neutral" }): React.JSX.Element {
+import React from "react";
+import { Image, View } from "react-native";
+import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { Icon } from "../../ui/index.tsx";
+import type { MoveSide } from "./moveSide.ts";
+import { CHESS_PIECE_SPRITE } from "./chessPieceSprite.ts";
+
+export function SessionScoreGlyph({ tone }: { tone: "positive" | "negative" | "neutral" }): React.JSX.Element {
   const styles = useStyles();
   return (
     <View
@@ -27,7 +34,7 @@ function SessionScoreGlyph({ tone }: { tone: "positive" | "negative" | "neutral"
   );
 }
 
-function MoveSideGlyph({
+export function MoveSideGlyph({
   kingPieceSize = 22,
   side,
   testID = `move-side-${side === "w" ? "white" : "black"}-glyph`
@@ -62,7 +69,7 @@ function MoveSideGlyph({
   );
 }
 
-function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "incomplete" }): React.JSX.Element {
+export function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "incomplete" }): React.JSX.Element {
   const appTheme = useTheme();
   if (tone === "correct") {
     return (
@@ -79,7 +86,7 @@ function ResultBadgeGlyph({ tone }: { tone: "correct" | "wrong" | "incomplete" }
   );
 }
 
-function FilterGlyph({ active }: { active: boolean }): React.JSX.Element {
+export function FilterGlyph({ active }: { active: boolean }): React.JSX.Element {
   const appTheme = useTheme();
   return (
     <Icon
@@ -92,7 +99,7 @@ function FilterGlyph({ active }: { active: boolean }): React.JSX.Element {
   );
 }
 
-function CloseGlyph({
+export function CloseGlyph({
   color,
   testID = "close-glyph"
 }: {
@@ -110,7 +117,7 @@ function CloseGlyph({
   );
 }
 
-function MoreGlyph(): React.JSX.Element {
+export function MoreGlyph(): React.JSX.Element {
   const styles = useStyles();
   return (
     <View style={styles.moreGlyph} testID="more-glyph">
@@ -121,7 +128,7 @@ function MoreGlyph(): React.JSX.Element {
   );
 }
 
-function PauseGlyph(): React.JSX.Element {
+export function PauseGlyph(): React.JSX.Element {
   const styles = useStyles();
   return (
     <View style={styles.pauseGlyph} testID="pause-glyph">
@@ -131,14 +138,14 @@ function PauseGlyph(): React.JSX.Element {
   );
 }
 
-function PlayGlyph(): React.JSX.Element {
+export function PlayGlyph(): React.JSX.Element {
   const styles = useStyles();
   return (
     <View style={styles.playGlyph} testID="play-glyph" />
   );
 }
 
-function ChevronGlyph({
+export function ChevronGlyph({
   direction
 }: {
   direction: "down" | "left" | "right" | "up";
@@ -158,7 +165,7 @@ function ChevronGlyph({
   );
 }
 
-function FlipGlyph(): React.JSX.Element {
+export function FlipGlyph(): React.JSX.Element {
   const styles = useStyles();
   return (
     <View style={styles.flipGlyph} testID="flip-glyph">
@@ -170,7 +177,7 @@ function FlipGlyph(): React.JSX.Element {
   );
 }
 
-function SearchGlyph(): React.JSX.Element {
+export function SearchGlyph(): React.JSX.Element {
   const styles = useStyles();
   return (
     <View style={styles.searchGlyph} testID="search-glyph">
@@ -180,6 +187,7 @@ function SearchGlyph(): React.JSX.Element {
   );
 }
 
+const useStyles = makeStyles((theme) => ({
   moveSideKingGlyph: {
     overflow: "hidden",
     position: "relative"
@@ -400,3 +408,4 @@ function SearchGlyph(): React.JSX.Element {
     transform: [{ rotate: "45deg" }],
     width: 6
   },
+}));

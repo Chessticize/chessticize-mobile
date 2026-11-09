@@ -1,5 +1,9 @@
+import React from "react";
+import { Pressable } from "react-native";
+import { makeStyles } from "../../../theme/index.ts";
+
 // A 44-pt circular toolbar button for a destination header (filters, paging).
-function ToolbarIconButton({
+export function ToolbarIconButton({
   accessibilityLabel,
   accessibilityState,
   active = false,
@@ -37,6 +41,10 @@ function ToolbarIconButton({
   );
 }
 
+const useStyles = makeStyles((theme) => ({
+  disabledButton: {
+    opacity: 0.36
+  },
   toolbarIconButton: {
     alignItems: "center",
     backgroundColor: theme.colors.surface,
@@ -51,3 +59,4 @@ function ToolbarIconButton({
   filterButtonPressed: {
     opacity: 0.7
   },
+}));
