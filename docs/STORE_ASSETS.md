@@ -1,6 +1,6 @@
 # App Store Assets
 
-This document is the 1.5.2 source of truth for App Store Connect metadata and
+This document is the 1.6 preparation source of truth for App Store Connect metadata and
 store screenshot capture. Recheck Apple's live documentation before upload:
 
 - Screenshot specifications:
@@ -44,9 +44,9 @@ Connect's stricter 100-byte reference.
 | Subtitle | `Build Tactical Intuition` | State the training benefit without repeating the product category; 24 / 30 characters. |
 | Promotional text | `Free, offline, no-ads, open-source app to practice rating-matched chess puzzles and prevent blunders with Arrow Duel. Learn from mistakes with scheduled Review.` | 160 / 170 characters. |
 | Keywords | `chess,puzzle,tactics,blunder,review,training,elo,analysis,stockfish,checkmate,offline` | 85 / 100 UTF-8 bytes; owner-approved search terms in submission order, with no spaces after commas, repeated entries, category names, or competitor terms. |
-| Support URL | `https://chessticize.github.io/chessticize-mobile/support/` | Stable public support, bug-report, feature-request, and private-contact entry point. |
-| Marketing URL | `https://chessticize.github.io/chessticize-mobile/` | Stable public product page with iOS and Android install paths. |
-| Accessibility URL | `https://chessticize.github.io/chessticize-mobile/accessibility/` | Current support and known limitations; do not use this page to imply an undeclared feature. |
+| Support URL | `https://chessticize.com/support/` | Stable public support, bug-report, feature-request, and private-contact entry point. |
+| Marketing URL | `https://chessticize.com/` | Stable public product page with iOS and Android install paths. |
+| Accessibility URL | `https://chessticize.com/accessibility/` | Current support and known limitations; do not use this page to imply an undeclared feature. |
 | Privacy policy URL | `https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md` | Must match `docs/APP_PRIVACY_DISCLOSURE.md`. |
 | Primary category | `Games` | App Store Connect selection. |
 | Secondary category | `Education` | App Store Connect selection. |
@@ -112,24 +112,25 @@ model-derived improvement.
 
 ### What's New
 
-For iOS 1.5.2, review this proposed ready-to-paste copy:
+For iOS 1.6.0, review this draft ready-to-paste copy:
 
 ```text
-• Focused Runs now continue normally after your first answer.
-• Close and reopen the app without losing an unfinished Focused Run—it returns paused at the puzzle where you left off.
+• A fresh, cleaner design for your chess practice.
+• New navigation for iPhone, iPad, and iPhone Duo.
+• Dark mode follows your system, or you can set it in Settings.
 ```
 
-This proposed copy is 181 / 300 Unicode characters, including line breaks.
-Future versions must use the reusable template in
+This draft is 165 / 300 Unicode characters, including line breaks.
+Use the reusable template in
 [`docs/releases/RELEASE_NOTES_TEMPLATE.md`](releases/RELEASE_NOTES_TEMPLATE.md):
-lead with user benefits, use two or three short bullets, omit raw URLs, and do
-not call stable features experimental unless that qualification is an
-intentional product promise.
+lead with user benefits, use two or three short bullets, and omit raw URLs.
 
-This copy belongs to the proposed `ios-v1.5.2-build-1` release identity and
-must match `docs/releases/ios-v1.5.2-build-1.md` before the owner marks that
-note Approved. The release PR must retain a screenshot or exported metadata
-record showing the exact submitted text.
+This copy belongs to the planned `ios-v1.6.0-build-1` identity and matches
+[`docs/releases/ios-v1.6.0-build-1.md`](releases/ios-v1.6.0-build-1.md).
+It is stored as `nextVersionWhatsNew`, separate from the canonical 1.5.2
+release metadata. It is Draft, not a tagged or submitted store record. Reconcile the
+exact candidate and validation evidence before marking the note Approved.
+The release PR must retain the exact submitted text after owner approval.
 
 ## Accessibility Metadata
 
@@ -155,7 +156,7 @@ the resulting feature is declared.
 
 ## Screenshot Requirements
 
-The app targets iPhone and iPad for 1.5.2. The current automated capture plan
+The app targets iPhone and iPad for 1.6. The current automated capture plan
 covers the required 6.9" iPhone, 6.1" iPhone, and 13" iPad screenshot groups.
 The original 1.0 plan called out 6.7" and 6.1" minimum iPhone coverage.
 Apple's current screenshot reference, rechecked on 2026-07-28, lists 6.9" as
@@ -182,14 +183,14 @@ Release rule:
 5. Do not upload debug screenshots that expose the development puzzle-source
    switch, Metro overlays, local paths, or user-private data.
 
-The 1.5.2 changes keep Focused Runs moving after the first answer and preserve
-unfinished Focused Runs across an app restart. The selected six-frame marketing
-moments do not include either changed state, so prior compositions are reused
-only after the exact-head product baseline and existing marketing claims pass
-review.
-The prior approved marketing compositions may be reused only after the current
-metadata and screenshot audit passes. The separate release-delta workflow must
-still recapture and inspect its exact-head product baseline.
+The 1.6 release changes the app presentation, navigation and appearance. Use
+the `releaseCampaign` capture plan in the shared marketing-story JSON and the
+[story contract](marketing/APP_STORE_SCREENSHOT_STORY.md#16-release-capture-plan)
+for the new Practice Home, dark mode, Tactical Profile, Focused Run and
+Survival coverage. Existing v1 compositions remain provenance for the older
+campaign; they are not 1.6 exports. Final native captures, matching headline
+templates, manifest hashes and contact-sheet review are still required before
+listing handoff. The independent release-delta checks retain their own scope.
 
 ## Bundled Puzzle Pack Measurement
 

@@ -4,7 +4,7 @@
   "issue": 416,
   "auditedOn": "2026-07-29",
   "appSourceCommit": "211ec0edb2b4b2a877efd429f3cba190225a1501",
-  "accessibilityUrl": "https://chessticize.github.io/chessticize-mobile/accessibility/",
+  "accessibilityUrl": "https://chessticize.com/accessibility/",
   "officialReferences": [
     "https://developer.apple.com/help/app-store-connect/manage-app-accessibility/overview-of-accessibility-nutrition-labels/",
     "https://developer.apple.com/help/app-store-connect/manage-app-accessibility/manage-accessibility-nutrition-labels/",

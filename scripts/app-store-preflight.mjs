@@ -304,9 +304,9 @@ check(
   storeAssets.includes("| App name | `Chessticize: Chess Puzzles` |") &&
     storeAssets.includes("| Subtitle | `Build Tactical Intuition` |") &&
     storeAssets.includes("config/app-store-metadata-en-us-v1.json") &&
-    storeAssets.includes("| Support URL | `https://chessticize.github.io/chessticize-mobile/support/` |") &&
-    storeAssets.includes("| Marketing URL | `https://chessticize.github.io/chessticize-mobile/` |") &&
-    storeAssets.includes("| Accessibility URL | `https://chessticize.github.io/chessticize-mobile/accessibility/` |") &&
+    storeAssets.includes("| Support URL | `https://chessticize.com/support/` |") &&
+    storeAssets.includes("| Marketing URL | `https://chessticize.com/` |") &&
+    storeAssets.includes("| Accessibility URL | `https://chessticize.com/accessibility/` |") &&
     storeAssets.includes("| Privacy policy URL | `https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md` |") &&
     storeAssets.includes("6.9\"") &&
     storeAssets.includes("6.1\""),
@@ -326,7 +326,7 @@ check(
       (feature) => feature.status === "not-declared"
     ) &&
     appStoreAccessibility.accessibilityUrl ===
-      "https://chessticize.github.io/chessticize-mobile/accessibility/" &&
+      "https://chessticize.com/accessibility/" &&
     accessibilityAudit.includes("Declare **no accessibility features**") &&
     accessibilityAudit.includes("Standard, Arrow Duel, Review, and Replay") &&
     accessibilityAudit.includes("demand-driven deferral") &&
@@ -435,7 +435,7 @@ manualGate(
 );
 manualGate(
   "Record the accessibility metadata decision",
-  "Leave every accessibility feature unselected for iPhone and iPad, save https://chessticize.github.io/chessticize-mobile/accessibility/ as the Accessibility URL after deployment, and retain an App Store Connect screenshot or export in issue #416 or #417."
+  "Leave every accessibility feature unselected for iPhone and iPad, save https://chessticize.com/accessibility/ as the Accessibility URL after deployment, and retain an App Store Connect screenshot or export in issue #416 or #417."
 );
 const failed = checks.filter((entry) => entry.status === "fail");
 const result = {

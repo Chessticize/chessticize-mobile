@@ -13,9 +13,9 @@
 <p align="center">
   <a href="https://apps.apple.com/us/app/chessticize/id6788610123">Download on the App Store</a>
   ·
-  <a href="https://chessticize.github.io/chessticize-mobile/">Visit the website</a>
+  <a href="https://chessticize.com/">Visit the website</a>
   ·
-  <a href="https://chessticize.github.io/chessticize-mobile/android/">Get the Android app</a>
+  <a href="https://chessticize.com/android/">Get the Android app</a>
 </p>
 
 ![Six Chessticize screens showing Puzzle Sprint, Arrow Duel, Custom Runs, Review, Ratings, and privacy](site/assets/screenshots/contact-sheet.webp)
@@ -30,8 +30,8 @@
 - **Use and inspect it freely:** the app and its bundled Stockfish integration are open source.
 
 Install from the links above, review the current
-[accessibility support](https://chessticize.github.io/chessticize-mobile/accessibility/),
-visit the [support page](https://chessticize.github.io/chessticize-mobile/support/),
+[accessibility support](https://chessticize.com/accessibility/),
+visit the [support page](https://chessticize.com/support/),
 or [report a problem or request a feature](https://github.com/Chessticize/chessticize-mobile/issues).
 
 ## For contributors

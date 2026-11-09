@@ -1,5 +1,7 @@
 const fs = require('fs');
+const { execFileSync } = require('node:child_process');
 const zlib = require('zlib');
+const { runAndroidAdbShell } = require('./androidAdbShell');
 const {
   dismissRunNameKeyboard,
   dragAndroidElementToElement,
@@ -40,6 +42,17 @@ const {
 const PRACTICE_RENDER_PUZZLE_SELECTION_SEED = 'practice-arrow-render-v4:23';
 const SURVIVAL_RECORDS_CAPTURE_ORIENTATION =
   process.env.CHESSTICIZE_SURVIVAL_RECORDS_CAPTURE_ORIENTATION;
+const REVIEW_ACTIONS_LARGE_TEXT = process.env.CHESSTICIZE_REVIEW_ACTIONS_LARGE_TEXT === '1';
+const REVIEW_ACTIONS_LANDSCAPE = process.env.CHESSTICIZE_REVIEW_ACTIONS_LANDSCAPE === '1';
+
+function setReviewActionTextSize(large) {
+  if (device.getPlatform() === 'ios') {
+    execFileSync('xcrun', ['simctl', 'ui', device.id, 'content_size',
+      large ? 'accessibility-extra-extra-extra-large' : 'large']);
+  } else {
+    runAndroidAdbShell(['settings', 'put', 'system', 'font_scale', large ? '2.0' : '1.0']);
+  }
+}
 
 if (SURVIVAL_RECORDS_CAPTURE_ORIENTATION
   && !['portrait', 'landscape'].includes(SURVIVAL_RECORDS_CAPTURE_ORIENTATION)) {
@@ -106,6 +119,7 @@ async function waitForRunOrder(sourceTestID, targetTestID, timeoutMs = 5000) {
 
 describe('Practice POC', () => {
   beforeEach(async () => {
+    if (REVIEW_ACTIONS_LARGE_TEXT) setReviewActionTextSize(false);
     // These smoke tests use explicit waitFor checks and screenshot assertions.
     // React Native, Skia, and native engine startup can keep Detox synchronization
     // busy after the first visible frame, so launch args disable synchronization
@@ -123,6 +137,11 @@ describe('Practice POC', () => {
     } else if (process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD !== '1') {
       await device.setOrientation('portrait');
     }
+  });
+
+  afterEach(async () => {
+    if (REVIEW_ACTIONS_LARGE_TEXT) setReviewActionTextSize(false);
+    if (REVIEW_ACTIONS_LANDSCAPE) await device.setOrientation('portrait');
   });
 
   it('opens the empty Survival records state from a fresh profile', async () => {
@@ -279,9 +298,10 @@ describe('Practice POC', () => {
     await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
     await element(by.id('session-abandon-confirm')).tap();
     await waitFor(element(by.id('sprint-summary-panel'))).toExist().withTimeout(15000);
-    await element(by.id('practice-main-scroll')).scrollTo('top');
+    await element(by.id('sprint-result-scroll')).scrollTo('top');
     await waitFor(element(by.id('sprint-result-top-bar'))).toBeVisible().withTimeout(10000);
-    await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('sprint-result-headline'))).toHaveText('Sprint abandoned').withTimeout(10000);
+    await expect(element(by.id('sprint-result-headline'))).toBeVisible(100);
     await element(by.id('back-practice-button')).tap();
 
     await openTab('settings-tab', 'settings-show-sprint-guide');
@@ -423,6 +443,11 @@ describe('Practice POC', () => {
 
   it('persists Unclear, places its History actions responsively, and manages Review Schedule there', async () => {
     const expectsRegularLayout = process.env.CHESSTICIZE_EXPECT_FULL_HISTORY_BOARD === '1';
+    const waitForReviewAction = (testID) => waitForVisibleInScroll(
+      testID,
+      expectsRegularLayout ? 'review-session-control-rail' : 'practice-main-scroll',
+      0.99
+    );
     await selectTestPuzzleSource('familiar15');
     await startPracticeMode('standard');
     await waitForVisibleInPracticeScroll('session-board');
@@ -438,9 +463,14 @@ describe('Practice POC', () => {
     // remains bound to the completed attempt rather than the newly shown puzzle.
     await waitForElementTextContaining('sprint-unclear-question', 'previous puzzle', 10000);
     await element(by.id('session-abandon')).tap();
-    await waitFor(element(by.id('session-abandon-confirmation'))).toBeVisible().withTimeout(5000);
+    await waitFor(element(by.id('session-abandon-confirmation'))).toExist().withTimeout(5000);
+    const abandonFrame = await frameFor(element(by.id('session-abandon-confirm')));
+    const abandonScreenFrame = await frameFor(element(by.id('safe-area-shell')));
+    expectFrameContained(abandonFrame, abandonScreenFrame, 'Sprint abandon action');
+    console.log('[review-setup-abandon-frame]', abandonFrame);
     await element(by.id('session-abandon-confirm')).tap();
-    await waitFor(element(by.text('Sprint failed'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('sprint-result-headline'))).toHaveText('Sprint abandoned').withTimeout(10000);
+    await expect(element(by.id('sprint-result-headline'))).toBeVisible(100);
 
     // Recreate the process so History reads the marker from SQLite rather than
     // relying on transient result-screen presentation from the sprint that
@@ -466,9 +496,18 @@ describe('Practice POC', () => {
     await expect(element(by.id('history-attempt-detail'))).not.toExist();
     await expect(element(by.id('bookmark-glyph'))).not.toExist();
 
+    // Keep fixture creation outside this focused visual check at the normal
+    // size. Change the real system setting on the open replay, without a
+    // relaunch, so the row actions themselves run at accessibility maximum.
+    if (REVIEW_ACTIONS_LANDSCAPE) await device.setOrientation('landscape');
+    if (REVIEW_ACTIONS_LARGE_TEXT) {
+      setReviewActionTextSize(true);
+      await sleep(1000);
+    }
+
     if (expectsRegularLayout) {
-      await waitForVisibleInPracticeScroll('review-schedule-add');
-      await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
+      await waitForReviewAction('review-schedule-add');
+      await waitForReviewAction('history-attempt-clear-unclear');
       await waitForElementAccessibilityLabelContaining(
         'adaptive-layout',
         'regularLandscape',
@@ -477,8 +516,7 @@ describe('Practice POC', () => {
       await element(by.id('practice-main-scroll')).scrollTo('top');
       await element(by.id('review-session-control-rail')).scrollTo('bottom');
       await waitFor(element(by.id('review-context-actions-rail'))).toExist().withTimeout(10000);
-      await expect(element(by.id('review-schedule-control'))).toBeVisible();
-      await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
+      await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible(100);
       const screenFrame = await frameFor(element(by.id('safe-area-shell')));
       const boardFrame = await frameFor(element(by.id('review-board')));
       const actionRailFrame = await frameFor(element(by.id('review-context-actions-rail')));
@@ -504,45 +542,38 @@ describe('Practice POC', () => {
     } else {
       await waitForElementAccessibilityLabelContaining(
         'adaptive-layout',
-        'compactPortrait',
+        REVIEW_ACTIONS_LANDSCAPE ? 'compactLandscape' : 'compactPortrait',
         10000
       );
       await waitFor(element(by.id('review-context-actions-bottom'))).toExist().withTimeout(10000);
-      try {
-        await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
-      } catch {
-        if (device.getPlatform() === 'android') {
-          // On compact Android the trailing action can sit only a few pixels
-          // below the viewport. A bounded public swipe reaches it reliably;
-          // Detox's stale-at-edge auto-scroll can otherwise wait indefinitely.
-          await element(by.id('practice-main-scroll')).swipe('up', 'fast', 0.75, 0.5, 0.9);
-          await sleep(500);
-        } else {
-          // On iOS the hidden tab bar's container stays over the bottom of
-          // the screen (touches pass through, but Detox counts it as covering
-          // the view). Scroll the action clear of it without a fling, so the
-          // next tap does not land on a still-moving list (#612).
-          await waitForVisibleInPracticeScroll('history-attempt-clear-unclear');
-        }
-      }
-      await expect(element(by.id('review-schedule-control'))).toBeVisible();
-      await expect(element(by.id('history-attempt-clear-unclear'))).toBeVisible();
     }
-    await waitForVisibleInPracticeScroll('review-schedule-add');
-
+    await waitForReviewAction('history-attempt-clear-unclear');
+    console.log('[review-action-frame] Clear', await frameFor(element(by.id('history-attempt-clear-unclear'))));
+    await device.takeScreenshot('review-clear-unclear-visible');
+    await waitForReviewAction('review-schedule-add');
+    console.log('[review-action-frame] Add', await frameFor(element(by.id('review-schedule-add'))));
+    await device.takeScreenshot('review-schedule-add-visible');
     await element(by.id('review-schedule-add')).tap();
     await waitFor(element(by.id('review-schedule-state'))).toHaveText('Due tomorrow').withTimeout(10000);
     await waitFor(element(by.id('history-attempt-clear-unclear'))).not.toExist().withTimeout(10000);
 
+    await waitForReviewAction('review-schedule-remove');
+    console.log('[review-action-frame] Remove', await frameFor(element(by.id('review-schedule-remove'))));
+    await device.takeScreenshot('review-schedule-remove-visible');
     await element(by.id('review-schedule-remove')).tap();
-    await waitFor(element(by.id('review-schedule-removal-confirmation'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('review-schedule-removal-confirmation'))).toExist().withTimeout(10000);
     await sleep(500);
+    await waitForVisibleInScroll('review-schedule-removal-cancel', 'review-schedule-removal-confirmation');
+    await device.takeScreenshot('review-schedule-removal-confirmation');
+    await waitForVisibleInScroll('review-schedule-removal-confirm', 'review-schedule-removal-confirmation');
     await element(by.id('review-schedule-removal-confirm')).tap();
     await waitFor(element(by.id('review-schedule-state')))
       .toHaveText('Not scheduled for Review')
       .withTimeout(10000);
 
     // Enrollment atomically cleared the marker, and removal does not restore it.
+    if (REVIEW_ACTIONS_LARGE_TEXT) setReviewActionTextSize(false);
+    if (REVIEW_ACTIONS_LANDSCAPE) await device.setOrientation('portrait');
     await device.terminateApp();
     await launchWithDisabledSynchronization({
       newInstance: true,
@@ -667,6 +698,25 @@ describe('Practice POC', () => {
     await waitForElementTextContaining('review-analysis-line-0', 'Top move', 90000);
   });
 });
+
+async function waitForVisibleInScroll(testID, scrollID, startX = 0.5) {
+  const target = element(by.id(testID));
+  await waitFor(target).toExist().withTimeout(10000);
+  try {
+    await expect(target).toBeVisible(100);
+    return;
+  } catch {
+    // Review's board locks its parent scroll while touched. Use the outside
+    // content gutter for that scroll, and the modal's own viewport for sheets.
+  }
+  try {
+    await waitFor(target).toBeVisible(100)
+      .whileElement(by.id(scrollID)).scroll(100, 'down', startX, 0.5);
+  } catch {
+    await waitFor(target).toBeVisible(100)
+      .whileElement(by.id(scrollID)).scroll(100, 'up', startX, 0.5);
+  }
+}
 
 async function injectMateIn2FocusedRun() {
   await waitForVisibleInPracticeScroll('test-focused-run-inject-mate-in-2');

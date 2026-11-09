@@ -29,10 +29,10 @@
   },
   "contact": {
     "supportEmail": "support@chessticize.com",
-    "supportUrl": "https://chessticize.github.io/chessticize-mobile/support/",
-    "marketingUrl": "https://chessticize.github.io/chessticize-mobile/",
-    "androidInstallUrl": "https://chessticize.github.io/chessticize-mobile/android/",
-    "accessibilityUrl": "https://chessticize.github.io/chessticize-mobile/accessibility/",
+    "supportUrl": "https://chessticize.com/support/",
+    "marketingUrl": "https://chessticize.com/",
+    "androidInstallUrl": "https://chessticize.com/android/",
+    "accessibilityUrl": "https://chessticize.com/accessibility/",
     "privacyPolicyUrl": "https://github.com/Chessticize/chessticize-mobile/blob/main/docs/PRIVACY_POLICY.md",
     "sourceUrl": "https://github.com/Chessticize/chessticize-mobile"
   },

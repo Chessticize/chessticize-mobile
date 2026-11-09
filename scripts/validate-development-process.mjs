@@ -310,7 +310,7 @@ assert.match(
 assert.match(landingPage, /assets\/download-on-the-app-store\.svg/);
 assert.match(landingPage, /assets\/get-it-on-google-play\.png/);
 assert.match(landingPageAndroid, /assets\/get-it-on-google-play\.png/);
-assert.match(rootReadme, /https:\/\/chessticize\.github\.io\/chessticize-mobile\/android\//);
+assert.match(rootReadme, /https:\/\/chessticize\.com\/android\//);
 assert.match(rootReadme, /site\/assets\/screenshots\/contact-sheet\.webp/);
 assert.match(rootReadme, /docs\/STORYBOOK_DEPLOYMENT\.md/);
 assert.match(landingPageDoc, /pnpm landing-page:assets/);
@@ -597,7 +597,7 @@ assert.equal(releaseVersion.publicVersion, "1.5.2");
 assert.equal(releaseVersion.androidVersionCode, 20);
 assert.deepEqual(developmentVersion, {
   schemaVersion: 1,
-  plannedPublicVersion: "1.5.3"
+  plannedPublicVersion: "1.6.0"
 });
 assert.match(releaseVersioning, /development-version\.json` is the public version/);
 assert.match(releaseVersioning, /release-version\.json` is the exact cross-platform candidate/);
