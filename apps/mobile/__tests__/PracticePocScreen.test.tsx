@@ -6994,6 +6994,27 @@ describe("PracticePocScreen", () => {
     expect(leadingWidth === trailingWidth).toBe(pairedHeader);
   });
 
+  it.each([
+    { fontScale: 1, stacked: false },
+    { fontScale: 2, stacked: true }
+  ])("puts the Replay row actions below their copy only at large text ($fontScale)", ({ fontScale, stacked }) => {
+    (ReactNative as unknown as {
+      __setWindowDimensions?: (dimensions: { fontScale: number; height: number; scale: number; width: number }) => void;
+    }).__setWindowDimensions?.({ width: 430, height: 932, scale: 3, fontScale });
+
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-07-17T12:02:00.000Z"),
+      practiceService: createUnclearHistoryReviewService()
+    });
+    pressHistoryTab(renderer);
+    press(renderer, "history-attempt-responsive-unclear-attempt");
+
+    for (const row of ["review-schedule-control", "history-attempt-unclear"]) {
+      const content = flattenTestStyle(findByTestId(renderer, `${row}-content`).props.style);
+      expect(content.flexDirection).toBe(stacked ? "column" : "row");
+    }
+  });
+
   it("preserves the active sprint across a live resize", () => {
     const service = createMobilePracticeService("familiar15");
     (ReactNative as unknown as {

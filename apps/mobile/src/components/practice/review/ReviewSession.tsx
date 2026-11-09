@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { GestureType } from "react-native-gesture-handler";
 import Chessboard, { type ChessboardRef, type MoveResult } from "react-native-chessboard";
@@ -142,6 +142,10 @@ function useReviewHeaderTextStyles(): {
 // Narrowest top bar whose title keeps about 140 pt between two paired button
 // groups (2 x 96 pt plus gaps).
 const REVIEW_HEADER_PAIRED_MIN_WIDTH = 348;
+// Above this text scale a schedule or Unclear row puts its action below the
+// copy instead of relying on a wrap that a live text-size change may not redo,
+// as the run editor's rows do.
+const REVIEW_ACTION_ROW_STACKED_TEXT_SCALE = 1.35;
 // The removal confirmation keeps the current orientation. React Native's iOS
 // Modal defaults to portrait only, which rotates a landscape phone and crashes
 // a landscape-only window.
@@ -1816,7 +1820,17 @@ function AnalysisLineContent({
 }
 
 // A grouped row: a leading tile, the row's copy, and a trailing text action
-// that moves below the copy when both do not fit on one line.
+// that moves below the copy when both do not fit on one line, and always at
+// large text sizes.
+const ActionRowStackedContext = createContext(false);
+
+// The copy column of a ReviewActionRow; it spans the row when the row stacks.
+function ActionRowCopy({ children }: React.PropsWithChildren): React.JSX.Element {
+  const styles = useStyles();
+  const stacked = useContext(ActionRowStackedContext);
+  return <View style={[styles.actionRowCopy, stacked ? styles.actionRowCopyStacked : null]}>{children}</View>;
+}
+
 function ReviewActionRow({
   accessibilityLabel,
   children,
@@ -1831,10 +1845,17 @@ function ReviewActionRow({
 }>): React.JSX.Element {
   const styles = useStyles();
   const rowStyle = useListRowStyle();
+  const { fontScale } = usePracticeViewport();
+  const stacked = fontScale >= REVIEW_ACTION_ROW_STACKED_TEXT_SCALE;
   return (
     <View accessibilityLabel={accessibilityLabel} style={rowStyle} testID={testID}>
       <IconTile name={icon} tone={iconTone} />
-      <View style={styles.actionRowContent}>{children}</View>
+      <View
+        style={[styles.actionRowContent, stacked ? styles.actionRowContentStacked : null]}
+        testID={`${testID}-content`}
+      >
+        <ActionRowStackedContext.Provider value={stacked}>{children}</ActionRowStackedContext.Provider>
+      </View>
     </View>
   );
 }
@@ -1930,14 +1951,14 @@ function ReviewScheduleControl({
 
   return (
     <ReviewActionRow icon="clock" iconTone="accent" testID="review-schedule-control">
-      <View style={styles.actionRowCopy}>
+      <ActionRowCopy>
         <AppText testID="review-schedule-state" variant="headline">
           {review ? reviewDueLabel(review, currentTimeMs()) : "Not scheduled for Review"}
         </AppText>
         {failure ? (
           <AppText testID="review-schedule-error" tone="negative" variant="footnote">{failure}</AppText>
         ) : null}
-      </View>
+      </ActionRowCopy>
       {actionVisible ? (
         <>
           <RowTextAction
@@ -2092,9 +2113,9 @@ function HistoryUnclearAction({
       iconTone="warning"
       testID="history-attempt-unclear"
     >
-      <View style={styles.actionRowCopy}>
+      <ActionRowCopy>
         <AppText variant="headline">Marked as unclear</AppText>
-      </View>
+      </ActionRowCopy>
       <RowTextAction
         accessibilityLabel={actionLabel === "Mark clear" ? "Mark attempt clear" : "Clear unclear mark"}
         label={actionLabel}
@@ -2507,12 +2528,25 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "space-between",
     minWidth: 0
   },
+  actionRowContentStacked: {
+    alignItems: "flex-start",
+    flexDirection: "column",
+    flexWrap: "nowrap"
+  },
+  actionRowCopyStacked: {
+    alignSelf: "stretch",
+    flexBasis: "auto",
+    flexGrow: 0,
+    minWidth: 0
+  },
+  // The copy never narrows below a short word, so a row that cannot fit both
+  // wraps its action instead of breaking the copy letter by letter.
   actionRowCopy: {
     flexBasis: 100,
     flexGrow: 1,
     flexShrink: 1,
     gap: 2,
-    minWidth: 0
+    minWidth: 96
   },
   rowTextAction: {
     justifyContent: "center",
