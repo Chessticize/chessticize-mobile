@@ -2,6 +2,7 @@ const standardFixture = require('../../../fixtures/puzzles/android-standard-prac
 const {
   launchWithDisabledSynchronization,
   openTab,
+  tapHistoryChip,
   waitForElementTextContaining,
   waitForVisibleInPracticeScroll,
 } = require('./helpers');
@@ -38,7 +39,7 @@ describe(`Android Progress Backup restore (${EXPECTATION || 'missing expectation
       await waitForElementTextContaining('practice-progress-weekly-solved', '1', 10000);
       await openTab('history-tab', 'history-action-header');
       await element(by.id('history-filter-toggle')).tap();
-      await element(by.id('history-range-max')).tap();
+      await tapHistoryChip('history-range-filters', 'history-range-max');
       await element(by.id('history-source-all')).tap();
       await waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000);
       return;

@@ -166,7 +166,7 @@ describe('Android Standard Practice release slice', () => {
     expect(practiceJourney).toContain("chessticizeTestNowMs: RELAUNCH_TEST_NOW_MS");
     expect(practiceJourney).toContain("history-tab");
     expect(practiceJourney).toContain("by.id('history-filter-toggle')");
-    expect(practiceJourney).toContain("by.id('history-range-max')");
+    expect(practiceJourney).toContain("tapHistoryChip('history-range-filters', 'history-range-max')");
     expect(practiceJourney).toContain("by.id('history-source-all')");
     expect(practiceJourney).toContain(
       "waitFor(element(by.text('Correct')).atIndex(0)).toExist().withTimeout(10000)"

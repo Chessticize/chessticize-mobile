@@ -72,7 +72,7 @@ describe('Android Arrow Duel release slice', () => {
     expect(journey).not.toContain(
       "waitFor(element(by.id('history-advanced-filters'))).not.toExist()"
     );
-    expect(helpers).toContain("by.id('history-advanced-filters')");
+    expect(helpers).toContain("by.id('history-advanced-filters-motion')");
     expect(helpers).toContain('not.toBeVisible()');
     expect(helpers).toContain("'Show history filters'");
     expect(journey).not.toContain("by.id('history-rating-arrow duel 5/30')");

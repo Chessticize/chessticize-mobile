@@ -341,7 +341,7 @@ describe('Android Progress Backup', () => {
     );
     expect(restoreJourney).toContain("history-attempt-legacy-attempt-standard-wrong");
     expect(restoreJourney).toContain("by.id('history-filter-toggle')");
-    expect(restoreJourney).toContain("by.id('history-range-max')");
+    expect(restoreJourney).toContain("tapHistoryChip('history-range-filters', 'history-range-max')");
     expect(restoreJourney).toContain("by.id('history-source-all')");
     expect(androidDetoxScript).toContain('CHESSTICIZE_DETOX_REUSE_INSTALLED_APP');
     expect(androidDetoxScript).toContain('detox_args+=(--reuse)');

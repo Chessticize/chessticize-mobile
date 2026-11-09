@@ -1078,9 +1078,21 @@ async function waitForHistoryFiltersCollapsed() {
     'Show history filters',
     10000
   );
-  await waitFor(element(by.id('history-advanced-filters')))
+  // The filter content is transparent, which Detox reads as not visible even
+  // while open, so assert on the motion clip whose height collapses to zero.
+  await waitFor(element(by.id('history-advanced-filters-motion')))
     .not.toBeVisible()
     .withTimeout(10000);
+}
+
+// The History chip rows scroll horizontally, so a chip at the trailing edge
+// (All Time, 1400+) is only partly on screen until its row scrolls.
+async function tapHistoryChip(rowTestID, chipTestID) {
+  await waitFor(element(by.id(chipTestID)))
+    .toBeVisible()
+    .whileElement(by.id(rowTestID))
+    .scroll(120, 'right');
+  await element(by.id(chipTestID)).tap();
 }
 
 async function openStandardHistoryTrend() {
@@ -1088,7 +1100,7 @@ async function openStandardHistoryTrend() {
   if (!(await detoxElementIsVisible('history-rating-standard 5/20'))) {
     await waitFor(element(by.id('history-filter-toggle'))).toBeVisible().withTimeout(10000);
     await element(by.id('history-filter-toggle')).tap();
-    await waitFor(element(by.id('history-advanced-filters'))).toBeVisible().withTimeout(10000);
+    await waitFor(element(by.id('history-range-filters'))).toBeVisible().withTimeout(10000);
   }
   await waitFor(element(by.id('history-rating-standard 5/20')))
     .toBeVisible()
@@ -1165,6 +1177,7 @@ module.exports = {
   tapAfterIosModalTransition,
   waitForVisibleInPracticeScroll,
   waitForHistoryFiltersCollapsed,
+  tapHistoryChip,
   tapUntilAnyExists,
   tapUntilExists,
   waitForElementAccessibilityLabelContaining,
