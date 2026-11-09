@@ -47,6 +47,7 @@ import {
   MoveFeedbackSettingsSection
 } from "../../MoveFeedbackSettingsSection.tsx";
 import { getBundledCorePackManifest } from "../../../platform/mobilePractice.ts";
+import { useUiHaptics } from "../../../platform/uiHaptics.ts";
 import { arePracticeTestControlsEnabled } from "../../../releaseConfig.ts";
 import {
   AppText,
@@ -989,6 +990,7 @@ function AdvancedRatingRow({
   const styles = useStyles();
   const appTheme = useTheme();
   const decrementDisabled = record.rating <= RATING_FLOOR;
+  const uiHaptics = useUiHaptics();
   return (
     <View style={styles.advancedRatingRow} testID={testID}>
       <View style={styles.advancedRatingCopy}>
@@ -1007,7 +1009,10 @@ function AdvancedRatingRow({
             pressed && !decrementDisabled ? styles.settingsActionButtonPressed : null,
             decrementDisabled ? styles.disabledButton : null
           ]}
-          onPress={() => onAdjust(record.key, stepManualRating(record.rating, -1))}
+          onPress={() => {
+            uiHaptics("selection");
+            onAdjust(record.key, stepManualRating(record.rating, -1));
+          }}
         >
           <Icon color={appTheme.colors.accent.s600} name="remove" size={18} weight="semibold" />
         </Pressable>
@@ -1017,7 +1022,10 @@ function AdvancedRatingRow({
           accessibilityLabel={`Increase ${label} rating`}
           testID={`${testID}-increase`}
           style={({ pressed }) => [styles.settingsStepperButton, pressed ? styles.settingsActionButtonPressed : null]}
-          onPress={() => onAdjust(record.key, stepManualRating(record.rating, 1))}
+          onPress={() => {
+            uiHaptics("selection");
+            onAdjust(record.key, stepManualRating(record.rating, 1));
+          }}
         >
           <Icon color={appTheme.colors.accent.s600} name="add" size={18} weight="semibold" />
         </Pressable>

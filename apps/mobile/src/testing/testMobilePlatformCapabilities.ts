@@ -21,6 +21,7 @@ import type {
   ReviewReminderScheduler,
 } from '../platform/reviewReminderScheduler.ts';
 import type { MoveFeedbackClient } from '../platform/moveFeedback.ts';
+import type { UiHapticsClient } from '../platform/uiHaptics.ts';
 import type { AppStoreReviewRequestClient } from '../platform/appStoreReviewRequest.ts';
 
 export interface TestMobilePlatformCapabilityOverrides {
@@ -40,6 +41,7 @@ export interface TestMobilePlatformCapabilityOverrides {
   progressProtection?: MobileProgressProtectionCapabilities;
   applicationMetadata?: Partial<MobileApplicationMetadata>;
   moveFeedbackClient?: MoveFeedbackClient | null;
+  uiHapticsClient?: UiHapticsClient | null;
   appStoreReviewRequestClient?: AppStoreReviewRequestClient | null;
   testControls?: Partial<MobileTestControlCapabilities>;
 }
@@ -89,6 +91,9 @@ export function createTestMobilePlatformCapabilities(
     },
     moveFeedback: {
       client: overrides.moveFeedbackClient ?? null,
+    },
+    uiHaptics: {
+      client: overrides.uiHapticsClient ?? null,
     },
     appReview: {
       client: overrides.appStoreReviewRequestClient ?? null,

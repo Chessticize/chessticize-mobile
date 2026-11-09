@@ -6,6 +6,7 @@ import {
   View
 } from "react-native";
 import { makeStyles } from "../theme/index.ts";
+import { useUiHaptics } from "../platform/uiHaptics.ts";
 import type {
   MoveFeedbackCue,
   MoveFeedbackPreferences,
@@ -134,6 +135,7 @@ function FeedbackToggleRow({
   onChange: (enabled: boolean) => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const uiHaptics = useUiHaptics();
   return (
     <View style={styles.toggleRow}>
       <View style={styles.rowCopy}>
@@ -147,7 +149,11 @@ function FeedbackToggleRow({
         hitSlop={7}
         testID={controlTestID}
         style={[styles.switchTrack, enabled ? styles.switchTrackEnabled : null]}
-        onPress={() => onChange(!enabled)}
+        onPress={() => {
+          onChange(!enabled);
+          // After the change, so turning haptics on confirms and off stays silent.
+          uiHaptics("selection");
+        }}
       >
         <View style={[styles.switchThumb, enabled ? styles.switchThumbEnabled : null]} />
       </Pressable>

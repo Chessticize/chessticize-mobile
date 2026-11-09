@@ -123,6 +123,7 @@ import {
   moveFeedbackCueForMove,
   type MoveFeedbackActor
 } from "../platform/moveFeedback.ts";
+import { createUiHaptics, UiHapticsProvider } from "../platform/uiHaptics.ts";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Move, PieceSymbol, Square } from "chess.js";
 import type {
@@ -626,6 +627,12 @@ export function PracticePocScreen({
   const notificationClient = platformCapabilities.reminders.notificationClient;
   const reminderPlatform = platformCapabilities.reminders.platform;
   const moveFeedbackClient = platformCapabilities.moveFeedback.client;
+  const uiHapticsClient = platformCapabilities.uiHaptics.client;
+  // UI haptics (#609) share the single Haptic feedback setting with moves.
+  const uiHaptics = useMemo(() => createUiHaptics({
+    client: uiHapticsClient,
+    isEnabled: () => service.getSettings().moveFeedback.hapticsEnabled
+  }), [service, uiHapticsClient]);
   const appStoreReviewRequestClient = platformCapabilities.appReview.client;
   const progressProtection = platformCapabilities.progressProtection;
   const iCloudSyncClient = platformCapabilities.progressSync.client;
@@ -5603,50 +5610,52 @@ export function PracticePocScreen({
   );
 
   return (
-    <GestureHandlerRootView
-      style={styles.predictiveBackStage}
-      testID="practice-gesture-root"
-    >
-      {mobileBackPreview ? (
-        <View
-          accessible={false}
-          style={styles.predictiveBackDestination}
-          testID="mobile-back-destination-preview"
-        >
-          <Text style={styles.predictiveBackEyebrow}>Back to</Text>
-          <Text style={styles.predictiveBackDestinationLabel} testID="mobile-back-destination-preview-label">
-            {mobileBackPreview.label}
-          </Text>
-          <Text style={FABRIC_SAFE_HIDDEN_TEXT_STYLE} testID="mobile-back-destination-preview-id">
-            {mobileBackPreview.testID}
-          </Text>
-        </View>
-      ) : null}
-      <NativeTabHost
-        chromeHidden={!appChromeVisible}
-        colorScheme={appTheme.name}
-        colors={{
-          accent: appTheme.colors.accent.s600,
-          androidBarBackground: appTheme.colors.surface,
-          androidIndicator: appTheme.colors.accent.s100,
-          androidInactive: appTheme.colors.text.secondary,
-          background: appTheme.colors.surfaceRaised,
-          badgeBackground: appTheme.colors.danger.s600,
-          badgeDangerBackground: appTheme.colors.danger.s600,
-          badgeText: appTheme.colors.text.onAccent
-        }}
-        dueReviewCount={dueTodayCount}
-        overdueReviewCount={overdueCount}
-        selectedTab={hostTab}
-        onSelectionOutcome={(outcome) => selectTopLevelTab(outcome.tab)}
-        renderTab={(candidate) => candidate === hostTab ? (
-          <>
-            {appChromeVisible ? <TabContentInsetsReporter onChange={setTabContentInsets} /> : null}
-            {appShell}
-          </>
+    <UiHapticsProvider value={uiHaptics}>
+      <GestureHandlerRootView
+        style={styles.predictiveBackStage}
+        testID="practice-gesture-root"
+      >
+        {mobileBackPreview ? (
+          <View
+            accessible={false}
+            style={styles.predictiveBackDestination}
+            testID="mobile-back-destination-preview"
+          >
+            <Text style={styles.predictiveBackEyebrow}>Back to</Text>
+            <Text style={styles.predictiveBackDestinationLabel} testID="mobile-back-destination-preview-label">
+              {mobileBackPreview.label}
+            </Text>
+            <Text style={FABRIC_SAFE_HIDDEN_TEXT_STYLE} testID="mobile-back-destination-preview-id">
+              {mobileBackPreview.testID}
+            </Text>
+          </View>
         ) : null}
-      />
-    </GestureHandlerRootView>
+        <NativeTabHost
+          chromeHidden={!appChromeVisible}
+          colorScheme={appTheme.name}
+          colors={{
+            accent: appTheme.colors.accent.s600,
+            androidBarBackground: appTheme.colors.surface,
+            androidIndicator: appTheme.colors.accent.s100,
+            androidInactive: appTheme.colors.text.secondary,
+            background: appTheme.colors.surfaceRaised,
+            badgeBackground: appTheme.colors.danger.s600,
+            badgeDangerBackground: appTheme.colors.danger.s600,
+            badgeText: appTheme.colors.text.onAccent
+          }}
+          dueReviewCount={dueTodayCount}
+          overdueReviewCount={overdueCount}
+          selectedTab={hostTab}
+          onSelectionOutcome={(outcome) => selectTopLevelTab(outcome.tab)}
+          renderTab={(candidate) => candidate === hostTab ? (
+            <>
+              {appChromeVisible ? <TabContentInsetsReporter onChange={setTabContentInsets} /> : null}
+              {appShell}
+            </>
+          ) : null}
+        />
+      </GestureHandlerRootView>
+    </UiHapticsProvider>
   );
 }
 

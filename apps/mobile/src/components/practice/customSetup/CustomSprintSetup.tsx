@@ -10,6 +10,7 @@ import { type CustomSprintConfigRecord, SERVER_CURATED_THEMES, type ThemeChoiceI
 import type { PracticeProgressSummary } from "../../../../../../packages/storage/src/rating-history.ts";
 import { AppText, Icon, ListRow, Section, useListRowStyle } from "../../ui/index.tsx";
 import { makeStyles, useTheme } from "../../../theme/index.ts";
+import { useUiHaptics } from "../../../platform/uiHaptics.ts";
 import { CollapsibleRegion, DisclosureChevron } from "../shared/CollapsibleRegion.tsx";
 import {
   CUSTOM_INITIAL_RATING_MAX,
@@ -543,6 +544,8 @@ function ThemeCatalogChoiceRow({
 }
 
 // A capsule choice: selection is an accentSoft tint, never a check or border.
+// A change plays selection feedback (#609): a single choice only when it moves,
+// a checkbox on every toggle.
 function ChoiceChip({
   accessibilityHint,
   accessibilityLabel,
@@ -563,6 +566,7 @@ function ChoiceChip({
   onPress: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const uiHaptics = useUiHaptics();
   return (
     <Pressable
       accessibilityHint={accessibilityHint}
@@ -576,7 +580,12 @@ function ChoiceChip({
         pressed && !selected ? styles.customMiniChipPressed : null
       ]}
       testID={testID}
-      onPress={onPress}
+      onPress={() => {
+        if (accessibilityRole === "checkbox" || !selected) {
+          uiHaptics("selection");
+        }
+        onPress();
+      }}
     >
       <AppText
         style={[styles.customMiniChipText, selected ? styles.customMiniChipTextActive : null]}

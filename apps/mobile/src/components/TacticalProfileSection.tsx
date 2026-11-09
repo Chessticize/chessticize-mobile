@@ -7,6 +7,7 @@ import {
   View
 } from "react-native";
 import { makeStyles, useTheme } from "../theme/index.ts";
+import { useUiHaptics } from "../platform/uiHaptics.ts";
 import { AppText, Badge, Button, Icon, ListRow, Section, useListRowStyle } from "./ui/index.tsx";
 import {
   TACTICAL_PROFILE_VISIBLE_FOCUS_LIMIT,
@@ -457,6 +458,7 @@ function TaskFamilySelector({
   onSelect: (taskFamily: TacticalProfileTaskFamily) => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const uiHaptics = useUiHaptics();
   return (
     <View
       accessibilityLabel="Choose tactical profile mode"
@@ -476,7 +478,12 @@ function TaskFamilySelector({
               pressed && !selected ? styles.pressed : null
             ]}
             testID={`tactical-profile-task-family-${taskFamily}`}
-            onPress={() => onSelect(taskFamily)}
+            onPress={() => {
+              if (!selected) {
+                uiHaptics("selection");
+              }
+              onSelect(taskFamily);
+            }}
           >
             <AppText tone={selected ? "accent" : "primary"} variant="headline">
               {taskFamilyLabel(taskFamily)}

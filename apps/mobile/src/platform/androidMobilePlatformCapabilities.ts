@@ -24,6 +24,7 @@ import {
   createNativeReviewReminderScheduler,
 } from './reviewReminderScheduler.ts';
 import { createNativeMoveFeedbackClient } from './moveFeedback.ts';
+import { createNativeUiHapticsClient } from './uiHaptics.ts';
 
 export function createAndroidMobilePlatformCapabilitiesSync():
   | MobilePlatformCapabilities
@@ -72,6 +73,9 @@ export function composeAndroidMobilePlatformCapabilities(
     },
     moveFeedback: {
       client: createNativeMoveFeedbackClient(),
+    },
+    uiHaptics: {
+      client: createNativeUiHapticsClient(),
     },
     appReview: {
       client: null,

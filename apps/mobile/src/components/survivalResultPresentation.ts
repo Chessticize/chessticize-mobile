@@ -8,6 +8,8 @@ import type { SprintState } from "../../../../packages/core/src/index.ts";
 import type { ResultStat } from "./resultStat.ts";
 
 export type SurvivalResultData = {
+  /** The finished session, so its outcome haptic plays once per result. */
+  sessionId?: string;
   challengeType: "puzzle" | "arrow_duel";
   level: { minRating: number; maxRating: number };
   /** A Survival Run ends only after the third mistake or when the level's pool is cleared. */
@@ -105,6 +107,7 @@ export function survivalResultDataFromSession(input: {
   };
 }): SurvivalResultData {
   return {
+    ...(input.state.id ? { sessionId: input.state.id } : {}),
     challengeType: input.challengeType,
     level: { minRating: input.level.minRating, maxRating: input.level.maxRating },
     endReason: input.result.endReason ?? "max_mistakes",
@@ -116,6 +119,18 @@ export function survivalResultDataFromSession(input: {
     isNewBest: input.result.isNewBest,
     previousBestScore: input.result.previousBestScore
   };
+}
+
+/**
+ * The notification haptic the result plays when it appears (#609): success for
+ * a new best, warning for a Run the third mistake ended. A perfect clear that
+ * only ties the best stays silent.
+ */
+export function survivalResultHapticIntent(data: SurvivalResultData): "success" | "warning" | null {
+  if (data.isNewBest) {
+    return "success";
+  }
+  return data.endReason === "max_mistakes" ? "warning" : null;
 }
 
 export function presentSurvivalResult(data: SurvivalResultData): SurvivalResultPresentation {

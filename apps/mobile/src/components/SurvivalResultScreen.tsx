@@ -23,8 +23,10 @@ import {
   ResultSummaryLine,
   type ResultInsets
 } from "./ResultScreenLayout.tsx";
+import { useUiHapticOnAppear } from "../platform/uiHaptics.ts";
 import {
   presentSurvivalResult,
+  survivalResultHapticIntent,
   type SurvivalResultData,
   type SurvivalResultPresentation
 } from "./survivalResultPresentation.ts";
@@ -64,6 +66,7 @@ export function SurvivalResultScreen({
   style?: StyleProp<ViewStyle>;
 }): React.JSX.Element {
   const result = presentSurvivalResult(data);
+  useUiHapticOnAppear(survivalResultHapticIntent(data), data.sessionId);
   return (
     <ResultScreenLayout
       actions={(

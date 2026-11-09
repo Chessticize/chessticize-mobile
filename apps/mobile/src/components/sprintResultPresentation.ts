@@ -18,6 +18,8 @@ import type { ResultStat } from "./resultStat.ts";
 export type SprintResultOutcome = "passed" | "failed" | "abandoned" | "ended" | "completed";
 
 export type SprintResultData = {
+  /** The finished session, so its outcome haptic plays once per result. */
+  sessionId?: string;
   /** A rated Sprint, or an unrated Focused Run (#616). */
   kind: "sprint" | "focusedRun";
   /** Run mode for the outcome line: Standard and custom Runs say Sprint. */
@@ -149,6 +151,7 @@ export function sprintResultDataFromSession(input: {
       ? "completed"
       : state.status === "won" ? "passed" : "failed";
   return {
+    ...(state.id ? { sessionId: state.id } : {}),
     kind: isFocusedRun ? "focusedRun" : "sprint",
     mode: state.config.mode === "arrow_duel" ? "arrowDuel" : "standard",
     outcome,
@@ -245,6 +248,15 @@ export function reviewExplanation(review: SprintResultData["review"]): string[] 
       : null,
     "Replaying them does not change when they come back in Review."
   ].filter((line): line is string => line !== null);
+}
+
+/**
+ * The notification haptic the result plays when it appears (#609): success for
+ * a passed Sprint, warning for a failed one. Focused Runs, ended and abandoned
+ * Sprints stay silent.
+ */
+export function sprintResultHapticIntent(data: SprintResultData): "success" | "warning" | null {
+  return data.outcome === "passed" ? "success" : data.outcome === "failed" ? "warning" : null;
 }
 
 export function presentSprintResult(data: SprintResultData): SprintResultPresentation {

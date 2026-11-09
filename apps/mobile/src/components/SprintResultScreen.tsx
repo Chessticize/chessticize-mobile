@@ -26,8 +26,10 @@ import {
   ResultSummaryLine,
   type ResultInsets
 } from "./ResultScreenLayout.tsx";
+import { useUiHapticOnAppear } from "../platform/uiHaptics.ts";
 import {
   presentSprintResult,
+  sprintResultHapticIntent,
   type SprintResultData,
   type SprintResultPresentation,
   type StatColumn
@@ -63,6 +65,7 @@ export function SprintResultScreen({
 }): React.JSX.Element {
   const [infoOpen, setInfoOpen] = useState(initialInfoOpen);
   const result = presentSprintResult(data);
+  useUiHapticOnAppear(sprintResultHapticIntent(data), data.sessionId);
 
   return (
     <ResultScreenLayout

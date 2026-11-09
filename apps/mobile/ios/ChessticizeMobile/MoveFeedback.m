@@ -9,6 +9,10 @@
 @property (nonatomic, copy) NSArray<AVAudioPlayerNode *> *playerNodes;
 @property (nonatomic, assign) NSUInteger nextPlayerNodeIndex;
 @property (nonatomic, strong) UIImpactFeedbackGenerator *impactGenerator;
+// UI haptics (#609), created on main at first use and touched only on main.
+@property (nonatomic, strong, nullable) UISelectionFeedbackGenerator *selectionGenerator;
+@property (nonatomic, strong, nullable) UIImpactFeedbackGenerator *lightImpactGenerator;
+@property (nonatomic, strong, nullable) UINotificationFeedbackGenerator *notificationGenerator;
 @property (nonatomic, strong) dispatch_queue_t audioQueue;
 @end
 
@@ -85,6 +89,53 @@ RCT_EXPORT_METHOD(play:(NSString *)cue
   }
 
   resolve(nil);
+}
+
+// UI haptics for primary actions (#609). The JS gate applies the app's Haptic
+// feedback setting; UIKit's feedback generators also stay silent when System
+// Haptics is off in iOS Settings.
+RCT_EXPORT_METHOD(playUiHaptic:(NSString *)intent
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+  if (![@[@"selection", @"impactLight", @"success", @"warning"] containsObject:intent]) {
+    reject(@"invalid_intent", @"UI haptic intent must be selection, impactLight, success or warning.", nil);
+    return;
+  }
+
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self playUiHapticOnMainQueue:intent];
+  });
+
+  resolve(nil);
+}
+
+- (void)playUiHapticOnMainQueue:(NSString *)intent
+{
+  if ([intent isEqualToString:@"selection"]) {
+    if (self.selectionGenerator == nil) {
+      self.selectionGenerator = [[UISelectionFeedbackGenerator alloc] init];
+    }
+    [self.selectionGenerator selectionChanged];
+    [self.selectionGenerator prepare];
+    return;
+  }
+
+  if ([intent isEqualToString:@"impactLight"]) {
+    if (self.lightImpactGenerator == nil) {
+      self.lightImpactGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+    }
+    [self.lightImpactGenerator impactOccurred];
+    [self.lightImpactGenerator prepare];
+    return;
+  }
+
+  if (self.notificationGenerator == nil) {
+    self.notificationGenerator = [[UINotificationFeedbackGenerator alloc] init];
+  }
+  [self.notificationGenerator notificationOccurred:[intent isEqualToString:@"success"]
+    ? UINotificationFeedbackTypeSuccess
+    : UINotificationFeedbackTypeWarning];
 }
 
 - (void)playSoundForCue:(NSString *)cue

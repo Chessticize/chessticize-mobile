@@ -2,9 +2,11 @@ import React from "react";
 import { Pressable, useWindowDimensions, View, type ViewStyle } from "react-native";
 import { makeStyles, useTheme } from "../../../theme/index.ts";
 import { Icon } from "../../ui/index.tsx";
+import { useUiHaptics } from "../../../platform/uiHaptics.ts";
 import { typography as baseTypography } from "../../../theme/scales.ts";
 
-// A grouped-row switch (51 x 31 pt track) with a 44 pt tall hit target.
+// A grouped-row switch (51 x 31 pt track) with a 44 pt tall hit target. A
+// toggle plays selection feedback (#609).
 export function EditorSwitch({
   accessibilityLabel,
   enabled,
@@ -17,6 +19,7 @@ export function EditorSwitch({
   onPress: () => void;
 }): React.JSX.Element {
   const styles = useStyles();
+  const uiHaptics = useUiHaptics();
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
@@ -25,7 +28,10 @@ export function EditorSwitch({
       accessibilityValue={{ text: enabled ? "On" : "Off" }}
       style={styles.runTimingToggle}
       testID={testID}
-      onPress={onPress}
+      onPress={() => {
+        uiHaptics("selection");
+        onPress();
+      }}
     >
       <View style={[styles.historyToggleTrack, enabled ? styles.historyToggleTrackActive : null]}>
         <View style={[styles.historyToggleThumb, enabled ? styles.historyToggleThumbActive : null]} />
@@ -35,6 +41,7 @@ export function EditorSwitch({
 }
 
 // One half of a stepper: a filled 36 x 32 pt button whose hit area reaches 44 pt.
+// A step plays selection feedback (#609).
 export function StepperButton({
   accessibilityLabel,
   direction,
@@ -50,6 +57,7 @@ export function StepperButton({
 }): React.JSX.Element {
   const styles = useStyles();
   const appTheme = useTheme();
+  const uiHaptics = useUiHaptics();
   return (
     <Pressable
       accessibilityRole="button"
@@ -63,7 +71,10 @@ export function StepperButton({
         disabled ? styles.disabledButton : null
       ]}
       testID={testID}
-      onPress={onPress}
+      onPress={() => {
+        uiHaptics("selection");
+        onPress();
+      }}
     >
       <Icon
         color={appTheme.colors.text.primary}
