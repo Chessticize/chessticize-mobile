@@ -133,7 +133,13 @@ describeMarketingAssets('deterministic store marketing journey', () => {
       }
       const screenshotPath = await takeReadyScreenshot(frame);
       if (frame.appearance === 'dark') {
-        expectScreenshotHasDarkChrome(screenshotPath);
+        // Survival's reachable Start position intentionally scrolls the
+        // full-screen hub: its three status-bar samples remain dark while the
+        // lower samples contain the blue action. Arrow Duel retains all four.
+        expectScreenshotHasDarkChrome(
+          screenshotPath,
+          frame.id === 'survival' ? 3 : 4
+        );
       }
       records.push(captureMarketingScreenshot({
         frame,

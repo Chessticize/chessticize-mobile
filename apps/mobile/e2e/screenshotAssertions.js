@@ -24,7 +24,7 @@ function expectBoardScreenshotContainsPieces(screenshotPath, boardFrame, screenF
   }
 }
 
-function expectScreenshotHasDarkChrome(screenshotPath) {
+function expectScreenshotHasDarkChrome(screenshotPath, minimumDarkSamples = 4) {
   const png = readRgbaPng(screenshotPath);
   const samples = [
     [0.05, 0.08], [0.5, 0.08], [0.95, 0.08],
@@ -33,9 +33,9 @@ function expectScreenshotHasDarkChrome(screenshotPath) {
   const darkSamples = samples.filter(([red, green, blue, alpha]) =>
     alpha > 128 && ((red + green + blue) / 3) < 110
   );
-  if (darkSamples.length < 4) {
+  if (darkSamples.length < minimumDarkSamples) {
     throw new Error(
-      `Expected dark native chrome; darkSamples=${darkSamples.length}; `
+      `Expected dark native chrome (at least ${minimumDarkSamples} samples); darkSamples=${darkSamples.length}; `
       + `samples=${JSON.stringify(samples)}`
     );
   }
