@@ -295,6 +295,21 @@ session use tabular figures.
 | Numeral row | 15 / 20 | Semibold, tabular | Numbers inside list rows, such as run ratings (secondary color) |
 | Display | 56 / 64 | Semibold, tabular | The single hero score on a result screen (Sprint Result `Solved / target`); grows at most 1.5x with Dynamic Type |
 
+#### Session text at accessibility sizes
+
+A phone's live session locks scrolling while the board takes input, so every
+row stacked with the board must fit the screen at every text size (#652). The
+layout reserves each row's height at the current text size and gives the
+board the rest:
+
+- HUD values (progress, timer, `Unrated`) grow at most 2x. Values that share a
+  line share one size, as large as their slots allow, and shrink to fit rather
+  than truncate. Phones and iPad keep the three values on one line; the narrow
+  landscape rail puts the timer on its own line at accessibility sizes.
+- The prompt and the post-answer feedback row grow at most 1.25x, and the
+  puzzle timing at most 1.5x. Score-strip labels keep their size; their values
+  grow at most 1.15x. Board coordinates do not scale.
+
 #### Text width rounding
 
 On Android, a text view that is exactly as wide as its own measured text is
