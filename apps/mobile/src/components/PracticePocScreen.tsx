@@ -131,7 +131,11 @@ import {
   type AdaptiveLayout
 } from "./adaptivePracticeLayout.ts";
 import { usePracticeViewport } from "./PracticeViewport.tsx";
-import { NativeTabHost, TabContentInsetsReporter } from "../navigation/NativeTabHost.tsx";
+import {
+  NativeTabHost,
+  TabContentInsetsReporter,
+  type TabContentInsets
+} from "../navigation/NativeTabHost.tsx";
 import {
   isTopLevelChromeVisible,
   topLevelTabIntent,
@@ -574,6 +578,7 @@ function openFeedbackIssuesInBrowser(url: string): Promise<void> {
 const CHESSBOARD_DURATIONS = { move: BOARD_MOVE_ANIMATION_MS } as const;
 // Space below the last tab content row, added to the tab chrome's bottom inset.
 const CONTENT_BOTTOM_PADDING = 40;
+const CONTENT_GAP = 12;
 
 export function PracticePocScreen({
   platformCapabilities,
@@ -1029,13 +1034,13 @@ export function PracticePocScreen({
     sessionGuideVisible: state === null
       && sessionGuide?.plan.steps[sessionGuide.stepIndex] !== undefined
   });
-  const [tabContentInsets, setTabContentInsets] = useState<{
-    bottom: number;
-    left: number;
-    right: number;
-    top: number;
-  } | null>(null);
+  const [tabContentInsets, setTabContentInsets] = useState<TabContentInsets | null>(null);
   const layoutInsets = topLevelChromeVisible && tabContentInsets ? tabContentInsets : insets;
+  // Only the native iPad top tab bar is a floating overlay. Other nested safe
+  // areas may differ from the root window too, so rely on the host's explicit
+  // chrome signal rather than comparing inset values.
+  const iPadTopTabBarOverlayVisible = topLevelChromeVisible
+    && tabContentInsets?.topTabBarOverlay === true;
   const adaptiveLayout = useMemo(
     () => {
       const layout = buildPracticeAdaptiveLayout({ fontScale, height, insets: layoutInsets, width });
@@ -4240,6 +4245,11 @@ export function PracticePocScreen({
   const practiceSubPageVisible = tab === "practice"
     && (tacticalProfileFlowVisible || practiceRunEditorVisible || customSprintSetupVisible);
   const appHeaderVisible = appChromeVisible && !contentOwnsHeader && !practiceSubPageVisible;
+  // Practice home is one scrolling page on every platform, so its large title
+  // travels with the page. Other app-shell headers keep their existing
+  // placement unless the native iPad tab bar overlays the whole tab surface.
+  const practiceHeaderScrolls = appHeaderVisible && tab === "practice";
+  const appHeaderScrolls = iPadTopTabBarOverlayVisible || practiceHeaderScrolls;
   // Stockfish diagnostics (dev only) open from Settings, so they keep the
   // Settings tab selected.
   const hostTab: TopLevelTab = tab === "analysis" ? "settings" : tab;
@@ -4724,6 +4734,36 @@ export function PracticePocScreen({
     service
   });
 
+  const appShellHeader = appHeaderVisible ? (
+    <View
+      accessibilityLabel={screenSubtitle ? `${screenTitle}, ${screenSubtitle}` : screenTitle}
+      style={[
+        styles.header,
+        iPadTopTabBarOverlayVisible
+          ? styles.headerInTopTabScroll
+          : practiceHeaderScrolls ? styles.headerInMainScroll : null,
+        adaptiveLayout.usesWideContent && !sessionLayoutUsesRail && !appHeaderScrolls
+          ? styles.contentWide
+          : null
+      ]}
+      testID="app-shell-header"
+    >
+      <View>
+        <Text
+          maxFontSizeMultiplier={tab === "practice" || tab === "settings" ? LARGE_TITLE_MAX_FONT_SCALE : undefined}
+          style={[styles.title, tab === "practice" || tab === "settings" ? styles.titleLarge : null]}
+        >
+          {screenTitle}
+        </Text>
+      </View>
+      {simulationProfile?.active ? (
+        <Text style={styles.simulationBadge} testID="simulation-profile-indicator">
+          Simulation data
+        </Text>
+      ) : null}
+    </View>
+  ) : null;
+
   const appShell = (
       <View
         testID="safe-area-shell"
@@ -4735,7 +4775,7 @@ export function PracticePocScreen({
             paddingBottom: appChromeVisible && Platform.OS === "ios" ? 0 : layoutInsets.bottom,
             paddingLeft: layoutInsets.left,
             paddingRight: layoutInsets.right,
-            paddingTop: layoutInsets.top
+            paddingTop: iPadTopTabBarOverlayVisible ? 0 : layoutInsets.top
           },
           mobileBackPreview
             ? {
@@ -4842,30 +4882,7 @@ export function PracticePocScreen({
             />
           ) : (
           <>
-          {appHeaderVisible ? (
-            <View
-              accessibilityLabel={screenSubtitle ? `${screenTitle}, ${screenSubtitle}` : screenTitle}
-              style={[
-                styles.header,
-                adaptiveLayout.usesWideContent && !sessionLayoutUsesRail ? styles.contentWide : null
-              ]}
-              testID="app-shell-header"
-            >
-              <View>
-                <Text
-                  maxFontSizeMultiplier={tab === "practice" || tab === "settings" ? LARGE_TITLE_MAX_FONT_SCALE : undefined}
-                  style={[styles.title, tab === "practice" || tab === "settings" ? styles.titleLarge : null]}
-                >
-                  {screenTitle}
-                </Text>
-              </View>
-              {simulationProfile?.active ? (
-                <Text style={styles.simulationBadge} testID="simulation-profile-indicator">
-                  Simulation data
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
+          {!appHeaderScrolls ? appShellHeader : null}
 
           <LegacyScrollView
             ref={setPracticeMainScrollRef}
@@ -4901,9 +4918,15 @@ export function PracticePocScreen({
               sessionLayoutUsesRail ? styles.contentSessionRail : null,
               sessionLayoutUsesRail && adaptiveLayout.sessionCentersRow
                 ? styles.contentSessionRailCentered
-                : null
+                : null,
+              // On iPad the native top tab bar floats over the full tab
+              // screen. Start the scroll content below it, while leaving the
+              // scroll view itself at the top so the large page title and the
+              // rest of the page can travel behind the glass.
+              iPadTopTabBarOverlayVisible ? { paddingTop: layoutInsets.top } : null
             ]}
           >
+            {appHeaderScrolls ? appShellHeader : null}
             {reviewReminderPermissionPromptVisible ? (
               <ReviewReminderPermissionPrompt
                 onDismiss={dismissReviewReminderPermissionPrompt}
@@ -6047,13 +6070,28 @@ const useStyles = makeStyles((theme) => ({
     paddingTop: 12,
     paddingBottom: 10
   },
+  // `styles.content` supplies the page gutter and inter-item gap. Cancel the
+  // horizontal gutter for the header, then preserve the old 16-point distance
+  // between the header and the first content item.
+  headerInTopTabScroll: {
+    marginBottom: UI_PADDING - CONTENT_GAP,
+    marginHorizontal: -UI_PADDING
+  },
+  // The scrolling content already starts with the normal page gutter. Remove
+  // that first gutter before laying out the Practice title so its initial
+  // position remains unchanged while it becomes part of the main scroll view.
+  headerInMainScroll: {
+    marginBottom: UI_PADDING - CONTENT_GAP,
+    marginHorizontal: -UI_PADDING,
+    marginTop: -UI_PADDING
+  },
   title: {
     color: theme.colors.text.ink,
     fontSize: 22,
     fontWeight: "700"
   },
   content: {
-    gap: 12,
+    gap: CONTENT_GAP,
     padding: UI_PADDING,
     paddingBottom: 40
   },
