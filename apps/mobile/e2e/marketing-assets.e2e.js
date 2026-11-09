@@ -220,11 +220,10 @@ async function prepareFrame(frame) {
       return;
     case 'survival':
       await waitFor(element(by.id('personal-best-hub'))).toExist().withTimeout(30000);
-      // The initial reachable Survival hub places Start at y=988..1038 on
-      // this 62..922 capture viewport. This public scroll moves it to
-      // y=863..913 while retaining the required type selector in-frame.
+      // Clear Start and the trailing title glyph together on the calibrated
+      // iPhone viewport; the type selector and full disclosure remain visible.
       if (target.deviceFamily === 'iphone') {
-        await element(by.id('practice-main-scroll')).scroll(125, 'down', 0.5, 0.5);
+        await element(by.id('practice-main-scroll')).scroll(136, 'down', 0.5, 0.5);
       }
       return;
     case 'review':
