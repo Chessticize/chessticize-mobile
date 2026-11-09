@@ -8392,6 +8392,7 @@ function PracticeRunEditor({
   const styles = useStyles();
   const appTheme = useTheme();
   const rowStyle = useListRowStyle();
+  const stackNameField = useEditorTextScale() >= STACKED_NAME_FIELD_TEXT_SCALE;
   const draft = presentation.draft;
   if (!draft) {
     return null;
@@ -8429,7 +8430,7 @@ function PracticeRunEditor({
   if (canEditName) {
     fieldRows.push(
       <View key="name" style={[rowStyle, styles.editorFieldStack]}>
-        <View style={styles.runNameRow} testID="practice-run-name-row">
+        <View style={[styles.runNameRow, stackNameField ? styles.runNameRowStacked : null]} testID="practice-run-name-row">
           <View style={styles.runNameCopy}>
             <AppText variant="body">Name</AppText>
             <AppText tone="secondary" variant="footnote">Required · unique</AppText>
@@ -8443,7 +8444,11 @@ function PracticeRunEditor({
             placeholder="e.g. Tactics Focus"
             placeholderTextColor={appTheme.colors.text.faint}
             returnKeyType="done"
-            style={[styles.runNameInput, presentation.nameError ? styles.editorInputError : null]}
+            style={[
+              styles.runNameInput,
+              stackNameField ? styles.runNameInputStacked : null,
+              presentation.nameError ? styles.editorInputError : null
+            ]}
             submitBehavior="blurAndSubmit"
             testID="practice-run-name-input"
             value={draft.name}
@@ -8739,11 +8744,20 @@ const STEPPER_HIT_SLOP = { bottom: 6, left: 4, right: 4, top: 6 };
 // text there, so four digits never clip inside a fixed-width field.
 const NUMERIC_FIELD_MAX_TEXT_SCALE = 1.5;
 
-function useNumericFieldScale(): number {
+// Above this text scale the Run name field moves below its label and spans the row.
+const STACKED_NAME_FIELD_TEXT_SCALE = 1.35;
+
+// The user's text scale: the system font scale on a device, or the theme's
+// scaled type roles in the Interaction Lab.
+function useEditorTextScale(): number {
   const appTheme = useTheme();
   const { fontScale } = useWindowDimensions();
   const themeScale = appTheme.typography.body.fontSize / baseTypography.body.fontSize;
-  return Math.min(NUMERIC_FIELD_MAX_TEXT_SCALE, Math.max(1, fontScale, themeScale));
+  return Math.max(1, fontScale, themeScale);
+}
+
+function useNumericFieldScale(): number {
+  return Math.min(NUMERIC_FIELD_MAX_TEXT_SCALE, useEditorTextScale());
 }
 
 function ArrowDuelReplyChallengeSetting({
@@ -18424,6 +18438,17 @@ const useStyles = makeStyles((theme) => ({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 16
+  },
+  runNameRowStacked: {
+    alignItems: "stretch",
+    flexDirection: "column",
+    gap: theme.spacing.inline
+  },
+  runNameInputStacked: {
+    flex: 0,
+    marginLeft: 0,
+    maxWidth: "100%",
+    minWidth: 0
   },
   runNameCopy: {
     flexShrink: 0,

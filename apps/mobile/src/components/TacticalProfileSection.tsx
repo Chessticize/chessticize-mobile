@@ -132,6 +132,8 @@ function TacticalProfileScreen({
     <View style={styles.flow} testID="tactical-profile-screen">
       <FlowTopBar
         backLabel="Back to Practice"
+        subtitle={taskFamilyLabel(activeTaskFamily)}
+        subtitleTestID="tactical-profile-active-mode"
         title="Tactical profile"
         onBack={() => presentation.onIntent({ type: "close-profile" })}
       />
@@ -144,9 +146,6 @@ function TacticalProfileScreen({
         />
       ) : null}
       <View style={styles.intro}>
-        <AppText style={styles.semibold} testID="tactical-profile-active-mode" tone="accent" variant="footnote">
-          {taskFamilyLabel(activeTaskFamily)}
-        </AppText>
         <AppText accessibilityRole="header" variant="title">
           {profileHeadingFor(presentation, familySignals)}
         </AppText>
@@ -418,15 +417,19 @@ function SignalRow({
   const rowStyle = useListRowStyle();
   return (
     <View style={[rowStyle, styles.textRow]} testID={`tactical-profile-signal-${signal.id}`}>
-      {rank ? (
-        <View style={styles.rankTile}>
-          <AppText numberOfLines={1} style={styles.semibold} tone="accent" variant="subheadline">{rank}</AppText>
-        </View>
-      ) : null}
       <View style={styles.signalCopy}>
-        <View style={styles.rowCopy}>
-          <AppText variant="headline">{signal.themeLabel}</AppText>
-          <AppText tone="secondary" variant="subheadline">{signal.priorityLabel}</AppText>
+        {/* The rank sits beside the name it ranks, centered on the name and
+            priority lines, rather than on the whole multi-line item. */}
+        <View style={styles.signalTitleRow}>
+          {rank ? (
+            <View style={styles.rankTile}>
+              <AppText numberOfLines={1} style={styles.semibold} tone="accent" variant="subheadline">{rank}</AppText>
+            </View>
+          ) : null}
+          <View style={styles.rowCopy}>
+            <AppText variant="headline">{signal.themeLabel}</AppText>
+            <AppText tone="secondary" variant="subheadline">{signal.priorityLabel}</AppText>
+          </View>
         </View>
         <SignalKindBadge kind={signal.kind} />
         <AppText variant="body">{signalSummary(signal)}</AppText>
@@ -536,10 +539,14 @@ function SignalKindBadge({
 // Back chevron and centered title, matching the other direction A sub-screens (#609).
 function FlowTopBar({
   backLabel,
+  subtitle,
+  subtitleTestID,
   title,
   onBack
 }: {
   backLabel: string;
+  subtitle?: string;
+  subtitleTestID?: string;
   title: string;
   onBack: () => void;
 }): React.JSX.Element {
@@ -557,7 +564,14 @@ function FlowTopBar({
       >
         <Icon color={theme.colors.accent.s600} name="chevronLeft" size={20} weight="semibold" />
       </Pressable>
-      <AppText accessibilityRole="header" style={styles.topBarTitle} variant="headline">{title}</AppText>
+      <View style={styles.topBarTitleBlock}>
+        <AppText accessibilityRole="header" style={styles.centeredText} variant="headline">{title}</AppText>
+        {subtitle ? (
+          <AppText style={styles.centeredText} testID={subtitleTestID} tone="secondary" variant="footnote">
+            {subtitle}
+          </AppText>
+        ) : null}
+      </View>
       <View style={styles.topBarButton} />
     </View>
   );
@@ -1042,9 +1056,9 @@ const useStyles = makeStyles((theme) => ({
     justifyContent: "center",
     width: theme.metrics.minTarget
   },
-  topBarTitle: {
+  topBarTitleBlock: {
     flex: 1,
-    textAlign: "center"
+    minWidth: 0
   },
   pressed: {
     backgroundColor: theme.colors.surfaceStrong
@@ -1093,6 +1107,11 @@ const useStyles = makeStyles((theme) => ({
     flexShrink: 1,
     gap: 6,
     minWidth: 0
+  },
+  signalTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: theme.spacing.row
   },
   rankTile: {
     alignItems: "center",
