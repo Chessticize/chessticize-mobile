@@ -677,7 +677,7 @@ async function assertRequiredFrameGeometry(frame) {
   }
 
   if (
-    frame.id === 'practice-home'
+    ['practice-home', 'tactical-profile', 'focused-run'].includes(frame.id)
     && device.getPlatform() === 'ios'
     && !isWideTabletTarget()
   ) {

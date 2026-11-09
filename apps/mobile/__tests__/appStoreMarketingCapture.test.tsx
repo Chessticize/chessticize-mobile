@@ -88,6 +88,10 @@ describe("App Store marketing capture fixture", () => {
         ])
       }
     });
+    expect(profile.practiceService.getTacticalProfileSnapshot(
+      appStoreMarketingCaptureStory().captureClock.instant
+    )?.evaluation.signals.map((signal) => ({ theme: signal.theme, status: signal.status })))
+      .toEqual([{ theme: "fork", status: "recommended" }]);
     expect(profile.fixture.tacticalProfilePresentation).toMatchObject({
       screen: "profile",
       assurance: "provisional"

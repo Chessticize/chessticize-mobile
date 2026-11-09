@@ -144,10 +144,13 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
 
     if (
       needsPortraitRestore
+      && onlyOrientation === undefined
       && device.getPlatform() !== 'android'
       && iosAppSupportsOrientation('portrait')
     ) {
-      // Leave the emulator in its natural orientation before the shell applies
+      // Orientation-specific captures retain their requested posture; Duo inner
+      // rotation is controlled by Device Hub. Otherwise leave the emulator
+      // in its natural orientation before the shell applies
       // the next profile's portrait-shaped size override. The landscape-only
       // iPad validation build cannot rotate back, so it skips this restore.
       await setAdaptiveOrientation('portrait');
