@@ -547,7 +547,7 @@ export function PersonalBestChallengeHub({
                 : "Recommended level"}
             rows
           >
-            <View style={rowStyle} testID="personal-best-reference-source">
+            <View style={[rowStyle, styles.sourceRow]} testID="personal-best-reference-source">
               <View style={styles.rowCopy}>
                 {sourceUnavailable ? (
                   <>
@@ -578,6 +578,7 @@ export function PersonalBestChallengeHub({
                   label="Use another Run"
                   size="compact"
                   testID="personal-best-use-another-run"
+                  style={styles.sourceChange}
                   variant="plain"
                   onPress={() => onSourcePickerVisibilityChange(true)}
                 />
@@ -1481,6 +1482,16 @@ const useStyles = makeStyles((theme) => ({
     alignItems: "stretch",
     flexDirection: "column",
     gap: theme.spacing.inline,
+    paddingVertical: 12
+  },
+  // The source copy keeps the full row width; "Use another Run" sits below it.
+  sourceChange: {
+    marginLeft: -14
+  },
+  sourceRow: {
+    alignItems: "stretch",
+    flexDirection: "column",
+    gap: 4,
     paddingVertical: 12
   },
   pressed: {
