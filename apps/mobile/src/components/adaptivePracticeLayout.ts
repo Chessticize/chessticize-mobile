@@ -59,19 +59,27 @@ const REGULAR_PORTRAIT_BOARD_MAX = 860;
 // default text size); the prompt height comes from this layout.
 // - status bar: close/pause row 53 + 8 gap + metrics 36
 // - board details: 3 + timing 18 + 3 + counts 46
-// - feedback: the taller of the Mark as unclear row (46) and the two-line
-//   previous-attempt notice (72.5), measured 283 points wide; these rows span
-//   the content width, which is at least that on supported phones
+// - feedback: the taller of the Mark as unclear row and the previous-attempt
+//   notice. The rows span the content width; at 343 points (iPhone SE) they
+//   are 46 and 58, and at 283 points the notice wraps to 72.5, which covers
+//   the 288-point column of a 320-point phone.
 export const COMPACT_PORTRAIT_SESSION_CHROME = {
   boardDetails: 70,
-  feedback: 73,
+  feedback: 58,
+  narrowColumnFeedback: 73,
+  narrowColumnWidth: 340,
   stackGap: 12,
   status: 97
 } as const;
 const REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT = 240;
 const HOME_COLUMNS_MIN_CONTENT_WIDTH = 650;
 
-function compactPortraitSessionChromeHeight(promptHeight: number): number {
+export function compactPortraitFeedbackHeight(columnWidth: number): number {
+  const chrome = COMPACT_PORTRAIT_SESSION_CHROME;
+  return columnWidth < chrome.narrowColumnWidth ? chrome.narrowColumnFeedback : chrome.feedback;
+}
+
+function compactPortraitSessionChromeHeight(promptHeight: number, columnWidth: number): number {
   const chrome = COMPACT_PORTRAIT_SESSION_CHROME;
   return chrome.status
     + chrome.stackGap
@@ -79,7 +87,7 @@ function compactPortraitSessionChromeHeight(promptHeight: number): number {
     + chrome.stackGap
     + chrome.boardDetails
     + chrome.stackGap
-    + chrome.feedback;
+    + compactPortraitFeedbackHeight(columnWidth);
 }
 
 // Top-level navigation chrome is drawn by the native tab host (#612). Its space
@@ -142,7 +150,7 @@ export function buildPracticeAdaptiveLayout({
     }
     const reservedControlsHeight = isRegularWidth
       ? REGULAR_PORTRAIT_RESERVED_CONTROLS_HEIGHT
-      : compactPortraitSessionChromeHeight(compactPortraitPromptHeight);
+      : compactPortraitSessionChromeHeight(compactPortraitPromptHeight, compactPortraitColumnWidth);
     return Math.max(
       0,
       contentHeight - PRACTICE_UI_PADDING * 2 - reservedControlsHeight - largeTextReservedHeight

@@ -1,6 +1,7 @@
 import {
   buildPracticeAdaptiveLayout,
   COMPACT_PORTRAIT_SESSION_CHROME,
+  compactPortraitFeedbackHeight,
   PRACTICE_UI_PADDING,
   type PracticeSafeAreaInsets
 } from "../src/components/adaptivePracticeLayout";
@@ -54,8 +55,8 @@ describe("buildPracticeAdaptiveLayout", () => {
 
     expect(layout.className).toBe("compactPortrait");
     // 683 safe height - 32 padding - measured chrome (97 + 12 + 96 + 12 + 70
-    // + 12 + 73); the prompt and feedback rows span the 379-point content.
-    expect(layout.boardSize).toBe(279);
+    // + 12 + 58); the prompt and feedback rows span the 379-point content.
+    expect(layout.boardSize).toBe(294);
     expect(layout.sessionColumnWidth).toBe(379);
   });
 
@@ -63,9 +64,9 @@ describe("buildPracticeAdaptiveLayout", () => {
   // board details and the post-answer feedback row with the scroll locked, so
   // their measured heights must fit the safe height without scrolling (#639).
   it.each([
-    { label: "iPhone SE (3rd generation)", width: 375, height: 667, insets: { top: 20, right: 0, bottom: 0, left: 0 }, board: 243 },
-    { label: "iPhone Duo outer display", width: 466, height: 678, insets: { top: 0, right: 84, bottom: 34, left: 0 }, board: 240 },
-    { label: "iPhone 16", width: 393, height: 852, insets: { top: 59, right: 0, bottom: 34, left: 0 }, board: 355 },
+    { label: "iPhone SE (3rd generation)", width: 375, height: 667, insets: { top: 20, right: 0, bottom: 0, left: 0 }, board: 258 },
+    { label: "iPhone Duo outer display", width: 466, height: 678, insets: { top: 0, right: 84, bottom: 34, left: 0 }, board: 255 },
+    { label: "iPhone 16", width: 393, height: 852, insets: { top: 59, right: 0, bottom: 34, left: 0 }, board: 361 },
     { label: "iPhone 17", width: 402, height: 874, insets: { top: 62, right: 0, bottom: 34, left: 0 }, board: 370 },
     { label: "iPhone 17 Pro Max", width: 440, height: 956, insets: { top: 62, right: 0, bottom: 34, left: 0 }, board: 408 }
   ])("fits the whole live session on $label without scrolling", ({ board, height, insets, width }) => {
@@ -79,7 +80,7 @@ describe("buildPracticeAdaptiveLayout", () => {
       + layout.boardSize
       + chrome.boardDetails
       + chrome.stackGap
-      + chrome.feedback
+      + compactPortraitFeedbackHeight(layout.sessionColumnWidth)
       + PRACTICE_UI_PADDING;
 
     expect(layout.className).toBe("compactPortrait");
@@ -289,7 +290,7 @@ describe("buildPracticeAdaptiveLayout", () => {
       width: 466,
       height: 678,
       insets: { top: 0, right: 84, bottom: 34, left: 0 },
-      expected: { className: "compactPortrait", board: 240, rail: false }
+      expected: { className: "compactPortrait", board: 255, rail: false }
     },
     {
       label: "iPad Pro 13-inch portrait",
