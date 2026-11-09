@@ -61,6 +61,7 @@ describeAdaptiveLayout('Adaptive layout screenshot capture', () => {
     const puzzleID = await elementText('session-current-puzzle-id');
     await captureSprint(initialOrientation);
     await expectSessionControlsContained(initialOrientation);
+    await expectAbandonConfirmationFloats(initialOrientation);
     await expectRegularLandscapeSessionCentered(initialOrientation);
 
     if (includeLandscape && initialOrientation === 'portrait') {
@@ -311,6 +312,40 @@ async function expectRegularLandscapeSessionCentered(orientation) {
       + `above=${railAbove} below=${railBelow}`
     );
   }
+}
+
+// The abandon confirmation floats over the prompt below the HUD instead of
+// growing the session stack, so opening it must not move the board or the
+// counts, and its own actions must stay on screen at every width.
+async function expectAbandonConfirmationFloats(orientation) {
+  const screenFrame = await frameFor(element(by.id('adaptive-layout')));
+  const boardBefore = await frameFor(element(by.id('session-board')));
+  const countsBefore = await frameFor(element(by.id('session-score-strip')));
+  await element(by.id('session-abandon')).tap();
+  await waitFor(element(by.id('session-abandon-confirmation'))).toExist().withTimeout(10000);
+  for (const testID of ['session-abandon-confirmation', 'session-abandon-cancel', 'session-abandon-confirm']) {
+    expectFrameContained(
+      await frameFor(element(by.id(testID))),
+      screenFrame,
+      `${deviceLabel} ${orientation} ${testID}`
+    );
+  }
+  const boardOpen = await frameFor(element(by.id('session-board')));
+  const countsOpen = await frameFor(element(by.id('session-score-strip')));
+  for (const [label, before, open] of [
+    ['session board', boardBefore, boardOpen],
+    ['session counts', countsBefore, countsOpen]
+  ]) {
+    if (Math.abs(before.y - open.y) > 1 || Math.abs(before.x - open.x) > 1) {
+      throw new Error(
+        `${deviceLabel} ${orientation} ${label} moved when the abandon confirmation opened: `
+        + `${JSON.stringify(before)} -> ${JSON.stringify(open)}`
+      );
+    }
+  }
+  await takeAdaptiveScreenshot(`${deviceLabel}-${orientation}-abandon-confirmation`);
+  await element(by.id('session-abandon-cancel')).tap();
+  await waitFor(element(by.id('session-abandon-confirmation'))).not.toExist().withTimeout(10000);
 }
 
 async function existsNow(testID) {

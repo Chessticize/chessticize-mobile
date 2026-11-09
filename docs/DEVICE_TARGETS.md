@@ -91,7 +91,10 @@ landscape session is reviewed.
 Regular landscape sessions (iPad, Duo inner display) size the board to the
 largest square the Safe Area height and the width beside the rail allow, up to
 640 points, and centre the board and the rail's content block vertically.
-Compact layouts keep their top-aligned session.
+Review, Replay and History replays use the same centred row. Compact layouts
+keep their top-aligned session. The abandon and Survival leave confirmations
+float over the prompt card below the HUD instead of growing the session stack,
+so the board and counts never move into the bottom inset at any width.
 
 The full-screen iPhone portrait lock stays. It no longer constrains the inner
 display, which follows the scene size, and lifting it would also rotate every

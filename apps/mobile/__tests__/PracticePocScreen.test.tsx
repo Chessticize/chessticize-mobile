@@ -6576,6 +6576,86 @@ describe("PracticePocScreen", () => {
     }
   });
 
+  it.each([
+    { label: "Duo inner landscape", width: 951, height: 669, insets: { top: 0, right: 84, bottom: 20, left: 0 }, centered: true },
+    { label: "iPad landscape", width: 1180, height: 820, insets: { top: 0, right: 0, bottom: 20, left: 0 }, centered: true },
+    { label: "iPad Pro 13-inch landscape", width: 1376, height: 1032, insets: { top: 10, right: 0, bottom: 20, left: 0 }, centered: true },
+    { label: "phone landscape", width: 874, height: 402, insets: { top: 0, right: 62, bottom: 21, left: 62 }, centered: false }
+  ])("centres the $label Review row only in regular landscape", ({ centered, height, insets, width }) => {
+    setPracticeViewport({ width, height, scale: 3, insets });
+    const layout = buildPracticeAdaptiveLayout({ fontScale: 1, height, insets, width });
+    const renderer = renderScreen({
+      currentTimeMs: () => Date.parse("2026-06-20T12:00:00.000Z"),
+      practiceService: createDueReviewService(1)
+    });
+    press(renderer, "review-tab");
+    press(renderer, "review-start-due");
+
+    expect(findByTestId(renderer, "review-session-adaptive-layout")).toBeTruthy();
+    const panel = flattenTestStyle(findByTestId(renderer, "review-session").props.style);
+    const rail = flattenTestStyle(
+      findByTestId(renderer, "review-session-control-rail-content").props.style
+    );
+    if (centered) {
+      // The panel spans the content height between the padding and centres
+      // its only in-flow child, the board and rail row.
+      expect(panel).toEqual(expect.objectContaining({
+        justifyContent: "center",
+        minHeight: layout.contentHeight - 32
+      }));
+      expect(rail.justifyContent).toBe("center");
+      // The packed row (1125 points on the 13-inch iPad) is not squeezed into
+      // the 1120-point wide-content cap.
+      expect(flattenTestStyle(
+        findByTestId(renderer, "practice-main-scroll").props.contentContainerStyle
+      ).maxWidth).toBeUndefined();
+    } else {
+      expect(panel.justifyContent).toBeUndefined();
+      expect(panel.minHeight).toBeUndefined();
+      expect(rail.justifyContent).toBeUndefined();
+    }
+  });
+
+  it.each([
+    { label: "Duo Split View third", width: 317, height: 669, insets: { top: 24, right: 0, bottom: 20, left: 0 }, stacked: true },
+    { label: "iPhone SE", width: 375, height: 667, insets: { top: 20, right: 0, bottom: 0, left: 0 }, stacked: false },
+    { label: "iPad landscape", width: 1180, height: 820, insets: { top: 0, right: 0, bottom: 20, left: 0 }, stacked: false },
+    { label: "phone landscape", width: 874, height: 402, insets: { top: 0, right: 62, bottom: 21, left: 62 }, stacked: true }
+  ])("floats the abandon confirmation over the prompt without growing the $label session", ({ height, insets, stacked, width }) => {
+    setPracticeViewport({ width, height, scale: 3, insets });
+    const renderer = renderScreen({ practiceService: createMobilePracticeService("familiar15") });
+    startStandardSprint(renderer);
+
+    press(renderer, "session-abandon");
+
+    const confirmation = findByTestId(renderer, "session-abandon-confirmation");
+    // Out of flow: it is anchored below the HUD it belongs to and drawn above
+    // the prompt, board and counts that follow, so none of them move.
+    expect(flattenTestStyle(confirmation.props.style)).toEqual(expect.objectContaining({
+      left: 0,
+      // It fills the prompt card's slot rather than half-covering the card.
+      minHeight: buildPracticeAdaptiveLayout({ fontScale: 1, height, insets, width }).promptFrameHeight + 4,
+      position: "absolute",
+      right: 0,
+      top: "100%"
+    }));
+    expect(flattenTestStyle(findByTestId(renderer, "active-session-shell").props.style).zIndex)
+      .toBeGreaterThan(0);
+    // In a column or rail under 320 points the copy sits above the buttons
+    // instead of wrapping to a word per line beside them.
+    expect(flattenTestStyle(confirmation.props.style).flexDirection).toBe(stacked ? "column" : "row");
+    // The covered prompt card leaves the accessibility tree while covered.
+    expect(findByTestId(renderer, "practice-prompt-stack").props.accessibilityElementsHidden).toBe(true);
+    expect(findByTestId(renderer, "session-abandon-cancel")).toBeTruthy();
+    expect(findByTestId(renderer, "session-abandon-confirm")).toBeTruthy();
+
+    press(renderer, "session-abandon-cancel");
+    expect(() => findByTestId(renderer, "session-abandon-confirmation")).toThrow();
+    expect(flattenTestStyle(findByTestId(renderer, "active-session-shell").props.style).zIndex)
+      .toBeUndefined();
+    expect(findByTestId(renderer, "practice-prompt-stack").props.accessibilityElementsHidden).toBe(false);
+  });
+
   it("keeps Home in two columns inside the maintained phone landscape Safe Area", () => {
     setPracticeViewport({
       width: 874,
